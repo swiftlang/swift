@@ -215,7 +215,11 @@ TypeRepr *CloneVisitor::visitProtocolTypeRepr(ProtocolTypeRepr *T) {
 }
 
 TypeRepr *CloneVisitor::visitInOutTypeRepr(InOutTypeRepr *T) {
-  return new (Ctx) InOutTypeRepr(visit(T->getBase()), T->getInOutLoc());
+  return new (Ctx) InOutTypeRepr(visit(T->getBase()), T->getSpecifierLoc());
+}
+
+TypeRepr *CloneVisitor::visitSharedTypeRepr(SharedTypeRepr *T) {
+  return new (Ctx) SharedTypeRepr(visit(T->getBase()), T->getSpecifierLoc());
 }
 
 TypeRepr *CloneVisitor::visitFixedTypeRepr(FixedTypeRepr *T) {
@@ -534,9 +538,14 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
 }
 
 
-void InOutTypeRepr::printImpl(ASTPrinter &Printer,
-                              const PrintOptions &Opts) const {
-  Printer.printKeyword("inout");
+void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
+                                  const PrintOptions &Opts) const {
+  if (getKind() == TypeReprKind::InOut) {
+    Printer.printKeyword("inout");
+  } else {
+    assert((getKind() == TypeReprKind::Shared) && "Unknown kind");
+    Printer.printKeyword("shared");
+  }
   Printer << " ";
   printTypeRepr(Base, Printer, Opts);
 }

@@ -463,7 +463,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         ApplySubs.insert(ApplySubs.end(), PAISubs.begin(), PAISubs.end());
       }
 
-      SILOpenedArchetypesTracker OpenedArchetypesTracker(*F);
+      SILOpenedArchetypesTracker OpenedArchetypesTracker(F);
       F->getModule().registerDeleteNotificationHandler(
           &OpenedArchetypesTracker);
       // The callee only needs to know about opened archetypes used in

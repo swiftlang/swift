@@ -20,6 +20,7 @@
 
 #include "swift/AST/LinkLibrary.h"
 #include "swift/Basic/Sanitizers.h"
+#include "swift/Basic/OptionSet.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
 #include "llvm/Transforms/Instrumentation.h"
@@ -96,8 +97,11 @@ public:
   /// Whether or not to run optimization passes.
   unsigned Optimize : 1;
 
+  /// Whether or not to optimize for code size.
+  unsigned OptimizeForSize : 1;
+
   /// Which sanitizer is turned on.
-  SanitizerKind Sanitize : 2;
+  OptionSet<SanitizerKind> Sanitizers;
 
   /// Whether we should emit debug info.
   IRGenDebugInfoKind DebugInfoKind : 2;
@@ -172,7 +176,8 @@ public:
 
   IRGenOptions()
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
-        Verify(true), Optimize(false), Sanitize(SanitizerKind::None),
+        Verify(true), Optimize(false), OptimizeForSize(false),
+        Sanitizers(OptionSet<SanitizerKind>()),
         DebugInfoKind(IRGenDebugInfoKind::None), UseJIT(false),
         DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
         DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
@@ -196,6 +201,7 @@ public:
   unsigned getLLVMCodeGenOptionsHash() {
     unsigned Hash = 0;
     Hash = (Hash << 1) | Optimize;
+    Hash = (Hash << 1) | OptimizeForSize;
     Hash = (Hash << 1) | DisableLLVMOptzns;
     Hash = (Hash << 1) | DisableLLVMARCOpts;
     return Hash;

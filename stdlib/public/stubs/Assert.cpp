@@ -21,7 +21,7 @@
 
 using namespace swift;
 
-bool swift::_swift_reportFatalErrorsToDebugger = false;
+bool swift::_swift_reportFatalErrorsToDebugger = true;
 
 static int swift_asprintf(char **strp, const char *fmt, ...) {
   va_list args;
@@ -118,7 +118,7 @@ void swift::_swift_stdlib_reportUnimplementedInitializerInFile(
   char *log;
   swift_asprintf(
       &log,
-      "%.*s: %" PRIu32 ": %" PRIu32 ": fatal error: use of unimplemented "
+      "%.*s: %" PRIu32 ": %" PRIu32 ": Fatal error: Use of unimplemented "
       "initializer '%.*s' for class '%.*s'\n",
       fileLength, file,
       line, column,
@@ -137,7 +137,7 @@ void swift::_swift_stdlib_reportUnimplementedInitializer(
   char *log;
   swift_asprintf(
       &log,
-      "fatal error: use of unimplemented "
+      "Fatal error: Use of unimplemented "
       "initializer '%.*s' for class '%.*s'\n",
       initNameLength, initName,
       classNameLength, className);

@@ -264,4 +264,16 @@ BOOL identityOfData(NSData *data) {
 
 @end
 
+@implementation NumberBridgingTester
 
+- (BOOL)verifyKeysInRange:(NSRange)range existInDictionary:(NSDictionary *)dictionary {
+    for (NSUInteger i = 0; i < range.length; i += 1) {
+        if (!dictionary[@(range.location + i)]) {
+            return NO;
+        }
+    }
+
+    return YES;
+}
+
+@end

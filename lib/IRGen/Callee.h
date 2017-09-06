@@ -21,13 +21,8 @@
 #include <type_traits>
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/SIL/SILType.h"
-#include "Explosion.h"
 #include "IRGen.h"
 #include "Signature.h"
-
-namespace llvm {
-  class PointerType;
-}
 
 namespace swift {
   class Substitution;
@@ -87,6 +82,12 @@ namespace irgen {
                                              llvm::Value *fnPtr,
                                              CanSILFunctionType fnType);
 
+    /// Is this function pointer completely constant?  That is, can it
+    /// be safely moved to a different function context?
+    bool isConstant() const {
+      return (isa<llvm::Constant>(Value));
+    }
+
     /// Return the actual function pointer.
     llvm::Value *getPointer() const { return Value; }
 
@@ -109,10 +110,10 @@ namespace irgen {
       return Sig.getCallingConv();
     }
 
-    llvm::AttributeSet getAttributes() const {
+    llvm::AttributeList getAttributes() const {
       return Sig.getAttributes();
     }
-    llvm::AttributeSet &getMutableAttributes() & {
+    llvm::AttributeList &getMutableAttributes() & {
       return Sig.getMutableAttributes();
     }
 
@@ -167,10 +168,10 @@ namespace irgen {
       return Fn.getFunctionType();
     }
 
-    llvm::AttributeSet getAttributes() const {
+    llvm::AttributeList getAttributes() const {
       return Fn.getAttributes();
     }
-    llvm::AttributeSet &getMutableAttributes() & {
+    llvm::AttributeList &getMutableAttributes() & {
       return Fn.getMutableAttributes();
     }
 

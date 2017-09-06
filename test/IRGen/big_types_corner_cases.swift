@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-large-loadable-types %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// UNSUPPORTED: resilient_stdlib
 
 public struct BigStruct {
   var i0 : Int32 = 0
@@ -32,6 +33,15 @@ class OptionalInoutFuncType {
     handler?(p, error)
   }
 }
+
+// CHECK-LABEL: define{{( protected)?}} i32 @main(i32, i8**) #0 {
+// CHECK: call void @llvm.lifetime.start
+// CHECK: call void @llvm.memcpy
+// CHECK: call void @llvm.lifetime.end
+// CHECK: ret i32 0
+let bigStructGlobalArray : [BigStruct] = [
+  BigStruct()
+]
 
 // CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases21OptionalInoutFuncTypeC7executeys5Error_pSgFyycfU_(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases21OptionalInoutFuncTypeC*, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIxcx_Sg* nocapture dereferenceable({{.*}})
 // CHECK: call void @_T0SqWy
@@ -129,10 +139,69 @@ public func enumCallee(_ x: LargeEnum) {
     case .Empty2: break
   }
 }
-// CHECK-LABEL-64: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10enumCalleeyAA9LargeEnumOF(%T22big_types_corner_cases9LargeEnumO* noalias nocapture dereferenceable(34)) #0 {
+// CHECK-LABEL-64: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10enumCalleeyAA9LargeEnumOF(%T22big_types_corner_cases9LargeEnumO* noalias nocapture dereferenceable({{.*}})) #0 {
 // CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO05InnerF0O
 // CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO
 // CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
 // CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
-// CHECK-64: call %swift.type* @_T0ypMa()
+// CHECK-64: _T0s5printySayypGd_SS9separatorSS10terminatortF
 // CHECK-64: ret void
+
+// CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, %T22big_types_corner_cases8SuperSubC*) #0 {
+// CHECK-64: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK-64: [[ALLOC4:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK-64: call swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_AFyKXKfu_TA(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture swifterror %swifterror)
+// CHECK: ret void
+class SuperBase {
+  func boom() -> BigStruct {
+    return BigStruct()
+  }
+}
+
+class SuperSub : SuperBase {
+  override func boom() -> BigStruct {
+    return BigStruct()
+  }
+  func f() {
+    let _ = {
+      nil ?? super.boom()
+    }
+  }
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10MUseStructV16superclassMirrorAA03BigF0VSgfg(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret, %T22big_types_corner_cases10MUseStructV* noalias nocapture swiftself dereferenceable({{.*}})) #0 {
+// CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK: [[LOAD:%.*]] = load %swift.refcounted*, %swift.refcounted** %.callInternalLet.data
+// CHECK: call swiftcc void %6(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret [[ALLOC]], %swift.refcounted* swiftself [[LOAD]])
+// CHECK: ret void
+public struct MUseStruct {
+  var x = BigStruct()
+  public var superclassMirror: BigStruct? {
+    return callInternalLet()
+  }
+
+  internal let callInternalLet: () -> BigStruct?
+}
+
+// CHECK-LABEL-64: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases18stringAndSubstringSS_s0G0VtyF(<{ %TSS, %Ts9SubstringV }>* noalias nocapture sret) #0 {
+// CHECK-LABEL-32: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases18stringAndSubstringSS_s0G0VtyF(<{ %TSS, [4 x i8], %Ts9SubstringV }>* noalias nocapture sret) #0 {
+// CHECK: alloca %Ts9SubstringV
+// CHECK: alloca %Ts9SubstringV
+// CHECK: ret void
+public func stringAndSubstring() -> (String, Substring) {
+  let s = "Hello, World"
+  let a = Substring(s).dropFirst()
+  return (s, a)
+}
+
+func bigStructGet() -> BigStruct {
+  return BigStruct()
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases11testGetFuncyyF() #0 {
+// CHECK: ret void
+public func testGetFunc() {
+  let testGetPtr: @convention(thin) () -> BigStruct = bigStructGet
+}

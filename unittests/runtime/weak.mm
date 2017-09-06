@@ -877,7 +877,7 @@ TEST(WeakTest, objc_unowned_isEqual_DeathTest) {
   // Deinit the assigned objects, invalidating ref1 and ref2
   swift_release(swift1);
   ASSERT_DEATH(swift_unownedCheck(swift1),
-               "attempted to read an unowned reference");
+               "Attempted to read an unowned reference");
   ASSERT_EQ(0U, DestroyedObjCCount);
   swift_unknownRelease(objc1);
   ASSERT_EQ(1U, DestroyedObjCCount);
@@ -886,10 +886,10 @@ TEST(WeakTest, objc_unowned_isEqual_DeathTest) {
   // Equal but invalidated does abort (Swift)
   // Formerly equal but now invalidated returns unequal (ObjC)
   ASSERT_DEATH(swift_unownedIsEqual(&ref1, swift1),
-               "attempted to read an unowned reference");
+               "Attempted to read an unowned reference");
   ASSERT_EQ(false, swift_unownedIsEqual(&ref1, swift2));
   ASSERT_DEATH(swift_unknownUnownedIsEqual(&ref1, swift1),
-               "attempted to read an unowned reference");
+               "Attempted to read an unowned reference");
   ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref1, swift2));
   ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref1, objc1));
   ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref1, objc2));

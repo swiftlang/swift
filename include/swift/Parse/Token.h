@@ -178,8 +178,11 @@ public:
     if (is(tok::identifier) || isEscapedIdentifier() || is(tok::kw__))
       return true;
 
-    // 'let', 'var', and 'inout' cannot be argument labels.
-    if (isAny(tok::kw_let, tok::kw_var, tok::kw_inout)) return false;
+    // 'let', 'var', 'inout', '__shared', and '__owned'
+    // cannot be argument labels.
+    if (isAny(tok::kw_let, tok::kw_var, tok::kw_inout,
+              tok::kw___owned, tok::kw___shared))
+      return false;
 
     // All other keywords can be argument labels.
     return isKeyword();

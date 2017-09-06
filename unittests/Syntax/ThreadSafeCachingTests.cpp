@@ -1,6 +1,4 @@
-#include "swift/Syntax/ExprSyntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/StmtSyntax.h"
 #include "llvm/ADT/SmallString.h"
 #include "gtest/gtest.h"
 
@@ -82,14 +80,14 @@ public:
 // - Both threads get the exact same child (by identity)
 TEST(ThreadSafeCachingTests, ReturnGetExpression) {
   auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
-  auto Minus = SyntaxFactory::makePrefixOperator("-", {});
-  auto One = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
+  auto Minus = SyntaxFactory::makePrefixOperator("-", {}, {});
+  auto One = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, One);
 
   Pool P;
 
   for (unsigned i = 0; i < 10000; ++i) {
-    auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne);
+    auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne, None);
 
     auto Future1 = P.run(getExpressionFrom, Return);
     auto Future2 = P.run(getExpressionFrom, Return);

@@ -1181,13 +1181,16 @@ private:
       // DW_TAG_reference_type types, but LLDB can deal better with
       // pointer-sized struct that has the appropriate mangled name.
       auto ObjectTy = BaseTy->castTo<InOutType>()->getObjectType();
+      auto Name = MangledName;
+      if (auto *Decl = ObjectTy->getAnyNominal())
+        Name = Decl->getName().str();
       if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes) {
         auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
-        return createPointerSizedStruct(Scope, MangledName, DT, File, 0, Flags,
+        return createPointerSizedStruct(Scope, Name, DT, File, 0, Flags,
                                         MangledName);
       } else
-        return createOpaqueStruct(Scope, MangledName, File, 0, SizeInBits,
-                                  AlignInBits, Flags, MangledName);
+        return createOpaqueStruct(Scope, Name, File, 0, SizeInBits, AlignInBits,
+                                  Flags, MangledName);
     }
 
     case TypeKind::Archetype: {
@@ -1518,7 +1521,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   llvm::sys::path::remove_filename(AbsMainFile);
   MainModule = getOrCreateModule(IGM.getSwiftModule(), TheCU, Opts.ModuleName,
                                  AbsMainFile);
-  DBuilder.createImportedModule(MainFile, MainModule, 1);
+  DBuilder.createImportedModule(MainFile, MainModule, MainFile, 0);
 
   // Macro definitions that were defined by the user with "-Xcc -D" on the
   // command line. This does not include any macros defined by ClangImporter.
@@ -1549,7 +1552,8 @@ void IRGenDebugInfoImpl::finalize() {
                                            ModuleDecl::ImportFilter::All);
   for (auto M : ModuleWideImports)
     if (!ImportedModules.count(M.second))
-      DBuilder.createImportedModule(MainFile, getOrCreateModule(M), 0);
+      DBuilder.createImportedModule(MainFile, getOrCreateModule(M), MainFile,
+                                    0);
 
   // Finalize all replaceable forward declarations.
   for (auto &Ty : ReplaceMap) {
@@ -1720,7 +1724,8 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
   ModuleDecl::ImportedModule Imported = {D->getModulePath(), M};
   auto DIMod = getOrCreateModule(Imported);
   auto L = getDebugLoc(*this, D);
-  DBuilder.createImportedModule(getOrCreateFile(L.Filename), DIMod, L.Line);
+  auto *File = getOrCreateFile(L.Filename);
+  DBuilder.createImportedModule(File, DIMod, File, L.Line);
   ImportedModules.insert(Imported.second);
 }
 
@@ -2005,13 +2010,13 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     while (InsPt != E && isa<llvm::PHINode>(&*InsPt))
       ++InsPt;
     if (InsPt != E) {
-      DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, &*InsPt);
+      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, &*InsPt);
       return;
     }
   }
 
   // Otherwise just insert it at the current insertion point.
-  DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
+  DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(

@@ -326,7 +326,7 @@ func runTestArrayShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   for _ in 0 ..< N {
     for _ in 0 ..< 5_000 {
       for i in 0 ..< existentialArray.count-1 {
-        swap(&existentialArray[i], &existentialArray[i+1])
+        existentialArray.swapAt(i, i+1)
       }
     }
   }

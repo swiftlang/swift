@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle %s -emit-silgen -enable-sil-ownership | %FileCheck %s
 
 protocol P {
   associatedtype Assoc1

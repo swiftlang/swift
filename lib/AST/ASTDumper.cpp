@@ -46,7 +46,7 @@ static const TerminalColor NAME##Color = { llvm::raw_ostream::COLOR, BOLD };
 
 DEF_COLOR(Func, YELLOW, false)
 DEF_COLOR(Range, YELLOW, false)
-DEF_COLOR(Accessibility, YELLOW, false)
+DEF_COLOR(AccessLevel, YELLOW, false)
 DEF_COLOR(ASTNode, YELLOW, true)
 DEF_COLOR(Parameter, YELLOW, false)
 DEF_COLOR(Extension, MAGENTA, false)
@@ -250,16 +250,16 @@ static StringRef getImportKindString(ImportKind value) {
   
   llvm_unreachable("Unhandled ImportKind in switch.");
 }
-static StringRef getAccessibilityString(Accessibility value) {
+static StringRef getAccessLevelString(AccessLevel value) {
   switch (value) {
-  case Accessibility::Private: return "private";
-  case Accessibility::FilePrivate: return "fileprivate";
-  case Accessibility::Internal: return "internal";
-  case Accessibility::Public: return "public";
-  case Accessibility::Open: return "open";
+  case AccessLevel::Private: return "private";
+  case AccessLevel::FilePrivate: return "fileprivate";
+  case AccessLevel::Internal: return "internal";
+  case AccessLevel::Public: return "public";
+  case AccessLevel::Open: return "open";
   }
 
-  llvm_unreachable("Unhandled Accessibility in switch.");
+  llvm_unreachable("Unhandled AccessLevel in switch.");
 }
 static StringRef
 getForeignErrorConventionKindString(ForeignErrorConvention::Kind value) {
@@ -282,7 +282,7 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
     case DefaultArgumentKind::Function: return "#function";
     case DefaultArgumentKind::Inherited: return "inherited";
     case DefaultArgumentKind::Line: return "#line";
-    case DefaultArgumentKind::Nil: return "nil";
+    case DefaultArgumentKind::NilLiteral: return "nil";
     case DefaultArgumentKind::EmptyArray: return "[]";
     case DefaultArgumentKind::EmptyDictionary: return "[:]";
     case DefaultArgumentKind::Normal: return "normal";
@@ -724,9 +724,9 @@ namespace {
         PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
       }
 
-      if (VD->hasAccessibility()) {
-        PrintWithColorRAII(OS, AccessibilityColor) << " access="
-          << getAccessibilityString(VD->getFormalAccess());
+      if (VD->hasAccess()) {
+        PrintWithColorRAII(OS, AccessLevelColor) << " access="
+          << getAccessLevelString(VD->getFormalAccess());
       }
 
       if (auto Overridden = VD->getOverriddenDecl()) {
@@ -941,8 +941,12 @@ namespace {
         PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
       }
 
-      if (!P->isLet())
+      if (P->getSpecifier() == VarDecl::Specifier::Var)
         OS << " mutable";
+      if (P->getSpecifier() == VarDecl::Specifier::InOut)
+        OS << " inout";
+      if (P->isShared())
+        OS << " shared";
 
       if (P->isVariadic())
         OS << " variadic";
@@ -1454,35 +1458,6 @@ public:
     printRec(S->getCond());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitForStmt(ForStmt *S) {
-    printCommon(S, "for_stmt") << '\n';
-    if (!S->getInitializerVarDecls().empty()) {
-      for (auto D : S->getInitializerVarDecls()) {
-        printRec(D);
-        OS << '\n';
-      }
-    } else if (auto *Initializer = S->getInitializer().getPtrOrNull()) {
-      printRec(Initializer);
-      OS << '\n';
-    } else {
-      OS.indent(Indent+2) << "<null initializer>\n";
-    }
-
-    if (auto *Cond = S->getCond().getPtrOrNull())
-      printRec(Cond);
-    else
-      OS.indent(Indent+2) << "<null condition>";
-    OS << '\n';
-
-    if (auto *Increment = S->getIncrement().getPtrOrNull()) {
-      printRec(Increment);
-    } else {
-      OS.indent(Indent+2) << "<null increment>";
-    }
-    OS << '\n';
-    printRec(S->getBody());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
   void visitForEachStmt(ForEachStmt *S) {
     printCommon(S, "for_each_stmt") << '\n';
     printRec(S->getPattern());
@@ -1783,7 +1758,7 @@ public:
     PrintWithColorRAII(OS, DeclColor) << " decl=";
     printDeclRef(E->getDeclRef());
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      PrintWithColorRAII(OS, AccessibilityColor)
+      PrintWithColorRAII(OS, AccessLevelColor)
         << " " << getAccessSemanticsString(E->getAccessSemantics());
     PrintWithColorRAII(OS, ExprModifierColor)
       << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
@@ -1846,7 +1821,7 @@ public:
       << " decl=";
     E->getMember().dump(OS);
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      PrintWithColorRAII(OS, AccessibilityColor)
+      PrintWithColorRAII(OS, AccessLevelColor)
         << " " << getAccessSemanticsString(E->getAccessSemantics());
     if (E->isSuper())
       OS << " super";
@@ -1931,7 +1906,7 @@ public:
   void visitSubscriptExpr(SubscriptExpr *E) {
     printCommon(E, "subscript_expr");
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      PrintWithColorRAII(OS, AccessibilityColor)
+      PrintWithColorRAII(OS, AccessLevelColor)
         << " " << getAccessSemanticsString(E->getAccessSemantics());
     if (E->isSuper())
       OS << " super";
@@ -2126,12 +2101,14 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitInOutToPointerExpr(InOutToPointerExpr *E) {
-    printCommon(E, "inout_to_pointer") << '\n';
+    printCommon(E, "inout_to_pointer")
+      << (E->isNonAccessing() ? " nonaccessing" : "") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitArrayToPointerExpr(ArrayToPointerExpr *E) {
-    printCommon(E, "array_to_pointer") << '\n';
+    printCommon(E, "array_to_pointer")
+      << (E->isNonAccessing() ? " nonaccessing" : "") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -2678,6 +2655,12 @@ public:
 
   void visitInOutTypeRepr(InOutTypeRepr *T) {
     printCommon("type_inout") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  
+  void visitSharedTypeRepr(SharedTypeRepr *T) {
+    printCommon("type_shared") << '\n';
     printRec(T->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

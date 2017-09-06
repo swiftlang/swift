@@ -18,6 +18,7 @@
 namespace clang {
   class Decl;
   class MacroInfo;
+  class ModuleMacro;
   class Module;
   class SourceLocation;
   class SourceRange;
@@ -40,18 +41,21 @@ namespace detail {
   };  
 }
 
-/// Represents a clang declaration, macro, or module.
+/// Represents a clang declaration, macro, or module. A macro definition
+/// imported from a module is recorded as the ModuleMacro, and a macro
+/// defined locally is represented by the MacroInfo.
 class ClangNode {
   template <typename T>
   using Box = detail::ClangNodeBox<T>;
 
-  llvm::PointerUnion3<Box<clang::Decl>, Box<clang::MacroInfo>,
-                      Box<clang::Module>> Ptr;
+  llvm::PointerUnion4<Box<clang::Decl>, Box<clang::MacroInfo>,
+                      Box<clang::ModuleMacro>, Box<clang::Module>> Ptr;
 
 public:
   ClangNode() = default;
   ClangNode(const clang::Decl *D) : Ptr(D) {}
   ClangNode(const clang::MacroInfo *MI) : Ptr(MI) {}
+  ClangNode(const clang::ModuleMacro *MM) : Ptr(MM) {}
   ClangNode(const clang::Module *Mod) : Ptr(Mod) {}
 
   bool isNull() const { return Ptr.isNull(); }
@@ -60,8 +64,11 @@ public:
   const clang::Decl *getAsDecl() const {
     return Ptr.dyn_cast<Box<clang::Decl>>().value;
   }
-  const clang::MacroInfo *getAsMacro() const {
+  const clang::MacroInfo *getAsMacroInfo() const {
     return Ptr.dyn_cast<Box<clang::MacroInfo>>().value;
+  }
+  const clang::ModuleMacro *getAsModuleMacro() const {
+    return Ptr.dyn_cast<Box<clang::ModuleMacro>>().value;
   }
   const clang::Module *getAsModule() const {
     return Ptr.dyn_cast<Box<clang::Module>>().value;
@@ -70,12 +77,19 @@ public:
   const clang::Decl *castAsDecl() const {
     return Ptr.get<Box<clang::Decl>>().value;
   }
-  const clang::MacroInfo *castAsMacro() const {
+  const clang::MacroInfo *castAsMacroInfo() const {
     return Ptr.get<Box<clang::MacroInfo>>().value;
+  }
+  const clang::ModuleMacro *castAsModuleMacro() const {
+    return Ptr.get<Box<clang::ModuleMacro>>().value;
   }
   const clang::Module *castAsModule() const {
     return Ptr.get<Box<clang::Module>>().value;
   }
+
+  // Get the MacroInfo for a local definition, one imported from a
+  // ModuleMacro, or null if it's neither.
+  const clang::MacroInfo *getAsMacro() const;
 
   /// Returns the module either the one wrapped directly, the one from a
   /// clang::ImportDecl or null if it's neither.

@@ -187,7 +187,6 @@ bool LabeledStmt::isPossibleContinueTarget() const {
   case StmtKind::Do:
   case StmtKind::DoCatch:
   case StmtKind::RepeatWhile:
-  case StmtKind::For:
   case StmtKind::ForEach:
   case StmtKind::While:
     return true;
@@ -209,7 +208,6 @@ bool LabeledStmt::requiresLabelOnJump() const {
     return true;
 
   case StmtKind::RepeatWhile:
-  case StmtKind::For:
   case StmtKind::ForEach:
   case StmtKind::Switch:
   case StmtKind::While:

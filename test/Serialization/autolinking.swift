@@ -28,13 +28,11 @@
 
 import someModule
 
-// CHECK: !{{[0-9]+}} = !{i32 6, !"Linker Options", ![[LINK_LIST:[0-9]+]]}
-// CHECK: ![[LINK_LIST]] = !{
+// CHECK: !llvm.linker.options = !{
 // CHECK-DAG: !{{[0-9]+}} = !{!"-lmagic"}
 // CHECK-DAG: !{{[0-9]+}} = !{!"-lmodule"}
 
-// FRAMEWORK: !{{[0-9]+}} = !{i32 6, !"Linker Options", ![[LINK_LIST:[0-9]+]]}
-// FRAMEWORK: ![[LINK_LIST]] = !{
+// FRAMEWORK: !llvm.linker.options = !{
 // FRAMEWORK-DAG: !{{[0-9]+}} = !{!"-lmagic"}
 // FRAMEWORK-DAG: !{{[0-9]+}} = !{!"-lmodule"}
 // FRAMEWORK-DAG: !{{[0-9]+}} = !{!"-framework", !"someModule"}

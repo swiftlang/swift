@@ -241,10 +241,23 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
   MemBehavior Behavior = MemBehavior::None;
 
   // We can ignore mayTrap().
-  if (ApplyEffects.mayReadRC() ||
-      (InspectionMode == RetainObserveKind::ObserveRetains &&
-       ApplyEffects.mayAllocObjects())) {
-    Behavior = MemBehavior::MayHaveSideEffects;
+  bool any_in_guaranteed_params = false;
+  for (auto op : enumerate(AI->getArgumentOperands())) {
+    if (op.value().get() == V &&
+        AI->getSubstCalleeConv().getSILArgumentConvention(op.index()) == swift::SILArgumentConvention::Indirect_In_Guaranteed) {
+      any_in_guaranteed_params = true;
+      break;
+    }
+  }
+
+  if (any_in_guaranteed_params) {
+    // one the parameters in the function call is @in_guaranteed of V, ie. the
+    // callee isn't allowed to modify it.
+    Behavior = MemBehavior::MayRead;
+  } else if (ApplyEffects.mayReadRC() ||
+        (InspectionMode == RetainObserveKind::ObserveRetains &&
+         ApplyEffects.mayAllocObjects())) {
+      Behavior = MemBehavior::MayHaveSideEffects;
   } else {
     auto &GlobalEffects = ApplyEffects.getGlobalEffects();
     Behavior = GlobalEffects.getMemBehavior(InspectionMode);
@@ -265,6 +278,7 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
       }
     }
   }
+
   if (Behavior > MemBehavior::None) {
     if (Behavior > MemBehavior::MayRead && isLetPointer(V))
       Behavior = MemBehavior::MayRead;

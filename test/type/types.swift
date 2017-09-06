@@ -44,9 +44,16 @@ var h10 : Int?.Type?.Type
 
 var i = Int?(42)
 
-var bad_io : (Int) -> (inout Int, Int)  // expected-error {{'inout' may only be used on parameters}}
-
-func bad_io2(_ a: (inout Int, Int)) {}    // expected-error {{'inout' may only be used on parameters}}
+func testInvalidUseOfParameterAttr() {
+  var bad_io : (Int) -> (inout Int, Int)  // expected-error {{'inout' may only be used on parameters}}
+  func bad_io2(_ a: (inout Int, Int)) {}    // expected-error {{'inout' may only be used on parameters}}
+  
+  var bad_is : (Int) -> (__shared Int, Int)  // expected-error {{'__shared' may only be used on parameters}}
+  func bad_is2(_ a: (__shared Int, Int)) {}    // expected-error {{'__shared' may only be used on parameters}}
+  
+  var bad_iow : (Int) -> (__owned Int, Int)
+  func bad_iow2(_ a: (__owned Int, Int)) {}
+}
 
 // <rdar://problem/15588967> Array type sugar default construction syntax doesn't work
 func test_array_construct<T>(_: T) {

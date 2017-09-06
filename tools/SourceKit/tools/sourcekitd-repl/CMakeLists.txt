@@ -3,18 +3,18 @@ check_symbol_exists(el_wgets "histedit.h" HAVE_UNICODE_LIBEDIT)
 
 if(HAVE_UNICODE_LIBEDIT)
   if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
-    set(SOURCEKITD_REPL_DEPEND sourcekitdInProc)
+    set(SOURCEKITD_REPL_LINK_LIBS sourcekitdInProc)
   else()
-    set(SOURCEKITD_REPL_DEPEND sourcekitd)
+    set(SOURCEKITD_REPL_LINK_LIBS sourcekitd)
   endif()
 
   if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
-    set(SOURCEKITD_REPL_DEPEND ${SOURCEKITD_REPL_DEPEND} dispatch swiftCore)
+    set(SOURCEKITD_REPL_LINK_LIBS ${SOURCEKITD_REPL_LINK_LIBS} dispatch swiftCore)
   endif()
 
   add_sourcekit_executable(sourcekitd-repl
     sourcekitd-repl.cpp
-    DEPENDS ${SOURCEKITD_REPL_DEPEND} edit
+    LINK_LIBS ${SOURCEKITD_REPL_LINK_LIBS} edit
     LLVM_COMPONENT_DEPENDS support coverage lto
   )
 

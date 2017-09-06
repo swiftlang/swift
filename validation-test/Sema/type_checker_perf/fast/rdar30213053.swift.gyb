@@ -1,0 +1,10 @@
+// RUN: %scale-test --begin 3 --end 7 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+let _: [Int: (Int, Int) -> Bool] =
+[
+%for i in range(0, N):
+  ${i}: { $0 != $1 },
+%end
+]

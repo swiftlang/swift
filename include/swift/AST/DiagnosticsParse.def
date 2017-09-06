@@ -142,6 +142,8 @@ NOTE(lex_multiline_string_indent_should_match_here,none,
       "should match %select{space|tab}0 here", (unsigned))
 NOTE(lex_multiline_string_indent_change_line,none,
       "change indentation of %select{this line|these lines}0 to match closing delimiter", (bool))
+ERROR(lex_escaped_newline_at_lastline,none,
+      "escaped newline at the last line is not allowed", ())
 
 ERROR(lex_invalid_character,none,
        "invalid character in source file", ())
@@ -620,6 +622,10 @@ ERROR(sil_vtable_func_not_found,none,
       "sil function not found %0", (Identifier))
 ERROR(sil_vtable_class_not_found,none,
       "sil class not found %0", (Identifier))
+ERROR(sil_vtable_bad_entry_kind,none,
+      "expected 'inherited' or 'override'", ())
+ERROR(sil_vtable_expect_rsquare,none,
+      "expected ']' after vtable entry kind", ())
 
 // SIL Global
 ERROR(sil_global_variable_not_found,none,
@@ -679,8 +685,6 @@ ERROR(expected_identifier_for_type,PointsToFirstBadToken,
       "expected identifier for type name", ())
 ERROR(expected_rangle_generic_arg_list,PointsToFirstBadToken,
       "expected '>' to complete generic argument list", ())
-ERROR(expected_ident_type_in_inheritance,none,
-      "inheritance from non-named type %0", (TypeLoc))
 
 
 // Function types
@@ -741,8 +745,6 @@ ERROR(tuple_type_multiple_labels,none,
 // Protocol Types
 ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol-constrained type", ())
-ERROR(disallowed_protocol_composition,PointsToFirstBadToken,
-      "protocol-constrained type is neither allowed nor needed here", ())
 
 WARNING(swift3_deprecated_protocol_composition,none,
         "'protocol<...>' composition syntax is deprecated; join the protocols using '&'", ())
@@ -811,8 +813,8 @@ ERROR(extra_var_in_multiple_pattern_list,none,
       "%0 must be bound in every pattern", (Identifier))
 ERROR(let_pattern_in_immutable_context,none,
       "'let' pattern cannot appear nested in an already immutable context", ())
-ERROR(inout_must_have_type,none,
-      "'inout' arguments must have a type specified", ())
+ERROR(specifier_must_have_type,none,
+      "%0 arguments must have a type specified", (StringRef))
 ERROR(expected_rparen_parameter,PointsToFirstBadToken,
       "expected ')' in parameter", ())
 ERROR(expected_parameter_type,PointsToFirstBadToken,
@@ -828,13 +830,14 @@ ERROR(multiple_parameter_ellipsis,none,
 ERROR(parameter_vararg_default,none,
       "variadic parameter cannot have a default value", ())
 ERROR(inout_as_attr_disallowed,none,
-      "'inout' before a parameter name is not allowed, place it before the parameter type instead",
-      ())
-ERROR(parameter_inout_var_let_repeated,none,
-      "parameter may not have multiple 'inout', 'var', or 'let' specifiers",
-      ())
+      "%0 before a parameter name is not allowed, place it before the parameter type instead",
+      (StringRef))
+ERROR(parameter_specifier_repeated,none,
+      "parameter may not have multiple '__owned', 'inout', '__shared',"
+      " 'var', or 'let' specifiers", ())
 ERROR(parameter_let_var_as_attr,none,
-      "'%select{var|let}0' as a parameter attribute is not allowed", (unsigned))
+      "'%0' as a parameter attribute is not allowed",
+      (StringRef))
 
 
 ERROR(expected_behavior_name,none,
@@ -989,30 +992,16 @@ ERROR(docatch_not_trycatch,PointsToFirstBadToken,
       "the 'do' keyword is used to specify a 'catch' region",
       ())
 
-
-
 // C-Style For Stmt
-ERROR(expected_init_for_stmt,PointsToFirstBadToken,
-      "expected initialization in a 'for' statement", ())
-ERROR(missing_init_for_stmt,none,
-      "missing initialization in a 'for' statement", ())
-ERROR(expected_semi_for_stmt,PointsToFirstBadToken,
-      "expected ';' in 'for' statement", ())
-ERROR(expected_cond_for_stmt,none,
-      "expected condition in 'for' statement", ())
-ERROR(expected_rparen_for_stmt,none,
-      "expected ')' in 'for' statement", ())
-ERROR(expected_lbrace_after_for,none,
-      "expected '{' in 'for' statement", ())
-ERROR(expected_var_decl_for_stmt,PointsToFirstBadToken,
-      "expected var declaration in a 'for' statement", ())
+ERROR(c_style_for_stmt_removed,none,
+      "C-style for statement has been removed in Swift 3", ())
 
 // For-each Stmt
-ERROR(expected_foreach_in,none,
+ERROR(expected_foreach_in,PointsToFirstBadToken,
       "expected 'in' after for-each pattern", ())
-ERROR(expected_foreach_container,none,
+ERROR(expected_foreach_container,PointsToFirstBadToken,
       "expected Sequence expression for for-each loop", ())
-ERROR(expected_foreach_lbrace,none,
+ERROR(expected_foreach_lbrace,PointsToFirstBadToken,
       "expected '{' to start the body of for-each loop", ())
 ERROR(expected_foreach_where_expr,PointsToFirstBadToken,
       "expected expression in 'where' guard of 'for/in'", ())
@@ -1281,8 +1270,8 @@ ERROR(attr_interpolated_string,none,
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
 
-// accessibility
-ERROR(attr_accessibility_expected_set,none,
+// Access control
+ERROR(attr_access_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
 
 // availability
@@ -1425,7 +1414,7 @@ ERROR(expected_generics_parameter_name,PointsToFirstBadToken,
 ERROR(unexpected_class_constraint,none,
        "'class' constraint can only appear on protocol declarations", ())
 NOTE(suggest_anyobject,none,
-     "did you mean to constrain %0 with the 'AnyObject' protocol?", (Identifier))
+     "did you mean to write an 'AnyObject' constraint?", ())
 ERROR(expected_generics_type_restriction,none,
       "expected a class type or protocol-constrained type restricting %0",
       (Identifier))
@@ -1434,8 +1423,6 @@ ERROR(requires_single_equal,none,
 ERROR(expected_requirement_delim,none,
       "expected ':' or '==' to indicate a conformance or same-type requirement",
       ())
-ERROR(invalid_class_requirement,none,
-      "'class' requirement only applies to protocols", ())
 ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,

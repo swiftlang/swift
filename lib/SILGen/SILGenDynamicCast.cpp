@@ -91,7 +91,6 @@ namespace {
         SILValue resultBuffer =
           createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
         SGF.B.createUnconditionalCheckedCastAddr(Loc,
-                                             CastConsumptionKind::TakeAlways,
                                              operand.forward(SGF), SourceType,
                                              resultBuffer, TargetType);
         return RValue(SGF, Loc, TargetType,
@@ -102,8 +101,7 @@ namespace {
       ManagedValue result;
       if (Strategy == CastStrategy::Address) {
         result = SGF.B.createUnconditionalCheckedCastValue(
-            Loc, CastConsumptionKind::TakeAlways, operand,
-            origTargetTL.getLoweredType());
+            Loc, operand, origTargetTL.getLoweredType());
       } else {
         result = SGF.B.createUnconditionalCheckedCast(
             Loc, operand, origTargetTL.getLoweredType());
@@ -372,8 +370,7 @@ namespace {
         SILValue resultBuffer =
             createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
         SGF.B.createUnconditionalCheckedCastAddr(
-            Loc, CastConsumptionKind::TakeAlways, operand.forward(SGF),
-            SourceType, resultBuffer, TargetType);
+            Loc, operand.forward(SGF), SourceType, resultBuffer, TargetType);
         return RValue(SGF, Loc, TargetType,
                       finishFromResultBuffer(hasAbstraction, resultBuffer,
                                              abstraction, origTargetTL, ctx));
@@ -382,8 +379,7 @@ namespace {
       SILValue resultScalar;
       if (Strategy == CastStrategy::Address) {
         resultScalar = SGF.B.createUnconditionalCheckedCastValue(
-            Loc, CastConsumptionKind::TakeAlways, operand.forward(SGF),
-            origTargetTL.getLoweredType());
+            Loc, operand.forward(SGF), origTargetTL.getLoweredType());
       } else {
         resultScalar = SGF.B.createUnconditionalCheckedCast(
             Loc, operand.forward(SGF), origTargetTL.getLoweredType());

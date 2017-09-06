@@ -38,11 +38,7 @@ protected:
 
   /// The declaration parsed during delayed parsing that was caused by code
   /// completion. This declaration contained the code completion token.
-  Decl *DelayedParsedDecl = nullptr;
-
-  /// If code completion is done inside a controlling expression of a C-style
-  /// for loop statement, this is the declaration of the iteration variable.
-  Decl *CStyleForLoopIterationVariable = nullptr;
+  Decl *ParsedDecl = nullptr;
 
   /// True if code completion is done inside a raw value expression of an enum
   /// case.
@@ -73,34 +69,16 @@ public:
     ExprBeginPosition = PP;
   }
 
-  void setDelayedParsedDecl(Decl *D) {
-    DelayedParsedDecl = D;
+  /// Set the decl inside which the code-completion occurred.  This is used when
+  /// completing inside a parameter list or where clause where the Parser's
+  /// CurDeclContext will not be where we want to perform lookup.
+  void setParsedDecl(Decl *D) {
+    ParsedDecl = D;
   }
 
   void setLeadingSequenceExprs(ArrayRef<Expr *> exprs) {
     leadingSequenceExprs.assign(exprs.begin(), exprs.end());
   }
-
-  class InCStyleForExprRAII {
-    CodeCompletionCallbacks *Callbacks;
-
-  public:
-    InCStyleForExprRAII(CodeCompletionCallbacks *Callbacks,
-                        Decl *IterationVariable)
-        : Callbacks(Callbacks) {
-      if (Callbacks)
-        Callbacks->CStyleForLoopIterationVariable = IterationVariable;
-    }
-
-    void finished() {
-      if (Callbacks)
-        Callbacks->CStyleForLoopIterationVariable = nullptr;
-    }
-
-    ~InCStyleForExprRAII() {
-      finished();
-    }
-  };
 
   class InEnumElementRawValueRAII {
     CodeCompletionCallbacks *Callbacks;

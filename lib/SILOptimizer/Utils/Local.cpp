@@ -9,6 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
@@ -23,6 +24,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -32,6 +34,9 @@
 #include <deque>
 
 using namespace swift;
+
+static llvm::cl::opt<bool> EnableExpandAll("enable-expand-all",
+                                           llvm::cl::init(false));
 
 /// Creates an increment on \p Ptr before insertion point \p InsertPt that
 /// creates a strong_retain if \p Ptr has reference semantics itself or a
@@ -220,9 +225,10 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
 
 void swift::eraseUsesOfInstruction(SILInstruction *Inst,
                                    CallbackTy Callback) {
-  for (auto UI = Inst->use_begin(), E = Inst->use_end(); UI != E;) {
+  while (!Inst->use_empty()) {
+    auto UI = Inst->use_begin();
     auto *User = UI->getUser();
-    UI++;
+    assert(User && "User should never be NULL!");
 
     // If the instruction itself has any uses, recursively zap them so that
     // nothing uses this instruction.
@@ -891,6 +897,55 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   }
 }
 
+static SILValue createLifetimeExtendedAllocStack(
+    SILBuilder &Builder, SILLocation Loc, SILValue Arg,
+    ArrayRef<SILBasicBlock *> ExitingBlocks, InstModCallbacks Callbacks) {
+  AllocStackInst *ASI = nullptr;
+  {
+    // Save our insert point and create a new alloc_stack in the initial BB and
+    // dealloc_stack in all exit blocks.
+    auto *OldInsertPt = &*Builder.getInsertionPoint();
+    Builder.setInsertionPoint(Builder.getFunction().begin()->begin());
+    ASI = Builder.createAllocStack(Loc, Arg->getType());
+    Callbacks.CreatedNewInst(ASI);
+
+    for (auto *BB : ExitingBlocks) {
+      Builder.setInsertionPoint(BB->getTerminator());
+      Callbacks.CreatedNewInst(Builder.createDeallocStack(Loc, ASI));
+    }
+    Builder.setInsertionPoint(OldInsertPt);
+  }
+  assert(ASI != nullptr);
+
+  // Then perform a copy_addr [take] [init] right after the partial_apply from
+  // the original address argument to the new alloc_stack that we have
+  // created.
+  Callbacks.CreatedNewInst(
+      Builder.createCopyAddr(Loc, Arg, ASI, IsTake, IsInitialization));
+
+  // Return the new alloc_stack inst that has the appropriate live range to
+  // destroy said values.
+  return ASI;
+}
+
+static bool shouldDestroyPartialApplyCapturedArg(SILValue Arg,
+                                                 SILParameterInfo PInfo,
+                                                 SILModule &M) {
+  // If we have a non-trivial type and the argument is passed in @inout, we do
+  // not need to destroy it here. This is something that is implicit in the
+  // partial_apply design that will be revisited when partial_apply is
+  // redesigned.
+  if (PInfo.isIndirectMutating())
+    return false;
+
+  // If we have a trivial type, we do not need to put in any extra releases.
+  if (Arg->getType().isTrivial(M))
+    return false;
+
+  // We handle all other cases.
+  return true;
+}
+
 // *HEY YOU, YES YOU, PLEASE READ*. Even though a textual partial apply is
 // printed with the convention of the closed over function upon it, all
 // non-inout arguments to a partial_apply are passed at +1. This includes
@@ -901,20 +956,14 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
 void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
                                            SILValue Arg, SILParameterInfo PInfo,
                                            InstModCallbacks Callbacks) {
-  // If we have a non-trivial type and the argument is passed in @inout, we do
-  // not need to destroy it here. This is something that is implicit in the
-  // partial_apply design that will be revisited when partial_apply is
-  // redesigned.
-  if (PInfo.isIndirectMutating())
+  if (!shouldDestroyPartialApplyCapturedArg(Arg, PInfo, Builder.getModule()))
     return;
 
-  // If we have a trivial type, we do not need to put in any extra releases.
-  if (Arg->getType().isTrivial(Builder.getModule()))
-    return;
-
-  // Otherwise, we need to destroy the argument. If we have an address, just
-  // emit a destroy_addr.
+  // Otherwise, we need to destroy the argument. If we have an address, we
+  // insert a destroy_addr and return. Any live range issues must have been
+  // dealt with by our caller.
   if (Arg->getType().isAddress()) {
+    // Then emit the destroy_addr for this arg
     SILInstruction *NewInst = Builder.emitDestroyAddrAndFold(Loc, Arg);
     Callbacks.CreatedNewInst(NewInst);
     return;
@@ -958,7 +1007,7 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
 /// For each captured argument of PAI, decrement the ref count of the captured
 /// argument as appropriate at each of the post dominated release locations
 /// found by Tracker.
-static void releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
+static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
                                                   ReleaseTracker &Tracker,
                                                   InstModCallbacks Callbacks) {
   SILBuilderWithScope Builder(PAI);
@@ -966,22 +1015,60 @@ static void releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
   CanSILFunctionType PAITy =
       PAI->getCallee()->getType().getAs<SILFunctionType>();
 
-  // Emit a destroy value for each captured closure argument.
   ArrayRef<SILParameterInfo> Params = PAITy->getParameters();
-  auto Args = PAI->getArguments();
+  llvm::SmallVector<SILValue, 8> Args;
+  for (SILValue v : PAI->getArguments()) {
+    // If any of our arguments contain open existentials, bail. We do not
+    // support this for now so that we can avoid having to re-order stack
+    // locations (a larger change).
+    if (v->getType().hasOpenedExistential())
+      return false;
+    Args.emplace_back(v);
+  }
   unsigned Delta = Params.size() - Args.size();
   assert(Delta <= Params.size() && "Error, more Args to partial apply than "
                                    "params in its interface.");
+  Params = Params.drop_front(Delta);
 
+  llvm::SmallVector<SILBasicBlock *, 2> ExitingBlocks;
+  PAI->getFunction()->findExitingBlocks(ExitingBlocks);
+
+  // Go through our argument list and create new alloc_stacks for each
+  // non-trivial address value. This ensures that the memory location that we
+  // are cleaning up has the same live range as the partial_apply. Otherwise, we
+  // may be inserting destroy_addr of alloc_stack that have already been passed
+  // to a dealloc_stack.
+  for (unsigned i : reversed(indices(Args))) {
+    SILValue Arg = Args[i];
+    SILParameterInfo PInfo = Params[i];
+
+    // If we are not going to destroy this partial_apply, continue.
+    if (!shouldDestroyPartialApplyCapturedArg(Arg, PInfo, Builder.getModule()))
+      continue;
+
+    // If we have an object, we will not have live range issues, just continue.
+    if (Arg->getType().isObject())
+      continue;
+
+    // Now that we know that we have a non-argument address, perform a take-init
+    // of Arg into a lifetime extended alloc_stack
+    Args[i] = createLifetimeExtendedAllocStack(Builder, Loc, Arg, ExitingBlocks,
+                                               Callbacks);
+  }
+
+  // Emit a destroy for each captured closure argument at each final release
+  // point.
   for (auto *FinalRelease : Tracker.getFinalReleases()) {
     Builder.setInsertionPoint(FinalRelease);
-    for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
-      SILValue Arg = Args[AI];
-      SILParameterInfo Param = Params[AI + Delta];
+    for (unsigned i : indices(Args)) {
+      SILValue Arg = Args[i];
+      SILParameterInfo Param = Params[i];
 
       releasePartialApplyCapturedArg(Builder, Loc, Arg, Param, Callbacks);
     }
   }
+
+  return true;
 }
 
 /// TODO: Generalize this to general objects.
@@ -1006,8 +1093,12 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
 
   // If we have a partial_apply, release each captured argument at each one of
   // the final release locations of the partial apply.
-  if (auto *PAI = dyn_cast<PartialApplyInst>(Closure))
-    releaseCapturedArgsOfDeadPartialApply(PAI, Tracker, Callbacks);
+  if (auto *PAI = dyn_cast<PartialApplyInst>(Closure)) {
+    // If we can not decrement the ref counts of the dead partial apply for any
+    // reason, bail.
+    if (!releaseCapturedArgsOfDeadPartialApply(PAI, Tracker, Callbacks))
+      return false;
+  }
 
   // Then delete all user instructions.
   for (auto *User : Tracker.getTrackedUsers()) {
@@ -1021,30 +1112,6 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
   Callbacks.DeleteInst(Closure);
 
   return true;
-}
-
-//===----------------------------------------------------------------------===//
-//                             DeadEndBlocks
-//===----------------------------------------------------------------------===//
-
-void DeadEndBlocks::compute() {
-  assert(ReachableBlocks.empty() && "Computed twice");
-
-  // First step: find blocks which end up in a no-return block (terminated by
-  // an unreachable instruction).
-  // Search for function-exiting blocks, i.e. return and throw.
-  for (SILBasicBlock &BB : *F) {
-    TermInst *TI = BB.getTerminator();
-    if (TI->isFunctionExiting())
-      ReachableBlocks.insert(&BB);
-  }
-  // Propagate the reachability up the control flow graph.
-  unsigned Idx = 0;
-  while (Idx < ReachableBlocks.size()) {
-    SILBasicBlock *BB = ReachableBlocks[Idx++];
-    for (SILBasicBlock *Pred : BB->getPredecessorBlocks())
-      ReachableBlocks.insert(Pred);
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1450,11 +1517,8 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   auto *AI = Builder.createApply(Loc, FuncRef, Subs, Args, false);
 
   // If the source of a cast should be destroyed, emit a release.
-  if (auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(Inst)) {
-    assert(UCCAI->getConsumptionKind() == CastConsumptionKind::TakeAlways);
-    if (UCCAI->getConsumptionKind() == CastConsumptionKind::TakeAlways) {
-      Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
-    }
+  if (isa<UnconditionalCheckedCastAddrInst>(Inst)) {
+    Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
   }
 
   if (auto *CCABI = dyn_cast<CheckedCastAddrBranchInst>(Inst)) {
@@ -1921,6 +1985,10 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
     // The unconditional_addr_cast can be skipped, if the result of a cast
     // is not used afterwards.
     if (ResultNotUsed) {
+      if (shouldTakeOnSuccess(Inst->getConsumptionKind())) {
+        auto &srcTL = Builder.getModule().getTypeLowering(Src->getType());
+        srcTL.emitDestroyAddress(Builder, Loc, Src);
+      }
       EraseInstAction(Inst);
       Builder.setInsertionPoint(BB);
       auto *NewI = Builder.createBranch(Loc, SuccessBB);
@@ -1931,10 +1999,17 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
     // Since it is an addr cast, only address types are handled here.
     if (!Src->getType().isAddress() || !Dest->getType().isAddress()) {
       return nullptr;
-    } else if (!emitSuccessfulIndirectUnconditionalCast(
-                   Builder, Mod.getSwiftModule(), Loc,
-                   Inst->getConsumptionKind(), Src, SourceType, Dest,
-                   TargetType, Inst)) {
+    }
+    // For CopyOnSuccess casts, we could insert an explicit copy here, but this
+    // case does not happen in practice.
+    // Both TakeOnSuccess and TakeAlways can be reduced to an
+    // UnconditionalCheckedCast, since the failure path is irrelevant.
+    if (Inst->getConsumptionKind() == CastConsumptionKind::CopyOnSuccess)
+      return nullptr;
+
+    if (!emitSuccessfulIndirectUnconditionalCast(
+          Builder, Mod.getSwiftModule(), Loc, Src, SourceType, Dest,
+          TargetType, Inst)) {
       // No optimization was possible.
       return nullptr;
     }
@@ -2143,7 +2218,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
     }
     if (!CastedValue)
       CastedValue = Builder.createUnconditionalCheckedCastValue(
-          Loc, CastConsumptionKind::TakeAlways, Op, LoweredTargetType);
+          Loc, Op, LoweredTargetType);
   } else {
     // No need to cast.
     CastedValue = Op;
@@ -2569,17 +2644,13 @@ static bool optimizeStaticallyKnownProtocolConformance(
               Conformances);
           B.createCopyAddr(
               Loc, Src, ExistentialAddr,
-              (Inst->getConsumptionKind() != CastConsumptionKind::CopyOnSuccess)
-                  ? IsTake_t::IsTake
-                  : IsTake_t::IsNotTake,
+              IsTake_t::IsTake,
               IsInitialization_t::IsInitialization);
           break;
         }
         case ExistentialRepresentation::Class: {
           auto Value = B.createLoad(Loc, Src,
                                     swift::LoadOwnershipQualifier::Unqualified);
-          if (Inst->getConsumptionKind() == CastConsumptionKind::CopyOnSuccess)
-            B.createRetainValue(Loc, Value, B.getDefaultAtomicity());
           auto Existential =
               B.createInitExistentialRef(Loc, Dest->getType().getObjectType(),
                                          SourceType, Value, Conformances);
@@ -2594,8 +2665,6 @@ static bool optimizeStaticallyKnownProtocolConformance(
               B.createProjectExistentialBox(Loc, Src->getType(), AllocBox);
           auto Value = B.createLoad(Loc, Src,
                                     swift::LoadOwnershipQualifier::Unqualified);
-          if (Inst->getConsumptionKind() == CastConsumptionKind::CopyOnSuccess)
-            B.createRetainValue(Loc, Value, B.getDefaultAtomicity());
           B.createStore(Loc, Value, Projection,
                         swift::StoreOwnershipQualifier::Unqualified);
           B.createStore(Loc, AllocBox, Dest,
@@ -2687,16 +2756,8 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     }
 
     if (ResultNotUsed) {
-      switch (Inst->getConsumptionKind()) {
-        case CastConsumptionKind::TakeAlways:
-        case CastConsumptionKind::TakeOnSuccess: {
-          SILBuilder B(Inst);
-          B.createDestroyAddr(Inst->getLoc(), Inst->getSrc());
-          break;
-        }
-        case CastConsumptionKind::CopyOnSuccess:
-          break;
-      }
+      SILBuilder B(Inst);
+      B.createDestroyAddr(Inst->getLoc(), Inst->getSrc());
       if (DestroyDestInst)
         EraseInstAction(DestroyDestInst);
       EraseInstAction(Inst);
@@ -2705,7 +2766,7 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     }
 
     // Try to apply the bridged casts optimizations.
-    auto NewI = optimizeBridgedCasts(Inst, Inst->getConsumptionKind(),
+    auto NewI = optimizeBridgedCasts(Inst, CastConsumptionKind::TakeAlways,
                                      false, Src, Dest, SourceType,
                                      TargetType, nullptr, nullptr);
     if (NewI) {
@@ -2728,9 +2789,9 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
       return nullptr;
 
     SILBuilderWithScope Builder(Inst);
-    if (!emitSuccessfulIndirectUnconditionalCast(
-            Builder, Mod.getSwiftModule(), Loc, Inst->getConsumptionKind(), Src,
-            SourceType, Dest, TargetType, Inst)) {
+    if (!emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(),
+                                                 Loc, Src, SourceType, Dest,
+                                                 TargetType, Inst)) {
       // No optimization was possible.
       return nullptr;
     }
@@ -2762,6 +2823,22 @@ bool swift::simplifyUsers(SILInstruction *I) {
   }
 
   return Changed;
+}
+
+/// True if a type can be expanded
+/// without a significant increase to code size.
+bool swift::shouldExpand(SILModule &Module, SILType Ty) {
+  if (EnableExpandAll) {
+    return true;
+  }
+  if (Ty.isAddressOnly(Module)) {
+    return false;
+  }
+  unsigned numFields = Module.Types.countNumberOfFields(Ty);
+  if (numFields > 6) {
+    return false;
+  }
+  return true;
 }
 
 /// Some support functions for the global-opt and let-properties-opts
@@ -2897,32 +2974,32 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   if (AFD->isDynamic())
     return false;
 
-  if (!AFD->hasAccessibility())
+  if (!AFD->hasAccess())
     return false;
 
   // Only consider 'private' members, unless we are in whole-module compilation.
   switch (AFD->getEffectiveAccess()) {
-  case Accessibility::Open:
+  case AccessLevel::Open:
     return false;
-  case Accessibility::Public:
+  case AccessLevel::Public:
     if (isa<ConstructorDecl>(AFD)) {
       // Constructors are special: a derived class in another module can
       // "override" a constructor if its class is "open", although the
       // constructor itself is not open.
       auto *ND = AFD->getDeclContext()
           ->getAsNominalTypeOrNominalTypeExtensionContext();
-      if (ND->getEffectiveAccess() == Accessibility::Open)
+      if (ND->getEffectiveAccess() == AccessLevel::Open)
         return false;
     }
     LLVM_FALLTHROUGH;
-  case Accessibility::Internal:
+  case AccessLevel::Internal:
     return M.isWholeModule();
-  case Accessibility::FilePrivate:
-  case Accessibility::Private:
+  case AccessLevel::FilePrivate:
+  case AccessLevel::Private:
     return true;
   }
 
-  llvm_unreachable("Unhandled Accessibility in switch.");
+  llvm_unreachable("Unhandled access level in switch.");
 }
 
 void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,

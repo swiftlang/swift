@@ -40,6 +40,11 @@ extension String {
   var capacity: Int {
     return _core.nativeBuffer?.capacity ?? 0
   }
+  func _rawIdentifier() -> (UInt, UInt) {
+    let triple = unsafeBitCast(self, to: (UInt, UInt, UInt).self)
+    let minusCount = (triple.0, triple.2)
+    return minusCount
+  }
 }
 
 extension Substring {
@@ -59,7 +64,7 @@ StringTests.test("AssociatedTypes-UTF8View") {
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: View.Iterator.self,
-    subSequenceType: BidirectionalSlice<View>.self,
+    subSequenceType: Substring.UTF8View.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: DefaultBidirectionalIndices<View>.self)
@@ -70,7 +75,7 @@ StringTests.test("AssociatedTypes-UTF16View") {
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: IndexingIterator<View>.self,
-    subSequenceType: View.self,
+    subSequenceType: Substring.UTF16View.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: View.Indices.self)
@@ -81,7 +86,7 @@ StringTests.test("AssociatedTypes-UnicodeScalarView") {
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: View.Iterator.self,
-    subSequenceType: View.self,
+    subSequenceType: Substring.UnicodeScalarView.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: DefaultBidirectionalIndices<View>.self)
@@ -466,7 +471,7 @@ StringTests.test("appendToSubstringBug") {
   }
 
   do {
-    var (s, unused) = { ()->(String, Int) in
+    var (s, _) = { ()->(String, Int) in
       let (s0, unused) = stringWithUnusedCapacity()
       return (s0[s0.index(_nth: 5)..<s0.endIndex], unused)
     }()
@@ -478,7 +483,7 @@ StringTests.test("appendToSubstringBug") {
   }
 
   do {
-    var (s, unused) = { ()->(Substring, Int) in
+    var (s, _) = { ()->(Substring, Int) in
       let (s0, unused) = stringWithUnusedCapacity()
       return (s0[s0.index(_nth: 5)..<s0.endIndex], unused)
     }()
@@ -503,6 +508,7 @@ StringTests.test("appendToSubstringBug") {
     expectEqual(originalID, s.bufferID)
     s += "."
     expectNotEqual(originalID, s.bufferID)
+    unused += 0 // warning suppression
   }
 }
 
@@ -640,7 +646,7 @@ StringTests.test("COW/removeSubrange/end") {
 StringTests.test("COW/replaceSubrange/end") {
   // Check literal-to-heap reallocation.
   do {
-    var str = "12345678"
+    let str = "12345678"
     let literalIdentity = str.bufferID
 
     var slice = str[str.startIndex..<str.index(_nth: 7)]
@@ -772,7 +778,7 @@ StringTests.test("stringCoreReserve")
     }
     expectEqual(!base._core.hasCocoaBuffer, startedNative)
     
-    var originalBuffer = base.bufferID
+    let originalBuffer = base.bufferID
     let startedUnique = startedNative && base._core._owner != nil
       && isKnownUniquelyReferenced(&base._core._owner!)
     
@@ -975,10 +981,11 @@ StringTests.test("growth") {
   var s = ""
   var s2 = s
 
-  for i in 0..<20 {
+  for _ in 0..<20 {
     s += "x"
     s2 = s
   }
+  expectEqual(s2, s)
   expectLE(s.nativeCapacity, 34)
 }
 
@@ -988,20 +995,20 @@ StringTests.test("Construction") {
 
 StringTests.test("Conversions") {
   do {
-    var c: Character = "a"
+    let c: Character = "a"
     let x = String(c)
     expectTrue(x._core.isASCII)
 
-    var s: String = "a"
+    let s: String = "a"
     expectEqual(s, x)
   }
 
   do {
-    var c: Character = "\u{B977}"
+    let c: Character = "\u{B977}"
     let x = String(c)
     expectFalse(x._core.isASCII)
 
-    var s: String = "\u{B977}"
+    let s: String = "\u{B977}"
     expectEqual(s, x)
   }
 }
@@ -1565,6 +1572,212 @@ StringTests.test("String.removeSubrange()/closedRange") {
       test.closedExpected,
       theString,
       stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// COW(🐄) tests
+//===----------------------------------------------------------------------===//
+
+public let testSuffix = "z"
+StringTests.test("COW.Smoke") {
+  var s1 = "Cypseloides" + testSuffix
+  var identity1 = s1._rawIdentifier()
+  
+  var s2 = s1
+  expectEqual(identity1, s2._rawIdentifier())
+  
+  s2.append(" cryptus")
+  expectTrue(identity1 != s2._rawIdentifier())
+  
+  s1.remove(at: s1.startIndex)
+  expectEqual(identity1, s1._rawIdentifier())
+  
+  _fixLifetime(s1)
+  _fixLifetime(s2)  
+}
+
+struct COWStringTest {
+  let test: String
+  let name: String
+}
+
+var testCases: [COWStringTest] {
+  return [ COWStringTest(test: "abcdefg", name: "ASCII"),
+           COWStringTest(test: "🐮🐄🤠", name: "Unicode") 
+         ]
+}
+
+for test in testCases {
+  StringTests.test("COW.\(test.name).IndexesDontAffectUniquenessCheck") {
+    var s = test.test + testSuffix
+    let identity1 = s._rawIdentifier()
+  
+    var startIndex = s.startIndex
+    var endIndex = s.endIndex
+    expectNotEqual(startIndex, endIndex)
+    expectLT(startIndex, endIndex)
+    expectLE(startIndex, endIndex)
+    expectGT(endIndex, startIndex)
+    expectGE(endIndex, startIndex)
+  
+    expectEqual(identity1, s._rawIdentifier())
+  
+    // Keep indexes alive during the calls above
+    _fixLifetime(startIndex)
+    _fixLifetime(endIndex)
+  }
+}
+
+for test in testCases {
+  StringTests.test("COW.\(test.name).SubscriptWithIndexDoesNotReallocate") {
+    var s = test.test + testSuffix
+    var identity1 = s._rawIdentifier()
+
+    var startIndex = s.startIndex
+    let empty = startIndex == s.endIndex
+    expectNotEqual((s.startIndex < s.endIndex), empty)
+    expectLE(s.startIndex, s.endIndex)
+    expectEqual((s.startIndex >= s.endIndex), empty)
+    expectGT(s.endIndex, s.startIndex)
+    expectEqual(identity1, s._rawIdentifier())
+  }
+}
+
+for test in testCases {
+  StringTests.test("COW.\(test.name).RemoveAtDoesNotReallocate") {
+    do {
+      var s = test.test + testSuffix
+      var identity1 = s._rawIdentifier()
+
+      let index1 = s.startIndex
+      expectEqual(identity1, s._rawIdentifier())
+
+      let _ = s.remove(at: index1)
+      expectEqual(identity1, s._rawIdentifier())
+    }
+
+    do {
+      var s1 = test.test + testSuffix
+      var identity1 = s1._rawIdentifier()
+
+      var s2 = s1
+      expectEqual(identity1, s1._rawIdentifier())
+      expectEqual(identity1, s2._rawIdentifier())
+
+      var index1 = s1.startIndex
+      expectEqual(identity1, s1._rawIdentifier())
+      expectEqual(identity1, s2._rawIdentifier())
+
+      let removed = s2.remove(at: index1)
+
+      expectEqual(identity1, s1._rawIdentifier())
+      expectTrue(identity1 == s2._rawIdentifier())
+    }
+  }
+}
+
+for test in testCases {
+  StringTests.test("COW.\(test.name).RemoveAtDoesNotReallocate") {
+    do {
+      var s = test.test + testSuffix
+      expectGT(s.count, 0)
+
+      s.removeAll()
+      var identity1 = s._rawIdentifier()
+      expectEqual(0, s.count)
+      expectEqual(identity1, s._rawIdentifier())
+    }
+
+    do {
+      var s = test.test + testSuffix
+      var identity1 = s._rawIdentifier()
+      expectGT(s.count, 3)
+
+      s.removeAll(keepingCapacity: true)
+      expectEqual(identity1, s._rawIdentifier())
+      expectEqual(0, s.count)
+    }
+
+    do {
+      var s1 = test.test + testSuffix
+      var identity1 = s1._rawIdentifier()
+      expectGT(s1.count, 0)
+
+      var s2 = s1
+      s2.removeAll()
+      var identity2 = s2._rawIdentifier()
+      expectEqual(identity1, s1._rawIdentifier())
+      expectTrue(identity2 != identity1)
+      expectGT(s1.count, 0)
+      expectEqual(0, s2.count)
+
+      // Keep variables alive.
+      _fixLifetime(s1)
+      _fixLifetime(s2)
+    }
+
+    do {
+      var s1 = test.test + testSuffix
+      var identity1 = s1._rawIdentifier()
+      expectGT(s1.count, 0)
+
+      var s2 = s1
+      s2.removeAll(keepingCapacity: true)
+      var identity2 = s2._rawIdentifier()
+      expectEqual(identity1, s1._rawIdentifier())
+      expectTrue(identity2 != identity1)
+      expectGT(s1.count, 0)
+      expectEqual(0, s2.count)
+
+      // Keep variables alive.
+      _fixLifetime(s1)
+      _fixLifetime(s2)
+    }
+  }
+}
+
+for test in testCases {
+  StringTests.test("COW.\(test.name).CountDoesNotReallocate") {
+    var s = test.test + testSuffix
+    var identity1 = s._rawIdentifier()
+
+    expectGT(s.count, 0)
+    expectEqual(identity1, s._rawIdentifier())
+  } 
+}
+
+for test in testCases {
+  StringTests.test("COW.\(test.name).GenerateDoesNotReallocate") {
+    var s = test.test + testSuffix
+    var identity1 = s._rawIdentifier()
+
+    var iter = s.makeIterator()
+    var copy = String()
+    while let value = iter.next() {
+      copy.append(value)
+    }
+    expectEqual(copy, s)
+    expectEqual(identity1, s._rawIdentifier())
+  }
+}
+
+for test in testCases {
+  StringTests.test("COW.\(test.name).EqualityTestDoesNotReallocate") {
+    var s1 = test.test + testSuffix
+    var identity1 = s1._rawIdentifier()
+
+    var s2 = test.test + testSuffix
+    var identity2 = s2._rawIdentifier()
+
+    expectEqual(s1, s2)
+    expectEqual(identity1, s1._rawIdentifier())
+    expectEqual(identity2, s2._rawIdentifier())
+
+    s2.remove(at: s2.startIndex)
+    expectNotEqual(s1, s2)
+    expectEqual(identity1, s1._rawIdentifier())
+    expectEqual(identity2, s2._rawIdentifier())
   }
 }
 

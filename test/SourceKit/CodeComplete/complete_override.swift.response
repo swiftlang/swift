@@ -2,6 +2,24 @@
   key.results: [
     {
       key.kind: source.lang.swift.keyword,
+      key.name: "__owned",
+      key.sourcetext: "__owned",
+      key.description: "__owned",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
+      key.name: "__shared",
+      key.sourcetext: "__shared",
+      key.description: "__shared",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
       key.name: "associatedtype",
       key.sourcetext: "associatedtype",
       key.description: "associatedtype",

@@ -52,10 +52,10 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
-  /// Resolve the accessibility of a value.
+  /// Resolve the access of a value.
   ///
   /// It does no type-checking.
-  virtual void resolveAccessibility(ValueDecl *VD) = 0;
+  virtual void resolveAccessControl(ValueDecl *VD) = 0;
 
   /// Resolve the type and declaration attributes of a value.
   ///
@@ -122,8 +122,8 @@ public:
     Principal.resolveWitness(conformance, requirement);
   }
 
-  void resolveAccessibility(ValueDecl *VD) override {
-    Principal.resolveAccessibility(VD);
+  void resolveAccessControl(ValueDecl *VD) override {
+    Principal.resolveAccessControl(VD);
   }
 
   void resolveDeclSignature(ValueDecl *VD) override {
@@ -211,37 +211,27 @@ public:
   ///
   /// The implementation should add the members to D.
   virtual void
-  loadAllMembers(Decl *D, uint64_t contextData) {
-    llvm_unreachable("unimplemented");
-  }
+  loadAllMembers(Decl *D, uint64_t contextData) = 0;
 
   /// Populates the given vector with all conformances for \p D.
   ///
   /// The implementation should \em not call setConformances on \p D.
   virtual void
   loadAllConformances(const Decl *D, uint64_t contextData,
-                      SmallVectorImpl<ProtocolConformance *> &Conformances) {
-    llvm_unreachable("unimplemented");
-  }
+                      SmallVectorImpl<ProtocolConformance *> &Conformances) = 0;
 
   /// Populates the given vector with all conformances for \p D.
   virtual void
   finishNormalConformance(NormalProtocolConformance *conformance,
-                          uint64_t contextData) {
-    llvm_unreachable("unimplemented");
-  }
+                          uint64_t contextData) = 0;
 
   /// Returns the default definition type for \p ATD.
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
-                                            uint64_t contextData) {
-    llvm_unreachable("unimplemented");
-  }
+                                            uint64_t contextData) = 0;
 
   /// Returns the generic environment.
   virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
-                                                     uint64_t contextData) {
-    llvm_unreachable("unimplemented");
-  }
+                                                     uint64_t contextData) = 0;
 };
 
 }

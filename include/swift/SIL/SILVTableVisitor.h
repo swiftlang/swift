@@ -56,7 +56,7 @@ template <class T> class SILVTableVisitor {
       bool needsAllocatingEntry = cd->needsNewVTableEntry();
       if (!needsAllocatingEntry)
         if (auto *baseCD = cd->getOverriddenDecl())
-          needsAllocatingEntry = !baseCD->isRequired();
+          needsAllocatingEntry = !baseCD->isRequired() || baseCD->hasClangNode();
       maybeAddEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator),
                     needsAllocatingEntry);
     }

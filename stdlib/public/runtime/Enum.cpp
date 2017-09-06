@@ -52,7 +52,8 @@ static unsigned getNumTagBytes(size_t size, unsigned emptyCases,
 /// should be a performance win for small constant values where the function
 /// can be inlined, the loop unrolled and the memory accesses merged.
 template <unsigned count> static void small_memcpy(void *dest, const void *src) {
-  uint8_t *d8 = (uint8_t*)dest, *s8 = (uint8_t*)src;
+  uint8_t *d8 = (uint8_t*)dest;
+  const uint8_t *s8 = (const uint8_t*)src;
   for (unsigned i = 0; i < count; i++) {
     *d8++ = *s8++;
   }
@@ -119,9 +120,11 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
           || payloadVWT == &VALUE_WITNESS_SYM(BO)
 #endif
           )) {
-#define COPY_PAYLOAD_WITNESS(NAME) vwtable->NAME = payloadVWT->NAME;
-    FOR_ALL_FUNCTION_VALUE_WITNESSES(COPY_PAYLOAD_WITNESS)
-#undef COPY_PAYLOAD_WITNESS
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+    vwtable->LOWER_ID = payloadVWT->LOWER_ID;
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
   } else {
 #endif
     installCommonValueWitnesses(vwtable);

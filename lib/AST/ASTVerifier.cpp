@@ -103,9 +103,9 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
         is_apply_expr<typename std::remove_pointer<Kind>::type>::value,
         Kind>::type node) {
   if (V.shouldVerify(node)) {
-    // Whitelist any inout_to_pointer or array_to_pointer that we see in
+    // Record any inout_to_pointer or array_to_pointer that we see in
     // the proper position.
-    V.updateExprToPointerWhitelist(node, node->getArg());
+    V.maybeRecordValidPointerConversion(node, node->getArg());
     return {true, node};
   }
   V.cleanup(node);
@@ -119,9 +119,9 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
         is_autoclosure_expr<typename std::remove_pointer<Kind>::type>::value,
         Kind>::type node) {
   if (V.shouldVerify(node)) {
-    // Whitelist any inout_to_pointer or array_to_pointer that we see in
+    // Record any inout_to_pointer or array_to_pointer that we see in
     // the proper position.
-    V.updateExprToPointerWhitelist(node, node->getSingleExpressionBody());
+    V.maybeRecordValidPointerConversion(node, node->getSingleExpressionBody());
     return {true, node};
   }
   V.cleanup(node);
@@ -219,8 +219,8 @@ class Verifier : public ASTWalker {
   ///
   /// Any other inout to pointer expr that we see is invalid and the verifier
   /// will assert.
-  llvm::DenseSet<InOutToPointerExpr *> WhitelistedInOutToPointerExpr;
-  llvm::DenseSet<ArrayToPointerExpr *> WhitelistedArrayToPointerExpr;
+  llvm::DenseSet<InOutToPointerExpr *> ValidInOutToPointerExprs;
+  llvm::DenseSet<ArrayToPointerExpr *> ValidArrayToPointerExprs;
 
   /// A key into ClosureDiscriminators is a combination of a
   /// ("canonicalized") local DeclContext* and a flag for whether to
@@ -828,15 +828,15 @@ public:
       if (D->hasInterfaceType())
         verifyChecked(D->getInterfaceType());
 
-      if (D->hasAccessibility()) {
+      if (D->hasAccess()) {
         PrettyStackTraceDecl debugStack("verifying access", D);
         if (D->getFormalAccessScope().isPublic() &&
-            D->getFormalAccess() < Accessibility::Public) {
+            D->getFormalAccess() < AccessLevel::Public) {
           Out << "non-public decl has no formal access scope\n";
           D->dump(Out);
           abort();
         }
-        if (D->getEffectiveAccess() == Accessibility::Private) {
+        if (D->getEffectiveAccess() == AccessLevel::Private) {
           Out << "effective access should use 'fileprivate' for 'private'\n";
           D->dump(Out);
           abort();
@@ -1050,9 +1050,14 @@ public:
       for_each(exprTy->getElements().begin(), exprTy->getElements().end(),
                E->getElements().begin(),
                [this](const TupleTypeElt &field, const Expr *elt) {
-        checkTrivialSubtype(field.getType()->getUnlabeledType(Ctx),
-                            elt->getType()->getUnlabeledType(Ctx),
-                            "tuple and element");
+        if (!field.getType()->isEqual(elt->getType())) {
+          Out << "tuple_expr element type mismatch:\n";
+          Out << "  field: ";
+          Out << field.getType() << "\n";
+          Out << "  element: ";
+          Out << elt->getType() << "\n";
+          abort();
+        }
       });
       // FIXME: Check all the variadic elements.
       verifyCheckedBase(E);
@@ -1272,8 +1277,8 @@ public:
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying InOutToPointer", E);
 
-      if (!WhitelistedInOutToPointerExpr.count(E)) {
-        Out << "Unwhitelisted InOutToPointerExpr?!\n";
+      if (!ValidInOutToPointerExprs.count(E)) {
+        Out << "InOutToPointerExpr in unexpected position!\n";
         E->print(Out);
         Out << "\n";
         abort();
@@ -1305,7 +1310,7 @@ public:
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying ArrayToPointer", E);
 
-      if (!WhitelistedArrayToPointerExpr.count(E)) {
+      if (!ValidArrayToPointerExprs.count(E)) {
         Out << "ArrayToPointer in invalid position?!\n";
         E->print(Out);
         Out << "\n";
@@ -1445,7 +1450,7 @@ public:
       verifyCheckedBase(E);
     }
 
-    void updateExprToPointerWhitelist(Expr *Base, Expr *Arg) {
+    void maybeRecordValidPointerConversion(Expr *Base, Expr *Arg) {
       auto handleSubExpr = [&](Expr *origSubExpr) {
         auto subExpr = origSubExpr;
         unsigned optionalDepth = 0;
@@ -1481,16 +1486,16 @@ public:
           break;
         }
 
-        // Whitelist inout-to-pointer conversions.
+        // Record inout-to-pointer conversions.
         if (auto *inOutToPtr = dyn_cast<InOutToPointerExpr>(subExpr)) {
-          WhitelistedInOutToPointerExpr.insert(inOutToPtr);
+          ValidInOutToPointerExprs.insert(inOutToPtr);
           checkIsBindOptional(inOutToPtr->getSubExpr());
           return;
         }
 
-        // Whitelist array-to-pointer conversions.
+        // Record array-to-pointer conversions.
         if (auto *arrayToPtr = dyn_cast<ArrayToPointerExpr>(subExpr)) {
-          WhitelistedArrayToPointerExpr.insert(arrayToPtr);
+          ValidArrayToPointerExprs.insert(arrayToPtr);
           checkIsBindOptional(arrayToPtr->getSubExpr());
           return;
         }
@@ -1997,10 +2002,10 @@ public:
     }
 
     void verifyChecked(ValueDecl *VD) {
-      if (!VD->hasAccessibility() && !VD->getDeclContext()->isLocalContext() &&
+      if (!VD->hasAccess() && !VD->getDeclContext()->isLocalContext() &&
           !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
         dumpRef(VD);
-        Out << " does not have accessibility";
+        Out << " does not have access";
         abort();
       }
 
@@ -2029,12 +2034,12 @@ public:
     }
 
     void verifyChecked(AbstractStorageDecl *ASD) {
-      if (ASD->hasAccessibility() && ASD->isSettable(nullptr)) {
-        auto setterAccess = ASD->getSetterAccessibility();
+      if (ASD->hasAccess() && ASD->isSettable(nullptr)) {
+        auto setterAccess = ASD->getSetterFormalAccess();
         if (ASD->getSetter() &&
             ASD->getSetter()->getFormalAccess() != setterAccess) {
-          Out << "AbstractStorageDecl's setter accessibility is out of sync"
-                 " with the accessibility actually on the setter";
+          Out << "AbstractStorageDecl's setter access is out of sync"
+                 " with the access actually on the setter";
           abort();
         }
       }

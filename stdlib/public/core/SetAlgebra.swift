@@ -276,15 +276,14 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   /// In the following example, the elements of the `employees` set that are
   /// also members of `neighbors` are removed from `employees`, while the
   /// elements of `neighbors` that are not members of `employees` are added to
-  /// `employees`. In particular, the names `"Alicia"`, `"Chris"`, and
-  /// `"Diana"` are removed from `employees` while the names `"Forlani"` and
-  /// `"Greta"` are added.
+  /// `employees`. In particular, the names `"Bethany"` and `"Eric"` are
+  /// removed from `employees` while the name `"Forlani"` is added.
   ///
-  ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
-  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
+  ///     var employees: Set = ["Alicia", "Bethany", "Diana", "Eric"]
+  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani"]
   ///     employees.formSymmetricDifference(neighbors)
   ///     print(employees)
-  ///     // Prints "["Diana", "Chris", "Forlani", "Alicia", "Greta"]"
+  ///     // Prints "["Diana", "Forlani", "Alicia"]"
   ///
   /// - Parameter other: A set of the same type.
   mutating func formSymmetricDifference(_ other: Self)
@@ -570,64 +569,3 @@ extension SetAlgebra where Element == ArrayLiteralElement {
     self.init(arrayLiteral)
   }  
 }
-
-@available(*, unavailable, renamed: "SetAlgebra")
-public typealias SetAlgebraType = SetAlgebra
-
-extension SetAlgebra {
-  @available(*, unavailable, renamed: "intersection(_:)")
-  public func intersect(_ other: Self) -> Self {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "symmetricDifference(_:)")
-  public func exclusiveOr(_ other: Self) -> Self {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "formUnion(_:)")
-  public mutating func unionInPlace(_ other: Self) {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "formIntersection(_:)")
-  public mutating func intersectInPlace(_ other: Self) {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "formSymmetricDifference(_:)")
-  public mutating func exclusiveOrInPlace(_ other: Self) {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "isSubset(of:)")
-  public func isSubsetOf(_ other: Self) -> Bool {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "isDisjoint(with:)")
-  public func isDisjointWith(_ other: Self) -> Bool {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "isSuperset(of:)")
-  public func isSupersetOf(_ other: Self) -> Bool {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "subtract(_:)")
-  public mutating func subtractInPlace(_ other: Self) {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "isStrictSuperset(of:)")
-  public func isStrictSupersetOf(_ other: Self) -> Bool {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "isStrictSubset(of:)")
-  public func isStrictSubsetOf(_ other: Self) -> Bool {
-    Builtin.unreachable()
-  }
-}
-

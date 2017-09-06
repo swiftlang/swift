@@ -27,7 +27,7 @@ public func run_DictionarySwap(_ N: Int) {
 
     var swapped = false
     for _ in 1...10000*N {
-        swap(&dict[25]!, &dict[75]!)
+        (dict[25], dict[75]) = (dict[75]!, dict[25]!)
         swapped = !swapped
         if !swappedCorrectly(swapped, dict[25]!, dict[75]!) {
             break
@@ -72,7 +72,9 @@ public func run_DictionarySwapOfObjects(_ N: Int) {
 
     var swapped = false
     for _ in 1...10000*N {
-        swap(&dict[Box(25)]!, &dict[Box(75)]!)
+        let b1 = Box(25)
+        let b2 = Box(75)
+        (dict[b1], dict[b2]) = (dict[b2]!, dict[b1]!)
         swapped = !swapped
         if !swappedCorrectly(swapped, dict[Box(25)]!.value, dict[Box(75)]!.value) {
             break

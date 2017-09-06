@@ -423,7 +423,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // Try ignoring access control.
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::KnownPrivate;
-    relookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     LookupResult inaccessibleResults = lookupUnqualified(DC, Name, Loc,
                                                          relookupOptions);
     if (inaccessibleResults) {
@@ -1100,34 +1100,32 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   }
 
   // Fold 'T.U' into a nested type.
-  //
-  // FIXME: Also support this if 'T' is a generic parameter.
   if (auto *ITR = dyn_cast<IdentTypeRepr>(InnerTypeRepr)) {
-    // The last component should be bound already.
-    if (auto *D = ITR->getComponentRange().back()->getBoundDecl()) {
-      auto BaseTy = D->getDeclaredInterfaceType();
-      // The last component should be a module, nominal type, or a typealias
-      // whose underlying type is a nominal type, otherwise we cannot perform
-      // a type member lookup, which will be diagnosed later.
-      if (BaseTy->getAnyNominal() ||
-          BaseTy->is<ModuleType>()) {
-        auto lookupOptions = defaultMemberLookupOptions;
-        if (isa<AbstractFunctionDecl>(DC) ||
-            isa<AbstractClosureExpr>(DC))
-          lookupOptions |= NameLookupFlags::KnownPrivate;
+    // Resolve the TypeRepr to get the base type for the lookup.
+    // Disable availability diagnostics here, because the final
+    // TypeRepr will be resolved again when generating constraints.
+    TypeResolutionOptions options = TR_AllowUnboundGenerics;
+    options |= TR_InExpression;
+    options |= TR_AllowUnavailable;
+    auto BaseTy = TC.resolveType(InnerTypeRepr, DC, options);
 
-        // See if there is a member type with this name.
-        auto Result = TC.lookupMemberType(DC,
-                                          BaseTy,
-                                          Name,
-                                          lookupOptions);
+    if (BaseTy && BaseTy->mayHaveMembers()) {
+      auto lookupOptions = defaultMemberLookupOptions;
+      if (isa<AbstractFunctionDecl>(DC) ||
+          isa<AbstractClosureExpr>(DC))
+        lookupOptions |= NameLookupFlags::KnownPrivate;
 
-        // If there is no nested type with this name, we have a lookup of
-        // a non-type member, so leave the expression as-is.
-        if (Result.size() == 1) {
-          return TypeExpr::createForMemberDecl(ITR, NameLoc,
-                                               Result.front().first);
-        }
+      // See if there is a member type with this name.
+      auto Result = TC.lookupMemberType(DC,
+                                        BaseTy,
+                                        Name,
+                                        lookupOptions);
+
+      // If there is no nested type with this name, we have a lookup of
+      // a non-type member, so leave the expression as-is.
+      if (Result.size() == 1) {
+        return TypeExpr::createForMemberDecl(ITR, NameLoc,
+                                             Result.front().first);
       }
     }
   }
@@ -1644,6 +1642,11 @@ void GenericRequirementsCheckListener::satisfiedConformance(
                                           ProtocolConformanceRef conformance) {
 }
 
+bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
+    const Requirement &req, Type first, Type second) {
+  return false;
+}
+
 bool TypeChecker::
 solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
                    FreeTypeVariableBinding allowFreeTypeVariables,
@@ -1779,7 +1782,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   if (options.contains(TypeCheckExprFlags::SkipApplyingSolution)) {
     cleanup.disable();
-    return cs.getType(expr);
+    return solution.simplifyType(cs.getType(expr));
   }
 
   // Apply the solution to the expression.
@@ -2180,8 +2183,15 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       options |= TR_EditorPlaceholder;
     }
 
+    // FIXME: initTy should be the same as resultTy; now that typeCheckExpression()
+    // returns a Type and not bool, we should be able to simplify the listener
+    // implementation here.
+    auto initTy = listener.getInitType();
+    if (initTy->hasDependentMember())
+      return true;
+
     // Apply the solution to the pattern as well.
-    if (coercePatternToType(pattern, DC, listener.getInitType(), options,
+    if (coercePatternToType(pattern, DC, initTy, options,
                             nullptr, TypeLoc(), listener.isInOut())) {
       return true;
     }
@@ -2732,6 +2742,21 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
 }
 
 bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
+  return typesSatisfyConstraint(type1, type2,
+                                /*openArchetypes=*/false,
+                                ConstraintKind::Subtype, dc);
+}
+
+bool TypeChecker::isSubclassOf(Type type1, Type type2, DeclContext *dc) {
+  assert(type2->getClassOrBoundGenericClass());
+
+  if (!typesSatisfyConstraint(type1,
+                              Context.getAnyObjectType(),
+                              /*openArchetypes=*/false,
+                              ConstraintKind::ConformsTo, dc)) {
+    return false;
+  }
+
   return typesSatisfyConstraint(type1, type2,
                                 /*openArchetypes=*/false,
                                 ConstraintKind::Subtype, dc);

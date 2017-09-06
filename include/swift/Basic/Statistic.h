@@ -74,6 +74,8 @@ public:
   struct AlwaysOnFrontendCounters
   {
     size_t NumSourceBuffers;
+    size_t NumSourceLines;
+    size_t NumSourceLinesPerSecond;
     size_t NumLinkLibraries;
     size_t NumLoadedModules;
     size_t NumImportedExternalDefinitions;
@@ -101,6 +103,7 @@ public:
     size_t NumLazyGenericEnvironments;
     size_t NumLazyGenericEnvironmentsLoaded;
     size_t NumLazyIterableDeclContexts;
+    size_t NominalTypeLookupDirectCount;
     size_t NumTypesDeserialized;
     size_t NumTypesValidated;
     size_t NumUnloadedLazyIterableDeclContexts;
@@ -132,6 +135,7 @@ public:
 
 private:
   SmallString<128> Filename;
+  llvm::TimeRecord StartedTime;
   std::unique_ptr<llvm::NamedRegionTimer> Timer;
 
   std::unique_ptr<AlwaysOnDriverCounters> DriverCounters;

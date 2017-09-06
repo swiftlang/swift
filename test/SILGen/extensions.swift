@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class Foo {
   // CHECK-LABEL: sil hidden @_T010extensions3FooC3zim{{[_0-9a-zA-Z]*}}F
@@ -43,7 +43,7 @@ func extensionMethodCurrying(_ x: Foo) {
 // Extensions of generic types with stored property initializers
 
 // CHECK-LABEL: sil hidden [transparent] @_T010extensions3BoxV1txSgvfi : $@convention(thin) <T> () -> @out Optional<T>
-// CHECK:      bb0(%0 : $*Optional<T>):
+// CHECK:      bb0(%0 : @trivial $*Optional<T>):
 // CHECK:      [[FN:%.*]] = function_ref @_T0SqxSgyt10nilLiteral_tcfC : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Optional<T>.Type
 // CHECK-NEXT: apply [[FN]]<T>(%0, [[METATYPE]]) : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>

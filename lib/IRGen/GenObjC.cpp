@@ -124,7 +124,7 @@ llvm::Value *IRGenFunction::emitObjCAutoreleaseCall(llvm::Value *val) {
   return call;
 }
 
-llvm::Value *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
+llvm::InlineAsm *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
   // Check to see if we've already computed the market.  Note that we
   // might have cached a null marker, and that's fine.
   auto &cache = ObjCRetainAutoreleasedReturnValueMarker;
@@ -170,7 +170,7 @@ llvm::Value *irgen::emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
                                                           llvm::Value *value) {
   // Call the inline-assembly marker if we need one.
   if (auto marker = IGF.IGM.getObjCRetainAutoreleasedReturnValueMarker()) {
-    IGF.Builder.CreateCall(marker, {});
+    IGF.Builder.CreateAsmCall(marker, {});
   }
 
   auto fn = IGF.IGM.getObjCRetainAutoreleasedReturnValueFn();
@@ -758,8 +758,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
  
   assert(resultType->getRepresentation()
            == SILFunctionType::Representation::Thick);
- 
-  llvm::AttributeSet attrs;
+
+  llvm::AttributeList attrs;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(resultType, attrs);
   // FIXME: Give the thunk a real name.
   // FIXME: Maybe cache the thunk by function and closure types?
@@ -770,11 +770,11 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   fwd->setCallingConv(
       expandCallingConv(IGM, SILFunctionTypeRepresentation::Thick));
 
-  auto initialAttrs = IGM.constructInitialAttributes();
-  // Merge initialAttrs with attrs.
-  auto updatedAttrs = attrs.addAttributes(IGM.getLLVMContext(),
-                        llvm::AttributeSet::FunctionIndex, initialAttrs);
-  fwd->setAttributes(updatedAttrs);
+  fwd->setAttributes(attrs);
+  // Merge initial attributes with attrs.
+  llvm::AttrBuilder b;
+  IGM.constructInitialFnAttributes(b);
+  fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
   
   IRGenFunction subIGF(IGM, fwd);
   if (IGM.DebugInfo)
@@ -871,8 +871,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     // Otherwise, we have a loadable type that can either be passed directly or
     // indirectly.
     assert(info.getSILStorageType().isObject());
-    auto &ti =
-        cast<LoadableTypeInfo>(IGM.getTypeInfo(info.getSILStorageType()));
+    auto curSILType = info.getSILStorageType();
+    auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(curSILType));
 
     // Load the indirectly passed parameter.
     auto &nativeSchema = ti.nativeParameterValueSchema(IGM);
@@ -881,8 +881,16 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
       ti.loadAsTake(subIGF, paramAddr, translatedParams);
       continue;
     }
+    // Map from the native calling convention into the explosion schema.
+    auto &nativeParamSchema = ti.nativeParameterValueSchema(IGM);
+    Explosion nativeParam;
+    params.transferInto(nativeParam, nativeParamSchema.size());
+    Explosion nonNativeParam = nativeParamSchema.mapFromNative(
+        subIGF.IGM, subIGF, nativeParam, curSILType);
+    assert(nativeParam.empty());
+
     // Pass along the value.
-    ti.reexplode(subIGF, params, translatedParams);
+    ti.reexplode(subIGF, nonNativeParam, translatedParams);
   }
 
   // Prepare the call to the underlying method.

@@ -216,6 +216,13 @@ tests.test("index-mapping/utf16-to-utf8/\(id)") {
     summer.utf8.endIndex,
     mapIndex(summer.utf16.endIndex, summer.utf8)!)
 }
+
+tests.test("index-mapping/utf8-to-utf8/\(id)") {
+  // should always succeed
+  for i in winter.utf8.indices {
+    expectEqual(i, mapIndex(i, winter.utf8)!)      
+  }
+}
 }
 checkToUTF8("legacy") { $0.samePosition(in: $1) }
 checkToUTF8("interchange") { i, _ in i }
@@ -687,6 +694,8 @@ tests.test("UTF16->String") {
           continue
         }
       }
+      // This tests for the Swift 3 semantics, which don't match the documented
+      // semantics!
       expectNil(String(v[i..<j]))
     }
   }
@@ -695,14 +704,20 @@ tests.test("UTF16->String") {
 tests.test("UTF8->String") {
   let s = summer + winter + winter + summer
   let v = s.utf8
+
   for i in v.indices {
     for j in v.indices[i..<v.endIndex] {
       if let si = i.samePosition(in: s) {
         if let sj = j.samePosition(in: s) {
-          expectEqual(s[si..<sj], String(v[i..<j])!)
+          expectEqual(
+            s[si..<sj], String(v[i..<j])!,
+            "\(String(reflecting: s))[\n  \(si..<sj)\n] != String(\n  \(String(reflecting: v))[\n    \(i..<j)\n  ])!"
+          )
           continue
         }
       }
+      // This tests for the Swift 3 semantics, which don't match the documented
+      // semantics!
       expectNil(String(v[i..<j]))
     }
   }

@@ -93,9 +93,9 @@ extension Unicode.UTF8 : _UnicodeEncoding {
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF16.self) {
       let c = _identityCast(content, to: UTF16.EncodedScalar.self)
-      var u0 = UInt16(extendingOrTruncating: c._storage) 
+      var u0 = UInt16(truncatingIfNeeded: c._storage) 
       if _fastPath(u0 < 0x80) {
-        return EncodedScalar(_containing: UInt8(extendingOrTruncating: u0))
+        return EncodedScalar(_containing: UInt8(truncatingIfNeeded: u0))
       }
       var r = UInt32(u0 & 0b0__11_1111)
       r &<<= 8
@@ -207,7 +207,7 @@ extension UTF8.ReverseParser : Unicode.Parser, _UTFParser {
   @inline(__always)
   @_inlineable
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
-    let x = UInt32(extendingOrTruncating: _buffer._storage.byteSwapped)
+    let x = UInt32(truncatingIfNeeded: _buffer._storage.byteSwapped)
     let shift = 32 &- bitCount
     return Encoding.EncodedScalar(_biasedBits: (x &+ 0x01010101) &>> shift)
   }

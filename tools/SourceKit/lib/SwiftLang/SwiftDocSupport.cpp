@@ -15,6 +15,7 @@
 #include "SwiftASTManager.h"
 #include "SwiftEditorDiagConsumer.h"
 #include "SwiftLangSupport.h"
+#include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
 
 #include "swift/AST/ASTPrinter.h"
@@ -25,6 +26,7 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/SyntaxModel.h"
+#include "swift/IDE/Refactoring.h"
 // This is included only for createLazyResolver(). Move to different header ?
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Config.h"
@@ -1112,6 +1114,288 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   return false;
 }
 
+class RequestRefactoringEditConsumer::Implementation {
+public:
+  CategorizedEditsReceiver Receiver;
+  std::vector<Edit> AllEdits;
+  std::vector<std::pair<unsigned, unsigned>> StartEnds;
+  std::vector<UIdent> UIds;
+  SmallString<64> ErrBuffer;
+  llvm::raw_svector_ostream OS;
+  PrintingDiagnosticConsumer DiagConsumer;
+  Implementation(CategorizedEditsReceiver Receiver):
+    Receiver(std::move(Receiver)), OS(ErrBuffer), DiagConsumer(OS) {}
+  ~Implementation() {
+    if (DiagConsumer.didErrorOccur()) {
+      Receiver({}, OS.str());
+      return;
+    }
+    assert(UIds.size() == StartEnds.size());
+    std::vector<CategorizedEdits> Results;
+    for (unsigned I = 0, N = UIds.size(); I < N; I ++) {
+      auto Pair = StartEnds[I];
+      Results.push_back({UIds[I],
+                         llvm::makeArrayRef(AllEdits.data() + Pair.first,
+                                             Pair.second - Pair.first)});
+    }
+    Receiver(Results, "");
+  }
+  void accept(SourceManager &SM, RegionType RegionType,
+              ArrayRef<Replacement> Replacements) {
+    unsigned Start = AllEdits.size();
+    std::transform(Replacements.begin(), Replacements.end(),
+                   std::back_inserter(AllEdits),
+                   [&](const Replacement &R) -> Edit {
+      std::pair<unsigned, unsigned>
+        Start = SM.getLineAndColumn(R.Range.getStart()),
+        End = SM.getLineAndColumn(R.Range.getEnd());
+      SmallVector<NoteRegion, 4> SubRanges;
+      auto RawRanges = R.RegionsWorthNote;
+      std::transform(RawRanges.begin(), RawRanges.end(),
+                     std::back_inserter(SubRanges),
+                     [](swift::ide::NoteRegion R) -> SourceKit::NoteRegion {
+                       return {
+                         SwiftLangSupport::getUIDForRefactoringRangeKind(R.Kind),
+                         R.StartLine, R.StartColumn, R.EndLine, R.EndColumn,
+                         R.ArgIndex
+                       }; });
+      return {Start.first, Start.second, End.first, End.second, R.Text,
+        std::move(SubRanges)};
+    });
+    unsigned End = AllEdits.size();
+    StartEnds.emplace_back(Start, End);
+    UIds.push_back(SwiftLangSupport::getUIDForRegionType(RegionType));
+  }
+};
+
+RequestRefactoringEditConsumer::
+RequestRefactoringEditConsumer(CategorizedEditsReceiver Receiver) :
+  Impl(*new Implementation(Receiver)) {}
+
+RequestRefactoringEditConsumer::
+~RequestRefactoringEditConsumer() { delete &Impl; };
+
+void RequestRefactoringEditConsumer::
+accept(SourceManager &SM, RegionType RegionType,
+       ArrayRef<Replacement> Replacements) {
+  Impl.accept(SM, RegionType, Replacements);
+}
+
+void RequestRefactoringEditConsumer::
+handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                 StringRef FormatString,
+                 ArrayRef<DiagnosticArgument> FormatArgs,
+                 const DiagnosticInfo &Info) {
+  Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
+                                     Info);
+}
+
+class RequestRenameRangeConsumer::Implementation {
+  CategorizedRenameRangesReceiver Receiver;
+  std::string ErrBuffer;
+  llvm::raw_string_ostream OS;
+  std::vector<CategorizedRenameRanges> CategorizedRanges;
+
+public:
+  PrintingDiagnosticConsumer DiagConsumer;
+
+public:
+  Implementation(CategorizedRenameRangesReceiver Receiver)
+      : Receiver(Receiver), OS(ErrBuffer), DiagConsumer(OS) {}
+
+  ~Implementation() {
+    if (DiagConsumer.didErrorOccur()) {
+      Receiver({}, OS.str());
+      return;
+    }
+    Receiver(CategorizedRanges, "");
+  }
+
+  void accept(SourceManager &SM, RegionType RegionType,
+              ArrayRef<ide::RenameRangeDetail> Ranges) {
+    CategorizedRenameRanges Results;
+    Results.Category = SwiftLangSupport::getUIDForRegionType(RegionType);
+    for (const auto &R : Ranges) {
+      SourceKit::RenameRangeDetail Result;
+      std::tie(Result.StartLine, Result.StartColumn) =
+          SM.getLineAndColumn(R.Range.getStart());
+      std::tie(Result.EndLine, Result.EndColumn) =
+          SM.getLineAndColumn(R.Range.getEnd());
+      Result.ArgIndex = R.Index;
+      Result.Kind =
+          SwiftLangSupport::getUIDForRefactoringRangeKind(R.RangeKind);
+      Results.Ranges.push_back(std::move(Result));
+    }
+    CategorizedRanges.push_back(std::move(Results));
+  }
+};
+
+RequestRenameRangeConsumer::RequestRenameRangeConsumer(
+    CategorizedRenameRangesReceiver Receiver)
+    : Impl(*new Implementation(Receiver)) {}
+RequestRenameRangeConsumer::~RequestRenameRangeConsumer() { delete &Impl; }
+
+void RequestRenameRangeConsumer::accept(
+    SourceManager &SM, RegionType RegionType,
+    ArrayRef<ide::RenameRangeDetail> Ranges) {
+  Impl.accept(SM, RegionType, Ranges);
+}
+
+void RequestRenameRangeConsumer::
+handleDiagnostic(SourceManager &SM,
+                 SourceLoc Loc,
+                 DiagnosticKind Kind,
+                 StringRef FormatString,
+                 ArrayRef<DiagnosticArgument> FormatArgs,
+                 const DiagnosticInfo &Info) {
+  Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
+                                     Info);
+}
+
+static NameUsage getNameUsage(RenameType Type) {
+  switch (Type) {
+  case RenameType::Definition:
+    return NameUsage::Definition;
+  case RenameType::Reference:
+    return NameUsage::Reference;
+  case RenameType::Call:
+    return NameUsage::Call;
+  case RenameType::Unknown:
+    return NameUsage::Unknown;
+  }
+}
+
+static std::vector<RenameLoc>
+getSyntacticRenameLocs(ArrayRef<RenameLocations> RenameLocations);
+
+void SwiftLangSupport::
+syntacticRename(llvm::MemoryBuffer *InputBuf,
+                ArrayRef<RenameLocations> RenameLocations,
+                ArrayRef<const char*> Args,
+                CategorizedEditsReceiver Receiver) {
+  std::string Error;
+  CompilerInstance ParseCI;
+  PrintingDiagnosticConsumer PrintDiags;
+  ParseCI.addDiagnosticConsumer(&PrintDiags);
+  SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
+  if (!SF) {
+    Receiver({}, Error);
+    return;
+  }
+
+  auto RenameLocs = getSyntacticRenameLocs(RenameLocations);
+  RequestRefactoringEditConsumer EditConsumer(Receiver);
+  swift::ide::syntacticRename(SF, RenameLocs, EditConsumer, EditConsumer);
+}
+
+void SwiftLangSupport::findRenameRanges(
+    llvm::MemoryBuffer *InputBuf, ArrayRef<RenameLocations> RenameLocations,
+    ArrayRef<const char *> Args, CategorizedRenameRangesReceiver Receiver) {
+  std::string Error;
+  CompilerInstance ParseCI;
+  PrintingDiagnosticConsumer PrintDiags;
+  ParseCI.addDiagnosticConsumer(&PrintDiags);
+  SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
+  if (!SF) {
+    Receiver({}, Error);
+    return;
+  }
+
+  auto RenameLocs = getSyntacticRenameLocs(RenameLocations);
+  RequestRenameRangeConsumer Consumer(Receiver);
+  swift::ide::findSyntacticRenameRanges(SF, RenameLocs, Consumer, Consumer);
+}
+
+void SwiftLangSupport::findLocalRenameRanges(
+    StringRef Filename, unsigned Line, unsigned Column, unsigned Length,
+    ArrayRef<const char *> Args, CategorizedRenameRangesReceiver Receiver) {
+  std::string Error;
+  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, Filename, Error);
+  if (!Invok) {
+    // FIXME: Report it as failed request.
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver({}, Error);
+    return;
+  }
+
+  struct LocalRenameRangeASTConsumer : public SwiftASTConsumer {
+    unsigned Line, Column, Length;
+    CategorizedRenameRangesReceiver Receiver;
+
+    LocalRenameRangeASTConsumer(unsigned Line, unsigned Column, unsigned Length,
+                                CategorizedRenameRangesReceiver Receiver)
+        : Line(Line), Column(Column), Length(Length),
+          Receiver(std::move(Receiver)) {}
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto &SF = AstUnit->getPrimarySourceFile();
+      swift::ide::RangeConfig Range{*SF.getBufferID(), Line, Column, Length};
+      RequestRenameRangeConsumer Consumer(std::move(Receiver));
+      swift::ide::findLocalRenameRanges(&SF, Range, Consumer, Consumer);
+    }
+
+    void cancelled() override { Receiver({}, "The refactoring is canceled."); }
+
+    void failed(StringRef Error) override { Receiver({}, Error); }
+  };
+
+  auto ASTConsumer = std::make_shared<LocalRenameRangeASTConsumer>(
+      Line, Column, Length, std::move(Receiver));
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  getASTManager().processASTAsync(Invok, ASTConsumer, &OncePerASTToken);
+}
+
+SourceFile *SwiftLangSupport::getSyntacticSourceFile(
+    llvm::MemoryBuffer *InputBuf, ArrayRef<const char *> Args,
+    CompilerInstance &ParseCI, std::string &Error) {
+  CompilerInvocation Invocation;
+
+  bool Failed = getASTManager().initCompilerInvocation(Invocation, Args,
+                                                       ParseCI.getDiags(),
+                                                       StringRef(), Error);
+  if (Failed) {
+    Error = "Compiler invocation init failed";
+    return nullptr;
+  }
+  Invocation.setInputKind(InputFileKind::IFK_Swift);
+  Invocation.addInputBuffer(InputBuf);
+
+  if (ParseCI.setup(Invocation)) {
+    Error = "Compiler invocation set up failed";
+    return nullptr;
+  }
+  ParseCI.performParseOnly(/*EvaluateConditionals*/true);
+
+  SourceFile *SF = nullptr;
+  unsigned BufferID = ParseCI.getInputBufferIDs().back();
+  for (auto Unit : ParseCI.getMainModule()->getFiles()) {
+    if (auto Current = dyn_cast<SourceFile>(Unit)) {
+      if (Current->getBufferID().getValue() == BufferID) {
+        SF = Current;
+        break;
+      }
+    }
+  }
+  if (!SF)
+    Error = "Failed to determine SourceFile for input buffer";
+  return SF;
+}
+
+static std::vector<RenameLoc>
+getSyntacticRenameLocs(ArrayRef<RenameLocations> RenameLocations) {
+  std::vector<RenameLoc> RenameLocs;
+  for(const auto &Locations: RenameLocations) {
+    for(const auto &Location: Locations.LineColumnLocs) {
+      RenameLocs.push_back({Location.Line, Location.Column,
+        getNameUsage(Location.Type), Locations.OldName, Locations.NewName,
+        Locations.IsFunctionLike, Locations.IsNonProtocolType});
+    }
+  }
+  return RenameLocs;
+}
+
 void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
                                   StringRef ModuleName,
                                   ArrayRef<const char *> Args,
@@ -1145,10 +1429,10 @@ void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
     Consumer.failed("Error occurred");
 }
 
-void SwiftLangSupport::findModuleGroups(StringRef ModuleName,
-                                        ArrayRef<const char *> Args,
-                                        std::function<void(ArrayRef<StringRef>,
-                                                           StringRef Error)> Receiver) {
+void SwiftLangSupport::
+findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
+                 std::function<void(ArrayRef<StringRef>,
+                                    StringRef Error)> Receiver) {
   CompilerInvocation Invocation;
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
   Invocation.clearInputs();

@@ -58,13 +58,12 @@ def create_lldb_target(binary, memmap):
     lldb_target = lldb_debugger.CreateTargetWithFileAndArch(
         binary, lldb.LLDB_ARCH_DEFAULT)
     module = lldb_target.GetModuleAtIndex(0)
-    # lldb seems to treat main binary differently, slide offset must be zero
-    lldb_target.SetModuleLoadAddress(module, 0)
     for dynlib_path in memmap:
-        if binary not in dynlib_path:
-            module = lldb_target.AddModule(
-                dynlib_path, lldb.LLDB_ARCH_DEFAULT, None, None)
-            lldb_target.SetModuleLoadAddress(module, memmap[dynlib_path])
+        module = lldb_target.AddModule(
+            dynlib_path, lldb.LLDB_ARCH_DEFAULT, None, None)
+        text_section = module.FindSection(".text")
+        slide = text_section.GetFileAddress() - text_section.GetFileOffset()
+        lldb_target.SetModuleLoadAddress(module, memmap[dynlib_path] - slide)
     return lldb_target
 
 

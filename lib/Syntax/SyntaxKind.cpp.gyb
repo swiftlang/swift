@@ -1,0 +1,42 @@
+%{
+  from gyb_syntax_support import *
+  # -*- mode: C++ -*-
+  # Ignore the following admonition; it applies to the resulting .cpp file only
+}%
+//// Automatically Generated From SyntaxKind.cpp.gyb.
+//// Do Not Edit Directly!
+//===-------------- SyntaxKind.cpp - Syntax Kind definitions --------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/Syntax/SyntaxKind.h"
+
+namespace swift {
+namespace syntax {
+
+void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind) {
+  switch (kind) {
+  case SyntaxKind::Token:
+    os << "Token";
+    break;
+  case SyntaxKind::Unknown:
+    os << "Unknown";
+    break;
+% for node in SYNTAX_NODES:
+  case SyntaxKind::${node.syntax_kind}:
+    os << "${node.syntax_kind}";
+    break;
+% end
+  }
+}
+
+} // end namespace syntax
+} // end namespace swift

@@ -708,6 +708,19 @@ class r18199087SubClassA: r18199087BaseClass {
   }
 }
 
+class r18199087BaseClassNonTrivial {
+  let data: SomeClass
+  init(val: SomeClass) {
+    data = val
+  }
+}
+
+class r18199087SubClassANonTrivial: r18199087BaseClassNonTrivial {
+  init() {
+    super.init(val: self.data)  // expected-error {{use of 'self' in property access 'data' before super.init initializes self}}
+  }
+}
+
 // <rdar://problem/18414728> QoI: DI should talk about "implicit use of self" instead of individual properties in some cases
 class rdar18414728Base {
   var prop:String? { return "boo" }
@@ -1127,7 +1140,7 @@ func test22436880() {
 
 // sr-184
 let x: String? // expected-note 2 {{constant defined here}}
-print(x?.characters.count as Any) // expected-error {{constant 'x' used before being initialized}}
+print(x?.count as Any) // expected-error {{constant 'x' used before being initialized}}
 print(x!) // expected-error {{constant 'x' used before being initialized}}
 
 

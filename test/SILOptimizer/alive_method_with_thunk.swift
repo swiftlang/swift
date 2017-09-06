@@ -19,6 +19,6 @@ public class DerivedClass: BaseClass<Double> {
 // CHECK: }
 
 // CHECK: sil_vtable DerivedClass {
-// CHECK:  #BaseClass.doSomething!1: <T> (BaseClass<T>) -> (T) -> Int : public _T023alive_method_with_thunk12DerivedClassC11doSomethingSiSdFAA04BaseF0CADSixFTV  // vtable thunk for BaseClass.doSomething(_:) dispatching to DerivedClass.doSomething(_:)
+// CHECK:  #BaseClass.doSomething!1: <T> (BaseClass<T>) -> (T) -> Int : public _T023alive_method_with_thunk12DerivedClassC11doSomethingSiSdFAA04BaseF0CADSixFTV [override]  // vtable thunk for BaseClass.doSomething(_:) dispatching to DerivedClass.doSomething(_:)
 // CHECK: }
 

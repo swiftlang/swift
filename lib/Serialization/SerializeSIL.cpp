@@ -74,6 +74,15 @@ static unsigned toStableSILLinkage(SILLinkage linkage) {
   llvm_unreachable("bad linkage");
 }
 
+static unsigned toStableVTableEntryKind(SILVTable::Entry::Kind kind) {
+  switch (kind) {
+  case SILVTable::Entry::Kind::Normal: return SIL_VTABLE_ENTRY_NORMAL;
+  case SILVTable::Entry::Kind::Inherited: return SIL_VTABLE_ENTRY_INHERITED;
+  case SILVTable::Entry::Kind::Override: return SIL_VTABLE_ENTRY_OVERRIDE;
+  }
+  llvm_unreachable("bad vtable entry kind");
+}
+
 static unsigned toStableCastConsumptionKind(CastConsumptionKind kind) {
   switch (kind) {
   case CastConsumptionKind::TakeAlways:
@@ -564,6 +573,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
 
+  case ValueKind::ObjectInst:
+    llvm_unreachable("static initializers of sil_global are not serialized");
+
   case ValueKind::DebugValueInst:
   case ValueKind::DebugValueAddrInst:
     // Currently we don't serialize debug variable infos, so it doesn't make
@@ -865,16 +877,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
             Ctx.getIdentifier(AGI->getReferencedGlobal()->getName())));
     break;
   }
-  case ValueKind::GlobalAddrInst: {
+  case ValueKind::GlobalAddrInst:
+  case ValueKind::GlobalValueInst: {
     // Format: Name and type. Use SILOneOperandLayout.
-    const GlobalAddrInst *GAI = cast<GlobalAddrInst>(&SI);
+    const GlobalAccessInst *GI = cast<GlobalAccessInst>(&SI);
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0,
-        S.addTypeRef(GAI->getType().getSwiftRValueType()),
-        (unsigned)GAI->getType().getCategory(),
+        S.addTypeRef(GI->getType().getSwiftRValueType()),
+        (unsigned)GI->getType().getCategory(),
         S.addDeclBaseNameRef(
-            Ctx.getIdentifier(GAI->getReferencedGlobal()->getName())));
+            Ctx.getIdentifier(GI->getReferencedGlobal()->getName())));
     break;
   }
   case ValueKind::BranchInst: {
@@ -1322,7 +1335,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::UnconditionalCheckedCastAddrInst: {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
     ValueID listOfValues[] = {
-      toStableCastConsumptionKind(CI->getConsumptionKind()),
       S.addTypeRef(CI->getSourceType()),
       addValueRef(CI->getSrc()),
       S.addTypeRef(CI->getSrc()->getType().getSwiftRValueType()),
@@ -1342,7 +1354,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstCastLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstCastLayout::Code],
         (unsigned)SI.getKind(),
-        toStableCastConsumptionKind(CI->getConsumptionKind()),
+        /*attr*/ 0,
         S.addTypeRef(CI->getType().getSwiftRValueType()),
         (unsigned)CI->getType().getCategory(),
         S.addTypeRef(CI->getOperand()->getType().getSwiftRValueType()),
@@ -2029,6 +2041,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
         SILAbbrCodes[VTableEntryLayout::Code],
         // SILFunction name
         S.addDeclBaseNameRef(Ctx.getIdentifier(entry.Implementation->getName())),
+        toStableVTableEntryKind(entry.TheKind),
         toStableSILLinkage(entry.Linkage),
         ListOfValues);
   }
@@ -2248,12 +2261,12 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // mandatory function bodies.
   for (const SILFunction &F : *SILMod) {
     if (emitDeclarationsForOnoneSupport) {
-      // Only declarations of whitelisted pre-specializations from with
+      // Only declarations of hardcoded pre-specializations with
       // public linkage need to be serialized as they will be used
-      // by UsePrespecializations pass during -Onone compilation to
+      // by the UsePrespecializations pass during -Onone compilation to
       // check for availability of concrete pre-specializations.
       if (!hasPublicVisibility(F.getLinkage()) ||
-          !isWhitelistedSpecialization(F.getName()))
+          !isKnownPrespecialization(F.getName()))
         continue;
     }
 

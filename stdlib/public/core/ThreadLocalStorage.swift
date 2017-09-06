@@ -93,7 +93,7 @@ internal struct _ThreadLocalStorage {
     var err = __swift_stdlib_U_ZERO_ERROR
     __swift_stdlib_ubrk_setText(
       brkIter, bufPtr.baseAddress!, Int32(bufPtr.count), &err)
-    _precondition(err.isSuccess, "unexpected ubrk_setUText failure")
+    _precondition(err.isSuccess, "Unexpected ubrk_setUText failure")
 
     return brkIter
   }
@@ -137,7 +137,7 @@ internal func _initializeThreadLocalStorage()
   let newUBreakIterator = __swift_stdlib_ubrk_open(
       /*type:*/ __swift_stdlib_UBRK_CHARACTER, /*locale:*/ nil,
       /*text:*/ nil, /*textLength:*/ 0, /*status:*/ &err)
-  _precondition(err.isSuccess, "unexpected ubrk_open failure")
+  _precondition(err.isSuccess, "Unexpected ubrk_open failure")
 
   let tlsPtr: UnsafeMutablePointer<_ThreadLocalStorage>
     = UnsafeMutablePointer<_ThreadLocalStorage>.allocate(

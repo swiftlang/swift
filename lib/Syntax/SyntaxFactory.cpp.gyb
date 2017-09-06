@@ -1,0 +1,191 @@
+%{
+  from gyb_syntax_support import *
+  # -*- mode: C++ -*-
+  # Ignore the following admonition; it applies to the resulting .cpp file only
+}%
+//// Automatically Generated From SyntaxFactory.cpp.gyb.
+//// Do Not Edit Directly!
+//===--------- SyntaxFactory.cpp - Syntax Factory implementations ---------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the SyntaxFactory, one of the most important client-facing
+// types in lib/Syntax and likely to be very commonly used.
+//
+// Effectively a namespace, SyntaxFactory is never instantiated, but is *the*
+// one-stop shop for making new Syntax nodes. Putting all of these into a
+// collection of static methods provides a single point of API lookup for
+// clients' convenience and also allows the library to hide all of the
+// constructors for all Syntax nodes, as the SyntaxFactory is friend to all.
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/Syntax/SyntaxFactory.h"
+#include "swift/Syntax/SyntaxNodes.h"
+#include "swift/Syntax/Trivia.h"
+#include "llvm/ADT/ArrayRef.h"
+
+#include <vector>
+
+using namespace swift;
+using namespace swift::syntax;
+
+TokenSyntax
+SyntaxFactory::makeToken(tok Kind, OwnedString Text, SourcePresence Presence,
+                         const Trivia &LeadingTrivia,
+                         const Trivia &TrailingTrivia) {
+  return make<TokenSyntax>(RawTokenSyntax::make(Kind, Text, Presence,
+                                                LeadingTrivia, TrailingTrivia));
+}
+
+UnknownSyntax
+SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
+  RawSyntax::LayoutList Layout;
+  for (auto &Token : Tokens) {
+    Layout.push_back(Token.getRaw());
+  }
+  auto Raw = RawSyntax::make(SyntaxKind::Unknown, Layout,
+                             SourcePresence::Present);
+  return make<UnknownSyntax>(Raw);
+}
+
+% for node in SYNTAX_NODES:
+%   if node.children:
+%     child_params = []
+%     for child in node.children:
+%         param_type = child.type_name
+%         if child.is_optional:
+%            param_type = "llvm::Optional<%s>" % param_type
+%         child_params.append("%s %s" % (param_type, child.name))
+%     child_params = ', '.join(child_params)
+${node.name}
+SyntaxFactory::make${node.syntax_kind}(${child_params}) {
+  auto Raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, {
+%     for child in node.children:
+%       if child.is_optional:
+    ${child.name}.hasValue() ? ${child.name}->getRaw() :
+        cast<RawSyntax>(${make_missing_child(child)}),
+%       else:
+    ${child.name}.getRaw(),
+%       end
+%     end
+  }, SourcePresence::Present);
+  return make<${node.name}>(Raw);
+}
+%   elif node.is_syntax_collection():
+${node.name}
+SyntaxFactory::make${node.syntax_kind}(
+  const std::vector<${node.collection_element_type}> &elements) {
+  RawSyntax::LayoutList layout;
+  for (auto &element : elements) {
+    layout.push_back(element.getRaw());
+  }
+  auto raw = RawSyntax::make(SyntaxKind::${node.syntax_kind},
+                             layout, SourcePresence::Present);
+  return make<${node.name}>(raw);
+}
+%   end
+
+${node.name}
+SyntaxFactory::makeBlank${node.syntax_kind}() {
+  auto raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, {
+%   for child in node.children:
+    ${make_missing_child(child)},
+%   end
+  }, SourcePresence::Present);
+  return make<${node.name}>(raw);
+}
+% end
+
+% for token in SYNTAX_TOKENS:
+%   if token.is_keyword:
+  TokenSyntax
+  SyntaxFactory::make${token.name}Keyword(const Trivia &LeadingTrivia,
+                                          const Trivia &TrailingTrivia) {
+    return makeToken(tok::${token.kind}, "${token.text}", 
+                     SourcePresence::Present,
+                     LeadingTrivia, TrailingTrivia);
+  }
+%   elif token.text:
+  TokenSyntax
+  SyntaxFactory::make${token.name}Token(const Trivia &LeadingTrivia,
+                                        const Trivia &TrailingTrivia) {
+    return makeToken(tok::${token.kind}, "${token.text}",
+                     SourcePresence::Present,
+                     LeadingTrivia, TrailingTrivia);
+  }
+%   else:
+  TokenSyntax
+  SyntaxFactory::make${token.name}(OwnedString Text,
+                                   const Trivia &LeadingTrivia,
+                                   const Trivia &TrailingTrivia) {
+    return makeToken(tok::${token.kind}, Text, SourcePresence::Present,
+                     LeadingTrivia, TrailingTrivia);
+  }
+%   end
+% end
+
+TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
+  return makeTupleType(makeLeftParenToken({}, {}),
+                       makeBlankTupleTypeElementList(),
+                       makeRightParenToken({}, {}));
+}
+
+TupleTypeElementSyntax SyntaxFactory::makeTupleTypeElement(
+    llvm::Optional<TokenSyntax> Label,
+    llvm::Optional<TokenSyntax> Colon, TypeSyntax Type,
+    llvm::Optional<TokenSyntax> TrailingComma) {
+  auto annotation = makeTypeAnnotation(makeBlankAttributeList(), None, Type);
+  return makeTupleTypeElement(Label, Colon, annotation, TrailingComma);
+}
+
+TupleTypeElementSyntax SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
+    llvm::Optional<TokenSyntax> TrailingComma) {
+  return makeTupleTypeElement(None, None, Type, TrailingComma);
+}
+
+GenericParameterSyntax
+SyntaxFactory::makeGenericParameter(TypeIdentifierSyntax Type,
+  llvm::Optional<TokenSyntax> TrailingComma) {
+  return makeGenericParameter(Type, None, None, TrailingComma);
+}
+
+TypeIdentifierSyntax SyntaxFactory::makeTypeIdentifier(OwnedString TypeName,
+    const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
+  auto identifier = makeIdentifier(TypeName, LeadingTrivia, TrailingTrivia);
+  return makeTypeIdentifier(identifier, None, None, None);
+}
+
+TypeIdentifierSyntax SyntaxFactory::makeAnyTypeIdentifier(
+    const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
+  return makeTypeIdentifier("Any", LeadingTrivia, TrailingTrivia);
+}
+  
+TypeIdentifierSyntax SyntaxFactory::makeSelfTypeIdentifier(
+    const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
+  return makeTypeIdentifier("Self", LeadingTrivia, TrailingTrivia);
+}
+
+TokenSyntax SyntaxFactory::makeTypeToken(
+  const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
+  return makeIdentifier("Type", LeadingTrivia, TrailingTrivia);
+}
+
+TokenSyntax SyntaxFactory::makeProtocolToken(
+  const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
+  return makeIdentifier("Protocol", LeadingTrivia, TrailingTrivia);
+}
+
+TokenSyntax SyntaxFactory::makeEqualityOperator(
+const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
+  return makeToken(tok::oper_binary_spaced, "==", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
+}

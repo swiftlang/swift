@@ -709,12 +709,9 @@ namespace {
       Entries.push_back(WitnessTableEntry::forOutOfLineBase(baseProto));
     }
 
-    void addMethod(FuncDecl *func) {
-      Entries.push_back(WitnessTableEntry::forFunction(func));
-    }
-
-    void addConstructor(ConstructorDecl *ctor) {
-      Entries.push_back(WitnessTableEntry::forFunction(ctor));
+    void addMethod(SILDeclRef func) {
+      auto decl = cast<AbstractFunctionDecl>(func.getDecl());
+      Entries.push_back(WitnessTableEntry::forFunction(decl));
     }
 
     void addPlaceholder(MissingMemberDecl *placeholder) {
@@ -724,13 +721,12 @@ namespace {
       }
     }
 
-    void addAssociatedType(AssociatedTypeDecl *ty) {
-      Entries.push_back(WitnessTableEntry::forAssociatedType(ty));
+    void addAssociatedType(AssociatedType requirement) {
+      Entries.push_back(WitnessTableEntry::forAssociatedType(requirement));
     }
 
-    void addAssociatedConformance(CanType path, ProtocolDecl *protocol) {
-      Entries.push_back(
-                   WitnessTableEntry::forAssociatedConformance(path, protocol));
+    void addAssociatedConformance(const AssociatedConformance &req) {
+      Entries.push_back(WitnessTableEntry::forAssociatedConformance(req));
     }
 
     ArrayRef<WitnessTableEntry> getEntries() const { return Entries; }
@@ -990,6 +986,9 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
   if (!accessor->empty())
     return accessor;
 
+  if (IGM.getOptions().OptimizeForSize)
+    accessor->addFnAttr(llvm::Attribute::NoInline);
+
   // Okay, define the accessor.
   auto cacheVariable = cast<llvm::GlobalVariable>(
     IGM.getAddrOfWitnessTableLazyCacheVariable(conformance, conformingType,
@@ -1138,7 +1137,7 @@ public:
       Table.addNullPointer(IGM.Int8PtrTy);
     }
 
-    void addMethodFromSILWitnessTable(AbstractFunctionDecl *requirement) {
+    void addMethod(SILDeclRef requirement) {
       auto &entry = SILEntries.front();
       SILEntries = SILEntries.slice(1);
 
@@ -1151,9 +1150,10 @@ public:
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::Method
              && "sil witness table does not match protocol");
-      assert(entry.getMethodWitness().Requirement.getDecl() == requirement
+      assert(entry.getMethodWitness().Requirement == requirement
              && "sil witness table does not match protocol");
-      auto piIndex = PI.getFunctionIndex(requirement);
+      auto piIndex =
+        PI.getFunctionIndex(cast<AbstractFunctionDecl>(requirement.getDecl()));
       assert(piIndex.getValue() == Table.size()
              && "offset doesn't match ProtocolInfo layout");
 #endif
@@ -1171,24 +1171,18 @@ public:
       return;
     }
 
-    void addMethod(FuncDecl *requirement) {
-      return addMethodFromSILWitnessTable(requirement);
-    }
-
-    void addConstructor(ConstructorDecl *requirement) {
-      return addMethodFromSILWitnessTable(requirement);
-    }
-
     void addPlaceholder(MissingMemberDecl *placeholder) {
       llvm_unreachable("cannot emit a witness table with placeholders in it");
     }
 
-    void addAssociatedType(AssociatedTypeDecl *requirement) {
+    void addAssociatedType(AssociatedType requirement) {
+
 #ifndef NDEBUG
       auto &entry = SILEntries.front();
       assert(entry.getKind() == SILWitnessTable::AssociatedType
              && "sil witness table does not match protocol");
-      assert(entry.getAssociatedTypeWitness().Requirement == requirement
+      assert(entry.getAssociatedTypeWitness().Requirement
+               == requirement.getAssociation()
              && "sil witness table does not match protocol");
       auto piIndex = PI.getAssociatedTypeIndex(requirement);
       assert(piIndex.getValue() == Table.size()
@@ -1198,7 +1192,8 @@ public:
       SILEntries = SILEntries.slice(1);
 
       CanType associate =
-        Conformance.getTypeWitness(requirement, nullptr)->getCanonicalType();
+        Conformance.getTypeWitness(requirement.getAssociation(), nullptr)
+          ->getCanonicalType();
 
       // This type will be expressed in terms of the archetypes
       // of the conforming context.
@@ -1209,15 +1204,17 @@ public:
       Table.addBitCast(metadataAccessFunction, IGM.Int8PtrTy);
     }
 
-    void addAssociatedConformance(Type associatedType, ProtocolDecl *protocol) {
+    void addAssociatedConformance(AssociatedConformance requirement) {
       // FIXME: Add static witness tables for type conformances.
 
-      CanType associate = Conformance.getAssociatedType(associatedType)
-                                    ->getCanonicalType();
+      CanType associate =
+        Conformance.getAssociatedType(requirement.getAssociation())
+          ->getCanonicalType();
       assert(!associate->hasTypeParameter());
 
       ProtocolConformanceRef associatedConformance =
-        Conformance.getAssociatedConformance(associatedType, protocol);
+        Conformance.getAssociatedConformance(requirement.getAssociation(),
+                                        requirement.getAssociatedRequirement());
 
 #ifndef NDEBUG
       auto &entry = SILEntries.front();
@@ -1225,13 +1222,12 @@ public:
       assert(entry.getKind() == SILWitnessTable::AssociatedTypeProtocol
              && "sil witness table does not match protocol");
       auto associatedWitness = entry.getAssociatedTypeProtocolWitness();
-      assert(associatedWitness.Requirement->isEqual(associatedType)
+      assert(associatedWitness.Requirement == requirement.getAssociation()
              && "sil witness table does not match protocol");
-      assert(associatedWitness.Protocol == protocol
+      assert(associatedWitness.Protocol ==
+               requirement.getAssociatedRequirement()
              && "sil witness table does not match protocol");
-      auto piIndex =
-        PI.getAssociatedConformanceIndex(associatedType->getCanonicalType(),
-                                         protocol);
+      auto piIndex = PI.getAssociatedConformanceIndex(requirement);
       assert(piIndex.getValue() == Table.size()
              && "offset doesn't match ProtocolInfo layout");
 #endif
@@ -1239,8 +1235,9 @@ public:
       SILEntries = SILEntries.slice(1);
 
       llvm::Constant *wtableAccessFunction = 
-        getAssociatedTypeWitnessTableAccessFunction(CanType(associatedType),
-                                 associate, protocol, associatedConformance);
+        getAssociatedTypeWitnessTableAccessFunction(requirement,
+                                                    associate,
+                                                    associatedConformance);
       Table.addBitCast(wtableAccessFunction, IGM.Int8PtrTy);
     }
 
@@ -1248,13 +1245,13 @@ public:
     llvm::Constant *buildInstantiationFunction();
 
     llvm::Constant *
-    getAssociatedTypeMetadataAccessFunction(AssociatedTypeDecl *requirement,
+    getAssociatedTypeMetadataAccessFunction(AssociatedType requirement,
                                             CanType associatedType);
 
     llvm::Constant *
-    getAssociatedTypeWitnessTableAccessFunction(CanType depAssociatedType,
-                                                CanType associatedType,
-                                                ProtocolDecl *protocol,
+    getAssociatedTypeWitnessTableAccessFunction(
+                                        AssociatedConformance requirement,
+                                        CanType associatedType,
                                         ProtocolConformanceRef conformance);
 
     void emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF,
@@ -1306,7 +1303,7 @@ void WitnessTableBuilder::build() {
 /// Return the address of a function which will return the type metadata
 /// for an associated type.
 llvm::Constant *WitnessTableBuilder::
-getAssociatedTypeMetadataAccessFunction(AssociatedTypeDecl *requirement,
+getAssociatedTypeMetadataAccessFunction(AssociatedType requirement,
                                         CanType associatedType) {
   // If the associated type is non-dependent, we can use an ordinary
   // metadata access function.  We'll just end up passing extra arguments.
@@ -1318,6 +1315,8 @@ getAssociatedTypeMetadataAccessFunction(AssociatedTypeDecl *requirement,
   llvm::Function *accessor =
     IGM.getAddrOfAssociatedTypeMetadataAccessFunction(&Conformance,
                                                       requirement);
+  if (IGM.getOptions().OptimizeForSize)
+    accessor->addFnAttr(llvm::Attribute::NoInline);
 
   IRGenFunction IGF(IGM, accessor);
   if (IGM.DebugInfo)
@@ -1330,7 +1329,7 @@ getAssociatedTypeMetadataAccessFunction(AssociatedTypeDecl *requirement,
 
   Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
   setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
-                              requirement->getProtocol());
+                              requirement.getSourceProtocol());
 
   // If the associated type is directly fulfillable from the type,
   // we don't need a cache entry.
@@ -1407,9 +1406,8 @@ static void buildAssociatedTypeValueName(CanType depAssociatedType,
 }
 
 llvm::Constant *WitnessTableBuilder::
-getAssociatedTypeWitnessTableAccessFunction(CanType depAssociatedType,
+getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
                                             CanType associatedType,
-                                            ProtocolDecl *associatedProtocol,
                                 ProtocolConformanceRef associatedConformance) {
   if (!associatedType->hasArchetype()) {
     assert(associatedConformance.isConcrete() &&
@@ -1421,12 +1419,14 @@ getAssociatedTypeWitnessTableAccessFunction(CanType depAssociatedType,
   // Otherwise, emit an access function.
   llvm::Function *accessor =
     IGM.getAddrOfAssociatedTypeWitnessTableAccessFunction(&Conformance,
-                                                          depAssociatedType,
-                                                          associatedProtocol);
+                                                          requirement);
 
   IRGenFunction IGF(IGM, accessor);
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
+
+  if (IGM.getOptions().OptimizeForSize)
+    accessor->addFnAttr(llvm::Attribute::NoInline);
 
   Explosion parameters = IGF.collectParameters();
 
@@ -1437,7 +1437,7 @@ getAssociatedTypeWitnessTableAccessFunction(CanType depAssociatedType,
   if (IGM.EnableValueNames) {
     SmallString<128> name;
     name += ConcreteType->getString();
-    buildAssociatedTypeValueName(depAssociatedType, name);
+    buildAssociatedTypeValueName(requirement.getAssociation(), name);
     associatedTypeMetadata->setName(name);
   }
 
@@ -1447,6 +1447,8 @@ getAssociatedTypeWitnessTableAccessFunction(CanType depAssociatedType,
   Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
   setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
                               Conformance.getProtocol());
+
+  ProtocolDecl *associatedProtocol = requirement.getAssociatedRequirement();
 
   const ConformanceInfo *conformanceI = nullptr;
   if (associatedConformance.isConcrete()) {
@@ -1522,7 +1524,7 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
   // Load and check whether it was null.
   auto cachedResult = IGF.Builder.CreateLoad(cache);
   // TODO: When LLVM supports Consume, we should use it here.
-  if (IGF.IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
+  if (IGF.IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
     cachedResult->setOrdering(llvm::AtomicOrdering::Acquire);
   auto cacheIsEmpty = IGF.Builder.CreateIsNull(cachedResult);
   llvm::BasicBlock *fetchBB = IGF.createBasicBlock("fetch");
@@ -1613,13 +1615,10 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   // is non-dependent.
   // TODO: the conformance might be conditional.
   llvm::Constant *instantiationFn;
-  llvm::Value *instantiationArgs =
-    llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy);
   if (SpecializedBaseConformances.empty()) {
-    instantiationFn = llvm::ConstantInt::get(IGM.RelativeAddressTy, 0);    
+    instantiationFn = nullptr;
   } else {
-    llvm::Constant *fn = buildInstantiationFunction();
-    instantiationFn = IGM.emitDirectRelativeReference(fn, cache, { 4 });
+    instantiationFn = buildInstantiationFunction();
   }
 
   auto descriptorRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
@@ -1628,22 +1627,35 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 
   // Fill in the global.
   auto cacheTy = cast<llvm::StructType>(cache->getValueType());
-  llvm::Constant *cacheData[] = {
-    // WitnessTableSizeInWords
-    llvm::ConstantInt::get(IGM.Int16Ty, TableSize),
-    // WitnessTablePrivateSizeInWords
-    llvm::ConstantInt::get(IGM.Int16Ty, NextCacheIndex),
-    // RelativeIndirectablePointer<ProtocolDescriptor>
-    IGM.emitRelativeReference(descriptorRef, cache, { 2 }),
-    // RelativePointer<WitnessTable>
-    IGM.emitDirectRelativeReference(wtable, cache, { 3 }),
-    // Instantiation function
-    instantiationFn,
-    // Private data
-    llvm::Constant::getNullValue(cacheTy->getStructElementType(5))
-  };
-  cache->setInitializer(llvm::ConstantStruct::get(cacheTy, cacheData));
+  ConstantInitBuilder cacheInitBuilder(IGM);
+  auto cacheData = cacheInitBuilder.beginStruct(cacheTy);
+  // WitnessTableSizeInWords
+  cacheData.addInt(IGM.Int16Ty, TableSize);
+  // WitnessTablePrivateSizeInWords
+  cacheData.addInt(IGM.Int16Ty, NextCacheIndex);
+  // RelativeIndirectablePointer<ProtocolDescriptor>
+  cacheData.addRelativeAddress(descriptorRef);
+  // RelativePointer<WitnessTable>
+  cacheData.addRelativeAddress(wtable);
+  // Instantiation function
+  cacheData.addRelativeAddressOrNull(instantiationFn);
+  // Private data
+  {
+    auto privateDataTy =
+      llvm::ArrayType::get(IGM.Int8PtrTy,
+                           swift::NumGenericMetadataPrivateDataWords);
+    auto privateDataInit = llvm::Constant::getNullValue(privateDataTy);
+    auto privateData =
+      new llvm::GlobalVariable(IGM.Module, privateDataTy, /*constant*/ false,
+                               llvm::GlobalVariable::InternalLinkage,
+                               privateDataInit, "");
+    cacheData.addRelativeAddress(privateData);
+  }
+  cacheData.finishAndSetAsInitializer(cache);
+  cache->setConstant(true);
 
+  llvm::Value *instantiationArgs =
+    llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy);
   auto call = IGF.Builder.CreateCall(IGM.getGetGenericWitnessTableFn(),
                                      { cache, metadata, instantiationArgs });
   call->setDoesNotThrow();
@@ -1985,14 +1997,15 @@ emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
   llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
 
   // Cast the witness to the appropriate function type.
-  auto witnessTy = IGF.IGM.getAssociatedTypeWitnessTableAccessFunctionTy();
+  auto sig = IGF.IGM.getAssociatedTypeWitnessTableAccessFunctionSignature();
+  auto witnessTy = sig.getType();
   witness = IGF.Builder.CreateBitCast(witness, witnessTy->getPointerTo());
 
+  FunctionPointer witnessFnPtr(witness, sig);
+
   // Call the accessor.
-  auto call = IGF.Builder.CreateCall(witness,
+  auto call = IGF.Builder.CreateCall(witnessFnPtr,
                             { associatedTypeMetadata, parentMetadata, wtable });
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.DefaultCC);
 
   return call;
 }
@@ -2334,9 +2347,7 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // more concrete than we're expecting.
   // TODO: make a best effort to devirtualize, maybe?
   auto concreteConformance = conformance.getConcrete();
-  if (concreteConformance->getProtocol() != proto) {
-    concreteConformance = concreteConformance->getInheritedConformance(proto);
-  }
+  assert(concreteConformance->getProtocol() == proto);
 
   // Check immediately for an existing cache entry.
   auto wtable = IGF.tryGetLocalTypeData(
@@ -2810,11 +2821,10 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                               CanSILFunctionType fnType) {
   auto fn = cast<AbstractFunctionDecl>(member.getDecl());
   auto fnProto = cast<ProtocolDecl>(fn->getDeclContext());
-  
-  conformance = conformance.getInherited(fnProto);
+
+  assert(conformance.getRequirement() == fnProto);
 
   // Find the witness table.
-  // FIXME conformance for concrete type
   llvm::Value *wtable = emitWitnessTableRef(IGF, baseTy, baseMetadataCache,
                                             conformance);
 
@@ -2831,52 +2841,62 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   return FunctionPointer(witnessFnPtr, signature);
 }
 
-llvm::FunctionType *IRGenModule::getAssociatedTypeMetadataAccessFunctionTy() {
-  if (AssociatedTypeMetadataAccessFunctionTy)
-    return AssociatedTypeMetadataAccessFunctionTy;
+Signature IRGenModule::getAssociatedTypeMetadataAccessFunctionSignature() {
+  auto &fnType = AssociatedTypeMetadataAccessFunctionTy;
+  if (!fnType) {
+    fnType = llvm::FunctionType::get(TypeMetadataPtrTy,
+                                     { TypeMetadataPtrTy,
+                                       WitnessTablePtrTy },
+                                     /*varargs*/ false);
+  }
 
-  auto accessorTy = llvm::FunctionType::get(TypeMetadataPtrTy,
-                                            { TypeMetadataPtrTy,
-                                              WitnessTablePtrTy },
-                                            /*varargs*/ false);
-  AssociatedTypeMetadataAccessFunctionTy = accessorTy;
-  return accessorTy;
+  auto attrs = llvm::AttributeList::get(getLLVMContext(),
+                                        llvm::AttributeList::FunctionIndex,
+                                        llvm::Attribute::NoUnwind);
+
+  return Signature(fnType, attrs, DefaultCC);
 }
 
 llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                                   llvm::Value *parentMetadata,
                                                   llvm::Value *wtable,
-                                          AssociatedTypeDecl *associatedType) {
-  auto &pi = IGF.IGM.getProtocolInfo(associatedType->getProtocol());
+                                                AssociatedType associatedType) {
+  auto &pi = IGF.IGM.getProtocolInfo(associatedType.getSourceProtocol());
   auto index = pi.getAssociatedTypeIndex(associatedType);
   llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
 
   // Cast the witness to the appropriate function type.
-  auto witnessTy = IGF.IGM.getAssociatedTypeMetadataAccessFunctionTy();
+  auto sig = IGF.IGM.getAssociatedTypeMetadataAccessFunctionSignature();
+  auto witnessTy = sig.getType();
   witness = IGF.Builder.CreateBitCast(witness, witnessTy->getPointerTo());
+
+  FunctionPointer witnessFnPtr(witness, sig);
 
   // Call the accessor.
   assert((!IGF.IGM.DebugInfo || IGF.Builder.getCurrentDebugLocation()) &&
          "creating a function call without a debug location");
-  auto call = IGF.Builder.CreateCall(witness, { parentMetadata, wtable });
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.DefaultCC);
+  auto call = IGF.Builder.CreateCall(witnessFnPtr,
+                                     { parentMetadata, wtable });
 
   return call;
 }
 
-llvm::FunctionType *
-IRGenModule::getAssociatedTypeWitnessTableAccessFunctionTy() {
-  if (AssociatedTypeWitnessTableAccessFunctionTy)
-    return AssociatedTypeWitnessTableAccessFunctionTy;
+Signature
+IRGenModule::getAssociatedTypeWitnessTableAccessFunctionSignature() {
+  auto &fnType = AssociatedTypeWitnessTableAccessFunctionTy;
+  if (!fnType) {
+    // The associated type metadata is passed first so that this function is
+    // CC-compatible with a conformance's witness table access function.
+    fnType = llvm::FunctionType::get(WitnessTablePtrTy,
+                                     { TypeMetadataPtrTy,
+                                       TypeMetadataPtrTy,
+                                       WitnessTablePtrTy },
+                                     /*varargs*/ false);
+  }
 
-  // The associated type metadata is passed first so that this function is
-  // CC-compatible with a conformance's witness table access function.
-  auto accessorTy = llvm::FunctionType::get(WitnessTablePtrTy,
-                                            { TypeMetadataPtrTy,
-                                              TypeMetadataPtrTy,
-                                              WitnessTablePtrTy },
-                                            /*varargs*/ false);
-  AssociatedTypeWitnessTableAccessFunctionTy = accessorTy;
-  return accessorTy;
+  auto attrs = llvm::AttributeList::get(getLLVMContext(),
+                                       llvm::AttributeList::FunctionIndex,
+                                       llvm::Attribute::NoUnwind);
+
+  return Signature(fnType, attrs, DefaultCC);
 }

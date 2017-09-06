@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "stack-promotion"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
@@ -18,8 +17,11 @@
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
 #include "llvm/ADT/Statistic.h"
+
+#define DEBUG_TYPE "stack-promotion"
 
 STATISTIC(NumStackPromoted, "Number of objects promoted to the stack");
 

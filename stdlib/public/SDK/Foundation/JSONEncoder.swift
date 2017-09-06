@@ -99,7 +99,7 @@ open class JSONEncoder {
     open var userInfo: [CodingUserInfoKey : Any] = [:]
 
     /// Options set on the top-level encoder to pass down the encoding hierarchy.
-    internal struct _Options {
+    fileprivate struct _Options {
         let dateEncodingStrategy: DateEncodingStrategy
         let dataEncodingStrategy: DataEncodingStrategy
         let nonConformingFloatEncodingStrategy: NonConformingFloatEncodingStrategy
@@ -129,13 +129,11 @@ open class JSONEncoder {
     /// - throws: An error if any value throws an error during encoding.
     open func encode<T : Encodable>(_ value: T) throws -> Data {
         let encoder = _JSONEncoder(options: self.options)
-        try value.encode(to: encoder)
 
-        guard encoder.storage.count > 0 else {
+        guard let topLevel = try encoder.box_(value) else {
             throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) did not encode any values."))
         }
 
-        let topLevel = encoder.storage.popContainer()
         if topLevel is NSNull {
             throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as null JSON fragment."))
         } else if topLevel is NSNumber {
@@ -155,14 +153,14 @@ open class JSONEncoder {
 
 // MARK: - _JSONEncoder
 
-internal class _JSONEncoder : Encoder {
+fileprivate class _JSONEncoder : Encoder {
     // MARK: Properties
 
     /// The encoder's storage.
     fileprivate var storage: _JSONEncodingStorage
 
     /// Options set on the top-level encoder.
-    internal let options: JSONEncoder._Options
+    fileprivate let options: JSONEncoder._Options
 
     /// The path to the current point in encoding.
     public var codingPath: [CodingKey]
@@ -468,77 +466,77 @@ extension _JSONEncoder : SingleValueEncodingContainer {
 
     public func encode(_ value: Bool) throws {
         assertCanEncodeNewValue()
-        self.storage.push(container: box(value))
+        self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: Int) throws {
         assertCanEncodeNewValue()
-        self.storage.push(container: box(value))
+        self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: Int8) throws {
         assertCanEncodeNewValue()
-        self.storage.push(container: box(value))
+        self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: Int16) throws {
         assertCanEncodeNewValue()
-        self.storage.push(container: box(value))
+        self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: Int32) throws {
         assertCanEncodeNewValue()
-        self.storage.push(container: box(value))
+        self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: Int64) throws {
         assertCanEncodeNewValue()
-        self.storage.push(container: box(value))
+        self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: UInt) throws {
         assertCanEncodeNewValue()
-        self.storage.push(container: box(value))
+        self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: UInt8) throws {
         assertCanEncodeNewValue()
-        self.storage.push(container: box(value))
+        self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: UInt16) throws {
         assertCanEncodeNewValue()
-        self.storage.push(container: box(value))
+        self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: UInt32) throws {
         assertCanEncodeNewValue()
-        self.storage.push(container: box(value))
+        self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: UInt64) throws {
         assertCanEncodeNewValue()
-        self.storage.push(container: box(value))
+        self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: String) throws {
         assertCanEncodeNewValue()
-        self.storage.push(container: box(value))
+        self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: Float) throws {
         assertCanEncodeNewValue()
-        try self.storage.push(container: box(value))
+        try self.storage.push(container: self.box(value))
     }
 
     public func encode(_ value: Double) throws {
         assertCanEncodeNewValue()
-        try self.storage.push(container: box(value))
+        try self.storage.push(container: self.box(value))
     }
 
     public func encode<T : Encodable>(_ value: T) throws {
         assertCanEncodeNewValue()
-        try self.storage.push(container: box(value))
+        try self.storage.push(container: self.box(value))
     }
 }
 
@@ -661,28 +659,32 @@ extension _JSONEncoder {
     }
 
     fileprivate func box<T : Encodable>(_ value: T) throws -> NSObject {
-        if T.self == Date.self {
+        return try self.box_(value) ?? NSDictionary()
+    }
+
+    // This method is called "box_" instead of "box" to disambiguate it from the overloads. Because the return type here is different from all of the "box" overloads (and is more general), any "box" calls in here would call back into "box" recursively instead of calling the appropriate overload, which is not what we want.
+    fileprivate func box_<T : Encodable>(_ value: T) throws -> NSObject? {
+        if T.self == Date.self || T.self == NSDate.self {
             // Respect Date encoding strategy
             return try self.box((value as! Date))
-        } else if T.self == Data.self {
+        } else if T.self == Data.self || T.self == NSData.self {
             // Respect Data encoding strategy
             return try self.box((value as! Data))
-        } else if T.self == URL.self {
+        } else if T.self == URL.self || T.self == NSURL.self {
             // Encode URLs as single strings.
             return self.box((value as! URL).absoluteString)
-        } else if T.self == Decimal.self {
+        } else if T.self == Decimal.self || T.self == NSDecimalNumber.self {
             // JSONSerialization can natively handle NSDecimalNumber.
-            return (value as! Decimal) as NSDecimalNumber
+            return (value as! NSDecimalNumber)
         }
 
         // The value should request a container from the _JSONEncoder.
-        let topContainer = self.storage.containers.last
+        let depth = self.storage.count
         try value.encode(to: self)
 
         // The top container should be a new container.
-        guard self.storage.containers.last! !== topContainer else {
-            // If the value didn't request a container at all, encode the default container instead.
-            return NSDictionary()
+        guard self.storage.count > depth else {
+            return nil
         }
 
         return self.storage.popContainer()
@@ -827,7 +829,7 @@ open class JSONDecoder {
     open var userInfo: [CodingUserInfoKey : Any] = [:]
 
     /// Options set on the top-level encoder to pass down the decoding hierarchy.
-    internal struct _Options {
+    fileprivate struct _Options {
         let dateDecodingStrategy: DateDecodingStrategy
         let dataDecodingStrategy: DataDecodingStrategy
         let nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy
@@ -865,20 +867,24 @@ open class JSONDecoder {
         }
 
         let decoder = _JSONDecoder(referencing: topLevel, options: self.options)
-        return try T(from: decoder)
+        guard let value = try decoder.unbox(topLevel, as: T.self) else {
+            throw DecodingError.valueNotFound(T.self, DecodingError.Context(codingPath: [], debugDescription: "The given data did not contain a top-level value."))
+        }
+
+        return value
     }
 }
 
 // MARK: - _JSONDecoder
 
-internal class _JSONDecoder : Decoder {
+fileprivate class _JSONDecoder : Decoder {
     // MARK: Properties
 
     /// The decoder's storage.
     fileprivate var storage: _JSONDecodingStorage
 
     /// Options set on the top-level decoder.
-    internal let options: JSONDecoder._Options
+    fileprivate let options: JSONDecoder._Options
 
     /// The path to the current point in encoding.
     fileprivate(set) public var codingPath: [CodingKey]
@@ -2088,13 +2094,13 @@ extension _JSONDecoder {
 
     fileprivate func unbox<T : Decodable>(_ value: Any, as type: T.Type) throws -> T? {
         let decoded: T
-        if T.self == Date.self {
+        if T.self == Date.self || T.self == NSDate.self {
             guard let date = try self.unbox(value, as: Date.self) else { return nil }
             decoded = date as! T
-        } else if T.self == Data.self {
+        } else if T.self == Data.self || T.self == NSData.self {
             guard let data = try self.unbox(value, as: Data.self) else { return nil }
             decoded = data as! T
-        } else if T.self == URL.self {
+        } else if T.self == URL.self || T.self == NSURL.self {
             guard let urlString = try self.unbox(value, as: String.self) else {
                 return nil
             }
@@ -2105,7 +2111,7 @@ extension _JSONDecoder {
             }
 
             decoded = (url as! T)
-        } else if T.self == Decimal.self {
+        } else if T.self == Decimal.self || T.self == NSDecimalNumber.self {
             guard let decimal = try self.unbox(value, as: Decimal.self) else { return nil }
             decoded = decimal as! T
         } else {

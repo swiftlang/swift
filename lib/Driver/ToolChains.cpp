@@ -153,6 +153,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_stats_output_dir);
   inputArgs.AddLastArg(arguments,
                        options::OPT_solver_shrink_unsolved_threshold);
+  inputArgs.AddLastArg(arguments, options::OPT_O_Group);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -231,9 +232,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_ImportedModules:
       FrontendModeOption = "-emit-imported-modules";
       break;
-    case types::TY_TBD:
-      FrontendModeOption = "-emit-tbd";
-      break;
 
     // BEGIN APPLE-ONLY OUTPUT TYPES
     case types::TY_IndexData:
@@ -263,6 +261,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_Image:
     case types::TY_SwiftDeps:
     case types::TY_ModuleTrace:
+    case types::TY_TBD:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -384,9 +383,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     }
   }
 
-  // Pass the optimization level down to the frontend.
-  context.Args.AddLastArg(Arguments, options::OPT_O_Group);
-
   if (context.Args.hasArg(options::OPT_parse_as_library) ||
       context.Args.hasArg(options::OPT_emit_library))
     Arguments.push_back("-parse-as-library");
@@ -433,6 +429,13 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (!LoadedModuleTracePath.empty()) {
     Arguments.push_back("-emit-loaded-module-trace-path");
     Arguments.push_back(LoadedModuleTracePath.c_str());
+  }
+
+  const std::string &TBDPath =
+      context.Output.getAdditionalOutputForType(types::TY_TBD);
+  if (!TBDPath.empty()) {
+    Arguments.push_back("-emit-tbd-path");
+    Arguments.push_back(TBDPath.c_str());
   }
 
   if (context.Args.hasArg(options::OPT_migrate_keep_objc_visibility)) {
@@ -502,9 +505,6 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         Arguments);
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
-
-  // Pass the optimization level down to the frontend.
-  context.Args.AddLastArg(Arguments, options::OPT_O_Group);
 
   context.Args.AddLastArg(Arguments, options::OPT_parse_sil);
 
@@ -617,7 +617,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     llvm_unreachable("invalid mode for backend job");
   }
 
-  // Only white-listed flags below are allowed to be embedded.
+  // -embed-bitcode only supports a restricted set of flags.
   Arguments.push_back("-target");
   Arguments.push_back(context.Args.MakeArgString(getTriple().str()));
 
@@ -632,9 +632,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     arg->render(context.Args, Arguments);
 
   context.Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
-
-  // Pass the optimization level down to the frontend.
-  context.Args.AddLastArg(Arguments, options::OPT_O_Group);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
@@ -663,8 +660,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
   Arguments.push_back("-frontend");
 
-  // We just want to emit a module, so pass -emit-module without any other
-  // mode options.
+  Arguments.push_back("-merge-modules");
   Arguments.push_back("-emit-module");
 
   if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
@@ -1067,10 +1063,13 @@ getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
 }
 
 static std::string
-getSanitizerRuntimeLibNameForDarwin(StringRef Sanitizer, const llvm::Triple &Triple) {
+getSanitizerRuntimeLibNameForDarwin(StringRef Sanitizer,
+                                    const llvm::Triple &Triple,
+                                    bool shared = true) {
   return (Twine("libclang_rt.")
       + Sanitizer + "_"
-      + getDarwinLibraryNameSuffixForTriple(Triple) + "_dynamic.dylib").str();
+      + getDarwinLibraryNameSuffixForTriple(Triple)
+      + (shared ? "_dynamic.dylib" : ".a")).str();
 }
 
 static std::string
@@ -1145,7 +1144,10 @@ addLinkRuntimeLibForLinux(const ArgList &Args, ArgStringList &Arguments,
 static void
 addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
                                  ArgStringList &Arguments,
-                                 StringRef Sanitizer, const ToolChain &TC) {
+                                 StringRef Sanitizer,
+                                 const ToolChain &TC,
+                                 bool shared = true
+                                 ) {
   // Sanitizer runtime libraries requires C++.
   Arguments.push_back("-lc++");
   // Add explicit dependency on -lc++abi, as -lc++ doesn't re-export
@@ -1153,30 +1155,30 @@ addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
   Arguments.push_back("-lc++abi");
 
   addLinkRuntimeLibForDarwin(Args, Arguments,
-      getSanitizerRuntimeLibNameForDarwin(Sanitizer, TC.getTriple()),
-      /*AddRPath=*/ true, TC);
+      getSanitizerRuntimeLibNameForDarwin(Sanitizer, TC.getTriple(), shared),
+      /*AddRPath=*/ shared, TC);
 }
 
 static void
 addLinkSanitizerLibArgsForLinux(const ArgList &Args,
                                  ArgStringList &Arguments,
                                  StringRef Sanitizer, const ToolChain &TC) {
+  addLinkRuntimeLibForLinux(Args, Arguments,
+      getSanitizerRuntimeLibNameForLinux(Sanitizer, TC.getTriple()), TC);
 
-     addLinkRuntimeLibForLinux(Args, Arguments,
-         getSanitizerRuntimeLibNameForLinux(Sanitizer, TC.getTriple()), TC);
+  // Code taken from
+  // https://github.com/apple/swift-clang/blob/ab3cbe7/lib/Driver/Tools.cpp#L3264-L3276
+  // There's no libpthread or librt on RTEMS.
+  if (TC.getTriple().getOS() != llvm::Triple::RTEMS) {
+    Arguments.push_back("-lpthread");
+    Arguments.push_back("-lrt");
+  }
+  Arguments.push_back("-lm");
 
-	//Code here from https://github.com/apple/swift-clang/blob/ab3cbe7/lib/Driver/Tools.cpp#L3264-L3276
-    // There's no libpthread or librt on RTEMS.
-    if (TC.getTriple().getOS() != llvm::Triple::RTEMS) {
-      Arguments.push_back("-lpthread");
-      Arguments.push_back("-lrt");
-    }
-    Arguments.push_back("-lm");
-    // There's no libdl on FreeBSD or RTEMS.
-    if (TC.getTriple().getOS() != llvm::Triple::FreeBSD &&
-        TC.getTriple().getOS() != llvm::Triple::RTEMS)
-      Arguments.push_back("-ldl");
-	
+  // There's no libdl on FreeBSD or RTEMS.
+  if (TC.getTriple().getOS() != llvm::Triple::FreeBSD &&
+      TC.getTriple().getOS() != llvm::Triple::RTEMS)
+    Arguments.push_back("-ldl");
 }
 
 ToolChain::InvocationInfo
@@ -1309,11 +1311,17 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   // Linking sanitizers will add rpaths, which might negatively interact when
   // other rpaths are involved, so we should make sure we add the rpaths after
   // all user-specified rpaths.
-  if (context.OI.SelectedSanitizer == SanitizerKind::Address)
+  if (context.OI.SelectedSanitizers & SanitizerKind::Address)
     addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
 
-  if (context.OI.SelectedSanitizer == SanitizerKind::Thread)
+  if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
     addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
+
+  // Only link in libFuzzer for executables.
+  if (job.getKind() == LinkKind::Executable &&
+      (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer))
+    addLinkSanitizerLibArgsForDarwin(
+        context.Args, Arguments, "fuzzer", *this, /*shared=*/false);
 
   if (context.Args.hasArg(options::OPT_embed_bitcode,
                           options::OPT_embed_bitcode_marker)) {
@@ -1562,6 +1570,11 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(A->getValue()));
   }
 
+  if (getTriple().getOS() == llvm::Triple::Linux &&
+      job.getKind() == LinkKind::Executable) {
+    Arguments.push_back("-pie");
+  }
+
   std::string Target = getTargetForLinker();
   if (!Target.empty()) {
     Arguments.push_back("-target");
@@ -1678,11 +1691,16 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   if (getTriple().getOS() == llvm::Triple::Linux) {
     //Make sure we only add SanitizerLibs for executables
     if (job.getKind() == LinkKind::Executable) {
-      if (context.OI.SelectedSanitizer == SanitizerKind::Address) 
+      if (context.OI.SelectedSanitizers & SanitizerKind::Address)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "asan", *this);
 
-      if (context.OI.SelectedSanitizer == SanitizerKind::Thread) 
+      if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
+
+      if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
+        addLinkRuntimeLibForLinux(context.Args, Arguments,
+            getSanitizerRuntimeLibNameForLinux(
+                "fuzzer", this->getTriple()), *this);
     }
   }
 

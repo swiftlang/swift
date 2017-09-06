@@ -372,6 +372,7 @@ private:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::Setter:
+    case Node::Kind::Shared:
     case Node::Kind::SILBoxLayout:
     case Node::Kind::SILBoxMutableField:
     case Node::Kind::SILBoxImmutableField:
@@ -411,6 +412,7 @@ private:
     case Node::Kind::OutlinedConsume:
     case Node::Kind::OutlinedRetain:
     case Node::Kind::OutlinedRelease:
+    case Node::Kind::OutlinedVariable:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -793,6 +795,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "outlined release of ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::OutlinedVariable:
+    Printer << "outlined variable #" << Node->getIndex() << " of ";
+    return nullptr;
   case Node::Kind::Directness:
     Printer << toString(Directness(Node->getIndex())) << " ";
     return nullptr;
@@ -984,6 +989,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::InOut:
     Printer << "inout ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::Shared:
+    Printer << "__shared ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::NonObjCAttribute:

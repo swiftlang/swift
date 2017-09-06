@@ -101,7 +101,7 @@ extension Character.UnicodeScalarView : Collection {
     case .valid(let s):
       return Index(
         _encodedOffset: startOfNextScalar, _scalar: s,
-        _stride: UInt8(extendingOrTruncating: s.count))
+        _stride: UInt8(truncatingIfNeeded: s.count))
     case .error:
       return Index(
         _encodedOffset: startOfNextScalar,
@@ -138,7 +138,7 @@ extension Character.UnicodeScalarView : BidirectionalCollection {
     case .valid(let s):
       return Index(
         _encodedOffset: i._encodedOffset - s.count, _scalar: s,
-        _stride: UInt8(extendingOrTruncating: s.count))
+        _stride: UInt8(truncatingIfNeeded: s.count))
     case .error:
       return Index(
         _encodedOffset: i._encodedOffset - 1,

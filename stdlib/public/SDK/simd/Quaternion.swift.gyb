@@ -43,13 +43,6 @@ extension ${quat} {
     vector = simd_make_${vec4}(imag, real)
   }
 
-  /// Construct a quaternion from a vector; the imaginary parts are the first
-  /// three components of the vector, and the real part is the last component.
-  @_transparent
-  public init(vector: ${vec4}) {
-    self.vector = vector
-  }
-
   /// A quaternion whose action is a rotation by `angle` radians about `axis`.
   ///
   /// - Parameters:

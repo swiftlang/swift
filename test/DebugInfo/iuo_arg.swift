@@ -17,7 +17,7 @@ class MyClass {
   func filterImage(_ image: UIImage!, _ doSomething:Bool) -> UIImage
 	{
     // Test that image is in an alloca, but not an indirect location.
-    // CHECK: call void @llvm.dbg.declare(metadata {{(i32|i64)}}* %[[ALLOCA:.*]], metadata ![[IMAGE:.*]], metadata !{{[0-9]+}})
+    // CHECK: call void @llvm.dbg.declare(metadata {{(i32|i64)}}* %[[ALLOCA:.*]], metadata ![[IMAGE:.*]], metadata !DIExpression())
     // CHECK: store {{(i32|i64)}} %0, {{(i32|i64)}}* %[[ALLOCA]], align
     // CHECK: ![[IMAGE]] = !DILocalVariable(name: "image", arg: 1
     // CHECK-NOT:                           flags:

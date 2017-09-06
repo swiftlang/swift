@@ -127,7 +127,7 @@ ${ArrayTy}Traps.test("sliceBounds3/${io}")
 
 ${ArrayTy}Traps.test("PopFromEmpty")
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "can't remove last element from an empty collection" : "")
+    "Can't remove last element from an empty collection" : "")
   .code {
   var a: ${ArrayTy}<Int> = []
   expectCrashLater()

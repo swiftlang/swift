@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
 
 struct B {
   var i : Int, j : Float
@@ -53,7 +53,7 @@ class E {
 // XCHECK-NEXT: return [[VALUE]] : $Int64
 
 // CHECK-LABEL: sil hidden @_T019default_constructor1EC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned E) -> @owned E
-// CHECK: bb0([[SELFIN:%[0-9]+]] : $E)
+// CHECK: bb0([[SELFIN:%[0-9]+]] : @owned $E)
 // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized
 // CHECK: [[INIT:%[0-9]+]] = function_ref @_T019default_constructor1EC1is5Int64Vvfi : $@convention(thin) () -> Int64
 // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[INIT]]() : $@convention(thin) () -> Int64
@@ -70,7 +70,7 @@ class E {
 class F : E { }
 
 // CHECK-LABEL: sil hidden @_T019default_constructor1FCACycfc : $@convention(method) (@owned F) -> @owned F
-// CHECK: bb0([[ORIGSELF:%[0-9]+]] : $F)
+// CHECK: bb0([[ORIGSELF:%[0-9]+]] : @owned $F)
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var F }
 // CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself] [[SELF_BOX]]
 // CHECK-NEXT: [[PB:%.*]] = project_box [[SELF]]

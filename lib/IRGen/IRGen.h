@@ -37,6 +37,7 @@ namespace swift {
 namespace irgen {
   using Lowering::AbstractionPattern;
   using clang::CodeGen::ConstantInitFuture;
+  class IRGenFunction;
 
 /// In IRGen, we use Swift's ClusteredBitVector data structure to
 /// store vectors of spare bits.
@@ -449,6 +450,42 @@ inline Alignment Alignment::alignmentAtOffset(Size S) const {
 inline Size Alignment::asSize() const {
   return Size(getValue());
 }
+
+/// A static or dynamic offset.
+class Offset {
+  enum Kind {
+    Static,
+    Dynamic,
+  };
+  enum : uint64_t {
+    KindBits = 1,
+    KindMask = (1 << KindBits) - 1,
+    PayloadMask = ~uint64_t(KindMask)
+  };
+  uint64_t Data;
+
+public:
+  explicit Offset(llvm::Value *offset)
+    : Data(reinterpret_cast<uintptr_t>(offset) | Dynamic) {}
+  explicit Offset(Size offset)
+    : Data((static_cast<uint64_t>(offset.getValue()) << KindBits) | Static) {
+    assert(getStatic() == offset && "overflow");
+  }
+
+  bool isStatic() const { return (Data & KindMask) == Static; }
+  bool isDynamic() const { return (Data & KindMask) == Dynamic; }
+  Size getStatic() const {
+    assert(isStatic());
+    return Size(static_cast<int64_t>(Data) >> KindBits);
+  }
+  llvm::Value *getDynamic() const {
+    assert(isDynamic());
+    return reinterpret_cast<llvm::Value*>(Data & PayloadMask);
+  }
+
+  llvm::Value *getAsValue(IRGenFunction &IGF) const;
+  Offset offsetBy(IRGenFunction &IGF, Offset other) const;
+};
 
 } // end namespace irgen
 } // end namespace swift

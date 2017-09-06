@@ -8,12 +8,12 @@ class C1 : Codable {
   var c: Nested = Nested()
 
   // CHECK: error: type 'C1' does not conform to protocol 'Decodable'
-  // CHECK: note: cannot automatically synthesize 'Decodable' because 'C1.Nested' does not conform to 'Decodable'
   // CHECK: note: protocol requires initializer 'init(from:)' with type 'Decodable'
+  // CHECK: note: cannot automatically synthesize 'Decodable' because 'C1.Nested' does not conform to 'Decodable'
 
   // CHECK: error: type 'C1' does not conform to protocol 'Encodable'
-  // CHECK: note: cannot automatically synthesize 'Encodable' because 'C1.Nested' does not conform to 'Encodable'
   // CHECK: note: protocol requires function 'encode(to:)' with type 'Encodable'
+  // CHECK: note: cannot automatically synthesize 'Encodable' because 'C1.Nested' does not conform to 'Encodable'
 }
 
 // Codable class with non-enum CodingKeys.
@@ -30,12 +30,12 @@ class C2 : Codable {
   }
 
   // CHECK: error: type 'C2' does not conform to protocol 'Decodable'
-  // CHECK: note: cannot automatically synthesize 'Decodable' because 'CodingKeys' is not an enum
   // CHECK: note: protocol requires initializer 'init(from:)' with type 'Decodable'
+  // CHECK: note: cannot automatically synthesize 'Decodable' because 'CodingKeys' is not an enum
 
   // CHECK: error: type 'C2' does not conform to protocol 'Encodable'
-  // CHECK: note: cannot automatically synthesize 'Encodable' because 'CodingKeys' is not an enum
   // CHECK: note: protocol requires function 'encode(to:)' with type 'Encodable'
+  // CHECK: note: cannot automatically synthesize 'Encodable' because 'CodingKeys' is not an enum
 }
 
 // Codable class with CodingKeys not conforming to CodingKey.
@@ -51,12 +51,12 @@ class C3 : Codable {
   }
 
   // CHECK: error: type 'C3' does not conform to protocol 'Decodable'
-  // CHECK: note: cannot automatically synthesize 'Decodable' because 'CodingKeys' does not conform to CodingKey
   // CHECK: note: protocol requires initializer 'init(from:)' with type 'Decodable'
+  // CHECK: note: cannot automatically synthesize 'Decodable' because 'CodingKeys' does not conform to CodingKey
 
   // CHECK: error: type 'C3' does not conform to protocol 'Encodable'
-  // CHECK: note: cannot automatically synthesize 'Encodable' because 'CodingKeys' does not conform to CodingKey
   // CHECK: note: protocol requires function 'encode(to:)' with type 'Encodable'
+  // CHECK: note: cannot automatically synthesize 'Encodable' because 'CodingKeys' does not conform to CodingKey
 }
 
 // Codable class with extraneous CodingKeys
@@ -75,16 +75,16 @@ class C4 : Codable {
   }
 
   // CHECK: error: type 'C4' does not conform to protocol 'Decodable'
+  // CHECK: note: protocol requires initializer 'init(from:)' with type 'Decodable'
   // CHECK: note: CodingKey case 'a2' does not match any stored properties
   // CHECK: note: CodingKey case 'b2' does not match any stored properties
   // CHECK: note: CodingKey case 'c2' does not match any stored properties
-  // CHECK: note: protocol requires initializer 'init(from:)' with type 'Decodable'
 
   // CHECK: error: type 'C4' does not conform to protocol 'Encodable'
+  // CHECK: note: protocol requires function 'encode(to:)' with type 'Encodable'
   // CHECK: note: CodingKey case 'a2' does not match any stored properties
   // CHECK: note: CodingKey case 'b2' does not match any stored properties
   // CHECK: note: CodingKey case 'c2' does not match any stored properties
-  // CHECK: note: protocol requires function 'encode(to:)' with type 'Encodable'
 }
 
 // Codable class with non-decoded property (which has no default value).
@@ -98,12 +98,12 @@ class C5 : Codable {
     case c
   }
 
+  // CHECK: error: type 'C5' does not conform to protocol 'Decodable'
+  // CHECK: note: protocol requires initializer 'init(from:)' with type 'Decodable'
+  // CHECK: note: cannot automatically synthesize 'Decodable' because 'b' does not have a matching CodingKey and does not have a default value
+
   // CHECK: error: class 'C5' has no initializers
   // CHECK: note: stored property 'b' without initial value prevents synthesized initializers
-
-  // CHECK: error: type 'C5' does not conform to protocol 'Decodable'
-  // CHECK: note: cannot automatically synthesize 'Decodable' because 'b' does not have a matching CodingKey and does not have a default value
-  // CHECK: note: protocol requires initializer 'init(from:)' with type 'Decodable'
 }
 
 // Codable class with non-decoded property (which has no default value).
@@ -122,8 +122,8 @@ class C6 : Codable {
   }
 
   // CHECK: error: type 'C6' does not conform to protocol 'Decodable'
-  // CHECK: note: cannot automatically synthesize 'Decodable' because 'b' does not have a matching CodingKey and does not have a default value
   // CHECK: note: protocol requires initializer 'init(from:)' with type 'Decodable'
+  // CHECK: note: cannot automatically synthesize 'Decodable' because 'b' does not have a matching CodingKey and does not have a default value
 }
 
 // Classes cannot yet synthesize Encodable or Decodable in extensions.

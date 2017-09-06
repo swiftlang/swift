@@ -1096,9 +1096,12 @@ static StringRef getEscapedName(DeclBaseName name) {
   switch (name.getKind()) {
   case DeclBaseName::Kind::Subscript:
     return "subscript";
+  case DeclBaseName::Kind::Destructor:
+    return "deinit";
   case DeclBaseName::Kind::Normal:
     return llvm::StringSwitch<StringRef>(name.getIdentifier().str())
         .Case("subscript", "`subscript`")
+        .Case("deinit", "`deinit`")
         .Default(name.getIdentifier().str());
   }
 }
@@ -1280,12 +1283,12 @@ static bool shouldIgnore(Decl *D) {
     if (VD->getBaseName().empty())
       return true;
     switch (VD->getFormalAccess()) {
-    case Accessibility::Internal:
-    case Accessibility::Private:
-    case Accessibility::FilePrivate:
+    case AccessLevel::Internal:
+    case AccessLevel::Private:
+    case AccessLevel::FilePrivate:
       return true;
-    case Accessibility::Public:
-    case Accessibility::Open:
+    case AccessLevel::Public:
+    case AccessLevel::Open:
       break;
     }
   }

@@ -15,36 +15,6 @@ import SwiftShims
 // Definitions that make elements of Builtin usable in real code
 // without gobs of boilerplate.
 
-@available(*, unavailable, message: "use MemoryLayout<T>.size instead.")
-public func sizeof<T>(_:T.Type) -> Int {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable, renamed: "MemoryLayout.size(ofValue:)")
-public func sizeofValue<T>(_:T) -> Int {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable, message: "use MemoryLayout<T>.alignment instead.")
-public func alignof<T>(_:T.Type) -> Int {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable, renamed: "MemoryLayout.alignment(ofValue:)")
-public func alignofValue<T>(_:T) -> Int {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable, message: "use MemoryLayout<T>.stride instead.")
-public func strideof<T>(_:T.Type) -> Int {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable, renamed: "MemoryLayout.stride(ofValue:)")
-public func strideofValue<T>(_:T) -> Int {
-  Builtin.unreachable()
-}
-
 // This function is the implementation of the `_roundUp` overload set.  It is
 // marked `@inline(__always)` to make primary `_roundUp` entry points seem
 // cheap enough for the inliner.
@@ -90,8 +60,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 /// - Value conversion from one integer type to another. Use the destination
 ///   type's initializer or the `numericCast(_:)` function.
 /// - Bitwise conversion from one integer type to another. Use the destination
-///   type's `init(extendingOrTruncating:)` or `init(bitPattern:)`
-///   initializer.
+///   type's `init(truncatingIfNeeded:)` or `init(bitPattern:)` initializer.
 /// - Conversion from a pointer to an integer value with the bit pattern of the
 ///   pointer's address in memory, or vice versa. Use the `init(bitPattern:)`
 ///   initializer for the destination type.
@@ -111,7 +80,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 @_transparent
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   _precondition(MemoryLayout<T>.size == MemoryLayout<U>.size,
-    "can't unsafeBitCast between types of different sizes")
+    "Can't unsafeBitCast between types of different sizes")
   return Builtin.reinterpretCast(x)
 }
 
@@ -223,19 +192,6 @@ internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
   }
 }
 
-/// Returns an `UnsafePointer` to the storage used for `object`.  There's
-/// not much you can do with this other than use it to identify the
-/// object.
-@available(*, unavailable, message: "Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.")
-public func unsafeAddress(of object: AnyObject) -> UnsafeRawPointer {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable, message: "Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.")
-public func unsafeAddressOf(_ object: AnyObject) -> UnsafeRawPointer {
-  Builtin.unreachable()
-}
-
 /// Converts a reference of type `T` to a reference of type `U` after
 /// unwrapping one level of Optional.
 ///
@@ -247,18 +203,26 @@ public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
   return Builtin.castReference(x)
 }
 
-/// - returns: `x as T`.
+/// Returns the given instance cast unconditionally to the specified type.
 ///
-/// - Precondition: `x is T`.  In particular, in -O builds, no test is
-///   performed to ensure that `x` actually has dynamic type `T`.
+/// The instance passed as `x` must be an instance of type `T`.
 ///
-/// - Warning: Trades safety for performance.  Use `unsafeDowncast`
-///   only when `x as! T` has proven to be a performance problem and you
-///   are confident that, always, `x is T`.  It is better than an
-///   `unsafeBitCast` because it's more restrictive, and because
-///   checking is still performed in debug builds.
+/// Use this function instead of `unsafeBitcast(_:to:)` because this function
+/// is more restrictive and still performs a check in debug builds. In -O
+/// builds, no test is performed to ensure that `x` actually has the dynamic
+/// type `T`.
+///
+/// - Warning: This function trades safety for performance. Use
+///   `unsafeDowncast(_:to:)` only when you are confident that `x is T` always
+///   evaluates to `true`, and only after `x as! T` has proven to be a
+///   performance problem.
+///
+/// - Parameters:
+///   - x: An instance to cast to type `T`.
+///   - type: The type `T` to which `x` is cast.
+/// - Returns: The instance `x`, cast to type `T`.
 @_transparent
-public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to: T.Type) -> T {
+public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
@@ -338,7 +302,6 @@ func swift_class_getInstanceExtents(_ theClass: AnyClass)
 func swift_objc_class_unknownGetInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
-/// - Returns: 
 @inline(__always)
 internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
@@ -618,11 +581,6 @@ func _isPOD<T>(_ type: T.Type) -> Bool {
 public // @testable
 func _isOptional<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.isOptional(type))
-}
-
-@available(*, unavailable, message: "Removed in Swift 3. Please use Optional.unsafelyUnwrapped instead.")
-public func unsafeUnwrap<T>(_ nonEmpty: T?) -> T {
-  Builtin.unreachable()
 }
 
 /// Extract an object reference from an Any known to contain an object.

@@ -251,8 +251,8 @@ bb0:
 
   // CHECK: unconditional_checked_cast undef : $C to $C
   unconditional_checked_cast undef : $C to $C
-  // CHECK: unconditional_checked_cast_addr take_always C in undef : $*C to C in undef : $*C
-  unconditional_checked_cast_addr take_always C in undef : $*C to C in undef : $*C
+  // CHECK: unconditional_checked_cast_addr C in undef : $*C to C in undef : $*C
+  unconditional_checked_cast_addr C in undef : $*C to C in undef : $*C
 
   // Runtime Failures
 

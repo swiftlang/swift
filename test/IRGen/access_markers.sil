@@ -25,25 +25,25 @@ bb0(%0 : $A):
   %2 = ref_element_addr %0 : $A, #A.property
 
   // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH1]] to i8*
-  // CHECK-NEXT: call void @llvm.lifetime.start(i64 {{.*}}, i8* [[T0]])
+  // CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 {{.*}}, i8* [[T0]])
   // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
   // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH1]], [[SIZE]] 1, i8* null)
   %3 = begin_access [modify] [dynamic] %2 : $*Int
 
   // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH1]])
   // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH1]] to i8*
-  // CHECK-NEXT: call void @llvm.lifetime.end(i64 {{.*}}, i8* [[T0]])
+  // CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 {{.*}}, i8* [[T0]])
   %4 = end_access %3 : $*Int
 
   // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH2]] to i8*
-  // CHECK-NEXT: call void @llvm.lifetime.start(i64 {{.*}}, i8* [[T0]])
+  // CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 {{.*}}, i8* [[T0]])
   // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
   // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH2]], [[SIZE]] 0, i8* null)
   %5 = begin_access [read] [dynamic] %2 : $*Int
 
   // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH2]])
   // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH2]] to i8*
-  // CHECK-NEXT: call void @llvm.lifetime.end(i64 {{.*}}, i8* [[T0]])
+  // CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 {{.*}}, i8* [[T0]])
   %6 = end_access %5 : $*Int
 
   %20 = tuple ()

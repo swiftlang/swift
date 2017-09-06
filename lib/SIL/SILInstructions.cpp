@@ -361,8 +361,8 @@ BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
                                  SILType ReturnType,
                                  SubstitutionList Substitutions,
                                  ArrayRef<SILValue> Args,
-                                 SILFunction &F) {
-  void *Buffer = F.getModule().allocateInst(
+                                 SILModule &M) {
+  void *Buffer = M.allocateInst(
                               sizeof(BuiltinInst)
                                 + decltype(Operands)::getExtraSize(Args.size())
                                 + sizeof(Substitution) * Substitutions.size(),
@@ -400,18 +400,19 @@ ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
                      SILType SubstCalleeTy, SILType Result,
                      SubstitutionList Subs,
                      ArrayRef<SILValue> Args, ArrayRef<SILValue> TypeDependentOperands,
-                     bool isNonThrowing)
+                     bool isNonThrowing,
+                     const GenericSpecializationInformation *SpecializationInfo)
     : ApplyInstBase(ValueKind::ApplyInst, Loc, Callee, SubstCalleeTy, Subs,
-                    Args, TypeDependentOperands, Result) {
+                    Args, TypeDependentOperands, SpecializationInfo, Result) {
   setNonThrowing(isNonThrowing);
 }
 
-ApplyInst *ApplyInst::create(SILDebugLocation Loc, SILValue Callee,
-                             SubstitutionList Subs, ArrayRef<SILValue> Args,
-                             bool isNonThrowing,
-                             Optional<SILModuleConventions> ModuleConventions,
-                             SILFunction &F,
-                             SILOpenedArchetypesState &OpenedArchetypes) {
+ApplyInst *
+ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionList Subs,
+                  ArrayRef<SILValue> Args, bool isNonThrowing,
+                  Optional<SILModuleConventions> ModuleConventions,
+                  SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+                  const GenericSpecializationInformation *SpecializationInfo) {
   SILType SubstCalleeSILTy =
       Callee->getType().substGenericArgs(F.getModule(), Subs);
   auto SubstCalleeTy = SubstCalleeSILTy.getAs<SILFunctionType>();
@@ -427,7 +428,8 @@ ApplyInst *ApplyInst::create(SILDebugLocation Loc, SILValue Callee,
   void *Buffer = allocate(F, Subs, TypeDependentOperands, Args);
   return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeSILTy,
                                  Result, Subs, Args,
-                                 TypeDependentOperands, isNonThrowing);
+                                 TypeDependentOperands, isNonThrowing,
+                                 SpecializationInfo);
 }
 
 bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
@@ -441,24 +443,24 @@ void *swift::allocateApplyInst(SILFunction &F, size_t size, size_t alignment) {
   return F.getModule().allocateInst(size, alignment);
 }
 
-PartialApplyInst::PartialApplyInst(SILDebugLocation Loc, SILValue Callee,
-                                   SILType SubstCalleeTy,
-                                   SubstitutionList Subs,
-                                   ArrayRef<SILValue> Args,
-                                   ArrayRef<SILValue> TypeDependentOperands,
-                                   SILType ClosureType)
+PartialApplyInst::PartialApplyInst(
+    SILDebugLocation Loc, SILValue Callee, SILType SubstCalleeTy,
+    SubstitutionList Subs, ArrayRef<SILValue> Args,
+    ArrayRef<SILValue> TypeDependentOperands, SILType ClosureType,
+    const GenericSpecializationInformation *SpecializationInfo)
     // FIXME: the callee should have a lowered SIL function type, and
     // PartialApplyInst
     // should derive the type of its result by partially applying the callee's
     // type.
     : ApplyInstBase(ValueKind::PartialApplyInst, Loc, Callee, SubstCalleeTy,
-                    Subs, Args, TypeDependentOperands, ClosureType) {}
+                    Subs, Args, TypeDependentOperands, SpecializationInfo,
+                    ClosureType) {}
 
-PartialApplyInst *
-PartialApplyInst::create(SILDebugLocation Loc, SILValue Callee,
-                         ArrayRef<SILValue> Args, SubstitutionList Subs,
-                         ParameterConvention CalleeConvention, SILFunction &F,
-                         SILOpenedArchetypesState &OpenedArchetypes) {
+PartialApplyInst *PartialApplyInst::create(
+    SILDebugLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
+    SubstitutionList Subs, ParameterConvention CalleeConvention, SILFunction &F,
+    SILOpenedArchetypesState &OpenedArchetypes,
+    const GenericSpecializationInformation *SpecializationInfo) {
   SILType SubstCalleeTy =
       Callee->getType().substGenericArgs(F.getModule(), Subs);
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
@@ -470,7 +472,8 @@ PartialApplyInst::create(SILDebugLocation Loc, SILValue Callee,
   void *Buffer = allocate(F, Subs, TypeDependentOperands, Args);
   return ::new(Buffer) PartialApplyInst(Loc, Callee, SubstCalleeTy,
                                         Subs, Args,
-                                        TypeDependentOperands, ClosureType);
+                                        TypeDependentOperands, ClosureType,
+                                        SpecializationInfo);
 }
 
 TryApplyInstBase::TryApplyInstBase(ValueKind valueKind, SILDebugLocation Loc,
@@ -478,20 +481,21 @@ TryApplyInstBase::TryApplyInstBase(ValueKind valueKind, SILDebugLocation Loc,
                                    SILBasicBlock *errorBB)
     : TermInst(valueKind, Loc), DestBBs{{this, normalBB}, {this, errorBB}} {}
 
-TryApplyInst::TryApplyInst(SILDebugLocation Loc, SILValue callee,
-                           SILType substCalleeTy, SubstitutionList subs,
-                           ArrayRef<SILValue> args,
-                           ArrayRef<SILValue> TypeDependentOperands,
-                           SILBasicBlock *normalBB, SILBasicBlock *errorBB)
+TryApplyInst::TryApplyInst(
+    SILDebugLocation Loc, SILValue callee, SILType substCalleeTy,
+    SubstitutionList subs, ArrayRef<SILValue> args,
+    ArrayRef<SILValue> TypeDependentOperands, SILBasicBlock *normalBB,
+    SILBasicBlock *errorBB,
+    const GenericSpecializationInformation *SpecializationInfo)
     : ApplyInstBase(ValueKind::TryApplyInst, Loc, callee, substCalleeTy, subs,
-                    args, TypeDependentOperands, normalBB, errorBB) {}
+                    args, TypeDependentOperands, SpecializationInfo, normalBB,
+                    errorBB) {}
 
-TryApplyInst *TryApplyInst::create(SILDebugLocation Loc, SILValue callee,
-                                   SubstitutionList subs,
-                                   ArrayRef<SILValue> args,
-                                   SILBasicBlock *normalBB,
-                                   SILBasicBlock *errorBB, SILFunction &F,
-                                   SILOpenedArchetypesState &OpenedArchetypes) {
+TryApplyInst *TryApplyInst::create(
+    SILDebugLocation Loc, SILValue callee, SubstitutionList subs,
+    ArrayRef<SILValue> args, SILBasicBlock *normalBB, SILBasicBlock *errorBB,
+    SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+    const GenericSpecializationInformation *SpecializationInfo) {
   SILType substCalleeTy =
       callee->getType().substGenericArgs(F.getModule(), subs);
 
@@ -501,7 +505,7 @@ TryApplyInst *TryApplyInst::create(SILDebugLocation Loc, SILValue callee,
   void *buffer = allocate(F, subs, TypeDependentOperands, args);
   return ::new (buffer) TryApplyInst(Loc, callee, substCalleeTy, subs, args,
                                      TypeDependentOperands,
-                                     normalBB, errorBB);
+                                     normalBB, errorBB, SpecializationInfo);
 }
 
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
@@ -529,14 +533,16 @@ AllocGlobalInst::AllocGlobalInst(SILDebugLocation Loc,
 AllocGlobalInst::AllocGlobalInst(SILDebugLocation Loc)
     : SILInstruction(ValueKind::AllocGlobalInst, Loc) {}
 
-GlobalAddrInst::GlobalAddrInst(SILDebugLocation Loc,
+GlobalAddrInst::GlobalAddrInst(SILDebugLocation DebugLoc,
                                SILGlobalVariable *Global)
-    : LiteralInst(ValueKind::GlobalAddrInst, Loc,
-              Global->getLoweredType().getAddressType()),
-      Global(Global) {}
+      : GlobalAccessInst(ValueKind::GlobalAddrInst, DebugLoc, Global,
+                          Global->getLoweredType().getAddressType()) {}
 
-GlobalAddrInst::GlobalAddrInst(SILDebugLocation Loc, SILType Ty)
-    : LiteralInst(ValueKind::GlobalAddrInst, Loc, Ty), Global(nullptr) {}
+GlobalValueInst::GlobalValueInst(SILDebugLocation DebugLoc,
+                                 SILGlobalVariable *Global)
+      : GlobalAccessInst(ValueKind::GlobalValueInst, DebugLoc, Global,
+                          Global->getLoweredType().getObjectType()) {}
+
 
 const IntrinsicInfo &BuiltinInst::getIntrinsicInfo() const {
   return getModule().getIntrinsicInfo(getName());
@@ -547,19 +553,20 @@ const BuiltinInfo &BuiltinInst::getBuiltinInfo() const {
 }
 
 static unsigned getWordsForBitWidth(unsigned bits) {
-  return (bits + llvm::integerPartWidth - 1)/llvm::integerPartWidth;
+  return ((bits + llvm::APInt::APINT_BITS_PER_WORD - 1)
+          / llvm::APInt::APINT_BITS_PER_WORD);
 }
 
 template<typename INST>
-static void *allocateLiteralInstWithTextSize(SILFunction &F, unsigned length) {
-  return F.getModule().allocateInst(sizeof(INST) + length, alignof(INST));
+static void *allocateLiteralInstWithTextSize(SILModule &M, unsigned length) {
+  return M.allocateInst(sizeof(INST) + length, alignof(INST));
 }
 
 template<typename INST>
-static void *allocateLiteralInstWithBitSize(SILFunction &F, unsigned bits) {
+static void *allocateLiteralInstWithBitSize(SILModule &M, unsigned bits) {
   unsigned words = getWordsForBitWidth(bits);
-  return F.getModule().allocateInst(
-      sizeof(INST) + sizeof(llvm::integerPart)*words, alignof(INST));
+  return M.allocateInst(
+      sizeof(INST) + sizeof(llvm::APInt::WordType)*words, alignof(INST));
 }
 
 IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
@@ -567,43 +574,43 @@ IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
     : LiteralInst(ValueKind::IntegerLiteralInst, Loc, Ty),
       numBits(Value.getBitWidth()) {
   std::uninitialized_copy_n(Value.getRawData(), Value.getNumWords(),
-                            getTrailingObjects<llvm::integerPart>());
+                            getTrailingObjects<llvm::APInt::WordType>());
 }
 
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
                                                SILType Ty, const APInt &Value,
-                                               SILFunction &B) {
+                                               SILModule &M) {
   auto intTy = Ty.castTo<BuiltinIntegerType>();
   assert(intTy->getGreatestWidth() == Value.getBitWidth() &&
          "IntegerLiteralInst APInt value's bit width doesn't match type");
   (void)intTy;
 
-  void *buf = allocateLiteralInstWithBitSize<IntegerLiteralInst>(B,
+  void *buf = allocateLiteralInstWithBitSize<IntegerLiteralInst>(M,
                                                           Value.getBitWidth());
   return ::new (buf) IntegerLiteralInst(Loc, Ty, Value);
 }
 
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
                                                SILType Ty, intmax_t Value,
-                                               SILFunction &B) {
+                                               SILModule &M) {
   auto intTy = Ty.castTo<BuiltinIntegerType>();
   return create(Loc, Ty,
-                APInt(intTy->getGreatestWidth(), Value), B);
+                APInt(intTy->getGreatestWidth(), Value), M);
 }
 
 IntegerLiteralInst *IntegerLiteralInst::create(IntegerLiteralExpr *E,
                                                SILDebugLocation Loc,
-                                               SILFunction &F) {
+                                               SILModule &M) {
   return create(
       Loc, SILType::getBuiltinIntegerType(
                E->getType()->castTo<BuiltinIntegerType>()->getGreatestWidth(),
-               F.getASTContext()),
-      E->getValue(), F);
+               M.getASTContext()),
+      E->getValue(), M);
 }
 
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
-  return APInt(numBits, {getTrailingObjects<llvm::integerPart>(),
+  return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
                          getWordsForBitWidth(numBits)});
 }
 
@@ -612,12 +619,12 @@ FloatLiteralInst::FloatLiteralInst(SILDebugLocation Loc, SILType Ty,
     : LiteralInst(ValueKind::FloatLiteralInst, Loc, Ty),
       numBits(Bits.getBitWidth()) {
         std::uninitialized_copy_n(Bits.getRawData(), Bits.getNumWords(),
-                                  getTrailingObjects<llvm::integerPart>());
+                                  getTrailingObjects<llvm::APInt::WordType>());
 }
 
 FloatLiteralInst *FloatLiteralInst::create(SILDebugLocation Loc, SILType Ty,
                                            const APFloat &Value,
-                                           SILFunction &B) {
+                                           SILModule &M) {
   auto floatTy = Ty.castTo<BuiltinFloatType>();
   assert(&floatTy->getAPFloatSemantics() == &Value.getSemantics() &&
          "FloatLiteralInst value's APFloat semantics do not match type");
@@ -625,24 +632,24 @@ FloatLiteralInst *FloatLiteralInst::create(SILDebugLocation Loc, SILType Ty,
 
   APInt Bits = Value.bitcastToAPInt();
 
-  void *buf = allocateLiteralInstWithBitSize<FloatLiteralInst>(B,
+  void *buf = allocateLiteralInstWithBitSize<FloatLiteralInst>(M,
                                                             Bits.getBitWidth());
   return ::new (buf) FloatLiteralInst(Loc, Ty, Bits);
 }
 
 FloatLiteralInst *FloatLiteralInst::create(FloatLiteralExpr *E,
                                            SILDebugLocation Loc,
-                                           SILFunction &F) {
+                                           SILModule &M) {
   return create(Loc,
                 // Builtin floating-point types are always valid SIL types.
                 SILType::getBuiltinFloatType(
                     E->getType()->castTo<BuiltinFloatType>()->getFPKind(),
-                    F.getASTContext()),
-                E->getValue(), F);
+                    M.getASTContext()),
+                E->getValue(), M);
 }
 
 APInt FloatLiteralInst::getBits() const {
-  return APInt(numBits, {getTrailingObjects<llvm::integerPart>(),
+  return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
                          getWordsForBitWidth(numBits)});
 }
 
@@ -660,11 +667,11 @@ StringLiteralInst::StringLiteralInst(SILDebugLocation Loc, StringRef Text,
 
 StringLiteralInst *StringLiteralInst::create(SILDebugLocation Loc,
                                              StringRef text, Encoding encoding,
-                                             SILFunction &F) {
+                                             SILModule &M) {
   void *buf
-    = allocateLiteralInstWithTextSize<StringLiteralInst>(F, text.size());
+    = allocateLiteralInstWithTextSize<StringLiteralInst>(M, text.size());
 
-  auto Ty = SILType::getRawPointerType(F.getModule().getASTContext());
+  auto Ty = SILType::getRawPointerType(M.getASTContext());
   return ::new (buf) StringLiteralInst(Loc, text, encoding, Ty);
 }
 
@@ -685,11 +692,11 @@ ConstStringLiteralInst::ConstStringLiteralInst(SILDebugLocation Loc,
 ConstStringLiteralInst *ConstStringLiteralInst::create(SILDebugLocation Loc,
                                                        StringRef text,
                                                        Encoding encoding,
-                                                       SILFunction &F) {
+                                                       SILModule &M) {
   void *buf =
-      allocateLiteralInstWithTextSize<ConstStringLiteralInst>(F, text.size());
+      allocateLiteralInstWithTextSize<ConstStringLiteralInst>(M, text.size());
 
-  auto Ty = SILType::getRawPointerType(F.getModule().getASTContext());
+  auto Ty = SILType::getRawPointerType(M.getASTContext());
   return ::new (buf) ConstStringLiteralInst(Loc, text, encoding, Ty);
 }
 
@@ -809,15 +816,14 @@ UncheckedRefCastAddrInst::UncheckedRefCastAddrInst(SILDebugLocation Loc,
       Operands(this, src, dest), SourceType(srcType), TargetType(targetType) {}
 
 UnconditionalCheckedCastAddrInst::UnconditionalCheckedCastAddrInst(
-    SILDebugLocation Loc, CastConsumptionKind consumption, SILValue src,
-    CanType srcType, SILValue dest, CanType targetType)
+    SILDebugLocation Loc, SILValue src, CanType srcType, SILValue dest,
+    CanType targetType)
     : SILInstruction(ValueKind::UnconditionalCheckedCastAddrInst, Loc),
-      Operands(this, src, dest), ConsumptionKind(consumption),
-      SourceType(srcType), TargetType(targetType) {}
+      Operands(this, src, dest), SourceType(srcType), TargetType(targetType) {}
 
 StructInst *StructInst::create(SILDebugLocation Loc, SILType Ty,
-                               ArrayRef<SILValue> Elements, SILFunction &F) {
-  void *Buffer = F.getModule().allocateInst(sizeof(StructInst) +
+                               ArrayRef<SILValue> Elements, SILModule &M) {
+  void *Buffer = M.allocateInst(sizeof(StructInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
                             alignof(StructInst));
   return ::new(Buffer) StructInst(Loc, Ty, Elements);
@@ -829,9 +835,23 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 
+ObjectInst *ObjectInst::create(SILDebugLocation Loc, SILType Ty,
+                               ArrayRef<SILValue> Elements,
+                               unsigned NumBaseElements, SILModule &M) {
+  void *Buffer = M.allocateInst(sizeof(ObjectInst) +
+                            decltype(Operands)::getExtraSize(Elements.size()),
+                            alignof(ObjectInst));
+  return ::new(Buffer) ObjectInst(Loc, Ty, Elements, NumBaseElements);
+}
+
+ObjectInst::ObjectInst(SILDebugLocation Loc, SILType Ty,
+                       ArrayRef<SILValue> Elems, unsigned NumBaseElements)
+    : SILInstruction(ValueKind::ObjectInst, Loc, Ty),
+      NumBaseElements(NumBaseElements), Operands(this, Elems) {}
+
 TupleInst *TupleInst::create(SILDebugLocation Loc, SILType Ty,
-                             ArrayRef<SILValue> Elements, SILFunction &F) {
-  void *Buffer = F.getModule().allocateInst(sizeof(TupleInst) +
+                             ArrayRef<SILValue> Elements, SILModule &M) {
+  void *Buffer = M.allocateInst(sizeof(TupleInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
                             alignof(TupleInst));
   return ::new(Buffer) TupleInst(Loc, Ty, Elements);
@@ -1552,19 +1572,27 @@ DynamicMethodBranchInst::create(SILDebugLocation Loc, SILValue Operand,
       DynamicMethodBranchInst(Loc, Operand, Member, HasMethodBB, NoMethodBB);
 }
 
-/// Create a witness method, creating a witness table declaration if we don't
-/// have a witness table for it. Later on if someone wants the real definition,
-/// lookUpWitnessTable will deserialize it for us if we can.
+/// Create a witness method call of a protocol requirement, passing in a lookup
+/// type and conformance.
 ///
-/// This is following the same model of how we deal with SILFunctions in
-/// function_ref. There we always just create a declaration and then later
-/// deserialize the actual function definition if we need to.
+/// At runtime, the witness is looked up in the conformance of the lookup type
+/// to the protocol.
+///
+/// The lookup type is usually an archetype, but it will be concrete if the
+/// witness_method instruction is inside a function body that was specialized.
+///
+/// The conformance must exactly match the requirement; the caller must handle
+/// the case where the requirement is defined in a base protocol that is
+/// refined by the conforming protocol.
 WitnessMethodInst *
 WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
                           ProtocolConformanceRef Conformance, SILDeclRef Member,
                           SILType Ty, SILFunction *F,
                           SILOpenedArchetypesState &OpenedArchetypes,
                           bool Volatile) {
+  assert(cast<ProtocolDecl>(Member.getDecl()->getDeclContext())
+         == Conformance.getRequirement());
+
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
@@ -1863,8 +1891,7 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
 }
 
 UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
-    SILDebugLocation DebugLoc, CastConsumptionKind consumption,
-    SILValue Operand, SILType DestTy, SILFunction &F,
+    SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy, SILFunction &F,
     SILOpenedArchetypesState &OpenedArchetypes) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
@@ -1875,7 +1902,7 @@ UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
   void *Buffer =
       Mod.allocateInst(size, alignof(UnconditionalCheckedCastValueInst));
   return ::new (Buffer) UnconditionalCheckedCastValueInst(
-      DebugLoc, consumption, Operand, TypeDependentOperands, DestTy);
+      DebugLoc, Operand, TypeDependentOperands, DestTy);
 }
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(
@@ -2222,4 +2249,47 @@ void KeyPathInst::dropReferencedPattern() {
     component.decrementRefCounts();
   }
   Pattern = nullptr;
+}
+
+GenericSpecializationInformation::GenericSpecializationInformation(
+    SILFunction *Caller, SILFunction *Parent, SubstitutionList Subs)
+    : Caller(Caller), Parent(Parent), Subs(Subs) {}
+
+const GenericSpecializationInformation *
+GenericSpecializationInformation::create(SILFunction *Caller,
+                                         SILFunction *Parent,
+                                         SubstitutionList Subs) {
+  auto &M = Parent->getModule();
+  void *Buf = M.allocate(sizeof(GenericSpecializationInformation),
+                           alignof(GenericSpecializationInformation));
+  auto NewSubs = M.allocateCopy(Subs);
+  return new (Buf) GenericSpecializationInformation(Caller, Parent, NewSubs);
+}
+
+const GenericSpecializationInformation *
+GenericSpecializationInformation::create(SILInstruction *Inst, SILBuilder &B) {
+  auto Apply = ApplySite::isa(Inst);
+  // Preserve history only for apply instructions for now.
+  // NOTE: We may want to preserve history for all instructions in the future,
+  // because it may allow us to track their origins.
+  assert(Apply);
+  auto *F = Inst->getFunction();
+  auto &BuilderF = B.getFunction();
+
+  // If cloning inside the same function, don't change the specialization info.
+  if (F == &BuilderF) {
+    return Apply.getSpecializationInfo();
+  }
+
+  // The following lines are used in case of inlining.
+
+  // If a call-site has a history already, simply preserve it.
+  if (Apply.getSpecializationInfo())
+    return Apply.getSpecializationInfo();
+
+  // If a call-site has no history, use the history of a containing function.
+  if (F->isSpecialization())
+    return F->getSpecializationInfo();
+
+  return nullptr;
 }

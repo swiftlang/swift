@@ -32,7 +32,7 @@ internal struct _ArrayBody {
     _storage = _SwiftArrayBodyStorage(
       count: count,
       _capacityAndFlags:
-        (UInt(extendingOrTruncating: capacity) &<< 1) |
+        (UInt(truncatingIfNeeded: capacity) &<< 1) |
         (elementTypeIsBridgedVerbatim ? 1 : 0))
   }
 

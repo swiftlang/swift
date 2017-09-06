@@ -135,7 +135,7 @@ namespace irgen {
   int32_t getIndexOfGenericArgument(IRGenModule &IGM,
                                     NominalTypeDecl *decl,
                                     ArchetypeType *archetype);
-  
+
   /// Given a reference to nominal type metadata of the given type,
   /// derive a reference to the parent type metadata.  There must be a
   /// parent type.
@@ -160,11 +160,6 @@ namespace irgen {
                                            const GenericTypeRequirements &reqts,
                                            unsigned reqtIndex,
                                            llvm::Value *metadata);
-
-  /// Get the offset of a field in the class type metadata.
-  Size getClassFieldOffset(IRGenModule &IGM,
-                           ClassDecl *theClass,
-                           VarDecl *field);
 
   /// Given a reference to class type metadata of the given type,
   /// decide the offset to the given field.  This assumes that the
@@ -237,9 +232,6 @@ namespace irgen {
                                          CanSILFunctionType methodType,
                                          bool useSuperVTable);
 
-  /// Get the offset of the given class method within the class's vtables.
-  unsigned getVirtualMethodIndex(IRGenModule &IGM, SILDeclRef method);
-  
   /// \brief Load a reference to the protocol descriptor for the given protocol.
   ///
   /// For Swift protocols, this is a constant reference to the protocol
@@ -260,7 +252,14 @@ namespace irgen {
                              NominalTypeDecl *type,
                              llvm::Function *fn,
                              ArrayRef<FieldTypeInfo> fieldTypes);
-  
+
+  /// \brief Initialize the field offset vector within the given class or struct
+  /// metadata.
+  llvm::Value *emitInitializeFieldOffsetVector(IRGenFunction &IGF,
+                                               SILType T,
+                                               llvm::Value *metadata,
+                                               llvm::Value *vwtable);
+
   /// Adjustment indices for the address points of various metadata.
   /// Size is in words.
   namespace MetadataAdjustmentIndex {

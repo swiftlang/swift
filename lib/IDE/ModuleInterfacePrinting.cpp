@@ -363,9 +363,9 @@ void swift::ide::printSubmoduleInterface(
 
     // Skip declarations that are not accessible.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (Options.AccessibilityFilter > Accessibility::Private &&
-          VD->hasAccessibility() &&
-          VD->getFormalAccess() < Options.AccessibilityFilter)
+      if (Options.AccessFilter > AccessLevel::Private &&
+          VD->hasAccess() &&
+          VD->getFormalAccess() < Options.AccessFilter)
         continue;
     }
 
@@ -494,7 +494,7 @@ void swift::ide::printSubmoduleInterface(
   });
 
   // If the group name is specified, we sort them according to their source order,
-  // which is the order preserved by getTopLeveDecls.
+  // which is the order preserved by getTopLevelDecls.
   if (GroupNames.empty()) {
     std::sort(SwiftDecls.begin(), SwiftDecls.end(),
       [&](Decl *LHS, Decl *RHS) -> bool {

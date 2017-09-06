@@ -57,6 +57,8 @@ extension String {
   ///         print(firstName)
   ///     }
   ///     // Prints "Marie"
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
   public struct CharacterView {
     @_versioned
     internal var _core: _StringCore
@@ -82,6 +84,8 @@ extension String {
   }
 
   /// A view of the string's contents as a collection of characters.
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
   public var characters: CharacterView {
     get {
       return CharacterView(self)
@@ -743,21 +747,5 @@ extension String.CharacterView {
     return String.CharacterView(
       unicodeScalars[bounds]._core,
       coreOffset: bounds.lowerBound.encodedOffset)
-  }
-}
-
-extension String.CharacterView {
-  @available(*, unavailable, renamed: "replaceSubrange")
-  public mutating func replaceRange<C>(
-    _ subRange: Range<Index>,
-    with newElements: C
-  ) where C : Collection, C.Element == Character {
-    Builtin.unreachable()
-  }
-    
-  @available(*, unavailable, renamed: "append(contentsOf:)")
-  public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
-    where S.Element == Character {
-    Builtin.unreachable()
   }
 }

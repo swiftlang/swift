@@ -833,34 +833,62 @@ private:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
-  
-/// \brief An 'inout' type.
-/// \code
-///   inout x : Int
-/// \endcode
-class InOutTypeRepr : public TypeRepr {
+
+class SpecifierTypeRepr : public TypeRepr {
   TypeRepr *Base;
-  SourceLoc InOutLoc;
+  SourceLoc SpecifierLoc;
   
 public:
-  InOutTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-  : TypeRepr(TypeReprKind::InOut), Base(Base), InOutLoc(InOutLoc) {
+  SpecifierTypeRepr(TypeReprKind Kind, TypeRepr *Base, SourceLoc Loc)
+    : TypeRepr(Kind), Base(Base), SpecifierLoc(Loc) {
   }
   
   TypeRepr *getBase() const { return Base; }
-  SourceLoc getInOutLoc() const { return InOutLoc; }
+  SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
+  
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::InOut
+        || T->getKind() == TypeReprKind::Shared;
+  }
+  static bool classof(const SpecifierTypeRepr *T) { return true; }
+  
+private:
+  SourceLoc getStartLocImpl() const { return SpecifierLoc; }
+  SourceLoc getEndLocImpl() const { return Base->getEndLoc(); }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+  
+/// \brief An 'inout' type.
+/// \code
+///   x : inout Int
+/// \endcode
+class InOutTypeRepr : public SpecifierTypeRepr {
+public:
+  InOutTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::InOut, Base, InOutLoc) {}
   
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::InOut;
   }
   static bool classof(const InOutTypeRepr *T) { return true; }
-  
-private:
-  SourceLoc getStartLocImpl() const { return InOutLoc; }
-  SourceLoc getEndLocImpl() const { return Base->getEndLoc(); }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
-  friend class TypeRepr;
 };
+  
+/// \brief A 'shared' type.
+/// \code
+///   x : shared Int
+/// \endcode
+class SharedTypeRepr : public SpecifierTypeRepr {
+public:
+  SharedTypeRepr(TypeRepr *Base, SourceLoc SharedLoc)
+    : SpecifierTypeRepr(TypeReprKind::Shared, Base, SharedLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Shared;
+  }
+  static bool classof(const SharedTypeRepr *T) { return true; }
+};
+
 
 /// \brief A TypeRepr for a known, fixed type.
 ///
@@ -997,6 +1025,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Fixed:
   case TypeReprKind::Array:
   case TypeReprKind::SILBox:
+  case TypeReprKind::Shared:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

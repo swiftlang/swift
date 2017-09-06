@@ -93,7 +93,7 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance {
   /// \brief The type that conforms to the protocol, in the context of the
   /// conformance definition.
   Type ConformingType;
-  
+
 protected:
   ProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
     : Kind(kind), ConformingType(conformingType) { }
@@ -199,6 +199,36 @@ private:
   bool hasWitness(ValueDecl *requirement) const;
 
 public:
+  /// Apply the given function object to each requirement, either type or value,
+  /// that is not witnessed.
+  ///
+  /// The function object should accept a \c ValueDecl* for the requirement.
+  template<typename F>
+  void forEachNonWitnessedRequirement(LazyResolver *Resolver, F f) const {
+    const ProtocolDecl *protocol = getProtocol();
+    for (auto req : protocol->getMembers()) {
+      auto valueReq = dyn_cast<ValueDecl>(req);
+      if (!valueReq || valueReq->isInvalid())
+        continue;
+
+      if (auto assocTypeReq = dyn_cast<AssociatedTypeDecl>(req)) {
+        // If we don't have witness for the associated type, apply the function.
+        if (getTypeWitness(assocTypeReq, Resolver)->hasError()) {
+          f(valueReq);
+        }
+        continue;
+      }
+
+      if (!valueReq->isProtocolRequirement())
+        continue;
+
+      // If we don't have witness for the value, apply the function.
+      if (!hasWitness(valueReq)) {
+        f(valueReq);
+      }
+    }
+  }
+
   /// Retrieve the protocol conformance for the inherited protocol.
   ProtocolConformance *getInheritedConformance(ProtocolDecl *protocol) const;
 
@@ -213,7 +243,7 @@ public:
   ProtocolConformanceRef
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol,
                            LazyResolver *resolver = nullptr) const;
- 
+
   /// Get the generic parameters open on the conforming type.
   GenericEnvironment *getGenericEnvironment() const;
 
@@ -252,15 +282,15 @@ public:
     assert(mem);
     return mem;
   }
-  
+
   /// Print a parseable and human-readable description of the identifying
   /// information of the protocol conformance.
   void printName(raw_ostream &os,
                  const PrintOptions &PO = PrintOptions()) const;
-  
+
   /// True if the conformance is for a property behavior instantiation.
   bool isBehaviorConformance() const;
-  
+
   /// Get the property declaration for a behavior conformance, if this is one.
   AbstractStorageDecl *getBehaviorDecl() const;
 
@@ -269,7 +299,7 @@ public:
   ProtocolConformance *subst(Type substType,
                              TypeSubstitutionFn subs,
                              LookupConformanceFn conformances) const;
-  
+
   void dump() const;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 };
@@ -348,7 +378,7 @@ public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const { return ProtocolAndState.getPointer(); }
 
-  /// Retrieve the location of this 
+  /// Retrieve the location of this
   SourceLoc getLoc() const { return Loc; }
 
   /// Get the declaration context that contains the conforming extension or
@@ -376,7 +406,7 @@ public:
   bool isInvalid() const {
     return ContextAndInvalid.getInt();
   }
-  
+
   /// Mark this conformance as invalid.
   void setInvalid() {
     ContextAndInvalid.setInt(true);
@@ -391,7 +421,7 @@ public:
   bool isBehaviorConformance() const {
     return ContextAndInvalid.getPointer().is<AbstractStorageDecl *>();
   }
-  
+
   /// Return the declaration using the behavior for this conformance, or null
   /// if this isn't a behavior conformance.
   AbstractStorageDecl *getBehaviorDecl() const {

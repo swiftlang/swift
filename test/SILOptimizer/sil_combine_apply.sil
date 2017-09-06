@@ -7,6 +7,13 @@ import Builtin
 //////////////////
 
 sil @unknown : $@convention(thin) () -> ()
+sil @generic_callee : $@convention(thin) <T, U> (@in T, @in U) -> ()
+
+protocol Error {}
+
+protocol SwiftP {
+  func foo()
+}
 
 /////////////////////////////////
 // Tests for SILCombinerApply. //
@@ -36,21 +43,30 @@ sil @sil_combine_partial_apply_callee : $@convention(thin) (@in S1, @in S2, @in_
 // CHECK-LABEL: sil @sil_combine_dead_partial_apply : $@convention(thin) (@in S2, @in S4, @inout S5, S6, @owned S7, @guaranteed S8) -> () {
 // CHECK: bb0([[IN_ARG:%.*]] : $*S2, [[INGUARANTEED_ARG:%.*]] : $*S4, [[INOUT_ARG:%.*]] : $*S5, [[UNOWNED_ARG:%.*]] : $S6, [[OWNED_ARG:%.*]] : $S7, [[GUARANTEED_ARG:%.*]] : $S8):
 //
+// CHECK: [[IN_ADDRESS_1:%.*]] = alloc_stack $S1
+// CHECK: [[IN_ARG_1:%.*]] = alloc_stack $S2
+// CHECK: [[INGUARANTEED_ADDRESS_1:%.*]] = alloc_stack $S3
+// CHECK: [[INGUARANTEED_ARG_1:%.*]] = alloc_stack $S4
+//
 // CHECK: function_ref unknown
 // CHECK: [[UNKNOWN_FUNC:%.*]] = function_ref @unknown
 // CHECK-NEXT: [[IN_ADDRESS:%.*]] = alloc_stack $S1
 // CHECK-NEXT: [[INGUARANTEED_ADDRESS:%.*]] = alloc_stack $S3
 //
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK: copy_addr [take] [[INGUARANTEED_ARG]] to [initialization] [[INGUARANTEED_ARG_1]]
+// CHECK: copy_addr [take] [[INGUARANTEED_ADDRESS]] to [initialization] [[INGUARANTEED_ADDRESS_1]]
+// CHECK: copy_addr [take] [[IN_ARG]] to [initialization] [[IN_ARG_1]]
+// CHECK: copy_addr [take] [[IN_ADDRESS]] to [initialization] [[IN_ADDRESS_1]]
 //
 // Then make sure that the destroys are placed after the destroy_value of the
 // partial_apply (which is after this apply)...
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
 //
-// CHECK-NEXT: destroy_addr [[IN_ADDRESS]]
-// CHECK-NEXT: destroy_addr [[IN_ARG]]
-// CHECK-NEXT: destroy_addr [[INGUARANTEED_ADDRESS]]
-// CHECK-NEXT: destroy_addr [[INGUARANTEED_ARG]]
+// CHECK-NEXT: destroy_addr [[IN_ADDRESS_1]]
+// CHECK-NEXT: destroy_addr [[IN_ARG_1]]
+// CHECK-NEXT: destroy_addr [[INGUARANTEED_ADDRESS_1]]
+// CHECK-NEXT: destroy_addr [[INGUARANTEED_ARG_1]]
 // CHECK-NEXT: release_value [[UNOWNED_ARG]]
 // CHECK-NEXT: release_value [[OWNED_ARG]]
 // CHECK-NEXT: release_value [[GUARANTEED_ARG]]
@@ -60,6 +76,10 @@ sil @sil_combine_partial_apply_callee : $@convention(thin) (@in S1, @in S2, @in_
 // CHECK-NEXT: dealloc_stack [[INGUARANTEED_ADDRESS]]
 // CHECK-NEXT: dealloc_stack [[IN_ADDRESS]]
 // CHECK-NEXT: tuple
+// CHECK-NEXT: dealloc_stack [[INGUARANTEED_ARG_1]]
+// CHECK-NEXT: dealloc_stack [[INGUARANTEED_ADDRESS_1]]
+// CHECK-NEXT: dealloc_stack [[IN_ARG_1]]
+// CHECK-NEXT: dealloc_stack [[IN_ADDRESS_1]]
 // CHECK-NEXT: return
 // CHECK-NEXT: } // end sil function 'sil_combine_dead_partial_apply'
 sil @sil_combine_dead_partial_apply : $@convention(thin) (@in S2, @in S4, @inout S5, S6, @owned S7, @guaranteed S8) -> () {
@@ -93,6 +113,199 @@ bb0(%1 : $*S2, %2 : $*S4, %4 : $*S5, %5 : $S6, %6 : $S7, %7 : $S8):
   dealloc_stack %11 : $*S3
   dealloc_stack %10 : $*S1
 
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @sil_combine_partial_apply_callee_2 : $@convention(thin) (@in S1) -> ()
+
+// CHECK-LABEL: sil @sil_combine_dead_partial_apply_non_overlapping_lifetime : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[NEW_ALLOC_STACK:%.*]] = alloc_stack $S1
+// CHECK-NEXT: function_ref unknown
+// CHECK-NEXT: [[UNKNOWN_FUNC:%.*]] = function_ref @unknown : $@convention(thin) () -> ()
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[ORIGINAL_ALLOC_STACK:%.*]] = alloc_stack $S1
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK-NEXT: copy_addr [take] [[ORIGINAL_ALLOC_STACK]] to [initialization] [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK-NEXT: dealloc_stack [[ORIGINAL_ALLOC_STACK]]
+// CHECK-NEXT: apply
+// CHECK-NEXT: cond_br undef, bb2, bb3
+//
+// CHECK: bb2:
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK-NEXT: destroy_addr [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK-NEXT:   br bb4
+//
+// CHECK: bb3:
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK-NEXT:   destroy_addr [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK-NEXT:   br bb4
+//
+// CHECK: bb4:
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK-NEXT: tuple
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
+// CHECK: } // end sil function 'sil_combine_dead_partial_apply_non_overlapping_lifetime'
+sil @sil_combine_dead_partial_apply_non_overlapping_lifetime : $@convention(thin) () -> () {
+bb0:
+  %3 = function_ref @unknown : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  br bb1
+
+bb1:
+  %0 = alloc_stack $S1
+  apply %3() : $@convention(thin) () -> ()
+  %1 = function_ref @sil_combine_partial_apply_callee_2 : $@convention(thin) (@in S1) -> ()
+  apply %3() : $@convention(thin) () -> ()
+  %2 = partial_apply %1(%0) : $@convention(thin) (@in S1) -> ()
+  apply %3() : $@convention(thin) () -> ()
+  dealloc_stack %0 : $*S1
+  apply %3() : $@convention(thin) () -> ()
+  cond_br undef, bb2, bb3
+
+bb2:
+  apply %3() : $@convention(thin) () -> ()
+  strong_release %2 : $@callee_owned () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  br bb4
+
+bb3:
+  apply %3() : $@convention(thin) () -> ()
+  strong_release %2 : $@callee_owned () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  br bb4
+
+bb4:
+  apply %3() : $@convention(thin) () -> ()
+  %9999 = tuple()
+  apply %3() : $@convention(thin) () -> ()
+  return %9999 : $()
+}
+
+sil @try_apply_func : $@convention(thin) () -> (Builtin.Int32, @error Error)
+
+// CHECK-LABEL: sil @sil_combine_dead_partial_apply_try_apply : $@convention(thin) () -> ((), @error Error) {
+// CHECK: bb0:
+// CHECK:   [[NEW_ALLOC_STACK:%.*]] = alloc_stack $S1
+// CHECK-NEXT: br bb1
+// CHECK: bb5(
+// CHECK-NEXT: tuple
+// CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: return
+// CHECK: bb6(
+// CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: throw
+// CHECK: } // end sil function 'sil_combine_dead_partial_apply_try_apply'
+sil @sil_combine_dead_partial_apply_try_apply : $@convention(thin) () -> ((), @error Error) {
+bb0:
+  br bb1
+
+bb1:
+  %0 = alloc_stack $S1
+  %1 = function_ref @sil_combine_partial_apply_callee_2 : $@convention(thin) (@in S1) -> ()
+  %2 = partial_apply %1(%0) : $@convention(thin) (@in S1) -> ()
+  dealloc_stack %0 : $*S1
+  cond_br undef, bb2, bb3
+
+bb2:
+  strong_release %2 : $@callee_owned () -> ()
+  %99991 = tuple()
+  br bb4
+
+bb3:
+  strong_release %2 : $@callee_owned () -> ()
+  %99992 = tuple()
+  br bb4
+
+bb4:
+  %3 = function_ref @try_apply_func : $@convention(thin) () -> (Builtin.Int32, @error Error)
+  try_apply %3() : $@convention(thin) () -> (Builtin.Int32, @error Error), normal bb5, error bb6
+
+bb5(%4 : $Builtin.Int32):
+  %9999 = tuple()
+  return %9999 : $()
+
+bb6(%5 : $Error):
+  %6 = builtin "willThrow"(%5 : $Error) : $()
+  throw %5 : $Error
+}
+
+// Make sure that we do not optimize this case. If we do optimize this case,
+// given the current algorithm which puts alloc_stack at the beginning/end of
+// the function, we will have a fatal error.
+sil @sil_combine_dead_partial_apply_with_opened_existential : $@convention(thin) () -> ((), @error Error) {
+bb0:
+  %0b = alloc_stack $SwiftP
+  %1 = open_existential_addr mutable_access %0b : $*SwiftP to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  %2 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP, #SwiftP.foo!1, %1 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP : $@convention(witness_method) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
+  %0c = alloc_stack $@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  %3 = partial_apply %2<@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP>(%0c) : $@convention(witness_method) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %0c : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  strong_release %3 : $@callee_owned () -> ()
+  dealloc_stack %0b : $*SwiftP
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This is a version of a test in sil_combine.sil that tests ignoring the
+// trivial alloc stack elimination optimization. Said optimization can make
+// testing ownership more difficult since the optimization does not care about
+// ownership correctness (i.e. it can hide leaks).
+//
+// This test first transforms (apply (partial_apply)) -> apply and then lets the
+// dead partial apply code eliminate the partial apply.
+//
+// CHECK-LABEL: sil @test_generic_partial_apply_apply
+// CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
+// CHECK-NEXT: [[PA_TMP:%.*]] = alloc_stack $T
+// CHECK-NEXT: [[APPLY_TMP:%.*]] = alloc_stack $T
+// CHECK: [[FN:%.*]] = function_ref @generic_callee
+// CHECK-NEXT: copy_addr [[ARG1]] to [initialization] [[APPLY_TMP]]
+// CHECK-NEXT: copy_addr [take] [[ARG1]] to [initialization] [[PA_TMP]]
+// CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[APPLY_TMP]])
+// CHECK-NEXT: destroy_addr [[PA_TMP]]
+// CHECK-NEXT: destroy_addr [[APPLY_TMP]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: dealloc_stack [[APPLY_TMP]]
+// CHECK-NEXT: dealloc_stack [[PA_TMP]]
+// CHECK-NEXT: return
+sil @test_generic_partial_apply_apply : $@convention(thin) <T> (@in T, @in T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %f1 = function_ref @generic_callee : $@convention(thin) <T, U> (@in T, @in U) -> ()
+  %pa = partial_apply %f1<T, T>(%1) : $@convention(thin) <T, U> (@in T, @in U) -> ()
+  %a1 = apply %pa(%0) : $@callee_owned (@in T) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Today when we optimize (apply (partial_apply)) -> apply, we can not handle
+// dependent types since the algorithm attempts to create an alloc_stack at the
+// beginning/end of the function. In such a case, the dependent type may not be
+// alive at that point, so the compiler will crash. This test ensures that we do
+// not optimize this case.
+//
+// CHECK-LABEL: sil @sil_combine_applied_partialapply_to_apply_with_dependent_type : $@convention(thin) (@in SwiftP) -> () {
+// CHECK: [[PAI:%.*]] = partial_apply
+// CHECK: apply [[PAI]]
+sil @sil_combine_applied_partialapply_to_apply_with_dependent_type : $@convention(thin) (@in SwiftP) -> () {
+bb0(%0 : $*SwiftP):
+  %0b = alloc_stack $SwiftP
+  %1 = open_existential_addr mutable_access %0b : $*SwiftP to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  %2 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP, #SwiftP.foo!1, %1 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP : $@convention(witness_method) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
+  %0c = alloc_stack $@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  %3 = partial_apply %2<@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP>(%0c) : $@convention(witness_method) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %0c : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  dealloc_stack %0b : $*SwiftP
+  %4 = apply %3() : $@callee_owned () -> ()
   %9999 = tuple()
   return %9999 : $()
 }

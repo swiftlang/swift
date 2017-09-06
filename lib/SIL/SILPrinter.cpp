@@ -42,6 +42,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/FileSystem.h"
@@ -61,6 +62,11 @@ SILFullDemangle("sil-full-demangle", llvm::cl::init(false),
 llvm::cl::opt<bool>
 SILPrintDebugInfo("sil-print-debuginfo", llvm::cl::init(false),
                 llvm::cl::desc("Include debug info in SIL output"));
+
+llvm::cl::opt<bool> SILPrintGenericSpecializationInfo(
+    "sil-print-generic-specialization-info", llvm::cl::init(false),
+    llvm::cl::desc("Include generic specialization"
+                   "information info in SIL output"));
 
 static std::string demangleSymbol(StringRef Name) {
   if (SILFullDemangle)
@@ -239,10 +245,21 @@ static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
 
   if (Decl->isOperator()) {
     OS << '"' << Decl->getBaseName() << '"';
-  } else if (Decl->getBaseName() == "subscript") {
-    OS << '`' << Decl->getBaseName() << '`';
   } else {
-    OS << Decl->getBaseName();
+    bool shouldEscape = !Decl->getBaseName().isSpecial() &&
+        llvm::StringSwitch<bool>(Decl->getBaseName().userFacingName())
+            // FIXME: Represent "init" by a special name and remove this case
+            .Case("init", false)
+#define KEYWORD(kw) \
+            .Case(#kw, true)
+#include "swift/Syntax/TokenKinds.def"
+            .Default(false);
+
+    if (shouldEscape) {
+      OS << '`' << Decl->getBaseName().userFacingName() << '`';
+    } else {
+      OS << Decl->getBaseName().userFacingName();
+    }
   }
 }
 
@@ -348,6 +365,44 @@ void SILDeclRef::print(raw_ostream &OS) const {
 void SILDeclRef::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
+}
+
+/// Pretty-print the generic specialization information.
+static void printGenericSpecializationInfo(
+    raw_ostream &OS, StringRef Kind, StringRef Name,
+    const GenericSpecializationInformation *SpecializationInfo,
+    SubstitutionList Subs = SubstitutionList()) {
+  if (!SpecializationInfo)
+    return;
+
+  auto PrintSubstitutions = [&](SubstitutionList Subs) {
+    OS << '<';
+    interleave(Subs,
+               [&](const Substitution &s) { OS << s.getReplacement(); },
+               [&] { OS << ", "; });
+    OS << '>';
+  };
+
+  OS << "// Generic specialization information for " << Kind << " " << Name;
+  if (!Subs.empty()) {
+    OS << " ";
+    PrintSubstitutions(Subs);
+  }
+
+  OS << ":\n";
+
+  while (SpecializationInfo) {
+    OS << "// Caller: " << SpecializationInfo->getCaller()->getName() << '\n';
+    OS << "// Parent: " << SpecializationInfo->getParent()->getName() << '\n';
+    OS << "// Substitutions: ";
+    PrintSubstitutions(SpecializationInfo->getSubstitutions());
+    OS << '\n';
+    OS << "//\n";
+    if (!SpecializationInfo->getCaller()->isSpecialization())
+      return;
+    SpecializationInfo =
+      SpecializationInfo->getCaller()->getSpecializationInfo();
+  }
 }
 
 static void print(raw_ostream &OS, SILValueCategory category) {
@@ -521,8 +576,10 @@ public:
     *this << '(';
     ArrayRef<SILArgument *> Args = BB->getArguments();
 
-    // If SIL ownership is enabled, print out ownership of SILArguments.
-    if (BB->getModule().getOptions().EnableSILOwnership) {
+    // If SIL ownership is enabled and the given function has not had ownership
+    // stripped out, print out ownership of SILArguments.
+    if (BB->getModule().getOptions().EnableSILOwnership &&
+        BB->getParent()->hasQualifiedOwnership()) {
       *this << getIDAndTypeAndOwnership(Args[0]);
       for (SILArgument *Arg : Args.drop_front()) {
         *this << ", " << getIDAndTypeAndOwnership(Arg);
@@ -573,6 +630,13 @@ public:
 
     for (const SILInstruction &I : *BB) {
       Ctx.printInstructionCallBack(&I);
+      if (SILPrintGenericSpecializationInfo) {
+        if (auto AI = ApplySite::isa(const_cast<SILInstruction *>(&I)))
+          if (AI.getSpecializationInfo() && AI.getCalleeFunction())
+            printGenericSpecializationInfo(
+                PrintState.OS, "call-site", AI.getCalleeFunction()->getName(),
+                AI.getSpecializationInfo(), AI.getSubstitutions());
+      }
       print(&I);
     }
   }
@@ -780,10 +844,16 @@ public:
 
     *this << "  ";
 
+    SILInstruction *I = dyn_cast<SILInstruction>(V);
+
     // Print result.
     if (V->hasValue()) {
-      ID Name = Ctx.getID(V);
-      *this << Name << " = ";
+      if (I && I->isStaticInitializerInst() && I == &I->getParent()->back()) {
+        *this << "%initval = ";
+      } else {
+        ID Name = Ctx.getID(V);
+        *this << Name << " = ";
+      }
     }
 
     // First if we have a SILInstruction, print the opcode.
@@ -794,8 +864,8 @@ public:
     visit(V);
 
     bool printedSlashes = false;
-    if (auto *I = dyn_cast<SILInstruction>(V)) {
-      if (Ctx.printDebugInfo()) {
+    if (I) {
+      if (Ctx.printDebugInfo() && !I->isStaticInitializerInst()) {
         auto &SM = I->getModule().getASTContext().SourceMgr;
         printDebugLocRef(I->getLoc(), SM);
         printDebugScopeRef(I->getDebugScope(), SM);
@@ -808,7 +878,7 @@ public:
 
     // Print SIL location.
     if (Ctx.printVerbose()) {
-      if (auto *I = dyn_cast<SILInstruction>(V)) {
+      if (I) {
         printSILLocation(I->getLoc(), I->getModule(), I->getDebugScope(),
                          printedSlashes);
       }
@@ -1008,6 +1078,11 @@ public:
       *this << "<<placeholder>>";
     }
     *this << " : " << GAI->getType();
+  }
+
+  void visitGlobalValueInst(GlobalValueInst *GVI) {
+    GVI->getReferencedGlobal()->printName(PrintState.OS);
+    *this << " : " << GVI->getType();
   }
 
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
@@ -1220,16 +1295,14 @@ public:
   }
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
-    *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
-          << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
+    *this << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetType() << " in "
           << getIDAndType(CI->getDest());
   }
 
   void visitUnconditionalCheckedCastValueInst(
       UnconditionalCheckedCastValueInst *CI) {
-    *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
-          << getIDAndType(CI->getOperand()) << " to " << CI->getType();
+    *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
@@ -1358,31 +1431,25 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
-  void visitRetainValueInst(RetainValueInst *I) { visitRefCountingInst(I); }
-
-  void visitReleaseValueInst(ReleaseValueInst *I) { visitRefCountingInst(I); }
-
-  void visitRetainValueAddrInst(RetainValueAddrInst *I) {
-    visitRefCountingInst(I);
-  }
-
-  void visitReleaseValueAddrInst(ReleaseValueAddrInst *I) {
-    visitRefCountingInst(I);
-  }
-
-  void visitAutoreleaseValueInst(AutoreleaseValueInst *I) {
-    visitRefCountingInst(I);
-  }
-
-  void visitSetDeallocatingInst(SetDeallocatingInst *I) {
-    visitRefCountingInst(I);
-  }
-
   void visitStructInst(StructInst *SI) {
     *this << SI->getType() << " (";
     interleave(SI->getElements(),
                [&](const SILValue &V) { *this << getIDAndType(V); },
                [&] { *this << ", "; });
+    *this << ')';
+  }
+
+  void visitObjectInst(ObjectInst *OI) {
+    *this << OI->getType() << " (";
+    interleave(OI->getBaseElements(),
+               [&](const SILValue &V) { *this << getIDAndType(V); },
+               [&] { *this << ", "; });
+    if (OI->getTailElements().size() > 0) {
+      *this << ", [tail_elems] ";
+      interleave(OI->getTailElements(),
+                 [&](const SILValue &V) { *this << getIDAndType(V); },
+                 [&] { *this << ", "; });
+    }
     *this << ')';
   }
 
@@ -1596,21 +1663,6 @@ public:
     if (I->isNonAtomic())
       *this << "[nonatomic] ";
     *this << getIDAndType(I->getOperand(0));
-  }
-  void visitStrongRetainInst(StrongRetainInst *RI) { visitRefCountingInst(RI); }
-  void visitStrongReleaseInst(StrongReleaseInst *RI) {
-    visitRefCountingInst(RI);
-  }
-  void visitStrongPinInst(StrongPinInst *PI) { visitRefCountingInst(PI); }
-  void visitStrongUnpinInst(StrongUnpinInst *UI) { visitRefCountingInst(UI); }
-  void visitStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
-    visitRefCountingInst(RI);
-  }
-  void visitUnownedRetainInst(UnownedRetainInst *RI) {
-    visitRefCountingInst(RI);
-  }
-  void visitUnownedReleaseInst(UnownedReleaseInst *RI) {
-    visitRefCountingInst(RI);
   }
   void visitIsUniqueInst(IsUniqueInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
@@ -1987,6 +2039,13 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "\n";
   }
 
+  if (SILPrintGenericSpecializationInfo) {
+    if (isSpecialization()) {
+      printGenericSpecializationInfo(OS, "function", getName(),
+                                     getSpecializationInfo());
+    }
+  }
+
   OS << "// " << demangleSymbol(getName()) << '\n';
   OS << "sil ";
   printLinkage(OS, getLinkage(), isDefinition());
@@ -2117,10 +2176,16 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   printName(OS);
   OS << " : " << LoweredType;
 
-  if (getInitializer()) {
-    OS << ", ";
-    getInitializer()->printName(OS);
-    OS << " : " << getInitializer()->getLoweredType();
+  if (!StaticInitializerBlock.empty()) {
+    OS << " = {\n";
+    {
+      SILPrintContext Ctx(OS);
+      SILPrinter Printer(Ctx);
+      for (const SILInstruction &I : StaticInitializerBlock) {
+        Printer.print(&I);
+      }
+    }
+    OS << "}\n";
   }
 
   OS << "\n\n";
@@ -2379,8 +2444,19 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
         stripExternalFromLinkage(entry.Implementation->getLinkage())) {
       OS << getLinkageString(entry.Linkage);
     }
-    OS << entry.Implementation->getName()
-       << "\t// " << demangleSymbol(entry.Implementation->getName()) << "\n";
+    OS << entry.Implementation->getName();
+    switch (entry.TheKind) {
+    case SILVTable::Entry::Kind::Normal:
+      break;
+    case SILVTable::Entry::Kind::Inherited:
+      OS << " [inherited]";
+      break;
+    case SILVTable::Entry::Kind::Override:
+      OS << " [override]";
+      break;
+    }
+    OS << "\t// " << demangleSymbol(entry.Implementation->getName());
+    OS << "\n";
   }
   OS << "}\n\n";
 }
@@ -2631,14 +2707,12 @@ SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
   OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
   DebugInfo(DebugInfo) { }
 
-SILPrintContext::SILPrintFunctionContext &
-SILPrintContext::getFuncContext(const SILFunction *F) {
-  if (F != FuncCtx.F) {
-    FuncCtx.BlocksToIDMap.clear();
-    FuncCtx.ValueToIDMap.clear();
-    FuncCtx.F = F;
+void SILPrintContext::setContext(const void *FunctionOrBlock) {
+  if (FunctionOrBlock != ContextFunctionOrBlock) {
+    BlocksToIDMap.clear();
+    ValueToIDMap.clear();
+    ContextFunctionOrBlock = FunctionOrBlock;
   }
-  return FuncCtx;
 }
 
 SILPrintContext::~SILPrintContext() {
@@ -2651,19 +2725,19 @@ void SILPrintContext::initBlockIDs(ArrayRef<const SILBasicBlock *> Blocks) {
   if (Blocks.empty())
     return;
 
-  auto funcCtx = getFuncContext(Blocks[0]->getParent());
+  setContext(Blocks[0]->getParent());
 
   // Initialize IDs so our IDs are in RPOT as well. This is a hack.
   for (unsigned Index : indices(Blocks))
-    funcCtx.BlocksToIDMap[Blocks[Index]] = Index;
+    BlocksToIDMap[Blocks[Index]] = Index;
 }
 
 ID SILPrintContext::getID(const SILBasicBlock *Block) {
-  auto funcCtx = getFuncContext(Block->getParent());
+  setContext(Block->getParent());
 
   // Lazily initialize the Blocks-to-IDs mapping.
   // If we are asked to emit sorted SIL, print out our BBs in RPOT order.
-  if (funcCtx.BlocksToIDMap.empty()) {
+  if (BlocksToIDMap.empty()) {
     if (sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
       auto *UnsafeF = const_cast<SILFunction *>(Block->getParent());
@@ -2671,28 +2745,37 @@ ID SILPrintContext::getID(const SILBasicBlock *Block) {
       std::reverse(RPOT.begin(), RPOT.end());
       // Initialize IDs so our IDs are in RPOT as well. This is a hack.
       for (unsigned Index : indices(RPOT))
-        funcCtx.BlocksToIDMap[RPOT[Index]] = Index;
+        BlocksToIDMap[RPOT[Index]] = Index;
     } else {
       unsigned idx = 0;
       for (const SILBasicBlock &B : *Block->getParent())
-        funcCtx.BlocksToIDMap[&B] = idx++;
+        BlocksToIDMap[&B] = idx++;
     }
   }
-  ID R = {ID::SILBasicBlock, funcCtx.BlocksToIDMap[Block]};
+  ID R = {ID::SILBasicBlock, BlocksToIDMap[Block]};
   return R;
 }
 
 ID SILPrintContext::getID(SILValue V) {
   if (isa<SILUndef>(V))
     return {ID::SILUndef, 0};
-
-  auto funcCtx = getFuncContext(V->getFunction());
-
-  // Lazily initialize the instruction -> ID mapping.
-  if (funcCtx.ValueToIDMap.empty()) {
-    V->getParentBlock()->getParent()->numberValues(funcCtx.ValueToIDMap);
+  
+  SILBasicBlock *BB = V->getParentBlock();
+  if (SILFunction *F = BB->getParent()) {
+    setContext(F);
+    // Lazily initialize the instruction -> ID mapping.
+    if (ValueToIDMap.empty())
+      F->numberValues(ValueToIDMap);
+  } else {
+    setContext(BB);
+    // Lazily initialize the instruction -> ID mapping.
+    if (ValueToIDMap.empty()) {
+      unsigned idx = 0;
+      for (auto &I : *BB) {
+        ValueToIDMap[&I] = idx++;
+      }
+    }
   }
-
-  ID R = {ID::SSAValue, funcCtx.ValueToIDMap[V]};
+  ID R = {ID::SSAValue, ValueToIDMap[V]};
   return R;
 }

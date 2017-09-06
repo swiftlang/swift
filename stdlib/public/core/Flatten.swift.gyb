@@ -124,11 +124,6 @@ extension Sequence where Element : Sequence {
   public func joined() -> FlattenSequence<Self> {
     return FlattenSequence(_base: self)
   }
-
-  @available(*, unavailable, renamed: "joined()")
-  public func flatten() -> FlattenSequence<Self> {
-    Builtin.unreachable()
-  }
 }
 
 extension LazySequenceProtocol where Element : Sequence {
@@ -139,11 +134,6 @@ extension LazySequenceProtocol where Element : Sequence {
     FlattenSequence<Elements>
   > {
     return FlattenSequence(_base: elements).lazy
-  }
-
-  @available(*, unavailable, renamed: "joined()")
-  public func flatten() -> LazySequence<FlattenSequence<Elements>> {
-    Builtin.unreachable()
   }
 }
 
@@ -398,11 +388,6 @@ extension ${collectionForTraversal(traversal)}
   public func joined() -> ${Collection}<Self> {
     return ${Collection}(self)
   }
-
-  @available(*, unavailable, renamed: "joined()")
-  public func flatten() -> ${Collection}<Self> {
-    Builtin.unreachable()
-  }
 }
 
 extension LazyCollectionProtocol
@@ -417,31 +402,6 @@ extension LazyCollectionProtocol
   public func joined() -> LazyCollection<${Collection}<Elements>> {
     return ${Collection}(elements).lazy
   }
-
-  @available(*, unavailable, renamed: "joined()")
-  public func flatten() -> LazyCollection<${Collection}<Elements>> {
-    Builtin.unreachable()
-  }
 }
 
 % end
-
-@available(*, unavailable, renamed: "FlattenIterator")
-public struct FlattenGenerator<Base : IteratorProtocol>
-  where Base.Element : Sequence {}
-
-extension FlattenSequence {
-  @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> FlattenIterator<Base.Iterator> {
-    Builtin.unreachable()
-  }
-}
-
-% for traversal in ('Forward', 'Bidirectional'):
-extension Flatten${collectionForTraversal(traversal)} {
-  @available(*, unavailable, renamed: "getter:underestimatedCount()")
-  public func underestimateCount() -> Int {
-    Builtin.unreachable()
-  }
-}
-%end

@@ -1,0 +1,10 @@
+// RUN: %scale-test --invert-result --begin 2 --end 6 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+func rdar33289839(s: String) -> String {
+  return "test" + String(s)
+%for i in range(0, N):
+       + "test" + String(s)
+%end
+}

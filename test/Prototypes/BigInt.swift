@@ -24,7 +24,7 @@ extension FixedWidthInteger {
   func addingFullWidth(_ other: Self) ->
     (high: Self, low: Self) {
     let sum = self.addingReportingOverflow(other)
-    return (sum.overflow == .overflow ? 1 : 0, sum.partialValue)
+    return (sum.overflow ? 1 : 0, sum.partialValue)
   }
 
   /// Returns the high and low parts of two seqeuential potentially overflowing
@@ -33,8 +33,8 @@ extension FixedWidthInteger {
     (high: Self, low: Self) {
     let xy = x.addingReportingOverflow(y)
     let xyz = xy.partialValue.addingReportingOverflow(z)
-    let high: Self = (xy.overflow == .overflow ? 1 : 0) +
-      (xyz.overflow == .overflow ? 1 : 0)
+    let high: Self = (xy.overflow ? 1 : 0) +
+      (xyz.overflow ? 1 : 0)
     return (high, xyz.partialValue)
   }
 
@@ -43,7 +43,7 @@ extension FixedWidthInteger {
   func subtractingWithBorrow(_ rhs: Self) ->
     (borrow: Self, partialValue: Self) {
     let difference = subtractingReportingOverflow(rhs)
-    return (difference.overflow == .overflow ? 1 : 0, difference.partialValue)
+    return (difference.overflow ? 1 : 0, difference.partialValue)
   }
 
   /// Returns a tuple containing the value that would be borrowed from a higher
@@ -53,8 +53,8 @@ extension FixedWidthInteger {
     let firstDifference = subtractingReportingOverflow(x)
     let secondDifference =
       firstDifference.partialValue.subtractingReportingOverflow(y)
-    let borrow: Self = (firstDifference.overflow == .overflow ? 1 : 0) +
-      (secondDifference.overflow == .overflow ? 1 : 0)
+    let borrow: Self = (firstDifference.overflow ? 1 : 0) +
+      (secondDifference.overflow ? 1 : 0)
     return (borrow, secondDifference.partialValue)
   }
 }
@@ -107,7 +107,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     var source = source
     if source < 0 as T {
       if source.bitWidth <= UInt64.bitWidth {
-        let sourceMag = Int(extendingOrTruncating: source).magnitude
+        let sourceMag = Int(truncatingIfNeeded: source).magnitude
         self = _BigInt(sourceMag)
         self.isNegative = true
         return
@@ -123,7 +123,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     _sanityCheck(wordRatio != 0)
     for var sourceWord in source.words {
       for _ in 0..<wordRatio {
-        _data.append(Word(extendingOrTruncating: sourceWord))
+        _data.append(Word(truncatingIfNeeded: sourceWord))
         sourceWord >>= Word.bitWidth
       }
     }
@@ -134,7 +134,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     self.init(source)
   }
 
-  public init<T : BinaryInteger>(extendingOrTruncating source: T) {
+  public init<T : BinaryInteger>(truncatingIfNeeded source: T) {
     self.init(source)
   }
 
@@ -142,11 +142,11 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     self.init(source)
   }
 
-  public init<T : FloatingPoint>(_ source: T) {
+  public init<T : BinaryFloatingPoint>(_ source: T) {
     fatalError("Not implemented")
   }
 
-  public init?<T : FloatingPoint>(exactly source: T) {
+  public init?<T : BinaryFloatingPoint>(exactly source: T) {
     fatalError("Not implemented")
   }
 
@@ -156,7 +156,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     if Word.bitWidth > UInt32.bitWidth {
       return Word(arc4random()) << 32 | Word(arc4random())
     } else {
-      return Word(extendingOrTruncating: arc4random())
+      return Word(truncatingIfNeeded: arc4random())
     }
   }
 
@@ -513,8 +513,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
         //      0b11111111 + (0b11111101_____00000010) + 0b11111111
         //                   (0b11111110_____00000001) + 0b11111111
         //                   (0b11111111_____00000000)
-        _sanityCheck(
-          product.high.addingReportingOverflow(carry).overflow == .none)
+        _sanityCheck(!product.high.addingReportingOverflow(carry).overflow)
         carry = product.high &+ carry
       }
 
@@ -668,7 +667,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     var word: UInt = 0
     var shift = 0
     for w in twosComplementData {
-      word |= UInt(extendingOrTruncating: w) << shift
+      word |= UInt(truncatingIfNeeded: w) << shift
       shift += Word.bitWidth
       if shift == UInt.bitWidth {
         words.append(word)
@@ -1090,16 +1089,18 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     data.removeFirst(Swift.min(data.count, words))
   }
 
-  public static func <<=(lhs: inout _BigInt, rhs: Int) {
+  public static func <<= <RHS : BinaryInteger>(lhs: inout _BigInt, rhs: RHS) {
     defer { lhs._checkInvariants() }
     guard rhs != 0 else { return }
     guard rhs > 0 else {
-      lhs >>= -rhs
+      lhs >>= 0 - rhs
       return
     }
 
+    let wordWidth = RHS(Word.bitWidth)
+    
     // We can add `rhs / bits` extra words full of zero at the low end.
-    let extraWords = rhs / Word.bitWidth
+    let extraWords = Int(rhs / wordWidth)
     lhs._data.reserveCapacity(lhs._data.count + extraWords + 1)
     _BigInt._shiftLeft(&lhs._data, byWords: extraWords)
 
@@ -1107,7 +1108,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // For each pair of words, we'll use the high `offset` bits of the
     // lower word and the low `Word.bitWidth - offset` bits of the higher
     // word.
-    let highOffset = rhs % Word.bitWidth
+    let highOffset = Int(rhs % wordWidth)
     let lowOffset = Word.bitWidth - highOffset
 
     // If there's no offset, we're finished, as `rhs` was a multiple of
@@ -1126,19 +1127,20 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     lhs._standardize()
   }
 
-  public static func >>=(lhs: inout _BigInt, rhs: Int) {
+  public static func >>= <RHS : BinaryInteger>(lhs: inout _BigInt, rhs: RHS) {
     defer { lhs._checkInvariants() }
     guard rhs != 0 else { return }
     guard rhs > 0 else {
-      lhs <<= -rhs
+      lhs <<= 0 - rhs
       return
     }
 
     var tempData = lhs._dataAsTwosComplement()
 
+    let wordWidth = RHS(Word.bitWidth)
     // We can remove `rhs / bits` full words at the low end.
     // If that removes the entirety of `_data`, we're done.
-    let wordsToRemove = rhs / Word.bitWidth
+    let wordsToRemove = Int(rhs / wordWidth)
     _BigInt._shiftRight(&tempData, byWords: wordsToRemove)
     guard tempData.count != 0 else {
       lhs = lhs.isNegative ? -1 : 0
@@ -1149,7 +1151,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // For each pair of words, we'll use the low `offset` bits of the
     // higher word and the high `_BigInt.Word.bitWidth - offset` bits of
     // the lower word.
-    let lowOffset = rhs % Word.bitWidth
+    let lowOffset = Int(rhs % wordWidth)
     let highOffset = Word.bitWidth - lowOffset
 
     // If there's no offset, we're finished, as `rhs` was a multiple of
@@ -1168,18 +1170,6 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // Finally, shift the highest word and standardize the result.
     tempData[tempData.count - 1] >>= lowOffset
     lhs = _BigInt(_twosComplementData: tempData)
-  }
-
-  public static func <<(lhs: _BigInt, rhs: Int) -> _BigInt {
-    var lhs = lhs
-    lhs <<= rhs
-    return lhs
-  }
-
-  public static func >>(lhs: _BigInt, rhs: Int) -> _BigInt {
-    var lhs = lhs
-    lhs >>= rhs
-    return lhs
   }
 }
 
@@ -1206,7 +1196,7 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     self = value
   }
 
-  init?<T: FloatingPoint>(exactly source: T) {
+  init?<T: BinaryFloatingPoint>(exactly source: T) {
     switch source {
     case T(0): value = 0
     case T(1): value = 1
@@ -1215,7 +1205,7 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     }
   }
 
-  init<T: FloatingPoint>(_ source: T) {
+  init<T: BinaryFloatingPoint>(_ source: T) {
     self = Bit(exactly: source.rounded(.down))!
   }
 
@@ -1228,7 +1218,7 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     }
   }
 
-  init<T: BinaryInteger>(extendingOrTruncating source: T) {
+  init<T: BinaryInteger>(truncatingIfNeeded source: T) {
     value = UInt8(source & 1)
   }
 
@@ -1302,60 +1292,60 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
 
   // Arithmetic Operations / Operators
 
-  func _checkOverflow(_ v: UInt8) -> ArithmeticOverflow {
+  func _checkOverflow(_ v: UInt8) -> Bool {
     let mask: UInt8 = ~0 << 1
-    return v & mask == 0 ? .none : .overflow
+    return v & mask != 0
   }
   
   func addingReportingOverflow(_ rhs: Bit) ->
-    (partialValue: Bit, overflow: ArithmeticOverflow) {
+    (partialValue: Bit, overflow: Bool) {
       let result = value &+ rhs.value
       return (Bit(result & 1), _checkOverflow(result))
   }
 
   func subtractingReportingOverflow(_ rhs: Bit) ->
-    (partialValue: Bit, overflow: ArithmeticOverflow) {
+    (partialValue: Bit, overflow: Bool) {
       let result = value &- rhs.value
       return (Bit(result & 1), _checkOverflow(result))
   }
 
   func multipliedReportingOverflow(by rhs: Bit) ->
-    (partialValue: Bit, overflow: ArithmeticOverflow) {
+    (partialValue: Bit, overflow: Bool) {
       let result = value &* rhs.value
-      return (Bit(result), .none)
+      return (Bit(result), false)
   }
 
   func dividedReportingOverflow(by rhs: Bit) ->
-    (partialValue: Bit, overflow: ArithmeticOverflow) {
-      return rhs == 0 ? (self, .none) : (self, .overflow)
+    (partialValue: Bit, overflow: Bool) {
+      return (self, rhs != 0)
   }
 
   func remainderReportingOverflow(dividingBy rhs: Bit) ->
-    (partialValue: Bit, overflow: ArithmeticOverflow) {
+    (partialValue: Bit, overflow: Bool) {
       fatalError()
   }
 
   static func +=(lhs: inout Bit, rhs: Bit) {
     let result = lhs.addingReportingOverflow(rhs)
-    assert(result.overflow == .none, "Addition overflow")
+    assert(!result.overflow, "Addition overflow")
     lhs = result.partialValue
   }
 
   static func -=(lhs: inout Bit, rhs: Bit) {
     let result = lhs.subtractingReportingOverflow(rhs)
-    assert(result.overflow == .none, "Subtraction overflow")
+    assert(!result.overflow, "Subtraction overflow")
     lhs = result.partialValue
   }
 
   static func *=(lhs: inout Bit, rhs: Bit) {
     let result = lhs.multipliedReportingOverflow(by: rhs)
-    assert(result.overflow == .none, "Multiplication overflow")
+    assert(!result.overflow, "Multiplication overflow")
     lhs = result.partialValue
   }
 
   static func /=(lhs: inout Bit, rhs: Bit) {
     let result = lhs.dividedReportingOverflow(by: rhs)
-    assert(result.overflow == .none, "Division overflow")
+    assert(!result.overflow, "Division overflow")
     lhs = result.partialValue
   }
 
@@ -1629,7 +1619,7 @@ BigIntTests.test("BinaryInteger interop") {
   expectTrue(z < zComp + 1)
 
   let w = BigInt(UInt.max)
-  let wComp = UInt(extendingOrTruncating: w)
+  let wComp = UInt(truncatingIfNeeded: w)
   expectTrue(w == wComp)
   expectTrue(wComp == w)
   expectTrue(wComp - (1 as UInt) < w)
@@ -1749,7 +1739,7 @@ BigInt8Tests.test("BinaryInteger interop") {
   expectTrue(z < zComp + 1)
 
   let w = BigInt8(UInt.max)
-  let wComp = UInt(extendingOrTruncating: w)
+  let wComp = UInt(truncatingIfNeeded: w)
   expectTrue(w == wComp)
   expectTrue(wComp == w)
   expectTrue(wComp - (1 as UInt) < w)
@@ -1788,7 +1778,8 @@ BigInt8Tests.test("Bitshift") {
 
   (x, y) = (BigInt(UInt.max), UInt.max)
   for i in 0...64 {   // test 64-bit shift, should both be zero
-    expectTrue(x >> i == y >> i)
+    expectTrue(x >> i == y >> i,
+    "\(x) as \(type(of:x)) >> \(i) => \(x >> i)  !=  \(y) as \(type(of:y)) >> \(i) => \(y >> i)")
   }
 
   x = BigInt(-1)
@@ -1811,8 +1802,8 @@ BigInt8Tests.test("Bitwise").forEach(in: [
     expectTrue(x & ~0 == x)
     expectTrue(x ^ 0 == x)
     expectTrue(x ^ ~0 == ~x)
-    expectTrue(x == BigInt8(Int(extendingOrTruncating: x)))
-    expectTrue(~x == BigInt8(~Int(extendingOrTruncating: x)))
+    expectTrue(x == BigInt8(Int(truncatingIfNeeded: x)))
+    expectTrue(~x == BigInt8(~Int(truncatingIfNeeded: x)))
   }
 }
 

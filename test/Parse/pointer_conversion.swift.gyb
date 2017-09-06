@@ -60,7 +60,7 @@ func mutablePointerArguments(_ p: UnsafeMutablePointer<Int>,
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafeMutablePointer<Int> = &i // expected-error{{cannot pass immutable value as inout argument: 'i' is immutable}}
-  x = &ii // expected-error{{cannot assign value of type '[Int]' to type 'Int'}}
+  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' to type 'UnsafeMutablePointer<Int>'}}
   _ = x
 }
 

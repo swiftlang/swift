@@ -14,8 +14,7 @@
 import module
 #endif
 
-// CHECK-MSVC-IR: !{{[0-9]+}} = !{i32 {{[0-9]+}}, !"Linker Options", [[NODE:![0-9]+]]}
-// CHECK-MSVC-IR: [[NODE]] = !{[[LIST:![0-9]+]]}
+// CHECK-MSVC-IR: !llvm.linker.options = !{[[LIST:![0-9]+]]}
 // CHECK-MSVC-IR: [[LIST]] = !{!"/DEFAULTLIB:module.lib"}
 
 // CHECK-MSVC-ASM: .section .drectve

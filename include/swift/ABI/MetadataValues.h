@@ -106,6 +106,62 @@ inline ClassFlags &operator|=(ClassFlags &a, ClassFlags b) {
   return a = (a | b);
 }
 
+/// Flags that go in a MethodDescriptor structure.
+class MethodDescriptorFlags {
+public:
+  typedef uint32_t int_type;
+  enum class Kind {
+    Method,
+    Init,
+    Getter,
+    Setter,
+    MaterializeForSet,
+  };
+
+private:
+  enum : int_type {
+    KindMask = 0x0F,                // 16 kinds should be enough for anybody
+    IsInstanceMask = 0x10,
+    IsDynamicMask = 0x20,
+  };
+
+  int_type Value;
+
+public:
+  MethodDescriptorFlags(Kind kind) : Value(unsigned(kind)) {}
+
+  MethodDescriptorFlags withIsInstance(bool isInstance) const {
+    auto copy = *this;
+    if (isInstance) {
+      copy.Value |= IsInstanceMask;
+    } else {
+      copy.Value &= ~IsInstanceMask;
+    }
+    return copy;
+  }
+
+  MethodDescriptorFlags withIsDynamic(bool isDynamic) const {
+    auto copy = *this;
+    if (isDynamic)
+      copy.Value |= IsDynamicMask;
+    else
+      copy.Value &= ~IsDynamicMask;
+    return copy;
+  }
+
+  Kind getKind() const { return Kind(Value & KindMask); }
+
+  /// Is the method marked 'dynamic'?
+  bool isDynamic() const { return Value & IsDynamicMask; }
+
+  /// Is the method an instance member?
+  ///
+  /// Note that 'init' is not considered an instance member.
+  bool isInstance() const { return Value & IsInstanceMask; }
+
+  int_type getIntValue() const { return Value; }
+};
+
 enum : unsigned {
   /// Number of words reserved in generic metadata patterns.
   NumGenericMetadataPrivateDataWords = 16,
@@ -253,6 +309,7 @@ class GenericParameterDescriptorFlags {
   enum : int_type {
     HasParent        = 0x01,
     HasGenericParent = 0x02,
+    HasVTable        = 0x04,
   };
   int_type Data;
   
@@ -270,6 +327,11 @@ public:
                                              : (Data & ~HasGenericParent));
   }
 
+  constexpr GenericParameterDescriptorFlags withHasVTable(bool b) const {
+    return GenericParameterDescriptorFlags(b ? (Data | HasVTable)
+                                             : (Data & ~HasVTable));
+  }
+
   /// Does this type have a lexical parent type?
   ///
   /// For class metadata, if this is true, the storage for the parent type
@@ -285,6 +347,13 @@ public:
   /// the generic metadata access function.
   bool hasGenericParent() const {
     return Data & HasGenericParent;
+  }
+
+  /// If this type is a class, does it have a vtable?  If so, the number
+  /// of vtable entries immediately follows the generic requirement
+  /// descriptor.
+  bool hasVTable() const {
+    return Data & HasVTable;
   }
 
   int_type getIntValue() const {
@@ -392,6 +461,52 @@ public:
   int_type getIntValue() const {
     return Data;
   }
+};
+
+/// Flags that go in a ProtocolRequirement structure.
+class ProtocolRequirementFlags {
+public:
+  typedef uint32_t int_type;
+  enum class Kind {
+    BaseProtocol,
+    Method,
+    Init,
+    Getter,
+    Setter,
+    MaterializeForSet,
+    AssociatedTypeAccessFunction,
+    AssociatedConformanceAccessFunction,
+  };
+
+private:
+  enum : int_type {
+    KindMask = 0x0F,                // 16 kinds should be enough for anybody
+    IsInstanceMask = 0x10,
+  };
+
+  int_type Value;
+
+public:
+  ProtocolRequirementFlags(Kind kind) : Value(unsigned(kind)) {}
+
+  ProtocolRequirementFlags withIsInstance(bool isInstance) const {
+    auto copy = *this;
+    if (isInstance) {
+      copy.Value |= IsInstanceMask;
+    } else {
+      copy.Value &= ~IsInstanceMask;
+    }
+    return copy;
+  }
+
+  Kind getKind() const { return Kind(Value & KindMask); }
+
+  /// Is the method an instance member?
+  ///
+  /// Note that 'init' is not considered an instance member.
+  bool isInstance() const { return Value & IsInstanceMask; }
+
+  int_type getIntValue() const { return Value; }
 };
 
 /// Flags in an existential type metadata record.

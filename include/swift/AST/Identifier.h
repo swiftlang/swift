@@ -70,6 +70,8 @@ public:
   }
   
   bool empty() const { return Pointer == nullptr; }
+
+  bool is(StringRef string) const { return str().equals(string); }
   
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
@@ -212,7 +214,8 @@ class DeclBaseName {
 public:
   enum class Kind: uint8_t {
     Normal,
-    Subscript
+    Subscript,
+    Destructor
   };
   
 private:
@@ -221,6 +224,8 @@ private:
   /// This is an implementation detail that should never leak outside of
   /// DeclName.
   static void *SubscriptIdentifierData;
+  /// As above, for special destructor DeclNames.
+  static void *DestructorIdentifierData;
 
   Identifier Ident;
 
@@ -233,9 +238,15 @@ public:
     return DeclBaseName(Identifier((const char *)SubscriptIdentifierData));
   }
 
+  static DeclBaseName createDestructor() {
+    return DeclBaseName(Identifier((const char *)DestructorIdentifierData));
+  }
+
   Kind getKind() const {
     if (Ident.get() == SubscriptIdentifierData) {
       return Kind::Subscript;
+    } else if (Ident.get() == DestructorIdentifierData) {
+        return Kind::Destructor;
     } else {
       return Kind::Normal;
     }
@@ -271,6 +282,8 @@ public:
       return getIdentifier().str();
     case Kind::Subscript:
       return "subscript";
+    case Kind::Destructor:
+      return "deinit";
     }
   }
 
@@ -279,7 +292,7 @@ public:
   }
 
   bool operator==(StringRef Str) const {
-    return !isSpecial() && getIdentifier().str() == Str;
+    return !isSpecial() && getIdentifier().is(Str);
   }
   bool operator!=(StringRef Str) const { return !(*this == Str); }
 
@@ -360,7 +373,7 @@ class DeclName {
     MutableArrayRef<Identifier> getArgumentNames() {
       return {getTrailingObjects<Identifier>(), NumArgs};
     }
-      
+
     /// Uniquing for the ASTContext.
     static void Profile(llvm::FoldingSetNodeID &id, DeclBaseName baseName,
                         ArrayRef<Identifier> argumentNames);
@@ -465,14 +478,16 @@ public:
   /// True if this name is a simple one-component name equal to the
   /// given string.
   bool isSimpleName(StringRef name) const {
-    if (!isSimpleName())
-      return false;
-
-    if (getBaseName().isSpecial())
-      return false;
-
-    return getBaseIdentifier().str().equals(name);
+    return isSimpleName() && getBaseName() == name;
   }
+
+  /// True if this name is a compound name equal to the given base name and
+  /// argument names.
+  bool isCompoundName(DeclBaseName base, ArrayRef<StringRef> args) const;
+
+  /// True if this name is a compound name equal to the given normal
+  /// base name and argument names.
+  bool isCompoundName(StringRef base, ArrayRef<StringRef> args) const;
   
   /// True if this name is an operator.
   bool isOperator() const {

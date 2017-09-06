@@ -42,7 +42,7 @@ struct OwnershipModelEliminatorVisitor
   SILOpenedArchetypesTracker OpenedArchetypesTracker;
 
   OwnershipModelEliminatorVisitor(SILBuilder &B)
-      : B(B), OpenedArchetypesTracker(B.getFunction()) {
+      : B(B), OpenedArchetypesTracker(&B.getFunction()) {
     B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 
@@ -268,6 +268,11 @@ struct OwnershipModelEliminator : SILModuleTransform {
       OwnershipModelEliminatorVisitor Visitor(B);
 
       for (auto &BB : F) {
+        // Change all arguments to have ValueOwnershipKind::Any.
+        for (auto *Arg : BB.getArguments()) {
+          Arg->setOwnershipKind(ValueOwnershipKind::Any);
+        }
+
         for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
           // Since we are going to be potentially removing instructions, we need
           // to make sure to increment our iterator before we perform any

@@ -389,7 +389,6 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::OCLEvent:
     case clang::BuiltinType::OCLClkEvent:
     case clang::BuiltinType::OCLQueue:
-    case clang::BuiltinType::OCLNDRange:
     case clang::BuiltinType::OCLReserveID:
       return OmissionTypeName();
 
@@ -425,8 +424,8 @@ retrieveNewTypeAttr(const clang::TypedefNameDecl *decl) {
   if (!attr)
     return nullptr;
 
-  // Blacklist types that temporarily lose their
-  // swift_wrapper/swift_newtype attributes in Foundation.
+  // FIXME: CFErrorDomain is marked as CF_EXTENSIBLE_STRING_ENUM, but it turned
+  // out to be more disruptive than not to leave it that way.
   auto name = decl->getName();
   if (name == "CFErrorDomain")
     return nullptr;

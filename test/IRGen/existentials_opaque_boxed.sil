@@ -259,7 +259,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 1
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[DESTROY:%.*]] = bitcast i8* [[VW]] to void (%swift.opaque*, %swift.type*)*
-// CHECK:   call void [[DESTROY]](%swift.opaque* [[OPAQUE]], %swift.type* [[METADATA]])
+// CHECK:   call void [[DESTROY]](%swift.opaque* noalias [[OPAQUE]], %swift.type* [[METADATA]])
 // CHECK:   ret void
 //
 // CHECK: outline:
@@ -363,7 +363,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 4
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[INITWITHTAKE:%.*]] = bitcast i8* [[VW]] to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
-// CHECK:   call %swift.opaque* [[INITWITHTAKE]](%swift.opaque* [[TMPBUFFER_OPAQUE]], %swift.opaque* [[DESTBUFFER_OPAQUE]], %swift.type* [[DEST_TYPE]])
+// CHECK:   call %swift.opaque* [[INITWITHTAKE]](%swift.opaque* noalias [[TMPBUFFER_OPAQUE]], %swift.opaque* noalias [[DESTBUFFER_OPAQUE]], %swift.type* [[DEST_TYPE]])
 // CHECK:   br i1 [[SRC_ISINLINE]], label %dest-inline-src-inline, label %dest-inline-src-outline
 //
 // CHECK: dest-inline-src-inline:
@@ -375,7 +375,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[INITWITHCOPY:%.*]] = bitcast i8* [[VW]] to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
-// CHECK:   call %swift.opaque* [[INITWITHCOPY]](%swift.opaque* [[DESTBUFFER_OPAQUE]], %swift.opaque* [[SRCBUFFER_OPAQUE]], %swift.type* [[SRC_TYPE]])
+// CHECK:   call %swift.opaque* [[INITWITHCOPY]](%swift.opaque* noalias [[DESTBUFFER_OPAQUE]], %swift.opaque* noalias [[SRCBUFFER_OPAQUE]], %swift.type* [[SRC_TYPE]])
 // CHECK:   br label %dest-inline-cont
 //
 // CHECK: dest-inline-src-outline:
@@ -394,7 +394,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 1
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[DESTROY:%.*]] = bitcast i8* [[VW]] to void (%swift.opaque*, %swift.type*)*
-// CHECK:   call void [[DESTROY]](%swift.opaque* [[TMPBUFFER_OPAQUE]], %swift.type* [[DEST_TYPE]])
+// CHECK:   call void [[DESTROY]](%swift.opaque* noalias [[TMPBUFFER_OPAQUE]], %swift.type* [[DEST_TYPE]])
 // CHECK:   br label %done
 //
 // CHECK: dest-outline:
@@ -411,7 +411,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[INITWITHCOPY:%.*]] = bitcast i8* [[VW]] to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
-// CHECK:   call %swift.opaque* [[INITWITHCOPY]](%swift.opaque* [[DESTBUFFER_OPAQUE]], %swift.opaque* [[SRCBUFFER_OPAQUE]], %swift.type* [[SRC_TYPE]])
+// CHECK:   call %swift.opaque* [[INITWITHCOPY]](%swift.opaque* noalias [[DESTBUFFER_OPAQUE]], %swift.opaque* noalias [[SRCBUFFER_OPAQUE]], %swift.type* [[SRC_TYPE]])
 // CHECK:   br label %dest-outline-cont
 //
 // CHECK: dest-outline-src-outline:
@@ -505,7 +505,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VWT]]
 // CHECK:   [[INITWITHCOPYBUFFER:%.*]] = bitcast i8* [[VW]]
-// CHECK:     call %swift.opaque* [[INITWITHCOPYBUFFER]]({{.*}} [[BUFFER_LOCAL_ADDR]], {{.*}} [[BUFFER_ARG_ADDR]], %swift.type* [[ARG_TYPE]])
+// CHECK:     call %swift.opaque* [[INITWITHCOPYBUFFER]]({{.*}} noalias [[BUFFER_LOCAL_ADDR]], {{.*}} noalias [[BUFFER_ARG_ADDR]], %swift.type* [[ARG_TYPE]])
 // CHECK:   ret void
 sil @test_initWithCopy_existential_addr : $@convention(thin) (@in Existential) -> () {
 bb0(%0 : $*Existential):

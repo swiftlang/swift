@@ -961,6 +961,14 @@ void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
+  // @objc enums never have generic parameters or payloads,
+  // and lower as their raw type.
+  if (auto *ED = dyn_cast<EnumDecl>(Decl))
+    if (ED->isObjC()) {
+      emitOpaqueTypeMetadataRecord(ED);
+      return;
+    }
+
   FieldTypeMetadataBuilder builder(*this, Decl);
   builder.emit();
 }

@@ -19,6 +19,9 @@ extension ARCamera {
      */
     public enum TrackingState {
         public enum Reason {
+            /** Tracking is limited due to initialization in progress. */
+            case initializing
+            
             /** Tracking is limited due to a excessive motion of the camera. */
             case excessiveMotion
             
@@ -47,11 +50,31 @@ extension ARCamera {
             let reason: TrackingState.Reason
             
             switch __trackingStateReason {
+            case .initializing: reason = .initializing
             case .excessiveMotion: reason = .excessiveMotion
             default: reason = .insufficientFeatures
             }
             
             return .limited(reason)
         }
+    }
+}
+
+@available(iOS, introduced: 11.0)
+extension ARPointCloud {
+    /**
+     The 3D points comprising the point cloud.
+     */
+    @nonobjc public var points: [vector_float3] {
+        let buffer = UnsafeBufferPointer(start: __points, count: Int(__count))
+        return Array(buffer)
+    }
+    
+    /**
+     The 3D point identifiers comprising the point cloud.
+     */
+    @nonobjc public var identifiers: [UInt64] {
+        let buffer = UnsafeBufferPointer(start: __identifiers, count: Int(__count))
+        return Array(buffer)
     }
 }

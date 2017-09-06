@@ -1250,6 +1250,11 @@ void Remangler::mangleWeak(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleShared(Node *node) {
+  Out << 'h';
+  mangleSingleChildNode(node); // type
+}
+
 void Remangler::mangleInOut(Node *node) {
   Out << 'R';
   mangleSingleChildNode(node); // type
@@ -1663,6 +1668,11 @@ void Remangler::mangleOutlinedRetain(Node *node) {
 
 void Remangler::mangleOutlinedRelease(Node *node) {
   Out << "Ws";
+  mangleSingleChildNode(node);
+}
+
+void Remangler::mangleOutlinedVariable(Node *node) {
+  Out << "Tv" << node->getIndex();
   mangleSingleChildNode(node);
 }
 

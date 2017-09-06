@@ -1,0 +1,15 @@
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all=0 -module-name ObjectiveC -o /dev/null 2>&1  %s
+// REQUIRES: asserts
+// REQUIRES: objc_interop
+
+@objc protocol NSBurrito {}
+
+class Protocol : NSBurrito {}
+
+sil @test_objc_protocol : $@convention(thin) () -> @owned Protocol {
+bb0:
+  %0 = objc_protocol #NSBurrito : $Protocol
+  %1 = copy_value %0 : $Protocol
+  return %1 : $Protocol
+}
+

@@ -38,7 +38,7 @@ entry(%0 : @trivial $*T, %1 : @trivial $Int):
 protocol P {}
 
 // CHECK-LABEL: sil @_T022generic_promotable_boxTf2ni_n : $@convention(thin) <T> (@in T, Builtin.Int32) -> Builtin.Int32
-// CHECK:       bb0([[ARG0:%.*]] : @trivial $*T, [[ARG1:%.*]] : @trivial $Builtin.Int32):
+// CHECK:       bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $Builtin.Int32):
 // CHECK-NEXT:    return [[ARG1]] : $Builtin.Int32
 
 sil @generic_promotable_box : $@convention(thin) <T> (@in T, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
@@ -50,7 +50,7 @@ entry(%0 : @trivial $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
 }
 
 // CHECK-LABEL: sil @call_generic_promotable_box_from_different_generic
-// CHECK:       bb0([[ARG0:%.*]] : @trivial $*T, [[ARG1:%.*]] : @trivial $*U, [[ARG2:%.*]] : @trivial $Builtin.Int32):
+// CHECK:       bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*U, [[ARG2:%.*]] : $Builtin.Int32):
 // CHECK-NEXT:    destroy_addr [[ARG0]] : $*T
 // CHECK-NEXT:    destroy_addr [[ARG1]] : $*U
 // CHECK:         [[F:%.*]] = function_ref @_T022generic_promotable_boxTf2ni_n : $@convention(thin) <τ_0_0> (@in τ_0_0, Builtin.Int32) -> Builtin.Int32
@@ -81,7 +81,7 @@ struct R<T> {
 // take argument of a type E<(R<T>) -> Builtin.Int32>, which used
 // to be a slot inside a box.
 // CHECK-LABEL: sil @_T023generic_promotable_box2Tf2nni_n : $@convention(thin) <T> (@in R<T>, @in Builtin.Int32, @owned E<(R<T>) -> Builtin.Int32>) -> () 
-// CHECK:       bb0([[ARG0:%.*]] : @trivial $*R<T>, [[ARG1:%.*]] : @trivial $*Builtin.Int32, [[ARG2:%.*]] : @owned $E<(R<T>) -> Builtin.Int32>):
+// CHECK:       bb0([[ARG0:%.*]] : $*R<T>, [[ARG1:%.*]] : $*Builtin.Int32, [[ARG2:%.*]] : $E<(R<T>) -> Builtin.Int32>):
 // CHECK-NOT:     project_box
 // CHECK:         switch_enum [[ARG2]] : $E<(R<T>) -> Builtin.Int32>
 // CHECK-NOT:     project_box
@@ -109,7 +109,7 @@ exit:
 // Check that alloc_box was eliminated and a specialized version of the
 // closure is invoked.
 // CHECK-LABEL: sil @call_generic_promotable_box_from_different_generic2
-// CHECK:       bb0([[ARG0:%.*]] : @trivial $*R<T>, [[ARG1:%.*]] : @trivial $*E<(R<U>) -> Builtin.Int32>, [[ARG2:%.*]] : @trivial $*Builtin.Int32):
+// CHECK:       bb0([[ARG0:%.*]] : $*R<T>, [[ARG1:%.*]] : $*E<(R<U>) -> Builtin.Int32>, [[ARG2:%.*]] : $*Builtin.Int32):
 // CHECK:         %3 = load [[ARG1]] : $*E<(R<U>) -> Builtin.Int32>
 // CHECK:         [[F:%.*]] = function_ref @_T023generic_promotable_box2Tf2nni_n : $@convention(thin) <τ_0_0> (@in R<τ_0_0>, @in Builtin.Int32, @owned E<(R<τ_0_0>) -> Builtin.Int32>) -> ()
 // CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [[F]]<U>(%2, %3)

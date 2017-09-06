@@ -74,7 +74,7 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
 /// an arbitrary property to an enum element using extractEnumElement.
 static EnumElementDecl *
 filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
-                     LookupResult foundElements) {
+                     bool unqualifiedLookup, LookupResult foundElements) {
   EnumElementDecl *foundElement = nullptr;
   VarDecl *foundConstant = nullptr;
 
@@ -85,9 +85,11 @@ filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
       continue;
     }
     // Skip if the enum element was referenced as an instance member
-    if (!result.getBaseDecl() ||
-        !result.getBaseDecl()->getInterfaceType()->is<MetatypeType>()) {
-      continue;
+    if (unqualifiedLookup) {
+      if (!result.getBaseDecl() ||
+          !result.getBaseDecl()->getInterfaceType()->is<MetatypeType>()) {
+        continue;
+      }
     }
 
     if (auto *oe = dyn_cast<EnumElementDecl>(e)) {
@@ -116,20 +118,24 @@ lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto lookup = TC.lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
-  return filterForEnumElement(TC, DC, UseLoc, lookup);
+  return filterForEnumElement(TC, DC, UseLoc,
+                              /*unqualifiedLookup=*/true, lookup);
 }
 
 /// Find an enum element in an enum type.
 static EnumElementDecl *
 lookupEnumMemberElement(TypeChecker &TC, DeclContext *DC, Type ty,
                         Identifier name, SourceLoc UseLoc) {
-  assert(ty->getAnyNominal());
+  if (!ty->mayHaveMembers())
+    return nullptr;
+
   // Look up the case inside the enum.
   // FIXME: We should be able to tell if this is a private lookup.
   NameLookupOptions lookupOptions
     = defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
   LookupResult foundElements = TC.lookupMember(DC, ty, name, lookupOptions);
-  return filterForEnumElement(TC, DC, UseLoc, foundElements);
+  return filterForEnumElement(TC, DC, UseLoc,
+                              /*unqualifiedLookup=*/false, foundElements);
 }
 
 namespace {
@@ -731,7 +737,8 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
   bool hadError = false;
   
   for (auto param : *PL) {
-    if (!param->getTypeLoc().getTypeRepr() &&
+    auto typeRepr = param->getTypeLoc().getTypeRepr();
+    if (!typeRepr &&
         param->hasInterfaceType()) {
       hadError |= param->isInvalid();
       continue;
@@ -763,8 +770,12 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
     }
     
     checkTypeModifyingDeclAttributes(param);
-    if (!hadError && param->getTypeLoc().getTypeRepr()->getKind() == TypeReprKind::InOut) {
-      param->setSpecifier(VarDecl::Specifier::InOut);
+    if (!hadError) {
+      if (isa<InOutTypeRepr>(typeRepr)) {
+        param->setSpecifier(VarDecl::Specifier::InOut);
+      } else if (isa<SharedTypeRepr>(typeRepr)) {
+        param->setSpecifier(VarDecl::Specifier::Shared);
+      }
     }
   }
   
@@ -897,58 +908,6 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     return false;
   }
   llvm_unreachable("bad pattern kind!");
-}
-
-/// Coerce the given 'isa' pattern via a conditional downcast.
-///
-/// This allows us to use an arbitrary conditional downcast to
-/// evaluate an "is" / "as" pattern, which includes any kind of
-/// downcast for which we don't have specialized logic.
-static bool coercePatternViaConditionalDowncast(TypeChecker &tc, 
-                                                Pattern *&pattern,
-                                                DeclContext *dc,
-                                                Type type,
-                                                TypeResolutionOptions options) {
-  auto isa = cast<IsPattern>(pattern);
-
-  // FIXME: We can't handle subpatterns here.
-  if (isa->getSubPattern()) {
-    tc.diagnose(isa->getLoc(), diag::isa_pattern_value, 
-                isa->getCastTypeLoc().getType());
-    return false;
-  }
-
-  // Create a new match variable $match.
-  auto *matchVar = new (tc.Context) VarDecl(/*IsStatic*/false,
-                                            VarDecl::Specifier::Let,
-                                            /*IsCaptureList*/false,
-                                            pattern->getLoc(),
-                                            tc.Context.getIdentifier("$match"),
-                                            type, dc);
-  matchVar->setInterfaceType(dc->mapTypeOutOfContext(type));
-  matchVar->setHasNonPatternBindingInit();
-
-  // Form the cast $match as? T, which produces an optional.
-  Expr *matchRef = new (tc.Context) DeclRefExpr(matchVar,
-                                                DeclNameLoc(pattern->getLoc()),
-                                                /*Implicit=*/true);
-  Expr *cast = new (tc.Context) ConditionalCheckedCastExpr(
-                                  matchRef,
-                                  isa->getLoc(),
-                                  isa->getLoc(),
-                                  isa->getCastTypeLoc());
-
-  // Type-check the cast as a condition.
-  if (tc.typeCheckCondition(cast, dc))
-    return true;
-
-  // Form an expression pattern with this match.
-  // FIXME: This is lossy; we can't get the value out.
-  pattern = new (tc.Context) ExprPattern(matchRef, /*isResolved=*/true, 
-                                         /*matchExpr=*/cast, matchVar,
-                                         false);
-  pattern->setType(isa->getCastTypeLoc().getType());
-  return false;
 }
 
 /// Perform top-down type coercion on the given pattern.
@@ -1272,10 +1231,12 @@ recur:
     // Valid checks.
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::DictionaryDowncast:
-    case CheckedCastKind::SetDowncast:
-      return coercePatternViaConditionalDowncast(
-               *this, P, dc, type,
-               subOptions|TR_FromNonInferredPattern);
+    case CheckedCastKind::SetDowncast: {
+      diagnose(IP->getLoc(),
+               diag::isa_collection_downcast_pattern_value_unimplemented,
+               IP->getCastTypeLoc().getType());
+      return false;
+    }
 
     case CheckedCastKind::ValueCast:
     case CheckedCastKind::Swift3BridgingDowncast:
@@ -1306,10 +1267,8 @@ recur:
     
     Type enumTy;
     if (!elt) {
-      if (type->getAnyNominal()) {
-        elt = lookupEnumMemberElement(*this, dc, type, EEP->getName(),
-                                      EEP->getLoc());
-      }
+      elt = lookupEnumMemberElement(*this, dc, type, EEP->getName(),
+                                    EEP->getLoc());
       if (!elt) {
         if (!type->hasError()) {
           // Lowercasing of Swift.Optional's cases is handled in the
@@ -1494,7 +1453,9 @@ recur:
     }
 
     EnumElementDecl *elementDecl = Context.getOptionalSomeDecl(optionalKind);
-    assert(elementDecl && "missing optional some decl?!");
+    if (!elementDecl)
+      return true;
+
     OP->setElementDecl(elementDecl);
 
     Pattern *sub = OP->getSubPattern();

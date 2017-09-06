@@ -85,22 +85,7 @@ public:
   }
 
   llvm::Value *getValueWitnessTable(IRGenFunction &IGF, SILType T) const {
-    return IGF.emitValueWitnessTableRefForLayout(T);
-  }
-
-  std::pair<llvm::Value*,llvm::Value*>
-  getSizeAndAlignmentMask(IRGenFunction &IGF, SILType T) const override {
-    auto size = emitLoadOfSize(IGF, T);
-    auto align = emitLoadOfAlignmentMask(IGF, T);
-    return { size, align };
-  }
-
-  std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
-  getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, SILType T) const override {
-    auto size = emitLoadOfSize(IGF, T);
-    auto align = emitLoadOfAlignmentMask(IGF, T);
-    auto stride = emitLoadOfStride(IGF, T);
-    return std::make_tuple(size, align, stride);
+    return IGF.emitValueWitnessTableRef(T);
   }
 
   llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override {

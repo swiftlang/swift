@@ -17,6 +17,8 @@
 #ifndef SWIFT_IRGEN_GENSTRUCT_H
 #define SWIFT_IRGEN_GENSTRUCT_H
 
+#include "llvm/ADT/Optional.h"
+
 namespace llvm {
   class Constant;
 }
@@ -49,13 +51,6 @@ namespace irgen {
                                                       SILType baseType,
                                                       VarDecl *field);
 
-  /// Return the constant offset within the struct's metadata object where the
-  /// offset of that field is stored, or null if the field is not in the
-  /// struct's field offset vector.
-  llvm::Constant *emitPhysicalStructMemberOffsetOfFieldOffset(IRGenModule &IGM,
-                                                              SILType baseType,
-                                                              VarDecl *field);
-
   /// Return a strategy for accessing the given stored struct property.
   ///
   /// This API is used by RemoteAST.
@@ -63,8 +58,14 @@ namespace irgen {
   getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
                                         SILType baseType, VarDecl *field);
 
-  unsigned getPhysicalStructFieldIndex(IRGenModule &IGM, SILType baseType,
-                                       VarDecl *field);
+  /// Returns the index of the element in the llvm struct type which represents
+  /// \p field in \p baseType.
+  ///
+  /// Returns None if \p field has an empty type and therefore has no
+  /// corresponding element in the llvm type.
+  llvm::Optional<unsigned> getPhysicalStructFieldIndex(IRGenModule &IGM,
+                                                       SILType baseType,
+                                                       VarDecl *field);
 
 } // end namespace irgen
 } // end namespace swift

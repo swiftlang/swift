@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership %s
 
 protocol Runcible {
   func runce<A>(_ x: A)

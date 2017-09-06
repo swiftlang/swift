@@ -67,6 +67,10 @@ namespace {
     llvm::SmallDenseMap<SILBasicBlock*, unsigned, 32> WorklistMap;
     // Keep track of loop headers - we don't want to jump-thread through them.
     SmallPtrSet<SILBasicBlock *, 32> LoopHeaders;
+    // The number of times jump threading was done through a switch_enum in
+    // a loop header. Used to limit that to prevent an infinite jump threading
+    // loop.
+    llvm::SmallDenseMap<SILBasicBlock*, unsigned, 8> JumpThreadedLoopHeaders;
 
     // Dominance and post-dominance info for the current function
     DominanceInfo *DT = nullptr;
@@ -1035,8 +1039,17 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // Don't jump thread through a potential header - this can produce irreducible
   // control flow. Still, we make an exception for switch_enum.
   bool DestIsLoopHeader = (LoopHeaders.count(DestBB) != 0);
-  if (!isa<SwitchEnumInst>(DestBB->getTerminator()) && DestIsLoopHeader)
-    return false;
+  if (DestIsLoopHeader) {
+    if (!isa<SwitchEnumInst>(DestBB->getTerminator()))
+      return false;
+
+    // Limit the number we jump-thread through an switch_enum loop header.
+    // In case the CFG contains an infinite loop through such a header we
+    // otherwise may end up with jump-threading indefinitely.
+    unsigned &NumThreaded = JumpThreadedLoopHeaders[DestBB];
+    if (++NumThreaded > 8)
+      return false;
+  }
 
   DEBUG(llvm::dbgs() << "jump thread from bb" << SrcBB->getDebugID() <<
         " to bb" << DestBB->getDebugID() << '\n');
@@ -1110,9 +1123,19 @@ static SILBasicBlock *getTrampolineDest(SILBasicBlock *SBB) {
   if (!BI)
     return nullptr;
 
-  // Disallow infinite loops.
-  if (BI->getDestBB() == SBB)
-    return nullptr;
+  // Disallow infinite loops through SBB.
+  llvm::SmallPtrSet<SILBasicBlock *, 8> VisitedBBs;
+  BranchInst *NextBI = BI;
+  do {
+    SILBasicBlock *NextBB = NextBI->getDestBB();
+    // We don't care about infinite loops after SBB.
+    if (!VisitedBBs.insert(NextBB).second)
+      break;
+    // Only if the infinite loop goes through SBB directly we bail.
+    if (NextBB == SBB)
+      return nullptr;
+    NextBI = dyn_cast<BranchInst>(NextBB->getTerminator());
+  } while (NextBI);
 
   auto BrArgs = BI->getArgs();
   if (BrArgs.size() != SBB->getNumArguments())
@@ -2844,7 +2867,7 @@ bool SimplifyCFG::run() {
 
 /// Is an argument from this terminator considered mandatory?
 static bool hasMandatoryArgument(TermInst *term) {
-  // It's more maintainable to just white-list the instructions that
+  // It's more maintainable to just explicitly list the instructions that
   // *do* have mandatory arguments.
   return (!isa<BranchInst>(term) && !isa<CondBranchInst>(term));
 }

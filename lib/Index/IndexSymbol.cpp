@@ -70,11 +70,11 @@ static bool isUnitTest(const ValueDecl *D) {
   if (FD->getParameterList(1)->size() != 0)
     return false;
 
-  // 5. ...is of at least 'internal' accessibility (unless we can use
+  // 5. ...is of at least 'internal' access (unless we can use
   //    Objective-C reflection)...
   if (!D->getASTContext().LangOpts.EnableObjCInterop &&
-      (D->getFormalAccess() < Accessibility::Internal ||
-      parentNTD->getFormalAccess() < Accessibility::Internal))
+      (D->getFormalAccess() < AccessLevel::Internal ||
+      parentNTD->getFormalAccess() < AccessLevel::Internal))
     return false;
 
   // 6. ...and starts with "test".

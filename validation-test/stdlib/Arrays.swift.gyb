@@ -6,6 +6,12 @@ import StdlibCollectionUnittest
 
 let CopyToNativeArrayBufferTests = TestSuite("CopyToNativeArrayBufferTests")
 
+extension Array {
+  func _rawIdentifier() -> Int {
+    return unsafeBitCast(self, to: Int.self)
+  }
+}
+
 CopyToNativeArrayBufferTests.test("Sequence._copyToContiguousArray()") {
   do {
     // Call from a static context.
@@ -138,38 +144,777 @@ ArrayTestSuite.test("${Kind}/popLast") {
 }
 % end
 
-// Check how removeFirst() affects indices.
-% for Kind in ['Array', 'ContiguousArray']:
-ArrayTestSuite.test("${Kind}/removeFirst") {
-  do {
-    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1 ].map(OpaqueValue.init))
-    a.removeFirst()
-    expectEqual(0, a.startIndex)
+//===----------------------------------------------------------------------===//
+// COW(🐄) tests
+//===----------------------------------------------------------------------===//
+
+class COWBox<
+  T: Equatable & CustomStringConvertible>
+  : Equatable, CustomStringConvertible {
+  var value: T
+  
+  init(_ value: T) {
+    self.value = value
   }
+  
+  var description: String {
+    return "Boxed: \(value.description)"
+  }
+  
+  static func ==(lhs: COWBox, rhs: COWBox) -> Bool {
+    return lhs.value == rhs.value
+  }
+}
+
+ArrayTestSuite.test("COW.Smoke") {
+  var a1 = Array<COWBox<Int>>(repeating: COWBox(0), count: 10)
+  var identity1 = a1._rawIdentifier()
+  
+  a1[0] = COWBox(1)
+  a1[1] = COWBox(2)
+  a1[2] = COWBox(3)
+  
+  var a2 = a1
+  expectEqual(identity1, a2._rawIdentifier())
+  
+  a2[3] = COWBox(4)
+  expectNotEqual(identity1, a2._rawIdentifier())
+  
+  a1[4] = COWBox(5)
+  expectEqual(identity1, a1._rawIdentifier())
+  
+  _blackHole(a1)
+  _blackHole(a2)  
+}
+
+func getCOWFastArray() -> Array<Int> {
+  var a = Array<Int>()
+  a.reserveCapacity(10)
+  a.append(1)
+  a.append(2)
+  a.append(3)
+  return a
+}
+
+func getCOWSlowArray() -> Array<COWBox<Int>> {
+  var a = Array<COWBox<Int>>()
+  a.reserveCapacity(10)
+  a.append(COWBox(1))
+  a.append(COWBox(2))
+  a.append(COWBox(3))
+  return a
+}
+
+ArrayTestSuite.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
+  var a = getCOWFastArray()
+  var identity1 = a._rawIdentifier()
+  var startIndex = a.startIndex
+
+  expectNotEqual(0, a[startIndex])
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
+  var a = getCOWSlowArray()
+  var identity1 = a._rawIdentifier()
+  var startIndex = a.startIndex
+
+  expectNotEqual(0, a[startIndex].value)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
   do {
-    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2 ].map(OpaqueValue.init))
-    a.removeFirst()
-    expectEqual(0, a.startIndex)
+    var a = getCOWFastArray()
+    var identity1 = a._rawIdentifier()
+
+    let index1 = 1
+    expectEqual(identity1, a._rawIdentifier())
+
+    expectEqual(2, a[index1])
+
+    let removed = a.remove(at: index1)
+    expectEqual(2, removed)
+
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    var a1 = getCOWFastArray()
+    var identity1 = a1._rawIdentifier()
+
+    var a2 = a1
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity1, a2._rawIdentifier())
+
+    var index1 = 1
+    expectEqual(2, a2[index1])
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity1, a2._rawIdentifier())
+
+    let removed = a2.remove(at: index1)
+    expectEqual(2, removed)
+
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity1, a2._rawIdentifier())
+  }
+}
+
+ArrayTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
+  do {
+    var a = getCOWSlowArray()
+    var identity1 = a._rawIdentifier()
+
+    let index1 = 1
+    expectEqual(identity1, a._rawIdentifier())
+
+    expectEqual(2, a[index1].value)
+
+    let removed = a.remove(at: index1)
+    expectEqual(2, removed.value)
+
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    var a1 = getCOWSlowArray()
+    var identity1 = a1._rawIdentifier()
+
+    var a2 = a1
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity1, a2._rawIdentifier())
+
+    var index1 = 1
+    expectEqual(2, a2[index1].value)
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity1, a2._rawIdentifier())
+
+    let removed = a2.remove(at: index1)
+    expectEqual(2, removed.value)
+
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity1, a2._rawIdentifier())
+  }
+}
+
+ArrayTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
+  do {
+    var a = getCOWFastArray()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1])
+
+    a.removeAll()
+    var identity1 = a._rawIdentifier()
+    expectLT(a.capacity, originalCapacity)
+    expectEqual(0, a.count)
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    var a = getCOWFastArray()
+    var identity1 = a._rawIdentifier()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1])
+
+    a.removeAll(keepingCapacity: true)
+    expectEqual(identity1, a._rawIdentifier())
+    expectEqual(originalCapacity, a.capacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a1 = getCOWFastArray()
+    var identity1 = a1._rawIdentifier()
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+
+    var a2 = a1
+    a2.removeAll()
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+
+  do {
+    var a1 = getCOWFastArray()
+    var identity1 = a1._rawIdentifier()
+    let originalCapacity = a1.capacity
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+
+    var a2 = a1
+    a2.removeAll(keepingCapacity: true)
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+    expectEqual(originalCapacity, a2.capacity)
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+}
+
+ArrayTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
+  do {
+    var a = getCOWSlowArray()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1].value)
+
+    a.removeAll()
+    var identity1 = a._rawIdentifier()
+    expectLT(a.capacity, originalCapacity)
+    expectEqual(0, a.count)
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    var a = getCOWSlowArray()
+    var identity1 = a._rawIdentifier()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1].value)
+
+    a.removeAll(keepingCapacity: true)
+    expectEqual(identity1, a._rawIdentifier())
+    expectEqual(originalCapacity, a.capacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a1 = getCOWSlowArray()
+    var identity1 = a1._rawIdentifier()
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1].value)
+
+    var a2 = a1
+    a2.removeAll()
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1].value)
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+
+  do {
+    var a1 = getCOWSlowArray()
+    var identity1 = a1._rawIdentifier()
+    let originalCapacity = a1.capacity
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1].value)
+
+    var a2 = a1
+    a2.removeAll(keepingCapacity: true)
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1].value)
+    expectEqual(originalCapacity, a2.capacity)
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+}
+
+ArrayTestSuite.test("COW.Fast.CountDoesNotReallocate") {
+  var a = getCOWFastArray()
+  var identity1 = a._rawIdentifier()
+
+  expectEqual(3, a.count)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Slow.CountDoesNotReallocate") {
+  var a = getCOWSlowArray()
+  var identity1 = a._rawIdentifier()
+
+  expectEqual(3, a.count)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
+  var a = getCOWFastArray()
+  var identity1 = a._rawIdentifier()
+
+  var iter = a.makeIterator()
+  var copy = Array<Int>()
+  while let value = iter.next() {
+    copy.append(value)
+  }
+  expectEqual(copy, [ 1, 2, 3 ])
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
+  var a = getCOWSlowArray()
+  var identity1 = a._rawIdentifier()
+
+  var iter = a.makeIterator()
+  var copy = Array<Int>()
+  while let value = iter.next() {
+    copy.append(value.value)
+  }
+  expectEqual(copy, [ 1, 2, 3 ])
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Fast.EqualityTestDoesNotReallocate") {
+  var a1 = getCOWFastArray()
+  var identity1 = a1._rawIdentifier()
+
+  var a2 = getCOWFastArray()
+  var identity2 = a2._rawIdentifier()
+
+  expectEqual(a1, a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+
+  a2[1] = 5
+  expectTrue(a1 != a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
+  var a1 = getCOWSlowArray()
+  var identity1 = a1._rawIdentifier()
+
+  var a2 = getCOWSlowArray()
+  var identity2 = a2._rawIdentifier()
+
+  expectEqual(a1, a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+
+  a2[2] = COWBox(5)
+  expectTrue(a1 != a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+}
+
+//===----------------------------------------------------------------------===//
+// Index tests
+//===----------------------------------------------------------------------===//
+public struct ArrayIndexTest<T: Collection> {  
+  public enum Operation {
+    case append(Int)
+    case insert(Int, at: Int)
+    case partition(by: (OpaqueValue<Int>) throws -> Bool)
+    case removeFirst
+    case removeFirstN(Int)
+    case removeLast
+    case removeLastN(Int)
+    case removeAt(Int)
+    case removeAll(Bool)
+    case removeClosedSubrange(ClosedRange<Int>)
+    case removeHalfClosedSubrange(Range<Int>)
+  }
+  
+  public let data: T
+  public let expectedStart: Int
+  public let expectedEnd: Int
+  public let range: Range<Int>?
+  public let operation: Operation
+  public let loc: SourceLoc
+
+  public init(data: T, expectedStart: Int, expectedEnd: Int, 
+        operation: Operation, range: Range<Int>? = nil,
+        file: String = #file, line: UInt = #line) {
+    self.data = data
+    self.expectedStart = expectedStart
+    self.expectedEnd = expectedEnd
+    self.operation = operation
+    self.range = range
+    self.loc = SourceLoc(file, line, comment: "Array index test data")
+  }
+}
+
+let indexTests: [ArrayIndexTest<[Int]>] = [
+  // Check how partition() affects indices.
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .partition(by: { $0.value > 100 } ),
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 3,
+    operation: .partition(by: { $0.value > 0} ),
+    range: 1..<3
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 3,
+    operation: .partition(by: { $0.value > 3000 }),
+    range: 1..<3
+  ),
+  // Check how partition(by:) affects indices. 
+  ArrayIndexTest(
+    data: [ 10, 2, -33, 44, -5 ],
+    expectedStart: 0,
+    expectedEnd: 5,
+    operation: .partition(by: { $0.value > 0 })
+  ),
+  ArrayIndexTest(
+    data: [ 10, 2, -33, 44, -5 ],
+    expectedStart: 0,
+    expectedEnd: 5,
+    operation: .partition(by: { $0.value > 100 })
+  ),
+  // Check how append affects indices.
+  ArrayIndexTest(
+    data: [ 2 ],
+    expectedStart: 0,
+    expectedEnd: 2,
+    operation: .append(1)
+  ),
+  ArrayIndexTest(
+    data: [],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .append(1)
+  ),
+  // TODO: re-enable when rdar://problem/33358110 is addressed
+  // ArrayIndexTest(
+  //   data: [ 42, 2525, 3535, 42 ],
+  //   expectedStart: 1,
+  //   expectedEnd: 3,
+  //   operation: .append(1),
+  //   range: 1..<2
+  // ),
+  // Check how insert(_:at:) affects indices.
+  ArrayIndexTest(
+    data: [ 2 ],
+    expectedStart: 0,
+    expectedEnd: 2,
+    operation: .insert(2, at: 0)
+  ),
+  ArrayIndexTest(
+    data: [ 2 ],
+    expectedStart: 0,
+    expectedEnd: 2,
+    operation: .insert(2, at: 1)
+  ),
+  ArrayIndexTest(
+    data: [ 42, 2525, 3535, 42 ],
+    expectedStart: 1,
+    expectedEnd: 3,
+    operation: .insert(2, at: 1),
+    range: 1..<2
+  ),
+  // Check how removeLast() affects indices.
+  ArrayIndexTest(
+    data: [ 1 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeLast
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeLast
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeLast,
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .removeLast,
+    range: 1..<3
+  ),
+  // Check how remove(at:) affects indices.
+  ArrayIndexTest(
+    data: [ 1 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeAt(0)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeAt(1)
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeAt(1),
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .removeAt(1),
+    range: 1..<3
+  ),
+  // Check how removeAll(keepingCapacity:) affects indices.
+  ArrayIndexTest(
+    data: [ 1, 2, 3 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeAll(true)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeAll(false)
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeAll(true),
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeAll(false),
+    range: 1..<2
+  ),
+  // Check how removeFirst() affects indices.
+  ArrayIndexTest(
+    data: [ 1 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeFirst
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeFirst
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 2,
+    expectedEnd: 2,
+    operation: .removeFirst,
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 2,
+    expectedEnd: 3,
+    operation: .removeFirst,
+    range: 1..<3
+  ),
+  // Check how removeFirst(_:) affects indices.
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeFirstN(2)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2, 3, 4 ],
+    expectedStart: 0,
+    expectedEnd: 2,
+    operation: .removeFirstN(2)
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 3,
+    expectedEnd: 3,
+    operation: .removeFirstN(2),
+    range: 1..<3
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 3,
+    expectedEnd: 4,
+    operation: .removeFirstN(2),
+    range: 1..<4
+  ),
+  // Check how removeLast() affects indices.
+  ArrayIndexTest(
+    data: [ 1 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeLast
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeLast
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeLast,
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeLast,
+    range: 1..<2
+  ),
+  // Check how removeSubrange(_:ClosedRange) affects indices.
+  ArrayIndexTest(
+    data: [ 1 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeHalfClosedSubrange(0..<1)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2, 3 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeHalfClosedSubrange(0..<2)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2, 3 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeHalfClosedSubrange(0..<3)
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeHalfClosedSubrange(1..<2),
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .removeHalfClosedSubrange(1..<2),
+    range: 1..<3
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .removeHalfClosedSubrange(2..<4),
+    range: 1..<4
+  ),
+  // Check how removeSubrange(_:Range) affects indices.
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeClosedSubrange(0...1)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2, 3 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeClosedSubrange(0...1)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2, 3 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeClosedSubrange(0...2)
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeClosedSubrange(1...2),
+    range: 1..<3
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99, 44 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .removeClosedSubrange(2...3),
+    range: 1..<4
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99, 44 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .removeClosedSubrange(1...2),
+    range: 1..<4
+  )
+]
+
+% for Kind in ['Array', 'ContiguousArray', 'ArraySlice']:
+ArrayTestSuite.test("ArrayIndexTests") {
+  for test in indexTests {
+    let testData = test.data.map(OpaqueValue.init)
+% if Kind == 'ArraySlice':
+    guard let range = test.range else { continue }
+    var a = testData[range]
+% else:
+    if test.range != nil { continue }
+    var a = ${Kind}(testData)
+% end
+
+    switch test.operation {
+    case let .append(v):
+      a.append(OpaqueValue(v))
+    case let .insert(v, index):
+      a.insert(OpaqueValue(v), at: index)
+    case let .partition(c):
+      expectDoesNotThrow({ 
+        _ = try a.partition(by: c) 
+      })
+    case .removeFirst:
+      a.removeFirst()
+    case let .removeFirstN(n):
+      a.removeFirst(n)
+    case .removeLast:
+      a.removeLast()
+    case let .removeLastN(n):
+      a.removeLast(n)
+    case let .removeAt(index):
+      a.remove(at: index)
+    case let .removeAll(keepCapacity):
+      a.removeAll(keepingCapacity: keepCapacity)
+    case let .removeHalfClosedSubrange(range):
+        a.removeSubrange(range)
+    case let .removeClosedSubrange(range):
+        a.removeSubrange(range)
+    }
+    
+    expectEqual(test.expectedStart, a.startIndex, stackTrace: SourceLocStack().with(test.loc))
+    expectEqual(test.expectedEnd, a.endIndex, stackTrace: SourceLocStack().with(test.loc))
   }
 }
 % end
-
-ArrayTestSuite.test("ArraySlice/removeFirst") {
-  do {
-    let a: [OpaqueValue<Int>] = [ 99, 1010, 99 ].map(OpaqueValue.init)
-    var s = a[1..<2]
-    expectEqual(1, s.startIndex)
-    s.removeFirst()
-    expectEqual(2, s.startIndex)
-  }
-  do {
-    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99 ].map(OpaqueValue.init)
-    var s = a[1..<2]
-    expectEqual(1, s.startIndex)
-    s.removeFirst()
-    expectEqual(2, s.startIndex)
-  }
-}
 
 //===----------------------------------------------------------------------===//
 // Array and EvilCollection that changes its size while we are not looking
@@ -329,7 +1074,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
         expectCrashLater()
       }
       a.replaceSubrange(0..<rangeMax, with: evil)
-      _fixLifetime(b)
+      _blackHole(b)
     }
   }
 

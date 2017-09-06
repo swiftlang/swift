@@ -558,3 +558,231 @@ func infinitelySized() -> Bool {
   case (.two, .two): return true
   }
 }
+
+func diagnoseDuplicateLiterals() {
+  let str = "def"
+  let int = 2
+  let dbl = 2.5
+
+  // No Diagnostics
+  switch str {
+  case "abc": break
+  case "def": break
+  case "ghi": break
+  default: break
+  }
+
+  switch str {
+  case "abc": break
+  case "def": break // expected-note {{first occurrence of identical literal pattern is here}}
+  case "def": break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case "ghi": break
+  default: break
+  }
+  
+  switch str {
+  case "abc", "def": break // expected-note 2 {{first occurrence of identical literal pattern is here}}
+  case "ghi", "jkl": break
+  case "abc", "def": break // expected-warning 2 {{literal value is already handled by previous pattern; consider removing it}}
+  default: break
+  }
+
+  switch str {
+  case "xyz": break // expected-note {{first occurrence of identical literal pattern is here}}
+  case "ghi": break
+  case "def": break
+  case "abc": break
+  case "xyz": break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  default: break
+  }
+
+  func someStr() -> String { return "sdlkj" }
+  let otherStr = "ifnvbnwe"
+  switch str {
+  case "sdlkj": break
+  case "ghi": break // expected-note {{first occurrence of identical literal pattern is here}}
+  case someStr(): break
+  case "def": break
+  case otherStr: break
+  case "xyz": break // expected-note {{first occurrence of identical literal pattern is here}}
+  case "ifnvbnwe": break
+  case "ghi": break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case "xyz": break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  default: break
+  }
+
+  // No Diagnostics
+  switch int {
+  case -2: break
+  case -1: break
+  case 0: break
+  case 1: break
+  case 2: break
+  case 3: break
+  default: break
+  }
+
+  switch int {
+  case -2: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case -2: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 1: break
+  case 2: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case 2: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 3: break
+  default: break
+  }
+    
+  switch int {
+  case -2, -2: break // expected-note {{first occurrence of identical literal pattern is here}} expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 1, 2: break // expected-note 3 {{first occurrence of identical literal pattern is here}}
+  case 2, 3: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 1, 2: break // expected-warning 2 {{literal value is already handled by previous pattern; consider removing it}}
+  case 4, 5: break
+  case 7, 7: break // expected-note {{first occurrence of identical literal pattern is here}}
+                   // expected-warning@-1 {{literal value is already handled by previous pattern; consider removing it}}
+  default: break
+  }
+
+  switch int {
+  case 1: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case 2: break // expected-note 2 {{first occurrence of identical literal pattern is here}}
+  case 3: break
+  case 17: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case 4: break
+  case 2: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 001: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 5: break
+  case 0x11: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 0b10: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  default: break
+  }
+
+  switch int {
+  case 10: break
+  case 0b10: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case -0b10: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case 3000: break
+  case 0x12: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case 400: break
+  case 2: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case -2: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 18: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  default: break
+  }
+
+  func someInt() -> Int { return 0x1234 }
+  let otherInt = 13254
+  switch int {
+  case 13254: break
+  case 3000: break
+  case 00000002: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case 0x1234: break
+  case someInt(): break
+  case 400: break
+  case 2: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 18: break
+  case otherInt: break
+  case 230: break
+  default: break
+  }
+
+  // No Diagnostics
+  switch dbl {
+  case -3.5: break
+  case -2.5: break
+  case -1.5: break
+  case 1.5: break
+  case 2.5: break
+  case 3.5: break
+  default: break
+  }
+  
+  switch dbl {
+  case -3.5: break
+  case -2.5: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case -2.5: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case -1.5: break
+  case 1.5: break
+  case 2.5: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case 2.5: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 3.5: break
+  default: break
+  }
+  
+  switch dbl {
+  case 1.5, 4.5, 7.5, 6.9: break // expected-note 2 {{first occurrence of identical literal pattern is here}}
+  case 3.4, 1.5: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 7.5, 2.3: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  default: break
+  }
+  
+  switch dbl {
+  case 1: break
+  case 1.5: break // expected-note 2 {{first occurrence of identical literal pattern is here}}
+  case 2.5: break
+  case 3.5: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case 5.3132: break
+  case 1.500: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 46.2395: break
+  case 1.5000: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 0003.50000: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 23452.43: break
+  default: break
+  }
+  
+  func someDouble() -> Double { return 324.4523 }
+  let otherDouble = 458.2345
+  switch dbl {
+  case 1: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case 1.5: break
+  case 2.5: break
+  case 3.5: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case 5.3132: break
+  case 46.2395: break
+  case someDouble(): break
+  case 0003.50000: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case otherDouble: break
+  case 2.50505: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case 23452.43: break
+  case 00001: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case 123453: break
+  case 2.50505000000: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  default: break
+  }
+}
+
+func checkLiteralTuples() {
+  let str1 = "abc"
+  let str2 = "def"
+  let int1 = 23
+  let int2 = 7
+  let dbl1 = 4.23
+  let dbl2 = 23.45
+  
+  // No Diagnostics
+  switch (str1, str2) {
+  case ("abc", "def"): break
+  case ("def", "ghi"): break
+  case ("ghi", "def"): break
+  case ("abc", "def"): break // We currently don't catch this
+  default: break
+  }
+  
+  // No Diagnostics
+  switch (int1, int2) {
+  case (94, 23): break
+  case (7, 23): break
+  case (94, 23): break // We currently don't catch this
+  case (23, 7): break
+  default: break
+  }
+  
+  // No Diagnostics
+  switch (dbl1, dbl2) {
+  case (543.21, 123.45): break
+  case (543.21, 123.45): break // We currently don't catch this
+  case (23.45, 4.23): break
+  case (4.23, 23.45): break
+  default: break
+  }
+}

@@ -21,12 +21,17 @@
 #include "Initialization.h"
 #include "SILGenFunction.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
 using namespace Lowering;
 
+//===----------------------------------------------------------------------===//
+//                              Helper Routines
+//===----------------------------------------------------------------------===//
 
 static unsigned getTupleSize(CanType t) {
   if (auto tt = dyn_cast<TupleType>(t))
@@ -61,6 +66,7 @@ static unsigned getRValueSize(CanType type) {
 }
 
 namespace {
+
 class ExplodeTupleValue
   : public CanTypeVisitor<ExplodeTupleValue,
                           /*RetTy=*/ void,
@@ -78,6 +84,16 @@ public:
   }
 
   void visitType(CanType formalType, ManagedValue v) {
+    // If we have a loadable type that has not been loaded, actually load it.
+    if (v.getType().isLoadable(SGF.getModule()) &&
+        !v.getType().isObject()) {
+      if (v.hasCleanup()) {
+        v = SGF.B.createLoadTake(loc, v);
+      } else {
+        v = SGF.B.createLoadBorrow(loc, v);
+      }
+    }
+
     values.push_back(v);
   }
 
@@ -107,36 +123,44 @@ public:
     }
   }
 
-  void visitAddressTupleType(CanTupleType tupleFormalType,
-                             ManagedValue tupleMV) {
-    bool isPlusZero = tupleMV.isPlusZeroRValueOrTrivial();
-    SILValue tuple = tupleMV.forward(SGF);
+  void visitAddressTupleType(CanTupleType tupleFormalType, ManagedValue tuple) {
+    bool isPlusZero = tuple.isPlusZeroRValueOrTrivial();
 
-    for (auto i : indices(tupleFormalType->getElements())) {
+    for (unsigned i : indices(tupleFormalType->getElements())) {
       CanType eltFormalType = tupleFormalType.getElementType(i);
       assert(eltFormalType->isMaterializable());
 
-      auto eltTy = tuple->getType().getTupleElementType(i);
-      assert(eltTy.isAddress() == tuple->getType().isAddress());
+      auto eltTy = tuple.getType().getTupleElementType(i);
+      assert(eltTy.isAddress() == tuple.getType().isAddress());
       auto &eltTI = SGF.getTypeLowering(eltTy);
 
-      // Project the element.
-      SILValue elt = SGF.B.createTupleElementAddr(loc, tuple, i, eltTy);
+      // Project the element. This always returns a +0 handle with independent
+      // lifetime from tuple. We forward tuple when we are done so we can use
+      // ownership APIs.
+      ManagedValue elt = SGF.B.createTupleElementAddr(loc, tuple, i, eltTy);
 
-      // RValue has an invariant that loadable values have been
-      // loaded.  Except it's not really an invariant, because
-      // argument emission likes to lie sometimes.
+      // RValue has an invariant that loadable values have been loaded. Except
+      // it's not really an invariant, because argument emission likes to lie
+      // sometimes.
       if (eltTI.isLoadable()) {
-        elt = eltTI.emitLoad(SGF.B, loc, elt, LoadOwnershipQualifier::Take);
+        if (isPlusZero) {
+          elt = SGF.B.createLoadBorrow(loc, elt);
+        } else {
+          elt = SGF.B.createLoadTake(loc, elt);
+        }
+      } else {
+        // In contrast if we have an address only type, we can not rely on
+        // ownership APIs to help us. So, manually create a cleanup to make up
+        // for the cleanup that we will forward on tuple.
+        if (!isPlusZero)
+          elt = SGF.emitManagedRValueWithCleanup(elt.getValue(), eltTI);
       }
 
-      // If we're returning a +1 value, emit a cleanup for the member
-      // to cover for the cleanup we disabled for the tuple aggregate.
-      auto eltMV = isPlusZero ? ManagedValue::forUnmanaged(elt)
-                              : SGF.emitManagedRValueWithCleanup(elt, eltTI);
-
-      visit(eltFormalType, eltMV);
+      visit(eltFormalType, elt);
     }
+
+    // Forward the cleanup for tuple now that we have finished emitting values.
+    tuple.forward(SGF);
   }
 
   void visitTupleType(CanTupleType tupleFormalType, ManagedValue tuple) {
@@ -244,6 +268,8 @@ public:
   }
 };
 
+} // end anonymous namespace
+
 template<ImplodeKind KIND>
 static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
                                    SILGenFunction &SGF,
@@ -258,7 +284,7 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
 
   // To implode an address-only tuple, we need to create a buffer to hold the
   // result tuple.
-  if (loweredType.isAddressOnly(SGF.F.getModule()) &&
+  if (loweredType.isAddressOnly(SGF.getModule()) &&
       SGF.silConv.useLoweredAddresses()) {
     assert(KIND != ImplodeKind::Unmanaged &&
            "address-only values are always managed!");
@@ -271,66 +297,6 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
   // TupleInsts.
   return ImplodeLoadableTupleValue<KIND>(values, SGF).visit(tupleType, l);
 }
-
-class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
-                                              /*RetTy*/ RValue>
-{
-public:
-  SILGenFunction &SGF;
-  SILBasicBlock *parent;
-  SILLocation loc;
-  bool functionArgs;
-
-  EmitBBArguments(SILGenFunction &SGF, SILBasicBlock *parent,
-                  SILLocation l, bool functionArgs)
-    : SGF(SGF), parent(parent), loc(l), functionArgs(functionArgs) {}
-
-  RValue visitType(CanType t) {
-    SILValue arg;
-    if (functionArgs) {
-      arg = parent->createFunctionArgument(SGF.getLoweredType(t),
-                                           loc.getAsASTNode<ValueDecl>());
-    } else {
-      SILType lty = SGF.getLoweredType(t);
-      ValueOwnershipKind ownershipkind = lty.isAddress()
-                                             ? ValueOwnershipKind::Trivial
-                                             : ValueOwnershipKind::Owned;
-      arg = parent->createPHIArgument(lty, ownershipkind,
-                                      loc.getAsASTNode<ValueDecl>());
-    }
-    ManagedValue mv = isa<InOutType>(t)
-      ? ManagedValue::forLValue(arg)
-      : SGF.emitManagedRValueWithCleanup(arg);
-
-    // If the value is a (possibly optional) ObjC block passed into the entry
-    // point of the function, then copy it so we can treat the value reliably
-    // as a heap object. Escape analysis can eliminate this copy if it's
-    // unneeded during optimization.
-    CanType objectType = t;
-    if (auto theObjTy = t.getAnyOptionalObjectType())
-      objectType = theObjTy;
-    if (functionArgs
-        && isa<FunctionType>(objectType)
-        && cast<FunctionType>(objectType)->getRepresentation()
-              == FunctionType::Representation::Block) {
-      SILValue blockCopy = SGF.B.createCopyBlock(loc, mv.getValue());
-      mv = SGF.emitManagedRValueWithCleanup(blockCopy);
-    }
-    return RValue(SGF, loc, t, mv);
-  }
-
-  RValue visitTupleType(CanTupleType t) {
-    RValue rv{t};
-
-    for (auto fieldType : t.getElementTypes())
-      rv.addElement(visit(fieldType));
-
-    return rv;
-  }
-};
-
-} // end anonymous namespace
-
 
 /// Perform a copy or init operation from an array of ManagedValue (from an
 /// RValue) into an initialization. The RValue will have one scalar ManagedValue
@@ -416,9 +382,47 @@ expectedExplosionSize(CanType type) {
   return total;
 }
 
-RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
-  : values(values.begin(), values.end()), type(type), elementsToBeAdded(0) {
-  
+/// This is separate from the main verification routine, so I can minimize the
+/// amount of places that need to use SILGenFunction &SGF.
+static void verifyHelper(ArrayRef<ManagedValue> values,
+                         NullablePtr<SILGenFunction> SGF = nullptr) {
+// This is a no-op in non-assert builds.
+#ifndef NDEBUG
+  auto result = Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
+  Optional<bool> sameHaveCleanups;
+  for (ManagedValue v : values) {
+    assert((!SGF || !v.getType().isLoadable(SGF.get()->getModule()) ||
+            v.getType().isObject()) &&
+           "All loadable values in an RValue must be an object");
+
+    ValueOwnershipKind kind = v.getOwnershipKind();
+    if (kind == ValueOwnershipKind::Trivial)
+      continue;
+
+    // Merge together whether or not the RValue has cleanups.
+    if (!sameHaveCleanups.hasValue()) {
+      sameHaveCleanups = v.hasCleanup();
+    } else {
+      assert(*sameHaveCleanups == v.hasCleanup());
+    }
+
+    // This variable is here so that if the assert below fires, the current
+    // reduction value is still available.
+    auto newResult = result.getValue().merge(kind);
+    assert(newResult.hasValue());
+    result = newResult;
+  }
+#endif
+}
+
+//===----------------------------------------------------------------------===//
+//                           RValue Implementation
+//===----------------------------------------------------------------------===//
+
+// Private helper constructor. Please see RValue.h for more information.
+RValue::RValue(SILGenFunction *SGF, ArrayRef<ManagedValue> values, CanType type)
+    : values(values.begin(), values.end()), type(type), elementsToBeAdded(0) {
+
   assert(values.size() == expectedExplosionSize(type)
          && "creating rvalue with wrong number of pre-exploded elements");
   
@@ -429,11 +433,7 @@ RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
     return;
   }
 
-}
-
-RValue RValue::withPreExplodedElements(ArrayRef<ManagedValue> values,
-                                       CanType type) {
-  return RValue(values, type);
+  verifyHelper(values, SGF);
 }
 
 RValue::RValue(SILGenFunction &SGF, SILLocation l, CanType formalType,
@@ -450,6 +450,7 @@ RValue::RValue(SILGenFunction &SGF, SILLocation l, CanType formalType,
 
   ExplodeTupleValue(values, SGF, l).visit(formalType, v);
   assert(values.size() == getRValueSize(type));
+  verify(SGF);
 }
 
 RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
@@ -464,6 +465,7 @@ RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
   assert(v && "creating r-value with consumed value");
   ExplodeTupleValue(values, SGF, expr).visit(type, v);
   assert(values.size() == getRValueSize(type));
+  verify(SGF);
 }
 
 RValue::RValue(CanType type)
@@ -485,6 +487,11 @@ void RValue::addElement(RValue &&element) & {
   element.makeUsed();
 
   assert(!isComplete() || values.size() == getRValueSize(type));
+  // Call into the verifier helper directly without an SGF since we know that
+  // all of our loadable values are already loaded and thus we do not need to
+  // recheck that. On the other hand, we need to check the consistency of
+  // cleanups and ownership.
+  verifyHelper(values);
 }
 
 void RValue::addElement(SILGenFunction &SGF, ManagedValue element,
@@ -498,10 +505,12 @@ void RValue::addElement(SILGenFunction &SGF, ManagedValue element,
   ExplodeTupleValue(values, SGF, l).visit(formalType, element);
 
   assert(!isComplete() || values.size() == getRValueSize(type));
+  verify(SGF);
 }
 
 SILValue RValue::forwardAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
   assert(isComplete() && "rvalue is not complete");
+  assert(isPlusOne(SGF) && "Can not forward borrowed RValues");
   SILValue result
     = implodeTupleValues<ImplodeKind::Forward>(values, SGF, type, l);
 
@@ -513,6 +522,7 @@ SILValue RValue::forwardAsSingleStorageValue(SILGenFunction &SGF,
                                              SILType storageType,
                                              SILLocation l) && {
   assert(isComplete() && "rvalue is not complete");
+  assert(isPlusOne(SGF) && "Can not forward borrowed RValues");
   SILValue result = std::move(*this).forwardAsSingleValue(SGF, l);
   return SGF.emitConversionFromSemanticValue(l, result, storageType);
 }
@@ -520,6 +530,7 @@ SILValue RValue::forwardAsSingleStorageValue(SILGenFunction &SGF,
 void RValue::forwardInto(SILGenFunction &SGF, SILLocation loc, 
                          Initialization *I) && {
   assert(isComplete() && "rvalue is not complete");
+  assert(isPlusOne(SGF) && "Can not forward borrowed RValues");
   ArrayRef<ManagedValue> elts = values;
   copyOrInitValuesInto<ImplodeKind::Forward>(I, elts, type, loc, SGF);
 }
@@ -561,7 +572,7 @@ void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
   assert(srcValues.empty() && "didn't claim all elements!");
 }
 
-ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
+ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation loc) && {
   assert(!isUsed() && "r-value already used");
 
   if (isInContext()) {
@@ -579,9 +590,9 @@ ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
   }
 
   // Forward into a single value, then install a cleanup on the resulting
-  // imploded value.
-  return SGF.emitManagedRValueWithCleanup(
-                                std::move(*this).forwardAsSingleValue(SGF, l));
+  // imploded value if we have a +1 rvalue.
+  CleanupCloner cloner(SGF, *this);
+  return cloner.clone(std::move(*this).forwardAsSingleValue(SGF, loc));
 }
 
 SILValue RValue::getUnmanagedSingleValue(SILGenFunction &SGF,
@@ -634,7 +645,7 @@ RValue RValue::extractElement(unsigned n) && {
     assert(n == 0);
     unsigned to = getRValueSize(type);
     assert(to == values.size());
-    RValue element({llvm::makeArrayRef(values).slice(0, to), type});
+    RValue element(nullptr, llvm::makeArrayRef(values).slice(0, to), type);
     makeUsed();
     return element;
   }
@@ -643,7 +654,7 @@ RValue RValue::extractElement(unsigned n) && {
   unsigned from = range.first, to = range.second;
 
   CanType eltType = cast<TupleType>(type).getElementType(n);
-  RValue element(llvm::makeArrayRef(values).slice(from, to - from), eltType);
+  RValue element(nullptr, llvm::makeArrayRef(values).slice(from, to - from), eltType);
   makeUsed();
   return element;
 }
@@ -655,7 +666,9 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   if (!tupleTy) {
     unsigned to = getRValueSize(type);
     assert(to == values.size());
-    elements.push_back({llvm::makeArrayRef(values).slice(0, to), type});
+    // We use push_back instead of emplace_back since emplace_back can not
+    // invoke the private constructor we are attempting to invoke.
+    elements.push_back({nullptr, llvm::makeArrayRef(values).slice(0, to), type});
     makeUsed();
     return;
   }
@@ -663,7 +676,9 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   unsigned from = 0;
   for (auto eltType : tupleTy.getElementTypes()) {
     unsigned to = from + getRValueSize(eltType);
-    elements.push_back({llvm::makeArrayRef(values).slice(from, to - from),
+    // We use push_back instead of emplace_back since emplace_back can not
+    // invoke the private constructor we are attempting to invoke.
+    elements.push_back({nullptr, llvm::makeArrayRef(values).slice(from, to - from),
                         eltType});
     from = to;
   }
@@ -672,19 +687,30 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   makeUsed();
 }
 
-RValue::RValue(const RValue &copied, SILGenFunction &SGF, SILLocation l)
-  : type(copied.type),
-    elementsToBeAdded(copied.elementsToBeAdded)
-{
-  assert((copied.isComplete() || copied.isInSpecialState())
-         && "can't copy incomplete rvalue");
-  values.reserve(copied.values.size());
-  for (ManagedValue value : copied.values) {
-    values.push_back(value.copy(SGF, l));
+RValue RValue::copy(SILGenFunction &SGF, SILLocation loc) const & {
+  assert((isComplete() || isInSpecialState()) &&
+         "can't copy an incomplete rvalue");
+  std::vector<ManagedValue> copiedValues;
+  copiedValues.reserve(values.size());
+  for (ManagedValue v : values) {
+    copiedValues.emplace_back(v.copy(SGF, loc));
   }
+  return RValue(SGF, std::move(copiedValues), type, elementsToBeAdded);
+}
+
+RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
+  assert((isComplete() || isInSpecialState()) &&
+         "can't borrow incomplete rvalue");
+  std::vector<ManagedValue> borrowedValues;
+  borrowedValues.reserve(values.size());
+  for (ManagedValue v : values) {
+    borrowedValues.emplace_back(v.borrow(SGF, loc));
+  }
+  return RValue(SGF, std::move(borrowedValues), type, elementsToBeAdded);
 }
 
 ManagedValue RValue::materialize(SILGenFunction &SGF, SILLocation loc) && {
+  assert(isPlusOne(SGF) && "Can not materialize a non-plus one RValue");
   auto &paramTL = SGF.getTypeLowering(getType());
 
   // If we're already materialized, we're done.
@@ -731,6 +757,7 @@ bool RValue::areObviouslySameValue(SILValue lhs, SILValue rhs) {
 void RValue::dump() const {
   dump(llvm::errs());
 }
+
 void RValue::dump(raw_ostream &OS, unsigned indent) const {
   if (isInContext()) {
     OS.indent(indent) << "InContext\n";
@@ -741,4 +768,44 @@ void RValue::dump(raw_ostream &OS, unsigned indent) const {
   for (auto &value : values) {
     value.dump(OS, indent + 2);
   }
+}
+
+void RValue::verify(SILGenFunction &SGF) const & {
+// This is a no-op in non-assert builds.
+#ifndef NDEBUG
+  verifyHelper(values, &SGF);
+#endif
+}
+
+bool RValue::isPlusOne(SILGenFunction &SGF) const & {
+  return llvm::all_of(values, [&SGF](ManagedValue mv) -> bool {
+    // Ignore trivial values and objects with trivial value ownership kind.
+    if (mv.getType().isTrivial(SGF.F.getModule()) ||
+        (mv.getType().isObject() &&
+         mv.getOwnershipKind() == ValueOwnershipKind::Trivial))
+      return true;
+    return mv.hasCleanup();
+  });
+}
+
+bool RValue::isPlusZero(SILGenFunction &SGF) const & {
+  return llvm::none_of(values, [&SGF](ManagedValue mv) -> bool {
+    return mv.hasCleanup();
+  });
+}
+
+const TypeLowering &RValue::getTypeLowering(SILGenFunction &SGF) const & {
+  return SGF.getTypeLowering(getType());
+}
+
+SILType RValue::getLoweredType(SILGenFunction &SGF) const & {
+  return getTypeLowering(SGF).getLoweredType();
+}
+
+SILType RValue::getLoweredImplodedTupleType(SILGenFunction &SGF) const & {
+  SILType loweredType = getLoweredType(SGF);
+  if (loweredType.isAddressOnly(SGF.getModule()) &&
+      SGF.silConv.useLoweredAddresses())
+    return loweredType.getAddressType();
+  return loweredType.getObjectType();
 }

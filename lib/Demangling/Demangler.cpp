@@ -100,6 +100,7 @@ static bool isFunctionAttr(Node::Kind kind) {
     case Node::Kind::VTableAttribute:
     case Node::Kind::PartialApplyForwarder:
     case Node::Kind::PartialApplyObjCForwarder:
+    case Node::Kind::OutlinedVariable:
     case Node::Kind::MergedFunction:
       return true;
     default:
@@ -400,6 +401,8 @@ NodePointer Demangler::demangleOperator() {
     case 'c': return popFunctionType(Node::Kind::FunctionType);
     case 'd': return createNode(Node::Kind::VariadicMarker);
     case 'f': return demangleFunctionEntity();
+    case 'h': return createType(createWithChild(Node::Kind::Shared,
+                                                popTypeAndGetChild()));
     case 'i': return demangleEntity(Node::Kind::Subscript);
     case 'l': return demangleGenericSignature(/*hasParamCounts*/ false);
     case 'm': return createType(createWithChild(Node::Kind::Metatype,
@@ -1302,6 +1305,12 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       } else {
         return createWithChildren(nodeKind, sigOrDecl, type);
       }
+    }
+    case 'v': {
+      int Idx = demangleIndex();
+      if (Idx < 0)
+        return nullptr;
+      return createNode(Node::Kind::OutlinedVariable, Idx);
     }
     default:
       return nullptr;

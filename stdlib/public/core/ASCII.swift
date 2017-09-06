@@ -41,7 +41,7 @@ extension Unicode.ASCII : Unicode.Encoding {
     _ source: Unicode.Scalar
   ) -> EncodedScalar? {
     guard source.value < (1&<<7) else { return nil }
-    return EncodedScalar(UInt8(extendingOrTruncating: source.value))
+    return EncodedScalar(UInt8(truncatingIfNeeded: source.value))
   }
 
   @inline(__always)
@@ -80,7 +80,7 @@ extension Unicode.ASCII.Parser : Unicode.Parser {
   where I.Element == Encoding.CodeUnit {
     let n = input.next()
     if _fastPath(n != nil), let x = n {
-      guard _fastPath(Int8(extendingOrTruncating: x) >= 0)
+      guard _fastPath(Int8(truncatingIfNeeded: x) >= 0)
       else { return .error(length: 1) }
       return .valid(Unicode.ASCII.EncodedScalar(x))
     }

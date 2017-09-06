@@ -1,6 +1,4 @@
-#include "swift/Syntax/ExprSyntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/StmtSyntax.h"
 #include "llvm/ADT/SmallString.h"
 #include "gtest/gtest.h"
 
@@ -43,7 +41,7 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
 
-    SyntaxFactory::makeFallthroughStmt(FallthroughKW).print(OS);
+    SyntaxFactory::makeFallthroughStmt(FallthroughKW, llvm::None).print(OS);
     ASSERT_EQ(OS.str().str(), "fallthrough");
   }
 
@@ -53,7 +51,7 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
 
     auto NewFallthroughKW = FallthroughKW.withLeadingTrivia(Trivia::spaces(2));
 
-    SyntaxFactory::makeFallthroughStmt(NewFallthroughKW).print(OS);
+    SyntaxFactory::makeFallthroughStmt(NewFallthroughKW, llvm::None).print(OS);
     ASSERT_EQ(OS.str().str(), "  fallthrough");
   }
 
@@ -64,7 +62,7 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
     auto NewFallthroughKW = FallthroughKW.withLeadingTrivia(Trivia::spaces(2))
                                          .withTrailingTrivia(Trivia::spaces(2));
 
-    SyntaxFactory::makeFallthroughStmt(NewFallthroughKW).print(OS);
+    SyntaxFactory::makeFallthroughStmt(NewFallthroughKW, llvm::None).print(OS);
     ASSERT_EQ(OS.str().str(), "  fallthrough  ");
   }
 
@@ -82,18 +80,18 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
 TEST(StmtSyntaxTests, BreakStmtGetAPIs) {
   auto BreakKW = SyntaxFactory::makeBreakKeyword({}, Trivia::spaces(1));
   auto Label = SyntaxFactory::makeIdentifier("sometimesYouNeedTo", {}, {});
-  auto Break = SyntaxFactory::makeBreakStmt(BreakKW, Label);
+  auto Break = SyntaxFactory::makeBreakStmt(BreakKW, Label, llvm::None);
 
   /// These should be directly shared through reference-counting.
   ASSERT_EQ(BreakKW.getRaw(), Break.getBreakKeyword().getRaw());
-  ASSERT_EQ(Label.getRaw(), Break.getLabel().getRaw());
+  ASSERT_EQ(Label.getRaw(), Break.getLabel()->getRaw());
 }
 
 TEST(StmtSyntaxTests, BreakStmtWithAPIs) {
   auto BreakKW = SyntaxFactory::makeBreakKeyword({}, {});
   auto Label = SyntaxFactory::makeIdentifier("theRules", {}, {});
 
-  auto Break = SyntaxFactory::makeBlankBreakStmtSyntax();
+  auto Break = SyntaxFactory::makeBlankBreakStmt();
 
   {
     llvm::SmallString<48> Scratch;
@@ -130,14 +128,14 @@ TEST(StmtSyntaxTests, BreakStmtMakeAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     auto BreakKW = SyntaxFactory::makeBreakKeyword({}, Trivia::spaces(1));
     auto Label = SyntaxFactory::makeIdentifier("theBuild", {}, {});
-    auto Break = SyntaxFactory::makeBreakStmt(BreakKW, Label);
+    auto Break = SyntaxFactory::makeBreakStmt(BreakKW, Label, llvm::None);
     Break.print(OS);
     ASSERT_EQ(OS.str().str(), "break theBuild"); // don't you dare
   }
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    SyntaxFactory::makeBlankBreakStmtSyntax().print(OS);
+    SyntaxFactory::makeBlankBreakStmt().print(OS);
     ASSERT_EQ(OS.str().str(), "");
   }
 }
@@ -147,17 +145,18 @@ TEST(StmtSyntaxTests, BreakStmtMakeAPIs) {
 TEST(StmtSyntaxTests, ContinueStmtGetAPIs) {
   auto ContinueKW = SyntaxFactory::makeContinueKeyword({}, Trivia::spaces(1));
   auto Label = SyntaxFactory::makeIdentifier("always", {}, {});
-  auto Continue = SyntaxFactory::makeContinueStmt(ContinueKW, Label);
+  auto Continue = SyntaxFactory::makeContinueStmt(ContinueKW, Label,
+                                                  llvm::None);
 
   /// These should be directly shared through reference-counting.
   ASSERT_EQ(ContinueKW.getRaw(), Continue.getContinueKeyword().getRaw());
-  ASSERT_EQ(Label.getRaw(), Continue.getLabel().getRaw());
+  ASSERT_EQ(Label.getRaw(), Continue.getLabel()->getRaw());
 }
 
 TEST(StmtSyntaxTests, ContinueStmtWithAPIs) {
   auto ContinueKW = SyntaxFactory::makeContinueKeyword({}, {});
   auto Label = SyntaxFactory::makeIdentifier("toCare", {}, {});
-  auto Continue = SyntaxFactory::makeBlankContinueStmtSyntax();
+  auto Continue = SyntaxFactory::makeBlankContinueStmt();
 
   {
     llvm::SmallString<48> Scratch;
@@ -195,14 +194,15 @@ TEST(StmtSyntaxTests, ContinueStmtMakeAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     auto ContinueKW = SyntaxFactory::makeContinueKeyword({}, Trivia::spaces(1));
     auto Label = SyntaxFactory::makeIdentifier("toLead", {}, {});
-    auto Continue = SyntaxFactory::makeContinueStmt(ContinueKW, Label);
+    auto Continue = SyntaxFactory::makeContinueStmt(ContinueKW, Label,
+                                                    llvm::None);
     Continue.print(OS);
     ASSERT_EQ(OS.str().str(), "continue toLead"); // by example
   }
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    SyntaxFactory::makeBlankContinueStmtSyntax().print(OS);
+    SyntaxFactory::makeBlankContinueStmt().print(OS);
     ASSERT_EQ(OS.str().str(), "");
   }
 }
@@ -211,8 +211,8 @@ TEST(StmtSyntaxTests, ContinueStmtMakeAPIs) {
 
 TEST(StmtSyntaxTests, ReturnStmtMakeAPIs) {
   auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
-  auto Minus = SyntaxFactory::makePrefixOperator("-", {});
-  auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
+  auto Minus = SyntaxFactory::makePrefixOperator("-", {}, {});
+  auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, OneDigits);
 
   {
@@ -225,17 +225,17 @@ TEST(StmtSyntaxTests, ReturnStmtMakeAPIs) {
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne).print(OS);
+    SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne, None).print(OS);
     ASSERT_EQ(OS.str().str(), "return -1");
   }
 }
 
 TEST(StmtSyntaxTests, ReturnStmtGetAPIs) {
   auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
-  auto Minus = SyntaxFactory::makePrefixOperator("-", {});
-  auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
+  auto Minus = SyntaxFactory::makePrefixOperator("-", {}, {});
+  auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, OneDigits);
-  auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne);
+  auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne, None);
 
   ASSERT_EQ(ReturnKW.getRaw(), Return.getReturnKeyword().getRaw());
   auto GottenExpression = Return.getExpression().getValue();
@@ -245,8 +245,8 @@ TEST(StmtSyntaxTests, ReturnStmtGetAPIs) {
 
 TEST(StmtSyntaxTests, ReturnStmtWithAPIs) {
   auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
-  auto Minus = SyntaxFactory::makePrefixOperator("-", {});
-  auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
+  auto Minus = SyntaxFactory::makePrefixOperator("-", {}, {});
+  auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, OneDigits);
 
   {

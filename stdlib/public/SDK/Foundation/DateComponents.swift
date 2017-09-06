@@ -411,24 +411,22 @@ extension DateComponents : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        // TODO: Replace all with encodeIfPresent, when added.
         var container = encoder.container(keyedBy: CodingKeys.self)
-        if self.calendar   != nil { try container.encode(self.calendar!, forKey: .calendar) }
-        if self.timeZone   != nil { try container.encode(self.timeZone!, forKey: .timeZone) }
-        if self.era        != nil { try container.encode(self.era!, forKey: .era) }
-        if self.year       != nil { try container.encode(self.year!, forKey: .year) }
-        if self.month      != nil { try container.encode(self.month!, forKey: .month) }
-        if self.day        != nil { try container.encode(self.day!, forKey: .day) }
-        if self.hour       != nil { try container.encode(self.hour!, forKey: .hour) }
-        if self.minute     != nil { try container.encode(self.minute!, forKey: .minute) }
-        if self.second     != nil { try container.encode(self.second!, forKey: .second) }
-        if self.nanosecond != nil { try container.encode(self.nanosecond!, forKey: .nanosecond) }
-
-        if self.weekday           != nil { try container.encode(self.weekday!, forKey: .weekday) }
-        if self.weekdayOrdinal    != nil { try container.encode(self.weekdayOrdinal!, forKey: .weekdayOrdinal) }
-        if self.quarter           != nil { try container.encode(self.quarter!, forKey: .quarter) }
-        if self.weekOfMonth       != nil { try container.encode(self.weekOfMonth!, forKey: .weekOfMonth) }
-        if self.weekOfYear        != nil { try container.encode(self.weekOfYear!, forKey: .weekOfYear) }
-        if self.yearForWeekOfYear != nil { try container.encode(self.yearForWeekOfYear!, forKey: .yearForWeekOfYear) }
+        try container.encodeIfPresent(self.calendar, forKey: .calendar)
+        try container.encodeIfPresent(self.timeZone, forKey: .timeZone)
+        try container.encodeIfPresent(self.era, forKey: .era)
+        try container.encodeIfPresent(self.year, forKey: .year)
+        try container.encodeIfPresent(self.month, forKey: .month)
+        try container.encodeIfPresent(self.day, forKey: .day)
+        try container.encodeIfPresent(self.hour, forKey: .hour)
+        try container.encodeIfPresent(self.minute, forKey: .minute)
+        try container.encodeIfPresent(self.second, forKey: .second)
+        try container.encodeIfPresent(self.nanosecond, forKey: .nanosecond)
+        try container.encodeIfPresent(self.weekday, forKey: .weekday)
+        try container.encodeIfPresent(self.weekdayOrdinal, forKey: .weekdayOrdinal)
+        try container.encodeIfPresent(self.quarter, forKey: .quarter)
+        try container.encodeIfPresent(self.weekOfMonth, forKey: .weekOfMonth)
+        try container.encodeIfPresent(self.weekOfYear, forKey: .weekOfYear)
+        try container.encodeIfPresent(self.yearForWeekOfYear, forKey: .yearForWeekOfYear)
     }
 }

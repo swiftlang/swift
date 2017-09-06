@@ -140,6 +140,8 @@ DECL_KEYWORD(struct)
 DECL_KEYWORD(subscript)
 DECL_KEYWORD(typealias)
 DECL_KEYWORD(var)
+DECL_KEYWORD(__shared)
+DECL_KEYWORD(__owned)
 
 DECL_KEYWORD(fileprivate)
 DECL_KEYWORD(internal)

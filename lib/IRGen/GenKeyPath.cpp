@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Callee.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
@@ -26,6 +27,7 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "MetadataLayout.h"
 #include "ProtocolInfo.h"
 #include "StructLayout.h"
 #include "llvm/ADT/SetVector.h"
@@ -72,7 +74,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   if (requirements.empty()) {
     return accessorFn;
   }
-  
+
   auto accessorFnTy = accessorFn->getType()->getPointerElementType();
   
   // Otherwise, we need a thunk to unmarshal the generic environment from the
@@ -142,9 +144,9 @@ getAccessorForComputedComponent(IRGenModule &IGM,
                              forwardingSubs,
                              &witnessMetadata,
                              forwardedArgs);
-    auto call = IGF.Builder.CreateCall(accessorFn, forwardedArgs.claimAll());
-    if (whichAccessor == Getter)
-      call->addAttribute(1, llvm::Attribute::StructRet);
+    auto fnPtr = FunctionPointer::forDirect(IGM, accessorFn,
+                                          accessor->getLoweredFunctionType());
+    IGF.Builder.CreateCall(fnPtr, forwardedArgs.claimAll());
     
     IGF.Builder.CreateRetVoid();
   }
@@ -405,7 +407,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
       // For a struct stored property, we may know the fixed offset of the field,
       // or we may need to fetch it out of the type's metadata at instantiation
       // time.
-      if (loweredBaseTy.getStructOrBoundGenericStruct()) {
+      if (auto theStruct = loweredBaseTy.getStructOrBoundGenericStruct()) {
         if (auto offset = emitPhysicalStructMemberFixedOffset(*this,
                                                               loweredBaseTy,
                                                               property)) {
@@ -413,15 +415,15 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
           addFixedOffset(/*struct*/ true, offset);
           break;
         }
-        
+
         // If the offset isn't fixed, try instead to get the field offset out
         // of the type metadata at instantiation time.
-        auto fieldOffset = emitPhysicalStructMemberOffsetOfFieldOffset(
-                                                *this, loweredBaseTy, property);
+        auto &metadataLayout = getMetadataLayout(theStruct);
+        auto fieldOffset = metadataLayout.getStaticFieldOffset(property);
+
         auto header = KeyPathComponentHeader::forStructComponentWithUnresolvedFieldOffset();
         fields.addInt32(header.getData());
-        fields.add(llvm::ConstantExpr::getTruncOrBitCast(fieldOffset,
-                                                         Int32Ty));
+        fields.addInt32(fieldOffset.getValue());
         break;
       }
       
@@ -459,8 +461,8 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
             KeyPathComponentHeader::forClassComponentWithUnresolvedFieldOffset();
           fields.addInt32(header.getData());
           auto fieldOffset =
-            getClassFieldOffset(*this, loweredBaseTy.getClassOrBoundGenericClass(),
-                                property);
+            getClassFieldOffsetOffset(*this, loweredBaseTy.getClassOrBoundGenericClass(),
+                                      property);
           fields.addInt32(fieldOffset.getValue());
           break;
         }
@@ -513,8 +515,12 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
           idKind = KeyPathComponentHeader::VTableOffset;
           auto dc = declRef.getDecl()->getDeclContext();
           if (isa<ClassDecl>(dc)) {
-            auto index = getVirtualMethodIndex(*this, declRef);
-            idValue = llvm::ConstantInt::get(SizeTy, index);
+            auto overridden = getSILTypes().getOverriddenVTableEntry(declRef);
+            auto declaringClass =
+              cast<ClassDecl>(overridden.getDecl()->getDeclContext());
+            auto &metadataLayout = getMetadataLayout(declaringClass);
+            auto offset = metadataLayout.getStaticMethodOffset(overridden);
+            idValue = llvm::ConstantInt::get(SizeTy, offset.getValue());
             idResolved = true;
           } else if (auto methodProto = dyn_cast<ProtocolDecl>(dc)) {
             auto &protoInfo = getProtocolInfo(methodProto);
@@ -535,9 +541,10 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         idKind = KeyPathComponentHeader::StoredPropertyIndex;
         if (baseTy->getStructOrBoundGenericStruct()) {
           idResolved = true;
-          idValue = llvm::ConstantInt::get(SizeTy,
-            getPhysicalStructFieldIndex(*this,
-                           SILType::getPrimitiveAddressType(baseTy), property));
+          Optional<unsigned> structIdx =  getPhysicalStructFieldIndex(*this,
+                            SILType::getPrimitiveAddressType(baseTy), property);
+          assert(structIdx.hasValue() && "empty property");
+          idValue = llvm::ConstantInt::get(SizeTy, structIdx.getValue());
         } else if (baseTy->getClassOrBoundGenericClass()) {
           // TODO: This field index would require runtime resolution with Swift
           // native class resilience. We never directly access ObjC-imported

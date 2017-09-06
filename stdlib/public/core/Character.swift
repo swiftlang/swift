@@ -130,7 +130,7 @@ public struct Character :
           shift += 16
         }
       }
-      guard _fastPath(Int64(extendingOrTruncating: bits) >= 0) else {
+      guard _fastPath(Int64(truncatingIfNeeded: bits) >= 0) else {
         break FastPath
       }
       _representation = .smallUTF16(Builtin.trunc_Int64_Int63(bits._value))
@@ -224,7 +224,7 @@ public struct Character :
 
     if _fastPath(s._core.count <= 4) {
       let b = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(s._core)
-      if _fastPath(Int64(extendingOrTruncating: b._storage) >= 0) {
+      if _fastPath(Int64(truncatingIfNeeded: b._storage) >= 0) {
         _representation = .smallUTF16(
           Builtin.trunc_Int64_Int63(b._storage._value))
         return
@@ -300,7 +300,7 @@ extension Character {
     return _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(
       _storage: bits,
       _bitCount: UInt8(
-        extendingOrTruncating: 16 * Swift.max(1, (minBitWidth + 15) / 16))
+        truncatingIfNeeded: 16 * Swift.max(1, (minBitWidth + 15) / 16))
     )
   }
 

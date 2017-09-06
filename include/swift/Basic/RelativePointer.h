@@ -255,10 +255,6 @@ public:
     return get();
   }
 
-  const ValueTy &operator*() const & {
-    return *get();
-  }
-
   const ValueTy *operator->() const & {
     return get();
   }
@@ -348,10 +344,6 @@ public:
 
   operator typename super::PointerTy() const & {
     return this->get();
-  }
-
-  const typename super::ValueTy &operator*() const & {
-    return *this->get();
   }
 
   const typename super::ValueTy *operator->() const & {

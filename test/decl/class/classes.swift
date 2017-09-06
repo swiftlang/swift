@@ -85,3 +85,23 @@ class HDerived : H {
   override func f(_ x: Int) { }
   override class func f(_ x: Int) { }
 }
+
+// Subclass existentials in inheritance clause
+protocol P {}
+protocol Q {}
+protocol R {}
+class Base : Q & R {}
+
+class Derived : P & Base {}
+
+func f(_: P) {}
+func g(_: Base) {}
+func h(_: Q) {}
+func i(_: R) {}
+
+func testSubclassExistentialsInInheritanceClause() {
+  f(Derived())
+  g(Derived())
+  h(Derived())
+  i(Derived())
+}

@@ -32,12 +32,9 @@ using namespace irgen;
 using llvm::coverage::CovMapVersion;
 using llvm::coverage::CounterMappingRegion;
 
-static bool isMachO(IRGenModule &IGM) {
-  return SwiftTargetInfo::get(IGM).OutputObjectFormat == llvm::Triple::MachO;
-}
-
-static StringRef getCoverageSection(IRGenModule &IGM) {
-  return llvm::getInstrProfCoverageSectionName(isMachO(IGM));
+static std::string getCoverageSection(IRGenModule &IGM) {
+  return llvm::getInstrProfSectionName(llvm::IPSK_covmap,
+                                       IGM.Triple.getObjectFormat());
 }
 
 void IRGenModule::emitCoverageMapping() {
@@ -169,7 +166,8 @@ void IRGenModule::emitCoverageMapping() {
   auto CovData = new llvm::GlobalVariable(
       *getModule(), CovDataTy, true, llvm::GlobalValue::InternalLinkage,
       CovDataVal, llvm::getCoverageMappingVarName());
-  CovData->setSection(getCoverageSection(*this));
+  std::string CovSection = getCoverageSection(*this);
+  CovData->setSection(CovSection);
   CovData->setAlignment(8);
   addUsedGlobal(CovData);
 }

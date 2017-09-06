@@ -6,7 +6,7 @@
 
 // The private, unused methods are optimized away. The test calls these
 // methods anyway (since it has overridden the access control), so we
-// expect them to produce "fatal error: call of deleted method" when run.
+// expect them to produce "Fatal error: Call of deleted method" when run.
 // RUN: %target-run %t/report_dead_method_call
 // REQUIRES: executable_test
 

@@ -971,7 +971,7 @@ extension AnyIndex : Comparable {
   ///   - rhs: Another index to compare.
   @_inlineable
   public static func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-    _precondition(lhs._typeID == rhs._typeID, "base index types differ")
+    _precondition(lhs._typeID == rhs._typeID, "Base index types differ")
     return lhs._box._isEqual(to: rhs._box)
   }
 
@@ -985,7 +985,7 @@ extension AnyIndex : Comparable {
   ///   - rhs: Another index to compare.
   @_inlineable
   public static func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-    _precondition(lhs._typeID == rhs._typeID, "base index types differ")
+    _precondition(lhs._typeID == rhs._typeID, "Base index types differ")
     return lhs._box._isLess(than: rhs._box)
   }
 }
@@ -1241,66 +1241,3 @@ public struct ${Self}<Element>
   internal let _box: _${Self}Box<Element>
 }
 % end
-
-@available(*, unavailable, renamed: "AnyIterator")
-public struct AnyGenerator<Element> {}
-
-extension AnyIterator {
-  @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> AnyIterator<Element> {
-    Builtin.unreachable()
-  }
-}
-
-% for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
-extension Any${Kind} {
-
-  @available(*, unavailable, renamed: "getter:underestimatedCount()")
-  public func underestimateCount() -> Int {
-    Builtin.unreachable()
-  }
-}
-%end
-
-@available(*, unavailable, renamed: "_AnyCollectionProtocol")
-public typealias AnyCollectionType = _AnyCollectionProtocol
-
-@available(*, unavailable, renamed: "_AnyCollectionProtocol")
-public typealias AnyCollectionProtocol = _AnyCollectionProtocol
-
-extension _AnyCollectionProtocol {
-  @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> AnyIterator<Element> {
-    Builtin.unreachable()
-  }
-}
-
-% for Traversal in TRAVERSALS:
-@available(*, unavailable, renamed: "AnyIndex")
-public typealias Any${Traversal}Index = AnyIndex
-% end
-
-
-@available(*, unavailable, renamed: "AnyIterator.init(_:)")
-public func anyGenerator<G : IteratorProtocol>(_ base: G) -> AnyIterator<G.Element> {
-    Builtin.unreachable()
-}
-
-@available(*, unavailable, renamed: "AnyIterator.init(_:)")
-public func anyGenerator<Element>(_ body: () -> Element?) -> AnyIterator<Element> {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable)
-public func === <
-  L : _AnyCollectionProtocol, R : _AnyCollectionProtocol
->(lhs: L, rhs: R) -> Bool {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable)
-public func !== <
-  L : _AnyCollectionProtocol, R : _AnyCollectionProtocol
->(lhs: L, rhs: R) -> Bool {
-  Builtin.unreachable()
-}

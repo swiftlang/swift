@@ -29,20 +29,10 @@ namespace syntax {
 ///
 /// This should not be vended by SyntaxFactory.
 class UnknownSyntax : public Syntax {
-  friend struct SyntaxFactory;
-  friend class Syntax;
-
-  virtual void validate() const override;
+  void validate() const;
 public:
   UnknownSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
     : Syntax(Root, Data) {}
-
-  /// Get the number of child nodes in this piece of syntax, not including
-  /// tokens.
-  size_t getNumChildren() const;
-
-  /// Get the Nth child of this piece of syntax.
-  Syntax getChild(const size_t N) const;
 
   static bool classof(const Syntax *S) {
     return S->isUnknown();

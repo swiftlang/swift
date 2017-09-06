@@ -92,6 +92,13 @@ FUNCTION(InitStackObject, swift_initStackObject, DefaultCC,
          ARGS(TypeMetadataPtrTy, RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// HeapObject *swift_initStaticObject(HeapMetadata const *metadata,
+//                                    HeapObject *object);
+FUNCTION(InitStaticObject, swift_initStaticObject, DefaultCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(TypeMetadataPtrTy, RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_verifyEndOfLifetime(HeapObject *object);
 FUNCTION(VerifyEndOfLifetime, swift_verifyEndOfLifetime, DefaultCC,
          RETURNS(VoidTy),
@@ -813,13 +820,13 @@ FUNCTION(GetExistentialMetadata,
 // struct FieldInfo { size_t Size; size_t AlignMask; };
 // Metadata *swift_initClassMetadata_UniversalStrategy(Metadata *self,
 //                                                     size_t numFields,
-//                                                     const FieldInfo *fields,
+//                                                     TypeLayout * const *fieldTypes,
 //                                                     size_t *fieldOffsets);
 FUNCTION(InitClassMetadataUniversal,
          swift_initClassMetadata_UniversalStrategy, DefaultCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy, SizeTy,
-              SizeTy->getPointerTo(),
+              Int8PtrPtrTy->getPointerTo(),
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
@@ -1000,7 +1007,7 @@ FUNCTION(DynamicCast, swift_dynamicCast, RegisterPreservingCC,
          RETURNS(Int1Ty),
          ARGS(OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
               SizeTy),
-         ATTRS(NoUnwind, ReadOnly))
+         ATTRS(ZExt, NoUnwind))
 
 // type* swift_dynamicCastTypeToObjCProtocolUnconditional(type* object,
 //                                               size_t numProtocols,
@@ -1064,14 +1071,14 @@ FUNCTION(IsClassType,
          swift_isClassType, DefaultCC,
          RETURNS(Int1Ty),
          ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
+         ATTRS(ZExt, NoUnwind, ReadNone))
 
 // bool swift_isOptionalType(type*);
 FUNCTION(IsOptionalType,
          swift_isOptionalType, DefaultCC,
          RETURNS(Int1Ty),
          ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
+         ATTRS(ZExt, NoUnwind, ReadNone))
 
 // void swift_once(swift_once_t *predicate,
 //                 void (*function_code)(RefCounted*),
@@ -1210,11 +1217,11 @@ FUNCTION(GetErrorValue, swift_getErrorValue, C_CC,
          ARGS(ErrorPtrTy, Int8PtrPtrTy, OpenedErrorTriplePtrTy),
          ATTRS(NoUnwind))
 
-// void __tsan_write1(void *addr);
+// void __tsan_external_write(void *addr, void *caller_pc, void *tag);
 // This is a Thread Sanitizer instrumentation entry point in compiler-rt.
-FUNCTION(TSanInoutAccess, __tsan_write1, C_CC,
+FUNCTION(TSanInoutAccess, __tsan_external_write, C_CC,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(GetKeyPath, swift_getKeyPath, C_CC,

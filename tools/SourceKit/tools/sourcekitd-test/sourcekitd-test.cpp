@@ -62,7 +62,9 @@ static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
 
 static void printModuleGroupNames(sourcekitd_variant_t Info,
                                   llvm::raw_ostream &OS);
-
+static void printSyntacticRenameEdits(sourcekitd_variant_t Info,
+                                      llvm::raw_ostream &OS);
+static void printRenameRanges(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
 static void prepareDemangleRequest(sourcekitd_object_t Req,
                                    const TestOptions &Opts);
 static void printDemangleResults(sourcekitd_variant_t Info, raw_ostream &OS);
@@ -90,6 +92,9 @@ static SourceKitRequest ActiveRequest = SourceKitRequest::None;
 #define REQUEST(NAME, CONTENT) static sourcekitd_uid_t Request##NAME;
 #define KIND(NAME, CONTENT) static sourcekitd_uid_t Kind##NAME;
 #include "SourceKit/Core/ProtocolUIDs.def"
+
+#define REFACTORING(KIND, NAME, ID) static sourcekitd_uid_t Kind##Refactoring##KIND;
+#include "swift/IDE/RefactoringKinds.def"
 
 static sourcekitd_uid_t SemaDiagnosticStage;
 
@@ -141,6 +146,9 @@ static int skt_main(int argc, const char **argv) {
 #define REQUEST(NAME, CONTENT) Request##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
 #define KIND(NAME, CONTENT) Kind##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
 #include "SourceKit/Core/ProtocolUIDs.def"
+
+#define REFACTORING(KIND, NAME, ID) Kind##Refactoring##KIND = sourcekitd_uid_get_from_cstr("source.refactoring.kind."#ID);
+#include "swift/IDE/RefactoringKinds.def"
 
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
@@ -304,6 +312,11 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     ByteOffset = resolveFromLineCol(Opts.Line, Opts.Col, SourceBuf.get());
   }
 
+  if (Opts.EndLine != 0) {
+    Opts.Length = resolveFromLineCol(Opts.EndLine, Opts.EndCol, SourceBuf.get()) -
+      ByteOffset;
+  }
+
   sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
                                                                  nullptr, 0);
   ActiveRequest = Opts.Request;
@@ -403,6 +416,12 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   case SourceKitRequest::CursorInfo:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCursorInfo);
+    if (Opts.CollectActionables) {
+      sourcekitd_request_dictionary_set_int64(Req, KeyRetrieveRefactorActions, 1);
+    }
+    if (Opts.Length) {
+      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+    }
     if (!Opts.USR.empty()) {
       sourcekitd_request_dictionary_set_string(Req, KeyUSR, Opts.USR.c_str());
     } else {
@@ -420,6 +439,19 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Length);
     break;
   }
+
+#define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:                 \
+    {                                                                                     \
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSemanticRefactoring); \
+      sourcekitd_request_dictionary_set_uid(Req, KeyActionUID, KindRefactoring##KIND);    \
+      sourcekitd_request_dictionary_set_string(Req, KeyName, Opts.Name.c_str());          \
+      sourcekitd_request_dictionary_set_int64(Req, KeyLine, Opts.Line);                   \
+      sourcekitd_request_dictionary_set_int64(Req, KeyColumn, Opts.Col);                  \
+      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);               \
+      break;                                                                              \
+    }
+#include "swift/IDE/RefactoringKinds.def"
+
   case SourceKitRequest::MarkupToXML: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestMarkupToXML);
     break;
@@ -620,6 +652,36 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       return 1;
     }
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestModuleGroups);
+    break;
+
+  case SourceKitRequest::FindLocalRenameRanges:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestFindLocalRenameRanges);
+    sourcekitd_request_dictionary_set_int64(Req, KeyLine, Opts.Line);
+    sourcekitd_request_dictionary_set_int64(Req, KeyColumn, Opts.Col);
+    sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+    break;
+
+  case SourceKitRequest::SyntacticRename:
+  case SourceKitRequest::FindRenameRanges:
+    if (Opts.Request == SourceKitRequest::SyntacticRename) {
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSyntacticRename);
+    } else {
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestFindRenameRanges);
+    }
+    if (Opts.RenameSpecPath.empty()) {
+      llvm::errs() << "Missing '-rename-spec <file path>'\n";
+      return 1;
+    }
+    auto Buffer = getBufferForFilename(Opts.RenameSpecPath)->getBuffer();
+    char *Err = nullptr;
+    auto RenameSpec = sourcekitd_request_create_from_yaml(Buffer.data(), &Err);
+    if (!RenameSpec) {
+      assert(Err);
+      llvm::errs() << Err;
+      free(Err);
+      return 1;
+    }
+    sourcekitd_request_dictionary_set_value(Req, KeyRenameLocations, RenameSpec);
     break;
   }
 
@@ -874,6 +936,15 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       case SourceKitRequest::ModuleGroups:
         printModuleGroupNames(Info, llvm::outs());
         break;
+#define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:
+#include "swift/IDE/RefactoringKinds.def"
+      case SourceKitRequest::SyntacticRename:
+        printSyntacticRenameEdits(Info, llvm::outs());
+        break;
+      case SourceKitRequest::FindRenameRanges:
+      case SourceKitRequest::FindLocalRenameRanges:
+        printRenameRanges(Info, llvm::outs());
+        break;
     }
   }
 
@@ -1091,15 +1162,24 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                                              KeyAnnotatedDecl));
   }
 
-  std::vector<const char *> AvailableActions;
+  struct ActionInfo {
+    const char* KindUID;
+    const char* KindName;
+    const char* UnavailReason;
+  };
+  std::vector<ActionInfo> AvailableActions;
   sourcekitd_variant_t ActionsObj =
-  sourcekitd_variant_dictionary_get_value(Info, KeyActionable);
+  sourcekitd_variant_dictionary_get_value(Info, KeyRefactorActions);
   for (unsigned i = 0, e = sourcekitd_variant_array_get_count(ActionsObj);
        i != e; ++i) {
     sourcekitd_variant_t Entry =
     sourcekitd_variant_array_get_value(ActionsObj, i);
-    AvailableActions.push_back(sourcekitd_variant_dictionary_get_string(Entry,
-                                                                KeyActionName));
+    AvailableActions.push_back({
+      sourcekitd_uid_get_string_ptr(sourcekitd_variant_dictionary_get_uid(Entry,
+                                                                KeyActionUID)),
+      sourcekitd_variant_dictionary_get_string(Entry, KeyActionName),
+      sourcekitd_variant_dictionary_get_string(Entry, KeyActionUnavailableReason)
+    });
   }
 
   uint64_t ParentOffset =
@@ -1158,8 +1238,13 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     OS << Group << '\n';
   OS << "MODULE GROUPS END\n";
   OS << "ACTIONS BEGIN\n";
-  for (auto Action : AvailableActions)
-    OS << Action << '\n';
+  for (auto Action : AvailableActions) {
+    OS << Action.KindUID << '\n';
+    OS << Action.KindName << '\n';
+    if (Action.UnavailReason) {
+      OS << Action.UnavailReason << '\n';
+    }
+  }
   OS << "ACTIONS END\n";
   if (ParentOffset) {
     OS << "PARENT OFFSET: " << ParentOffset << "\n";
@@ -1296,6 +1381,120 @@ static void printModuleGroupNames(sourcekitd_variant_t Info,
     OS << sourcekitd_variant_dictionary_get_string(Entry, KeyGroupName) << "\n";
   }
   OS << "<\\GROUPS>\n";
+}
+
+static StringRef getLineColRange(StringRef Text, int64_t StartLine,
+                                 int64_t StartCol, int64_t EndLine,
+                                 int64_t EndCol) {
+  unsigned Line = 1;
+  size_t Length = 0;
+
+  while (Line < StartLine) {
+    Text = Text.split('\n').second;
+    ++Line;
+  }
+  Text = Text.drop_front(StartCol - 1);
+  if (StartLine == EndLine)
+    return Text.substr(0, EndCol - StartCol);
+
+  while(Line < EndLine) {
+    Length = Text.find('\n', Length) + 1;
+    ++Line;
+  }
+  Length += EndCol - 1;
+
+  return Text.substr(0, Length);
+}
+
+static void printSyntacticRenameEdits(sourcekitd_variant_t Info,
+                                      llvm::raw_ostream &OS) {
+  sourcekitd_variant_t CategorizedEdits =
+    sourcekitd_variant_dictionary_get_value(Info, KeyCategorizedEdits);
+  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(CategorizedEdits);
+       i != e; ++i) {
+    sourcekitd_variant_t
+    Categorized = sourcekitd_variant_array_get_value(CategorizedEdits, i);
+    sourcekitd_uid_t
+    Category = sourcekitd_variant_dictionary_get_uid(Categorized, KeyCategory);
+    OS << sourcekitd_uid_get_string_ptr(Category) << ":\n";
+
+    sourcekitd_variant_t Edits =
+    sourcekitd_variant_dictionary_get_value(Categorized, KeyEdits);
+    for(unsigned j = 0, je = sourcekitd_variant_array_get_count(Edits);
+        j != je; ++j) {
+      OS << "  "; // indent
+      sourcekitd_variant_t Edit = sourcekitd_variant_array_get_value(Edits, j);
+      int64_t Line = sourcekitd_variant_dictionary_get_int64(Edit, KeyLine);
+      int64_t Column = sourcekitd_variant_dictionary_get_int64(Edit, KeyColumn);
+      int64_t EndLine = sourcekitd_variant_dictionary_get_int64(Edit, KeyEndLine);
+      int64_t EndColumn = sourcekitd_variant_dictionary_get_int64(Edit, KeyEndColumn);
+      OS << Line << ':' << Column << '-' << EndLine << ':' << EndColumn << " \"";
+      StringRef Text(sourcekitd_variant_dictionary_get_string(Edit, KeyText));
+      OS << Text << "\"\n";
+      sourcekitd_variant_t NoteRanges =
+        sourcekitd_variant_dictionary_get_value(Edit, KeyRangesWorthNote);
+      if (unsigned e = sourcekitd_variant_array_get_count(NoteRanges)) {
+        for (unsigned i = 0; i != e; ++i) {
+          OS << "  <note>";
+          sourcekitd_variant_t Note =
+            sourcekitd_variant_array_get_value(NoteRanges, i);
+          int64_t Line = sourcekitd_variant_dictionary_get_int64(Note, KeyLine);
+          int64_t Column = sourcekitd_variant_dictionary_get_int64(Note, KeyColumn);
+          int64_t EndLine = sourcekitd_variant_dictionary_get_int64(Note, KeyEndLine);
+          int64_t EndColumn = sourcekitd_variant_dictionary_get_int64(Note, KeyEndColumn);
+          auto index = sourcekitd_variant_dictionary_get_value(Note, KeyArgIndex);
+          sourcekitd_uid_t Kind = sourcekitd_variant_dictionary_get_uid(Note,
+                                                              KeyKind);
+          StringRef NoteText = getLineColRange(Text, Line, Column, EndLine, EndColumn);
+          OS << sourcekitd_uid_get_string_ptr(Kind) << " ";
+          OS << Line << ":" << Column << "-" << EndLine << ":" << EndColumn;
+          if (sourcekitd_variant_get_type(index) != SOURCEKITD_VARIANT_TYPE_NULL) {
+            OS << " arg-index=" << sourcekitd_variant_int64_get_value(index);
+          }
+          OS << " \"" << NoteText << "\"";
+          OS << "</note>\n";
+        }
+      }
+    }
+  }
+}
+
+static void printRenameRanges(sourcekitd_variant_t Info,
+                              llvm::raw_ostream &OS) {
+  sourcekitd_variant_t CategorizedRanges =
+      sourcekitd_variant_dictionary_get_value(Info, KeyCategorizedRanges);
+  sourcekitd_variant_array_apply(CategorizedRanges, ^bool(
+                                     size_t i,
+                                     sourcekitd_variant_t Categorized) {
+    sourcekitd_uid_t Category =
+        sourcekitd_variant_dictionary_get_uid(Categorized, KeyCategory);
+    OS << sourcekitd_uid_get_string_ptr(Category) << ":\n";
+
+    sourcekitd_variant_t Ranges =
+        sourcekitd_variant_dictionary_get_value(Categorized, KeyRanges);
+    sourcekitd_variant_array_apply(Ranges, ^bool(size_t j,
+                                                 sourcekitd_variant_t Range) {
+
+      OS << "  "; // indent
+      int64_t Line = sourcekitd_variant_dictionary_get_int64(Range, KeyLine);
+      int64_t Column =
+          sourcekitd_variant_dictionary_get_int64(Range, KeyColumn);
+      int64_t EndLine =
+          sourcekitd_variant_dictionary_get_int64(Range, KeyEndLine);
+      int64_t EndColumn =
+          sourcekitd_variant_dictionary_get_int64(Range, KeyEndColumn);
+      OS << Line << ':' << Column << '-' << EndLine << ':' << EndColumn << " ";
+      auto Kind = sourcekitd_variant_dictionary_get_uid(Range, KeyKind);
+      OS << sourcekitd_uid_get_string_ptr(Kind);
+      auto index = sourcekitd_variant_dictionary_get_value(Range, KeyArgIndex);
+      if (sourcekitd_variant_get_type(index) != SOURCEKITD_VARIANT_TYPE_NULL) {
+        OS << " arg-index=" << sourcekitd_variant_int64_get_value(index);
+      }
+      OS << "\n";
+      return true;
+    });
+    return true;
+  });
 }
 
 static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII) {

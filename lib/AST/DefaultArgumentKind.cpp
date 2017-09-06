@@ -30,7 +30,7 @@ StringRef swift::getDefaultArgumentSpelling(DefaultArgumentKind kind) {
   case DefaultArgumentKind::Column:    return "#column";
   case DefaultArgumentKind::Function:  return "#function";
   case DefaultArgumentKind::DSOHandle: return "#dsohandle";
-  case DefaultArgumentKind::Nil:       return "nil";
+  case DefaultArgumentKind::NilLiteral: return "nil";
   case DefaultArgumentKind::EmptyArray: return "[]";
   case DefaultArgumentKind::EmptyDictionary: return "[:]";
   }
@@ -65,7 +65,7 @@ DefaultArgumentKind swift::inferDefaultArgumentKind(Expr *expr) {
           if (ctor->getFullName().getArgumentNames().size() == 1 &&
               ctor->getFullName().getArgumentNames()[0]
                 == ctor->getASTContext().Id_nilLiteral)
-            return DefaultArgumentKind::Nil;
+            return DefaultArgumentKind::NilLiteral;
         }
       }
     }

@@ -1167,7 +1167,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     SmallVector<LocatorPathElt, 4> path;
     locator.getLocatorParts(path);
 
-    // Find the last path element, skipping OptioanlPayload elements
+    // Find the last path element, skipping OptionalPayload elements
     // so that we allow this exception in cases of optional injection.
     auto last = std::find_if(
         path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
@@ -1208,15 +1208,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
-                                       ConstraintKind kind,
                                        TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   auto classDecl2 = type2->getClassOrBoundGenericClass();
-  bool done = false;
   for (auto super1 = TC.getSuperClassOf(type1);
-       !done && super1;
+       super1;
        super1 = TC.getSuperClassOf(super1)) {
     if (super1->getClassOrBoundGenericClass() != classDecl2)
       continue;
@@ -3078,120 +3076,23 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
                                           argumentLabels->HasTrailingClosure);
   };
 
-  
-  // Handle initializers, they have their own approach to name lookup.
+  // Look for members within the base.
+  LookupResult &lookup = lookupMember(instanceTy, memberName);
+
+  TypeBase *favoredType = nullptr;
   if (memberName.isSimpleName(TC.Context.Id_init)) {
-    // The constructors are only found on the metatype.
-    if (!isMetatype)
-      return result;
-    
-    NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
-    if (isa<AbstractFunctionDecl>(DC))
-      lookupOptions |= NameLookupFlags::KnownPrivate;
-    
-    // If we're doing a lookup for diagnostics, include inaccessible members,
-    // the diagnostics machinery will sort it out.
-    if (includeInaccessibleMembers)
-      lookupOptions |= NameLookupFlags::IgnoreAccessibility;
-
-    // If a constructor is only visible as a witness for a protocol
-    // requirement, it must be an invalid override. Also, protocol
-    // extensions cannot yet define designated initializers.
-    lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-
-    LookupResult ctors = TC.lookupConstructors(DC, instanceTy, lookupOptions);
-    if (!ctors)
-      return result;    // No result.
-    
-    TypeBase *favoredType = nullptr;
     if (auto anchor = memberLocator->getAnchor()) {
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
         auto argExpr = applyExpr->getArg();
         favoredType = getFavoredType(argExpr);
-        
+
         if (!favoredType) {
           optimizeConstraints(argExpr);
           favoredType = getFavoredType(argExpr);
-        }        
-      }
-    }
-    
-    // Introduce a new overload set.
-  retry_ctors_after_fail:
-    bool labelMismatch = false;
-    for (auto entry : ctors) {
-      auto *ctor = entry.getValueDecl();
-
-      // If the constructor is invalid, we fail entirely to avoid error cascade.
-      TC.validateDecl(ctor);
-      if (ctor->isInvalid())
-        return result.markErrorAlreadyDiagnosed();
-
-      // FIXME: Deal with broken recursion
-      if (!ctor->hasInterfaceType())
-        continue;
-
-      // If the argument labels for this result are incompatible with
-      // the call site, skip it.
-      if (!hasCompatibleArgumentLabels(ctor)) {
-        labelMismatch = true;
-        result.addUnviable(ctor, MemberLookupResult::UR_LabelMismatch);
-        continue;
-      }
-
-      // If our base is an existential type, we can't make use of any
-      // constructor whose signature involves associated types.
-      if (isExistential) {
-        if (auto *proto = ctor->getDeclContext()
-                ->getAsProtocolOrProtocolExtensionContext()) {
-          if (!proto->isAvailableInExistential(ctor)) {
-            result.addUnviable(ctor,
-                               MemberLookupResult::UR_UnavailableInExistential);
-            continue;
-          }
         }
       }
-
-      // If the invocation's argument expression has a favored type,
-      // use that information to determine whether a specific overload for
-      // the initializer should be favored.
-      if (favoredType && result.FavoredChoice == ~0U) {
-        // Only try and favor monomorphic initializers.
-        if (auto fnTypeWithSelf =
-            ctor->getInterfaceType()->getAs<FunctionType>()) {
-          
-          if (auto fnType =
-                  fnTypeWithSelf->getResult()->getAs<FunctionType>()) {
-          
-            auto argType = fnType->getInput()->getWithoutParens();
-            argType = ctor->getInnermostDeclContext()
-                ->mapTypeIntoContext(argType);
-            if (argType->isEqual(favoredType))
-              if (!ctor->getAttrs().isUnavailable(getASTContext()))
-                result.FavoredChoice = result.ViableCandidates.size();
-          }
-        }
-      }
-      
-      result.addViable(OverloadChoice(baseTy, ctor, functionRefKind));
     }
-
-
-    // If we rejected some possibilities due to an argument-label
-    // mismatch and ended up with nothing, try again ignoring the
-    // labels. This allows us to perform typo correction on the labels.
-    if (result.ViableCandidates.empty() && labelMismatch &&
-        shouldAttemptFixes()) {
-      argumentLabels.reset();
-      goto retry_ctors_after_fail;
-    }
-
-    // FIXME: Should we look for constructors in bridged types?
-    return result;
   }
-
-  // Look for members within the base.
-  LookupResult &lookup = lookupMember(instanceTy, memberName);
 
   // The set of directly accessible types, which is only used when
   // we're performing dynamic lookup into an existential type.
@@ -3213,11 +3114,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // reasonable choice.
   auto addChoice = [&](ValueDecl *cand, bool isBridged,
                        bool isUnwrappedOptional) {
-    // Destructors cannot be referenced manually
-    if (isa<DestructorDecl>(cand)) {
-      result.addUnviable(cand, MemberLookupResult::UR_DestructorInaccessible);
-      return;
-    }
     // If the result is invalid, skip it.
     TC.validateDecl(cand);
     if (cand->isInvalid()) {
@@ -3246,6 +3142,26 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
           result.addUnviable(cand,
                              MemberLookupResult::UR_UnavailableInExistential);
           return;
+        }
+      }
+    }
+
+    // If the invocation's argument expression has a favored type,
+    // use that information to determine whether a specific overload for
+    // the candidate should be favored.
+    if (isa<ConstructorDecl>(cand) && favoredType &&
+        result.FavoredChoice == ~0U) {
+      // Only try and favor monomorphic initializers.
+      if (auto fnTypeWithSelf = cand->getInterfaceType()
+                                                      ->getAs<FunctionType>()) {
+        if (auto fnType = fnTypeWithSelf->getResult()
+                                                      ->getAs<FunctionType>()) {
+          auto argType = fnType->getInput()->getWithoutParens();
+          argType = cand->getInnermostDeclContext()
+                                                  ->mapTypeIntoContext(argType);
+          if (argType->isEqual(favoredType))
+            if (!cand->getAttrs().isUnavailable(getASTContext()))
+              result.FavoredChoice = result.ViableCandidates.size();
         }
       }
     }
@@ -3347,7 +3263,7 @@ retry_after_fail:
 
   // If the instance type is a bridged to an Objective-C type, perform
   // a lookup into that Objective-C type.
-  if (bridgedType) {
+  if (bridgedType && !isMetatype) {
     LookupResult &bridgedLookup = lookupMember(bridgedClass, memberName);
     ModuleDecl *foundationModule = nullptr;
     for (auto result : bridgedLookup) {
@@ -3404,9 +3320,9 @@ retry_after_fail:
       includeInaccessibleMembers) {
     NameLookupOptions lookupOptions = defaultMemberLookupOptions;
     
-    // Ignore accessibility so we get candidates that might have been missed
+    // Ignore access control so we get candidates that might have been missed
     // before.
-    lookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    lookupOptions |= NameLookupFlags::IgnoreAccessControl;
     // This is only used for diagnostics, so always use KnownPrivate.
     lookupOptions |= NameLookupFlags::KnownPrivate;
     
@@ -4417,7 +4333,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
   case ConversionRestrictionKind::Superclass:
     addContextualScore();
-    return matchSuperclassTypes(type1, type2, matchKind, subflags, locator);
+    return matchSuperclassTypes(type1, type2, subflags, locator);
 
   case ConversionRestrictionKind::LValueToRValue:
     return matchTypes(type1->getRValueType(), type2,

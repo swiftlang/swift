@@ -36,7 +36,7 @@ sil_vtable BigClass {}
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*
 // CHECK-NEXT: call {{.*}} @swift_rt_swift_release {{.*}} [[R]])
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %[[C]]* [[R]] to i8*
-// CHECK-NEXT: call void @llvm.lifetime.end(i64 -1, i8* [[O2]])
+// CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[O2]])
 // CHECK-NEXT: ret void
 sil @simple_promote : $@convention(thin) () -> () {
 bb0:
@@ -88,7 +88,7 @@ bb0:
 // CHECK-NEXT: call {{.*}} @swift_setDeallocating {{.*}}(%[[C]]* [[R]])
 // CHECK-NEXT: call swiftcc void @not_inlined_destructor(%[[C]]* [[R]])
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %[[C]]* [[R]] to i8*
-// CHECK-NEXT: call void @llvm.lifetime.end(i64 -1, i8* [[O2]])
+// CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[O2]])
 // CHECK-NEXT: ret void
 sil @promoted_with_devirtualized_release : $@convention(thin) () -> () {
 bb0:
@@ -110,7 +110,7 @@ bb0:
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*
 // CHECK-NOT: call
 // CHECK: [[O2:%[0-9]+]] = bitcast %[[C]]* [[R]] to i8*
-// CHECK-NEXT: call void @llvm.lifetime.end(i64 -1, i8* [[O2]])
+// CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[O2]])
 // CHECK-NEXT: ret void
 sil @promoted_with_inlined_devirtualized_release : $@convention(thin) () -> () {
 bb0:

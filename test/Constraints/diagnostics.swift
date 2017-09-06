@@ -281,7 +281,7 @@ func r18800223(_ i : Int) {
 
   
   var buttonTextColor: String?
-  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
+  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{type of expression is ambiguous without more context}}
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
@@ -760,7 +760,7 @@ func read<T : BinaryInteger>() -> T? {
 
 func f23213302() {
   var s = Set<Int>()
-  s.subtractInPlace(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Set<Int>'}}
+  s.subtract(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Set<Int>'}}
 }
 
 // <rdar://problem/24202058> QoI: Return of call to overloaded function in void-return context
@@ -1085,3 +1085,20 @@ fun_31849281(a: { !$0 }, c: [nil, 42], b: { "\($0)" })
 
 func f_31849281(x: Int, y: Int, z: Int) {}
 f_31849281(42, y: 10, x: 20) // expected-error {{argument 'x' must precede unnamed argument #1}} {{12-12=x: 20, }} {{21-28=}}
+
+func sr5081() {
+  var a = ["1", "2", "3", "4", "5"]
+  var b = [String]()
+  b = a[2...4] // expected-error {{cannot assign value of type 'ArraySlice<String>' to type '[String]'}}
+}
+
+func rdar17170728() {
+  var i: Int? = 1
+  var j: Int?
+  var k: Int? = 2
+
+  let _ = [i, j, k].reduce(0 as Int?) {
+    $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
+    // expected-error@-1 {{type of expression is ambiguous without more context}}
+  }
+}

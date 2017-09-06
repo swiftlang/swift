@@ -44,12 +44,12 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
-#include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include "GenEnum.h"
 #include "GenType.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
+#include "StructLayout.h"
 
 #include <initializer_list>
 
@@ -194,12 +194,18 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy,              // objc properties
     Int32Ty,                // size
     Int32Ty,                // flags
-    Int16Ty,                // minimum witness count
-    Int16Ty,                // default witness count
-    Int32Ty                 // padding
+    Int16Ty,                // mandatory requirement count
+    Int16Ty,                // total requirement count
+    Int32Ty                 // requirements array
   });
   
   ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();
+
+  ProtocolRequirementStructTy =
+      createStructType(*this, "swift.protocol_requirement", {
+    Int32Ty,                // flags
+    Int32Ty                 // default implementation
+  });
   
   // A tuple type metadata record has a couple extra fields.
   auto tupleElementTy = createStructType(*this, "swift.tuple_element_type", {
@@ -284,6 +290,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     = llvm::StructType::create(LLVMContext, "swift.type_descriptor");
   NominalTypeDescriptorPtrTy
     = NominalTypeDescriptorTy->getPointerTo(DefaultAS);
+
+  MethodDescriptorStructTy
+    = createStructType(*this, "swift.method_descriptor", {
+      RelativeAddressTy,
+      Int32Ty
+    });
 
   TypeMetadataRecordTy
     = createStructType(*this, "swift.type_metadata_record", {
@@ -466,20 +478,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
       else
         buildFnAttr.addAttribute(Attr);
     }
-    // FIXME: getting attributes here without setting them does
-    // nothing. This cannot be fixed until the attributes are correctly specified.
-    fn->getAttributes().
-      addAttributes(Module.getContext(),
-                    llvm::AttributeSet::FunctionIndex,
-                    llvm::AttributeSet::get(Module.getContext(),
-                                            llvm::AttributeSet::FunctionIndex,
-                                            buildFnAttr));
-    fn->getAttributes().
-      addAttributes(Module.getContext(),
-                    llvm::AttributeSet::ReturnIndex,
-                    llvm::AttributeSet::get(Module.getContext(),
-                                            llvm::AttributeSet::ReturnIndex,
-                                            buildRetAttr));
+    fn->addAttributes(llvm::AttributeList::FunctionIndex, buildFnAttr);
+    fn->addAttributes(llvm::AttributeList::ReturnIndex, buildRetAttr);
   }
 
   return cache;
@@ -506,7 +506,7 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
   auto *fun = dyn_cast<llvm::Function>(fn);
   assert(fun && "Wrapper should be an llvm::Function");
   // Do not inline wrappers, because this would result in a code size increase.
-  fun->addAttribute(llvm::AttributeSet::FunctionIndex,
+  fun->addAttribute(llvm::AttributeList::FunctionIndex,
                     llvm::Attribute::NoInline);
   assert(fun->hasFnAttribute(llvm::Attribute::NoInline) &&
          "Wrappers should not be inlined");
@@ -736,11 +736,11 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
     wt->getConformance()->getType()->getNominalOrBoundGenericNominal();
 
   switch (ConformingTy->getEffectiveAccess()) {
-    case Accessibility::Private:
-    case Accessibility::FilePrivate:
+    case AccessLevel::Private:
+    case AccessLevel::FilePrivate:
       return true;
 
-    case Accessibility::Internal:
+    case AccessLevel::Internal:
       return PrimaryIGM->getSILModule().isWholeModule();
 
     default:
@@ -776,33 +776,26 @@ void IRGenerator::addClassForEagerInitialization(ClassDecl *ClassDecl) {
   ClassesForEagerInitialization.push_back(ClassDecl);
 }
 
-llvm::AttributeSet IRGenModule::getAllocAttrs() {
+llvm::AttributeList IRGenModule::getAllocAttrs() {
   if (AllocAttrs.isEmpty()) {
-    AllocAttrs = llvm::AttributeSet::get(LLVMContext,
-                                         llvm::AttributeSet::ReturnIndex,
-                                         llvm::Attribute::NoAlias);
-    AllocAttrs = AllocAttrs.addAttribute(LLVMContext,
-                               llvm::AttributeSet::FunctionIndex,
-                               llvm::Attribute::NoUnwind);
+    AllocAttrs =
+        llvm::AttributeList::get(LLVMContext, llvm::AttributeList::ReturnIndex,
+                                 llvm::Attribute::NoAlias);
+    AllocAttrs =
+        AllocAttrs.addAttribute(LLVMContext, llvm::AttributeList::FunctionIndex,
+                                llvm::Attribute::NoUnwind);
   }
   return AllocAttrs;
 }
 
-/// Construct initial attributes from options.
-llvm::AttributeSet IRGenModule::constructInitialAttributes() {
-  llvm::AttributeSet attrsUpdated;
+/// Construct initial function attributes from options.
+void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs) {
   // Add DisableFPElim. 
   if (!IRGen.Opts.DisableFPElim) {
-    attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
-                     llvm::AttributeSet::FunctionIndex,
-                     "no-frame-pointer-elim", "false");
+    Attrs.addAttribute("no-frame-pointer-elim", "false");
   } else {
-    attrsUpdated = attrsUpdated.addAttribute(
-        LLVMContext, llvm::AttributeSet::FunctionIndex,
-        "no-frame-pointer-elim", "true");
-    attrsUpdated = attrsUpdated.addAttribute(
-        LLVMContext, llvm::AttributeSet::FunctionIndex,
-        "no-frame-pointer-elim-non-leaf");
+    Attrs.addAttribute("no-frame-pointer-elim", "true");
+    Attrs.addAttribute("no-frame-pointer-elim-non-leaf");
   }
 
   // Add target-cpu and target-features if they are non-null.
@@ -811,8 +804,7 @@ llvm::AttributeSet IRGenModule::constructInitialAttributes() {
 
   std::string &CPU = ClangOpts.CPU;
   if (CPU != "")
-    attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
-                     llvm::AttributeSet::FunctionIndex, "target-cpu", CPU);
+    Attrs.addAttribute("target-cpu", CPU);
 
   std::vector<std::string> Features = ClangOpts.Features;
   if (!Features.empty()) {
@@ -824,11 +816,17 @@ llvm::AttributeSet IRGenModule::constructInitialAttributes() {
     }, [&]{
       allFeatures.push_back(',');
     });
-    attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
-                     llvm::AttributeSet::FunctionIndex, "target-features",
-                     allFeatures);
+    Attrs.addAttribute("target-features", allFeatures);
   }
-  return attrsUpdated;
+  if (IRGen.Opts.OptimizeForSize)
+    Attrs.addAttribute(llvm::Attribute::OptimizeForSize);
+}
+
+llvm::AttributeList IRGenModule::constructInitialAttributes() {
+  llvm::AttrBuilder b;
+  constructInitialFnAttributes(b);
+  return llvm::AttributeList::get(LLVMContext,
+                                  llvm::AttributeList::FunctionIndex, b);
 }
 
 llvm::Constant *IRGenModule::getSize(Size size) {
@@ -966,21 +964,17 @@ static bool replaceModuleFlagsEntry(llvm::LLVMContext &Ctx,
 }
 
 void IRGenModule::emitAutolinkInfo() {
-
-  // FIXME: This constant should be vended by LLVM somewhere.
-  static const char * const LinkerOptionsFlagName = "Linker Options";
-
   // Collect the linker options already in the module (from ClangCodeGen).
-  auto *LinkerOptions = Module.getModuleFlag(LinkerOptionsFlagName);
-  if (LinkerOptions)
-    for (const auto &LinkOption : cast<llvm::MDNode>(LinkerOptions)->operands())
-      AutolinkEntries.push_back(LinkOption);
+  // FIXME: This constant should be vended by LLVM somewhere.
+  auto *Metadata = Module.getOrInsertNamedMetadata("llvm.linker.options");
+  for (llvm::MDNode *LinkOption : Metadata->operands())
+    AutolinkEntries.push_back(LinkOption);
 
   // Remove duplicates.
-  llvm::SmallPtrSet<llvm::Metadata*, 4> knownAutolinkEntries;
+  llvm::SmallPtrSet<llvm::MDNode *, 4> knownAutolinkEntries;
   AutolinkEntries.erase(std::remove_if(AutolinkEntries.begin(),
                                        AutolinkEntries.end(),
-                                       [&](llvm::Metadata *entry) -> bool {
+                                       [&](llvm::MDNode *entry) -> bool {
                                          return !knownAutolinkEntries.insert(
                                                    entry).second;
                                        }),
@@ -989,21 +983,12 @@ void IRGenModule::emitAutolinkInfo() {
   if ((TargetInfo.OutputObjectFormat == llvm::Triple::COFF &&
        !Triple.isOSCygMing()) ||
       TargetInfo.OutputObjectFormat == llvm::Triple::MachO || Triple.isPS4()) {
-    llvm::LLVMContext &ctx = Module.getContext();
 
-    if (!LinkerOptions) {
-      // Create a new linker flag entry.
-      Module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
-                           llvm::MDNode::get(ctx, AutolinkEntries));
-    } else {
-      // Replace the old linker flag entry.
-      bool FoundOldEntry = replaceModuleFlagsEntry(
-          ctx, Module, LinkerOptionsFlagName, llvm::Module::AppendUnique,
-          llvm::MDNode::get(ctx, AutolinkEntries));
+    // On platforms that support autolinking, continue to use the metadata.
+    Metadata->clearOperands();
+    for (auto *Entry : AutolinkEntries)
+      Metadata->addOperand(Entry);
 
-      (void)FoundOldEntry;
-      assert(FoundOldEntry && "Could not replace old linker options entry?");
-    }
   } else {
     assert((TargetInfo.OutputObjectFormat == llvm::Triple::ELF ||
             Triple.isOSCygMing()) &&
@@ -1043,31 +1028,6 @@ void IRGenModule::emitAutolinkInfo() {
     if (useDllStorage())
       symbol->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
   }
-}
-
-void IRGenModule::emitEnableReportErrorsToDebugger() {
-  if (!Context.LangOpts.ReportErrorsToDebugger)
-    return;
-
-  if (!getSwiftModule()->hasEntryPoint())
-    return;
-
-  llvm::Function *NewFn = llvm::Function::Create(
-      llvm::FunctionType::get(VoidTy, false), llvm::GlobalValue::PrivateLinkage,
-      "_swift_enable_report_errors_to_debugger");
-  IRGenFunction NewIGF(*this, NewFn);
-  NewFn->setAttributes(constructInitialAttributes());
-  Module.getFunctionList().push_back(NewFn);
-  NewFn->setCallingConv(DefaultCC);
-
-  llvm::Value *addr =
-      Module.getOrInsertGlobal("_swift_reportFatalErrorsToDebugger", Int1Ty);
-  llvm::Value *one = llvm::ConstantInt::get(Int1Ty, 1);
-
-  NewIGF.Builder.CreateStore(one, addr, Alignment(1));
-  NewIGF.Builder.CreateRetVoid();
-
-  llvm::appendToGlobalCtors(Module, NewFn, 0, nullptr);
 }
 
 void IRGenModule::cleanupClangCodeGenMetadata() {
@@ -1138,7 +1098,6 @@ bool IRGenModule::finalize() {
     return false;
 
   emitAutolinkInfo();
-  emitEnableReportErrorsToDebugger();
   emitGlobalLists();
   if (DebugInfo)
     DebugInfo->finalize();

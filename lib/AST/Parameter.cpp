@@ -128,7 +128,7 @@ Type ParameterList::getType(const ASTContext &C) const {
     
     argumentInfo.emplace_back(
         type->getInOutObjectType(), P->getArgumentName(),
-        ParameterTypeFlags::fromParameterType(type, P->isVariadic()).withInOut(P->isInOut()));
+        ParameterTypeFlags::fromParameterType(type, P->isVariadic(), P->isShared()).withInOut(P->isInOut()));
   }
 
   return TupleType::get(argumentInfo, C);
@@ -148,7 +148,7 @@ Type ParameterList::getInterfaceType(const ASTContext &C) const {
 
     argumentInfo.emplace_back(
         type->getInOutObjectType(), P->getArgumentName(),
-        ParameterTypeFlags::fromParameterType(type, P->isVariadic()).withInOut(P->isInOut()));
+        ParameterTypeFlags::fromParameterType(type, P->isVariadic(), P->isShared()).withInOut(P->isInOut()));
   }
 
   return TupleType::get(argumentInfo, C);

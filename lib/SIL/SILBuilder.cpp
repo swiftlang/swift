@@ -12,6 +12,7 @@
 
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILGlobalVariable.h"
 
 using namespace swift;
 
@@ -19,12 +20,20 @@ using namespace swift;
 // SILBuilder Implementation
 //===----------------------------------------------------------------------===//
 
+SILBuilder::SILBuilder(SILGlobalVariable *GlobVar,
+                       SmallVectorImpl<SILInstruction *> *InsertedInstrs)
+    : F(nullptr), Mod(GlobVar->getModule()), InsertedInstrs(InsertedInstrs) {
+  setInsertionPoint(&GlobVar->StaticInitializerBlock);
+}
+
 IntegerLiteralInst *SILBuilder::createIntegerLiteral(IntegerLiteralExpr *E) {
-  return insert(IntegerLiteralInst::create(E, getSILDebugLocation(E), F));
+  return insert(IntegerLiteralInst::create(E, getSILDebugLocation(E),
+                                           getModule()));
 }
 
 FloatLiteralInst *SILBuilder::createFloatLiteral(FloatLiteralExpr *E) {
-  return insert(FloatLiteralInst::create(E, getSILDebugLocation(E), F));
+  return insert(FloatLiteralInst::create(E, getSILDebugLocation(E),
+                                         getModule()));
 }
 
 TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
@@ -33,7 +42,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
   for (auto elt : elts)
     eltTypes.push_back(elt->getType().getSwiftRValueType());
   auto tupleType = SILType::getPrimitiveObjectType(
-      CanType(TupleType::get(eltTypes, F.getASTContext())));
+      CanType(TupleType::get(eltTypes, getASTContext())));
 
   return createTuple(loc, tupleType, elts);
 }
@@ -84,22 +93,20 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
 SILInstruction *SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc,
                                                       SILValue Op,
                                                       SILType ResultTy) {
-  auto &M = F.getModule();
-  if (!SILType::canRefCast(Op->getType(), ResultTy, M))
+  if (!SILType::canRefCast(Op->getType(), ResultTy, getModule()))
     return nullptr;
 
   return insert(UncheckedRefCastInst::create(getSILDebugLocation(Loc), Op,
-                                             ResultTy, F, OpenedArchetypes));
+                                   ResultTy, getFunction(), OpenedArchetypes));
 }
 
 // Create the appropriate cast instruction based on result type.
 SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
                                                    SILValue Op,
                                                    SILType Ty) {
-  auto &M = F.getModule();
-  if (Ty.isTrivial(M))
+  if (Ty.isTrivial(getModule()))
     return insert(UncheckedTrivialBitCastInst::create(
-        getSILDebugLocation(Loc), Op, Ty, F, OpenedArchetypes));
+        getSILDebugLocation(Loc), Op, Ty, getFunction(), OpenedArchetypes));
 
   if (auto refCast = tryCreateUncheckedRefCast(Loc, Op, Ty))
     return refCast;
@@ -107,7 +114,7 @@ SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
   return insert(UncheckedBitwiseCastInst::create(getSILDebugLocation(Loc), Op,
-                                                 Ty, F, OpenedArchetypes));
+                                         Ty, getFunction(), OpenedArchetypes));
 }
 
 BranchInst *SILBuilder::createBranch(SILLocation Loc,
@@ -148,7 +155,7 @@ void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
 SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   // If we are concatenating, just create and return a new block.
   if (insertingAtEndOfBlock()) {
-    return F.createBasicBlock(BB);
+    return getFunction().createBasicBlock(BB);
   }
 
   // Otherwise we need to split the current block at the insertion point.
@@ -436,6 +443,6 @@ ValueMetatypeInst *SILBuilder::createValueMetatype(SILLocation Loc,
           getModule(), MetatypeTy.castTo<MetatypeType>().getInstanceType()) &&
       "value_metatype result must be formal metatype of the lowered operand "
       "type");
-  return insert(new (F.getModule()) ValueMetatypeInst(getSILDebugLocation(Loc),
+  return insert(new (getModule()) ValueMetatypeInst(getSILDebugLocation(Loc),
                                                       MetatypeTy, Base));
 }

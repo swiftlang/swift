@@ -6,7 +6,6 @@
 import module
 #endif
 
-// CHECK-IR: !{{[0-9]+}} = !{i32 {{[0-9]+}}, !"Linker Options", [[NODE:![0-9]+]]}
-// CHECK-IR: [[NODE]] = !{[[LIST:![0-9]+]]}
+// CHECK-IR: !llvm.linker.options = !{[[LIST:![0-9]+]]}
 // CHECK-IR: [[LIST]] = !{!"\01module"}
 

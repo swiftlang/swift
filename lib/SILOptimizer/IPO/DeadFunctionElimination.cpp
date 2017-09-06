@@ -364,18 +364,18 @@ protected:
 
   /// Retrieve the visibility information from the AST.
   bool isVisibleExternally(const ValueDecl *decl) {
-    Accessibility accessibility = decl->getEffectiveAccess();
+    AccessLevel access = decl->getEffectiveAccess();
     SILLinkage linkage;
-    switch (accessibility) {
-    case Accessibility::Private:
-    case Accessibility::FilePrivate:
+    switch (access) {
+    case AccessLevel::Private:
+    case AccessLevel::FilePrivate:
       linkage = SILLinkage::Private;
       break;
-    case Accessibility::Internal:
+    case AccessLevel::Internal:
       linkage = SILLinkage::Hidden;
       break;
-    case Accessibility::Public:
-    case Accessibility::Open:
+    case AccessLevel::Public:
+    case AccessLevel::Open:
       linkage = SILLinkage::Public;
       break;
     }
@@ -409,12 +409,6 @@ protected:
       if (!F.shouldOptimize()) {
         DEBUG(llvm::dbgs() << "  anchor a no optimization function: " << F.getName() << "\n");
         ensureAlive(&F);
-      }
-    }
-
-    for (SILGlobalVariable &G : Module->getSILGlobalList()) {
-      if (SILFunction *initFunc = G.getInitializer()) {
-        ensureAlive(initFunc);
       }
     }
   }
@@ -532,7 +526,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         if (// A conservative approach: if any of the overridden functions is
             // visible externally, we mark the whole method as alive.
             isPossiblyUsedExternally(entry.Linkage, Module->isWholeModule())
-            // We also have to check the method declaration's accessibility.
+            // We also have to check the method declaration's access level.
             // Needed if it's a public base method declared in another
             // compilation unit (for this we have no SILFunction).
             || isVisibleExternally(fd)

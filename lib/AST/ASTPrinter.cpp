@@ -429,41 +429,41 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printAccessibility(Accessibility access, StringRef suffix = "") {
+  void printAccess(AccessLevel access, StringRef suffix = "") {
     switch (access) {
-    case Accessibility::Private:
+    case AccessLevel::Private:
       Printer << tok::kw_private;
       break;
-    case Accessibility::FilePrivate:
+    case AccessLevel::FilePrivate:
       Printer << tok::kw_fileprivate;
       break;
-    case Accessibility::Internal:
-      if (!Options.PrintInternalAccessibilityKeyword)
+    case AccessLevel::Internal:
+      if (!Options.PrintInternalAccessKeyword)
         return;
       Printer << tok::kw_internal;
       break;
-    case Accessibility::Public:
+    case AccessLevel::Public:
       Printer << tok::kw_public;
       break;
-    case Accessibility::Open:
+    case AccessLevel::Open:
       Printer.printKeyword("open");
       break;
     }
     Printer << suffix << " ";
   }
 
-  void printAccessibility(const ValueDecl *D) {
-    if (!Options.PrintAccessibility || !D->hasAccessibility() ||
-        D->getAttrs().hasAttribute<AccessibilityAttr>())
+  void printAccess(const ValueDecl *D) {
+    if (!Options.PrintAccess || !D->hasAccess() ||
+        D->getAttrs().hasAttribute<AccessControlAttr>())
       return;
 
-    printAccessibility(D->getFormalAccess());
+    printAccess(D->getFormalAccess());
 
     if (auto storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       if (auto setter = storageDecl->getSetter()) {
-        Accessibility setterAccess = setter->getFormalAccess();
+        AccessLevel setterAccess = setter->getFormalAccess();
         if (setterAccess != D->getFormalAccess())
-          printAccessibility(setterAccess, "(set)");
+          printAccess(setterAccess, "(set)");
       }
     }
   }
@@ -594,11 +594,9 @@ private:
   void printInherited(const Decl *decl,
                       ArrayRef<TypeLoc> inherited,
                       ArrayRef<ProtocolDecl *> protos,
-                      Type superclass = {},
-                      bool explicitClass = false);
+                      Type superclass = {});
 
-  void printInherited(const NominalTypeDecl *decl,
-                      bool explicitClass = false);
+  void printInherited(const NominalTypeDecl *decl);
   void printInherited(const EnumDecl *D);
   void printInherited(const ExtensionDecl *decl);
   void printInherited(const GenericTypeParamDecl *D);
@@ -917,8 +915,12 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
 
     // A requirement like Self : Protocol or Self.T : Class might be from an
     // inheritance, or might be a where clause.
-    if (req.getKind() != RequirementKind::Layout && result.second) {
-      auto inherited = req.getSecondType();
+    if (result.second) {
+      Type inherited;
+      if (req.getKind() == RequirementKind::Layout)
+        inherited = proto->getASTContext().getAnyObjectType();
+      else
+        inherited = req.getSecondType();
       inWhereClause =
           none_of(result.first->getInherited(), [&](const TypeLoc &loc) {
             return loc.getType()->isEqual(inherited);
@@ -1266,15 +1268,13 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
 
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (Options.AccessibilityFilter > Accessibility::Private &&
-        VD->hasAccessibility() &&
-        VD->getFormalAccess() < Options.AccessibilityFilter)
+    if (Options.AccessFilter > AccessLevel::Private &&
+        VD->hasAccess() && VD->getFormalAccess() < Options.AccessFilter)
       return false;
   }
 
   if (Options.SkipPrivateStdlibDecls &&
-      D->isPrivateStdlibDecl(
-                /*whitelistProtocols=*/!Options.SkipUnderscoredStdlibProtocols))
+      D->isPrivateStdlibDecl(!Options.SkipUnderscoredStdlibProtocols))
     return false;
 
   if (Options.SkipEmptyExtensionDecls && isa<ExtensionDecl>(D)) {
@@ -1637,9 +1637,8 @@ void PrintAST::printNominalDeclGenericRequirements(NominalTypeDecl *decl) {
 void PrintAST::printInherited(const Decl *decl,
                               ArrayRef<TypeLoc> inherited,
                               ArrayRef<ProtocolDecl *> protos,
-                              Type superclass,
-                              bool explicitClass) {
-  if (inherited.empty() && superclass.isNull() && !explicitClass) {
+                              Type superclass) {
+  if (inherited.empty() && superclass.isNull()) {
     if (protos.empty())
       return;
   }
@@ -1648,10 +1647,7 @@ void PrintAST::printInherited(const Decl *decl,
     bool PrintedColon = false;
     bool PrintedInherited = false;
 
-    if (explicitClass) {
-      Printer << " : " << tok::kw_class;
-      PrintedInherited = true;
-    } else if (superclass) {
+    if (superclass) {
       bool ShouldPrintSuper = true;
       if (auto NTD = superclass->getAnyNominal()) {
         ShouldPrintSuper = shouldPrint(NTD);
@@ -1703,9 +1699,6 @@ void PrintAST::printInherited(const Decl *decl,
 
     Printer << " : ";
 
-    if (explicitClass)
-      Printer << " " << tok::kw_class << ", ";
-
     interleave(TypesToPrint, [&](TypeLoc TL) {
       printTypeLoc(TL);
     }, [&]() {
@@ -1714,9 +1707,8 @@ void PrintAST::printInherited(const Decl *decl,
   }
 }
 
-void PrintAST::printInherited(const NominalTypeDecl *decl,
-                              bool explicitClass) {
-  printInherited(decl, decl->getInherited(), { }, nullptr, explicitClass);
+void PrintAST::printInherited(const NominalTypeDecl *decl) {
+  printInherited(decl, decl->getInherited(), { }, nullptr);
 }
 
 void PrintAST::printInherited(const EnumDecl *decl) {
@@ -1914,7 +1906,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   // after type-checking, but it's close enough for now.
   if (anyVar) {
     printAttributes(anyVar);
-    printAccessibility(anyVar);
+    printAccess(anyVar);
   }
 
   if (decl->isStatic())
@@ -1975,7 +1967,7 @@ void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << tok::kw_typealias << " ";
   printContextIfNeeded(decl);
@@ -2040,7 +2032,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
 void PrintAST::visitEnumDecl(EnumDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
 
   if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
     ASTContext &Ctx = decl->getASTContext();
@@ -2068,7 +2060,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
 void PrintAST::visitStructDecl(StructDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
 
   if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
     ASTContext &Ctx = decl->getASTContext();
@@ -2096,7 +2088,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
 void PrintAST::visitClassDecl(ClassDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
 
   if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
     ASTContext &Ctx = decl->getASTContext();
@@ -2126,7 +2118,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
 
   if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
     ASTContext &Ctx = decl->getASTContext();
@@ -2141,23 +2133,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
         Printer.printName(decl->getName());
       });
 
-    // Figure out whether we need an explicit 'class' in the inheritance.
-    bool explicitClass = false;
-    if (decl->requiresClass() && !decl->isObjC()) {
-      bool inheritsRequiresClass = false;
-      for (auto proto : decl->getLocalProtocols(
-                          ConformanceLookupKind::OnlyExplicit)) {
-        if (proto->requiresClass()) {
-          inheritsRequiresClass = true;
-          break;
-        }
-      }
-
-      if (!inheritsRequiresClass)
-        explicitClass = true;
-    }
-
-    printInherited(decl, explicitClass);
+    printInherited(decl);
 
     // The trailing where clause is a syntactic thing, which isn't serialized
     // (etc.) and thus isn't available for printing things out of
@@ -2190,6 +2166,8 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
     printer << "@autoclosure ";
   if (!options.excludeAttrKind(TAK_escaping) && flags.isEscaping())
     printer << "@escaping ";
+  if (flags.isShared())
+    printer << "__shared ";
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -2201,11 +2179,26 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       !decl->getAttrs().hasAttribute<SILStoredAttr>())
     Printer << "@sil_stored ";
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
   if (!Options.SkipIntroducerKeywords) {
     if (decl->isStatic())
       printStaticKeyword(decl->getCorrectStaticSpelling());
-    Printer << (decl->isLet() ? tok::kw_let : tok::kw_var) << " ";
+    if (decl->getKind() == DeclKind::Var
+        || Options.PrintParameterSpecifiers) {
+      // Map all non-let specifiers to 'var'.  This is not correct, but
+      // SourceKit relies on this for info about parameter decls.
+      switch (decl->getSpecifier()) {
+        case VarDecl::Specifier::Owned:
+          Printer << tok::kw_let;
+          break;
+        case VarDecl::Specifier::Var:
+        case VarDecl::Specifier::InOut:
+        case VarDecl::Specifier::Shared:
+          Printer << tok::kw_var;
+          break;
+      }
+      Printer << " ";
+    }
   }
   printContextIfNeeded(decl);
   recordDeclLoc(decl,
@@ -2487,7 +2480,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   } else {
     printDocumentationComment(decl);
     printAttributes(decl);
-    printAccessibility(decl);
+    printAccess(decl);
 
     if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
       ASTContext &Ctx = decl->getASTContext();
@@ -2508,6 +2501,9 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           printStaticKeyword(decl->getCorrectStaticSpelling());
         if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>()) {
           Printer.printKeyword("mutating");
+          Printer << " ";
+        } else if (decl->isConsuming() && !decl->getAttrs().hasAttribute<ConsumingAttr>()) {
+          Printer.printKeyword("__consuming");
           Printer << " ";
         }
         Printer << tok::kw_func << " ";
@@ -2634,7 +2630,7 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
 void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
   printContextIfNeeded(decl);
   recordDeclLoc(decl, [&]{
     Printer << "subscript";
@@ -2658,7 +2654,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
 void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
 
   if ((decl->getInitKind() == CtorInitializerKind::Convenience ||
        decl->getInitKind() == CtorInitializerKind::ConvenienceFactory) &&
@@ -2912,19 +2908,6 @@ void PrintAST::visitCatchStmt(CatchStmt *stmt) {
     (void) guard;
   }
   Printer << ' ';
-  visit(stmt->getBody());
-}
-
-void PrintAST::visitForStmt(ForStmt *stmt) {
-  Printer << tok::kw_for << " (";
-  // FIXME: print initializer
-  Printer << "; ";
-  if (stmt->getCond().isNonNull()) {
-    // FIXME: print cond
-  }
-  Printer << "; ";
-  // FIXME: print increment
-  Printer << ") ";
   visit(stmt->getBody());
 }
 
@@ -4160,4 +4143,57 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
 void Substitution::print(llvm::raw_ostream &os,
                          const PrintOptions &PO) const {
   Replacement->print(os, PO);
+}
+
+void swift::printEnumElementsAsCases(
+    llvm::DenseSet<EnumElementDecl *> &UnhandledElements,
+    llvm::raw_ostream &OS) {
+  // Sort the missing elements to a vector because set does not guarantee
+  // orders.
+  SmallVector<EnumElementDecl *, 4> SortedElements;
+  SortedElements.insert(SortedElements.begin(), UnhandledElements.begin(),
+                        UnhandledElements.end());
+  std::sort(SortedElements.begin(), SortedElements.end(),
+            [](EnumElementDecl *LHS, EnumElementDecl *RHS) {
+              return LHS->getNameStr().compare(RHS->getNameStr()) < 0;
+            });
+
+  auto printPayloads = [](EnumElementDecl *EE, llvm::raw_ostream &OS) {
+    // If the enum element has no payloads, return.
+    auto TL = EE->getArgumentTypeLoc();
+    if (TL.isNull())
+      return;
+    TypeRepr *TR = EE->getArgumentTypeLoc().getTypeRepr();
+    if (auto *TTR = dyn_cast<TupleTypeRepr>(TR)) {
+      SmallVector<Identifier, 4> Names;
+      if (TTR->hasElementNames()) {
+        // Get the name from the tuple repr, if exist.
+        TTR->getElementNames(Names);
+      } else {
+        // Create same amount of empty names to the elements.
+        Names.assign(TTR->getNumElements(), Identifier());
+      }
+      OS << "(";
+      // Print each element in the pattern match.
+      for (unsigned I = 0, N = Names.size(); I < N; I++) {
+        auto Id = Names[I];
+        if (Id.empty())
+          OS << "_";
+        else
+          OS << tok::kw_let << " " << Id.str();
+        if (I + 1 != N) {
+          OS << ", ";
+        }
+      }
+      OS << ")";
+    }
+  };
+
+  // Print each enum element name.
+  std::for_each(SortedElements.begin(), SortedElements.end(),
+                [&](EnumElementDecl *EE) {
+                  OS << tok::kw_case << " ." << EE->getNameStr();
+                  printPayloads(EE, OS);
+                  OS << ": " << getCodePlaceholder() << "\n";
+                });
 }

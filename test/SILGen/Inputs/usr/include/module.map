@@ -39,3 +39,8 @@ module Newtype {
   header "newtype.h"
   export *
 }
+
+module NonNilTest {
+  header "NonNilTest.h"
+  export *
+}

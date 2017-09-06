@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=Newtype -skip-unavailable > %t.printed.A.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=Newtype -skip-unavailable -access-filter-public > %t.printed.A.txt
 // RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 // RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -I %t
 // REQUIRES: objc_interop
@@ -8,7 +8,6 @@
 // PRINT-LABEL: struct ErrorDomain : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
-// PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:    typealias RawValue = String
 // PRINT-NEXT:    typealias _ObjectiveCType = NSString
@@ -29,7 +28,6 @@
 // PRINT-NEXT:  }
 // PRINT-NEXT:  struct ClosedEnum : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(rawValue: String)
-// PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:    typealias RawValue = String
 // PRINT-NEXT:    typealias _ObjectiveCType = NSString
@@ -42,7 +40,6 @@
 // PRINT-NEXT:  struct IUONewtype : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
-// PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:    typealias RawValue = String
 // PRINT-NEXT:    typealias _ObjectiveCType = NSString
@@ -120,7 +117,6 @@
 // PRINT-LABEL: struct MyABINewTypeNS : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
-// PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:    typealias RawValue = String
 // PRINT-NEXT:    typealias _ObjectiveCType = NSString
@@ -140,7 +136,6 @@
 // PRINT-NEXT:    struct Name : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:      init(_ rawValue: String)
 // PRINT-NEXT:      init(rawValue: String)
-// PRINT-NEXT:      var _rawValue: NSString
 // PRINT-NEXT:      var rawValue: String { get }
 // PRINT-NEXT:      typealias RawValue = String
 // PRINT-NEXT:      typealias _ObjectiveCType = NSString

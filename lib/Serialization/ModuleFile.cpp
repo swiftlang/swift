@@ -341,6 +341,8 @@ public:
     }
     case static_cast<uint8_t>(DeclNameKind::Subscript):
       return {DeclBaseName::Kind::Subscript, StringRef()};
+    case static_cast<uint8_t>(DeclNameKind::Destructor):
+      return {DeclBaseName::Kind::Destructor, StringRef()};
     default:
       llvm_unreachable("Unknown DeclNameKind");
     }
@@ -1553,8 +1555,8 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   if (iter == ExtensionDecls->end())
     return;
 
-  if (nominal->hasAccessibility() &&
-      nominal->getEffectiveAccess() < Accessibility::Internal) {
+  if (nominal->hasAccess() &&
+      nominal->getEffectiveAccess() < AccessLevel::Internal) {
     if (nominal->getModuleScopeContext() != getFile())
       return;
   }
@@ -1562,15 +1564,27 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   if (nominal->getParent()->isModuleScopeContext()) {
     Identifier moduleName = nominal->getParentModule()->getName();
     for (auto item : *iter) {
-      if (item.first == moduleName.str())
-        (void)getDecl(item.second);
+      if (item.first != moduleName.str())
+        continue;
+      Expected<Decl *> declOrError = getDeclChecked(item.second);
+      if (!declOrError) {
+        if (!getContext().LangOpts.EnableDeserializationRecovery)
+          fatal(declOrError.takeError());
+        llvm::consumeError(declOrError.takeError());
+      }
     }
   } else {
     std::string mangledName =
         Mangle::ASTMangler().mangleNominalType(nominal);
     for (auto item : *iter) {
-      if (item.first == mangledName)
-        (void)getDecl(item.second);
+      if (item.first != mangledName)
+        continue;
+      Expected<Decl *> declOrError = getDeclChecked(item.second);
+      if (!declOrError) {
+        if (!getContext().LangOpts.EnableDeserializationRecovery)
+          fatal(declOrError.takeError());
+        llvm::consumeError(declOrError.takeError());
+      }
     }
   }
 }
@@ -1749,8 +1763,16 @@ void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
 
   if (ExtensionDecls) {
     for (auto entry : ExtensionDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
+      for (auto item : entry) {
+        Expected<Decl *> declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          llvm::consumeError(declOrError.takeError());
+          continue;
+        }
+        results.push_back(declOrError.get());
+      }
     }
   }
 }

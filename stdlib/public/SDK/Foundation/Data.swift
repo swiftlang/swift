@@ -1137,7 +1137,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
         @inline(__always)
         set {
-            precondition(count >= 0, "count must be positive")
+            precondition(count >= 0, "Count must be positive")
             if !isKnownUniquelyReferenced(&_backing) {
                 _backing = _backing.mutableCopy(_sliceRange)
             }
@@ -1181,7 +1181,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - warning: This method does not verify that the contents at pointer have enough space to hold `count` bytes.
     @inline(__always)
     public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, count: Int) {
-        precondition(count >= 0, "count of bytes to copy must be positive")
+        precondition(count >= 0, "Count of bytes to copy must be positive")
         if count == 0 { return }
         memcpy(UnsafeMutableRawPointer(pointer), _backing.bytes!.advanced(by: _sliceRange.lowerBound), Swift.min(count, _sliceRange.count))
     }
@@ -1302,7 +1302,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     @inline(__always)
     public mutating func append(_ bytes: UnsafePointer<UInt8>, count: Int) {
-        precondition(count >= 0, "count must be positive")
+        precondition(count >= 0, "Count must be positive")
         if count == 0 { return }
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
@@ -1827,27 +1827,11 @@ extension NSData : _HasCustomAnyHashableRepresentation {
 
 extension Data : Codable {
     public init(from decoder: Decoder) throws {
-        // FIXME: This is a hook for bypassing a conditional conformance implementation to apply a strategy (see SR-5206). Remove this once conditional conformance is available.
-        do {
-            let singleValueContainer = try decoder.singleValueContainer()
-            if let decoder = singleValueContainer as? _JSONDecoder {
-                switch decoder.options.dataDecodingStrategy {
-                case .deferredToData:
-                    break /* fall back to default implementation below; this would recurse */
-
-                default:
-                    // _JSONDecoder has a hook for Datas; this won't recurse since we're not going to defer back to Data in _JSONDecoder.
-                    self = try singleValueContainer.decode(Data.self)
-                    return
-                }
-            }
-        } catch { /* fall back to default implementation below */ }
-
         var container = try decoder.unkeyedContainer()
         
         // It's more efficient to pre-allocate the buffer if we can.
         if let count = container.count {
-            self = Data(count: count)
+            self.init(count: count)
             
             // Loop only until count, not while !container.isAtEnd, in case count is underestimated (this is misbehavior) and we haven't allocated enough space.
             // We don't want to write past the end of what we allocated.
@@ -1856,7 +1840,7 @@ extension Data : Codable {
                 self[i] = byte
             }
         } else {
-            self = Data()
+            self.init()
         }
         
         while !container.isAtEnd {
@@ -1866,21 +1850,6 @@ extension Data : Codable {
     }
     
     public func encode(to encoder: Encoder) throws {
-        // FIXME: This is a hook for bypassing a conditional conformance implementation to apply a strategy (see SR-5206). Remove this once conditional conformance is available.
-        // We are allowed to request this container as long as we don't encode anything through it when we need the unkeyed container below.
-        var singleValueContainer = encoder.singleValueContainer()
-        if let encoder = singleValueContainer as? _JSONEncoder {
-            switch encoder.options.dataEncodingStrategy {
-            case .deferredToData:
-                break /* fall back to default implementation below; this would recurse */
-
-            default:
-                // _JSONEncoder has a hook for Datas; this won't recurse since we're not going to defer back to Data in _JSONEncoder.
-                try singleValueContainer.encode(self)
-                return
-            }
-        }
-
         var container = encoder.unkeyedContainer()
         
         // Since enumerateBytes does not rethrow, we need to catch the error, stow it away, and rethrow if we stopped.

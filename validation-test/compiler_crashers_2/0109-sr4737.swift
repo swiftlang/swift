@@ -33,8 +33,8 @@ public struct _UIntBuffer<
   
   @inline(__always)
   public init(containing e: Element) {
-    _storage = Storage(extendingOrTruncating: e)
-    _bitCount = UInt8(extendingOrTruncating: Element.bitWidth)
+    _storage = Storage(truncatingIfNeeded: e)
+    _bitCount = UInt8(truncatingIfNeeded: Element.bitWidth)
   }
 }
 
@@ -51,7 +51,7 @@ extension _UIntBuffer : Sequence {
         _impl._storage = _impl._storage &>> Element.bitWidth
         _impl._bitCount = _impl._bitCount &- _impl._elementWidth
       }
-      return Element(extendingOrTruncating: _impl._storage)
+      return Element(truncatingIfNeeded: _impl._storage)
     }
     @_versioned
     var _impl: _UIntBuffer
@@ -74,7 +74,7 @@ extension _UIntBuffer : Sequence {
       var s: Storage = 0
       for x in self {
         s <<= Element.bitWidth
-        s |= Storage(extendingOrTruncating: x)
+        s |= Storage(truncatingIfNeeded: x)
       }
       return Self(_storage: s, _bitCount: _bitCount)
     }
@@ -116,13 +116,13 @@ extension _UIntBuffer : Collection {
 
   @_versioned
   internal var _elementWidth : UInt8 {
-    return UInt8(extendingOrTruncating: Element.bitWidth)
+    return UInt8(truncatingIfNeeded: Element.bitWidth)
   }
   
   public subscript(i: Index) -> Element {
     @inline(__always)
     get {
-      return Element(extendingOrTruncating: _storage &>> i.bitOffset)
+      return Element(truncatingIfNeeded: _storage &>> i.bitOffset)
     }
   }
 }
@@ -141,7 +141,7 @@ extension _UIntBuffer : RandomAccessCollection {
   @inline(__always)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     let x = IndexDistance(i.bitOffset) &+ n &* Element.bitWidth
-    return Index(bitOffset: UInt8(extendingOrTruncating: x))
+    return Index(bitOffset: UInt8(truncatingIfNeeded: x))
   }
 
   @inline(__always)
@@ -220,7 +220,7 @@ extension _UIntBuffer : RangeReplaceableCollection {
     _storage |= replacement1._storage &<< (headCount &* w)
     _storage |= tailBits &<< ((tailOffset &+ growth) &* w)
     _bitCount = UInt8(
-      extendingOrTruncating: IndexDistance(_bitCount) &+ growth &* w)
+      truncatingIfNeeded: IndexDistance(_bitCount) &+ growth &* w)
   }
 }
 //===----------------------------------------------------------------------===//
@@ -520,10 +520,10 @@ extension _UTFEncoding {
       }
       // Non-ASCII, proceed to buffering mode.
       buffer.append(codeUnit)
-    } else if Self._isScalar(CodeUnit(extendingOrTruncating: buffer._storage)) {
+    } else if Self._isScalar(CodeUnit(truncatingIfNeeded: buffer._storage)) {
       // ASCII in buffer.  We don't refill the buffer so we can return
       // to bufferless mode once we've exhausted it.
-      let codeUnit = CodeUnit(extendingOrTruncating: buffer._storage)
+      let codeUnit = CodeUnit(truncatingIfNeeded: buffer._storage)
       buffer.remove(at: buffer.startIndex)
       return (
           EncodedScalar(containing: codeUnit),
@@ -826,7 +826,7 @@ extension _UTF16Decoder {
   public // @testable
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(  // this case handled elsewhere
-      !Self._isScalar(UInt16(extendingOrTruncating: buffer._storage)))
+      !Self._isScalar(UInt16(truncatingIfNeeded: buffer._storage)))
     
     if _fastPath(buffer._storage & 0xFC00_FC00 == Self._surrogatePattern) {
       return (true, 2*16)

@@ -581,7 +581,7 @@ void CompilerInstance::performSema() {
         finishTypeChecking(*SF);
 }
 
-void CompilerInstance::performParseOnly() {
+void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   const InputFileKind Kind = Invocation.getInputKind();
   ModuleDecl *MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
@@ -608,6 +608,7 @@ void CompilerInstance::performParseOnly() {
   }
 
   PersistentParserState PersistentState;
+  PersistentState.PerformConditionEvaluation = EvaluateConditionals;
   // Parse all the library files.
   for (auto BufferID : BufferIDs) {
     if (BufferID == MainBufferID)

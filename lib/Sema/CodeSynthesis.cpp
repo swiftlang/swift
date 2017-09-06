@@ -166,7 +166,7 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
   getter->setImplicit();
 
   if (storage->isGetterMutating())
-    getter->setMutating();
+    getter->setSelfAccessKind(SelfAccessKind::Mutating);
 
   if (storage->isStatic())
     getter->setStatic();
@@ -213,7 +213,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   setter->setImplicit();
 
   if (isMutating)
-    setter->setMutating();
+    setter->setSelfAccessKind(SelfAccessKind::Mutating);
 
   if (isStatic)
     setter->setStatic();
@@ -340,10 +340,10 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   // Open-code the setMutating() calculation since we might run before
   // the setter has been type checked.
   Type contextTy = DC->getDeclaredInterfaceType();
-  materializeForSet->setMutating(
-      contextTy && !contextTy->hasReferenceSemantics() &&
+  if (contextTy && !contextTy->hasReferenceSemantics() &&
       !setter->getAttrs().hasAttribute<NonMutatingAttr>() &&
-      !storage->isSetterNonMutating());
+      !storage->isSetterNonMutating())
+    materializeForSet->setSelfAccessKind(SelfAccessKind::Mutating);
 
   materializeForSet->setStatic(storage->isStatic());
 
@@ -454,7 +454,7 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
   return result;
 }
 
-enum class SelfAccessKind {
+enum class SelfAccessorKind {
   /// We're building a derived accessor on top of whatever this
   /// class provides.
   Peer,
@@ -466,13 +466,13 @@ enum class SelfAccessKind {
 };
 
 static Expr *buildSelfReference(VarDecl *selfDecl,
-                                SelfAccessKind selfAccessKind,
+                                SelfAccessorKind selfAccessorKind,
                                 TypeChecker &TC) {
-  switch (selfAccessKind) {
-  case SelfAccessKind::Peer:
+  switch (selfAccessorKind) {
+  case SelfAccessorKind::Peer:
     return new (TC.Context) DeclRefExpr(selfDecl, DeclNameLoc(), IsImplicit);
 
-  case SelfAccessKind::Super:
+  case SelfAccessorKind::Super:
     return new (TC.Context) SuperRefExpr(selfDecl, SourceLoc(), IsImplicit);
   }
   llvm_unreachable("bad self access kind");
@@ -518,7 +518,7 @@ static Expr *buildStorageReference(
                              const StorageReferenceContext &referenceContext,
                                    AbstractStorageDecl *storage,
                                    AccessSemantics semantics,
-                                   SelfAccessKind selfAccessKind,
+                                   SelfAccessorKind selfAccessorKind,
                                    TypeChecker &TC) {
   ASTContext &ctx = TC.Context;
 
@@ -529,16 +529,16 @@ static Expr *buildStorageReference(
 
   // If we should use a super access if applicable, and we have an
   // overridden decl, then use ordinary access to it.
-  if (selfAccessKind == SelfAccessKind::Super) {
+  if (selfAccessorKind == SelfAccessorKind::Super) {
     if (auto overridden = storage->getOverriddenDecl()) {
       storage = overridden;
       semantics = AccessSemantics::Ordinary;
     } else {
-      selfAccessKind = SelfAccessKind::Peer;
+      selfAccessorKind = SelfAccessorKind::Peer;
     }
   }
 
-  Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, TC);
+  Expr *selfDRE = buildSelfReference(selfDecl, selfAccessorKind, TC);
 
   if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
     Expr *indices = referenceContext.getIndexRefExpr(ctx, subscript);
@@ -556,10 +556,10 @@ static Expr *buildStorageReference(
 static Expr *buildStorageReference(FuncDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    AccessSemantics semantics,
-                                   SelfAccessKind selfAccessKind,
+                                   SelfAccessorKind selfAccessorKind,
                                    TypeChecker &TC) {
   return buildStorageReference(AccessorStorageReferenceContext(accessor),
-                               storage, semantics, selfAccessKind, TC);
+                               storage, semantics, selfAccessorKind, TC);
 }
 
 /// Load the value of VD.  If VD is an @override of another value, we call the
@@ -569,7 +569,7 @@ static Expr *createPropertyLoadOrCallSuperclassGetter(FuncDecl *accessor,
                                                       TypeChecker &TC) {
   return buildStorageReference(accessor, storage,
                                AccessSemantics::DirectToStorage,
-                               SelfAccessKind::Super, TC);
+                               SelfAccessorKind::Super, TC);
 }
 
 /// Look up the NSCopying protocol from the Foundation module, if present.
@@ -686,7 +686,7 @@ static void createPropertyStoreOrCallSuperclassSetter(FuncDecl *accessor,
   //   (assign (member_ref_expr(decl_ref_expr(self), VD)), decl_ref_expr(value))
   Expr *dest = buildStorageReference(accessor, storage,
                                      AccessSemantics::DirectToStorage,
-                                     SelfAccessKind::Super, TC);
+                                     SelfAccessorKind::Super, TC);
 
   body.push_back(new (TC.Context) AssignExpr(dest, SourceLoc(), value,
                                              IsImplicit));
@@ -706,8 +706,6 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
 
   SourceLoc loc = storage->getLoc();
   getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc, true));
-
-  maybeMarkTransparent(getter, storage, TC);
 
   // Record the getter as an override, which can happen with addressors.
   if (auto *baseASD = storage->getOverriddenDecl())
@@ -732,8 +730,6 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
   createPropertyStoreOrCallSuperclassSetter(setter, valueDRE, storage,
                                             setterBody, TC);
   setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc, true));
-
-  maybeMarkTransparent(setter, storage, TC);
 
   // Record the setter as an override, which can happen with addressors.
   if (auto *baseASD = storage->getOverriddenDecl()) {
@@ -800,10 +796,12 @@ static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
   // Synthesize the body of the getter.
   synthesizeTrivialGetter(getter, storage, TC);
+  maybeMarkTransparent(getter, storage, TC);
 
   if (setter) {
     // Synthesize the body of the setter.
     synthesizeTrivialSetter(setter, storage, setterValueParam, TC);
+    maybeMarkTransparent(setter, storage, TC);
   }
 
   // We've added some members to our containing context, add them to
@@ -829,6 +827,7 @@ synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
   // Synthesize the body of the setter.
   VarDecl *valueParamDecl = getFirstParamDecl(setter);
   synthesizeTrivialSetter(setter, storage, valueParamDecl, TC);
+  maybeMarkTransparent(setter, storage, TC);
 }
 
 /// Add a materializeForSet accessor to the given declaration.
@@ -928,6 +927,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   // a call of a superclass getter if this is an override.
   auto *Get = VD->getGetter();
   synthesizeTrivialGetter(Get, VD, TC);
+  maybeMarkTransparent(Get, VD, TC);
 
   // Okay, the getter is done, create the setter now.  Start by finding the
   // decls for 'self' and 'value'.
@@ -1199,8 +1199,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     makeFinal(Context, Storage);
   Storage->setImplicit();
-  Storage->setAccessibility(Accessibility::Private);
-  Storage->setSetterAccessibility(Accessibility::Private);
+  Storage->setAccess(AccessLevel::Private);
+  Storage->setSetterAccess(AccessLevel::Private);
   
   addMemberToContextIfNeeded(Storage, DC);
   
@@ -1406,7 +1406,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   if (DC->getAsClassOrClassExtensionContext())
     makeFinal(Context, Parameter);
   Parameter->setImplicit();
-  Parameter->setAccessibility(Accessibility::Private);
+  Parameter->setAccess(AccessLevel::Private);
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the parameter function.
@@ -1623,8 +1623,8 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     makeFinal(Context, Storage);
   Storage->setImplicit();
-  Storage->setAccessibility(Accessibility::Private);
-  Storage->setSetterAccessibility(Accessibility::Private);
+  Storage->setAccess(AccessLevel::Private);
+  Storage->setSetterAccess(AccessLevel::Private);
 }
 
 /// Consider add a materializeForSet accessor to the given storage
@@ -1691,28 +1691,30 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
         getter = createGetterPrototype(var, TC);
         // The getter is mutating if the behavior implementation is, unless
         // we're in a class or non-instance context.
-        getter->setMutating(mightBeMutating &&
-                            valueProp->getGetter()->isMutating());
-        getter->setAccessibility(var->getFormalAccess());
-        
+        if (mightBeMutating && valueProp->getGetter()->isMutating())
+          getter->setSelfAccessKind(SelfAccessKind::Mutating);
+
+        getter->setAccess(var->getFormalAccess());
+
         // Make a setter if the behavior property has one.
         if (auto valueSetter = valueProp->getSetter()) {
           ParamDecl *newValueParam = nullptr;
           setter = createSetterPrototype(var, newValueParam, TC);
-          setter->setMutating(mightBeMutating && valueSetter->isMutating());
+          if (mightBeMutating && valueSetter->isMutating())
+            setter->setSelfAccessKind(SelfAccessKind::Mutating);
           // TODO: max of property and implementation setter visibility?
-          setter->setAccessibility(var->getFormalAccess());
+          setter->setAccess(var->getFormalAccess());
         }
       } else {
         // Even if we couldn't find a value property, still make up a stub
         // getter and setter, so that subsequent diagnostics make sense for a
         // computed-ish property.
         getter = createGetterPrototype(var, TC);
-        getter->setAccessibility(var->getFormalAccess());
+        getter->setAccess(var->getFormalAccess());
         ParamDecl *newValueParam = nullptr;
         setter = createSetterPrototype(var, newValueParam, TC);
-        setter->setMutating(false);
-        setter->setAccessibility(var->getFormalAccess());
+        setter->setSelfAccessKind(SelfAccessKind::NonMutating);
+        setter->setAccess(var->getFormalAccess());
       }
       
       var->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
@@ -1809,8 +1811,8 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     auto *getter = createGetterPrototype(var, TC);
     // lazy getters are mutating on an enclosing value type.
     if (!dc->getAsClassOrClassExtensionContext())
-      getter->setMutating();
-    getter->setAccessibility(var->getFormalAccess());
+      getter->setSelfAccessKind(SelfAccessKind::Mutating);
+    getter->setAccess(var->getFormalAccess());
 
     ParamDecl *newValueParam = nullptr;
     auto *setter = createSetterPrototype(var, newValueParam, TC);
@@ -1890,7 +1892,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
                                                   ImplicitConstructorKind ICK) {
   ASTContext &context = tc.Context;
   SourceLoc Loc = decl->getLoc();
-  auto accessLevel = Accessibility::Internal;
+  auto accessLevel = AccessLevel::Internal;
   if (decl->hasClangNode())
     accessLevel = std::max(accessLevel, decl->getFormalAccess());
 
@@ -1954,7 +1956,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 
   // Mark implicit.
   ctor->setImplicit();
-  ctor->setAccessibility(accessLevel);
+  ctor->setAccess(accessLevel);
 
   if (ICK == ImplicitConstructorKind::Memberwise)
     ctor->setIsMemberwiseInitializer();
@@ -2094,10 +2096,10 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   ctor->setImplicit();
 
-  Accessibility access = classDecl->getFormalAccess();
-  access = std::max(access, Accessibility::Internal);
+  AccessLevel access = classDecl->getFormalAccess();
+  access = std::max(access, AccessLevel::Internal);
   access = std::min(access, superclassCtor->getFormalAccess());
-  ctor->setAccessibility(access);
+  ctor->setAccess(access);
 
   // Make sure the constructor is only as available as its superclass's
   // constructor.
@@ -2185,8 +2187,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
 
   auto *selfDecl = ParamDecl::createSelf(CD->getLoc(), CD);
 
-  auto *DD = new (Context) DestructorDecl(Context.Id_deinit, CD->getLoc(),
-                                          selfDecl, CD);
+  auto *DD = new (Context) DestructorDecl(CD->getLoc(), selfDecl, CD);
 
   DD->setImplicit();
 

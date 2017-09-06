@@ -34,6 +34,7 @@ class SILBasicBlock :
 public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
   friend class SILSuccessor;
   friend class SILFunction;
+  friend class SILGlobalVariable;
 public:
   using InstListType = llvm::iplist<SILInstruction>;
 private:
@@ -352,6 +353,11 @@ public:
 
   /// Returns true if this instruction only contains a branch instruction.
   bool isTrampoline() const;
+
+  /// Returns true if it is legal to hoist instructions into this block.
+  ///
+  /// Used by llvm::LoopInfo.
+  bool isLegalToHoistInto() const;
 
   //===--------------------------------------------------------------------===//
   // Debugging

@@ -125,14 +125,14 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
                                       LazyResolver *TypeResolver) {
   if (TypeResolver) {
     TypeResolver->resolveDeclSignature(Member);
-    TypeResolver->resolveAccessibility(Member);
+    TypeResolver->resolveAccessControl(Member);
   }
 
-  // Check accessibility when relevant.
+  // Check access when relevant.
   if (!Member->getDeclContext()->isLocalContext() &&
       !isa<GenericTypeParamDecl>(Member) && !isa<ParamDecl>(Member) &&
       FromContext->getASTContext().LangOpts.EnableAccessControl) {
-    if (Member->isInvalid() && !Member->hasAccessibility())
+    if (Member->isInvalid() && !Member->hasAccess())
       return false;
     if (!Member->isAccessibleFrom(FromContext))
       return false;
@@ -745,7 +745,7 @@ public:
 
     if (TypeResolver) {
       TypeResolver->resolveDeclSignature(VD);
-      TypeResolver->resolveAccessibility(VD);
+      TypeResolver->resolveAccessControl(VD);
     }
 
     if (VD->isInvalid()) {
@@ -885,7 +885,6 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
   // and if so, whether this is a reference to one of them.
   while (!DC->isModuleScopeContext()) {
     const ValueDecl *BaseDecl = nullptr;
-    GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
     auto LS = LookupState::makeUnqualified();
 
@@ -894,6 +893,8 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       DC = DC->getParent();
       LS = LS.withOnMetatype();
     }
+
+    GenericParamList *GenericParams = DC->getGenericParamsOfContext();
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
       // Look for local variables; normally, the parser resolves these
@@ -922,9 +923,6 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
           if (FD->isStatic())
             ExtendedType = MetatypeType::get(ExtendedType);
       }
-
-      // Look in the generic parameters after checking our local declaration.
-      GenericParams = AFD->getGenericParams();
     } else if (auto CE = dyn_cast<ClosureExpr>(DC)) {
       if (Loc.isValid()) {
         namelookup::FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());

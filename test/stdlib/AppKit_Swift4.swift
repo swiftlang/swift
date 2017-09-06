@@ -94,4 +94,15 @@ AppKitTests.test("NSRectFills") {
   expectEqual(bitmapImage.colorAt(x: 2, y: 2), blue)
 }
 
+AppKitTests.test("NSColor.Literals") {
+  if #available(macOS 10.12, *) {
+    // Color literal in the extended sRGB color space.
+    let c1 = #colorLiteral(red: 1.358, green: -0.074, blue: -0.012, alpha: 1.0)
+    
+    var printedC1 = ""
+    print(c1, to: &printedC1)
+    expectTrue(printedC1.contains("extended"))
+  }
+}
+
 runAllTests()

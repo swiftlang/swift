@@ -502,18 +502,18 @@ public:
   ExistentialInitialization(SILValue existential, SILValue address,
                             CanType concreteFormalType,
                             ExistentialRepresentation repr,
-                            SILGenFunction &gen)
+                            SILGenFunction &SGF)
       : KnownAddressInitialization(address) {
     // Any early exit before we store a value into the existential must
     // clean up the existential container.
-    Cleanup = gen.enterDeinitExistentialCleanup(existential,
+    Cleanup = SGF.enterDeinitExistentialCleanup(existential,
                                                 concreteFormalType,
                                                 repr);
   }
 
-  void finishInitialization(SILGenFunction &gen) override {
-    SingleBufferInitialization::finishInitialization(gen);
-    gen.Cleanups.setCleanupState(Cleanup, CleanupState::Dead);
+  void finishInitialization(SILGenFunction &SGF) override {
+    SingleBufferInitialization::finishInitialization(SGF);
+    SGF.Cleanups.setCleanupState(Cleanup, CleanupState::Dead);
   }
 };
 
@@ -745,10 +745,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       // opaque values mode: This is a case of an opaque value that we can
       // "treat" as a by-value one
       ManagedValue sub = F(SGFContext());
-      SILValue v = B.createInitExistentialValue(
+      return B.createInitExistentialValue(
           loc, existentialTL.getLoweredType(), concreteFormalType,
-          sub.getValue(), conformances);
-      return ManagedValue(v, sub.getCleanup());
+          sub, conformances);
     }
 
     // Allocate the existential.
@@ -846,7 +845,10 @@ SILGenFunction::emitOpenExistential(
   SILType existentialType = existentialValue.getType();
   switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
   case ExistentialRepresentation::Opaque: {
-    SILValue archetypeValue;
+    // With CoW existentials we can't consume the boxed value inside of
+    // the existential. (We could only do so after a uniqueness check on
+    // the box holding the value).
+    canConsume = false;
     if (existentialType.isAddress()) {
       OpenedExistentialAccess allowedAccess =
           getOpenedExistentialAccessFor(accessKind);
@@ -856,24 +858,14 @@ SILGenFunction::emitOpenExistential(
                "value mode");
         loweredOpenedType = loweredOpenedType.getAddressType();
       }
-      archetypeValue =
-          B.createOpenExistentialAddr(loc, existentialValue.forward(*this),
-                                      loweredOpenedType, allowedAccess);
-    } else {
-      archetypeValue = B.createOpenExistentialValue(
-          loc, existentialValue.forward(*this), loweredOpenedType);
-    }
-
-    if (existentialValue.hasCleanup()) {
-      // With CoW existentials we can't consume the boxed value inside of
-      // the existential. (We could only do so after a uniqueness check on
-      // the box holding the value).
-      canConsume = false;
-      enterDestroyCleanup(existentialValue.getValue());
+      SILValue archetypeValue =
+        B.createOpenExistentialAddr(loc, existentialValue.getValue(),
+                                    loweredOpenedType, allowedAccess);
       archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
     } else {
-      canConsume = false;
-      archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
+      // borrow the existential and return an unmanaged opened value.
+      archetypeMV = getBuilder().createOpenExistentialValue(
+          loc, existentialValue, loweredOpenedType);
     }
     break;
   }
@@ -913,9 +905,8 @@ SILGenFunction::emitOpenExistential(
                                    loweredOpenedType));
     } else {
       assert(!silConv.useLoweredAddresses());
-      archetypeMV = ManagedValue::forUnmanaged(
-        B.createOpenExistentialBoxValue(loc, existentialValue.getValue(),
-                                        loweredOpenedType));
+      archetypeMV = getBuilder().createOpenExistentialBoxValue(
+        loc, existentialValue, loweredOpenedType);
     }
     // NB: Don't forward the cleanup, because consuming a boxed value won't
     // consume the box reference.

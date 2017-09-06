@@ -65,7 +65,7 @@ public:
   SourceLoc getEndLocForDecl(const Decl *D) const;
   SourceLoc getEndLocForStmt(const Stmt *S) const;
   SourceLoc getEndLocForExpr(const Expr *E) const;
-  RC<SyntaxData> getUnknownSyntax(SourceRange SR);
+  RC<SyntaxData> getUnknownSyntax(SourceRange SR, SyntaxKind Kind);
   RC<SyntaxData> getAttributesFromDecl(Decl *D);
   RC<SyntaxData> getUnknownDecl(Decl *D);
   RC<SyntaxData> getUnknownStmt(Stmt *S);

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -8,7 +8,7 @@ import ansible
 class Hoozit : Gizmo {
   @objc func typical(_ x: Int, y: Gizmo) -> Gizmo { return y }
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC7typicalSo5GizmoCSi_AF1ytFTo : $@convention(objc_method) (Int, Gizmo, Hoozit) -> @autoreleased Gizmo {
-  // CHECK: bb0([[X:%.*]] : $Int, [[Y:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[X:%.*]] : @trivial $Int, [[Y:%.*]] : @unowned $Gizmo, [[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[Y_COPY:%.*]] = copy_value [[Y]]
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
@@ -23,7 +23,7 @@ class Hoozit : Gizmo {
   // NS_CONSUMES_SELF by inheritance
   override func fork() { }
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC4forkyyFTo : $@convention(objc_method) (@owned Hoozit) -> () {
-  // CHECK: bb0([[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[THIS:%.*]] : @owned $Hoozit):
   // CHECK-NEXT:   [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_T011objc_thunks6HoozitC4forkyyF : $@convention(method) (@guaranteed Hoozit) -> ()
@@ -36,7 +36,7 @@ class Hoozit : Gizmo {
   // NS_CONSUMED 'gizmo' argument by inheritance
   override class func consume(_ gizmo: Gizmo?) { }
    // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC7consumeySo5GizmoCSgFZTo : $@convention(objc_method) (@owned Optional<Gizmo>, @objc_metatype Hoozit.Type) -> () {
-  // CHECK: bb0([[GIZMO:%.*]] : $Optional<Gizmo>, [[THIS:%.*]] : $@objc_metatype Hoozit.Type):
+  // CHECK: bb0([[GIZMO:%.*]] : @owned $Optional<Gizmo>, [[THIS:%.*]] : @trivial $@objc_metatype Hoozit.Type):
   // CHECK-NEXT: [[THICK_THIS:%[0-9]+]] = objc_to_thick_metatype [[THIS]] : $@objc_metatype Hoozit.Type to $@thick Hoozit.Type
   // CHECK:   [[NATIVE:%.*]] = function_ref @_T011objc_thunks6HoozitC7consumeySo5GizmoCSgFZ : $@convention(method) (@owned Optional<Gizmo>, @thick Hoozit.Type) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[GIZMO]], [[THICK_THIS]])
@@ -46,7 +46,7 @@ class Hoozit : Gizmo {
   // NS_RETURNS_RETAINED by family (-copy)
   @objc func copyFoo() -> Gizmo { return self }
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC7copyFooSo5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo
-  // CHECK: bb0([[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK-NEXT:   // function_ref
@@ -61,7 +61,7 @@ class Hoozit : Gizmo {
   // returning at +0.
   @objc func initFoo() -> Gizmo { return self }
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC7initFooSo5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo
-  // CHECK: bb0([[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK-NEXT:   // function_ref
@@ -75,7 +75,7 @@ class Hoozit : Gizmo {
   @objc var typicalProperty: Gizmo
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC15typicalPropertySo5GizmoCfgTo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
-  // CHECK: bb0([[SELF:%.*]] : $Hoozit):
+  // CHECK: bb0([[SELF:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK-NEXT:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.typicalProperty.getter
@@ -87,7 +87,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
   
   // CHECK-LABEL: sil hidden @_T011objc_thunks6HoozitC15typicalPropertySo5GizmoCfg : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
-  // CHECK: bb0(%0 : $Hoozit):
+  // CHECK: bb0(%0 : @guaranteed $Hoozit):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.typicalProperty
   // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*Gizmo
@@ -97,7 +97,7 @@ class Hoozit : Gizmo {
 
   // -- setter
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC15typicalPropertySo5GizmoCfsTo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
-  // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[VALUE:%.*]] : @unowned $Gizmo, [[THIS:%.*]] : @unowned $Hoozit):
   // CHECK:   [[VALUE_COPY:%.*]] = copy_value [[VALUE]] : $Gizmo
   // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]] : $Hoozit
   // CHECK:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
@@ -110,7 +110,7 @@ class Hoozit : Gizmo {
   // CHECK: } // end sil function '_T011objc_thunks6HoozitC15typicalPropertySo5GizmoCfsTo'
 
   // CHECK-LABEL: sil hidden @_T011objc_thunks6HoozitC15typicalPropertySo5GizmoCfs
-  // CHECK: bb0([[ARG0:%.*]] : $Gizmo, [[ARG1:%.*]] : $Hoozit):
+  // CHECK: bb0([[ARG0:%.*]] : @owned $Gizmo, [[ARG1:%.*]] : @guaranteed $Hoozit):
   // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
   // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[BORROWED_ARG0]]
   // CHECK:   [[ADDR:%.*]] = ref_element_addr [[ARG1]] : {{.*}}, #Hoozit.typicalProperty
@@ -125,7 +125,7 @@ class Hoozit : Gizmo {
   @objc var copyProperty: Gizmo
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC12copyPropertySo5GizmoCfgTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo {
-  // CHECK: bb0([[SELF:%.*]] : $Hoozit):
+  // CHECK: bb0([[SELF:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK-NEXT:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.copyProperty.getter
@@ -137,7 +137,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
 
   // CHECK-LABEL: sil hidden @_T011objc_thunks6HoozitC12copyPropertySo5GizmoCfg
-  // CHECK: bb0(%0 : $Hoozit):
+  // CHECK: bb0(%0 : @guaranteed $Hoozit):
   // CHECK:        [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.copyProperty
   // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = load [copy] [[READ]]
@@ -146,7 +146,7 @@ class Hoozit : Gizmo {
 
   // -- setter is normal
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC12copyPropertySo5GizmoCfsTo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
-  // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[VALUE:%.*]] : @unowned $Gizmo, [[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
@@ -158,7 +158,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   return [[RES]]
 
   // CHECK-LABEL: sil hidden @_T011objc_thunks6HoozitC12copyPropertySo5GizmoCfs
-  // CHECK: bb0([[ARG1:%.*]] : $Gizmo, [[SELF:%.*]] : $Hoozit):
+  // CHECK: bb0([[ARG1:%.*]] : @owned $Gizmo, [[SELF:%.*]] : @guaranteed $Hoozit):
   // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
   // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
   // CHECK:   [[ADDR:%.*]] = ref_element_addr [[SELF]] : {{.*}}, #Hoozit.copyProperty
@@ -172,7 +172,7 @@ class Hoozit : Gizmo {
   @objc var roProperty: Gizmo { return self }
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC10roPropertySo5GizmoCfgTo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
-  // CHECK: bb0([[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK-NEXT:   // function_ref
@@ -197,7 +197,7 @@ class Hoozit : Gizmo {
 
   // -- setter
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC10rwPropertySo5GizmoCfsTo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
-  // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[VALUE:%.*]] : @unowned $Gizmo, [[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
@@ -217,7 +217,7 @@ class Hoozit : Gizmo {
   }
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC14copyRWPropertySo5GizmoCfgTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo {
-  // CHECK: bb0([[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK-NEXT:   // function_ref
@@ -231,7 +231,7 @@ class Hoozit : Gizmo {
 
   // -- setter is normal
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC14copyRWPropertySo5GizmoCfsTo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
-  // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[VALUE:%.*]] : @unowned $Gizmo, [[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
@@ -246,7 +246,7 @@ class Hoozit : Gizmo {
   @objc var initProperty: Gizmo
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC12initPropertySo5GizmoCfgTo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
-  // CHECK: bb0([[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK-NEXT:   // function_ref
@@ -259,7 +259,7 @@ class Hoozit : Gizmo {
 
   // -- setter
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC12initPropertySo5GizmoCfsTo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
-  // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[VALUE:%.*]] : @unowned $Gizmo, [[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
@@ -277,7 +277,7 @@ class Hoozit : Gizmo {
   }
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC12propComputedSo5GizmoCfgTo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
-  // CHECK: bb0([[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK-NEXT:   // function_ref
@@ -290,7 +290,7 @@ class Hoozit : Gizmo {
 
   // -- setter
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC12propComputedSo5GizmoCfsTo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
-  // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[VALUE:%.*]] : @unowned $Gizmo, [[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
@@ -329,7 +329,7 @@ class Hoozit : Gizmo {
   @objc subscript (i: Int) -> Hoozit {
   // Getter
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC9subscriptACSicfgTo : $@convention(objc_method) (Int, Hoozit) -> @autoreleased Hoozit
-  // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $Hoozit):
+  // CHECK: bb0([[I:%[0-9]+]] : @trivial $Int, [[SELF:%[0-9]+]] : @unowned $Hoozit):
   // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Hoozit
   // CHECK-NEXT: [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT: // function_ref
@@ -344,7 +344,7 @@ class Hoozit : Gizmo {
 
   // Setter
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC9subscriptACSicfsTo : $@convention(objc_method) (Hoozit, Int, Hoozit) -> ()
-  // CHECK: bb0([[VALUE:%[0-9]+]] : $Hoozit, [[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $Hoozit):
+  // CHECK: bb0([[VALUE:%[0-9]+]] : @unowned $Hoozit, [[I:%[0-9]+]] : @trivial $Int, [[SELF:%[0-9]+]] : @unowned $Hoozit):
   // CHECK:   [[VALUE_COPY:%.*]] = copy_value [[VALUE]] : $Hoozit
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Hoozit
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -360,7 +360,7 @@ class Hoozit : Gizmo {
 
 class Wotsit<T> : Gizmo {
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6WotsitC5plainyyFTo : $@convention(objc_method) <T> (Wotsit<T>) -> () {
-  // CHECK: bb0([[SELF:%.*]] : $Wotsit<T>):
+  // CHECK: bb0([[SELF:%.*]] : @unowned $Wotsit<T>):
   // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Wotsit<T>
   // CHECK-NEXT: [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT: // function_ref
@@ -382,7 +382,7 @@ class Wotsit<T> : Gizmo {
   }
 
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6WotsitC11descriptionSSfgTo : $@convention(objc_method) <T> (Wotsit<T>) -> @autoreleased NSString {
-  // CHECK: bb0([[SELF:%.*]] : $Wotsit<T>):
+  // CHECK: bb0([[SELF:%.*]] : @unowned $Wotsit<T>):
   // CHECK-NEXT:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Wotsit<T>
   // CHECK-NEXT:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT:   // function_ref
@@ -427,7 +427,9 @@ extension Hoozit {
     // CHECK: [[CTOR:%[0-9]+]] = class_method [volatile] [[SELF:%[0-9]+]] : $Hoozit, #Hoozit.init!initializer.1.foreign : (Hoozit.Type) -> (Int) -> Hoozit, $@convention(objc_method) (Int, @owned Hoozit) -> @owned Hoozit
     // CHECK: [[NEW_SELF:%[0-9]+]] = apply [[CTOR]]
     // CHECK: store [[NEW_SELF]] to [init] [[PB_BOX]] : $*Hoozit
-    // CHECK: [[NONNULL:%[0-9]+]] = is_nonnull [[NEW_SELF]] : $Hoozit
+    // CHECK: [[RELOADED_SELF:%.*]] = load_borrow [[PB_BOX]]
+    // CHECK: [[NONNULL:%[0-9]+]] = is_nonnull [[RELOADED_SELF]] : $Hoozit
+    // CHECK: end_borrow [[RELOADED_SELF]] from [[PB_BOX]]
     // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
     // CHECK: [[NULL_BB]]:
     // CHECK-NEXT: destroy_value [[X_BOX]] : ${ var X }
@@ -483,7 +485,7 @@ class X { }
 
 // CHECK-LABEL: sil hidden @_T011objc_thunks8propertySiSo5GizmoCF
 func property(_ g: Gizmo) -> Int {
-  // CHECK: bb0([[ARG:%.*]] : $Gizmo):
+  // CHECK: bb0([[ARG:%.*]] : @owned $Gizmo):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.count!getter.1.foreign
   return g.count
@@ -491,7 +493,7 @@ func property(_ g: Gizmo) -> Int {
 
 // CHECK-LABEL: sil hidden @_T011objc_thunks13blockPropertyySo5GizmoCF
 func blockProperty(_ g: Gizmo) {
-  // CHECK: bb0([[ARG:%.*]] : $Gizmo):
+  // CHECK: bb0([[ARG:%.*]] : @owned $Gizmo):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.block!setter.1.foreign
   g.block = { }

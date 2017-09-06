@@ -157,7 +157,6 @@ SILLinkage getSpecializedLinkage(SILFunction *F, SILLinkage L);
 /// string literals. Returns a new instruction if optimization was possible.
 SILInstruction *tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B);
 
-
 /// Tries to perform jump-threading on all checked_cast_br instruction in
 /// function \p Fn.
 bool tryCheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
@@ -200,32 +199,6 @@ tryDeleteDeadClosure(SILInstruction *Closure,
 void releasePartialApplyCapturedArg(
     SILBuilder &Builder, SILLocation Loc, SILValue Arg, SILParameterInfo PInfo,
     InstModCallbacks Callbacks = InstModCallbacks());
-
-/// A utility for finding dead-end blocks.
-///
-/// Dead-end blocks are blocks from which there is no path to the function exit
-/// (either return or throw). These are blocks which end with an unreachable
-/// instruction and blocks from which all paths end in "unreachable" blocks.
-class DeadEndBlocks {
-  llvm::SetVector<SILBasicBlock *> ReachableBlocks;
-  SILFunction *F;
-  bool isComputed = false;
-
-  void compute();
-
-public:
-  DeadEndBlocks(SILFunction *F) : F(F) {}
-
-  /// Returns true if \p BB is a dead-end block.
-  bool isDeadEnd(SILBasicBlock *BB) {
-    if (!isComputed) {
-      // Lazily compute the dataflow.
-      compute();
-      isComputed = true;
-    }
-    return ReachableBlocks.count(BB) == 0;
-  }
-};
 
 /// This computes the lifetime of a single SILValue.
 ///
@@ -688,6 +661,10 @@ ignore_expect_uses(ValueBase *V) {
 /// aggregate and reforming it, the reformed aggregate may have extract
 /// operations from it. These can be simplified and removed.
 bool simplifyUsers(SILInstruction *I);
+
+///  True if a type can be expanded
+/// without a significant increase to code size.
+bool shouldExpand(SILModule &Module, SILType Ty);
 
 /// Check if a given type is a simple type, i.e. a builtin
 /// integer or floating point type or a struct/tuple whose members

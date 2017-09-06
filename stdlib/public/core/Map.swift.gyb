@@ -285,23 +285,6 @@ extension LazyCollectionProtocol
 
 % end
 
-@available(*, unavailable, renamed: "LazyMapIterator")
-public struct LazyMapGenerator<Base : IteratorProtocol, Element> {}
-
-extension LazyMapSequence {
-  @available(*, unavailable, message: "use '.lazy.map' on the sequence")
-  public init(_ base: Base, transform: (Base.Element) -> Element) {
-    Builtin.unreachable()
-  }
-}
-
-extension LazyMapCollection {
-  @available(*, unavailable, message: "use '.lazy.map' on the collection")
-  public init(_ base: Base, transform: (Base.Element) -> Element) {
-    Builtin.unreachable()
-  }
-}
-
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

@@ -756,6 +756,10 @@ static bool isConstantValue(SILValue V) {
     }
     return true;
   }
+  if (auto *MT = dyn_cast<MetatypeInst>(V)) {
+    if (!MT->getType().hasArchetype())
+      return true;
+  }
   return false;
 }
 

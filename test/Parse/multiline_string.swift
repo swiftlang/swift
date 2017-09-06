@@ -83,6 +83,11 @@ _ = """
 // CHECK: "\\"
 
 _ = """
+  \\
+  """
+// CHECK: "\\"
+
+_ = """
 
   ABC
   """
@@ -107,6 +112,51 @@ _ = """
 	Nu
 	"""
 // CHECK: "Twelve\nNu"
+
+_ = """
+  newline \
+  elided
+  """
+// CHECK: "newline elided"
+
+// contains trailing whitepsace
+_ = """
+  trailing \
+  \("""
+    substring1 \
+    \("""
+      substring2 \          
+      substring3
+      """)
+    """) \
+  whitepsace
+  """
+// CHECK: "trailing "
+// CHECK: "substring1 "
+// CHECK: "substring2 substring3"
+// CHECK: " whitepsace"
+
+// contains trailing whitepsace
+_ = """
+    foo\ 
+
+    bar
+    """
+// CHECK: "foo\nbar"
+
+// contains trailing whitepsace
+_ = """
+    foo\ 
+    
+    bar
+    """
+// CHECK: "foo\nbar"
+
+_ = """
+    foo \
+      bar
+    """
+// CHECK: "foo   bar"
 
 _ = """
 

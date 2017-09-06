@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t && mkdir %t
 // RUN: %target-build-swift %s -o %t/a.out3 -swift-version 3 && %target-run %t/a.out3
 // RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-run %t/a.out4
 // REQUIRES: executable_test
@@ -39,6 +39,17 @@ if #available(iOS 11.0, *) {
     }
     else {
       expectUnreachable()
+    }
+  }
+
+  IntentsTestSuite.test("INSetProfileInCarIntent/defaultProfile availability/\(swiftVersion)") {
+    func f(profile: INSetProfileInCarIntent) {
+      var isDefaultProfile = profile.isDefaultProfile
+      expectType(Bool?.self, &isDefaultProfile)
+#if !swift(>=4)
+      var defaultProfile = profile.defaultProfile
+      expectType(Int?.self, &defaultProfile)
+#endif
     }
   }
 }

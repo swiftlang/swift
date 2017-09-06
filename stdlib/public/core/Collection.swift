@@ -445,18 +445,6 @@ public struct IndexingIterator<
 /// corresponding element. In the example above, `firstSpace` is used to
 /// extract the prefix that contains elements up to that index.
 ///
-/// You can pass only valid indices to collection operations. You can find a
-/// complete set of a collection's valid indices by starting with the
-/// collection's `startIndex` property and finding every successor up to, and
-/// including, the `endIndex` property. All other values of the `Index` type,
-/// such as the `startIndex` property of a different collection, are invalid
-/// indices for this collection.
-///
-/// Saved indices may become invalid as a result of mutating operations. For
-/// more information about index invalidation in mutable collections, see the
-/// reference for the `MutableCollection` and `RangeReplaceableCollection`
-/// protocols, as well as for the specific type you're using.
-///
 /// Accessing Individual Elements
 /// =============================
 ///
@@ -480,6 +468,18 @@ public struct IndexingIterator<
 ///
 ///     print(text.first)
 ///     // Prints "Optional("B")"
+///
+/// You can pass only valid indices to collection operations. You can find a
+/// complete set of a collection's valid indices by starting with the
+/// collection's `startIndex` property and finding every successor up to, and
+/// including, the `endIndex` property. All other values of the `Index` type,
+/// such as the `startIndex` property of a different collection, are invalid
+/// indices for this collection.
+///
+/// Saved indices may become invalid as a result of mutating operations. For
+/// more information about index invalidation in mutable collections, see the
+/// reference for the `MutableCollection` and `RangeReplaceableCollection`
+/// protocols, as well as for the specific type you're using.
 ///
 /// Accessing Slices of a Collection
 /// ================================
@@ -1010,10 +1010,10 @@ extension _Indexable {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
       bounds.lowerBound <= index,
-      "out of bounds: index < startIndex")
+      "Out of bounds: index < startIndex")
     _precondition(
       index < bounds.upperBound,
-      "out of bounds: index >= endIndex")
+      "Out of bounds: index >= endIndex")
   }
 
   @_inlineable
@@ -1021,10 +1021,10 @@ extension _Indexable {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
       bounds.lowerBound <= index,
-      "out of bounds: index < startIndex")
+      "Out of bounds: index < startIndex")
     _precondition(
       index <= bounds.upperBound,
-      "out of bounds: index > endIndex")
+      "Out of bounds: index > endIndex")
   }
 
   @_inlineable
@@ -1032,16 +1032,16 @@ extension _Indexable {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
       bounds.lowerBound <= range.lowerBound,
-      "out of bounds: range begins before startIndex")
+      "Out of bounds: range begins before startIndex")
     _precondition(
       range.lowerBound <= bounds.upperBound,
-      "out of bounds: range ends after endIndex")
+      "Out of bounds: range ends after endIndex")
     _precondition(
       bounds.lowerBound <= range.upperBound,
-      "out of bounds: range ends before bounds.lowerBound")
+      "Out of bounds: range ends before bounds.lowerBound")
     _precondition(
       range.upperBound <= bounds.upperBound,
-      "out of bounds: range begins after bounds.upperBound")
+      "Out of bounds: range begins after bounds.upperBound")
   }
 
   /// Returns an index that is the specified distance from the given index.
@@ -1870,7 +1870,7 @@ extension Collection where SubSequence == Self {
   @discardableResult
   public mutating func removeFirst() -> Element {
     // TODO: swift-3-indexing-model - review the following
-    _precondition(!isEmpty, "can't remove items from an empty collection")
+    _precondition(!isEmpty, "Can't remove items from an empty collection")
     let element = first!
     self = self[index(after: startIndex)..<endIndex]
     return element
@@ -1888,9 +1888,9 @@ extension Collection where SubSequence == Self {
   @_inlineable
   public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
-    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
-      "can't remove more items from a collection than it contains")
+      "Can't remove more items from a collection than it contains")
     self = self[index(startIndex, offsetBy: numericCast(n))..<endIndex]
   }
 }
@@ -1904,52 +1904,13 @@ extension Collection {
   }
 }
 
-@available(*, unavailable, message: "Bit enum has been removed. Please use Int instead.")
-public enum Bit {}
-
-@available(*, unavailable, renamed: "IndexingIterator")
-public struct IndexingGenerator<Elements : _IndexableBase> {}
-
-@available(*, unavailable, renamed: "Collection")
-public typealias CollectionType = Collection
-
 extension Collection {
+  // FIXME: <rdar://problem/34142121>
+  // This typealias should be removed as it predates the source compatibility
+  // guarantees of Swift 3, but it cannot due to a bug.
   @available(*, unavailable, renamed: "Iterator")
   public typealias Generator = Iterator
-
-  @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> Iterator {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "getter:underestimatedCount()")
-  public func underestimateCount() -> Int {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, message: "Please use split(maxSplits:omittingEmptySubsequences:whereSeparator:) instead")
-  public func split(
-    _ maxSplit: Int = Int.max,
-    allowEmptySlices: Bool = false,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [SubSequence] {
-    Builtin.unreachable()
-  }
 }
-
-extension Collection where Element : Equatable {
-  @available(*, unavailable, message: "Please use split(separator:maxSplits:omittingEmptySubsequences:) instead")
-  public func split(
-    _ separator: Element,
-    maxSplit: Int = Int.max,
-    allowEmptySlices: Bool = false
-  ) -> [SubSequence] {
-    Builtin.unreachable()
-  }
-}
-
-@available(*, unavailable, message: "PermutationGenerator has been removed in Swift 3")
-public struct PermutationGenerator<C : Collection, Indices : Sequence> {}
 
 extension _IndexableBase {
   @available(swift, deprecated: 3.2, renamed: "Element")

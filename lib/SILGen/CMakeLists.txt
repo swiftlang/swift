@@ -6,6 +6,7 @@ add_swift_library(swiftSILGen STATIC
   ManagedValue.cpp
   ResultPlan.cpp
   RValue.cpp
+  Scope.cpp
   SwitchCaseFullExpr.cpp
   SILGen.cpp
   SILGenApply.cpp

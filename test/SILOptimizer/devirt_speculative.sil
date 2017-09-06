@@ -3,16 +3,19 @@
 sil_stage canonical
 
 import Builtin
+import Swift
 
 @objc class MyNSObject {}
 private class Base : MyNSObject {
    override init()
   @inline(never) func foo()
+  @inline(never) func exit() -> Never
 }
 
 private class Sub : Base {
   override init()
   @inline(never) override func foo()
+  @inline(never) override func exit() -> Never
 }
 
 sil private [noinline] @_TBaseFooFun : $@convention(method) (@guaranteed Base) -> () {
@@ -27,12 +30,19 @@ bb0(%0 : $Sub):
   return %1 : $()
 }
 
+
+sil @Base_exit : $@convention(method) (@guaranteed Base) -> Never
+
+sil @Sub_exit : $@convention(method) (@guaranteed Sub) -> Never
+
 sil_vtable Base {
   #Base.foo!1: _TBaseFooFun
+  #Base.exit!1: Base_exit 
 }
 
 sil_vtable Sub {
   #Base.foo!1: _TSubFooFun
+  #Base.exit!1: Sub_exit 
 }
 
 sil @test_objc_ancestry : $@convention(thin) (@guaranteed Base) -> () {
@@ -124,3 +134,23 @@ bb0(%0: $Base2):
   %3 = tuple()
   return %3 : $()
 }
+
+// Check that NoReturn functions are devirtualized properly.
+// The new apply should be followed by an unreachable instruction
+// instead of a branch instruction.
+// CHECK-LABEL: sil{{.*}}test_devirt_of_noreturn_function
+// CHECK: checked_cast_br
+// CHECK: function_ref @Base_exit
+// CHECK-NEXT: apply
+// CHECK-NEXT: unreachable
+// CHECK: checked_cast_br
+// CHECK: function_ref @Sub_exit
+// CHECK-NEXT: apply
+// CHECK-NEXT: unreachable
+sil hidden [noinline] @test_devirt_of_noreturn_function : $@convention(thin) (@owned Base) -> () {
+bb0(%0 : $Base):
+  %2 = class_method %0 : $Base, #Base.exit!1 : (Base) -> () -> Never, $@convention(method) (@guaranteed Base) -> Never 
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed Base) -> Never
+  unreachable
+} 
+

@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "NameLookupImpl.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTScope.h"
@@ -55,8 +56,8 @@ void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
                                             DeclVisibilityKind reason) {
   if (D->getASTContext().LangOpts.EnableAccessControl) {
     if (TypeResolver)
-      TypeResolver->resolveAccessibility(D);
-    if (D->isInvalid() && !D->hasAccessibility())
+      TypeResolver->resolveAccessControl(D);
+    if (D->isInvalid() && !D->hasAccess())
       return;
     if (!D->isAccessibleFrom(DC))
       return;
@@ -347,7 +348,7 @@ enum class DiscriminatorMatch {
 
 static DiscriminatorMatch matchDiscriminator(Identifier discriminator,
                                              const ValueDecl *value) {
-  if (value->getFormalAccess() > Accessibility::FilePrivate)
+  if (value->getFormalAccess() > AccessLevel::FilePrivate)
     return DiscriminatorMatch::NoDiscriminator;
 
   auto containingFile =
@@ -423,7 +424,6 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   case ASTScopeKind::ForEachStmt:
   case ASTScopeKind::DoCatchStmt:
   case ASTScopeKind::SwitchStmt:
-  case ASTScopeKind::ForStmt:
   case ASTScopeKind::Accessors:
   case ASTScopeKind::TopLevelCode:
     llvm_unreachable("no local declarations?");
@@ -443,7 +443,6 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   case ASTScopeKind::BraceStmt:
   case ASTScopeKind::CatchStmt:
   case ASTScopeKind::CaseStmt:
-  case ASTScopeKind::ForStmtInitializer:
     return DeclVisibilityKind::LocalVariable;
   }
 
@@ -585,7 +584,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (IsTypeLookup)
           options |= NL_OnlyTypes;
         if (IgnoreAccessControl)
-          options |= NL_IgnoreAccessibility;
+          options |= NL_IgnoreAccessControl;
 
         SmallVector<ValueDecl *, 4> lookup;
         dc->lookupQualified(lookupType, Name, options, TypeResolver, lookup);
@@ -795,7 +794,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (IsTypeLookup)
             options |= NL_OnlyTypes;
           if (IgnoreAccessControl)
-            options |= NL_IgnoreAccessibility;
+            options |= NL_IgnoreAccessControl;
 
           SmallVector<ValueDecl *, 4> Lookup;
           DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
@@ -855,29 +854,29 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
               return;
             }
           }
+        }
 
-          // Check the generic parameters if our context is a generic type or
-          // extension thereof.
-          GenericParamList *dcGenericParams = nullptr;
-          if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
-            dcGenericParams = nominal->getGenericParams();
-          else if (auto ext = dyn_cast<ExtensionDecl>(DC))
-            dcGenericParams = ext->getGenericParams();
-          else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
-            dcGenericParams = subscript->getGenericParams();
+        // Check the generic parameters if our context is a generic type or
+        // extension thereof.
+        GenericParamList *dcGenericParams = nullptr;
+        if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
+          dcGenericParams = nominal->getGenericParams();
+        else if (auto ext = dyn_cast<ExtensionDecl>(DC))
+          dcGenericParams = ext->getGenericParams();
+        else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
+          dcGenericParams = subscript->getGenericParams();
 
-          while (dcGenericParams) {
-            namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-            localVal.checkGenericParams(dcGenericParams);
+        while (dcGenericParams) {
+          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+          localVal.checkGenericParams(dcGenericParams);
 
-            if (!Results.empty())
-              return;
+          if (!Results.empty())
+            return;
 
-            if (!isa<ExtensionDecl>(DC))
-              break;
+          if (!isa<ExtensionDecl>(DC))
+            break;
 
-            dcGenericParams = dcGenericParams->getOuterParameters();
-          }
+          dcGenericParams = dcGenericParams->getOuterParameters();
         }
 
         DC = DC->getParentForLookup();
@@ -1193,6 +1192,14 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
+  static RecursiveSharedTimer timer("lookupDirect");
+  auto guard = RecursiveSharedTimer::Guard(timer);
+  (void)guard;
+
+  ASTContext &ctx = getASTContext();
+  if (ctx.Stats)
+    ++ctx.Stats->getFrontendCounters().NominalTypeLookupDirectCount;
+  
   (void)getMembers();
 
   // Make sure we have the complete list of members (in this nominal and in all
@@ -1276,20 +1283,19 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
   vec.push_back(method);
 }
 
-static bool checkAccessibility(const DeclContext *useDC,
-                               const DeclContext *sourceDC,
-                               Accessibility access) {
+static bool checkAccess(const DeclContext *useDC, const DeclContext *sourceDC,
+                        AccessLevel access) {
   if (!useDC)
-    return access >= Accessibility::Public;
+    return access >= AccessLevel::Public;
 
   assert(sourceDC && "ValueDecl being accessed must have a valid DeclContext");
   switch (access) {
-  case Accessibility::Private:
+  case AccessLevel::Private:
     return (useDC == sourceDC ||
       AccessScope::allowsPrivateAccess(useDC, sourceDC));
-  case Accessibility::FilePrivate:
+  case AccessLevel::FilePrivate:
     return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
-  case Accessibility::Internal: {
+  case AccessLevel::Internal: {
     const ModuleDecl *sourceModule = sourceDC->getParentModule();
     const DeclContext *useFile = useDC->getModuleScopeContext();
     if (useFile->getParentModule() == sourceModule)
@@ -1299,15 +1305,15 @@ static bool checkAccessibility(const DeclContext *useDC,
         return true;
     return false;
   }
-  case Accessibility::Public:
-  case Accessibility::Open:
+  case AccessLevel::Public:
+  case AccessLevel::Open:
     return true;
   }
-  llvm_unreachable("bad Accessibility");
+  llvm_unreachable("bad access level");
 }
 
 bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
-  return checkAccessibility(DC, getDeclContext(), getFormalAccess());
+  return checkAccess(DC, getDeclContext(), getFormalAccess());
 }
 
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
@@ -1315,11 +1321,11 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
 
   // If a stored property does not have a setter, it is still settable from the
   // designated initializer constructor. In this case, don't check setter
-  // accessibility, it is not set.
+  // access; it is not set.
   if (hasStorage() && !isSettable(nullptr))
     return true;
   
-  return checkAccessibility(DC, getDeclContext(), getSetterAccessibility());
+  return checkAccess(DC, getDeclContext(), getSetterFormalAccess());
 }
 
 bool DeclContext::lookupQualified(Type type,
@@ -1401,7 +1407,7 @@ bool DeclContext::lookupQualified(Type type,
 
   auto &ctx = getASTContext();
   if (!ctx.LangOpts.EnableAccessControl)
-    options |= NL_IgnoreAccessibility;
+    options |= NL_IgnoreAccessControl;
 
   // The set of nominal type declarations we should (and have) visited.
   SmallVector<NominalTypeDecl *, 4> stack;
@@ -1478,7 +1484,7 @@ bool DeclContext::lookupQualified(Type type,
     }
 
     // Check access.
-    if (!(options & NL_IgnoreAccessibility))
+    if (!(options & NL_IgnoreAccessControl))
       return decl->isAccessibleFrom(this);
 
     return true;

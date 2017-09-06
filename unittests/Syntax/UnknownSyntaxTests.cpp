@@ -1,7 +1,5 @@
-#include "swift/Syntax/ExprSyntax.h"
-#include "swift/Syntax/GenericSyntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/UnknownSyntax.h"
+#include "swift/Syntax/SyntaxBuilders.h"
 #include "llvm/ADT/SmallString.h"
 #include "gtest/gtest.h"
 
@@ -14,12 +12,14 @@ using namespace swift::syntax;
 SymbolicReferenceExprSyntax getCannedSymbolicRef() {
   // First, make a symbolic reference to an 'Array<Int>'
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
-  auto IntType = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
-  GenericArgumentClauseBuilder ArgBuilder;
+  auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
+  auto IntType = SyntaxFactory::makeTypeIdentifier(Int, None, None, None);
+  auto IntArg = SyntaxFactory::makeGenericArgument(IntType, None);
+  GenericArgumentClauseSyntaxBuilder ArgBuilder;
   ArgBuilder
     .useLeftAngleBracket(SyntaxFactory::makeLeftAngleToken({}, {}))
     .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addGenericArgument(llvm::None, IntType);
+    .addGenericArgument(IntArg);
 
   return SyntaxFactory::makeSymbolicReferenceExpr(Array, ArgBuilder.build());
 }
@@ -30,7 +30,7 @@ FunctionCallExprSyntax getCannedFunctionCall() {
 
   auto Label = SyntaxFactory::makeIdentifier("elements", {}, {});
   auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
-  auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
+  auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
   auto One = SyntaxFactory::makeIntegerLiteralExpr(NoSign, OneDigits);
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");

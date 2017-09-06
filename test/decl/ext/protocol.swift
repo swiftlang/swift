@@ -237,6 +237,8 @@ protocol ConformedProtocol {
 class BaseWithAlias<T> : ConformedProtocol {
   typealias ConcreteAlias = T
 
+  struct NestedNominal {}
+
   func baseMethod(_: T) {}
 }
 
@@ -261,6 +263,8 @@ extension ExtendedProtocol where Self : DerivedWithAlias {
   func f3(x: AbstractConformanceAlias) {
     let _: DerivedWithAlias = x
   }
+
+  func f4(x: NestedNominal) {}
 }
 
 // ----------------------------------------------------------------------------

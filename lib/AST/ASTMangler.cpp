@@ -314,8 +314,8 @@ std::string ASTMangler::mangleDeclType(const ValueDecl *decl) {
 
 #ifdef USE_NEW_MANGLING_FOR_OBJC_RUNTIME_NAMES
 static bool isPrivate(const NominalTypeDecl *Nominal) {
-  return Nominal->hasAccessibility() &&
-         Nominal->getFormalAccess() <= Accessibility::FilePrivate;
+  return Nominal->hasAccess() &&
+         Nominal->getFormalAccess() <= AccessLevel::FilePrivate;
 }
 #endif
 
@@ -456,7 +456,7 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
     return false;
 
   auto *nominal = declaredType->getAnyNominal();
-  if (nominal->getFormalAccess() <= Accessibility::FilePrivate)
+  if (nominal->getFormalAccess() <= AccessLevel::FilePrivate)
     return true;
   return isInPrivateOrLocalContext(nominal);
 }
@@ -502,8 +502,8 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
 }
 
 static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
-  if (!decl->hasAccessibility() ||
-      decl->getFormalAccess() > Accessibility::FilePrivate ||
+  if (!decl->hasAccess() ||
+      decl->getFormalAccess() > AccessLevel::FilePrivate ||
       isInPrivateOrLocalContext(decl)) {
     return StringRef();
   }
@@ -548,6 +548,8 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     case DeclBaseName::Kind::Subscript:
       appendIdentifier("subscript");
       break;
+    case DeclBaseName::Kind::Destructor:
+      llvm_unreachable("Destructors are not mangled using appendDeclName");
     }
   } else {
     assert(AllowNamelessEntities && "attempt to mangle unnamed decl");
@@ -1432,10 +1434,15 @@ void ASTMangler::appendParams(Type ParamsTy, bool forceSingleParam) {
       return;
     }
     if (forceSingleParam && Tuple->getNumElements() > 1) {
-      if (ParenType *Paren = dyn_cast<ParenType>(ParamsTy.getPointer()))
+      auto flags = ParameterTypeFlags();
+      if (ParenType *Paren = dyn_cast<ParenType>(ParamsTy.getPointer())) {
         ParamsTy = Paren->getUnderlyingType();
+        flags = Paren->getParameterFlags();
+      }
 
       appendType(ParamsTy);
+      if (flags.isShared())
+        appendOperator("h");
       appendListSeparator();
       appendOperator("t");
       return;
@@ -1454,7 +1461,11 @@ void ASTMangler::appendTypeList(Type listTy) {
       return appendOperator("y");
     bool firstField = true;
     for (auto &field : tuple->getElements()) {
-      appendType(field.getType());
+      appendType(field.getType()->getInOutObjectType());
+      if (field.isInOut())
+        appendOperator("z");
+      if (field.getParameterFlags().isShared())
+        appendOperator("h");
       if (field.hasName())
         appendIdentifier(field.getName().str());
       if (field.isVararg())

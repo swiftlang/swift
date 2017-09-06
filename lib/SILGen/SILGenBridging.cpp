@@ -941,7 +941,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
   }
 
   // Bridge Objective-C to thick metatypes.
-  if (auto nativeMetaTy = dyn_cast<AnyMetatypeType>(nativeType)) {
+  if (isa<AnyMetatypeType>(nativeType)) {
     auto bridgedMetaTy = cast<AnyMetatypeType>(bridgedType);
     if (bridgedMetaTy->hasRepresentation() &&
         bridgedMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
@@ -1692,7 +1692,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     CalleeTypeInfo calleeTypeInfo(
         fnType, AbstractionPattern(nativeFnTy->getGenericSignature(),
                                    bridgedFormalResultType),
-        nativeFormalResultType, foreignError);
+        nativeFormalResultType, foreignError, ImportAsMemberStatus());
 
     auto init = indirectResult
                 ? useBufferAsTemporary(indirectResult,

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 // ----------------------------------------------------------------------------
 // DynamicSelf is only allowed on the return type of class and
@@ -328,5 +328,63 @@ class Runce : Runcible {
     runce()
     wantsRuncible(self)
     return self
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Forming a type with 'Self' in invariant position
+
+struct Generic<T> { init(_: T) {} }
+
+class InvariantSelf {
+  func me() -> Self {
+    let a = Generic(self)
+    let _: Generic<InvariantSelf> = a
+    // expected-error@-1 {{cannot convert value of type 'Generic<Self>' to specified type 'Generic<InvariantSelf>'}}
+
+    return self
+  }
+}
+
+// FIXME: This should be allowed
+
+final class FinalInvariantSelf {
+  func me() -> Self {
+    let a = Generic(self)
+    let _: Generic<FinalInvariantSelf> = a
+    // expected-error@-1 {{cannot convert value of type 'Generic<Self>' to specified type 'Generic<FinalInvariantSelf>'}}
+
+    return self
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Semi-bogus factory init pattern
+
+protocol FactoryPattern {
+  init(factory: @autoclosure () -> Self)
+}
+
+extension  FactoryPattern {
+  init(factory: @autoclosure () -> Self) { self = factory() }
+}
+
+class Factory : FactoryPattern {
+  init(_string: String) {}
+
+  convenience init(string: String) {
+    self.init(factory: Factory(_string: string))
+    // expected-error@-1 {{incorrect argument label in call (have 'factory:', expected '_string:')}}
+    // FIXME: Bogus diagnostic
+  }
+}
+
+// Final classes are OK
+
+final class FinalFactory : FactoryPattern {
+  init(_string: String) {}
+
+  convenience init(string: String) {
+    self.init(factory: FinalFactory(_string: string))
   }
 }

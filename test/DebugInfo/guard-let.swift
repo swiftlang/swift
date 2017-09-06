@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s --check-prefix=CHECK2
+
+// UNSUPPORTED: OS=watchos
+
 func use<T>(_ t: T) {}
 
 public func f(_ i : Int?)
@@ -18,6 +21,10 @@ public func f(_ i : Int?)
   guard let val = i else { return }
   use(val)
 }
+
+// With large type optimizations the string is passed indirectly on i386 so
+// there is no shadow copy happening.
+// UNSUPPORTED: CPU=i386
 
 public func g(_ s : String?)
 {

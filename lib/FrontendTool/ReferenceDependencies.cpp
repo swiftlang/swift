@@ -41,8 +41,8 @@ static void findNominalsAndOperators(
     if (!VD)
       continue;
 
-    if (VD->hasAccessibility() &&
-        VD->getFormalAccess() <= Accessibility::FilePrivate) {
+    if (VD->hasAccess() &&
+        VD->getFormalAccess() <= AccessLevel::FilePrivate) {
       continue;
     }
 
@@ -82,7 +82,7 @@ static bool declIsPrivate(const Decl *member) {
     }
   }
 
-  return VD->getFormalAccess() <= Accessibility::FilePrivate;
+  return VD->getFormalAccess() <= AccessLevel::FilePrivate;
 }
 
 static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
@@ -174,8 +174,8 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
       auto *NTD = ED->getExtendedType()->getAnyNominal();
       if (!NTD)
         break;
-      if (NTD->hasAccessibility() &&
-          NTD->getFormalAccess() <= Accessibility::FilePrivate) {
+      if (NTD->hasAccess() &&
+          NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
         break;
       }
 
@@ -215,8 +215,8 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
       auto *NTD = cast<NominalTypeDecl>(D);
       if (!NTD->hasName())
         break;
-      if (NTD->hasAccessibility() &&
-          NTD->getFormalAccess() <= Accessibility::FilePrivate) {
+      if (NTD->hasAccess() &&
+          NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
         break;
       }
       out << "- \"" << escape(NTD->getName()) << "\"\n";
@@ -232,8 +232,8 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
       auto *VD = cast<ValueDecl>(D);
       if (!VD->hasName())
         break;
-      if (VD->hasAccessibility() &&
-          VD->getFormalAccess() <= Accessibility::FilePrivate) {
+      if (VD->hasAccess() &&
+          VD->getFormalAccess() <= AccessLevel::FilePrivate) {
         break;
       }
       out << "- \"" << escape(VD->getBaseName()) << "\"\n";
@@ -288,7 +288,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     for (auto *member : ED->getMembers()) {
       auto *VD = dyn_cast<ValueDecl>(member);
       if (!VD || !VD->hasName() ||
-          VD->getFormalAccess() <= Accessibility::FilePrivate) {
+          VD->getFormalAccess() <= AccessLevel::FilePrivate) {
         continue;
       }
       out << "- [\"" << mangledName << "\", \""
@@ -371,8 +371,8 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
 
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
-    if (entry.first.first->hasAccessibility() &&
-        entry.first.first->getFormalAccess() <= Accessibility::FilePrivate)
+    if (entry.first.first->hasAccess() &&
+        entry.first.first->getFormalAccess() <= AccessLevel::FilePrivate)
       continue;
 
     out << "- ";
@@ -394,8 +394,8 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
       isCascading |= i->second;
     }
 
-    if (i->first.first->hasAccessibility() &&
-        i->first.first->getFormalAccess() <= Accessibility::FilePrivate)
+    if (i->first.first->hasAccess() &&
+        i->first.first->getFormalAccess() <= AccessLevel::FilePrivate)
       continue;
 
     out << "- ";

@@ -1,15 +1,15 @@
 // This test is paired with testable-multifile-other.swift.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module %S/Inputs/TestableMultifileHelper.swift -enable-testing -o %t
+// RUN: %target-swift-frontend -emit-module %S/Inputs/TestableMultifileHelper.swift -enable-testing -enable-sil-ownership -o %t
 
-// RUN: %target-swift-frontend -emit-silgen -sil-serialize-witness-tables -I %t %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -sil-serialize-witness-tables -I %t %S/testable-multifile-other.swift %s -module-name main | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -sil-serialize-witness-tables -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -sil-serialize-witness-tables -I %t %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -sil-serialize-witness-tables -I %t %S/testable-multifile-other.swift %s -module-name main | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -sil-serialize-witness-tables -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
 
 // Just make sure we don't crash later on.
-// RUN: %target-swift-frontend -emit-ir -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
-// RUN: %target-swift-frontend -emit-ir -I %t -O -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
+// RUN: %target-swift-frontend -enable-sil-ownership -emit-ir -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
+// RUN: %target-swift-frontend -enable-sil-ownership -emit-ir -I %t -O -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
 
 @testable import TestableMultifileHelper
 

@@ -347,6 +347,22 @@ class alignas(8) Expr {
   enum { NumTupleShuffleExprBits = NumImplicitConversionExprBits + 2 };
   static_assert(NumTupleShuffleExprBits <= 32, "fits in an unsigned");
 
+  class InOutToPointerExprBitfields {
+    friend class InOutToPointerExpr;
+    unsigned : NumImplicitConversionExprBits;
+    unsigned IsNonAccessing : 1;
+  };
+  enum { NumInOutToPointerExprBits = NumImplicitConversionExprBits + 1 };
+  static_assert(NumInOutToPointerExprBits <= 32, "fits in an unsigned");
+
+  class ArrayToPointerExprBitfields {
+    friend class ArrayToPointerExpr;
+    unsigned : NumImplicitConversionExprBits;
+    unsigned IsNonAccessing : 1;
+  };
+  enum { NumArrayToPointerExprBits = NumImplicitConversionExprBits + 1 };
+  static_assert(NumArrayToPointerExprBits <= 32, "fits in an unsigned");
+
   class ApplyExprBitfields {
     friend class ApplyExpr;
     unsigned : NumExprBits;
@@ -434,6 +450,8 @@ protected:
     CheckedCastExprBitfields CheckedCastExprBits;
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
     TupleShuffleExprBitfields TupleShuffleExprBits;
+    InOutToPointerExprBitfields InOutToPointerExprBits;
+    ArrayToPointerExprBitfields ArrayToPointerExprBits;
     ObjCSelectorExprBitfields ObjCSelectorExprBits;
     KeyPathExprBitfields KeyPathExprBits;
   };
@@ -875,7 +893,7 @@ public:
   {}
 
   APInt getValue() const;
-  static APInt getValue(StringRef Text, unsigned BitWidth);
+  static APInt getValue(StringRef Text, unsigned BitWidth, bool Negative);
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::IntegerLiteral;
@@ -892,7 +910,8 @@ public:
   {}
   
   APFloat getValue() const;
-  static APFloat getValue(StringRef Text, const llvm::fltSemantics &Semantics);
+  static APFloat getValue(StringRef Text, const llvm::fltSemantics &Semantics,
+                          bool Negative);
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FloatLiteral;
@@ -2751,8 +2770,19 @@ public:
 class InOutToPointerExpr : public ImplicitConversionExpr {
 public:
   InOutToPointerExpr(Expr *subExpr, Type ty)
-    : ImplicitConversionExpr(ExprKind::InOutToPointer, subExpr, ty) {}
-  
+      : ImplicitConversionExpr(ExprKind::InOutToPointer, subExpr, ty) {
+    InOutToPointerExprBits.IsNonAccessing = false;
+  }
+
+  /// Is this conversion "non-accessing"?  That is, is it only using the
+  /// pointer for its identity, as opposed to actually accessing the memory?
+  bool isNonAccessing() const {
+    return InOutToPointerExprBits.IsNonAccessing;
+  }
+  void setNonAccessing(bool nonAccessing = true) {
+    InOutToPointerExprBits.IsNonAccessing = nonAccessing;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::InOutToPointer;
   }
@@ -2762,8 +2792,19 @@ public:
 class ArrayToPointerExpr : public ImplicitConversionExpr {
 public:
   ArrayToPointerExpr(Expr *subExpr, Type ty)
-    : ImplicitConversionExpr(ExprKind::ArrayToPointer, subExpr, ty) {}
+      : ImplicitConversionExpr(ExprKind::ArrayToPointer, subExpr, ty) {
+    ArrayToPointerExprBits.IsNonAccessing = false;
+  }
   
+  /// Is this conversion "non-accessing"?  That is, is it only using the
+  /// pointer for its identity, as opposed to actually accessing the memory?
+  bool isNonAccessing() const {
+    return ArrayToPointerExprBits.IsNonAccessing;
+  }
+  void setNonAccessing(bool nonAccessing = true) {
+    ArrayToPointerExprBits.IsNonAccessing = nonAccessing;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ArrayToPointer;
   }

@@ -48,6 +48,7 @@ namespace llvm {
   class Function;
   class FunctionType;
   class GlobalVariable;
+  class InlineAsm;
   class IntegerType;
   class LLVMContext;
   class MDNode;
@@ -57,7 +58,7 @@ namespace llvm {
   class StructType;
   class StringRef;
   class Type;
-  class AttributeSet;
+  class AttributeList;
 }
 namespace clang {
   class ASTContext;
@@ -74,24 +75,17 @@ namespace clang {
 
 namespace swift {
   class GenericSignatureBuilder;
+  class AssociatedConformance;
+  class AssociatedType;
   class ASTContext;
   class BraceStmt;
   class CanType;
-  class ClassDecl;
-  class ConstructorDecl;
-  class Decl;
-  class DestructorDecl;
-  class ExtensionDecl;
-  class FuncDecl;
   class LinkLibrary;
   class SILFunction;
-  class EnumElementDecl;
-  class EnumDecl;
   class IRGenOptions;
   class NormalProtocolConformance;
   class ProtocolConformance;
   class ProtocolCompositionType;
-  class ProtocolDecl;
   struct SILDeclRef;
   class SILGlobalVariable;
   class SILModule;
@@ -99,12 +93,7 @@ namespace swift {
   class SILWitnessTable;
   class SourceLoc;
   class SourceFile;
-  class StructDecl;
   class Type;
-  class TypeAliasDecl;
-  class TypeDecl;
-  class ValueDecl;
-  class VarDecl;
 
 namespace Lowering {
   class TypeConverter;
@@ -113,20 +102,26 @@ namespace Lowering {
 namespace irgen {
   class Address;
   class ClangTypeConverter;
+  class ClassMetadataLayout;
   class DebugTypeInfo;
   class EnumImplStrategy;
+  class EnumMetadataLayout;
   class ExplosionSchema;
   class FixedTypeInfo;
   class ForeignFunctionInfo;
   class FormalType;
   class HeapLayout;
+  class StructLayout;
   class IRGenDebugInfo;
   class IRGenFunction;
   class LinkEntity;
   class LoadableTypeInfo;
+  class MetadataLayout;
   class NecessaryBindings;
+  class NominalMetadataLayout;
   class ProtocolInfo;
   class Signature;
+  class StructMetadataLayout;
   class TypeConverter;
   class TypeInfo;
   enum class ValueWitness : unsigned;
@@ -402,6 +397,7 @@ public:
   ModuleDecl *getSwiftModule() const;
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
+  const IRGenOptions &getOptions() const { return IRGen.Opts; }
   SILModuleConventions silConv;
 
   llvm::SmallString<128> OutputFilename;
@@ -472,6 +468,7 @@ public:
   llvm::PointerType *FullTypeMetadataPtrTy;/// %swift.full_type*
   llvm::StructType *ProtocolDescriptorStructTy; /// %swift.protocol = type { ... }
   llvm::PointerType *ProtocolDescriptorPtrTy; /// %swift.protocol*
+  llvm::StructType *ProtocolRequirementStructTy; /// %swift.protocol_requirement
   union {
     llvm::PointerType *ObjCPtrTy;        /// %objc_object*
     llvm::PointerType *UnknownRefCountedPtrTy;
@@ -489,6 +486,7 @@ public:
   llvm::PointerType *ProtocolConformanceRecordPtrTy;
   llvm::StructType *NominalTypeDescriptorTy;
   llvm::PointerType *NominalTypeDescriptorPtrTy;
+  llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;
@@ -496,7 +494,11 @@ public:
   llvm::PointerType *ErrorPtrTy;       /// %swift.error*
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
-  
+
+  /// Used to create unique names for class layout types with tail allocated
+  /// elements.
+  unsigned TailElemTypeID = 0;
+
   unsigned InvariantMetadataID; /// !invariant.load
   unsigned DereferenceableID;   /// !dereferenceable
   llvm::MDNode *InvariantNode;
@@ -507,8 +509,8 @@ public:
   llvm::CallingConv::ID SwiftCC;     /// swift calling convention
   bool UseSwiftCC;
 
-  llvm::FunctionType *getAssociatedTypeMetadataAccessFunctionTy();
-  llvm::FunctionType *getAssociatedTypeWitnessTableAccessFunctionTy();
+  Signature getAssociatedTypeMetadataAccessFunctionSignature();
+  Signature getAssociatedTypeWitnessTableAccessFunctionSignature();
   llvm::StructType *getGenericWitnessTableCacheTy();
 
   /// Get the bit width of an integer type for the target platform.
@@ -571,6 +573,7 @@ public:
 
   llvm::Type *getFixedBufferTy();
   llvm::Type *getValueWitnessTy(ValueWitness index);
+  Signature getValueWitnessSignature(ValueWitness index);
 
   void unimplemented(SourceLoc, StringRef Message);
   LLVM_ATTRIBUTE_NORETURN
@@ -649,7 +652,12 @@ public:
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
-  
+
+  NominalMetadataLayout &getMetadataLayout(NominalTypeDecl *decl);
+  StructMetadataLayout &getMetadataLayout(StructDecl *decl);
+  ClassMetadataLayout &getMetadataLayout(ClassDecl *decl);
+  EnumMetadataLayout &getMetadataLayout(EnumDecl *decl);
+
 private:
   TypeConverter &Types;
   friend class TypeConverter;
@@ -658,6 +666,9 @@ private:
   ClangTypeConverter *ClangTypes;
   void initClangTypeConverter();
   void destroyClangTypeConverter();
+
+  llvm::DenseMap<Decl*, MetadataLayout*> MetadataLayouts;
+  void destroyMetadataLayoutMap();
 
   friend class GenericContextScope;
   
@@ -730,7 +741,7 @@ private:
   /// present in the object file; bitcast to i8*. This is used for
   /// forcing visibility of symbols which may otherwise be optimized
   /// out.
-  SmallVector<llvm::WeakVH, 4> LLVMUsed;
+  SmallVector<llvm::WeakTrackingVH, 4> LLVMUsed;
 
   /// LLVMCompilerUsed - List of global values which are required to be
   /// present in the object file; bitcast to i8*. This is used for
@@ -738,21 +749,18 @@ private:
   /// out.
   ///
   /// Similar to LLVMUsed, but emitted as llvm.compiler.used.
-  SmallVector<llvm::WeakVH, 4> LLVMCompilerUsed;
+  SmallVector<llvm::WeakTrackingVH, 4> LLVMCompilerUsed;
 
   /// Metadata nodes for autolinking info.
-  ///
-  /// This is typed using llvm::Value instead of llvm::MDNode because it
-  /// needs to be used to produce another MDNode during finalization.
-  SmallVector<llvm::Metadata *, 32> AutolinkEntries;
+  SmallVector<llvm::MDNode *, 32> AutolinkEntries;
 
   /// List of Objective-C classes, bitcast to i8*.
-  SmallVector<llvm::WeakVH, 4> ObjCClasses;
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCClasses;
   /// List of Objective-C classes that require nonlazy realization, bitcast to
   /// i8*.
-  SmallVector<llvm::WeakVH, 4> ObjCNonLazyClasses;
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCNonLazyClasses;
   /// List of Objective-C categories, bitcast to i8*.
-  SmallVector<llvm::WeakVH, 4> ObjCCategories;
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCCategories;
   /// List of protocol conformances to generate records for.
   SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
@@ -765,10 +773,10 @@ private:
   /// The interesting global variables relating to an ObjC protocol.
   struct ObjCProtocolPair {
     /// The global variable that contains the protocol record.
-    llvm::WeakVH record;
+    llvm::WeakTrackingVH record;
     /// The global variable that contains the indirect reference to the
     /// protocol record.
-    llvm::WeakVH ref;
+    llvm::WeakTrackingVH ref;
   };
 
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
@@ -786,6 +794,10 @@ private:
   friend struct ::llvm::DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey>;
   llvm::DenseMap<FixedLayoutKey, llvm::Constant *> PrivateFixedLayouts;
 
+  /// A cache for layouts of statically initialized objects.
+  llvm::DenseMap<SILGlobalVariable *, std::unique_ptr<StructLayout>>
+    StaticObjectLayouts;
+
   /// A mapping from order numbers to the LLVM functions which we
   /// created for the SIL functions with those orders.
   SuccessorMap<unsigned, llvm::Function*> EmittedFunctionsByOrder;
@@ -796,7 +808,6 @@ private:
 
   void emitGlobalLists();
   void emitAutolinkInfo();
-  void emitEnableReportErrorsToDebugger();
   void cleanupClangCodeGenMetadata();
 
 //--- Remote reflection metadata --------------------------------------------
@@ -867,21 +878,21 @@ public:
   llvm::Constant *getEmptyTupleMetadata();
   llvm::Constant *getObjCEmptyCachePtr();
   llvm::Constant *getObjCEmptyVTablePtr();
-  llvm::Value *getObjCRetainAutoreleasedReturnValueMarker();
+  llvm::InlineAsm *getObjCRetainAutoreleasedReturnValueMarker();
   ClassDecl *getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass);
   ClassDecl *getObjCRuntimeBaseClass(Identifier name, Identifier objcName);
   llvm::Module *getModule() const;
   llvm::Module *releaseModule();
-  llvm::AttributeSet getAllocAttrs();
+  llvm::AttributeList getAllocAttrs();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
   llvm::Constant *ObjCEmptyCachePtr = nullptr;
   llvm::Constant *ObjCEmptyVTablePtr = nullptr;
   llvm::Constant *ObjCISAMaskPtr = nullptr;
-  Optional<llvm::Value*> ObjCRetainAutoreleasedReturnValueMarker;
+  Optional<llvm::InlineAsm*> ObjCRetainAutoreleasedReturnValueMarker;
   llvm::DenseMap<Identifier, ClassDecl*> SwiftRootClasses;
-  llvm::AttributeSet AllocAttrs;
+  llvm::AttributeList AllocAttrs;
 
 #define FUNCTION_ID(Id)             \
 public:                             \
@@ -920,14 +931,15 @@ public:
   /// invalid.
   bool finalize();
 
-  llvm::AttributeSet constructInitialAttributes();
+  void constructInitialFnAttributes(llvm::AttrBuilder &Attrs);
+  llvm::AttributeList constructInitialAttributes();
 
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);
   void emitStructDecl(StructDecl *D);
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
-  Address emitSILGlobalVariable(SILGlobalVariable *gv);
+  void emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitCoverageMapping();
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
@@ -941,7 +953,7 @@ public:
 
   Signature getSignature(CanSILFunctionType fnType);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
-                                      llvm::AttributeSet &attrs,
+                                      llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
   ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
 
@@ -1013,11 +1025,10 @@ public:
                                     const NormalProtocolConformance *C);
   llvm::Function *getAddrOfAssociatedTypeMetadataAccessFunction(
                                            const NormalProtocolConformance *C,
-                                           AssociatedTypeDecl *associatedType);
+                                           AssociatedType association);
   llvm::Function *getAddrOfAssociatedTypeWitnessTableAccessFunction(
-                                           const NormalProtocolConformance *C,
-                                           CanType depAssociatedType,
-                                           ProtocolDecl *requiredProtocol);
+                                     const NormalProtocolConformance *C,
+                                     const AssociatedConformance &association);
 
   Address getAddrOfObjCISAMask();
 
@@ -1045,10 +1056,10 @@ public:
   void setTrueConstGlobal(llvm::GlobalVariable *var);
 
   /// Add the swiftself attribute.
-  void addSwiftSelfAttributes(llvm::AttributeSet &attrs, unsigned argIndex);
+  void addSwiftSelfAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
   /// Add the swifterror attribute.
-  void addSwiftErrorAttributes(llvm::AttributeSet &attrs, unsigned argIndex);
+  void addSwiftErrorAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
 private:
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,

@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InlineAsm.h"
 #include "swift/Basic/LLVM.h"
 #include "Address.h"
 #include "IRGen.h"
@@ -264,19 +265,15 @@ public:
                    llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
   }
 
-  //using IRBuilderBase::CreateCall;
+  // We're intentionally not allowing direct use of
+  // llvm::IRBuilder::CreateCall in order to push code towards using
+  // FunctionPointer.
 
   llvm::CallInst *CreateCall(llvm::Value *Callee, ArrayRef<llvm::Value *> Args,
                              const Twine &Name = "",
-                             llvm::MDNode *FPMathTag = nullptr) {
-    // assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on
-    // call");
-    auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
-    setCallingConvUsingCallee(Call);
-    return Call;
-  }
+                             llvm::MDNode *FPMathTag = nullptr) = delete;
 
-  llvm::CallInst *CreateCall(llvm::FunctionType *FTy, llvm::Value *Callee,
+  llvm::CallInst *CreateCall(llvm::FunctionType *FTy, llvm::Constant *Callee,
                              ArrayRef<llvm::Value *> Args,
                              const Twine &Name = "",
                              llvm::MDNode *FPMathTag = nullptr) {
@@ -286,7 +283,7 @@ public:
     return Call;
   }
 
-  llvm::CallInst *CreateCall(llvm::Function *Callee,
+  llvm::CallInst *CreateCall(llvm::Constant *Callee,
                              ArrayRef<llvm::Value *> Args,
                              const Twine &Name = "",
                              llvm::MDNode *FPMathTag = nullptr) {
@@ -299,6 +296,11 @@ public:
 
   llvm::CallInst *CreateCall(const FunctionPointer &fn,
                              ArrayRef<llvm::Value *> args);
+
+  llvm::CallInst *CreateAsmCall(llvm::InlineAsm *asmBlock,
+                                ArrayRef<llvm::Value *> args) {
+    return IRBuilderBase::CreateCall(asmBlock, args);
+  }
 };
 
 } // end namespace irgen

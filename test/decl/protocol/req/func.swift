@@ -195,6 +195,19 @@ struct X6 : P6 { // expected-error{{type 'X6' does not conform to protocol 'P6'}
   func bar() { } // expected-note{{candidate has non-matching type '() -> ()'}}
 }
 
+protocol P6Ownership {
+  func foo(_ x: __shared Int) // expected-note{{protocol requires function 'foo' with type '(__shared Int) -> ()'}}
+  func foo2(_ x: Int) // expected-note{{protocol requires function 'foo2' with type '(Int) -> ()'}}
+  func bar(x: Int)
+  func bar2(x: __owned Int)
+}
+struct X6Ownership : P6Ownership { // expected-error{{type 'X6Ownership' does not conform to protocol 'P6Ownership'}}
+  func foo(_ x: Int) { } // expected-note{{candidate has non-matching type '(Int) -> ()'}}
+  func foo2(_ x: __shared Int) { } // expected-note{{candidate has non-matching type '(__shared Int) -> ()'}}
+  func bar(x: __owned Int) { } // no diagnostic
+  func bar2(x: Int) { } // no diagnostic
+}
+
 protocol P7 {
   func foo(_ x: Blarg) // expected-error{{use of undeclared type 'Blarg'}}
 }

@@ -257,17 +257,26 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           checkTupleSplat(Call);
 
         // Check the callee, looking through implicit conversions.
-        auto Base = Call->getFn();
-        while (auto Conv = dyn_cast<ImplicitConversionExpr>(Base))
-          Base = Conv->getSubExpr();
-        while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(Base))
-          Base = ignoredBase->getRHS();
-        if (auto *DRE = dyn_cast<DeclRefExpr>(Base)) {
-          checkNoEscapeParameterUse(DRE, Call, OperandKind::Callee);
-          checkForSuspiciousBitCasts(DRE, Call);
+        auto base = Call->getFn();
+        unsigned uncurryLevel = 0;
+        while (auto conv = dyn_cast<ImplicitConversionExpr>(base))
+          base = conv->getSubExpr();
+        while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(base))
+          base = ignoredBase->getRHS();
+        auto *calleeDRE = dyn_cast<DeclRefExpr>(base);
+        if (calleeDRE) {
+          checkNoEscapeParameterUse(calleeDRE, Call, OperandKind::Callee);
+          checkForSuspiciousBitCasts(calleeDRE, Call);
+
+        // Otherwise, try to drill down through member calls for the purposes
+        // of argument-matching code below.
+        } else if (auto selfApply = dyn_cast<SelfApplyExpr>(base)) {
+          uncurryLevel++;
+          base = selfApply->getSemanticFn();
+          calleeDRE = dyn_cast<DeclRefExpr>(base);
         }
 
-        visitArguments(Call, [&](Expr *arg) {
+        visitArguments(Call, [&](unsigned argIndex, Expr *arg) {
           // InOutExpr's are allowed in argument lists directly.
           if (auto *IOE = dyn_cast<InOutExpr>(arg)) {
             if (isa<CallExpr>(Call))
@@ -277,12 +286,24 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           Expr *unwrapped = arg;
           if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(arg))
             unwrapped = IIO->getSubExpr();
-          if (auto *ICO = dyn_cast<ImplicitConversionExpr>(unwrapped)) {
-            if (isa<InOutToPointerExpr>(ICO) ||
-                isa<ArrayToPointerExpr>(ICO) ||
-                isa<ErasureExpr>(ICO))
-              if (auto *IOE = dyn_cast<InOutExpr>(ICO->getSubExpr()))
-                AcceptableInOutExprs.insert(IOE);
+
+          if (isa<InOutToPointerExpr>(unwrapped) ||
+              isa<ArrayToPointerExpr>(unwrapped) ||
+              isa<ErasureExpr>(unwrapped)) {
+            auto operand =
+              cast<ImplicitConversionExpr>(unwrapped)->getSubExpr();
+            if (auto *IOE = dyn_cast<InOutExpr>(operand)) {
+              AcceptableInOutExprs.insert(IOE);
+              operand = IOE->getSubExpr();
+            }
+
+            // Also do some additional work based on how the function uses
+            // the argument.
+            if (calleeDRE) {
+              checkConvertedPointerArgument(calleeDRE->getDeclRef(),
+                                            uncurryLevel, argIndex,
+                                            unwrapped, operand);
+            }
           }
 
           // Also give special treatment to noescape function arguments.
@@ -332,7 +353,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     }
 
     static void visitArguments(ApplyExpr *apply,
-                               llvm::function_ref<void(Expr*)> fn) {
+                               llvm::function_ref<void(unsigned, Expr*)> fn) {
       auto *arg = apply->getArg();
 
       // The argument could be shuffled if it includes default arguments,
@@ -342,12 +363,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // The argument is either a ParenExpr or TupleExpr.
       if (auto *TE = dyn_cast<TupleExpr>(arg)) {
-        for (auto elt : TE->getElements())
-          fn(elt);
+        auto elts = TE->getElements();
+        for (auto i : indices(elts))
+          fn(i, elts[i]);
       } else if (auto *PE = dyn_cast<ParenExpr>(arg)) {
-        fn(PE->getSubExpr());
+        fn(0, PE->getSubExpr());
       } else {
-        fn(arg);
+        fn(0, arg);
       }
     }
 
@@ -366,6 +388,58 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     Expr *walkToExprPost(Expr *E) override {
       checkInvalidPartialApplication(E);
       return E;
+    }
+
+    void checkConvertedPointerArgument(ConcreteDeclRef callee,
+                                       unsigned uncurryLevel,
+                                       unsigned argIndex,
+                                       Expr *pointerExpr,
+                                       Expr *storage) {
+      if (!isPointerIdentityArgument(callee, uncurryLevel, argIndex))
+        return;
+
+      // Flag that the argument is non-accessing.
+      if (auto inout = dyn_cast<InOutToPointerExpr>(pointerExpr)) {
+        inout->setNonAccessing(true);
+      } else if (auto array = dyn_cast<ArrayToPointerExpr>(pointerExpr)) {
+        array->setNonAccessing(true);
+      }
+
+      // TODO: warn if taking the address of 'storage' will definitely
+      // yield a temporary address.
+    }
+
+    /// Is the given call argument, known to be of pointer type, just used
+    /// for its pointer identity?
+    bool isPointerIdentityArgument(ConcreteDeclRef ref, unsigned uncurryLevel,
+                                   unsigned argIndex) {
+      // FIXME: derive this from an attribute instead of hacking it based
+      // on the target name!
+      auto decl = ref.getDecl();
+
+      // Assume that == and != are non-accessing uses.
+      if (decl->isOperator()) {
+        auto op = decl->getBaseName();
+        if (op == "==" || op == "!=")
+          return true;
+        return false;
+      }
+
+      // NSObject.addObserver(_:forKeyPath:options:context:)
+      if (uncurryLevel == 1 && argIndex == 3) {
+        return decl->getFullName().isCompoundName("addObserver",
+                                                  { "", "forKeyPath",
+                                                    "options", "context" });
+      }
+
+      // NSObject.removeObserver(_:forKeyPath:context:)
+      if (uncurryLevel == 1 && argIndex == 2) {
+        return decl->getFullName().isCompoundName("removeObserver",
+                                                  { "", "forKeyPath",
+                                                    "context" });
+      }
+
+      return false;
     }
 
     /// We have a collection literal with a defaulted type, e.g. of [Any].  Emit
@@ -509,7 +583,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       NoEscapeArgument noescapeArgument;
       Expr *problematicArg = nullptr;
 
-      visitArguments(apply, [&](Expr *arg) {
+      visitArguments(apply, [&](unsigned argIndex, Expr *arg) {
         // Just find the first problematic argument.
         if (noescapeArgument) return;
 
@@ -643,7 +717,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // - member references T.foo, T.Type, T.self, etc.
       // - constructor calls T()
       if (auto *ParentExpr = Parent.getAsExpr()) {
-        // This is the white-list of accepted syntactic forms.
+        // This is an exhaustive list of the accepted syntactic forms.
         if (isa<ErrorExpr>(ParentExpr) ||
             isa<DotSelfExpr>(ParentExpr) ||               // T.self
             isa<CallExpr>(ParentExpr) ||                  // T()
@@ -2232,7 +2306,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     // If this is a 'let' value, any stores to it are actually initializations,
     // not mutations.
     auto isWrittenLet = false;
-    if (var->isLet()) {
+    if (var->isLet() || var->isShared()) {
       isWrittenLet = (access & RK_Written) != 0;
       access &= ~RK_Written;
     }
@@ -2356,7 +2430,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     
     // If this is a mutable 'var', and it was never written to, suggest
     // upgrading to 'let'.  We do this even for a parameter.
-    if (!var->isLet() && (access & RK_Written) == 0 &&
+    if (!(var->isLet() || var->isShared()) && (access & RK_Written) == 0 &&
         // Don't warn if we have something like "let (x,y) = ..." and 'y' was
         // never mutated, but 'x' was.
         !isVarDeclPartOfPBDThatHadSomeMutation(var)) {
@@ -2487,6 +2561,9 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     if (KPA->getKeyPath()->getType()->getAnyNominal()
           == C.getWritableKeyPathDecl())
       markStoredOrInOutExpr(KPA->getBase(), RK_Written|RK_Read);
+    if (KPA->getKeyPath()->getType()->getAnyNominal()
+          == C.getReferenceWritableKeyPathDecl())
+      markStoredOrInOutExpr(KPA->getBase(), RK_Read);
     return;
   }
   
@@ -2610,227 +2687,6 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
   // declared as constants.
   AFD->getBody()->walk(VarDeclUsageChecker(TC, AFD));
 }
-
-/// Diagnose C style for loops.
-
-namespace {
-enum class OperatorKind : char {
-  Greater,
-  GreaterEqual,
-  Smaller,
-  SmallerEqual,
-  NotEqual,
-};
-
-static ValueDecl *getReferencedDecl(Expr *expr) {
-  if (auto inoutExpr = dyn_cast<InOutExpr>(expr))
-    expr = inoutExpr->getSubExpr();
-  if (auto declRefExpr = dyn_cast<DeclRefExpr>(expr))
-    return declRefExpr->getDecl();
-  return nullptr;
-}
-
-static DeclBaseName getOperatorName(ApplyExpr *expr) {
-  auto fnExpr = expr->getFn();
-  if (auto dotSyntaxExpr = dyn_cast<DotSyntaxCallExpr>(fnExpr)) {
-    if (!isa<TypeExpr>(dotSyntaxExpr->getBase()))
-      return DeclBaseName();
-    fnExpr = dotSyntaxExpr->getFn();
-  }
-  if (auto fnRefExpr = dyn_cast<DeclRefExpr>(fnExpr)) {
-    return fnRefExpr->getDecl()->getBaseName();
-  }
-  if (auto fnRefExpr = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
-    auto decls = fnRefExpr->getDecls();
-    if (decls.empty()) return DeclBaseName();
-    return decls.front()->getBaseName();
-  }
-  return DeclBaseName();
-}
-
-static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS,
-                                        VarDecl *loopVar, OperatorKind &OpKind) {
-  auto *Cond = FS->getCond().getPtrOrNull();
-  if (!Cond)
-    return nullptr;
-  auto callExpr = dyn_cast<CallExpr>(Cond);
-  if (!callExpr)
-    return nullptr;
-  auto dotSyntaxExpr = dyn_cast<DotSyntaxCallExpr>(callExpr->getFn());
-  if (!dotSyntaxExpr)
-    return nullptr;
-  auto binaryExpr = dyn_cast<BinaryExpr>(dotSyntaxExpr->getBase());
-  if (!binaryExpr)
-    return nullptr;
-
-  // Verify that the condition is a simple != or < comparison to the loop variable.
-  auto comparisonOpName = getOperatorName(binaryExpr);
-  if (comparisonOpName == "!=")
-    OpKind = OperatorKind::NotEqual;
-  else if (comparisonOpName == "<")
-    OpKind = OperatorKind::Smaller;
-  else if (comparisonOpName == "<=")
-    OpKind = OperatorKind::SmallerEqual;
-  else if (comparisonOpName == ">")
-    OpKind = OperatorKind::Greater;
-  else if (comparisonOpName == ">=")
-    OpKind = OperatorKind::GreaterEqual;
-  else
-    return nullptr;
-
-  auto args = binaryExpr->getArg()->getElements();
-  auto loadExpr = dyn_cast<LoadExpr>(args[0]);
-  if (!loadExpr)
-    return nullptr;
-  if (getReferencedDecl(loadExpr->getSubExpr()) != loopVar)
-    return nullptr;
-  return args[1];
-}
-
-static bool unaryOperatorCheckForConvertingCStyleForLoop(const ForStmt *FS,
-                                                         VarDecl *loopVar,
-                                                         StringRef opName) {
-  auto *Increment = FS->getIncrement().getPtrOrNull();
-  if (!Increment)
-    return false;
-  ApplyExpr *unaryExpr = dyn_cast<PrefixUnaryExpr>(Increment);
-  if (!unaryExpr)
-    unaryExpr = dyn_cast<PostfixUnaryExpr>(Increment);
-  if (!unaryExpr)
-    return false;
-  if (getOperatorName(unaryExpr) != opName)
-    return false;
-  return getReferencedDecl(unaryExpr->getArg()) == loopVar;
-}
-
-static bool unaryIncrementForConvertingCStyleForLoop(const ForStmt *FS,
-                                                     VarDecl *loopVar) {
-  return unaryOperatorCheckForConvertingCStyleForLoop(FS, loopVar, "++");
-}
-
-static bool unaryDecrementForConvertingCStyleForLoop(const ForStmt *FS,
-                                                     VarDecl *loopVar) {
-  return unaryOperatorCheckForConvertingCStyleForLoop(FS, loopVar, "--");
-}
-
-static bool binaryOperatorCheckForConvertingCStyleForLoop(TypeChecker &TC,
-                                                            const ForStmt *FS,
-                                                            VarDecl *loopVar,
-                                                            StringRef OpName) {
-  auto *Increment = FS->getIncrement().getPtrOrNull();
-  if (!Increment)
-    return false;
-  ApplyExpr *binaryExpr = dyn_cast<BinaryExpr>(Increment);
-  if (!binaryExpr)
-    return false;
-  if (getOperatorName(binaryExpr) != OpName)
-    return false;
-  auto argTupleExpr = dyn_cast<TupleExpr>(binaryExpr->getArg());
-  if (!argTupleExpr)
-    return false;
-  auto addOneConstExpr = argTupleExpr->getElement(1);
-
-  // Rather than unwrapping expressions all the way down implicit constructors, etc, just check that the
-  // source text for the += argument is "1".
-  SourceLoc constEndLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, addOneConstExpr->getEndLoc());
-  auto range = CharSourceRange(TC.Context.SourceMgr, addOneConstExpr->getStartLoc(), constEndLoc);
-  if (range.str() != "1")
-    return false;
-
-  return getReferencedDecl(argTupleExpr->getElement(0)) == loopVar;
-}
-
-static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC,
-                                                            const ForStmt *FS,
-                                                            VarDecl *loopVar) {
-  return binaryOperatorCheckForConvertingCStyleForLoop(TC, FS, loopVar, "+=");
-}
-
-static bool minusEqualOneDecrementForConvertingCStyleForLoop(TypeChecker &TC,
-                                                             const ForStmt *FS,
-                                                             VarDecl *loopVar) {
-  return binaryOperatorCheckForConvertingCStyleForLoop(TC, FS, loopVar, "-=");
-}
-
-static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
-  // If we're missing semi-colons we'll already be erroring out, and this may
-  // not even have been intended as C-style.
-  if (FS->getFirstSemicolonLoc().isInvalid() || FS->getSecondSemicolonLoc().isInvalid())
-    return;
-    
-  InFlightDiagnostic diagnostic = TC.diagnose(FS->getStartLoc(), diag::deprecated_c_style_for_stmt);
-    
-  // Try to construct a fix it using for-each:
-
-  // Verify that there is only one loop variable, and it is declared here.
-  auto initializers = FS->getInitializerVarDecls();
-  PatternBindingDecl *loopVarDecl = initializers.size() == 2 ?
-    dyn_cast<PatternBindingDecl>(initializers[0]) : nullptr;
-  if (!loopVarDecl || loopVarDecl->getNumPatternEntries() != 1)
-    return;
-
-  auto *loopVar = dyn_cast<VarDecl>(initializers[1]);
-  Expr *startValue = loopVarDecl->getInit(0);
-  OperatorKind OpKind;
-  Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar, OpKind);
-  bool strideByOne = unaryIncrementForConvertingCStyleForLoop(FS, loopVar) ||
-               plusEqualOneIncrementForConvertingCStyleForLoop(TC, FS, loopVar);
-  bool strideBackByOne = unaryDecrementForConvertingCStyleForLoop(FS, loopVar) ||
-               minusEqualOneDecrementForConvertingCStyleForLoop(TC, FS, loopVar);
-
-  if (!loopVar || !startValue || !endValue || (!strideByOne && !strideBackByOne))
-    return;
-
-  assert(strideBackByOne != strideByOne && "cannot be both increment and decrement.");
-
-  // Verify that the loop variable is invariant inside the body.
-  VarDeclUsageChecker checker(TC, loopVar);
-  checker.suppressDiagnostics();
-  FS->getBody()->walk(checker);
-    
-  if (checker.isVarDeclEverWritten(loopVar)) {
-    diagnostic.flush();
-    return;
-  }
-    
-  SourceLoc loopPatternEnd =
-    Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                               loopVarDecl->getPattern(0)->getEndLoc());
-  SourceLoc endOfIncrementLoc =
-    Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                               FS->getIncrement().getPtrOrNull()->getEndLoc());
-
-  if (strideByOne &&
-      (OpKind == OperatorKind::Smaller ||
-       OpKind == OperatorKind::SmallerEqual)) {
-    diagnostic
-      .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
-      .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
-      .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(),
-                         OpKind == OperatorKind::Smaller ? " ..< " : " ... ")
-      .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
-    return;
-  } else if (strideBackByOne &&
-             (OpKind == OperatorKind::Greater ||
-              OpKind == OperatorKind::GreaterEqual)) {
-    SourceLoc startValueEnd = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                                         startValue->getEndLoc());
-
-    StringRef endValueStr = CharSourceRange(TC.Context.SourceMgr, endValue->getStartLoc(),
-      Lexer::getLocForEndOfToken(TC.Context.SourceMgr, endValue->getEndLoc())).str();
-
-    diagnostic
-      .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
-      .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
-      .fixItInsert(startValue->getStartLoc(),
-                   OpKind == OperatorKind::Greater
-                     ? (llvm::Twine("((") + endValueStr + " + 1)...").str()
-                     : (llvm::Twine("(") + endValueStr + "...").str())
-      .fixItInsert(startValueEnd, ").reversed()")
-      .fixItRemoveChars(FS->getFirstSemicolonLoc(), endOfIncrementLoc);
-  }
-}
-} // end anonymous namespace
 
 // Perform MiscDiagnostics on Switch Statements.
 static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
@@ -3469,6 +3325,10 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return { false, E };
 
+      if (auto *CE = dyn_cast<AbstractClosureExpr>(E))
+        if (!CE->hasSingleExpressionBody())
+          return { false, E };
+
       if (auto *coercion = dyn_cast<CoerceExpr>(E)) {
         if (E->getType()->isAny() && isa<ErasureExpr>(coercion->getSubExpr()))
           ErasureCoercedToAny.insert(coercion->getSubExpr());
@@ -3557,9 +3417,6 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
 void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
   TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
     
-  if (auto forStmt = dyn_cast<ForStmt>(S))
-    checkCStyleForLoop(TC, forStmt);
-  
   if (auto switchStmt = dyn_cast<SwitchStmt>(S))
     checkSwitch(TC, switchStmt);
 
@@ -3575,35 +3432,35 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
-                               Accessibility desiredAccess, bool isForSetter) {
+void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
+                        AccessLevel desiredAccess, bool isForSetter) {
   StringRef fixItString;
   switch (desiredAccess) {
-  case Accessibility::Private:      fixItString = "private ";      break;
-  case Accessibility::FilePrivate:  fixItString = "fileprivate ";  break;
-  case Accessibility::Internal:     fixItString = "internal ";     break;
-  case Accessibility::Public:       fixItString = "public ";       break;
-  case Accessibility::Open:         fixItString = "open ";         break;
+  case AccessLevel::Private:      fixItString = "private ";      break;
+  case AccessLevel::FilePrivate:  fixItString = "fileprivate ";  break;
+  case AccessLevel::Internal:     fixItString = "internal ";     break;
+  case AccessLevel::Public:       fixItString = "public ";       break;
+  case AccessLevel::Open:         fixItString = "open ";         break;
   }
 
   DeclAttributes &attrs = VD->getAttrs();
-  AbstractAccessibilityAttr *attr;
+  AbstractAccessControlAttr *attr;
   if (isForSetter) {
-    attr = attrs.getAttribute<SetterAccessibilityAttr>();
-    cast<AbstractStorageDecl>(VD)->overwriteSetterAccessibility(desiredAccess);
+    attr = attrs.getAttribute<SetterAccessAttr>();
+    cast<AbstractStorageDecl>(VD)->overwriteSetterAccess(desiredAccess);
   } else {
-    attr = attrs.getAttribute<AccessibilityAttr>();
-    VD->overwriteAccessibility(desiredAccess);
+    attr = attrs.getAttribute<AccessControlAttr>();
+    VD->overwriteAccess(desiredAccess);
 
     if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD)) {
       if (auto *getter = ASD->getGetter())
-        getter->overwriteAccessibility(desiredAccess);
+        getter->overwriteAccess(desiredAccess);
 
-      if (auto *setterAttr = attrs.getAttribute<SetterAccessibilityAttr>()) {
+      if (auto *setterAttr = attrs.getAttribute<SetterAccessAttr>()) {
         if (setterAttr->getAccess() > desiredAccess)
-          fixItAccessibility(diag, VD, desiredAccess, true);
+          fixItAccess(diag, VD, desiredAccess, true);
       } else {
-        ASD->overwriteSetterAccessibility(desiredAccess);
+        ASD->overwriteSetterAccess(desiredAccess);
       }
     }
   }

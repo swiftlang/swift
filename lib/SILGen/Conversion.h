@@ -73,24 +73,25 @@ private:
     CanType SubstType;
   };
 
-  static int getStorageIndexForKind(KindTy kind) {
+  using Members = ExternalUnionMembers<BridgingTypes, ReabstractionTypes>;
+
+  static Members::Index getStorageIndexForKind(KindTy kind) {
     switch (kind) {
     case BridgeToObjC:
     case ForceAndBridgeToObjC:
     case BridgeFromObjC:
     case BridgeResultFromObjC:
     case AnyErasure:
-      return 0;
+      return Members::indexOf<BridgingTypes>();
 
     case OrigToSubst:
     case SubstToOrig:
-      return 1;
+      return Members::indexOf<ReabstractionTypes>();
     }
     llvm_unreachable("bad kind");
   }
 
-  ExternalUnion<KindTy, getStorageIndexForKind,
-                BridgingTypes, ReabstractionTypes> Types;
+  ExternalUnion<KindTy, Members, getStorageIndexForKind> Types;
   static_assert(decltype(Types)::union_is_trivially_copyable,
                 "define the special members if this changes");
 

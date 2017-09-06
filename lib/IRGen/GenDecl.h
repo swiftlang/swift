@@ -22,7 +22,7 @@
 #include "IRGen.h"
 
 namespace llvm {
-  class AttributeSet;
+  class AttributeList;
   class Function;
   class FunctionType;
 }
@@ -30,12 +30,11 @@ namespace swift {
 namespace irgen {
   class IRGenModule;
   class LinkInfo;
+  class Signature;
 
   llvm::Function *createFunction(IRGenModule &IGM,
                                  LinkInfo &linkInfo,
-                                 llvm::FunctionType *fnType,
-                                 llvm::CallingConv::ID cc,
-                                 const llvm::AttributeSet &attrs,
+                                 const Signature &signature,
                                  llvm::Function *insertBefore = nullptr);
 
 

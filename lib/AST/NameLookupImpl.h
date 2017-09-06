@@ -165,15 +165,6 @@ private:
     visit(S->getBody());
   }
 
-  void visitForStmt(ForStmt *S) {
-    if (!isReferencePointInRange(S->getSourceRange()))
-      return;
-    visit(S->getBody());
-    for (Decl *D : S->getInitializerVarDecls()) {
-      if (auto *VD = dyn_cast<ValueDecl>(D))
-        checkValueDecl(VD, DeclVisibilityKind::LocalVariable);
-    }
-  }
   void visitForEachStmt(ForEachStmt *S) {
     if (!isReferencePointInRange(S->getSourceRange()))
       return;

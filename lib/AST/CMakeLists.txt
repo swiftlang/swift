@@ -59,9 +59,13 @@ add_swift_library(swiftAST STATIC
   TypeRepr.cpp
   TypeWalker.cpp
   USRGeneration.cpp
+  DEPENDS
+    swift-syntax-generated-headers
+
   LINK_LIBRARIES
     swiftMarkup
     swiftBasic
+    swiftSyntax
 
   INTERFACE_LINK_LIBRARIES
     # Clang dependencies.

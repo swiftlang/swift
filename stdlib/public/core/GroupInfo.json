@@ -30,7 +30,6 @@
     "UnicodeEncoding.swift",
     "UnicodeParser.swift",
     "UnicodeScalar.swift",
-    "UnicodeTrie.swift",
     "UnavailableStringAPIs.swift",
     "UTFEncoding.swift",
     "UTF8.swift",

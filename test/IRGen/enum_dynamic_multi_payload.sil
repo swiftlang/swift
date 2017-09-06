@@ -343,7 +343,7 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[NOOP:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      <label>:[[LEFT]]
-  // CHECK:        call void %destroy(%swift.opaque* {{%.*}}, %swift.type* %T)
+  // CHECK:        call void %destroy(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[NOOP]]
   // CHECK:      <label>:[[NOOP]]
   destroy_addr %a : $*EitherOr<T, Builtin.Int64>
@@ -353,7 +353,7 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[TRIVIAL:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      <label>:[[LEFT]]
-  // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* {{%.*}}, %swift.type* %T)
+  // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      <label>:[[TRIVIAL]]
   // CHECK:        call void @llvm.memcpy
@@ -378,7 +378,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK-NEXT:     i32 1, label %[[RIGHT:[0-9]+]]
   // CHECK-NEXT:   ]
   // CHECK:      <label>:[[LEFT]]
-  // CHECK:        call void %destroy(%swift.opaque* {{%.*}}, %swift.type* %T)
+  // CHECK:        call void %destroy(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[NOOP]]
   // CHECK:      <label>:[[RIGHT]]
   // CHECK:        call void {{.*}} @swift_rt_swift_release
@@ -390,7 +390,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[TRIVIAL:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      <label>:[[LEFT]]
-  // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* {{%.*}}, %swift.type* %T)
+  // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      <label>:[[TRIVIAL]]
   // CHECK:        call void @llvm.memcpy
@@ -405,7 +405,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK-NEXT:     i32 1, label %[[RIGHT:[0-9]+]]
   // CHECK-NEXT:   ]
   // CHECK:      <label>:[[LEFT]]
-  // CHECK:        call %swift.opaque* %initializeWithCopy(%swift.opaque* {{%.*}}, %swift.type* %T)
+  // CHECK:        call %swift.opaque* %initializeWithCopy(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      <label>:[[RIGHT]]
   // CHECK:        call void @swift_rt_swift_retain

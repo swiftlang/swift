@@ -318,6 +318,30 @@ public:
   }
 };
 
+class ExtensionError : public llvm::ErrorInfo<ExtensionError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  std::unique_ptr<ErrorInfoBase> underlyingReason;
+
+public:
+  explicit ExtensionError(std::unique_ptr<ErrorInfoBase> reason)
+      : underlyingReason(std::move(reason)) {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "could not deserialize extension";
+    if (underlyingReason) {
+      OS << ": ";
+      underlyingReason->log(OS);
+    }
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 class PrettyStackTraceModuleFile : public llvm::PrettyStackTraceEntry {
   const char *Action;
   const ModuleFile &MF;

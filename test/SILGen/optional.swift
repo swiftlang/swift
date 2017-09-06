@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func testCall(_ f: (() -> ())?) {
   f?()
 }
 // CHECK:    sil hidden @{{.*}}testCall{{.*}}
-// CHECK:    bb0([[T0:%.*]] : $Optional<@callee_owned () -> ()>):
+// CHECK:    bb0([[T0:%.*]] : @owned $Optional<@callee_owned () -> ()>):
 // CHECK:      [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
 // CHECK:      [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
 // CHECK:      [[T1:%.*]] = select_enum [[T0_COPY]]
@@ -35,7 +35,7 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
   var x = f?()
 }
 // CHECK-LABEL: sil hidden @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@owned Optional<@callee_owned () -> @out T>) -> ()
-// CHECK:    bb0([[T0:%.*]] : $Optional<@callee_owned () -> @out T>):
+// CHECK:    bb0([[T0:%.*]] : @owned $Optional<@callee_owned () -> @out T>):
 // CHECK: [[F:%.*]] = alloc_box $<τ_0_0> { var Optional<@callee_owned () -> @out τ_0_0> } <T>, var, name "f"
 // CHECK-NEXT: [[PBF:%.*]] = project_box [[F]]
 // CHECK: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]

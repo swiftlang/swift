@@ -226,6 +226,8 @@ IRGEN_PASS(LoadableByAddress, "loadable-address",
      "SIL Large Loadable type by-address lowering.")
 PASS(RemovePins, "remove-pins",
      "Remove SIL pin/unpin pairs")
+PASS(TempRValueOpt, "temp-rvalue-opt",
+     "Remove short-lived immutable temporary copies")
 PASS(SideEffectsDumper, "side-effects-dump",
      "Print Side-Effect Information for all Functions")
 PASS(SILCleanup, "cleanup",
