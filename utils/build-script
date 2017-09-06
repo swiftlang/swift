@@ -1659,13 +1659,15 @@ details of the setups of other systems or automated environments.""")
         action=arguments.action.optional_bool)
     run_tests_group.add_argument(
         "-s",
-        help="run the test suite in optimize for size mode too (implies --test)",
+        help="run the test suite in optimize for size mode too \
+        (implies --test)",
         action="store_const",
         const=True,
         dest="test_optimize_for_size")
     run_tests_group.add_argument(
         "--test-optimize-for-size",
-        help="run the test suite in optimize for size mode too (implies --test)",
+        help="run the test suite in optimize for size mode too \
+        (implies --test)",
         action=arguments.action.optional_bool)
     run_tests_group.add_argument(
         "--long-test",
