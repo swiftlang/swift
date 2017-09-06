@@ -201,7 +201,7 @@ public:
   bool NeedsReturn = false;
 
   /// \brief Is emission currently within a formal modification?
-  bool InWritebackScope = false;
+  bool InFormalEvaluationScope = false;
 
   /// \brief Is emission currently within an inout conversion?
   bool InInOutConversionScope = false;
