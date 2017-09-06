@@ -490,8 +490,9 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (inheritedTy->isExistentialType()) {
       auto layout = inheritedTy->getExistentialLayout();
 
-      // Classes and extensions cannot inherit from subclass
-      // existentials or AnyObject.
+      // Protocols, generic parameters and associated types can inherit
+      // from subclass existentials, which are "exploded" into their
+      // corresponding requirements.
       if (isa<ProtocolDecl>(decl) ||
           isa<AbstractTypeParamDecl>(decl) ||
           (!layout.hasExplicitAnyObject &&
@@ -503,7 +504,22 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
         continue;
       }
 
-      // Swift 3 compatibility:
+      // Classes can inherit from subclass existentials as long as they
+      // do not contain an explicit AnyObject member.
+      if (isa<ClassDecl>(decl) &&
+          !layout.hasExplicitAnyObject) {
+        for (auto proto : layout.getProtocols()) {
+          auto *protoDecl = proto->getDecl();
+          allProtocols.insert(protoDecl);
+        }
+
+        // Superclass inheritance is handled below.
+        inheritedTy = layout.superclass;
+        if (!inheritedTy)
+          continue;
+      }
+
+      // Swift 3 compatibility -- a class inheriting from AnyObject is a no-op.
       if (Context.LangOpts.isSwiftVersion3() && isa<ClassDecl>(decl) &&
           inheritedTy->isAnyObject()) {
         auto classDecl = cast<ClassDecl>(decl);

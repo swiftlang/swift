@@ -145,7 +145,7 @@ public func funcWithTwoGenericParameters<X, Y>(x: X, y: Y) {
 @_specialize(kind: partial, exported: true, where X == Int, Y == Int)
 @_specialize(kind: partial, kind: partial, where X == Int, Y == Int) // expected-error{{parameter 'kind' was already defined in '_specialize' attribute}}
 
-@_specialize(where X == Int, Y == Int, exported: true, kind: partial) // expected-error{{use of undeclared type 'exported'}} expected-error{{use of undeclared type 'kind'}} expected-error{{use of undeclared type 'partial'}} expected-error{{expected identifier for type name}}
+@_specialize(where X == Int, Y == Int, exported: true, kind: partial) // expected-error{{use of undeclared type 'exported'}} expected-error{{use of undeclared type 'kind'}} expected-error{{use of undeclared type 'partial'}} expected-error{{expected type}}
 public func anotherFuncWithTwoGenericParameters<X: P, Y>(x: X, y: Y) {
 }
 
