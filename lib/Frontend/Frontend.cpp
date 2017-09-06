@@ -341,7 +341,7 @@ void CompilerInstance::performSema() {
 
   // Parse main file last in order to make sure that it can use decls from other
   // files in the module.
-  parseMainAndTypeCheckTopLevelFiles(PersistentState, DelayedCB.get());
+  checkTypesWhileParsingMain(PersistentState, DelayedCB.get());
 }
 
 CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
@@ -533,7 +533,6 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
   return TypeCheckOptions;
 }
 
-// Return true if had load error
 bool CompilerInstance::parsePartialModulesAndLibraryFiles(
     ImplicitImports &implicitImports,
     PersistentParserState &PersistentState,
@@ -550,8 +549,9 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
 
   // Then parse all the library files.
   for (auto BufferID : BufferIDs) {
-    if (BufferID != MainBufferID)
+    if (BufferID != MainBufferID) {
       parseALibraryFile(BufferID, implicitImports, PersistentState, DelayedParseCB);
+    }
   }
   if (Invocation.isCodeCompletion()) {
     // When we are doing code completion, make sure to emit at least one
@@ -563,10 +563,10 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   return hadLoadError;
 }
 
-void CompilerInstance::parseMainAndTypeCheckTopLevelFiles(
+void CompilerInstance::checkTypesWhileParsingMain(
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB) {
-  SharedTimer timer("performSema-parseMainAndTypeCheckTopLevelFiles");
+  SharedTimer timer("performSema-checkTypesWhileParsingMain");
   OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions();
 
   // Parse the main file last.
@@ -593,7 +593,7 @@ void CompilerInstance::parseAndTypeCheckTheMainFile(
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB,
     const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
-  SharedTimer timer("performSema-parseMainAndTypeCheckTopLevelFiles-parseAndTypeCheckTheMainFile");
+  SharedTimer timer("performSema-checkTypesWhileParsingMain-parseAndTypeCheckTheMainFile");
   bool mainIsPrimary =
       (PrimaryBufferID == NO_SUCH_BUFFER || MainBufferID == PrimaryBufferID);
 
@@ -643,11 +643,11 @@ void CompilerInstance::parseAndTypeCheckTheMainFile(
   }
 }
 
-void CompilerInstance::typeCheckTopLevelInputsExcludingMain(PersistentParserState &PersistentState,
-                                                            const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
-    SharedTimer timer("performSema-parseMainAndTypeCheckTopLevelFiles-typeCheckTopLevelInputsExcludingMain");
-    
-   for (auto File : MainModule->getFiles())
+void CompilerInstance::typeCheckTopLevelInputsExcludingMain(
+    PersistentParserState &PersistentState,
+    const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
+  SharedTimer timer("performSema-checkTypesWhileParsingMain-typeCheckTopLevelInputsExcludingMain");
+  for (auto File : MainModule->getFiles())
     if (auto SF = dyn_cast<SourceFile>(File))
       if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
         performTypeChecking(*SF, PersistentState.getTopLevelContext(),
@@ -659,7 +659,7 @@ void CompilerInstance::typeCheckTopLevelInputsExcludingMain(PersistentParserStat
 
 void CompilerInstance::typeCheckMainModule(
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
-  SharedTimer timer("performSema-parseMainAndTypeCheckTopLevelFiles-typeCheckMainModule");
+  SharedTimer timer("performSema-checkTypesWhileParsingMain-typeCheckMainModule");
   if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
     performWholeModuleTypeCheckingOnMainModule();
   }

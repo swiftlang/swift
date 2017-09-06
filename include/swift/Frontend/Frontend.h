@@ -476,13 +476,14 @@ private:
       PersistentParserState &PersistentState,
       DelayedParsingCallbacks *DelayedParseCB);
 
+  /// Return true if had load error
   bool parsePartialModulesAndLibraryFiles(
       ImplicitImports &implicitImports,
       PersistentParserState &PersistentState,
       DelayedParsingCallbacks *DelayedParseCB);
 
   void
-  parseMainAndTypeCheckTopLevelFiles(PersistentParserState &PersistentState,
+  checkTypesWhileParsingMain(PersistentParserState &PersistentState,
                                      DelayedParsingCallbacks *DelayedParseCB);
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
