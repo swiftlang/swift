@@ -1171,10 +1171,6 @@ struct TargetVTableDescriptor {
   }
 };
 
-struct ClassTypeDescriptor;
-struct StructTypeDescriptor;
-struct EnumTypeDescriptor;
-
 /// Common information about all nominal types. For generic types, this
 /// descriptor is shared for all instantiations of the generic type.
 template <typename Runtime>
