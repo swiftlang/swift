@@ -588,7 +588,9 @@ void StmtEmitter::visitWhileStmt(WhileStmt *S) {
     // Enter a scope for any bound pattern variables.
     Scope conditionScope(SGF.Cleanups, S);
     
-    SGF.emitStmtCondition(S->getCond(), breakDest, S);
+    auto NumTrueTaken = SGF.loadProfilerCount(S->getBody());
+    auto NumFalseTaken = SGF.loadProfilerCount(S);
+    SGF.emitStmtCondition(S->getCond(), breakDest, S, NumTrueTaken, NumFalseTaken);
     
     // In the success path, emit the body of the while.
     SGF.emitProfilerIncrement(S->getBody());
