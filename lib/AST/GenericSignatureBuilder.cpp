@@ -2886,26 +2886,22 @@ static ConstraintResult visitInherited(
   return result;
 }
 
-ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
-                               PotentialArchetype *PAT,
-                               ProtocolDecl *Proto,
-                               const RequirementSource *Source) {
-  // Add the requirement, if we haven't done so already.
-  if (!PAT->addConformance(Proto, Source, *this))
-    return ConstraintResult::Resolved;
-
-  auto concreteSelf = PAT->getDependentType({});
+ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
+                                            PotentialArchetype *pa,
+                                            ProtocolDecl *proto,
+                                            const RequirementSource *source) {
+  auto concreteSelf = pa->getDependentType({});
   auto protocolSubMap = SubstitutionMap::getProtocolSubstitutions(
-      Proto, concreteSelf, ProtocolConformanceRef(Proto));
+      proto, concreteSelf, ProtocolConformanceRef(proto));
 
   // Use the requirement signature to avoid rewalking the entire protocol.  This
   // cannot compute the requirement signature directly, because that may be
   // infinitely recursive: this code is also used to construct it.
-  if (Proto->isRequirementSignatureComputed()) {
+  if (proto->isRequirementSignatureComputed()) {
     auto innerSource =
-      FloatingRequirementSource::viaProtocolRequirement(Source, Proto,
+      FloatingRequirementSource::viaProtocolRequirement(source, proto,
                                                         /*inferred=*/false);
-    for (const auto &req : Proto->getRequirementSignature()) {
+    for (const auto &req : proto->getRequirementSignature()) {
       auto reqResult = addRequirement(req, innerSource, nullptr,
                                       &protocolSubMap);
       if (isErrorResult(reqResult)) return reqResult;
@@ -2916,20 +2912,20 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
 
   // Add all of the inherited protocol requirements, recursively.
   if (auto resolver = getLazyResolver())
-    resolver->resolveInheritedProtocols(Proto);
+    resolver->resolveInheritedProtocols(proto);
 
-  auto protoModule = Proto->getParentModule();
+  auto protoModule = proto->getParentModule();
 
   auto inheritedReqResult =
-    addInheritedRequirements(Proto, PAT, Source, protoModule);
+    addInheritedRequirements(proto, pa, source, protoModule);
   if (isErrorResult(inheritedReqResult))
     return inheritedReqResult;
 
   // Add any requirements in the where clause on the protocol.
-  if (auto WhereClause = Proto->getTrailingWhereClause()) {
+  if (auto WhereClause = proto->getTrailingWhereClause()) {
     for (auto &req : WhereClause->getRequirements()) {
       auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
-          Source, Proto, &req, /*inferred=*/false);
+          source, proto, &req, /*inferred=*/false);
       addRequirement(&req, innerSource, &protocolSubMap, protoModule);
     }
   }
@@ -2938,9 +2934,9 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   // inherited protocols (recursively).
   llvm::MapVector<DeclName, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;
   {
-    Proto->walkInheritedProtocols(
+    proto->walkInheritedProtocols(
         [&](ProtocolDecl *inheritedProto) -> TypeWalker::Action {
-      if (inheritedProto == Proto) return TypeWalker::Action::Continue;
+      if (inheritedProto == proto) return TypeWalker::Action::Continue;
 
       for (auto req : getProtocolMembers(inheritedProto)) {
         if (auto typeReq = dyn_cast<TypeDecl>(req))
@@ -2954,11 +2950,11 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   // clause, as well as the string to start the insertion ("where" or ",");
   auto getProtocolWhereLoc = [&]() -> std::pair<SourceLoc, const char *> {
     // Already has a trailing where clause.
-    if (auto trailing = Proto->getTrailingWhereClause())
+    if (auto trailing = proto->getTrailingWhereClause())
       return { trailing->getRequirements().back().getSourceRange().End, ", " };
 
     // Inheritance clause.
-    return { Proto->getInherited().back().getSourceRange().End, " where " };
+    return { proto->getInherited().back().getSourceRange().End, " where " };
   };
 
   // Retrieve the set of requirements that a given associated type declaration
@@ -3032,21 +3028,21 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
 
     auto inferredSameTypeSource =
       FloatingRequirementSource::viaProtocolRequirement(
-                    Source, Proto, WrittenRequirementLoc(), /*inferred=*/true);
+                    source, proto, WrittenRequirementLoc(), /*inferred=*/true);
 
     addRequirement(
       Requirement(RequirementKind::SameType, firstType, secondType),
-      inferredSameTypeSource, Proto->getParentModule(),
+      inferredSameTypeSource, proto->getParentModule(),
       &protocolSubMap);
   };
 
   // Add requirements for each of the associated types.
-  for (auto Member : getProtocolMembers(Proto)) {
+  for (auto Member : getProtocolMembers(proto)) {
     if (auto assocTypeDecl = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
       Type assocType = DependentMemberType::get(concreteSelf, assocTypeDecl);
       auto assocResult =
-        addInheritedRequirements(assocTypeDecl, assocType, Source, protoModule);
+        addInheritedRequirements(assocTypeDecl, assocType, source, protoModule);
       if (isErrorResult(assocResult))
         return assocResult;
 
@@ -3055,7 +3051,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
         for (auto &req : WhereClause->getRequirements()) {
           auto innerSource =
             FloatingRequirementSource::viaProtocolRequirement(
-                                      Source, Proto, &req, /*inferred=*/false);
+                                      source, proto, &req, /*inferred=*/false);
           addRequirement(&req, innerSource, &protocolSubMap, protoModule);
         }
       }
@@ -3066,7 +3062,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
       if (knownInherited == inheritedTypeDecls.end()) continue;
 
       bool shouldWarnAboutRedeclaration =
-        Source->kind == RequirementSource::RequirementSignatureSelf &&
+        source->kind == RequirementSource::RequirementSignatureSelf &&
         assocTypeDecl->getDefaultDefinitionLoc().isNull();
       for (auto inheritedType : knownInherited->second) {
         // If we have inherited associated type...
@@ -3100,7 +3096,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
 
         // We inherited a type; this associated type will be identical
         // to that typealias.
-        if (Source->kind == RequirementSource::RequirementSignatureSelf) {
+        if (source->kind == RequirementSource::RequirementSignatureSelf) {
           auto inheritedOwningDecl =
             inheritedType->getDeclContext()
               ->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -3124,7 +3120,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
       if (knownInherited == inheritedTypeDecls.end()) continue;
 
       bool shouldWarnAboutRedeclaration =
-        Source->kind == RequirementSource::RequirementSignatureSelf;
+        source->kind == RequirementSource::RequirementSignatureSelf;
 
       for (auto inheritedType : knownInherited->second) {
         // If we have inherited associated type...
@@ -3174,6 +3170,17 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   }
 
   return ConstraintResult::Resolved;
+}
+
+ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
+                               PotentialArchetype *PAT,
+                               ProtocolDecl *Proto,
+                               const RequirementSource *Source) {
+  // Add the requirement, if we haven't done so already.
+  if (!PAT->addConformance(Proto, Source, *this))
+    return ConstraintResult::Resolved;
+
+  return expandConformanceRequirement(PAT, Proto, Source);
 }
 
 ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
