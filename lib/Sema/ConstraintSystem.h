@@ -2535,6 +2535,9 @@ private:
   };
 
   struct PotentialBindings {
+    typedef std::tuple<bool, bool, bool, bool, unsigned char,
+                       bool, unsigned int> BindingScore;
+
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
 
@@ -2564,22 +2567,21 @@ private:
       return Bindings.size() > NumDefaultableBindings;
     }
 
+    static BindingScore formBindingScore(const PotentialBindings &b) {
+      return std::make_tuple(!b.hasNonDefaultableBindings(),
+                             b.FullyBound,
+                             b.IsRHSOfBindParam,
+                             b.SubtypeOfExistentialType,
+                             static_cast<unsigned char>(b.LiteralBinding),
+                             b.InvolvesTypeVariables,
+                             -(b.Bindings.size() - b.NumDefaultableBindings));
+    }
+
     /// Compare two sets of bindings, where \c x < y indicates that
     /// \c x is a better set of bindings that \c y.
     friend bool operator<(const PotentialBindings &x,
                           const PotentialBindings &y) {
-      return std::make_tuple(!x.hasNonDefaultableBindings(),
-                             x.FullyBound, x.IsRHSOfBindParam,
-                             x.SubtypeOfExistentialType,
-                             static_cast<unsigned char>(x.LiteralBinding),
-                             x.InvolvesTypeVariables,
-                             -(x.Bindings.size() - x.NumDefaultableBindings)) <
-             std::make_tuple(!y.hasNonDefaultableBindings(),
-                             y.FullyBound, y.IsRHSOfBindParam,
-                             y.SubtypeOfExistentialType,
-                             static_cast<unsigned char>(y.LiteralBinding),
-                             y.InvolvesTypeVariables,
-                             -(y.Bindings.size() - y.NumDefaultableBindings));
+      return formBindingScore(x) < formBindingScore(y);
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
