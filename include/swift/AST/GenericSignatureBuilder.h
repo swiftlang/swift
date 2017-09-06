@@ -316,6 +316,14 @@ private:
                                              ProtocolDecl *Proto,
                                              const RequirementSource *Source);
 
+  /// "Expand" the conformance of the given \c pa to the protocol \c proto,
+  /// adding the requirements from its requirement signature, rooted at
+  /// the given requirement \c source.
+  ConstraintResult expandConformanceRequirement(
+                                      PotentialArchetype *pa,
+                                      ProtocolDecl *proto,
+                                      const RequirementSource *source);
+
 public:
   /// \brief Add a new same-type requirement between two fully resolved types
   /// (output of \c GenericSignatureBuilder::resolve).
