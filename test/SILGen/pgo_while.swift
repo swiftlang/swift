@@ -6,8 +6,6 @@
 // RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-ir -module-name pgo_while -o - | %FileCheck %s --check-prefix=IR
 // need to fix SIL Opt before running this:
 // %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-sorted-sil -emit-sil -module-name pgo_while -o - | %FileCheck %s --check-prefix=SIL-OPT
-
-// Need to cherry-pick llvm/r280600 to test this:
 // %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-ir -module-name pgo_while -o - | %FileCheck %s --check-prefix=IR-OPT
 
 // REQUIRES: profile_runtime
@@ -15,6 +13,8 @@
 
 // SIL-LABEL: // pgo_while.guessWhile
 // IR-LABEL: define swiftcc i32 @_T09pgo_while10guessWhiles5Int32VAD1x_tF
+// IR-OPT-LABEL: define swiftcc i32 @_T09pgo_while10guessWhiles5Int32VAD1x_tF
+
 public func guessWhile(x: Int32) -> Int32 {
   // SIL: cond_br {{.*}} !true_count(420) !false_count(42)
   // SIL: cond_br {{.*}} !true_count(176400) !false_count(420)
@@ -44,3 +44,5 @@ main()
 
 // IR: !{!"branch_weights", i32 421, i32 43}
 // IR: !{!"branch_weights", i32 176401, i32 421}
+// IR-OPT: !{!"branch_weights", i32 421, i32 43}
+// IR-OPT: !{!"branch_weights", i32 176401, i32 421}

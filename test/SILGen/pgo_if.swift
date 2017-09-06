@@ -5,15 +5,14 @@
 // RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-sorted-sil -emit-sil -module-name pgo_if -o - | %FileCheck %s --check-prefix=SIL
 // RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-ir -module-name pgo_if -o - | %FileCheck %s --check-prefix=IR
 // RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-sorted-sil -emit-sil -module-name pgo_if -o - | %FileCheck %s --check-prefix=SIL-OPT
-
-// Need to cherry-pick llvm/r280600 to test this:
-// %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-ir -module-name pgo_if -o - | %FileCheck %s --check-prefix=IR-OPT
+// RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-ir -module-name pgo_if -o - | %FileCheck %s --check-prefix=IR-OPT
 
 // REQUIRES: profile_runtime
 // REQUIRES: OS=macosx
 
 // SIL-LABEL: // pgo_if.guess1
-// IR-LABEL: define i32 @_TF6pgo_if6guess1
+// IR-LABEL: define swiftcc i32 @_T06pgo_if6guess1s5Int32VAD1x_tF
+// IR-OPT-LABEL: define swiftcc i32 @_T06pgo_if6guess1s5Int32VAD1x_tF
 public func guess1(x: Int32) -> Int32 {
   // SIL: cond_br {{.*}} !true_count(5000) !false_count(1)
   // SIL-OPT: cond_br {{.*}} !true_count(5000) !false_count(1)
@@ -27,7 +26,8 @@ public func guess1(x: Int32) -> Int32 {
 }
 
 // SIL-LABEL: // pgo_if.guess2
-// IR-LABEL: define i32 @_TF6pgo_if6guess2
+// IR-LABEL: define swiftcc i32 @_T06pgo_if6guess2s5Int32VAD1x_tF
+// IR-OPT-LABEL: define swiftcc i32 @_T06pgo_if6guess2s5Int32VAD1x_tF
 public func guess2(x: Int32) -> Int32 {
   // SIL: cond_br {{.*}} !true_count(5000) !false_count(1)
   // SIL-OPT: cond_br {{.*}} !true_count(5000) !false_count(1)
@@ -49,3 +49,4 @@ func main() {
 main()
 
 // IR: !{!"branch_weights", i32 5001, i32 2}
+// IR-OPT: !{!"branch_weights", i32 5001, i32 2}
