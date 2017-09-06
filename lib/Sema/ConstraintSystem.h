@@ -2536,7 +2536,7 @@ private:
 
   struct PotentialBindings {
     typedef std::tuple<bool, bool, bool, bool, unsigned char,
-                       bool, unsigned int> BindingScore;
+                       bool, bool, unsigned int> BindingScore;
 
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
@@ -2559,6 +2559,9 @@ private:
     /// Is this type variable on the RHS of a BindParam constraint?
     bool IsRHSOfBindParam = false;
 
+    /// Is this type variable on the RHS of a Subtype constraint?
+    bool IsRHSOfSubtype = false;
+
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
 
@@ -2574,6 +2577,7 @@ private:
                              b.SubtypeOfExistentialType,
                              static_cast<unsigned char>(b.LiteralBinding),
                              b.InvolvesTypeVariables,
+                             b.IsRHSOfSubtype,
                              -(b.Bindings.size() - b.NumDefaultableBindings));
     }
 
