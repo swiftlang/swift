@@ -1555,6 +1555,106 @@ bool RefactoringActionCollapseNestedIfExpr::performChange() {
   return false;
 }
 
+static std::unique_ptr<llvm::SetVector<Expr*>>
+  findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext& Ctx) {
+  if (Info.Kind != RangeKind::SingleExpression
+      && Info.Kind != RangeKind::PartOfExpression)
+    return nullptr;
+  Expr *E = Info.ContainedNodes[0].get<Expr*>();
+
+  struct StringInterpolationExprFinder: public SourceEntityWalker {
+    std::unique_ptr<llvm::SetVector<Expr*>> Bucket = llvm::
+    make_unique<llvm::SetVector<Expr*>>();
+    ASTContext& Ctx;
+
+    bool IsValidInterpolation = true;
+    StringInterpolationExprFinder(ASTContext& Ctx): Ctx(Ctx) {}
+
+    bool isConcatenationExpr(DeclRefExpr* Expr) {
+      if (!Expr)
+        return false;
+      auto *FD = dyn_cast<FuncDecl>(Expr->getDecl());
+      if (FD == nullptr || FD != Ctx.getPlusFunctionOnString()) {
+        return false;
+      }
+      return true;
+    }
+
+    bool walkToExprPre(Expr *E) {
+      if (E->isImplicit())
+        return true;
+      auto ExprType = E->getType()->getNominalOrBoundGenericNominal();
+      //Only binary concatenation operators should exist in expression
+      if (E->getKind() == ExprKind::Binary) {
+        auto *BE = dyn_cast<BinaryExpr>(E);
+        auto *OperatorDeclRef = BE->getSemanticFn()->getMemberOperatorRef();
+        if (!(isConcatenationExpr(OperatorDeclRef)
+            && ExprType == Ctx.getStringDecl())) {
+          IsValidInterpolation = false;
+          return false;
+        }
+        return true;
+      }
+      // Everything that evaluates to string should be gathered.
+      if (ExprType == Ctx.getStringDecl()) {
+        Bucket->insert(E);
+        return false;
+      }
+      if (auto *DR = dyn_cast<DeclRefExpr>(E)) {
+        // Checks whether all function references in expression are concatenations.
+        auto *FD = dyn_cast<FuncDecl>(DR->getDecl());
+        auto IsConcatenation = isConcatenationExpr(DR);
+        if (FD && IsConcatenation) {
+          return false;
+        }
+      }
+      // There was non-expected expression, it's not valid interpolation then.
+      IsValidInterpolation = false;
+      return false;
+    }
+  } Walker(Ctx);
+  Walker.walk(E);
+
+  // There should be two or more expressions to convert.
+  if (!Walker.IsValidInterpolation || Walker.Bucket->size() < 2)
+    return nullptr;
+
+  return std::move(Walker.Bucket);
+}
+
+static std::string interpolatedExpressionForm(Expr* E, SourceManager& SM) {
+  if (auto *Literal = dyn_cast<StringLiteralExpr>(E)) {
+    return Literal->getValue();
+  }
+  auto ExpStr = Lexer::getCharSourceRangeFromSourceRange(SM,
+    E->getSourceRange()).str().str();
+  if (auto *Interpolation = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+    ExpStr.erase(0, 1);
+    ExpStr.pop_back();
+    return ExpStr;
+  }
+  return "\\(" + ExpStr + ")";
+}
+
+bool RefactoringActionConvertStringsConcatenationToInterpolation::
+isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  auto Type = Info.getType();
+  return findConcatenatedExpressions(Info, Type->getASTContext()) != nullptr;
+}
+
+bool RefactoringActionConvertStringsConcatenationToInterpolation::performChange() {
+  auto Expressions = findConcatenatedExpressions(RangeInfo, Ctx);
+  if (!Expressions)
+    return true;
+  std::string Replacement = "\"";
+  for (auto It = Expressions->begin(); It != Expressions->end(); It++) {
+    Replacement.append(interpolatedExpressionForm(*It, SM));
+  }
+  Replacement.append("\"");
+  EditConsumer.accept(SM, RangeInfo.ContentRange, StringRef(Replacement));
+  return false;
+}
+
 /// The helper class analyzes a given nominal decl or an extension decl to
 /// decide whether stubs are required to filled in and the context in which
 /// these stubs should be filled.

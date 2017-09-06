@@ -440,6 +440,9 @@ public:
   /// Get the '+' function on two RangeReplaceableCollection.
   FuncDecl *getPlusFunctionOnRangeReplaceableCollection() const;
 
+  /// Get the '+' function on two String.
+  FuncDecl *getPlusFunctionOnString() const;
+
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
   ///
