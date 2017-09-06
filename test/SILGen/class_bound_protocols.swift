@@ -7,6 +7,8 @@ enum Optional<T> {
 
 precedencegroup AssignmentPrecedence {}
 
+typealias AnyObject = Builtin.AnyObject
+
 // -- Class-bound archetypes and existentials are *not* address-only and can
 //    be manipulated using normal reference type value semantics.
 

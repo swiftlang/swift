@@ -6,6 +6,8 @@ import Builtin
 // NonTest Utilities //
 ///////////////////////
 
+typealias AnyObject = Builtin.AnyObject
+
 protocol FakeAnyObject : class {}
 
 class C : FakeAnyObject {
