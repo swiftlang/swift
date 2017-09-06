@@ -104,18 +104,6 @@ struct MapRegionCounters : public ASTWalker {
   MapRegionCounters(llvm::DenseMap<ASTNode, unsigned> &CounterMap)
       : NextCounter(0), CounterMap(CounterMap) {}
 
-  unsigned getParentCounter() const {
-    if (Parent.isNull())
-      return 0;
-    else if (Parent.getKind() == ASTWalker::ParentKind::Decl)
-      return CounterMap[Parent.getAsDecl()];
-    else if (Parent.getKind() == ASTWalker::ParentKind::Stmt)
-      return CounterMap[Parent.getAsStmt()];
-    else if (Parent.getKind() == ASTWalker::ParentKind::Expr)
-      return CounterMap[Parent.getAsExpr()];
-    return 0;
-  }
-
   bool walkToDeclPre(Decl *D) override {
     if (isUnmappedDecl(D))
       return false;
@@ -129,15 +117,8 @@ struct MapRegionCounters : public ASTWalker {
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *IS = dyn_cast<IfStmt>(S)) {
       CounterMap[IS->getThenStmt()] = NextCounter++;
-
-      // XXX/Hack: Map the else stmt to the parent's counter.
-      if (IS->getElseStmt())
-        CounterMap[IS->getElseStmt()] = getParentCounter();
-
     } else if (auto *US = dyn_cast<GuardStmt>(S)) {
       CounterMap[US->getBody()] = NextCounter++;
-      // Map the guard statement to the parent's counter.
-      CounterMap[US] = getParentCounter();
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       CounterMap[WS->getBody()] = NextCounter++;
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
@@ -160,11 +141,6 @@ struct MapRegionCounters : public ASTWalker {
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto *IE = dyn_cast<IfExpr>(E)) {
       CounterMap[IE->getThenExpr()] = NextCounter++;
-
-      // XXX/Hack: Map the else expr to the parent's counter.
-      if (IE->getElseExpr())
-        CounterMap[IE->getElseExpr()] = getParentCounter();
-
     } else if (isa<AutoClosureExpr>(E) || isa<ClosureExpr>(E)) {
       CounterMap[E] = NextCounter++;
     }
@@ -293,6 +269,157 @@ public:
   const SourceLoc &getEndLoc() const {
     assert(EndLoc && "Region has no end location");
     return *EndLoc;
+  }
+};
+
+/// An ASTWalker that maps ASTNodes to profiling counters.
+struct PGOMapping : public ASTWalker {
+  /// The next counter value to assign.
+  unsigned NextCounter;
+
+  /// The map of statements to counters.
+  llvm::DenseMap<ASTNode, Optional<uint64_t>> &LoadedCounterMap;
+  llvm::Expected<llvm::InstrProfRecord> &LoadedCounts;
+  llvm::DenseMap<ASTNode, unsigned> CounterMap;
+
+  PGOMapping(llvm::DenseMap<ASTNode, Optional<uint64_t>> &LoadedCounterMap,
+             llvm::Expected<llvm::InstrProfRecord> &LoadedCounts)
+      : NextCounter(0), LoadedCounterMap(LoadedCounterMap),
+        LoadedCounts(LoadedCounts) {}
+
+  unsigned getParentCounter() const {
+    if (Parent.isNull())
+      return 0;
+    else if (Parent.getKind() == ASTWalker::ParentKind::Decl) {
+      auto it = CounterMap.find(Parent.getAsDecl());
+      return (it != CounterMap.end()) ? it->getSecond() : 0;
+    } else if (Parent.getKind() == ASTWalker::ParentKind::Stmt) {
+      auto it = CounterMap.find(Parent.getAsStmt());
+      return (it != CounterMap.end()) ? it->getSecond() : 0;
+    } else if (Parent.getKind() == ASTWalker::ParentKind::Expr) {
+      auto it = CounterMap.find(Parent.getAsExpr());
+      return (it != CounterMap.end()) ? it->getSecond() : 0;
+    }
+    return 0;
+  }
+
+  Optional<uint64_t> subtract(Optional<uint64_t> L, Optional<uint64_t> R) {
+    if (!L || !R) {
+      return L;
+    }
+    uint64_t LV = L.getValue();
+    uint64_t RV = R.getValue();
+    assert(LV >= RV && "Invalid counter subtraction");
+    return LV - RV;
+  }
+
+  /// Load the execution count corresponding to \p Node from a profile, if one
+  /// is available.
+  Optional<uint64_t> loadExecutionCount(ASTNode Node) {
+    if (!Node)
+      return None;
+
+    auto CounterIt = CounterMap.find(Node);
+    assert(CounterIt != CounterMap.end() &&
+           "region does not have an associated counter");
+
+    unsigned CounterIndexForFunc = CounterIt->second;
+    return LoadedCounts->Counts[CounterIndexForFunc];
+  }
+
+  bool walkToDeclPre(Decl *D) override {
+    if (isUnmappedDecl(D))
+      return false;
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      auto node = AFD->getBody();
+      CounterMap[node] = NextCounter++;
+      auto count = loadExecutionCount(node);
+      LoadedCounterMap[node] = count;
+    }
+    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      auto node = TLCD->getBody();
+      CounterMap[node] = NextCounter++;
+      auto count = loadExecutionCount(node);
+      LoadedCounterMap[node] = count;
+    }
+    return true;
+  }
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    unsigned parent = getParentCounter();
+    if (auto *IS = dyn_cast<IfStmt>(S)) {
+      auto thenStmt = IS->getThenStmt();
+      CounterMap[thenStmt] = NextCounter++;
+      auto thenCount = loadExecutionCount(thenStmt);
+      LoadedCounterMap[thenStmt] = thenCount;
+      if (auto elseStmt = IS->getElseStmt()) {
+        CounterMap[elseStmt] = parent;
+        auto count = loadExecutionCount(elseStmt);
+        LoadedCounterMap[elseStmt] = subtract(count, thenCount);
+      }
+    } else if (auto *US = dyn_cast<GuardStmt>(S)) {
+      auto guardBody = US->getBody();
+      CounterMap[guardBody] = NextCounter++;
+      auto guardCount = loadExecutionCount(guardBody);
+      LoadedCounterMap[guardBody] = guardCount;
+      CounterMap[US] = parent;
+      auto count = loadExecutionCount(US);
+      LoadedCounterMap[US] = subtract(count, guardCount);
+    } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
+      auto whileBody = WS->getBody();
+      CounterMap[whileBody] = NextCounter++;
+      auto whileCount = loadExecutionCount(whileBody);
+      LoadedCounterMap[whileBody] = whileCount;
+    } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
+      auto rwsBody = RWS->getBody();
+      CounterMap[rwsBody] = NextCounter++;
+      auto rwsBodyCount = loadExecutionCount(rwsBody);
+      LoadedCounterMap[rwsBody] = rwsBodyCount;
+    } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
+      auto fesBody = FES->getBody();
+      CounterMap[fesBody] = NextCounter++;
+      auto fesCount = loadExecutionCount(fesBody);
+      LoadedCounterMap[fesBody] = fesCount;
+      walkPatternForProfiling(FES->getIterator(), *this);
+    } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
+      CounterMap[SS] = NextCounter++;
+      auto ssCount = loadExecutionCount(SS);
+      LoadedCounterMap[SS] = ssCount;
+    } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
+      CounterMap[CS] = NextCounter++;
+      auto csCount = loadExecutionCount(CS);
+      LoadedCounterMap[CS] = csCount;
+    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+      CounterMap[DCS] = NextCounter++;
+      auto dcsCount = loadExecutionCount(DCS);
+      LoadedCounterMap[DCS] = dcsCount;
+    } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
+      auto csBody = CS->getBody();
+      CounterMap[csBody] = NextCounter++;
+      auto csBodyCount = loadExecutionCount(csBody);
+      LoadedCounterMap[csBody] = csBodyCount;
+    }
+    return {true, S};
+  }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    unsigned parent = getParentCounter();
+    if (auto *IE = dyn_cast<IfExpr>(E)) {
+      auto thenExpr = IE->getThenExpr();
+      CounterMap[thenExpr] = NextCounter++;
+      auto thenCount = loadExecutionCount(thenExpr);
+      LoadedCounterMap[thenExpr] = thenCount;
+      if (auto elseExpr = IE->getElseExpr()) {
+        CounterMap[elseExpr] = parent;
+        auto count = loadExecutionCount(elseExpr);
+        LoadedCounterMap[elseExpr] = subtract(count, thenCount);
+      }
+    } else if (isa<AutoClosureExpr>(E) || isa<ClosureExpr>(E)) {
+      CounterMap[E] = NextCounter++;
+      auto eCount = loadExecutionCount(E);
+      LoadedCounterMap[E] = eCount;
+    }
+    return {true, E};
   }
 };
 
@@ -691,7 +818,7 @@ public:
 
 SILGenProfiling::SILGenProfiling(SILGenModule &SGM, bool EmitCoverageMapping)
     : SGM(SGM), EmitCoverageMapping(EmitCoverageMapping), NumRegionCounters(0),
-      FunctionHash(0), LoadedCounts(std::error_code()) {}
+      FunctionHash(0) {}
 
 static llvm::GlobalValue::LinkageTypes
 getEquivalentPGOLinkage(FormalLinkage Linkage) {
@@ -737,12 +864,6 @@ void SILGenProfiling::assignRegionCounters(Decl *Root) {
   // TODO: Mapper needs to calculate a function hash as it goes.
   FunctionHash = 0x0;
 
-  if (SGM.PGOReader) {
-    // FIXME: We need some kind of error tracking mechanism here, like clang's
-    // PGOStats tracker.
-    LoadedCounts = SGM.PGOReader->getInstrProfRecord(PGOFuncName, FunctionHash);
-  }
-
   if (EmitCoverageMapping) {
     CoverageMapping Coverage(SM);
     walkForProfiling(Root, Coverage);
@@ -751,6 +872,27 @@ void SILGenProfiling::assignRegionCounters(Decl *Root) {
                                    getEquivalentPGOLinkage(CurrentFuncLinkage)),
                                FunctionHash, RegionCounterMap, CurrentFileName);
   }
+
+  if (SGM.PGOReader) {
+    auto LoadedCounts =
+        SGM.PGOReader->getInstrProfRecord(PGOFuncName, FunctionHash);
+    if (auto E = LoadedCounts.takeError()) {
+      return;
+    }
+    PGOMapping pgoMapper(PGORegionLoadedCounterMap, LoadedCounts);
+    walkForProfiling(Root, pgoMapper);
+  }
+}
+
+Optional<uint64_t> SILGenProfiling::getExecutionCount(ASTNode Node) {
+  if (!Node) {
+    return None;
+  }
+  auto it = PGORegionLoadedCounterMap.find(Node);
+  if (it == PGORegionLoadedCounterMap.end()) {
+    return None;
+  }
+  return it->getSecond();
 }
 
 static SILLocation getLocation(ASTNode Node) {
@@ -786,31 +928,3 @@ void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
   Builder.createBuiltin(Loc, C.getIdentifier("int_instrprof_increment"),
                         SGM.Types.getEmptyTupleType(), {}, Args);
 }
-
-Optional<uint64_t> SILGenProfiling::loadExecutionCount(ASTNode Node) {
-  if (!Node || !LoadedCounts)
-    return None;
-
-  auto CounterIt = RegionCounterMap.find(Node);
-  assert(CounterIt != RegionCounterMap.end() &&
-         "region does not have an associated counter");
-
-  unsigned CounterIndexForFunc = CounterIt->second;
-  return LoadedCounts->Counts[CounterIndexForFunc];
-}
-
-namespace swift {
-namespace ProfileCounter {
-
-Optional<uint64_t> subtract(Optional<uint64_t> L, Optional<uint64_t> R) {
-  if (!L || !R)
-    return L;
-
-  uint64_t LV = L.getValue();
-  uint64_t RV = R.getValue();
-  assert(LV >= RV && "Invalid counter subtraction");
-  return LV - RV;
-}
-
-} // end namespace ProfileCounter
-} // end namespace swift

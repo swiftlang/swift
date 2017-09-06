@@ -379,7 +379,7 @@ public:
   /// available.
   Optional<uint64_t> loadProfilerCount(ASTNode N) {
     if (SGM.Profiler && SGM.Profiler->hasRegionCounters())
-      return SGM.Profiler->loadExecutionCount(N);
+      return SGM.Profiler->getExecutionCount(N);
     return None;
   }
   
