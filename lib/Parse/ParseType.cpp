@@ -470,42 +470,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                                specifierLoc));
 }
 
-ParserResult<TypeRepr> Parser::parseTypeForInheritance(
-    Diag<> MessageID, Diag<TypeLoc> NonIdentifierTypeMessageID) {
-  ParserResult<TypeRepr> Ty = parseTypeSimpleOrComposition(MessageID);
-
-  if (Ty.hasCodeCompletion())
-    return makeParserCodeCompletionResult<TypeRepr>();
-
-  if (Ty.isParseError() || isa<ErrorTypeRepr>(Ty.get()))
-    return Ty;
-
-  if (isa<IdentTypeRepr>(Ty.get()))
-    return Ty;
-
-  if (auto Comp = dyn_cast<CompositionTypeRepr>(Ty.get())) {
-    bool hasNonIdent = false;
-    for (auto T : Comp->getTypes()) {
-      if (isa<IdentTypeRepr>(T))
-        continue;
-      hasNonIdent = true;
-      diagnose(T->getLoc(), NonIdentifierTypeMessageID, T)
-        .highlight(T->getSourceRange());
-    }
-    // IdentType only composition are allowed.
-    if (!hasNonIdent)
-      return Ty;
-  } else {
-    diagnose(Ty.get()->getLoc(), NonIdentifierTypeMessageID, Ty.get())
-      .highlight(Ty.get()->getSourceRange());
-  }
-
-  return makeParserErrorResult(
-    new (Context) ErrorTypeRepr(Ty.get()->getSourceRange()));
-
-  return Ty;
-}
-
 bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                                    SourceLoc &LAngleLoc,
                                    SourceLoc &RAngleLoc) {
