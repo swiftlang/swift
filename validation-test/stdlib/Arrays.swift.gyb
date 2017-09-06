@@ -1,8 +1,241 @@
-// RUN: %target-run-simple-swiftgyb
+// RUN: %empty-directory(%t)
+//
+// RUN: %gyb %s -o %t/main.swift
+// RUN: if [ %target-runtime == "objc" ]; then \
+// RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
+// RUN:   %line-directive %t/main.swift -- %target-build-swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Arrays -g -Onone -Xfrontend -disable-access-control; \
+// RUN: else \
+// RUN:   %line-directive %t/main.swift -- %target-build-swift %t/main.swift -o %t/Arrays -Xfrontend -disable-access-control; \
+// RUN: fi
+//
+// RUN: %line-directive %t/main.swift -- %target-run %t/Arrays
 // REQUIRES: executable_test
 
+import Swift
 import StdlibUnittest
 import StdlibCollectionUnittest
+
+#if _runtime(_ObjC)
+import Foundation
+import StdlibUnittestFoundationExtras
+#endif
+
+func isCocoaArray<T>(_ a: Array<T>) -> Bool {
+  return !isNativeArray(a)
+}
+
+func isNativeArray<T>(_ a: Array<T>) -> Bool {
+  return a._buffer._storage.isNative
+}
+
+func convertArrayToNSArray<T>(_ a: [T]) -> NSArray {
+  return a._bridgeToObjectiveC()
+}
+
+func convertNSArrayToArray<T>(_ a: NSArray?) -> [T] {
+  if _slowPath(a == nil) { return [] }
+  var result: [T]?
+  Array._forceBridgeFromObjectiveC(a!, result: &result)
+  return result!
+}
+
+var _objcValueCount = _stdlib_AtomicInt(0)
+var _objcValueSerial = _stdlib_AtomicInt(0)
+
+class TestObjCValueTy : NSObject {
+  class var objectCount: Int {
+    get {
+      return _objcValueCount.load()
+    }
+    set {
+      _objcValueCount.store(newValue)
+    }
+  }
+
+  init(_ value: Int) {
+    _objcValueCount.fetchAndAdd(1)
+    serial = _objcValueSerial.addAndFetch(1)
+    self.value = value
+  }
+
+  deinit {
+    assert(serial > 0, "double destruction")
+    _objcValueCount.fetchAndAdd(-1)
+    serial = -serial
+  }
+
+  override var description: String {
+    assert(serial > 0, "dead TestObjCValueTy")
+    return value.description
+  }
+
+  var value: Int
+  var serial: Int
+}
+
+var _objcEquatableValueCount = _stdlib_AtomicInt(0)
+var _objcEquatableValueSerial = _stdlib_AtomicInt(0)
+
+class TestObjCEquatableValueTy : NSObject {
+  class var objectCount: Int {
+    get {
+      return _objcEquatableValueCount.load()
+    }
+    set {
+      _objcEquatableValueCount.store(newValue)
+    }
+  }
+
+  init(_ value: Int) {
+    _objcEquatableValueCount.fetchAndAdd(1)
+    serial = _objcEquatableValueSerial.addAndFetch(1)
+    self.value = value
+  }
+
+  deinit {
+    assert(serial > 0, "double destruction")
+    _objcEquatableValueCount.fetchAndAdd(-1)
+    serial = -serial
+  }
+
+  override func isEqual(_ object: Any!) -> Bool {
+    if let other = object {
+      if let otherObjcKey = other as? TestObjCEquatableValueTy {
+        return self.value == otherObjcKey.value
+      }
+    }
+    return false
+  }
+
+  override var description: String {
+    assert(serial > 0, "dead TestObjCValueTy")
+    return value.description
+  }
+
+  var value: Int
+  var serial: Int
+}
+
+func == (lhs: TestObjCEquatableValueTy, rhs: TestObjCEquatableValueTy) -> Bool {
+  return lhs.value == rhs.value
+}
+
+var _bridgedValueSerial = _stdlib_AtomicInt(0)
+var _bridgedValueBridgeOperations = _stdlib_AtomicInt(0)
+
+struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
+  static var bridgeOperations: Int {
+    get {
+      return _bridgedValueBridgeOperations.load()
+    }
+    set {
+      _bridgedValueBridgeOperations.store(newValue)
+    }
+  }
+
+  init(_ value: Int) {
+    serial = _bridgedValueSerial.fetchAndAdd(1)
+    self.value = value
+  }
+
+  var description: String {
+    assert(serial > 0, "dead TestBridgedValueTy")
+    return value.description
+  }
+
+  func _bridgeToObjectiveC() -> TestObjCValueTy {
+    TestBridgedValueTy.bridgeOperations += 1
+    return TestObjCValueTy(value)
+  }
+
+  static func _forceBridgeFromObjectiveC(
+    _ x: TestObjCValueTy,
+    result: inout TestBridgedValueTy?
+  ) {
+    TestBridgedValueTy.bridgeOperations += 1
+    result = TestBridgedValueTy(x.value)
+  }
+
+  static func _conditionallyBridgeFromObjectiveC(
+    _ x: TestObjCValueTy,
+    result: inout TestBridgedValueTy?
+  ) -> Bool {
+    self._forceBridgeFromObjectiveC(x, result: &result)
+    return true
+  }
+
+  static func _unconditionallyBridgeFromObjectiveC(_ source: TestObjCValueTy?)
+      -> TestBridgedValueTy {
+    var result: TestBridgedValueTy? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+
+  var value: Int
+  var serial: Int
+}
+
+var _bridgedEquatableValueSerial = _stdlib_AtomicInt(0)
+var _bridgedEquatableValueBridgeOperations = _stdlib_AtomicInt(0)
+
+struct TestBridgedEquatableValueTy
+  : Equatable, CustomStringConvertible, _ObjectiveCBridgeable {
+
+  static var bridgeOperations: Int {
+    get {
+      return _bridgedEquatableValueBridgeOperations.load()
+    }
+    set {
+      _bridgedEquatableValueBridgeOperations.store(newValue)
+    }
+  }
+
+  init(_ value: Int) {
+    serial = _bridgedEquatableValueSerial.addAndFetch(1)
+    self.value = value
+  }
+
+  var description: String {
+    assert(serial > 0, "dead TestBridgedValueTy")
+    return value.description
+  }
+
+  func _bridgeToObjectiveC() -> TestObjCEquatableValueTy {
+    _bridgedEquatableValueBridgeOperations.fetchAndAdd(1)
+    return TestObjCEquatableValueTy(value)
+  }
+
+  static func _forceBridgeFromObjectiveC(
+    _ x: TestObjCEquatableValueTy,
+    result: inout TestBridgedEquatableValueTy?
+  ) {
+    _bridgedEquatableValueBridgeOperations.fetchAndAdd(1)
+    result = TestBridgedEquatableValueTy(x.value)
+  }
+
+  static func _conditionallyBridgeFromObjectiveC(
+    _ x: TestObjCEquatableValueTy,
+    result: inout TestBridgedEquatableValueTy?
+  ) -> Bool {
+    self._forceBridgeFromObjectiveC(x, result: &result)
+    return true
+  }
+
+  static func _unconditionallyBridgeFromObjectiveC(
+    _ source: TestObjCEquatableValueTy?
+  ) -> TestBridgedEquatableValueTy {
+    var result: TestBridgedEquatableValueTy? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+
+  var value: Int
+  var serial: Int
+}
+
+func == (lhs: TestBridgedEquatableValueTy, rhs: TestBridgedEquatableValueTy) -> Bool {
+  return lhs.value == rhs.value
+}
 
 let CopyToNativeArrayBufferTests = TestSuite("CopyToNativeArrayBufferTests")
 
@@ -96,6 +329,754 @@ ArrayTestSuite.test("valueDestruction") {
     a.append(LifetimeTracked(i))
   }
 }
+
+#if _runtime(_ObjC)
+//===----------------------------------------------------------------------===//
+// NSArray -> Array bridging tests.
+//===----------------------------------------------------------------------===//
+
+func getAsNSArray(_ a: Array<Int>) -> NSArray {
+  let values = Array(a.map { TestObjCValueTy($0) })
+  
+  // Return an `NSMutableArray` to make sure that it has a unique
+  // pointer identity.
+  let nsarray = NSMutableArray()
+  nsarray.addObjects(from: values)
+  return nsarray
+}
+
+func getAsEquatableNSArray(_ a: Array<Int>) -> NSArray {
+  let values = Array(a.map { TestObjCEquatableValueTy($0) })
+
+  // Return an `NSMutableArray` to make sure that it has a unique
+  // pointer identity.
+  let nsarray = NSMutableArray()
+  nsarray.addObjects(from: values)
+  return nsarray
+}
+
+func getAsNSMutableArray(_ a: Array<Int>) -> NSMutableArray {
+  let values = Array(a.map { TestObjCValueTy($0) })
+  let nsarray = NSMutableArray()
+  nsarray.addObjects(from: values)
+  return nsarray
+}
+
+func getBridgedVerbatimArray() -> Array<AnyObject> {
+  let nsa = getAsNSArray([1010, 1020, 1030])
+  return convertNSArrayToArray(nsa)
+}
+
+func getBridgedVerbatimArray(_ a: Array<Int>) -> Array<AnyObject> {
+  let nsa = getAsNSArray(a)
+  return convertNSArrayToArray(nsa)
+}
+
+func getBridgedVerbatimArrayAndNSMutableArray()
+    -> (Array<AnyObject>, NSMutableArray) {
+  let nsa = getAsNSMutableArray([1010, 1020, 1030])
+  return (convertNSArrayToArray(nsa), nsa)
+}
+
+func getBridgedNonverbatimArray() -> Array<TestBridgedValueTy> {
+  let nsa = getAsNSArray([1010, 1020, 1030 ])
+  return Swift._forceBridgeFromObjectiveC(nsa, Array.self)
+}
+
+func getBridgedNonverbatimArray(_ a: Array<Int>) -> Array<TestBridgedValueTy> {
+  let nsa = getAsNSArray(a)
+  return Swift._forceBridgeFromObjectiveC(nsa, Array.self)
+}
+
+func getBridgedNonverbatimArrayAndNSMutableArray()
+    -> (Array<TestBridgedValueTy>, NSMutableArray) {
+  let nsa = getAsNSMutableArray([1010, 1020, 1030])
+  return (Swift._forceBridgeFromObjectiveC(nsa, Array.self), nsa)
+}
+
+func getBridgedVerbatimEquatableArray(_ a: Array<Int>) 
+    -> Array<TestObjCEquatableValueTy> {
+  let nsa = getAsEquatableNSArray(a)
+  return convertNSArrayToArray(nsa)
+}
+
+func getBridgedNonverbatimEquatableArray(_ a: Array<Int>) 
+    -> Array<TestBridgedEquatableValueTy> {
+  let nsa = getAsEquatableNSArray(a)
+  return Swift._forceBridgeFromObjectiveC(nsa, Array.self)
+}
+
+func getHugeBridgedVerbatimArrayHelper() -> NSArray {
+  let values = (1...32).map { TestObjCValueTy(1000 + $0) }
+
+  let nsa = NSMutableArray()
+  nsa.addObjects(from: values)
+  return nsa
+}
+
+func getHugeBridgedVerbatimArray() -> Array<AnyObject> {
+  let nsa = getHugeBridgedVerbatimArrayHelper()
+  return convertNSArrayToArray(nsa)
+}
+
+func getHugeBridgedNonverbatimArray() 
+    -> Array<TestBridgedValueTy> {
+  let nsa = getHugeBridgedVerbatimArrayHelper()
+  return Swift._forceBridgeFromObjectiveC(nsa, Array.self)
+}
+
+@objc
+class CustomImmutableNSArray : NSArray {
+  init(_privateInit: ()) {
+    super.init()
+  }
+    
+  override init() {
+    expectUnreachable()
+    super.init()
+  }
+  
+  override init(objects: UnsafePointer<AnyObject>!, count cnt: Int) {
+    expectUnreachable()
+    super.init(objects: objects, count: cnt)
+  }
+
+  required init?(coder aDecoder: NSCoder) {
+    fatalError("init(coder:) not implemented by CustomImmutableNSArray")
+  }
+
+  @objc(copyWithZone:)
+  override func copy(with zone: NSZone?) -> Any {
+    CustomImmutableNSArray.timesCopyWithZoneWasCalled += 1
+    return self
+  }
+
+  override func object(at index: Int) -> Any {
+    CustomImmutableNSArray.timesObjectAtIndexWasCalled += 1
+    return getAsNSArray([1010, 1020, 1030]).object(at: index)
+  }
+  
+  override func objectEnumerator() -> NSEnumerator {
+    CustomImmutableNSArray.timesObjectEnumeratorWasCalled += 1
+    return getAsNSArray([1010, 1020, 1030]).objectEnumerator()
+  }
+
+  override var count: Int {
+    CustomImmutableNSArray.timesCountWasCalled += 1
+    return 3
+  }
+
+  static var timesCopyWithZoneWasCalled = 0
+  static var timesObjectAtIndexWasCalled = 0
+  static var timesObjectEnumeratorWasCalled = 0
+  static var timesCountWasCalled = 0
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
+  var (a, nsa) = getBridgedVerbatimArrayAndNSMutableArray()
+  var identity1 = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  // Find an existing value.
+  do {
+    var v = a[0]
+    expectEqual(1010, v.value)
+  }
+
+  // Remove the value from the NSMutableArray.
+  nsa.removeObject(at: 0)
+
+  // Find an existing value, again.
+  do {
+    var v = a[0]
+    expectEqual(1010, v.value)
+  }
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
+  var (a, nsa) = getBridgedNonverbatimArrayAndNSMutableArray()
+  var identity1 = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  // Find an existing value.
+  do {
+    var v = a[0]
+    expectEqual(1010, v.value)
+  }
+
+  // Remove the value from the NSMutableArray.
+  nsa.removeObject(at: 0)
+
+  // Find an existing value, again.
+  do {
+    var v = a[0]
+    expectEqual(1010, v.value)
+  }
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
+  var nsa: NSArray = autoreleasepool {
+    NSArray(array: getAsNSArray([1010, 1020, 1030]))
+  }
+  
+  var a: [AnyObject] = convertNSArrayToArray(nsa)
+  
+  var bridgedBack: NSArray = convertArrayToNSArray(a)
+  
+  expectEqual(
+    unsafeBitCast(nsa, to: Int.self),
+    unsafeBitCast(bridgedBack, to: Int.self))
+  
+  _blackHole(nsa)
+  _blackHole(a)
+  _blackHole(bridgedBack)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
+  var nsa: NSArray = autoreleasepool {
+    NSArray(array: getAsNSArray([1010, 1020, 1030]))
+  }
+  
+  var a: [TestBridgedValueTy] = convertNSArrayToArray(nsa)
+  
+  var bridgedBack: NSArray = convertArrayToNSArray(a)
+  
+  expectNotEqual(
+    unsafeBitCast(nsa, to: Int.self),
+    unsafeBitCast(bridgedBack, to: Int.self))
+  
+  _blackHole(nsa)
+  _blackHole(a)
+  _blackHole(bridgedBack)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
+  var nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
+  
+  CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
+  CustomImmutableNSArray.timesObjectAtIndexWasCalled = 0
+  CustomImmutableNSArray.timesObjectEnumeratorWasCalled = 0
+  CustomImmutableNSArray.timesCountWasCalled = 0
+  var a: [AnyObject] = convertNSArrayToArray(nsa)
+  expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
+  expectEqual(0, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
+  expectEqual(0, CustomImmutableNSArray.timesObjectEnumeratorWasCalled)
+  expectEqual(0, CustomImmutableNSArray.timesCountWasCalled)
+  
+  var bridgedBack: NSArray = convertArrayToNSArray(a)
+  expectEqual(
+    unsafeBitCast(nsa, to: Int.self),
+    unsafeBitCast(bridgedBack, to: Int.self))
+  
+  _blackHole(nsa)
+  _blackHole(a)
+  _blackHole(bridgedBack)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
+  var nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
+
+  CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
+  CustomImmutableNSArray.timesObjectAtIndexWasCalled = 0
+  CustomImmutableNSArray.timesObjectEnumeratorWasCalled = 0
+  CustomImmutableNSArray.timesCountWasCalled = 0
+  TestBridgedValueTy.bridgeOperations = 0
+  var a: [TestBridgedValueTy] = convertNSArrayToArray(nsa)
+  //FIXME: Why is this copied?
+  expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
+  expectEqual(3, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
+  expectNotEqual(0, CustomImmutableNSArray.timesCountWasCalled)
+  expectEqual(3, TestBridgedValueTy.bridgeOperations)
+
+  var bridgedBack: NSArray = convertArrayToNSArray(a)
+  expectNotEqual(
+    unsafeBitCast(nsa, to: Int.self),
+    unsafeBitCast(bridgedBack, to: Int.self))
+
+  _fixLifetime(nsa)
+  _fixLifetime(a)
+  _fixLifetime(bridgedBack)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.Subscript") {
+  var a = getBridgedVerbatimArray()
+  var identity1 = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  // Find an existing value.
+  do {
+    var v = a[0]
+    expectEqual(1010, (v as! TestObjCValueTy).value)
+
+    v = a[1]
+    expectEqual(1020, (v as! TestObjCValueTy).value)
+
+    v = a[2]
+    expectEqual(1030, (v as! TestObjCValueTy).value)
+  }
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Subscript") {
+  var a = getBridgedNonverbatimArray()
+  var identity1 = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  // Find an existing value.
+  do {
+    var v = a[0]
+    expectEqual(1010, v.value)
+
+    v = a[1]
+    expectEqual(1020, v.value)
+
+    v = a[2]
+    expectEqual(1030, v.value)
+  }
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
+  var a = getBridgedVerbatimArray()
+  var identity = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  let index = 0
+  expectEqual(1010, (a[index] as! TestObjCValueTy).value)
+  expectEqual(identity, a._rawIdentifier())
+
+  let removedElement = a.remove(at: index)
+  expectNotEqual(identity, a._rawIdentifier())
+  expectTrue(isNativeArray(a))
+  expectEqual(1010, (removedElement as! TestObjCValueTy).value)
+  expectEqual(2, a.count)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
+  var a = getBridgedNonverbatimArray()
+  var identity = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  let index = 0
+  expectEqual(1010, a[index].value)
+  expectEqual(identity, a._rawIdentifier())
+
+  let removedElement = a.remove(at: index)
+  expectEqual(identity, a._rawIdentifier())
+  expectTrue(isNativeArray(a))
+  expectEqual(1010, removedElement.value)
+  expectEqual(2, a.count)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
+  // do {
+//     var a = getBridgedVerbatimArray([])
+//     var identity1 = a._rawIdentifier()
+//     expectTrue(isCocoaArray(a))
+//     expectEqual(0, a.count)
+//
+//     a.removeAll()
+//     expectEqual(identity1, a._rawIdentifier())
+//     expectEqual(0, a.count)
+//   }
+
+  do {
+    var a = getBridgedVerbatimArray()
+    var identity1 = a._rawIdentifier()
+    expectTrue(isCocoaArray(a))
+    let originalCapacity = a.count
+    expectEqual(3, a.count)
+    expectEqual(1010, (a[0] as! TestObjCValueTy).value)
+
+    a.removeAll()
+    expectNotEqual(identity1, a._rawIdentifier())
+    expectLT(a._buffer.capacity, originalCapacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a = getBridgedVerbatimArray()
+    var identity1 = a._rawIdentifier()
+    expectTrue(isCocoaArray(a))
+    let originalCapacity = a.count
+    expectEqual(3, a.count)
+    expectEqual(1010, (a[0] as! TestObjCValueTy).value)
+
+    a.removeAll(keepingCapacity: true)
+    expectNotEqual(identity1, a._rawIdentifier())
+    expectGE(a._buffer.capacity, originalCapacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a1 = getBridgedVerbatimArray()
+    var identity1 = a1._rawIdentifier()
+    expectTrue(isCocoaArray(a1))
+    let originalCapacity = a1.count
+    expectEqual(3, a1.count)
+    expectEqual(1010, (a1[0] as! TestObjCValueTy).value)
+
+    var a2 = a1
+    a2.removeAll()
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(1010, (a1[0] as! TestObjCValueTy).value)
+    assert(a2._buffer.capacity < originalCapacity)
+    expectEqual(0, a2.count)
+  }
+
+  do {
+    var a1 = getBridgedVerbatimArray()
+    var identity1 = a1._rawIdentifier()
+    expectTrue(isCocoaArray(a1))
+    let originalCapacity = a1.count
+    expectEqual(3, a1.count)
+    expectEqual(1010, (a1[0] as! TestObjCValueTy).value)
+
+    var a2 = a1
+    a2.removeAll(keepingCapacity: true)
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(1010, (a1[0] as! TestObjCValueTy).value)
+    expectGE(a2._buffer.capacity, originalCapacity)
+    expectEqual(0, a2.count)
+  }
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
+  // do {
+  //   var a = getBridgedNonverbatimArray([])
+  //   var identity1 = a._rawIdentifier()
+  //   expectTrue(isNativeArray(a))
+  //   expectEqual(0, a.count)
+  //
+  //   a.removeAll()
+  //   expectEqual(identity1, a._rawIdentifier())
+  //   expectEqual(0, a.count)
+  // }
+
+  do {
+    var a = getBridgedNonverbatimArray()
+    var identity1 = a._rawIdentifier()
+    expectTrue(isNativeArray(a))
+    let originalCapacity = a.count
+    expectEqual(3, a.count)
+    expectEqual(1010, a[0].value)
+
+    a.removeAll()
+    expectNotEqual(identity1, a._rawIdentifier())
+    expectLT(a._buffer.capacity, originalCapacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a = getBridgedNonverbatimArray()
+    var identity1 = a._rawIdentifier()
+    expectTrue(isNativeArray(a))
+    let originalCapacity = a.count
+    expectEqual(3, a.count)
+    expectEqual(1010, a[0].value)
+
+    a.removeAll(keepingCapacity: true)
+    expectEqual(identity1, a._rawIdentifier())
+    expectGE(a._buffer.capacity, originalCapacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a1 = getBridgedNonverbatimArray()
+    var identity1 = a1._rawIdentifier()
+    expectTrue(isNativeArray(a1))
+    let originalCapacity = a1.count
+    expectEqual(3, a1.count)
+    expectEqual(1010, a1[0].value)
+
+    var a2 = a1
+    a2.removeAll()
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(1010, a1[0].value)
+    assert(a2._buffer.capacity < originalCapacity)
+    expectEqual(0, a2.count)
+  }
+
+  do {
+    var a1 = getBridgedNonverbatimArray()
+    var identity1 = a1._rawIdentifier()
+    expectTrue(isNativeArray(a1))
+    let originalCapacity = a1.count
+    expectEqual(3, a1.count)
+    expectEqual(1010, a1[0].value)
+
+    var a2 = a1
+    a2.removeAll(keepingCapacity: true)
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(1010, a1[0].value)
+    assert(a2._buffer.capacity >= originalCapacity)
+    expectEqual(0, a2.count)
+  }
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.Count") {
+  var a = getBridgedVerbatimArray()
+  var identity1 = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  expectEqual(3, a.count)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
+  var a = getBridgedNonverbatimArray()
+  var identity1 = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  expectEqual(3, a.count)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
+  var a = getBridgedVerbatimArray()
+  var identity1 = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  var iter = a.makeIterator()
+  var values = Array<Int>()
+  while let value = iter.next() {
+    values.append((value as! TestObjCValueTy).value)
+  }
+  expectEqual(values, [1010, 1020, 1030])
+  // The following is not required by the IteratorProtocol protocol, but
+  // it is a nice QoI.
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
+  var a = getBridgedNonverbatimArray()
+  var identity1 = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  var iter = a.makeIterator()
+  var values = Array<Int>()
+  while let value = iter.next() {
+    values.append(value.value)
+  }
+  expectEqual(values, [1010, 1020, 1030])
+  // The following is not required by the IteratorProtocol protocol, but
+  // it is a nice QoI.
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
+  var a = getBridgedVerbatimArray([])
+  var identity1 = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  var iter = a.makeIterator()
+  expectNil(iter.next())
+  // The following is not required by the IteratorProtocol protocol, but
+  // it is a nice QoI.
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
+  var a = getBridgedNonverbatimArray([])
+  var identity1 = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  var iter = a.makeIterator()
+  expectNil(iter.next())
+  // The following is not required by the IteratorProtocol protocol, but
+  // it is a nice QoI.
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
+  var a = getHugeBridgedVerbatimArray()
+  var identity1 = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  var iter = a.makeIterator()
+  var values = Array<Int>()
+  while let value = iter.next() {
+    values.append((value as! TestObjCValueTy).value)
+  }
+  var expectedValues = Array<Int>()
+  for i in 1...32 {
+    expectedValues += [1000 + i]
+  }
+  expectEqual(values, expectedValues)
+  // The following is not required by the IteratorProtocol protocol, but
+  // it is a nice QoI.
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
+  var a = getHugeBridgedNonverbatimArray()
+  var identity1 = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  var iter = a.makeIterator()
+  var values = Array<Int>()
+  while let value = iter.next() {
+    values.append(value.value)
+  }
+  var expectedValues = Array<Int>()
+  for i in 1...32 {
+    expectedValues += [1000 + i]
+  }
+  expectEqual(values, expectedValues)
+  // The following is not required by the IteratorProtocol protocol, but
+  // it is a nice QoI.
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
+  var a1 = getBridgedVerbatimEquatableArray([])
+  var identity1 = a1._rawIdentifier()
+  expectTrue(isCocoaArray(a1))
+
+  var a2 = getBridgedVerbatimEquatableArray([])
+  var identity2 = a2._rawIdentifier()
+  expectTrue(isCocoaArray(a2))
+
+  // We can't check that `identity1 != identity2` because Foundation might be
+  // returning the same singleton NSArray for empty arrays.
+
+  expectEqual(a1, a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
+  var a1 = getBridgedNonverbatimEquatableArray([])
+  a1.append(TestBridgedEquatableValueTy(1))
+  a1.removeLast()
+  var identity1 = a1._rawIdentifier()
+  expectTrue(isNativeArray(a1))
+
+  var a2 = getBridgedNonverbatimEquatableArray([])
+  var identity2 = a2._rawIdentifier()
+  expectTrue(isNativeArray(a2))
+  expectNotEqual(identity1, identity2)
+
+  expectEqual(a1, a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
+  func helper(_ na1: Array<Int>, _ na2: Array<Int>, _ expectedEq: Bool) {
+    let a1 = getBridgedVerbatimEquatableArray(na1)
+    let identity1 = a1._rawIdentifier()
+    expectTrue(isCocoaArray(a1))
+
+    var a2 = getBridgedVerbatimEquatableArray(na2)
+    var identity2 = a2._rawIdentifier()
+    expectTrue(isCocoaArray(a2))
+
+    do {
+      let eq1 = (a1 == a2)
+      expectEqual(eq1, expectedEq)
+
+      let eq2 = (a2 == a1)
+      expectEqual(eq2, expectedEq)
+
+      let neq1 = (a1 != a2)
+      expectNotEqual(neq1, expectedEq)
+
+      let neq2 = (a2 != a1)
+      expectNotEqual(neq2, expectedEq)
+    }
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity2, a2._rawIdentifier())
+
+    a2.append(TestObjCEquatableValueTy(1111))
+    a2.removeLast()
+    expectTrue(isNativeArray(a2))
+    expectNotEqual(identity2, a2._rawIdentifier())
+    identity2 = a2._rawIdentifier()
+
+    do {
+      let eq1 = (a1 == a2)
+      expectEqual(eq1, expectedEq)
+
+      let eq2 = (a2 == a1)
+      expectEqual(eq2, expectedEq)
+
+      let neq1 = (a1 != a2)
+      expectNotEqual(neq1, expectedEq)
+
+      let neq2 = (a2 != a1)
+      expectNotEqual(neq2, expectedEq)
+    }
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity2, a2._rawIdentifier())
+  }
+
+  helper([], [], true)
+
+  helper([1010],
+         [1010],
+         true)
+
+  helper([1010, 1020],
+         [1010, 1020],
+         true)
+
+  helper([1010, 1020, 1030],
+         [1010, 1020, 1030],
+         true)
+
+  helper([1010, 1020, 1030],
+         [1010, 1020, 1111],
+         false)
+
+  helper([1010, 1020, 1030],
+         [1010, 1020],
+         false)
+
+  helper([1010, 1020, 1030],
+         [1010],
+         false)
+
+  helper([1010, 1020, 1030],
+         [],
+         false)
+
+  helper([1010, 1020, 1030],
+         [1010, 1020, 1030, 1040],
+         false)
+}
+
+#endif
 
 //===----------------------------------------------------------------------===//
 // Native array tests
