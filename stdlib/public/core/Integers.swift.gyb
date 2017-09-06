@@ -2421,7 +2421,7 @@ ${unsafeOperationComment(x.operator)}
   /// - Parameter source: An integer to convert to this type.
   @inline(__always)
   public init<T : BinaryInteger>(truncatingIfNeeded source: T) {
-    if Self.bitWidth <= ${word_bits} || source.bitWidth <= ${word_bits} {
+    if Self.bitWidth <= ${word_bits} {
       self = Self.init(_truncatingBits: source._word(at: 0))
     }
     else {
