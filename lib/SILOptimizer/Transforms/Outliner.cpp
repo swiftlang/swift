@@ -68,7 +68,7 @@ public:
   std::string mangle();
 
 private:
-  unsigned char getMethodKindMangling() {
+  char getMethodKindMangling() {
     switch (Kind) {
     case BridgedProperty:
       return 'p';
@@ -206,7 +206,7 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
 ///
 ///  bb10(%45 : $Optional<String>):
 class BridgedProperty : public OutlinePattern {
-  std::string outlinedName;
+  std::string OutlinedName;
   SILInstruction *FirstInst;
   SILBasicBlock *StartBB;
   SILBasicBlock *SomeBB;
@@ -249,15 +249,15 @@ void BridgedProperty::clearState() {
     ClassMethod = nullptr;
     Release = nullptr;
     PropApply = nullptr;
-    outlinedName.clear();
+    OutlinedName.clear();
 }
 
 std::string BridgedProperty::getOutlinedFunctionName() {
-  if (outlinedName.empty()) {
+  if (OutlinedName.empty()) {
     OutlinerMangler Mangler(ClassMethod->getMember(), isa<LoadInst>(FirstInst));
-    outlinedName = Mangler.mangle();
+    OutlinedName = Mangler.mangle();
   }
-  return outlinedName;
+  return OutlinedName;
 }
 
 /// Returns the outlined function type.
@@ -394,8 +394,10 @@ BridgedProperty::outline(SILModule &M) {
 }
 
 #define ADVANCE_ITERATOR_OR_RETURN_FALSE(It)                                   \
-  if (It->getParent()->end() == ++It)                                          \
-    return false;
+  do {                                                                         \
+    if (It->getParent()->end() == ++It)                                        \
+      return false;                                                            \
+  } while (0);
 
 bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It) {
   // Matches:
@@ -567,7 +569,8 @@ bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
     if (!CMI)
       return false;
     FirstInst = CMI;
-  } else FirstInst = Load;
+  } else
+    FirstInst = Load;
 
   StartBB = FirstInst->getParent();
 
@@ -951,7 +954,7 @@ class ObjcMethodCall : public OutlinePattern {
   ClassMethodInst *ClassMethod;
   ApplyInst *BridgedCall;
   SmallVector<BridgedArgument, 4> BridgedArguments;
-  std::string outlinedName;
+  std::string OutlinedName;
   llvm::BitVector IsBridgedArgument;
   BridgedReturn BridgedReturn;
 public:
@@ -977,7 +980,7 @@ void ObjcMethodCall::clearState() {
   ClassMethod = nullptr;
   BridgedCall = nullptr;
   BridgedArguments.clear();
-  outlinedName.clear();
+  OutlinedName.clear();
 }
 
 std::pair<SILFunction *, SILBasicBlock::iterator>
@@ -1080,12 +1083,12 @@ ObjcMethodCall::outline(SILModule &M) {
 }
 
 std::string ObjcMethodCall::getOutlinedFunctionName() {
-  if (outlinedName.empty()) {
+  if (OutlinedName.empty()) {
     OutlinerMangler Mangler(ClassMethod->getMember(), &IsBridgedArgument,
                             BridgedReturn);
-    outlinedName = Mangler.mangle();
+    OutlinedName = Mangler.mangle();
   }
-  return outlinedName;
+  return OutlinedName;
 }
 
 bool ObjcMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
@@ -1132,17 +1135,17 @@ bool ObjcMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
   BridgedReturn.match(BridgedCall);
 
   // Don't outline inside the outlined function.
-  auto outlinedName = getOutlinedFunctionName();
-  auto currentName = ClassMethod->getFunction()->getName();
-  if (ClassMethod->getFunction()->getName().equals(outlinedName))
+  auto OutlinedName = getOutlinedFunctionName();
+  auto CurrentName = ClassMethod->getFunction()->getName();
+  if (CurrentName.equals(OutlinedName))
     return false;
 
   // Don't outline if we created an outlined function without the bridged result
   // from the outlined function with the bridged result (only the suffix is
   // different: MethodNameTem...n_ vs MethodNameTem...b_).
-  if (outlinedName.size() == currentName.size() &&
-      currentName.startswith(
-          StringRef(outlinedName.c_str(), outlinedName.size() - 2)))
+  if (OutlinedName.size() == CurrentName.size() &&
+      CurrentName.startswith(
+          StringRef(OutlinedName.c_str(), OutlinedName.size() - 2)))
     return false;
 
   return !BridgedArguments.empty();
@@ -1261,7 +1264,7 @@ bool tryOutline(SILFunction *Fun,
        }
     }
   }
-	return false;
+  return false;
 }
 
 namespace {
@@ -1285,7 +1288,7 @@ public:
     }
 
     SmallVector<SILFunction *, 16> FunctionsAdded;
-		bool Changed = tryOutline(Fun, FunctionsAdded);
+    bool Changed = tryOutline(Fun, FunctionsAdded);
 
     if (!FunctionsAdded.empty()) {
       // Notify the pass manager of any new functions we outlined.
