@@ -28,17 +28,36 @@ using namespace constraints;
 
 #define DEBUG_TYPE "ConstraintSystem"
 
+ExpressionTimer::ExpressionTimer(Expr *E, ConstraintSystem &CS)
+    : E(E), WarnLimit(CS.TC.getWarnLongExpressionTypeChecking()),
+      Context(CS.getASTContext()),
+      StartTime(llvm::TimeRecord::getCurrentTime()),
+      PrintDebugTiming(CS.TC.getDebugTimeExpressions()), PrintWarning(true) {
+  if (auto *baseCS = CS.baseCS) {
+    // If we already have a timer in the base constraint
+    // system, let's seed its start time to the child.
+    if (baseCS->Timer) {
+      StartTime = baseCS->Timer->startedAt();
+      PrintWarning = false;
+      PrintDebugTiming = false;
+    }
+  }
+}
+
 ExpressionTimer::~ExpressionTimer() {
   auto elapsed = getElapsedProcessTimeInFractionalSeconds();
   unsigned elapsedMS = static_cast<unsigned>(elapsed * 1000);
 
-  if (ShouldDump) {
+  if (PrintDebugTiming) {
     // Round up to the nearest 100th of a millisecond.
     llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100)
                  << "ms\t";
     E->getLoc().print(llvm::errs(), Context.SourceMgr);
     llvm::errs() << "\n";
   }
+
+  if (!PrintWarning)
+    return;
 
   if (WarnLimit != 0 && elapsedMS >= WarnLimit && E->getLoc().isValid())
     Context.Diags.diagnose(E->getLoc(), diag::debug_long_expression,
