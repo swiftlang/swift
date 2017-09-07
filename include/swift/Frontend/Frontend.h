@@ -305,7 +305,7 @@ public:
   /// identifying the conditions under which the module was built, for use
   /// in generating a cached PCH file for the bridging header.
   std::string getPCHHash() const;
-  
+
   SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() {
     if (getInputKind() == InputFileKind::IFK_SIL) {
       return SourceFile::ImplicitModuleImportKind::None;
@@ -352,10 +352,12 @@ class CompilerInstance {
 
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
   unsigned MainBufferID = NO_SUCH_BUFFER;
-  
+
   /// Corresponds to PrimaryInput
   unsigned PrimaryBufferID = NO_SUCH_BUFFER;
-  bool generateOutputForTheWholeModule() { return PrimaryBufferID == NO_SUCH_BUFFER; }
+  bool generateOutputForTheWholeModule() {
+    return PrimaryBufferID == NO_SUCH_BUFFER;
+  }
 
   SourceFile *PrimarySourceFile = nullptr;
 
@@ -453,41 +455,37 @@ private:
   ModuleDecl *importUnderlyingModule();
   ModuleDecl *importBridgingHeader();
 
-  void getImplicitlyImportedModules(
-      SmallVectorImpl<ModuleDecl *> &importModules);
-  
+  void
+  getImplicitlyImportedModules(SmallVectorImpl<ModuleDecl *> &importModules);
+
 public: // for static functions in Frontend.cpp
-  
   struct ImplicitImports {
     SourceFile::ImplicitModuleImportKind kind;
     ModuleDecl *objCModuleUnderlyingMixedFramework;
     ModuleDecl *headerModule;
     SmallVector<ModuleDecl *, 4> modules;
-    
+
     explicit ImplicitImports(CompilerInstance &compiler);
   };
-  
+
 private:
   void createREPLFile(ImplicitImports &implicitImports);
   std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
 
   void addMainFileToModule(ImplicitImports &implicitImports);
- 
-  void parseLibraryFile(
-      unsigned BufferID,
-      ImplicitImports &implicitImports,
-      PersistentParserState &PersistentState,
-      DelayedParsingCallbacks *DelayedParseCB);
+
+  void parseLibraryFile(unsigned BufferID, ImplicitImports &implicitImports,
+                        PersistentParserState &PersistentState,
+                        DelayedParsingCallbacks *DelayedParseCB);
 
   /// Return true if had load error
-  bool parsePartialModulesAndLibraryFiles(
-      ImplicitImports &implicitImports,
-      PersistentParserState &PersistentState,
-      DelayedParsingCallbacks *DelayedParseCB);
-
-  void
-  checkTypesWhileParsingMain(PersistentParserState &PersistentState,
+  bool
+  parsePartialModulesAndLibraryFiles(ImplicitImports &implicitImports,
+                                     PersistentParserState &PersistentState,
                                      DelayedParsingCallbacks *DelayedParseCB);
+
+  void checkTypesWhileParsingMain(PersistentParserState &PersistentState,
+                                  DelayedParsingCallbacks *DelayedParseCB);
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
 
@@ -496,13 +494,13 @@ private:
       DelayedParsingCallbacks *DelayedParseCB,
       const OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performTypeCheckingAndDelayedParsing();
- 
+
   void typeCheckEveryFileInMainModule(
-                                  PersistentParserState &PersistentState,
-                                  const OptionSet<TypeCheckingFlags> TypeCheckOptions);
-  void typeCheckThePrimaryFile(
-                                  PersistentParserState &PersistentState,
-                                  const OptionSet<TypeCheckingFlags> TypeCheckOptions);
+      PersistentParserState &PersistentState,
+      const OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void
+  typeCheckThePrimaryFile(PersistentParserState &PersistentState,
+                          const OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void typeCheckMainModule(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 };
 
