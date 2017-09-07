@@ -91,7 +91,7 @@ extension S6 : Codable {}
 // CHECK: note: protocol requires initializer 'init(from:)' with type 'Decodable'
 // CHECK: note: cannot automatically synthesize 'Decodable' because 'b' does not have a matching CodingKey and does not have a default value
 
-// CHECK: error: implementation of 'Decodable' cannot be automatically synthesized in an extension yet
+// CHECK: error: implementation of 'Decodable' cannot be automatically synthesized in an extension
 
 // }
 
@@ -115,6 +115,6 @@ extension S6 : Codable {}
 // CHECK: note: CodingKey case 'b2' does not match any stored properties
 // CHECK: note: CodingKey case 'c2' does not match any stored properties
 
-// CHECK: error: implementation of 'Encodable' cannot be automatically synthesized in an extension yet
+// CHECK: error: implementation of 'Encodable' cannot be automatically synthesized in an extension
 
 // }

@@ -129,5 +129,5 @@ class C6 : Codable {
 // Classes cannot yet synthesize Encodable or Decodable in extensions.
 class C7 {}
 extension C7 : Codable {}
-// CHECK: error: implementation of 'Decodable' cannot be automatically synthesized in an extension yet
-// CHECK: error: implementation of 'Encodable' cannot be automatically synthesized in an extension yet
+// CHECK: error: implementation of 'Decodable' cannot be automatically synthesized in an extension
+// CHECK: error: implementation of 'Encodable' cannot be automatically synthesized in an extension
