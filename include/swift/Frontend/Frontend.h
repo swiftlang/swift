@@ -493,9 +493,13 @@ private:
       DelayedParsingCallbacks *DelayedParseCB,
       const OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performTypeCheckingAndDelayedParsing();
-  void typeCheckTopLevelInputsExcludingMain(
-      PersistentParserState &PersistentState,
-      const OptionSet<TypeCheckingFlags> TypeCheckOptions);
+ 
+  void typeCheckEveryFileInMainModule(
+                                  PersistentParserState &PersistentState,
+                                  const OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void typeCheckThePrimaryFile(
+                                  PersistentParserState &PersistentState,
+                                  const OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void typeCheckMainModule(OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performWholeModuleTypeCheckingOnMainModule();
   void finishTypeCheckingMainModule();

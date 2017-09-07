@@ -575,7 +575,10 @@ void CompilerInstance::checkTypesWhileParsingMain(
                                  TypeCheckOptions);
   }
 
-  typeCheckTopLevelInputsExcludingMain(PersistentState, TypeCheckOptions);
+  if (PrimaryBufferID == NO_SUCH_BUFFER)
+    typeCheckEveryFileInMainModule(PersistentState, TypeCheckOptions);
+  else if (PrimarySourceFile != nullptr)
+    typeCheckThePrimaryFile(PersistentState, TypeCheckOptions);
 
   // Even if there were no source files, we should still record known
   // protocols.
@@ -643,19 +646,31 @@ void CompilerInstance::parseAndTypeCheckTheMainFile(
   }
 }
 
-void CompilerInstance::typeCheckTopLevelInputsExcludingMain(
-    PersistentParserState &PersistentState,
-    const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
-  SharedTimer timer("performSema-checkTypesWhileParsingMain-typeCheckTopLevelInputsExcludingMain");
-  for (auto File : MainModule->getFiles())
-    if (auto SF = dyn_cast<SourceFile>(File))
-      if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
-        performTypeChecking(*SF, PersistentState.getTopLevelContext(),
-                            TypeCheckOptions, /*curElem*/ 0,
-                            options.WarnLongFunctionBodies,
-                            options.WarnLongExpressionTypeChecking,
-                            options.SolverExpressionTimeThreshold);
+void CompilerInstance::typeCheckEveryFileInMainModule(
+                                                      PersistentParserState &PersistentState,
+                                                      const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
+  for (auto File : MainModule->getFiles()) {
+    if (auto SF = dyn_cast<SourceFile>(File)) {
+      performTypeChecking(*SF, PersistentState.getTopLevelContext(),
+                          TypeCheckOptions, /*curElem*/ 0,
+                          options.WarnLongFunctionBodies,
+                          options.WarnLongExpressionTypeChecking,
+                          options.SolverExpressionTimeThreshold);
+    }
+  }
 }
+void CompilerInstance::typeCheckThePrimaryFile(
+                                               PersistentParserState &PersistentState,
+                                               const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
+  assert (PrimarySourceFile != nullptr  &&  "No primary file?");
+  performTypeChecking(*PrimarySourceFile, PersistentState.getTopLevelContext(),
+                      TypeCheckOptions, /*curElem*/ 0,
+                      options.WarnLongFunctionBodies,
+                      options.WarnLongExpressionTypeChecking,
+                      options.SolverExpressionTimeThreshold);
+}
+
+
 
 void CompilerInstance::typeCheckMainModule(
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
