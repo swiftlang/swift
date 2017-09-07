@@ -1779,8 +1779,8 @@ NOTE(overridden_near_match_here,none,
      "potential overridden %0 %1 here",
       (DescriptiveDeclKind, DeclName))
 ERROR(override_decl_extension,none,
-      "declarations %select{in extensions|from extensions}0 cannot "
-      "%select{override|be overridden}0 yet", (bool))
+      "overriding declarations %select{in extensions|from extensions}0 "
+      "is not supported", (bool))
 NOTE(overridden_here,none,
      "overridden declaration is here", ())
 ERROR(override_objc_type_mismatch_method,none,
@@ -2056,7 +2056,7 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
 // Derived conformances
 
 ERROR(cannot_synthesize_in_extension,none,
-      "implementation of %0 cannot be automatically synthesized in an extension yet", (Type))
+      "implementation of %0 cannot be automatically synthesized in an extension", (Type))
 
 ERROR(broken_raw_representable_requirement,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())

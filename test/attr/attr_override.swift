@@ -138,7 +138,7 @@ class B : A {
 }
 
 extension B {
-  override func overriddenInExtension() {} // expected-error{{declarations in extensions cannot override yet}}
+  override func overriddenInExtension() {} // expected-error{{overriding declarations in extensions is not supported}}
 }
 
 struct S {
