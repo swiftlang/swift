@@ -6720,6 +6720,60 @@ public:
                                 desiredAccessScope, access);
       }
       TC.checkConformancesInContext(ED, ED);
+
+      // If we just extended a nominal type with a protocol conformance (which
+      // may have just gotten derived), members which are synthesized might need
+      // to be visited for validation (since the extended type might have
+      // otherwise finished being validated).
+      if (auto extendedTy = ED->getExtendedType()) {
+        if (auto nominal = extendedTy->getAnyNominal()) {
+          // Put together the list of protocols that the nominal type inherited
+          // from this extension.
+          SmallVector<ProtocolDecl *, 2> inheritedProtocols;
+          for (auto typeLoc : ED->getInherited()) {
+            if (!typeLoc.wasValidated() || typeLoc.isError() ||
+                typeLoc.isNull())
+              break;
+
+            // The type being inherited here can be a direct protocol
+            // conformance (e.g. extension Foo : Sequence), or an existential
+            // composition of conformances (e.g. extension Foo : Codable, where
+            // typealias Codable = Encodable & Decodable).
+            auto canType = typeLoc.getType()->getCanonicalType();
+            if (canType->isExistentialType()) {
+              auto layout = canType->getExistentialLayout();
+              for (auto protocolType : layout.getProtocols())
+                inheritedProtocols.push_back(protocolType->getDecl());
+            } else if (auto *inheritedNominal = canType->getAnyNominal()) {
+              if (auto *protocolDecl = dyn_cast<ProtocolDecl>(inheritedNominal))
+                inheritedProtocols.push_back(protocolDecl);
+            }
+          }
+
+          // Any protocol witness satisfied by an implicit decl in any of these
+          // protocols may just have been synthesized, and should be visited.
+          for (auto *protocol : inheritedProtocols) {
+            SmallVector<ProtocolConformance *, 1> conformances;
+            if (!nominal->lookupConformance(nullptr, protocol, conformances))
+              continue;
+
+            for (auto *conformance : conformances) {
+              auto *normal = dyn_cast<NormalProtocolConformance>(conformance);
+              if (!normal)
+                continue;
+
+              normal->forEachValueWitness(&TC, [=](ValueDecl *requirement,
+                                                   Witness witness) {
+                // We need to visit the witness if the requirement has been met,
+                // and the witness was synthesized.
+                auto *witnessDecl = witness.getDecl();
+                if (witnessDecl && witnessDecl->isImplicit())
+                  visit(witnessDecl);
+              });
+            }
+          }
+        }
+      }
     }
 
     for (Decl *Member : ED->getMembers())
