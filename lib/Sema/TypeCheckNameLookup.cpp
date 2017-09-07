@@ -387,7 +387,10 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
         }
       }
 
-      if (isa<TypeAliasDecl>(typeDecl)) {
+      // FIXME: This is a hack, we should be able to remove this entire 'if'
+      // statement once we learn how to deal with the circularity here.
+      if (isa<TypeAliasDecl>(typeDecl) &&
+          isa<ProtocolDecl>(typeDecl->getDeclContext())) {
         if (!type->is<ArchetypeType>() &&
             !type->isTypeParameter() &&
             memberType->hasTypeParameter() &&

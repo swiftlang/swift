@@ -122,7 +122,8 @@ extension MySeq {
   }
 }
 
-// Specific diagnosis for trying to use complex typealiases in generic constraints
+// Typealiases whose underlying type is a structural type written in terms of
+// associated types
 protocol P1 {
     associatedtype A
     typealias F = (A) -> ()
@@ -186,7 +187,7 @@ struct T5 : P5 {
   var v9 = P6.B.self // expected-error {{type alias 'B' can only be used with a concrete type or generic parameter base}}
 }
 
-// Unqualified lookup finds typealiases in protocol extensions, though
+// Unqualified lookup finds typealiases in protocol extensions
 protocol P7 {
   associatedtype A
 }
@@ -215,3 +216,30 @@ protocol P8 {
 }
 
 func testP8<T: P8>(_: T) where T.A == Int { } // expected-error{{'A' has been renamed to 'B'}}{{34-35=B}}
+
+// Associated type resolution via lookup should find typealiases in protocol extensions
+protocol Edible {
+  associatedtype Snack
+}
+
+protocol CandyWrapper {
+  associatedtype Wrapped
+}
+
+extension CandyWrapper where Wrapped : Edible {
+  typealias Snack = Wrapped.Snack
+}
+
+struct Candy {}
+
+struct CandyBar : CandyWrapper {
+  typealias Wrapped = CandyEdible
+}
+
+struct CandyEdible : Edible {
+  typealias Snack = Candy
+}
+
+// Edible.Snack is witnessed by 'typealias Snack' inside the
+// constrained extension of CandyWrapper above
+extension CandyBar : Edible {}
