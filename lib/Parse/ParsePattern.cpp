@@ -293,7 +293,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         diagnose(Tok, diag::expected_parameter_name);
         param.isInvalid = true;
         param.FirstNameLoc = Tok.getLoc();
-        Tok.setKind(tok::identifier);
+        TokReceiver->registerTokenKindChange(param.FirstNameLoc,
+                                             tok::identifier);
         status.setIsParseError();
       }
     }
