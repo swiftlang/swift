@@ -294,15 +294,15 @@ addAdditionalInitialImportsTo(SourceFile *SF, CompilerInstance::ImplicitImports 
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
 /// execute much faster.
-static bool shouldImplicityImportSwiftOnoneSupportModule(
-    SILOptions::SILOptMode optimization,
-    FrontendOptions::ActionType requestedAction) {
-  return ((optimization <= SILOptions::SILOptMode::None &&
-           (requestedAction == FrontendOptions::EmitObject ||
-            requestedAction == FrontendOptions::Immediate ||
-            requestedAction == FrontendOptions::EmitSIL)) ||
-          (optimization == SILOptions::SILOptMode::None &&
-           requestedAction >= FrontendOptions::EmitSILGen));
+static bool shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
+  if (Invocation.getImplicitModuleImportKind() != SourceFile::ImplicitModuleImportKind::Stdlib)
+    return false;
+  SILOptions::SILOptMode optimization = Invocation.getSILOptions().Optimization;
+  if (optimization <= SILOptions::SILOptMode::None  &&
+      Invocation.getFrontendOptions().shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization()) {
+      return true;
+  }
+  return optimization == SILOptions::SILOptMode::None  &&  Invocation.getFrontendOptions().isCreatingSIL();
 }
 
 void CompilerInstance::performSema() {
@@ -316,8 +316,11 @@ void CompilerInstance::performSema() {
   }
   
   if (Invocation.getImplicitModuleImportKind() == SourceFile::ImplicitModuleImportKind::Stdlib) {
-    if (!loadStdlibAndMaybeSwiftOnoneSupport())
-    return;
+    if (!loadStdlib())
+      return;
+  }
+  if (shouldImplicityImportSwiftOnoneSupportModule(Invocation)) {
+    Invocation.getFrontendOptions().ImplicitImportModuleNames.push_back(SWIFT_ONONE_SUPPORT);
   }
   
   ImplicitImports implicitImports(*this);
@@ -359,8 +362,8 @@ CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
 }
 
 // Return true if should continue, i.e. no error
-bool CompilerInstance::loadStdlibAndMaybeSwiftOnoneSupport() {
-  SharedTimer timer("performSema-loadStdlibAndMaybeSwiftOnoneSupport");
+bool CompilerInstance::loadStdlib() {
+  SharedTimer timer("performSema-loadStdlib");
   ModuleDecl *M = Context->getStdlibModule(true);
 
   if (!M) {
@@ -374,12 +377,6 @@ bool CompilerInstance::loadStdlibAndMaybeSwiftOnoneSupport() {
     assert(Diagnostics.hadAnyError() &&
            "Module failed to load but nothing was diagnosed?");
     return false;
-  }
-  if (shouldImplicityImportSwiftOnoneSupportModule(
-          Invocation.getSILOptions().Optimization,
-          Invocation.getFrontendOptions().RequestedAction)) {
-    Invocation.getFrontendOptions().ImplicitImportModuleNames.push_back(
-        SWIFT_ONONE_SUPPORT);
   }
   return true;
 }
