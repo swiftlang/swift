@@ -330,8 +330,7 @@ void CompilerInstance::performSema() {
     return;
   }
 
-  std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
-      computeDelayedParsingCallback());
+  std::unique_ptr<DelayedParsingCallbacks> DelayedCB { computeDelayedParsingCallback() };
 
   PersistentParserState PersistentState;
 
@@ -443,14 +442,16 @@ void CompilerInstance::createREPLFile( ImplicitImports &implicitImports) {
   addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
 }
 
-DelayedParsingCallbacks *CompilerInstance::computeDelayedParsingCallback() {
-  SharedTimer timer("performSema-computeDelayedParsingCallback");
+std::unique_ptr<DelayedParsingCallbacks>
+CompilerInstance::computeDelayedParsingCallback() {
+  DelayedParsingCallbacks *cb = nullptr;
   if (Invocation.isCodeCompletion())
-    return new CodeCompleteDelayedCallbacks(SourceMgr.getCodeCompletionLoc());
-  if (Invocation.isDelayedFunctionBodyParsing()) {
-    return new AlwaysDelayedCallbacks;
-  }
-  return nullptr;
+    cb = new CodeCompleteDelayedCallbacks(SourceMgr.getCodeCompletionLoc());
+  else if (Invocation.isDelayedFunctionBodyParsing())
+    cb = new AlwaysDelayedCallbacks;
+  
+  std::unique_ptr<DelayedParsingCallbacks> up(cb);
+  return up;
 }
 
 // The main file may only be
