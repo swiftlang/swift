@@ -464,7 +464,7 @@ public: // for static functions in Frontend.cpp
     ModuleDecl *headerModule;
     SmallVector<ModuleDecl *, 4> modules;
     
-    ImplicitImports(CompilerInstance &compiler);
+    explicit ImplicitImports(CompilerInstance &compiler);
   };
   
 private:
