@@ -120,21 +120,22 @@ public:
 class ExpressionTimer {
   Expr* E;
   unsigned WarnLimit;
-  bool ShouldDump;
   ASTContext &Context;
-  llvm::TimeRecord StartTime = llvm::TimeRecord::getCurrentTime();
+  llvm::TimeRecord StartTime;
+
+  bool PrintDebugTiming;
+  bool PrintWarning;
 
 public:
-  ExpressionTimer(Expr *E, bool shouldDump, unsigned warnLimit,
-                  ASTContext &Context)
-      : E(E), WarnLimit(warnLimit), ShouldDump(shouldDump), Context(Context) {
-  }
+  ExpressionTimer(Expr *E, ConstraintSystem &CS);
 
   ~ExpressionTimer();
 
+  llvm::TimeRecord startedAt() const { return StartTime; }
+
   /// Return the elapsed process time (including fractional seconds)
   /// as a double.
-  double getElapsedProcessTimeInFractionalSeconds() {
+  double getElapsedProcessTimeInFractionalSeconds() const {
     llvm::TimeRecord endTime = llvm::TimeRecord::getCurrentTime(false);
 
     return endTime.getProcessTime() - StartTime.getProcessTime();
@@ -142,7 +143,12 @@ public:
 
   // Disable emission of warnings about expressions that take longer
   // than the warning threshold.
-  void disableWarning() { WarnLimit = 0; }
+  void disableWarning() { PrintWarning = false; }
+
+  bool isExpired(unsigned thresholdInMillis) const {
+    auto elapsed = getElapsedProcessTimeInFractionalSeconds();
+    return unsigned(elapsed) > thresholdInMillis;
+  }
 };
 
 } // end namespace constraints
@@ -1021,6 +1027,8 @@ private:
     DeclContext *DC;
     llvm::BumpPtrAllocator &Allocator;
 
+    ConstraintSystem &BaseCS;
+
     // Contextual Information.
     Type CT;
     ContextualTypePurpose CTP;
@@ -1028,8 +1036,8 @@ private:
   public:
     Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
               ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), TC(cs.TC), DC(cs.DC), Allocator(cs.Allocator), CT(ct),
-          CTP(ctp) {}
+        : E(expr), TC(cs.TC), DC(cs.DC), Allocator(cs.Allocator), BaseCS(cs),
+          CT(ct), CTP(ctp) {}
 
     /// \brief Return underlying expression.
     Expr *getExpr() const { return E; }
@@ -2831,15 +2839,13 @@ public:
   /// \brief Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
-    if (Timer.hasValue()) {
-      auto elapsed = Timer->getElapsedProcessTimeInFractionalSeconds();
-      if (unsigned(elapsed) > TC.getExpressionTimeoutThresholdInSeconds()) {
-        // Disable warnings about expressions that go over the warning
-        // threshold since we're arbitrarily ending evaluation and
-        // emitting an error.
-        Timer->disableWarning();
-        return true;
-      }
+    auto timeoutThresholdInMillis = TC.getExpressionTimeoutThresholdInSeconds();
+    if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
+      // Disable warnings about expressions that go over the warning
+      // threshold since we're arbitrarily ending evaluation and
+      // emitting an error.
+      Timer->disableWarning();
+      return true;
     }
 
     if (!getASTContext().isSwiftVersion3()) {
