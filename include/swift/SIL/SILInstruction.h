@@ -5945,10 +5945,6 @@ private:
   unsigned NumTrueArgs;
   /// The number of arguments for the False branch.
   unsigned NumFalseArgs;
-  /// The number of times the True branch was executed.
-  Optional<uint64_t> TrueBBCount;
-  /// The number of times the False branch was executed.
-  Optional<uint64_t> FalseBBCount;
 
   /// The first argument is the condition; the rest are BB arguments.
   TailAllocatedOperandList<1> Operands;
@@ -5993,8 +5989,10 @@ public:
   SILBasicBlock *getFalseBB() { return DestBBs[1]; }
   const SILBasicBlock *getFalseBB() const { return DestBBs[1]; }
 
-  Optional<uint64_t> getTrueBBCount() const { return TrueBBCount; }
-  Optional<uint64_t> getFalseBBCount() const { return FalseBBCount; }
+  /// The number of times the True branch was executed.
+  Optional<uint64_t> getTrueBBCount() const { return DestBBs[0].getCount(); }
+  /// The number of times the False branch was executed.
+  Optional<uint64_t> getFalseBBCount() const { return DestBBs[1].getCount(); }
 
   /// Get the arguments to the true BB.
   OperandValueArrayRef getTrueArgs() const;
