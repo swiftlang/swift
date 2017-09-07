@@ -66,7 +66,7 @@ static void pushWriteback(SILGenFunction &SGF,
                           std::unique_ptr<LogicalPathComponent> &&comp,
                           ManagedValue base,
                           MaterializedLValue materialized) {
-  assert(SGF.InWritebackScope);
+  assert(SGF.InFormalEvaluationScope);
 
   // Push a cleanup to execute the writeback consistently.
   auto &context = SGF.FormalEvalContext;
@@ -253,7 +253,7 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &SGF,
       return temporaryInit->getManagedAddress();
     }
 
-    assert(SGF.InWritebackScope &&
+    assert(SGF.InFormalEvaluationScope &&
          "materializing l-value for modification without writeback scope");
 
     // Clone anything else about the component that we might need in the
@@ -305,7 +305,7 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &SGF,
                                 std::move(*this));
   }
 
-  assert(SGF.InWritebackScope &&
+  assert(SGF.InFormalEvaluationScope &&
          "materializing l-value for modification without writeback scope");
 
   // Clone anything else about the component that we might need in the
@@ -373,7 +373,7 @@ void LogicalPathComponent::writeback(SILGenFunction &SGF, SILLocation loc,
 InOutConversionScope::InOutConversionScope(SILGenFunction &SGF)
   : SGF(SGF)
 {
-  assert(SGF.InWritebackScope
+  assert(SGF.InFormalEvaluationScope
          && "inout conversions should happen in writeback scopes");
   assert(!SGF.InInOutConversionScope
          && "inout conversions should not be nested");
@@ -515,7 +515,7 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
 
   // Hack for materializeForSet emission, where we can't safely
   // push a begin/end access.
-  if (!SGF.InWritebackScope) {
+  if (!SGF.InFormalEvaluationScope) {
     auto unpairedAccesses = SGF.UnpairedAccessesForMaterializeForSet;
     assert(unpairedAccesses &&
            "tried to enter access scope without a writeback scope!");
@@ -1180,7 +1180,7 @@ namespace {
 
       assert(decl->getMaterializeForSetFunc() &&
              "polymorphic storage without materializeForSet");
-      assert(SGF.InWritebackScope &&
+      assert(SGF.InFormalEvaluationScope &&
              "materializing l-value for modification without writeback scope");
 
       // Allocate opaque storage for the callback to use.
@@ -1526,7 +1526,7 @@ namespace {
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
-      assert(SGF.InWritebackScope &&
+      assert(SGF.InFormalEvaluationScope &&
              "offsetting l-value for modification without writeback scope");
 
       SILDeclRef addressor = SGF.getAddressorDeclRef(decl, accessKind, 
@@ -1717,7 +1717,7 @@ namespace {
   
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
-      assert(SGF.InWritebackScope &&
+      assert(SGF.InFormalEvaluationScope &&
              "offsetting l-value for modification without writeback scope");
       switch (accessKind) {
       case AccessKind::ReadWrite:
@@ -2009,7 +2009,7 @@ LValue SILGenFunction::emitLValue(Expr *e, AccessKind accessKind,
   // Some lvalue nodes (namely BindOptionalExprs) require immediate evaluation
   // of their subexpression, so we must have a writeback scope open while
   // building an lvalue.
-  assert(InWritebackScope && "must be in a writeback scope");
+  assert(InFormalEvaluationScope && "must be in a formal evaluation scope");
 
   LValue r = SILGenLValue(*this).visit(e, accessKind, options);
   // If the final component has an abstraction change, introduce a

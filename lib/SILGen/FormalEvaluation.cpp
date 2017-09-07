@@ -70,25 +70,25 @@ void OwnedFormalAccess::finishImpl(SILGenFunction &SGF) {
 
 FormalEvaluationScope::FormalEvaluationScope(SILGenFunction &SGF)
     : SGF(SGF), savedDepth(SGF.FormalEvalContext.stable_begin()),
-      wasInWritebackScope(SGF.InWritebackScope),
+      wasInFormalEvaluationScope(SGF.InFormalEvaluationScope),
       wasInInOutConversionScope(SGF.InInOutConversionScope) {
   if (wasInInOutConversionScope) {
     savedDepth.reset();
     return;
   }
-  SGF.InWritebackScope = true;
+  SGF.InFormalEvaluationScope = true;
 }
 
 FormalEvaluationScope::FormalEvaluationScope(FormalEvaluationScope &&o)
     : SGF(o.SGF), savedDepth(o.savedDepth),
-      wasInWritebackScope(o.wasInWritebackScope),
+      wasInFormalEvaluationScope(o.wasInFormalEvaluationScope),
       wasInInOutConversionScope(o.wasInInOutConversionScope) {
   o.savedDepth.reset();
 }
 
 void FormalEvaluationScope::popImpl() {
-  // Pop the InWritebackScope bit.
-  SGF.InWritebackScope = wasInWritebackScope;
+  // Pop the SGF.InFormalEvaluationScope bit.
+  SGF.InFormalEvaluationScope = wasInFormalEvaluationScope;
 
   // Check to see if there is anything going on here.
 
@@ -156,7 +156,7 @@ void FormalEvaluationScope::popImpl() {
   // Then check that we did not add any additional cleanups to the beginning of
   // the stack...
   assert(originalBegin == context.stable_begin() &&
-         "more writebacks placed onto context during writeback scope pop?!");
+         "more formal eval cleanups placed onto context during formal eval scope pop?!");
 
   // And then pop off all stack elements until we reach the savedDepth.
   context.pop(savedDepth.getValue());
