@@ -1209,6 +1209,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // Initialize a SILBuilder and create a function_ref referencing the cloned
   // closure.
   SILBuilderWithScope B(PAI);
+  B.addOpenedArchetypeOperands(PAI);
   SILValue FnVal = B.createFunctionRef(PAI->getLoc(), ClonedFn);
 
   // Populate the argument list for a new partial_apply instruction, taking into
@@ -1222,7 +1223,8 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   auto CalleePInfo = SubstCalleeFunctionTy->getParameters();
   SILFunctionConventions paConv(PAI->getType().castTo<SILFunctionType>(), M);
   unsigned FirstIndex = paConv.getNumSILArguments();
-  unsigned OpNo = 1, OpCount = PAI->getNumOperands();
+  unsigned OpNo = 1;
+  unsigned OpCount = PAI->getNumOperands() - PAI->getNumTypeDependentOperands();
   SmallVector<SILValue, 16> Args;
   auto NumIndirectResults = calleeConv.getNumIndirectSILResults();
   for (; OpNo != OpCount; ++OpNo) {
