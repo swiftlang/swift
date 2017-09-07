@@ -473,7 +473,7 @@ private:
 
   void addMainFileToModule(ImplicitImports &implicitImports);
  
-  void parseALibraryFile(
+  void parseLibraryFile(
       unsigned BufferID,
       ImplicitImports &implicitImports,
       PersistentParserState &PersistentState,

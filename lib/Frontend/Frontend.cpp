@@ -478,12 +478,12 @@ void CompilerInstance::addMainFileToModule(ImplicitImports &implicitImports) {
     setPrimarySourceFile(MainFile);
 }
 
-void CompilerInstance::parseALibraryFile(
+void CompilerInstance::parseLibraryFile(
     unsigned BufferID,
     ImplicitImports &implicitImports,
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB) {
-  SharedTimer timer("performSema-parseALibraryFile");
+  SharedTimer timer("performSema-parseLibraryFile");
 
   auto *NextInput = new (*Context) SourceFile(
       *MainModule, SourceFileKind::Library, BufferID, implicitImports.kind, Invocation.getLangOptions().KeepTokensInSourceFile);
@@ -547,7 +547,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   // Then parse all the library files.
   for (auto BufferID : BufferIDs) {
     if (BufferID != MainBufferID) {
-      parseALibraryFile(BufferID, implicitImports, PersistentState, DelayedParseCB);
+      parseLibraryFile(BufferID, implicitImports, PersistentState, DelayedParseCB);
     }
   }
   if (Invocation.isCodeCompletion()) {
