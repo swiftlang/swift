@@ -194,6 +194,15 @@ public:
     EmitBC, ///< Emit LLVM BC
     EmitObject, ///< Emit object file
   };
+  
+  bool isCreatingSIL() { return RequestedAction >= EmitSILGen; }
+  bool shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization() {
+    return
+    RequestedAction == EmitObject ||
+    RequestedAction == Immediate ||
+    RequestedAction == EmitSIL;
+  }
+
 
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = NoneAction;

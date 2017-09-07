@@ -449,7 +449,7 @@ public:
   void freeContextAndSIL();
 
 private:
-  bool loadStdlibAndMaybeSwiftOnoneSupport();
+  bool loadStdlib();
   ModuleDecl *importUnderlyingModule();
   ModuleDecl *importBridgingHeader();
 
