@@ -256,8 +256,7 @@ GenericSignature::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (type->isTypeParameter())
     return ProtocolConformanceRef(proto);
 
-  return M->lookupConformance(type, proto,
-                              M->getASTContext().getLazyResolver());
+  return M->lookupConformance(type, proto);
 }
 
 bool GenericSignature::enumeratePairedRequirements(

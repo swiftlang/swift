@@ -76,8 +76,7 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
     }
   }
 
-  auto optConf = SGM.SwiftModule->lookupConformance(type, errorProtocol,
-                                                    /*lazy resolver*/ nullptr);
+  auto optConf = SGM.SwiftModule->lookupConformance(type, errorProtocol);
   return optConf.hasValue();
 }
 

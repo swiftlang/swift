@@ -322,13 +322,11 @@ public:
   ///
   /// \param protocol The protocol to which we are computing conformance.
   ///
-  /// \param resolver The lazy resolver.
-  ///
   /// \returns The result of the conformance search, which will be
   /// None if the type does not conform to the protocol or contain a
   /// ProtocolConformanceRef if it does conform.
   Optional<ProtocolConformanceRef>
-  lookupConformance(Type type, ProtocolDecl *protocol, LazyResolver *resolver);
+  lookupConformance(Type type, ProtocolDecl *protocol);
 
   /// Find a member named \p name in \p container that was declared in this
   /// module.

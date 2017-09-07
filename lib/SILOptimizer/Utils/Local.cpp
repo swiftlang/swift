@@ -1463,7 +1463,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   auto BridgedProto =
       M.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   auto Conf =
-      *M.getSwiftModule()->lookupConformance(Target, BridgedProto, nullptr);
+      *M.getSwiftModule()->lookupConformance(Target, BridgedProto);
 
   auto ParamTypes = BridgedFunc->getLoweredFunctionType()->getParameters();
 
@@ -1591,7 +1591,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
       M.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
 
   auto Conf =
-      M.getSwiftModule()->lookupConformance(Source, BridgedProto, nullptr);
+      M.getSwiftModule()->lookupConformance(Source, BridgedProto);
 
   assert(Conf && "_ObjectiveCBridgeable conformance should exist");
   (void) Conf;
@@ -2621,7 +2621,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
 
     auto Proto = dyn_cast<ProtocolDecl>(TargetType->getAnyNominal());
     if (Proto) {
-      auto Conformance = SM->lookupConformance(SourceType, Proto, nullptr);
+      auto Conformance = SM->lookupConformance(SourceType, Proto);
       if (Conformance.hasValue()) {
         // SourceType is a non-existential type conforming to a
         // protocol represented by the TargetType.

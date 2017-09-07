@@ -2141,7 +2141,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
         !isa<ArchetypeType>(associatedType)) {
       if (auto concreteConf =
             IGF.IGM.getSwiftModule()->lookupConformance(associatedType,
-                                              associatedRequirement, nullptr)) {
+                                                      associatedRequirement)) {
         associatedConformance = *concreteConf;
       }
     }
