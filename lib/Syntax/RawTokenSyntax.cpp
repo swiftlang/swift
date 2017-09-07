@@ -73,6 +73,9 @@ void RawTokenSyntax::dumpKind(llvm::raw_ostream &OS) const {
   case tok::oper_binary_spaced:
     OS << "oper_binary_spaced";
     break;
+  case tok::string_interpolation_anchor:
+    OS << "string_interpolation_anchor";
+    break;
   case tok::oper_postfix:
     OS << "oper_postfix";
     break;
