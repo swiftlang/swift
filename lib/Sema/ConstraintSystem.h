@@ -2655,6 +2655,10 @@ private:
       }
     }
 
+    void dump(ConstraintSystem *cs, unsigned indent =0) const {
+      dump(cs->getASTContext().TypeCheckerDebug->getStream());
+    }
+
     void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
               unsigned indent =0) const {
       out.indent(indent);
