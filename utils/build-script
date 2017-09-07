@@ -190,6 +190,10 @@ class HostSpecificConfiguration(object):
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize-{}".format(
                             subset_suffix, name))
+                if args.test_optimize_for_size and not test_host_only:
+                    self.swift_test_run_targets.append(
+                        "check-swift{}-optimize_size-{}".format(
+                            subset_suffix, name))
 
 
 class BuildScriptInvocation(object):
@@ -389,6 +393,10 @@ class BuildScriptInvocation(object):
 
         # --test-optimized implies --test.
         if args.test_optimized:
+            args.test = True
+
+        # --test-optimize-size implies --test.
+        if args.test_optimize_for_size:
             args.test = True
 
         # If none of tests specified skip swift stdlib test on all platforms
@@ -811,6 +819,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-benchmarks"]
         if not args.test_optimized:
             impl_args += ["--skip-test-optimized"]
+        if not args.test_optimize_for_size:
+            impl_args += ["--skip-test-optimize-for-size"]
 
         if args.android:
             impl_args += [
@@ -1648,6 +1658,18 @@ details of the setups of other systems or automated environments.""")
         help="run the test suite in optimized mode too (implies --test)",
         action=arguments.action.optional_bool)
     run_tests_group.add_argument(
+        "-s",
+        help="run the test suite in optimize for size mode too \
+        (implies --test)",
+        action="store_const",
+        const=True,
+        dest="test_optimize_for_size")
+    run_tests_group.add_argument(
+        "--test-optimize-for-size",
+        help="run the test suite in optimize for size mode too \
+        (implies --test)",
+        action=arguments.action.optional_bool)
+    run_tests_group.add_argument(
         "--long-test",
         help="run the long test suite",
         action=arguments.action.optional_bool)
@@ -2167,6 +2189,7 @@ iterations with -O",
         "--build-jobs",
         "--common-cmake-options",
         "--only-execute",
+        "--skip-test-optimize-for-size",
         "--skip-test-optimized",
         action=arguments.action.unavailable)
 

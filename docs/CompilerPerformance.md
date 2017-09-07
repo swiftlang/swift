@@ -677,12 +677,12 @@ performance between two compilers, say `${OLD}/swiftc` and `${NEW}/swiftc`:
 ```
 $ mkdir stats
 $ ${OLD}/swiftc -stats-output-dir stats test.swift
-$ utils/process-stats-dir.py -set-csv-baseline baseline.csv stats
+$ utils/process-stats-dir.py --set-csv-baseline baseline.csv stats
 making new baseline baseline.csv
 
 $ rm stats/*
 $ ${NEW}/swiftc -stats-output-dir stats test.swift
-$ utils/process-stats-dir.py -compare-to-csv-baseline baseline.csv stats
+$ utils/process-stats-dir.py --compare-to-csv-baseline baseline.csv stats
 old     new     delta_pct       name
 1402939 1430732 1.98    AST.NumASTBytesAllocated
 7       0       -100.0  AST.NumUsedConformances

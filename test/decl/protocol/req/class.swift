@@ -8,4 +8,4 @@ protocol P3 : P2, class { } // expected-error{{'class' must come first in the re
 // expected-warning@-1 {{redundant layout constraint 'Self' : 'AnyObject'}}
 // expected-note@-2 {{layout constraint constraint 'Self' : 'AnyObject' implied here}}
 
-struct X : class { } // expected-error{{'class' requirement only applies to protocols}} {{12-18=}}
+struct X : class { } // expected-error{{'class' constraint can only appear on protocol declarations}}

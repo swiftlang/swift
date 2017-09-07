@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-sil %s -parse-stdlib -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership %s -parse-stdlib -o /dev/null -verify
 
 import Swift
 

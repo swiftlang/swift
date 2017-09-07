@@ -602,6 +602,7 @@ precedencegroup BitwiseShiftPrecedence {
 // Standard postfix operators.
 postfix operator ++
 postfix operator --
+postfix operator ...
 
 // Optional<T> unwrapping operator is built into the compiler as a part of
 // postfix expression grammar.
@@ -615,13 +616,17 @@ prefix operator !
 prefix operator ~
 prefix operator +
 prefix operator -
+prefix operator ...
+prefix operator ..<
 
 // Standard infix operators.
 
 // "Exponentiative"
 
-infix operator << : BitwiseShiftPrecedence
-infix operator >> : BitwiseShiftPrecedence
+infix operator  << : BitwiseShiftPrecedence
+infix operator &<< : BitwiseShiftPrecedence
+infix operator  >> : BitwiseShiftPrecedence
+infix operator &>> : BitwiseShiftPrecedence
 
 // "Multiplicative"
 
@@ -643,15 +648,13 @@ infix operator   ^ : AdditionPrecedence
 // FIXME: is this the right precedence level for "..." ?
 infix operator  ... : RangeFormationPrecedence
 infix operator  ..< : RangeFormationPrecedence
-postfix operator ...
-prefix operator ...
-prefix operator ..<
 
 // The cast operators 'as' and 'is' are hardcoded as if they had the
 // following attributes:
 // infix operator as : CastingPrecedence
 
 // "Coalescing"
+
 infix operator ?? : NilCoalescingPrecedence
 
 // "Comparative"
@@ -675,7 +678,6 @@ infix operator && : LogicalConjunctionPrecedence
 
 infix operator || : LogicalDisjunctionPrecedence
 
-
 // User-defined ternary operators are not supported. The ? : operator is
 // hardcoded as if it had the following attributes:
 // operator ternary ? : : TernaryPrecedence
@@ -686,16 +688,18 @@ infix operator || : LogicalDisjunctionPrecedence
 
 // Compound
 
-infix operator  *= : AssignmentPrecedence
-infix operator  /= : AssignmentPrecedence
-infix operator  %= : AssignmentPrecedence
-infix operator  += : AssignmentPrecedence
-infix operator  -= : AssignmentPrecedence
-infix operator <<= : AssignmentPrecedence
-infix operator >>= : AssignmentPrecedence
-infix operator  &= : AssignmentPrecedence
-infix operator  ^= : AssignmentPrecedence
-infix operator  |= : AssignmentPrecedence
+infix operator   *= : AssignmentPrecedence
+infix operator   /= : AssignmentPrecedence
+infix operator   %= : AssignmentPrecedence
+infix operator   += : AssignmentPrecedence
+infix operator   -= : AssignmentPrecedence
+infix operator  <<= : AssignmentPrecedence
+infix operator &<<= : AssignmentPrecedence
+infix operator  >>= : AssignmentPrecedence
+infix operator &>>= : AssignmentPrecedence
+infix operator   &= : AssignmentPrecedence
+infix operator   ^= : AssignmentPrecedence
+infix operator   |= : AssignmentPrecedence
 
 // Workaround for <rdar://problem/14011860> SubTLF: Default
 // implementations in protocols.  Library authors should ensure

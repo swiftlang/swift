@@ -1765,7 +1765,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     }
     storageType = Layout->getType();
     fixedSize = Layout->getSize();
-    fixedAlignment = TargetInfo.HeapObjectAlignment;
+    fixedAlignment = Layout->getAlignment();
+    assert(fixedAlignment >= TargetInfo.HeapObjectAlignment);
   } else if (ti.isFixedSize(expansion)) {
     // Allocate static storage.
     auto &fixedTI = cast<FixedTypeInfo>(ti);
@@ -1793,12 +1794,15 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       // A statically initialized object must be placed into a container struct
       // because the swift_initStaticObject needs a swift_once_t at offset -1:
       //     struct Container {
-      //       swift_once_t token;
+      //       swift_once_t token[fixedAlignment / sizeof(swift_once_t)];
       //       HeapObject object;
       //     };
       std::string typeName = storageType->getStructName().str() + 'c';
+      assert(fixedAlignment >= getPointerAlignment());
+      unsigned numTokens = fixedAlignment.getValue() /
+        getPointerAlignment().getValue();
       storageTypeWithContainer = llvm::StructType::create(getLLVMContext(),
-                                              {OnceTy, storageType}, typeName);
+              {llvm::ArrayType::get(OnceTy, numTokens), storageType}, typeName);
       gvar = createVariable(*this, link, storageTypeWithContainer,
                             fixedAlignment);
     } else {

@@ -1,8 +1,15 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c %S/../Inputs/resilient_protocol.swift -o %t/resilient_protocol.o
-// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c %S/../Inputs/resilient_protocol.swift -o %t/resilient_protocol.o
-// RUN: %target-build-swift %s -Xlinker %t/resilient_protocol.o -I %t -L %t -o %t/main
+
+// RUN: %target-build-swift -emit-module -parse-as-library -Xfrontend -enable-resilience %S/../Inputs/resilient_protocol.swift -emit-module-path %t/resilient_protocol.swiftmodule -module-name resilient_protocol -emit-library -o %t/libresilient_protocol.%target-dylib-extension
+// RUN: %target-build-swift %s -lresilient_protocol -I %t -L %t -o %t/main -Xlinker -rpath -Xlinker %t
+// RUN: %target-codesign %t/libresilient_protocol.%target-dylib-extension
 // RUN: %target-run %t/main
+
+// RUN: %target-build-swift -emit-module -parse-as-library -Xfrontend -enable-resilience %S/../Inputs/resilient_protocol.swift -emit-module-path %t/resilient_protocol.swiftmodule -module-name resilient_protocol -emit-library -o %t/libresilient_protocol.%target-dylib-extension -whole-module-optimization
+// RUN: %target-build-swift %s -lresilient_protocol -I %t -L %t -o %t/main -Xlinker -rpath -Xlinker %t
+// RUN: %target-codesign %t/libresilient_protocol.%target-dylib-extension
+// RUN: %target-run %t/main
+
 // REQUIRES: executable_test
 
 //

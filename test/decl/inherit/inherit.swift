@@ -25,20 +25,18 @@ protocol Q : A { } // expected-error{{non-class type 'Q' cannot inherit from cla
 extension C : A { } // expected-error{{extension of type 'C' cannot inherit from class 'A'}}
 
 // Keywords in inheritance clauses
-struct S2 : struct { } // expected-error{{expected identifier for type name}}
+struct S2 : struct { } // expected-error{{expected type}}
 
 // Protocol composition in inheritance clauses
-struct S3 : P, P & Q { } // expected-error {{duplicate inheritance from 'P'}}
-                         // expected-error @-1 {{protocol-constrained type is neither allowed nor needed here}}
-                         // expected-error @-2 {{'Q' requires that 'S3' inherit from 'A'}}
-                         // expected-note @-3 {{requirement specified as 'Self' : 'A' [with Self = S3]}}
+struct S3 : P, P & Q { } // expected-error {{redundant conformance of 'S3' to protocol 'P'}}
+                         // expected-error @-1 {{'Q' requires that 'S3' inherit from 'A'}}
+                         // expected-note @-2 {{requirement specified as 'Self' : 'A' [with Self = S3]}}
+                         // expected-note @-3 {{'S3' declares conformance to protocol 'P' here}}
 struct S4 : P, P { }     // expected-error {{duplicate inheritance from 'P'}}
 struct S6 : P & { }      // expected-error {{expected identifier for type name}}
-                         // expected-error @-1 {{protocol-constrained type is neither allowed nor needed here}}
 struct S7 : protocol<P, Q> { }  // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
-                                // expected-error @-1 {{protocol-constrained type is neither allowed nor needed here}}{{13-22=}} {{26-27=}}
-                                // expected-error @-2 {{'Q' requires that 'S7' inherit from 'A'}}
-                                // expected-note @-3 {{requirement specified as 'Self' : 'A' [with Self = S7]}}
+                                // expected-error @-1 {{'Q' requires that 'S7' inherit from 'A'}}
+                                // expected-note @-2 {{requirement specified as 'Self' : 'A' [with Self = S7]}}
 
 class GenericBase<T> {}
 

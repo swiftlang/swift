@@ -120,12 +120,12 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
 /// Create a var member for this struct, along with its pattern binding, and add
 /// it as a member
 static std::pair<VarDecl *, PatternBindingDecl *>
-createVarWithPattern(ASTContext &cxt, DeclContext *dc, Identifier name, Type ty,
+createVarWithPattern(ASTContext &ctx, DeclContext *dc, Identifier name, Type ty,
                      VarDecl::Specifier specifier, bool isImplicit,
                      AccessLevel access,
                      AccessLevel setterAccess) {
   // Create a variable to store the underlying value.
-  auto var = new (cxt) VarDecl(
+  auto var = new (ctx) VarDecl(
       /*IsStatic*/false,
       specifier,
       /*IsCaptureList*/false,
@@ -139,7 +139,7 @@ createVarWithPattern(ASTContext &cxt, DeclContext *dc, Identifier name, Type ty,
   // Create a pattern binding to describe the variable.
   Pattern *varPattern = createTypedNamedPattern(var);
   auto patternBinding =
-      PatternBindingDecl::create(cxt, SourceLoc(), StaticSpellingKind::None,
+      PatternBindingDecl::create(ctx, SourceLoc(), StaticSpellingKind::None,
                                  SourceLoc(), varPattern, nullptr, dc);
 
   return {var, patternBinding};
@@ -1277,7 +1277,7 @@ static void makeStructRawValued(
     ArrayRef<ProtocolDecl *> protocols,
     MakeStructRawValuedOptions options = getDefaultMakeStructRawValuedOptions(),
     AccessLevel setterAccess = AccessLevel::Private) {
-  auto &cxt = Impl.SwiftContext;
+  auto &ctx = Impl.SwiftContext;
   addProtocolsToStruct(Impl, structDecl, synthesizedProtocolAttrs, protocols);
 
   // Create a variable to store the underlying value.
@@ -1287,7 +1287,7 @@ static void makeStructRawValued(
                  ? VarDecl::Specifier::Let
                  : VarDecl::Specifier::Var;
   std::tie(var, patternBinding) = createVarWithPattern(
-      cxt, structDecl, cxt.Id_rawValue, underlyingType,
+      ctx, structDecl, ctx.Id_rawValue, underlyingType,
       specifier,
       options.contains(MakeStructRawValuedFlags::IsImplicit),
       AccessLevel::Public,
@@ -1309,7 +1309,7 @@ static void makeStructRawValued(
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
 
-  addSynthesizedTypealias(structDecl, cxt.Id_RawValue, underlyingType);
+  addSynthesizedTypealias(structDecl, ctx.Id_RawValue, underlyingType);
 }
 
 /// Create a rawValue-ed constructor that bridges to its underlying storage.
@@ -1317,7 +1317,7 @@ static ConstructorDecl *createRawValueBridgingConstructor(
     ClangImporter::Implementation &Impl, StructDecl *structDecl,
     VarDecl *computedRawValue, VarDecl *storedRawValue, bool wantLabel,
     bool wantBody) {
-  auto &cxt = Impl.SwiftContext;
+  auto &ctx = Impl.SwiftContext;
   auto init = createValueConstructor(Impl, structDecl, computedRawValue,
                                      /*wantCtorParamNames=*/wantLabel,
                                      /*wantBody=*/false);
@@ -1326,22 +1326,22 @@ static ConstructorDecl *createRawValueBridgingConstructor(
     auto selfDecl = init->getParameterList(0)->get(0);
 
     // Construct left-hand side.
-    Expr *lhs = new (cxt) DeclRefExpr(selfDecl, DeclNameLoc(),
+    Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                       /*Implicit=*/true);
-    lhs = new (cxt) MemberRefExpr(lhs, SourceLoc(), storedRawValue,
+    lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), storedRawValue,
                                   DeclNameLoc(), /*Implicit=*/true);
 
     // Construct right-hand side.
     // FIXME: get the parameter from the init, and plug it in here.
-    auto rhs = new (cxt) CoerceExpr(
-        new (cxt) DeclRefExpr(init->getParameterList(1)->get(0), DeclNameLoc(),
+    auto rhs = new (ctx) CoerceExpr(
+        new (ctx) DeclRefExpr(init->getParameterList(1)->get(0), DeclNameLoc(),
                               /*Implicit=*/true),
         {}, {nullptr, storedRawValue->getType()});
 
     // Add assignment.
-    auto assign = new (cxt) AssignExpr(lhs, SourceLoc(), rhs,
+    auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
                                        /*Implicit=*/true);
-    auto body = BraceStmt::create(cxt, SourceLoc(), {assign}, SourceLoc());
+    auto body = BraceStmt::create(ctx, SourceLoc(), {assign}, SourceLoc());
     init->setBody(body);
   }
 
@@ -1368,24 +1368,23 @@ static void makeStructRawValuedWithBridge(
     Type storedUnderlyingType, Type bridgedType,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
     ArrayRef<ProtocolDecl *> protocols, bool makeUnlabeledValueInit = false) {
-  auto &cxt = Impl.SwiftContext;
+  auto &ctx = Impl.SwiftContext;
   addProtocolsToStruct(Impl, structDecl, synthesizedProtocolAttrs, protocols);
 
-  auto storedVarName = cxt.getIdentifier("_rawValue");
-  auto computedVarName = cxt.Id_rawValue;
+  auto storedVarName = ctx.getIdentifier("_rawValue");
+  auto computedVarName = ctx.Id_rawValue;
 
   // Create a variable to store the underlying value.
   VarDecl *storedVar;
   PatternBindingDecl *storedPatternBinding;
   std::tie(storedVar, storedPatternBinding) = createVarWithPattern(
-      cxt, structDecl, storedVarName, storedUnderlyingType,
+      ctx, structDecl, storedVarName, storedUnderlyingType,
       VarDecl::Specifier::Var, /*isImplicit=*/true,
       AccessLevel::Private,
       AccessLevel::Private);
 
-  //
-  // Create a computed value variable
-  auto computedVar = new (cxt) VarDecl(
+  // Create a computed value variable.
+  auto computedVar = new (ctx) VarDecl(
       /*IsStatic*/false, VarDecl::Specifier::Var, /*IsCaptureList*/false,
       SourceLoc(), computedVarName, bridgedType, structDecl);
   computedVar->setInterfaceType(bridgedType);
@@ -1400,7 +1399,7 @@ static void makeStructRawValuedWithBridge(
   // Create a pattern binding to describe the variable.
   Pattern *computedVarPattern = createTypedNamedPattern(computedVar);
   auto computedPatternBinding = PatternBindingDecl::create(
-      cxt, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+      ctx, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
       computedVarPattern, nullptr, structDecl);
 
   // Don't bother synthesizing the body if we've already finished
@@ -1427,7 +1426,7 @@ static void makeStructRawValuedWithBridge(
   structDecl->addMember(computedVar);
   structDecl->addMember(computedVarGetter);
 
-  addSynthesizedTypealias(structDecl, cxt.Id_RawValue, bridgedType);
+  addSynthesizedTypealias(structDecl, ctx.Id_RawValue, bridgedType);
 }
 
 static Type getGenericMethodType(DeclContext *dc, AnyFunctionType *fnType) {
@@ -2411,7 +2410,7 @@ namespace {
       if (!dc)
         return nullptr;
       
-      ASTContext &cxt = Impl.SwiftContext;
+      ASTContext &ctx = Impl.SwiftContext;
       auto name = importedName.getDeclName().getBaseIdentifier();
 
       // Create the enum declaration and record it.
@@ -2441,8 +2440,8 @@ namespace {
         structDecl->computeType();
 
         ProtocolDecl *protocols[]
-          = {cxt.getProtocol(KnownProtocolKind::RawRepresentable),
-             cxt.getProtocol(KnownProtocolKind::Equatable)};
+          = {ctx.getProtocol(KnownProtocolKind::RawRepresentable),
+             ctx.getProtocol(KnownProtocolKind::Equatable)};
         if (!protocols[0] || !protocols[1])
           return nullptr;
 
@@ -2599,6 +2598,8 @@ namespace {
         enumDecl->addMember(rawValueGetter);
         enumDecl->addMember(rawValue);
         enumDecl->addMember(rawValueBinding);
+
+        addSynthesizedTypealias(enumDecl, C.Id_RawValue, underlyingType);
 
         // If we have an error wrapper, finish it up now that its
         // nested enum has been constructed.
@@ -4958,7 +4959,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     // No other cases yet
   }
 
-  auto &cxt = Impl.SwiftContext;
+  auto &ctx = Impl.SwiftContext;
   auto Loc = Impl.importSourceLoc(decl->getLocation());
 
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
@@ -5003,7 +5004,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
   // Local function to add a known protocol.
   auto addKnown = [&](KnownProtocolKind kind) {
-    if (auto proto = cxt.getProtocol(kind)) {
+    if (auto proto = ctx.getProtocol(kind)) {
       protocols.push_back(proto);
       synthesizedProtocols.push_back(kind);
     }
@@ -5020,7 +5021,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     if (!computedNominal)
       return false;
 
-    auto proto = cxt.getProtocol(kind);
+    auto proto = ctx.getProtocol(kind);
     if (!proto)
       return false;
 
@@ -5062,7 +5063,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
                                   /*makeUnlabeledValueInit=*/unlabeledCtor);
 
     if (transferredObjCBridgeable)
-      addSynthesizedTypealias(structDecl, cxt.Id_ObjectiveCType,
+      addSynthesizedTypealias(structDecl, ctx.Id_ObjectiveCType,
                               storedUnderlyingType);
   }
 
@@ -5201,7 +5202,7 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
 NominalTypeDecl *
 SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
                                           const clang::EnumDecl *decl) {
-  ASTContext &cxt = Impl.SwiftContext;
+  ASTContext &ctx = Impl.SwiftContext;
 
   // Compute the underlying type.
   auto underlyingType = Impl.importType(
@@ -5217,11 +5218,14 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
   structDecl->computeType();
 
-  ProtocolDecl *protocols[] = {cxt.getProtocol(KnownProtocolKind::OptionSet)};
+  ProtocolDecl *protocols[] = {ctx.getProtocol(KnownProtocolKind::OptionSet)};
   makeStructRawValued(Impl, structDecl, underlyingType,
                       {KnownProtocolKind::OptionSet}, protocols);
-  addSynthesizedTypealias(structDecl, cxt.Id_Element,
-                          structDecl->getDeclaredInterfaceType());
+  auto selfType = structDecl->getDeclaredInterfaceType();
+  addSynthesizedTypealias(structDecl, ctx.Id_Element,
+                          selfType);
+  addSynthesizedTypealias(structDecl, ctx.getIdentifier("ArrayLiteralElement"),
+                          selfType);
   return structDecl;
 }
 
@@ -7029,8 +7033,7 @@ void ClangImporter::Implementation::importAttributes(
 
       StringRef message = avail->getMessage();
 
-      clang::VersionTuple deprecated = avail->getDeprecated();
-
+      const auto &deprecated = avail->getDeprecated();
       if (!deprecated.empty()) {
         if (platformAvailability.deprecatedAsUnavailableFilter &&
             platformAvailability.deprecatedAsUnavailableFilter(
@@ -7042,14 +7045,8 @@ void ClangImporter::Implementation::importAttributes(
         }
       }
 
-      clang::VersionTuple obsoleted = avail->getObsoleted();
-      clang::VersionTuple introduced = avail->getIntroduced();
-
-      // Swift only allows "." separators.
-      obsoleted.UseDotAsSeparator();
-      introduced.UseDotAsSeparator();
-      deprecated.UseDotAsSeparator();
-
+      const auto &obsoleted = avail->getObsoleted();
+      const auto &introduced = avail->getIntroduced();
       const auto &replacement = avail->getReplacement();
 
       StringRef swiftReplacement = "";
@@ -7423,8 +7420,7 @@ void ClangImporter::Implementation::finishNormalConformance(
   for (auto *inherited : inheritedProtos) {
     ModuleDecl *M = conformance->getDeclContext()->getParentModule();
     auto inheritedConformance = M->lookupConformance(conformance->getType(),
-                                                     inherited,
-                                                     /*resolver=*/nullptr);
+                                                     inherited);
     assert(inheritedConformance && inheritedConformance->isConcrete() &&
            "inherited conformance not found");
   }
@@ -7440,7 +7436,7 @@ void ClangImporter::Implementation::finishNormalConformance(
 
     ModuleDecl *M = conformance->getDeclContext()->getParentModule();
     auto reqConformance = M->lookupConformance(conformance->getType(),
-                                               reqProto, /*resolver=*/nullptr);
+                                               reqProto);
     assert(reqConformance && reqConformance->isConcrete() &&
            "required conformance not found");
     reqConformances.push_back(*reqConformance);

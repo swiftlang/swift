@@ -101,6 +101,7 @@ static bool isFunctionAttr(Node::Kind kind) {
     case Node::Kind::PartialApplyForwarder:
     case Node::Kind::PartialApplyObjCForwarder:
     case Node::Kind::OutlinedVariable:
+    case Node::Kind::OutlinedBridgedMethod:
     case Node::Kind::MergedFunction:
       return true;
     default:
@@ -1312,9 +1313,38 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
         return nullptr;
       return createNode(Node::Kind::OutlinedVariable, Idx);
     }
+    case 'e': {
+      std::string Params = demangleBridgedMethodParams();
+      if (Params.empty())
+        return nullptr;
+      return createNode(Node::Kind::OutlinedBridgedMethod, Params);
+    }
     default:
       return nullptr;
   }
+}
+
+std::string Demangler::demangleBridgedMethodParams() {
+  if (nextIf('_'))
+    return std::string();
+
+  std::string Str;
+
+  auto kind = nextChar();
+  switch (kind) {
+  default:
+    return std::string();
+  case 'p': case 'a': case 'm':
+    Str.push_back(kind);
+  }
+
+  while (!nextIf('_')) {
+    auto c = nextChar();
+    if (!c && c != 'n' && c != 'b')
+      return std::string();
+    Str.push_back(c);
+  }
+  return Str;
 }
 
 NodePointer Demangler::demangleGenericSpecialization(Node::Kind SpecKind) {

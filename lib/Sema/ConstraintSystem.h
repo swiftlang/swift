@@ -120,21 +120,22 @@ public:
 class ExpressionTimer {
   Expr* E;
   unsigned WarnLimit;
-  bool ShouldDump;
   ASTContext &Context;
-  llvm::TimeRecord StartTime = llvm::TimeRecord::getCurrentTime();
+  llvm::TimeRecord StartTime;
+
+  bool PrintDebugTiming;
+  bool PrintWarning;
 
 public:
-  ExpressionTimer(Expr *E, bool shouldDump, unsigned warnLimit,
-                  ASTContext &Context)
-      : E(E), WarnLimit(warnLimit), ShouldDump(shouldDump), Context(Context) {
-  }
+  ExpressionTimer(Expr *E, ConstraintSystem &CS);
 
   ~ExpressionTimer();
 
+  llvm::TimeRecord startedAt() const { return StartTime; }
+
   /// Return the elapsed process time (including fractional seconds)
   /// as a double.
-  double getElapsedProcessTimeInFractionalSeconds() {
+  double getElapsedProcessTimeInFractionalSeconds() const {
     llvm::TimeRecord endTime = llvm::TimeRecord::getCurrentTime(false);
 
     return endTime.getProcessTime() - StartTime.getProcessTime();
@@ -142,7 +143,12 @@ public:
 
   // Disable emission of warnings about expressions that take longer
   // than the warning threshold.
-  void disableWarning() { WarnLimit = 0; }
+  void disableWarning() { PrintWarning = false; }
+
+  bool isExpired(unsigned thresholdInMillis) const {
+    auto elapsed = getElapsedProcessTimeInFractionalSeconds();
+    return unsigned(elapsed) > thresholdInMillis;
+  }
 };
 
 } // end namespace constraints
@@ -1021,6 +1027,8 @@ private:
     DeclContext *DC;
     llvm::BumpPtrAllocator &Allocator;
 
+    ConstraintSystem &BaseCS;
+
     // Contextual Information.
     Type CT;
     ContextualTypePurpose CTP;
@@ -1028,8 +1036,8 @@ private:
   public:
     Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
               ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), TC(cs.TC), DC(cs.DC), Allocator(cs.Allocator), CT(ct),
-          CTP(ctp) {}
+        : E(expr), TC(cs.TC), DC(cs.DC), Allocator(cs.Allocator), BaseCS(cs),
+          CT(ct), CTP(ctp) {}
 
     /// \brief Return underlying expression.
     Expr *getExpr() const { return E; }
@@ -2535,6 +2543,9 @@ private:
   };
 
   struct PotentialBindings {
+    typedef std::tuple<bool, bool, bool, bool, unsigned char,
+                       bool, unsigned int> BindingScore;
+
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
 
@@ -2564,22 +2575,21 @@ private:
       return Bindings.size() > NumDefaultableBindings;
     }
 
+    static BindingScore formBindingScore(const PotentialBindings &b) {
+      return std::make_tuple(!b.hasNonDefaultableBindings(),
+                             b.FullyBound,
+                             b.IsRHSOfBindParam,
+                             b.SubtypeOfExistentialType,
+                             static_cast<unsigned char>(b.LiteralBinding),
+                             b.InvolvesTypeVariables,
+                             -(b.Bindings.size() - b.NumDefaultableBindings));
+    }
+
     /// Compare two sets of bindings, where \c x < y indicates that
     /// \c x is a better set of bindings that \c y.
     friend bool operator<(const PotentialBindings &x,
                           const PotentialBindings &y) {
-      return std::make_tuple(!x.hasNonDefaultableBindings(),
-                             x.FullyBound, x.IsRHSOfBindParam,
-                             x.SubtypeOfExistentialType,
-                             static_cast<unsigned char>(x.LiteralBinding),
-                             x.InvolvesTypeVariables,
-                             -(x.Bindings.size() - x.NumDefaultableBindings)) <
-             std::make_tuple(!y.hasNonDefaultableBindings(),
-                             y.FullyBound, y.IsRHSOfBindParam,
-                             y.SubtypeOfExistentialType,
-                             static_cast<unsigned char>(y.LiteralBinding),
-                             y.InvolvesTypeVariables,
-                             -(y.Bindings.size() - y.NumDefaultableBindings));
+      return formBindingScore(x) < formBindingScore(y);
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
@@ -2601,47 +2611,57 @@ private:
       }
     }
 
+    void dump(llvm::raw_ostream &out, unsigned indent =0) const {
+      out.indent(indent);
+      if (FullyBound)
+        out << "fully_bound ";
+      if (SubtypeOfExistentialType)
+        out << "subtype_of_existential ";
+      if (LiteralBinding != LiteralBindingKind::None)
+        out << "literal=" << static_cast<int>(LiteralBinding) << " ";
+      if (InvolvesTypeVariables)
+        out << "involves_type_vars ";
+      if (NumDefaultableBindings > 0)
+        out << "#defaultable_bindings=" << NumDefaultableBindings << " ";
+
+      out << "bindings=";
+      if (!Bindings.empty()) {
+        interleave(Bindings,
+                   [&](const PotentialBinding &binding) {
+                     auto type = binding.BindingType;
+                     auto &ctx = type->getASTContext();
+                     llvm::SaveAndRestore<bool> debugConstraints(
+                         ctx.LangOpts.DebugConstraintSolver, true);
+                     switch (binding.Kind) {
+                     case AllowedBindingKind::Exact:
+                       break;
+
+                     case AllowedBindingKind::Subtypes:
+                       out << "(subtypes of) ";
+                       break;
+
+                     case AllowedBindingKind::Supertypes:
+                       out << "(supertypes of) ";
+                       break;
+                     }
+                     if (binding.DefaultedProtocol)
+                       out << "(default from "
+                           << (*binding.DefaultedProtocol)->getName() << ") ";
+                     out << type.getString();
+                   },
+                   [&]() { out << " "; });
+      } else {
+        out << "{}";
+      }
+    }
+
     void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
-              unsigned indent) const {
+              unsigned indent =0) const {
       out.indent(indent);
       out << "(";
       if (typeVar)
         out << "$T" << typeVar->getImpl().getID();
-      if (FullyBound)
-        out << " fully_bound";
-      if (SubtypeOfExistentialType)
-        out << " subtype_of_existential";
-      if (LiteralBinding != LiteralBindingKind::None)
-        out << " literal=" << static_cast<int>(LiteralBinding);
-      if (InvolvesTypeVariables)
-        out << " involves_type_vars";
-      if (NumDefaultableBindings > 0)
-        out << " defaultable_bindings=" << NumDefaultableBindings;
-      out << " bindings=";
-      interleave(Bindings,
-                 [&](const PotentialBinding &binding) {
-                   auto type = binding.BindingType;
-                   auto &ctx = type->getASTContext();
-                   llvm::SaveAndRestore<bool> debugConstraints(
-                       ctx.LangOpts.DebugConstraintSolver, true);
-                   switch (binding.Kind) {
-                   case AllowedBindingKind::Exact:
-                     break;
-
-                   case AllowedBindingKind::Subtypes:
-                     out << "(subtypes of) ";
-                     break;
-
-                   case AllowedBindingKind::Supertypes:
-                     out << "(supertypes of) ";
-                     break;
-                   }
-                   if (binding.DefaultedProtocol)
-                     out << "(default from "
-                         << (*binding.DefaultedProtocol)->getName() << ") ";
-                   out << type.getString();
-                 },
-                 [&]() { out << " "; });
+      dump(out);
       out << ")\n";
     }
   };
@@ -2829,15 +2849,13 @@ public:
   /// \brief Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
-    if (Timer.hasValue()) {
-      auto elapsed = Timer->getElapsedProcessTimeInFractionalSeconds();
-      if (unsigned(elapsed) > TC.getExpressionTimeoutThresholdInSeconds()) {
-        // Disable warnings about expressions that go over the warning
-        // threshold since we're arbitrarily ending evaluation and
-        // emitting an error.
-        Timer->disableWarning();
-        return true;
-      }
+    auto timeoutThresholdInMillis = TC.getExpressionTimeoutThresholdInSeconds();
+    if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
+      // Disable warnings about expressions that go over the warning
+      // threshold since we're arbitrarily ending evaluation and
+      // emitting an error.
+      Timer->disableWarning();
+      return true;
     }
 
     if (!getASTContext().isSwiftVersion3()) {

@@ -83,7 +83,7 @@ static void _buildNameForMetadata(const Metadata *type,
     }
   } else if (type->getKind() == MetadataKind::ObjCClassWrapper) {
     auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
-    const char *className = class_getName((Class)objcWrapper->Class);
+    const char *className = class_getName(class_const_cast(objcWrapper->Class));
     result = className;
     return;
   }
@@ -571,14 +571,10 @@ id
 swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
   case MetadataKind::Class:
+  case MetadataKind::ObjCClassWrapper:
     // Swift classes are objects in and of themselves.
-    return (id)metatype;
-
-  case MetadataKind::ObjCClassWrapper: {
-    // Unwrap ObjC class objects.
-    auto wrapper = static_cast<const ObjCClassWrapperMetadata*>(metatype);
-    return (id)wrapper->getClassObject();
-  }
+    // ObjC class wrappers get unwrapped.
+    return (id)metatype->getObjCClassObject();
   
   // Other kinds of metadata don't cast to AnyObject.
   case MetadataKind::Struct:
@@ -603,14 +599,10 @@ id
 swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
   case MetadataKind::Class:
+  case MetadataKind::ObjCClassWrapper:
     // Swift classes are objects in and of themselves.
-    return (id)metatype;
-
-  case MetadataKind::ObjCClassWrapper: {
-    // Unwrap ObjC class objects.
-    auto wrapper = static_cast<const ObjCClassWrapperMetadata*>(metatype);
-    return (id)wrapper->getClassObject();
-  }
+    // ObjC class wrappers get unwrapped.
+    return (id)metatype->getObjCClassObject();
   
   // Other kinds of metadata don't cast to AnyObject.
   case MetadataKind::Struct:
@@ -1487,7 +1479,7 @@ static void unwrapExistential(OpaqueValue *src,
   switch (srcType->getRepresentation()) {
     case ExistentialTypeRepresentation::Class: {
       auto classContainer =
-      reinterpret_cast<const ClassExistentialContainer*>(src);
+        reinterpret_cast<ClassExistentialContainer*>(src);
       srcValue = (OpaqueValue*) &classContainer->Value;
       void *obj = classContainer->Value;
       srcCapturedType = swift_getObjectType(reinterpret_cast<HeapObject*>(obj));
@@ -2929,7 +2921,7 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
     // Class metatypes bridge to their class object.
     if (isa<ClassMetadata>(srcMetatypeValue)
         || isa<ObjCClassWrapperMetadata>(srcMetatypeValue)) {
-      return (id)srcMetatypeValue->getClassObject();
+      return (id)srcMetatypeValue->getObjCClassObject();
     
     // ObjC protocols bridge to their Protocol object.
     } else if (auto existential
@@ -2937,7 +2929,7 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
       if (existential->isObjC() && existential->Protocols.NumProtocols == 1) {
         // Though they're statically-allocated globals, Protocol inherits
         // NSObject's default refcounting behavior so must be retained.
-        auto protocolObj = (id)existential->Protocols[0];
+        auto protocolObj = id_const_cast(existential->Protocols[0]);
         return objc_retain(protocolObj);
       }
     }

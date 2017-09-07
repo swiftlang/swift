@@ -170,8 +170,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   // TODO: maybe Sema shouldn't ever do this?
   if (Type classBound = archetype->getSuperclass()) {
     auto conformance =
-      IGF.IGM.getSwiftModule()->lookupConformance(classBound, protocol,
-                                                  nullptr);
+      IGF.IGM.getSwiftModule()->lookupConformance(classBound, protocol);
     if (conformance && conformance->isConcrete()) {
       return emitWitnessTableRef(IGF, archetype, *conformance);
     }

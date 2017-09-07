@@ -230,17 +230,3 @@ public struct Unmanaged<Instance : AnyObject> {
   }
 #endif
 }
-
-extension Unmanaged {
-  @available(*, unavailable, 
-    message:"use 'fromOpaque(_: UnsafeRawPointer)' instead")
-  public static func fromOpaque(_ value: OpaquePointer) -> Unmanaged {
-    Builtin.unreachable()
-  }
-  
-  @available(*, unavailable, 
-    message:"use 'toOpaque() -> UnsafeRawPointer' instead")
-  public func toOpaque() -> OpaquePointer {
-    Builtin.unreachable()
-  }
-}

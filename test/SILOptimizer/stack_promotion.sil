@@ -569,7 +569,7 @@ bb0(%0 : $Int):
 }
 
 sil [_semantics "array.uninitialized"] @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
-sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
 
 sil @take_array : $@convention(thin) (@owned Array<Int>) -> () {
 bb0(%0 : $Array<Int>):
@@ -589,8 +589,8 @@ bb0(%0 : $Array<Int>):
 // CHECK: dealloc_ref [stack] [[B]]
 // CHECK: return
 
-sil @promote_array_withUnsafeMutableBufferPointer_use : $@convention(thin) (Int, @owned @callee_owned (@inout Int) -> (@out (), @error ErrorType)) -> () {
-bb0(%0 : $Int, %closure: $@callee_owned (@inout Int) -> (@out (), @error ErrorType)):
+sil @promote_array_withUnsafeMutableBufferPointer_use : $@convention(thin) (Int, @owned @callee_owned (@inout Int) -> (@out (), @error Error)) -> () {
+bb0(%0 : $Int, %closure: $@callee_owned (@inout Int) -> (@out (), @error Error)):
 
   %the_array = alloc_stack $Array<Int>
 
@@ -622,9 +622,9 @@ bb0(%0 : $Int, %closure: $@callee_owned (@inout Int) -> (@out (), @error ErrorTy
   %20 = apply %19(%11) : $@convention(thin) (@owned Array<Int>) -> ()
 
   // pass the array to the withUnsafeMutableBufferPointer closure.
-  %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+  %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
   %22 = alloc_stack $()
-  %23 = apply [nothrow]%21(%22, %closure, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+  %23 = apply [nothrow]%21(%22, %closure, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
   dealloc_stack %22 : $*()
 
   dealloc_stack %the_array: $*Array<Int>
@@ -674,10 +674,10 @@ bb0(%0 : $Int):
   // pass the array to the withUnsafeMutableBufferPointer closure.
   %closure_fun = function_ref @array_capture_closure : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
   %closure = partial_apply %closure_fun(%11) : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
-  %closure2 = convert_function %closure : $@callee_owned (@inout Int) -> (@out ()) to $@callee_owned (@inout Int) -> (@out (), @error ErrorType)
-  %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+  %closure2 = convert_function %closure : $@callee_owned (@inout Int) -> (@out ()) to $@callee_owned (@inout Int) -> (@out (), @error Error)
+  %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
   %22 = alloc_stack $()
-  %23 = apply [nothrow]%21(%22, %closure2, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+  %23 = apply [nothrow]%21(%22, %closure2, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
   dealloc_stack %22 : $*()
 
   dealloc_stack %the_array: $*Array<Int>
@@ -731,10 +731,10 @@ bb0(%0 : $Int, %another: $Array<Int>):
   // pass the array to the withUnsafeMutableBufferPointer closure.
   %closure_fun = function_ref @array_capture_closure : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
   %closure = partial_apply %closure_fun(%another) : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
-  %closure2 = convert_function %closure : $@callee_owned (@inout Int) -> (@out ()) to $@callee_owned (@inout Int) -> (@out (), @error ErrorType)
-  %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+  %closure2 = convert_function %closure : $@callee_owned (@inout Int) -> (@out ()) to $@callee_owned (@inout Int) -> (@out (), @error Error)
+  %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
   %22 = alloc_stack $()
-  %23 = apply [nothrow]%21(%22, %closure2, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+  %23 = apply [nothrow]%21(%22, %closure2, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
   dealloc_stack %22 : $*()
 
   dealloc_stack %the_array: $*Array<Int>

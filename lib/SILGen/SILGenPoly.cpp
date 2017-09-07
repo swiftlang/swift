@@ -170,7 +170,7 @@ collectExistentialConformances(ModuleDecl *M, CanType fromType, CanType toType) 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
     auto conformance =
-      M->lookupConformance(fromType, proto->getDecl(), nullptr);
+      M->lookupConformance(fromType, proto->getDecl());
     conformances.push_back(*conformance);
   }
   
@@ -561,7 +561,7 @@ ManagedValue Transform::transform(ManagedValue v,
     auto *protocol = SGF.getASTContext().getProtocol(
         KnownProtocolKind::Hashable);
     auto conformance = SGF.SGM.M.getSwiftModule()->lookupConformance(
-        inputSubstType, protocol, nullptr);
+        inputSubstType, protocol);
     auto result = SGF.emitAnyHashableErasure(Loc, v, inputSubstType,
                                              *conformance, ctxt);
     if (result.isInContext())

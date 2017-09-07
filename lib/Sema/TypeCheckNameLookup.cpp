@@ -108,7 +108,6 @@ namespace {
         conformanceOptions |= ConformanceCheckFlags::InExpression;
 
       DeclContext *foundDC = found->getDeclContext();
-      auto foundProto = foundDC->getAsProtocolOrProtocolExtensionContext();
 
       auto addResult = [&](ValueDecl *result) {
         if (Known.insert({{result, baseDC}, false}).second) {
@@ -150,8 +149,9 @@ namespace {
       }
 
       // Dig out the protocol conformance.
+      auto *foundProto = cast<ProtocolDecl>(foundDC);
       auto conformance = TC.conformsToProtocol(conformingType, foundProto, DC,
-                                                 conformanceOptions);
+                                               conformanceOptions);
       if (!conformance) {
         // If there's no conformance, we have an existential
         // and we found a member from one of the protocols, and
@@ -387,7 +387,10 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
         }
       }
 
-      if (isa<TypeAliasDecl>(typeDecl)) {
+      // FIXME: This is a hack, we should be able to remove this entire 'if'
+      // statement once we learn how to deal with the circularity here.
+      if (isa<TypeAliasDecl>(typeDecl) &&
+          isa<ProtocolDecl>(typeDecl->getDeclContext())) {
         if (!type->is<ArchetypeType>() &&
             !type->isTypeParameter() &&
             memberType->hasTypeParameter() &&

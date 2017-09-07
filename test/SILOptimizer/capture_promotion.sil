@@ -305,4 +305,24 @@ bb0(%0: $*Int, %1 : $<τ_0_0> { var τ_0_0 } <Foo>, %2 : $<τ_0_0> { var τ_0_0 
   return %16 : $()
 }
 
+// CHECK-LABEL: sil @test_with_dynamic_self
+// CHECK: %{{[0-9]+}} = partial_apply %{{[0-9]+}}(%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(thin) (Int, @thick @dynamic_self Bar.Type) -> () // type-defs: %1
+// CHECK: return
+sil @test_with_dynamic_self : $@convention(method) (Int, @guaranteed Bar) -> () {
+bb0(%0 : $Int, %1 : $Bar):
+  %4 = alloc_box ${ var Int }, var, name "item"
+  %5 = project_box %4 : ${ var Int }, 0
+  store %0 to %5 : $*Int
+  %17 = function_ref @closure_with_dynamic_self : $@convention(thin) (@owned { var Int }, @thick @dynamic_self Bar.Type) -> ()
+  %21 = metatype $@thick @dynamic_self Bar.Type
+  %26 = partial_apply %17(%4, %21) : $@convention(thin) (@owned { var Int }, @thick @dynamic_self Bar.Type) -> ()
+  %39 = tuple ()
+  return %39 : $()
+}
 
+sil private @closure_with_dynamic_self : $@convention(thin) (@owned { var Int }, @thick @dynamic_self Bar.Type) -> () {
+bb0(%1 : ${ var Int }, %2 : $@thick @dynamic_self Bar.Type):
+  strong_release %1 : ${ var Int }
+  %39 = tuple ()
+  return %39 : $()
+}

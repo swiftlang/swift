@@ -242,7 +242,7 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
     if (!cls) cls = _getSwiftValueClass();
 
     // Check whether the class conforms to the protocol.
-    if (![cls conformsToProtocol: (Protocol*) protocol])
+    if (![cls conformsToProtocol: protocol_const_cast(protocol)])
       return false;
   }
 

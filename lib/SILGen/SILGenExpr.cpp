@@ -257,7 +257,7 @@ SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
     return ManagedValue(borrowed, CleanupHandle::invalid());
   }
 
-  assert(InWritebackScope && "Must be in formal evaluation scope");
+  assert(InFormalEvaluationScope && "Must be in formal evaluation scope");
   auto &cleanup = Cleanups.pushCleanup<FormalEvaluationEndBorrowCleanup>();
   CleanupHandle handle = Cleanups.getTopCleanup();
   FormalEvalContext.push<SharedBorrowFormalAccess>(loc, handle, original,
@@ -831,23 +831,10 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
     return RValue(*this, loc, refType, InitDelegationSelf);
   }
 
-  // If we hit this point, we must have DidExclusiveBorrowSelf. Thus borrow
-  // self.
-  assert(SelfInitDelegationState == SILGenFunction::DidExclusiveBorrowSelf);
-
-  // If we do not have a super init delegation self, just perform a formal
-  // access borrow and return. This occurs with delegating initializers.
-  if (!SuperInitDelegationSelf) {
-    return RValue(*this, loc, refType, InitDelegationSelf.borrow(*this, loc));
-  }
-
-  // Otherwise, we had an upcast of some sort due to a chaining
-  // initializer. This means that we need to perform a borrow from
-  // SuperInitDelegationSelf and then downcast that borrow.
-  ManagedValue borrowedUpcast = SuperInitDelegationSelf.borrow(*this, loc);
-  ManagedValue castedBorrowedType = B.createUncheckedRefCast(
-      loc, borrowedUpcast, InitDelegationSelf.getType());
-  return RValue(*this, loc, refType, castedBorrowedType);
+  // If we hit this point, we must have DidExclusiveBorrowSelf. We should have
+  // gone through the formal evaluation variant.
+  llvm_unreachable("Accessed self via non-formal evaluation API after "
+                   "exclusively borrowing self?!");
 }
 
 RValue SILGenFunction::emitFormalEvaluationRValueForSelfInDelegationInit(
@@ -1164,13 +1151,13 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
   return result;
 }
 
-/// Produce a singular RValue for a load from the specified property.  This
-/// is designed to work with RValue ManagedValue bases that are either +0 or +1.
+/// Produce a singular RValue for a load from the specified property.  This is
+/// designed to work with RValue ManagedValue bases that are either +0 or +1.
 RValue SILGenFunction::emitRValueForPropertyLoad(
     SILLocation loc, ManagedValue base, CanType baseFormalType,
     bool isSuper, VarDecl *field, SubstitutionList substitutions,
     AccessSemantics semantics, Type propTy, SGFContext C,
-    bool isGuaranteedValid) {
+    bool isBaseGuaranteed) {
   AccessStrategy strategy =
     field->getAccessStrategy(semantics, AccessKind::Read);
 
@@ -1237,7 +1224,7 @@ RValue SILGenFunction::emitRValueForPropertyLoad(
     LValue LV = emitPropertyLValue(loc, base, baseFormalType, field,
                                    LValueOptions(), AccessKind::Read,
                                    AccessSemantics::DirectToStorage);
-    return emitLoadOfLValue(loc, std::move(LV), C, isGuaranteedValid);
+    return emitLoadOfLValue(loc, std::move(LV), C, isBaseGuaranteed);
   }
 
   ManagedValue result;
@@ -1252,7 +1239,7 @@ RValue SILGenFunction::emitRValueForPropertyLoad(
 
     } else if (hasAbstractionChange ||
                (!C.isImmediatePlusZeroOk() &&
-                !(C.isGuaranteedPlusZeroOk() && isGuaranteedValid))) {
+                !(C.isGuaranteedPlusZeroOk() && isBaseGuaranteed))) {
       // If we have an abstraction change or if we have to produce a result at
       // +1, then copy the value. If we know that our base will stay alive for
       // the entire usage of this value, we can borrow the value at +0 for a
@@ -1554,8 +1541,65 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   return RValue(SGF, E, optTemp->getManagedAddress());
 }
 
+static bool inExclusiveBorrowSelfSection(
+    SILGenFunction::SelfInitDelegationStates delegationState) {
+  return delegationState == SILGenFunction::WillExclusiveBorrowSelf ||
+         delegationState == SILGenFunction::DidExclusiveBorrowSelf;
+}
+
+static RValue visitDerivedToBaseExprOfSelf(SILGenFunction &SGF,
+                                           DeclRefExpr *dre,
+                                           DerivedToBaseExpr *E, SGFContext C) {
+  SGFContext ctx;
+  auto *vd = cast<ParamDecl>(dre->getDecl());
+  SILType derivedType = SGF.getLoweredType(E->getType());
+  ManagedValue selfValue;
+
+  // If we have not exclusively borrowed self, we need to do so now.
+  if (SGF.SelfInitDelegationState == SILGenFunction::WillExclusiveBorrowSelf) {
+    // We need to use a full scope here to ensure that any underlying
+    // "normal cleanup" borrows are cleaned up.
+    Scope S(SGF, E);
+    selfValue = S.popPreservingValue(SGF.emitRValueAsSingleValue(dre));
+  } else {
+    // If we already exclusively borrowed self, then we need to emit self
+    // using formal evaluation primitives.
+
+    assert(SGF.SelfInitDelegationState ==
+           SILGenFunction::DidExclusiveBorrowSelf);
+    // This needs to be inlined since there is a Formal Evaluation Scope
+    // in emitRValueForDecl that causing any borrow for this LValue to be
+    // popped too soon.
+    selfValue =
+        SGF.emitLValueForDecl(dre, vd, dre->getType()->getCanonicalType(),
+                              AccessKind::Read, dre->getAccessSemantics());
+    selfValue = SGF.emitFormalEvaluationRValueForSelfInDelegationInit(
+                       E, dre->getType()->getCanonicalType(),
+                       selfValue.getLValueAddress(), ctx)
+                    .getAsSingleValue(SGF, E);
+  }
+  assert(selfValue);
+
+  // Check if we need to perform a conversion here.
+  if (derivedType && selfValue.getType() != derivedType)
+    selfValue = SGF.B.createUpcast(E, selfValue, derivedType);
+  return RValue(SGF, dre, selfValue);
+}
+
 RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
                                              SGFContext C) {
+  // If we are going through a decl ref expr and have self and we are in the
+  // exclusive borrow section of delegating init emission, use a special case.
+  if (inExclusiveBorrowSelfSection(SGF.SelfInitDelegationState)) {
+    if (auto *dre = dyn_cast<DeclRefExpr>(E->getSubExpr())) {
+      if (isa<ParamDecl>(dre->getDecl()) &&
+          dre->getDecl()->getFullName() == SGF.getASTContext().Id_self &&
+          dre->getDecl()->isImplicit()) {
+        return visitDerivedToBaseExprOfSelf(SGF, dre, E, C);
+      }
+    }
+  }
+
   // We can pass down the SGFContext as a following projection. We have never
   // actually implemented emit into here, so we are not changing behavior.
   ManagedValue original =
@@ -2368,11 +2412,23 @@ private:
     if (!Field->isLet())
       return None;
 
+    // If we are emitting a delegating init super and we have begun the
+    // super.init call, since self has been exclusively borrowed, we need to be
+    // conservative and use the lvalue machinery. This ensures that we properly
+    // create FormalEvaluationScopes around the access to self.
+    //
+    // TODO: This currently turns off this optimization for /all/ classes that
+    // are accessed as a direct argument to a super.init call. In the future, we
+    // should be able to be less conservative here by pattern matching if
+    // something /can not/ be self.
+    if (SGF.SelfInitDelegationState == SILGenFunction::DidExclusiveBorrowSelf)
+      return None;
+
     // Ok, now we know that we are able to emit our base at guaranteed plus zero
     // emit base.
     ManagedValue base =
       SGF.emitRValueAsSingleValue(Expr->getBase(), Context);
-    
+
     CanType baseFormalType =
       Expr->getBase()->getType()->getCanonicalType();
     assert(baseFormalType->isMaterializable());
@@ -2664,6 +2720,41 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
   return result;
 }
 
+static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
+    SILGenFunction &SGF, SILLocation loc, DeclRefExpr *dre, SILType metaTy) {
+  SGFContext ctx;
+  auto *vd = cast<ParamDecl>(dre->getDecl());
+  ManagedValue selfValue;
+
+  // If we have not exclusively borrowed self, we need to do so now.
+  if (SGF.SelfInitDelegationState == SILGenFunction::WillExclusiveBorrowSelf) {
+    // We need to use a full scope here to ensure that any underlying
+    // "normal cleanup" borrows are cleaned up.
+    Scope S(SGF, loc);
+    selfValue = S.popPreservingValue(SGF.emitRValueAsSingleValue(dre));
+  } else {
+    // If we already exclusively borrowed self, then we need to emit self
+    // using formal evaluation primitives.
+
+    assert(SGF.SelfInitDelegationState ==
+           SILGenFunction::DidExclusiveBorrowSelf);
+    // This needs to be inlined since there is a Formal Evaluation Scope
+    // in emitRValueForDecl that causing any borrow for this LValue to be
+    // popped too soon.
+    selfValue =
+        SGF.emitLValueForDecl(dre, vd, dre->getType()->getCanonicalType(),
+                              AccessKind::Read, dre->getAccessSemantics());
+    selfValue = SGF.emitFormalEvaluationRValueForSelfInDelegationInit(
+                       loc, dre->getType()->getCanonicalType(),
+                       selfValue.getLValueAddress(), ctx)
+                    .getAsSingleValue(SGF, loc);
+  }
+  assert(selfValue && !selfValue.hasCleanup());
+
+  // Check if we need to perform a conversion here.
+  return SGF.B.createValueMetatype(loc, metaTy, selfValue.getValue());
+}
+
 SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
   Type formalBaseType = baseExpr->getType()->getWithoutSpecifierType();
   CanType baseTy = formalBaseType->getCanonicalType();
@@ -2682,6 +2773,17 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
   // dynamically from the instance.
   if (metaTy.castTo<MetatypeType>()->getRepresentation()
           != MetatypeRepresentation::Thin) {
+    if (inExclusiveBorrowSelfSection(SelfInitDelegationState)) {
+      if (auto *dre = dyn_cast<DeclRefExpr>(baseExpr)) {
+        if (isa<ParamDecl>(dre->getDecl()) &&
+            dre->getDecl()->getFullName() == getASTContext().Id_self &&
+            dre->getDecl()->isImplicit()) {
+          return emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
+              *this, loc, dre, metaTy);
+        }
+      }
+    }
+
     Scope S(*this, loc);
     auto base = emitRValueAsSingleValue(baseExpr, SGFContext::AllowImmediatePlusZero);
     return S.popPreservingValue(B.createValueMetatype(loc, metaTy, base))

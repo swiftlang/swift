@@ -241,14 +241,3 @@ func _memmove(
     /*alignment:*/ Int32()._value,
     /*volatile:*/ false._value)
 }
-
-@available(*, unavailable, renamed: "OpaquePointer")
-public struct COpaquePointer {}
-
-extension OpaquePointer {
-  @available(*, unavailable, 
-    message:"use 'Unmanaged.toOpaque()' instead")
-  public init<T>(bitPattern bits: Unmanaged<T>) {
-    Builtin.unreachable()
-  }
-}

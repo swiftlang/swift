@@ -925,6 +925,3 @@ extension Mirror : CustomReflectable {
     return Mirror(self, children: [:])
   }
 }
-
-@available(*, unavailable, renamed: "MirrorPath")
-public typealias MirrorPathType = MirrorPath
