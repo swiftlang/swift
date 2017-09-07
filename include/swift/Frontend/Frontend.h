@@ -453,7 +453,7 @@ private:
   ModuleDecl *importUnderlyingModule();
   ModuleDecl *importBridgingHeader();
 
-  void fillInModulesToImportFromImplicitImportModuleNames(
+  void getImplicitlyImportedModules(
       SmallVectorImpl<ModuleDecl *> &importModules);
   
 public: // for static functions in Frontend.cpp

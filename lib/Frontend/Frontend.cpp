@@ -356,7 +356,7 @@ CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
   ? compiler.importUnderlyingModule()
   : nullptr;
   
-  compiler.fillInModulesToImportFromImplicitImportModuleNames(modules);
+  compiler.getImplicitlyImportedModules(modules);
   
   headerModule = compiler.importBridgingHeader();
 }
@@ -407,9 +407,9 @@ CompilerInstance::importBridgingHeader() {
   return importedHeaderModule;
 }
 
-void CompilerInstance::fillInModulesToImportFromImplicitImportModuleNames(
+void CompilerInstance::getImplicitlyImportedModules(
     SmallVectorImpl<ModuleDecl *> &importModules) {
-  SharedTimer timer("performSema-fillInModulesToImportFromImplicitImportModuleNames");
+  SharedTimer timer("performSema-getImplicitlyImportedModules");
   for (auto &ImplicitImportModuleName :
        Invocation.getFrontendOptions().ImplicitImportModuleNames) {
     if (Lexer::isIdentifier(ImplicitImportModuleName)) {
