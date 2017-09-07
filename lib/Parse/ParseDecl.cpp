@@ -268,6 +268,8 @@ bool Parser::parseTopLevel() {
   // attach it to the token.
   State->markParserPosition(Tok.getCommentRange().getStart(), PreviousLoc,
                             InPoundLineEnvironment);
+  if (Tok.is(tok::eof))
+    TokReceiver->finalize();
 
   return FoundTopLevelCodeToExecute;
 }

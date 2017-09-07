@@ -75,6 +75,7 @@ class ConsumeTokenReceiver {
 public:
   virtual void receive(Token Tok) {}
   virtual void registerTokenKindChange(SourceLoc Loc, tok NewKind) {};
+  virtual void finalize() {};
   virtual ~ConsumeTokenReceiver() = default;
 };
 

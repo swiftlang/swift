@@ -310,12 +310,43 @@ namespace {
       return lower_bound(Tok.getLoc());
     }
 
+    void relexComment(CharSourceRange CommentRange,
+                      llvm::SmallVectorImpl<Token> &Scracth) {
+      Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
+              CommentRetentionMode::ReturnAsTokens,
+              TriviaRetentionMode::WithoutTrivia,
+              SM.getLocOffsetInBuffer(CommentRange.getStart(), BufferID),
+              SM.getLocOffsetInBuffer(CommentRange.getEnd(), BufferID));
+      while(true) {
+        Token Result;
+        L.lex(Result);
+        if (Result.is(tok::eof))
+          break;
+        assert(Result.is(tok::comment));
+        Scracth.push_back(Result);
+      }
+    }
+
   public:
     TokenRecorder(SourceFile &SF):
       Ctx(SF.getASTContext()),
       SM(SF.getASTContext().SourceMgr),
       Bag(SF.getTokenVector()),
       BufferID(SF.getBufferID().getValue()) {};
+
+    void finalize() override {
+      SourceLoc TokEndLoc;
+      if (!Bag.empty()) {
+        Token Last = Bag.back();
+        TokEndLoc = Last.getLoc().getAdvancedLoc(Last.getLength());
+      } else {
+        TokEndLoc = SM.getLocForBufferStart(BufferID);
+      }
+      llvm::SmallVector<Token, 4> Scratch;
+      relexComment(CharSourceRange(SM, TokEndLoc,
+                            SM.getRangeForBuffer(BufferID).getEnd()), Scratch);
+      Bag.insert(Bag.end(), Scratch.begin(), Scratch.end());
+    }
 
     void registerTokenKindChange(SourceLoc Loc, tok NewKind) override {
       // If a token with the same location is already in the bag, update its kind.
@@ -348,20 +379,7 @@ namespace {
 
       llvm::SmallVector<Token, 4> TokensToConsume;
       if (Tok.hasComment()) {
-        CharSourceRange CommentRange = Tok.getCommentRange();
-        Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
-                CommentRetentionMode::ReturnAsTokens,
-                TriviaRetentionMode::WithoutTrivia,
-                SM.getLocOffsetInBuffer(CommentRange.getStart(), BufferID),
-                SM.getLocOffsetInBuffer(CommentRange.getEnd(), BufferID));
-        while(true) {
-          Token Result;
-          L.lex(Result);
-          if (Result.is(tok::eof))
-            break;
-          assert(Result.is(tok::comment));
-          TokensToConsume.push_back(Result);
-        }
+        relexComment(Tok.getCommentRange(), TokensToConsume);
       }
       TokensToConsume.push_back(Tok);
       Bag.insert(Pos, TokensToConsume.begin(), TokensToConsume.end());
