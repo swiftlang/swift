@@ -3111,6 +3111,8 @@ void ConstraintSystem::print(raw_ostream &out) {
       if (auto fixed = getFixedType(tv)) {
         out << " as ";
         fixed->print(out);
+      } else {
+        getPotentialBindings(tv).dump(out, 1);
       }
     } else {
       out << " equivalent to ";

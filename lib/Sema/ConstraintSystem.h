@@ -2603,47 +2603,57 @@ private:
       }
     }
 
+    void dump(llvm::raw_ostream &out, unsigned indent =0) const {
+      out.indent(indent);
+      if (FullyBound)
+        out << "fully_bound ";
+      if (SubtypeOfExistentialType)
+        out << "subtype_of_existential ";
+      if (LiteralBinding != LiteralBindingKind::None)
+        out << "literal=" << static_cast<int>(LiteralBinding) << " ";
+      if (InvolvesTypeVariables)
+        out << "involves_type_vars ";
+      if (NumDefaultableBindings > 0)
+        out << "#defaultable_bindings=" << NumDefaultableBindings << " ";
+
+      out << "bindings=";
+      if (!Bindings.empty()) {
+        interleave(Bindings,
+                   [&](const PotentialBinding &binding) {
+                     auto type = binding.BindingType;
+                     auto &ctx = type->getASTContext();
+                     llvm::SaveAndRestore<bool> debugConstraints(
+                         ctx.LangOpts.DebugConstraintSolver, true);
+                     switch (binding.Kind) {
+                     case AllowedBindingKind::Exact:
+                       break;
+
+                     case AllowedBindingKind::Subtypes:
+                       out << "(subtypes of) ";
+                       break;
+
+                     case AllowedBindingKind::Supertypes:
+                       out << "(supertypes of) ";
+                       break;
+                     }
+                     if (binding.DefaultedProtocol)
+                       out << "(default from "
+                           << (*binding.DefaultedProtocol)->getName() << ") ";
+                     out << type.getString();
+                   },
+                   [&]() { out << " "; });
+      } else {
+        out << "{}";
+      }
+    }
+
     void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
-              unsigned indent) const {
+              unsigned indent =0) const {
       out.indent(indent);
       out << "(";
       if (typeVar)
         out << "$T" << typeVar->getImpl().getID();
-      if (FullyBound)
-        out << " fully_bound";
-      if (SubtypeOfExistentialType)
-        out << " subtype_of_existential";
-      if (LiteralBinding != LiteralBindingKind::None)
-        out << " literal=" << static_cast<int>(LiteralBinding);
-      if (InvolvesTypeVariables)
-        out << " involves_type_vars";
-      if (NumDefaultableBindings > 0)
-        out << " defaultable_bindings=" << NumDefaultableBindings;
-      out << " bindings=";
-      interleave(Bindings,
-                 [&](const PotentialBinding &binding) {
-                   auto type = binding.BindingType;
-                   auto &ctx = type->getASTContext();
-                   llvm::SaveAndRestore<bool> debugConstraints(
-                       ctx.LangOpts.DebugConstraintSolver, true);
-                   switch (binding.Kind) {
-                   case AllowedBindingKind::Exact:
-                     break;
-
-                   case AllowedBindingKind::Subtypes:
-                     out << "(subtypes of) ";
-                     break;
-
-                   case AllowedBindingKind::Supertypes:
-                     out << "(supertypes of) ";
-                     break;
-                   }
-                   if (binding.DefaultedProtocol)
-                     out << "(default from "
-                         << (*binding.DefaultedProtocol)->getName() << ") ";
-                   out << type.getString();
-                 },
-                 [&]() { out << " "; });
+      dump(out);
       out << ")\n";
     }
   };
