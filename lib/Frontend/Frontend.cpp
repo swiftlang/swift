@@ -676,13 +676,13 @@ void CompilerInstance::typeCheckMainModule(
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   SharedTimer timer("performSema-checkTypesWhileParsingMain-typeCheckMainModule");
   if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
-    performWholeModuleTypeCheckingOnMainModule();
+    performWholeModuleTypeChecking();
   }
   finishTypeCheckingMainModule();
 }
 
-void CompilerInstance::performWholeModuleTypeCheckingOnMainModule() {
-  SharedTimer timer("performWholeModuleTypeCheckingOnMainModule");
+void CompilerInstance::performWholeModuleTypeChecking() {
+  SharedTimer timer("performWholeModuleTypeChecking");
   for (auto File : MainModule->getFiles())
     if (auto SF = dyn_cast<SourceFile>(File))
       performWholeModuleTypeChecking(*SF);
