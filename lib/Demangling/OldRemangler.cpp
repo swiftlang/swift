@@ -1676,6 +1676,11 @@ void Remangler::mangleOutlinedVariable(Node *node) {
   mangleSingleChildNode(node);
 }
 
+void Remangler::mangleOutlinedBridgedMethod(Node *node) {
+  Out << "Te" << node->getText();
+  mangleSingleChildNode(node);
+}
+
 void Remangler::mangleKeyPathGetterThunkHelper(Node *node) {
   Out << "TK";
   mangleChildNodes(node);

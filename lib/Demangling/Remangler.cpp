@@ -1067,6 +1067,7 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::GenericSpecializationNotReAbstracted:
       case Node::Kind::GenericPartialSpecialization:
       case Node::Kind::GenericPartialSpecializationNotReAbstracted:
+      case Node::Kind::OutlinedBridgedMethod:
       case Node::Kind::OutlinedVariable:
       case Node::Kind::ObjCAttribute:
       case Node::Kind::NonObjCAttribute:
@@ -1737,6 +1738,12 @@ void Remangler::mangleOutlinedRelease(Node *node) {
 void Remangler::mangleOutlinedVariable(Node *node) {
   Buffer << "Tv";
   mangleIndex(node->getIndex());
+}
+
+void Remangler::mangleOutlinedBridgedMethod(Node *node) {
+  Buffer << "Te";
+  Buffer << node->getText();
+  Buffer << "_";
 }
 
 void Remangler::mangleSILBoxTypeWithLayout(Node *node) {
