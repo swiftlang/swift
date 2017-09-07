@@ -577,7 +577,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 267,
     key.length: 3
   },
@@ -760,7 +760,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 504,
     key.length: 3
   },
@@ -782,7 +782,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 536,
     key.length: 3
   },
@@ -965,7 +965,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 773,
     key.length: 3
   },
@@ -987,7 +987,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 805,
     key.length: 3
   },
@@ -1110,7 +1110,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 17
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 1045,
     key.length: 3
   },
@@ -1137,7 +1137,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 17
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 1101,
     key.length: 3
   },
@@ -2446,7 +2446,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 4
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 3277,
     key.length: 3
   },
@@ -3731,7 +3731,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5334,
     key.length: 3
   },
@@ -3956,7 +3956,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5737,
     key.length: 3
   },
@@ -3978,7 +3978,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5768,
     key.length: 3
   },
@@ -4000,7 +4000,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5799,
     key.length: 3
   },
@@ -4022,7 +4022,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5831,
     key.length: 3
   },
@@ -4044,7 +4044,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5863,
     key.length: 3
   },
@@ -4066,7 +4066,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 13
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5902,
     key.length: 3
   },
@@ -4088,7 +4088,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 13
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5941,
     key.length: 3
   },
@@ -4110,7 +4110,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 4
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5971,
     key.length: 3
   },
@@ -4132,7 +4132,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 6002,
     key.length: 3
   },
@@ -4154,7 +4154,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 6034,
     key.length: 3
   },
@@ -4176,7 +4176,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 6064,
     key.length: 3
   },
@@ -4198,7 +4198,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 6096,
     key.length: 3
   },
@@ -4220,7 +4220,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 6129,
     key.length: 3
   },
@@ -4242,7 +4242,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 6168,
     key.length: 3
   },
@@ -4264,7 +4264,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 6205,
     key.length: 3
   },
@@ -4286,7 +4286,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 6242,
     key.length: 3
   },
@@ -4308,7 +4308,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 6279,
     key.length: 3
   },
@@ -5244,7 +5244,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 11
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 8174,
     key.length: 3
   },
@@ -5266,7 +5266,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 11
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 8212,
     key.length: 3
   },
@@ -5288,7 +5288,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 8255,
     key.length: 3
   }

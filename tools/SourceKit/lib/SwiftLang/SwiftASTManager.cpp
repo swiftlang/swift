@@ -410,6 +410,7 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   Invocation.setSerializedDiagnosticsPath(StringRef());
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().DiagnosticsEditorMode = true;
+  Invocation.getLangOptions().KeepTokensInSourceFile = true;
   auto &FrontendOpts = Invocation.getFrontendOptions();
   if (FrontendOpts.PlaygroundTransform) {
     // The playground instrumenter changes the AST in ways that disrupt the
