@@ -474,7 +474,7 @@ private:
   std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
 
   void addMainFileToModule(ImplicitImports &implicitImports);
-  
+
   void parseAndCheckTypes(ImplicitImports &implicitImports);
 
   void parseLibraryFile(unsigned BufferID, ImplicitImports &implicitImports,
