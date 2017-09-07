@@ -368,7 +368,8 @@ ArrayTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate")
   }
 }
 
-ArrayTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
+ArrayTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate")
+  .skip(.linuxAny(reason: "rdar://problem/34268868")).code {
   do {
     var a = getCOWSlowArray()
     let originalCapacity = a.capacity
