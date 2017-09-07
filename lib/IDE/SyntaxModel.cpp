@@ -97,30 +97,6 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #include "swift/Syntax/TokenKinds.def"
 #undef KEYWORD
         Kind = SyntaxNodeKind::Keyword;
-        // Some keywords can be used as an argument labels. If this one can and
-        // is being used as one, treat it as an identifier instead.
-        if (Tok.canBeArgumentLabel() && !Tok.is(tok::kw__) &&
-            0 < I && I < Tokens.size() - 1) {
-          auto prev = Tokens[I - 1];
-          auto next = Tokens[I + 1];
-          if ((prev.is(tok::identifier) || prev.isKeyword()) && I > 1)
-            prev = Tokens[I - 2];
-          else if ((next.is(tok::identifier) || next.isKeyword()) &&
-                   I < Tokens.size() - 2)
-            next = Tokens[I + 2];
-
-          if ((prev.is(tok::l_paren) || prev.is(tok::comma)) &&
-              next.is(tok::colon))
-            Kind = SyntaxNodeKind::Identifier;
-        }
-
-        if (I) {
-          auto Prev = Tokens[I - 1];
-          if (Prev.isAny(tok::period, tok::period_prefix) &&
-              SM.getByteDistance(Prev.getLoc(), Tok.getLoc()) == 1) {
-            Kind = SyntaxNodeKind::Identifier;
-          }
-        }
         break;
 
 #define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) \

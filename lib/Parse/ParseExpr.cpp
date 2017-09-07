@@ -1908,6 +1908,8 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
     auto unescapedUnderscore = underscore && !escaped;
     if (!unescapedUnderscore)
       name = Context.getIdentifier(text);
+    if (!underscore)
+      Tok.setKind(tok::identifier);
     loc = consumeToken();
     consumeToken(tok::colon);
   }
@@ -1927,6 +1929,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     baseName = Context.getIdentifier(Tok.getText());
     baseNameLoc = consumeToken();
   } else if (afterDot && Tok.isKeyword()) {
+    Tok.setKind(tok::identifier);
     baseNameLoc = consumeToken();
   } else {
     checkForInputIncomplete();
