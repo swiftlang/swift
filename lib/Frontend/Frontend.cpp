@@ -347,17 +347,15 @@ void CompilerInstance::performSema() {
 CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
   kind = compiler.Invocation.getImplicitModuleImportKind();
 
-  auto clangImporter =
-  static_cast<ClangImporter *>(compiler.Context->getClangModuleLoader());
   
   objCModuleUnderlyingMixedFramework =
   compiler.Invocation.getFrontendOptions().ImportUnderlyingModule
-  ? compiler.importUnderlyingModule(clangImporter)
+  ? compiler.importUnderlyingModule()
   : nullptr;
   
   compiler.fillInModulesToImportFromImplicitImportModuleNames(modules);
   
-  headerModule = compiler.importBridgingHeader(clangImporter);
+  headerModule = compiler.importBridgingHeader();
 }
 
 // Return true if should continue, i.e. no error
@@ -387,10 +385,10 @@ bool CompilerInstance::loadStdlibAndMaybeSwiftOnoneSupport() {
 }
 
 ModuleDecl *
-CompilerInstance::importUnderlyingModule(ClangImporter *clangImporter) {
+CompilerInstance::importUnderlyingModule() {
   SharedTimer timer("performSema-importUnderlyingModule");
-  ModuleDecl *objCModuleUnderlyingMixedFramework = clangImporter->loadModule(
-      SourceLoc(), std::make_pair(MainModule->getName(), SourceLoc()));
+  ModuleDecl *objCModuleUnderlyingMixedFramework = static_cast<ClangImporter *>(Context->getClangModuleLoader())
+    ->loadModule(SourceLoc(), std::make_pair(MainModule->getName(), SourceLoc()));
   if (objCModuleUnderlyingMixedFramework)
     return objCModuleUnderlyingMixedFramework;
   Diagnostics.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
@@ -399,10 +397,11 @@ CompilerInstance::importUnderlyingModule(ClangImporter *clangImporter) {
 }
 
 ModuleDecl *
-CompilerInstance::importBridgingHeader(ClangImporter *clangImporter) {
+CompilerInstance::importBridgingHeader() {
   SharedTimer timer("performSema-importBridgingHeader");
   const StringRef &implicitHeaderPath =
       Invocation.getFrontendOptions().ImplicitObjCHeaderPath;
+  auto clangImporter = static_cast<ClangImporter *>(Context->getClangModuleLoader());
   if (implicitHeaderPath.empty() ||
       clangImporter->importBridgingHeader(implicitHeaderPath, MainModule))
     return nullptr;

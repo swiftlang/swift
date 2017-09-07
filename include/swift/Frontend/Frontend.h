@@ -450,8 +450,8 @@ public:
 
 private:
   bool loadStdlibAndMaybeSwiftOnoneSupport();
-  ModuleDecl *importUnderlyingModule(ClangImporter *clangImporter);
-  ModuleDecl *importBridgingHeader(ClangImporter *clangImporter);
+  ModuleDecl *importUnderlyingModule();
+  ModuleDecl *importBridgingHeader();
 
   void fillInModulesToImportFromImplicitImportModuleNames(
       SmallVectorImpl<ModuleDecl *> &importModules);
