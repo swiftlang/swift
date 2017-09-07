@@ -340,7 +340,8 @@ void CompilerInstance::performSema() {
   PersistentParserState PersistentState;
 
   // Make sure the main file is the first file in the module, so do this now.
-  addMainFileToModule(implicitImports);
+  if (MainBufferID != NO_SUCH_BUFFER)
+    addMainFileToModule(implicitImports);
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(
       implicitImports, PersistentState, DelayedCB.get());
@@ -458,13 +459,8 @@ CompilerInstance::computeDelayedParsingCallback() {
   return up;
 }
 
-// The main file may only be
-// a source file, or it may be a SIL file, which requires pumping the parser.
-
 void CompilerInstance::addMainFileToModule(ImplicitImports &implicitImports) {
   SharedTimer timer("performSema-addMainFileToModule");
-  if (MainBufferID == NO_SUCH_BUFFER)
-    return;
 
   const InputFileKind Kind = Invocation.getInputKind();
   assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_SIL);
