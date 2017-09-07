@@ -451,6 +451,7 @@ public:
   void freeContextAndSIL();
 
 private:
+  /// Load stdlib & true if should continue, i.e. no error
   bool loadStdlib();
   ModuleDecl *importUnderlyingModule();
   ModuleDecl *importBridgingHeader();

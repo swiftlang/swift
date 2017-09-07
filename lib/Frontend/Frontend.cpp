@@ -365,7 +365,6 @@ CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
   headerModule = compiler.importBridgingHeader();
 }
 
-// Return true if should continue, i.e. no error
 bool CompilerInstance::loadStdlib() {
   SharedTimer timer("performSema-loadStdlib");
   ModuleDecl *M = Context->getStdlibModule(true);
@@ -400,7 +399,7 @@ ModuleDecl *CompilerInstance::importUnderlyingModule() {
 
 ModuleDecl *CompilerInstance::importBridgingHeader() {
   SharedTimer timer("performSema-importBridgingHeader");
-  const StringRef &implicitHeaderPath =
+  const StringRef implicitHeaderPath =
       Invocation.getFrontendOptions().ImplicitObjCHeaderPath;
   auto clangImporter =
       static_cast<ClangImporter *>(Context->getClangModuleLoader());
