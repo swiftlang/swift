@@ -44,6 +44,7 @@ struct PrintOptions;
 class Decl;
 class ClassDecl;
 class GenericFunctionType;
+class LazyConformanceLoader;
 class TrailingWhereClause;
 
 /// TypeAttributes - These are attributes that may be applied to types.
@@ -1016,18 +1017,24 @@ public:
 /// synthesized conformances.
 class SynthesizedProtocolAttr : public DeclAttribute {
   KnownProtocolKind ProtocolKind;
+  LazyConformanceLoader *Loader;
 
 public:
-  SynthesizedProtocolAttr(KnownProtocolKind protocolKind)
+  SynthesizedProtocolAttr(KnownProtocolKind protocolKind,
+                          LazyConformanceLoader *Loader)
     : DeclAttribute(DAK_SynthesizedProtocol, SourceLoc(), SourceRange(),
                     /*Implicit=*/true),
-      ProtocolKind(protocolKind)
+      ProtocolKind(protocolKind), Loader(Loader)
   {
   }
 
   /// Retrieve the known protocol kind naming the protocol to be
   /// synthesized.
   KnownProtocolKind getProtocolKind() const { return ProtocolKind; }
+
+  /// Retrieve the lazy loader that will be used to populate the
+  /// synthesized conformance.
+  LazyConformanceLoader *getLazyLoader() const { return Loader; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SynthesizedProtocol;

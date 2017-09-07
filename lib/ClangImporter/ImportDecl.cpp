@@ -1238,7 +1238,7 @@ addProtocolsToStruct(ClangImporter::Implementation &Impl,
   // Note synthesized protocols
   for (auto kind : synthesizedProtocolAttrs)
     structDecl->getAttrs().add(new (Impl.SwiftContext)
-                                   SynthesizedProtocolAttr(kind));
+                                   SynthesizedProtocolAttr(kind, &Impl));
 }
 
 /// Add a synthesized typealias to the given nominal type.
@@ -2502,7 +2502,7 @@ namespace {
 
           // Set up error conformance to be lazily expanded
           errorWrapper->getAttrs().add(new (C) SynthesizedProtocolAttr(
-              KnownProtocolKind::BridgedStoredNSError));
+              KnownProtocolKind::BridgedStoredNSError, &Impl));
 
           // Create the _nsError member.
           //   public let _nsError: NSError
@@ -4810,7 +4810,7 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   if (cfObjectProto) {
     populateInheritedTypes(theClass, cfObjectProto, superclass);
     auto *attr = new (Impl.SwiftContext) SynthesizedProtocolAttr(
-        KnownProtocolKind::CFObject);
+        KnownProtocolKind::CFObject, &Impl);
     theClass->getAttrs().add(attr);
   }
 
