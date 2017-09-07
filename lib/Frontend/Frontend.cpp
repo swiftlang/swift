@@ -326,7 +326,7 @@ void CompilerInstance::performSema() {
   ImplicitImports implicitImports(*this);
   
   if (Invocation.getInputKind() == InputFileKind::IFK_Swift_REPL) {
-    createREPLFileWithImports(implicitImports);
+    createREPLFile(implicitImports);
     return;
   }
 
@@ -434,8 +434,8 @@ void CompilerInstance::getImplicitlyImportedModules(
   }
 }
 
-void CompilerInstance::createREPLFileWithImports( ImplicitImports &implicitImports) {
-  SharedTimer timer("performSema-createREPLFileWithImports");
+void CompilerInstance::createREPLFile( ImplicitImports &implicitImports) {
+  SharedTimer timer("performSema-createREPLFile");
   auto *SingleInputFile =
   new (*Context) SourceFile(*MainModule, Invocation.getSourceFileKind(),
                             None, implicitModuleImportKind, Invocation.getLangOptions().KeepTokensInSourceFile);
