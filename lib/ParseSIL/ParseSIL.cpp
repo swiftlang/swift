@@ -1510,8 +1510,7 @@ static bool getConformancesForSubstitution(Parser &P,
 
   for (auto protoTy : protocols) {
     auto conformance = M->lookupConformance(subReplacement,
-                                            protoTy->getDecl(),
-                                            nullptr);
+                                            protoTy->getDecl());
     if (conformance) {
       conformances.push_back(*conformance);
       continue;
@@ -3695,8 +3694,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
     ProtocolConformanceRef Conformance(proto);
     if (!isa<ArchetypeType>(LookupTy)) {
-      auto lookup = P.SF.getParentModule()->lookupConformance(
-                                                      LookupTy, proto, nullptr);
+      auto lookup = P.SF.getParentModule()->lookupConformance(LookupTy, proto);
       if (!lookup) {
         P.diagnose(TyLoc, diag::sil_witness_method_type_does_not_conform);
         return true;
@@ -5162,8 +5160,7 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
   Type lookupTy = ConformingTy;
   if (auto bound = lookupTy->getAs<BoundGenericType>())
     lookupTy = bound->getDecl()->getDeclaredType();
-  auto lookup = P.SF.getParentModule()->lookupConformance(
-                         lookupTy, proto, nullptr);
+  auto lookup = P.SF.getParentModule()->lookupConformance(lookupTy, proto);
   if (!lookup) {
     P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
     return nullptr;

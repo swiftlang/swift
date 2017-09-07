@@ -4197,8 +4197,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
             = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
         if (auto conformance
               = dc->getParentModule()->lookupConformance(
-                  nominal->getDeclaredType(), objcBridgeable,
-                  getLazyResolver())) {
+                  nominal->getDeclaredType(), objcBridgeable)) {
           result =
               ForeignRepresentationInfo::forBridged(conformance->getConcrete());
         }
@@ -4342,8 +4341,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       auto proto = getProtocol(known);
       if (!proto) return None;
 
-      return dc->getParentModule()->lookupConformance(type, proto,
-                                                      getLazyResolver());
+      return dc->getParentModule()->lookupConformance(type, proto);
     };
 
   // Do we conform to _ObjectiveCBridgeable?

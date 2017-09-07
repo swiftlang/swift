@@ -38,12 +38,10 @@ static bool inheritsConformanceTo(ClassDecl *target, ProtocolDecl *proto) {
   if (!target->hasSuperclass())
     return false;
 
-  auto &C = target->getASTContext();
   auto *superclassDecl = target->getSuperclassDecl();
   auto *superclassModule = superclassDecl->getModuleContext();
   return (bool)superclassModule->lookupConformance(target->getSuperclass(),
-                                                   proto,
-                                                   C.getLazyResolver());
+                                                   proto);
 }
 
 /// Returns whether the superclass of the given class conforms to Encodable.

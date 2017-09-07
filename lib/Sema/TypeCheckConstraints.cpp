@@ -2807,7 +2807,7 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
 
   for (auto proto : archetype->getConformsTo()) {
     if (!dc->getParentModule()->lookupConformance(
-          type, proto, this))
+          type, proto))
       return false;
   }
 

@@ -387,7 +387,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
       // Compute the conformances for each protocol.
       bool anySuperseded = false;
       for (const auto &entry : Conformances) {
-        if (resolveConformances(nominal, entry.first, resolver))
+        if (resolveConformances(nominal, entry.first))
           anySuperseded = true;
       }
 
@@ -668,8 +668,7 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
 }
 
 bool ConformanceLookupTable::resolveConformances(NominalTypeDecl *nominal,
-                                                 ProtocolDecl *protocol,
-                                                 LazyResolver *resolver) {
+                                                 ProtocolDecl *protocol) {
   // Find any entries that are superseded by other entries.
   ConformanceEntries &entries = Conformances[protocol];
   llvm::SmallPtrSet<DeclContext *, 4> knownConformances;
@@ -733,7 +732,6 @@ bool ConformanceLookupTable::resolveConformances(NominalTypeDecl *nominal,
 
 DeclContext *ConformanceLookupTable::getConformingContext(
                NominalTypeDecl *nominal,
-               LazyResolver *resolver,
                ConformanceEntry *entry) {
   ProtocolDecl *protocol = entry->getProtocol();
 
@@ -762,8 +760,7 @@ DeclContext *ConformanceLookupTable::getConformingContext(
 
       superclassDecl->prepareConformanceTable();
       superclassDecl->ConformanceTable->resolveConformances(superclassDecl,
-                                                            protocol,
-                                                            resolver);
+                                                            protocol);
     }
 
     // Grab the superclass entry and continue searching for a
@@ -778,7 +775,6 @@ DeclContext *ConformanceLookupTable::getConformingContext(
 
 ProtocolConformance *ConformanceLookupTable::getConformance(
                        NominalTypeDecl *nominal,
-                       LazyResolver *resolver,
                        ConformanceEntry *entry) {
   // If we already have a conformance, we're done.
   if (auto conformance = entry->getConformance())
@@ -790,7 +786,7 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
   // FIXME: This is a hack to ensure that inherited conformances are
   // always "single step", which is bad for resilience but is assumed
   // elsewhere in the compiler.
-  DeclContext *conformingDC = getConformingContext(nominal, resolver, entry);
+  DeclContext *conformingDC = getConformingContext(nominal, entry);
   if (!conformingDC)
     return nullptr;
 
@@ -815,8 +811,7 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
     // Look up the inherited conformance.
     ModuleDecl *module = entry->getDeclContext()->getParentModule();
     auto inheritedConformance = module->lookupConformance(superclassTy,
-                                                          protocol,
-                                                          resolver);
+                                                          protocol);
 
     // Form the inherited conformance.
     conformance = ctx.getInheritedConformance(
@@ -908,9 +903,9 @@ bool ConformanceLookupTable::lookupConformance(
   }
 
   // Resolve the conformances for this protocol.
-  resolveConformances(nominal, protocol, resolver);
+  resolveConformances(nominal, protocol);
   for (auto entry : Conformances[protocol]) {
-    if (auto conformance = getConformance(nominal, resolver, entry)) {
+    if (auto conformance = getConformance(nominal, entry)) {
       conformances.push_back(conformance);
     }
   }
@@ -935,7 +930,7 @@ void ConformanceLookupTable::lookupConformances(
   /// context.
   auto &potentialConformances = AllConformances[dc]; 
   for (const auto &potential : potentialConformances) {
-    resolveConformances(nominal, potential->getProtocol(), resolver);
+    resolveConformances(nominal, potential->getProtocol());
   }
 
   // Remove any superseded conformances from AllConformances.
@@ -958,8 +953,7 @@ void ConformanceLookupTable::lookupConformances(
 
                      // Record the conformance.
                      if (conformances) {
-                       if (auto conformance = getConformance(nominal, resolver,
-                                                             entry))
+                       if (auto conformance = getConformance(nominal, entry))
                          conformances->push_back(conformance);
                      }
                      return false;
@@ -1055,7 +1049,7 @@ void ConformanceLookupTable::getAllConformances(
   // Gather all of the protocols.
   for (const auto &conformance : AllConformances) {
     for (auto entry : conformance.second) {
-      if (auto conformance = getConformance(nominal, resolver, entry))
+      if (auto conformance = getConformance(nominal, entry))
         scratch.push_back(conformance);
     }
   }

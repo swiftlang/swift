@@ -3028,8 +3028,7 @@ LookUpConformanceInModule::operator()(CanType dependentType,
     return ProtocolConformanceRef(conformedProtocol->getDecl());
 
   return M->lookupConformance(conformingReplacementType,
-                              conformedProtocol->getDecl(),
-                              M->getASTContext().getLazyResolver());
+                              conformedProtocol->getDecl());
 }
 
 Optional<ProtocolConformanceRef>
