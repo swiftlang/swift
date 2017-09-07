@@ -499,7 +499,7 @@ void CompilerInstance::parseALibraryFile(
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
   auto IsPrimary =
-      PrimaryBufferID == NO_SUCH_BUFFER || BufferID == PrimaryBufferID;
+      generateOutputForTheWholeModule() || BufferID == PrimaryBufferID;
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
   bool Done;
@@ -517,7 +517,7 @@ void CompilerInstance::parseALibraryFile(
 
 OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
   OptionSet<TypeCheckingFlags> TypeCheckOptions;
-  if (PrimaryBufferID == NO_SUCH_BUFFER) {
+  if (generateOutputForTheWholeModule()) {
     TypeCheckOptions |= TypeCheckingFlags::DelayWholeModuleChecking;
   }
   const auto &options = Invocation.getFrontendOptions();
@@ -575,7 +575,7 @@ void CompilerInstance::checkTypesWhileParsingMain(
                                  TypeCheckOptions);
   }
 
-  if (PrimaryBufferID == NO_SUCH_BUFFER)
+  if (generateOutputForTheWholeModule())
     typeCheckEveryFileInMainModule(PersistentState, TypeCheckOptions);
   else if (PrimarySourceFile != nullptr)
     typeCheckThePrimaryFile(PersistentState, TypeCheckOptions);
@@ -598,7 +598,7 @@ void CompilerInstance::parseAndTypeCheckTheMainFile(
     const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   SharedTimer timer("performSema-checkTypesWhileParsingMain-parseAndTypeCheckTheMainFile");
   bool mainIsPrimary =
-      (PrimaryBufferID == NO_SUCH_BUFFER || MainBufferID == PrimaryBufferID);
+      (generateOutputForTheWholeModule() || MainBufferID == PrimaryBufferID);
 
   SourceFile &MainFile =
       MainModule->getMainSourceFile(Invocation.getSourceFileKind());

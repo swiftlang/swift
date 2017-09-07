@@ -352,7 +352,10 @@ class CompilerInstance {
 
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
   unsigned MainBufferID = NO_SUCH_BUFFER;
+  
+  /// Corresponds to PrimaryInput
   unsigned PrimaryBufferID = NO_SUCH_BUFFER;
+  bool generateOutputForTheWholeModule() { return PrimaryBufferID == NO_SUCH_BUFFER; }
 
   SourceFile *PrimarySourceFile = nullptr;
 
