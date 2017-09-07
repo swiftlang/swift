@@ -492,15 +492,15 @@ private:
   void parseAndTypeCheckMainFile(
       PersistentParserState &PersistentState,
       DelayedParsingCallbacks *DelayedParseCB,
-      const OptionSet<TypeCheckingFlags> TypeCheckOptions);
+      OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performTypeCheckingAndDelayedParsing();
 
   void typeCheckEveryFileInMainModule(
       PersistentParserState &PersistentState,
-      const OptionSet<TypeCheckingFlags> TypeCheckOptions);
+      OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void
   typeCheckThePrimaryFile(PersistentParserState &PersistentState,
-                          const OptionSet<TypeCheckingFlags> TypeCheckOptions);
+                          OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void typeCheckMainModule(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 };
 

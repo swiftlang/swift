@@ -600,7 +600,7 @@ void CompilerInstance::checkTypesWhileParsingMain(
 void CompilerInstance::parseAndTypeCheckMainFile(
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB,
-    const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
+    OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   SharedTimer timer(
       "performSema-checkTypesWhileParsingMain-parseAndTypeCheckMainFile");
   bool mainIsPrimary =
