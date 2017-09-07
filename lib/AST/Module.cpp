@@ -605,8 +605,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
 
     // If the existential type cannot be represented or the protocol does not
     // conform to itself, there's no point in looking further.
-    if (!protocol->existentialConformsToSelf() ||
-        !protocol->existentialTypeSupported(resolver))
+    if (!protocol->existentialConformsToSelf())
       return None;
 
     auto layout = type->getExistentialLayout();
