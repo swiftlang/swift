@@ -129,7 +129,7 @@ static SILDeclRef getBridgeToObjectiveC(CanType NativeType,
   if (!Proto)
     return SILDeclRef();
   auto ConformanceRef =
-      SwiftModule->lookupConformance(NativeType, Proto, nullptr);
+      SwiftModule->lookupConformance(NativeType, Proto);
   if (!ConformanceRef)
     return SILDeclRef();
 
@@ -159,7 +159,7 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
   if (!Proto)
     return SILDeclRef();
   auto ConformanceRef =
-      SwiftModule->lookupConformance(NativeType, Proto, nullptr);
+      SwiftModule->lookupConformance(NativeType, Proto);
   if (!ConformanceRef)
     return SILDeclRef();
   auto Conformance = ConformanceRef->getConcrete();
