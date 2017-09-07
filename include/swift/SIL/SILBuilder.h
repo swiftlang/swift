@@ -1084,27 +1084,33 @@ public:
         getSILDebugLocation(Loc), Operand, Element));
   }
 
-  SelectEnumInst *createSelectEnum(
-      SILLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
-      ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues) {
-    return insert(SelectEnumInst::create(getSILDebugLocation(Loc), Operand,
-                                 Ty, DefaultValue, CaseValues, getFunction()));
+  SelectEnumInst *
+  createSelectEnum(SILLocation Loc, SILValue Operand, SILType Ty,
+                   SILValue DefaultValue,
+                   ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+                   Optional<ArrayRef<Optional<uint64_t>>> CaseCounts = None,
+                   Optional<uint64_t> DefaultCount = None) {
+    return insert(SelectEnumInst::create(
+        getSILDebugLocation(Loc), Operand, Ty, DefaultValue, CaseValues,
+        getFunction(), CaseCounts, DefaultCount));
   }
 
   SelectEnumAddrInst *createSelectEnumAddr(
       SILLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
-      ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues) {
+      ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+      Optional<ArrayRef<Optional<uint64_t>>> CaseCounts = None,
+      Optional<uint64_t> DefaultCount = None) {
     return insert(SelectEnumAddrInst::create(
         getSILDebugLocation(Loc), Operand, Ty, DefaultValue, CaseValues,
-                                             getFunction()));
+        getFunction(), CaseCounts, DefaultCount));
   }
 
   SelectValueInst *createSelectValue(
       SILLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultResult,
       ArrayRef<std::pair<SILValue, SILValue>> CaseValuesAndResults) {
-    return insert(SelectValueInst::create(getSILDebugLocation(Loc), Operand,
-                                          Ty, DefaultResult,
-                                          CaseValuesAndResults, getFunction()));
+    return insert(SelectValueInst::create(getSILDebugLocation(Loc), Operand, Ty,
+                                          DefaultResult, CaseValuesAndResults,
+                                          getFunction()));
   }
 
   TupleExtractInst *createTupleExtract(SILLocation Loc, SILValue Operand,
@@ -1596,7 +1602,7 @@ public:
                                    Optional<uint64_t> Target2Count = None) {
     return insertTerminator(
         CondBranchInst::create(getSILDebugLocation(Loc), Cond, Target1, Target2,
-                               Target1Count, Target2Count, F));
+                               Target1Count, Target2Count, getFunction()));
   }
 
   CondBranchInst *createCondBranch(SILLocation Loc, SILValue Cond,
@@ -1608,7 +1614,7 @@ public:
                                    Optional<uint64_t> Target2Count = None) {
     return insertTerminator(
         CondBranchInst::create(getSILDebugLocation(Loc), Cond, Target1, Args1,
-                               Target2, Args2, Target1Count, Target2Count, F));
+                               Target2, Args2, Target1Count, Target2Count, getFunction()));
   }
 
   CondBranchInst *createCondBranch(SILLocation Loc, SILValue Cond,
@@ -1631,7 +1637,7 @@ public:
 
     return insertTerminator(CondBranchInst::create(
         getSILDebugLocation(Loc), Cond, Target1, ArgsCopy1, Target2, ArgsCopy2,
-        Target1Count, Target2Count, F));
+        Target1Count, Target2Count, getFunction()));
   }
 
   BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock) {
@@ -1658,16 +1664,22 @@ public:
 
   SwitchEnumInst *createSwitchEnum(
       SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
-      ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs) {
+      ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
+      Optional<ArrayRef<Optional<uint64_t>>> CaseCounts = None,
+      Optional<uint64_t> DefaultCount = None) {
     return insertTerminator(SwitchEnumInst::create(
-        getSILDebugLocation(Loc), Operand, DefaultBB, CaseBBs, getFunction()));
+        getSILDebugLocation(Loc), Operand, DefaultBB, CaseBBs, getFunction(),
+        CaseCounts, DefaultCount));
   }
 
   SwitchEnumAddrInst *createSwitchEnumAddr(
       SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
-      ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs) {
+      ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
+      Optional<ArrayRef<Optional<uint64_t>>> CaseCounts = None,
+      Optional<uint64_t> DefaultCount = None) {
     return insertTerminator(SwitchEnumAddrInst::create(
-        getSILDebugLocation(Loc), Operand, DefaultBB, CaseBBs, getFunction()));
+        getSILDebugLocation(Loc), Operand, DefaultBB, CaseBBs, getFunction(),
+        CaseCounts, DefaultCount));
   }
 
   DynamicMethodBranchInst *

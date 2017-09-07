@@ -1340,7 +1340,9 @@ getCaseOperands(ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
 SelectEnumInstBase::SelectEnumInstBase(
     SILInstructionKind Kind, SILDebugLocation Loc,
     SILType Ty, SILValue Operand, SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues)
+    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+    Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
+    Optional<uint64_t> DefaultCount)
     : SelectInstBase(Kind, Loc, Ty, CaseValues.size(), bool(DefaultValue),
                      getCaseOperands(CaseValues, DefaultValue), Operand) {
   // Initialize the case and successor arrays.
@@ -1353,42 +1355,50 @@ SelectEnumInstBase::SelectEnumInstBase(
 template <typename SELECT_ENUM_INST>
 SELECT_ENUM_INST *SelectEnumInstBase::createSelectEnum(
     SILDebugLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-    SILFunction &F) {
+    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILFunction &F,
+    Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
+    Optional<uint64_t> DefaultCount) {
   // Allocate enough room for the instruction with tail-allocated
   // EnumElementDecl and operand arrays. There are `CaseBBs.size()` decls
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` values.
   unsigned numCases = CaseValues.size();
 
   void *buf = F.getModule().allocateInst(
-    sizeof(SELECT_ENUM_INST) + sizeof(EnumElementDecl*) * numCases
-     + TailAllocatedOperandList<1>::getExtraSize(numCases + (bool)DefaultValue),
-    alignof(SELECT_ENUM_INST));
-  return ::new (buf) SELECT_ENUM_INST(Loc,Operand,Ty,DefaultValue,CaseValues);
+      sizeof(SELECT_ENUM_INST) + sizeof(EnumElementDecl *) * numCases +
+          sizeof(Optional<uint64_t>) +
+          TailAllocatedOperandList<1>::getExtraSize(numCases +
+                                                    (bool)DefaultValue),
+      alignof(SELECT_ENUM_INST));
+  return ::new (buf) SELECT_ENUM_INST(Loc, Operand, Ty, DefaultValue,
+                                      CaseValues, CaseCounts, DefaultCount);
 }
 
 SelectEnumInst *SelectEnumInst::create(
-    SILDebugLocation Loc, SILValue Operand, SILType Type,
-    SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-    SILFunction &F) {
+    SILDebugLocation Loc, SILValue Operand, SILType Type, SILValue DefaultValue,
+    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILFunction &F,
+    Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
+    Optional<uint64_t> DefaultCount) {
   return createSelectEnum<SelectEnumInst>(Loc, Operand, Type, DefaultValue,
-                                          CaseValues, F);
+                                          CaseValues, F, CaseCounts,
+                                          DefaultCount);
 }
 
 SelectEnumAddrInst *SelectEnumAddrInst::create(
-    SILDebugLocation Loc, SILValue Operand, SILType Type,
-    SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-    SILFunction &F) {
+    SILDebugLocation Loc, SILValue Operand, SILType Type, SILValue DefaultValue,
+    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILFunction &F,
+    Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
+    Optional<uint64_t> DefaultCount) {
   return createSelectEnum<SelectEnumAddrInst>(Loc, Operand, Type, DefaultValue,
-                                              CaseValues, F);
+                                              CaseValues, F, CaseCounts,
+                                              DefaultCount);
 }
 
 SwitchEnumInstBase::SwitchEnumInstBase(
     SILInstructionKind Kind, SILDebugLocation Loc, SILValue Operand,
     SILBasicBlock *DefaultBB,
-    ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs)
+    ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
+    Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
+    Optional<uint64_t> DefaultCount)
     : TermInst(Kind, Loc), Operands(this, Operand), NumCases(CaseBBs.size()),
       HasDefault(bool(DefaultBB)) {
   // Initialize the case and successor arrays.
@@ -1396,11 +1406,17 @@ SwitchEnumInstBase::SwitchEnumInstBase(
   auto *succs = getSuccessorBuf();
   for (unsigned i = 0, size = CaseBBs.size(); i < size; ++i) {
     cases[i] = CaseBBs[i].first;
-    ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
+    if (CaseCounts) {
+      ::new (succs + i)
+          SILSuccessor(this, CaseBBs[i].second, CaseCounts.getValue()[i]);
+    } else {
+      ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
+    }
   }
 
-  if (HasDefault)
-    ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
+  if (HasDefault) {
+    ::new (succs + NumCases) SILSuccessor(this, DefaultBB, DefaultCount);
+  }
 }
 
 void SwitchEnumInstBase::swapCase(unsigned i, unsigned j) {
@@ -1498,18 +1514,20 @@ template <typename SWITCH_ENUM_INST>
 SWITCH_ENUM_INST *SwitchEnumInstBase::createSwitchEnum(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    SILFunction &F) {
+    SILFunction &F, Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
+    Optional<uint64_t> DefaultCount) {
   // Allocate enough room for the instruction with tail-allocated
   // EnumElementDecl and SILSuccessor arrays. There are `CaseBBs.size()` decls
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
   unsigned numCases = CaseBBs.size();
   unsigned numSuccessors = numCases + (DefaultBB ? 1 : 0);
 
-  void *buf = F.getModule().allocateInst(sizeof(SWITCH_ENUM_INST)
-                                       + sizeof(EnumElementDecl*) * numCases
-                                       + sizeof(SILSuccessor) * numSuccessors,
-                                     alignof(SWITCH_ENUM_INST));
-  return ::new (buf) SWITCH_ENUM_INST(Loc, Operand, DefaultBB, CaseBBs);
+  void *buf = F.getModule().allocateInst(
+      sizeof(SWITCH_ENUM_INST) + sizeof(EnumElementDecl *) * numCases +
+          sizeof(SILSuccessor) * numSuccessors,
+      alignof(SWITCH_ENUM_INST));
+  return ::new (buf) SWITCH_ENUM_INST(Loc, Operand, DefaultBB, CaseBBs,
+                                      CaseCounts, DefaultCount);
 }
 
 NullablePtr<EnumElementDecl> SwitchEnumInstBase::getUniqueCaseForDefault() {
@@ -1542,17 +1560,19 @@ SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
 SwitchEnumInst *SwitchEnumInst::create(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    SILFunction &F) {
-  return
-    createSwitchEnum<SwitchEnumInst>(Loc, Operand, DefaultBB, CaseBBs, F);
+    SILFunction &F, Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
+    Optional<uint64_t> DefaultCount) {
+  return createSwitchEnum<SwitchEnumInst>(Loc, Operand, DefaultBB, CaseBBs, F,
+                                          CaseCounts, DefaultCount);
 }
 
 SwitchEnumAddrInst *SwitchEnumAddrInst::create(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    SILFunction &F) {
-  return createSwitchEnum<SwitchEnumAddrInst>
-    (Loc, Operand, DefaultBB, CaseBBs, F);
+    SILFunction &F, Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
+    Optional<uint64_t> DefaultCount) {
+  return createSwitchEnum<SwitchEnumAddrInst>(Loc, Operand, DefaultBB, CaseBBs,
+                                              F, CaseCounts, DefaultCount);
 }
 
 DynamicMethodBranchInst::DynamicMethodBranchInst(SILDebugLocation Loc,
