@@ -1001,18 +1001,6 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
   if (!D)
     return false;
   if (isa<AvailableAttr>(D)) {
-    std::vector<SourceLoc> PlatformLocs;
-    for (auto T : Toks) {
-      if (!SM.rangeContainsTokenLoc(D->getRangeWithAt(), T.getLoc()))
-        continue;
-#define AVAILABILITY_PLATFORM(X, PrettyName)                                  \
-      if (#X == T.getText()) {                                                \
-        PlatformLocs.push_back(T.getLoc());                                   \
-        continue;                                                             \
-      }
-#include "swift/AST/PlatformKinds.def"
-    }
-
     unsigned I = 0;
     for (; I < TokenNodes.size(); ++ I) {
       auto Node = TokenNodes[I];
@@ -1023,13 +1011,7 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
           break;
         continue;
       }
-      if (PlatformLocs.end() !=
-          std::find(PlatformLocs.begin(), PlatformLocs.end(),
-                    Node.Range.getStart())) {
-          if (!passNode({SyntaxNodeKind::Keyword, Node.Range}))
-            break;
-          continue;
-      }
+
       if (!passNode(Node))
         break;
     }

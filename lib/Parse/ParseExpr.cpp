@@ -3317,6 +3317,9 @@ Parser::parsePlatformVersionConstraintSpec() {
     return nullptr;
   }
 
+  // Register the platform name as a keyword token.
+  TokReceiver->registerTokenKindChange(PlatformLoc, tok::contextual_keyword);
+
   return makeParserResult(new (Context) PlatformVersionConstraintAvailabilitySpec(
       Platform.getValue(), PlatformLoc, Version, VersionRange));
 }
