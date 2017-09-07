@@ -55,7 +55,7 @@ std::string CompilerInvocation::getPCHHash() const {
 
 void CompilerInstance::createSILModule() {
   assert(MainModule && "main module not created yet");
-  // Assume WMO, if a -primary-file option was not provided.
+  // Assume WMO if a -primary-file option was not provided.
   bool WholeModule = !Invocation.getFrontendOptions().PrimaryInput.hasValue();
   TheSILModule = SILModule::createEmptyModule(
     getMainModule(), Invocation.getSILOptions(), WholeModule);
