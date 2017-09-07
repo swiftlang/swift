@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 let x: Int = 1
 let y: Int = x.self
