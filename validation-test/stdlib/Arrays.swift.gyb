@@ -297,7 +297,8 @@ ArrayTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
   }
 }
 
-ArrayTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
+ArrayTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate")
+  .skip(.linuxAny(reason: "rdar://problem/34268868")).code {
   do {
     var a = getCOWFastArray()
     let originalCapacity = a.capacity
@@ -599,7 +600,7 @@ let indexTests: [ArrayIndexTest<[Int]>] = [
     expectedEnd: 1,
     operation: .append(1)
   ),
-  // TODO: re-enable when rdar://problem/33358110 is addressed
+  // FIXME: re-enable when rdar://problem/33358110 is addressed
   // ArrayIndexTest(
   //   data: [ 42, 2525, 3535, 42 ],
   //   expectedStart: 1,
