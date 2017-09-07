@@ -7420,8 +7420,7 @@ void ClangImporter::Implementation::finishNormalConformance(
   for (auto *inherited : inheritedProtos) {
     ModuleDecl *M = conformance->getDeclContext()->getParentModule();
     auto inheritedConformance = M->lookupConformance(conformance->getType(),
-                                                     inherited,
-                                                     /*resolver=*/nullptr);
+                                                     inherited);
     assert(inheritedConformance && inheritedConformance->isConcrete() &&
            "inherited conformance not found");
   }
@@ -7437,7 +7436,7 @@ void ClangImporter::Implementation::finishNormalConformance(
 
     ModuleDecl *M = conformance->getDeclContext()->getParentModule();
     auto reqConformance = M->lookupConformance(conformance->getType(),
-                                               reqProto, /*resolver=*/nullptr);
+                                               reqProto);
     assert(reqConformance && reqConformance->isConcrete() &&
            "required conformance not found");
     reqConformances.push_back(*reqConformance);

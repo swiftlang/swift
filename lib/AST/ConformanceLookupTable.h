@@ -364,19 +364,16 @@ class ConformanceLookupTable {
   /// \returns true if any conformance entries were superseded by this
   /// operation.
   bool resolveConformances(NominalTypeDecl *nominal,
-                           ProtocolDecl *protocol,
-                           LazyResolver *resolver);
+                           ProtocolDecl *protocol);
 
   /// Retrieve the declaration context that provides the
   /// (non-inherited) conformance described by the given conformance
   /// entry.
   DeclContext *getConformingContext(NominalTypeDecl *nominal,
-                                    LazyResolver *resolver,
                                     ConformanceEntry *entry);
 
   /// Resolve the given conformance entry to an actual protocol conformance.
   ProtocolConformance *getConformance(NominalTypeDecl *nominal,
-                                      LazyResolver *resolver,
                                       ConformanceEntry *entry);
 
   /// Enumerate each of the unhandled contexts (nominal type

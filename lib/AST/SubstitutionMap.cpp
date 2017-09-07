@@ -227,8 +227,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
            substType->castTo<ArchetypeType>()->getSuperclass()) &&
           !substType->isTypeParameter() &&
           !substType->isExistentialType()) {
-        auto lazyResolver = M->getASTContext().getLazyResolver();
-        return *M->lookupConformance(substType, proto, lazyResolver);
+        return *M->lookupConformance(substType, proto);
       }
 
       return ProtocolConformanceRef(proto);

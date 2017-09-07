@@ -294,7 +294,7 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
   if (!proto) return nullptr;
 
   // Find the conformance to _ObjectiveCBridgeable.
-  auto result = SwiftModule->lookupConformance(type, proto, nullptr);
+  auto result = SwiftModule->lookupConformance(type, proto);
   if (result) return result->getConcrete();
   return nullptr;
 }
@@ -341,7 +341,7 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   if (!proto) return None;
 
   // Find the conformance to _BridgedStoredNSError.
-  return SwiftModule->lookupConformance(type, proto, nullptr);
+  return SwiftModule->lookupConformance(type, proto);
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
@@ -363,8 +363,7 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
 
   auto conformance =
     SwiftModule->lookupConformance(nsError->getDeclaredInterfaceType(),
-                                   cast<ProtocolDecl>(error),
-                                   nullptr);
+                                   cast<ProtocolDecl>(error));
 
   if (conformance && conformance->isConcrete())
     NSErrorConformanceToError = conformance->getConcrete();

@@ -5518,7 +5518,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 
   // Look up conformance in the module.
   ModuleDecl *M = DC->getParentModule();
-  auto lookupResult = M->lookupConformance(T, Proto, this);
+  auto lookupResult = M->lookupConformance(T, Proto);
   if (!lookupResult) {
     if (ComplainLoc.isValid())
       diagnoseConformanceFailure(*this, T, Proto, DC, ComplainLoc);
