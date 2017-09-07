@@ -577,7 +577,7 @@ void CompilerInstance::checkTypesWhileParsingMain(
   // Parse the main file last.
   if (MainBufferID != NO_SUCH_BUFFER) {
     parseAndTypeCheckMainFile(PersistentState, DelayedParseCB,
-                                 TypeCheckOptions);
+                              TypeCheckOptions);
   }
 
   if (generateOutputForTheWholeModule())
