@@ -293,15 +293,23 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
 
 namespace {
   class TokenRecorder: public ConsumeTokenReceiver {
-    static bool tokComp(const Token &A, const Token &B) {
-      return A.getLoc().getOpaquePointerValue() <
-             B.getLoc().getOpaquePointerValue();
-    }
     ASTContext &Ctx;
     SourceManager &SM;
     std::vector<Token> &Bag;
     unsigned BufferID;
     llvm::DenseMap<const void*, tok> TokenKindChangeMap;
+
+    std::vector<Token>::iterator lower_bound(SourceLoc Loc) {
+      return std::lower_bound(Bag.begin(), Bag.end(), Loc,
+        [](const Token &T, SourceLoc L) {
+          return T.getLoc().getOpaquePointerValue() < L.getOpaquePointerValue();
+        });
+    }
+
+    std::vector<Token>::iterator lower_bound(Token Tok) {
+      return lower_bound(Tok.getLoc());
+    }
+
   public:
     TokenRecorder(SourceFile &SF):
       Ctx(SF.getASTContext()),
@@ -310,13 +318,22 @@ namespace {
       BufferID(SF.getBufferID().getValue()) {};
 
     void registerTokenKindChange(SourceLoc Loc, tok NewKind) override {
+      // If a token with the same location is already in the bag, update its kind.
+      auto Pos = lower_bound(Loc);
+      if (Pos != Bag.end() && Pos->getLoc().getOpaquePointerValue() ==
+          Loc.getOpaquePointerValue()) {
+        Pos->setKind(NewKind);
+        return;
+      }
+
+      // Save the update for later.
       TokenKindChangeMap[Loc.getOpaquePointerValue()] = NewKind;
     }
 
     void receive(Token Tok) override {
 
       // If a token with the same location is already in the bag, skip this token.
-      auto Pos = std::lower_bound(Bag.begin(), Bag.end(), Tok, tokComp);
+      auto Pos = lower_bound(Tok);
       if (Pos != Bag.end() && Pos->getLoc().getOpaquePointerValue() ==
           Tok.getLoc().getOpaquePointerValue()) {
         return;
