@@ -748,7 +748,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   SILValue addrOnlyBuf;
   ManagedValue nextBufOrValue;
 
-  if (optTL.isAddressOnly())
+  if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses())
     addrOnlyBuf = SGF.emitTemporaryAllocation(S, optTL.getLoweredType());
 
   // Create a new basic block and jump into it.
@@ -763,7 +763,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   //
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
-  if (optTL.isAddressOnly()) {
+  if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
     Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
     auto nextInit = SGF.useBufferAsTemporary(addrOnlyBuf, optTL);
     SGF.emitExprInto(S->getIteratorNext(), nextInit.get());
@@ -815,7 +815,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           //
           // *NOTE* If we do not have an address only value, then inputValue is
           // *already properly unwrapped.
-          if (optTL.isAddressOnly()) {
+          if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
             inputValue =
                 SGF.emitManagedBufferWithCleanup(nextBufOrValue.getValue());
             inputValue = SGF.emitUncheckedGetOptionalValueFrom(
