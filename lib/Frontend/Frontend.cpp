@@ -334,23 +334,11 @@ void CompilerInstance::performSema() {
     return;
   }
 
-  std::unique_ptr<DelayedParsingCallbacks> DelayedCB{
-      computeDelayedParsingCallback()};
-
-  PersistentParserState PersistentState;
-
   // Make sure the main file is the first file in the module, so do this now.
   if (MainBufferID != NO_SUCH_BUFFER)
     addMainFileToModule(implicitImports);
-
-  bool hadLoadError = parsePartialModulesAndLibraryFiles(
-      implicitImports, PersistentState, DelayedCB.get());
-  if (hadLoadError)
-    return;
-
-  // Parse main file last in order to make sure that it can use decls from other
-  // files in the module.
-  checkTypesWhileParsingMain(PersistentState, DelayedCB.get());
+  
+  parseAndCheckTypes(implicitImports);
 }
 
 CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
@@ -476,6 +464,22 @@ void CompilerInstance::addMainFileToModule(ImplicitImports &implicitImports) {
 
   if (MainBufferID == PrimaryBufferID)
     setPrimarySourceFile(MainFile);
+}
+
+void CompilerInstance::parseAndCheckTypes(ImplicitImports &implicitImports) {
+  std::unique_ptr<DelayedParsingCallbacks> DelayedCB{
+    computeDelayedParsingCallback()};
+  
+  PersistentParserState PersistentState;
+
+  bool hadLoadError = parsePartialModulesAndLibraryFiles(
+                                                         implicitImports, PersistentState, DelayedCB.get());
+  if (hadLoadError)
+    return;
+  
+  // Parse main file last in order to make sure that it can use decls from other
+  // files in the module.
+  checkTypesWhileParsingMain(PersistentState, DelayedCB.get());
 }
 
 void CompilerInstance::parseLibraryFile(
