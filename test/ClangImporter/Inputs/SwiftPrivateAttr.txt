@@ -80,11 +80,13 @@ var __PrivE2A: __PrivE2 { get }
 enum __PrivNSEnum : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
+  typealias RawValue = Int
   case A
 }
 enum NSEnum : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
+  typealias RawValue = Int
   case __privA
   @available(swift, obsoleted: 3, renamed: "__privA")
   static var __PrivA: NSEnum { get }
@@ -95,6 +97,7 @@ struct __PrivNSOptions : OptionSet {
   let rawValue: Int
   typealias RawValue = Int
   typealias Element = __PrivNSOptions
+  typealias ArrayLiteralElement = __PrivNSOptions
   static var A: __PrivNSOptions { get }
 }
 struct NSOptions : OptionSet {
@@ -102,6 +105,7 @@ struct NSOptions : OptionSet {
   let rawValue: Int
   typealias RawValue = Int
   typealias Element = NSOptions
+  typealias ArrayLiteralElement = NSOptions
   static var __privA: NSOptions { get }
   @available(swift, obsoleted: 3, renamed: "__privA")
   static var __PrivA: NSOptions { get }
