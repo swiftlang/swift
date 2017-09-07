@@ -314,6 +314,9 @@ struct RowToSpecialize {
 
   /// Whether the row will be irrefutable after this specialization.
   bool Irrefutable;
+
+  /// Profile Count of hte row we intend to specialize.
+  Optional<uint64_t> Count;
 };
 
 /// Changes that we wish to apply to a row which we have specialized.
@@ -470,7 +473,8 @@ private:
   void emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
                                ConsumableManagedValue src,
                                const SpecializationHandler &handleSpec,
-                               const FailureHandler &failure);
+                               const FailureHandler &failure,
+                               Optional<uint64_t> defaultCaseCount);
   void emitBoolDispatch(ArrayRef<RowToSpecialize> rows,
                         ConsumableManagedValue src,
                         const SpecializationHandler &handleSpec,
@@ -1324,9 +1328,15 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
   auto addRowToSpecialize = [&](Pattern *pattern, unsigned rowIndex) {
     assert(getSpecializingPattern(clauses[rowIndex][column]) == pattern);
     bool irrefutable = clauses[rowIndex].isIrrefutableAfterSpecializing(column);
-    rowsToSpecialize.push_back({pattern, rowIndex, irrefutable});
+    auto caseBlock = clauses[rowIndex].getClientData<CaseStmt>();
+    Optional<uint64_t> count = None;
+    if (caseBlock) {
+      count = SGF.loadProfilerCount(caseBlock);
+    }
+    rowsToSpecialize.push_back({pattern, rowIndex, irrefutable, count});
   };
 
+  Optional<uint64_t> defaultCaseCount = None;
   Pattern *firstSpecializer = getSpecializingPattern(clauses[firstRow][column]);
   assert(firstSpecializer && "specializing unspecializable row?");
   addRowToSpecialize(firstSpecializer, firstRow);
@@ -1335,7 +1345,13 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
   for (++lastRow; lastRow != clauses.rows(); ++lastRow) {
     Pattern *specializer =
       getSimilarSpecializingPattern(clauses[lastRow][column], firstSpecializer);
-    if (!specializer) break;
+    if (!specializer) {
+      auto caseBlock = clauses[lastRow].getClientData<CaseStmt>();
+      if (caseBlock) {
+        defaultCaseCount = SGF.loadProfilerCount(caseBlock);
+      }
+      break;
+    }
     addRowToSpecialize(specializer, lastRow);
   }
   assert(lastRow - firstRow == rowsToSpecialize.size());
@@ -1380,7 +1396,8 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
     return emitIsDispatch(rowsToSpecialize, arg, handler, failure);
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
-    return emitEnumElementDispatch(rowsToSpecialize, arg, handler, failure);
+    return emitEnumElementDispatch(rowsToSpecialize, arg, handler, failure,
+                                   defaultCaseCount);
   case PatternKind::Bool:
     return emitBoolDispatch(rowsToSpecialize, arg, handler, failure);
   }
@@ -1878,8 +1895,8 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
 /// OptionalSomePattern.
 void PatternMatchEmission::emitEnumElementDispatch(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
-    const SpecializationHandler &handleCase,
-    const FailureHandler &outerFailure) {
+    const SpecializationHandler &handleCase, const FailureHandler &outerFailure,
+    Optional<uint64_t> defaultCaseCount) {
   // If sil ownership is enabled and we have that our source type is an object,
   // use the dispatch code path.
   if (SGF.getOptions().EnableSILOwnership && src.getType().isObject()) {
@@ -1904,6 +1921,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
   // instructions want only the first information, so we split them up.
   SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 4> caseBBs;
   SmallVector<CaseInfo, 4> caseInfos;
+  SmallVector<Optional<uint64_t>, 4> caseCounts;
   SILBasicBlock *defaultBB = nullptr;
 
   caseBBs.reserve(rows.size());
@@ -1935,6 +1953,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
         caseInfos.resize(caseInfos.size() + 1);
         caseInfos.back().FormalElement = formalElt;
         caseInfos.back().FirstMatcher = row.Pattern;
+        caseCounts.push_back(row.Count);
       }
       assert(caseToIndex[elt] == index);
       assert(caseBBs[index].first == elt);
@@ -2019,10 +2038,13 @@ void PatternMatchEmission::emitEnumElementDispatch(
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
   SILLocation loc = PatternMatchStmt;
   loc.setDebugLoc(rows[0].Pattern);
+  ArrayRef<Optional<uint64_t>> caseCountsArrayRef = caseCounts;
   if (addressOnlyEnum) {
-    SGF.B.createSwitchEnumAddr(loc, srcValue, defaultBB, caseBBs);
+    SGF.B.createSwitchEnumAddr(loc, srcValue, defaultBB, caseBBs,
+                               caseCountsArrayRef, defaultCaseCount);
   } else {
-    SGF.B.createSwitchEnum(loc, srcValue, defaultBB, caseBBs);
+    SGF.B.createSwitchEnum(loc, srcValue, defaultBB, caseBBs,
+                           caseCountsArrayRef, defaultCaseCount);
   }
 
   // Okay, now emit all the cases.

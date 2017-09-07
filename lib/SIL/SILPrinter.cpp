@@ -1821,9 +1821,16 @@ public:
       std::tie(elt, dest) = SOI->getCase(i);
       *this << ", case " << SILDeclRef(elt, SILDeclRef::Kind::EnumElement)
             << ": " << Ctx.getID(dest);
+      if (SOI->getCaseCount(i)) {
+        *this << " !case_count(" << SOI->getCaseCount(i).getValue() << ")";
+      }
     }
-    if (SOI->hasDefault())
+    if (SOI->hasDefault()) {
       *this << ", default " << Ctx.getID(SOI->getDefaultBB());
+      if (SOI->getDefaultCount()) {
+        *this << " !default_count(" << SOI->getDefaultCount().getValue() << ")";
+      }
+    }
   }
   
   void visitSwitchEnumInst(SwitchEnumInst *SOI) {
