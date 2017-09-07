@@ -489,18 +489,15 @@ private:
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
 
-  void parseAndTypeCheckMainFile(
-      PersistentParserState &PersistentState,
-      DelayedParsingCallbacks *DelayedParseCB,
-      OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void parseAndTypeCheckMainFile(PersistentParserState &PersistentState,
+                                 DelayedParsingCallbacks *DelayedParseCB,
+                                 OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performTypeCheckingAndDelayedParsing();
 
-  void typeCheckEveryFile(
-      PersistentParserState &PersistentState,
-      OptionSet<TypeCheckingFlags> TypeCheckOptions);
-  void
-  typeCheckThePrimaryFile(PersistentParserState &PersistentState,
+  void typeCheckEveryFile(PersistentParserState &PersistentState,
                           OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void typeCheckThePrimaryFile(PersistentParserState &PersistentState,
+                               OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void typeCheckMainModule(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 };
 
