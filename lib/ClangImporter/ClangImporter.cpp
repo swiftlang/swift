@@ -578,13 +578,8 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   }
 
   const std::string &moduleCachePath = importerOpts.ModuleCachePath;
-
-  // Set the module and API notes cache paths to the same location.
   if (!moduleCachePath.empty()) {
     invocationArgStrs.push_back("-fmodules-cache-path=");
-    invocationArgStrs.back().append(moduleCachePath);
-
-    invocationArgStrs.push_back("-fapinotes-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
   }
 
