@@ -15,6 +15,7 @@ set(TRANSFORMS_SOURCES
   Transforms/GenericSpecializer.cpp
   Transforms/MergeCondFail.cpp
   Transforms/MarkUninitializedFixup.cpp
+  Transforms/Outliner.cpp
   Transforms/OwnershipModelEliminator.cpp
   Transforms/PerformanceInliner.cpp
   Transforms/RedundantLoadElimination.cpp
