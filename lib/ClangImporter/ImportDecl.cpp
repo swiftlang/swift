@@ -1383,8 +1383,7 @@ static void makeStructRawValuedWithBridge(
       AccessLevel::Private,
       AccessLevel::Private);
 
-  //
-  // Create a computed value variable
+  // Create a computed value variable.
   auto computedVar = new (ctx) VarDecl(
       /*IsStatic*/false, VarDecl::Specifier::Var, /*IsCaptureList*/false,
       SourceLoc(), computedVarName, bridgedType, structDecl);
@@ -2599,6 +2598,8 @@ namespace {
         enumDecl->addMember(rawValueGetter);
         enumDecl->addMember(rawValue);
         enumDecl->addMember(rawValueBinding);
+
+        addSynthesizedTypealias(enumDecl, C.Id_RawValue, underlyingType);
 
         // If we have an error wrapper, finish it up now that its
         // nested enum has been constructed.
@@ -5220,8 +5221,11 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   ProtocolDecl *protocols[] = {ctx.getProtocol(KnownProtocolKind::OptionSet)};
   makeStructRawValued(Impl, structDecl, underlyingType,
                       {KnownProtocolKind::OptionSet}, protocols);
+  auto selfType = structDecl->getDeclaredInterfaceType();
   addSynthesizedTypealias(structDecl, ctx.Id_Element,
-                          structDecl->getDeclaredInterfaceType());
+                          selfType);
+  addSynthesizedTypealias(structDecl, ctx.getIdentifier("ArrayLiteralElement"),
+                          selfType);
   return structDecl;
 }
 
