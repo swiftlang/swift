@@ -266,10 +266,6 @@ ModuleDecl *CompilerInstance::getMainModule() {
 
 static void addAdditionalInitialImportsTo(
     SourceFile *SF, CompilerInstance::ImplicitImports &implicitImports) {
-  if (!implicitImports.objCModuleUnderlyingMixedFramework &&
-      !implicitImports.headerModule && implicitImports.modules.empty())
-    return;
-
   using ImportPair =
       std::pair<ModuleDecl::ImportedModule, SourceFile::ImportOptions>;
   SmallVector<ImportPair, 4> additionalImports;
