@@ -581,7 +581,7 @@ void CompilerInstance::checkTypesWhileParsingMain(
   }
 
   if (generateOutputForTheWholeModule())
-    typeCheckEveryFileInMainModule(PersistentState, TypeCheckOptions);
+    typeCheckEveryFile(PersistentState, TypeCheckOptions);
   else if (PrimarySourceFile != nullptr)
     typeCheckThePrimaryFile(PersistentState, TypeCheckOptions);
 
@@ -652,9 +652,9 @@ void CompilerInstance::parseAndTypeCheckMainFile(
   }
 }
 
-void CompilerInstance::typeCheckEveryFileInMainModule(
-                                                      PersistentParserState &PersistentState,
-                                                      const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
+void CompilerInstance::typeCheckEveryFile(
+    PersistentParserState &PersistentState,
+    OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   for (auto File : MainModule->getFiles()) {
     if (auto SF = dyn_cast<SourceFile>(File)) {
       performTypeChecking(*SF, PersistentState.getTopLevelContext(),

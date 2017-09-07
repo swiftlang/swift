@@ -495,7 +495,7 @@ private:
       OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performTypeCheckingAndDelayedParsing();
 
-  void typeCheckEveryFileInMainModule(
+  void typeCheckEveryFile(
       PersistentParserState &PersistentState,
       OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void
