@@ -362,6 +362,7 @@ namespace {
     }
 
     void receive(Token Tok) override {
+      assert(Tok.getLoc().isValid());
 
       // If a token with the same location is already in the bag, skip this token.
       auto Pos = lower_bound(Tok);

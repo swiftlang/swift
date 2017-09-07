@@ -187,7 +187,7 @@ bool Parser::parseTopLevel() {
 
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
-    consumeToken();
+    consumeTokenWithoutFeedingReceiver();
 
   // Parse the body of the file.
   SmallVector<ASTNode, 128> Items;
