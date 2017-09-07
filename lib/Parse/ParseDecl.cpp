@@ -268,6 +268,8 @@ bool Parser::parseTopLevel() {
   // attach it to the token.
   State->markParserPosition(Tok.getCommentRange().getStart(), PreviousLoc,
                             InPoundLineEnvironment);
+
+  // If we are done parsing the whole file, finalize the token receiver.
   if (Tok.is(tok::eof))
     TokReceiver->finalize();
 

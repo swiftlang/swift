@@ -1087,6 +1087,8 @@ public:
   }
 
 private:
+  /// Whether the SourceFile instance opts to collect underlying tokens and
+  /// the vector containing these tokens if so.
   std::pair<bool, std::vector<Token>> EnabledAndAllCorrectedTokens;
 };
 

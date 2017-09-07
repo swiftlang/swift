@@ -289,7 +289,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
       } else {
         // Otherwise, we're not sure what is going on, but this doesn't smell
-        // like a parameter.  
+        // like a parameter.
         diagnose(Tok, diag::expected_parameter_name);
         param.isInvalid = true;
         param.FirstNameLoc = Tok.getLoc();

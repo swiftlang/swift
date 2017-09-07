@@ -1802,6 +1802,8 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
         createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
   }
 
+  // We don't expose the entire interpolated string as one token. Instead, we
+  // should expose the tokens in each segment.
   consumeTokenWithoutFeedingReceiver();
   ParserStatus Status;
   SmallVector<Expr*, 4> Exprs;

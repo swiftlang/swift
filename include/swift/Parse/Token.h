@@ -71,6 +71,7 @@ public:
 
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }
+  void clearCommentLength() { CommentLength = 0; }
   
   /// is/isNot - Predicates to check if this token is a specific kind, as in
   /// "if (Tok.is(tok::l_brace)) {...}".
