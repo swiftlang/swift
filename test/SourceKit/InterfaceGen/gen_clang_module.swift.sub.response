@@ -195,7 +195,7 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 11
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 305,
     key.length: 3
   },
@@ -220,7 +220,7 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 11
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 350,
     key.length: 3
   },
@@ -245,7 +245,7 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 401,
     key.length: 3
   }
