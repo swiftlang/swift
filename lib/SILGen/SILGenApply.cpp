@@ -3025,6 +3025,10 @@ private:
       if (maybeEmitDelayed(expr, OriginalArgument(expr, /*indirect*/ false)))
         return;
 
+      // Any borrows from any rvalue accesses, we want to be cleaned up at this
+      // point.
+      FormalEvaluationScope S(SGF);
+
       // Otherwise, just use the default logic.
       value = SGF.emitRValueAsSingleValue(expr, contexts.FinalContext);
       Args.push_back(convertOwnershipConvention(value));
