@@ -501,7 +501,7 @@ private:
                                   PersistentParserState &PersistentState,
                                   const OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void typeCheckMainModule(OptionSet<TypeCheckingFlags> TypeCheckOptions);
-  void performWholeModuleTypeCheckingOnMainModule();
+  void performWholeModuleTypeChecking();
   void finishTypeCheckingMainModule();
 };
 
