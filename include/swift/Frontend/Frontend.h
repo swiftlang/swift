@@ -469,7 +469,7 @@ public: // for static functions in Frontend.cpp
   
 private:
   void createREPLFile(ImplicitImports &implicitImports);
-  DelayedParsingCallbacks *computeDelayedParsingCallback();
+  std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
 
   void createMainFileWithImportsAndAddToModule(ImplicitImports &implicitImports);
  
