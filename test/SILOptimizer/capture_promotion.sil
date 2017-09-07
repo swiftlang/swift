@@ -305,7 +305,7 @@ bb0(%0: $*Int, %1 : $<τ_0_0> { var τ_0_0 } <Foo>, %2 : $<τ_0_0> { var τ_0_0 
   return %16 : $()
 }
 
-// CHECK-LABL: sil @test_with_dynamic_self
+// CHECK-LABEL: sil @test_with_dynamic_self
 // CHECK: %{{[0-9]+}} = partial_apply %{{[0-9]+}}(%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(thin) (Int, @thick @dynamic_self Bar.Type) -> () // type-defs: %1
 // CHECK: return
 sil @test_with_dynamic_self : $@convention(method) (Int, @guaranteed Bar) -> () {
