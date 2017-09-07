@@ -673,26 +673,20 @@ void CompilerInstance::typeCheckThePrimaryFile(
 
 void CompilerInstance::typeCheckMainModule(
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
-  SharedTimer timer("performSema-checkTypesWhileParsingMain-typeCheckMainModule");
   if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
-    performWholeModuleTypeChecking();
+    for (auto File : MainModule->getFiles())
+      if (auto SF = dyn_cast<SourceFile>(File))
+        performWholeModuleTypeChecking(*SF);
+
   }
-  finishTypeCheckingMainModule();
-}
-
-void CompilerInstance::performWholeModuleTypeChecking() {
-  SharedTimer timer("performWholeModuleTypeChecking");
-  for (auto File : MainModule->getFiles())
-    if (auto SF = dyn_cast<SourceFile>(File))
-      performWholeModuleTypeChecking(*SF);
-}
-
-void CompilerInstance::finishTypeCheckingMainModule() {
-  SharedTimer timer("finishTypeCheckingMainModule");
-  for (auto File : MainModule->getFiles())
-    if (auto SF = dyn_cast<SourceFile>(File))
-      if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
+  if (generateOutputForTheWholeModule()) {
+    for (auto File : MainModule->getFiles())
+      if (auto SF = dyn_cast<SourceFile>(File))
         finishTypeChecking(*SF);
+  }
+  else {
+    finishTypeChecking(*PrimarySourceFile);
+  }
 }
 
 void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
