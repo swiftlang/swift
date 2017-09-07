@@ -96,6 +96,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #define KEYWORD(X) case tok::kw_##X:
 #include "swift/Syntax/TokenKinds.def"
 #undef KEYWORD
+        case tok::contextual_keyword:
         Kind = SyntaxNodeKind::Keyword;
         break;
 
@@ -681,28 +682,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     auto *FD = dyn_cast<FuncDecl>(AFD);
-    if (FD && FD->isAccessor()) {
-      // Pass context sensitive keyword token.
-      SourceLoc SL = FD->getFuncLoc();
-      // Make sure the func loc is not the start of the function body, in which
-      // case the context sensitive keyword was implied.
-      if (FD->getBodySourceRange().Start != SL) {
-        unsigned TokLen;
-        switch (FD->getAccessorKind()) {
-          case AccessorKind::NotAccessor: llvm_unreachable("expected accessor");
-          case AccessorKind::IsGetter: TokLen = 3; break;
-          case AccessorKind::IsSetter: TokLen = 3; break;
-          case AccessorKind::IsAddressor: TokLen = 7; break;
-          case AccessorKind::IsMutableAddressor: TokLen = 14; break;
-          case AccessorKind::IsWillSet: TokLen = 7; break;
-          case AccessorKind::IsDidSet: TokLen = 6; break;
-          case AccessorKind::IsMaterializeForSet: llvm_unreachable("always implicit");
-        }
-        if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
-                                CharSourceRange(SL, TokLen)}))
-          return false;
-      }
-    } else {
+    if (!FD || !FD->isAccessor()) {
       // Pass Function / Method structure node.
       SyntaxStructureNode SN;
       setDecl(SN, D);

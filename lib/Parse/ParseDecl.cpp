@@ -3774,6 +3774,11 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
         return true;
       }
 
+      // Correct the token kind to be contextual keyword.
+      if (AccessorKeywordLoc.isValid()) {
+        Tok.setKind(tok::contextual_keyword);
+      }
+
       FuncDecl *&TheDecl = *TheDeclPtr;
       SourceLoc Loc = consumeToken();
 
@@ -3891,6 +3896,11 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       Kind = AccessorKind::IsGetter;
       TheDeclPtr = &accessors.Get;
       isImplicitGet = true;
+    }
+
+    // Set the contextual keyword kind properly.
+    if (AccessorKeywordLoc.isValid()) {
+      Tok.setKind(tok::contextual_keyword);
     }
 
     IsFirstAccessor = false;
