@@ -489,7 +489,7 @@ private:
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
 
-  void parseAndTypeCheckTheMainFile(
+  void parseAndTypeCheckMainFile(
       PersistentParserState &PersistentState,
       DelayedParsingCallbacks *DelayedParseCB,
       const OptionSet<TypeCheckingFlags> TypeCheckOptions);

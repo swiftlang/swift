@@ -576,7 +576,7 @@ void CompilerInstance::checkTypesWhileParsingMain(
 
   // Parse the main file last.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    parseAndTypeCheckTheMainFile(PersistentState, DelayedParseCB,
+    parseAndTypeCheckMainFile(PersistentState, DelayedParseCB,
                                  TypeCheckOptions);
   }
 
@@ -597,12 +597,12 @@ void CompilerInstance::checkTypesWhileParsingMain(
   typeCheckMainModule(TypeCheckOptions);
 }
 
-void CompilerInstance::parseAndTypeCheckTheMainFile(
+void CompilerInstance::parseAndTypeCheckMainFile(
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB,
     const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   SharedTimer timer(
-      "performSema-checkTypesWhileParsingMain-parseAndTypeCheckTheMainFile");
+      "performSema-checkTypesWhileParsingMain-parseAndTypeCheckMainFile");
   bool mainIsPrimary =
       (generateOutputForTheWholeModule() || MainBufferID == PrimaryBufferID);
 
