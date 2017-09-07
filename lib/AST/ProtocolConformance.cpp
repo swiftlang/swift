@@ -305,22 +305,22 @@ void NormalProtocolConformance::setSignatureConformances(
 }
 
 void NormalProtocolConformance::resolveLazyInfo() const {
-  assert(Resolver);
+  assert(Loader);
   assert(isComplete());
 
-  auto *resolver = Resolver;
+  auto *loader = Loader;
   auto *mutableThis = const_cast<NormalProtocolConformance *>(this);
-  mutableThis->Resolver = nullptr;
+  mutableThis->Loader = nullptr;
   mutableThis->setState(ProtocolConformanceState::Incomplete);
-  resolver->finishNormalConformance(mutableThis, ResolverContextData);
+  loader->finishNormalConformance(mutableThis, LoaderContextData);
   mutableThis->setState(ProtocolConformanceState::Complete);
 }
 
-void NormalProtocolConformance::setLazyLoader(LazyConformanceLoader *resolver,
+void NormalProtocolConformance::setLazyLoader(LazyConformanceLoader *loader,
                                               uint64_t contextData) {
-  assert(!Resolver && "already has a resolver");
-  Resolver = resolver;
-  ResolverContextData = contextData;
+  assert(!Loader && "already has a loader");
+  Loader = loader;
+  LoaderContextData = contextData;
 }
 
 namespace {
@@ -346,7 +346,7 @@ namespace {
 
 bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
                                                LazyResolver *resolver) const {
-  if (Resolver)
+  if (Loader)
     resolveLazyInfo();
 
   if (TypeWitnesses.find(assocType) != TypeWitnesses.end()) {
@@ -444,7 +444,7 @@ std::pair<Type, TypeDecl *>
 NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                                                  LazyResolver *resolver,
                                                  SubstOptions options) const {
-  if (Resolver)
+  if (Loader)
     resolveLazyInfo();
 
   // Check whether we already have a type witness.
@@ -590,7 +590,7 @@ Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
   assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
   assert(requirement->isProtocolRequirement() && "Not a requirement");
 
-  if (Resolver)
+  if (Loader)
     resolveLazyInfo();
 
   auto known = Mapping.find(requirement);
