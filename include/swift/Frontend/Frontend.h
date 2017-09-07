@@ -471,7 +471,7 @@ private:
   void createREPLFile(ImplicitImports &implicitImports);
   std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
 
-  void createMainFileWithImportsAndAddToModule(ImplicitImports &implicitImports);
+  void addMainFileToModule(ImplicitImports &implicitImports);
  
   void parseALibraryFile(
       unsigned BufferID,
