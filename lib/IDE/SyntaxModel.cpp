@@ -255,7 +255,6 @@ public:
   bool walkToDeclPre(Decl *D) override;
   bool walkToDeclPost(Decl *D) override;
   bool walkToTypeReprPre(TypeRepr *T) override;
-  std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override;
   bool shouldWalkIntoGenericParams() override { return true; }
 
 private:
@@ -812,11 +811,6 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
             CharSourceRange(ConfigD->getEndLoc(), 6/*'#endif'*/) }))
         return false;
 
-  } else if (auto OperD = dyn_cast<OperatorDecl>(D)) {
-    if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
-          CharSourceRange(OperD->getOperatorLoc(), strlen("operator")) }))
-      return false;
-
   } else if (auto *EnumCaseD = dyn_cast<EnumCaseDecl>(D)) {
     SyntaxStructureNode SN;
     setDecl(SN, D);
@@ -915,22 +909,6 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
       return false;
   }
   return true;
-}
-
-std::pair<bool, Pattern*> ModelASTWalker::walkToPatternPre(Pattern *P) {
-  if (!P->isImplicit()) {
-    if (auto TyPat = dyn_cast<TypedPattern>(P)) {
-      if (auto InOutT =
-           dyn_cast_or_null<InOutTypeRepr>(TyPat->getTypeLoc().getTypeRepr())) {
-        if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
-                                CharSourceRange(InOutT->getSpecifierLoc(),
-                                                /*'inout'*/5)
-                              }))
-          return { false, nullptr };
-      }
-    }
-  }
-  return { true, P };
 }
 
 namespace {
