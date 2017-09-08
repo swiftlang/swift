@@ -84,34 +84,6 @@ constexpr unsigned SILInstructionsNum = int(ValueKind::Last_SILInstruction) + 1;
 /// A set of counters, one per SILInstruction kind.
 using InstructionCounts = SmallVector<int, SILInstructionsNum>;
 
-/// Map a SILInstruction name to its SILInstructionKind.
-SILInstructionKind getSILInstructionKind(StringRef InstName) {
-#define INST(Id, Parent, TextualName, MemoryBehavior, ReleasingBehavior)       \
-  if (InstName == #TextualName)                                                \
-    return SILInstructionKind::Id;
-
-#include "swift/SIL/SILNodes.def"
-
-#ifdef NDEBUG
-  llvm::errs()
-      << "Unknown instruction name used by the -sil-stats-only-instructions\n";
-  abort();
-#endif
-  llvm_unreachable(
-      "Unknown insruction name used by the -sil-stats-only-instructions");
-}
-
-/// Map SILInstructionKind to a corresponding SILInstruction name.
-const char *getSILInstructionName(SILInstructionKind Kind) {
-  switch (Kind) {
-#define INST(Id, Parent, TextualName, MemoryBehavior, ReleasingBehavior)       \
-  case SILInstructionKind::Id:                                                 \
-    return #TextualName;                                                       \
-    break;
-#include "swift/SIL/SILNodes.def"
-  }
-}
-
 /// A helper type to parse a comma separated list of SIL instruction names
 /// provided as argument of the -sil-stats-only-instructions options.
 class StatsOnlyInstructionsOpt {

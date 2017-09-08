@@ -68,6 +68,12 @@ enum class SILInstructionKind : std::underlying_type<ValueKind>::type {
 #include "SILNodes.def"
 };
 
+/// Map SILInstruction's mnemonic name to its SILInstructionKind.
+SILInstructionKind getSILInstructionKind(StringRef InstName);
+
+/// Map SILInstructionKind to a corresponding SILInstruction name.
+StringRef getSILInstructionName(SILInstructionKind Kind);
+
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
 class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{

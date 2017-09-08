@@ -785,6 +785,12 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
   return OS;
 }
 
+/// Map a SILValue mnemonic name to its ValueKind.
+ValueKind getSILValueKind(StringRef Name);
+
+/// Map ValueKind to a corresponding mnemonic name.
+StringRef getSILValueName(ValueKind Kind);
+
 } // end namespace swift
 
 
