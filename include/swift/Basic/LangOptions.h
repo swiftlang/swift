@@ -174,7 +174,7 @@ namespace swift {
 
     /// \brief The upper bound to number of sub-expressions unsolved
     /// before termination of the shrink phrase of the constraint solver.
-    unsigned SolverShrinkUnsolvedThreshold = 5;
+    unsigned SolverShrinkUnsolvedThreshold = 10;
 
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
