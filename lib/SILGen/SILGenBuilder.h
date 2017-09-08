@@ -334,11 +334,13 @@ private:
     SILBasicBlock *block;
     NullablePtr<SILBasicBlock> contBlock;
     NormalCaseHandler handler;
+    Optional<uint64_t> count;
 
     NormalCaseData(EnumElementDecl *decl, SILBasicBlock *block,
                    NullablePtr<SILBasicBlock> contBlock,
-                   NormalCaseHandler handler)
-        : decl(decl), block(block), contBlock(contBlock), handler(handler) {}
+                   NormalCaseHandler handler, Optional<uint64_t> count)
+        : decl(decl), block(block), contBlock(contBlock), handler(handler),
+          count(count) {}
     ~NormalCaseData() = default;
   };
 
@@ -347,12 +349,13 @@ private:
     NullablePtr<SILBasicBlock> contBlock;
     DefaultCaseHandler handler;
     DefaultDispatchTime dispatchTime;
+    Optional<uint64_t> count;
 
     DefaultCaseData(SILBasicBlock *block, NullablePtr<SILBasicBlock> contBlock,
                     DefaultCaseHandler handler,
-                    DefaultDispatchTime dispatchTime)
+                    DefaultDispatchTime dispatchTime, Optional<uint64_t> count)
         : block(block), contBlock(contBlock), handler(handler),
-          dispatchTime(dispatchTime) {}
+          dispatchTime(dispatchTime), count(count) {}
     ~DefaultCaseData() = default;
   };
 
@@ -367,17 +370,19 @@ public:
                     ManagedValue optional)
       : builder(builder), loc(loc), optional(optional) {}
 
-  void addDefaultCase(SILBasicBlock *defaultBlock,
-                      NullablePtr<SILBasicBlock> contBlock,
-                      DefaultCaseHandler handle,
-                      DefaultDispatchTime dispatchTime =
-                          DefaultDispatchTime::AfterNormalCases) {
-    defaultBlockData.emplace(defaultBlock, contBlock, handle, dispatchTime);
+  void addDefaultCase(
+      SILBasicBlock *defaultBlock, NullablePtr<SILBasicBlock> contBlock,
+      DefaultCaseHandler handle,
+      DefaultDispatchTime dispatchTime = DefaultDispatchTime::AfterNormalCases,
+      Optional<uint64_t> count = None) {
+    defaultBlockData.emplace(defaultBlock, contBlock, handle, dispatchTime,
+                             count);
   }
 
   void addCase(EnumElementDecl *decl, SILBasicBlock *caseBlock,
-               NullablePtr<SILBasicBlock> contBlock, NormalCaseHandler handle) {
-    caseDataArray.emplace_back(decl, caseBlock, contBlock, handle);
+               NullablePtr<SILBasicBlock> contBlock, NormalCaseHandler handle,
+               Optional<uint64_t> count = None) {
+    caseDataArray.emplace_back(decl, caseBlock, contBlock, handle, count);
   }
 
   void emit() &&;
