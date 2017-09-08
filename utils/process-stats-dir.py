@@ -228,19 +228,9 @@ def set_csv_baseline(args):
     return 0
 
 
-def compare_to_csv_baseline(args):
-    old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline)
-    m = merge_all_jobstats([s for d in args.remainder
-                            for s in load_stats_dir(d)])
-    new_stats = m.stats
-
-    regressions = 0
-    outfieldnames = ["old", "new", "delta_pct", "name"]
-    out = csv.DictWriter(args.output, outfieldnames, dialect='excel-tab')
-    out.writeheader()
-
+def compare_stats(args, old_stats, new_stats):
     for stat_name in sorted(old_stats.keys()):
-        (_, old) = old_stats[stat_name]
+        old = old_stats[stat_name]
         new = new_stats.get(stat_name, 0)
         (delta, delta_pct) = diff_and_pct(old, new)
         if (stat_name.startswith("time.") and
@@ -248,12 +238,55 @@ def compare_to_csv_baseline(args):
             continue
         if abs(delta_pct) < args.delta_pct_thresh:
             continue
+        yield (stat_name, old, new, delta, delta_pct)
+
+
+def write_comparison(args, old_stats, new_stats):
+    regressions = 0
+    outfieldnames = ["old", "new", "delta_pct", "name"]
+    out = csv.DictWriter(args.output, outfieldnames, dialect='excel-tab')
+    out.writeheader()
+
+    for (stat_name, old, new, delta, delta_pct) in compare_stats(args,
+                                                                 old_stats,
+                                                                 new_stats):
         out.writerow(dict(name=stat_name,
                           old=int(old), new=int(new),
                           delta_pct=delta_pct))
         if delta > 0:
             regressions += 1
     return regressions
+
+
+def compare_to_csv_baseline(args):
+    old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline)
+    sel = args.select_module
+    m = merge_all_jobstats([s for d in args.remainder
+                            for s in load_stats_dir(d, select_module=sel)],
+                           select_module=sel,
+                           group_by_module=args.group_by_module)
+    old_stats = dict([(k, v) for (k, (_, v)) in old_stats.items()])
+    new_stats = m.stats
+
+    return write_comparison(args, old_stats, new_stats)
+
+
+# Summarize immediate difference between two stats-dirs, optionally
+def compare_stats_dirs(args):
+    if len(args.remainder) != 2:
+        raise ValueError("Expected exactly 2 stats-dirs")
+
+    (old, new) = args.remainder
+    old_stats = merge_all_jobstats(
+        load_stats_dir(old, select_module=args.select_module),
+        select_module=args.select_module,
+        group_by_module=args.group_by_module)
+    new_stats = merge_all_jobstats(
+        load_stats_dir(new, select_module=args.select_module),
+        select_module=args.select_module,
+        group_by_module=args.group_by_module)
+
+    return write_comparison(args, old_stats.stats, new_stats.stats)
 
 
 def main():
@@ -303,6 +336,9 @@ def main():
                        type=argparse.FileType('rb', 0), default=None,
                        metavar="BASELINE.csv",
                        help="Compare stats dir to named CSV baseline")
+    modes.add_argument("--compare-stats-dirs",
+                       action="store_true",
+                       help="Compare two stats dirs directly")
     modes.add_argument("--lnt", action="store_true",
                        help="Emit an LNT-compatible test summary")
     parser.add_argument('remainder', nargs=argparse.REMAINDER,
@@ -314,6 +350,8 @@ def main():
         return 1
     if args.catapult:
         write_catapult_trace(args)
+    elif args.compare_stats_dirs:
+        return compare_stats_dirs(args)
     elif args.set_csv_baseline is not None:
         return set_csv_baseline(args)
     elif args.compare_to_csv_baseline is not None:
