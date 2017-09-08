@@ -1275,3 +1275,19 @@ class BadFooSubclass: BadFooSuper {
     super.init(self) // expected-error {{'self' used before super.init call}}
   }
 }
+
+class SuperConvenienceBase {
+  public init(_ i: Int) {}
+  public convenience init(_ i1: Int, _ i2: Int) {
+    self.init(i2)
+  }
+}
+
+class SuperConvenienceSub : SuperConvenienceBase {
+  public override init(_ i: Int) {
+    super.init(i)
+  }
+  public init(_ i1: Int, _ i2: Int, _ i3: Int) {
+    self.init(i1, i1)
+  }
+}

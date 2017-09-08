@@ -73,6 +73,10 @@ SILValue stripIndexingInsts(SILValue V);
 /// intrinsic call.
 SILValue stripExpectIntrinsic(SILValue V);
 
+/// If V is a begin_borrow, strip off the begin_borrow and return. Otherwise,
+/// ust return V.
+SILValue stripBorrow(SILValue V);
+
 /// A utility class for evaluating whether a newly parsed or deserialized
 /// function has qualified or unqualified ownership.
 ///

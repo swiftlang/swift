@@ -11,13 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "definite-init"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "DIMemoryUseCollectorOwnership.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -83,8 +84,8 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     // If this is an initialization, or the storage type is trivial, we
     // can just replace the assignment with a store.
     assert(isInitialization != PartialInitializationKind::IsReinitialization);
-    B.createStore(Loc, Src, Inst->getDest(),
-                  StoreOwnershipQualifier::Unqualified);
+    B.createTrivialStoreOr(Loc, Src, Inst->getDest(),
+                           StoreOwnershipQualifier::Init);
     Inst->eraseFromParent();
     return;
   }
@@ -96,9 +97,8 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     // instance, which has not been initialized and never will be, must be
     // freed using dealloc_partial_ref.
     SILValue Pointer =
-        B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Unqualified);
-    B.createStore(Loc, Src, Inst->getDest(),
-                  StoreOwnershipQualifier::Unqualified);
+        B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Take);
+    B.createStore(Loc, Src, Inst->getDest(), StoreOwnershipQualifier::Init);
 
     auto MetatypeTy = CanMetatypeType::get(
         Inst->getDest()->getType().getSwiftRValueType(),
@@ -120,9 +120,9 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
   // This is basically TypeLowering::emitStoreOfCopy, except that if we have
   // a known incoming value, we can avoid the load.
   SILValue IncomingVal =
-      B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Unqualified);
+      B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Take);
   B.createStore(Inst->getLoc(), Src, Inst->getDest(),
-                StoreOwnershipQualifier::Unqualified);
+                StoreOwnershipQualifier::Init);
 
   B.emitDestroyValueOperation(Loc, IncomingVal);
   Inst->eraseFromParent();
@@ -1262,10 +1262,50 @@ void LifetimeChecker::diagnoseRefElementAddr(RefElementAddrInst *REI) {
            REI->getField()->getName(), true, Kind);
 }
 
+template <typename T>
+static FuncDecl *
+findMethodForStoreInitializationOfTemporary(const DIMemoryObjectInfo &TheMemory,
+                                            T *SI) {
+  // We unconditionally strip borrow since a store must take a consuming
+  // argument, so the ownership verifier would trip. So we know that such a
+  // thing can not happen. On the other hand, for store_borrow, we need to
+  // strip the borrow, so lets use idempotence for correctness.
+  if (stripBorrow(SI->getSrc()) != TheMemory.MemoryInst ||
+      !isa<AllocStackInst>(SI->getDest()) || !TheMemory.isClassInitSelf()) {
+    return nullptr;
+  }
+
+  ApplyInst *TheApply = nullptr;
+
+  // Check to see if the address of the alloc_stack is only passed to one
+  // apply_inst and gather the apply while we are at it.
+  for (auto UI : SI->getDest()->getUses()) {
+    if (auto *ApplyUser = dyn_cast<ApplyInst>(UI->getUser())) {
+      if (TheApply || UI->getOperandNumber() != 1) {
+        return nullptr;
+      }
+      TheApply = ApplyUser;
+    }
+  }
+
+  // If we didn't find an apply, just return nullptr. This isn't our pattern.
+  if (!TheApply)
+    return nullptr;
+
+  // Otherwise, try to get the func decl from the referenced function if we can
+  // find one.
+  auto *Fn = TheApply->getReferencedFunction();
+  if (!Fn->hasLocation())
+    return nullptr;
+
+  return Fn->getLocation().getAsASTNode<FuncDecl>();
+}
+
 bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
                                          bool SuperInitDone) {
   SILInstruction *Inst = Use.Inst;
 
+  // All of these cases imply that Inst as at +0.
   if (auto *REI = dyn_cast<RefElementAddrInst>(Inst)) {
     diagnoseRefElementAddr(REI);
     return true;
@@ -1275,7 +1315,42 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
   // so, emit a specific diagnostic.
   FuncDecl *Method = nullptr;
 
-  // Check for an access to the base class through an Upcast.
+  // Check for an access to the base class through a borrow+cast.
+  if (auto *BBI = dyn_cast<BeginBorrowInst>(Inst)) {
+    llvm::SmallVector<Operand *, 8> Worklist(BBI->use_begin(), BBI->use_end());
+    while (!Worklist.empty()) {
+      auto *BBIOp = Worklist.pop_back_val();
+      auto *BBIOpUser = BBIOp->getUser();
+
+      // Skip over end_borrow.
+      if (isa<EndBorrowInst>(BBIOpUser))
+        continue;
+
+      // Look through upcasts.
+      if (isa<UpcastInst>(BBIOpUser)) {
+        std::copy(BBIOpUser->use_begin(), BBIOpUser->use_end(),
+                  std::back_inserter(Worklist));
+        continue;
+      }
+
+      // Look through unchecked_ref_cast.
+      if (isa<UncheckedRefCastInst>(BBIOpUser)) {
+        std::copy(BBIOpUser->use_begin(), BBIOpUser->use_end(),
+                  std::back_inserter(Worklist));
+        continue;
+      }
+
+      // If we have a ref_element_addr, then perform the diagnosis.
+      if (auto *REI = dyn_cast<RefElementAddrInst>(BBIOpUser)) {
+        diagnoseRefElementAddr(REI);
+        return true;
+      }
+
+      // If we were not able to find a better error, return false.
+      return false;
+    }
+  }
+
   if (auto UCI = dyn_cast<UpcastInst>(Inst)) {
     // If the upcast is used by a ref_element_addr, then it is an access to a
     // base ivar before super.init is called.
@@ -1356,31 +1431,12 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
   // protocol in a root class, then we could have a store to a temporary whose
   // address is passed into an apply.  Look through this pattern.
   if (auto *SI = dyn_cast<StoreInst>(Inst)) {
-    if (SI->getSrc() == TheMemory.MemoryInst &&
-        isa<AllocStackInst>(SI->getDest()) &&
-        TheMemory.isClassInitSelf()) {
-      ApplyInst *TheApply = nullptr;
-      // Check to see if the address of the alloc_stack is only passed to one
-      // apply_inst.
-      for (auto UI : SI->getDest()->getUses()) {
-        if (auto *ApplyUser = dyn_cast<ApplyInst>(UI->getUser())) {
-          if (!TheApply && UI->getOperandNumber() == 1) {
-            TheApply = ApplyUser;
-          } else {
-            TheApply = nullptr;
-            break;
-          }
-        }
-      }
-      
-      if (TheApply) {
-        if (auto *Fn = TheApply->getReferencedFunction())
-          if (Fn->hasLocation())
-            Method = Fn->getLocation().getAsASTNode<FuncDecl>();
-      }
-    }
+    Method = findMethodForStoreInitializationOfTemporary(TheMemory, SI);
   }
-  
+
+  if (auto *SI = dyn_cast<StoreBorrowInst>(Inst)) {
+    Method = findMethodForStoreInitializationOfTemporary(TheMemory, SI);
+  }
 
   // If we were able to find a method call, emit a diagnostic about the method.
   if (Method) {
@@ -1411,12 +1467,11 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
   return false;
 }
 
-/// handleLoadUseFailure - Check and diagnose various failures when a load use
-/// is not fully initialized.
+/// Check and diagnose various failures when a load use is not fully
+/// initialized.
 ///
-/// TODO: In the "No" case, we can emit a fixit adding a default
-/// initialization of the type.
-///
+/// TODO: In the "No" case, we can emit a fixit adding a default initialization
+/// of the type.
 void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
                                            bool SuperInitDone,
                                            bool FailedSelfUse) {
@@ -1437,7 +1492,8 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   // retain_value for non-trivial structs/enums), then this is a return in the
   // enum/struct init case, and we haven't stored to self.   Emit a specific
   // diagnostic.
-  if (auto *LI = dyn_cast<LoadInst>(Inst)) {
+  if (isa<LoadInst>(Inst) || isa<LoadBorrowInst>(Inst)) {
+    auto *LI = Inst;
     bool hasReturnUse = false, hasUnknownUses = false;
     
     for (auto LoadUse : LI->getUses()) {
@@ -1577,8 +1633,8 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
 
   // If this is a load of self in a struct/enum/protocol initializer, then it
   // must be a use of 'self' before all the stored properties are set up.
-  if (isa<LoadInst>(Inst) && TheMemory.isAnyInitSelf() &&
-      !TheMemory.isClassInitSelf()) {
+  if ((isa<LoadInst>(Inst) || isa<LoadBorrowInst>(Inst)) &&
+      TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf()) {
     if (!shouldEmitError(Inst)) return;
 
     auto diagID = diag::use_of_self_before_fully_init;
@@ -1591,7 +1647,8 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   
   // If this is a load into a promoted closure capture, diagnose properly as
   // a capture.
-  if (isa<LoadInst>(Inst) && Inst->getLoc().isASTNode<AbstractClosureExpr>())
+  if ((isa<LoadInst>(Inst) || isa<LoadBorrowInst>(Inst)) &&
+      Inst->getLoc().isASTNode<AbstractClosureExpr>())
     diagnoseInitError(Use, diag::variable_closure_use_uninit);
   else
     diagnoseInitError(Use, diag::variable_used_before_initialized);
@@ -1802,8 +1859,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
 
     if (!consumed) {
       if (Pointer->getType().isAddress())
-        Pointer =
-            B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Unqualified);
+        Pointer = B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Take);
 
       auto MetatypeTy = CanMetatypeType::get(
           TheMemory.MemorySILType.getSwiftRValueType(),
@@ -1859,12 +1915,14 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   if (isa<DeallocStackInst>(Release) || isa<DeallocBoxInst>(Release) ||
       isa<DeallocRefInst>(Release) || isa<DeallocPartialRefInst>(Release))
     return;
-  
-  // We only handle strong_release and destroy_addr here.  The former is a
+
+  // We only handle strong_release, destroy_value, and destroy_addr here.  The
+  // former is a
   // release of a class in an initializer, the later is used for local variable
   // destruction.
-  assert(isa<StrongReleaseInst>(Release) || isa<DestroyAddrInst>(Release));
-  
+  assert(isa<StrongReleaseInst>(Release) || isa<DestroyValueInst>(Release) ||
+         isa<DestroyAddrInst>(Release));
+
   auto Availability = getLivenessAtInst(Release, 0, TheMemory.NumElements);
   DIKind SelfConsumed =
     getSelfConsumedAtInst(Release);
@@ -1937,7 +1995,7 @@ static void updateControlVariable(SILLocation Loc,
   // load/or/store sequence to mask in the bits.
   if (!Bitmask.isAllOnesValue()) {
     SILValue Tmp =
-        B.createLoad(Loc, ControlVariable, LoadOwnershipQualifier::Unqualified);
+        B.createLoad(Loc, ControlVariable, LoadOwnershipQualifier::Trivial);
     if (!OrFn.get())
       OrFn = getBinaryFunction("or", IVType, B.getASTContext());
       
@@ -1946,7 +2004,7 @@ static void updateControlVariable(SILLocation Loc,
   }
 
   B.createStore(Loc, MaskVal, ControlVariable,
-                StoreOwnershipQualifier::Unqualified);
+                StoreOwnershipQualifier::Trivial);
 }
 
 /// Test a bit in the control variable at the current insertion point.
@@ -1958,8 +2016,8 @@ static SILValue testControlVariable(SILLocation Loc,
                                     Identifier &TruncateFn,
                                     SILBuilder &B) {
   if (!ControlVariable)
-    ControlVariable = B.createLoad(Loc, ControlVariableAddr,
-                                   LoadOwnershipQualifier::Unqualified);
+    ControlVariable =
+        B.createLoad(Loc, ControlVariableAddr, LoadOwnershipQualifier::Trivial);
 
   SILValue CondVal = ControlVariable;
   CanBuiltinIntegerType IVType = CondVal->getType().castTo<BuiltinIntegerType>();
@@ -2032,7 +2090,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   SILValue ControlVariableAddr = ControlVariableBox;
   auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
   B.createStore(Loc, Zero, ControlVariableAddr,
-                StoreOwnershipQualifier::Unqualified);
+                StoreOwnershipQualifier::Trivial);
 
   Identifier OrFn;
 
@@ -2106,10 +2164,18 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 
       // Emit a destroy_addr in the taken block.
       B.setInsertionPoint(TrueBB->begin());
-      SILValue EltPtr = TheMemory.emitElementAddress(Elt, Loc, B);
-      if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
-        Destroys.push_back(DA);
-
+      SILValue EltPtr;
+      {
+        llvm::SmallVector<std::pair<SILValue, SILValue>, 4> EndBorrowList;
+        EltPtr = TheMemory.emitElementAddress(Elt, Loc, B, EndBorrowList);
+        if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
+          Destroys.push_back(DA);
+        while (!EndBorrowList.empty()) {
+          SILValue Borrowed, Original;
+          std::tie(Borrowed, Original) = EndBorrowList.pop_back_val();
+          B.createEndBorrow(Loc, Borrowed, Original);
+        }
+      }
       B.setInsertionPoint(ContBB->begin());
     }
     
@@ -2278,9 +2344,16 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       case DIKind::Yes:
         // If an element is known to be initialized, then we can strictly
         // destroy its value at releases position.
-        SILValue EltPtr = TheMemory.emitElementAddress(Elt, Loc, B);
+        llvm::SmallVector<std::pair<SILValue, SILValue>, 4> EndBorrowList;
+        SILValue EltPtr =
+            TheMemory.emitElementAddress(Elt, Loc, B, EndBorrowList);
         if (auto *DA = B.emitDestroyAddrAndFold(Release->getLoc(), EltPtr))
           Destroys.push_back(DA);
+        while (!EndBorrowList.empty()) {
+          SILValue Borrowed, Original;
+          std::tie(Borrowed, Original) = EndBorrowList.pop_back_val();
+          B.createEndBorrow(Loc, Borrowed, Original);
+        }
         continue;
       }
       
@@ -2303,9 +2376,18 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
       // Set up the initialized release block.
       B.setInsertionPoint(ReleaseBlock->begin());
-      SILValue EltPtr = TheMemory.emitElementAddress(Elt, Loc, B);
-      if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
-        Destroys.push_back(DA);
+      SILValue EltPtr;
+      {
+        llvm::SmallVector<std::pair<SILValue, SILValue>, 4> EndBorrowList;
+        EltPtr = TheMemory.emitElementAddress(Elt, Loc, B, EndBorrowList);
+        if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
+          Destroys.push_back(DA);
+        while (!EndBorrowList.empty()) {
+          SILValue Borrowed, Original;
+          std::tie(Borrowed, Original) = EndBorrowList.pop_back_val();
+          B.createEndBorrow(Loc, Borrowed, Original);
+        }
+      }
 
       // Set up the uninitialized release block. Free the self value in
       // convenience initializers, otherwise there's nothing to do.
