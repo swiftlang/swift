@@ -34,6 +34,7 @@ from jobstats import load_stats_dir, merge_all_jobstats
 def load_paired_stats_dirs(args):
     assert(len(args.remainder) == 2)
     paired_stats = []
+    sel = args.select_module
     (old, new) = args.remainder
     for p in sorted(os.listdir(old)):
         full_old = os.path.join(old, p)
@@ -41,8 +42,8 @@ def load_paired_stats_dirs(args):
         if not (os.path.exists(full_old) and os.path.isdir(full_old) and
                 os.path.exists(full_new) and os.path.isdir(full_new)):
             continue
-        old_stats = load_stats_dir(full_old)
-        new_stats = load_stats_dir(full_new)
+        old_stats = load_stats_dir(full_old, select_module=sel)
+        new_stats = load_stats_dir(full_new, select_module=sel)
         if len(old_stats) == 0 or len(new_stats) == 0:
             continue
         paired_stats.append((p, (old_stats, new_stats)))
@@ -59,7 +60,9 @@ def write_catapult_trace(args):
 def write_lnt_values(args):
     for d in args.remainder:
         stats = load_stats_dir(d)
-        merged = merge_all_jobstats(stats)
+        merged = merge_all_jobstats(stats,
+                                    select_module=args.select_module,
+                                    group_by_module=args.group_by_module)
         j = merged.to_lnt_test_obj(args)
         if args.lnt_submit is None:
             json.dump(j, args.output, indent=4)
@@ -88,11 +91,16 @@ def show_paired_incrementality(args):
     out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
     out.writeheader()
 
+    sel = args.select_module
     for (name, (oldstats, newstats)) in load_paired_stats_dirs(args):
         olddriver = merge_all_jobstats([x for x in oldstats
-                                        if x.is_driver_job()])
+                                        if x.is_driver_job()],
+                                       select_module=sel,
+                                       group_by_module=args.group_by_module)
         newdriver = merge_all_jobstats([x for x in newstats
-                                        if x.is_driver_job()])
+                                        if x.is_driver_job()],
+                                       select_module=sel,
+                                       group_by_module=args.group_by_module)
         if olddriver is None or newdriver is None:
             continue
         oldpct = olddriver.incrementality_percentage()
@@ -113,7 +121,7 @@ def show_incrementality(args):
     out.writeheader()
 
     for path in args.remainder:
-        stats = load_stats_dir(path)
+        stats = load_stats_dir(path, select_module=args.select_module)
         for s in stats:
             if s.is_driver_job():
                 pct = s.incrementality_percentage()
@@ -196,8 +204,11 @@ def set_csv_baseline(args):
     with open(args.set_csv_baseline, "wb") as f:
         out = csv.DictWriter(f, fieldnames, dialect='excel-tab',
                              quoting=csv.QUOTE_NONNUMERIC)
+        sel = args.select_module
         m = merge_all_jobstats([s for d in args.remainder
-                                for s in load_stats_dir(d)])
+                                for s in load_stats_dir(d, select_module=sel)],
+                               select_module=sel,
+                               group_by_module=args.group_by_module)
         changed = 0
         newepoch = int(time.time())
         for name in sorted(m.stats.keys()):
@@ -273,6 +284,14 @@ def main():
                         help="Tag for LNT submission")
     parser.add_argument("--lnt-submit", type=str, default=None,
                         help="URL to submit LNT data to (rather than print)")
+    parser.add_argument("--select-module",
+                        default=[],
+                        action="append",
+                        help="Select specific modules")
+    parser.add_argument("--group-by-module",
+                        default=False,
+                        action="store_true",
+                        help="Group stats by module")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")
