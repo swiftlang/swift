@@ -666,23 +666,17 @@ If you dump diagnostic output using `-stats-output-dir <dir>`, the resulting
 files in `<dir>` will be simple JSON files that can be processed with any
 JSON-reading program or library, such as `jq`. Alternatively, a bulk-analysis
 script also exists in `utils/process-stats-dir.py`, which permits a variety of
-aggregation and analysis tasks. The most useful tasks revolve around setting and
-comparing against so-called "baselines": merge-friendly CSV files that summarize
-all the counters from all the stats files in a stats-dir.
+aggregation and analysis tasks.
 
 Here is an example of how to use `-stats-output-dir` together with
 `utils/process-stats-dir.py` to analyze the difference in compilation
 performance between two compilers, say `${OLD}/swiftc` and `${NEW}/swiftc`:
 
 ```
-$ mkdir stats
-$ ${OLD}/swiftc -stats-output-dir stats test.swift
-$ utils/process-stats-dir.py --set-csv-baseline baseline.csv stats
-making new baseline baseline.csv
-
-$ rm stats/*
-$ ${NEW}/swiftc -stats-output-dir stats test.swift
-$ utils/process-stats-dir.py --compare-to-csv-baseline baseline.csv stats
+$ mkdir stats-old stats-new
+$ ${OLD}/swiftc -stats-output-dir stats-old test.swift
+$ ${OLD}/swiftc -stats-output-dir stats-new test.swift
+$ utils/process-stats-dir.py --compare-stats-dirs stats-old stats-new
 old     new     delta_pct       name
 1402939 1430732 1.98    AST.NumASTBytesAllocated
 7       0       -100.0  AST.NumUsedConformances
@@ -702,6 +696,11 @@ old     new     delta_pct       name
 5776    4084    -29.29  Generic signature builder.NumSameTypeConstraints
 ...
 ```
+
+When comparing two stats directories that contain the combined results of
+multiple projects, it can be helpful to select a single project with
+`--select-module` and/or group counters by module with `--group-by-module`.
+
 
 #### Artifact-analysis tools
 
