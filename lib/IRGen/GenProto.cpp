@@ -2134,18 +2134,6 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     auto associatedConformance =
       sourceConformance.getAssociatedConformance(sourceType, association,
                                                  associatedRequirement);
-
-    // FIXME: this should be taken care of automatically by
-    // getAssociatedConformance.
-    if (!associatedConformance.isConcrete() &&
-        !isa<ArchetypeType>(associatedType)) {
-      if (auto concreteConf =
-            IGF.IGM.getSwiftModule()->lookupConformance(associatedType,
-                                                      associatedRequirement)) {
-        associatedConformance = *concreteConf;
-      }
-    }
-
     sourceKey.Kind =
       LocalTypeDataKind::forProtocolWitnessTable(associatedConformance);
 
