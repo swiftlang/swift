@@ -959,7 +959,7 @@ func s440__cleanupEmission<T>(_ x: T) {
 // Test SILGenBuilder.loadCopy().
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s450__________lastValxSayxGd_tlF : $@convention(thin) <T> (@owned Array<T>) -> @out T
-// CHECK: [[LOAD:%.*]] = load [copy] %34 : $*T
+// CHECK: [[LOAD:%.*]] = load [copy] %{{.*}} : $*T
 // CHECK: return [[LOAD]] : $T
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s450__________lastValxSayxGd_tlF'
 func s450__________lastVal<T>(_ rest: T...) -> T {
