@@ -244,6 +244,9 @@ int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
       llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
   Invocation.setMainExecutablePath(MainExecutablePath);
 
+  // Formatting logic requires tokens on source file.
+  Invocation.getLangOptions().KeepTokensInSourceFile = true;
+
   DiagnosticEngine &Diags = Instance.getDiags();
   if (Invocation.parseArgs(Args, Diags) != 0)
     return EXIT_FAILURE;
