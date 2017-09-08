@@ -6054,6 +6054,9 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     auto attrName = Tok.getText();
 
     if (attrName == "associativity") {
+      // "associativity" is considered as a contextual keyword.
+      TokReceiver->registerTokenKindChange(Tok.getLoc(),
+                                           tok::contextual_keyword);
       parseAttributePrefix(associativityKeywordLoc);
 
       if (!Tok.is(tok::identifier)) {
@@ -6079,6 +6082,9 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     if (attrName == "assignment") {
       parseAttributePrefix(assignmentKeywordLoc);
 
+      // "assignment" is considered as a contextual keyword.
+      TokReceiver->registerTokenKindChange(assignmentKeywordLoc,
+                                           tok::contextual_keyword);
       if (consumeIf(tok::kw_true, assignmentValueLoc)) {
         assignment = true;
       } else if (consumeIf(tok::kw_false, assignmentValueLoc)) {
@@ -6093,6 +6099,9 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     bool isLowerThan = false;
     if (attrName == "higherThan" ||
         (isLowerThan = (attrName == "lowerThan"))) {
+      // "lowerThan" and "higherThan" are contextual keywords.
+      TokReceiver->registerTokenKindChange(Tok.getLoc(),
+                                           tok::contextual_keyword);
       parseAttributePrefix(isLowerThan ? lowerThanKeywordLoc
                                        : higherThanKeywordLoc);
       auto &relations = (isLowerThan ? lowerThan : higherThan);
