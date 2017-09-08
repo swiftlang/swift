@@ -23,7 +23,7 @@ import random
 import re
 
 
-class JobStats:
+class JobStats(object):
     """Object holding the stats of a single job run during a compilation,
     corresponding to a single JSON file produced by a single job process
     passed -stats-output-dir."""
@@ -167,39 +167,42 @@ def load_stats_dir(path, select_module=[]):
     fpat = (r"^stats-(?P<start>\d+)-swift-(?P<kind>\w+)-" +
             auxpat +
             r"-(?P<pid>\d+)(-.*)?.json$")
+    fre = re.compile(fpat)
     for root, dirs, files in os.walk(path):
         for f in files:
-            m = re.match(fpat, f)
-            if m:
-                # NB: "pid" in fpat is a random number, not unix pid.
-                mg = m.groupdict()
-                jobkind = mg['kind']
-                jobid = int(mg['pid'])
-                start_usec = int(mg['start'])
-                module = mg["module"]
-                if len(select_module) != 0 and module not in select_module:
-                    continue
-                jobargs = [mg["input"], mg["triple"], mg["out"], mg["opt"]]
+            m = fre.match(f)
+            if not m:
+                continue
+            # NB: "pid" in fpat is a random number, not unix pid.
+            mg = m.groupdict()
+            jobkind = mg['kind']
+            jobid = int(mg['pid'])
+            start_usec = int(mg['start'])
+            module = mg["module"]
+            if len(select_module) != 0 and module not in select_module:
+                continue
+            jobargs = [mg["input"], mg["triple"], mg["out"], mg["opt"]]
 
-                j = json.load(open(os.path.join(root, f)))
-                dur_usec = 1
-                patstr = (r"time\.swift-" + jobkind + r"\." + auxpat +
-                          r"\.wall$")
-                pat = re.compile(patstr)
-                stats = dict()
-                for (k, v) in j.items():
-                    if k.startswith("time."):
-                        v = int(1000000.0 * float(v))
-                    stats[k] = v
-                    tm = re.match(pat, k)
-                    if tm:
-                        dur_usec = v
+            with open(os.path.join(root, f)) as fp:
+                j = json.load(fp)
+            dur_usec = 1
+            patstr = (r"time\.swift-" + jobkind + r"\." + auxpat +
+                      r"\.wall$")
+            pat = re.compile(patstr)
+            stats = dict()
+            for (k, v) in j.items():
+                if k.startswith("time."):
+                    v = int(1000000.0 * float(v))
+                stats[k] = v
+                tm = re.match(pat, k)
+                if tm:
+                    dur_usec = v
 
-                e = JobStats(jobkind=jobkind, jobid=jobid,
-                             module=module, start_usec=start_usec,
-                             dur_usec=dur_usec, jobargs=jobargs,
-                             stats=stats)
-                jobstats.append(e)
+            e = JobStats(jobkind=jobkind, jobid=jobid,
+                         module=module, start_usec=start_usec,
+                         dur_usec=dur_usec, jobargs=jobargs,
+                         stats=stats)
+            jobstats.append(e)
     return jobstats
 
 

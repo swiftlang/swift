@@ -93,12 +93,12 @@ def show_paired_incrementality(args):
 
     sel = args.select_module
     for (name, (oldstats, newstats)) in load_paired_stats_dirs(args):
-        olddriver = merge_all_jobstats([x for x in oldstats
-                                        if x.is_driver_job()],
+        olddriver = merge_all_jobstats((x for x in oldstats
+                                        if x.is_driver_job()),
                                        select_module=sel,
                                        group_by_module=args.group_by_module)
-        newdriver = merge_all_jobstats([x for x in newstats
-                                        if x.is_driver_job()],
+        newdriver = merge_all_jobstats((x for x in newstats
+                                        if x.is_driver_job()),
                                        select_module=sel,
                                        group_by_module=args.group_by_module)
         if olddriver is None or newdriver is None:
@@ -205,8 +205,8 @@ def set_csv_baseline(args):
         out = csv.DictWriter(f, fieldnames, dialect='excel-tab',
                              quoting=csv.QUOTE_NONNUMERIC)
         sel = args.select_module
-        m = merge_all_jobstats([s for d in args.remainder
-                                for s in load_stats_dir(d, select_module=sel)],
+        m = merge_all_jobstats((s for d in args.remainder
+                                for s in load_stats_dir(d, select_module=sel)),
                                select_module=sel,
                                group_by_module=args.group_by_module)
         changed = 0
@@ -261,11 +261,11 @@ def write_comparison(args, old_stats, new_stats):
 def compare_to_csv_baseline(args):
     old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline)
     sel = args.select_module
-    m = merge_all_jobstats([s for d in args.remainder
-                            for s in load_stats_dir(d, select_module=sel)],
+    m = merge_all_jobstats((s for d in args.remainder
+                            for s in load_stats_dir(d, select_module=sel)),
                            select_module=sel,
                            group_by_module=args.group_by_module)
-    old_stats = dict([(k, v) for (k, (_, v)) in old_stats.items()])
+    old_stats = dict((k, v) for (k, (_, v)) in old_stats.items())
     new_stats = m.stats
 
     return write_comparison(args, old_stats, new_stats)
