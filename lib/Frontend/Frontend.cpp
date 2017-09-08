@@ -575,11 +575,14 @@ void CompilerInstance::checkTypesWhileParsingMain(
                               TypeCheckOptions);
   }
 
-  if (generateOutputForTheWholeModule())
-    typeCheckEveryFile(PersistentState, TypeCheckOptions);
-  else
-    typeCheckThePrimaryFile(PersistentState, TypeCheckOptions);
-
+  forEachFileToTypeCheck([&](SourceFile &SF) {
+    performTypeChecking(SF, PersistentState.getTopLevelContext(),
+                        TypeCheckOptions, /*curElem*/ 0,
+                        options.WarnLongFunctionBodies,
+                        options.WarnLongExpressionTypeChecking,
+                        options.SolverExpressionTimeThreshold);
+  });
+ 
   // Even if there were no source files, we should still record known
   // protocols.
   if (auto *stdlib = Context->getStdlibModule())
@@ -647,44 +650,25 @@ void CompilerInstance::parseAndTypeCheckMainFile(
   }
 }
 
-void CompilerInstance::typeCheckEveryFile(
-    PersistentParserState &PersistentState,
-    OptionSet<TypeCheckingFlags> TypeCheckOptions) {
-  for (auto File : MainModule->getFiles()) {
-    if (auto SF = dyn_cast<SourceFile>(File)) {
-      performTypeChecking(*SF, PersistentState.getTopLevelContext(),
-                          TypeCheckOptions, /*curElem*/ 0,
-                          options.WarnLongFunctionBodies,
-                          options.WarnLongExpressionTypeChecking,
-                          options.SolverExpressionTimeThreshold);
-    }
+void CompilerInstance::forEachFileToTypeCheck(const std::function<void(SourceFile &)> &fn) {
+  if (generateOutputForTheWholeModule()) {
+    MainModule->forEachSourceFile([&] (SourceFile &SF) { fn(SF); });
   }
-}
-void CompilerInstance::typeCheckThePrimaryFile(
-                                               PersistentParserState &PersistentState,
-                                               const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
-  assert (PrimarySourceFile != nullptr  &&  "No primary file?");
-  performTypeChecking(*PrimarySourceFile, PersistentState.getTopLevelContext(),
-                      TypeCheckOptions, /*curElem*/ 0,
-                      options.WarnLongFunctionBodies,
-                      options.WarnLongExpressionTypeChecking,
-                      options.SolverExpressionTimeThreshold);
+  else {
+    fn(*PrimarySourceFile);
+  }
 }
 
 void CompilerInstance::typeCheckMainModule(
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
-    for (auto File : MainModule->getFiles())
-      if (auto SF = dyn_cast<SourceFile>(File))
-        performWholeModuleTypeChecking(*SF);
+    MainModule->forEachSourceFile([&](SourceFile &SF) {
+      performWholeModuleTypeChecking(SF);
+    });
   }
-  if (generateOutputForTheWholeModule()) {
-    for (auto File : MainModule->getFiles())
-      if (auto SF = dyn_cast<SourceFile>(File))
-        finishTypeChecking(*SF);
-  } else {
-    finishTypeChecking(*PrimarySourceFile);
-  }
+  forEachFileToTypeCheck([&](SourceFile &SF) {
+    finishTypeChecking(SF);
+  });
 }
 
 void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
