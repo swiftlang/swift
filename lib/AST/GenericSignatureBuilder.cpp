@@ -58,6 +58,7 @@ namespace {
     GenericSignatureBuilder::Constraint<T>;
   typedef GenericSignatureBuilder::EquivalenceClass EquivalenceClass;
   typedef EquivalenceClass::DerivedSameTypeComponent DerivedSameTypeComponent;
+  typedef GenericSignatureBuilder::DelayedRequirement DelayedRequirement;
 
 } // end anonymous namespace
 
@@ -1510,6 +1511,14 @@ void EquivalenceClass::dump(llvm::raw_ostream &out) const {
   if (layout)
     out << "\nLayout: " << layout.getString();
 
+  if (!delayedRequirements.empty()) {
+    out << "\nDelayed requirements:";
+    for (const auto &req : delayedRequirements) {
+      out << "\n  ";
+      req.dump(out);
+    }
+  }
+
   out << "\n";
 
   {
@@ -1546,6 +1555,38 @@ void EquivalenceClass::dump(llvm::raw_ostream &out) const {
 
 void EquivalenceClass::dump() const {
   dump(llvm::errs());
+}
+
+void DelayedRequirement::dump(llvm::raw_ostream &out) const {
+  // Print LHS.
+  if (auto lhsPA = lhs.dyn_cast<PotentialArchetype *>())
+    out << lhsPA->getDebugName();
+  else
+    lhs.get<swift::Type>().print(out);
+
+  switch (kind) {
+  case Type:
+  case Layout:
+    out << ": ";
+      break;
+
+  case SameType:
+    out << " == ";
+    break;
+  }
+
+  // Print RHS.
+  if (auto rhsPA = rhs.dyn_cast<PotentialArchetype *>())
+    out << rhsPA->getDebugName();
+  else if (auto rhsType = rhs.dyn_cast<swift::Type>())
+    rhsType.print(out);
+  else
+    rhs.get<LayoutConstraint>().print(out);
+}
+
+void DelayedRequirement::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << "\n";
 }
 
 ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
@@ -2811,7 +2852,7 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
     // fails, it's because we weren't allowed to resolve anything now.
     auto resolved = resolvePotentialArchetype(type, resolutionKind);
     pa = resolved.dyn_cast<PotentialArchetype *>();
-      if (!pa) return resolved.get<EquivalenceClass *>();
+    if (!pa) return resolved.get<EquivalenceClass *>();
   }
 
   return ResolvedType::forPotentialArchetype(pa);

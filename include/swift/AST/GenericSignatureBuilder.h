@@ -1703,6 +1703,12 @@ public:
   UnresolvedType lhs;
   RequirementRHS rhs;
   FloatingRequirementSource source;
+
+  /// Dump a debugging representation of this delayed requirement class.
+  void dump(llvm::raw_ostream &out) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "only for use in the debugger");
 };
 
 /// Whether the given constraint result signals an error.
