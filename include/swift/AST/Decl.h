@@ -305,10 +305,16 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether we are overridden later
     unsigned Overridden : 1;
 
+    /// Whether the getter is mutating.
+    unsigned IsGetterMutating : 1;
+
+    /// Whether the setter is mutating.
+    unsigned IsSetterMutating : 1;
+
     /// The storage kind.
     unsigned StorageKind : 4;
   };
-  enum { NumAbstractStorageDeclBits = NumValueDeclBits + 5 };
+  enum { NumAbstractStorageDeclBits = NumValueDeclBits + 7 };
   static_assert(NumAbstractStorageDeclBits <= 32, "fits in an unsigned");
 
   class VarDeclBitfields {
@@ -3970,6 +3976,8 @@ protected:
                       SourceLoc NameLoc)
     : ValueDecl(Kind, DC, Name, NameLoc), OverriddenDecl(nullptr) {
     AbstractStorageDeclBits.StorageKind = Stored;
+    AbstractStorageDeclBits.IsGetterMutating = false;
+    AbstractStorageDeclBits.IsSetterMutating = true;
     AbstractStorageDeclBits.Overridden = false;
   }
 public:
@@ -4072,13 +4080,23 @@ public:
     llvm_unreachable("bad storage kind");
   }
   
-  /// \brief Return true if the 'getter' is 'mutating', i.e. that it requires an
-  /// lvalue base to be accessed.
-  bool isGetterMutating() const;
+  /// \brief Return true if reading this storage requires the ability to
+  /// modify the base value.
+  bool isGetterMutating() const {
+    return AbstractStorageDeclBits.IsGetterMutating;
+  }
+  void setIsGetterMutating(bool isMutating) {
+    AbstractStorageDeclBits.IsGetterMutating = isMutating;
+  }
   
-  /// \brief Return true if the 'setter' is 'nonmutating', i.e. that it can be
-  /// called even on an immutable base value.
-  bool isSetterNonMutating() const;
+  /// \brief Return true if modifying this storage requires the ability to
+  /// modify the base value.
+  bool isSetterMutating() const {
+    return AbstractStorageDeclBits.IsSetterMutating;
+  }
+  void setIsSetterMutating(bool isMutating) {
+    AbstractStorageDeclBits.IsSetterMutating = isMutating;
+  }
 
   FuncDecl *getAccessorFunction(AccessorKind accessor) const;
 

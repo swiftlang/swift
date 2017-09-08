@@ -2694,6 +2694,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
+    bool isGetterMutating, isSetterMutating;
     unsigned specifier;
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
@@ -2703,8 +2704,9 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, specifier,
-                                       hasNonPatternBindingInit, storageKind,
-                                       interfaceTypeID,
+                                       hasNonPatternBindingInit,
+                                       isGetterMutating, isSetterMutating,
+                                       storageKind, interfaceTypeID,
                                        getterID, setterID, materializeForSetID,
                                        addressorID, mutableAddressorID,
                                        willSetID, didSetID, overriddenID,
@@ -2736,6 +2738,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                    /*IsCaptureList*/false, SourceLoc(), name,
                                    Type(), DC);
     var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
+    var->setIsGetterMutating(isGetterMutating);
+    var->setIsSetterMutating(isSetterMutating);
     declOrOffset = var;
 
     Type interfaceType = getType(interfaceTypeID);
@@ -3388,7 +3392,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::SUBSCRIPT_DECL: {
     DeclContextID contextID;
-    bool isImplicit, isObjC;
+    bool isImplicit, isObjC, isGetterMutating, isSetterMutating;
     GenericEnvironmentID genericEnvID;
     TypeID interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID;
@@ -3400,7 +3404,9 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID,
-                                             isImplicit, isObjC, rawStorageKind,
+                                             isImplicit, isObjC,
+                                             isGetterMutating, isSetterMutating,
+                                             rawStorageKind,
                                              genericEnvID,
                                              interfaceTypeID,
                                              getterID, setterID,
@@ -3441,6 +3447,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
                                                SourceLoc(), TypeLoc(),
                                                parent, genericParams);
+    subscript->setIsGetterMutating(isGetterMutating);
+    subscript->setIsSetterMutating(isSetterMutating);
     declOrOffset = subscript;
 
     configureGenericEnvironment(subscript, genericEnvID);

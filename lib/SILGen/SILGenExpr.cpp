@@ -3042,9 +3042,9 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
                              ParameterConvention::Indirect_In);
   
   SILParameterInfo baseParam(loweredBaseTy.getSwiftRValueType(),
-                             property->isSetterNonMutating()
-                             ? ParameterConvention::Indirect_In
-                             : ParameterConvention::Indirect_Inout);
+                             property->isSetterMutating()
+                             ? ParameterConvention::Indirect_Inout
+                             : ParameterConvention::Indirect_In);
   
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
@@ -3097,7 +3097,7 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
                                                 propertyType);
   
   LValue lv;
-  if (property->isSetterNonMutating()) {
+  if (!property->isSetterMutating()) {
     auto baseSubst = emitKeyPathRValueBase(subSGF, property,
                                            loc, baseArg,
                                            baseType);

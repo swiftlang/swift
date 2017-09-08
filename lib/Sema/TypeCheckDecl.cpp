@@ -3870,27 +3870,118 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
   }
 }
 
-static void validateAbstractStorageDecl(AbstractStorageDecl *ASD,
-                                        TypeChecker &TC) {
-  if (ASD->hasAccessorFunctions())
-    maybeAddMaterializeForSet(ASD, TC);
+static bool doesContextHaveValueSemantics(DeclContext *dc) {
+  if (Type contextTy = dc->getDeclaredInterfaceType())
+    return !contextTy->hasReferenceSemantics();
+  return false;
+}
 
-  if (ASD->isFinal())
-    makeFinal(TC.Context, ASD->getMaterializeForSetFunc());
+static void validateSelfAccessKind(TypeChecker &TC, FuncDecl *FD) {
+  // Validate the mutating attribute if present, and install it into the bit
+  // on funcdecl (instead of just being a DeclAttribute).
+  if (FD->getAttrs().hasAttribute<MutatingAttr>())
+    FD->setSelfAccessKind(SelfAccessKind::Mutating);
+  else if (FD->getAttrs().hasAttribute<NonMutatingAttr>())
+    FD->setSelfAccessKind(SelfAccessKind::NonMutating);
+  else if (FD->getAttrs().hasAttribute<ConsumingAttr>())
+    FD->setSelfAccessKind(SelfAccessKind::__Consuming);
 
-  if (auto getter = ASD->getGetter())
-    TC.validateDecl(getter);
-  if (auto setter = ASD->getSetter())
-    TC.validateDecl(setter);
-  if (auto materializeForSet = ASD->getMaterializeForSetFunc())
-    TC.validateDecl(materializeForSet);
-  if (ASD->hasAddressors()) {
-    if (auto addressor = ASD->getAddressor())
-      TC.validateDecl(addressor);
-    if (auto addressor = ASD->getMutableAddressor())
-      TC.validateDecl(addressor);
+  if (FD->isMutating()) {
+    if (!FD->isInstanceMember() ||
+        !doesContextHaveValueSemantics(FD->getDeclContext()))
+      FD->setSelfAccessKind(SelfAccessKind::NonMutating);
+  }
+}
+
+static bool validateAccessorIsMutating(TypeChecker &TC, FuncDecl *accessor) {
+  assert(accessor && "accessor not present!");
+  validateSelfAccessKind(TC, accessor);
+  return accessor->isMutating();
+}
+
+static bool computeIsGetterMutating(TypeChecker &TC,
+                                    AbstractStorageDecl *storage) {
+  switch (storage->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+    return false;
+
+  case AbstractStorageDecl::StoredWithObservers:
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+  case AbstractStorageDecl::InheritedWithObservers:
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+  case AbstractStorageDecl::Computed:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::AddressedWithObservers:
+    return validateAccessorIsMutating(TC, storage->getGetter());
+
+  case AbstractStorageDecl::Addressed:
+    return validateAccessorIsMutating(TC, storage->getAddressor());
   }
 
+  llvm_unreachable("bad storage kind");
+}
+
+static bool computeIsSetterMutating(TypeChecker &TC,
+                                    AbstractStorageDecl *storage) {
+  switch (storage->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+    // Instance member setters are mutating; static property setters and
+    // top-level setters are not.
+    return storage->isInstanceMember() &&
+           doesContextHaveValueSemantics(storage->getDeclContext());
+
+  case AbstractStorageDecl::StoredWithObservers:
+  case AbstractStorageDecl::InheritedWithObservers:
+  case AbstractStorageDecl::Computed:
+    if (auto setter = storage->getSetter())
+      return validateAccessorIsMutating(TC, setter);
+    return false;
+
+  case AbstractStorageDecl::Addressed:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::AddressedWithObservers:
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+    if (auto addressor = storage->getMutableAddressor())
+      return validateAccessorIsMutating(TC, addressor);
+    return false;
+  }
+  llvm_unreachable("bad storage kind");
+}
+
+static void validateAbstractStorageDecl(TypeChecker &TC,
+                                        AbstractStorageDecl *storage) {
+  // isGetterMutating and isSetterMutating are part of the signature
+  // of a storage declaration and need to be validated immediately.
+  storage->setIsGetterMutating(computeIsGetterMutating(TC, storage));
+  storage->setIsSetterMutating(computeIsSetterMutating(TC, storage));
+
+  // Create a materializeForSet function if necessary.  This needs to
+  // happen immediately so that subclass materializeForSet functions
+  // will be properly marked as overriding it.
+  if (storage->hasAccessorFunctions())
+    maybeAddMaterializeForSet(storage, TC);
+  if (storage->isFinal())
+    makeFinal(TC.Context, storage->getMaterializeForSetFunc());
+
+  // Everything else about the accessors can wait until finalization.
+  TC.DeclsToFinalize.insert(storage);
+}
+
+static void finalizeAbstractStorageDecl(TypeChecker &TC,
+                                        AbstractStorageDecl *storage) {
+  if (auto getter = storage->getGetter())
+    TC.validateDecl(getter);
+  if (auto setter = storage->getSetter())
+    TC.validateDecl(setter);
+  if (auto materializeForSet = storage->getMaterializeForSetFunc())
+    TC.validateDecl(materializeForSet);
+  if (storage->hasAddressors()) {
+    if (auto addressor = storage->getAddressor())
+      TC.validateDecl(addressor);
+    if (auto addressor = storage->getMutableAddressor())
+      TC.validateDecl(addressor);
+  }
 }
 
 namespace {
@@ -4288,7 +4379,8 @@ public:
       inferDynamic(TC.Context, SD);
     }
 
-    validateAbstractStorageDecl(SD, TC);
+    // Perform accessor-related validation.
+    validateAbstractStorageDecl(TC, SD);
 
     // If this is a get+mutableAddress property, synthesize the setter body.
     if (SD->getStorageKind() == SubscriptDecl::ComputedWithMutableAddress &&
@@ -4379,7 +4471,7 @@ public:
 
       TC.validateDecl(ED);
 
-      TC.TypesToFinalize.remove(ED);
+      TC.DeclsToFinalize.remove(ED);
 
       {
         // Check for circular inheritance of the raw type.
@@ -4435,7 +4527,7 @@ public:
       checkUnsupportedNestedType(SD);
 
       TC.validateDecl(SD);
-      TC.TypesToFinalize.remove(SD);
+      TC.DeclsToFinalize.remove(SD);
       TC.addImplicitConstructors(SD);
     }
 
@@ -4567,7 +4659,7 @@ public:
       if (!CD->hasValidSignature())
         return;
 
-      TC.TypesToFinalize.remove(CD);
+      TC.DeclsToFinalize.remove(CD);
 
       {
         // Check for circular inheritance.
@@ -5086,20 +5178,7 @@ public:
       }
     }
 
-    // Validate the mutating attribute if present, and install it into the bit
-    // on funcdecl (instead of just being a DeclAttribute).
-    if (FD->getAttrs().hasAttribute<MutatingAttr>())
-      FD->setSelfAccessKind(SelfAccessKind::Mutating);
-    else if (FD->getAttrs().hasAttribute<NonMutatingAttr>())
-      FD->setSelfAccessKind(SelfAccessKind::NonMutating);
-    else if (FD->getAttrs().hasAttribute<ConsumingAttr>())
-      FD->setSelfAccessKind(SelfAccessKind::__Consuming);
-
-    if (FD->isMutating()) {
-      Type contextTy = FD->getDeclContext()->getDeclaredInterfaceType();
-      if (contextTy->hasReferenceSemantics())
-        FD->setSelfAccessKind(SelfAccessKind::NonMutating);
-    }
+    validateSelfAccessKind(TC, FD);
 
     // Check whether the return type is dynamic 'Self'.
     if (checkDynamicSelfReturn(FD))
@@ -7300,7 +7379,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         checkEnumRawValues(*this, ED);
     }
 
-    TypesToFinalize.insert(nominal);
+    DeclsToFinalize.insert(nominal);
     break;
   }
 
@@ -7369,13 +7448,16 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       markAsObjC(*this, proto, isObjC);
     }
 
-    TypesToFinalize.insert(proto);
+    DeclsToFinalize.insert(proto);
     break;
   }
 
   case DeclKind::Var:
   case DeclKind::Param: {
     auto VD = cast<VarDecl>(D);
+
+    D->setIsBeingValidated();
+
     if (!VD->hasInterfaceType()) {
       if (VD->isSelfParameter()) {
         if (!VD->hasInterfaceType()) {
@@ -7403,8 +7485,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
             diagnose(parentPattern->getLoc(), diag::identifier_init_failure,
                      parentPattern->getBoundName());
           }
-          
-          return;
         }
       } else {
         // FIXME: This case is hit when code completion occurs in a function
@@ -7418,93 +7498,91 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    if (!VD->didEarlyAttrValidation()) {
-      checkDeclAttributesEarly(VD);
-      validateAttributes(*this, VD);
+    // We're not really done with processing the signature yet, but
+    // @objc checking requires the declaration to call itself validated
+    // so that it can be considered as a witness.
+    D->setIsBeingValidated(false);
 
-      // Synthesize accessors as necessary.
-      maybeAddAccessorsToVariable(VD, *this);
+    checkDeclAttributesEarly(VD);
+    validateAttributes(*this, VD);
 
-      // FIXME: Guarding the rest of these things together with early attribute
-      // validation is a hack. It's necessary because properties can get types
-      // before validateDecl is called.
-
-      if (!DeclChecker::checkOverrides(*this, VD)) {
-        // If a property has an override attribute but does not override
-        // anything, complain.
-        auto overridden = VD->getOverriddenDecl();
-        if (auto *OA = VD->getAttrs().getAttribute<OverrideAttr>()) {
-          if (!overridden) {
-            diagnose(VD, diag::property_does_not_override)
-              .highlight(OA->getLocation());
-            OA->setInvalid();
-          }
+    if (!DeclChecker::checkOverrides(*this, VD)) {
+      // If a property has an override attribute but does not override
+      // anything, complain.
+      auto overridden = VD->getOverriddenDecl();
+      if (auto *OA = VD->getAttrs().getAttribute<OverrideAttr>()) {
+        if (!overridden) {
+          diagnose(VD, diag::property_does_not_override)
+            .highlight(OA->getLocation());
+          OA->setInvalid();
         }
       }
-
-      // Properties need some special validation logic.
-      if (auto *nominalDecl = VD->getDeclContext()
-              ->getAsNominalTypeOrNominalTypeExtensionContext()) {
-        // If this is a property, check if it needs to be exposed to
-        // Objective-C.
-        Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, VD);
-
-        if (isObjC && !isRepresentableInObjC(VD, *isObjC))
-          isObjC = None;
-
-        markAsObjC(*this, VD, isObjC);
-
-        // Under the Swift 3 inference rules, if we have @IBInspectable or
-        // @GKInspectable but did not infer @objc, warn that the attribute is
-        if (!isObjC && Context.LangOpts.EnableSwift3ObjCInference) {
-          if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
-            diagnose(attr->getLocation(),
-                     diag::attribute_meaningless_when_nonobjc,
-                     attr->getAttrName())
-              .fixItRemove(attr->getRange());
-          }
-
-          if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
-            diagnose(attr->getLocation(),
-                     diag::attribute_meaningless_when_nonobjc,
-                     attr->getAttrName())
-              .fixItRemove(attr->getRange());
-          }
-        }
-
-        // Infer 'dynamic' before touching accessors.
-        inferDynamic(Context, VD);
-
-        // If this variable is a class member, mark it final if the
-        // class is final, or if it was declared with 'let'.
-        if (auto cls = dyn_cast<ClassDecl>(nominalDecl)) {
-          if (cls->isFinal() || VD->isLet()) {
-            if (!VD->isFinal() && !VD->isDynamic()) {
-              makeFinal(Context, VD);
-            }
-          }
-          if (VD->isStatic()) {
-            auto staticSpelling =
-              VD->getParentPatternBinding()->getStaticSpelling();
-            if (staticSpelling == StaticSpellingKind::KeywordStatic) {
-              auto finalAttr = VD->getAttrs().getAttribute<FinalAttr>();
-              if (finalAttr) {
-                auto finalRange = finalAttr->getRange();
-                if (finalRange.isValid())
-                  diagnose(finalRange.Start, diag::decl_already_final)
-                  .highlight(finalRange)
-                  .fixItRemove(finalRange);
-              }
-              makeFinal(Context, VD);
-            }
-          }
-        }
-      }
-
-      // Make sure the getter and setter have valid types, since they will be
-      // used by SILGen for any accesses to this variable.
-      validateAbstractStorageDecl(VD, *this);
     }
+
+    // Properties need some special validation logic.
+    if (auto *nominalDecl = VD->getDeclContext()
+            ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      // If this is a property, check if it needs to be exposed to
+      // Objective-C.
+      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, VD);
+
+      if (isObjC && !isRepresentableInObjC(VD, *isObjC))
+        isObjC = None;
+
+      markAsObjC(*this, VD, isObjC);
+
+      // Under the Swift 3 inference rules, if we have @IBInspectable or
+      // @GKInspectable but did not infer @objc, warn that the attribute is
+      if (!isObjC && Context.LangOpts.EnableSwift3ObjCInference) {
+        if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
+          diagnose(attr->getLocation(),
+                   diag::attribute_meaningless_when_nonobjc,
+                   attr->getAttrName())
+            .fixItRemove(attr->getRange());
+        }
+
+        if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
+          diagnose(attr->getLocation(),
+                   diag::attribute_meaningless_when_nonobjc,
+                   attr->getAttrName())
+            .fixItRemove(attr->getRange());
+        }
+      }
+
+      // Infer 'dynamic' before touching accessors.
+      inferDynamic(Context, VD);
+
+      // If this variable is a class member, mark it final if the
+      // class is final, or if it was declared with 'let'.
+      if (auto cls = dyn_cast<ClassDecl>(nominalDecl)) {
+        if (cls->isFinal() || VD->isLet()) {
+          if (!VD->isFinal() && !VD->isDynamic()) {
+            makeFinal(Context, VD);
+          }
+        }
+        if (VD->isStatic()) {
+          auto staticSpelling =
+            VD->getParentPatternBinding()->getStaticSpelling();
+          if (staticSpelling == StaticSpellingKind::KeywordStatic) {
+            auto finalAttr = VD->getAttrs().getAttribute<FinalAttr>();
+            if (finalAttr) {
+              auto finalRange = finalAttr->getRange();
+              if (finalRange.isValid())
+                diagnose(finalRange.Start, diag::decl_already_final)
+                .highlight(finalRange)
+                .fixItRemove(finalRange);
+            }
+            makeFinal(Context, VD);
+          }
+        }
+      }
+    }
+
+    // Perform accessor-related validation.
+    validateAbstractStorageDecl(*this, VD);
+
+    // Synthesize accessors as necessary.
+    maybeAddAccessorsToVariable(VD, *this);
 
     break;
   }
@@ -7571,7 +7649,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     }
 
     // Make sure the protocol is fully validated by the end of Sema.
-    TypesToFinalize.insert(proto);
+    DeclsToFinalize.insert(proto);
     break;
   }
   case DeclKind::AssociatedType: {
@@ -7627,6 +7705,112 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
   default:
     validateDecl(D);
     break;
+  }
+}
+
+static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
+                                                   ValueDecl *VD) {
+  // For enums, we only need to validate enum elements to know
+  // the layout.
+  if (isa<EnumDecl>(nominal) &&
+      isa<EnumElementDecl>(VD))
+    return true;
+
+  // For structs, we only need to validate stored properties to
+  // know the layout.
+  if (isa<StructDecl>(nominal) &&
+      (isa<VarDecl>(VD) &&
+       !cast<VarDecl>(VD)->isStatic() &&
+       (cast<VarDecl>(VD)->hasStorage() ||
+        VD->getAttrs().hasAttribute<LazyAttr>())))
+    return true;
+
+  // For classes, we need to validate properties and functions,
+  // but skipping nested types is OK.
+  if (isa<ClassDecl>(nominal) &&
+      !isa<TypeDecl>(VD))
+    return true;
+
+  // For protocols, skip nested typealiases and nominal types.
+  if (isa<ProtocolDecl>(nominal) &&
+      !isa<GenericTypeDecl>(VD))
+    return true;
+
+  return false;
+}
+
+static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
+  Optional<bool> lazyVarsAlreadyHaveImplementation;
+
+  for (auto *D : nominal->getMembers()) {
+    auto VD = dyn_cast<ValueDecl>(D);
+    if (!VD)
+      continue;
+
+    if (!shouldValidateMemberDuringFinalization(nominal, VD))
+      continue;
+
+    TC.validateDecl(VD);
+
+    // The only thing left to do is synthesize storage for lazy variables.
+    // We only have to do that if it's a type from another file, though.
+    // In NDEBUG builds, bail out as soon as we can.
+#ifdef NDEBUG
+    if (lazyVarsAlreadyHaveImplementation.hasValue() &&
+        lazyVarsAlreadyHaveImplementation.getValue())
+      continue;
+#endif
+    auto *prop = dyn_cast<VarDecl>(D);
+    if (!prop)
+      continue;
+
+    if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic()
+                                                  && prop->getGetter()) {
+      bool hasImplementation = prop->getGetter()->hasBody();
+
+      if (lazyVarsAlreadyHaveImplementation.hasValue()) {
+        assert(lazyVarsAlreadyHaveImplementation.getValue() ==
+                 hasImplementation &&
+               "only some lazy vars already have implementations");
+      } else {
+        lazyVarsAlreadyHaveImplementation = hasImplementation;
+      }
+
+      if (!hasImplementation)
+        TC.completeLazyVarImplementation(prop);
+    }
+  }
+
+  // FIXME: We need to add implicit initializers and dtors when a decl is
+  // touched, because it affects vtable layout.  If you're not defining the
+  // class, you shouldn't have to know what the vtable layout is.
+  if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
+    TC.addImplicitConstructors(CD);
+    TC.addImplicitDestructor(CD);
+  }
+
+  // validateDeclForNameLookup will not trigger an immediate full
+  // validation of protocols, but clients will assume that things
+  // like the requirement signature have been set.
+  if (auto PD = dyn_cast<ProtocolDecl>(nominal)) {
+    if (!PD->isRequirementSignatureComputed()) {
+      TC.validateDecl(PD);
+    }
+  }
+}
+
+void TypeChecker::finalizeDecl(ValueDecl *decl) {
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    finalizeType(*this, nominal);
+  } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    // We synthesize certain functions --- mostly accessors --- at
+    // times that can be inconvenient for immediate validation.  We add
+    // them to the list of declarations to finalize so that we can
+    // fully validate them at a more opportune time.
+    validateDecl(func);
+  } else {
+    auto storage = cast<AbstractStorageDecl>(decl);
+    finalizeAbstractStorageDecl(*this, storage);
   }
 }
 

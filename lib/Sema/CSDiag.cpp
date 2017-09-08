@@ -4322,7 +4322,7 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
   else {
     diagID = diag::assignment_lhs_is_immutable_variable;
   }
-  
+
   diagnoseSubElementFailure(dest, equalLoc, *this, diagID,
                             diag::assignment_lhs_not_lvalue);
 }
