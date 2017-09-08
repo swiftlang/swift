@@ -485,11 +485,11 @@ public:
 };
 
 class FormatWalker : public SourceEntityWalker {
-  typedef std::vector<Token>::iterator TokenIt;
+  typedef ArrayRef<Token>::iterator TokenIt;
   class SiblingCollector {
     SourceLoc FoundSibling;
     SourceManager &SM;
-    std::vector<Token> &Tokens;
+    ArrayRef<Token> Tokens;
     SourceLoc &TargetLoc;
     TokenIt TI;
     bool NeedExtraIndentation;
@@ -552,7 +552,7 @@ class FormatWalker : public SourceEntityWalker {
     }
 
   public:
-    SiblingCollector(SourceManager &SM, std::vector<Token> &Tokens,
+    SiblingCollector(SourceManager &SM, ArrayRef<Token> Tokens,
                      SourceLoc &TargetLoc) : SM(SM), Tokens(Tokens),
     TargetLoc(TargetLoc), TI(Tokens.begin()),
     NeedExtraIndentation(false) {}
@@ -660,7 +660,7 @@ class FormatWalker : public SourceEntityWalker {
   bool InDocCommentBlock = false;
   bool InCommentLine = false;
   bool InStringLiteral = false;
-  std::vector<Token> Tokens;
+  ArrayRef<Token> Tokens;
   LangOptions Options;
   TokenIt CurrentTokIt;
   unsigned TargetLine;
@@ -739,7 +739,7 @@ class FormatWalker : public SourceEntityWalker {
 public:
   explicit FormatWalker(SourceFile &SF, SourceManager &SM)
   :SF(SF), SM(SM),
-  Tokens(tokenize(Options, SM, SF.getBufferID().getValue())),
+  Tokens(SF.getAllTokens()),
   CurrentTokIt(Tokens.begin()),
   SCollector(SM, Tokens, TargetLocation) {}
 

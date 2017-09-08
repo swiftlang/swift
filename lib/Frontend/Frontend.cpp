@@ -264,6 +264,7 @@ ModuleDecl *CompilerInstance::getMainModule() {
 void CompilerInstance::performSema() {
   const FrontendOptions &options = Invocation.getFrontendOptions();
   const InputFileKind Kind = Invocation.getInputKind();
+  bool KeepTokens = Invocation.getLangOptions().KeepTokensInSourceFile;
   ModuleDecl *MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
 
@@ -392,7 +393,7 @@ void CompilerInstance::performSema() {
   if (Kind == InputFileKind::IFK_Swift_REPL) {
     auto *SingleInputFile =
       new (*Context) SourceFile(*MainModule, Invocation.getSourceFileKind(),
-                                None, modImpKind);
+                                None, modImpKind, KeepTokens);
     MainModule->addFile(*SingleInputFile);
     addAdditionalInitialImports(SingleInputFile);
     return;
@@ -420,7 +421,8 @@ void CompilerInstance::performSema() {
 
     auto *MainFile = new (*Context) SourceFile(*MainModule,
                                                Invocation.getSourceFileKind(),
-                                               MainBufferID, modImpKind);
+                                               MainBufferID, modImpKind,
+                                               KeepTokens);
     MainModule->addFile(*MainFile);
     addAdditionalInitialImports(MainFile);
 
@@ -446,7 +448,8 @@ void CompilerInstance::performSema() {
     auto *NextInput = new (*Context) SourceFile(*MainModule,
                                                 SourceFileKind::Library,
                                                 BufferID,
-                                                modImpKind);
+                                                modImpKind,
+                                                KeepTokens);
     MainModule->addFile(*NextInput);
     addAdditionalInitialImports(NextInput);
 
@@ -585,6 +588,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   const InputFileKind Kind = Invocation.getInputKind();
   ModuleDecl *MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
+  bool KeepTokens = Invocation.getLangOptions().KeepTokensInSourceFile;
 
   assert((Kind == InputFileKind::IFK_Swift ||
           Kind == InputFileKind::IFK_Swift_Library) &&
@@ -600,7 +604,8 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
     SourceMgr.setHashbangBufferID(MainBufferID);
 
     auto *MainFile = new (*Context) SourceFile(
-        *MainModule, Invocation.getSourceFileKind(), MainBufferID, modImpKind);
+        *MainModule, Invocation.getSourceFileKind(), MainBufferID, modImpKind,
+                                               KeepTokens);
     MainModule->addFile(*MainFile);
 
     if (MainBufferID == PrimaryBufferID)
@@ -615,7 +620,9 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
       continue;
 
     auto *NextInput = new (*Context)
-        SourceFile(*MainModule, SourceFileKind::Library, BufferID, modImpKind);
+        SourceFile(*MainModule, SourceFileKind::Library, BufferID, modImpKind,
+                   KeepTokens);
+
     MainModule->addFile(*NextInput);
     if (BufferID == PrimaryBufferID)
       setPrimarySourceFile(NextInput);

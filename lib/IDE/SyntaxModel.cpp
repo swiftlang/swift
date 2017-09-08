@@ -51,12 +51,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
   : Impl(*new Implementation(SrcFile)) {
   const bool IsPlayground = Impl.LangOpts.Playground;
   const SourceManager &SM = Impl.SrcMgr;
-  std::vector<Token> Tokens = swift::tokenize(Impl.LangOpts, SM,
-                                              *Impl.SrcFile.getBufferID(),
-                                              /*Offset=*/0,
-                                              /*EndOffset=*/0,
-                                              /*KeepComments=*/true,
-                                           /*TokenizeInterpolatedString=*/true);
+  ArrayRef<Token> Tokens = SrcFile.getAllTokens();
   std::vector<SyntaxNode> Nodes;
   SourceLoc AttrLoc;
   SourceLoc UnaryMinusLoc;
@@ -101,31 +96,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #define KEYWORD(X) case tok::kw_##X:
 #include "swift/Syntax/TokenKinds.def"
 #undef KEYWORD
+        case tok::contextual_keyword:
         Kind = SyntaxNodeKind::Keyword;
-        // Some keywords can be used as an argument labels. If this one can and
-        // is being used as one, treat it as an identifier instead.
-        if (Tok.canBeArgumentLabel() && !Tok.is(tok::kw__) &&
-            0 < I && I < Tokens.size() - 1) {
-          auto prev = Tokens[I - 1];
-          auto next = Tokens[I + 1];
-          if ((prev.is(tok::identifier) || prev.isKeyword()) && I > 1)
-            prev = Tokens[I - 2];
-          else if ((next.is(tok::identifier) || next.isKeyword()) &&
-                   I < Tokens.size() - 2)
-            next = Tokens[I + 2];
-
-          if ((prev.is(tok::l_paren) || prev.is(tok::comma)) &&
-              next.is(tok::colon))
-            Kind = SyntaxNodeKind::Identifier;
-        }
-
-        if (I) {
-          auto Prev = Tokens[I - 1];
-          if (Prev.isAny(tok::period, tok::period_prefix) &&
-              SM.getByteDistance(Prev.getLoc(), Tok.getLoc()) == 1) {
-            Kind = SyntaxNodeKind::Identifier;
-          }
-        }
         break;
 
 #define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) \
@@ -188,31 +160,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         AttrLoc = Tok.getLoc();
         continue;
 
-      case tok::l_paren: {
-        // Check if this is a string interpolation paren.
-        if (I == 0)
-          continue;
-        auto &PrevTok = Tokens[I-1];
-        if (PrevTok.getKind() != tok::string_literal)
-          continue;
-        StringRef StrText = PrevTok.getText();
-        if (StrText.size() > 1 && StrText.back() == '\"' &&
-            !StrText.endswith("\\\""))
-          continue;
-        Kind = SyntaxNodeKind::StringInterpolationAnchor;
-        break;
-      }
-
-      case tok::r_paren: {
-        // Check if this is a string interpolation paren.
-        if (I+1 == E)
-          continue;
-        auto &NextTok = Tokens[I+1];
-        if (NextTok.getKind() != tok::string_literal)
-          continue;
-        StringRef StrText = NextTok.getText();
-        if (StrText.size() > 1 && StrText.front() == '\"')
-          continue;
+      case tok::string_interpolation_anchor: {
         Kind = SyntaxNodeKind::StringInterpolationAnchor;
         break;
       }
@@ -734,28 +682,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     auto *FD = dyn_cast<FuncDecl>(AFD);
-    if (FD && FD->isAccessor()) {
-      // Pass context sensitive keyword token.
-      SourceLoc SL = FD->getFuncLoc();
-      // Make sure the func loc is not the start of the function body, in which
-      // case the context sensitive keyword was implied.
-      if (FD->getBodySourceRange().Start != SL) {
-        unsigned TokLen;
-        switch (FD->getAccessorKind()) {
-          case AccessorKind::NotAccessor: llvm_unreachable("expected accessor");
-          case AccessorKind::IsGetter: TokLen = 3; break;
-          case AccessorKind::IsSetter: TokLen = 3; break;
-          case AccessorKind::IsAddressor: TokLen = 7; break;
-          case AccessorKind::IsMutableAddressor: TokLen = 14; break;
-          case AccessorKind::IsWillSet: TokLen = 7; break;
-          case AccessorKind::IsDidSet: TokLen = 6; break;
-          case AccessorKind::IsMaterializeForSet: llvm_unreachable("always implicit");
-        }
-        if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
-                                CharSourceRange(SL, TokLen)}))
-          return false;
-      }
-    } else {
+    if (!FD || !FD->isAccessor()) {
       // Pass Function / Method structure node.
       SyntaxStructureNode SN;
       setDecl(SN, D);
@@ -1074,18 +1001,6 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
   if (!D)
     return false;
   if (isa<AvailableAttr>(D)) {
-    std::vector<SourceLoc> PlatformLocs;
-    for (auto T : Toks) {
-      if (!SM.rangeContainsTokenLoc(D->getRangeWithAt(), T.getLoc()))
-        continue;
-#define AVAILABILITY_PLATFORM(X, PrettyName)                                  \
-      if (#X == T.getText()) {                                                \
-        PlatformLocs.push_back(T.getLoc());                                   \
-        continue;                                                             \
-      }
-#include "swift/AST/PlatformKinds.def"
-    }
-
     unsigned I = 0;
     for (; I < TokenNodes.size(); ++ I) {
       auto Node = TokenNodes[I];
@@ -1096,13 +1011,7 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
           break;
         continue;
       }
-      if (PlatformLocs.end() !=
-          std::find(PlatformLocs.begin(), PlatformLocs.end(),
-                    Node.Range.getStart())) {
-          if (!passNode({SyntaxNodeKind::Keyword, Node.Range}))
-            break;
-          continue;
-      }
+
       if (!passNode(Node))
         break;
     }

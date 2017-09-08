@@ -27,6 +27,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Parse/Token.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
@@ -886,7 +887,7 @@ public:
   ASTStage_t ASTStage = Parsing;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
-             ImplicitModuleImportKind ModImpKind);
+             ImplicitModuleImportKind ModImpKind, bool KeepTokens);
 
   void
   addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
@@ -1070,6 +1071,25 @@ public:
     getInterfaceHash(str);
     out << str << '\n';
   }
+
+  std::vector<Token> &getTokenVector() {
+    assert(EnabledAndAllCorrectedTokens.first && "Disabled");
+    return EnabledAndAllCorrectedTokens.second;
+  }
+
+  ArrayRef<Token> getAllTokens() const {
+    assert(EnabledAndAllCorrectedTokens.first && "Disabled");
+    return EnabledAndAllCorrectedTokens.second;
+  }
+
+  bool shouldKeepTokens() const {
+    return EnabledAndAllCorrectedTokens.first;
+  }
+
+private:
+  /// Whether the SourceFile instance opts to collect underlying tokens and
+  /// the vector containing these tokens if so.
+  std::pair<bool, std::vector<Token>> EnabledAndAllCorrectedTokens;
 };
 
 

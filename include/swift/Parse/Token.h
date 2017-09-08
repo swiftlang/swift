@@ -61,13 +61,17 @@ class Token {
 public:
   Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false), CommentLength(0),
             EscapedIdentifier(false) {}
-  Token(tok Kind, StringRef Text)
-    : Kind(Kind), AtStartOfLine(false), CommentLength(0),
-      EscapedIdentifier(false), MultilineString(false),
-      Text(Text) {}
-  
+
+  Token(tok Kind, StringRef Text, unsigned CommentLength)
+          : Kind(Kind), AtStartOfLine(false), CommentLength(CommentLength),
+            EscapedIdentifier(false), MultilineString(false),
+            Text(Text) {}
+
+  Token(tok Kind, StringRef Text): Token(Kind, Text, 0) {};
+
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }
+  void clearCommentLength() { CommentLength = 0; }
   
   /// is/isNot - Predicates to check if this token is a specific kind, as in
   /// "if (Tok.is(tok::l_brace)) {...}".
