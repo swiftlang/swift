@@ -582,7 +582,7 @@ void CompilerInstance::checkTypesWhileParsingMain(
                         options.WarnLongExpressionTypeChecking,
                         options.SolverExpressionTimeThreshold);
   });
- 
+
   // Even if there were no source files, we should still record known
   // protocols.
   if (auto *stdlib = Context->getStdlibModule())
@@ -650,11 +650,11 @@ void CompilerInstance::parseAndTypeCheckMainFile(
   }
 }
 
-void CompilerInstance::forEachFileToTypeCheck(const std::function<void(SourceFile &)> &fn) {
+void CompilerInstance::forEachFileToTypeCheck(
+    const std::function<void(SourceFile &)> &fn) {
   if (generateOutputForTheWholeModule()) {
-    MainModule->forEachSourceFile([&] (SourceFile &SF) { fn(SF); });
-  }
-  else {
+    MainModule->forEachSourceFile([&](SourceFile &SF) { fn(SF); });
+  } else {
     fn(*PrimarySourceFile);
   }
 }
@@ -662,13 +662,10 @@ void CompilerInstance::forEachFileToTypeCheck(const std::function<void(SourceFil
 void CompilerInstance::typeCheckMainModule(
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
-    MainModule->forEachSourceFile([&](SourceFile &SF) {
-      performWholeModuleTypeChecking(SF);
-    });
+    MainModule->forEachSourceFile(
+        [&](SourceFile &SF) { performWholeModuleTypeChecking(SF); });
   }
-  forEachFileToTypeCheck([&](SourceFile &SF) {
-    finishTypeChecking(SF);
-  });
+  forEachFileToTypeCheck([&](SourceFile &SF) { finishTypeChecking(SF); });
 }
 
 void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
