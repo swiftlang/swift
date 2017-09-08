@@ -577,7 +577,7 @@ void CompilerInstance::checkTypesWhileParsingMain(
 
   if (generateOutputForTheWholeModule())
     typeCheckEveryFile(PersistentState, TypeCheckOptions);
-  else if (PrimarySourceFile != nullptr)
+  else
     typeCheckThePrimaryFile(PersistentState, TypeCheckOptions);
 
   // Even if there were no source files, we should still record known
