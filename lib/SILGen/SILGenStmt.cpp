@@ -883,7 +883,8 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
         RegularLocation L(S->getBody());
         L.pointToEnd();
         scope.exitAndBranch(L);
-      });
+      },
+      SGF.loadProfilerCount(S->getBody()));
 
   // We add loop fail block, just to be defensive about intermediate
   // transformations performing cleanups at scope.exit(). We still jump to the
@@ -894,7 +895,8 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
       [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
         assert(!inputValue && "None should not be passed an argument!");
         scope.exitAndBranch(S);
-      });
+      },
+      SGF.loadProfilerCount(S));
 
   std::move(switchEnumBuilder).emit();
 

@@ -713,16 +713,26 @@ void SwitchEnumBuilder::emit() && {
   {
     // TODO: We could store the data in CaseBB form and not have to do this.
     llvm::SmallVector<DeclBlockPair, 8> caseBlocks;
+    llvm::SmallVector<Optional<uint64_t>, 8> caseBlockCounts;
     std::transform(caseDataArray.begin(), caseDataArray.end(),
                    std::back_inserter(caseBlocks),
                    [](NormalCaseData &caseData) -> DeclBlockPair {
                      return {caseData.decl, caseData.block};
                    });
+    std::transform(caseDataArray.begin(), caseDataArray.end(),
+                   std::back_inserter(caseBlockCounts),
+                   [](NormalCaseData &caseData) -> Optional<uint64_t> {
+                     return caseData.count;
+                   });
     SILBasicBlock *defaultBlock =
         defaultBlockData ? defaultBlockData->block : nullptr;
+    Optional<uint64_t> defaultBlockCount =
+        defaultBlockData ? defaultBlockData->count : None;
+    ArrayRef<Optional<uint64_t>> caseBlockCountsRef = caseBlockCounts;
     if (isAddressOnly) {
       builder.createSwitchEnumAddr(loc, optional.getValue(), defaultBlock,
-                                   caseBlocks);
+                                   caseBlocks, caseBlockCountsRef,
+                                   defaultBlockCount);
     } else {
       if (optional.getType().isAddress()) {
         // TODO: Refactor this into a maybe load.
@@ -733,7 +743,8 @@ void SwitchEnumBuilder::emit() && {
         }
       }
       builder.createSwitchEnum(loc, optional.forward(getSGF()), defaultBlock,
-                               caseBlocks);
+                               caseBlocks, caseBlockCountsRef,
+                               defaultBlockCount);
     }
   }
 
