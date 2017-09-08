@@ -190,8 +190,10 @@ public:
 
   /// emitElementAddress - Given an element number (in the flattened sense)
   /// return a pointer to a leaf element of the specified number.
-  SILValue emitElementAddress(unsigned TupleEltNo, SILLocation Loc,
-                              SILBuilder &B) const;
+  SILValue
+  emitElementAddress(unsigned TupleEltNo, SILLocation Loc, SILBuilder &B,
+                     llvm::SmallVectorImpl<std::pair<SILValue, SILValue>>
+                         &EndBorrowList) const;
 
   /// getElementType - Return the swift type of the specified element.
   SILType getElementType(unsigned EltNo) const;
