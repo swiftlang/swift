@@ -6083,7 +6083,7 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
       parseAttributePrefix(assignmentKeywordLoc);
 
       // "assignment" is considered as a contextual keyword.
-      TokReceiver->registerTokenKindChange(Tok.getLoc(),
+      TokReceiver->registerTokenKindChange(assignmentKeywordLoc,
                                            tok::contextual_keyword);
       if (consumeIf(tok::kw_true, assignmentValueLoc)) {
         assignment = true;
