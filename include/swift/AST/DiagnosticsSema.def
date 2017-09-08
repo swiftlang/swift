@@ -1350,9 +1350,6 @@ ERROR(extension_stored_property,none,
       "extensions must not contain stored properties", ())
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0", (Type))
-ERROR(extension_constrained_inheritance,none,
-      "extension of type %0 with constraints cannot have an "
-      "inheritance clause", (Type))
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
 ERROR(objc_generic_extension_using_type_parameter,none,

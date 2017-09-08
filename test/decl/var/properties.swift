@@ -1132,9 +1132,10 @@ extension rdar17391625derived {
 }
 
 // <rdar://problem/27671033> Crash when defining property inside an invalid extension
+// (This extension is no longer invalid.)
 public protocol rdar27671033P {}
 struct rdar27671033S<Key, Value> {}
-extension rdar27671033S : rdar27671033P where Key == String { // expected-error {{extension of type 'rdar27671033S' with constraints cannot have an inheritance clause}}
+extension rdar27671033S : rdar27671033P where Key == String {
   let d = rdar27671033S<Int, Int>() // expected-error {{extensions must not contain stored properties}}
 }
 
