@@ -291,6 +291,124 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
                    : CommentRetentionMode::None)), SF, SIL, PersistentState){
 }
 
+namespace {
+
+/// This is the token receiver that helps SourceFile to keep track of its
+/// underlying corrected token stream.
+class TokenRecorder: public ConsumeTokenReceiver {
+  ASTContext &Ctx;
+  SourceManager &SM;
+
+  // Token list ordered by their appearance in the source file.
+  std::vector<Token> &Bag;
+  unsigned BufferID;
+
+  // Registered token kind change. These changes are regiestered before the
+  // token is consumed, so we need to keep track of them here.
+  llvm::DenseMap<const void*, tok> TokenKindChangeMap;
+
+  std::vector<Token>::iterator lower_bound(SourceLoc Loc) {
+    return std::lower_bound(Bag.begin(), Bag.end(), Loc,
+      [](const Token &T, SourceLoc L) {
+        return T.getLoc().getOpaquePointerValue() < L.getOpaquePointerValue();
+    });
+  }
+
+  std::vector<Token>::iterator lower_bound(Token Tok) {
+    return lower_bound(Tok.getLoc());
+  }
+
+  void relexComment(CharSourceRange CommentRange,
+                    llvm::SmallVectorImpl<Token> &Scracth) {
+    Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
+            CommentRetentionMode::ReturnAsTokens,
+            TriviaRetentionMode::WithoutTrivia,
+            SM.getLocOffsetInBuffer(CommentRange.getStart(), BufferID),
+            SM.getLocOffsetInBuffer(CommentRange.getEnd(), BufferID));
+    while(true) {
+      Token Result;
+      L.lex(Result);
+      if (Result.is(tok::eof))
+        break;
+      assert(Result.is(tok::comment));
+      Scracth.push_back(Result);
+    }
+  }
+
+public:
+  TokenRecorder(SourceFile &SF):
+  Ctx(SF.getASTContext()),
+  SM(SF.getASTContext().SourceMgr),
+  Bag(SF.getTokenVector()),
+  BufferID(SF.getBufferID().getValue()) {};
+
+  void finalize() override {
+
+    // We should consume the comments at the end of the file that don't attach
+    // to any tokens.
+    SourceLoc TokEndLoc;
+    if (!Bag.empty()) {
+      Token Last = Bag.back();
+      TokEndLoc = Last.getLoc().getAdvancedLoc(Last.getLength());
+    } else {
+
+      // Special case: the file contains nothing but comments.
+      TokEndLoc = SM.getLocForBufferStart(BufferID);
+    }
+    llvm::SmallVector<Token, 4> Scratch;
+    relexComment(CharSourceRange(SM, TokEndLoc,
+                                 SM.getRangeForBuffer(BufferID).getEnd()),
+                 Scratch);
+    // Accept these orphaned comments.
+    Bag.insert(Bag.end(), Scratch.begin(), Scratch.end());
+  }
+
+  void registerTokenKindChange(SourceLoc Loc, tok NewKind) override {
+    // If a token with the same location is already in the bag, update its kind.
+    auto Pos = lower_bound(Loc);
+    if (Pos != Bag.end() && Pos->getLoc().getOpaquePointerValue() ==
+        Loc.getOpaquePointerValue()) {
+      Pos->setKind(NewKind);
+      return;
+    }
+
+    // Save the update for later.
+    TokenKindChangeMap[Loc.getOpaquePointerValue()] = NewKind;
+  }
+
+  void receive(Token Tok) override {
+    // We filter out all tokens without valid location
+    if(Tok.getLoc().isInvalid())
+      return;
+
+    // If a token with the same location is already in the bag, skip this token.
+    auto Pos = lower_bound(Tok);
+    if (Pos != Bag.end() && Pos->getLoc().getOpaquePointerValue() ==
+        Tok.getLoc().getOpaquePointerValue()) {
+      return;
+    }
+
+    // Update Token kind if a kind update was regiestered before.
+    auto Found = TokenKindChangeMap.find(Tok.getLoc().
+                                         getOpaquePointerValue());
+    if (Found != TokenKindChangeMap.end()) {
+      Tok.setKind(Found->getSecond());
+    }
+
+    // If the token has comment attached to it, re-lexing these comments and
+    // consume them as separate tokens.
+    llvm::SmallVector<Token, 4> TokensToConsume;
+    if (Tok.hasComment()) {
+      relexComment(Tok.getCommentRange(), TokensToConsume);
+      Tok.clearCommentLength();
+    }
+
+    TokensToConsume.push_back(Tok);
+    Bag.insert(Pos, TokensToConsume.begin(), TokensToConsume.end());
+  }
+};
+} // End of an anonymous namespace.
+
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState)
@@ -300,7 +418,10 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     L(Lex.release()),
     SIL(SIL),
     CurDeclContext(&SF),
-    Context(SF.getASTContext()) {
+    Context(SF.getASTContext()),
+    TokReceiver(SF.shouldKeepTokens() ?
+                new TokenRecorder(SF) :
+                new ConsumeTokenReceiver())  {
 
   State = PersistentState;
   if (!State) {
@@ -323,23 +444,32 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
 
 Parser::~Parser() {
   delete L;
+  delete TokReceiver;
 }
 
 const Token &Parser::peekToken() {
   return L->peekNextToken();
 }
 
-SourceLoc Parser::consumeToken() {
+SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
   SourceLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
 
   if (IsParsingInterfaceTokens && !Tok.getText().empty()) {
     SF.recordInterfaceToken(Tok.getText());
   }
-
   L->lex(Tok);
   PreviousLoc = Loc;
   return Loc;
+}
+
+void Parser::consumeExtraToken(Token Extra) {
+  TokReceiver->receive(Extra);
+}
+
+SourceLoc Parser::consumeToken() {
+  TokReceiver->receive(Tok);
+  return consumeTokenWithoutFeedingReceiver();
 }
 
 SourceLoc Parser::getEndOfPreviousLoc() {
@@ -766,7 +896,8 @@ struct ParserUnit::Implementation {
       SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SourceFileKind::Main, BufferID,
-            SourceFile::ImplicitModuleImportKind::None)) {
+            SourceFile::ImplicitModuleImportKind::None,
+            Opts.KeepTokensInSourceFile)) {
   }
 };
 

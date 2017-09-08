@@ -94,7 +94,7 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 163,
     key.length: 3
   },
@@ -119,7 +119,7 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 216,
     key.length: 3
   }
