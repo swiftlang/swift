@@ -5343,18 +5343,6 @@ PrecedenceGroupDecl::PrecedenceGroupDecl(DeclContext *dc,
          lowerThan.size() * sizeof(Relation));
 }
 
-void PrecedenceGroupDecl::collectOperatorKeywordRanges(
-                                    SmallVectorImpl<CharSourceRange> &Ranges) {
-  auto AddToRange = [&] (SourceLoc Loc, StringRef Word) {
-    if (Loc.isValid())
-      Ranges.push_back(CharSourceRange(Loc, strlen(Word.data())));
-  };
-  AddToRange(AssociativityKeywordLoc, "associativity");
-  AddToRange(AssignmentKeywordLoc, "assignment");
-  AddToRange(HigherThanLoc, "higherThan");
-  AddToRange(LowerThanLoc, "lowerThan");
-}
-
 bool FuncDecl::isDeferBody() const {
   return getName() == getASTContext().getIdentifier("$defer");
 }

@@ -6054,8 +6054,6 @@ public:
     return { getLowerThanBuffer(), NumLowerThan };
   }
 
-  void collectOperatorKeywordRanges(SmallVectorImpl<CharSourceRange> &Ranges);
-
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PrecedenceGroup;
   }
