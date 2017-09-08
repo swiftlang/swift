@@ -1460,10 +1460,12 @@ class GenericSignatureBuilder::PotentialArchetype {
   {
   }
 
+public:
   /// \brief Retrieve the representative for this archetype, performing
   /// path compression on the way.
   PotentialArchetype *getRepresentative() const;
 
+private:
   /// Retrieve the generic signature builder with which this archetype is
   /// associated.
   GenericSignatureBuilder *getBuilder() const {
