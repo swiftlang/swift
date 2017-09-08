@@ -1649,8 +1649,13 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getDestroyArrayOperation(Context, Id);
       
   case BuiltinValueKind::CopyArray:
+  case BuiltinValueKind::TakeArrayNoAlias:
   case BuiltinValueKind::TakeArrayFrontToBack:
   case BuiltinValueKind::TakeArrayBackToFront:
+  case BuiltinValueKind::AssignCopyArrayNoAlias:
+  case BuiltinValueKind::AssignCopyArrayFrontToBack:
+  case BuiltinValueKind::AssignCopyArrayBackToFront:
+  case BuiltinValueKind::AssignTakeArray:
     if (!Types.empty()) return nullptr;
     return getTransferArrayOperation(Context, Id);
 
