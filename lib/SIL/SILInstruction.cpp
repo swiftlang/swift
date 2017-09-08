@@ -168,6 +168,10 @@ void SILInstruction::dropAllReferences() {
   }
 }
 
+// Initialize the static members of SILInstruction.
+int SILInstruction::NumCreatedInstructions = 0;
+int SILInstruction::NumDeletedInstructions = 0;
+
 namespace {
 class InstructionDestroyer
     : public SILInstructionVisitor<InstructionDestroyer> {
