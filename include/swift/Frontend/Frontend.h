@@ -491,7 +491,7 @@ private:
                                   DelayedParsingCallbacks *DelayedParseCB);
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
-  
+
   void forEachFileToTypeCheck(const std::function<void(SourceFile &)> &fn);
 
   void parseAndTypeCheckMainFile(PersistentParserState &PersistentState,
