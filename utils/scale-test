@@ -89,7 +89,7 @@ def run_once_with_primary(args, ast, rng, primary_idx):
         elif args.optimize_unchecked:
             opts = ['-Ounchecked']
 
-        extra = args.Xfrontend[:]
+        extra = ["-" + arg for arg in args.Xfrontend[:]]
         if args.debuginfo:
             extra.append('-g')
 
