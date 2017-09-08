@@ -14,19 +14,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
-#include "swift/AST/NameLookup.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleLoader.h"
-#include "swift/Parse/Parser.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Parse/Parser.h"
+#include "swift/Subsystems.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/Statistics.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 #include <system_error>
 using namespace swift;
