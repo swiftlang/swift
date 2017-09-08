@@ -281,20 +281,6 @@ SourceLoc PoundAvailableInfo::getEndLoc() const {
   return RParenLoc;
 }
 
-void PoundAvailableInfo::
-getPlatformKeywordLocs(SmallVectorImpl<SourceLoc> &PlatformLocs) {
-  for (unsigned i = 0; i < NumQueries; i++) {
-    auto *VersionSpec =
-      dyn_cast<PlatformVersionConstraintAvailabilitySpec>(getQueries()[i]);
-    if (!VersionSpec)
-      continue;
-    
-    PlatformLocs.push_back(VersionSpec->getPlatformLoc());
-  }
-}
-
-
-
 SourceRange StmtConditionElement::getSourceRange() const {
   switch (getKind()) {
   case StmtConditionElement::CK_Boolean:

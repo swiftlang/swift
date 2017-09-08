@@ -271,8 +271,6 @@ private:
                                   std::vector<Token> &Toks);
   bool handleAttrRanges(ArrayRef<DeclAttributeAndRange> DeclRanges);
 
-  void handleStmtCondition(StmtCondition cond);
-
   bool shouldPassBraceStructureNode(BraceStmt *S);
 
   enum PassNodesBehavior {
@@ -516,21 +514,6 @@ Expr *ModelASTWalker::walkToExprPost(Expr *E) {
   return E;
 }
 
-void ModelASTWalker::handleStmtCondition(StmtCondition cond) {
-  for (const auto &elt : cond) {
-    if (elt.getKind() != StmtConditionElement::CK_Availability) continue;
-
-    SmallVector<SourceLoc, 5> PlatformLocs;
-    elt.getAvailability()->getPlatformKeywordLocs(PlatformLocs);
-    std::for_each(PlatformLocs.begin(), PlatformLocs.end(),
-                  [&](SourceLoc loc) {
-      auto range = charSourceRangeFromSourceRange(SM, loc);
-      passNonTokenNode({SyntaxNodeKind::Keyword, range});
-    });
-  }
-}
-
-
 std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
   if (isVisitedBeforeInIfConfig(S)) {
     return {false, S};
@@ -573,7 +556,6 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
                                charSourceRangeFromSourceRange(SM, ElemRange));
     }
     pushStructureNode(SN, S);
-    handleStmtCondition(WhileS->getCond());
 
   } else if (auto *RepeatWhileS = dyn_cast<RepeatWhileStmt>(S)) {
     SyntaxStructureNode SN;
@@ -596,7 +578,6 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
                                charSourceRangeFromSourceRange(SM, ElemRange));
     }
     pushStructureNode(SN, S);
-    handleStmtCondition(IfS->getCond());
 
   } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
     SyntaxStructureNode SN;
@@ -610,7 +591,6 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
                                charSourceRangeFromSourceRange(SM, ElemRange));
     }
     pushStructureNode(SN, S);
-    handleStmtCondition(GS->getCond());
 
   } else if (auto *SwitchS = dyn_cast<SwitchStmt>(S)) {
     SyntaxStructureNode SN;
