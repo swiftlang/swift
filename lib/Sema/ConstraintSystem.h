@@ -2611,7 +2611,8 @@ private:
       }
     }
 
-    void dump(llvm::raw_ostream &out, unsigned indent =0) const {
+    void dump(llvm::raw_ostream &out,
+              unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
       out.indent(indent);
       if (FullyBound)
         out << "fully_bound ";
@@ -2655,13 +2656,18 @@ private:
       }
     }
 
+    void dump(ConstraintSystem *cs,
+              unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
+      dump(cs->getASTContext().TypeCheckerDebug->getStream());
+    }
+
     void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
-              unsigned indent =0) const {
+              unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
       out.indent(indent);
       out << "(";
       if (typeVar)
         out << "$T" << typeVar->getImpl().getID();
-      dump(out);
+      dump(out, 1);
       out << ")\n";
     }
   };
