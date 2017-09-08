@@ -2665,7 +2665,7 @@ private:
       out << "(";
       if (typeVar)
         out << "$T" << typeVar->getImpl().getID();
-      dump(out);
+      dump(out, 1);
       out << ")\n";
     }
   };
