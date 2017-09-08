@@ -5181,10 +5181,15 @@ static unsigned findRepresentative(SmallVectorImpl<unsigned> &parents,
 
 /// Union the same-type components denoted by \c index1 and \c index2.
 ///
+/// \param successThreshold Returns true when two sets have been joined
+/// and both representatives are below the threshold. The default of 0
+/// is equivalent to \c successThreshold == parents.size().
+///
 /// \returns \c true if the two components were separate and have now
 /// been joined; \c false if they were already in the same set.
 static bool unionSets(SmallVectorImpl<unsigned> &parents,
-                      unsigned index1, unsigned index2) {
+                      unsigned index1, unsigned index2,
+                      unsigned successThreshold = 0) {
   // Find the representatives of each component class.
   unsigned rep1 = findRepresentative(parents, index1);
   unsigned rep2 = findRepresentative(parents, index2);
@@ -5196,9 +5201,12 @@ static bool unionSets(SmallVectorImpl<unsigned> &parents,
   else
     parents[rep1] = rep2;
 
-  return true;
+  return (successThreshold == 0) ||
+    (rep1 < successThreshold && rep2 < successThreshold);
 }
 
+/// Determine whether the removal of the given edge will disconnect the
+/// nodes \c from and \c to within the given equivalence class.
 static bool removalDisconnectsEquivalenceClass(
                EquivalenceClass *equivClass,
                llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
@@ -5266,7 +5274,90 @@ static bool isSelfDerivedNestedTypeNameMatchEdge(
   return false;
 }
 
-static void resolveSameTypeEdges(
+/// Collapse same-type components using the "delayed" requirements of the
+/// equivalence class.
+///
+/// This operation looks through the delayed requirements within the equivalence
+/// class to find paths that connect existing potential archetypes.
+static void collapseSameTypeComponentsThroughDelayedRequirements(
+              GenericSignatureBuilder &builder,
+              EquivalenceClass *equivClass,
+              llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
+              SmallVectorImpl<unsigned> &collapsedParents,
+              unsigned &remainingComponents) {
+  unsigned numCollapsedParents = collapsedParents.size();
+
+  /// "Virtual" components for types that aren't resolve to potential
+  /// archetypes.
+  llvm::SmallDenseMap<CanType, unsigned> virtualComponents;
+
+  /// Retrieve the component for a type representing a virtual component
+  auto getTypeVirtualComponent = [&](Type type) {
+    CanType canType = type->getCanonicalType();
+    auto knownVirtual = virtualComponents.find(canType);
+    if (knownVirtual != virtualComponents.end())
+      return knownVirtual->second;
+
+    unsigned component = collapsedParents.size();
+    collapsedParents.push_back(component);
+    virtualComponents[canType] = component;
+    return component;
+  };
+
+  /// Retrieve the component for the given potential archetype.
+  auto getPotentialArchetypeVirtualComponent = [&](PotentialArchetype *pa) {
+    if (pa->getEquivalenceClassIfPresent() == equivClass)
+      return componentOf[pa];
+
+    // We found a potential archetype in another equivalence class. Treat it
+    // as a "virtual" component representing that potential archetype's
+    // equivalence class.
+    return getTypeVirtualComponent(
+                             pa->getRepresentative()->getDependentType({ }));
+  };
+
+  /// Local function to retrieve the component with which the given type is
+  /// associated, for a type that we haven't tried to resolve yet.
+  auto getUnknownTypeVirtualComponent = [&](Type type) {
+    if (auto pa =
+            builder.resolveArchetype(type,
+                                     ArchetypeResolutionKind::AlreadyKnown))
+      return getPotentialArchetypeVirtualComponent(pa);
+
+    return getTypeVirtualComponent(type);
+  };
+
+  for (const auto &delayedReq : equivClass->delayedRequirements) {
+    // Only consider same-type requirements.
+    if (delayedReq.kind != DelayedRequirement::SameType) continue;
+
+    unsigned lhsComponent;
+    if (auto lhsPA = delayedReq.lhs.dyn_cast<PotentialArchetype *>())
+      lhsComponent = getPotentialArchetypeVirtualComponent(lhsPA);
+    else
+      lhsComponent = getUnknownTypeVirtualComponent(delayedReq.lhs.get<Type>());
+
+    unsigned rhsComponent;
+    if (auto rhsPA = delayedReq.rhs.dyn_cast<PotentialArchetype *>())
+      rhsComponent = getPotentialArchetypeVirtualComponent(rhsPA);
+    else
+      rhsComponent = getUnknownTypeVirtualComponent(delayedReq.rhs.get<Type>());
+
+    // Collapse the sets
+    if (unionSets(collapsedParents, lhsComponent, rhsComponent,
+                  numCollapsedParents))
+      --remainingComponents;
+  }
+
+  /// Remove any additional collapsed parents we added.
+  collapsedParents.erase(collapsedParents.begin() + numCollapsedParents,
+                         collapsedParents.end());
+}
+
+/// Collapse same-type components within an equivalence class, minimizing the
+/// number of requirements required to express the equivalence class.
+static void collapseSameTypeComponents(
+              GenericSignatureBuilder &builder,
               EquivalenceClass *equivClass,
               llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
               std::vector<IntercomponentEdge> &sameTypeEdges) {
@@ -5315,6 +5406,10 @@ static void resolveSameTypeEdges(
     if (unionSets(collapsedParents, edge.source, edge.target))
       --remainingComponents;
   }
+
+  // Collapse same-type components by looking at the delayed requirements.
+  collapseSameTypeComponentsThroughDelayedRequirements(
+      builder, equivClass, componentOf, collapsedParents, remainingComponents);
 
   // If needed, collapse the same-type components merged by a derived
   // nested-type-name-match edge.
@@ -5589,7 +5684,8 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
     }
   }
 
-  resolveSameTypeEdges(equivClass, componentOf, nestedTypeNameMatchEdges);
+  collapseSameTypeComponents(*this, equivClass, componentOf,
+                             nestedTypeNameMatchEdges);
 }
 
 /// Resolve any unresolved dependent member types using the given builder.
