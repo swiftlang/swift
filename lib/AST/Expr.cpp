@@ -1582,8 +1582,8 @@ DynamicSubscriptExpr::DynamicSubscriptExpr(Expr *base, Expr *index,
                                            bool hasTrailingClosure,
                                            ConcreteDeclRef member,
                                            bool implicit)
-    : DynamicLookupExpr(ExprKind::DynamicSubscript),
-      Base(base), Index(index), Member(member) {
+    : DynamicLookupExpr(ExprKind::DynamicSubscript, member, base),
+      Index(index) {
   DynamicSubscriptExprBits.NumArgLabels = argLabels.size();
   DynamicSubscriptExprBits.HasArgLabelLocs = !argLabelLocs.empty();
   DynamicSubscriptExprBits.HasTrailingClosure = hasTrailingClosure;
