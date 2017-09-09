@@ -508,14 +508,11 @@ enum TypeResolutionFlags : unsigned {
   /// Whether we are in a type argument for an optional
   TR_ImmediateOptionalTypeArgument = 0x800000,
 
-  /// Whether we are checking the outermost type of a computed property setter's newValue
-  TR_ImmediateSetterNewValue = 0x1000000,
-
   /// Whether we are checking the underlying type of a typealias.
-  TR_TypeAliasUnderlyingType = 0x2000000,
+  TR_TypeAliasUnderlyingType = 0x1000000,
 
   /// Whether we are checking the parameter list of a subscript.
-  TR_SubscriptParameters = 0x4000000,
+  TR_SubscriptParameters = 0x2000000,
 };
 
 /// Option set describing how type resolution should work.

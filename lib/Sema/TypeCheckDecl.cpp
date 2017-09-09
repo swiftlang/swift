@@ -5158,6 +5158,10 @@ public:
 
     FD->setIsBeingValidated();
 
+    SWIFT_DEFER {
+      assert(FD->hasInterfaceType() && "didn't assign interface type");
+    };
+
     // Bind operator functions to the corresponding operator declaration.
     if (FD->isOperator())
       bindFuncDeclToOperator(FD);
@@ -5184,23 +5188,65 @@ public:
     if (checkDynamicSelfReturn(FD))
       FD->setInvalid();
 
-    // Observing accessors (and their generated regular accessors) may have
-    // the type of the var inferred.
-    if (auto *VD = dyn_cast_or_null<VarDecl>(FD->getAccessorStorageDecl())) {
-      if (VD->hasObservers()) {
-        TC.validateDecl(VD);
-        Type valueTy = VD->getType()->getReferenceStorageReferent();
-        Type valueIfaceTy = VD->getInterfaceType()->getReferenceStorageReferent();
-        if (FD->isObservingAccessor() || (FD->isSetter() && FD->isImplicit())) {
-          unsigned firstParamIdx = FD->getParent()->isTypeContext();
-          auto *firstParamPattern = FD->getParameterList(firstParamIdx);
-          auto *newValueParam = firstParamPattern->get(0);
-          newValueParam->setType(valueTy);
-          newValueParam->setInterfaceType(valueIfaceTy);
-          newValueParam->getTypeLoc().setType(valueTy);
-        } else if (FD->isGetter() && FD->isImplicit()) {
-          FD->getBodyResultTypeLoc().setType(valueIfaceTy, true);
+    // Accessors should pick up various parts of their type signatures
+    // directly from the storage declaration instead of re-deriving them.
+    // FIXME: should this include the generic signature?
+    if (auto storage = FD->getAccessorStorageDecl()) {
+      TC.validateDecl(storage);
+
+      auto valueParams = FD->getParameterList(FD->getParent()->isTypeContext());
+
+      // Determine the value type.
+      Type valueIfaceTy, valueTy;
+      if (auto VD = dyn_cast<VarDecl>(storage)) {
+        valueIfaceTy = VD->getInterfaceType()->getReferenceStorageReferent();
+        valueTy = VD->getType()->getReferenceStorageReferent();
+      } else {
+        auto SD = cast<SubscriptDecl>(storage);
+        valueIfaceTy = SD->getElementInterfaceType();
+        valueTy = SD->mapTypeIntoContext(valueIfaceTy);
+
+        // Copy the index types instead of re-validating them.
+        auto indices = SD->getIndices();
+        for (size_t i = 0, e = indices->size(); i != e; ++i) {
+          auto subscriptParam = indices->get(i);
+          if (!subscriptParam->hasInterfaceType())
+            continue;
+
+          Type paramIfaceTy = subscriptParam->getInterfaceType();
+          Type paramTy = SD->mapTypeIntoContext(paramIfaceTy);
+
+          auto accessorParam = valueParams->get(valueParams->size() - e + i);
+          accessorParam->setType(paramTy);
+          accessorParam->setInterfaceType(paramIfaceTy);
+          accessorParam->getTypeLoc().setType(paramTy);
         }
+      }
+
+      // Propagate the value type into the correct position.
+      switch (FD->getAccessorKind()) {
+      case AccessorKind::NotAccessor:
+        llvm_unreachable("not an accessor");
+
+      case AccessorKind::IsGetter:
+        FD->getBodyResultTypeLoc().setType(valueIfaceTy, true);
+        break;
+
+      case AccessorKind::IsDidSet:
+      case AccessorKind::IsWillSet:
+      case AccessorKind::IsSetter: {
+        auto newValueParam = valueParams->get(0);
+        newValueParam->setType(valueTy);
+        newValueParam->setInterfaceType(valueIfaceTy);
+        newValueParam->getTypeLoc().setType(valueTy);
+        break;
+      }
+
+      // These don't mention the value types directly.
+      case AccessorKind::IsMaterializeForSet:
+      case AccessorKind::IsAddressor:
+      case AccessorKind::IsMutableAddressor:
+        break;
       }
     }
 
@@ -5213,7 +5259,14 @@ public:
       gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
       auto *sig = TC.validateGenericFuncSignature(FD);
-      auto *env = sig->createGenericEnvironment(*FD->getModuleContext());
+
+      GenericEnvironment *env;
+      if (auto storage = FD->getAccessorStorageDecl()) {
+        env = cast<SubscriptDecl>(storage)->getGenericEnvironment();
+        assert(env && "accessor has generics but subscript is not generic");
+      } else {
+        env = sig->createGenericEnvironment(*FD->getModuleContext());
+      }
       FD->setGenericEnvironment(env);
 
       // Revert the types within the signature so it can be type-checked with

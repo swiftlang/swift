@@ -69,7 +69,6 @@ extension Container {
     _ = Container.PrivateInner()
   }
 
-  // FIXME: Why do these errors happen twice?
   var extensionInner: PrivateInner? { return nil } // expected-error {{property must be declared private because its type uses a private type}}
   var extensionInnerQualified: Container.PrivateInner? { return nil } // expected-error {{property must be declared private because its type uses a private type}}
 }
@@ -86,9 +85,8 @@ extension Container.Inner {
     _ = Container.PrivateInner()
   }
 
-  // FIXME: Why do these errors happen twice?
   // FIXME: Unqualified lookup won't look into Container from here.
-  var inner: PrivateInner? { return nil } // expected-error 2 {{use of undeclared type 'PrivateInner'}}
+  var inner: PrivateInner? { return nil } // expected-error {{use of undeclared type 'PrivateInner'}}
   var innerQualified: Container.PrivateInner? { return nil } // expected-error {{invalid redeclaration of 'innerQualified'}} expected-error {{property must be declared private because its type uses a private type}}
 }
 
