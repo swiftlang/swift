@@ -2472,13 +2472,11 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclContextID contextID;
     TypeID defaultDefinitionID;
     bool isImplicit;
-    ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::AssociatedTypeDeclLayout::readRecord(scratch, nameID,
                                                       contextID,
                                                       defaultDefinitionID,
-                                                      isImplicit,
-                                                      rawInheritedIDs);
+                                                      isImplicit);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2503,12 +2501,6 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     assocType->setAccess(std::max(parentAccess, AccessLevel::Internal));
     if (isImplicit)
       assocType->setImplicit();
-
-    auto inherited = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
-    for_each(inherited, rawInheritedIDs, [this](TypeLoc &loc, uint64_t rawID) {
-      loc.setType(getType(rawID));
-    });
-    assocType->setInherited(inherited);
 
     assocType->setCheckedInheritanceClause();
     break;

@@ -2703,18 +2703,13 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(assocType->getDeclContext());
 
-    SmallVector<TypeID, 4> inheritedTypes;
-    for (auto inherited : assocType->getInherited())
-      inheritedTypes.push_back(addTypeRef(inherited.getType()));
-
     unsigned abbrCode = DeclTypeAbbrCodes[AssociatedTypeDeclLayout::Code];
     AssociatedTypeDeclLayout::emitRecord(
       Out, ScratchRecord, abbrCode,
       addDeclBaseNameRef(assocType->getName()),
       contextID,
       addTypeRef(assocType->getDefaultDefinitionType()),
-      assocType->isImplicit(),
-      inheritedTypes);
+      assocType->isImplicit());
     break;
   }
 
