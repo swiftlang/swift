@@ -658,12 +658,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
                        AI.getSubstitutions(),
                        OpenedArchetypesTracker);
 
-    auto Success = Inliner.inlineFunction(AI, Args);
-    (void) Success;
     // We've already determined we should be able to inline this, so
-    // we expect it to have happened.
-    assert(Success && "Expected inliner to inline this function!");
-
+    // unconditionally inline the function.
+    //
+    // If for whatever reason we can not inline this function, inlineFunction
+    // will assert, so we are safe making this assumption.
+    Inliner.inlineFunction(AI, Args);
     recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
 
     NumFunctionsInlined++;

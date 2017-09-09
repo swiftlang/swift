@@ -17,6 +17,10 @@
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
+bool SILInliner::canInlineFunction(FullApplySite AI) {
+  return AI.getFunction() != &Original;
+}
+
 /// \brief Inlines the callee of a given ApplyInst (which must be the value of a
 /// FunctionRefInst referencing a function with a known body), into the caller
 /// containing the ApplyInst, which must be the same function as provided to the
@@ -28,13 +32,12 @@ using namespace swift;
 ///
 /// \returns true on success or false if it is unable to inline the function
 /// (for any reason).
-bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
-  SILFunction *CalleeFunction = &Original;
-  this->CalleeFunction = CalleeFunction;
+void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
+  assert(canInlineFunction(AI) &&
+         "Asked to inline function that is unable to be inlined?!");
 
-  // Do not attempt to inline an apply into its parent function.
-  if (AI.getFunction() == CalleeFunction)
-    return false;
+  // Setup the callee function.
+  CalleeFunction = &Original;
 
   SILFunction &F = getBuilder().getFunction();
   assert(AI.getFunction() && AI.getFunction() == &F &&
@@ -113,7 +116,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
       // Replace all uses of the apply instruction with the operands of the
       // return instruction, appropriately mapped.
       nonTryAI->replaceAllUsesWith(remapValue(RI->getOperand()));
-      return true;
+      return;
     }
   }
 
@@ -177,8 +180,6 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     // but remaps basic blocks and values.
     visit(BI->first->getTerminator());
   }
-
-  return true;
 }
 
 void SILInliner::visitDebugValueInst(DebugValueInst *Inst) {
