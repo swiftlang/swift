@@ -222,14 +222,16 @@ bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {
   if (!type1->hasTypeParameter() && !type2->hasTypeParameter())
     return type1->isEqual(type2);
 
-  auto pa1 =
-    Builder.resolveArchetype(type1,
+  auto equivClass1 =
+    Builder.resolveEquivalenceClass(
+                             type1,
                              ArchetypeResolutionKind::CompleteWellFormed);
-  auto pa2 =
-    Builder.resolveArchetype(type2,
+  auto equivClass2 =
+    Builder.resolveEquivalenceClass(
+                             type2,
                              ArchetypeResolutionKind::CompleteWellFormed);
-  if (pa1 && pa2)
-    return pa1->isInSameEquivalenceClassAs(pa2);
+  if (equivClass1 && equivClass2)
+    return equivClass1 == equivClass2;
 
   return type1->isEqual(type2);
 }
