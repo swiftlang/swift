@@ -1651,6 +1651,24 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Okay. Bind below.
       }
 
+      // Check whether the type variable must be bound to a materializable
+      // type.
+      if (typeVar2->getImpl().mustBeMaterializable()) {
+        if (!type1->isMaterializable())
+          return SolutionKind::Error;
+
+        setMustBeMaterializableRecursive(type1);
+      }
+
+      // A constraint that binds any pointer to a void pointer is
+      // ineffective, since any pointer can be converted to a void pointer.
+      if (kind == ConstraintKind::BindToPointerType && type1->isVoid()) {
+        // Bind type1 to Void only as a last resort.
+        addConstraint(ConstraintKind::Defaultable, typeVar2, type1,
+                      getConstraintLocator(locator));
+        return SolutionKind::Solved;
+      }
+
       assignFixedType(typeVar2, type1);
       return SolutionKind::Solved;
     }
