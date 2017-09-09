@@ -1629,7 +1629,7 @@ protocol infer_protocol4 : Protocol_Class1, Protocol_ObjC1 {
 }
 
 protocol infer_protocol5 : Protocol_ObjC1, Protocol_Class1 {
-// CHECK-LABEL: {{^}}protocol infer_protocol5 : Protocol_ObjC1, Protocol_Class1 {
+// CHECK-LABEL: {{^}}protocol infer_protocol5 : Protocol_Class1, Protocol_ObjC1 {
   func nonObjC1()
   // CHECK: {{^}} func nonObjC1()
 }

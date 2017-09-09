@@ -563,8 +563,11 @@ public:
     InnermostOnly = 4,
     SkipSelfRequirement = 8,
     SwapSelfAndDependentMemberType = 16,
+    PrintInherited = 32,
   };
 
+  void printInheritedFromRequirementSignature(ProtocolDecl *proto,
+                                              Decl *attachingTo);
   void printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
                                                 Decl *attachingTo);
   void printTrailingWhereClause(TrailingWhereClause *whereClause);
@@ -912,22 +915,7 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
     auto result = findRelevantDeclAndDirectUse(subject);
 
     bestDecl = result.first;
-
-    // A requirement like Self : Protocol or Self.T : Class might be from an
-    // inheritance, or might be a where clause.
-    if (result.second) {
-      Type inherited;
-      if (req.getKind() == RequirementKind::Layout)
-        inherited = proto->getASTContext().getAnyObjectType();
-      else
-        inherited = req.getSecondType();
-      inWhereClause =
-          none_of(result.first->getInherited(), [&](const TypeLoc &loc) {
-            return loc.getType()->isEqual(inherited);
-          });
-    } else {
-      inWhereClause = true;
-    }
+    inWhereClause = !bestDecl || !result.second;
     break;
   }
   case RequirementKind::SameType: {
@@ -965,6 +953,19 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
   }
 
   return {/*AttachedTo=*/bestDecl, inWhereClause};
+}
+
+void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
+                                                      Decl *attachingTo) {
+  assert(proto->isRequirementSignatureComputed());
+  printGenericSignature(
+      GenericSignature::get({proto->getProtocolSelfType()} ,
+                            proto->getRequirementSignature()),
+      PrintInherited,
+      [&](const Requirement &req) {
+        auto location = bestRequirementPrintLocation(proto, req);
+        return location.AttachedTo == attachingTo && !location.InWhereClause;
+      });
 }
 
 void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
@@ -1093,6 +1094,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::function_ref<bool(const Requirement &)> filter) {
   bool printParams = (flags & PrintParams);
   bool printRequirements = (flags & PrintRequirements);
+  bool printInherited = (flags & PrintInherited);
   bool swapSelfAndDependentMemberType =
     (flags & SwapSelfAndDependentMemberType);
 
@@ -1133,7 +1135,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
                [&] { Printer << ", "; });
   }
 
-  if (printRequirements) {
+  if (printRequirements || printInherited) {
     bool isFirstReq = true;
     for (const auto &req : requirements) {
       if (!filter(req))
@@ -1165,7 +1167,11 @@ void PrintAST::printSingleDepthOfGenericSignature(
       }
 
       if (isFirstReq) {
-        Printer << " " << tok::kw_where << " ";
+        if (printRequirements)
+          Printer << " " << tok::kw_where << " ";
+        else
+          Printer << " : ";
+
         isFirstReq = false;
       } else {
         Printer << ", ";
@@ -1178,15 +1184,34 @@ void PrintAST::printSingleDepthOfGenericSignature(
           second->is<DependentMemberType>())
         std::swap(first, second);
 
-      Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
-      if (second) {
-        Requirement substReq(req.getKind(), first, second);
-        printRequirement(substReq);
+      if (printInherited) {
+        // We only print the second part of a requirement in the "inherited"
+        // clause.
+        switch (req.getKind()) {
+        case RequirementKind::Layout:
+          req.getLayoutConstraint()->print(Printer, Options);
+          break;
+
+        case RequirementKind::Conformance:
+        case RequirementKind::Superclass:
+          printType(second);
+          break;
+
+        case RequirementKind::SameType:
+          llvm_unreachable("same-type constraints belong in the where clause");
+          break;
+        }
       } else {
-        Requirement substReq(req.getKind(), first, req.getLayoutConstraint());
-        printRequirement(substReq);
+        Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
+        if (second) {
+          Requirement substReq(req.getKind(), first, second);
+          printRequirement(substReq);
+        } else {
+          Requirement substReq(req.getKind(), first, req.getLayoutConstraint());
+          printRequirement(substReq);
+        }
+        Printer.printStructurePost(PrintStructureKind::GenericRequirement);
       }
-      Printer.printStructurePost(PrintStructureKind::GenericRequirement);
     }
   }
 
@@ -2010,14 +2035,18 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
       Printer.printName(decl->getName());
     });
 
-  printInherited(decl, decl->getInherited(), { });
+  auto proto = decl->getProtocol();
+  if (proto->isRequirementSignatureComputed()) {
+    printInheritedFromRequirementSignature(proto, decl);
+  } else {
+    printInherited(decl, decl->getInherited(), { });
+  }
 
   if (!decl->getDefaultDefinitionLoc().isNull()) {
     Printer << " = ";
     decl->getDefaultDefinitionLoc().getType().print(Printer, Options);
   }
 
-  auto proto = decl->getProtocol();
   // As with protocol's trailing where clauses, use the requirement signature
   // when available.
   if (proto->isRequirementSignatureComputed()) {
@@ -2133,7 +2162,11 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
         Printer.printName(decl->getName());
       });
 
-    printInherited(decl);
+    if (decl->isRequirementSignatureComputed()) {
+      printInheritedFromRequirementSignature(decl, decl);
+    } else {
+      printInherited(decl);
+    }
 
     // The trailing where clause is a syntactic thing, which isn't serialized
     // (etc.) and thus isn't available for printing things out of
