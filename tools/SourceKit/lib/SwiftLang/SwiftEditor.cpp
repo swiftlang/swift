@@ -1101,7 +1101,9 @@ public:
                                                     BufferID);
         }
 
-        Attrs.push_back({AttrUID.getValue(), AttrOffset, AttrEnd - AttrOffset});
+        auto AttrTuple = std::make_tuple(AttrUID.getValue(), AttrOffset,
+                                         AttrEnd - AttrOffset);
+        Attrs.push_back(AttrTuple);
       }
     }
 
