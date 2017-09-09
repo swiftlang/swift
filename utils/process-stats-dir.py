@@ -17,174 +17,14 @@
 
 import argparse
 import csv
-import datetime
 import json
 import os
 import platform
-import random
-import re
 import sys
 import time
 import urllib
 import urllib2
-
-
-class JobStats:
-
-    def __init__(self, jobkind, jobid, module, start_usec, dur_usec,
-                 jobargs, stats):
-        self.jobkind = jobkind
-        self.jobid = jobid
-        self.module = module
-        self.start_usec = start_usec
-        self.dur_usec = dur_usec
-        self.jobargs = jobargs
-        self.stats = stats
-
-    def is_driver_job(self):
-        return self.jobkind == 'driver'
-
-    def is_frontend_job(self):
-        return self.jobkind == 'frontend'
-
-    def driver_jobs_ran(self):
-        assert(self.is_driver_job())
-        return self.stats.get("Driver.NumDriverJobsRun", 0)
-
-    def driver_jobs_skipped(self):
-        assert(self.is_driver_job())
-        return self.stats.get("Driver.NumDriverJobsSkipped", 0)
-
-    def driver_jobs_total(self):
-        assert(self.is_driver_job())
-        return self.driver_jobs_ran() + self.driver_jobs_skipped()
-
-    def merged_with(self, other):
-        merged_stats = {}
-        for k, v in self.stats.items() + other.stats.items():
-            merged_stats[k] = v + merged_stats.get(k, 0.0)
-        merged_kind = self.jobkind
-        if other.jobkind != merged_kind:
-            merged_kind = "<merged>"
-        merged_module = self.module
-        if other.module != merged_module:
-            merged_module = "<merged>"
-        merged_start = min(self.start_usec, other.start_usec)
-        merged_end = max(self.start_usec + self.dur_usec,
-                         other.start_usec + other.dur_usec)
-        merged_dur = merged_end - merged_start
-        return JobStats(merged_kind, random.randint(0, 1000000000),
-                        merged_module, merged_start, merged_dur,
-                        self.jobargs + other.jobargs, merged_stats)
-
-    def incrementality_percentage(self):
-        assert(self.is_driver_job())
-        ran = self.driver_jobs_ran()
-        total = self.driver_jobs_total()
-        return round((float(ran) / float(total)) * 100.0, 2)
-
-    # Return a JSON-formattable object of the form preferred by google chrome's
-    # 'catapult' trace-viewer.
-    def to_catapult_trace_obj(self):
-        return {"name": self.module,
-                "cat": self.jobkind,
-                "ph": "X",              # "X" == "complete event"
-                "pid": self.jobid,
-                "tid": 1,
-                "ts": self.start_usec,
-                "dur": self.dur_usec,
-                "args": self.jobargs}
-
-    def start_timestr(self):
-        t = datetime.datetime.fromtimestamp(self.start_usec / 1000000.0)
-        return t.strftime("%Y-%m-%d %H:%M:%S")
-
-    def end_timestr(self):
-        t = datetime.datetime.fromtimestamp((self.start_usec +
-                                             self.dur_usec) / 1000000.0)
-        return t.strftime("%Y-%m-%d %H:%M:%S")
-
-    def pick_lnt_metric_suffix(self, metric_name):
-        if "BytesOutput" in metric_name:
-            return "code_size"
-        if "RSS" in metric_name or "BytesAllocated" in metric_name:
-            return "mem"
-        return "compile"
-
-    # Return a JSON-formattable object of the form preferred by LNT's
-    # 'submit' format.
-    def to_lnt_test_obj(self, args):
-        run_info = {
-            "run_order": str(args.lnt_order),
-            "tag": str(args.lnt_tag),
-        }
-        run_info.update(dict(args.lnt_run_info))
-        stats = self.stats
-        return {
-            "Machine":
-            {
-                "Name": args.lnt_machine,
-                "Info": dict(args.lnt_machine_info)
-            },
-            "Run":
-            {
-                "Start Time": self.start_timestr(),
-                "End Time": self.end_timestr(),
-                "Info": run_info
-            },
-            "Tests":
-            [
-                {
-                    "Data": [v],
-                    "Info": {},
-                    "Name": "%s.%s.%s.%s" % (args.lnt_tag, self.module,
-                                             k, self.pick_lnt_metric_suffix(k))
-                }
-                for (k, v) in stats.items()
-            ]
-        }
-
-
-# Return an array of JobStats objects
-def load_stats_dir(path):
-    jobstats = []
-    auxpat = (r"(?P<module>[^-]+)-(?P<input>[^-]+)-(?P<triple>[^-]+)" +
-              r"-(?P<out>[^-]+)-(?P<opt>[^-]+)")
-    fpat = (r"^stats-(?P<start>\d+)-swift-(?P<kind>\w+)-" +
-            auxpat +
-            r"-(?P<pid>\d+)(-.*)?.json$")
-    for root, dirs, files in os.walk(path):
-        for f in files:
-            m = re.match(fpat, f)
-            if m:
-                # NB: "pid" in fpat is a random number, not unix pid.
-                mg = m.groupdict()
-                jobkind = mg['kind']
-                jobid = int(mg['pid'])
-                start_usec = int(mg['start'])
-                module = mg["module"]
-                jobargs = [mg["input"], mg["triple"], mg["out"], mg["opt"]]
-
-                j = json.load(open(os.path.join(root, f)))
-                dur_usec = 1
-                patstr = (r"time\.swift-" + jobkind + r"\." + auxpat +
-                          r"\.wall$")
-                pat = re.compile(patstr)
-                stats = dict()
-                for (k, v) in j.items():
-                    if k.startswith("time."):
-                        v = int(1000000.0 * float(v))
-                    stats[k] = v
-                    tm = re.match(pat, k)
-                    if tm:
-                        dur_usec = v
-
-                e = JobStats(jobkind=jobkind, jobid=jobid,
-                             module=module, start_usec=start_usec,
-                             dur_usec=dur_usec, jobargs=jobargs,
-                             stats=stats)
-                jobstats.append(e)
-    return jobstats
+from jobstats import load_stats_dir, merge_all_jobstats
 
 
 # Passed args with 2-element remainder ["old", "new"], return a list of tuples
@@ -194,6 +34,7 @@ def load_stats_dir(path):
 def load_paired_stats_dirs(args):
     assert(len(args.remainder) == 2)
     paired_stats = []
+    sel = args.select_module
     (old, new) = args.remainder
     for p in sorted(os.listdir(old)):
         full_old = os.path.join(old, p)
@@ -201,8 +42,8 @@ def load_paired_stats_dirs(args):
         if not (os.path.exists(full_old) and os.path.isdir(full_old) and
                 os.path.exists(full_new) and os.path.isdir(full_new)):
             continue
-        old_stats = load_stats_dir(full_old)
-        new_stats = load_stats_dir(full_new)
+        old_stats = load_stats_dir(full_old, select_module=sel)
+        new_stats = load_stats_dir(full_new, select_module=sel)
         if len(old_stats) == 0 or len(new_stats) == 0:
             continue
         paired_stats.append((p, (old_stats, new_stats)))
@@ -219,7 +60,9 @@ def write_catapult_trace(args):
 def write_lnt_values(args):
     for d in args.remainder:
         stats = load_stats_dir(d)
-        merged = merge_all_jobstats(stats)
+        merged = merge_all_jobstats(stats,
+                                    select_module=args.select_module,
+                                    group_by_module=args.group_by_module)
         j = merged.to_lnt_test_obj(args)
         if args.lnt_submit is None:
             json.dump(j, args.output, indent=4)
@@ -240,16 +83,6 @@ def write_lnt_values(args):
                 sys.exit(1)
 
 
-def merge_all_jobstats(jobstats):
-    m = None
-    for j in jobstats:
-        if m is None:
-            m = j
-        else:
-            m = m.merged_with(j)
-    return m
-
-
 def show_paired_incrementality(args):
     fieldnames = ["old_pct", "old_skip",
                   "new_pct", "new_skip",
@@ -258,11 +91,16 @@ def show_paired_incrementality(args):
     out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
     out.writeheader()
 
+    sel = args.select_module
     for (name, (oldstats, newstats)) in load_paired_stats_dirs(args):
-        olddriver = merge_all_jobstats([x for x in oldstats
-                                        if x.is_driver_job()])
-        newdriver = merge_all_jobstats([x for x in newstats
-                                        if x.is_driver_job()])
+        olddriver = merge_all_jobstats((x for x in oldstats
+                                        if x.is_driver_job()),
+                                       select_module=sel,
+                                       group_by_module=args.group_by_module)
+        newdriver = merge_all_jobstats((x for x in newstats
+                                        if x.is_driver_job()),
+                                       select_module=sel,
+                                       group_by_module=args.group_by_module)
         if olddriver is None or newdriver is None:
             continue
         oldpct = olddriver.incrementality_percentage()
@@ -283,7 +121,7 @@ def show_incrementality(args):
     out.writeheader()
 
     for path in args.remainder:
-        stats = load_stats_dir(path)
+        stats = load_stats_dir(path, select_module=args.select_module)
         for s in stats:
             if s.is_driver_job():
                 pct = s.incrementality_percentage()
@@ -366,8 +204,11 @@ def set_csv_baseline(args):
     with open(args.set_csv_baseline, "wb") as f:
         out = csv.DictWriter(f, fieldnames, dialect='excel-tab',
                              quoting=csv.QUOTE_NONNUMERIC)
-        m = merge_all_jobstats([s for d in args.remainder
-                                for s in load_stats_dir(d)])
+        sel = args.select_module
+        m = merge_all_jobstats((s for d in args.remainder
+                                for s in load_stats_dir(d, select_module=sel)),
+                               select_module=sel,
+                               group_by_module=args.group_by_module)
         changed = 0
         newepoch = int(time.time())
         for name in sorted(m.stats.keys()):
@@ -387,19 +228,9 @@ def set_csv_baseline(args):
     return 0
 
 
-def compare_to_csv_baseline(args):
-    old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline)
-    m = merge_all_jobstats([s for d in args.remainder
-                            for s in load_stats_dir(d)])
-    new_stats = m.stats
-
-    regressions = 0
-    outfieldnames = ["old", "new", "delta_pct", "name"]
-    out = csv.DictWriter(args.output, outfieldnames, dialect='excel-tab')
-    out.writeheader()
-
+def compare_stats(args, old_stats, new_stats):
     for stat_name in sorted(old_stats.keys()):
-        (_, old) = old_stats[stat_name]
+        old = old_stats[stat_name]
         new = new_stats.get(stat_name, 0)
         (delta, delta_pct) = diff_and_pct(old, new)
         if (stat_name.startswith("time.") and
@@ -407,12 +238,55 @@ def compare_to_csv_baseline(args):
             continue
         if abs(delta_pct) < args.delta_pct_thresh:
             continue
+        yield (stat_name, old, new, delta, delta_pct)
+
+
+def write_comparison(args, old_stats, new_stats):
+    regressions = 0
+    outfieldnames = ["old", "new", "delta_pct", "name"]
+    out = csv.DictWriter(args.output, outfieldnames, dialect='excel-tab')
+    out.writeheader()
+
+    for (stat_name, old, new, delta, delta_pct) in compare_stats(args,
+                                                                 old_stats,
+                                                                 new_stats):
         out.writerow(dict(name=stat_name,
                           old=int(old), new=int(new),
                           delta_pct=delta_pct))
         if delta > 0:
             regressions += 1
     return regressions
+
+
+def compare_to_csv_baseline(args):
+    old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline)
+    sel = args.select_module
+    m = merge_all_jobstats((s for d in args.remainder
+                            for s in load_stats_dir(d, select_module=sel)),
+                           select_module=sel,
+                           group_by_module=args.group_by_module)
+    old_stats = dict((k, v) for (k, (_, v)) in old_stats.items())
+    new_stats = m.stats
+
+    return write_comparison(args, old_stats, new_stats)
+
+
+# Summarize immediate difference between two stats-dirs, optionally
+def compare_stats_dirs(args):
+    if len(args.remainder) != 2:
+        raise ValueError("Expected exactly 2 stats-dirs")
+
+    (old, new) = args.remainder
+    old_stats = merge_all_jobstats(
+        load_stats_dir(old, select_module=args.select_module),
+        select_module=args.select_module,
+        group_by_module=args.group_by_module)
+    new_stats = merge_all_jobstats(
+        load_stats_dir(new, select_module=args.select_module),
+        select_module=args.select_module,
+        group_by_module=args.group_by_module)
+
+    return write_comparison(args, old_stats.stats, new_stats.stats)
 
 
 def main():
@@ -443,6 +317,14 @@ def main():
                         help="Tag for LNT submission")
     parser.add_argument("--lnt-submit", type=str, default=None,
                         help="URL to submit LNT data to (rather than print)")
+    parser.add_argument("--select-module",
+                        default=[],
+                        action="append",
+                        help="Select specific modules")
+    parser.add_argument("--group-by-module",
+                        default=False,
+                        action="store_true",
+                        help="Group stats by module")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")
@@ -454,6 +336,9 @@ def main():
                        type=argparse.FileType('rb', 0), default=None,
                        metavar="BASELINE.csv",
                        help="Compare stats dir to named CSV baseline")
+    modes.add_argument("--compare-stats-dirs",
+                       action="store_true",
+                       help="Compare two stats dirs directly")
     modes.add_argument("--lnt", action="store_true",
                        help="Emit an LNT-compatible test summary")
     parser.add_argument('remainder', nargs=argparse.REMAINDER,
@@ -465,6 +350,8 @@ def main():
         return 1
     if args.catapult:
         write_catapult_trace(args)
+    elif args.compare_stats_dirs:
+        return compare_stats_dirs(args)
     elif args.set_csv_baseline is not None:
         return set_csv_baseline(args)
     elif args.compare_to_csv_baseline is not None:
