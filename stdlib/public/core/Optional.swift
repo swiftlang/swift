@@ -301,7 +301,7 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
                                     _filenameIsASCII: Builtin.Int1,
                                     _line: Builtin.Word) {
   _preconditionFailure(
-    "unexpectedly found nil while unwrapping an Optional value",
+    "Unexpectedly found nil while unwrapping an Optional value",
     file: StaticString(_start: _filenameStart,
                        utf8CodeUnitCount: _filenameLength,
                        isASCII: _filenameIsASCII),
@@ -673,19 +673,6 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
   case .none:
     return try defaultValue()
   }
-}
-
-extension Optional {
-
-  @available(*, unavailable, renamed: "none")
-  public static var None: Optional<Wrapped> {
-    return .none
-  }
-  @available(*, unavailable, renamed: "some")
-  public static func Some(_ x: Wrapped) -> Optional<Wrapped> {
-    return .some(x)
-  }
-
 }
 
 //===----------------------------------------------------------------------===//

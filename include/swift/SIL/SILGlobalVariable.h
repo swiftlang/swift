@@ -20,6 +20,7 @@
 #include <string>
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
@@ -38,8 +39,8 @@ class SILGlobalVariable
     public SILAllocated<SILGlobalVariable>
 {
 private:
-  friend class SILBasicBlock;
   friend class SILModule;
+  friend class SILBuilder;
 
   /// The SIL module that the global variable belongs to.
   SILModule &Module;
@@ -73,8 +74,16 @@ private:
   /// Whether or not this is a declaration.
   bool IsDeclaration;
 
-  /// The static initializer.
-  SILFunction *InitializerF;
+  /// If this block is not empty, the global variable has a static initializer.
+  ///
+  /// The last instruction of this block is the top-level value of the static
+  /// initializer.
+  ///
+  /// The block is just used as a container for the instructions. So the
+  /// instructions still have a parent SILBasicBlock (but no parent function).
+  /// It would be somehow cleaner to just store an instruction list here and
+  /// make the SILGlobalVariable the parent pointer of the instructions.
+  SILBasicBlock StaticInitializerBlock;
 
   SILGlobalVariable(SILModule &M, SILLinkage linkage,
                     IsSerialized_t IsSerialized,
@@ -118,9 +127,6 @@ public:
 
   VarDecl *getDecl() const { return VDecl; }
 
-  SILFunction *getInitializer() const { return InitializerF; }
-  void setInitializer(SILFunction *InitF);
-
   /// Initialize the source location of the function.
   void setLocation(SILLocation L) { Location = L; }
 
@@ -137,13 +143,22 @@ public:
     return Location.getValue();
   }
 
-  // Helper functions to analyze the static initializer.
-  static bool canBeStaticInitializer(SILFunction *F);
-  /// Check if a given SILFunction can be a static initializer. If yes, return
-  /// the SILGlobalVariable that it writes to.
-  static SILGlobalVariable *getVariableOfStaticInitializer(SILFunction *F);
-  /// Return the value that is written into the global variable.
-  SILInstruction *getValueOfStaticInitializer();
+  /// Returns the value of the static initializer or null if the global has no
+  /// static initializer.
+  SILInstruction *getStaticInitializerValue();
+
+  /// Returns true if the global is a statically initialized heap object.
+  bool isInitializedObject() {
+    return dyn_cast_or_null<ObjectInst>(getStaticInitializerValue()) != nullptr;
+  }
+
+  /// Returns true if \p I is a valid instruction to be contained in the
+  /// static initializer.
+  static bool isValidStaticInitializerInst(const SILInstruction *I);
+
+  void dropAllReferences() {
+    StaticInitializerBlock.dropAllReferences();
+  }
 
   /// Return whether this variable corresponds to a Clang node.
   bool hasClangNode() const;

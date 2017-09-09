@@ -1119,6 +1119,21 @@ public:
   virtual void
   loadAllMembers(Decl *D, uint64_t unused) override;
 
+private:
+  void
+  loadAllMembersOfObjcContainer(Decl *D,
+                                const clang::ObjCContainerDecl *objcContainer);
+  void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
+                           Decl *D, DeclContext *DC,
+                           SmallVectorImpl<Decl *> &members);
+  void insertMembersAndAlternates(const clang::NamedDecl *nd,
+                                  SmallVectorImpl<Decl *> &members);
+  void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
+  void addMemberAndAlternatesToExtension(
+      clang::NamedDecl *decl, importer::ImportedName newName,
+      importer::ImportNameVersion nameVersion, ExtensionDecl *ext);
+
+public:
   void
   loadAllConformances(
     const Decl *D, uint64_t contextData,
@@ -1126,9 +1141,21 @@ public:
 
   void finishNormalConformance(NormalProtocolConformance *conformance,
                                uint64_t unused) override;
+  
+  /// Returns the default definition type for \p ATD.
+  TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
+                                            uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+  
+  /// Returns the generic environment.
+  virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
+                                                     uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
 
   template <typename DeclTy, typename ...Targs>
-  DeclTy *createDeclWithClangNode(ClangNode ClangN, Accessibility access,
+  DeclTy *createDeclWithClangNode(ClangNode ClangN, AccessLevel access,
                                   Targs &&... Args) {
     assert(ClangN);
     void *DeclPtr = allocateMemoryForDecl<DeclTy>(SwiftContext, sizeof(DeclTy),
@@ -1136,9 +1163,9 @@ public:
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
     D->setEarlyAttrValidation(true);
-    D->setAccessibility(access);
+    D->setAccess(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
-      ASD->setSetterAccessibility(access);
+      ASD->setSetterAccess(access);
     // All imported decls are constructed fully validated.
     D->setValidationStarted();
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(static_cast<Decl *>(D)))

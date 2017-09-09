@@ -49,6 +49,7 @@
 #include "GenType.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
+#include "StructLayout.h"
 
 #include <initializer_list>
 
@@ -193,12 +194,18 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy,              // objc properties
     Int32Ty,                // size
     Int32Ty,                // flags
-    Int16Ty,                // minimum witness count
-    Int16Ty,                // default witness count
-    Int32Ty                 // padding
+    Int16Ty,                // mandatory requirement count
+    Int16Ty,                // total requirement count
+    Int32Ty                 // requirements array
   });
   
   ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();
+
+  ProtocolRequirementStructTy =
+      createStructType(*this, "swift.protocol_requirement", {
+    Int32Ty,                // flags
+    Int32Ty                 // default implementation
+  });
   
   // A tuple type metadata record has a couple extra fields.
   auto tupleElementTy = createStructType(*this, "swift.tuple_element_type", {
@@ -283,6 +290,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     = llvm::StructType::create(LLVMContext, "swift.type_descriptor");
   NominalTypeDescriptorPtrTy
     = NominalTypeDescriptorTy->getPointerTo(DefaultAS);
+
+  MethodDescriptorStructTy
+    = createStructType(*this, "swift.method_descriptor", {
+      RelativeAddressTy,
+      Int32Ty
+    });
 
   TypeMetadataRecordTy
     = createStructType(*this, "swift.type_metadata_record", {
@@ -723,11 +736,11 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
     wt->getConformance()->getType()->getNominalOrBoundGenericNominal();
 
   switch (ConformingTy->getEffectiveAccess()) {
-    case Accessibility::Private:
-    case Accessibility::FilePrivate:
+    case AccessLevel::Private:
+    case AccessLevel::FilePrivate:
       return true;
 
-    case Accessibility::Internal:
+    case AccessLevel::Internal:
       return PrimaryIGM->getSILModule().isWholeModule();
 
     default:
@@ -805,6 +818,8 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs) {
     });
     Attrs.addAttribute("target-features", allFeatures);
   }
+  if (IRGen.Opts.OptimizeForSize)
+    Attrs.addAttribute(llvm::Attribute::OptimizeForSize);
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {

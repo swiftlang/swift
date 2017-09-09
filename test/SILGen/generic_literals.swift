@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_T016generic_literals0A14IntegerLiteralyx1x_ts013ExpressibleBycD0RzlF
 func genericIntegerLiteral<T : ExpressibleByIntegerLiteral>(x: T) {

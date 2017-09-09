@@ -63,6 +63,7 @@
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "Signature.h"
+#include "StructLayout.h"
 
 using namespace swift;
 using namespace irgen;
@@ -1376,7 +1377,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
   if (isFragile) {
     // Fragile functions/globals must be visible from outside, regardless of
-    // their accessibility. If a caller is also fragile and inlined into another
+    // their access level. If a caller is also fragile and inlined into another
     // module it must be able to access this (not-inlined) function/global.
     switch (linkage) {
     case SILLinkage::Hidden:
@@ -1747,16 +1748,34 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   Size fixedSize;
   Alignment fixedAlignment;
 
-  // If the type has a fixed size, allocate static storage. Otherwise, allocate
-  // a fixed-size buffer and possibly heap-allocate a payload at runtime if the
-  // runtime size of the type does not fit in the buffer.
-  if (ti.isFixedSize(expansion)) {
+  if (var->isInitializedObject()) {
+    assert(ti.isFixedSize(expansion));
+    StructLayout *Layout = StaticObjectLayouts[var].get();
+    if (!Layout) {
+      // Create the layout (includes the llvm type) for the statically
+      // initialized object and store it for later.
+      ObjectInst *OI = cast<ObjectInst>(var->getStaticInitializerValue());
+      llvm::SmallVector<SILType, 16> TailTypes;
+      for (SILValue TailOp : OI->getTailElements()) {
+        TailTypes.push_back(TailOp->getType());
+      }
+      Layout = getClassLayoutWithTailElems(*this,
+                                           var->getLoweredType(), TailTypes);
+      StaticObjectLayouts[var] = std::unique_ptr<StructLayout>(Layout);
+    }
+    storageType = Layout->getType();
+    fixedSize = Layout->getSize();
+    fixedAlignment = Layout->getAlignment();
+    assert(fixedAlignment >= TargetInfo.HeapObjectAlignment);
+  } else if (ti.isFixedSize(expansion)) {
+    // Allocate static storage.
     auto &fixedTI = cast<FixedTypeInfo>(ti);
-
     storageType = fixedTI.getStorageType();
     fixedSize = fixedTI.getFixedSize();
     fixedAlignment = fixedTI.getFixedAlignment();
   } else {
+    // Allocate a fixed-size buffer and possibly heap-allocate a payload at
+    // runtime if the runtime size of the type does not fit in the buffer.
     storageType = getFixedBufferTy();
     fixedSize = Size(DataLayout.getTypeAllocSize(storageType));
     fixedAlignment = Alignment(DataLayout.getABITypeAlignment(storageType));
@@ -1768,36 +1787,57 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   if (gvar) {
     if (forDefinition)
       updateLinkageForDefinition(*this, gvar, entity);
-
-    llvm::Constant *addr = gvar;
-    if (storageType != gvar->getType()->getElementType()) {
-      auto *expectedTy = storageType->getPointerTo();
-      addr = llvm::ConstantExpr::getBitCast(addr, expectedTy);
-    }
-    return Address(addr, Alignment(gvar->getAlignment()));
-  }
-
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  auto DbgTy =
-      DebugTypeInfo::getGlobal(var, storageType, fixedSize, fixedAlignment);
-  if (var->getDecl()) {
-    // If we have the VarDecl, use it for more accurate debugging information.
-    gvar = createVariable(*this, link, storageType, fixedAlignment, DbgTy,
-                          SILLocation(var->getDecl()),
-                          var->getDecl()->getName().str());
   } else {
-    Optional<SILLocation> loc;
-    if (var->hasLocation())
-      loc = var->getLocation();
-    gvar = createVariable(*this, link, storageType, fixedAlignment, DbgTy, loc,
-                          var->getName());
+    LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+    llvm::Type *storageTypeWithContainer = storageType;
+    if (var->isInitializedObject()) {
+      // A statically initialized object must be placed into a container struct
+      // because the swift_initStaticObject needs a swift_once_t at offset -1:
+      //     struct Container {
+      //       swift_once_t token[fixedAlignment / sizeof(swift_once_t)];
+      //       HeapObject object;
+      //     };
+      std::string typeName = storageType->getStructName().str() + 'c';
+      assert(fixedAlignment >= getPointerAlignment());
+      unsigned numTokens = fixedAlignment.getValue() /
+        getPointerAlignment().getValue();
+      storageTypeWithContainer = llvm::StructType::create(getLLVMContext(),
+              {llvm::ArrayType::get(OnceTy, numTokens), storageType}, typeName);
+      gvar = createVariable(*this, link, storageTypeWithContainer,
+                            fixedAlignment);
+    } else {
+      auto DbgTy = DebugTypeInfo::getGlobal(var, storageTypeWithContainer,
+                                            fixedSize, fixedAlignment);
+      if (var->getDecl()) {
+        // If we have the VarDecl, use it for more accurate debugging information.
+        gvar = createVariable(*this, link, storageTypeWithContainer,
+                              fixedAlignment, DbgTy, SILLocation(var->getDecl()),
+                              var->getDecl()->getName().str());
+      } else {
+        Optional<SILLocation> loc;
+        if (var->hasLocation())
+          loc = var->getLocation();
+        gvar = createVariable(*this, link, storageTypeWithContainer,
+                              fixedAlignment, DbgTy, loc, var->getName());
+      }
+    }
+    /// Add a zero initializer.
+    if (forDefinition)
+      gvar->setInitializer(llvm::Constant::getNullValue(storageTypeWithContainer));
   }
-  
-  // Set the alignment from the TypeInfo.
-  Address gvarAddr = Address(gvar, fixedAlignment);
-  gvar->setAlignment(fixedAlignment.getValue());
-  
-  return gvarAddr;
+  llvm::Constant *addr = gvar;
+  if (var->isInitializedObject()) {
+    // Project out the object from the container.
+    llvm::Constant *Indices[2] = {
+      llvm::ConstantExpr::getIntegerValue(Int32Ty, APInt(32, 0)),
+      llvm::ConstantExpr::getIntegerValue(Int32Ty, APInt(32, 1))
+    };
+    // Return the address of the initialized object itself (and not the address
+    // to a reference to it).
+    addr = llvm::ConstantExpr::getGetElementPtr(nullptr, gvar, Indices);
+  }
+  addr = llvm::ConstantExpr::getBitCast(addr, storageType->getPointerTo());
+  return Address(addr, Alignment(gvar->getAlignment()));
 }
 
 /// Return True if the function \p f is a 'readonly' function. Checking
@@ -3276,7 +3316,7 @@ bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion)
 ResilienceExpansion
 IRGenModule::getResilienceExpansionForAccess(NominalTypeDecl *decl) {
   if (decl->getModuleContext() == getSwiftModule() &&
-      decl->getEffectiveAccess() < Accessibility::Public)
+      decl->getEffectiveAccess() < AccessLevel::Public)
     return ResilienceExpansion::Maximal;
   return ResilienceExpansion::Minimal;
 }
@@ -3349,7 +3389,7 @@ llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
       // Instantiator
       RelativeAddressTy,
       // PrivateData
-      llvm::ArrayType::get(Int8PtrTy, swift::NumGenericMetadataPrivateDataWords)
+      RelativeAddressTy
     }, "swift.generic_witness_table_cache");
   return GenericWitnessTableCacheTy;
 }
@@ -3439,11 +3479,12 @@ IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *conf,
 llvm::Function *
 IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
                                   const NormalProtocolConformance *conformance,
-                                  AssociatedTypeDecl *associate) {
+                                  AssociatedType association) {
   auto forDefinition = ForDefinition;
 
   LinkEntity entity =
-    LinkEntity::forAssociatedTypeMetadataAccessFunction(conformance, associate);
+    LinkEntity::forAssociatedTypeMetadataAccessFunction(conformance,
+                                                        association);
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
     if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
@@ -3459,14 +3500,12 @@ IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
 llvm::Function *
 IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                   const NormalProtocolConformance *conformance,
-                                  CanType associatedType,
-                                  ProtocolDecl *associatedProtocol) {
+                                  const AssociatedConformance &association) {
   auto forDefinition = ForDefinition;
 
   LinkEntity entity =
     LinkEntity::forAssociatedTypeWitnessTableAccessFunction(conformance,
-                                                            associatedType,
-                                                            associatedProtocol);
+                                                            association);
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
     if (forDefinition) updateLinkageForDefinition(*this, entry, entity);

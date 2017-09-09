@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -12,7 +12,7 @@ import gizmo
   // Bridging dictionary parameters
   // CHECK-LABEL: sil hidden [thunk] @_T024objc_dictionary_bridging3FooC23bridge_Dictionary_param{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (NSDictionary, Foo) -> ()
   func bridge_Dictionary_param(_ dict: Dictionary<Foo, Foo>) {
-    // CHECK: bb0([[NSDICT:%[0-9]+]] : $NSDictionary, [[SELF:%[0-9]+]] : $Foo):
+    // CHECK: bb0([[NSDICT:%[0-9]+]] : @unowned $NSDictionary, [[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[NSDICT_COPY:%.*]] = copy_value [[NSDICT]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s10DictionaryV10FoundationE36_unconditionallyBridgeFromObjectiveCAByxq_GSo12NSDictionaryCSgFZ
@@ -31,7 +31,7 @@ import gizmo
   // Bridging dictionary results
   // CHECK-LABEL: sil hidden [thunk] @_T024objc_dictionary_bridging3FooC24bridge_Dictionary_result{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
   func bridge_Dictionary_result() -> Dictionary<Foo, Foo> { 
-    // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
+    // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
     // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_T024objc_dictionary_bridging3FooC24bridge_Dictionary_result{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
@@ -52,7 +52,7 @@ import gizmo
 
   // Property getter
   // CHECK-LABEL: sil hidden [thunk] @_T024objc_dictionary_bridging3FooC8propertys10DictionaryVyA2CGfgTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
-  // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
+  // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_T024objc_dictionary_bridging3FooC8propertys10DictionaryVyA2CGfg : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
@@ -69,7 +69,7 @@ import gizmo
 
   // Property setter
   // CHECK-LABEL: sil hidden [thunk] @_T024objc_dictionary_bridging3FooC8propertys10DictionaryVyA2CGfsTo : $@convention(objc_method) (NSDictionary, Foo) -> ()
-  // CHECK: bb0([[NSDICT:%[0-9]+]] : $NSDictionary, [[SELF:%[0-9]+]] : $Foo):
+  // CHECK: bb0([[NSDICT:%[0-9]+]] : @unowned $NSDictionary, [[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[NSDICT_COPY:%.*]] = copy_value [[NSDICT]]
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s10DictionaryV10FoundationE36_unconditionallyBridgeFromObjectiveCAByxq_GSo12NSDictionaryCSgFZ

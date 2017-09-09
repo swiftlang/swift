@@ -743,7 +743,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
 
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::KnownPrivate;
-    relookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     auto inaccessibleResults =
         tc.lookupUnqualifiedType(lookupDC, comp->getIdentifier(), comp->getIdLoc(),
                                  relookupOptions);
@@ -809,7 +809,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
   // Try ignoring access control.
   NameLookupOptions relookupOptions = lookupOptions;
   relookupOptions |= NameLookupFlags::KnownPrivate;
-  relookupOptions |= NameLookupFlags::IgnoreAccessibility;
+  relookupOptions |= NameLookupFlags::IgnoreAccessControl;
   auto inaccessibleMembers = tc.lookupMemberType(dc, parentType,
                                                  comp->getIdentifier(),
                                                  relookupOptions);
@@ -857,7 +857,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     // this allows for more precise diagnostic, which distinguishes between
     // identifier not found as a member type vs. not found at all.
     NameLookupOptions memberLookupOptions = lookupOptions;
-    memberLookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    memberLookupOptions |= NameLookupFlags::IgnoreAccessControl;
     memberLookupOptions |= NameLookupFlags::KnownPrivate;
 
     memberLookup = tc.lookupMember(dc, parentType, comp->getIdentifier(),
@@ -2927,7 +2927,7 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   };
 
   for (auto tyR : repr->getTypes()) {
-    Type ty = TC.resolveType(tyR, DC, withoutContext(options), Resolver);
+    Type ty = resolveType(tyR, withoutContext(options));
     if (!ty || ty->hasError()) return ty;
 
     auto nominalDecl = ty->getAnyNominal();

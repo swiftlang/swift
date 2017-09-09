@@ -61,7 +61,9 @@ def create_lldb_target(binary, memmap):
     for dynlib_path in memmap:
         module = lldb_target.AddModule(
             dynlib_path, lldb.LLDB_ARCH_DEFAULT, None, None)
-        lldb_target.SetModuleLoadAddress(module, memmap[dynlib_path])
+        text_section = module.FindSection(".text")
+        slide = text_section.GetFileAddress() - text_section.GetFileOffset()
+        lldb_target.SetModuleLoadAddress(module, memmap[dynlib_path] - slide)
     return lldb_target
 
 

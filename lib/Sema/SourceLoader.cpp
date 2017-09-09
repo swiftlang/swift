@@ -131,7 +131,8 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
     implicitImportKind = SourceFile::ImplicitModuleImportKind::None;
 
   auto *importFile = new (Ctx) SourceFile(*importMod, SourceFileKind::Library,
-                                          bufferID, implicitImportKind);
+                                          bufferID, implicitImportKind,
+                                          Ctx.LangOpts.KeepTokensInSourceFile);
   importMod->addFile(*importFile);
 
   bool done;

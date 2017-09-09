@@ -16,7 +16,7 @@ import Foundation
 
 #if os(iOS)
 
-internal protocol _AVCaptureDeviceFormatSupportedColorSpaces {
+public protocol _AVCaptureDeviceFormatSupportedColorSpaces {
   @available(iOS, introduced: 10.0)
   var __supportedColorSpaces: [NSNumber] { get }
 }

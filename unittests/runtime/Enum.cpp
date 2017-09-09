@@ -22,9 +22,10 @@ ExtraInhabitantsValueWitnessTable Int8WithExtraInhabitantValueWitness
 = {
   // ValueWitnessTable
   ValueWitnessTable{
-#define STEAL_INT8_WITNESS(witness) VALUE_WITNESS_SYM(Bi8_).witness,
-    FOR_ALL_FUNCTION_VALUE_WITNESSES(STEAL_INT8_WITNESS)
-#undef STEAL_INT8_WITNESS
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) VALUE_WITNESS_SYM(Bi8_).LOWER_ID,
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
     VALUE_WITNESS_SYM(Bi8_).size,
     VALUE_WITNESS_SYM(Bi8_).flags.withExtraInhabitants(true),
     VALUE_WITNESS_SYM(Bi8_).stride

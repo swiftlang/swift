@@ -1,0 +1,9 @@
+// RUN: %scale-test --begin 3 --end 7 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+let _ = [
+%for i in range(0, N):
+  ["key1" : "value", "key2" : "value"],
+%end
+]

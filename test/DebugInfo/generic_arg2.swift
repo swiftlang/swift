@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
 // CHECK: define hidden swiftcc void @_T012generic_arg25ClassC3foo{{.*}}, %swift.type* %U
-// CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %y.addr, metadata ![[U:.*]], metadata !{{[0-9]+}})
+// CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %y.addr, metadata ![[U:.*]], metadata !DIExpression())
 // Make sure there is no conflicting dbg.value for this variable.x
 // CHECK-NOT: dbg.value{{.*}}metadata ![[U]]
 class Class <T> {

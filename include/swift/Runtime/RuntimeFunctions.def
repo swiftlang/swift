@@ -92,6 +92,13 @@ FUNCTION(InitStackObject, swift_initStackObject, DefaultCC,
          ARGS(TypeMetadataPtrTy, RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// HeapObject *swift_initStaticObject(HeapMetadata const *metadata,
+//                                    HeapObject *object);
+FUNCTION(InitStaticObject, swift_initStaticObject, DefaultCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(TypeMetadataPtrTy, RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_verifyEndOfLifetime(HeapObject *object);
 FUNCTION(VerifyEndOfLifetime, swift_verifyEndOfLifetime, DefaultCC,
          RETURNS(VoidTy),
@@ -813,13 +820,13 @@ FUNCTION(GetExistentialMetadata,
 // struct FieldInfo { size_t Size; size_t AlignMask; };
 // Metadata *swift_initClassMetadata_UniversalStrategy(Metadata *self,
 //                                                     size_t numFields,
-//                                                     const FieldInfo *fields,
+//                                                     TypeLayout * const *fieldTypes,
 //                                                     size_t *fieldOffsets);
 FUNCTION(InitClassMetadataUniversal,
          swift_initClassMetadata_UniversalStrategy, DefaultCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy, SizeTy,
-              SizeTy->getPointerTo(),
+              Int8PtrPtrTy->getPointerTo(),
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 

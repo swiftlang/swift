@@ -492,8 +492,8 @@ class has the following fields:
 | --- | ---- | ----------- |
 | `kind` | `String` | The "base class" for this node. Must be one of `["Syntax", "SyntaxCollection", "Expr", "Stmt", "Decl", "Pattern", "Type"]`. |
 | `element` | `String?` | If the node is a `SyntaxCollection`, then this is the `SyntaxKind` of the element of this collection. If this is not a `SyntaxCollection`, then this value is ignored. |
-| `element_name` | `String?` | If the node is a `SyntaxCollection`, then this is a different name for the element that you wish to appear in the generated API. Some nodes cannot find a good upper-bound for the element, and so must defer to `Syntax` -- those nodes use this field to populate a better name for `add${element_name}` APIs.
-| `children` | `[[String: Child]]?` | The children of this node.
+| `element_name` | `String?` | If the node is a `SyntaxCollection`, then this is a different name for the element that you wish to appear in the generated API. Some nodes cannot find a good upper-bound for the element, and so must defer to `Syntax` -- those nodes use this field to populate a better name for `add${element_name}` APIs. |
+| `children` | `[[String: Child]]?` | The children of this node. |
 
 #### Children
 
@@ -513,7 +513,7 @@ A `Token` represents one of the `tok::` enums in
 `include/Syntax/TokenKinds.def`. `Token.py` has a top-level array of token
 declarations. The `Token` class has the following fields.
 
-| Key | Type | Description |f
+| Key | Type | Description |
 | --- | ---- | ----------- |
 | `kind` | `String` | The name of the token in the C++ `tok::` namespace. This is what we use to map these nodes to C++ tokens. |
 | `text` | `String?` | If the text of this node is fixed, then this field contains that text. For example, `Struct` has text `"struct"` and kind `"kw_struct"`. |

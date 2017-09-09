@@ -786,21 +786,23 @@ void swift::computeDefaultMap(Type type, const ValueDecl *paramOwner,
   switch (type->getKind()) {
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
-    
-    // FIXME: In the weird case where we have a tuple type that should
-    // be wrapped in a ParenType but isn't, just... forget it happened.
-    if (paramList && tupleTy->getNumElements() != paramList->size() &&
-        paramList->size() == 1)
+
+    // Arguments and parameters are not guaranteed to always line-up
+    // perfectly, e.g. failure diagnostics tries to match argument type
+    // to different "candidate" parameters.
+    if (paramList && tupleTy->getNumElements() != paramList->size())
       paramList = nullptr;
-    
+
     for (auto i : range(0, tupleTy->getNumElements())) {
-      outDefaultMap.push_back(paramList && paramList->get(i)->isDefaultArgument());
+      outDefaultMap.push_back(paramList &&
+                              paramList->get(i)->isDefaultArgument());
     }
     break;
   }
       
   case TypeKind::Paren: {
-    outDefaultMap.push_back(paramList && paramList->get(0)->isDefaultArgument());
+    outDefaultMap.push_back(paramList && paramList->size() == 1 &&
+                            paramList->get(0)->isDefaultArgument());
     break;
   }
       
@@ -2718,9 +2720,6 @@ void ArchetypeType::populateNestedTypes() const {
   llvm::SmallPtrSet<Identifier, 4> knownNestedTypes;
   ProtocolType::visitAllProtocols(getConformsTo(),
                                   [&](ProtocolDecl *proto) -> bool {
-    // Objective-C protocols don't have type members.
-    if (proto->isObjC()) return false;
-
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         if (knownNestedTypes.insert(assocType->getName()).second)
@@ -3029,8 +3028,7 @@ LookUpConformanceInModule::operator()(CanType dependentType,
     return ProtocolConformanceRef(conformedProtocol->getDecl());
 
   return M->lookupConformance(conformingReplacementType,
-                              conformedProtocol->getDecl(),
-                              M->getASTContext().getLazyResolver());
+                              conformedProtocol->getDecl());
 }
 
 Optional<ProtocolConformanceRef>
@@ -4044,23 +4042,27 @@ TypeTraitResult TypeBase::canBeClass() {
   return TypeTraitResult::IsNot;
 }
 
-bool Type::isPrivateStdlibType(bool whitelistProtocols) const {
+bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
   Type Ty = *this;
   if (!Ty)
     return false;
 
   // A 'public' typealias can have an 'internal' type.
-  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
-    return NAT->getDecl()->isPrivateStdlibDecl(whitelistProtocols);
+  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
+    auto *AliasDecl = NAT->getDecl();
+    return AliasDecl->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic);
+  }
 
-  if (auto Paren = dyn_cast<ParenType>(Ty.getPointer()))
-    return Paren->getUnderlyingType().isPrivateStdlibType(whitelistProtocols);
+  if (auto Paren = dyn_cast<ParenType>(Ty.getPointer())) {
+    Type Underlying = Paren->getUnderlyingType();
+    return Underlying.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
+  }
 
   if (Type Unwrapped = Ty->getAnyOptionalObjectType())
-    return Unwrapped.isPrivateStdlibType(whitelistProtocols);
+    return Unwrapped.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
 
   if (auto TyD = Ty->getAnyNominal())
-    if (TyD->isPrivateStdlibDecl(whitelistProtocols))
+    if (TyD->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic))
       return true;
 
   return false;

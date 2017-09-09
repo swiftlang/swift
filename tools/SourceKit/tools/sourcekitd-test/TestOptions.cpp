@@ -133,9 +133,20 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("extract-comment", SourceKitRequest::ExtractComment)
         .Case("module-groups", SourceKitRequest::ModuleGroups)
         .Case("range", SourceKitRequest::RangeInfo)
+        .Case("syntactic-rename", SourceKitRequest::SyntacticRename)
+        .Case("find-rename-ranges", SourceKitRequest::FindRenameRanges)
+        .Case("find-local-rename-ranges", SourceKitRequest::FindLocalRenameRanges)
         .Case("translate", SourceKitRequest::NameTranslation)
+        .Case("local-rename", SourceKitRequest::LocalRename)
+        .Case("extract-expr", SourceKitRequest::ExtractExpr)
+        .Case("extract-repeated", SourceKitRequest::ExtractRepeatedExpr)
+        .Case("extract-func", SourceKitRequest::ExtractFunction)
+        .Case("fill-stub", SourceKitRequest::FillProtocolStub)
+        .Case("expand-default", SourceKitRequest::ExpandDefault)
+        .Case("localize-string", SourceKitRequest::LocalizeString)
         .Case("markup-xml", SourceKitRequest::MarkupToXML)
         .Default(SourceKitRequest::None);
+
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request, expected one of "
             << "version/demangle/mangle/index/complete/complete.open/complete.cursor/"
@@ -143,7 +154,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                "cursor/related-idents/syntax-map/structure/format/expand-placeholder/"
                "doc-info/sema/interface-gen/interface-gen-openfind-usr/find-interface/"
                "open/edit/print-annotations/print-diags/extract-comment/module-groups/"
-               "range/translate/markup-xml\n";
+               "range/syntactic-rename/find-rename-ranges/translate/markup-xml\n";
         return true;
       }
       break;
@@ -267,6 +278,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       Inputs.push_back(InputArg->getValue());
       break;
 
+    case OPT_rename_spec:
+      RenameSpecPath = InputArg->getValue();
+      break;
+
     case OPT_json_request_path:
       JsonRequestPath = InputArg->getValue();
       break;
@@ -297,6 +312,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_objc_selector:
       ObjCSelector = InputArg->getValue();
+      break;
+
+    case OPT_name:
+      Name = InputArg->getValue();
       break;
 
     case OPT_cancel_on_subsequent_request:

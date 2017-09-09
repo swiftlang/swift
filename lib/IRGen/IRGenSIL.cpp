@@ -827,6 +827,7 @@ public:
   void visitFunctionRefInst(FunctionRefInst *i);
   void visitAllocGlobalInst(AllocGlobalInst *i);
   void visitGlobalAddrInst(GlobalAddrInst *i);
+  void visitGlobalValueInst(GlobalValueInst *i);
 
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitFloatLiteralInst(FloatLiteralInst *i);
@@ -865,6 +866,9 @@ public:
   void visitDestroyValueInst(DestroyValueInst *i);
   void visitAutoreleaseValueInst(AutoreleaseValueInst *i);
   void visitSetDeallocatingInst(SetDeallocatingInst *i);
+  void visitObjectInst(ObjectInst *i)  {
+    llvm_unreachable("object instruction cannot appear in a function");
+  }
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
   void visitEnumInst(EnumInst *i);
@@ -1097,8 +1101,8 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                   f->getDebugScope(), f->getLocation()),
     CurSILFn(f) {
   // Apply sanitizer attributes to the function.
-  // TODO: Check if the function is ASan black listed either in the external
-  // file or via annotations.
+  // TODO: Check if the function is supposed to be excluded from ASan either by
+  // being in the external file or via annotations.
   if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Address)
     CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
   if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) {
@@ -1754,6 +1758,30 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   addr = emitProjectValueInBuffer(*this, loweredTy, addr);
   
   setLoweredAddress(i, addr);
+}
+
+void IRGenSILFunction::visitGlobalValueInst(GlobalValueInst *i) {
+  SILGlobalVariable *var = i->getReferencedGlobal();
+  assert(var->isInitializedObject() &&
+         "global_value only supported for statically initialized objects");
+  SILType loweredTy = var->getLoweredType();
+  assert(loweredTy == i->getType());
+  auto &ti = getTypeInfo(loweredTy);
+  assert(ti.isFixedSize(IGM.getResilienceExpansionForLayout(var)));
+
+  llvm::Value *Ref = IGM.getAddrOfSILGlobalVariable(var, ti,
+                                                NotForDefinition).getAddress();
+
+  CanType ClassType = loweredTy.getSwiftRValueType();
+  llvm::Value *Metadata =
+    emitClassHeapMetadataRef(*this, ClassType, MetadataValueType::TypeMetadata);
+  llvm::Value *CastAddr = Builder.CreateBitCast(Ref, IGM.RefCountedPtrTy);
+  llvm::Value *InitRef = emitInitStaticObjectCall(Metadata, CastAddr, "staticref");
+  InitRef = Builder.CreateBitCast(InitRef, Ref->getType());
+
+  Explosion e;
+  e.add(InitRef);
+  setLoweredExplosion(i, e);
 }
 
 void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
@@ -4128,7 +4156,8 @@ visitUncheckedRefCastAddrInst(swift::UncheckedRefCastAddrInst *i) {
   Address dest = getLoweredAddress(i->getDest());
   Address src = getLoweredAddress(i->getSrc());
   emitCheckedCast(*this, src, i->getSourceType(), dest, i->getTargetType(),
-                  i->getConsumptionKind(), CheckedCastMode::Unconditional);
+                  CastConsumptionKind::TakeAlways,
+                  CheckedCastMode::Unconditional);
 }
 
 void IRGenSILFunction::visitUncheckedAddrCastInst(
@@ -4496,7 +4525,8 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
   Address dest = getLoweredAddress(i->getDest());
   Address src = getLoweredAddress(i->getSrc());
   emitCheckedCast(*this, src, i->getSourceType(), dest, i->getTargetType(),
-                  i->getConsumptionKind(), CheckedCastMode::Unconditional);
+                  CastConsumptionKind::TakeAlways,
+                  CheckedCastMode::Unconditional);
 }
 
 void IRGenSILFunction::visitUnconditionalCheckedCastValueInst(
@@ -5074,7 +5104,8 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
 void IRGenModule::emitSILStaticInitializers() {
   SmallVector<SILFunction *, 8> StaticInitializers;
   for (SILGlobalVariable &Global : getSILModule().getSILGlobals()) {
-    if (!Global.getInitializer())
+    SILInstruction *InitValue = Global.getStaticInitializerValue();
+    if (!InitValue)
       continue;
 
     auto *IRGlobal =
@@ -5085,7 +5116,15 @@ void IRGenModule::emitSILStaticInitializers() {
     if (!IRGlobal || !IRGlobal->hasInitializer())
       continue;
 
-    auto *InitValue = Global.getValueOfStaticInitializer();
+    if (auto *OI = dyn_cast<ObjectInst>(InitValue)) {
+      StructLayout *Layout = StaticObjectLayouts[&Global].get();
+      llvm::Constant *InitVal = emitConstantObject(*this, OI, Layout);
+      auto *ContainerTy = cast<llvm::StructType>(IRGlobal->getValueType());
+      auto *zero = llvm::ConstantAggregateZero::get(ContainerTy->getElementType(0));
+      IRGlobal->setInitializer(llvm::ConstantStruct::get(ContainerTy,
+                                                         {zero , InitVal}));
+      continue;
+    }
 
     // Set the IR global's initializer to the constant for this SIL
     // struct.

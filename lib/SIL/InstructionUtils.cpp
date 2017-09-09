@@ -226,6 +226,12 @@ SILValue swift::stripExpectIntrinsic(SILValue V) {
   return BI->getArguments()[0];
 }
 
+SILValue swift::stripBorrow(SILValue V) {
+  if (auto *BBI = dyn_cast<BeginBorrowInst>(V))
+    return BBI->getOperand();
+  return V;
+}
+
 namespace {
 
 enum class OwnershipQualifiedKind {

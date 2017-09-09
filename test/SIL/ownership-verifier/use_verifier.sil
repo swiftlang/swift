@@ -15,7 +15,7 @@ import Builtin
 
 sil @allocate_object : $@convention(thin) () -> @owned Builtin.NativeObject
 
-public protocol AnyObject : class {}
+typealias AnyObject = Builtin.AnyObject
 
 public protocol Error {}
 
@@ -385,6 +385,13 @@ bb0(%0 : @owned $SuperKlass):
   dealloc_partial_ref %0 : $SuperKlass, %1 : $@thick SuperKlass.Type
   %9999 = tuple()
   return %9999 : $()
+}
+
+sil @test_isnonnull : $@convention(thin) (@owned SuperKlass) -> Builtin.Int1 {
+bb0(%0 : @owned $SuperKlass):
+  %1 = is_nonnull %0 : $SuperKlass
+  destroy_value %0 : $SuperKlass
+  return %1 : $Builtin.Int1
 }
 
 //////////////////////

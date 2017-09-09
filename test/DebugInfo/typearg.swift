@@ -8,7 +8,7 @@ class AClass : AProtocol {
 }
 
 // CHECK: define hidden {{.*}}void @{{.*}}aFunction
-// CHECK:  call void @llvm.dbg.declare(metadata %swift.type** %{{.*}}, metadata ![[TYPEARG:.*]], metadata !{{[0-9]+}}),
+// CHECK:  call void @llvm.dbg.declare(metadata %swift.type** %{{.*}}, metadata ![[TYPEARG:.*]], metadata !DIExpression()),
 // CHECK: ![[TYPEARG]] = !DILocalVariable(name: "$swift.type.T"
 // CHECK-SAME:                            type: ![[SWIFTMETATYPE:[^,)]+]]
 // CHECK-SAME:                            flags: DIFlagArtificial

@@ -125,14 +125,14 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
                                       LazyResolver *TypeResolver) {
   if (TypeResolver) {
     TypeResolver->resolveDeclSignature(Member);
-    TypeResolver->resolveAccessibility(Member);
+    TypeResolver->resolveAccessControl(Member);
   }
 
-  // Check accessibility when relevant.
+  // Check access when relevant.
   if (!Member->getDeclContext()->isLocalContext() &&
       !isa<GenericTypeParamDecl>(Member) && !isa<ParamDecl>(Member) &&
       FromContext->getASTContext().LangOpts.EnableAccessControl) {
-    if (Member->isInvalid() && !Member->hasAccessibility())
+    if (Member->isInvalid() && !Member->hasAccess())
       return false;
     if (!Member->isAccessibleFrom(FromContext))
       return false;
@@ -564,26 +564,26 @@ static void lookupVisibleMemberDeclsImpl(
   // If we're looking into a type parameter and we have a generic signature
   // builder, use the GSB to resolve where we should look.
   if (BaseTy->isTypeParameter() && GSB) {
-    auto PA = GSB->resolveArchetype(
-                BaseTy,
-                ArchetypeResolutionKind::CompleteWellFormed);
-    if (!PA) return;
+    auto EquivClass =
+      GSB->resolveEquivalenceClass(BaseTy,
+                                   ArchetypeResolutionKind::CompleteWellFormed);
+    if (!EquivClass) return;
 
-    if (auto Concrete = PA->getConcreteType()) {
-      BaseTy = Concrete;
+    if (EquivClass->concreteType) {
+      BaseTy = EquivClass->concreteType;
     } else {
       // Conformances
-      for (auto Proto : PA->getConformsTo()) {
+      for (const auto &Conforms : EquivClass->conformsTo) {
         lookupVisibleProtocolMemberDecls(
-            BaseTy, Proto->getDeclaredType(), Consumer, CurrDC, LS,
-            getReasonForSuper(Reason), TypeResolver, GSB, Visited);
+            BaseTy, Conforms.first->getDeclaredType(), Consumer, CurrDC,
+            LS, getReasonForSuper(Reason), TypeResolver, GSB, Visited);
       }
 
       // Superclass.
-      if (auto Superclass = PA->getSuperclass()) {
-        lookupVisibleMemberDeclsImpl(Superclass, Consumer, CurrDC, LS,
-                                     getReasonForSuper(Reason), TypeResolver,
-                                     GSB, Visited);
+      if (EquivClass->superclass) {
+        lookupVisibleMemberDeclsImpl(EquivClass->superclass, Consumer, CurrDC,
+                                     LS, getReasonForSuper(Reason),
+                                     TypeResolver, GSB, Visited);
       }
       return;
     }
@@ -745,7 +745,7 @@ public:
 
     if (TypeResolver) {
       TypeResolver->resolveDeclSignature(VD);
-      TypeResolver->resolveAccessibility(VD);
+      TypeResolver->resolveAccessControl(VD);
     }
 
     if (VD->isInvalid()) {

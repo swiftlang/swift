@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 // High-level tests that DI handles early returns from failable and throwing
 // initializers properly. The main complication is conditional release of self
@@ -1338,8 +1338,9 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb6:
 // CHECK-NEXT:    br bb8
 // CHECK:       bb7:
-// CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick ThrowDerivedClass.Type, %1 : $ThrowDerivedClass
-// CHECK-NEXT:    dealloc_partial_ref %1 : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
+// CHECK-NEXT:    [[RELOADED_SELF:%.*]] = load [[SELF_BOX]]
+// CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick ThrowDerivedClass.Type, [[RELOADED_SELF]] : $ThrowDerivedClass
+// CHECK-NEXT:    dealloc_partial_ref [[RELOADED_SELF]] : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
 // CHECK-NEXT:    br bb8
 // CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]

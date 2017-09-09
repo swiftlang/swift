@@ -94,7 +94,7 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 163,
     key.length: 3
   },
@@ -119,7 +119,7 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 216,
     key.length: 3
   }
@@ -177,6 +177,7 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.name: "fooHelperFunc1(_:)",
     key.offset: 74,
     key.length: 40,
+    key.typename: "Int32",
     key.nameoffset: 79,
     key.namelength: 26,
     key.substructure: [

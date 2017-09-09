@@ -1,3 +1,6 @@
+from kinds import lowercase_first_word
+
+
 class Token(object):
     """
     Represents the specification for a Token in the TokenSyntax file.
@@ -8,6 +11,12 @@ class Token(object):
         self.kind = kind
         self.text = text or ""
         self.is_keyword = is_keyword
+
+    def swift_kind(self):
+        name = lowercase_first_word(self.name)
+        if self.is_keyword:
+            return name + 'Keyword'
+        return name
 
 
 class Keyword(Token):
@@ -120,6 +129,7 @@ SYNTAX_TOKENS = [
     Token('InfixQuestionMark', 'question_infix', text='?'),
     Token('ExclamationMark', 'exclaim_postfix', text='!'),
     Token('Identifier', 'identifier'),
+    Token('DollarIdentifier', 'dollarident'),
     Token('UnspacedBinaryOperator', 'oper_binary_unspaced'),
     Token('SpacedBinaryOperator', 'oper_binary_spaced'),
     Token('PrefixOperator', 'oper_prefix'),

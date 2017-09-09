@@ -98,6 +98,10 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
   case PlatformConditionKind::Runtime:
     return contains(SupportedConditionalCompilationRuntimes, Value,
                     suggestions);
+  case PlatformConditionKind::CanImport:
+    // All importable names are valid.
+    // FIXME: Perform some kind of validation of the string?
+    return true;
   }
   llvm_unreachable("Unhandled enum value");
 }

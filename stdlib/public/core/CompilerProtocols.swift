@@ -771,9 +771,6 @@ public protocol _ExpressibleByFileReferenceLiteral {
 public protocol _DestructorSafeContainer {
 }
 
-@available(*, unavailable, renamed: "Bool")
-public typealias BooleanType = Bool
-
 // Deprecated by SE-0115.
 
 @available(*, deprecated, renamed: "ExpressibleByNilLiteral")

@@ -535,69 +535,6 @@ extension LazyCollectionProtocol
   }
 }
 
-@available(*, unavailable, renamed: "ReversedCollection")
-public typealias ReverseCollection<Base : BidirectionalCollection> =
-  ReversedCollection<Base>
-
-@available(*, unavailable, renamed: "ReversedRandomAccessCollection")
-public typealias ReverseRandomAccessCollection<Base : RandomAccessCollection> =
-  ReversedRandomAccessCollection<Base>
-
-extension ReversedCollection {
-  @available(*, unavailable, renamed: "BidirectionalCollection.reversed(self:)")
-  public init(_ base: Base) {
-    Builtin.unreachable()
-  }
-}
-
-extension ReversedRandomAccessCollection {
-  @available(*, unavailable, renamed: "RandomAccessCollection.reversed(self:)")
-  public init(_ base: Base) {
-    Builtin.unreachable()
-  }
-}
-
-extension BidirectionalCollection {
-  @available(*, unavailable, renamed: "reversed()")
-  public func reverse() -> ReversedCollection<Self> {
-    Builtin.unreachable()
-  }
-}
-
-extension RandomAccessCollection {
-  @available(*, unavailable, renamed: "reversed()")
-  public func reverse() -> ReversedRandomAccessCollection<Self> {
-    Builtin.unreachable()
-  }
-}
-
-extension LazyCollectionProtocol
-  where
-  Self : BidirectionalCollection,
-  Elements : BidirectionalCollection
-{
-
-  @available(*, unavailable, renamed: "reversed()")
-  public func reverse() -> LazyCollection<
-    ReversedCollection<Elements>
-  > {
-    Builtin.unreachable()
-  }
-}
-
-extension LazyCollectionProtocol
-  where
-  Self : RandomAccessCollection,
-  Elements : RandomAccessCollection
-{
-  @available(*, unavailable, renamed: "reversed()")
-  public func reverse() -> LazyCollection<
-    ReversedRandomAccessCollection<Elements>
-  > {
-    Builtin.unreachable()
-  }
-}
-
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

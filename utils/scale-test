@@ -15,15 +15,18 @@
 from __future__ import print_function
 
 import argparse
+import functools
 import json
 import math
 import os
 import os.path
+import random
 import shutil
 import subprocess
 import sys
 import tempfile
-
+from collections import namedtuple
+from operator import attrgetter
 import gyb
 
 
@@ -101,12 +104,17 @@ def run_once_with_primary(args, ast, rng, primary_idx):
             trace = "trace.txt"
             script = ("pid$target:swiftc:*%s*:entry { @[probefunc] = count() }"
                       % args.select)
-            subprocess.check_call(
-                ["sudo", "dtrace", "-q",
-                 "-o", trace,
-                 "-b", "256",
-                 "-n", script,
-                 "-c", " ".join(command)], cwd=d)
+            try:
+                subprocess.check_call(
+                    ["sudo", "dtrace", "-q",
+                     "-o", trace,
+                     "-b", "256",
+                     "-n", script,
+                     "-c", " ".join(command)], cwd=d)
+            except subprocess.CalledProcessError as e:
+                if e.returncode != args.expected_exit_code:
+                    raise
+
             r = {fields[0]: int(fields[1]) for fields in
                  [line.split() for line in open(os.path.join(d, trace))]
                  if len(fields) == 2}
@@ -117,7 +125,12 @@ def run_once_with_primary(args, ast, rng, primary_idx):
             argv = command + ["-Xllvm", "-stats",
                               "-Xllvm", "-stats-json",
                               "-Xllvm", "-info-output-file=" + stats]
-            subprocess.check_call(argv, cwd=d)
+            try:
+                subprocess.check_call(argv, cwd=d)
+            except subprocess.CalledProcessError as e:
+                if e.returncode != args.expected_exit_code:
+                    raise
+
             with open(os.path.join(d, stats)) as f:
                 r = json.load(f)
     finally:
@@ -157,71 +170,312 @@ def run_many(args):
 
     ast = gyb.parse_template(args.file.name, args.file.read())
     rng = range(args.begin, args.end, args.step)
+    if args.step > (args.end - args.begin):
+        print("Step value", args.step,
+              "is too large for the range", str((args.begin, args.end)) + ".",
+              "Have you forgotten to override it?")
+        exit(1)
     if args.multi_file or args.sum_multi:
         return (rng, [run_once(args, ast, range(i)) for i in rng])
     else:
         return (rng, [run_once(args, ast, [r]) for r in rng])
 
 
-def is_small(x):
-    return abs(x) < 1e-9
+somewhat_small = 1e-4
 
 
-def linear_regression(x, y):
-    # By the book: https://en.wikipedia.org/wiki/Simple_linear_regression
-    n = float(len(x))
-    assert n == len(y)
+def is_somewhat_small(x):
+    return abs(x) < somewhat_small
+
+
+def tup_add(t1, t2):
+    return tuple(a + b for (a, b) in zip(t1, t2))
+
+
+def tup_sub(t1, t2):
+    return tuple(a - b for (a, b) in zip(t1, t2))
+
+
+def tup_mul(s, t):
+    return tuple(s * v for v in t)
+
+
+def tup_distance(t1, t2):
+    return math.sqrt(sum((a - b) ** 2 for (a, b) in zip(t1, t2)))
+
+
+def centroid(tuples):
+    n = len(tuples)
     if n == 0:
-        return 0, 0
-    sum_x = sum(x)
-    sum_y = sum(y)
-    sum_prod = sum(a * b for a, b in zip(x, y))
-    sum_x_sq = sum(a ** 2 for a in x)
-    sum_y_sq = sum(b ** 2 for b in y)
-    mean_x = sum_x / n
-    mean_y = sum_y / n
-    mean_prod = sum_prod / n
-    mean_x_sq = sum_x_sq / n
-    mean_y_sq = sum_y_sq / n
-    covar_xy = mean_prod - mean_x * mean_y
-    var_x = mean_x_sq - mean_x**2
-    var_y = mean_y_sq - mean_y**2
-    slope = covar_xy / var_x
-    inter = mean_y - slope * mean_x
-
-    # Compute the correlation coefficient aka r^2, to compare goodness-of-fit.
-    if is_small(var_y):
-        # all of the outputs are the same, so this is a perfect fit
-        assert is_small(covar_xy)
-        cor_coeff_sq = 1.0
-    elif is_small(var_x):
-        # all of the inputs are the same, and the outputs are different, so
-        # this is a completely imperfect fit
-        assert is_small(covar_xy)
-        cor_coeff_sq = 0.0
-    else:
-        cor_coeff_sq = covar_xy**2 / (var_x * var_y)
-
-    return slope, inter, cor_coeff_sq
+        return 0.0
+    tupsz = len(tuples[0])
+    zero = (0,) * tupsz
+    s = functools.reduce(tup_add, tuples, zero)
+    return tup_mul(1.0 / float(n), s)
 
 
-# Y = a * X^b, returns a, b, R^2
-def fit_polynomial_model(x, y):
-    # transform into linear regression via log(Y) = b*log(X) + log(a)
-    log_x = [math.log(val) for val in x]
-    log_y = [math.log(val) for val in y]
-
-    b, log_a, r2 = linear_regression(log_x, log_y)
-    return b, math.exp(log_a), r2
+def converged(ctr, simplex, epsilon):
+    return max(tup_distance(ctr, p.loc) for p in simplex) < epsilon
 
 
-# Y = a * b^X, returns a, b, R^2
-def fit_exponential_model(x, y):
-    # transform into linear regression via log(Y) = log(b) * X + log(a)
-    log_y = [math.log(val) for val in y]
+def Nelder_Mead_simplex(objective, params, bounds, epsilon=1.0e-6):
+    # By the book: https://en.wikipedia.org/wiki/Nelder%E2%80%93Mead_method
+    ndim = len(params)
+    assert(ndim >= 2)
 
-    log_b, log_a, r2 = linear_regression(x, log_y)
-    return math.exp(log_b), math.exp(log_a), r2
+    def named(tup):
+        return params.__new__(params.__class__, *tup)
+
+    def f(tup):
+        return objective(named(tup))
+
+    locs = [tuple(random.uniform(*b) for b in bounds)
+            for _ in range(ndim + 1)]
+    SimplexPoint = namedtuple("SimplexPoint", ["loc", "val"])
+    simplex = [SimplexPoint(loc=l, val=f(l)) for l in locs]
+
+    # Algorithm parameters
+    alpha = 1.0
+    gamma = 2.0
+    rho = 0.5
+    sigma = 0.5
+    max_iter = 1024
+
+    while True:
+
+        # 1. Order
+        simplex.sort(key=attrgetter('val'))
+
+        # 2. Centroid
+        x0 = centroid([s.loc for s in simplex[:-1]])
+
+        max_iter -= 1
+        if max_iter < 0 or converged(x0, simplex, epsilon):
+            return (named(simplex[0].loc), simplex[0].val)
+
+        # (convenient names for best-point and value)
+        xb = simplex[0].loc
+        vb = simplex[0].val
+
+        # (convenient names for worst-point and value)
+        xw = simplex[-1].loc
+        vw = simplex[-1].val
+
+        # 3. Reflection
+        xr = tup_add(x0, tup_mul(alpha, tup_sub(x0, xw)))
+        vr = f(xr)
+        if vb <= vr and vr < simplex[-2].val:
+            simplex[-1] = SimplexPoint(loc=xr, val=vr)
+            continue
+
+        # 4. Expansion
+        if vr < vb:
+            xe = tup_add(x0, tup_mul(gamma, tup_sub(xr, x0)))
+            ve = f(xe)
+            if ve < vr:
+                simplex[-1] = SimplexPoint(loc=xe, val=ve)
+            else:
+                simplex[-1] = SimplexPoint(loc=xr, val=vr)
+            continue
+
+        # 5. Contraction
+        assert(vr >= simplex[-2].val)
+        xc = tup_add(x0, tup_mul(rho, tup_sub(xw, x0)))
+        vc = f(xc)
+        if vc < vw:
+            simplex[-1] = SimplexPoint(loc=xc, val=vc)
+            continue
+
+        # 6. Shrink
+        simplex = (simplex[:1] +
+                   [SimplexPoint(loc=l, val=f(l))
+                    for l in [tup_add(xb, tup_mul(sigma, tup_sub(p.loc, xb)))
+                              for p in simplex[1:]]])
+
+
+# Nonlinear regression entrypoint
+#
+# Takes an objective function of type
+#
+#   objective: (params:namedtuple, x:float) -> y:float
+#
+# Along with a set of parameters, bounds on the parameters, and some xs and
+# ys that make up a dataset. Creates a local function (over _just_
+# parameters) that calculates the sum-of-squares-of-residuals between the
+# objective-at-those-params and the data. Then runs a simple
+# coordinate_descent nonlinear optimization on the parameter space until it
+# converges. Then calculates the r_squared (coefficient of determination
+# a.k.a. goodness-of-fit, a number betwee 0 and 1 with 1 meaning "fits
+# perfectly") and finally returns (fit_params, r_squared).
+def fit_function_to_data_by_least_squares(objective, params, bounds, xs, ys):
+
+    assert(len(ys) > 0)
+    mean_y = sum(ys) / len(ys)
+    ss_total = sum((y - mean_y) ** 2 for y in ys)
+    data = zip(xs, ys)
+
+    def inner(ps):
+        s = 0.0
+        for (x, y) in data:
+            s += (y - objective(ps, x)) ** 2
+        return s
+
+    retries = 100
+    for _ in range(retries):
+        (fit_params, ss_residuals) = Nelder_Mead_simplex(inner, params, bounds)
+        if is_somewhat_small(ss_total):
+            ss_total = somewhat_small
+        if is_somewhat_small(ss_residuals / ss_total):
+            r_squared = 1.0 - (ss_residuals / ss_total)
+            return (fit_params, r_squared)
+        else:
+            # Bad fit, restart
+            pass
+    raise ValueError("Nelder-Mead failed %d retries" % retries)
+
+
+# Fit a 3-parameter polynomial model f(x) = const + coeff * x^exp to a set
+# of data (lists of xs and ys). Returns (exp, coeff, fit).
+def fit_polynomial_model(xs, ys):
+
+    # Don't bother running a simplex around a flat landscape if the input is
+    # constant.
+    if all(y == ys[0] for y in ys):
+        return (0.0, 0.0, 1.0)
+
+    PolynomialParams = namedtuple('PolynomialParams',
+                                  ['const', 'coeff', 'exp'])
+    params = PolynomialParams(const=0.0, coeff=1.0, exp=1.0)
+    mag = max(abs(y) for y in ys)
+    bounds = PolynomialParams(const=(0, mag),
+                              coeff=(0, mag),
+                              exp=(0.25, 3.0))
+
+    def objective(params, x):
+        return params.const + params.coeff * (x ** params.exp)
+
+    (p, f) = fit_function_to_data_by_least_squares(objective,
+                                                   params, bounds,
+                                                   xs, ys)
+    e = p.exp
+    if is_somewhat_small(p.coeff):
+        e = 0.0
+    return (e, p.coeff, f)
+
+
+# Fit a 3-parameter exponential model f(x) = const + coeff * base^x to
+# a set of data (lists of xs and ys). Returns (base, coeff, fit).
+def fit_exponential_model(xs, ys):
+    ExponentialParams = namedtuple('ExponentialParams',
+                                   ['base', 'coeff', 'const'])
+    params = ExponentialParams(base=1.0, const=1.0, coeff=1.0)
+    mag = max(abs(y) for y in ys)
+    bounds = ExponentialParams(base=(0.0, 10.0),
+                               coeff=(-mag, mag),
+                               const=(-mag, mag))
+
+    def objective(params, x):
+        return params.const + params.coeff * (params.base ** x)
+
+    (p, f) = fit_function_to_data_by_least_squares(objective,
+                                                   params, bounds,
+                                                   xs, ys)
+    b = p.base
+    if is_somewhat_small(p.coeff):
+        b = 0.0
+    return (b, p.coeff, f)
+
+
+def self_test():
+    import unittest
+
+    class Tests(unittest.TestCase):
+
+        def check_polyfit(self, xs, ys, exp, fit=1.0):
+            (e, _, f) = fit_polynomial_model(xs, ys)
+            print("polyfit(xs, ys, exp=%f, fit=%f) = (%f, %f)" %
+                  (exp, fit, e, f))
+            self.assertAlmostEqual(e, exp, places=0)
+            self.assertAlmostEqual(f, fit, places=0)
+
+        def check_expfit(self, xs, ys, base, fit=1.0):
+            (b, _, f) = fit_exponential_model(xs, ys)
+            print("expfit(xs, ys, base=%f, fit=%f) = (%f, %f)" %
+                  (base, fit, b, f))
+            self.assertAlmostEqual(b, base, places=0)
+            self.assertAlmostEqual(f, fit, places=0)
+
+        def test_tuples(self):
+            self.assertEqual(tup_distance((1, 0, 0), (0, 0, 0)), 1.0)
+            self.assertEqual(tup_distance((1, 0, 0), (1, 0, 0)), 0.0)
+            self.assertEqual(tup_distance((2, 0, 2, 0),
+                                          (0, 2, 0, 2)), 4.0)
+            self.assertEqual(tup_add((1, 0, 0), (1, 0, 0)), (2, 0, 0))
+            self.assertEqual(tup_add((1, 3, 1), (1, 2, 5)), (2, 5, 6))
+            self.assertEqual(centroid([(1, 0),
+                                       (0, 1)]), (0.5, 0.5))
+            self.assertEqual(centroid([(1, 0, 0, 0),
+                                       (0, 1, 0, 0),
+                                       (0, 0, 1, 0),
+                                       (0, 0, 0, 1)]),
+                             (0.25, 0.25, 0.25, 0.25))
+
+        def test_constant(self):
+            self.check_polyfit([1, 2, 3, 4, 5, 6],
+                               [5, 5, 5, 5, 5, 5], 0)
+
+        def test_linear1(self):
+            self.check_polyfit([1, 2, 3, 4, 5, 6],
+                               [1, 2, 3, 4, 5, 6], 1)
+
+        def test_linear2(self):
+            self.check_polyfit([1, 2, 3, 4, 5, 6],
+                               [100, 200, 300, 400, 500, 600], 1)
+
+        def test_linear3(self):
+            self.check_polyfit([5, 10, 15],
+                               [307, 632, 957], 1)
+
+        def test_linear_offset(self):
+            self.check_polyfit([1, 2, 3, 4, 5, 6],
+                               [1000 + i for i in range(1, 7)], 1)
+
+        def test_linear_offset_scaled(self):
+            self.check_polyfit([1, 2, 3, 4, 5, 6],
+                               [1000 + 2 * i for i in range(1, 7)], 1)
+
+        def test_quadratic2(self):
+            self.check_polyfit([10, 20, 30, 40, 50, 60],
+                               [100, 400, 900, 1600, 2500, 3600], 2)
+
+        def test_exp_model_of_quadratic(self):
+            with self.assertRaises(ValueError):
+                self.check_expfit([10, 20, 30, 40, 50, 60],
+                                  [100, 400, 900, 1600, 2500, 3600], 2)
+
+        def test_poly_model_of_exp(self):
+            with self.assertRaises(ValueError):
+                self.check_polyfit([10, 20, 30, 40, 50, 60],
+                                   [1002, 1004, 1008, 1016, 1032], 2)
+
+        def test_quadratic_offset(self):
+            self.check_polyfit([10, 20, 30, 40, 50, 60],
+                               [1100, 1400, 1900, 2600, 3500, 4600], 2)
+
+        def test_expt(self):
+            self.check_expfit([1, 2, 3, 4, 5],
+                              [2, 4, 8, 16, 32], 2)
+
+        def test_expt_offset(self):
+            self.check_expfit([1, 2, 3, 4, 5],
+                              [1002, 1004, 1008, 1016, 1032], 2)
+
+        def test_expt_scale_offset(self):
+            self.check_expfit([1, 2, 3, 4, 5],
+                              [2004, 2008, 2016, 2032, 2064], 2)
+
+    suite = unittest.TestLoader().loadTestsFromTestCase(Tests)
+    return unittest.TextTestRunner(verbosity=2).run(suite)
 
 
 def report(args, rng, runs):
@@ -236,11 +490,27 @@ def report(args, rng, runs):
     for k in keys:
         vals = [r[k] for r in runs]
         bounded = [max(v, 1) for v in vals]
-        p_b, p_a, p_r2 = fit_polynomial_model(rng, bounded)
-        e_b, e_a, e_r2 = fit_exponential_model(rng, bounded)
+        one_fit = False
+        p_b, p_a, p_r2 = (1.0, 1.0, 0.0)
+        e_b, e_a, e_r2 = (1.0, 1.0, 0.0)
+        try:
+            p_b, p_a, p_r2 = fit_polynomial_model(rng, bounded)
+            if p_r2 > 0.9:
+                one_fit = True
+        except ValueError:
+            pass
+        try:
+            e_b, e_a, e_r2 = fit_exponential_model(rng, bounded)
+            if e_r2 > 0.9:
+                one_fit = True
+        except ValueError:
+            pass
+        if not one_fit:
+            print("failed to fit either polynomial or exponential model to " +
+                  repr(vals))
+            return True
         if p_r2 >= e_r2:
             # polynomial is best
-            p_b = 0 if is_small(p_b) else p_b
             rows.append((False, p_b, k, vals))
         else:
             # exponential is best
@@ -263,6 +533,9 @@ def report(args, rng, runs):
             print("O(%s) : %s" % (formatted, k))
             if args.values:
                 print("                = ", vals)
+
+    if args.invert_result:
+        bad = not bad
     return bad
 
 
@@ -325,6 +598,15 @@ def main():
     parser.add_argument(
         '--debug', action='store_true',
         default=False, help='invoke lldb on each scale test')
+    parser.add_argument(
+        '--self-test', action='store_true',
+        default=False, help='run arithmetic unit-tests of scale-test itself')
+    parser.add_argument(
+        '--expected-exit-code', type=int, default=0,
+        help='exit code expected from the compiler invocation')
+    parser.add_argument(
+        '--invert-result', action='store_true',
+        default=False, help='invert the result of the data fitting')
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
@@ -346,6 +628,8 @@ def main():
         default=False, help='simulate a multi-primary run and sum stats')
 
     args = parser.parse_args(sys.argv[1:])
+    if args.self_test:
+        exit(self_test())
     (rng, runs) = run_many(args)
     if report(args, rng, runs):
         exit(1)

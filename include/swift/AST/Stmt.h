@@ -270,8 +270,6 @@ public:
   
   const VersionRange &getAvailableRange() const { return AvailableRange; }
   void setAvailableRange(const VersionRange &Range) { AvailableRange = Range; }
-  
-  void getPlatformKeywordLocs(SmallVectorImpl<SourceLoc> &PlatformLocs);
 };
 
 

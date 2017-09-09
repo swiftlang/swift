@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership %s -swift-version 5 | %FileCheck %s
 
 // Ensure that convenience initializers on concrete types can
 // delegate to factory initializers defined in protocol
@@ -30,11 +30,11 @@ class TrivialClass : TriviallyConstructible {
   // CHECK-NEXT:  [[SELF_BOX:%.*]] = alloc_stack $TrivialClass
   // CHECK-NEXT:  debug_value
   // CHECK-NEXT:  store [[OLD_SELF]] to [[SELF_BOX]]
-  // CHECK-NEXT:  [[METATYPE:%.*]] = value_metatype $@thick TrivialClass.Type, %1
+  // CHECK-NEXT:  [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self TrivialClass.Type, %1
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[FN:%.*]] = function_ref @_T0023definite_init_protocol_B022TriviallyConstructiblePAAExSi6middle_tcfC
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $TrivialClass
-  // CHECK-NEXT:  apply [[FN]]<TrivialClass>([[RESULT]], %0, [[METATYPE]])
+  // CHECK-NEXT:  apply [[FN]]<@dynamic_self TrivialClass>([[RESULT]], %0, [[METATYPE]])
   // CHECK-NEXT:  [[NEW_SELF:%.*]] = load [[RESULT]]
   // CHECK-NEXT:  store [[NEW_SELF]] to [[SELF_BOX]]
   // CHECK-NEXT:  [[METATYPE:%.*]] = value_metatype $@thick TrivialClass.Type, %1

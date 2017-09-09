@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 import Swift
 
@@ -206,7 +206,7 @@ class Class {}
 protocol HasClassAssoc { associatedtype Assoc : Class }
 
 // CHECK-LABEL: sil hidden @_T016generic_closures027captures_class_constrained_A0yx_5AssocQzADc1ftAA08HasClassF0RzlF
-// CHECK: bb0([[ARG1:%.*]] : $*T, [[ARG2:%.*]] : $@callee_owned (@owned T.Assoc) -> @owned T.Assoc):
+// CHECK: bb0([[ARG1:%.*]] : @trivial $*T, [[ARG2:%.*]] : @owned $@callee_owned (@owned T.Assoc) -> @owned T.Assoc):
 // CHECK: [[GENERIC_FN:%.*]] = function_ref @_T016generic_closures027captures_class_constrained_A0yx_5AssocQzADc1ftAA08HasClassF0RzlFA2DcycfU_
 // CHECK: [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
 // CHECK: [[CONCRETE_FN:%.*]] = partial_apply [[GENERIC_FN]]<T>([[ARG2_COPY]])

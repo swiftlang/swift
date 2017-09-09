@@ -67,7 +67,7 @@ std::unique_ptr<Job>
 ToolChain::constructJob(const JobAction &JA,
                         Compilation &C,
                         SmallVectorImpl<const Job *> &&inputs,
-                        const ActionList &inputActions,
+                        ArrayRef<const Action *> inputActions,
                         std::unique_ptr<CommandOutput> output,
                         const OutputInfo &OI) const {
   JobContext context{C, inputs, inputActions, *output, OI};

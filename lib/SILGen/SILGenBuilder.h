@@ -9,10 +9,20 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// \file
+///
+/// This file defines SILGenBuilder, a subclass of SILBuilder that provides APIs
+/// that traffic in ManagedValue. The intention is that if one is using a
+/// SILGenBuilder, the SILGenBuilder will handle preserving ownership invariants
+/// (or assert upon failure) freeing the implementor of such concerns.
+///
+//===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILGEN_SILGENBUILDER_H
 #define SWIFT_SILGEN_SILGENBUILDER_H
 
+#include "Cleanup.h"
 #include "JumpDest.h"
 #include "ManagedValue.h"
 #include "RValue.h"
@@ -91,9 +101,13 @@ public:
                             ArrayRef<ProtocolConformanceRef> conformances);
 
   InitExistentialValueInst *
-  createInitExistentialValue(SILLocation Loc, SILType ExistentialType,
-                              CanType FormalConcreteType, SILValue Concrete,
-                              ArrayRef<ProtocolConformanceRef> Conformances);
+  createInitExistentialValue(SILLocation loc, SILType existentialType,
+                             CanType formalConcreteType, SILValue concrete,
+                             ArrayRef<ProtocolConformanceRef> conformances);
+  ManagedValue
+  createInitExistentialValue(SILLocation loc, SILType existentialType,
+                             CanType formalConcreteType, ManagedValue concrete,
+                             ArrayRef<ProtocolConformanceRef> conformances);
 
   InitExistentialMetatypeInst *
   createInitExistentialMetatype(SILLocation loc, SILValue metatype,
@@ -120,10 +134,15 @@ public:
   //
 
   using SILBuilder::createStructExtract;
-  using SILBuilder::createCopyValue;
-  using SILBuilder::createCopyUnownedValue;
   ManagedValue createStructExtract(SILLocation loc, ManagedValue base,
                                    VarDecl *decl);
+
+  using SILBuilder::createRefElementAddr;
+  ManagedValue createRefElementAddr(SILLocation loc, ManagedValue operand,
+                                    VarDecl *field, SILType resultTy);
+
+  using SILBuilder::createCopyValue;
+  using SILBuilder::createCopyUnownedValue;
 
   /// Emit a +1 copy on \p originalValue that lives until the end of the current
   /// lexical scope.
@@ -228,7 +247,6 @@ public:
   using SILBuilder::createUnconditionalCheckedCastValue;
   ManagedValue
   createUnconditionalCheckedCastValue(SILLocation loc,
-                                      CastConsumptionKind consumption,
                                       ManagedValue operand, SILType type);
   using SILBuilder::createUnconditionalCheckedCast;
   ManagedValue createUnconditionalCheckedCast(SILLocation loc,
@@ -254,9 +272,21 @@ public:
   ManagedValue createUncheckedRefCast(SILLocation loc, ManagedValue original,
                                       SILType type);
 
+  using SILBuilder::createUncheckedBitCast;
+  ManagedValue createUncheckedBitCast(SILLocation loc, ManagedValue original,
+                                      SILType type);
+
   using SILBuilder::createOpenExistentialRef;
   ManagedValue createOpenExistentialRef(SILLocation loc, ManagedValue arg,
                                         SILType openedType);
+
+  using SILBuilder::createOpenExistentialValue;
+  ManagedValue createOpenExistentialValue(SILLocation loc,
+                                          ManagedValue original, SILType type);
+
+  using SILBuilder::createOpenExistentialBoxValue;
+  ManagedValue createOpenExistentialBoxValue(SILLocation loc,
+                                          ManagedValue original, SILType type);
 
   using SILBuilder::createOptionalSome;
   ManagedValue createOptionalSome(SILLocation Loc, ManagedValue Arg);
@@ -270,6 +300,15 @@ public:
   /// it.
   ManagedValue createStore(SILLocation loc, ManagedValue value,
                            SILValue address, StoreOwnershipQualifier qualifier);
+
+  using SILBuilder::createSuperMethod;
+  ManagedValue createSuperMethod(SILLocation loc, ManagedValue operand,
+                                 SILDeclRef member, SILType methodTy,
+                                 bool isVolatile = false);
+
+  using SILBuilder::createValueMetatype;
+  ManagedValue createValueMetatype(SILLocation loc, SILType metatype,
+                                   ManagedValue base);
 };
 
 class SwitchCaseFullExpr;
@@ -345,27 +384,6 @@ public:
 
 private:
   SILGenFunction &getSGF() const { return builder.getSILGenFunction(); }
-};
-
-class CleanupCloner {
-  SILGenFunction &SGF;
-  bool hasCleanup;
-  bool isLValue;
-
-public:
-  CleanupCloner(SILGenFunction &SGF, ManagedValue mv)
-      : SGF(SGF), hasCleanup(mv.hasCleanup()), isLValue(mv.isLValue()) {}
-
-  CleanupCloner(SILGenBuilder &builder, ManagedValue mv)
-      : CleanupCloner(builder.getSILGenFunction(), mv) {}
-
-  CleanupCloner(SILGenFunction &SGF, const RValue &rv)
-      : SGF(SGF), hasCleanup(rv.isPlusOne(SGF)), isLValue(false) {}
-
-  CleanupCloner(SILGenBuilder &builder, const RValue &rv)
-      : CleanupCloner(builder.getSILGenFunction(), rv) {}
-
-  ManagedValue clone(SILValue value) const;
 };
 
 } // namespace Lowering

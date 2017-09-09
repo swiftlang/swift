@@ -27,6 +27,8 @@ namespace llvm {
 }
 
 namespace swift {
+  class AssociatedConformance;
+  class AssociatedType;
   class CanType;
   class FuncDecl;
   class ProtocolConformanceRef;
@@ -69,7 +71,7 @@ namespace irgen {
   llvm::Value *emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                              llvm::Value *parentMetadata,
                                              llvm::Value *wtable,
-                                           AssociatedTypeDecl *associatedType);
+                                             AssociatedType associatedType);
 
   /// Add the witness parameters necessary for calling a function with
   /// the given generics clause.

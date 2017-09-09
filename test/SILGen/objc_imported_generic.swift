@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -sil-serialize-witness-tables %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -sil-serialize-witness-tables %s -enable-sil-ownership | %FileCheck %s
 // For integration testing, ensure we get through IRGen too.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -verify -DIRGEN_INTEGRATION_TEST %s
 
@@ -25,12 +25,12 @@ public func genericMethodOnAnyObjectChained(o: AnyObject, b: Bool) -> AnyObject?
 }
 
 // CHECK-LABEL: sil @_T021objc_imported_generic0C24MethodOnAnyObjectChainedyXlSgyXl1o_Sb1btF
-// CHECK: bb0([[ANY:%.*]] : $AnyObject, [[BOOL:%.*]] : $Bool):
+// CHECK: bb0([[ANY:%.*]] : @owned $AnyObject, [[BOOL:%.*]] : @trivial $Bool):
 // CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.thing!1.foreign, bb1
-// CHECK:   bb1({{%.*}} : $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
+// CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
 // CHECK: } // end sil function '_T021objc_imported_generic0C24MethodOnAnyObjectChainedyXlSgyXl1o_Sb1btF'
 
 public func genericSubscriptOnAnyObject(o: AnyObject, b: Bool) -> AnyObject? {
@@ -42,7 +42,7 @@ public func genericSubscriptOnAnyObject(o: AnyObject, b: Bool) -> AnyObject? {
 // CHCEK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.subscript!getter.1.foreign, bb1
-// CHECK:   bb1({{%.*}} : $@convention(objc_method) @pseudogeneric (UInt16, @opened([[TAG]]) AnyObject) -> @autoreleased AnyObject):
+// CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) @pseudogeneric (UInt16, @opened([[TAG]]) AnyObject) -> @autoreleased AnyObject):
 // CHECK: } // end sil function '_T021objc_imported_generic0C20SubscriptOnAnyObjectyXlSgyXl1o_Sb1btF'
 
 public func genericPropertyOnAnyObject(o: AnyObject, b: Bool) -> AnyObject?? {
@@ -50,12 +50,12 @@ public func genericPropertyOnAnyObject(o: AnyObject, b: Bool) -> AnyObject?? {
 }
 
 // CHECK-LABEL: sil @_T021objc_imported_generic0C19PropertyOnAnyObjectyXlSgSgyXl1o_Sb1btF
-// CHECK: bb0([[ANY:%.*]] : $AnyObject, [[BOOL:%.*]] : $Bool):
+// CHECK: bb0([[ANY:%.*]] : @owned $AnyObject, [[BOOL:%.*]] : @trivial $Bool):
 // CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.propertyThing!getter.1.foreign, bb1
-// CHECK:   bb1({{%.*}} : $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
+// CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
 // CHECK: } // end sil function '_T021objc_imported_generic0C19PropertyOnAnyObjectyXlSgSgyXl1o_Sb1btF'
 
 public protocol ThingHolder {
@@ -89,9 +89,9 @@ public func genericBlockBridging<T: Ansible>(x: GenericClass<T>) {
 }
 
 // CHECK-LABEL: sil @_T021objc_imported_generic0C13BlockBridging{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[BLOCK_TO_FUNC:%.*]] = function_ref @_T0xxIyBya_xxIxxo_RlzC21objc_imported_generic7AnsibleRzlTR
+// CHECK:         [[BLOCK_TO_FUNC:%.*]] = function_ref @_T0xxIyBya_xxIxxo_21objc_imported_generic7AnsibleRzlTR
 // CHECK:         partial_apply [[BLOCK_TO_FUNC]]<T>
-// CHECK:         [[FUNC_TO_BLOCK:%.*]] = function_ref @_T0xxIxxo_xxIyBya_RlzC21objc_imported_generic7AnsibleRzlTR
+// CHECK:         [[FUNC_TO_BLOCK:%.*]] = function_ref @_T0xxIxxo_xxIyBya_21objc_imported_generic7AnsibleRzlTR
 // CHECK:         init_block_storage_header {{.*}} invoke [[FUNC_TO_BLOCK]]<T>
 
 // CHECK-LABEL: sil @_T021objc_imported_generic20arraysOfGenericParam{{[_0-9a-zA-Z]*}}F

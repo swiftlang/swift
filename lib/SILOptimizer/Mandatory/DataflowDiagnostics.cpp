@@ -43,6 +43,8 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
 
   if (auto *FD = FLoc.getAsASTNode<FuncDecl>()) {
     ResTy = FD->getResultInterfaceType();
+  } else if (auto *CD = FLoc.getAsASTNode<ConstructorDecl>()) {
+    ResTy = CD->getResultInterfaceType();
   } else if (auto *CE = FLoc.getAsASTNode<ClosureExpr>()) {
     ResTy = CE->getResultType();
   } else {

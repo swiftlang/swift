@@ -1489,7 +1489,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// - Returns: The element that was removed.
   @_inlineable
   public mutating func _customRemoveLast() -> Element? {
-    _precondition(count > 0, "can't removeLast from an empty ${Self}")
+    _precondition(count > 0, "Can't removeLast from an empty ${Self}")
     // FIXME(performance): if `self` is uniquely referenced, we should remove
     // the element as shown below (this will deallocate the element and
     // decrease memory use).  If `self` is not uniquely referenced, the code
@@ -1573,11 +1573,11 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   @_inlineable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (UnsafeMutablePointer<Element>, Int) throws -> R
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      let r = try body(bufferPointer.baseAddress!, bufferPointer.count)
+      let r = try body(&bufferPointer)
       return r
     }
   }
@@ -2379,34 +2379,6 @@ extension ArraySlice {
         shiftedToStartIndex: _startIndex))
   }
 }
-
-%for (Self, a_Self) in arrayTypes:
-extension ${Self} {
-  @available(*, unavailable, message: "Please use init(repeating:count:) instead")
-  init(count: Int, repeatedValue: Element) {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "remove(at:)")
-  public mutating func removeAtIndex(_ index: Int) -> Element {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "replaceSubrange(_:with:)")
-  public mutating func replaceRange<C>(
-    _ subRange: Range<Int>,
-    with newElements: C
-  ) where C : Collection, C.Element == Element {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "append(contentsOf:)")
-  public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
-    where S.Element == Element {
-    Builtin.unreachable()
-  }
-}
-%end
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

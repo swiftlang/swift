@@ -1250,7 +1250,7 @@ bb0(%0 : $F):
   %1 = alloc_stack $F
   store %0 to %1 : $*F
   strong_retain %0 : $F
-  unconditional_checked_cast_addr take_always F in %1 : $*F to G in %1 : $*F
+  unconditional_checked_cast_addr F in %1 : $*F to G in %1 : $*F
   strong_release %0 : $F
   dealloc_stack %1 : $*F
   %2 = tuple ()

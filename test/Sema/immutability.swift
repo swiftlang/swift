@@ -2,12 +2,12 @@
 
 func markUsed<T>(_ t: T) {}
 
-let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}}
+let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}} {{1-4=var}}
   get {
     return 42
   }
 }
-let bad_property_2: Int = 0 { // expected-error {{'let' declarations cannot be computed properties}} expected-error {{variable with getter/setter cannot have an initial value}}
+let bad_property_2: Int = 0 { // expected-error {{'let' declarations cannot be computed properties}} {{1-4=var}} expected-error {{variable with getter/setter cannot have an initial value}}
   get {
     return 42
   }
@@ -64,7 +64,7 @@ class FooClass {
   nonmutating         // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}} {{3-15=}}
   func bay() {}
 
-  mutating nonmutating // expected-error {{method may not be declared both mutating and nonmutating}} expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}} expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+  mutating nonmutating // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}} expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
   func bax() {}
 
   var x : Int {
@@ -204,6 +204,7 @@ struct TestMutableStruct {
 
   @mutating func mutating_attr() {}  // expected-error {{'mutating' is a declaration modifier, not an attribute}} {{3-4=}}
   @nonmutating func nonmutating_attr() {}  // expected-error {{'nonmutating' is a declaration modifier, not an attribute}} {{3-4=}}
+  @__consuming func consuming_attr() {}  // expected-error {{'__consuming' is a declaration modifier, not an attribute}} {{3-4=}}
 }
 
 func test_mutability() {
@@ -245,23 +246,29 @@ protocol MutatingTestProto {
   mutating
   func mutatingfunc()
   
-  func nonmutatingfunc()  // expected-note {{protocol requires}}
+  func nonmutatingfunc()  // expected-note 2 {{protocol requires}}
+  __consuming
+  func consuming_nonmutating_func()  // expected-note 2 {{protocol requires}}
 }
 
 class TestClass : MutatingTestProto {
   func mutatingfunc() {}  // Ok, doesn't need to be mutating.
   func nonmutatingfunc() {}
+  __consuming // OK, but doesn't make much sense.
+  func consuming_nonmutating_func() {}
 }
 
 struct TestStruct1 : MutatingTestProto {
   func mutatingfunc() {}  // Ok, doesn't need to be mutating.
   func nonmutatingfunc() {}
+  __consuming func consuming_nonmutating_func() {}
 }
 
 struct TestStruct2 : MutatingTestProto {
   mutating
   func mutatingfunc() {}  // Ok, can be mutating.
   func nonmutatingfunc() {}
+  __consuming func consuming_nonmutating_func() {}
 }
 
 struct TestStruct3 : MutatingTestProto {   // expected-error {{type 'TestStruct3' does not conform to protocol 'MutatingTestProto'}}
@@ -269,9 +276,25 @@ struct TestStruct3 : MutatingTestProto {   // expected-error {{type 'TestStruct3
 
   // This is not ok, "nonmutatingfunc" doesn't allow mutating functions.
   mutating
-  func nonmutatingfunc() {}          // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
+  func nonmutatingfunc() {} // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
+  mutating
+  func consuming_nonmutating_func() {} // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
 }
 
+struct TestStruct4 : MutatingTestProto { // expected-error {{type 'TestStruct4' does not conform to protocol 'MutatingTestProto'}}
+  mutating
+  func mutatingfunc() {}  // Ok, can be mutating.
+  func nonmutatingfunc() {}
+  nonmutating func consuming_nonmutating_func() {}  // expected-note {{candidate is marked 'nonmutating' but protocol does not allow it}}
+}
+
+struct TestStruct5 : MutatingTestProto { // expected-error {{type 'TestStruct5' does not conform to protocol 'MutatingTestProto'}}
+  mutating
+  func mutatingfunc() {}  // Ok, can be mutating.
+  __consuming
+  func nonmutatingfunc() {} // expected-note {{candidate is marked '__consuming' but protocol does not allow it}}
+  __consuming func consuming_nonmutating_func() {}
+}
 
 // <rdar://problem/16722603> invalid conformance of mutating setter
 protocol NonMutatingSubscriptable {
@@ -465,8 +488,11 @@ struct F { // expected-note 1 {{in declaration of 'F'}}
   mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{expected declaration}}
   }
   
-  mutating nonmutating func g() {  // expected-error {{method may not be declared both mutating and nonmutating}}
-  }
+  mutating nonmutating func g() {}  // expected-error {{method may not be declared both mutating and nonmutating}}
+  __consuming nonmutating func h() {}  // expected-error {{method may not be declared both __consuming and nonmutating}}
+  __consuming mutating func i() {}  // expected-error {{method may not be declared both __consuming and mutating}}
+  nonmutating mutating func j() {}  // expected-error {{method may not be declared both nonmutating and mutating}}
+  __consuming nonmutating mutating func k() {}  // expected-error {{method may not be declared both __consuming and mutating}} expected-error {{method may not be declared both nonmutating and mutating}}
 }
 
 protocol SingleIntProperty {

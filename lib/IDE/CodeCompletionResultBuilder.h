@@ -108,27 +108,27 @@ public:
     ExpectedTypeRelation = relation;
   }
 
-  void addAccessControlKeyword(Accessibility Access) {
+  void addAccessControlKeyword(AccessLevel Access) {
     switch (Access) {
-    case Accessibility::Private:
+    case AccessLevel::Private:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "private ");
       break;
-    case Accessibility::FilePrivate:
+    case AccessLevel::FilePrivate:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "fileprivate ");
       break;
-    case Accessibility::Internal:
+    case AccessLevel::Internal:
       // 'internal' is the default, don't add it.
       break;
-    case Accessibility::Public:
+    case AccessLevel::Public:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "public ");
       break;
-    case Accessibility::Open:
+    case AccessLevel::Open:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "open ");

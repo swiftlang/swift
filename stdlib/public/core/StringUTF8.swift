@@ -191,7 +191,7 @@ extension String {
       // Ensure j's cache is utf8
       if _slowPath(j._cache.utf8 == nil) {
         j = _index(atEncodedOffset: j.encodedOffset)
-        precondition(j != endIndex, "index out of bounds")
+        precondition(j != endIndex, "Index out of bounds")
       }
       
       let buffer = j._cache.utf8._unsafelyUnwrappedUnchecked
@@ -255,7 +255,7 @@ extension String {
       case .error:
         u8 = Unicode.UTF8.encodedReplacementCharacter
       case .emptyInput:
-        _preconditionFailure("index out of bounds")
+        _preconditionFailure("Index out of bounds")
       }
       return Index(
         encodedOffset: i.encodedOffset &- (u8.count < 4 ? 1 : 2),
@@ -299,7 +299,7 @@ extension String {
       @inline(__always)
       get {
         if _fastPath(_core.asciiBuffer != nil), let ascii = _core.asciiBuffer {
-          _precondition(position < endIndex, "index out of bounds")
+          _precondition(position < endIndex, "Index out of bounds")
           return ascii[position.encodedOffset]
         }
         var j = position
@@ -310,7 +310,7 @@ extension String {
               buffer.index(buffer.startIndex, offsetBy: j._transcodedOffset)]
           }
           j = _index(atEncodedOffset: j.encodedOffset)
-          precondition(j < endIndex, "index out of bounds")
+          precondition(j < endIndex, "Index out of bounds")
         }
       }
     }
@@ -598,9 +598,16 @@ extension String.UTF8View.Index {
   ///   - sourcePosition: A position in a `String` or one of its views.
   ///   - target: The `UTF8View` in which to find the new position.
   public init?(_ sourcePosition: String.Index, within target: String.UTF8View) {
-    guard String.UnicodeScalarView(target._core)._isOnUnicodeScalarBoundary(
-      sourcePosition) else { return nil }
-    self.init(encodedOffset: sourcePosition.encodedOffset)
+    switch sourcePosition._cache {
+    case .utf8:
+      self.init(encodedOffset: sourcePosition.encodedOffset,
+        transcodedOffset:sourcePosition._transcodedOffset, sourcePosition._cache)
+
+    default:
+      guard String.UnicodeScalarView(target._core)._isOnUnicodeScalarBoundary(
+        sourcePosition) else { return nil }
+      self.init(encodedOffset: sourcePosition.encodedOffset)
+    }
   }
 }
 
@@ -615,13 +622,6 @@ extension String.UTF8View : CustomReflectable {
 extension String.UTF8View : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
-  }
-}
-
-extension String {
-  @available(*, unavailable, message: "Please use String.utf8CString instead.")
-  public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
-    Builtin.unreachable()
   }
 }
 

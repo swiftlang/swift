@@ -88,7 +88,7 @@ void BuiltinUnit::LookupCache::lookupValue(
                                           /*genericparams*/nullptr,
                                           const_cast<BuiltinUnit*>(&M));
       TAD->setUnderlyingType(Ty);
-      TAD->setAccessibility(Accessibility::Public);
+      TAD->setAccess(AccessLevel::Public);
       Entry = TAD;
     }
   }
@@ -350,7 +350,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
-  setAccessibility(Accessibility::Public);
+  setAccess(AccessLevel::Public);
 }
 
 void ModuleDecl::addFile(FileUnit &newFile) {
@@ -451,14 +451,14 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   } else if (privateDiscriminator.empty()) {
     auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
                                  [](const ValueDecl *VD) -> bool {
-      return VD->getFormalAccess() <= Accessibility::FilePrivate;
+      return VD->getFormalAccess() <= AccessLevel::FilePrivate;
     });
     results.erase(newEnd, results.end());
 
   } else {
     auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
                                  [=](const ValueDecl *VD) -> bool {
-      if (VD->getFormalAccess() > Accessibility::FilePrivate)
+      if (VD->getFormalAccess() > AccessLevel::FilePrivate)
         return true;
       auto enclosingFile =
         cast<FileUnit>(VD->getDeclContext()->getModuleScopeContext());
@@ -558,8 +558,7 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
 }
 
 Optional<ProtocolConformanceRef>
-ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
-                              LazyResolver *resolver) {
+ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   ASTContext &ctx = getASTContext();
 
   // A dynamic Self type conforms to whatever its underlying type
@@ -578,8 +577,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
     // able to be resolved by a substitution that makes the archetype
     // concrete.
     if (auto super = archetype->getSuperclass()) {
-      if (auto inheritedConformance = lookupConformance(super, protocol,
-                                                        resolver)) {
+      if (auto inheritedConformance = lookupConformance(super, protocol)) {
         return ProtocolConformanceRef(
                  ctx.getInheritedConformance(
                    type,
@@ -605,8 +603,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
 
     // If the existential type cannot be represented or the protocol does not
     // conform to itself, there's no point in looking further.
-    if (!protocol->existentialConformsToSelf() ||
-        !protocol->existentialTypeSupported(resolver))
+    if (!protocol->existentialConformsToSelf())
       return None;
 
     auto layout = type->getExistentialLayout();
@@ -620,8 +617,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
     // If the existential is class-constrained, the class might conform
     // concretely.
     if (layout.superclass) {
-      if (auto result = lookupConformance(layout.superclass, protocol,
-                                          resolver))
+      if (auto result = lookupConformance(layout.superclass, protocol))
         return result;
     }
 
@@ -676,8 +672,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
       superclassTy = superclassTy->getSuperclass();
 
     // Compute the conformance for the inherited type.
-    auto inheritedConformance = lookupConformance(superclassTy, protocol,
-                                                  resolver);
+    auto inheritedConformance = lookupConformance(superclassTy, protocol);
     assert(inheritedConformance &&
            "We already found the inherited conformance");
 
@@ -1326,9 +1321,11 @@ static void performAutoImport(SourceFile &SF,
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
-                       ImplicitModuleImportKind ModImpKind)
+                       ImplicitModuleImportKind ModImpKind,
+                       bool KeepTokens)
   : FileUnit(FileUnitKind::Source, M),
-    BufferID(bufferID ? *bufferID : -1), Kind(K) {
+    BufferID(bufferID ? *bufferID : -1),
+    Kind(K) {
   M.getASTContext().addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
 
@@ -1336,6 +1333,9 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     bool problem = M.registerEntryPointFile(this, SourceLoc(), None);
     assert(!problem && "multiple main files?");
     (void)problem;
+  }
+  if (KeepTokens) {
+    AllCorrectedTokens = std::vector<Token>();
   }
 }
 

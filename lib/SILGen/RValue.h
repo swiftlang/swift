@@ -30,6 +30,7 @@
 namespace swift {
 namespace Lowering {
 
+class ArgumentSource;
 class Initialization;
 class Scope;
 class SILGenFunction;
@@ -69,13 +70,19 @@ class TypeLowering;
 /// require considering resilience, a job we want to delegate to IRGen.
 class RValue {
   friend class swift::Lowering::Scope;
+  friend class swift::Lowering::ArgumentSource;
 
   std::vector<ManagedValue> values;
   CanType type;
   unsigned elementsToBeAdded;
   
-  /// Flag value used to mark an rvalue as invalid, because it was
-  /// consumed or it was default-initialized.
+  /// \brief Flag value used to mark an rvalue as invalid.
+  ///
+  /// The reasons why this can be true is:
+  ///
+  /// 1. The RValue was consumed.
+  /// 2. The RValue was default-initialized.
+  /// 3. The RValue was emitted into an SGFContext initialization.
   enum : unsigned {
     Null = ~0U,
     Used = Null - 1,
@@ -303,6 +310,14 @@ public:
 
   /// Return the type lowering of RValue::getType().
   const Lowering::TypeLowering &getTypeLowering(SILGenFunction &SGF) const &;
+
+  /// Return the lowered SILType that would be used to implode the given RValue
+  /// into 1 tuple value.
+  ///
+  /// This means that if any sub-objects are address only, an address type will
+  /// be returned. Otherwise, an object will be returned. So this is a
+  /// convenient way to determine if an RValue needs an address.
+  SILType getLoweredImplodedTupleType(SILGenFunction &SGF) const &;
 
   /// Rewrite the type of this r-value.
   void rewriteType(CanType newType) & {

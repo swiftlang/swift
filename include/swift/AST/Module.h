@@ -27,6 +27,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Parse/Token.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
@@ -322,13 +323,11 @@ public:
   ///
   /// \param protocol The protocol to which we are computing conformance.
   ///
-  /// \param resolver The lazy resolver.
-  ///
   /// \returns The result of the conformance search, which will be
   /// None if the type does not conform to the protocol or contain a
   /// ProtocolConformanceRef if it does conform.
   Optional<ProtocolConformanceRef>
-  lookupConformance(Type type, ProtocolDecl *protocol, LazyResolver *resolver);
+  lookupConformance(Type type, ProtocolDecl *protocol);
 
   /// Find a member named \p name in \p container that was declared in this
   /// module.
@@ -888,7 +887,7 @@ public:
   ASTStage_t ASTStage = Parsing;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
-             ImplicitModuleImportKind ModImpKind);
+             ImplicitModuleImportKind ModImpKind, bool KeepTokens);
 
   void
   addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
@@ -1072,6 +1071,24 @@ public:
     getInterfaceHash(str);
     out << str << '\n';
   }
+
+  std::vector<Token> &getTokenVector() {
+    assert(shouldKeepTokens() && "Disabled");
+    return *AllCorrectedTokens;
+  }
+
+  ArrayRef<Token> getAllTokens() const {
+    assert(shouldKeepTokens() && "Disabled");
+    return *AllCorrectedTokens;
+  }
+
+  bool shouldKeepTokens() const {
+    return (bool)AllCorrectedTokens;
+  }
+
+private:
+  /// If not None, the underlying vector should contain tokens of this source file.
+  Optional<std::vector<Token>> AllCorrectedTokens;
 };
 
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -16,7 +16,7 @@ public func importAsUnaryInit() {
 
 // CHECK-LABEL: sil @_T010cf_members3foo{{[_0-9a-zA-Z]*}}F
 public func foo(_ x: Double) {
-// CHECK: bb0([[X:%.*]] : $Double):
+// CHECK: bb0([[X:%.*]] : @trivial $Double):
   // CHECK: [[GLOBALVAR:%.*]] = global_addr @IAMStruct1GlobalVar
   // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBALVAR]] : $*Double
   // CHECK: [[ZZ:%.*]] = load [trivial] [[READ]]
@@ -220,37 +220,37 @@ public func foo(_ x: Double) {
 // CHECK: } // end sil function '_T010cf_members3foo{{[_0-9a-zA-Z]*}}F'
 
 // CHECK-LABEL: sil shared [serializable] [thunk] @_T0SC7Struct1VABSd5value_tcfCTO
-// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $@thin Struct1.Type):
+// CHECK:       bb0([[X:%.*]] : @trivial $Double, [[SELF:%.*]] : @trivial $@thin Struct1.Type):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1CreateSimple
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[X]])
 // CHECK:         return [[RET]]
 
 // CHECK-LABEL: sil shared [serializable] [thunk] @_T0SC7Struct1V9translateABSd7radians_tFTO
-// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
+// CHECK:       bb0([[X:%.*]] : @trivial $Double, [[SELF:%.*]] : @trivial $Struct1):
 // CHECK:         store [[SELF]] to [trivial] [[TMP:%.*]] :
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Rotate
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[TMP]], [[X]])
 // CHECK:         return [[RET]]
 
 // CHECK-LABEL: sil shared [serializable] [thunk] @_T0SC7Struct1V5scaleABSdFTO
-// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
+// CHECK:       bb0([[X:%.*]] : @trivial $Double, [[SELF:%.*]] : @trivial $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Scale
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[SELF]], [[X]])
 // CHECK:         return [[RET]]
 
 // CHECK-LABEL: sil shared [serializable] [thunk] @_T0SC7Struct1V12staticMethods5Int32VyFZTO
-// CHECK:       bb0([[SELF:%.*]] : $@thin Struct1.Type):
+// CHECK:       bb0([[SELF:%.*]] : @trivial $@thin Struct1.Type):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1StaticMethod
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]()
 // CHECK:         return [[RET]]
 
 // CHECK-LABEL: sil shared [serializable] [thunk] @_T0SC7Struct1V13selfComesLastySd1x_tFTO
-// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
+// CHECK:       bb0([[X:%.*]] : @trivial $Double, [[SELF:%.*]] : @trivial $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesLast
 // CHECK:         apply [[CFUNC]]([[X]], [[SELF]])
 
 // CHECK-LABEL: sil shared [serializable] [thunk] @_T0SC7Struct1V14selfComesThirdys5Int32V1a_Sf1bSd1xtFTO
-// CHECK:       bb0([[X:%.*]] : $Int32, [[Y:%.*]] : $Float, [[Z:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
+// CHECK:       bb0([[X:%.*]] : @trivial $Int32, [[Y:%.*]] : @trivial $Float, [[Z:%.*]] : @trivial $Double, [[SELF:%.*]] : @trivial $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesThird
 // CHECK:         apply [[CFUNC]]([[X]], [[Y]], [[SELF]], [[Z]])
 

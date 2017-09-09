@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-sil %s -parse-stdlib -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership %s -parse-stdlib -o /dev/null -verify
 
 import Swift
 
@@ -708,6 +708,19 @@ class r18199087SubClassA: r18199087BaseClass {
   }
 }
 
+class r18199087BaseClassNonTrivial {
+  let data: SomeClass
+  init(val: SomeClass) {
+    data = val
+  }
+}
+
+class r18199087SubClassANonTrivial: r18199087BaseClassNonTrivial {
+  init() {
+    super.init(val: self.data)  // expected-error {{use of 'self' in property access 'data' before super.init initializes self}}
+  }
+}
+
 // <rdar://problem/18414728> QoI: DI should talk about "implicit use of self" instead of individual properties in some cases
 class rdar18414728Base {
   var prop:String? { return "boo" }
@@ -1127,7 +1140,7 @@ func test22436880() {
 
 // sr-184
 let x: String? // expected-note 2 {{constant defined here}}
-print(x?.characters.count as Any) // expected-error {{constant 'x' used before being initialized}}
+print(x?.count as Any) // expected-error {{constant 'x' used before being initialized}}
 print(x!) // expected-error {{constant 'x' used before being initialized}}
 
 
@@ -1260,5 +1273,21 @@ class BadFooSuper {
 class BadFooSubclass: BadFooSuper {
   override init() {
     super.init(self) // expected-error {{'self' used before super.init call}}
+  }
+}
+
+class SuperConvenienceBase {
+  public init(_ i: Int) {}
+  public convenience init(_ i1: Int, _ i2: Int) {
+    self.init(i2)
+  }
+}
+
+class SuperConvenienceSub : SuperConvenienceBase {
+  public override init(_ i: Int) {
+    super.init(i)
+  }
+  public init(_ i1: Int, _ i2: Int, _ i3: Int) {
+    self.init(i1, i1)
   }
 }

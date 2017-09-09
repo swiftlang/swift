@@ -216,15 +216,17 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.FirstNameLoc = consumeToken();
       } else {
         assert(Tok.canBeArgumentLabel() && "startsParameterName() lied");
+        Tok.setKind(tok::identifier);
         param.FirstName = Context.getIdentifier(Tok.getText());
         param.FirstNameLoc = consumeToken();
       }
 
       // identifier-or-none? for the second name
       if (Tok.canBeArgumentLabel()) {
-        if (!Tok.is(tok::kw__))
+        if (!Tok.is(tok::kw__)) {
           param.SecondName = Context.getIdentifier(Tok.getText());
-
+          Tok.setKind(tok::identifier);
+        }
         param.SecondNameLoc = consumeToken();
       }
 
@@ -291,6 +293,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         diagnose(Tok, diag::expected_parameter_name);
         param.isInvalid = true;
         param.FirstNameLoc = Tok.getLoc();
+        TokReceiver->registerTokenKindChange(param.FirstNameLoc,
+                                             tok::identifier);
         status.setIsParseError();
       }
     }

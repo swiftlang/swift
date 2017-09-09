@@ -1181,13 +1181,16 @@ private:
       // DW_TAG_reference_type types, but LLDB can deal better with
       // pointer-sized struct that has the appropriate mangled name.
       auto ObjectTy = BaseTy->castTo<InOutType>()->getObjectType();
+      auto Name = MangledName;
+      if (auto *Decl = ObjectTy->getAnyNominal())
+        Name = Decl->getName().str();
       if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes) {
         auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
-        return createPointerSizedStruct(Scope, MangledName, DT, File, 0, Flags,
+        return createPointerSizedStruct(Scope, Name, DT, File, 0, Flags,
                                         MangledName);
       } else
-        return createOpaqueStruct(Scope, MangledName, File, 0, SizeInBits,
-                                  AlignInBits, Flags, MangledName);
+        return createOpaqueStruct(Scope, Name, File, 0, SizeInBits, AlignInBits,
+                                  Flags, MangledName);
     }
 
     case TypeKind::Archetype: {

@@ -38,12 +38,10 @@ static bool inheritsConformanceTo(ClassDecl *target, ProtocolDecl *proto) {
   if (!target->hasSuperclass())
     return false;
 
-  auto &C = target->getASTContext();
   auto *superclassDecl = target->getSuperclassDecl();
   auto *superclassModule = superclassDecl->getModuleContext();
   return (bool)superclassModule->lookupConformance(target->getSuperclass(),
-                                                   proto,
-                                                   C.getLazyResolver());
+                                                   proto);
 }
 
 /// Returns whether the superclass of the given class conforms to Encodable.
@@ -365,7 +363,7 @@ static EnumDecl *synthesizeCodingKeysEnum(TypeChecker &tc,
   auto *enumDecl = new (C) EnumDecl(SourceLoc(), C.Id_CodingKeys, SourceLoc(),
                                     inherited, nullptr, target);
   enumDecl->setImplicit();
-  enumDecl->setAccessibility(Accessibility::Private);
+  enumDecl->setAccess(AccessLevel::Private);
 
   // For classes which inherit from something Encodable or Decodable, we
   // provide case `super` as the first key (to be used in encoding super).
@@ -789,8 +787,8 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
   }
 
   encodeDecl->setInterfaceType(interfaceType);
-  encodeDecl->setAccessibility(std::max(target->getFormalAccess(),
-                                        Accessibility::Internal));
+  encodeDecl->setAccess(std::max(target->getFormalAccess(),
+                                 AccessLevel::Internal));
 
   // If the type was not imported, the derived conformance is either from the
   // type itself or an extension, in which case we will emit the declaration
@@ -1136,8 +1134,8 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
 
   initDecl->setInterfaceType(interfaceType);
   initDecl->setInitializerInterfaceType(initializerType);
-  initDecl->setAccessibility(std::max(target->getFormalAccess(),
-                                      Accessibility::Internal));
+  initDecl->setAccess(std::max(target->getFormalAccess(),
+                               AccessLevel::Internal));
 
   // If the type was not imported, the derived conformance is either from the
   // type itself or an extension, in which case we will emit the declaration
@@ -1217,7 +1215,7 @@ static bool canSynthesize(TypeChecker &tc, NominalTypeDecl *target,
           auto accessScope = initializer->getFormalAccessScope(target);
           tc.diagnose(initializer, diag::decodable_inaccessible_super_init_here,
                       requirement->getFullName(), memberName,
-                      accessScope.accessibilityForDiagnostics());
+                      accessScope.accessLevelForDiagnostics());
           return false;
         } else if (initializer->getFailability() != OTK_None) {
           // We can't call super.init() if it's failable, since init(from:)

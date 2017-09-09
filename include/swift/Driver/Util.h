@@ -26,11 +26,6 @@ namespace opt {
 namespace swift {
 
 namespace driver {
-  class Action;
-
-  /// Type used for list of Actions.
-  typedef SmallVector<Action *, 3> ActionList;
-
   /// An input argument from the command line and its inferred type.
   typedef std::pair<types::ID, const llvm::opt::Arg *> InputPair;
   /// Type used for a list of input arguments.

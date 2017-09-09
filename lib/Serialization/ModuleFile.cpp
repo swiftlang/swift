@@ -1555,8 +1555,8 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   if (iter == ExtensionDecls->end())
     return;
 
-  if (nominal->hasAccessibility() &&
-      nominal->getEffectiveAccess() < Accessibility::Internal) {
+  if (nominal->hasAccess() &&
+      nominal->getEffectiveAccess() < AccessLevel::Internal) {
     if (nominal->getModuleScopeContext() != getFile())
       return;
   }

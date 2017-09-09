@@ -175,7 +175,7 @@ public struct ${Self}<
   public func formIndex(after i: inout Index) {
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
     var index = i
-    _precondition(index != _base.endIndex, "can't advance past endIndex")
+    _precondition(index != _base.endIndex, "Can't advance past endIndex")
     repeat {
       _base.formIndex(after: &index)
     } while index != _base.endIndex && !_predicate(_base[index])
@@ -192,7 +192,7 @@ public struct ${Self}<
   public func formIndex(before i: inout Index) {
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
     var index = i
-    _precondition(index != _base.startIndex, "can't retreat before startIndex")
+    _precondition(index != _base.startIndex, "Can't retreat before startIndex")
     repeat {
       _base.formIndex(before: &index)
     } while !_predicate(_base[index])
@@ -291,49 +291,6 @@ extension LazyCollectionProtocol
 }
 
 % end
-
-@available(*, unavailable, renamed: "LazyFilterIterator")
-public struct LazyFilterGenerator<Base : IteratorProtocol> {}
-
-extension LazyFilterIterator {
-  @available(*, unavailable, message: "use '.lazy.filter' on the sequence")
-  public init(
-    _ base: Base,
-    whereElementsSatisfy predicate: (Base.Element) -> Bool
-  ) {
-    Builtin.unreachable()
-  }
-}
-
-extension LazyFilterSequence {
-  @available(*, unavailable, message: "use '.lazy.filter' on the sequence")
-  public init(
-    _ base: Base,
-    whereElementsSatisfy predicate: (Base.Element) -> Bool
-  ) {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> LazyFilterIterator<Base.Iterator> {
-    Builtin.unreachable()
-  }
-}
-
-extension LazyFilterCollection {
-  @available(*, unavailable, message: "use '.lazy.filter' on the collection")
-  public init(
-    _ base: Base,
-    whereElementsSatisfy predicate: (Base.Element) -> Bool
-  ) {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> LazyFilterIterator<Base.Iterator> {
-    Builtin.unreachable()
-  }
-}
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

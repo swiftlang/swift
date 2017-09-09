@@ -154,7 +154,7 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
   SmallVector<const FunctionType *, 4> openFunctionTypes;
   const DelayedMemberSet &delayedMembers;
 
-  Accessibility minRequiredAccess;
+  AccessLevel minRequiredAccess;
   bool protocolMembersOptional = false;
 
   Optional<Type> NSCopyingType;
@@ -164,7 +164,7 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
 
 public:
   explicit ObjCPrinter(ModuleDecl &mod, raw_ostream &out,
-                       DelayedMemberSet &delayed, Accessibility access)
+                       DelayedMemberSet &delayed, AccessLevel access)
     : M(mod), os(out), delayedMembers(delayed), minRequiredAccess(access) {}
 
   void print(const Decl *D) {
@@ -310,11 +310,13 @@ private:
     StringRef customName = getNameForObjC(CD, CustomNamesOnly);
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
-      os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")\n"
-         << "@interface " << CD->getName();
+      os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")";
+      printAvailability(CD);
+      os << "\n@interface " << CD->getName();
     } else {
-      os << "SWIFT_CLASS_NAMED(\"" << CD->getName() << "\")\n"
-         << "@interface " << customName;
+      os << "SWIFT_CLASS_NAMED(\"" << CD->getName() << "\")";
+      printAvailability(CD);
+      os << "\n@interface " << customName;
     }
 
     if (Type superTy = CD->getSuperclass())
@@ -350,6 +352,8 @@ private:
 
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
 
+    if (printAvailability(ED, PrintLeadingSpace::No))
+      os << "\n";
     os << "@interface " << getNameForObjC(baseClass);
     maybePrintObjCGenericParameters(baseClass);
     os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
@@ -365,11 +369,13 @@ private:
     StringRef customName = getNameForObjC(PD, CustomNamesOnly);
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
-      os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")\n"
-         << "@protocol " << PD->getName();
+      os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")";
+      printAvailability(PD);
+      os << "\n@protocol " << PD->getName();
     } else {
-      os << "SWIFT_PROTOCOL_NAMED(\"" << PD->getName() << "\")\n"
-         << "@protocol " << customName;
+      os << "SWIFT_PROTOCOL_NAMED(\"" << PD->getName() << "\")";
+      printAvailability(PD);
+      os << "\n@protocol " << customName;
     }
 
     printProtocols(PD->getInheritedProtocols());
@@ -626,7 +632,7 @@ private:
     }
 
     if (!skipAvailability) {
-      appendAvailabilityAttribute(AFD);
+      printAvailability(AFD);
     }
 
     if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->isAccessor()) {
@@ -683,116 +689,37 @@ private:
       os << " SWIFT_WARN_UNUSED_RESULT";
     }
 
-    appendAvailabilityAttribute(FD);
+    printAvailability(FD);
     
     os << ';';
   }
 
-  void appendAvailabilityAttribute(const ValueDecl *VD) {
-    for (auto Attr : VD->getAttrs()) {
-      if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-        if (AvAttr->isInvalid()) continue;
-        if (AvAttr->Platform == PlatformKind::none) {
-          if (AvAttr->PlatformAgnostic == PlatformAgnosticAvailabilityKind::Unavailable) {
-            // Availability for *
-            if (!AvAttr->Rename.empty()) {
-              // NB: Don't bother getting obj-c names, we can't get one for the
-              // rename
-              os << " SWIFT_UNAVAILABLE_MSG(\"'" << VD->getBaseName()
-                 << "' has been renamed to '";
-              printEncodedString(AvAttr->Rename, false);
-              os << '\'';
-              if (!AvAttr->Message.empty()) {
-                os << ": ";
-                printEncodedString(AvAttr->Message, false);
-              }
-              os << "\")";
-            } else if (!AvAttr->Message.empty()) {
-              os << " SWIFT_UNAVAILABLE_MSG(";
-              printEncodedString(AvAttr->Message);
-              os << ")";
-            } else {
-                os << " SWIFT_UNAVAILABLE";
-            }
-            break;
-          }
-          if (AvAttr->isUnconditionallyDeprecated()) {
-            if (!AvAttr->Rename.empty() || !AvAttr->Message.empty()) {
-              os << " SWIFT_DEPRECATED_MSG(";
-              printEncodedString(AvAttr->Message);
-              if (!AvAttr->Rename.empty()) {
-                os << ", ";
-                printEncodedString(AvAttr->Rename);
-              }
-              os << ")";
-            } else {
-              os << " SWIFT_DEPRECATED";
-            }
-          }
-          continue;
-        }
-        // Availability for a specific platform
-        if (!AvAttr->Introduced.hasValue()
-            && !AvAttr->Deprecated.hasValue()
-            && !AvAttr->Obsoleted.hasValue()
-            && !AvAttr->isUnconditionallyDeprecated()
-            && !AvAttr->isUnconditionallyUnavailable()) {
-          continue;
-        }
-        const char *plat = nullptr;
-        switch (AvAttr->Platform) {
-        case PlatformKind::OSX:
-          plat = "macos";
-          break;
-        case PlatformKind::iOS:
-          plat = "ios";
-          break;
-        case PlatformKind::tvOS:
-          plat = "tvos";
-          break;
-        case PlatformKind::watchOS:
-          plat = "watchos";
-          break;
-        case PlatformKind::OSXApplicationExtension:
-          plat = "macos_app_extension";
-          break;
-        case PlatformKind::iOSApplicationExtension:
-          plat = "ios_app_extension";
-          break;
-        case PlatformKind::tvOSApplicationExtension:
-          plat = "tvos_app_extension";
-          break;
-        case PlatformKind::watchOSApplicationExtension:
-          plat = "watchos_app_extension";
-          break;
-        default:
-          break;
-        }
-        if (!plat) continue;
-        os << " SWIFT_AVAILABILITY(" << plat;
-        if (AvAttr->isUnconditionallyUnavailable()) {
-          os << ",unavailable";
-        } else {
-          if (AvAttr->Introduced.hasValue()) {
-            os << ",introduced=" << AvAttr->Introduced.getValue().getAsString();
-          }
-          if (AvAttr->Deprecated.hasValue()) {
-            os << ",deprecated=" << AvAttr->Deprecated.getValue().getAsString();
-          } else if (AvAttr->isUnconditionallyDeprecated()) {
-            // We need to specify some version, we can't just say deprecated.
-            // We also can't deprecate it before it's introduced.
-            if (AvAttr->Introduced.hasValue()) {
-              os << ",deprecated=" << AvAttr->Introduced.getValue().getAsString();
-            } else {
-              os << ",deprecated=0.0.1";
-            }
-          }
-          if (AvAttr->Obsoleted.hasValue()) {
-            os << ",obsoleted=" << AvAttr->Obsoleted.getValue().getAsString();
-          }
-          if (!AvAttr->Rename.empty()) {
-            // NB: Don't bother getting obj-c names, we can't get one for the rename
-            os << ",message=\"'" << VD->getBaseName()
+  enum class PrintLeadingSpace : bool {
+    No = false,
+    Yes = true
+  };
+
+  /// Returns \c true if anything was printed.
+  bool printAvailability(
+      const Decl *D,
+      PrintLeadingSpace printLeadingSpace = PrintLeadingSpace::Yes) {
+    bool hasPrintedAnything = false;
+    auto maybePrintLeadingSpace = [&] {
+      if (printLeadingSpace == PrintLeadingSpace::Yes || hasPrintedAnything)
+        os << " ";
+      hasPrintedAnything = true;
+    };
+
+    for (auto AvAttr : D->getAttrs().getAttributes<AvailableAttr>()) {
+      if (AvAttr->Platform == PlatformKind::none) {
+        if (AvAttr->PlatformAgnostic == PlatformAgnosticAvailabilityKind::Unavailable) {
+          // Availability for *
+          if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
+            // NB: Don't bother getting obj-c names, we can't get one for the
+            // rename
+            maybePrintLeadingSpace();
+            os << "SWIFT_UNAVAILABLE_MSG(\"'"
+               << cast<ValueDecl>(D)->getBaseName()
                << "' has been renamed to '";
             printEncodedString(AvAttr->Rename, false);
             os << '\'';
@@ -800,15 +727,116 @@ private:
               os << ": ";
               printEncodedString(AvAttr->Message, false);
             }
-            os << "\"";
+            os << "\")";
           } else if (!AvAttr->Message.empty()) {
-            os << ",message=";
+            maybePrintLeadingSpace();
+            os << "SWIFT_UNAVAILABLE_MSG(";
             printEncodedString(AvAttr->Message);
+            os << ")";
+          } else {
+            maybePrintLeadingSpace();
+            os << "SWIFT_UNAVAILABLE";
+          }
+          break;
+        }
+        if (AvAttr->isUnconditionallyDeprecated()) {
+          if (!AvAttr->Rename.empty() || !AvAttr->Message.empty()) {
+            maybePrintLeadingSpace();
+            os << "SWIFT_DEPRECATED_MSG(";
+            printEncodedString(AvAttr->Message);
+            if (!AvAttr->Rename.empty()) {
+              os << ", ";
+              printEncodedString(AvAttr->Rename);
+            }
+            os << ")";
+          } else {
+            maybePrintLeadingSpace();
+            os << "SWIFT_DEPRECATED";
           }
         }
-        os << ")";
+        continue;
       }
+
+      // Availability for a specific platform
+      if (!AvAttr->Introduced.hasValue()
+          && !AvAttr->Deprecated.hasValue()
+          && !AvAttr->Obsoleted.hasValue()
+          && !AvAttr->isUnconditionallyDeprecated()
+          && !AvAttr->isUnconditionallyUnavailable()) {
+        continue;
+      }
+
+      const char *plat;
+      switch (AvAttr->Platform) {
+      case PlatformKind::OSX:
+        plat = "macos";
+        break;
+      case PlatformKind::iOS:
+        plat = "ios";
+        break;
+      case PlatformKind::tvOS:
+        plat = "tvos";
+        break;
+      case PlatformKind::watchOS:
+        plat = "watchos";
+        break;
+      case PlatformKind::OSXApplicationExtension:
+        plat = "macos_app_extension";
+        break;
+      case PlatformKind::iOSApplicationExtension:
+        plat = "ios_app_extension";
+        break;
+      case PlatformKind::tvOSApplicationExtension:
+        plat = "tvos_app_extension";
+        break;
+      case PlatformKind::watchOSApplicationExtension:
+        plat = "watchos_app_extension";
+        break;
+      case PlatformKind::none:
+        llvm_unreachable("handled above");
+      }
+
+      maybePrintLeadingSpace();
+      os << "SWIFT_AVAILABILITY(" << plat;
+      if (AvAttr->isUnconditionallyUnavailable()) {
+        os << ",unavailable";
+      } else {
+        if (AvAttr->Introduced.hasValue()) {
+          os << ",introduced=" << AvAttr->Introduced.getValue().getAsString();
+        }
+        if (AvAttr->Deprecated.hasValue()) {
+          os << ",deprecated=" << AvAttr->Deprecated.getValue().getAsString();
+        } else if (AvAttr->isUnconditionallyDeprecated()) {
+          // We need to specify some version, we can't just say deprecated.
+          // We also can't deprecate it before it's introduced.
+          if (AvAttr->Introduced.hasValue()) {
+            os << ",deprecated=" << AvAttr->Introduced.getValue().getAsString();
+          } else {
+            os << ",deprecated=0.0.1";
+          }
+        }
+        if (AvAttr->Obsoleted.hasValue()) {
+          os << ",obsoleted=" << AvAttr->Obsoleted.getValue().getAsString();
+        }
+      }
+      if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
+        // NB: Don't bother getting obj-c names, we can't get one for the rename
+        os << ",message=\"'" << cast<ValueDecl>(D)->getBaseName()
+           << "' has been renamed to '";
+        printEncodedString(AvAttr->Rename, false);
+        os << '\'';
+        if (!AvAttr->Message.empty()) {
+          os << ": ";
+          printEncodedString(AvAttr->Message, false);
+        }
+        os << "\"";
+      } else if (!AvAttr->Message.empty()) {
+        os << ",message=";
+        printEncodedString(AvAttr->Message);
+      }
+      os << ")";
     }
+    return hasPrintedAnything;
   }
 
   void printSwift3ObjCDeprecatedInference(ValueDecl *VD) {
@@ -904,7 +932,7 @@ private:
     ASTContext &ctx = M.getASTContext();
     bool isSettable = VD->isSettable(nullptr);
     if (isSettable && ctx.LangOpts.EnableAccessControl)
-      isSettable = (VD->getSetterAccessibility() >= minRequiredAccess);
+      isSettable = (VD->getSetterFormalAccess() >= minRequiredAccess);
     if (!isSettable)
       os << ", readonly";
 
@@ -1988,7 +2016,7 @@ class ModuleWriter {
   StringRef bridgingHeader;
   ObjCPrinter printer;
 public:
-  ModuleWriter(ModuleDecl &mod, StringRef header, Accessibility access)
+  ModuleWriter(ModuleDecl &mod, StringRef header, AccessLevel access)
     : M(mod), bridgingHeader(header), printer(M, os, delayedMembers, access) {}
 
   /// Returns true if we added the decl's module to the import set, false if
@@ -2725,7 +2753,7 @@ public:
 
 bool swift::printAsObjC(llvm::raw_ostream &os, ModuleDecl *M,
                         StringRef bridgingHeader,
-                        Accessibility minRequiredAccess) {
+                        AccessLevel minRequiredAccess) {
   llvm::PrettyStackTraceString trace("While generating Objective-C header");
   return ModuleWriter(*M, bridgingHeader, minRequiredAccess).writeToStream(os);
 }

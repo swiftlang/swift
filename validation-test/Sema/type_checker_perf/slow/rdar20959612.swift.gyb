@@ -1,0 +1,32 @@
+// RUN: %scale-test --invert-result --begin 3 --end 7 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+func curry<T0
+%for i in range(1, N+2):
+, T${i}
+%end
+>(
+  _ fn: @escaping (T0
+%for i in range(1, N+1):
+, T${i}
+%end
+  ) -> T${N+1}
+) -> (T0)
+%for i in range(1, N+2):
+  -> (T${i})
+%end
+{
+  return { t0 in
+%for i in range(1, N+1):
+    { t${i} in
+%end
+      fn(t0
+%for i in range(1, N+1):
+	, t${i}
+%end
+      )
+%for i in range(0, N+1):
+    }
+%end
+}

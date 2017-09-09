@@ -210,3 +210,74 @@ bb3:
   %8 = tuple()
   return %8 : $()
 }
+
+sil @big_func: $@convention(thin) () -> Builtin.Int64 {
+bb0:
+   %x0 = integer_literal $Builtin.Int64, 1
+   %overflow_check = integer_literal $Builtin.Int1, 0
+   %sum1 = builtin "sadd_with_overflow_Int64"(%x0 : $Builtin.Int64, %x0 : $Builtin.Int64, %overflow_check : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+   %x1 = tuple_extract %sum1 : $(Builtin.Int64, Builtin.Int1), 0
+   br bb1
+
+bb1:
+   %sum2 = builtin "sadd_with_overflow_Int64"(%x1 : $Builtin.Int64, %x1 : $Builtin.Int64, %overflow_check : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+   %x2 = tuple_extract %sum2 : $(Builtin.Int64, Builtin.Int1), 0
+   br bb2
+
+bb2:
+   %sum3 = builtin "sadd_with_overflow_Int64"(%x2 : $Builtin.Int64, %x2 : $Builtin.Int64, %overflow_check : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+   %x3 = tuple_extract %sum3 : $(Builtin.Int64, Builtin.Int1), 0
+   br bb3
+
+bb3:
+   %sum4 = builtin "sadd_with_overflow_Int64"(%x3 : $Builtin.Int64, %x3 : $Builtin.Int64, %overflow_check : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+   %x4 = tuple_extract %sum4 : $(Builtin.Int64, Builtin.Int1), 0
+   br bb4
+
+bb4:
+   %sum5 = builtin "sadd_with_overflow_Int64"(%x4 : $Builtin.Int64, %x4 : $Builtin.Int64, %overflow_check : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+   %x5 = tuple_extract %sum5 : $(Builtin.Int64, Builtin.Int1), 0
+   br bb5
+
+bb5:
+   %sum6 = builtin "sadd_with_overflow_Int64"(%x5 : $Builtin.Int64, %x5 : $Builtin.Int64, %overflow_check : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+   %x6 = tuple_extract %sum6 : $(Builtin.Int64, Builtin.Int1), 0
+   br bb6
+
+bb6:
+   return %x6 : $Builtin.Int64 
+}
+
+// Check that the compiler does not unroll loops containing calls
+// of big inlineable functions.
+//
+// CHECK-LABEL: sil @unroll_with_apply
+// CHECK: apply
+// CHECK: // end sil function 'unroll_with_apply'
+sil @unroll_with_apply : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 20
+ %3 = integer_literal $Builtin.Int1, 1
+ %f = function_ref @big_func: $@convention(thin) () -> Builtin.Int64 
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %r = apply %f() : $@convention(thin) () -> Builtin.Int64
+  br bb2
+
+bb2:
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb4, bb3
+
+bb3:
+  br bb1(%6 : $Builtin.Int64)
+
+bb4:
+  %8 = tuple()
+  return %8 : $()
+}
+

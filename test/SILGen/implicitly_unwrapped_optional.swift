@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func foo(f f: (() -> ())!) {
   var f: (() -> ())! = f
   f?()
 }
 // CHECK: sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@owned Optional<@callee_owned () -> ()>) -> () {
-// CHECK: bb0([[T0:%.*]] : $Optional<@callee_owned () -> ()>):
+// CHECK: bb0([[T0:%.*]] : @owned $Optional<@callee_owned () -> ()>):
 // CHECK:   [[F:%.*]] = alloc_box ${ var Optional<@callee_owned () -> ()> }
 // CHECK:   [[PF:%.*]] = project_box [[F]]
 // CHECK:   [[BORROWED_T0:%.*]] = begin_borrow [[T0]]

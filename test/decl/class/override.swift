@@ -330,3 +330,25 @@ class CallbackSubC : CallbackBase {
   override func perform(nonescapingHandler: @escaping () -> Void) {} // expected-error {{method does not override any method from its superclass}}
 }
 
+// Issues with overrides of internal(set) and fileprivate(set) members
+public class BaseWithInternalSetter {
+    public internal(set) var someValue: Int = 0
+}
+
+public class DerivedWithInternalSetter: BaseWithInternalSetter {
+    override public internal(set) var someValue: Int {
+        get { return 0 }
+        set { }
+    }
+}
+
+class BaseWithFilePrivateSetter {
+    fileprivate(set) var someValue: Int = 0
+}
+
+class DerivedWithFilePrivateSetter: BaseWithFilePrivateSetter {
+    override fileprivate(set) var someValue: Int {
+        get { return 0 }
+        set { }
+    }
+}

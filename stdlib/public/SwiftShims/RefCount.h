@@ -961,7 +961,7 @@ class RefCounts {
   bool isUniquelyReferenced() const {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable())
-      return false;  // FIXME: implement side table path if useful
+      return bits.getSideTable()->isUniquelyReferenced();
     
     assert(!bits.getIsDeiniting());
     return bits.isUniquelyReferenced();
@@ -1293,7 +1293,7 @@ class RefCounts {
 
 
   private:
-  HeapObject *getHeapObject() const;
+  HeapObject *getHeapObject();
   
   HeapObjectSideTableEntry* allocateSideTable();
 };
@@ -1382,6 +1382,10 @@ class HeapObjectSideTableEntry {
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getCount() const {
     return refCounts.getCount();
+  }
+
+  bool isUniquelyReferenced() const {
+    return refCounts.isUniquelyReferenced();
   }
 
   bool isUniquelyReferencedOrPinned() const {
@@ -1548,14 +1552,14 @@ doDecrementNonAtomicSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
 
 
 template <> inline
-HeapObject* RefCounts<InlineRefCountBits>::getHeapObject() const {
+HeapObject* RefCounts<InlineRefCountBits>::getHeapObject() {
   auto offset = sizeof(void *);
   auto prefix = ((char *)this - offset);
   return (HeapObject *)prefix;
 }
 
 template <> inline
-HeapObject* RefCounts<SideTableRefCountBits>::getHeapObject() const {
+HeapObject* RefCounts<SideTableRefCountBits>::getHeapObject() {
   auto offset = HeapObjectSideTableEntry::refCountsOffset();
   auto prefix = ((char *)this - offset);
   return *(HeapObject **)prefix;

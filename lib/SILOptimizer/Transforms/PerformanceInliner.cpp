@@ -108,6 +108,8 @@ class SILPerformanceInliner {
     DefaultApplyLength = 10
   };
 
+  SILOptions::SILOptMode OptMode;
+
 #ifndef NDEBUG
   SILFunction *LastPrintedCaller = nullptr;
   void dumpCaller(SILFunction *Caller) {
@@ -146,8 +148,10 @@ class SILPerformanceInliner {
 
 public:
   SILPerformanceInliner(InlineSelection WhatToInline, DominanceAnalysis *DA,
-                        SILLoopAnalysis *LA, SideEffectAnalysis *SEA)
-      : WhatToInline(WhatToInline), DA(DA), LA(LA), SEA(SEA), CBI(DA) {}
+                        SILLoopAnalysis *LA, SideEffectAnalysis *SEA,
+                        SILOptions::SILOptMode OptMode)
+      : WhatToInline(WhatToInline), DA(DA), LA(LA), SEA(SEA), CBI(DA),
+        OptMode(OptMode) {}
 
   bool inlineCallsIntoFunction(SILFunction *F);
 };
@@ -170,11 +174,36 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
   assert(EnableSILInliningOfGenerics || !IsGeneric);
 
+  // Start with a base benefit.
+  int BaseBenefit = RemovedCallBenefit;
+
+  // Osize heuristic.
+  if (OptMode == SILOptions::SILOptMode::OptimizeForSize) {
+    // Don't inline into thunks.
+    if (AI.getFunction()->isThunk())
+      return false;
+
+    // Don't inline class methods.
+    if (Callee->hasSelfParam()) {
+      auto SelfTy = Callee->getLoweredFunctionType()->getSelfInstanceType();
+      if (SelfTy->mayHaveSuperclass() &&
+          Callee->getRepresentation() == SILFunctionTypeRepresentation::Method)
+        return false;
+    }
+
+    BaseBenefit = BaseBenefit / 2;
+  }
+
+  // It is always OK to inline a simple call.
+  // TODO: May be consider also the size of the callee?
+  if (isPureCall(AI, SEA))
+    return true;
+
   // Bail out if this generic call can be optimized by means of
   // the generic specialization, because we prefer generic specialization
   // to inlining of generics.
   if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutions())) {
-    return isPureCall(AI, SEA);
+    return false;
   }
 
   SILLoopInfo *LI = LA->get(Callee);
@@ -190,9 +219,6 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
   int CalleeCost = 0;
   int Benefit = 0;
 
-  // Start with a base benefit.
-  int BaseBenefit = RemovedCallBenefit;
-
   SubstitutionMap CalleeSubstMap;
   if (IsGeneric) {
     CalleeSubstMap = Callee->getLoweredFunctionType()
@@ -200,11 +226,9 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
       ->getSubstitutionMap(AI.getSubstitutions());
   }
 
-  const SILOptions &Opts = Callee->getModule().getOptions();
-
   // For some reason -Ounchecked can accept a higher base benefit without
   // increasing the code size too much.
-  if (Opts.Optimization == SILOptions::SILOptMode::OptimizeUnchecked)
+  if (OptMode == SILOptions::SILOptMode::OptimizeUnchecked)
     BaseBenefit *= 2;
 
   CallerWeight.updateBenefit(Benefit, BaseBenefit);
@@ -319,7 +343,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     // Only inline trivial functions into thunks (which will not increase the
     // code size).
     if (CalleeCost > TrivialFunctionThreshold) {
-      return isPureCall(AI, SEA);
+      return false;
     }
 
     DEBUG(
@@ -340,7 +364,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
   // This is the final inlining decision.
   if (CalleeCost > Benefit) {
-    return isPureCall(AI, SEA);
+    return false;
   }
 
   NumCallerBlocks += Callee->size();
@@ -623,7 +647,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
           Caller->size() << "] " << Callee->getName() << "\n";
     );
 
-    SILOpenedArchetypesTracker OpenedArchetypesTracker(*Caller);
+    SILOpenedArchetypesTracker OpenedArchetypesTracker(Caller);
     Caller->getModule().registerDeleteNotificationHandler(&OpenedArchetypesTracker);
     // The callee only needs to know about opened archetypes used in
     // the substitution list.
@@ -634,12 +658,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
                        AI.getSubstitutions(),
                        OpenedArchetypesTracker);
 
-    auto Success = Inliner.inlineFunction(AI, Args);
-    (void) Success;
     // We've already determined we should be able to inline this, so
-    // we expect it to have happened.
-    assert(Success && "Expected inliner to inline this function!");
-
+    // unconditionally inline the function.
+    //
+    // If for whatever reason we can not inline this function, inlineFunction
+    // will assert, so we are safe making this assumption.
+    Inliner.inlineFunction(AI, Args);
     recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
 
     NumFunctionsInlined++;
@@ -696,7 +720,9 @@ public:
       return;
     }
 
-    SILPerformanceInliner Inliner(WhatToInline, DA, LA, SEA);
+    auto OptMode = getFunction()->getModule().getOptions().Optimization;
+
+    SILPerformanceInliner Inliner(WhatToInline, DA, LA, SEA, OptMode);
 
     assert(getFunction()->isDefinition() &&
            "Expected only functions with bodies!");

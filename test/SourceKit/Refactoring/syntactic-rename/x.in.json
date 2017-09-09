@@ -1,0 +1,20 @@
+[
+  {
+    "key.name": "x",
+    "key.newname": "z",
+    "key.is_function_like": 0,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 17,
+        "key.column": 5,
+        "key.nametype": source.syntacticrename.definition
+      },
+      {
+        "key.line": 19,
+        "key.column": 7,
+        "key.nametype": source.syntacticrename.reference
+      }
+    ]
+  }
+]

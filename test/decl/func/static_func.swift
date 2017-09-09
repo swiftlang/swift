@@ -83,8 +83,8 @@ class C_Derived : C {
   override class func f2() {}
   class override func f3() {}
 
-  override class func ef2() {} // expected-error {{declarations from extensions cannot be overridden yet}}
-  class override func ef3() {} // expected-error {{declarations from extensions cannot be overridden yet}}
+  override class func ef2() {} // expected-error {{overriding declarations from extensions is not supported}}
+  class override func ef3() {} // expected-error {{overriding declarations from extensions is not supported}}
   override static func f7() {} // expected-error {{static method overrides a 'final' class method}}
 }
 
@@ -98,11 +98,11 @@ class C_Derived3 : C {
 }
 
 extension C_Derived {
-  override class func f4() {} // expected-error {{declarations in extensions cannot override yet}}
-  class override func f5() {} // expected-error {{declarations in extensions cannot override yet}}
+  override class func f4() {} // expected-error {{overriding declarations in extensions is not supported}}
+  class override func f5() {} // expected-error {{overriding declarations in extensions is not supported}}
 
-  override class func ef4() {} // expected-error {{declarations in extensions cannot override yet}}
-  class override func ef5() {} // expected-error {{declarations in extensions cannot override yet}}
+  override class func ef4() {} // expected-error {{overriding declarations in extensions is not supported}}
+  class override func ef5() {} // expected-error {{overriding declarations in extensions is not supported}}
 }
 
 protocol P {

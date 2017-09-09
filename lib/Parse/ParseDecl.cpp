@@ -187,7 +187,7 @@ bool Parser::parseTopLevel() {
 
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
-    consumeToken();
+    consumeTokenWithoutFeedingReceiver();
 
   // Parse the body of the file.
   SmallVector<ASTNode, 128> Items;
@@ -268,6 +268,10 @@ bool Parser::parseTopLevel() {
   // attach it to the token.
   State->markParserPosition(Tok.getCommentRange().getStart(), PreviousLoc,
                             InPoundLineEnvironment);
+
+  // If we are done parsing the whole file, finalize the token receiver.
+  if (Tok.is(tok::eof))
+    TokReceiver->finalize();
 
   return FoundTopLevelCodeToExecute;
 }
@@ -550,8 +554,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   case DAK_SynthesizedProtocol:
     llvm_unreachable("virtual attributes should not be parsed "
                      "by attribute parsing code");
-  case DAK_SetterAccessibility:
-    llvm_unreachable("handled by DAK_Accessibility");
+  case DAK_SetterAccess:
+    llvm_unreachable("handled by DAK_AccessControl");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...) \
   case DAK_##CLASS: \
@@ -664,26 +668,26 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  case DAK_Accessibility: {
+  case DAK_AccessControl: {
 
-    // Diagnose using accessibility in a local scope, which isn't meaningful.
+    // Diagnose using access control in a local scope, which isn't meaningful.
     if (CurDeclContext->isLocalContext()) {
       diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
     }
 
-    Accessibility access = llvm::StringSwitch<Accessibility>(AttrName)
-      .Case("private", Accessibility::Private)
-      .Case("fileprivate", Accessibility::FilePrivate)
-      .Case("internal", Accessibility::Internal)
-      .Case("public", Accessibility::Public)
-      .Case("open", Accessibility::Open);
+    AccessLevel access = llvm::StringSwitch<AccessLevel>(AttrName)
+      .Case("private", AccessLevel::Private)
+      .Case("fileprivate", AccessLevel::FilePrivate)
+      .Case("internal", AccessLevel::Internal)
+      .Case("public", AccessLevel::Public)
+      .Case("open", AccessLevel::Open);
 
     if (!consumeIf(tok::l_paren)) {
-      // Normal accessibility attribute.
+      // Normal access control attribute.
       AttrRange = Loc;
-      DuplicateAttribute = Attributes.getAttribute<AccessibilityAttr>();
+      DuplicateAttribute = Attributes.getAttribute<AccessControlAttr>();
       if (!DuplicateAttribute)
-        Attributes.add(new (Context) AccessibilityAttr(AtLoc, Loc, access));
+        Attributes.add(new (Context) AccessControlAttr(AtLoc, Loc, access));
       break;
     }
 
@@ -691,7 +695,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     if (Tok.isContextualKeyword("set")) {
       consumeToken();
     } else {
-      diagnose(Loc, diag::attr_accessibility_expected_set, AttrName);
+      diagnose(Loc, diag::attr_access_expected_set, AttrName);
       // Minimal recovery: if there's a single token and then an r_paren,
       // consume them both. If there's just an r_paren, consume that.
       if (!consumeIf(tok::r_paren)) {
@@ -711,10 +715,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    DuplicateAttribute = Attributes.getAttribute<SetterAccessibilityAttr>();
+    DuplicateAttribute = Attributes.getAttribute<SetterAccessAttr>();
     if (!DuplicateAttribute) {
-      Attributes.add(new (Context) SetterAccessibilityAttr(AtLoc, AttrRange,
-                                                           access));
+      Attributes.add(new (Context) SetterAccessAttr(AtLoc, AttrRange, access));
     }
 
     break;
@@ -2227,7 +2230,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
     case tok::kw_internal:
     case tok::kw_public:
       // We still model these specifiers as attributes.
-      parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Accessibility);
+      parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_AccessControl);
       continue;
 
     // Context sensitive keywords.
@@ -2235,7 +2238,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       // FIXME: This is ridiculous, this all needs to be sucked into the
       // declparsing goop.
       if (Tok.isContextualKeyword("open")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Accessibility);
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_AccessControl);
         continue;
       }
       if (Tok.isContextualKeyword("weak") ||
@@ -2289,6 +2292,10 @@ Parser::parseDecl(ParseDeclOptions Flags,
       }
       if (Tok.isContextualKeyword("nonmutating")) {
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
+        continue;
+      }
+      if (Tok.isContextualKeyword("__consuming")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
         continue;
       }
       if (Tok.isContextualKeyword("convenience")) {
@@ -2508,7 +2515,7 @@ void Parser::parseDeclDelayed() {
 
   // ParserPositionRAII needs a primed parser to restore to.
   if (Tok.is(tok::NUM_TOKENS))
-    consumeToken();
+    consumeTokenWithoutFeedingReceiver();
 
   // Ensure that we restore the parser state at exit.
   ParserPositionRAII PPR(*this);
@@ -2648,13 +2655,12 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 ///     type-identifier
 /// \endverbatim
 ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
-                                      SourceLoc *classRequirementLoc) {
+                                      bool allowClassRequirement,
+                                      bool allowAnyObject) {
   Scope S(this, ScopeKind::InheritanceClause);
   consumeToken(tok::colon);
 
-  // Clear out the class requirement location.
-  if (classRequirementLoc)
-    *classRequirementLoc = SourceLoc();
+  SourceLoc classRequirementLoc;
 
   ParserStatus Status;
   SourceLoc prevComma;
@@ -2663,17 +2669,24 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
     if (Tok.is(tok::kw_class)) {
       // If we aren't allowed to have a class requirement here, complain.
       auto classLoc = consumeToken();
-      if (!classRequirementLoc) {
-        SourceLoc endLoc = Tok.is(tok::comma) ? Tok.getLoc() : classLoc;
-        diagnose(classLoc, diag::invalid_class_requirement)
-          .fixItRemove(SourceRange(classLoc, endLoc));
+      if (!allowClassRequirement) {
+        diagnose(classLoc, diag::unexpected_class_constraint);
+
+        // Note that it makes no sense to suggest fixing
+        // 'struct S : class' to 'struct S : AnyObject' for
+        // example; in that case we just complain about
+        // 'class' being invalid here.
+        if (allowAnyObject) {
+          diagnose(classLoc, diag::suggest_anyobject)
+            .fixItReplace(classLoc, "AnyObject");
+        }
         continue;
       }
 
       // If we already saw a class requirement, complain.
-      if (classRequirementLoc->isValid()) {
+      if (classRequirementLoc.isValid()) {
         diagnose(classLoc, diag::redundant_class_requirement)
-          .highlight(*classRequirementLoc)
+          .highlight(classRequirementLoc)
           .fixItRemove(SourceRange(prevComma, classLoc));
         continue;
       }
@@ -2687,47 +2700,17 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
       }
 
       // Record the location of the 'class' keyword.
-      *classRequirementLoc = classLoc;
+      classRequirementLoc = classLoc;
+
+      // Add 'AnyObject' to the inherited list.
+      Inherited.push_back(
+        new (Context) SimpleIdentTypeRepr(classLoc,
+                                          Context.getIdentifier("AnyObject")));
       continue;
     }
 
-    bool usesDeprecatedCompositionSyntax =
-      Tok.is(tok::kw_protocol) && startsWithLess(peekToken());
-    bool isAny = Tok.is(tok::kw_Any); // We allow (redundant) inheritance from Any
-
-    auto ParsedTypeResult = parseTypeForInheritance(
-        diag::expected_identifier_for_type,
-        diag::expected_ident_type_in_inheritance);
+    auto ParsedTypeResult = parseType();
     Status |= ParsedTypeResult;
-
-    // Recover and emit nice diagnostic for composition.
-    if (auto Composition = dyn_cast_or_null<CompositionTypeRepr>(
-          ParsedTypeResult.getPtrOrNull())) {
-      // Record the protocols inside the composition.
-      Inherited.append(Composition->getTypes().begin(),
-                       Composition->getTypes().end());
-      // We can inherit from Any
-      if (!isAny) {
-        if (usesDeprecatedCompositionSyntax) {
-          // Provide fixits to remove the composition, leaving the types intact.
-          auto compositionRange = Composition->getCompositionRange();
-          auto token = Lexer::getTokenAtLocation(SourceMgr, compositionRange.End);
-          diagnose(Composition->getSourceLoc(),
-                   diag::disallowed_protocol_composition)
-            .highlight({Composition->getStartLoc(), compositionRange.End})
-            .fixItRemove({Composition->getSourceLoc(), compositionRange.Start})
-            .fixItRemove(startsWithGreater(token)
-                         ? compositionRange.End
-                         : SourceLoc());
-        } else {
-          diagnose(Composition->getStartLoc(),
-                   diag::disallowed_protocol_composition)
-            .highlight(Composition->getSourceRange());
-          // TODO: Decompose 'A & B & C' list to 'A, B, C'
-        }
-      }
-      continue;
-    }
 
     // Record the type if its a single type.
     if (ParsedTypeResult.isNonNull())
@@ -2951,7 +2934,9 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
-    status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
+    status |= parseInheritance(Inherited,
+                               /*allowClassRequirement=*/false,
+                               /*allowAnyObject=*/false);
 
   // Parse the optional where-clause.
   TrailingWhereClause *trailingWhereClause = nullptr;
@@ -3290,7 +3275,9 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   // FIXME: Allow class requirements here.
   SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
-    Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
+    Status |= parseInheritance(Inherited,
+                               /*allowClassRequirement=*/false,
+                               /*allowAnyObject=*/true);
   
   ParserResult<TypeRepr> UnderlyingTy;
   if (Tok.is(tok::equal)) {
@@ -3489,7 +3476,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   case AccessorKind::IsWillSet:
   case AccessorKind::IsDidSet:
     if (D->isInstanceMember())
-      D->setMutating();
+      D->setSelfAccessKind(SelfAccessKind::Mutating);
     break;
 
   case AccessorKind::IsMaterializeForSet:
@@ -3738,6 +3725,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
       } else if (Tok.isContextualKeyword("nonmutating")) {
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
+      } else if (Tok.isContextualKeyword("__consuming")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
       }
 
       AccessorKind Kind;
@@ -3764,6 +3753,11 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
         AccessorKeywordLoc = SourceLoc();
         diagnose(Tok, diag::expected_getset_in_protocol);
         return true;
+      }
+
+      // Correct the token kind to be contextual keyword.
+      if (AccessorKeywordLoc.isValid()) {
+        Tok.setKind(tok::contextual_keyword);
       }
 
       FuncDecl *&TheDecl = *TheDeclPtr;
@@ -3835,6 +3829,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
     } else if (Tok.isContextualKeyword("nonmutating")) {
       parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
+    } else if (Tok.isContextualKeyword("__consuming")) {
+      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
     }
     
     bool isImplicitGet = false;
@@ -3881,6 +3877,11 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       Kind = AccessorKind::IsGetter;
       TheDeclPtr = &accessors.Get;
       isImplicitGet = true;
+    }
+
+    // Set the contextual keyword kind properly.
+    if (AccessorKeywordLoc.isValid()) {
+      Tok.setKind(tok::contextual_keyword);
     }
 
     IsFirstAccessor = false;
@@ -4006,7 +4007,7 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
 
   // ParserPositionRAII needs a primed parser to restore to.
   if (Tok.is(tok::NUM_TOKENS))
-    consumeToken();
+    consumeTokenWithoutFeedingReceiver();
 
   // Ensure that we restore the parser state at exit.
   ParserPositionRAII PPR(*this);
@@ -4035,7 +4036,8 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
 /// \brief Parse the brace-enclosed getter and setter for a variable.
 VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
                                     ParseDeclOptions Flags,
-                                    SourceLoc StaticLoc, bool hasInitializer,
+                                    SourceLoc StaticLoc, SourceLoc VarLoc,
+                                    bool hasInitializer,
                                     const DeclAttributes &Attributes,
                                     SmallVectorImpl<Decl *> &Decls) {
   bool Invalid = false;
@@ -4090,12 +4092,15 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
 
   // Reject accessors on 'let's after parsing them (for better recovery).
   if (PrimaryVar->isLet() && !Attributes.hasAttribute<SILStoredAttr>()) {
+    Diag<> DiagID;
     if (accessors.WillSet || accessors.DidSet)
-      diagnose(accessors.LBLoc, diag::let_cannot_be_observing_property);
+      DiagID = diag::let_cannot_be_observing_property;
     else if (accessors.Addressor || accessors.MutableAddressor)
-      diagnose(accessors.LBLoc, diag::let_cannot_be_addressed_property);
+      DiagID = diag::let_cannot_be_addressed_property;
     else
-      diagnose(accessors.LBLoc, diag::let_cannot_be_computed_property);
+      DiagID = diag::let_cannot_be_computed_property;
+
+    diagnose(accessors.LBLoc, DiagID).fixItReplace(VarLoc, "var");
     PrimaryVar->setSpecifier(VarDecl::Specifier::Var);
     Invalid = true;
   }
@@ -4595,10 +4600,11 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       });
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
-    } else if (Tok.is(tok::l_brace) && !Flags.contains(PD_InLoop)) {
+    } else if (Tok.is(tok::l_brace)) {
       HasAccessors = true;
       
-      if (auto *boundVar = parseDeclVarGetSet(pattern, Flags, StaticLoc,
+      if (auto *boundVar = parseDeclVarGetSet(pattern, Flags,
+                                              StaticLoc, VarLoc,
                                               PatternInit != nullptr,
                                               Attributes, Decls)) {
         if (PatternInit && !boundVar->hasStorage()) {
@@ -4945,7 +4951,7 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
 
   // ParserPositionRAII needs a primed parser to restore to.
   if (Tok.is(tok::NUM_TOKENS))
-    consumeToken();
+    consumeTokenWithoutFeedingReceiver();
 
   // Ensure that we restore the parser state at exit.
   ParserPositionRAII PPR(*this);
@@ -5021,7 +5027,9 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
     SmallVector<TypeLoc, 2> Inherited;
-    Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
+    Status |= parseInheritance(Inherited,
+                               /*allowClassRequirement=*/false,
+                               /*allowAnyObject=*/false);
     ED->setInherited(Context.AllocateCopy(Inherited));
   }
 
@@ -5281,7 +5289,9 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
     SmallVector<TypeLoc, 2> Inherited;
-    Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
+    Status |= parseInheritance(Inherited,
+                               /*allowClassRequirement=*/false,
+                               /*allowAnyObject=*/false);
     SD->setInherited(Context.AllocateCopy(Inherited));
   }
 
@@ -5366,7 +5376,9 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   // Parse optional inheritance clause within the context of the class.
   if (Tok.is(tok::colon)) {
     SmallVector<TypeLoc, 2> Inherited;
-    Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
+    Status |= parseInheritance(Inherited,
+                               /*allowClassRequirement=*/false,
+                               /*allowAnyObject=*/false);
     CD->setInherited(Context.AllocateCopy(Inherited));
   }
 
@@ -5450,11 +5462,12 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 4> InheritedProtocols;
-  SourceLoc classRequirementLoc;
   SourceLoc colonLoc;
   if (Tok.is(tok::colon)) {
     colonLoc = Tok.getLoc();
-    Status |= parseInheritance(InheritedProtocols, &classRequirementLoc);
+    Status |= parseInheritance(InheritedProtocols,
+                               /*allowClassRequirement=*/true,
+                               /*allowAnyObject=*/true);
   }
 
   TrailingWhereClause *TrailingWhere = nullptr;
@@ -5470,10 +5483,6 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc, ProtocolName,
                    Context.AllocateCopy(InheritedProtocols), TrailingWhere);
   // No need to setLocalDiscriminator: protocols can't appear in local contexts.
-
-  // If there was a 'class' requirement, mark this as a class-bounded protocol.
-  if (classRequirementLoc.isValid())
-    Proto->setClassBounded(classRequirementLoc);
 
   Proto->getAttrs() = Attributes;
 
@@ -6045,6 +6054,9 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     auto attrName = Tok.getText();
 
     if (attrName == "associativity") {
+      // "associativity" is considered as a contextual keyword.
+      TokReceiver->registerTokenKindChange(Tok.getLoc(),
+                                           tok::contextual_keyword);
       parseAttributePrefix(associativityKeywordLoc);
 
       if (!Tok.is(tok::identifier)) {
@@ -6070,6 +6082,9 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     if (attrName == "assignment") {
       parseAttributePrefix(assignmentKeywordLoc);
 
+      // "assignment" is considered as a contextual keyword.
+      TokReceiver->registerTokenKindChange(assignmentKeywordLoc,
+                                           tok::contextual_keyword);
       if (consumeIf(tok::kw_true, assignmentValueLoc)) {
         assignment = true;
       } else if (consumeIf(tok::kw_false, assignmentValueLoc)) {
@@ -6084,6 +6099,9 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     bool isLowerThan = false;
     if (attrName == "higherThan" ||
         (isLowerThan = (attrName == "lowerThan"))) {
+      // "lowerThan" and "higherThan" are contextual keywords.
+      TokReceiver->registerTokenKindChange(Tok.getLoc(),
+                                           tok::contextual_keyword);
       parseAttributePrefix(isLowerThan ? lowerThanKeywordLoc
                                        : higherThanKeywordLoc);
       auto &relations = (isLowerThan ? lowerThan : higherThan);

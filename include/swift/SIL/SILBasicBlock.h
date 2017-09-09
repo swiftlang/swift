@@ -34,6 +34,7 @@ class SILBasicBlock :
 public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
   friend class SILSuccessor;
   friend class SILFunction;
+  friend class SILGlobalVariable;
 public:
   using InstListType = llvm::iplist<SILInstruction>;
 private:
@@ -142,6 +143,9 @@ public:
   /// Assumes that the basic blocks must reside in the same function. In asserts
   /// builds, an assert verifies that this is true.
   void moveAfter(SILBasicBlock *After);
+
+  /// \brief Moves the instruction to the iterator in this basic block.
+  void moveTo(SILBasicBlock::iterator To, SILInstruction *I);
 
   //===--------------------------------------------------------------------===//
   // SILBasicBlock Argument List Inspection and Manipulation
@@ -383,6 +387,14 @@ public:
     dropAllArguments();
     for (SILInstruction &I : *this)
       I.dropAllReferences();
+  }
+
+  void eraseInstructions() {
+   for (auto It = begin(); It != end();) {
+      auto *Inst = &*It++;
+      Inst->replaceAllUsesWithUndef();
+      Inst->eraseFromParent();
+    }
   }
 
 private:

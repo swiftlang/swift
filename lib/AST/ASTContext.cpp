@@ -267,6 +267,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// The single-parameter generic signature with no constraints, <T>.
   CanGenericSignature SingleGenericParameterSignature;
 
+  /// The existential signature <T : P> for each P.
+  llvm::DenseMap<CanType, CanGenericSignature> ExistentialSignatures;
+
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -1542,12 +1545,18 @@ bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
   if (getLoadedModule(ModulePath) != nullptr)
     return true;
 
+  // If we've failed loading this module before, don't look for it again.
+  if (FailedModuleImportNames.count(ModulePath.first))
+    return false;
+
   // Otherwise, ask the module loaders.
   for (auto &importer : Impl.ModuleLoaders) {
     if (importer->canImportModule(ModulePath)) {
       return true;
     }
   }
+
+  FailedModuleImportNames.insert(ModulePath.first);
   return false;
 }
 
@@ -2894,14 +2903,18 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
 
   bool isStatic = false;
   bool isMutating = false;
+  bool isDynamicSelf = false;
 
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     isStatic = FD->isStatic();
     isMutating = FD->isMutating();
 
+    // Methods returning 'Self' have a dynamic 'self'.
+    //
+    // FIXME: All methods of non-final classes should have this.
     if (wantDynamicSelf && FD->hasDynamicSelf())
-      selfTy = DynamicSelfType::get(selfTy, Ctx);
-  } else if (isa<ConstructorDecl>(AFD)) {
+      isDynamicSelf = true;
+  } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
       // inout self.
@@ -2910,10 +2923,21 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
       // allocating constructors have metatype 'self'.
       isStatic = true;
     }
+
+    // Convenience initializers have a dynamic 'self' in '-swift-version 5'.
+    if (Ctx.isSwiftVersionAtLeast(5)) {
+      if (wantDynamicSelf && CD->isConvenienceInit())
+        if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
+          if (!classDecl->isFinal())
+            isDynamicSelf = true;
+    }
   } else if (isa<DestructorDecl>(AFD)) {
     // destructors of value types always have an implicitly inout self.
     isMutating = true;
   }
+
+  if (isDynamicSelf)
+    selfTy = DynamicSelfType::get(selfTy, Ctx);
 
   // 'static' functions have 'self' of type metatype<T>.
   if (isStatic)
@@ -4257,8 +4281,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
             = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
         if (auto conformance
               = dc->getParentModule()->lookupConformance(
-                  nominal->getDeclaredType(), objcBridgeable,
-                  getLazyResolver())) {
+                  nominal->getDeclaredType(), objcBridgeable)) {
           result =
               ForeignRepresentationInfo::forBridged(conformance->getConcrete());
         }
@@ -4402,8 +4425,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       auto proto = getProtocol(known);
       if (!proto) return None;
 
-      return dc->getParentModule()->lookupConformance(type, proto,
-                                                      getLazyResolver());
+      return dc->getParentModule()->lookupConformance(type, proto);
     };
 
   // Do we conform to _ObjectiveCBridgeable?
@@ -4570,6 +4592,35 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   auto canonicalSig = CanGenericSignature(sig);
   Impl.SingleGenericParameterSignature = canonicalSig;
   return canonicalSig;
+}
+
+CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
+                                                        ModuleDecl *mod) {
+  auto found = Impl.ExistentialSignatures.find(existential);
+  if (found != Impl.ExistentialSignatures.end())
+    return found->second;
+
+  assert(existential.isExistentialType());
+
+  GenericSignatureBuilder builder(*this, LookUpConformanceInModule(mod));
+
+  auto genericParam = GenericTypeParamType::get(0, 0, *this);
+  builder.addGenericParameter(genericParam);
+
+  Requirement requirement(RequirementKind::Conformance, genericParam,
+                          existential);
+  auto source =
+    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+  builder.addRequirement(requirement, source, nullptr);
+
+  CanGenericSignature genericSig(builder.computeGenericSignature(SourceLoc()));
+
+  auto result = Impl.ExistentialSignatures.insert(
+    std::make_pair(existential, genericSig));
+  assert(result.second);
+  (void) result;
+
+  return genericSig;
 }
 
 SILLayout *SILLayout::get(ASTContext &C,

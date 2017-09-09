@@ -284,7 +284,7 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
 
   // To implode an address-only tuple, we need to create a buffer to hold the
   // result tuple.
-  if (loweredType.isAddressOnly(SGF.F.getModule()) &&
+  if (loweredType.isAddressOnly(SGF.getModule()) &&
       SGF.silConv.useLoweredAddresses()) {
     assert(KIND != ImplodeKind::Unmanaged &&
            "address-only values are always managed!");
@@ -510,6 +510,7 @@ void RValue::addElement(SILGenFunction &SGF, ManagedValue element,
 
 SILValue RValue::forwardAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
   assert(isComplete() && "rvalue is not complete");
+  assert(isPlusOne(SGF) && "Can not forward borrowed RValues");
   SILValue result
     = implodeTupleValues<ImplodeKind::Forward>(values, SGF, type, l);
 
@@ -521,6 +522,7 @@ SILValue RValue::forwardAsSingleStorageValue(SILGenFunction &SGF,
                                              SILType storageType,
                                              SILLocation l) && {
   assert(isComplete() && "rvalue is not complete");
+  assert(isPlusOne(SGF) && "Can not forward borrowed RValues");
   SILValue result = std::move(*this).forwardAsSingleValue(SGF, l);
   return SGF.emitConversionFromSemanticValue(l, result, storageType);
 }
@@ -528,6 +530,7 @@ SILValue RValue::forwardAsSingleStorageValue(SILGenFunction &SGF,
 void RValue::forwardInto(SILGenFunction &SGF, SILLocation loc, 
                          Initialization *I) && {
   assert(isComplete() && "rvalue is not complete");
+  assert(isPlusOne(SGF) && "Can not forward borrowed RValues");
   ArrayRef<ManagedValue> elts = values;
   copyOrInitValuesInto<ImplodeKind::Forward>(I, elts, type, loc, SGF);
 }
@@ -707,6 +710,7 @@ RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
 }
 
 ManagedValue RValue::materialize(SILGenFunction &SGF, SILLocation loc) && {
+  assert(isPlusOne(SGF) && "Can not materialize a non-plus one RValue");
   auto &paramTL = SGF.getTypeLowering(getType());
 
   // If we're already materialized, we're done.
@@ -796,4 +800,12 @@ const TypeLowering &RValue::getTypeLowering(SILGenFunction &SGF) const & {
 
 SILType RValue::getLoweredType(SILGenFunction &SGF) const & {
   return getTypeLowering(SGF).getLoweredType();
+}
+
+SILType RValue::getLoweredImplodedTupleType(SILGenFunction &SGF) const & {
+  SILType loweredType = getLoweredType(SGF);
+  if (loweredType.isAddressOnly(SGF.getModule()) &&
+      SGF.silConv.useLoweredAddresses())
+    return loweredType.getAddressType();
+  return loweredType.getObjectType();
 }

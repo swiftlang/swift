@@ -195,7 +195,7 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 11
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 305,
     key.length: 3
   },
@@ -220,7 +220,7 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 11
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 350,
     key.length: 3
   },
@@ -245,7 +245,7 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 401,
     key.length: 3
   }
@@ -332,6 +332,7 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
     key.name: "fooSubFunc1(_:)",
     key.offset: 62,
     key.length: 37,
+    key.typename: "Int32",
     key.nameoffset: 67,
     key.namelength: 23,
     key.substructure: [

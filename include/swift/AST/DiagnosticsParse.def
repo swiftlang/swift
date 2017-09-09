@@ -622,6 +622,10 @@ ERROR(sil_vtable_func_not_found,none,
       "sil function not found %0", (Identifier))
 ERROR(sil_vtable_class_not_found,none,
       "sil class not found %0", (Identifier))
+ERROR(sil_vtable_bad_entry_kind,none,
+      "expected 'inherited' or 'override'", ())
+ERROR(sil_vtable_expect_rsquare,none,
+      "expected ']' after vtable entry kind", ())
 
 // SIL Global
 ERROR(sil_global_variable_not_found,none,
@@ -681,8 +685,6 @@ ERROR(expected_identifier_for_type,PointsToFirstBadToken,
       "expected identifier for type name", ())
 ERROR(expected_rangle_generic_arg_list,PointsToFirstBadToken,
       "expected '>' to complete generic argument list", ())
-ERROR(expected_ident_type_in_inheritance,none,
-      "inheritance from non-named type %0", (TypeLoc))
 
 
 // Function types
@@ -743,8 +745,6 @@ ERROR(tuple_type_multiple_labels,none,
 // Protocol Types
 ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol-constrained type", ())
-ERROR(disallowed_protocol_composition,PointsToFirstBadToken,
-      "protocol-constrained type is neither allowed nor needed here", ())
 
 WARNING(swift3_deprecated_protocol_composition,none,
         "'protocol<...>' composition syntax is deprecated; join the protocols using '&'", ())
@@ -1270,8 +1270,8 @@ ERROR(attr_interpolated_string,none,
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
 
-// accessibility
-ERROR(attr_accessibility_expected_set,none,
+// Access control
+ERROR(attr_access_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
 
 // availability
@@ -1414,7 +1414,7 @@ ERROR(expected_generics_parameter_name,PointsToFirstBadToken,
 ERROR(unexpected_class_constraint,none,
        "'class' constraint can only appear on protocol declarations", ())
 NOTE(suggest_anyobject,none,
-     "did you mean to constrain %0 with the 'AnyObject' protocol?", (Identifier))
+     "did you mean to write an 'AnyObject' constraint?", ())
 ERROR(expected_generics_type_restriction,none,
       "expected a class type or protocol-constrained type restricting %0",
       (Identifier))
@@ -1423,8 +1423,6 @@ ERROR(requires_single_equal,none,
 ERROR(expected_requirement_delim,none,
       "expected ':' or '==' to indicate a conformance or same-type requirement",
       ())
-ERROR(invalid_class_requirement,none,
-      "'class' requirement only applies to protocols", ())
 ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,

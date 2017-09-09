@@ -157,7 +157,6 @@ SILLinkage getSpecializedLinkage(SILFunction *F, SILLinkage L);
 /// string literals. Returns a new instruction if optimization was possible.
 SILInstruction *tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B);
 
-
 /// Tries to perform jump-threading on all checked_cast_br instruction in
 /// function \p Fn.
 bool tryCheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
@@ -662,6 +661,10 @@ ignore_expect_uses(ValueBase *V) {
 /// aggregate and reforming it, the reformed aggregate may have extract
 /// operations from it. These can be simplified and removed.
 bool simplifyUsers(SILInstruction *I);
+
+///  True if a type can be expanded
+/// without a significant increase to code size.
+bool shouldExpand(SILModule &Module, SILType Ty);
 
 /// Check if a given type is a simple type, i.e. a builtin
 /// integer or floating point type or a struct/tuple whose members

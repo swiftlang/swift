@@ -408,10 +408,12 @@ private:
     case Node::Kind::EmptyList:
     case Node::Kind::FirstElementMarker:
     case Node::Kind::VariadicMarker:
+    case Node::Kind::OutlinedBridgedMethod:
     case Node::Kind::OutlinedCopy:
     case Node::Kind::OutlinedConsume:
     case Node::Kind::OutlinedRetain:
     case Node::Kind::OutlinedRelease:
+    case Node::Kind::OutlinedVariable:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -778,6 +780,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "curry thunk of ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::OutlinedBridgedMethod:
+    Printer << "outlined bridged method (" << Node->getText() << ") of ";
+    return nullptr;
   case Node::Kind::OutlinedCopy:
     Printer << "outlined copy of ";
     print(Node->getChild(0));
@@ -793,6 +798,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::OutlinedRelease:
     Printer << "outlined release of ";
     print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedVariable:
+    Printer << "outlined variable #" << Node->getIndex() << " of ";
     return nullptr;
   case Node::Kind::Directness:
     Printer << toString(Directness(Node->getIndex())) << " ";

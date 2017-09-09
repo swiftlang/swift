@@ -28,8 +28,8 @@ extension A {
 class B : A { }
 
 extension B { 
-  func f1() { }  // expected-error{{declarations in extensions cannot override yet}}
-  func f2() -> B { } // expected-error{{declarations in extensions cannot override yet}}
+  func f1() { }  // expected-error{{overriding declarations in extensions is not supported}}
+  func f2() -> B { } // expected-error{{overriding declarations in extensions is not supported}}
 
   override func f3() { } // expected-error{{cannot override a non-dynamic class declaration from an extension}}
   override func f4() -> ObjCClassB { } // expected-error{{cannot override a non-dynamic class declaration from an extension}}
@@ -46,8 +46,8 @@ extension B {
   override func f3D() { }
   override func f4D() -> ObjCClassB { }
 
-  func f5() { }  // expected-error{{declarations in extensions cannot override yet}}
-  func f6() -> A { }  // expected-error{{declarations in extensions cannot override yet}}
+  func f5() { }  // expected-error{{overriding declarations in extensions is not supported}}
+  func f6() -> A { }  // expected-error{{overriding declarations in extensions is not supported}}
 
   @objc override func f7() { }
   @objc override func f8() -> ObjCClassA { }

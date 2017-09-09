@@ -166,8 +166,8 @@ bool SILWitnessTable::conformanceIsSerialized(ProtocolConformance *conformance,
   // witness tables.
   auto moduleIsResilient = strategy == ResilienceStrategy::Resilient;
   auto protocolIsPublic =
-      conformance->getProtocol()->getEffectiveAccess() >= Accessibility::Public;
-  auto typeIsPublic = nominal->getEffectiveAccess() >= Accessibility::Public;
+      conformance->getProtocol()->getEffectiveAccess() >= AccessLevel::Public;
+  auto typeIsPublic = nominal->getEffectiveAccess() >= AccessLevel::Public;
   return (moduleIsResilient || silSerializeWitnessTables) &&
          nominal->hasFixedLayout() && protocolIsPublic && typeIsPublic;
 }

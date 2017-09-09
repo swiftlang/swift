@@ -445,22 +445,8 @@ extension String.UnicodeScalarView {
       return true
     }
     if !_isOnUnicodeScalarBoundary(i) { return false }
-    let precedingScalar = self[index(before: i)]
-
-    let graphemeClusterBreakProperty =
-      _UnicodeGraphemeClusterBreakPropertyTrie()
-    let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-
-    let gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
-      precedingScalar.value)
-
-    if segmenter.isBoundaryAfter(gcb0) {
-      return true
-    }
-
-    let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(self[i].value)
-
-    return segmenter.isBoundary(gcb0, gcb1)
+    let str = String(_core)
+    return i == str.index(before: str.index(after: i))
   }
 }
 

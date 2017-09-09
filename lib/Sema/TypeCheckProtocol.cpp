@@ -69,9 +69,49 @@ namespace {
   /// generic requirements. See the \c Witness class for more information about
   /// this synthetic environment.
   class RequirementEnvironment {
+    /// A generic signature that combines the generic parameters of the
+    /// concrete conforming type with the generic parameters of the
+    /// requirement.
+    ///
+    ///
+    /// For example, if you have:
+    ///
+    /// protocol P { func f<T>(_: T) }
+    /// struct S<A, B> : P { func f<T>(_: T) }
+    ///
+    /// The requirement and witness signatures are, respectively:
+    ///
+    /// <Self : P, T>
+    /// <A, B, T>
+    ///
+    /// The synthetic signature in this case is just the witness signature.
+    ///
+    /// It may be that the witness is more generic than the requirement,
+    /// for example:
+    ///
+    /// protocol P { func f(_: Int) }
+    /// struct S<A, B> : P { func f<T>(_: T) { } }
+    ///
+    /// Here, the requirement signature and witness signatures are:
+    ///
+    /// <Self : P>
+    /// <A, B, T>
+    ///
+    /// The synthetic signature is just:
+    ///
+    /// <A, B>
+    ///
+    /// The witness thunk emitted by SILGen uses the synthetic signature.
+    /// Therefore one invariant we preserve is that the witness thunk is
+    /// ABI compatible with the requirement's function type.
     GenericSignature *syntheticSignature = nullptr;
     GenericEnvironment *syntheticEnvironment = nullptr;
+
+    /// The generic signature of the protocol requirement member.
     GenericSignature *reqSig = nullptr;
+
+    /// A substitution map mapping the requirement signature to the
+    /// generic parameters of the synthetic signature.
     SubstitutionMap reqToSyntheticEnvMap;
 
   public:
@@ -158,10 +198,10 @@ namespace {
                          unsigned &bestIdx,
                          bool &doNotDiagnoseMatches);
 
-    bool checkWitnessAccessibility(AccessScope &requiredAccessScope,
-                                   ValueDecl *requirement,
-                                   ValueDecl *witness,
-                                   bool *isSetter);
+    bool checkWitnessAccess(AccessScope &requiredAccessScope,
+                            ValueDecl *requirement,
+                            ValueDecl *witness,
+                            bool *isSetter);
 
     bool checkWitnessAvailability(ValueDecl *requirement,
                                   ValueDecl *witness,
@@ -211,6 +251,12 @@ namespace {
     
     /// \brief The witness did not match because of mutating conflicts.
     MutatingConflict,
+    
+    /// \brief The witness did not match because of nonmutating conflicts.
+    NonMutatingConflict,
+    
+    /// \brief The witness did not match because of __consuming conflicts.
+    ConsumingConflict,
 
     /// The witness is not rethrows, but the requirement is.
     RethrowsConflict,
@@ -258,11 +304,11 @@ namespace {
     Success,
 
     /// The witness is less accessible than the requirement.
-    Accessibility,
+    Access,
 
     /// The witness is storage whose setter is less accessible than the
     /// requirement.
-    AccessibilityOfSetter,
+    AccessOfSetter,
 
     /// The witness is less available than the requirement.
     Availability,
@@ -407,6 +453,8 @@ namespace {
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
+      case MatchKind::NonMutatingConflict:
+      case MatchKind::ConsumingConflict:
       case MatchKind::RethrowsConflict:
       case MatchKind::ThrowsConflict:
       case MatchKind::NonObjC:
@@ -432,6 +480,8 @@ namespace {
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
+      case MatchKind::NonMutatingConflict:
+      case MatchKind::ConsumingConflict:
       case MatchKind::RethrowsConflict:
       case MatchKind::ThrowsConflict:
       case MatchKind::NonObjC:
@@ -818,6 +868,10 @@ matchWitness(TypeChecker &tc,
     // Check that the mutating bit is ok.
     if (checkMutating(funcReq, funcWitness, funcWitness))
       return RequirementMatch(witness, MatchKind::MutatingConflict);
+    if (funcWitness->isNonMutating() && funcReq->isConsuming())
+      return RequirementMatch(witness, MatchKind::NonMutatingConflict);
+    if (funcWitness->isConsuming() && !funcReq->isConsuming())
+      return RequirementMatch(witness, MatchKind::ConsumingConflict);
 
     // If the requirement is rethrows, the witness must either be
     // rethrows or be non-throwing.
@@ -1462,11 +1516,10 @@ bool WitnessChecker::findBestWitness(
   return isReallyBest;
 }
 
-bool WitnessChecker::
-checkWitnessAccessibility(AccessScope &requiredAccessScope,
-                          ValueDecl *requirement,
-                          ValueDecl *witness,
-                          bool *isSetter) {
+bool WitnessChecker::checkWitnessAccess(AccessScope &requiredAccessScope,
+                                        ValueDecl *requirement,
+                                        ValueDecl *witness,
+                                        bool *isSetter) {
   *isSetter = false;
 
   auto scopeIntersection =
@@ -1523,11 +1576,11 @@ checkWitness(AccessScope requiredAccessScope,
     return CheckKind::OptionalityConflict;
 
   bool isSetter = false;
-  if (checkWitnessAccessibility(requiredAccessScope, requirement,
-                                match.Witness, &isSetter)) {
+  if (checkWitnessAccess(requiredAccessScope, requirement, match.Witness,
+                         &isSetter)) {
     CheckKind kind = (isSetter
-                      ? CheckKind::AccessibilityOfSetter
-                      : CheckKind::Accessibility);
+                      ? CheckKind::AccessOfSetter
+                      : CheckKind::Access);
     return RequirementCheck(kind, requiredAccessScope);
   }
 
@@ -2388,7 +2441,21 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
   case MatchKind::MutatingConflict:
     // FIXME: Could emit a Fix-It here.
-    diags.diagnose(match.Witness, diag::protocol_witness_mutating_conflict);
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_mutation_modifier_conflict,
+                   unsigned(SelfAccessKind::Mutating));
+    break;
+  case MatchKind::NonMutatingConflict:
+    // FIXME: Could emit a Fix-It here.
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_mutation_modifier_conflict,
+                   unsigned(SelfAccessKind::NonMutating));
+    break;
+  case MatchKind::ConsumingConflict:
+    // FIXME: Could emit a Fix-It here.
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_mutation_modifier_conflict,
+                   unsigned(SelfAccessKind::__Consuming));
     break;
   case MatchKind::RethrowsConflict:
     // FIXME: Could emit a Fix-It here.
@@ -2486,8 +2553,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     AccessScope requiredAccessScope =
         Adoptee->getAnyNominal()->getFormalAccessScope(DC);
     bool isSetter = false;
-    if (checkWitnessAccessibility(requiredAccessScope, assocType, typeDecl,
-                                  &isSetter)) {
+    if (checkWitnessAccess(requiredAccessScope, assocType, typeDecl,
+                           &isSetter)) {
       assert(!isSetter);
 
       // Avoid relying on the lifetime of 'this'.
@@ -2495,8 +2562,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       diagnoseOrDefer(assocType, false,
         [DC, typeDecl, requiredAccessScope](
           NormalProtocolConformance *conformance) {
-        Accessibility requiredAccess =
-          requiredAccessScope.requiredAccessibilityForDiagnostics();
+        AccessLevel requiredAccess =
+          requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
@@ -2510,7 +2577,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                    typeDecl->getFullName(),
                                    requiredAccess,
                                    proto->getName());
-        fixItAccessibility(diag, typeDecl, requiredAccess);
+        fixItAccess(diag, typeDecl, requiredAccess);
       });
     }
   } else {
@@ -2550,14 +2617,14 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
-      TC.computeAccessibility(nominal);
+      TC.computeAccessLevel(nominal);
       // FIXME: Ideally this would use the protocol's access too---that is,
       // a typealias added for an internal protocol shouldn't need to be
       // public---but that can be problematic if the same type conforms to two
       // protocols with different access levels.
-      Accessibility aliasAccess = nominal->getFormalAccess();
-      aliasAccess = std::max(aliasAccess, Accessibility::Internal);
-      aliasDecl->setAccessibility(aliasAccess);
+      AccessLevel aliasAccess = nominal->getFormalAccess();
+      aliasAccess = std::max(aliasAccess, AccessLevel::Internal);
+      aliasDecl->setAccess(aliasAccess);
 
       if (nominal == DC) {
         nominal->addMember(aliasDecl);
@@ -2609,14 +2676,14 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
   ExtraIndentStreamPrinter Printer(OS, StubIndent);
   Printer.printNewline();
 
-  Accessibility Access =
+  AccessLevel Access =
     std::min(
       /* Access of the context */
       Adopter->getAsNominalTypeOrNominalTypeExtensionContext()->getFormalAccess(),
       /* Access of the protocol */
       Requirement->getDeclContext()->getAsProtocolOrProtocolExtensionContext()->
         getFormalAccess());
-  if (Access == Accessibility::Public)
+  if (Access == AccessLevel::Public)
     Printer << "public ";
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
@@ -2635,8 +2702,8 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
 
     PrintOptions Options = PrintOptions::printForDiagnostics();
     Options.PrintDocumentationComments = false;
-    Options.AccessibilityFilter = Accessibility::Private;
-    Options.PrintAccessibility = false;
+    Options.AccessFilter = AccessLevel::Private;
+    Options.PrintAccess = false;
     Options.SkipAttributes = true;
     Options.FunctionBody = [](const ValueDecl *VD) { return getCodePlaceholder(); };
     Options.setBaseType(AdopterTy);
@@ -2907,16 +2974,16 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     case CheckKind::Success:
       break;
 
-    case CheckKind::Accessibility:
-    case CheckKind::AccessibilityOfSetter: {
+    case CheckKind::Access:
+    case CheckKind::AccessOfSetter: {
       // Avoid relying on the lifetime of 'this'.
       const DeclContext *DC = this->DC;
       diagnoseOrDefer(requirement, false,
         [DC, witness, check, requirement](
           NormalProtocolConformance *conformance) {
         auto requiredAccessScope = check.RequiredAccessScope;
-        Accessibility requiredAccess =
-          requiredAccessScope.requiredAccessibilityForDiagnostics();
+        AccessLevel requiredAccess =
+          requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
@@ -2924,7 +2991,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         auto diagKind = protoForcesAccess
                           ? diag::witness_not_accessible_proto
                           : diag::witness_not_accessible_type;
-        bool isSetter = (check.Kind == CheckKind::AccessibilityOfSetter);
+        bool isSetter = (check.Kind == CheckKind::AccessOfSetter);
 
         auto &diags = DC->getASTContext().Diags;
         auto diag = diags.diagnose(
@@ -2933,9 +3000,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                              witness->getFullName(),
                              isSetter,
                              requiredAccess,
-                             protoAccessScope.accessibilityForDiagnostics(),
+                             protoAccessScope.accessLevelForDiagnostics(),
                              proto->getName());
-        fixItAccessibility(diag, witness, requiredAccess, isSetter);
+        fixItAccess(diag, witness, requiredAccess, isSetter);
       });
       break;
     }
@@ -3417,6 +3484,16 @@ InferredAssociatedTypesByWitnesses
 ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
                     const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                     ValueDecl *req) {
+  // Conformances constructed by the ClangImporter should have explicit type
+  // witnesses already.
+  if (isa<ClangModuleUnit>(Conformance->getDeclContext()->getModuleScopeContext())) {
+    llvm::errs() << "Cannot infer associated types for imported conformance:\n";
+    Conformance->getType().dump(llvm::errs());
+    for (auto assocTypeDecl : allUnresolved)
+      assocTypeDecl->dump(llvm::errs());
+    abort();
+  }
+
   InferredAssociatedTypesByWitnesses result;
 
   auto isExtensionUsableForInference = [&](ExtensionDecl *extension) -> bool {
@@ -5270,7 +5347,7 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   emitDelayedDiags();
 
-  // Except in specific whitelisted cases for Foundation/Swift
+  // Except in specific hardcoded cases for Foundation/Swift
   // standard library compatibility, an _ObjectiveCBridgeable
   // conformance must appear in the same module as the definition of
   // the conforming type.
@@ -5444,7 +5521,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 
   // Look up conformance in the module.
   ModuleDecl *M = DC->getParentModule();
-  auto lookupResult = M->lookupConformance(T, Proto, this);
+  auto lookupResult = M->lookupConformance(T, Proto);
   if (!lookupResult) {
     if (ComplainLoc.isValid())
       diagnoseConformanceFailure(*this, T, Proto, DC, ComplainLoc);
@@ -5944,7 +6021,7 @@ static unsigned getNameLength(DeclName name) {
 /// match for the given optional requirement.
 static bool shouldWarnAboutPotentialWitness(ValueDecl *req,
                                             ValueDecl *witness,
-                                            Accessibility accessibility,
+                                            AccessLevel access,
                                             unsigned score) {
   // If the warning couldn't be suppressed, don't warn.
   if (!canSuppressPotentialWitnessWarningWithMovement(req, witness) &&
@@ -5957,8 +6034,8 @@ static bool shouldWarnAboutPotentialWitness(ValueDecl *req,
 
   // Don't warn if the potential witness has been explicitly given less
   // visibility than the conformance.
-  if (witness->getFormalAccess() < accessibility) {
-    if (auto attr = witness->getAttrs().getAttribute<AccessibilityAttr>())
+  if (witness->getFormalAccess() < access) {
+    if (auto attr = witness->getAttrs().getAttribute<AccessControlAttr>())
       if (!attr->isImplicit()) return false;
   }
 
@@ -5979,7 +6056,7 @@ static void diagnosePotentialWitness(TypeChecker &tc,
                                      NormalProtocolConformance *conformance,
                                      ValueDecl *req,
                                      ValueDecl *witness,
-                                     Accessibility accessibility) {
+                                     AccessLevel access) {
   auto proto = cast<ProtocolDecl>(req->getDeclContext());
 
   // Primary warning.
@@ -6014,11 +6091,10 @@ static void diagnosePotentialWitness(TypeChecker &tc,
   }
 
   // If adding 'private', 'fileprivate', or 'internal' can help, suggest that.
-  if (accessibility > Accessibility::FilePrivate &&
-      !witness->getAttrs().hasAttribute<AccessibilityAttr>()) {
-    tc.diagnose(witness, diag::optional_req_near_match_accessibility,
-                witness->getFullName(),
-                accessibility)
+  if (access > AccessLevel::FilePrivate &&
+      !witness->getAttrs().hasAttribute<AccessControlAttr>()) {
+    tc.diagnose(witness, diag::optional_req_near_match_access,
+                witness->getFullName(), access)
       .fixItInsert(witness->getAttributeInsertionLoc(true), "private ");
   }
 
@@ -6088,9 +6164,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
     return;
 
-  // Determine the accessibility of this conformance.
+  // Determine the access level of this conformance.
   Decl *currentDecl = nullptr;
-  Accessibility defaultAccessibility;
+  AccessLevel defaultAccess;
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
     Type extendedTy = ext->getExtendedType();
     if (!extendedTy)
@@ -6098,10 +6174,10 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     const NominalTypeDecl *nominal = extendedTy->getAnyNominal();
     if (!nominal)
       return;
-    defaultAccessibility = nominal->getFormalAccess();
+    defaultAccess = nominal->getFormalAccess();
     currentDecl = ext;
   } else {
-    defaultAccessibility = cast<NominalTypeDecl>(dc)->getFormalAccess();
+    defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
     currentDecl = cast<NominalTypeDecl>(dc);
   }
 
@@ -6127,7 +6203,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     if (tracker)
       tracker->addUsedMember({conformance->getProtocol(), Identifier()},
-                             defaultAccessibility > Accessibility::FilePrivate);
+                             defaultAccess > AccessLevel::FilePrivate);
 
     // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which
     // have unstable archival names.
@@ -6151,17 +6227,17 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
             kind = UnstableNameKind::Local;
         } else {
           switch (classDecl->getFormalAccess()) {
-          case Accessibility::FilePrivate:
+          case AccessLevel::FilePrivate:
             kind = UnstableNameKind::FilePrivate;
             break;
 
-          case Accessibility::Private:
+          case AccessLevel::Private:
             kind = UnstableNameKind::Private;
             break;
 
-          case Accessibility::Internal:
-          case Accessibility::Open:
-          case Accessibility::Public:
+          case AccessLevel::Internal:
+          case AccessLevel::Open:
+          case AccessLevel::Public:
             break;
           }
         }
@@ -6344,8 +6420,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
             bestOptionalReqs.begin(),
             bestOptionalReqs.end(),
             [&](ValueDecl *req) {
-              return !shouldWarnAboutPotentialWitness(req, value,
-                                                      defaultAccessibility,
+              return !shouldWarnAboutPotentialWitness(req, value, defaultAccess,
                                                       bestScore);
             }),
           bestOptionalReqs.end());
@@ -6359,7 +6434,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           if (conformance->getProtocol() == req->getDeclContext()) {
             diagnosePotentialWitness(*this,
                                      conformance->getRootNormalConformance(),
-                                     req, value, defaultAccessibility);
+                                     req, value, defaultAccess);
             diagnosed = true;
             break;
           }

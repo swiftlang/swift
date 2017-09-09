@@ -41,7 +41,8 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
   using ImplicitModuleImportKind = SourceFile::ImplicitModuleImportKind;
   FileForLookups = new (Ctx) SourceFile(*module, SourceFileKind::Library,
                                         /*buffer*/None,
-                                        ImplicitModuleImportKind::None);
+                                        ImplicitModuleImportKind::None,
+                                        /*keeps token*/false);
   module->addFile(*FileForLookups);
 
   if (optionals == DeclareOptionalTypes) {

@@ -174,6 +174,8 @@ Entities
   entity-spec ::= 'fd'                       // non-deallocating destructor; untyped
   entity-spec ::= 'fE'                       // ivar destroyer; untyped
   entity-spec ::= 'fe'                       // ivar initializer; untyped
+  entity-spec ::= 'Tv' NATURAL               // outlined global variable (from context function)
+  entity-spec ::= 'Te' bridge-spec           // outlined objective c method call
 
   entity-spec ::= decl-name function-signature generic-signature? 'F'    // function
   entity-spec ::= decl-name type 'i'                 // subscript ('i'ndex) itself (not the individual accessors)
@@ -209,6 +211,23 @@ enclosing module. The second identifier is the name of the entity. Not all
 declarations marked ``private`` declarations will use this mangling; if the
 entity's context is enough to uniquely identify the entity, the simple
 ``identifier`` form is preferred.
+
+Outlined bridged Objective C method call mangling includes which parameters and
+return value are bridged and the type of pattern outlined.
+
+::
+
+  bridge-spec := bridged-kind bridged-param* bridged-return '_'
+
+  bridged-param := 'n' // not bridged parameter
+  bridged-param := 'b' // bridged parameter
+
+  bridged-return := 'n' // not bridged return
+  bridged-return := 'b' // bridged return
+
+  bridged-kind := 'm' // bridged method
+  bridged-kind := 'a' // bridged property (by address)
+  bridged-kind := 'p' // bridged property (by value)
 
 Declaration Contexts
 ~~~~~~~~~~~~~~~~~~~~

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen -module-name Swift %s | %FileCheck %s
 // UNSUPPORTED: resilient_stdlib
 
 precedencegroup AssignmentPrecedence { assignment: true }
@@ -42,7 +42,7 @@ func s020__________bitCast<T, U>(_ x: T, to type: U.Type) -> U {
 // Test emitBuiltinCastReference
 // ---
 // CHECK-LABEL: sil hidden @_T0s21s030__________refCastq_x_q_m2totr0_lF : $@convention(thin) <T, U> (@in T, @thick U.Type) -> @out U {
-// CHECK: bb0(%0 : $T, %1 : $@thick U.Type):
+// CHECK: bb0(%0 : @owned $T, %1 : @trivial $@thick U.Type):
 // CHECK: [[BORROW:%.*]] = begin_borrow %0 : $T
 // CHECK: [[COPY:%.*]] = copy_value [[BORROW]] : $T
 // CHECK: [[SRC:%.*]] = alloc_stack $T
@@ -62,13 +62,13 @@ func s030__________refCast<T, U>(_ x: T, to: U.Type) -> U {
 // Init of Empty protocol + Builtin.NativeObject enum (including opaque tuples as a return value)
 // ---
 // CHECK-LABEL: sil shared [transparent] @_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmF : $@convention(method) (@in EmptyP, @owned String, @thin PAndSEnum.Type) -> @out PAndSEnum {
-// CHECK: bb0([[ARG0:%.*]] : $EmptyP, [[ARG1:%.*]]  : $String, [[ARG2:%.*]] : $@thin PAndSEnum.Type):
+// CHECK: bb0([[ARG0:%.*]] : @owned $EmptyP, [[ARG1:%.*]]  : @owned $String, [[ARG2:%.*]] : @trivial $@thin PAndSEnum.Type):
 // CHECK:   [[RTUPLE:%.*]] = tuple ([[ARG0]] : $EmptyP, [[ARG1]] : $String)
 // CHECK:   [[RETVAL:%.*]] = enum $PAndSEnum, #PAndSEnum.A!enumelt.1, [[RTUPLE]] : $(EmptyP, String)
 // CHECK:   return [[RETVAL]] : $PAndSEnum
 // CHECK-LABEL: } // end sil function '_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmF'
 // CHECK-LABEL: sil shared [transparent] [thunk] @_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmFTc : $@convention(thin) (@thin PAndSEnum.Type) -> @owned @callee_owned (@in EmptyP, @owned String) -> @out PAndSEnum {
-// CHECK: bb0([[ARG:%.*]] : $@thin PAndSEnum.Type):
+// CHECK: bb0([[ARG:%.*]] : @trivial $@thin PAndSEnum.Type):
 // CHECK:   [[RETVAL:%.*]] = partial_apply {{.*}}([[ARG]]) : $@convention(method) (@in EmptyP, @owned String, @thin PAndSEnum.Type) -> @out PAndSEnum
 // CHECK:   return [[RETVAL]] : $@callee_owned (@in EmptyP, @owned String) -> @out PAndSEnum
 // CHECK-LABEL: } // end sil function '_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmFTc'

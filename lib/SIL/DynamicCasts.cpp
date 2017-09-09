@@ -58,12 +58,12 @@ static bool canClassOrSuperclassesHaveExtensions(ClassDecl *CD,
                                                  bool isWholeModuleOpts) {
   while (CD) {
     // Open classes can always be extended
-    if (CD->getEffectiveAccess() == Accessibility::Open)
+    if (CD->getEffectiveAccess() == AccessLevel::Open)
       return true;
 
     // Internal and public classes can be extended, if we are not in
     // whole-module-optimization mode.
-    if (CD->getEffectiveAccess() >= Accessibility::Internal &&
+    if (CD->getEffectiveAccess() >= AccessLevel::Internal &&
         !isWholeModuleOpts)
       return true;
 
@@ -144,8 +144,8 @@ classifyDynamicCastToProtocol(CanType source,
   // then conformances cannot be changed at run-time, because only this
   // file could have implemented them, but no conformances were found.
   // Therefore it is safe to make a negative decision at compile-time.
-  if (SourceNominalTy->getEffectiveAccess() <= Accessibility::FilePrivate ||
-      TargetProtocol->getEffectiveAccess() <= Accessibility::FilePrivate) {
+  if (SourceNominalTy->getEffectiveAccess() <= AccessLevel::FilePrivate ||
+      TargetProtocol->getEffectiveAccess() <= AccessLevel::FilePrivate) {
     // This cast is always false. Replace it with a branch to the
     // failure block.
     return DynamicCastFeasibility::WillFail;
@@ -157,8 +157,8 @@ classifyDynamicCastToProtocol(CanType source,
   // module could have implemented them, but no conformances were found.
   // Therefore it is safe to make a negative decision at compile-time.
   if (isWholeModuleOpts &&
-      (SourceNominalTy->getEffectiveAccess() <= Accessibility::Internal ||
-       TargetProtocol->getEffectiveAccess() <= Accessibility::Internal)) {
+      (SourceNominalTy->getEffectiveAccess() <= AccessLevel::Internal ||
+       TargetProtocol->getEffectiveAccess() <= AccessLevel::Internal)) {
     return DynamicCastFeasibility::WillFail;
   }
 
@@ -213,7 +213,7 @@ bool swift::isObjectiveCBridgeable(ModuleDecl *M, CanType Ty) {
   if (bridgedProto) {
     // Find the conformance of the value type to _BridgedToObjectiveC.
     // Check whether the type conforms to _BridgedToObjectiveC.
-    auto conformance = M->lookupConformance(Ty, bridgedProto, nullptr);
+    auto conformance = M->lookupConformance(Ty, bridgedProto);
     return conformance.hasValue();
   }
   return false;
@@ -228,7 +228,7 @@ bool swift::isError(ModuleDecl *M, CanType Ty) {
   if (errorTypeProto) {
     // Find the conformance of the value type to Error.
     // Check whether the type conforms to Error.
-    auto conformance = M->lookupConformance(Ty, errorTypeProto, nullptr);
+    auto conformance = M->lookupConformance(Ty, errorTypeProto);
     return conformance.hasValue();
   }
   return false;
@@ -729,16 +729,12 @@ namespace {
   struct Source {
     SILValue Value;
     CanType FormalType;
-    CastConsumptionKind Consumption;
 
     bool isAddress() const { return Value->getType().isAddress(); }
-    IsTake_t shouldTake() const {
-      return shouldTakeOnSuccess(Consumption);
-    }
 
     Source() = default;
-    Source(SILValue value, CanType formalType, CastConsumptionKind consumption)
-      : Value(value), FormalType(formalType), Consumption(consumption) {}
+    Source(SILValue value, CanType formalType)
+      : Value(value), FormalType(formalType) {}
   };
 
   struct Target {
@@ -750,12 +746,12 @@ namespace {
 
     Source asAddressSource() const {
       assert(isAddress());
-      return { Address, FormalType, CastConsumptionKind::TakeAlways };
+      return { Address, FormalType };
     }
     Source asScalarSource(SILValue value) const {
       assert(!isAddress());
       assert(!value->getType().isAddress());
-      return { value, FormalType, CastConsumptionKind::TakeAlways };
+      return { value, FormalType };
     }
 
     Target() = default;
@@ -797,8 +793,6 @@ namespace {
 
     SILValue getOwnedScalar(Source source, const TypeLowering &srcTL) {
       assert(!source.isAddress());
-      if (!source.shouldTake())
-        srcTL.emitCopyValue(B, Loc, source.Value);
       return source.Value;
     }
 
@@ -822,7 +816,6 @@ namespace {
       // +1 if it's a scalar.
       if (!source.isAddress()) {
         source.Value = getOwnedScalar(source, srcTL);
-        source.Consumption = CastConsumptionKind::TakeAlways;
       }
 
       // If we've got a scalar and want a scalar, the source is
@@ -832,14 +825,13 @@ namespace {
 
       // If the destination wants a non-address value, load
       if (!target.isAddress()) {
-        SILValue value = srcTL.emitLoadOfCopy(B, Loc, source.Value,
-                                              source.shouldTake());
+        SILValue value = srcTL.emitLoadOfCopy(B, Loc, source.Value, IsTake);
         return target.asScalarSource(value);
       }
 
       if (source.isAddress()) {
         srcTL.emitCopyInto(B, Loc, source.Value, target.Address,
-                           source.shouldTake(), IsInitialization);
+                           IsTake, IsInitialization);
       } else {
         srcTL.emitStoreOfCopy(B, Loc, source.Value, target.Address,
                               IsInitialization);
@@ -869,7 +861,7 @@ namespace {
       auto &srcTL = getTypeLowering(source.Value->getType());
       SILValue value;
       if (source.isAddress()) {
-        value = srcTL.emitLoadOfCopy(B, Loc, source.Value, source.shouldTake());
+        value = srcTL.emitLoadOfCopy(B, Loc, source.Value, IsTake);
       } else {
         value = getOwnedScalar(source, srcTL);
       }
@@ -934,23 +926,14 @@ namespace {
           // TODO: add an instruction for non-destructively getting a
           // specific element's data.
           SILValue sourceAddr = source.Value;
-          if (!source.shouldTake()) {
-            sourceTemp = B.createAllocStack(Loc,
-                                       sourceAddr->getType().getObjectType());
-            sourceAddr = sourceTemp;
-            B.createCopyAddr(Loc, source.Value, sourceAddr, IsNotTake,
-                             IsInitialization);
-          }
           sourceAddr = B.createUncheckedTakeEnumDataAddr(Loc, sourceAddr,
                                     sourceSomeDecl, loweredSourceObjectType);
-          objectSource = Source(sourceAddr, sourceObjectType,
-                                CastConsumptionKind::TakeAlways);
+          objectSource = Source(sourceAddr, sourceObjectType);
         } else {
           // switch enum always start as @owned.
           SILValue sourceObjectValue = someBB->createPHIArgument(
               loweredSourceObjectType, ValueOwnershipKind::Owned);
-          objectSource = Source(sourceObjectValue, sourceObjectType,
-                                source.Consumption);
+          objectSource = Source(sourceObjectValue, sourceObjectType);
         }
 
         Source resultObject = emit(objectSource, objectTarget);
@@ -1070,23 +1053,18 @@ swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, ModuleDecl *M,
   if (sourceType == targetType)
     return value;
 
-  Source source(value, sourceType, CastConsumptionKind::TakeAlways);
+  Source source(value, sourceType);
   Target target(loweredTargetType, targetType);
   Source result = CastEmitter(B, M, loc).emitTopLevel(source, target);
   assert(!result.isAddress());
   assert(result.Value->getType() == loweredTargetType);
-  assert(result.Consumption == CastConsumptionKind::TakeAlways);
   return result.Value;
 }
 
-bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, ModuleDecl *M,
-                                                    SILLocation loc,
-                                               CastConsumptionKind consumption,
-                                                    SILValue src,
-                                                    CanType sourceType,
-                                                    SILValue dest,
-                                                    CanType targetType,
-                                                    SILInstruction *existingCast) {
+bool swift::emitSuccessfulIndirectUnconditionalCast(
+    SILBuilder &B, ModuleDecl *M, SILLocation loc, SILValue src,
+    CanType sourceType, SILValue dest, CanType targetType,
+    SILInstruction *existingCast) {
   assert(classifyDynamicCast(M, sourceType, targetType)
            == DynamicCastFeasibility::WillSucceed);
 
@@ -1104,41 +1082,35 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, ModuleDecl *M
       dest->getType().isAnyExistentialType() ||
       !(src->getType().getClassOrBoundGenericClass() &&
        dest->getType().getClassOrBoundGenericClass())) {
+
     // If there is an existing cast with the same arguments,
     // indicate we cannot improve it.
     if (existingCast) {
       auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(existingCast);
-      if (UCCAI && UCCAI->getSrc() == src && UCCAI->getDest() == dest &&
-          UCCAI->getSourceType() == sourceType &&
-          UCCAI->getTargetType() == targetType &&
-          UCCAI->getConsumptionKind() == consumption) {
+      if (UCCAI && UCCAI->getSrc() == src && UCCAI->getDest() == dest
+          && UCCAI->getSourceType() == sourceType
+          && UCCAI->getTargetType() == targetType) {
         // Indicate that the existing cast cannot be further improved.
         return false;
       }
     }
 
-    B.createUnconditionalCheckedCastAddr(loc, consumption, src, sourceType,
-                                         dest, targetType);
+    B.createUnconditionalCheckedCastAddr(loc, src, sourceType, dest,
+                                         targetType);
     return true;
   }
 
-  Source source(src, sourceType, consumption);
+  Source source(src, sourceType);
   Target target(dest, targetType);
   Source result = CastEmitter(B, M, loc).emitTopLevel(source, target);
   assert(result.isAddress());
   assert(result.Value == dest);
-  assert(result.Consumption == CastConsumptionKind::TakeAlways);
   (void) result;
   return true;
 }
 
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions?
-///
-/// CAUTION: if you introduce bridging conversions to the set of
-/// things handleable by the scalar checked casts --- and that's not
-/// totally unreasonable --- you will need to make the scalar checked
-/// casts take a cast consumption kind.
 bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
                                                 CanType sourceType,
                                                 CanType targetType) {

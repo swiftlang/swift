@@ -152,7 +152,7 @@ static bool shouldUseObjCUSR(const Decl *D) {
   if (const auto *VD = dyn_cast<ValueDecl>(D)) {
     if (isa<EnumElementDecl>(VD))
       return true;
-    return objc_translation::isVisibleToObjC(VD, Accessibility::Internal);
+    return objc_translation::isVisibleToObjC(VD, AccessLevel::Internal);
   }
 
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {

@@ -14,7 +14,6 @@
 
 // FIXME: This test runs very slowly on watchOS.
 // UNSUPPORTED: OS=watchos
-// UNSUPPORTED: CPU=armv7
 
 public enum ApproximateCount {
   case Unknown

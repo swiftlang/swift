@@ -545,7 +545,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 431,
     key.length: 3
   },
@@ -660,7 +660,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 633,
     key.length: 3
   },
@@ -685,7 +685,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 672,
     key.length: 3
   },
@@ -800,7 +800,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 873,
     key.length: 3
   },
@@ -825,7 +825,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 912,
     key.length: 3
   },
@@ -970,7 +970,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 17
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 1327,
     key.length: 3
   },
@@ -1000,7 +1000,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 17
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 1390,
     key.length: 3
   },
@@ -2285,7 +2285,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 4327,
     key.length: 3
   },
@@ -2465,7 +2465,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 4746,
     key.length: 3
   },
@@ -2490,7 +2490,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 4784,
     key.length: 3
   },
@@ -2515,7 +2515,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 4822,
     key.length: 3
   },
@@ -2545,7 +2545,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 4900,
     key.length: 3
   },
@@ -2570,7 +2570,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 4939,
     key.length: 3
   },
@@ -2595,7 +2595,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 13
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 4985,
     key.length: 3
   },
@@ -2620,7 +2620,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 13
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5031,
     key.length: 3
   },
@@ -2645,7 +2645,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 4
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5068,
     key.length: 3
   },
@@ -2670,7 +2670,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5106,
     key.length: 3
   },
@@ -2695,7 +2695,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5145,
     key.length: 3
   },
@@ -2720,7 +2720,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5182,
     key.length: 3
   },
@@ -2745,7 +2745,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5221,
     key.length: 3
   },
@@ -2770,7 +2770,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5261,
     key.length: 3
   },
@@ -2795,7 +2795,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5307,
     key.length: 3
   },
@@ -2820,7 +2820,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5351,
     key.length: 3
   },
@@ -2845,7 +2845,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5396,
     key.length: 3
   },
@@ -2870,7 +2870,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5441,
     key.length: 3
   },
@@ -3415,7 +3415,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 10
   },
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 6593,
     key.length: 3
   },
@@ -4978,6 +4978,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.name: "fooFunc1(_:)",
     key.offset: 2119,
     key.length: 34,
+    key.typename: "Int32",
     key.nameoffset: 2124,
     key.namelength: 20,
     key.docoffset: 2086,
@@ -5000,6 +5001,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.name: "fooFunc1AnonymousParam(_:)",
     key.offset: 2162,
     key.length: 46,
+    key.typename: "Int32",
     key.nameoffset: 2167,
     key.namelength: 32,
     key.substructure: [
@@ -5019,6 +5021,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.name: "fooFunc3(_:_:_:_:)",
     key.offset: 2216,
     key.length: 94,
+    key.typename: "Int32",
     key.nameoffset: 2221,
     key.namelength: 80,
     key.substructure: [
@@ -5106,6 +5109,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.name: "fooFuncNoreturn1()",
     key.offset: 2508,
     key.length: 32,
+    key.typename: "Never",
     key.nameoffset: 2513,
     key.namelength: 18
   },
@@ -5115,6 +5119,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.name: "fooFuncNoreturn2()",
     key.offset: 2548,
     key.length: 32,
+    key.typename: "Never",
     key.nameoffset: 2553,
     key.namelength: 18
   },
@@ -5177,6 +5182,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.name: "redeclaredInMultipleModulesFunc1(_:)",
     key.offset: 3092,
     key.length: 58,
+    key.typename: "Int32",
     key.nameoffset: 3097,
     key.namelength: 44,
     key.docoffset: 3035,
@@ -5340,6 +5346,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.name: "fooBaseInstanceFunc1(_:)",
         key.offset: 3898,
         key.length: 60,
+        key.typename: "FooClassBase!",
         key.nameoffset: 3903,
         key.namelength: 38,
         key.substructure: [
@@ -5836,6 +5843,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.name: "_internalMeth1()",
         key.offset: 5658,
         key.length: 29,
+        key.typename: "Any!",
         key.nameoffset: 5663,
         key.namelength: 16
       }
@@ -5857,6 +5865,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.name: "_internalMeth2()",
         key.offset: 5771,
         key.length: 29,
+        key.typename: "Any!",
         key.nameoffset: 5776,
         key.namelength: 16
       },
@@ -5866,6 +5875,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.name: "nonInternalMeth()",
         key.offset: 5811,
         key.length: 30,
+        key.typename: "Any!",
         key.nameoffset: 5816,
         key.namelength: 17
       }
@@ -5887,6 +5897,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.name: "_internalMeth3()",
         key.offset: 5880,
         key.length: 29,
+        key.typename: "Any!",
         key.nameoffset: 5885,
         key.namelength: 16
       }

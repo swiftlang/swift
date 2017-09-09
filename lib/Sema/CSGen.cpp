@@ -102,6 +102,7 @@ namespace {
     unsigned haveIntLiteral : 1;
     unsigned haveFloatLiteral : 1;
     unsigned haveStringLiteral : 1;
+    unsigned haveCollectionLiteral : 1;
     
     llvm::SmallSet<TypeBase*, 16> collectedTypes;
 
@@ -120,10 +121,12 @@ namespace {
       haveIntLiteral = false;
       haveFloatLiteral = false;
       haveStringLiteral = false;
+      haveCollectionLiteral = false;
     }
 
     bool haveLiteral() { 
-      return haveIntLiteral || haveFloatLiteral || haveStringLiteral; 
+      return haveIntLiteral || haveFloatLiteral || haveStringLiteral ||
+             haveCollectionLiteral;
     }
   };
 
@@ -225,6 +228,11 @@ namespace {
         }
 
         return { false, expr };
+      }
+
+      if (isa<CollectionExpr>(expr)) {
+        LTI.haveCollectionLiteral = true;
+        return { true, expr };
       }
       
       if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
@@ -406,73 +414,66 @@ namespace {
     if (lti.collectedTypes.size() == 1) {
       // TODO: Compute the BCT.
 
+      // It's only useful to favor the type instead of
+      // binding it directly to arguments/result types,
+      // which means in case it has been miscalculated
+      // solver can still make progress.
       auto favoredTy = (*lti.collectedTypes.begin())->getWithoutSpecifierType();
-
       CS.setFavoredType(expr, favoredTy.getPointer());
-      
+
       // If we have a chain of identical binop expressions with homogeneous
       // argument types, we can directly simplify the associated constraint
       // graph.
       auto simplifyBinOpExprTyVars = [&]() {
-        if (!lti.haveLiteral()) {
-          for (auto binExp1 : lti.binaryExprs) {
-            for (auto binExp2 : lti.binaryExprs) {
-              if (binExp1 == binExp2)
-                continue;
+        for (auto binExp1 : lti.binaryExprs) {
+          for (auto binExp2 : lti.binaryExprs) {
+            if (binExp1 == binExp2)
+              continue;
 
-              auto fnTy1 = CS.getType(binExp1)->getAs<TypeVariableType>();
-              auto fnTy2 = CS.getType(binExp2)->getAs<TypeVariableType>();
+            auto fnTy1 = CS.getType(binExp1)->getAs<TypeVariableType>();
+            auto fnTy2 = CS.getType(binExp2)->getAs<TypeVariableType>();
 
-              if (!(fnTy1 && fnTy2))
-                return;
+            if (!(fnTy1 && fnTy2))
+              return;
 
-              auto ODR1 = dyn_cast<OverloadedDeclRefExpr>(binExp1->getFn());
-              auto ODR2 = dyn_cast<OverloadedDeclRefExpr>(binExp2->getFn());
+            auto ODR1 = dyn_cast<OverloadedDeclRefExpr>(binExp1->getFn());
+            auto ODR2 = dyn_cast<OverloadedDeclRefExpr>(binExp2->getFn());
 
-              if (!(ODR1 && ODR2))
-                return; 
+            if (!(ODR1 && ODR2))
+              return;
 
-              // TODO: We currently limit this optimization to known arithmetic
-              // operators, but we should be able to broaden this out to
-              // logical operators as well.
-              if (!isArithmeticOperatorDecl(ODR1->getDecls()[0]))
-                return;
+            // TODO: We currently limit this optimization to known arithmetic
+            // operators, but we should be able to broaden this out to
+            // logical operators as well.
+            if (!isArithmeticOperatorDecl(ODR1->getDecls()[0]))
+              return;
 
-              if (ODR1->getDecls()[0]->getBaseName() !=
-                  ODR2->getDecls()[0]->getBaseName())
-                return;
+            if (ODR1->getDecls()[0]->getBaseName() !=
+                ODR2->getDecls()[0]->getBaseName())
+              return;
 
-              // All things equal, we can merge the tyvars for the function
-              // types.
-              auto rep1 = CS.getRepresentative(fnTy1);
-              auto rep2 = CS.getRepresentative(fnTy2);
+            // All things equal, we can merge the tyvars for the function
+            // types.
+            auto rep1 = CS.getRepresentative(fnTy1);
+            auto rep2 = CS.getRepresentative(fnTy2);
 
-              if (rep1 != rep2) {
-                CS.mergeEquivalenceClasses(rep1, rep2, 
+            if (rep1 != rep2) {
+              CS.mergeEquivalenceClasses(rep1, rep2,
+                                         /*updateWorkList*/ false);
+            }
+
+            auto odTy1 = CS.getType(ODR1)->getAs<TypeVariableType>();
+            auto odTy2 = CS.getType(ODR2)->getAs<TypeVariableType>();
+
+            if (odTy1 && odTy2) {
+              auto odRep1 = CS.getRepresentative(odTy1);
+              auto odRep2 = CS.getRepresentative(odTy2);
+
+              // Since we'll be choosing the same overload, we can merge
+              // the overload tyvar as well.
+              if (odRep1 != odRep2)
+                CS.mergeEquivalenceClasses(odRep1, odRep2,
                                            /*updateWorkList*/ false);
-
-                // Since we're merging argument constraints, make sure that
-                // the representative tyvar is properly bound to the argument
-                // type.
-                CS.addConstraint(ConstraintKind::Bind,
-                                 rep1,
-                                 favoredTy,
-                                 CS.getConstraintLocator(binExp1));
-              }
-
-              auto odTy1 = CS.getType(ODR1)->getAs<TypeVariableType>();
-              auto odTy2 = CS.getType(ODR2)->getAs<TypeVariableType>();
-
-              if (odTy1 && odTy2) {
-                auto odRep1 = CS.getRepresentative(odTy1);
-                auto odRep2 = CS.getRepresentative(odTy2);
-
-                // Since we'll be choosing the same overload, we can merge
-                // the overload tyvar as well.
-                if (odRep1 != odRep2)
-                  CS.mergeEquivalenceClasses(odRep1, odRep2,
-                                             /*updateWorkList*/ false);
-              }
             }
           }
         }
@@ -643,8 +644,6 @@ namespace {
         auto overloadChoice = favoredConstraints[0]->getOverloadChoice();
         auto overloadType = overloadChoice.getDecl()->getInterfaceType();
         auto resultType = overloadType->getAs<AnyFunctionType>()->getResult();
-        resultType = overloadChoice.getDecl()->getInnermostDeclContext()
-            ->mapTypeIntoContext(resultType);
         CS.setFavoredType(expr, resultType.getPointer());
       }
 
@@ -730,10 +729,8 @@ namespace {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
       
-      Type paramTy = value->getInnermostDeclContext()
-          ->mapTypeIntoContext(fnTy->getInput());
-      auto resultTy = value->getInnermostDeclContext()
-          ->mapTypeIntoContext(fnTy->getResult());
+      Type paramTy = fnTy->getInput();
+      auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
 
       return isFavoredParamAndArg(
@@ -807,9 +804,6 @@ namespace {
           }
         }
         Type paramTy = fnTy->getInput();
-        paramTy = value->getInnermostDeclContext()
-            ->mapTypeIntoContext(paramTy);
-        
         return favoredTy->isEqual(paramTy);
       };
 
@@ -894,8 +888,7 @@ namespace {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
       
-      Type paramTy = value->getInnermostDeclContext()
-          ->mapTypeIntoContext(fnTy->getInput());
+      Type paramTy = fnTy->getInput();
       auto paramTupleTy = paramTy->getAs<TupleType>();
       if (!paramTupleTy || paramTupleTy->getNumElements() != 2)
         return false;
@@ -903,8 +896,7 @@ namespace {
       auto firstParamTy = paramTupleTy->getElement(0).getType();
       auto secondParamTy = paramTupleTy->getElement(1).getType();
       
-      auto resultTy = value->getInnermostDeclContext()
-          ->mapTypeIntoContext(fnTy->getResult());
+      auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
       
       return
@@ -3042,11 +3034,19 @@ namespace {
 
       // Don't visit CoerceExpr with an empty sub expression. They may occur
       // if the body of a closure was not visited while pre-checking because
-      // of an error in the closure's signature
+      // of an error in the closure's signature.
       if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
         if (!coerceExpr->getSubExpr()) {
           return { false, expr };
         }
+      }
+
+      // Don't visit IfExpr with empty sub expressions. They may occur
+      // if the body of a closure was not visited while pre-checking because
+      // of an error in the closure's signature.
+      if (auto ifExpr = dyn_cast<IfExpr>(expr)) {
+        if (!ifExpr->getThenExpr() || !ifExpr->getElseExpr())
+          return { false, expr };
       }
 
       return { true, expr };

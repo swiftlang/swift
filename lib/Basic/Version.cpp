@@ -319,14 +319,16 @@ Optional<Version> Version::getEffectiveLanguageVersion() const {
   switch (Components[0]) {
   case 3:
 #ifdef SWIFT_VERSION_PATCHLEVEL
-    return Version{3, 2, SWIFT_VERSION_PATCHLEVEL};
+    return Version{3, 3, SWIFT_VERSION_PATCHLEVEL};
 #else
-    return Version{3, 2};
+    return Version{3, 3};
 #endif
   case 4:
     static_assert(SWIFT_VERSION_MAJOR == 4,
                   "getCurrentLanguageVersion is no longer correct here");
     return Version::getCurrentLanguageVersion();
+  case 5:
+    return Version{5, 0};
   default:
     return None;
   }

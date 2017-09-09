@@ -65,7 +65,9 @@ importer::nameVersionFromOptions(const LangOptions &langOpts) {
     return ImportNameVersion::Swift2;
   case 3:
     return ImportNameVersion::Swift3;
+  // Fixme: Figure out the importing story for 5 instead of falling back to 4.
   case 4:
+  case 5:
     return ImportNameVersion::Swift4;
   }
 }
@@ -629,7 +631,7 @@ importer::findSwiftNameAttr(const clang::Decl *decl,
   // used for naming in Swift 2.
   if (attr->isImplicit()) return nullptr;
 
-  // Whitelist certain explicitly-written Swift names that were
+  // Hardcode certain kinds of explicitly-written Swift names that were
   // permitted and used in Swift 2. All others are ignored, so that we are
   // assuming a more direct translation from the Objective-C APIs into Swift.
 
@@ -1545,10 +1547,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   // "Code" off the end of the name, if it's there, because it's
   // redundant.
   if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
-    auto enumInfo = getEnumInfo(enumDecl);
-    if (enumInfo.isErrorEnum() && baseName.size() > 4 &&
-        camel_case::getLastWord(baseName) == "Code")
-      baseName = baseName.substr(0, baseName.size() - 4);
+    if (enumDecl->isThisDeclarationADefinition()) {
+      auto enumInfo = getEnumInfo(enumDecl);
+      if (enumInfo.isErrorEnum() && baseName.size() > 4 &&
+          camel_case::getLastWord(baseName) == "Code")
+        baseName = baseName.substr(0, baseName.size() - 4);
+    }
   }
 
   // Objective-C protocols may have the suffix "Protocol" appended if
@@ -1680,7 +1684,7 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro) {
   if (macro->isFunctionLike())
     return true;
 
-  // Consult the blacklist of macros to suppress.
+  // Consult the list of macros to suppress.
   auto suppressMacro = llvm::StringSwitch<bool>(name)
 #define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
 #include "MacroTable.def"

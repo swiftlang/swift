@@ -464,9 +464,9 @@ struct DocStructureReader {
     APPLY(KeyLength, Int, node.Length);
     APPLY(KeyKind, UID, node.Kind);
     if (node.AccessLevel)
-      APPLY(KeyAccessibility, UID, node.AccessLevel);
+      APPLY(KeyAccessLevel, UID, node.AccessLevel);
     if (node.SetterAccessLevel)
-      APPLY(KeySetterAccessibility, UID, node.SetterAccessLevel);
+      APPLY(KeySetterAccessLevel, UID, node.SetterAccessLevel);
     APPLY(KeyNameOffset, Int, node.NameOffset);
     APPLY(KeyNameLength, Int, node.NameLength);
     if (node.BodyOffset || node.BodyLength) {

@@ -40,7 +40,7 @@ from swift_build_support.swift_build_support.SwiftBuildSupport import (
     SWIFT_REPO_NAME,
     SWIFT_SOURCE_ROOT,
     get_all_preset_names,
-    get_preset_options,  
+    get_preset_options,
 )
 
 from swift_build_support.swift_build_support.cmake import CMake
@@ -189,6 +189,10 @@ class HostSpecificConfiguration(object):
                 if args.test_optimized and not test_host_only:
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize-{}".format(
+                            subset_suffix, name))
+                if args.test_optimize_for_size and not test_host_only:
+                    self.swift_test_run_targets.append(
+                        "check-swift{}-optimize_size-{}".format(
                             subset_suffix, name))
 
 
@@ -389,6 +393,10 @@ class BuildScriptInvocation(object):
 
         # --test-optimized implies --test.
         if args.test_optimized:
+            args.test = True
+
+        # --test-optimize-size implies --test.
+        if args.test_optimize_for_size:
             args.test = True
 
         # If none of tests specified skip swift stdlib test on all platforms
@@ -811,6 +819,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-benchmarks"]
         if not args.test_optimized:
             impl_args += ["--skip-test-optimized"]
+        if not args.test_optimize_for_size:
+            impl_args += ["--skip-test-optimize-for-size"]
 
         if args.android:
             impl_args += [
@@ -1323,6 +1333,8 @@ To use it, specify the '--preset=' argument:
   --build-subdir=ds --
   ...
 
+Existing presets can be found in `utils/build-presets.ini`
+
 Philosophy
 ----------
 
@@ -1646,6 +1658,18 @@ details of the setups of other systems or automated environments.""")
         help="run the test suite in optimized mode too (implies --test)",
         action=arguments.action.optional_bool)
     run_tests_group.add_argument(
+        "-s",
+        help="run the test suite in optimize for size mode too \
+        (implies --test)",
+        action="store_const",
+        const=True,
+        dest="test_optimize_for_size")
+    run_tests_group.add_argument(
+        "--test-optimize-for-size",
+        help="run the test suite in optimize for size mode too \
+        (implies --test)",
+        action=arguments.action.optional_bool)
+    run_tests_group.add_argument(
         "--long-test",
         help="run the long test suite",
         action=arguments.action.optional_bool)
@@ -1803,7 +1827,7 @@ iterations with -O",
         "--skip-test-ios-32bit-simulator",
         help="skip testing iOS 32 bit simulator targets",
         action=arguments.action.optional_bool,
-        default=True)
+        default=False)
     skip_test_group.add_argument(
         "--skip-test-ios-host",
         help="skip testing iOS device targets on the host machine (the phone "
@@ -2072,7 +2096,7 @@ iterations with -O",
         "--swift-user-visible-version",
         help="User-visible version of the embedded Swift compiler",
         type=arguments.type.swift_compiler_version,
-        default="4.0",
+        default="4.1",
         metavar="MAJOR.MINOR")
 
     parser.add_argument(
@@ -2165,6 +2189,7 @@ iterations with -O",
         "--build-jobs",
         "--common-cmake-options",
         "--only-execute",
+        "--skip-test-optimize-for-size",
         "--skip-test-optimized",
         action=arguments.action.unavailable)
 

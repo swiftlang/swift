@@ -64,8 +64,8 @@ llvm::Value *irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
            "type metadata for primary archetype was not bound in context");
 
     CanArchetypeType parent(archetype->getParent());
-    metadata = emitAssociatedTypeMetadataRef(IGF, parent,
-                                             archetype->getAssocType());
+    AssociatedType association(archetype->getAssocType());
+    metadata = emitAssociatedTypeMetadataRef(IGF, parent, association);
 
     setTypeMetadataName(IGF.IGM, metadata, archetype);
 
@@ -170,8 +170,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   // TODO: maybe Sema shouldn't ever do this?
   if (Type classBound = archetype->getSuperclass()) {
     auto conformance =
-      IGF.IGM.getSwiftModule()->lookupConformance(classBound, protocol,
-                                                  nullptr);
+      IGF.IGM.getSwiftModule()->lookupConformance(classBound, protocol);
     if (conformance && conformance->isConcrete()) {
       return emitWitnessTableRef(IGF, archetype, *conformance);
     }
@@ -242,8 +241,8 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
 
     // Otherwise, it's an associated conformance requirement.
     } else {
-      WitnessIndex index =
-        lastPI.getAssociatedConformanceIndex(depType, requirement);
+      AssociatedConformance association(lastProtocol, depType, requirement);
+      WitnessIndex index = lastPI.getAssociatedConformanceIndex(association);
       path.addAssociatedConformanceComponent(index);
     }
 
@@ -263,15 +262,16 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
 
 llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                                   CanArchetypeType origin,
-                                               AssociatedTypeDecl *associate) {
+                                                  AssociatedType association) {
   // Find the conformance of the origin to the associated type's protocol.
   llvm::Value *wtable = emitArchetypeWitnessTableRef(IGF, origin,
-                                                     associate->getProtocol());
+                                               association.getSourceProtocol());
 
   // Find the origin's type metadata.
   llvm::Value *originMetadata = emitArchetypeTypeMetadataRef(IGF, origin);
 
-  return emitAssociatedTypeMetadataRef(IGF, originMetadata, wtable, associate);
+  return emitAssociatedTypeMetadataRef(IGF, originMetadata, wtable,
+                                       association);
 }
 
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {

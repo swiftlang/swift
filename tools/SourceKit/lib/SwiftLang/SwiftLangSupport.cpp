@@ -55,6 +55,9 @@ using swift::index::SymbolRoleSet;
 #define KIND(NAME, CONTENT) static UIdent Kind##NAME(CONTENT);
 #include "SourceKit/Core/ProtocolUIDs.def"
 
+#define REFACTORING(KIND, NAME, ID) static UIdent Kind##Refactoring##KIND("source.refactoring.kind."#ID);
+#include "swift/IDE/RefactoringKinds.def"
+
 std::unique_ptr<LangSupport>
 SourceKit::createSwiftLangSupport(SourceKit::Context &SKCtx) {
   return std::unique_ptr<LangSupport>(new SwiftLangSupport(SKCtx));
@@ -235,6 +238,15 @@ SourceKit::UIdent SwiftLangSupport::getUIDForModuleRef() {
   return KindRefModule;
 }
 
+UIdent SwiftLangSupport::getUIDForRefactoringKind(ide::RefactoringKind Kind){
+  switch(Kind) {
+  case ide::RefactoringKind::None: llvm_unreachable("cannot end up here.");
+#define REFACTORING(KIND, NAME, ID)                                            \
+  case ide::RefactoringKind::KIND: return KindRefactoring##KIND;
+#include "swift/IDE/RefactoringKinds.def"
+  }
+}
+
 UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
     ide::CodeCompletionDeclKind Kind, bool IsRef) {
   if (IsRef) {
@@ -371,6 +383,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindDeclVarStatic;
     case SyntaxStructureKind::ClassVariable:
       return KindDeclVarClass;
+    case SyntaxStructureKind::LocalVariable:
+      return KindDeclVarLocal;
     case SyntaxStructureKind::EnumCase:
       return KindDeclEnumCase;
     case SyntaxStructureKind::EnumElement:
@@ -379,6 +393,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindDeclTypeAlias;
     case SyntaxStructureKind::Subscript:
       return KindDeclSubscript;
+    case SyntaxStructureKind::AssociatedType:
+      return KindDeclAssociatedType;
     case SyntaxStructureKind::Parameter:
       return KindDeclVarParam;
     case SyntaxStructureKind::ForEachStatement:
@@ -438,6 +454,41 @@ getUIDForRangeKind(swift::ide::RangeKind Kind) {
   }
 
   llvm_unreachable("Unhandled RangeKind in switch.");
+}
+
+SourceKit::UIdent SwiftLangSupport::
+getUIDForRegionType(swift::ide::RegionType Type) {
+  switch (Type) {
+    case swift::ide::RegionType::ActiveCode: return KindEditActive;
+    case swift::ide::RegionType::InactiveCode: return KindEditInactive;
+    case swift::ide::RegionType::Selector: return KindEditSelector;
+    case swift::ide::RegionType::String: return KindEditString;
+    case swift::ide::RegionType::Comment: return KindEditComment;
+    case swift::ide::RegionType::Mismatch: return KindEditMismatch;
+    case swift::ide::RegionType::Unmatched: return KindEditUnknown;
+  }
+}
+
+SourceKit::UIdent SwiftLangSupport::
+getUIDForRefactoringRangeKind(ide::RefactoringRangeKind Kind) {
+  switch (Kind) {
+  case ide::RefactoringRangeKind::BaseName:
+    return KindRenameRangeBase;
+  case ide::RefactoringRangeKind::KeywordBaseName:
+    return KindRenameRangeKeywordBase;
+  case ide::RefactoringRangeKind::ParameterName:
+    return KindRenameRangeParam;
+  case ide::RefactoringRangeKind::DeclArgumentLabel:
+    return KindRenameRangeDeclArgLabel;
+  case ide::RefactoringRangeKind::CallArgumentLabel:
+    return KindRenameRangeCallArgLabel;
+  case ide::RefactoringRangeKind::CallArgumentColon:
+    return KindRenameRangeCallArgColon;
+  case ide::RefactoringRangeKind::CallArgumentCombined:
+    return KindRenameRangeCallArgCombined;
+  case ide::RefactoringRangeKind::SelectorArgumentLabel:
+    return KindRenameRangeSelectorArgLabel;
+  }
 }
 
 UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
@@ -589,9 +640,9 @@ std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttribute
       continue;
     }
 
-    // We handle accessibility explicitly.
-    case DAK_Accessibility:
-    case DAK_SetterAccessibility:
+    // We handle access control explicitly.
+    case DAK_AccessControl:
+    case DAK_SetterAccess:
     // Ignore these.
     case DAK_ShowInInterface:
     case DAK_RawDocComment:

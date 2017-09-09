@@ -52,6 +52,7 @@ public:
     None,
     Debug,
     Optimize,
+    OptimizeForSize,
     OptimizeUnchecked
   };
 

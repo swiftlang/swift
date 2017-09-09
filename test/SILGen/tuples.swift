@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 class C {}
 
 enum Foo {
@@ -137,7 +137,7 @@ func testTupleUnsplat() {
 // formed with isGuaranteed set.
 extension P {
   // CHECK-LABEL: sil hidden @_T06tuples1PPAAE12immutableUseyAA1CC5index_x5valuet5tuple_tFZ
-  // CHECK: bb0([[TUP0:%.*]] : $C, [[TUP1:%.*]] : $*Self
+  // CHECK: bb0([[TUP0:%.*]] : @owned $C, [[TUP1:%.*]] : @trivial $*Self
   // Allocate space for the RValue.
   // CHECK:   [[RVALUE:%.*]] = alloc_stack $(index: C, value: Self), let, name "tuple"
   //

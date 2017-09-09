@@ -253,7 +253,7 @@ namespace {
                               SmallVectorImpl<CleanupHandle> &cleanups)
       : Storage(storage), Cleanups(cleanups) {}
 
-    void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
+    void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                              ManagedValue value, bool isInit) override {
       Storage = value.getValue();
       auto cleanup = value.getCleanup();
@@ -263,7 +263,7 @@ namespace {
 } // end anonymous namespace
 
 static InitializationPtr
-prepareIndirectResultInit(SILGenFunction &gen, CanType resultType,
+prepareIndirectResultInit(SILGenFunction &SGF, CanType resultType,
                           ArrayRef<SILResultInfo> &allResults,
                           MutableArrayRef<SILValue> &directResults,
                           ArrayRef<SILArgument*> &indirectResultAddrs,
@@ -274,7 +274,7 @@ prepareIndirectResultInit(SILGenFunction &gen, CanType resultType,
     tupleInit->SubInitializations.reserve(resultTupleType->getNumElements());
 
     for (auto resultEltType : resultTupleType.getElementTypes()) {
-      auto eltInit = prepareIndirectResultInit(gen, resultEltType, allResults,
+      auto eltInit = prepareIndirectResultInit(SGF, resultEltType, allResults,
                                                directResults,
                                                indirectResultAddrs, cleanups);
       tupleInit->SubInitializations.push_back(std::move(eltInit));
@@ -288,14 +288,14 @@ prepareIndirectResultInit(SILGenFunction &gen, CanType resultType,
   allResults = allResults.slice(1);
 
   // If it's indirect, we should be emitting into an argument.
-  if (gen.silConv.isSILIndirect(result)) {
+  if (SGF.silConv.isSILIndirect(result)) {
     // Pull off the next indirect result argument.
     SILValue addr = indirectResultAddrs.front();
     indirectResultAddrs = indirectResultAddrs.slice(1);
 
     // Create an initialization which will initialize it.
-    auto &resultTL = gen.getTypeLowering(addr->getType());
-    auto temporary = gen.useBufferAsTemporary(addr, resultTL);
+    auto &resultTL = SGF.getTypeLowering(addr->getType());
+    auto temporary = SGF.useBufferAsTemporary(addr, resultTL);
 
     // Remember the cleanup that will be activated.
     auto cleanup = temporary->getInitializedCleanup();
@@ -320,19 +320,19 @@ prepareIndirectResultInit(SILGenFunction &gen, CanType resultType,
 /// \param cleanups - will be filled (after initialization completes)
 ///   with all the active cleanups managing the result values
 static std::unique_ptr<Initialization>
-prepareIndirectResultInit(SILGenFunction &gen, CanType formalResultType,
+prepareIndirectResultInit(SILGenFunction &SGF, CanType formalResultType,
                           SmallVectorImpl<SILValue> &directResultsBuffer,
                           SmallVectorImpl<CleanupHandle> &cleanups) {
-  auto fnConv = gen.F.getConventions();
+  auto fnConv = SGF.F.getConventions();
 
   // Make space in the direct-results array for all the entries we need.
   directResultsBuffer.append(fnConv.getNumDirectSILResults(), SILValue());
 
   ArrayRef<SILResultInfo> allResults = fnConv.funcTy->getResults();
   MutableArrayRef<SILValue> directResults = directResultsBuffer;
-  ArrayRef<SILArgument*> indirectResultAddrs = gen.F.getIndirectResults();
+  ArrayRef<SILArgument*> indirectResultAddrs = SGF.F.getIndirectResults();
 
-  auto init = prepareIndirectResultInit(gen, formalResultType, allResults,
+  auto init = prepareIndirectResultInit(SGF, formalResultType, allResults,
                                         directResults, indirectResultAddrs,
                                         cleanups);
 

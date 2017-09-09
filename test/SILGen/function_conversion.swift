@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -primary-file %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership -primary-file %s
 
 // Check SILGen against various FunctionConversionExprs emitted by Sema.
 
@@ -25,7 +25,7 @@ func cToBlock(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(block
 // ==== Throws variance
 
 // CHECK-LABEL: sil hidden @_T019function_conversion12funcToThrowsyyKcyycF : $@convention(thin) (@owned @callee_owned () -> ()) -> @owned @callee_owned () -> @error Error
-// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> ()):
+// CHECK: bb0([[ARG:%.*]] : @owned $@callee_owned () -> ()):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   [[FUNC:%.*]] = convert_function [[ARG_COPY]] : $@callee_owned () -> () to $@callee_owned () -> @error Error
@@ -59,7 +59,7 @@ class Feral {}
 class Domesticated : Feral {}
 
 // CHECK-LABEL: sil hidden @_T019function_conversion12funcToUpcastAA5FeralCycAA12DomesticatedCycF : $@convention(thin) (@owned @callee_owned () -> @owned Domesticated) -> @owned @callee_owned () -> @owned Feral {
-// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> @owned Domesticated):
+// CHECK: bb0([[ARG:%.*]] : @owned $@callee_owned () -> @owned Domesticated):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   [[FUNC:%.*]] = convert_function [[ARG_COPY]] : $@callee_owned () -> @owned Domesticated to $@callee_owned () -> @owned Feral
@@ -218,7 +218,7 @@ func convExistentialTrivial(_ t2: @escaping (Q) -> Trivial, t3: @escaping (Q?) -
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion1Q_pSgAA7TrivialVIxid_AESgAA1P_pIxyr_TR
 // CHECK:         switch_enum
-// CHECK: bb1([[TRIVIAL:%.*]] : $Trivial):
+// CHECK: bb1([[TRIVIAL:%.*]] : @trivial $Trivial):
 // CHECK:         init_existential_addr
 // CHECK:         init_enum_data_addr
 // CHECK:         copy_addr
@@ -270,7 +270,7 @@ func convExistentialMetatype(_ em: @escaping (Q.Type?) -> Trivial.Type) {
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion1Q_pXmTSgAA7TrivialVXMtIxyd_AEXMtSgAA1P_pXmTIxyd_TR : $@convention(thin) (Optional<@thin Trivial.Type>, @owned @callee_owned (Optional<@thick Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
 // CHECK:         switch_enum %0 : $Optional<@thin Trivial.Type>
-// CHECK: bb1([[META:%.*]] : $@thin Trivial.Type):
+// CHECK: bb1([[META:%.*]] : @trivial $@thin Trivial.Type):
 // CHECK-NEXT:    metatype $@thick Trivial.Type
 // CHECK-NEXT:    init_existential_metatype {{.*}} : $@thick Trivial.Type, $@thick Q.Type
 // CHECK-NEXT:    enum $Optional<@thick Q.Type>
@@ -380,7 +380,7 @@ func convClassBoundArchetypeUpcast<T : Parent>(_ f1: @escaping (Parent) -> (T, T
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion6ParentCxAA7TrivialVIxxod_xAcESgIxxod_ACRbzlTR : $@convention(thin) <T where T : Parent> (@owned T, @owned @callee_owned (@owned Parent) -> (@owned T, Trivial)) -> (@owned Parent, Optional<Trivial>)
-// CHECK: bb0([[ARG:%.*]] : $T, [[CLOSURE:%.*]] : $@callee_owned (@owned Parent) -> (@owned T, Trivial)):
+// CHECK: bb0([[ARG:%.*]] : @owned $T, [[CLOSURE:%.*]] : @owned $@callee_owned (@owned Parent) -> (@owned T, Trivial)):
 // CHECK:    [[CASTED_ARG:%.*]] = upcast [[ARG]] : $T to $Parent
 // CHECK:    [[RESULT:%.*]] = apply [[CLOSURE]]([[CASTED_ARG]])
 // CHECK:    [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]] : $(T, Trivial)
@@ -435,7 +435,7 @@ func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) ->
 }
 
 // CHECK-LABEL: sil hidden @_T019function_conversion25convTupleToOptionalDirectSi_SitSgSicSi_SitSicF : $@convention(thin) (@owned @callee_owned (Int) -> (Int, Int)) -> @owned @callee_owned (Int) -> Optional<(Int, Int)>
-// CHECK:         bb0([[ARG:%.*]] : $@callee_owned (Int) -> (Int, Int)):
+// CHECK:         bb0([[ARG:%.*]] : @owned $@callee_owned (Int) -> (Int, Int)):
 // CHECK:           [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:           [[FN:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:           [[THUNK_FN:%.*]] = function_ref @_T0S3iIxydd_S2i_SitSgIxyd_TR
@@ -445,7 +445,7 @@ func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) ->
 // CHECK-NEXT:      return [[THUNK]]
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0S3iIxydd_S2i_SitSgIxyd_TR : $@convention(thin) (Int, @owned @callee_owned (Int) -> (Int, Int)) -> Optional<(Int, Int)>
-// CHECK:         bb0(%0 : $Int, %1 : $@callee_owned (Int) -> (Int, Int)):
+// CHECK:         bb0(%0 : @trivial $Int, %1 : @owned $@callee_owned (Int) -> (Int, Int)):
 // CHECK:           [[RESULT:%.*]] = apply %1(%0)
 // CHECK-NEXT:      [[LEFT:%.*]] = tuple_extract [[RESULT]]
 // CHECK-NEXT:      [[RIGHT:%.*]] = tuple_extract [[RESULT]]
@@ -458,7 +458,7 @@ func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (
 }
 
 // CHECK-LABEL: sil hidden @_T019function_conversion27convTupleToOptionalIndirectx_xtSgxcx_xtxclF : $@convention(thin) <T> (@owned @callee_owned (@in T) -> (@out T, @out T)) -> @owned @callee_owned (@in T) -> @out Optional<(T, T)>
-// CHECK:       bb0([[ARG:%.*]] : $@callee_owned (@in T) -> (@out T, @out T)):
+// CHECK:       bb0([[ARG:%.*]] : @owned $@callee_owned (@in T) -> (@out T, @out T)):
 // CHECK:          [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:          [[FN:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:          [[THUNK_FN:%.*]] = function_ref @_T0xxxIxirr_xx_xtSgIxir_lTR
@@ -468,7 +468,7 @@ func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (
 // CHECK-NEXT:     return [[THUNK]]
 
 // CHECK:       sil shared [transparent] [serializable] [reabstraction_thunk] @_T0xxxIxirr_xx_xtSgIxir_lTR : $@convention(thin) <T> (@in T, @owned @callee_owned (@in T) -> (@out T, @out T)) -> @out Optional<(T, T)>
-// CHECK:       bb0(%0 : $*Optional<(T, T)>, %1 : $*T, %2 : $@callee_owned (@in T) -> (@out T, @out T)):
+// CHECK:       bb0(%0 : @trivial $*Optional<(T, T)>, %1 : @trivial $*T, %2 : @owned $@callee_owned (@in T) -> (@out T, @out T)):
 // CHECK:         [[OPTIONAL:%.*]] = init_enum_data_addr %0 : $*Optional<(T, T)>, #Optional.some!enumelt.1
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr %3 : $*(T, T), 0
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr %3 : $*(T, T), 1

@@ -423,7 +423,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // Try ignoring access control.
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::KnownPrivate;
-    relookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     LookupResult inaccessibleResults = lookupUnqualified(DC, Name, Loc,
                                                          relookupOptions);
     if (inaccessibleResults) {
@@ -2807,7 +2807,7 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
 
   for (auto proto : archetype->getConformsTo()) {
     if (!dc->getParentModule()->lookupConformance(
-          type, proto, this))
+          type, proto))
       return false;
   }
 
@@ -3111,6 +3111,8 @@ void ConstraintSystem::print(raw_ostream &out) {
       if (auto fixed = getFixedType(tv)) {
         out << " as ";
         fixed->print(out);
+      } else {
+        getPotentialBindings(tv).dump(out, 1);
       }
     } else {
       out << " equivalent to ";

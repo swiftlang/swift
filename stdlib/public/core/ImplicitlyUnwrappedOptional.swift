@@ -76,7 +76,7 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> AnyObject {
     switch self {
     case .none:
-      _preconditionFailure("attempt to bridge an implicitly unwrapped optional containing nil")
+      _preconditionFailure("Attempt to bridge an implicitly unwrapped optional containing nil")
 
     case .some(let x):
       return Swift._bridgeAnythingToObjectiveC(x)
@@ -111,24 +111,3 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
   }
 }
 #endif
-
-extension ImplicitlyUnwrappedOptional {
-  @available(*, unavailable, message: "Please use nil literal instead.")
-  public init() {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, message: "Has been removed in Swift 3.")
-  public func map<U>(
-    _ f: (Wrapped) throws -> U
-  ) rethrows -> ImplicitlyUnwrappedOptional<U> {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, message: "Has been removed in Swift 3.")
-  public func flatMap<U>(
-      _ f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
-  ) rethrows -> ImplicitlyUnwrappedOptional<U> {
-    Builtin.unreachable()
-  }
-}

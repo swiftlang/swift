@@ -1027,7 +1027,7 @@ struct PropertiesWithOwnershipTypes {
 
 // <rdar://problem/16608609> Assert (and incorrect error message) when defining a constant stored property with observers
 class Test16608609 {
-   let constantStored: Int = 0 {  // expected-error {{'let' declarations cannot be observing properties}}
+   let constantStored: Int = 0 {  // expected-error {{'let' declarations cannot be observing properties}} {{4-7=var}}
       willSet {
       }
       didSet {
@@ -1126,7 +1126,7 @@ class rdar17391625derived :  rdar17391625 {
 
 extension rdar17391625derived {
   // Not a stored property, computed because it is an override.
-  override var prop: Int { // expected-error {{declarations in extensions cannot override yet}}
+  override var prop: Int { // expected-error {{overriding declarations in extensions is not supported}}
   didSet {
   }
   }

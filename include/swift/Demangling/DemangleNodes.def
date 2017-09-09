@@ -181,9 +181,11 @@ NODE(ThrowsAnnotation)
 NODE(EmptyList)
 NODE(FirstElementMarker)
 NODE(VariadicMarker)
+NODE(OutlinedBridgedMethod)
 NODE(OutlinedCopy)
 NODE(OutlinedConsume)
 NODE(OutlinedRetain)
 NODE(OutlinedRelease)
+NODE(OutlinedVariable)
 #undef CONTEXT_NODE
 #undef NODE

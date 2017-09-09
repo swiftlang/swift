@@ -27,6 +27,10 @@
 #include <link.h>
 #include <string.h>
 
+#if defined(__ANDROID__)
+#include "llvm/ADT/StringRef.h"
+#endif
+
 using namespace swift;
 
 /// The symbol name in the image that identifies the beginning of the
@@ -68,6 +72,13 @@ static SectionInfo getSectionInfo(const char *imageName,
   SectionInfo sectionInfo = { 0, nullptr };
   void *handle = dlopen(imageName, RTLD_LAZY | RTLD_NOLOAD);
   if (!handle) {
+#ifdef __ANDROID__
+    llvm::StringRef imagePath = llvm::StringRef(imageName);
+    if (imagePath.startswith("/system/lib") ||
+        (imageName && !imagePath.endswith(".so"))) {
+      return sectionInfo;
+    }
+#endif
     fatalError(/* flags = */ 0, "dlopen() failed on `%s': %s", imageName,
                dlerror());
   }

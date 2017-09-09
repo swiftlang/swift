@@ -15,36 +15,6 @@ import SwiftShims
 // Definitions that make elements of Builtin usable in real code
 // without gobs of boilerplate.
 
-@available(*, unavailable, message: "use MemoryLayout<T>.size instead.")
-public func sizeof<T>(_:T.Type) -> Int {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable, renamed: "MemoryLayout.size(ofValue:)")
-public func sizeofValue<T>(_:T) -> Int {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable, message: "use MemoryLayout<T>.alignment instead.")
-public func alignof<T>(_:T.Type) -> Int {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable, renamed: "MemoryLayout.alignment(ofValue:)")
-public func alignofValue<T>(_:T) -> Int {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable, message: "use MemoryLayout<T>.stride instead.")
-public func strideof<T>(_:T.Type) -> Int {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable, renamed: "MemoryLayout.stride(ofValue:)")
-public func strideofValue<T>(_:T) -> Int {
-  Builtin.unreachable()
-}
-
 // This function is the implementation of the `_roundUp` overload set.  It is
 // marked `@inline(__always)` to make primary `_roundUp` entry points seem
 // cheap enough for the inliner.
@@ -110,7 +80,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 @_transparent
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   _precondition(MemoryLayout<T>.size == MemoryLayout<U>.size,
-    "can't unsafeBitCast between types of different sizes")
+    "Can't unsafeBitCast between types of different sizes")
   return Builtin.reinterpretCast(x)
 }
 
@@ -220,19 +190,6 @@ internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
   default:
     return _swift_isClassOrObjCExistentialType(x)
   }
-}
-
-/// Returns an `UnsafePointer` to the storage used for `object`.  There's
-/// not much you can do with this other than use it to identify the
-/// object.
-@available(*, unavailable, message: "Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.")
-public func unsafeAddress(of object: AnyObject) -> UnsafeRawPointer {
-  Builtin.unreachable()
-}
-
-@available(*, unavailable, message: "Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.")
-public func unsafeAddressOf(_ object: AnyObject) -> UnsafeRawPointer {
-  Builtin.unreachable()
 }
 
 /// Converts a reference of type `T` to a reference of type `U` after
@@ -624,11 +581,6 @@ func _isPOD<T>(_ type: T.Type) -> Bool {
 public // @testable
 func _isOptional<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.isOptional(type))
-}
-
-@available(*, unavailable, message: "Removed in Swift 3. Please use Optional.unsafelyUnwrapped instead.")
-public func unsafeUnwrap<T>(_ nonEmpty: T?) -> T {
-  Builtin.unreachable()
 }
 
 /// Extract an object reference from an Any known to contain an object.

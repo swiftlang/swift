@@ -393,10 +393,12 @@ bool AbstractFunctionDecl::isTransparent() const {
   return false;
 }
 
-bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
+bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   const Decl *D = this;
-  if (auto ExtD = dyn_cast<ExtensionDecl>(D))
-    return ExtD->getExtendedType().isPrivateStdlibType(whitelistProtocols);
+  if (auto ExtD = dyn_cast<ExtensionDecl>(D)) {
+    Type extTy = ExtD->getExtendedType();
+    return extTy.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
+  }
 
   DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
   if (DC->getParentModule()->isBuiltinModule() ||
@@ -449,7 +451,7 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
       return true;
     if (NameStr.startswith("_ExpressibleBy"))
       return true;
-    if (whitelistProtocols)
+    if (treatNonBuiltinProtocolsAsPublic)
       return false;
   }
 
@@ -807,11 +809,6 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   return FirstKind;
 }
 
-DeclRange NominalTypeDecl::getMembers() const {
-  loadAllMembers();
-  return IterableDeclContext::getMembers();
-}
-
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                            uint64_t contextData) {
   assert(!NominalTypeDeclBits.HasLazyConformances &&
@@ -869,11 +866,6 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
     result->setClangNode(clangNode);
 
   return result;
-}
-
-DeclRange ExtensionDecl::getMembers() const {
-  loadAllMembers();
-  return IterableDeclContext::getMembers();
 }
 
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
@@ -1905,7 +1897,7 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 /// Returns true if \p VD needs to be treated as publicly-accessible
 /// at the SIL, LLVM, and machine levels due to being versioned.
 bool ValueDecl::isVersionedInternalDecl() const {
-  assert(getFormalAccess() == Accessibility::Internal);
+  assert(getFormalAccess() == AccessLevel::Internal);
 
   if (getAttrs().hasAttribute<VersionedAttr>())
     return true;
@@ -1922,42 +1914,42 @@ bool ValueDecl::isVersionedInternalDecl() const {
   return false;
 }
 
-/// Return the accessibility of an internal or public declaration
+/// Return the access level of an internal or public declaration
 /// that's been testably imported.
-static Accessibility getTestableAccess(const ValueDecl *decl) {
+static AccessLevel getTestableAccess(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
   if (auto cls = dyn_cast<ClassDecl>(decl)) {
     if (!cls->isFinal())
-      return Accessibility::Open;
+      return AccessLevel::Open;
 
   // Non-final overridable class members are considered open to
   // @testable importers.
   } else if (decl->isPotentiallyOverridable()) {
     if (!cast<ValueDecl>(decl)->isFinal())
-      return Accessibility::Open;
+      return AccessLevel::Open;
   }
 
   // Everything else is considered public.
-  return Accessibility::Public;
+  return AccessLevel::Public;
 }
 
-Accessibility ValueDecl::getEffectiveAccess() const {
+AccessLevel ValueDecl::getEffectiveAccess() const {
   auto effectiveAccess = getFormalAccess(/*useDC=*/nullptr,
                                          /*respectVersionedAttr=*/true);
 
   // Handle @testable.
   switch (effectiveAccess) {
-  case Accessibility::Open:
+  case AccessLevel::Open:
     break;
-  case Accessibility::Public:
-  case Accessibility::Internal:
+  case AccessLevel::Public:
+  case AccessLevel::Internal:
     if (getModuleContext()->isTestingEnabled())
       effectiveAccess = getTestableAccess(this);
     break;
-  case Accessibility::FilePrivate:
+  case AccessLevel::FilePrivate:
     break;
-  case Accessibility::Private:
-    effectiveAccess = Accessibility::FilePrivate;
+  case AccessLevel::Private:
+    effectiveAccess = AccessLevel::FilePrivate;
     break;
   }
 
@@ -1976,15 +1968,15 @@ Accessibility ValueDecl::getEffectiveAccess() const {
     }
 
   } else if (getDeclContext()->isLocalContext()) {
-    effectiveAccess = Accessibility::FilePrivate;
+    effectiveAccess = AccessLevel::FilePrivate;
   }
 
   return effectiveAccess;
 }
 
-Accessibility ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
-  assert((getFormalAccess() == Accessibility::Internal ||
-          getFormalAccess() == Accessibility::Public) &&
+AccessLevel ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
+  assert((getFormalAccess() == AccessLevel::Internal ||
+          getFormalAccess() == AccessLevel::Public) &&
          "should be able to fast-path non-internal cases");
   assert(useDC && "should fast-path non-scoped cases");
   if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
@@ -1996,10 +1988,10 @@ Accessibility ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
 AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
                                             bool respectVersionedAttr) const {
   const DeclContext *result = getDeclContext();
-  Accessibility access = getFormalAccess(useDC, respectVersionedAttr);
+  AccessLevel access = getFormalAccess(useDC, respectVersionedAttr);
 
   while (!result->isModuleScopeContext()) {
-    if (result->isLocalContext() || access == Accessibility::Private)
+    if (result->isLocalContext() || access == AccessLevel::Private)
       return AccessScope(result, true);
 
     if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(result)) {
@@ -2026,18 +2018,18 @@ AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
   }
 
   switch (access) {
-  case Accessibility::Private:
-  case Accessibility::FilePrivate:
+  case AccessLevel::Private:
+  case AccessLevel::FilePrivate:
     assert(result->isModuleScopeContext());
-    return AccessScope(result, access == Accessibility::Private);
-  case Accessibility::Internal:
+    return AccessScope(result, access == AccessLevel::Private);
+  case AccessLevel::Internal:
     return AccessScope(result->getParentModule());
-  case Accessibility::Public:
-  case Accessibility::Open:
+  case AccessLevel::Public:
+  case AccessLevel::Open:
     return AccessScope::getPublic();
   }
 
-  llvm_unreachable("unknown accessibility level");
+  llvm_unreachable("unknown access level");
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
@@ -3406,9 +3398,9 @@ void AbstractStorageDecl::configureSetRecord(GetSetRecord *getSetInfo,
 
   auto setSetterAccess = [&](FuncDecl *fn) {
     if (auto setterAccess = GetSetInfo.getInt()) {
-      assert(!fn->hasAccessibility() ||
+      assert(!fn->hasAccess() ||
              fn->getFormalAccess() == setterAccess.getValue());
-      fn->overwriteAccessibility(setterAccess.getValue());
+      fn->overwriteAccess(setterAccess.getValue());
     }    
   };
 
@@ -3478,9 +3470,9 @@ void AbstractStorageDecl::setComputedSetter(FuncDecl *Set) {
   GetSetInfo.getPointer()->Set = Set;
   Set->makeAccessor(this, AccessorKind::IsSetter);
   if (auto setterAccess = GetSetInfo.getInt()) {
-    assert(!Set->hasAccessibility() ||
+    assert(!Set->hasAccess() ||
            Set->getFormalAccess() == setterAccess.getValue());
-    Set->overwriteAccessibility(setterAccess.getValue());
+    Set->overwriteAccess(setterAccess.getValue());
   }
 }
 
@@ -3524,9 +3516,9 @@ void AbstractStorageDecl::setMaterializeForSetFunc(FuncDecl *accessor) {
   GetSetInfo.getPointer()->MaterializeForSet = accessor;
   accessor->makeAccessor(this, AccessorKind::IsMaterializeForSet);
   if (auto setterAccess = GetSetInfo.getInt()) {
-    assert(!accessor->hasAccessibility() ||
+    assert(!accessor->hasAccess() ||
            accessor->getFormalAccess() == setterAccess.getValue());
-    accessor->overwriteAccessibility(setterAccess.getValue());
+    accessor->overwriteAccess(setterAccess.getValue());
   }
 }
 
@@ -3835,7 +3827,11 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
     if (!CD) return false;
     
     auto *CDC = CD->getDeclContext();
-      
+
+    // 'let' properties are not valid inside protocols.
+    if (CDC->getAsProtocolExtensionContext())
+      return false;
+
     // If this init is defined inside of the same type (or in an extension
     // thereof) as the let property, then it is mutable.
     if (!CDC->isTypeContext() ||
@@ -5279,18 +5275,6 @@ PrecedenceGroupDecl::PrecedenceGroupDecl(DeclContext *dc,
          higherThan.size() * sizeof(Relation));
   memcpy(getLowerThanBuffer(), lowerThan.data(),
          lowerThan.size() * sizeof(Relation));
-}
-
-void PrecedenceGroupDecl::collectOperatorKeywordRanges(
-                                    SmallVectorImpl<CharSourceRange> &Ranges) {
-  auto AddToRange = [&] (SourceLoc Loc, StringRef Word) {
-    if (Loc.isValid())
-      Ranges.push_back(CharSourceRange(Loc, strlen(Word.data())));
-  };
-  AddToRange(AssociativityKeywordLoc, "associativity");
-  AddToRange(AssignmentKeywordLoc, "assignment");
-  AddToRange(HigherThanLoc, "higherThan");
-  AddToRange(LowerThanLoc, "lowerThan");
 }
 
 bool FuncDecl::isDeferBody() const {

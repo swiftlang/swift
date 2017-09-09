@@ -91,6 +91,7 @@
 // FOUNDATION-NEXT: {{^}}enum NSRuncingMode : UInt {{{$}}
 // FOUNDATION-NEXT: {{^}}  init?(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  typealias RawValue = UInt
 // FOUNDATION-NEXT: {{^}}  case mince{{$}}
 // FOUNDATION-NEXT: {{^}}  @available(swift, obsoleted: 3, renamed: "mince"){{$}}
 // FOUNDATION-NEXT: {{^}}  static var Mince: NSRuncingMode { get }{{$}}
@@ -105,6 +106,7 @@
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  typealias RawValue = UInt
 // FOUNDATION-NEXT: {{^}}  typealias Element = NSRuncingOptions
+// FOUNDATION-NEXT: {{^}}  typealias ArrayLiteralElement = NSRuncingOptions
 // FOUNDATION-NEXT: {{^}}  @available(*, unavailable, message: "use [] to construct an empty option set"){{$}}
 // FOUNDATION-NEXT: {{^}}  static var none: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  @available(*, unavailable, message: "use [] to construct an empty option set"){{$}}

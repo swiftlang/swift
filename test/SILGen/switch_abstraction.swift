@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -parse-stdlib %s | %FileCheck %s
 
 struct A {}
 
@@ -9,7 +9,7 @@ enum Optionable<T> {
 
 // CHECK-LABEL: sil hidden @_T018switch_abstraction18enum_reabstractionyAA10OptionableOyAA1AVAFcG1x_AF1atF : $@convention(thin) (@owned Optionable<(A) -> A>, A) -> ()
 // CHECK: switch_enum {{%.*}} : $Optionable<(A) -> A>, case #Optionable.Summn!enumelt.1: [[DEST:bb[0-9]+]]
-// CHECK: [[DEST]]([[ORIG:%.*]] : $@callee_owned (@in A) -> @out A):
+// CHECK: [[DEST]]([[ORIG:%.*]] : @owned $@callee_owned (@in A) -> @out A):
 // CHECK:   [[REABSTRACT:%.*]] = function_ref @_T0{{.*}}TR :
 // CHECK:   [[SUBST:%.*]] = partial_apply [[REABSTRACT]]([[ORIG]])
 func enum_reabstraction(x x: Optionable<(A) -> A>, a: A) {

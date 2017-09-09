@@ -361,8 +361,8 @@ BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
                                  SILType ReturnType,
                                  SubstitutionList Substitutions,
                                  ArrayRef<SILValue> Args,
-                                 SILFunction &F) {
-  void *Buffer = F.getModule().allocateInst(
+                                 SILModule &M) {
+  void *Buffer = M.allocateInst(
                               sizeof(BuiltinInst)
                                 + decltype(Operands)::getExtraSize(Args.size())
                                 + sizeof(Substitution) * Substitutions.size(),
@@ -533,14 +533,16 @@ AllocGlobalInst::AllocGlobalInst(SILDebugLocation Loc,
 AllocGlobalInst::AllocGlobalInst(SILDebugLocation Loc)
     : SILInstruction(ValueKind::AllocGlobalInst, Loc) {}
 
-GlobalAddrInst::GlobalAddrInst(SILDebugLocation Loc,
+GlobalAddrInst::GlobalAddrInst(SILDebugLocation DebugLoc,
                                SILGlobalVariable *Global)
-    : LiteralInst(ValueKind::GlobalAddrInst, Loc,
-              Global->getLoweredType().getAddressType()),
-      Global(Global) {}
+      : GlobalAccessInst(ValueKind::GlobalAddrInst, DebugLoc, Global,
+                          Global->getLoweredType().getAddressType()) {}
 
-GlobalAddrInst::GlobalAddrInst(SILDebugLocation Loc, SILType Ty)
-    : LiteralInst(ValueKind::GlobalAddrInst, Loc, Ty), Global(nullptr) {}
+GlobalValueInst::GlobalValueInst(SILDebugLocation DebugLoc,
+                                 SILGlobalVariable *Global)
+      : GlobalAccessInst(ValueKind::GlobalValueInst, DebugLoc, Global,
+                          Global->getLoweredType().getObjectType()) {}
+
 
 const IntrinsicInfo &BuiltinInst::getIntrinsicInfo() const {
   return getModule().getIntrinsicInfo(getName());
@@ -556,14 +558,14 @@ static unsigned getWordsForBitWidth(unsigned bits) {
 }
 
 template<typename INST>
-static void *allocateLiteralInstWithTextSize(SILFunction &F, unsigned length) {
-  return F.getModule().allocateInst(sizeof(INST) + length, alignof(INST));
+static void *allocateLiteralInstWithTextSize(SILModule &M, unsigned length) {
+  return M.allocateInst(sizeof(INST) + length, alignof(INST));
 }
 
 template<typename INST>
-static void *allocateLiteralInstWithBitSize(SILFunction &F, unsigned bits) {
+static void *allocateLiteralInstWithBitSize(SILModule &M, unsigned bits) {
   unsigned words = getWordsForBitWidth(bits);
-  return F.getModule().allocateInst(
+  return M.allocateInst(
       sizeof(INST) + sizeof(llvm::APInt::WordType)*words, alignof(INST));
 }
 
@@ -577,33 +579,33 @@ IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
 
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
                                                SILType Ty, const APInt &Value,
-                                               SILFunction &B) {
+                                               SILModule &M) {
   auto intTy = Ty.castTo<BuiltinIntegerType>();
   assert(intTy->getGreatestWidth() == Value.getBitWidth() &&
          "IntegerLiteralInst APInt value's bit width doesn't match type");
   (void)intTy;
 
-  void *buf = allocateLiteralInstWithBitSize<IntegerLiteralInst>(B,
+  void *buf = allocateLiteralInstWithBitSize<IntegerLiteralInst>(M,
                                                           Value.getBitWidth());
   return ::new (buf) IntegerLiteralInst(Loc, Ty, Value);
 }
 
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
                                                SILType Ty, intmax_t Value,
-                                               SILFunction &B) {
+                                               SILModule &M) {
   auto intTy = Ty.castTo<BuiltinIntegerType>();
   return create(Loc, Ty,
-                APInt(intTy->getGreatestWidth(), Value), B);
+                APInt(intTy->getGreatestWidth(), Value), M);
 }
 
 IntegerLiteralInst *IntegerLiteralInst::create(IntegerLiteralExpr *E,
                                                SILDebugLocation Loc,
-                                               SILFunction &F) {
+                                               SILModule &M) {
   return create(
       Loc, SILType::getBuiltinIntegerType(
                E->getType()->castTo<BuiltinIntegerType>()->getGreatestWidth(),
-               F.getASTContext()),
-      E->getValue(), F);
+               M.getASTContext()),
+      E->getValue(), M);
 }
 
 /// getValue - Return the APInt for the underlying integer literal.
@@ -622,7 +624,7 @@ FloatLiteralInst::FloatLiteralInst(SILDebugLocation Loc, SILType Ty,
 
 FloatLiteralInst *FloatLiteralInst::create(SILDebugLocation Loc, SILType Ty,
                                            const APFloat &Value,
-                                           SILFunction &B) {
+                                           SILModule &M) {
   auto floatTy = Ty.castTo<BuiltinFloatType>();
   assert(&floatTy->getAPFloatSemantics() == &Value.getSemantics() &&
          "FloatLiteralInst value's APFloat semantics do not match type");
@@ -630,20 +632,20 @@ FloatLiteralInst *FloatLiteralInst::create(SILDebugLocation Loc, SILType Ty,
 
   APInt Bits = Value.bitcastToAPInt();
 
-  void *buf = allocateLiteralInstWithBitSize<FloatLiteralInst>(B,
+  void *buf = allocateLiteralInstWithBitSize<FloatLiteralInst>(M,
                                                             Bits.getBitWidth());
   return ::new (buf) FloatLiteralInst(Loc, Ty, Bits);
 }
 
 FloatLiteralInst *FloatLiteralInst::create(FloatLiteralExpr *E,
                                            SILDebugLocation Loc,
-                                           SILFunction &F) {
+                                           SILModule &M) {
   return create(Loc,
                 // Builtin floating-point types are always valid SIL types.
                 SILType::getBuiltinFloatType(
                     E->getType()->castTo<BuiltinFloatType>()->getFPKind(),
-                    F.getASTContext()),
-                E->getValue(), F);
+                    M.getASTContext()),
+                E->getValue(), M);
 }
 
 APInt FloatLiteralInst::getBits() const {
@@ -665,11 +667,11 @@ StringLiteralInst::StringLiteralInst(SILDebugLocation Loc, StringRef Text,
 
 StringLiteralInst *StringLiteralInst::create(SILDebugLocation Loc,
                                              StringRef text, Encoding encoding,
-                                             SILFunction &F) {
+                                             SILModule &M) {
   void *buf
-    = allocateLiteralInstWithTextSize<StringLiteralInst>(F, text.size());
+    = allocateLiteralInstWithTextSize<StringLiteralInst>(M, text.size());
 
-  auto Ty = SILType::getRawPointerType(F.getModule().getASTContext());
+  auto Ty = SILType::getRawPointerType(M.getASTContext());
   return ::new (buf) StringLiteralInst(Loc, text, encoding, Ty);
 }
 
@@ -690,11 +692,11 @@ ConstStringLiteralInst::ConstStringLiteralInst(SILDebugLocation Loc,
 ConstStringLiteralInst *ConstStringLiteralInst::create(SILDebugLocation Loc,
                                                        StringRef text,
                                                        Encoding encoding,
-                                                       SILFunction &F) {
+                                                       SILModule &M) {
   void *buf =
-      allocateLiteralInstWithTextSize<ConstStringLiteralInst>(F, text.size());
+      allocateLiteralInstWithTextSize<ConstStringLiteralInst>(M, text.size());
 
-  auto Ty = SILType::getRawPointerType(F.getModule().getASTContext());
+  auto Ty = SILType::getRawPointerType(M.getASTContext());
   return ::new (buf) ConstStringLiteralInst(Loc, text, encoding, Ty);
 }
 
@@ -814,15 +816,14 @@ UncheckedRefCastAddrInst::UncheckedRefCastAddrInst(SILDebugLocation Loc,
       Operands(this, src, dest), SourceType(srcType), TargetType(targetType) {}
 
 UnconditionalCheckedCastAddrInst::UnconditionalCheckedCastAddrInst(
-    SILDebugLocation Loc, CastConsumptionKind consumption, SILValue src,
-    CanType srcType, SILValue dest, CanType targetType)
+    SILDebugLocation Loc, SILValue src, CanType srcType, SILValue dest,
+    CanType targetType)
     : SILInstruction(ValueKind::UnconditionalCheckedCastAddrInst, Loc),
-      Operands(this, src, dest), ConsumptionKind(consumption),
-      SourceType(srcType), TargetType(targetType) {}
+      Operands(this, src, dest), SourceType(srcType), TargetType(targetType) {}
 
 StructInst *StructInst::create(SILDebugLocation Loc, SILType Ty,
-                               ArrayRef<SILValue> Elements, SILFunction &F) {
-  void *Buffer = F.getModule().allocateInst(sizeof(StructInst) +
+                               ArrayRef<SILValue> Elements, SILModule &M) {
+  void *Buffer = M.allocateInst(sizeof(StructInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
                             alignof(StructInst));
   return ::new(Buffer) StructInst(Loc, Ty, Elements);
@@ -834,9 +835,23 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 
+ObjectInst *ObjectInst::create(SILDebugLocation Loc, SILType Ty,
+                               ArrayRef<SILValue> Elements,
+                               unsigned NumBaseElements, SILModule &M) {
+  void *Buffer = M.allocateInst(sizeof(ObjectInst) +
+                            decltype(Operands)::getExtraSize(Elements.size()),
+                            alignof(ObjectInst));
+  return ::new(Buffer) ObjectInst(Loc, Ty, Elements, NumBaseElements);
+}
+
+ObjectInst::ObjectInst(SILDebugLocation Loc, SILType Ty,
+                       ArrayRef<SILValue> Elems, unsigned NumBaseElements)
+    : SILInstruction(ValueKind::ObjectInst, Loc, Ty),
+      NumBaseElements(NumBaseElements), Operands(this, Elems) {}
+
 TupleInst *TupleInst::create(SILDebugLocation Loc, SILType Ty,
-                             ArrayRef<SILValue> Elements, SILFunction &F) {
-  void *Buffer = F.getModule().allocateInst(sizeof(TupleInst) +
+                             ArrayRef<SILValue> Elements, SILModule &M) {
+  void *Buffer = M.allocateInst(sizeof(TupleInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
                             alignof(TupleInst));
   return ::new(Buffer) TupleInst(Loc, Ty, Elements);
@@ -1557,19 +1572,27 @@ DynamicMethodBranchInst::create(SILDebugLocation Loc, SILValue Operand,
       DynamicMethodBranchInst(Loc, Operand, Member, HasMethodBB, NoMethodBB);
 }
 
-/// Create a witness method, creating a witness table declaration if we don't
-/// have a witness table for it. Later on if someone wants the real definition,
-/// lookUpWitnessTable will deserialize it for us if we can.
+/// Create a witness method call of a protocol requirement, passing in a lookup
+/// type and conformance.
 ///
-/// This is following the same model of how we deal with SILFunctions in
-/// function_ref. There we always just create a declaration and then later
-/// deserialize the actual function definition if we need to.
+/// At runtime, the witness is looked up in the conformance of the lookup type
+/// to the protocol.
+///
+/// The lookup type is usually an archetype, but it will be concrete if the
+/// witness_method instruction is inside a function body that was specialized.
+///
+/// The conformance must exactly match the requirement; the caller must handle
+/// the case where the requirement is defined in a base protocol that is
+/// refined by the conforming protocol.
 WitnessMethodInst *
 WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
                           ProtocolConformanceRef Conformance, SILDeclRef Member,
                           SILType Ty, SILFunction *F,
                           SILOpenedArchetypesState &OpenedArchetypes,
                           bool Volatile) {
+  assert(cast<ProtocolDecl>(Member.getDecl()->getDeclContext())
+         == Conformance.getRequirement());
+
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
@@ -1868,8 +1891,7 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
 }
 
 UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
-    SILDebugLocation DebugLoc, CastConsumptionKind consumption,
-    SILValue Operand, SILType DestTy, SILFunction &F,
+    SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy, SILFunction &F,
     SILOpenedArchetypesState &OpenedArchetypes) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
@@ -1880,7 +1902,7 @@ UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
   void *Buffer =
       Mod.allocateInst(size, alignof(UnconditionalCheckedCastValueInst));
   return ::new (Buffer) UnconditionalCheckedCastValueInst(
-      DebugLoc, consumption, Operand, TypeDependentOperands, DestTy);
+      DebugLoc, Operand, TypeDependentOperands, DestTy);
 }
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(
@@ -2231,13 +2253,7 @@ void KeyPathInst::dropReferencedPattern() {
 
 GenericSpecializationInformation::GenericSpecializationInformation(
     SILFunction *Caller, SILFunction *Parent, SubstitutionList Subs)
-    : Caller(Caller), Parent(Parent), Subs(Subs) {
-  // Specialization information may reference these functions, even
-  // if they are removed by means of e.g. dead function elimination.
-  if (Caller)
-    Caller->setReferencedByMetainformation();
-  Parent->setReferencedByMetainformation();
-}
+    : Caller(Caller), Parent(Parent), Subs(Subs) {}
 
 const GenericSpecializationInformation *
 GenericSpecializationInformation::create(SILFunction *Caller,
