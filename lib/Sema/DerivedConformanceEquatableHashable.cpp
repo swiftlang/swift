@@ -32,16 +32,6 @@
 using namespace swift;
 using namespace DerivedConformance;
 
-/// Returns true if the given type conforms to the protocol.
-/// \p type The type whose conformance should be checked.
-/// \p protocol The protocol being requested.
-/// \return True if the type conforms to the protocol.
-static bool typeConformsToProtocol(TypeChecker &tc, DeclContext *context,
-                                   Type type, ProtocolDecl *protocol) {
-  return tc.conformsToProtocol(type, protocol, context,
-                               ConformanceCheckFlags::Used).hasValue();
-}
-
 /// Returns true if, for every element of the given enum, it either has no
 /// associated values or all of them conform to a protocol.
 /// \p theEnum The enum whose elements and associated values should be checked.
@@ -63,15 +53,16 @@ bool allAssociatedValuesConformToProtocol(TypeChecker &tc, EnumDecl *theEnum,
       // One associated value with a label or multiple associated values
       // (labeled or unlabeled) are tuple types.
       for (auto tupleElementType : tupleType->getElementTypes()) {
-        if (!typeConformsToProtocol(tc, declContext, tupleElementType,
-                                    protocol)) {
+        if (!tc.conformsToProtocol(tupleElementType, protocol, declContext,
+                                   ConformanceCheckFlags::Used)) {
           return false;
         }
       }
     } else {
       // One associated value with no label is represented as a paren type.
       auto actualType = argumentType->getWithoutParens();
-      if (!typeConformsToProtocol(tc, declContext, actualType, protocol)) {
+      if (!tc.conformsToProtocol(actualType, protocol, declContext,
+                                 ConformanceCheckFlags::Used)) {
         return false;
       }
     }
@@ -96,8 +87,8 @@ bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
       tc.validateDecl(propertyDecl);
 
     if (!propertyDecl->hasType() ||
-        !typeConformsToProtocol(tc, declContext, propertyDecl->getType(),
-                                protocol)) {
+        !tc.conformsToProtocol(propertyDecl->getType(), protocol, declContext,
+                               ConformanceCheckFlags::Used)) {
       return false;
     }
   }
@@ -267,8 +258,8 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
     auto indexExpr = new (C) IntegerLiteralExpr(StringRef(indexStr.data(),
                                                 indexStr.size()), SourceLoc(),
                                                 /*implicit*/ true);
-    auto indexRef = new (C) DeclRefExpr(ConcreteDeclRef(indexVar),
-                                        DeclNameLoc(), /*implicit*/true);
+    auto indexRef = new (C) DeclRefExpr(indexVar, DeclNameLoc(),
+                                        /*implicit*/true);
     auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
                                          indexExpr, /*implicit*/ true);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
@@ -279,17 +270,16 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   }
 
   // generate: switch enumVar { }
-  auto enumRef = new (C) DeclRefExpr(ConcreteDeclRef(enumVarDecl),
-                                     DeclNameLoc(), /*implicit*/true);
+  auto enumRef = new (C) DeclRefExpr(enumVarDecl, DeclNameLoc(),
+                                     /*implicit*/true);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
                                        SourceLoc(), cases, SourceLoc(), C);
 
   stmts.push_back(indexBind);
   stmts.push_back(switchStmt);
 
-  return new (C) DeclRefExpr(ConcreteDeclRef(indexVar), DeclNameLoc(),
-                             /*implicit*/ true, AccessSemantics::Ordinary,
-                             intType);
+  return new (C) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit*/ true,
+                             AccessSemantics::Ordinary, intType);
 }
 
 /// Generates a guard statement that checks whether the given lhs and rhs
@@ -357,8 +347,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
   FuncDecl *cmpFunc = C.getEqualIntDecl();
   assert(cmpFunc && "should have a == for int as we already checked for it");
 
-  auto fnType = cast<FunctionType>(cmpFunc->getInterfaceType()
-                                   ->getCanonicalType());
+  auto fnType = cmpFunc->getInterfaceType()->castTo<FunctionType>();
 
   Expr *cmpFuncExpr;
   if (cmpFunc->getDeclContext()->isTypeContext()) {
@@ -367,7 +356,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
     Expr *ref = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(), /*Implicit*/ true,
                                     AccessSemantics::Ordinary, fnType);
 
-    fnType = cast<FunctionType>(fnType.getResult());
+    fnType = fnType->getResult()->castTo<FunctionType>();
     cmpFuncExpr = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base, fnType);
     cmpFuncExpr->setImplicit();
   } else {
@@ -451,10 +440,10 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
     SmallVector<ASTNode, 6> statementsInCase;
     for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); varIdx++) {
       auto lhsVar = lhsPayloadVars[varIdx];
-      auto lhsExpr = new (C) DeclRefExpr(ConcreteDeclRef(lhsVar), DeclNameLoc(),
+      auto lhsExpr = new (C) DeclRefExpr(lhsVar, DeclNameLoc(),
                                          /*implicit*/true);
       auto rhsVar = rhsPayloadVars[varIdx];
-      auto rhsExpr = new (C) DeclRefExpr(ConcreteDeclRef(rhsVar), DeclNameLoc(),
+      auto rhsExpr = new (C) DeclRefExpr(rhsVar, DeclNameLoc(),
                                          /*Implicit*/true);
       auto guardStmt = returnIfNotEqualGuard(C, lhsExpr, rhsExpr);
       statementsInCase.emplace_back(guardStmt);
@@ -494,10 +483,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
   }
 
   // switch (a, b) { <case statements> }
-  auto aRef = new (C) DeclRefExpr(ConcreteDeclRef(aParam), DeclNameLoc(),
-                                  /*implicit*/true);
-  auto bRef = new (C) DeclRefExpr(ConcreteDeclRef(bParam), DeclNameLoc(),
-                                  /*implicit*/true);
+  auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/true);
+  auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/true);
   auto abExpr = TupleExpr::create(C, SourceLoc(), { aRef, bRef }, {}, {},
                                   SourceLoc(), /*HasTrailingClosure*/ false,
                                   /*implicit*/ true);
@@ -530,14 +517,14 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl) {
   for (auto propertyDecl : storedProperties) {
     auto aPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
                                             /*implicit*/ true);
-    auto aParamRef = new (C) DeclRefExpr(ConcreteDeclRef(aParam), DeclNameLoc(),
+    auto aParamRef = new (C) DeclRefExpr(aParam, DeclNameLoc(),
                                          /*implicit*/ true);
     auto aPropertyExpr = new (C) DotSyntaxCallExpr(aPropertyRef, SourceLoc(),
                                                    aParamRef);
 
     auto bPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
                                             /*implicit*/ true);
-    auto bParamRef = new (C) DeclRefExpr(ConcreteDeclRef(bParam), DeclNameLoc(),
+    auto bParamRef = new (C) DeclRefExpr(bParam, DeclNameLoc(),
                                          /*implicit*/ true);
     auto bPropertyExpr = new (C) DotSyntaxCallExpr(bPropertyRef, SourceLoc(),
                                                    bParamRef);
@@ -790,8 +777,8 @@ static Expr* mixInHashExpr_hashValue(ASTContext &C,
                                                   { hashValueExpr }, {});
 
   // result ^= _mixInt(<exprToHash>.hashValue)
-  auto resultExpr = new (C) DeclRefExpr(ConcreteDeclRef(resultVar),
-                                        DeclNameLoc(), /*implicit*/ true);
+  auto resultExpr = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
+                                        /*implicit*/ true);
   auto resultInoutExpr = new (C) InOutExpr(SourceLoc(), resultExpr,
                                            intType, /*implicit*/ true);
 
@@ -870,8 +857,8 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
     if (hasNoAssociatedValues) {
       // result = <ordinal>
       auto ordinalExpr = integerLiteralExpr(C, index++);
-      auto resultRef = new (C) DeclRefExpr(ConcreteDeclRef(resultVar),
-                                           DeclNameLoc(), /*implicit*/ true);
+      auto resultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
+                                           /*implicit*/ true);
       auto assignExpr = new (C) AssignExpr(resultRef, SourceLoc(),
                                            ordinalExpr, /*implicit*/ true);
       mixExpressions.emplace_back(ASTNode(assignExpr));
@@ -883,8 +870,8 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
       auto ordinalExpr = integerLiteralExpr(C, index++);
       auto mixedOrdinalExpr = CallExpr::createImplicit(C, mixinFuncExpr,
                                                        { ordinalExpr }, {});
-      auto resultRef = new (C) DeclRefExpr(ConcreteDeclRef(resultVar),
-                                           DeclNameLoc(), /*implicit*/ true);
+      auto resultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
+                                           /*implicit*/ true);
       auto assignExpr = new (C) AssignExpr(resultRef, SourceLoc(),
                                            mixedOrdinalExpr, /*implicit*/ true);
       mixExpressions.emplace_back(ASTNode(assignExpr));
@@ -892,8 +879,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
       // Generate a sequence of expressions that mix the payload's hash values
       // into result.
       for (auto payloadVar : payloadVars) {
-        auto payloadVarRef = new (C) DeclRefExpr(ConcreteDeclRef(payloadVar),
-                                                 DeclNameLoc(),
+        auto payloadVarRef = new (C) DeclRefExpr(payloadVar, DeclNameLoc(),
                                                  /*implicit*/ true);
         // result ^= <payloadVar>.hashValue
         auto mixExpr = mixInHashExpr_hashValue(C, resultVar, payloadVarRef);
@@ -916,8 +902,8 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   statements.push_back(switchStmt);
 
   // generate: return result
-  auto resultRef = new (C) DeclRefExpr(ConcreteDeclRef(resultVar),
-                                       DeclNameLoc(), /*implicit*/ true,
+  auto resultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
+                                       /*implicit*/ true,
                                        AccessSemantics::Ordinary, intType);
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), resultRef);
   statements.push_back(returnStmt);
@@ -959,8 +945,8 @@ deriveBodyHashable_struct_hashValue(AbstractFunctionDecl *hashValueDecl) {
 
   // result = 0
   {
-    auto resultRef = new (C) DeclRefExpr(ConcreteDeclRef(resultVar),
-                                         DeclNameLoc(), /*implicit*/ true);
+    auto resultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
+                                         /*implicit*/ true);
     auto assignExpr = new (C) AssignExpr(resultRef, SourceLoc(),
                                          integerLiteralExpr(C, 0),
                                          /*implicit*/ true);
@@ -986,8 +972,8 @@ deriveBodyHashable_struct_hashValue(AbstractFunctionDecl *hashValueDecl) {
 
   // return result
   {
-    auto resultRef = new (C) DeclRefExpr(ConcreteDeclRef(resultVar),
-                                         DeclNameLoc(), /*implicit*/ true,
+    auto resultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
+                                         /*implicit*/ true,
                                          AccessSemantics::Ordinary, intType);
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), resultRef);
     statements.push_back(returnStmt);
