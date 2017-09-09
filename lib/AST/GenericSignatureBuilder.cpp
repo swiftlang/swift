@@ -2770,6 +2770,15 @@ auto GenericSignatureBuilder::resolvePotentialArchetype(
   return (EquivalenceClass *)nullptr;
 }
 
+EquivalenceClass *GenericSignatureBuilder::resolveEquivalenceClass(
+                                    Type type,
+                                    ArchetypeResolutionKind resolutionKind) {
+  auto pa = resolveArchetype(type, resolutionKind);
+  if (!pa) return nullptr;
+
+  return pa->getOrCreateEquivalenceClass();
+}
+
 PotentialArchetype *GenericSignatureBuilder::resolveArchetype(
                                       Type type,
                                       ArchetypeResolutionKind resolutionKind) {

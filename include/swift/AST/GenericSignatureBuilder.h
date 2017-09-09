@@ -679,6 +679,21 @@ private:
                             ArchetypeResolutionKind resolutionKind);
 
 public:
+  /// \brief Resolve the equivalence class for the given type parameter,
+  /// which provides information about that type.
+  ///
+  /// The \c resolutionKind parameter describes how resolution should be
+  /// performed. If the potential archetype named by the given dependent type
+  /// already exists, it will be always returned. If it doesn't exist yet,
+  /// the \c resolutionKind dictates whether the potential archetype will
+  /// be created or whether null will be returned.
+  ///
+  /// For any type that cannot refer to an equivalence class, this routine
+  /// returns null.
+  EquivalenceClass *resolveEquivalenceClass(
+                      Type type,
+                      ArchetypeResolutionKind resolutionKind);
+
   /// \brief Resolve the given type to the potential archetype it names.
   ///
   /// The \c resolutionKind parameter describes how resolution should be
