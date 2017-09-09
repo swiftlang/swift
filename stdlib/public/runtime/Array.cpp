@@ -28,6 +28,7 @@
 
 using namespace swift;
 
+namespace {
 enum class ArrayCopy : unsigned {
   NoAlias = 0,
   FrontToBack = 1,
@@ -43,6 +44,7 @@ enum class ArrayDest {
   Init,
   Assign
 };
+} // end anonymous namespace.
 
 static void array_pod_copy(ArrayCopy copyKind, OpaqueValue *dest,
                            OpaqueValue *src, size_t stride, size_t count) {
