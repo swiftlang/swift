@@ -476,12 +476,14 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       SILInliner Inliner(*F, *CalleeFunction,
                          SILInliner::InlineKind::MandatoryInline,
                          ApplySubs, OpenedArchetypesTracker);
-      if (!Inliner.inlineFunction(InnerAI, FullArgs)) {
+      if (!Inliner.canInlineFunction(InnerAI)) {
         I = InnerAI.getInstruction()->getIterator();
         continue;
       }
 
-      // Inlining was successful. Remove the apply.
+      Inliner.inlineFunction(InnerAI, FullArgs);
+
+      // We were able to inline successfully. Remove the apply.
       InnerAI.getInstruction()->eraseFromParent();
 
       // Reestablish our iterator if it wrapped.
