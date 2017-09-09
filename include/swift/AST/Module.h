@@ -1073,23 +1073,22 @@ public:
   }
 
   std::vector<Token> &getTokenVector() {
-    assert(EnabledAndAllCorrectedTokens.first && "Disabled");
-    return EnabledAndAllCorrectedTokens.second;
+    assert(pAllCorrectedTokens && "Disabled");
+    return *pAllCorrectedTokens;
   }
 
   ArrayRef<Token> getAllTokens() const {
-    assert(EnabledAndAllCorrectedTokens.first && "Disabled");
-    return EnabledAndAllCorrectedTokens.second;
+    assert(pAllCorrectedTokens && "Disabled");
+    return *pAllCorrectedTokens;
   }
 
   bool shouldKeepTokens() const {
-    return EnabledAndAllCorrectedTokens.first;
+    return (bool)pAllCorrectedTokens;
   }
 
 private:
-  /// Whether the SourceFile instance opts to collect underlying tokens and
-  /// the vector containing these tokens if so.
-  std::pair<bool, std::vector<Token>> EnabledAndAllCorrectedTokens;
+  /// If not null, the pointee vector should contain tokens of this source file.
+  std::unique_ptr<std::vector<Token>> pAllCorrectedTokens;
 };
 
 
