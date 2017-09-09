@@ -1335,7 +1335,7 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     (void)problem;
   }
   if (KeepTokens) {
-    pAllCorrectedTokens.reset(new std::vector<Token>());
+    AllCorrectedTokens = std::vector<Token>();
   }
 }
 

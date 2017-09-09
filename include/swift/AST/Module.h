@@ -1073,22 +1073,22 @@ public:
   }
 
   std::vector<Token> &getTokenVector() {
-    assert(pAllCorrectedTokens && "Disabled");
-    return *pAllCorrectedTokens;
+    assert(shouldKeepTokens() && "Disabled");
+    return *AllCorrectedTokens;
   }
 
   ArrayRef<Token> getAllTokens() const {
-    assert(pAllCorrectedTokens && "Disabled");
-    return *pAllCorrectedTokens;
+    assert(shouldKeepTokens() && "Disabled");
+    return *AllCorrectedTokens;
   }
 
   bool shouldKeepTokens() const {
-    return (bool)pAllCorrectedTokens;
+    return (bool)AllCorrectedTokens;
   }
 
 private:
-  /// If not null, the pointee vector should contain tokens of this source file.
-  std::unique_ptr<std::vector<Token>> pAllCorrectedTokens;
+  /// If not None, the underlying vector should contain tokens of this source file.
+  Optional<std::vector<Token>> AllCorrectedTokens;
 };
 
 
