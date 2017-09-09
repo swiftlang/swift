@@ -55,6 +55,12 @@ public:
         Callback(Callback) {
   }
 
+  /// Returns true if we are able to inline \arg AI.
+  ///
+  /// *NOTE* This must be checked before attempting to inline \arg AI. If one
+  /// attempts to inline \arg AI and this returns false, an assert will fire.
+  bool canInlineFunction(FullApplySite AI);
+
   /// inlineFunction - This method inlines a callee function, assuming that it
   /// is called with the given arguments, into the caller at a given instruction
   /// (as specified by a basic block iterator), assuming that the instruction
@@ -62,11 +68,15 @@ public:
   /// performs one step of inlining: it does not recursively inline functions
   /// called by the callee.
   ///
-  /// Returns true on success or false if it is unable to inline the function
-  /// (for any reason). If successful, I now points to the first inlined
-  /// instruction, or the next instruction after the removed instruction in the
-  /// original function, in case the inlined function is completely trivial
-  bool inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args);
+  /// After completion, I now points to the first inlined instruction, or the
+  /// next instruction after the removed instruction in the original function,
+  /// in case the inlined function is completely trivial
+  ///
+  /// *NOTE*: This attempts to perform inlining unconditionally and thus asserts
+  /// if inlining will fail. All users /must/ check that a function is allowed
+  /// to be inlined using SILInliner::canInlineFunction before calling this
+  /// function.
+  void inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args);
 
 private:
   void visitDebugValueInst(DebugValueInst *Inst);
