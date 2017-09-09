@@ -458,32 +458,14 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       // If we intend to inline a thick function, then we need to balance the
       // reference counts for correctness.
-      if (IsThick && I != ApplyBlock->begin()) {
-        // We need to find an appropriate location for our fix up code
-        // We used to do this after inlining Without any modifications
-        // This caused us to add a release in a wrong place:
-        // It would release a value *before* retaining it!
-        // It is really problematic to do this after inlining -
-        // Finding a valid insertion point is tricky:
-        // Inlining might add new basic blocks and/or remove the apply
-        // We want to add the fix up *just before* where the current apply is!
-        // Unfortunately, we *can't* add the fix up code here:
-        // Inlining might fail for any reason -
-        // If that occurred we'd need to undo our fix up code.
-        // Instead, we split the current basic block -
-        // Making sure we have a basic block that starts with our apply.
-        SILBuilderWithScope B(I);
-        ApplyBlock = splitBasicBlockAndBranch(B, &*I, nullptr, nullptr);
-        I = ApplyBlock->begin();
+      if (IsThick) {
+        fixupReferenceCounts(I, Loc, CalleeValue, CaptureArgs);
       }
 
       // Decrement our iterator (carefully, to avoid going off the front) so it
       // is valid after inlining is done.  Inlining deletes the apply, and can
       // introduce multiple new basic blocks.
-      if (I != ApplyBlock->begin())
-        --I;
-      else
-        I = ApplyBlock->end();
+      I = prev_or_end(I, ApplyBlock->begin(), ApplyBlock->end());
 
       Inliner.inlineFunction(InnerAI, FullArgs);
 
@@ -496,11 +478,6 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       // Update the iterator when instructions are removed.
       DeleteInstructionsHandler DeletionHandler(I);
-
-      // If the inlined apply was a thick function, then we need to balance the
-      // reference counts for correctness.
-      if (IsThick)
-        fixupReferenceCounts(I, Loc, CalleeValue, CaptureArgs);
 
       // Now that the IR is correct, see if we can remove dead callee
       // computations (e.g. dead partial_apply closures).
