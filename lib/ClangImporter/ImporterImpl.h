@@ -1131,7 +1131,14 @@ private:
   void insertMembersAndAlternates(const clang::NamedDecl *nd,
                                   SmallVectorImpl<Decl *> &members);
   void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
-  void addMemberAndAlternatesToExtension(
+
+  /// Imports \p decl under \p nameVersion with the name \p newName, and adds
+  /// it and its alternates to \p ext.
+  ///
+  /// \returns true if \p decl was successfully imported, whether or not it was
+  /// ultimately added to \p ext. This matches the behavior of
+  /// forEachDistinctName's callback.
+  bool addMemberAndAlternatesToExtension(
       clang::NamedDecl *decl, importer::ImportedName newName,
       importer::ImportNameVersion nameVersion, ExtensionDecl *ext);
 
@@ -1222,11 +1229,14 @@ public:
   /// will eventually reference that declaration, the contexts will still be
   /// considered distinct.
   ///
+  /// If \p action returns false, the current name will \e not be added to the
+  /// set of seen names.
+  ///
   /// The names are generated in the same order as
   /// forEachImportNameVersionFromCurrent. The current name is always first.
   void forEachDistinctName(
       const clang::NamedDecl *decl,
-      llvm::function_ref<void(importer::ImportedName,
+      llvm::function_ref<bool(importer::ImportedName,
                               importer::ImportNameVersion)> action);
 
   /// Dump the Swift-specific name lookup tables we generate.

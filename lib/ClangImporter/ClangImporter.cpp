@@ -2508,32 +2508,34 @@ ClangModuleUnit::lookupNestedType(Identifier name,
 
     bool anyMatching = false;
     TypeDecl *originalDecl = nullptr;
-    owner.forEachDistinctName(clangTypeDecl, [&](ImportedName newName,
-                                                 ImportNameVersion nameVersion){
+    owner.forEachDistinctName(clangTypeDecl,
+                              [&](ImportedName newName,
+                                  ImportNameVersion nameVersion) -> bool {
       if (anyMatching)
-        return;
+        return true;
       if (!newName.getDeclName().isSimpleName(name))
-        return;
+        return true;
 
       auto decl = dyn_cast_or_null<TypeDecl>(
           owner.importDeclReal(clangTypeDecl, nameVersion));
       if (!decl)
-        return;
+        return false;
 
       if (!originalDecl)
         originalDecl = decl;
       else if (originalDecl == decl)
-        return;
+        return true;
 
       auto *importedContext = decl->getDeclContext()->
           getAsNominalTypeOrNominalTypeExtensionContext();
       if (importedContext != baseType)
-        return;
+        return true;
 
       assert(decl->getFullName().matchesRef(name) &&
              "importFullName behaved differently from importDecl");
       results.push_back(decl);
       anyMatching = true;
+      return true;
     });
   }
 
@@ -3211,12 +3213,12 @@ void ClangImporter::Implementation::lookupObjCMembers(
 
     forEachDistinctName(clangDecl,
                         [&](ImportedName importedName,
-                            ImportNameVersion nameVersion) {
+                            ImportNameVersion nameVersion) -> bool {
       // Import the declaration.
       auto decl =
           cast_or_null<ValueDecl>(importDeclReal(clangDecl, nameVersion));
       if (!decl)
-        return;
+        return false;
 
       // If the name we found matches, report the declaration.
       // FIXME: If we didn't need to check alternate decls here, we could avoid
@@ -3232,6 +3234,7 @@ void ClangImporter::Implementation::lookupObjCMembers(
           consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
         }
       }
+      return true;
     });
   }
 }
