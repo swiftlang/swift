@@ -235,6 +235,7 @@ namespace {
       // FIXME: Types that can be mapped, but aren't yet.
       case clang::BuiltinType::Half:
       case clang::BuiltinType::LongDouble:
+      case clang::BuiltinType::Float16:
       case clang::BuiltinType::Float128:
       case clang::BuiltinType::NullPtr:
         return Type();
