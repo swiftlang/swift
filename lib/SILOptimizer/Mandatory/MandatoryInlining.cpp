@@ -311,6 +311,28 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
   return CalleeFunction;
 }
 
+static std::tuple<FullApplySite, SILBasicBlock::iterator>
+tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
+                           ClassHierarchyAnalysis *CHA) {
+  auto NewInstPair = tryDevirtualizeApply(InnerAI, CHA);
+  auto *NewInst = NewInstPair.first;
+  if (!NewInst)
+    return std::make_tuple(InnerAI, I);
+
+  replaceDeadApply(InnerAI, NewInst);
+  if (auto *II = dyn_cast<SILInstruction>(NewInst))
+    I = II->getIterator();
+  else
+    I = NewInst->getParentBlock()->begin();
+  auto NewAI = FullApplySite::isa(NewInstPair.second.getInstruction());
+  // *NOTE*, it is important that we return I here since we may have
+  // devirtualized but not have a full apply site anymore.
+  if (!NewAI)
+    return std::make_tuple(FullApplySite(), I);
+
+  return std::make_tuple(NewAI, I);
+}
+
 /// \brief Inlines all mandatory inlined functions into the body of a function,
 /// first recursively inlining all mandatory apply instructions in those
 /// functions into their bodies if necessary.
@@ -363,19 +385,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       auto *ApplyBlock = InnerAI.getParent();
 
-      auto NewInstPair = tryDevirtualizeApply(InnerAI, CHA);
-      if (auto *NewInst = NewInstPair.first) {
-        replaceDeadApply(InnerAI, NewInst);
-        if (auto *II = dyn_cast<SILInstruction>(NewInst))
-          I = II->getIterator();
-        else
-          I = NewInst->getParentBlock()->begin();
-        auto NewAI = FullApplySite::isa(NewInstPair.second.getInstruction());
-        if (!NewAI)
-          continue;
-
-        InnerAI = NewAI;
-      }
+      std::tie(InnerAI, I) = tryDevirtualizeApplyHelper(InnerAI, I, CHA);
+      if (!InnerAI)
+        continue;
 
       SILLocation Loc = InnerAI.getLoc();
       SILValue CalleeValue = InnerAI.getCallee();
