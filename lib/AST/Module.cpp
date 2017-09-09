@@ -1325,8 +1325,7 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        bool KeepTokens)
   : FileUnit(FileUnitKind::Source, M),
     BufferID(bufferID ? *bufferID : -1),
-    Kind(K),
-    EnabledAndAllCorrectedTokens(KeepTokens, std::vector<Token>()) {
+    Kind(K) {
   M.getASTContext().addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
 
@@ -1334,6 +1333,9 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     bool problem = M.registerEntryPointFile(this, SourceLoc(), None);
     assert(!problem && "multiple main files?");
     (void)problem;
+  }
+  if (KeepTokens) {
+    pAllCorrectedTokens.reset(new std::vector<Token>());
   }
 }
 
