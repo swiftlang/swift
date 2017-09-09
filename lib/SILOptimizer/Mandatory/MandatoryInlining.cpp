@@ -83,25 +83,19 @@ public:
 /// applications: namely, that an apply of a thick function consumes the callee
 /// and that the function implementing the closure consumes its capture
 /// arguments.
-static void fixupReferenceCounts(SILBasicBlock::iterator I, SILLocation Loc,
+static void fixupReferenceCounts(SILBasicBlock::iterator I,
                                  SILValue CalleeValue,
                                  SmallVectorImpl<SILValue> &CaptureArgs) {
-  // Either release the callee (which the apply would have done) or remove a
-  // retain that happens to be the immediately preceding instruction.
-  SILBuilderWithScope B(I);
-  auto *NewRelease = B.emitStrongReleaseAndFold(Loc, CalleeValue);
-
-  // Important: we move the insertion point before this new release, just in
-  // case this inserted release would have caused the deallocation of the
-  // closure and its contained capture arguments.
-  if (NewRelease)
-    B.setInsertionPoint(NewRelease);
-
-  // Add a retain of each non-address type capture argument, because it will be
-  // consumed by the closure body.
+  // Add a copy of each non-address type capture argument to lifetime extend the
+  // captured argument over the inlined function. This deals with the
+  // possibility of the closure being destroyed by an earlier application and
+  // thus cause the captured argument to be destroyed.
   for (auto &CaptureArg : CaptureArgs)
     if (!CaptureArg->getType().isAddress())
-      B.emitCopyValueOperation(Loc, CaptureArg);
+      createIncrementBefore(CaptureArg, &*I);
+
+  // Destroy the callee as the apply would have done.
+  createDecrementBefore(CalleeValue, &*I);
 }
 
 /// \brief Removes instructions that create the callee value if they are no
@@ -390,7 +384,6 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       if (!InnerAI)
         continue;
 
-      SILLocation Loc = InnerAI.getLoc();
       SILValue CalleeValue = InnerAI.getCallee();
       bool IsThick;
       PartialApplyInst *PAI;
@@ -513,7 +506,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // If the inlined apply was a thick function, then we need to balance the
       // reference counts for correctness.
       if (IsThick)
-        fixupReferenceCounts(II, Loc, CalleeValue, CaptureArgs);
+        fixupReferenceCounts(II, CalleeValue, CaptureArgs);
 
       // Now that the IR is correct, see if we can remove dead callee
       // computations (e.g. dead partial_apply closures).
