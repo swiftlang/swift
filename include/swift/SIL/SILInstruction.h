@@ -6529,6 +6529,16 @@ public:
     FOREACH_IMPL_RETURN(getSubstitutions());
   }
 
+  /// Return a begin iterator for the substitution array.
+  auto subs_begin() const -> decltype(getSubstitutions().begin()) {
+    return getSubstitutions().begin();
+  }
+
+  /// Return an end iterator for the substitution array.
+  auto subs_end() const -> decltype(getSubstitutions().end()) {
+    return getSubstitutions().end();
+  }
+
   /// The arguments passed to this instruction.
   MutableArrayRef<Operand> getArgumentOperands() const {
     FOREACH_IMPL_RETURN(getArgumentOperands());
