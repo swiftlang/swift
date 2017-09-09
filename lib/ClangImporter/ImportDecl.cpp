@@ -6921,9 +6921,7 @@ getSwiftNameFromClangName(StringRef replacement) {
   {
     // Render a swift_name string.
     llvm::raw_svector_ostream os(renamed);
-    printSwiftName(importedName,
-                   /*fullyQualified=*/true,
-                   os);
+    printSwiftName(importedName, CurrentVersion, /*fullyQualified=*/true, os);
   }
 
   return SwiftContext.AllocateCopy(StringRef(renamed));

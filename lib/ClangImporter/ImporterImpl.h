@@ -640,7 +640,9 @@ public:
 
   /// Print an imported name as a string suitable for the swift_name attribute,
   /// or the 'Rename' field of AvailableAttr.
-  void printSwiftName(importer::ImportedName, bool fullyQualified,
+  void printSwiftName(importer::ImportedName name,
+                      importer::ImportNameVersion version,
+                      bool fullyQualified,
                       llvm::raw_ostream &os);
 
   /// \brief Import the given Clang identifier into Swift.

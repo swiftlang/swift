@@ -318,10 +318,9 @@ static bool shouldLowercaseValueName(StringRef name) {
 
 /// Will recursively print out the fully qualified context for the given name.
 /// Ends with a trailing "."
-static void
-printFullContextPrefix(ImportedName name,
-                       llvm::raw_ostream &os,
-                       ClangImporter::Implementation &Impl) {
+static void printFullContextPrefix(ImportedName name, ImportNameVersion version,
+                                   llvm::raw_ostream &os,
+                                   ClangImporter::Implementation &Impl) {
   const clang::NamedDecl *newDeclContextNamed = nullptr;
   switch (name.getEffectiveContext().getKind()) {
   case EffectiveClangContext::UnresolvedContext:
@@ -347,12 +346,13 @@ printFullContextPrefix(ImportedName name,
 
   // Now, let's print out the parent
   assert(newDeclContextNamed && "should of been set");
-  auto parentName = Impl.importFullName(newDeclContextNamed, name.getVersion());
-  printFullContextPrefix(parentName, os, Impl);
+  auto parentName = Impl.importFullName(newDeclContextNamed, version);
+  printFullContextPrefix(parentName, version, os, Impl);
   os << parentName.getDeclName() << ".";
 }
 
 void ClangImporter::Implementation::printSwiftName(ImportedName name,
+                                                   ImportNameVersion version,
                                                    bool fullyQualified,
                                                    llvm::raw_ostream &os) {
   // Property accessors.
@@ -376,7 +376,7 @@ void ClangImporter::Implementation::printSwiftName(ImportedName name,
   }
 
   if (fullyQualified)
-    printFullContextPrefix(name, os, *this);
+    printFullContextPrefix(name, version, os, *this);
 
   // Base name.
   os << name.getDeclName().getBaseName();
@@ -1723,7 +1723,6 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   }
   ++ImportNameNumCacheMisses;
   auto res = importNameImpl(decl, version, givenName);
-  res.setVersion(version);
   if (!givenName)
     importNameCache[key] = res;
   return res;
