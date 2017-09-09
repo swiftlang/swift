@@ -260,7 +260,7 @@ class SILValue {
 
 public:
   SILValue(const ValueBase *V = nullptr)
-    : Value((ValueBase *)V) { }
+    : Value(const_cast<ValueBase *>(V)) { }
 
   ValueBase *operator->() const { return Value; }
   ValueBase &operator*() const { return *Value; }
