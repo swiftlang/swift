@@ -418,6 +418,35 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         return false;
       }
 
+      // Create our initial list of substitutions.
+      llvm::SmallVector<Substitution, 16> ApplySubs(InnerAI.subs_begin(),
+                                                    InnerAI.subs_end());
+
+      // Then if we have a partial_apply, add any additional subsitutions that
+      // we may require to the end of the list.
+      if (PAI) {
+        copy(PAI->getSubstitutions(), std::back_inserter(ApplySubs));
+      }
+
+      SILOpenedArchetypesTracker OpenedArchetypesTracker(F);
+      F->getModule().registerDeleteNotificationHandler(
+          &OpenedArchetypesTracker);
+      // The callee only needs to know about opened archetypes used in
+      // the substitution list.
+      OpenedArchetypesTracker.registerUsedOpenedArchetypes(
+          InnerAI.getInstruction());
+      if (PAI) {
+        OpenedArchetypesTracker.registerUsedOpenedArchetypes(PAI);
+      }
+
+      SILInliner Inliner(*F, *CalleeFunction,
+                         SILInliner::InlineKind::MandatoryInline, ApplySubs,
+                         OpenedArchetypesTracker);
+      if (!Inliner.canInlineFunction(InnerAI)) {
+        I = InnerAI.getInstruction()->getIterator();
+        continue;
+      }
+
       // Inline function at I, which also changes I to refer to the first
       // instruction inlined in the case that it succeeds. We purposely
       // process the inlined body after inlining, because the inlining may
@@ -455,31 +484,6 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         --I;
       else
         I = ApplyBlock->end();
-
-      std::vector<Substitution> ApplySubs(InnerAI.getSubstitutions());
-
-      if (PAI) {
-        auto PAISubs = PAI->getSubstitutions();
-        ApplySubs.insert(ApplySubs.end(), PAISubs.begin(), PAISubs.end());
-      }
-
-      SILOpenedArchetypesTracker OpenedArchetypesTracker(F);
-      F->getModule().registerDeleteNotificationHandler(
-          &OpenedArchetypesTracker);
-      // The callee only needs to know about opened archetypes used in
-      // the substitution list.
-      OpenedArchetypesTracker.registerUsedOpenedArchetypes(InnerAI.getInstruction());
-      if (PAI) {
-        OpenedArchetypesTracker.registerUsedOpenedArchetypes(PAI);
-      }
-
-      SILInliner Inliner(*F, *CalleeFunction,
-                         SILInliner::InlineKind::MandatoryInline,
-                         ApplySubs, OpenedArchetypesTracker);
-      if (!Inliner.canInlineFunction(InnerAI)) {
-        I = InnerAI.getInstruction()->getIterator();
-        continue;
-      }
 
       Inliner.inlineFunction(InnerAI, FullArgs);
 
