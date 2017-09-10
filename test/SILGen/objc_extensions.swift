@@ -36,7 +36,7 @@ extension Sub {
     // CHECK: end_borrow [[BORROWED_SELF_COPY_CAST]]
     // CHECK: [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[SELF_COPY_CAST]])
     // CHECK: bb3(
-    // CHECK: destroy_value [[SELF_COPY]]
+    // CHECK: destroy_value [[SELF_COPY_CAST]]
     // CHECK: } // end sil function '_T015objc_extensions3SubC4propSQySSGfg'
 
     // Then check the setter @objc thunk.
@@ -72,7 +72,7 @@ extension Sub {
 
     // CHECK: bb3([[OLD_NSSTRING_BRIDGED:%.*]] : $Optional<String>):
     // This next line is completely not needed. But we are emitting it now.
-    // CHECK:   destroy_value [[SELF_COPY]]
+    // CHECK:   destroy_value [[UPCAST_SELF_COPY]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
     // CHECK:   [[BORROWED_UPCAST_SELF:%.*]] = begin_borrow [[UPCAST_SELF_COPY]] : $Base
@@ -88,7 +88,7 @@ extension Sub {
     // CHECK:    end_borrow [[BORROWED_NEW_VALUE]]
     // CHECK:    apply [[SET_SUPER_METHOD]]([[BRIDGED_NEW_STRING]], [[UPCAST_SELF_COPY]])
     // CHECK:    destroy_value [[BRIDGED_NEW_STRING]]
-    // CHECK:    destroy_value [[SELF_COPY]]
+    // CHECK:    destroy_value [[UPCAST_SELF_COPY]]
     // CHECK:    [[DIDSET_NOTIFIER:%.*]] = function_ref @_T015objc_extensions3SubC4propSQySSGfW : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> ()
     // CHECK:    [[BORROWED_OLD_NSSTRING_BRIDGED:%.*]] = begin_borrow [[OLD_NSSTRING_BRIDGED]]
     // CHECK:    [[COPIED_OLD_NSSTRING_BRIDGED:%.*]] = copy_value [[BORROWED_OLD_NSSTRING_BRIDGED]]

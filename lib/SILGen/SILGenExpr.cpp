@@ -1293,10 +1293,9 @@ RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
           .getScalarValue();
 
   // Perform an upcast to convert self to the indicated super type.
-  auto Result = SGF.B.createUpcast(E, Self.getValue(),
-                                   SGF.getLoweredType(E->getType()));
+  auto result = SGF.B.createUpcast(E, Self, SGF.getLoweredType(E->getType()));
 
-  return RValue(SGF, E, ManagedValue(Result, Self.getCleanup()));
+  return RValue(SGF, E, result);
 }
 
 RValue RValueEmitter::
@@ -1770,10 +1769,9 @@ RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
   ManagedValue archetype = SGF.emitRValueAsSingleValue(E->getSubExpr());
   // Replace the cleanup with a new one on the superclass value so we always use
   // concrete retain/release operations.
-  SILValue base = SGF.B.createUpcast(E,
-                                    archetype.forward(SGF),
-                                    SGF.getLoweredLoadableType(E->getType()));
-  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(base));
+  auto base = SGF.B.createUpcast(E, archetype,
+                                 SGF.getLoweredLoadableType(E->getType()));
+  return RValue(SGF, E, base);
 }
 
 static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
@@ -3363,10 +3361,8 @@ visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
                                           nullptr,
                                           keyPathTy->getGenericArgs())
           ->getCanonicalType();
-        auto upcast = SGF.B.createUpcast(SILLocation(E),
-                                     keyPath.forward(SGF),
+        keyPath = SGF.B.createUpcast(SILLocation(E), keyPath,
                                      SILType::getPrimitiveObjectType(castToTy));
-        keyPath = SGF.emitManagedRValueWithCleanup(upcast);
       }
     }
   }
