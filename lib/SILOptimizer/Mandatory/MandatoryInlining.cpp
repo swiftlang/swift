@@ -104,6 +104,65 @@ static void fixupReferenceCounts(SILBasicBlock::iterator I, SILLocation Loc,
       B.emitCopyValueOperation(Loc, CaptureArg);
 }
 
+static SILValue cleanupLoadedCalleeValue(SILValue CalleeValue, LoadInst *LI) {
+  auto *PBI = cast<ProjectBoxInst>(LI->getOperand());
+  auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
+
+  // The load instruction must have no more uses left to erase it.
+  if (!LI->use_empty())
+    return SILValue();
+  LI->eraseFromParent();
+
+  // Look through uses of the alloc box the load is loading from to find up to
+  // one store and up to one strong release.
+  StrongReleaseInst *SRI = nullptr;
+  for (Operand *ABIUse : ABI->getUses()) {
+    if (SRI == nullptr && isa<StrongReleaseInst>(ABIUse->getUser())) {
+      SRI = cast<StrongReleaseInst>(ABIUse->getUser());
+      continue;
+    }
+
+    if (ABIUse->getUser() == PBI)
+      continue;
+
+    return SILValue();
+  }
+
+  StoreInst *SI = nullptr;
+  for (Operand *PBIUse : PBI->getUses()) {
+    if (SI == nullptr && isa<StoreInst>(PBIUse->getUser())) {
+      SI = cast<StoreInst>(PBIUse->getUser());
+      continue;
+    }
+
+    return SILValue();
+  }
+
+  // If we found a store, record its source and erase it.
+  if (SI) {
+    CalleeValue = SI->getSrc();
+    SI->eraseFromParent();
+  } else {
+    CalleeValue = SILValue();
+  }
+
+  // If we found a strong release, replace it with a strong release of the
+  // source of the store and erase it.
+  if (SRI) {
+    if (CalleeValue)
+      SILBuilderWithScope(SRI).emitStrongReleaseAndFold(SRI->getLoc(),
+                                                        CalleeValue);
+    SRI->eraseFromParent();
+  }
+
+  assert(PBI->use_empty());
+  PBI->eraseFromParent();
+  assert(ABI->use_empty());
+  ABI->eraseFromParent();
+
+  return CalleeValue;
+}
+
 /// \brief Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
 static void
@@ -118,64 +177,14 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   }
   recursivelyDeleteTriviallyDeadInstructions(InstsToDelete, true);
 
-  // Handle the case where the callee of the apply is a load instruction.
+  // Handle the case where the callee of the apply is a load instruction. If we
+  // fail to optimize, return. Otherwise, see if we can look through other
+  // abstractions on our callee.
   if (auto *LI = dyn_cast<LoadInst>(CalleeValue)) {
-    auto *PBI = cast<ProjectBoxInst>(LI->getOperand());
-    auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
-
-    // The load instruction must have no more uses left to erase it.
-    if (!LI->use_empty())
-      return;
-    LI->eraseFromParent();
-
-    // Look through uses of the alloc box the load is loading from to find up to
-    // one store and up to one strong release.
-    StrongReleaseInst *SRI = nullptr;
-    for (Operand *ABIUse : ABI->getUses()) {
-      if (SRI == nullptr && isa<StrongReleaseInst>(ABIUse->getUser())) {
-        SRI = cast<StrongReleaseInst>(ABIUse->getUser());
-        continue;
-      }
-
-      if (ABIUse->getUser() == PBI)
-        continue;
-
+    CalleeValue = cleanupLoadedCalleeValue(CalleeValue, LI);
+    if (!CalleeValue) {
       return;
     }
-
-    StoreInst *SI = nullptr;
-    for (Operand *PBIUse : PBI->getUses()) {
-      if (SI == nullptr && isa<StoreInst>(PBIUse->getUser())) {
-        SI = cast<StoreInst>(PBIUse->getUser());
-        continue;
-      }
-
-      return;
-    }
-
-    // If we found a store, record its source and erase it.
-    if (SI) {
-      CalleeValue = SI->getSrc();
-      SI->eraseFromParent();
-    } else {
-      CalleeValue = SILValue();
-    }
-
-    // If we found a strong release, replace it with a strong release of the
-    // source of the store and erase it.
-    if (SRI) {
-      if (CalleeValue)
-        SILBuilderWithScope(SRI)
-            .emitStrongReleaseAndFold(SRI->getLoc(), CalleeValue);
-      SRI->eraseFromParent();
-    }
-
-    assert(PBI->use_empty());
-    PBI->eraseFromParent();
-    assert(ABI->use_empty());
-    ABI->eraseFromParent();
-    if (!CalleeValue)
-      return;
   }
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(CalleeValue)) {
