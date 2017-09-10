@@ -709,8 +709,12 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
                                       defaultMap,
                                       hasTrailingClosure,
                                       cs.shouldAttemptFixes(), listener,
-                                      parameterBindings))
+                                      parameterBindings)) {
+    if (cs.solverState)
+      cs.solverState->recordFailure(argType, paramType, kind, locator);
+
     return ConstraintSystem::SolutionKind::Error;
+  }
 
   // Check the argument types for each of the parameters.
   ConstraintSystem::TypeMatchOptions subflags =
@@ -1596,17 +1600,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
         // If the left-hand type variable cannot bind to an lvalue,
         // but we still have an lvalue, fail.
-        if (!typeVar1->getImpl().canBindToLValue() &&
-            type2->hasLValueType())
+        if (!typeVar1->getImpl().canBindToLValue() && type2->hasLValueType()) {
+          if (solverState)
+            solverState->recordFailure(typeVar1, type2, kind, locator);
           return SolutionKind::Error;
+        }
 
         // Okay. Bind below.
 
         // Check whether the type variable must be bound to a materializable
         // type.
         if (typeVar1->getImpl().mustBeMaterializable()) {
-          if (!type2->isMaterializable())
+          if (!type2->isMaterializable()) {
+            if (solverState)
+              solverState->recordFailure(typeVar1, type2, kind, locator);
             return SolutionKind::Error;
+          }
 
           setMustBeMaterializableRecursive(type2);
         }
@@ -1646,6 +1655,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       if (!typeVar2->getImpl().canBindToLValue() &&
           type1->hasLValueType()) {
+        if (solverState)
+          solverState->recordFailure(type1, typeVar2, kind, locator);
         return SolutionKind::Error;
         
         // Okay. Bind below.
@@ -1791,6 +1802,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (!typeVar1 && !typeVar2) {
       if (isa<ParenType>(type1.getPointer()) !=
           isa<ParenType>(type2.getPointer())) {
+        if (solverState)
+          solverState->recordFailure(type1, type2, kind, locator);
         return SolutionKind::Error;
       }
     }
@@ -1953,9 +1966,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::InOut:
       // If the RHS is an inout type, the LHS must be an @lvalue type.
       if (kind == ConstraintKind::BindParam ||
-          kind >= ConstraintKind::OperatorArgumentConversion)
+          kind >= ConstraintKind::OperatorArgumentConversion) {
+        if (solverState)
+          solverState->recordFailure(desugar1, desugar2, kind, locator);
         return SolutionKind::Error;
-      
+      }
+
       return matchTypes(cast<InOutType>(desugar1)->getObjectType(),
                         cast<InOutType>(desugar2)->getObjectType(),
                         ConstraintKind::Equal, subflags,
@@ -2414,6 +2430,8 @@ commit_to_conversions:
     if (isTypeVarOrMember1 || isTypeVarOrMember2)
       return formUnsolvedResult();
 
+    if (solverState)
+      solverState->recordFailure(type1, type2, kind, locator);
     return SolutionKind::Error;
   }
 

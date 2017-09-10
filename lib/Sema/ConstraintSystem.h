@@ -63,6 +63,188 @@ namespace swift {
 
 namespace constraints {
 
+class TypeMismatch {
+public:
+  Type LHS, RHS;
+
+private:
+  ConstraintKind MatchKind;
+  ConstraintLocator *Locator;
+
+public:
+  TypeMismatch(Type lhs, Type rhs, ConstraintKind kind,
+               ConstraintLocator *locator)
+      : LHS(lhs), RHS(rhs), MatchKind(kind), Locator(locator) {}
+
+  ConstraintLocator *getLocator() const { return Locator; }
+
+  bool isEqual(const TypeMismatch &other) const {
+    return LHS->isEqual(other.LHS) && RHS->isEqual(other.RHS) &&
+           MatchKind == other.MatchKind && Locator == other.Locator;
+  }
+
+  void print(llvm::raw_ostream &log, SourceManager *SM, unsigned depth) const {
+    log.indent(depth * 2) << "(LHS: " << LHS->getString() << ","
+                          << " RHS: " << RHS->getString() << ","
+                          << " Loc: ";
+
+    Locator->dump(SM, log);
+    log << ")";
+  }
+};
+
+class ConstraintFailure {
+  Constraint *FailedConstraint;
+  SmallVector<TypeMismatch, 8> Errors;
+
+public:
+  ConstraintFailure(Constraint *constraint, ArrayRef<TypeMismatch> errors)
+      : FailedConstraint(constraint) {
+    Errors.append(errors.begin(), errors.end());
+  }
+
+  // ConstraintFailure is a non-copyable type for performance reasons.
+  ConstraintFailure(const ConstraintFailure &other) = delete;
+  ConstraintFailure &operator=(const ConstraintFailure &other) = delete;
+
+  ConstraintFailure(ConstraintFailure &&other) = default;
+  ConstraintFailure &operator=(ConstraintFailure &&other) = default;
+
+  Constraint *getConstraint() const { return FailedConstraint; }
+
+  bool hasErrors() const { return !Errors.empty(); }
+
+  ArrayRef<TypeMismatch> getErrors() const { return Errors; }
+};
+
+class SolverStep {
+  const std::shared_ptr<SolverStep> Parent;
+  const unsigned Depth;
+
+  Optional<std::pair<Constraint *, unsigned>> Choice;
+  SmallVector<ConstraintFailure, 8> Failures;
+
+  SmallVector<std::shared_ptr<SolverStep>, 8> NextSteps;
+
+public:
+  SolverStep(std::shared_ptr<SolverStep> parent, unsigned depth)
+      : Parent(parent), Depth(depth) {}
+
+  SolverStep(std::shared_ptr<SolverStep> parent, Constraint *disjunction,
+             unsigned choice)
+      : Parent(parent), Depth(parent->getDepth() + 1),
+        Choice(std::make_pair(disjunction, choice)) {}
+
+  std::shared_ptr<SolverStep> getParent() { return Parent; }
+
+  void add(std::shared_ptr<SolverStep> step) { NextSteps.push_back(step); }
+
+  ArrayRef<std::shared_ptr<SolverStep>> getNextSteps() const {
+    return NextSteps;
+  }
+
+  Optional<std::pair<Constraint *, unsigned>> getChoice() const {
+    return Choice;
+  }
+
+  unsigned getDepth() const { return Depth; }
+
+  bool hasFailures() const { return !Failures.empty(); }
+
+  ArrayRef<ConstraintFailure> getFailures() const { return Failures; }
+
+  bool isViable() const {
+    // If there is something already linked
+    // to this step, we can't drop it, but
+    // that also means that it doesn't have
+    // any failures.
+    if (!NextSteps.empty())
+      return true;
+
+    // If there is only one failure, let's
+    // if if it brings any interesting information.
+    if (Failures.size() == 1) {
+      auto &failure = Failures.front();
+      auto *constraint = failure.getConstraint();
+
+      // If the only thing which failed is function
+      // application itself without any further clarification,
+      // let's drop this step.
+      if (constraint->getKind() == ConstraintKind::ApplicableFunction &&
+          !failure.hasErrors())
+        return false;
+    }
+
+    return true;
+  }
+
+  void recordFailure(Constraint *constraint, ArrayRef<TypeMismatch> errors) {
+    Failures.push_back({constraint, errors});
+  }
+
+  void print(ConstraintSystem &cs, llvm::raw_ostream &log) const;
+};
+
+class DiagnosticListener {
+  typedef std::shared_ptr<SolverStep> Step;
+
+  Step Root;
+  Step CurrentStep;
+
+  /// Tracks all type match failures encountered per step in the solver path.
+  SmallVector<TypeMismatch, 8> LocalFailures;
+
+  unsigned LongestPath = 0;
+
+public:
+  DiagnosticListener()
+      : Root(std::make_shared<SolverStep>(nullptr, 0)), CurrentStep(Root) {}
+
+  std::shared_ptr<SolverStep> getRoot() {
+    return Root;
+  }
+
+  unsigned getLongestPath() const { return LongestPath; }
+
+  void forEach(std::function<bool(Step)> processor) const {
+    SmallVector<Step, 16> steps;
+    steps.push_back(Root);
+
+    do {
+      auto current = steps.back();
+      steps.pop_back();
+
+      if (processor(current))
+        break;
+
+      for (auto nextStep : current->getNextSteps())
+        steps.push_back(nextStep);
+    } while (!steps.empty());
+  }
+
+  void incrementDepth(Constraint *disjunction, unsigned idx) {
+    CurrentStep = std::make_shared<SolverStep>(CurrentStep, disjunction, idx);
+    LongestPath = std::max(LongestPath, CurrentStep->getDepth());
+  }
+
+  void decrementDepth() {
+    auto parent = CurrentStep->getParent();
+    if (CurrentStep->isViable())
+      parent->add(CurrentStep);
+
+    CurrentStep = parent;
+  }
+
+  void recordFailure(Constraint *constraint) {
+    CurrentStep->recordFailure(constraint, LocalFailures);
+    LocalFailures.clear();
+  }
+
+  void recordFailure(Type lhs, Type rhs, ConstraintKind matchKind,
+                     ConstraintLocator *locator) {
+    LocalFailures.push_back({lhs, rhs, matchKind, locator});
+  }
+};
 /// \brief A handle that holds the saved state of a type variable, which
 /// can be restored.
 class SavedTypeVariableBinding {
@@ -1093,6 +1275,7 @@ private:
     }
   };
 
+private:
   /// \brief Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs);
@@ -1125,9 +1308,39 @@ private:
     /// Refers to the innermost partial solution scope.
     SolverScope *PartialSolutionScope = nullptr;
 
+    /// \brief Tracks diagnostic information e.g. each solver
+    /// path taken, constraint failures, type mismatches etc.
+    DiagnosticListener *Diagnostics = nullptr;
+
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
+
+    void incrementDepth(Constraint *disjunction, unsigned choice) {
+      ++depth;
+
+      if (Diagnostics)
+        Diagnostics->incrementDepth(disjunction, choice);
+    }
+
+    void decrementDepth() {
+      --depth;
+
+      if (Diagnostics)
+        Diagnostics->decrementDepth();
+    }
+
+    void recordFailure(Constraint *constraint) {
+      if (Diagnostics)
+        Diagnostics->recordFailure(constraint);
+    }
+
+    void recordFailure(Type lhs, Type rhs, ConstraintKind matchKind,
+                       ConstraintLocatorBuilder &locator) {
+      if (Diagnostics)
+        Diagnostics->recordFailure(lhs, rhs, matchKind,
+                                   CS.getConstraintLocator(locator));
+    }
 
     /// \brief Register given scope to be tracked by the current solver state,
     /// this helps to make sure that all of the retired/generated constraints
@@ -1463,6 +1676,15 @@ private:
         ConstraintSystemFlags::ReturnAllDiscoveredSolutions);
   }
 
+  /// \brief Select the best disjunction in current conditions to attempt
+  /// to solve next.
+  ///
+  /// \param disjunctions The list of currently available disjunctions.
+  ///
+  /// \returns the disjunction to solve next, or nullptr.
+  Constraint *
+  selectDisjunction(SmallVectorImpl<Constraint *> &disjunctions) const;
+
   /// \brief Finalize this constraint system; we're done attempting to solve
   /// it.
   ///
@@ -1697,7 +1919,14 @@ public:
   /// invalid, emit a detailed error about the condition.
   void diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
 
-  
+  /// \brief Generate a diagnosis of why the system could not be solved.
+  ///
+  /// \param capturedInfo The information captured from the solver
+  /// which identifies each solver path taken, constraint failures etc.
+  ///
+  /// \returns true if diagnostic was provided, false otherwise.
+  bool diagnoseFailure(DiagnosticListener &capturedInfo);
+
   /// \brief Mine the active and inactive constraints in the constraint
   /// system to generate a plausible diagnosis of why the system could not be
   /// solved.

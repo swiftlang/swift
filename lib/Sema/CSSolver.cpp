@@ -341,8 +341,10 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
         failedConstraint = constraint;
       }
 
-      if (solverState)
+      if (solverState) {
+        solverState->recordFailure(constraint);
         solverState->retireConstraint(constraint);
+      }
 
       CG.removeConstraint(constraint);
       break;
@@ -448,8 +450,6 @@ ConstraintSystem::SolverState::~SolverState() {
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   : cs(cs), CGScope(cs.CG)
 {
-  ++cs.solverState->depth;
-
   resolvedOverloadSets = cs.resolvedOverloadSets;
   numTypeVariables = cs.TypeVariables.size();
   numSavedBindings = cs.solverState->savedBindings.size();
@@ -469,8 +469,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
-  --cs.solverState->depth;
-
   // Erase the end of various lists.
   cs.resolvedOverloadSets = resolvedOverloadSets;
   truncate(cs.TypeVariables, numTypeVariables);
@@ -1890,6 +1888,8 @@ bool ConstraintSystem::solveSimplified(
       DisjunctionChoices.push_back({locator, index});
     }
 
+    solverState->incrementDepth(disjunction, index);
+
     if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables)) {
       if (!currentChoice.isGenericOperatorOrUnavailable() &&
           currentChoice.isSymmetricOperator()) {
@@ -1906,6 +1906,8 @@ bool ConstraintSystem::solveSimplified(
           break;
       }
     }
+
+    solverState->decrementDepth();
 
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
