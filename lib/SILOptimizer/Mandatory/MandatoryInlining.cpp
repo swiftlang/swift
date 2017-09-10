@@ -377,16 +377,16 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
   SmallVector<SILValue, 16> CaptureArgs;
   SmallVector<SILValue, 32> FullArgs;
 
-  for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
-    for (auto I = FI->begin(), E = FI->end(); I != E; ++I) {
-      FullApplySite InnerAI = FullApplySite::isa(&*I);
+  for (auto BI = F->begin(), BE = F->end(); BI != BE; ++BI) {
+    for (auto II = BI->begin(), IE = BI->end(); II != IE; ++II) {
+      FullApplySite InnerAI = FullApplySite::isa(&*II);
 
       if (!InnerAI)
         continue;
 
       auto *ApplyBlock = InnerAI.getParent();
 
-      std::tie(InnerAI, I) = tryDevirtualizeApplyHelper(InnerAI, I, CHA);
+      std::tie(InnerAI, II) = tryDevirtualizeApplyHelper(InnerAI, II, CHA);
       if (!InnerAI)
         continue;
 
@@ -456,7 +456,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
                          SILInliner::InlineKind::MandatoryInline, ApplySubs,
                          OpenedArchetypesTracker);
       if (!Inliner.canInlineFunction(InnerAI)) {
-        I = InnerAI.getInstruction()->getIterator();
+        II = InnerAI.getInstruction()->getIterator();
         continue;
       }
 
@@ -471,7 +471,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       // If we intend to inline a thick function, then we need to balance the
       // reference counts for correctness.
-      if (IsThick && I != ApplyBlock->begin()) {
+      if (IsThick && II != ApplyBlock->begin()) {
         // We need to find an appropriate location for our fix up code
         // We used to do this after inlining Without any modifications
         // This caused us to add a release in a wrong place:
@@ -485,18 +485,18 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         // If that occurred we'd need to undo our fix up code.
         // Instead, we split the current basic block -
         // Making sure we have a basic block that starts with our apply.
-        SILBuilderWithScope B(I);
-        ApplyBlock = splitBasicBlockAndBranch(B, &*I, nullptr, nullptr);
-        I = ApplyBlock->begin();
+        SILBuilderWithScope B(II);
+        ApplyBlock = splitBasicBlockAndBranch(B, &*II, nullptr, nullptr);
+        II = ApplyBlock->begin();
       }
 
       // Decrement our iterator (carefully, to avoid going off the front) so it
       // is valid after inlining is done.  Inlining deletes the apply, and can
       // introduce multiple new basic blocks.
-      if (I != ApplyBlock->begin())
-        --I;
+      if (II != ApplyBlock->begin())
+        --II;
       else
-        I = ApplyBlock->end();
+        II = ApplyBlock->end();
 
       Inliner.inlineFunction(InnerAI, FullArgs);
 
@@ -504,25 +504,25 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       InnerAI.getInstruction()->eraseFromParent();
 
       // Reestablish our iterator if it wrapped.
-      if (I == ApplyBlock->end())
-        I = ApplyBlock->begin();
+      if (II == ApplyBlock->end())
+        II = ApplyBlock->begin();
 
       // Update the iterator when instructions are removed.
-      DeleteInstructionsHandler DeletionHandler(I);
+      DeleteInstructionsHandler DeletionHandler(II);
 
       // If the inlined apply was a thick function, then we need to balance the
       // reference counts for correctness.
       if (IsThick)
-        fixupReferenceCounts(I, Loc, CalleeValue, CaptureArgs);
+        fixupReferenceCounts(II, Loc, CalleeValue, CaptureArgs);
 
       // Now that the IR is correct, see if we can remove dead callee
       // computations (e.g. dead partial_apply closures).
       cleanupCalleeValue(CalleeValue, CaptureArgs, FullArgs);
 
       // Reposition iterators possibly invalidated by mutation.
-      FI = SILFunction::iterator(ApplyBlock);
-      E = ApplyBlock->end();
-      assert(FI == SILFunction::iterator(I->getParent()) &&
+      BI = SILFunction::iterator(ApplyBlock);
+      IE = ApplyBlock->end();
+      assert(BI == SILFunction::iterator(II->getParent()) &&
              "Mismatch between the instruction and basic block");
       ++NumMandatoryInlines;
     }
