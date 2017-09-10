@@ -23,10 +23,11 @@
 #include "llvm/ADT/ImmutableSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+
 using namespace swift;
 
-typedef llvm::DenseSet<SILFunction*> DenseFunctionSet;
-typedef llvm::ImmutableSet<SILFunction*> ImmutableFunctionSet;
+using DenseFunctionSet = llvm::DenseSet<SILFunction *>;
+using ImmutableFunctionSet = llvm::ImmutableSet<SILFunction *>;
 
 STATISTIC(NumMandatoryInlines,
           "Number of function application sites inlined by the mandatory "
