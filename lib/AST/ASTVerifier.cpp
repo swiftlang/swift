@@ -2044,6 +2044,44 @@ public:
         }
       }
 
+      if (auto getter = ASD->getGetter()) {
+        if (getter->isMutating() != ASD->isGetterMutating()) {
+          Out << "AbstractStorageDecl::isGetterMutating is out of sync"
+                 " with whether the getter is actually mutating";
+          abort();
+        }
+      }
+      if (auto setter = ASD->getSetter()) {
+        if (setter->isMutating() != ASD->isSetterMutating()) {
+          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
+                 " with whether the setter is actually mutating";
+          abort();
+        }
+      }
+      if (auto materializeForSet = ASD->getMaterializeForSetFunc()) {
+        if (materializeForSet->isMutating() != ASD->isSetterMutating()) {
+          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
+                 " with whether materializeForSet is mutating";
+          abort();
+        }
+      }
+      if (ASD->hasAddressors()) {
+        if (auto addressor = ASD->getAddressor()) {
+          if (addressor->isMutating() != ASD->isGetterMutating()) {
+            Out << "AbstractStorageDecl::isGetterMutating is out of sync"
+                   " with whether immutable addressor is mutating";
+            abort();
+          }
+        }
+        if (auto addressor = ASD->getMutableAddressor()) {
+          if (addressor->isMutating() != ASD->isSetterMutating()) {
+            Out << "AbstractStorageDecl::isSetterMutating is out of sync"
+                   " with whether mutable addressor is mutating";
+            abort();
+          }
+        }
+      }
+
       // Make sure we consistently set accessor overrides.
       if (auto *baseASD = ASD->getOverriddenDecl()) {
         if (ASD->getGetter() && baseASD->getGetter())

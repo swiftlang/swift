@@ -2894,6 +2894,8 @@ void Serializer::writeDecl(const Decl *D) {
                           var->isStatic(),
                           getRawStableVarDeclSpecifier(var->getSpecifier()),
                           var->hasNonPatternBindingInit(),
+                          var->isGetterMutating(),
+                          var->isSetterMutating(),
                           (unsigned) accessors.Kind,
                           addTypeRef(ty),
                           addDeclRef(accessors.Get),
@@ -3047,6 +3049,8 @@ void Serializer::writeDecl(const Decl *D) {
                                 contextID,
                                 subscript->isImplicit(),
                                 subscript->isObjC(),
+                                subscript->isGetterMutating(),
+                                subscript->isSetterMutating(),
                                 (unsigned) accessors.Kind,
                                 addGenericEnvironmentRef(
                                             subscript->getGenericEnvironment()),

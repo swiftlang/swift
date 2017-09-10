@@ -3964,7 +3964,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
         continue;
       }
       // A nonmutating setter indicates a reference-writable base.
-      if (storage->isSetterNonMutating()) {
+      if (!storage->isSetterMutating()) {
         capability = ReferenceWritable;
         continue;
       }

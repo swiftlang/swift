@@ -1451,7 +1451,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     bool mutatingGetter = ASD->getGetter() && ASD->isGetterMutating();
     bool settable = ASD->isSettable(nullptr);
     bool nonmutatingSetter = false;
-    if (settable && ASD->isSetterNonMutating() && ASD->isInstanceMember() &&
+    if (settable && !ASD->isSetterMutating() && ASD->isInstanceMember() &&
         !ASD->getDeclContext()->getDeclaredTypeInContext()
             ->hasReferenceSemantics())
       nonmutatingSetter = true;

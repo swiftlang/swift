@@ -508,14 +508,11 @@ enum TypeResolutionFlags : unsigned {
   /// Whether we are in a type argument for an optional
   TR_ImmediateOptionalTypeArgument = 0x800000,
 
-  /// Whether we are checking the outermost type of a computed property setter's newValue
-  TR_ImmediateSetterNewValue = 0x1000000,
-
   /// Whether we are checking the underlying type of a typealias.
-  TR_TypeAliasUnderlyingType = 0x2000000,
+  TR_TypeAliasUnderlyingType = 0x1000000,
 
   /// Whether we are checking the parameter list of a subscript.
-  TR_SubscriptParameters = 0x4000000,
+  TR_SubscriptParameters = 0x2000000,
 };
 
 /// Option set describing how type resolution should work.
@@ -686,10 +683,10 @@ public:
   /// completed before type checking is considered complete.
   llvm::SetVector<NormalProtocolConformance *> UsedConformances;
 
-  /// The list of nominal type declarations that we've done at least
-  /// partial validation of during type-checking and which will need
-  /// to be finalized before we can hand off to SILGen etc.
-  llvm::SetVector<NominalTypeDecl *> TypesToFinalize;
+  /// The list of declarations that we've done at least partial validation
+  /// of during type-checking, but which will need to be finalized before
+  /// we can hand them off to SILGen etc.
+  llvm::SetVector<ValueDecl *> DeclsToFinalize;
 
   /// The list of types whose circularity checks were delayed.
   SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
@@ -1045,6 +1042,10 @@ public:
   /// Validate the given extension declaration, ensuring that it
   /// properly extends the nominal type it names.
   void validateExtension(ExtensionDecl *ext);
+
+  /// Perform final validation of a declaration after everything in the
+  /// translation unit has been processed.
+  void finalizeDecl(ValueDecl *D);
 
   /// \brief Force all members of an external decl, and also add its
   /// conformances.

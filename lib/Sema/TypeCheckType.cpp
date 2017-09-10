@@ -1547,10 +1547,6 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     // Raise error if we parse an IUO type in an illegal position.
     checkForIllegalIUOs(*this, Loc.getTypeRepr(), options);
 
-    // Special case: in computed property setter, newValue closure is escaping
-    if (isa<FuncDecl>(DC) && cast<FuncDecl>(DC)->isSetter())
-      options |= TR_ImmediateSetterNewValue;
-
     auto type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
                             unsatisfiedDependency);
     if (!type) {
@@ -1697,9 +1693,6 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
     options -= TR_TypeAliasUnderlyingType;
   }
 
-  bool isImmediateSetterNewValue = options.contains(TR_ImmediateSetterNewValue);
-  options -= TR_ImmediateSetterNewValue;
-
   if (Context.LangOpts.DisableAvailabilityChecking)
     options |= TR_AllowUnavailable;
 
@@ -1725,7 +1718,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
       // Default non-escaping for closure parameters
       auto result =
           resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
-      if (result && result->is<FunctionType>() && !isImmediateSetterNewValue)
+      if (result && result->is<FunctionType>())
         return applyNonEscapingFromContext(DC, result, options);
       return result;
     }

@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 362; // Last change: associated type inherited clause
+const uint16_t VERSION_MINOR = 363; // Last change: storage get/set mutating
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -910,6 +910,8 @@ namespace decls_block {
     BCFixed<1>,   // static?
     VarDeclSpecifierField,   // specifier
     BCFixed<1>,   // HasNonPatternBindingInit?
+    BCFixed<1>,   // is getter mutating?
+    BCFixed<1>,   // is setter mutating?
     StorageKindField,   // StorageKind
     TypeIDField,  // interface type
     DeclIDField,  // getter
@@ -1018,6 +1020,8 @@ namespace decls_block {
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
+    BCFixed<1>,   // is getter mutating?
+    BCFixed<1>,   // is setter mutating?
     StorageKindField,   // StorageKind
     GenericEnvironmentIDField, // generic environment
     TypeIDField, // interface type
