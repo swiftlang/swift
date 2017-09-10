@@ -502,10 +502,7 @@ sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: [[BB2]](
   // CHECK: br [[BB5:.*]](
 
-// CHECK: bb3:
-  // CHECK: br bb4
-
-// CHECK: [[BB4]]:
+// CHECK: [[BB3]]:
   // CHECK: strong_retain [[VAL4:%[0-9]*]]
   // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
   // CHECK: {{%.*}} = tuple ()
@@ -541,16 +538,13 @@ sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
 
   // CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB3:bb[0-9]+]]
 
-// CHECK: bb1:
+// CHECK: [[BB1]]:
   // CHECK: br [[BB2:.*]](
 
 // CHECK: [[BB2]](
   // CHECK: br [[BB5:.*]](
 
-// CHECK: bb3:
-  // CHECK: br bb4
-
-// CHECK: [[BB4]]:
+// CHECK: [[BB3]]:
   // CHECK: strong_retain [[VAL4:%[0-9]*]]
   // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
   // CHECK: {{%.*}} = tuple ()
@@ -849,8 +843,6 @@ bb0(%0 : $@callee_owned () -> Builtin.Int8):
 // CHECK-LABEL: sil @testouter_transparent
 sil @testouter_transparent : $@convention(thin) (Builtin.Int8) -> Builtin.Int8 {
 // CHECK: bb0
-// CHECK-NEXT: br bb1
-// CHECK: bb1
 // CHECK-NEXT: return
 bb0(%0 : $Builtin.Int8):
   %2 = function_ref @outer_transparent : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
