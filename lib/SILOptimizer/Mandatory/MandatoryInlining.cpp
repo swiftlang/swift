@@ -395,6 +395,10 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       auto *ApplyBlock = InnerAI.getParent();
 
+      // *NOTE* If devirtualization succeeds, sometimes II will not be InnerAI,
+      // but a casted result of InnerAI or even a block argument due to
+      // abstraction changes when calling the witness or class method. We still
+      // know that InnerAI dominates II though.
       std::tie(InnerAI, II) = tryDevirtualizeApplyHelper(InnerAI, II, CHA);
       if (!InnerAI)
         continue;
@@ -465,6 +469,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
                          SILInliner::InlineKind::MandatoryInline, ApplySubs,
                          OpenedArchetypesTracker);
       if (!Inliner.canInlineFunction(InnerAI)) {
+        // See comment above about casting when devirtualizing and how this
+        // sometimes causes II and InnerAI to be different and even in different
+        // blocks.
         II = InnerAI.getInstruction()->getIterator();
         continue;
       }
