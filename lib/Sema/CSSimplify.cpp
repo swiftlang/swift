@@ -1473,6 +1473,65 @@ static bool isBindable(TypeVariableType *typeVar, Type type) {
          !type->is<DependentMemberType>();
 }
 
+ConstraintSystem::SolutionKind ConstraintSystem::matchTypesBindTypeVar(
+    TypeVariableType *typeVar, Type type, ConstraintKind kind,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator,
+    std::function<SolutionKind()> formUnsolvedResult) {
+  assert(typeVar->is<TypeVariableType>() && "Expected a type variable!");
+  // FIXME: Due to some SE-0110 related code farther up we can end
+  // up with type variables wrapped in parens that will trip this
+  // assert. For now, maintain the existing behavior.
+  // assert(!type->is<TypeVariableType>() && "Expected a non-type variable!");
+
+  // Simplify the right-hand type and perform the "occurs" check.
+  typeVar = getRepresentative(typeVar);
+  type = simplifyType(type, flags);
+  if (!isBindable(typeVar, type))
+    return formUnsolvedResult();
+
+  // Equal constraints allow mixed LValue/RValue bindings, but
+  // if we bind a type to a type variable that can bind to
+  // LValues as part of simplifying the Equal constraint we may
+  // later block a binding of the opposite "LValue-ness" to the
+  // same type variable that happens as part of simplifying
+  // another constraint.
+  if (kind == ConstraintKind::Equal) {
+    if (typeVar->getImpl().canBindToLValue())
+      return formUnsolvedResult();
+
+    type = type->getRValueType();
+  }
+
+  // If the left-hand type variable cannot bind to an lvalue,
+  // but we still have an lvalue, fail.
+  if (!typeVar->getImpl().canBindToLValue() && type->hasLValueType())
+    return SolutionKind::Error;
+
+  // Okay. Bind below.
+
+  // Check whether the type variable must be bound to a materializable
+  // type.
+  if (typeVar->getImpl().mustBeMaterializable()) {
+    if (!type->isMaterializable())
+      return SolutionKind::Error;
+
+    setMustBeMaterializableRecursive(type);
+  }
+
+  // A constraint that binds any pointer to a void pointer is
+  // ineffective, since any pointer can be converted to a void pointer.
+  if (kind == ConstraintKind::BindToPointerType && type->isVoid()) {
+    // Bind type1 to Void only as a last resort.
+    addConstraint(ConstraintKind::Defaultable, typeVar, type,
+                  getConstraintLocator(locator));
+    return SolutionKind::Solved;
+  }
+
+  assignFixedType(typeVar, type);
+
+  return SolutionKind::Solved;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
@@ -1573,67 +1632,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return SolutionKind::Solved;
       }
 
-      TypeVariableType *typeVar;
-      Type type;
-      if (typeVar1) {
-        assert(!type2->is<TypeVariableType>() && "Unexpected type variable!");
-        typeVar = typeVar1;
-        type = type2;
-      } else {
-        typeVar = typeVar2;
-        type = type1;
-      }
+      assert((type1->is<TypeVariableType>() || type2->is<TypeVariableType>()) &&
+             "Expected a type variable!");
+      // FIXME: Due to some SE-0110 related code farther up we can end
+      // up with type variables wrapped in parens that will trip this
+      // assert. For now, maintain the existing behavior.
+      // assert(
+      //     (!type1->is<TypeVariableType>() || !type2->is<TypeVariableType>())
+      //     && "Expected a non-type variable!");
 
-      // Provide a fixed type for the type variable.
+      auto *typeVar = typeVar1 ? typeVar1 : typeVar2;
+      auto type = typeVar1 ? type2 : type1;
 
-      // Simplify the right-hand type and perform the "occurs" check.
-      typeVar = getRepresentative(typeVar);
-      type = simplifyType(type, flags);
-      if (!isBindable(typeVar, type))
-        return formUnsolvedResult();
-
-      // Equal constraints allow mixed LValue/RValue bindings, but
-      // if we bind a type to a type variable that can bind to
-      // LValues as part of simplifying the Equal constraint we may
-      // later block a binding of the opposite "LValue-ness" to the
-      // same type variable that happens as part of simplifying
-      // another constraint.
-      if (kind == ConstraintKind::Equal) {
-        if (typeVar->getImpl().canBindToLValue())
-          return formUnsolvedResult();
-
-        type = type->getRValueType();
-      }
-
-      // If the left-hand type variable cannot bind to an lvalue,
-      // but we still have an lvalue, fail.
-      if (!typeVar->getImpl().canBindToLValue() &&
-          type->hasLValueType())
-        return SolutionKind::Error;
-
-      // Okay. Bind below.
-
-      // Check whether the type variable must be bound to a materializable
-      // type.
-      if (typeVar->getImpl().mustBeMaterializable()) {
-        if (!type->isMaterializable())
-          return SolutionKind::Error;
-
-        setMustBeMaterializableRecursive(type);
-      }
-
-      // A constraint that binds any pointer to a void pointer is
-      // ineffective, since any pointer can be converted to a void pointer.
-      if (kind == ConstraintKind::BindToPointerType && type->isVoid()) {
-        // Bind type1 to Void only as a last resort.
-        addConstraint(ConstraintKind::Defaultable, typeVar, type,
-                      getConstraintLocator(locator));
-        return SolutionKind::Solved;
-      }
-
-      assignFixedType(typeVar, type);
-
-      return SolutionKind::Solved;
+      return matchTypesBindTypeVar(typeVar, type, kind, flags, locator,
+                                   formUnsolvedResult);
     }
 
     case ConstraintKind::BindParam: {
