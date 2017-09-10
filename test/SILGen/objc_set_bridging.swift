@@ -50,11 +50,11 @@ import gizmo
   var property: Set<Foo> = Set()
 
   // Property getter
-  // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}fgTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet
+  // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}vgTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet
   // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[SELF_COPY]] = copy_value [[SELF]] : $Foo
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
-  // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}fg : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
+  // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
   // CHECK:   [[SET:%[0-9]+]] = apply [[GETTER]]([[BORROWED_SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
   // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]]
@@ -64,10 +64,10 @@ import gizmo
   // CHECK:   end_borrow [[BORROWED_SET]] from [[SET]]
   // CHECK:   destroy_value [[SET]]
   // CHECK:   return [[NSSET]] : $NSSet
-  // CHECK: } // end sil function '_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}fgTo'
+  // CHECK: } // end sil function '_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}vgTo'
   
   // Property setter
-  // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}fsTo : $@convention(objc_method) (NSSet, Foo) -> () {
+  // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}vsTo : $@convention(objc_method) (NSSet, Foo) -> () {
   // CHECK: bb0([[NSSET:%[0-9]+]] : @unowned $NSSet, [[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[NSSET_COPY:%.*]] = copy_value [[NSSET]] : $NSSet
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
@@ -76,14 +76,14 @@ import gizmo
   // CHECK:   [[SET_META:%[0-9]+]] = metatype $@thin Set<Foo>.Type
   // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]], [[SET_META]])
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
-  // CHECK:   [[SETTER:%[0-9]+]] = function_ref @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}fs : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
+  // CHECK:   [[SETTER:%[0-9]+]] = function_ref @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}vs : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[SETTER]]([[SET]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
   // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]] : $Foo
   // CHECK:   return [[RESULT]] : $()
   
-  // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}fgTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet
-  // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}fsTo : $@convention(objc_method) (NSSet, Foo) -> () {
+  // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}vgTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet
+  // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}vsTo : $@convention(objc_method) (NSSet, Foo) -> () {
   @objc var nonVerbatimProperty: Set<String> = Set()
 }
 

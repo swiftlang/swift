@@ -7,20 +7,20 @@
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
-// CHECK: @_T016class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvWvd = {{(protected )?}}global [[INT]] 0
-// CHECK: @_T016class_resilience26ClassWithResilientPropertyC5colors5Int32VvWvd = {{(protected )?}}global [[INT]] 0
+// CHECK: @_T016class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd = {{(protected )?}}global [[INT]] 0
+// CHECK: @_T016class_resilience26ClassWithResilientPropertyC5colors5Int32VvpWvd = {{(protected )?}}global [[INT]] 0
 
-// CHECK: @_T016class_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvWvd = {{(protected )?}}global [[INT]] 0
-// CHECK: @_T016class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvWvd = {{(protected )?}}global [[INT]] 0
+// CHECK: @_T016class_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvpWvd = {{(protected )?}}global [[INT]] 0
+// CHECK: @_T016class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvpWvd = {{(protected )?}}global [[INT]] 0
 
-// CHECK: @_T016class_resilience14ResilientChildC5fields5Int32VvWvd = {{(protected )?}}global [[INT]] {{12|16}}
-// CHECK: @_T016class_resilience21ResilientGenericChildC5fields5Int32VvWvi = {{(protected )?}}global [[INT]] {{56|88}}
+// CHECK: @_T016class_resilience14ResilientChildC5fields5Int32VvpWvd = {{(protected )?}}global [[INT]] {{12|16}}
+// CHECK: @_T016class_resilience21ResilientGenericChildC5fields5Int32VvpWvi = {{(protected )?}}global [[INT]] {{56|88}}
 
-// CHECK: @_T016class_resilience28ClassWithMyResilientPropertyC1rAA0eF6StructVvWvd = {{(protected )?}}constant [[INT]] {{12|16}}
-// CHECK: @_T016class_resilience28ClassWithMyResilientPropertyC5colors5Int32VvWvd = {{(protected )?}}constant [[INT]] {{16|20}}
+// CHECK: @_T016class_resilience28ClassWithMyResilientPropertyC1rAA0eF6StructVvpWvd = {{(protected )?}}constant [[INT]] {{12|16}}
+// CHECK: @_T016class_resilience28ClassWithMyResilientPropertyC5colors5Int32VvpWvd = {{(protected )?}}constant [[INT]] {{16|20}}
 
-// CHECK: @_T016class_resilience30ClassWithIndirectResilientEnumC1s14resilient_enum10FunnyShapeOvWvd = {{(protected )?}}constant [[INT]] {{12|16}}
-// CHECK: @_T016class_resilience30ClassWithIndirectResilientEnumC5colors5Int32VvWvd = {{(protected )?}}constant [[INT]] {{16|24}}
+// CHECK: @_T016class_resilience30ClassWithIndirectResilientEnumC1s14resilient_enum10FunnyShapeOvpWvd = {{(protected )?}}constant [[INT]] {{12|16}}
+// CHECK: @_T016class_resilience30ClassWithIndirectResilientEnumC5colors5Int32VvpWvd = {{(protected )?}}constant [[INT]] {{16|24}}
 
 import resilient_class
 import resilient_struct
@@ -117,8 +117,8 @@ public class MyResilientChild : MyResilientParent {
 
 // ClassWithResilientProperty.color getter
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience26ClassWithResilientPropertyC5colors5Int32Vfg(%T16class_resilience26ClassWithResilientPropertyC* swiftself)
-// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience26ClassWithResilientPropertyC5colors5Int32VvWvd
+// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience26ClassWithResilientPropertyC5colors5Int32Vvg(%T16class_resilience26ClassWithResilientPropertyC* swiftself)
+// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience26ClassWithResilientPropertyC5colors5Int32VvpWvd
 // CHECK-NEXT: [[PTR:%.*]] = bitcast %T16class_resilience26ClassWithResilientPropertyC* %0 to i8*
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[PTR]], [[INT]] [[OFFSET]]
 // CHECK-NEXT: [[FIELD_PTR:%.*]] = bitcast i8* [[FIELD_ADDR]] to %Ts5Int32V*
@@ -146,8 +146,8 @@ public class MyResilientChild : MyResilientParent {
 
 // ClassWithResilientlySizedProperty.color getter
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32Vfg(%T16class_resilience33ClassWithResilientlySizedPropertyC* swiftself)
-// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvWvd
+// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32Vvg(%T16class_resilience33ClassWithResilientlySizedPropertyC* swiftself)
+// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvpWvd
 // CHECK-NEXT: [[PTR:%.*]] = bitcast %T16class_resilience33ClassWithResilientlySizedPropertyC* %0 to i8*
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[PTR]], [[INT]] [[OFFSET]]
 // CHECK-NEXT: [[FIELD_PTR:%.*]] = bitcast i8* [[FIELD_ADDR]] to %Ts5Int32V*
@@ -176,7 +176,7 @@ public class MyResilientChild : MyResilientParent {
 
 // ClassWithIndirectResilientEnum.color getter
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience30ClassWithIndirectResilientEnumC5colors5Int32Vfg(%T16class_resilience30ClassWithIndirectResilientEnumC* swiftself)
+// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience30ClassWithIndirectResilientEnumC5colors5Int32Vvg(%T16class_resilience30ClassWithIndirectResilientEnumC* swiftself)
 // CHECK:      [[FIELD_PTR:%.*]] = getelementptr inbounds %T16class_resilience30ClassWithIndirectResilientEnumC, %T16class_resilience30ClassWithIndirectResilientEnumC* %0, i32 0, i32 2
 // CHECK: call void @swift_beginAccess
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_PTR]], i32 0, i32 0
@@ -187,8 +187,8 @@ public class MyResilientChild : MyResilientParent {
 
 // ResilientChild.field getter
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience14ResilientChildC5fields5Int32Vfg(%T16class_resilience14ResilientChildC* swiftself)
-// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience14ResilientChildC5fields5Int32VvWvd
+// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience14ResilientChildC5fields5Int32Vvg(%T16class_resilience14ResilientChildC* swiftself)
+// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience14ResilientChildC5fields5Int32VvpWvd
 // CHECK-NEXT: [[PTR:%.*]] = bitcast %T16class_resilience14ResilientChildC* %0 to i8*
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[PTR]], [[INT]] [[OFFSET]]
 // CHECK-NEXT: [[FIELD_PTR:%.*]] = bitcast i8* [[FIELD_ADDR]] to %Ts5Int32V*
@@ -202,7 +202,7 @@ public class MyResilientChild : MyResilientParent {
 // ResilientGenericChild.field getter
 
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience21ResilientGenericChildC5fields5Int32Vfg(%T16class_resilience21ResilientGenericChildC* swiftself)
+// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience21ResilientGenericChildC5fields5Int32Vvg(%T16class_resilience21ResilientGenericChildC* swiftself)
 
 // FIXME: we could eliminate the unnecessary isa load by lazily emitting
 // metadata sources in EmitPolymorphicParameters
@@ -211,7 +211,7 @@ public class MyResilientChild : MyResilientParent {
 
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds %T16class_resilience21ResilientGenericChildC, %T16class_resilience21ResilientGenericChildC* %0, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
-// CHECK-NEXT: [[INDIRECT_OFFSET:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience21ResilientGenericChildC5fields5Int32VvWvi
+// CHECK-NEXT: [[INDIRECT_OFFSET:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience21ResilientGenericChildC5fields5Int32VvpWvi
 // CHECK-NEXT: [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to i8*
 // CHECK-NEXT: [[FIELD_OFFSET_TMP:%.*]] = getelementptr inbounds i8, i8* [[ISA_ADDR]], [[INT]] [[INDIRECT_OFFSET]]
 // CHECK-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = bitcast i8* [[FIELD_OFFSET_TMP]] to [[INT]]*
@@ -228,7 +228,7 @@ public class MyResilientChild : MyResilientParent {
 
 // MyResilientChild.field getter
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience16MyResilientChildC5fields5Int32Vfg(%T16class_resilience16MyResilientChildC* swiftself)
+// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience16MyResilientChildC5fields5Int32Vvg(%T16class_resilience16MyResilientChildC* swiftself)
 // CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds %T16class_resilience16MyResilientChildC, %T16class_resilience16MyResilientChildC* %0, i32 0, i32 2
 // CHECK:      call void @swift_beginAccess
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_ADDR]], i32 0, i32 0

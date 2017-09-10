@@ -411,7 +411,7 @@ func test_do_labeled() {
     // CHECK: apply [[BAR]](
     bar(1)
 
-    // CHECK: [[GLOBAL:%.*]] = function_ref @_T010statements11global_condSbfau
+    // CHECK: [[GLOBAL:%.*]] = function_ref @_T010statements11global_condSbvau
     // CHECK: cond_br {{%.*}}, bb2, bb3
     if (global_cond) {
       // CHECK: bb2:
@@ -426,7 +426,7 @@ func test_do_labeled() {
     // CHECK: apply [[BAR]](
     bar(2)
 
-    // CHECK: [[GLOBAL:%.*]] = function_ref @_T010statements11global_condSbfau
+    // CHECK: [[GLOBAL:%.*]] = function_ref @_T010statements11global_condSbvau
     // CHECK: cond_br {{%.*}}, bb4, bb5
     if (global_cond) {
       // CHECK: bb4:

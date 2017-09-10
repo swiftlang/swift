@@ -7,7 +7,7 @@ protocol ParentProtocol1 {
 
   /// ParentProtocol.onlyParent1Var
   var onlyParent1Var: Int { get }
-  // CHECK: Var/ParentProtocol1.onlyParent1Var {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent1Var</Name><USR>s:14swift_ide_test15ParentProtocol1P14onlyParent1VarSiv</USR><Declaration>var onlyParent1Var: Int { get }</Declaration><CommentParts><Abstract><Para>ParentProtocol.onlyParent1Var</Para></Abstract></CommentParts></Other>]
+  // CHECK: Var/ParentProtocol1.onlyParent1Var {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent1Var</Name><USR>s:14swift_ide_test15ParentProtocol1P14onlyParent1VarSivp</USR><Declaration>var onlyParent1Var: Int { get }</Declaration><CommentParts><Abstract><Para>ParentProtocol.onlyParent1Var</Para></Abstract></CommentParts></Other>]
 
   /// ParentProtocol.subscript(index:)
   subscript(index: Int) -> Int { get }
@@ -67,7 +67,7 @@ extension ChildProtocol {
 
   // Should come from ParentProtocol1.
   var onlyParent1Var: Int { return 0 }
-  // CHECK: Var/onlyParent1Var {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent1Var</Name><USR>s:14swift_ide_test15ParentProtocol1P14onlyParent1VarSiv</USR><Declaration>var onlyParent1Var: Int { get }</Declaration><CommentParts><Abstract><Para>ParentProtocol.onlyParent1Var</Para></Abstract></CommentParts></Other>]
+  // CHECK: Var/onlyParent1Var {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent1Var</Name><USR>s:14swift_ide_test15ParentProtocol1P14onlyParent1VarSivp</USR><Declaration>var onlyParent1Var: Int { get }</Declaration><CommentParts><Abstract><Para>ParentProtocol.onlyParent1Var</Para></Abstract></CommentParts></Other>]
 
   // Should come from ParentProtocol1.
   subscript(index: Int) -> Int { return 0 }

@@ -1166,6 +1166,8 @@ private:
     // entity-name
     Node::Kind entityKind;
     bool hasType = true;
+    // Wrap the enclosed entity in a variable or subscript node
+    bool wrapEntity = false;
     NodePointer name = nullptr;
     if (Mangled.nextIf('D')) {
       entityKind = Node::Kind::Deallocator;
@@ -1184,6 +1186,7 @@ private:
     } else if (Mangled.nextIf('c')) {
       entityKind = Node::Kind::Constructor;
     } else if (Mangled.nextIf('a')) {
+      wrapEntity = true;
       if (Mangled.nextIf('O')) {
         entityKind = Node::Kind::OwningMutableAddressor;
       } else if (Mangled.nextIf('o')) {
@@ -1198,6 +1201,7 @@ private:
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('l')) {
+      wrapEntity = true;
       if (Mangled.nextIf('O')) {
         entityKind = Node::Kind::OwningAddressor;
       } else if (Mangled.nextIf('o')) {
@@ -1212,26 +1216,32 @@ private:
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('g')) {
+      wrapEntity = true;
       entityKind = Node::Kind::Getter;
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('G')) {
+      wrapEntity = true;
       entityKind = Node::Kind::GlobalGetter;
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('s')) {
+      wrapEntity = true;
       entityKind = Node::Kind::Setter;
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('m')) {
+      wrapEntity = true;
       entityKind = Node::Kind::MaterializeForSet;
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('w')) {
+      wrapEntity = true;
       entityKind = Node::Kind::WillSet;
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('W')) {
+      wrapEntity = true;
       entityKind = Node::Kind::DidSet;
       name = demangleDeclName();
       if (!name) return nullptr;
@@ -1263,14 +1273,69 @@ private:
     }
 
     NodePointer entity = Factory.createNode(entityKind);
-    entity->addChild(context, Factory);
+    if (wrapEntity) {
+      // Create a subscript or variable node and make it the accessor's child
+      NodePointer wrappedEntity;
+      bool isSubscript = false;
 
-    if (name) entity->addChild(name, Factory);
+      // Rewrite the subscript's name to match the new mangling scheme
+      switch (name->getKind()) {
+        case Node::Kind::Identifier:
+          if (name->getText() == "subscript") {
+            isSubscript = true;
+            // Subscripts have no 'subscript' identifier name
+            name = nullptr;
+          }
+          break;
+        case Node::Kind::PrivateDeclName: // identifier file-discriminator?
+          if (name->getNumChildren() > 1 &&
+              name->getChild(1)->getText() == "subscript") {
+            isSubscript = true;
 
-    if (hasType) {
-      auto type = demangleType();
-      if (!type) return nullptr;
-      entity->addChild(type, Factory);
+            auto discriminator = name->getChild(0);
+
+            // Create new PrivateDeclName with no 'subscript' identifer child
+            name = Factory.createNode(Node::Kind::PrivateDeclName);
+            name->addChild(discriminator, Factory);
+          }
+          break;
+        default:
+          break;
+      }
+
+      // Create wrapped entity node
+      if (isSubscript) {
+        wrappedEntity = Factory.createNode(Node::Kind::Subscript);
+      } else {
+        wrappedEntity = Factory.createNode(Node::Kind::Variable);
+      }
+      wrappedEntity->addChild(context, Factory);
+
+      // Variables mangle their name before their type
+      if (!isSubscript)
+        wrappedEntity->addChild(name, Factory);
+
+      if (hasType) {
+        auto type = demangleType();
+        if (!type) return nullptr;
+        wrappedEntity->addChild(type, Factory);
+      }
+
+      // Subscripts mangle their file-discriminator after the type
+      if (isSubscript && name)
+        wrappedEntity->addChild(name, Factory);
+
+      entity->addChild(wrappedEntity, Factory);
+    } else {
+      entity->addChild(context, Factory);
+
+      if (name) entity->addChild(name, Factory);
+
+      if (hasType) {
+        auto type = demangleType();
+        if (!type) return nullptr;
+        entity->addChild(type, Factory);
+      }
     }
     
     if (isStatic) {

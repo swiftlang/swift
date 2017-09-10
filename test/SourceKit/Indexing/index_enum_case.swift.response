@@ -50,14 +50,14 @@
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "text",
-          key.usr: "s:15index_enum_case1EO4textSSv",
+          key.usr: "s:15index_enum_case1EO4textSSvp",
           key.line: 8,
           key.column: 9,
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
               key.name: "getter:text",
-              key.usr: "s:15index_enum_case1EO4textSSfg",
+              key.usr: "s:15index_enum_case1EO4textSSvg",
               key.line: 8,
               key.column: 22,
               key.entities: [
@@ -98,19 +98,19 @@
     {
       key.kind: source.lang.swift.decl.var.global,
       key.name: "e",
-      key.usr: "s:15index_enum_case1eAA1EOv",
+      key.usr: "s:15index_enum_case1eAA1EOvp",
       key.line: 21,
       key.column: 5,
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.accessor.getter,
-          key.usr: "s:15index_enum_case1eAA1EOfg",
+          key.usr: "s:15index_enum_case1eAA1EOvg",
           key.line: 21,
           key.column: 5
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
-          key.usr: "s:15index_enum_case1eAA1EOfs",
+          key.usr: "s:15index_enum_case1eAA1EOvs",
           key.line: 21,
           key.column: 5
         }

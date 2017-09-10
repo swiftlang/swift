@@ -9,12 +9,12 @@ public struct MySt {
   // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute4MyStV6methodyyF : $@convention(method) (MySt) -> ()
   @_inlineable public func method() {}
 
-  // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute4MyStV8propertySifg : $@convention(method) (MySt) -> Int
+  // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute4MyStV8propertySivg : $@convention(method) (MySt) -> Int
   @_inlineable public var property: Int {
     return 5
   }
 
-  // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute4MyStV9subscriptS2icfg : $@convention(method) (Int, MySt) -> Int
+  // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute4MyStVS2icig : $@convention(method) (Int, MySt) -> Int
   @_inlineable public subscript(x: Int) -> Int {
     return x
   }
@@ -49,7 +49,7 @@ public class MyCls {
   _ = MyEnum.c
 }
 
-// CHECK-LABEL: sil [transparent] @_T020inlineable_attribute15HasInitializersV1xSivfi : $@convention(thin) () -> Int
+// CHECK-LABEL: sil [transparent] @_T020inlineable_attribute15HasInitializersV1xSivpfi : $@convention(thin) () -> Int
 
 public struct HasInitializers {
   public let x = 1234

@@ -17,7 +17,7 @@
 // CHECK: function_ref @_T0s16IndexingIteratorV4next7ElementQzSgyFs14CountableRangeVySiG_Tgq5
 //
 // Look for generic specialization <Swift.Int> of Swift.Array.subscript.getter : (Swift.Int) -> A
-// CHECK: function_ref {{@_T0Sa9subscriptxSicfgSi_Tgq5|@_TTSg5Si___TFSaap9subscriptFSix}}
+// CHECK: function_ref {{@_T0SaxSicigSi_Tgq5|@_TTSg5Si___TFSaap9subscriptFSix}}
 // CHECK: return
 @inline(never)
 public func test(_ a: inout [Int], size: Int) {

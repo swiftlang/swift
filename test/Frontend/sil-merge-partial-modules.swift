@@ -59,15 +59,15 @@ public class CircleManager : ShapeManager {
 
 // CHECK-LABEL: sil @_T04test14publicFunctionyyF : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T04test9RectangleVAA5ShapeA2aDP4areaSffgTW : $@convention(witness_method) (@in_guaranteed Rectangle) -> Float {
-// CHECK: function_ref @_T04test9RectangleV4areaSffg
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T04test9RectangleVAA5ShapeA2aDP4areaSfvgTW : $@convention(witness_method) (@in_guaranteed Rectangle) -> Float {
+// CHECK: function_ref @_T04test9RectangleV4areaSfvg
 // CHECK: }
 
-// CHECK-LABEL: sil @_T04test9RectangleV4areaSffg : $@convention(method) (Rectangle) -> Float
+// CHECK-LABEL: sil @_T04test9RectangleV4areaSfvg : $@convention(method) (Rectangle) -> Float
 
 // CHECK-LABEL: sil_witness_table [serialized] Rectangle: Shape module test {
 // CHECK-LABEL:   method #Shape.draw!1: <Self where Self : Shape> (Self) -> () -> () : @_T04test9RectangleVAA5ShapeA2aDP4drawyyFTW
-// CHECK-LABEL:   method #Shape.area!getter.1: <Self where Self : Shape> (Self) -> () -> Float : @_T04test9RectangleVAA5ShapeA2aDP4areaSffgTW
+// CHECK-LABEL:   method #Shape.area!getter.1: <Self where Self : Shape> (Self) -> () -> Float : @_T04test9RectangleVAA5ShapeA2aDP4areaSfvgTW
 // CHECK-LABEL: }
 
 // NEGATIVE-NOT: sil {{.*}}internalFunction

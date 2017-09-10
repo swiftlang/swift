@@ -421,7 +421,7 @@ class Foo<T> {
     // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
 
     // -- initialization for y
-    // CHECK: [[Y_INIT:%[0-9]+]] = function_ref @_T08lifetime3FooC1ySi_AA3RefCtvfi : $@convention(thin) <τ_0_0> () -> (Int, @owned Ref)
+    // CHECK: [[Y_INIT:%[0-9]+]] = function_ref @_T08lifetime3FooC1ySi_AA3RefCtvpfi : $@convention(thin) <τ_0_0> () -> (Int, @owned Ref)
     // CHECK: [[Y_VALUE:%[0-9]+]] = apply [[Y_INIT]]<T>()
     // CHECK: [[BORROWED_Y_VALUE:%.*]] = begin_borrow [[Y_VALUE]]
     // CHECK: [[Y_EXTRACTED_0:%.*]] = tuple_extract [[BORROWED_Y_VALUE]] : $(Int, Ref), 0
@@ -440,7 +440,7 @@ class Foo<T> {
     // CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
 
     // -- Initialization for w
-    // CHECK: [[Z_FUNC:%.*]] = function_ref @_T{{.*}}8lifetime3FooC1wAA3RefCvfi : $@convention(thin) <τ_0_0> () -> @owned Ref
+    // CHECK: [[Z_FUNC:%.*]] = function_ref @_T{{.*}}8lifetime3FooC1wAA3RefCvpfi : $@convention(thin) <τ_0_0> () -> @owned Ref
     // CHECK: [[Z_RESULT:%.*]] = apply [[Z_FUNC]]<T>()
     // CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
     // CHECK: [[THIS_Z:%.*]] = ref_element_addr [[BORROWED_THIS]]

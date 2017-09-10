@@ -16,16 +16,16 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK:         copy_addr %1 to [initialization] [[OTHER_SIZE_BOX:%[0-9]*]] : $*Size
   var s2 = s
 
-// CHECK:         [[SETTER:%.*]] = function_ref @_T016resilient_struct4SizeV1wSifs : $@convention(method) (Int, @inout Size) -> ()
+// CHECK:         [[SETTER:%.*]] = function_ref @_T016resilient_struct4SizeV1wSivs : $@convention(method) (Int, @inout Size) -> ()
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
-// CHECK:         [[GETTER:%.*]] = function_ref @_T016resilient_struct4SizeV1wSifg : $@convention(method) (@in_guaranteed Size) -> Int
+// CHECK:         [[GETTER:%.*]] = function_ref @_T016resilient_struct4SizeV1wSivg : $@convention(method) (@in_guaranteed Size) -> Int
 // CHECK:         [[RESULT:%.*]] = apply [[GETTER]]([[SIZE_BOX]])
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] [[OTHER_SIZE_BOX]] : $*Size
 // CHECK:         apply [[SETTER]]([[RESULT]], [[WRITE]])
   s2.w = s.w
 
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
-// CHECK:         [[FN:%.*]] = function_ref @_T016resilient_struct4SizeV1hSifg : $@convention(method) (@in_guaranteed Size) -> Int
+// CHECK:         [[FN:%.*]] = function_ref @_T016resilient_struct4SizeV1hSivg : $@convention(method) (@in_guaranteed Size) -> Int
 // CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
   _ = s.h
 
@@ -46,7 +46,7 @@ func inoutFunc(_ x: inout Int) {}
 func resilientInOutTest(_ s: inout Size) {
 
 // CHECK:         function_ref @_T017struct_resilience9inoutFuncySizF
-// CHECK:         function_ref @_T016resilient_struct4SizeV1wSifm
+// CHECK:         function_ref @_T016resilient_struct4SizeV1wSivm
 
   inoutFunc(&s.w)
 
@@ -91,9 +91,9 @@ public struct MySize {
 
   // Static computed property
 
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV10expirationSifgZ : $@convention(method) (@thin MySize.Type) -> Int
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV10expirationSifsZ : $@convention(method) (Int, @thin MySize.Type) -> ()
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV10expirationSifmZ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV10expirationSivgZ : $@convention(method) (@thin MySize.Type) -> Int
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV10expirationSivsZ : $@convention(method) (Int, @thin MySize.Type) -> ()
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV10expirationSivmZ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public static var expiration: Int {
     get { return copyright + 70 }
     set { copyright = newValue - 70 }
@@ -101,9 +101,9 @@ public struct MySize {
 
   // Instance computed property
 
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1dSifg : $@convention(method) (@in_guaranteed MySize) -> Int
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1dSifs : $@convention(method) (Int, @inout MySize) -> ()
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1dSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1dSivg : $@convention(method) (@in_guaranteed MySize) -> Int
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1dSivs : $@convention(method) (Int, @inout MySize) -> ()
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1dSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public var d: Int {
     get { return 0 }
     set { }
@@ -111,21 +111,21 @@ public struct MySize {
 
   // Instance stored property
 
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1wSifg : $@convention(method) (@in_guaranteed MySize) -> Int
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1wSifs : $@convention(method) (Int, @inout MySize) -> ()
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1wSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1wSivg : $@convention(method) (@in_guaranteed MySize) -> Int
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1wSivs : $@convention(method) (Int, @inout MySize) -> ()
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1wSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public var w: Int
 
   // Read-only instance stored property
 
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1hSifg : $@convention(method) (@in_guaranteed MySize) -> Int
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV1hSivg : $@convention(method) (@in_guaranteed MySize) -> Int
   public let h: Int
 
   // Static stored property
 
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV9copyrightSifgZ : $@convention(method) (@thin MySize.Type) -> Int
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV9copyrightSifsZ : $@convention(method) (Int, @thin MySize.Type) -> ()
-// CHECK-LABEL: sil @_T017struct_resilience6MySizeV9copyrightSifmZ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV9copyrightSivgZ : $@convention(method) (@thin MySize.Type) -> Int
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV9copyrightSivsZ : $@convention(method) (Int, @thin MySize.Type) -> ()
+// CHECK-LABEL: sil @_T017struct_resilience6MySizeV9copyrightSivmZ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public static var copyright: Int = 0
 }
 
@@ -166,7 +166,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK:         [[SELF:%.*]] = alloc_stack $MySize
 // CHECK-NEXT:    copy_addr %0 to [initialization] [[SELF]]
 
-// CHECK:         [[GETTER:%.*]] = function_ref @_T017struct_resilience6MySizeV1wSifg
+// CHECK:         [[GETTER:%.*]] = function_ref @_T017struct_resilience6MySizeV1wSivg
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]]([[SELF]])
 // CHECK-NEXT:    destroy_addr [[SELF]]
 // CHECK-NEXT:    dealloc_stack [[SELF]]
@@ -179,7 +179,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 @_transparent public func publicTransparentLocalFunction(_ s: MySize) -> () -> Int {
 
 // CHECK-LABEL: sil shared [serialized] @_T017struct_resilience30publicTransparentLocalFunctionSiycAA6MySizeVFSiycfU_ : $@convention(thin) (@owned { var MySize }) -> Int
-// CHECK: function_ref @_T017struct_resilience6MySizeV1wSifg : $@convention(method) (@in_guaranteed MySize) -> Int
+// CHECK: function_ref @_T017struct_resilience6MySizeV1wSivg : $@convention(method) (@in_guaranteed MySize) -> Int
 // CHECK: return {{.*}} : $Int
 
   return { s.w }
@@ -209,7 +209,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK:         [[SELF:%.*]] = alloc_stack $MySize
 // CHECK-NEXT:    copy_addr %0 to [initialization] [[SELF]]
 
-// CHECK:         [[GETTER:%.*]] = function_ref @_T017struct_resilience6MySizeV1wSifg
+// CHECK:         [[GETTER:%.*]] = function_ref @_T017struct_resilience6MySizeV1wSivg
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]]([[SELF]])
 // CHECK-NEXT:    destroy_addr [[SELF]]
 // CHECK-NEXT:    dealloc_stack [[SELF]]
@@ -236,8 +236,8 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 @_transparent func useVersionedResilientStruct(_ s: VersionedResilientStruct)
     -> VersionedResilientStruct {
   // CHECK:       function_ref @_T017struct_resilience24VersionedResilientStructVACSi1x_Si1ytcfC
-  // CHECK:       function_ref @_T017struct_resilience24VersionedResilientStructV1ySifg
-  // CHECK:       function_ref @_T017struct_resilience24VersionedResilientStructV1xSifg
+  // CHECK:       function_ref @_T017struct_resilience24VersionedResilientStructV1ySivg
+  // CHECK:       function_ref @_T017struct_resilience24VersionedResilientStructV1xSivg
 
   return VersionedResilientStruct(x: s.y, y: s.x)
 }

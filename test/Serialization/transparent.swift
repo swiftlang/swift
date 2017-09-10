@@ -8,13 +8,13 @@
 import def_transparent
 
 // SIL-LABEL: sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-// SIL: [[RAW:%.+]] = global_addr @_T011transparent3rawSbv : $*Bool
+// SIL: [[RAW:%.+]] = global_addr @_T011transparent3rawSbvp : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @_T015def_transparent15testTransparentS2b1x_tF : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
 // SIL: store [[RESULT]] to [trivial] [[RAW]] : $*Bool
 var raw = testTransparent(x: false)
 
-// SIL: [[TMP:%.+]] = global_addr @_T011transparent3tmps5Int32Vv : $*Int32
+// SIL: [[TMP:%.+]] = global_addr @_T011transparent3tmps5Int32Vvp : $*Int32
 // SIL: [[FUNC2:%.+]] = function_ref @_T015def_transparent11testBuiltins5Int32VyF : $@convention(thin) () -> Int32
 // SIL: [[RESULT2:%.+]] = apply [[FUNC2]]() : $@convention(thin) () -> Int32
 // SIL: store [[RESULT2]] to [trivial] [[TMP]] : $*Int32
@@ -53,7 +53,7 @@ func test_switch(u: MaybePair) {
 
 // SIL-LABEL: sil public_external [transparent] [serialized] @_T015def_transparent7WrapperVACs5Int32V3Val_tcfC : $@convention(method) (Int32, @thin Wrapper.Type) -> Wrapper {
 // SIL-LABEL: sil public_external [transparent] [serialized] @_T015def_transparent7WrapperV8getValue{{[_0-9a-zA-Z]*}}F : $@convention(method) (Wrapper) -> Int32 {
-// SIL-LABEL: sil public_external [transparent] [serialized] @_T015def_transparent7WrapperV10valueAgains5Int32Vfg : $@convention(method) (Wrapper) -> Int32 {
+// SIL-LABEL: sil public_external [transparent] [serialized] @_T015def_transparent7WrapperV10valueAgains5Int32Vvg : $@convention(method) (Wrapper) -> Int32 {
 // SIL-LABEL: sil public_external [transparent] [serialized] @_T015def_transparent7WrapperV13getValueAgain{{[_0-9a-zA-Z]*}}F : $@convention(method) (Wrapper) -> Int32 {
 func test_wrapper() {
   var w = Wrapper(Val: 42)

@@ -29,7 +29,7 @@ var computed: Int {
 }
 
 // CHECK-LABEL: sil hidden @_T021copy_lvalue_peepholes023init_var_from_computed_B0{{[_0-9a-zA-Z]*}}F
-// CHECK:   [[GETTER:%.*]] = function_ref @_T021copy_lvalue_peepholes8computedBi64_fg
+// CHECK:   [[GETTER:%.*]] = function_ref @_T021copy_lvalue_peepholes8computedBi64_vg
 // CHECK:   [[GOTTEN:%.*]] = apply [[GETTER]]()
 // CHECK:   store [[GOTTEN]] to [trivial] {{%.*}}
 func init_var_from_computed_lvalue() {
@@ -41,7 +41,7 @@ func init_var_from_computed_lvalue() {
 // CHECK:   [[PBY:%.*]] = project_box [[Y]]
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBY]]
 // CHECK:   [[Y_VAL:%.*]] = load [trivial] [[READ]]
-// CHECK:   [[SETTER:%.*]] = function_ref @_T021copy_lvalue_peepholes8computedBi64_fs
+// CHECK:   [[SETTER:%.*]] = function_ref @_T021copy_lvalue_peepholes8computedBi64_vs
 // CHECK:   apply [[SETTER]]([[Y_VAL]])
 func assign_computed_from_lvalue(y: Int) {
   var y = y

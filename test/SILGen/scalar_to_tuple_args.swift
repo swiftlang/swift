@@ -12,7 +12,7 @@ func variadicFirst(_ x: Int...) {}
 func variadicSecond(_ x: Int, _ y: Int...) {}
 
 var x = 0
-// CHECK: [[X_ADDR:%.*]] = global_addr @_T020scalar_to_tuple_args1xSiv : $*Int
+// CHECK: [[X_ADDR:%.*]] = global_addr @_T020scalar_to_tuple_args1xSivp : $*Int
 // CHECK: [[INOUT_WITH_DEFAULTS:%.*]] = function_ref @_T020scalar_to_tuple_args17inoutWithDefaultsySiz_Si1ySi1ztF
 // CHECK: [[DEFAULT_Y:%.*]] = apply {{.*}} : $@convention(thin) () -> Int
 // CHECK: [[DEFAULT_Z:%.*]] = apply {{.*}} : $@convention(thin) () -> Int

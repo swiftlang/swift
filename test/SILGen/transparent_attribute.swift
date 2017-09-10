@@ -72,13 +72,13 @@ func testProperty(z: MySt) {
   var m1 : MySt = x1
   var m2 : MySt = x2
   // CHECK-APPLY: sil hidden @_T021transparent_attribute12testPropertyyAA4MyStV1z_tF
-  // CHECK: function_ref @_T021transparent_attribute2x1AA4MyStVfs
+  // CHECK: function_ref @_T021transparent_attribute2x1AA4MyStVvs
   // CHECK-NEXT: apply
-  // CHECK: function_ref @_T021transparent_attribute2x2AA4MyStVfs
+  // CHECK: function_ref @_T021transparent_attribute2x2AA4MyStVvs
   // CHECK-NEXT: apply
-  // CHECK: function_ref @_T021transparent_attribute2x1AA4MyStVfg
+  // CHECK: function_ref @_T021transparent_attribute2x1AA4MyStVvg
   // CHECK-NEXT: apply
-  // CHECK: function_ref @_T021transparent_attribute2x2AA4MyStVfg
+  // CHECK: function_ref @_T021transparent_attribute2x2AA4MyStVvg
   // CHECK-NEXT: apply
 }
 
@@ -122,9 +122,9 @@ func testStructExtension() {
   // CHECK: apply [[INIT]]
   // CHECK: [[TR1:%[0-9]+]] = function_ref @_T021transparent_attribute14MyTranspStructV3tr1{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[TR1]]
-  // CHECK: [[TR2:%[0-9]+]] = function_ref @_T021transparent_attribute14MyTranspStructV3tr2AA0C2StVfg
+  // CHECK: [[TR2:%[0-9]+]] = function_ref @_T021transparent_attribute14MyTranspStructV3tr2AA0C2StVvg
   // CHECK: apply [[TR2]]
-  // CHECK: [[TR3:%[0-9]+]] = function_ref @_T021transparent_attribute14MyTranspStructV3tr3AA0C2StVfg
+  // CHECK: [[TR3:%[0-9]+]] = function_ref @_T021transparent_attribute14MyTranspStructV3tr3AA0C2StVvg
   // CHECK: apply [[TR3]]
 }
 
@@ -159,7 +159,7 @@ struct testVarDecl {
   func testVarDeclFoo () {
     var z: Int = max
     // CHECK-APPLY: sil hidden @_T021transparent_attribute11testVarDeclV0cdE3Foo{{[_0-9a-zA-Z]*}}F
-    // CHECK: [[TR4:%[0-9]+]] = function_ref @_T021transparent_attribute11testVarDeclV3maxSifg
+    // CHECK: [[TR4:%[0-9]+]] = function_ref @_T021transparent_attribute11testVarDeclV3maxSivg
     // CHECK: apply [[TR4]]
   }
 }
@@ -169,7 +169,7 @@ struct testVarDeclShortenedSyntax {
   func testVarDeclShortenedSyntaxfoo () {
     var z: Int = testVarDeclShortenedSyntax.max
     // CHECK-APPLY: sil hidden @_T021transparent_attribute26testVarDeclShortenedSyntaxV0cdeF9Syntaxfoo{{[_0-9a-zA-Z]*}}F
-    // CHECK: [[TR5:%[0-9]+]] = function_ref @_T021transparent_attribute26testVarDeclShortenedSyntaxV3maxSifgZ
+    // CHECK: [[TR5:%[0-9]+]] = function_ref @_T021transparent_attribute26testVarDeclShortenedSyntaxV3maxSivgZ
     // CHECK: apply [[TR5]]
   }
 };
@@ -179,7 +179,7 @@ struct testVarDeclShortenedSyntax {
     return 0xFF
   }
 }
-// CHECK: sil hidden [transparent] @_T021transparent_attribute0A11OnGlobalVarSifg
+// CHECK: sil hidden [transparent] @_T021transparent_attribute0A11OnGlobalVarSivg
 
 // Local functions in transparent context are fragile.
 @_transparent public func foo() {

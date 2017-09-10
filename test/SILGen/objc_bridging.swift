@@ -277,11 +277,11 @@ extension NSString {
     get { return NSS }
     set {}
   }
-  // CHECK-LABEL: sil hidden [thunk] @_T0So8NSStringC13objc_bridgingE13nsstrFakePropABfgTo
+  // CHECK-LABEL: sil hidden [thunk] @_T0So8NSStringC13objc_bridgingE13nsstrFakePropABvgTo
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: _T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
   // CHECK: }
-  // CHECK-LABEL: sil hidden [thunk] @_T0So8NSStringC13objc_bridgingE13nsstrFakePropABfsTo
+  // CHECK-LABEL: sil hidden [thunk] @_T0So8NSStringC13objc_bridgingE13nsstrFakePropABvsTo
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: _T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
   // CHECK: }
@@ -303,12 +303,12 @@ extension NSString {
 class Bas : NSObject {
   // -- Bridging thunks for String properties convert between NSString
   var strRealProp: String = "Hello"
-  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11strRealPropSSfgTo : $@convention(objc_method) (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11strRealPropSSvgTo : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK: bb0([[THIS:%.*]] : @unowned $Bas):
   // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]] : $Bas
   // CHECK:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK:   // function_ref objc_bridging.Bas.strRealProp.getter
-  // CHECK:   [[PROPIMPL:%.*]] = function_ref @_T013objc_bridging3BasC11strRealPropSSfg
+  // CHECK:   [[PROPIMPL:%.*]] = function_ref @_T013objc_bridging3BasC11strRealPropSSvg
   // CHECK:   [[PROP_COPY:%.*]] = apply [[PROPIMPL]]([[BORROWED_THIS_COPY]]) : $@convention(method) (@guaranteed Bas) -> @owned String
   // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
@@ -321,13 +321,13 @@ class Bas : NSObject {
   // CHECK: }
 
 
-  // CHECK-LABEL: sil hidden @_T013objc_bridging3BasC11strRealPropSSfg
+  // CHECK-LABEL: sil hidden @_T013objc_bridging3BasC11strRealPropSSvg
   // CHECK:   [[PROP_ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Bas.strRealProp
   // CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[PROP_ADDR]] : $*String
   // CHECK:   [[PROP:%.*]] = load [copy] [[READ]]
 
 
-  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11strRealPropSSfsTo : $@convention(objc_method) (NSString, Bas) -> () {
+  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11strRealPropSSvsTo : $@convention(objc_method) (NSString, Bas) -> () {
   // CHECK: bb0([[VALUE:%.*]] : @unowned $NSString, [[THIS:%.*]] : @unowned $Bas):
   // CHECK:   [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
@@ -336,13 +336,13 @@ class Bas : NSObject {
   // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[VALUE_BOX]]
 
   // CHECK:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
-  // CHECK:   [[SETIMPL:%.*]] = function_ref @_T013objc_bridging3BasC11strRealPropSSfs
+  // CHECK:   [[SETIMPL:%.*]] = function_ref @_T013objc_bridging3BasC11strRealPropSSvs
   // CHECK:   apply [[SETIMPL]]([[STR]], [[BORROWED_THIS_COPY]])
   // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
-  // CHECK: } // end sil function '_T013objc_bridging3BasC11strRealPropSSfsTo'
+  // CHECK: } // end sil function '_T013objc_bridging3BasC11strRealPropSSvsTo'
 
-  // CHECK-LABEL: sil hidden @_T013objc_bridging3BasC11strRealPropSSfs
+  // CHECK-LABEL: sil hidden @_T013objc_bridging3BasC11strRealPropSSvs
   // CHECK: bb0(%0 : @owned $String, %1 : @guaranteed $Bas):
 
   // CHECK:   [[STR_ADDR:%.*]] = ref_element_addr %1 : {{.*}}, #Bas.strRealProp
@@ -354,11 +354,11 @@ class Bas : NSObject {
     get { return "" }
     set {}
   }
-  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11strFakePropSSfgTo : $@convention(objc_method) (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11strFakePropSSvgTo : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK: bb0([[THIS:%.*]] : @unowned $Bas):
   // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
-  // CHECK:   [[GETTER:%.*]] = function_ref @_T013objc_bridging3BasC11strFakePropSSfg
+  // CHECK:   [[GETTER:%.*]] = function_ref @_T013objc_bridging3BasC11strFakePropSSvg
   // CHECK:   [[STR:%.*]] = apply [[GETTER]]([[BORROWED_THIS_COPY]])
   // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
@@ -370,7 +370,7 @@ class Bas : NSObject {
   // CHECK:   return [[NSSTR]]
   // CHECK: }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11strFakePropSSfsTo : $@convention(objc_method) (NSString, Bas) -> () {
+  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11strFakePropSSvsTo : $@convention(objc_method) (NSString, Bas) -> () {
   // CHECK: bb0([[NSSTR:%.*]] : @unowned $NSString, [[THIS:%.*]] : @unowned $Bas):
   // CHECK:   [[NSSTR_COPY:%.*]] = copy_value [[NSSTR]]
   // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
@@ -378,11 +378,11 @@ class Bas : NSObject {
   // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR_COPY]]
   // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[NSSTR_BOX]]
   // CHECK:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
-  // CHECK:   [[SETTER:%.*]] = function_ref @_T013objc_bridging3BasC11strFakePropSSfs
+  // CHECK:   [[SETTER:%.*]] = function_ref @_T013objc_bridging3BasC11strFakePropSSvs
   // CHECK:   apply [[SETTER]]([[STR]], [[BORROWED_THIS_COPY]])
   // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
-  // CHECK: } // end sil function '_T013objc_bridging3BasC11strFakePropSSfsTo'
+  // CHECK: } // end sil function '_T013objc_bridging3BasC11strFakePropSSvsTo'
 
   // -- Bridging thunks for explicitly NSString properties don't convert
   var nsstrRealProp: NSString
@@ -390,12 +390,12 @@ class Bas : NSObject {
     get { return NSS }
     set {}
   }
-  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC13nsstrRealPropSo8NSStringCfgTo : $@convention(objc_method) (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC13nsstrRealPropSo8NSStringCvgTo : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: _T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
   // CHECK: }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC13nsstrRealPropSo8NSStringCfsTo : $@convention(objc_method) (NSString, Bas) ->
+  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC13nsstrRealPropSo8NSStringCvsTo : $@convention(objc_method) (NSString, Bas) ->
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: _T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
   // CHECK: }
@@ -481,8 +481,8 @@ class Bas : NSObject {
   // CHECK:   return [[NSARRAY]]
   func arrayResult() -> [AnyObject] { return [] }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC9arrayPropSaySSGfgTo : $@convention(objc_method) (Bas) -> @autoreleased NSArray
-  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC9arrayPropSaySSGfsTo : $@convention(objc_method) (NSArray, Bas) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC9arrayPropSaySSGvgTo : $@convention(objc_method) (Bas) -> @autoreleased NSArray
+  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC9arrayPropSaySSGvsTo : $@convention(objc_method) (NSArray, Bas) -> ()
   var arrayProp: [String] = []
 }
 

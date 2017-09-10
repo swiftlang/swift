@@ -20,20 +20,20 @@
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "b",
-          key.usr: "s:12implicit_vis1AC1bAA1BCv",
+          key.usr: "s:12implicit_vis1AC1bAA1BCvp",
           key.line: 2,
           key.column: 6,
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
-              key.usr: "s:12implicit_vis1AC1bAA1BCfg",
+              key.usr: "s:12implicit_vis1AC1bAA1BCvg",
               key.line: 2,
               key.column: 6,
               key.is_dynamic: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
-              key.usr: "s:12implicit_vis1AC1bAA1BCfs",
+              key.usr: "s:12implicit_vis1AC1bAA1BCvs",
               key.line: 2,
               key.column: 6,
               key.is_dynamic: 1

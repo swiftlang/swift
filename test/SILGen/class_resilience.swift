@@ -9,7 +9,7 @@ import resilient_class
 // through accessor
 
 // CHECK-LABEL: sil @_T016class_resilience20finalPropertyOfOthery010resilient_A022ResilientOutsideParentCF
-// CHECK: function_ref @_T015resilient_class22ResilientOutsideParentC13finalPropertySSfg
+// CHECK: function_ref @_T015resilient_class22ResilientOutsideParentC13finalPropertySSvg
 
 public func finalPropertyOfOther(_ other: ResilientOutsideParent) {
   _ = other.finalProperty

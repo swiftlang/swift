@@ -100,7 +100,7 @@ func testCallWithMagicLiterals() {
   autoclosure(testMagicLiterals())
 }
 
-// CHECK-LABEL: sil hidden @_T017default_arguments25testPropWithMagicLiteralsSifg
+// CHECK-LABEL: sil hidden @_T017default_arguments25testPropWithMagicLiteralsSivg
 // CHECK:         string_literal utf16 "testPropWithMagicLiterals"
 var testPropWithMagicLiterals: Int {
   testMagicLiterals()
@@ -127,7 +127,7 @@ class Foo {
     autoclosure(testMagicLiterals())
   }
 
-  // CHECK-LABEL: sil hidden @_T017default_arguments3FooC9subscriptS2icfg
+  // CHECK-LABEL: sil hidden @_T017default_arguments3FooCS2icig
   // CHECK:         string_literal utf16 "subscript"
   subscript(x: Int) -> Int {
     testMagicLiterals()

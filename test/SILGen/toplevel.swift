@@ -12,7 +12,7 @@ func trap() -> Never {
 
 // -- initialize x
 // CHECK: alloc_global @_T08toplevel1xSiv
-// CHECK: [[X:%[0-9]+]] = global_addr @_T08toplevel1xSiv : $*Int
+// CHECK: [[X:%[0-9]+]] = global_addr @_T08toplevel1xSivp : $*Int
 // CHECK: integer_literal $Builtin.Int2048, 999
 // CHECK: store {{.*}} to [trivial] [[X]]
 
@@ -35,7 +35,7 @@ print_x()
 
 // <rdar://problem/19770775> Deferred initialization of let bindings rejected at top level in playground
 // CHECK: alloc_global @_T08toplevel5countSiv
-// CHECK: [[COUNTADDR:%[0-9]+]] = global_addr @_T08toplevel5countSiv : $*Int
+// CHECK: [[COUNTADDR:%[0-9]+]] = global_addr @_T08toplevel5countSivp : $*Int
 // CHECK-NEXT: [[COUNTMUI:%[0-9]+]] = mark_uninitialized [var] [[COUNTADDR]] : $*Int
 let count: Int
 // CHECK: cond_br
@@ -64,7 +64,7 @@ func print_y() {
 
 // -- assign y
 // CHECK: alloc_global @_T08toplevel1ySiv
-// CHECK: [[Y1:%[0-9]+]] = global_addr @_T08toplevel1ySiv : $*Int
+// CHECK: [[Y1:%[0-9]+]] = global_addr @_T08toplevel1ySivp : $*Int
 // CHECK: [[Y:%[0-9]+]] = mark_uninitialized [var] [[Y1]]
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[Y]]
  // CHECK: assign {{.*}} to [[WRITE]]
@@ -117,7 +117,7 @@ fooUsesUninitializedValue()
 
 // CHECK: sil hidden @_T08toplevel13testGlobalCSESiyF
 // CHECK-NOT: global_addr
-// CHECK: %0 = global_addr @_T08toplevel1xSiv : $*Int
+// CHECK: %0 = global_addr @_T08toplevel1xSivp : $*Int
 // CHECK-NOT: global_addr
 // CHECK: return
 func testGlobalCSE() -> Int {

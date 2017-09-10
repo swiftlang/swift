@@ -20,12 +20,12 @@ public struct Pair {
   public func test(_ t: (Int, Int)) {
   }
 
-  // CHECK: sil @_T04test4PairV9subscriptS2i_Sitcfg :
+  // CHECK: sil @_T04test4PairVS2i_Sitcig :
   public subscript(_:Int, _:Int) -> Int {
       get { return 0 }
   }
 
-  // CHECK: sil @_T04test4PairV9subscriptS2i_Sit_tcfg :
+  // CHECK: sil @_T04test4PairVS2i_Sit_tcig :
   public subscript(_:(Int, Int)) -> Int {
       get { return 0 }
   }
