@@ -826,14 +826,7 @@ public:
   }
 
   void printInstOpCode(SILInstruction *I) {
-    // If we have a SILInstruction, print out the opcode.
-    switch (SILInstructionKind(I->getKind())) {
-#define INST(Id, Parent, TextualName, MemoryBehavior, ReleasingBehavior)       \
-  case SILInstructionKind::Id:                                                 \
-    *this << #TextualName " ";                                                 \
-    break;
-#include "swift/SIL/SILNodes.def"
-    }
+    *this << getSILValueName(I->getKind()) << " ";
   }
 
   void print(SILValue V) {
