@@ -2367,8 +2367,8 @@ public:
           break;
         case ValueKind::LoadInst:
           // A 'non-taking' value load is harmless.
-          return cast<LoadInst>(inst)->getOwnershipQualifier() !=
-                 LoadOwnershipQualifier::Copy;
+          return cast<LoadInst>(inst)->getOwnershipQualifier() ==
+                 LoadOwnershipQualifier::Take;
           break;
         case ValueKind::DebugValueAddrInst:
           // Harmless use.
