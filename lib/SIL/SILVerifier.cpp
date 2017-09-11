@@ -2380,8 +2380,8 @@ public:
       }
       return false;
     };
-    require(!isMutatingOrConsuming(OEI) ||
-                allowedAccessKind == OpenedExistentialAccess::Mutable,
+    require(allowedAccessKind == OpenedExistentialAccess::Mutable
+            || !isMutatingOrConsuming(OEI),
             "open_existential_addr uses that consumes or mutates but is not "
             "opened for mutation");
   }
