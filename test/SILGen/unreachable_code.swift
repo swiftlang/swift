@@ -111,6 +111,15 @@ func testUnreachableCase5(a : Tree) {
   }
 }
 
+func testOptionalEvaluationBreak(a : Tree) {
+  class SR5763 { func foo() {} }
+  func createOptional() -> SR5763? { return SR5763() }
+  switch a {
+  case _:
+    break
+    createOptional()?.foo() // expected-warning {{code after 'break' will never be executed}}
+  }
+}
 
 func testUnreachableAfterThrow(e: Error) throws {
   throw e
