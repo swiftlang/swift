@@ -50,9 +50,10 @@ TermInst *swift::addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
       assert(FalseArgs.size() == Dest->getNumArguments());
     }
 
-    NewBr = Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
-                                    CBI->getTrueBB(), TrueArgs,
-                                    CBI->getFalseBB(), FalseArgs);
+    NewBr = Builder.createCondBranch(
+        CBI->getLoc(), CBI->getCondition(), CBI->getTrueBB(), TrueArgs,
+        CBI->getFalseBB(), FalseArgs, CBI->getTrueBBCount(),
+        CBI->getFalseBBCount());
   } else if (auto *BI = dyn_cast<BranchInst>(Branch)) {
     SmallVector<SILValue, 8> Args;
 
@@ -120,9 +121,10 @@ TermInst *swift::changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest,
     assert(FalseArgs.size() == CBI->getFalseBB()->getNumArguments() &&
            "Destination block's number of arguments must match");
 
-    CBI = Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
-                                    CBI->getTrueBB(), TrueArgs,
-                                    CBI->getFalseBB(), FalseArgs);
+    CBI = Builder.createCondBranch(
+        CBI->getLoc(), CBI->getCondition(), CBI->getTrueBB(), TrueArgs,
+        CBI->getFalseBB(), FalseArgs, CBI->getTrueBBCount(),
+        CBI->getFalseBBCount());
     Branch->dropAllReferences();
     Branch->eraseFromParent();
     return CBI;
@@ -205,8 +207,9 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     else
       FalseDest = NewDest;
 
-    B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(),
-                       TrueDest, TrueArgs, FalseDest, FalseArgs);
+    B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(), TrueDest,
+                       TrueArgs, FalseDest, FalseArgs, CondBr->getTrueBBCount(),
+                       CondBr->getFalseBBCount());
     CondBr->dropAllReferences();
     CondBr->eraseFromParent();
     return;
@@ -372,8 +375,9 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
       FalseDest = NewDest;
     }
 
-    B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(),
-        TrueDest, TrueArgs, FalseDest, FalseArgs);
+    B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(), TrueDest,
+                       TrueArgs, FalseDest, FalseArgs, CondBr->getTrueBBCount(),
+                       CondBr->getFalseBBCount());
     CondBr->dropAllReferences();
     CondBr->eraseFromParent();
     return;
