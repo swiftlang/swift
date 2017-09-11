@@ -5356,6 +5356,53 @@ static void collapseSameTypeComponentsThroughDelayedRequirements(
                          collapsedParents.end());
 }
 
+/// Check whether two potential archetypes "structurally" match, e.g.,
+/// the names match up to the root (which must match).
+static bool potentialArchetypesStructurallyMatch(PotentialArchetype *pa1,
+                                                 PotentialArchetype *pa2) {
+  auto parent1 = pa1->getParent();
+  auto parent2 = pa2->getParent();
+  if (!parent1 && !parent2)
+    return pa1->getGenericParamKey() == pa2->getGenericParamKey();
+
+  // Check for depth mismatch.
+  if (static_cast<bool>(parent1) != static_cast<bool>(parent2))
+    return false;
+
+  // Check names.
+  if (pa1->getNestedName() != pa2->getNestedName())
+    return false;
+
+  return potentialArchetypesStructurallyMatch(parent1, parent2);
+}
+
+/// Look for structurally-equivalent types within the given equivalence class,
+/// collapsing their components.
+static void collapseStructurallyEquivalentSameTypeComponents(
+              EquivalenceClass *equivClass,
+              llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
+              SmallVectorImpl<unsigned> &collapsedParents,
+              unsigned &remainingComponents) {
+  for (unsigned i : indices(equivClass->members)) {
+    auto pa1 = equivClass->members[i];
+    auto rep1 = findRepresentative(collapsedParents, componentOf[pa1]);
+    for (unsigned j : indices(equivClass->members).slice(i + 1)) {
+      auto pa2 = equivClass->members[j];
+      auto rep2 = findRepresentative(collapsedParents, componentOf[pa2]);
+      if (rep1 == rep2) continue;
+
+      auto depth = pa1->getNestingDepth();
+      if (depth < 2 || depth != pa2->getNestingDepth()) continue;
+
+      if (potentialArchetypesStructurallyMatch(pa1, pa2) &&
+          unionSets(collapsedParents, rep1, rep2)) {
+        --remainingComponents;
+        rep1 = findRepresentative(collapsedParents, componentOf[pa1]);
+      }
+    }
+  }
+}
+
 /// Collapse same-type components within an equivalence class, minimizing the
 /// number of requirements required to express the equivalence class.
 static void collapseSameTypeComponents(
@@ -5409,9 +5456,19 @@ static void collapseSameTypeComponents(
       --remainingComponents;
   }
 
-  // Collapse same-type components by looking at the delayed requirements.
-  collapseSameTypeComponentsThroughDelayedRequirements(
+  if (remainingComponents > 1) {
+    // Collapse same-type components by looking at the delayed requirements.
+    collapseSameTypeComponentsThroughDelayedRequirements(
       builder, equivClass, componentOf, collapsedParents, remainingComponents);
+  }
+
+  if (remainingComponents > 1) {
+    // Collapse structurally-equivalent components.
+    collapseStructurallyEquivalentSameTypeComponents(equivClass,
+                                                     componentOf,
+                                                     collapsedParents,
+                                                     remainingComponents);
+  }
 
   // If needed, collapse the same-type components merged by a derived
   // nested-type-name-match edge.
