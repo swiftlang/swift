@@ -219,6 +219,7 @@ int main(int argc, char *argv[]) {
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
   Invocation.addInputFilename(options::SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
+  Invocation.getLangOptions().KeepTokensInSourceFile = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.addInputFilename(FileName);
