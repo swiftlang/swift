@@ -1463,6 +1463,64 @@ bool RefactoringActionExtractRepeatedExpr::performChange() {
                                           EditConsumer).performChange();
 }
 
+struct CollapsibleNestedIfInfo {
+    IfStmt *OuterIf;
+    IfStmt *InnerIf;
+    CollapsibleNestedIfInfo(): OuterIf(nullptr), InnerIf(nullptr) {}
+    bool isValid() { return OuterIf && InnerIf; }
+};
+
+static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
+    if (CursorInfo.Kind != CursorInfoKind::StmtStart)
+        return CollapsibleNestedIfInfo();
+    struct IfStmtFinder: public SourceEntityWalker {
+        SourceLoc StartLoc;
+        CollapsibleNestedIfInfo IfInfo;
+        IfStmtFinder(SourceLoc StartLoc): StartLoc(StartLoc), IfInfo() {}
+        bool walkToStmtPre(Stmt *S) {
+            if (S->getKind() == StmtKind::If) {
+                if (!IfInfo.OuterIf) {
+                    IfInfo.OuterIf = dyn_cast<IfStmt>(S);
+                    return true;
+                }
+                if (S->getKind() == StmtKind::If) {
+                    IfInfo.InnerIf = dyn_cast<IfStmt>(S);
+                }
+                return false;
+            }
+            if (IfInfo.OuterIf && S->getKind() == StmtKind::Brace) {
+                return true;
+            }
+            return false;
+        }
+    } Walker(CursorInfo.TrailingStmt->getStartLoc());
+    Walker.walk(CursorInfo.TrailingStmt);
+    return Walker.IfInfo;
+}
+
+bool RefactoringActionCollapseNestedIfExpr::isApplicable(ResolvedCursorInfo Tok) {
+    return findCollapseNestedIfTarget(Tok).isValid();
+}
+
+bool RefactoringActionCollapseNestedIfExpr::performChange() {
+    auto Target = findCollapseNestedIfTarget(CursorInfo);
+    if (!Target.isValid())
+        return true;
+    auto OuterIfConditionals = Target.OuterIf->getCond().vec();
+    auto InnerIfConditionals = Target.InnerIf->getCond().vec();
+
+    auto OuterIfConditionalText = Lexer::getCharSourceRangeFromSourceRange(SM, OuterIfConditionals[0].getSourceRange()).str();
+    auto InnerIfConditionalText = Lexer::getCharSourceRangeFromSourceRange(SM, InnerIfConditionals[0].getSourceRange()).str();
+    auto ThenStatementText = Lexer::getCharSourceRangeFromSourceRange(SM, Target.InnerIf->getThenStmt()->getSourceRange()).str();
+
+    llvm::SmallString<64> DeclBuffer;
+    llvm::raw_svector_ostream OS(DeclBuffer);
+    OS << tok::kw_if << " (" << OuterIfConditionalText << ") && (" << InnerIfConditionalText << ") " << ThenStatementText;
+
+    EditConsumer.accept(SM, Lexer::getCharSourceRangeFromSourceRange(SM, Target.OuterIf->getSourceRange()), DeclBuffer.str());
+    return false;
+}
+
 /// The helper class analyzes a given nominal decl or an extension decl to
 /// decide whether stubs are required to filled in and the context in which
 /// these stubs should be filled.
