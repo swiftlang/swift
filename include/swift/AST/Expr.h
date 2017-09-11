@@ -1612,9 +1612,22 @@ public:
 /// subscript is available.
 class DynamicLookupExpr : public Expr {
 protected:
-  explicit DynamicLookupExpr(ExprKind kind) : Expr(kind, /*Implicit=*/false) { }
+  Expr *Base;
+  ConcreteDeclRef Member;
+
+  explicit DynamicLookupExpr(ExprKind kind, ConcreteDeclRef member, Expr *base)
+    : Expr(kind, /*Implicit=*/false), Base(base), Member(member) { }
 
 public:
+  /// Retrieve the member to which this access refers.
+  ConcreteDeclRef getMember() const { return Member; }
+
+  /// Retrieve the base of the expression.
+  Expr *getBase() const { return Base; }
+
+  /// Replace the base of the expression.
+  void setBase(Expr *base) { Base = base; }
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_DynamicLookupExpr &&
            E->getKind() <= ExprKind::Last_DynamicLookupExpr;
@@ -1637,8 +1650,6 @@ public:
 /// print(x.foo!(17)) // x.foo has type ((i : Int) -> String)?
 /// \endcode
 class DynamicMemberRefExpr : public DynamicLookupExpr {
-  Expr *Base;
-  ConcreteDeclRef Member;
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
 
@@ -1646,18 +1657,9 @@ public:
   DynamicMemberRefExpr(Expr *base, SourceLoc dotLoc,
                        ConcreteDeclRef member,
                        DeclNameLoc nameLoc)
-    : DynamicLookupExpr(ExprKind::DynamicMemberRef),
-      Base(base), Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
+    : DynamicLookupExpr(ExprKind::DynamicMemberRef, member, base),
+      DotLoc(dotLoc), NameLoc(nameLoc) {
     }
-
-  /// Retrieve the base of the expression.
-  Expr *getBase() const { return Base; }
-
-  /// Replace the base of the expression.
-  void setBase(Expr *base) { Base = base; }
-
-  /// Retrieve the member to which this access refers.
-  ConcreteDeclRef getMember() const { return Member; }
 
   /// Retrieve the location of the member name.
   DeclNameLoc getNameLoc() const { return NameLoc; }
@@ -1707,9 +1709,7 @@ class DynamicSubscriptExpr final
       public TrailingCallArguments<DynamicSubscriptExpr> {
   friend TrailingCallArguments;
 
-  Expr *Base;
   Expr *Index;
-  ConcreteDeclRef Member;
 
   DynamicSubscriptExpr(Expr *base, Expr *index, ArrayRef<Identifier> argLabels,
                        ArrayRef<SourceLoc> argLabelLocs,
@@ -1761,9 +1761,6 @@ public:
   bool hasTrailingClosure() const {
     return DynamicSubscriptExprBits.HasTrailingClosure;
   }
-
-  /// Retrieve the member to which this access refers.
-  ConcreteDeclRef getMember() const { return Member; }
 
   SourceLoc getLoc() const { return Index->getStartLoc(); }
 
