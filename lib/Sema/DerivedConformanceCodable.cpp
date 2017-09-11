@@ -244,7 +244,22 @@ validateCodingKeysEnum(TypeChecker &tc, EnumDecl *codingKeysDecl,
   if (!properties.empty() &&
       proto->isSpecificProtocol(KnownProtocolKind::Decodable)) {
     for (auto it = properties.begin(); it != properties.end(); ++it) {
-      if (it->second->getParentInitializer() != nullptr) {
+      auto *varDecl = it->second;
+
+      // Optional vars (not lets!) have an implicit default value of nil.
+      if (!varDecl->isLet()) {
+        if (!varDecl->hasType())
+          tc.validateDecl(varDecl);
+
+        if (varDecl->hasType()) {
+          auto varTypeDecl = varDecl->getType()->getAnyNominal();
+          if (varTypeDecl == tc.Context.getOptionalDecl() ||
+              varTypeDecl == tc.Context.getImplicitlyUnwrappedOptionalDecl())
+            continue;
+        }
+      }
+
+      if (varDecl->getParentInitializer() != nullptr) {
         // Var has a default value.
         continue;
       }
