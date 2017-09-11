@@ -641,13 +641,6 @@ static bool shouldContractEdge(ConstraintKind kind) {
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Equal:
-
-  // We currently only allow subtype contractions for the purpose of 
-  // parameter binding constraints.
-  // TODO: We do this because of how inout parameter bindings are handled
-  // for implicit closure parameters. We should consider adjusting our
-  // current approach to unlock more opportunities for subtype contractions.
-  case ConstraintKind::Subtype:
     return true;
 
   default:
@@ -671,12 +664,7 @@ static bool isStrictInoutSubtypeConstraint(Constraint *constraint) {
     t1 = tt->getElementType(0).getPointer();
   }
 
-  auto iot = t1->getAs<InOutType>();
-
-  if (!iot)
-    return false;
-
-  return !iot->getObjectType()->isTypeVariableOrMember();
+  return t1->is<InOutType>();
 }
 
 bool ConstraintGraph::contractEdges() {
@@ -697,14 +685,6 @@ bool ConstraintGraph::contractEdges() {
       if (shouldContractEdge(kind)) {
         auto t1 = constraint->getFirstType()->getDesugaredType();
         auto t2 = constraint->getSecondType()->getDesugaredType();
-
-        if (kind == ConstraintKind::Subtype) {
-          if (auto iot1 = t1->getAs<InOutType>()) {
-            t1 = iot1->getObjectType().getPointer();
-          } else {
-            continue;
-          }
-        }
 
         auto tyvar1 = t1->getAs<TypeVariableType>();
         auto tyvar2 = t2->getAs<TypeVariableType>();
