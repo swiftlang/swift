@@ -1657,7 +1657,7 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo &Input,
                      SwiftArgs, OpArgs);
     }
 
-    IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Input, Receiver] {
+    IFaceGenRef->accessASTAsync([IFaceGenRef, Offset, Input, Receiver] {
       SwiftInterfaceGenContext::ResolvedEntity Entity;
       Entity = IFaceGenRef->resolveEntityForOffset(Offset);
       if (Entity.isResolved()) {

@@ -1025,7 +1025,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
 
   std::vector<NoteRegion> NoteRegions(Renamer.Ranges.size());
   std::transform(Ranges.begin(), Ranges.end(), NoteRegions.begin(),
-                 [&SM, BufferId](RenameRangeDetail &Detail) -> NoteRegion {
+                 [&SM](RenameRangeDetail &Detail) -> NoteRegion {
     auto Start = SM.getLineAndColumn(Detail.Range.getStart());
     auto End = SM.getLineAndColumn(Detail.Range.getEnd());
     return {Detail.RangeKind, Start.first, Start.second, End.first, End.second, Detail.Index};
