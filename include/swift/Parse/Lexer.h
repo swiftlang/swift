@@ -536,8 +536,8 @@ private:
   bool tryLexConflictMarker();
 };
   
-/// Given an ordered token \param Array, get the iterator pointing to the first
-/// token that is not before \param Loc.
+/// Given an ordered token \param Array , get the iterator pointing to the first
+/// token that is not before \param Loc .
 template<typename ArrayTy, typename Iterator = typename ArrayTy::iterator>
 Iterator token_lower_bound(ArrayTy &Array, SourceLoc Loc) {
   return std::lower_bound(Array.begin(), Array.end(), Loc,

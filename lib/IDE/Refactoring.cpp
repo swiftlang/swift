@@ -1328,16 +1328,16 @@ bool RefactoringActionExtractExprBase::performChange() {
     Collector.walk(BS);
 
     if (ExtractRepeated) {
-      unsigned BufferId = *TheFile->getBufferID();
-
       // Tokenize the brace statement; all expressions should have their tokens
       // in this array.
-      std::vector<Token> AllToks(tokenize(Ctx.LangOpts, SM, BufferId,
-          /*start offset*/SM.getLocOffsetInBuffer(BS->getStartLoc(), BufferId),
-          /*end offset*/SM.getLocOffsetInBuffer(BS->getEndLoc(), BufferId)));
+      auto AllTokens = TheFile->getAllTokens();
+      auto StartIt = token_lower_bound(AllTokens, BS->getStartLoc());
+      auto EndIt = token_lower_bound(AllTokens, BS->getEndLoc());
 
       // Collect all expressions we are going to extract.
-      SimilarExprCollector(SM, SelectedExpr, AllToks, AllExpressions).walk(BS);
+      SimilarExprCollector(SM, SelectedExpr,
+        AllTokens.slice(StartIt - AllTokens.begin(), EndIt - StartIt + 1),
+                           AllExpressions).walk(BS);
     } else {
       AllExpressions.insert(SelectedExpr);
     }
