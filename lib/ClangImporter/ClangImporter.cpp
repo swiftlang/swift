@@ -3334,5 +3334,12 @@ bool swift::isInOverlayModuleForImportedModule(DeclContext *overlayDC,
     return false;
 
   auto overlayModule = overlayDC->getParentModule();
-  return overlayModule == importedClangModuleUnit->getAdapterModule();
+  if (overlayModule == importedClangModuleUnit->getAdapterModule())
+    return true;
+
+  // Is this a private module that's re-exported to the public (overlay) name?
+  auto clangModule =
+    importedClangModuleUnit->getClangModule()->getTopLevelModule();
+  return !clangModule->ExportAsModule.empty() &&
+    clangModule->ExportAsModule == overlayModule->getName().str();
 }
