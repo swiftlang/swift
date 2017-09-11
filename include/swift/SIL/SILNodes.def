@@ -285,11 +285,20 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(ObjCMetatypeToObjectInst, ConversionInst, objc_metatype_to_object, None, DoesNotRelease)
     INST(ObjCExistentialMetatypeToObjectInst, ConversionInst, objc_existential_metatype_to_object, None,
          DoesNotRelease)
-    // We have to use a MayRead here to block moving the ultimate release
-    // accross the cast (which reads the type metadata). With Semantic SIL we
-    // should be able to move this back to None - it should model the scoping
-    // and forbid the compiler from moving the ultimate retain.
+    // unconditional_checked_cast_value reads the source value and produces
+    // a new value with a potentially different representation.
     INST(UnconditionalCheckedCastValueInst, ConversionInst, unconditional_checked_cast_value, MayRead, MayRelease)
+    // unconditional_checked_cast_inst is only MayRead to prevent a subsequent
+    // release of the cast's source from being hoisted above the cast:
+    // retain X
+    // Y = unconditional_checked_cast_inst X
+    // _ = Y
+    // release X // This release cannot be reordered with the cast.
+    //
+    // With Semantic SIL, this pattern of unbalanced retain/release
+    // should never happen.  Since unconditional_checked_cast is a
+    // scalar cast that doesn't affect the value's representation, its
+    // side effect can then be modeled as None.
     INST(UnconditionalCheckedCastInst, ConversionInst, unconditional_checked_cast, MayRead, DoesNotRelease)
     VALUE_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
   INST(IsNonnullInst, SILInstruction, is_nonnull, None, DoesNotRelease)
