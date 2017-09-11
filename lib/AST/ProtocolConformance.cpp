@@ -316,7 +316,7 @@ void NormalProtocolConformance::resolveLazyInfo() const {
   mutableThis->setState(ProtocolConformanceState::Complete);
 }
 
-void NormalProtocolConformance::setLazyLoader(LazyMemberLoader *resolver,
+void NormalProtocolConformance::setLazyLoader(LazyConformanceLoader *resolver,
                                               uint64_t contextData) {
   assert(!Resolver && "already has a resolver");
   Resolver = resolver;

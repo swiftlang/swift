@@ -349,7 +349,7 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// requirement signature of the protocol.
   ArrayRef<ProtocolConformanceRef> SignatureConformances;
 
-  LazyMemberLoader *Resolver = nullptr;
+  LazyConformanceLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
 
   friend class ASTContext;
@@ -518,7 +518,7 @@ public:
     return false;
   }
 
-  void setLazyLoader(LazyMemberLoader *resolver, uint64_t contextData);
+  void setLazyLoader(LazyConformanceLoader *resolver, uint64_t contextData);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getProtocol(), getDeclContext());

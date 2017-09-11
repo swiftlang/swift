@@ -274,7 +274,8 @@ using LookupTableMap = llvm::StringMap<std::unique_ptr<SwiftLookupTable>>;
 
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
-  : public LazyMemberLoader
+  : public LazyMemberLoader,
+    public LazyConformanceLoader
 {
   friend class ClangImporter;
   using Version = importer::ImportNameVersion;
