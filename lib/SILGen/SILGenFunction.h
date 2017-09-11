@@ -375,14 +375,6 @@ public:
       SGM.Profiler->emitCounterIncrement(B, N);
   }
 
-  /// Load the profiled execution count corresponding to \p N, if one is
-  /// available.
-  Optional<uint64_t> loadProfilerCount(ASTNode N) {
-    if (SGM.Profiler && SGM.Profiler->hasRegionCounters())
-      return SGM.Profiler->getExecutionCount(N);
-    return None;
-  }
-  
   SILGenFunction(SILGenModule &SGM, SILFunction &F);
   ~SILGenFunction();
   

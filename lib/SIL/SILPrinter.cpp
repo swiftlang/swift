@@ -2247,6 +2247,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
   
   if (!isExternalDeclaration()) {
+    if (auto eCount = getEntryCount()) {
+      OS << " !function_entry_count(" << eCount.getValue() << ")";
+    }
     OS << " {\n";
 
     SILPrinter(PrintCtx, (Aliases.empty() ? nullptr : &Aliases))

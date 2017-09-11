@@ -700,10 +700,9 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
 
   auto callback = SGM.M.createFunction(
       callbackLinkage, CallbackName, callbackType, genericEnv,
-      SILLocation(Witness), IsBare, F.isTransparent(), F.isSerialized(), IsNotThunk,
-      SubclassScope::NotApplicable,
-      /*inlineStrategy=*/InlineDefault,
-      /*EK=*/EffectsKind::Unspecified,
+      SILLocation(Witness), IsBare, F.isTransparent(), F.isSerialized(),
+      F.getEntryCount(), IsNotThunk, SubclassScope::NotApplicable,
+      /*inlineStrategy=*/InlineDefault, /*EK=*/EffectsKind::Unspecified,
       /*InsertBefore=*/&F);
 
   callback->setDebugScope(new (SGM.M) SILDebugScope(Witness, callback));

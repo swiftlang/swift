@@ -258,11 +258,10 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   if (NewFTy->getGenericSignature())
     GenericEnv = OrigF->getGenericEnvironment();
   SILFunction *NewF = OrigF->getModule().createFunction(
-      SILLinkage::Shared, Name, NewFTy,
-      GenericEnv, OrigF->getLocation(), OrigF->isBare(),
-      OrigF->isTransparent(), Serialized, OrigF->isThunk(),
-      OrigF->getClassSubclassScope(), OrigF->getInlineStrategy(),
-      OrigF->getEffectsKind(),
+      SILLinkage::Shared, Name, NewFTy, GenericEnv, OrigF->getLocation(),
+      OrigF->isBare(), OrigF->isTransparent(), Serialized,
+      OrigF->getEntryCount(), OrigF->isThunk(), OrigF->getClassSubclassScope(),
+      OrigF->getInlineStrategy(), OrigF->getEffectsKind(),
       /*InsertBefore*/ OrigF, OrigF->getDebugScope());
   if (OrigF->hasUnqualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();

@@ -180,6 +180,10 @@ private:
   /// The function's effects attribute.
   EffectsKind EffectsKindAttr;
 
+  /// Has value if there's a profile for this function
+  /// Contains Function Entry Count
+  Optional<uint64_t> EntryCount;
+
   /// True if this function is inlined at least once. This means that the
   /// debug info keeps a pointer to this function.
   bool Inlined = false;
@@ -204,9 +208,9 @@ private:
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
               Optional<SILLocation> loc, IsBare_t isBareSILFunction,
               IsTransparent_t isTrans, IsSerialized_t isSerialized,
-              IsThunk_t isThunk, SubclassScope classSubclassScope,
-              Inline_t inlineStrategy, EffectsKind E,
-              SILFunction *insertBefore,
+              Optional<uint64_t> entryCount, IsThunk_t isThunk,
+              SubclassScope classSubclassScope, Inline_t inlineStrategy,
+              EffectsKind E, SILFunction *insertBefore,
               const SILDebugScope *debugScope);
 
   static SILFunction *
@@ -214,7 +218,7 @@ private:
          CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
          Optional<SILLocation> loc, IsBare_t isBareSILFunction,
          IsTransparent_t isTrans, IsSerialized_t isSerialized,
-         IsThunk_t isThunk = IsNotThunk,
+         Optional<uint64_t> entryCount, IsThunk_t isThunk = IsNotThunk,
          SubclassScope classSubclassScope = SubclassScope::NotApplicable,
          Inline_t inlineStrategy = InlineDefault,
          EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
@@ -235,6 +239,8 @@ public:
   SILFunctionConventions getConventions() const {
     return SILFunctionConventions(LoweredType, getModule());
   }
+
+  Optional<uint64_t> getEntryCount() const { return EntryCount; }
 
   bool isNoReturnFunction() const;
 

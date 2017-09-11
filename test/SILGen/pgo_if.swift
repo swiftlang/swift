@@ -11,6 +11,7 @@
 // REQUIRES: OS=macosx
 
 // SIL-LABEL: // pgo_if.guess1
+// SIL-LABEL: sil @_T06pgo_if6guess1s5Int32VAD1x_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(5001) {
 // IR-LABEL: define swiftcc i32 @_T06pgo_if6guess1s5Int32VAD1x_tF
 // IR-OPT-LABEL: define swiftcc i32 @_T06pgo_if6guess1s5Int32VAD1x_tF
 public func guess1(x: Int32) -> Int32 {
@@ -26,6 +27,7 @@ public func guess1(x: Int32) -> Int32 {
 }
 
 // SIL-LABEL: // pgo_if.guess2
+// SIL-LABEL: sil @_T06pgo_if6guess2s5Int32VAD1x_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(5001) {
 // IR-LABEL: define swiftcc i32 @_T06pgo_if6guess2s5Int32VAD1x_tF
 // IR-OPT-LABEL: define swiftcc i32 @_T06pgo_if6guess2s5Int32VAD1x_tF
 public func guess2(x: Int32) -> Int32 {

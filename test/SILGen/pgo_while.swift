@@ -12,6 +12,7 @@
 // REQUIRES: OS=macosx
 
 // SIL-LABEL: // pgo_while.guessWhile
+// SIL-LABEL: sil @_T09pgo_while10guessWhiles5Int32VAD1x_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(42) {
 // IR-LABEL: define swiftcc i32 @_T09pgo_while10guessWhiles5Int32VAD1x_tF
 // IR-OPT-LABEL: define swiftcc i32 @_T09pgo_while10guessWhiles5Int32VAD1x_tF
 

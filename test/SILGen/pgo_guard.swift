@@ -11,6 +11,7 @@
 // REQUIRES: OS=macosx
 
 // SIL-LABEL: // pgo_guard.guess1
+// SIL-LABEL: sil @_T09pgo_guard6guess1s5Int32VAD1x_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(5002) {
 // IR-LABEL: define swiftcc i32 @_T09pgo_guard6guess1s5Int32VAD1x_tF
 // IR-OPT-LABEL: define swiftcc i32 @_T09pgo_guard6guess1s5Int32VAD1x_tF
 

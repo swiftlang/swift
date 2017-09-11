@@ -483,12 +483,12 @@ public:
 
   /// \brief Return the declaration of a utility function that can,
   /// but needn't, be shared between modules.
-  SILFunction *getOrCreateSharedFunction(SILLocation loc,
-                                         StringRef name,
+  SILFunction *getOrCreateSharedFunction(SILLocation loc, StringRef name,
                                          CanSILFunctionType type,
                                          IsBare_t isBareSILFunction,
                                          IsTransparent_t isTransparent,
                                          IsSerialized_t isSerialized,
+                                         Optional<uint64_t> entryCount,
                                          IsThunk_t isThunk);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
@@ -497,30 +497,32 @@ public:
       SILLocation loc, StringRef name, SILLinkage linkage,
       CanSILFunctionType type, IsBare_t isBareSILFunction,
       IsTransparent_t isTransparent, IsSerialized_t isSerialized,
-      IsThunk_t isThunk = IsNotThunk,
+      Optional<uint64_t> entryCount = None, IsThunk_t isThunk = IsNotThunk,
       SubclassScope subclassScope = SubclassScope::NotApplicable);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
   /// exist.
-  SILFunction *getOrCreateFunction(SILLocation loc,
-                                   SILDeclRef constant,
-                                   ForDefinition_t forDefinition);
+  SILFunction *getOrCreateFunction(SILLocation loc, SILDeclRef constant,
+                                   ForDefinition_t forDefinition,
+                                   Optional<uint64_t> entryCount = None);
 
   /// \brief Create a function declaration.
   ///
   /// This signature is a direct copy of the signature of SILFunction::create()
   /// in order to simplify refactoring all SILFunction creation use-sites to use
   /// SILModule. Eventually the uses should probably be refactored.
-  SILFunction *createFunction(
-      SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
-      GenericEnvironment *genericEnv, Optional<SILLocation> loc,
-      IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-      IsSerialized_t isSerialized, IsThunk_t isThunk = IsNotThunk,
-      SubclassScope subclassScope = SubclassScope::NotApplicable,
-      Inline_t inlineStrategy = InlineDefault,
-      EffectsKind EK = EffectsKind::Unspecified,
-      SILFunction *InsertBefore = nullptr,
-      const SILDebugScope *DebugScope = nullptr);
+  SILFunction *
+  createFunction(SILLinkage linkage, StringRef name,
+                 CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
+                 Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+                 IsTransparent_t isTrans, IsSerialized_t isSerialized,
+                 Optional<uint64_t> entryCount = None,
+                 IsThunk_t isThunk = IsNotThunk,
+                 SubclassScope subclassScope = SubclassScope::NotApplicable,
+                 Inline_t inlineStrategy = InlineDefault,
+                 EffectsKind EK = EffectsKind::Unspecified,
+                 SILFunction *InsertBefore = nullptr,
+                 const SILDebugScope *DebugScope = nullptr);
 
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced
