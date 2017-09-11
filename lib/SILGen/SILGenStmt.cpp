@@ -497,8 +497,8 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
     // Enter a scope for any bound pattern variables.
     LexicalScope trueScope(SGF, S);
 
-    auto NumTrueTaken = SGF.loadProfilerCount(S->getThenStmt());
-    auto NumFalseTaken = SGF.loadProfilerCount(S->getElseStmt());
+    auto NumTrueTaken = SGF.SGM.loadProfilerCount(S->getThenStmt());
+    auto NumFalseTaken = SGF.SGM.loadProfilerCount(S->getElseStmt());
 
     SGF.emitStmtCondition(S->getCond(), falseDest, S, NumTrueTaken,
                           NumFalseTaken);
@@ -562,8 +562,8 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
 
   // Emit the condition bindings, branching to the bodyBB if they fail.  Since
   // we didn't push a scope, the bound variables are live after this statement.
-  auto NumFalseTaken = SGF.loadProfilerCount(S->getBody());
-  auto NumNonTaken = SGF.loadProfilerCount(S);
+  auto NumFalseTaken = SGF.SGM.loadProfilerCount(S->getBody());
+  auto NumNonTaken = SGF.SGM.loadProfilerCount(S);
   SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken);
 }
 
@@ -587,9 +587,9 @@ void StmtEmitter::visitWhileStmt(WhileStmt *S) {
   {
     // Enter a scope for any bound pattern variables.
     Scope conditionScope(SGF.Cleanups, S);
-    
-    auto NumTrueTaken = SGF.loadProfilerCount(S->getBody());
-    auto NumFalseTaken = SGF.loadProfilerCount(S);
+
+    auto NumTrueTaken = SGF.SGM.loadProfilerCount(S->getBody());
+    auto NumFalseTaken = SGF.SGM.loadProfilerCount(S);
     SGF.emitStmtCondition(S->getCond(), breakDest, S, NumTrueTaken, NumFalseTaken);
     
     // In the success path, emit the body of the while.
@@ -742,8 +742,8 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   if (SGF.B.hasValidInsertionPoint()) {
     // Evaluate the condition with the false edge leading directly
     // to the continuation block.
-    auto NumTrueTaken = SGF.loadProfilerCount(S->getBody());
-    auto NumFalseTaken = SGF.loadProfilerCount(S);
+    auto NumTrueTaken = SGF.SGM.loadProfilerCount(S->getBody());
+    auto NumFalseTaken = SGF.SGM.loadProfilerCount(S);
     Condition Cond = SGF.emitCondition(S->getCond(), /*hasFalseCode*/ false,
                                        /*invertValue*/ false, /*contArgs*/ {},
                                        NumTrueTaken, NumFalseTaken);
@@ -884,7 +884,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
         L.pointToEnd();
         scope.exitAndBranch(L);
       },
-      SGF.loadProfilerCount(S->getBody()));
+      SGF.SGM.loadProfilerCount(S->getBody()));
 
   // We add loop fail block, just to be defensive about intermediate
   // transformations performing cleanups at scope.exit(). We still jump to the
@@ -896,7 +896,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
         assert(!inputValue && "None should not be passed an argument!");
         scope.exitAndBranch(S);
       },
-      SGF.loadProfilerCount(S));
+      SGF.SGM.loadProfilerCount(S));
 
   std::move(switchEnumBuilder).emit();
 

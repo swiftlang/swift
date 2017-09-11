@@ -64,6 +64,14 @@ public:
   /// The indexed profile data to be used for PGO, or nullptr.
   std::unique_ptr<llvm::IndexedInstrProfReader> PGOReader;
 
+  /// Load the profiled execution count corresponding to \p N, if one is
+  /// available.
+  Optional<uint64_t> loadProfilerCount(ASTNode N) {
+    if (PGOReader && Profiler && Profiler->hasRegionCounters())
+      return Profiler->getExecutionCount(N);
+    return None;
+  }
+
   /// Mapping from SILDeclRefs to emitted SILFunctions.
   llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
   /// Mapping from ProtocolConformances to emitted SILWitnessTables.

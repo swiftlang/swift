@@ -1331,7 +1331,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
     auto caseBlock = clauses[rowIndex].getClientData<CaseStmt>();
     Optional<uint64_t> count = None;
     if (caseBlock) {
-      count = SGF.loadProfilerCount(caseBlock);
+      count = SGF.SGM.loadProfilerCount(caseBlock);
     }
     rowsToSpecialize.push_back({pattern, rowIndex, irrefutable, count});
   };
@@ -1348,7 +1348,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
     if (!specializer) {
       auto caseBlock = clauses[lastRow].getClientData<CaseStmt>();
       if (caseBlock) {
-        defaultCaseCount = SGF.loadProfilerCount(caseBlock);
+        defaultCaseCount = SGF.SGM.loadProfilerCount(caseBlock);
       }
       break;
     }
