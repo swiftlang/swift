@@ -31,7 +31,7 @@
       key.doc.brief: "fooInstanceVar Aaa. Bbb.",
       key.context: source.codecompletion.context.thisclass,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:15complete_member11FooProtocolP14fooInstanceVarSiv",
+      key.associated_usrs: "s:15complete_member11FooProtocolP14fooInstanceVarSivp",
       key.modulename: "complete_member"
     }
   ]

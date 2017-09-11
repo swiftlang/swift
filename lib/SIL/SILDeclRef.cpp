@@ -757,7 +757,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     assert(!isCurried);
     return mangler.mangleAccessorEntity(AccessorKind::IsMutableAddressor,
                                         AddressorKind::Unsafe,
-                                        getDecl(),
+                                        cast<AbstractStorageDecl>(getDecl()),
                                         /*isStatic*/ false,
                                         SKind);
 

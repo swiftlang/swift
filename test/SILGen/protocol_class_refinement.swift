@@ -45,7 +45,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: apply [[SET_CLSID]]<T>([[UID]], [[WRITE]])
   x.clsid = x.uid()
 
-  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSifs
+  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSivs
   // -- call x.uid()
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
@@ -63,7 +63,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // -- call x.uid()
   // CHECK: [[READ1:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
   // CHECK: [[X1:%.*]] = load [copy] [[READ1]]
-  // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_T025protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSifs
+  // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_T025protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSivs
   // CHECK: [[BORROWED_X1:%.*]] = begin_borrow [[X1]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
@@ -104,7 +104,7 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: apply [[SET_CLSID]]<T>([[UID]], [[WRITE]])
   x.clsid = x.uid()
 
-  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSifs
+  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSivs
   // -- call x.uid()
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T

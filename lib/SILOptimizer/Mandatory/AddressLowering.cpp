@@ -411,6 +411,8 @@ void OpaqueStorageAllocation::allocateOpaqueStorage() {
 void OpaqueStorageAllocation::convertIndirectFunctionArgs() {
   // Insert temporary argument loads at the top of the function.
   SILBuilder argBuilder(pass.F->getEntryBlock()->begin());
+  argBuilder.setSILConventions(
+      SILModuleConventions::getLoweredAddressConventions());
 
   auto fnConv = pass.F->getConventions();
   unsigned argIdx = fnConv.getSILArgIndexOfFirstParam();
@@ -572,6 +574,8 @@ void OpaqueStorageAllocation::allocateForValue(SILValue value,
   }
 
   SILBuilder allocBuilder(pass.F->begin()->begin());
+  allocBuilder.setSILConventions(
+      SILModuleConventions::getLoweredAddressConventions());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(getLocForValue(value), value->getType());
 
@@ -580,6 +584,8 @@ void OpaqueStorageAllocation::allocateForValue(SILValue value,
   // Insert stack deallocations.
   for (TermInst *termInst : pass.returnInsts) {
     SILBuilder deallocBuilder(termInst);
+    deallocBuilder.setSILConventions(
+        SILModuleConventions::getLoweredAddressConventions());
     deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
   }
 }
@@ -713,7 +719,10 @@ class ApplyRewriter {
 
 public:
   ApplyRewriter(SILInstruction *origCall, AddressLoweringState &pass)
-      : pass(pass), apply(origCall), argBuilder(origCall) {}
+      : pass(pass), apply(origCall), argBuilder(origCall) {
+    argBuilder.setSILConventions(
+        SILModuleConventions::getLoweredAddressConventions());
+  }
 
   void rewriteParameters();
   void rewriteIndirectParameter(Operand *operand);
@@ -755,6 +764,8 @@ static void insertStackDeallocationAtCall(AllocStackInst *allocInst,
   switch (applyInst->getKind()) {
   case ValueKind::ApplyInst: {
     SILBuilder deallocBuilder(&*std::next(lastUse->getIterator()));
+    deallocBuilder.setSILConventions(
+        SILModuleConventions::getLoweredAddressConventions());
     deallocBuilder.createDeallocStack(allocInst->getLoc(), allocInst);
     break;
   }
@@ -824,11 +835,14 @@ void ApplyRewriter::canonicalizeResults(
       SILInstruction *result = directResultValues[resultIdx];
       if (!result) {
         SILBuilder resultBuilder(std::next(SILBasicBlock::iterator(applyInst)));
+        resultBuilder.setSILConventions(
+            SILModuleConventions::getLoweredAddressConventions());
         result = resultBuilder.createTupleExtract(applyInst->getLoc(),
                                                   applyInst, resultIdx);
         directResultValues[resultIdx] = result;
       }
       SILBuilder B(destroyInst);
+      B.setSILConventions(SILModuleConventions::getLoweredAddressConventions());
       auto &TL = pass.F->getModule().getTypeLowering(result->getType());
       TL.emitDestroyValue(B, destroyInst->getLoc(), result);
     }
@@ -860,6 +874,8 @@ SILValue ApplyRewriter::materializeIndirectResultAddress(
     // TODO: Find the try_apply's result block.
     // Build results outside-in to next stack allocations.
     SILBuilder resultBuilder(std::next(SILBasicBlock::iterator(origCallInst)));
+    resultBuilder.setSILConventions(
+        SILModuleConventions::getLoweredAddressConventions());
     // This is a formally indirect argument, but is loadable.
     loadInst = resultBuilder.createLoad(loc, allocInst,
                                         LoadOwnershipQualifier::Unqualified);
@@ -907,6 +923,8 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   // Prepare to emit a new call instruction.
   SILLocation loc = origCallInst->getLoc();
   SILBuilder callBuilder(origCallInst);
+  callBuilder.setSILConventions(
+      SILModuleConventions::getLoweredAddressConventions());
 
   // The new call instruction's SIL calling convention.
   SILFunctionConventions loweredCalleeConv(
@@ -966,9 +984,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   case ValueKind::ApplyInst:
     newCallInst = callBuilder.createApply(
         loc, apply.getCallee(), apply.getSubstitutions(), newCallArgs,
-        cast<ApplyInst>(origCallInst)->isNonThrowing(),
-        nullptr,
-        SILModuleConventions::getLoweredAddressConventions());
+        cast<ApplyInst>(origCallInst)->isNonThrowing(), nullptr);
     break;
   case ValueKind::TryApplyInst:
     // TODO: insert dealloc in the catch block.
@@ -984,6 +1000,9 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   // TODO: handle bbargs from try_apply.
   SILBuilder resultBuilder(
     std::next(SILBasicBlock::iterator(origCallInst)));
+  resultBuilder.setSILConventions(
+      SILModuleConventions::getLoweredAddressConventions());
+
   SmallVector<Operand*, 8> origUses(origCallInst->getUses());
   for (Operand *operand : origUses) {
     auto *extractInst = dyn_cast<TupleExtractInst>(operand->getUser());
@@ -1057,6 +1076,7 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
       break;
   }
   SILBuilder B(insertPt);
+  B.setSILConventions(SILModuleConventions::getLoweredAddressConventions());
 
   // Gather direct function results.
   unsigned numOrigDirectResults =
@@ -1152,7 +1172,9 @@ class AddressOnlyUseRewriter
 
 public:
   explicit AddressOnlyUseRewriter(AddressLoweringState &pass)
-      : pass(pass), B(*pass.F), addrMat(pass, B) {}
+      : pass(pass), B(*pass.F), addrMat(pass, B) {
+    B.setSILConventions(SILModuleConventions::getLoweredAddressConventions());
+  }
 
   void visitOperand(Operand *operand) {
     currOper = operand;
@@ -1288,7 +1310,9 @@ class AddressOnlyDefRewriter
 
 public:
   explicit AddressOnlyDefRewriter(AddressLoweringState &pass)
-      : pass(pass), B(*pass.F), addrMat(pass, B) {}
+      : pass(pass), B(*pass.F), addrMat(pass, B) {
+    B.setSILConventions(SILModuleConventions::getLoweredAddressConventions());
+  }
 
   void visitInst(SILInstruction *inst) { visit(inst); }
 

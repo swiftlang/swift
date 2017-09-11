@@ -301,7 +301,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
       if ((accessKind != AccessKind::Write &&
            memberDecl->isGetterMutating()) ||
           (accessKind != AccessKind::Read &&
-           !memberDecl->isSetterNonMutating())) {
+           memberDecl->isSetterMutating())) {
         return AccessKind::ReadWrite;
       }
 
@@ -1582,8 +1582,8 @@ DynamicSubscriptExpr::DynamicSubscriptExpr(Expr *base, Expr *index,
                                            bool hasTrailingClosure,
                                            ConcreteDeclRef member,
                                            bool implicit)
-    : DynamicLookupExpr(ExprKind::DynamicSubscript),
-      Base(base), Index(index), Member(member) {
+    : DynamicLookupExpr(ExprKind::DynamicSubscript, member, base),
+      Index(index) {
   DynamicSubscriptExprBits.NumArgLabels = argLabels.size();
   DynamicSubscriptExprBits.HasArgLabelLocs = !argLabelLocs.empty();
   DynamicSubscriptExprBits.HasTrailingClosure = hasTrailingClosure;

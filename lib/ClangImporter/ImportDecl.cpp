@@ -4584,6 +4584,7 @@ namespace {
 
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
+      result->setIsSetterMutating(false);
       result->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
       applyPropertyOwnership(result, decl->getPropertyAttributesAsWritten());
@@ -5573,6 +5574,9 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       markAsVariant(swiftSetter, *swift3SetterName);
   }
 
+  if (swiftGetter) property->setIsGetterMutating(swiftGetter->isMutating());
+  if (swiftSetter) property->setIsSetterMutating(swiftSetter->isMutating());
+
   // Make this a computed property.
   property->makeComputed(SourceLoc(), swiftGetter, swiftSetter, nullptr,
                          SourceLoc());
@@ -6295,6 +6299,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 
   subscript->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
+  subscript->setIsSetterMutating(false);
   subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
                           SourceLoc());
   auto indicesType = bodyParams->getType(C);

@@ -3886,6 +3886,7 @@ namespace {
       assert(method && "Didn't find a method?");
 
       // The declaration we found must be exposed to Objective-C.
+      tc.validateDecl(method);
       if (!method->isObjC()) {
         tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
                     foundDecl->getDescriptiveKind(), foundDecl->getFullName())
@@ -3984,8 +3985,7 @@ namespace {
           } else {
             // Key paths don't work with mutating-get properties.
             auto varDecl = cast<VarDecl>(property);
-            if (varDecl->hasAccessorFunctions()
-                && varDecl->getGetter()->isMutating()) {
+            if (varDecl->isGetterMutating()) {
               cs.TC.diagnose(origComponent.getLoc(),
                              diag::expr_keypath_mutating_getter,
                              property->getFullName());
@@ -4038,7 +4038,7 @@ namespace {
             break;
           }
           auto subscript = cast<SubscriptDecl>(foundDecl->choice.getDecl());
-          if (subscript->getGetter()->isMutating()) {
+          if (subscript->isGetterMutating()) {
             cs.TC.diagnose(origComponent.getLoc(),
                            diag::expr_keypath_mutating_getter,
                            subscript->getFullName());
@@ -6350,7 +6350,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
     // If neither the property's getter nor its setter are mutating, the base
     // can be an rvalue.
     if (!SD->isGetterMutating()
-        && (!isSettableFromHere || SD->isSetterNonMutating()))
+        && (!isSettableFromHere || !SD->isSetterMutating()))
       return baseObjectTy;
 
     // If we're calling an accessor, keep the base as an inout type, because the

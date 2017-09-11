@@ -4921,7 +4921,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "rawValue",
-        key.usr: "s:SC8FooEnum1V8rawValues6UInt32Vv",
+        key.usr: "s:SC8FooEnum1V8rawValues6UInt32Vvp",
         key.offset: 156,
         key.length: 20,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
@@ -4929,12 +4929,12 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzvp"
           },
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzvp"
           }
         ]
       },
@@ -5044,7 +5044,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "rawValue",
-        key.usr: "s:SC8FooEnum2V8rawValues6UInt32Vv",
+        key.usr: "s:SC8FooEnum2V8rawValues6UInt32Vvp",
         key.offset: 393,
         key.length: 20,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
@@ -5052,12 +5052,12 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzvp"
           },
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzvp"
           }
         ]
       },
@@ -5174,7 +5174,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "rawValue",
-        key.usr: "s:SC8FooEnum3V8rawValues6UInt32Vv",
+        key.usr: "s:SC8FooEnum3V8rawValues6UInt32Vvp",
         key.offset: 662,
         key.length: 20,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
@@ -5182,12 +5182,12 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzvp"
           },
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzvp"
           }
         ]
       },
@@ -5780,9 +5780,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "isEmpty",
-        key.usr: "s:s10SetAlgebraPsE7isEmptySbv::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s10SetAlgebraPsE7isEmptySbv",
-        key.doc.full_as_xml: "<Other><Name>isEmpty</Name><USR>s:s10SetAlgebraPsE7isEmptySbv</USR><Declaration>var isEmpty: Bool { get }</Declaration><CommentParts><Abstract><Para>A Boolean value that indicates whether the set has no elements.</Para></Abstract></CommentParts></Other>",
+        key.usr: "s:s10SetAlgebraPsE7isEmptySbvp::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE7isEmptySbvp",
+        key.doc.full_as_xml: "<Other><Name>isEmpty</Name><USR>s:s10SetAlgebraPsE7isEmptySbvp</USR><Declaration>var isEmpty: Bool { get }</Declaration><CommentParts><Abstract><Para>A Boolean value that indicates whether the set has no elements.</Para></Abstract></CommentParts></Other>",
         key.offset: 2559,
         key.length: 25,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>isEmpty</decl.name>: <decl.var.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
@@ -7466,7 +7466,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "rawValue",
-        key.usr: "s:SC11FooSubEnum1V8rawValues6UInt32Vv",
+        key.usr: "s:SC11FooSubEnum1V8rawValues6UInt32Vvp",
         key.offset: 7353,
         key.length: 20,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
@@ -7474,12 +7474,12 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzvp"
           },
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzvp"
           }
         ]
       },

@@ -100,18 +100,18 @@ public let singleClosure: () -> () = {
 }
 
 public var singlePattern: Int {
-  // CHECK-DAG: 10LocalTypes13singlePatternSifg06SingleD6StructL_V
+  // CHECK-DAG: 10LocalTypes13singlePatternSivg06SingleD6StructL_V
   struct SinglePatternStruct {
     let spsi: Int
   }
-  // CHECK-DAG: 10LocalTypes13singlePatternSifg06SingleD5ClassL_C
+  // CHECK-DAG: 10LocalTypes13singlePatternSivg06SingleD5ClassL_C
   class SinglePatternClass {
     let spcs: String
     init(s: String) {
       self.spcs = s
     }
   }
-  // CHECK-DAG: 10LocalTypes13singlePatternSifg06SingleD4EnumL_O
+  // CHECK-DAG: 10LocalTypes13singlePatternSivg06SingleD4EnumL_O
   enum SinglePatternEnum {
     case SPEI(Int)
   }

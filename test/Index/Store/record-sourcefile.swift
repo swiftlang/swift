@@ -9,17 +9,17 @@
 // CHECK: record-sourcefile.swift
 // CHECK: ------------
 // CHECK: struct/Swift | S1 | s:4file2S1V | <no-cgname> | Def,Ref,RelCont -
-// CHECK: instance-method/acc-get/Swift | getter:property | s:4file2S1V8propertySifg | <no-cgname> | Def,Ref,Call,Impl,RelChild,RelRec,RelCall,RelAcc,RelCont - 
-// CHECK: instance-property/Swift | property | [[property_USR:s:4file2S1V8propertySiv]] | <no-cgname> | Def,Ref,Read,RelChild,RelCont -
-// CHECK: static-method/acc-get/Swift | getter:staticProperty | s:4file2S1V14staticPropertySifg | <no-cgname> | Def,Ref,Call,Impl,RelChild,RelRec,RelCall,RelAcc,RelCont -
+// CHECK: instance-method/acc-get/Swift | getter:property | s:4file2S1V8propertySivg | <no-cgname> | Def,Ref,Call,Impl,RelChild,RelRec,RelCall,RelAcc,RelCont - 
+// CHECK: instance-property/Swift | property | [[property_USR:s:4file2S1V8propertySivp]] | <no-cgname> | Def,Ref,Read,RelChild,RelCont -
+// CHECK: static-method/acc-get/Swift | getter:staticProperty | s:4file2S1V14staticPropertySivg | <no-cgname> | Def,Ref,Call,Impl,RelChild,RelRec,RelCall,RelAcc,RelCont -
 // CHECK: static-property/Swift | staticProperty | s:{{.*}} | <no-cgname> | Def,Ref,Read,RelChild,RelCont -
 // CHECK: instance-property/Swift | computedPropertyGetSet | s:{{.*}} | <no-cgname> | Def,RelChild -
 // CHECK: struct/Swift | Int | s:Si | <no-cgname> | Ref -
-// CHECK: instance-method/acc-get/Swift | getter:computedPropertyGetSet | s:4file2S1V22computedPropertyGetSetSifg | <no-cgname> | Def,RelChild,RelAcc -
-// CHECK: instance-method/acc-set/Swift | setter:computedPropertyGetSet | s:4file2S1V22computedPropertyGetSetSifs | <no-cgname> | Def,RelChild,RelAcc -
+// CHECK: instance-method/acc-get/Swift | getter:computedPropertyGetSet | s:4file2S1V22computedPropertyGetSetSivg | <no-cgname> | Def,RelChild,RelAcc -
+// CHECK: instance-method/acc-set/Swift | setter:computedPropertyGetSet | s:4file2S1V22computedPropertyGetSetSivs | <no-cgname> | Def,RelChild,RelAcc -
 // CHECK: instance-property/Swift | computedPropertyWillDid | s:{{.*}} | <no-cgname> | Def,RelChild -
-// CHECK: instance-method/acc-willset/Swift | willSet:computedPropertyWillDid | s:4file2S1V23computedPropertyWillDidSifw | <no-cgname> | Def,RelChild,RelAcc -
-// CHECK: instance-method/acc-didset/Swift | didSet:computedPropertyWillDid | s:4file2S1V23computedPropertyWillDidSifW | <no-cgname> | Def,RelChild,RelAcc -
+// CHECK: instance-method/acc-willset/Swift | willSet:computedPropertyWillDid | s:4file2S1V23computedPropertyWillDidSivw | <no-cgname> | Def,RelChild,RelAcc -
+// CHECK: instance-method/acc-didset/Swift | didSet:computedPropertyWillDid | s:4file2S1V23computedPropertyWillDidSivW | <no-cgname> | Def,RelChild,RelAcc -
 // CHECK: instance-property/Swift | computedPropertyAddressor | s:{{.*}} | <no-cgname> | Def,RelChild -
 // CHECK: instance-method/acc-addr/Swift | <no-name> | s:{{.*}} | <no-cgname> | Def,RelChild,RelAcc -
 // CHECK: instance-method/acc-mutaddr/Swift | <no-name> | s:{{.*}} | <no-cgname> | Def,RelChild,RelAcc -

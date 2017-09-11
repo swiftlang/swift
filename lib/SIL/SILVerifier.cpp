@@ -2367,8 +2367,8 @@ public:
           break;
         case ValueKind::LoadInst:
           // A 'non-taking' value load is harmless.
-          return cast<LoadInst>(inst)->getOwnershipQualifier() !=
-                 LoadOwnershipQualifier::Copy;
+          return cast<LoadInst>(inst)->getOwnershipQualifier() ==
+                 LoadOwnershipQualifier::Take;
           break;
         case ValueKind::DebugValueAddrInst:
           // Harmless use.
@@ -2380,8 +2380,8 @@ public:
       }
       return false;
     };
-    require(!isMutatingOrConsuming(OEI) ||
-                allowedAccessKind == OpenedExistentialAccess::Mutable,
+    require(allowedAccessKind == OpenedExistentialAccess::Mutable
+            || !isMutatingOrConsuming(OEI),
             "open_existential_addr uses that consumes or mutates but is not "
             "opened for mutation");
   }

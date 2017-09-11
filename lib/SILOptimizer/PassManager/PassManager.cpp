@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -316,6 +317,8 @@ void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
     return;
   }
 
+  updateSILModuleStatsBeforeTransform(F->getModule(), SFT, *this, NumPassesRun);
+
   CurrentPassHasInvalidated = false;
 
   if (SILPrintPassName)
@@ -338,8 +341,8 @@ void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   Mod->removeDeleteNotificationHandler(SFT);
 
+  auto Delta = (std::chrono::system_clock::now() - StartTime).count();
   if (SILPrintPassTime) {
-    auto Delta = (std::chrono::system_clock::now() - StartTime).count();
     llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F->getName()
                  << ")\n";
   }
@@ -351,6 +354,9 @@ void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
                  << NumOptimizationIterations << ") ***\n";
     F->dump(getOptions().EmitVerboseSIL);
   }
+
+  updateSILModuleStatsAfterTransform(F->getModule(), SFT, *this, NumPassesRun,
+                                     Delta);
 
   // Remember if this pass didn't change anything.
   if (!CurrentPassHasInvalidated)
@@ -440,6 +446,8 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
   SMT->injectPassManager(this);
   SMT->injectModule(Mod);
 
+  updateSILModuleStatsBeforeTransform(*Mod, SMT, *this, NumPassesRun);
+
   CurrentPassHasInvalidated = false;
 
   if (SILPrintPassName)
@@ -460,8 +468,8 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
   Mod->removeDeleteNotificationHandler(SMT);
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
+  auto Delta = (std::chrono::system_clock::now() - StartTime).count();
   if (SILPrintPassTime) {
-    auto Delta = (std::chrono::system_clock::now() - StartTime).count();
     llvm::dbgs() << Delta << " (" << SMT->getName() << ",Module)\n";
   }
 
@@ -473,6 +481,8 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
                  << NumOptimizationIterations << ") ***\n";
     printModule(Mod, Options.EmitVerboseSIL);
   }
+
+  updateSILModuleStatsAfterTransform(*Mod, SMT, *this, NumPassesRun, Delta);
 
   if (Options.VerifyAll &&
       (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
@@ -606,6 +616,10 @@ void SILPassManager::resetAndRemoveTransformations() {
 
 void SILPassManager::setStageName(llvm::StringRef NextStage) {
   StageName = NextStage;
+}
+
+StringRef SILPassManager::getStageName() const {
+  return StageName;
 }
 
 const SILOptions &SILPassManager::getOptions() const {

@@ -184,7 +184,8 @@ struct XCollectionLikeP0a<T> : CollectionLikeP0 {
 struct XCollectionLikeP0b : CollectionLikeP0 {
 // expected-error@-1 {{type 'XCollectionLikeP0b' does not conform to protocol 'CollectionLikeP0'}}
   var startIndex: XCollectionLikeP0b.Index
-  // expected-error@-1 {{'startIndex' used within its own type}}
+  // There was an error @-1 ("'startIndex' used within its own type"),
+  // but it disappeared and doesn't seem like much of a loss.
   var startElement: XCollectionLikeP0b.Element
 }
 

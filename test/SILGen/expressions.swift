@@ -197,7 +197,7 @@ func calls() {
 // CHECK-LABEL: sil hidden @_T011expressions11module_path{{[_0-9a-zA-Z]*}}F
 func module_path() -> Int {
   return FooBar.x
-  // CHECK: [[x_GET:%[0-9]+]] = function_ref @_T06FooBar1xSifau
+  // CHECK: [[x_GET:%[0-9]+]] = function_ref @_T06FooBar1xSivau
   // CHECK-NEXT: apply [[x_GET]]()
 }
 

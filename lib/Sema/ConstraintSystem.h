@@ -2270,6 +2270,14 @@ public:
                                      TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
 
+  /// \brief Subroutine of \c matchTypes(), used to bind a type to a
+  /// type variable.
+  SolutionKind
+  matchTypesBindTypeVar(TypeVariableType *typeVar, Type type,
+                        ConstraintKind kind, TypeMatchOptions flags,
+                        ConstraintLocatorBuilder locator,
+                        std::function<SolutionKind()> formUnsolvedResult);
+
 public: // FIXME: public due to statics in CSSimplify.cpp
   /// \brief Attempt to match up types \c type1 and \c type2, which in effect
   /// is solving the given type constraint between these two types.

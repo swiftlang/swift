@@ -25,7 +25,7 @@ class TestDerived : TestClass {
 // CHECK: apply [[FINALMETH]]([[BORROWED_ARG]])
 // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK: [[FINALPROP:%[0-9]+]] = function_ref @_T05final9TestClassC0A8PropertySifg
+// CHECK: [[FINALPROP:%[0-9]+]] = function_ref @_T05final9TestClassC0A8PropertySivg
 // CHECK: apply [[FINALPROP]]([[BORROWED_ARG]])
 // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
 func testDirectDispatch(c : TestClass) -> Int {

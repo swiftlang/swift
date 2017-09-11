@@ -260,7 +260,7 @@ class SILValue {
 
 public:
   SILValue(const ValueBase *V = nullptr)
-    : Value((ValueBase *)V) { }
+    : Value(const_cast<ValueBase *>(V)) { }
 
   ValueBase *operator->() const { return Value; }
   ValueBase &operator*() const { return *Value; }
@@ -784,6 +784,12 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
   V->print(OS);
   return OS;
 }
+
+/// Map a SILValue mnemonic name to its ValueKind.
+ValueKind getSILValueKind(StringRef Name);
+
+/// Map ValueKind to a corresponding mnemonic name.
+StringRef getSILValueName(ValueKind Kind);
 
 } // end namespace swift
 

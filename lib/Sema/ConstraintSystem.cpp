@@ -677,7 +677,7 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
   // getter and setter are nonmutating.
   return !storage->hasStorage() &&
       !storage->isGetterMutating() &&
-      storage->isSetterNonMutating();
+      !storage->isSetterMutating();
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,

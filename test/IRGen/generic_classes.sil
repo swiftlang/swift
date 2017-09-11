@@ -49,9 +49,9 @@ import Swift
 
 // -- Check that offset vars are emitted for fixed-layout generics
 //    <rdar://problem/15081049>
-// CHECK: @_T015generic_classes22RootGenericFixedLayoutC1xs5UInt8VvWvd = hidden constant i64 16, align 8
-// CHECK: @_T015generic_classes22RootGenericFixedLayoutC1ySayxGvWvd = hidden constant i64 24, align 8
-// CHECK: @_T015generic_classes22RootGenericFixedLayoutC1zs5UInt8VvWvd = hidden constant i64 32, align 8
+// CHECK: @_T015generic_classes22RootGenericFixedLayoutC1xs5UInt8VvpWvd = hidden constant i64 16, align 8
+// CHECK: @_T015generic_classes22RootGenericFixedLayoutC1ySayxGvpWvd = hidden constant i64 24, align 8
+// CHECK: @_T015generic_classes22RootGenericFixedLayoutC1zs5UInt8VvpWvd = hidden constant i64 32, align 8
 
 // -- fixed-layout nongeneric descriptor
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524

@@ -71,14 +71,14 @@ struct Y1 {
 }
 
 struct Y2 {
-  subscript(idx: Int) -> TypoType { // expected-error 3{{use of undeclared type 'TypoType'}}
+  subscript(idx: Int) -> TypoType { // expected-error {{use of undeclared type 'TypoType'}}
     get { repeat {} while true }
     set {}
   }
 }
 
 class Y3 {
-  subscript(idx: Int) -> TypoType { // expected-error 3{{use of undeclared type 'TypoType'}}
+  subscript(idx: Int) -> TypoType { // expected-error {{use of undeclared type 'TypoType'}}
     get { repeat {} while true }
     set {}
   }

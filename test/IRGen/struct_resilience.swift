@@ -113,7 +113,7 @@ public struct StructWithResilientStorage {
 // resilient layout, and go through the field offset vector in the
 // metadata when accessing stored properties.
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc {{i32|i64}} @_T017struct_resilience26StructWithResilientStorageV1nSifg(%T17struct_resilience26StructWithResilientStorageV* {{.*}})
+// CHECK-LABEL: define{{( protected)?}} swiftcc {{i32|i64}} @_T017struct_resilience26StructWithResilientStorageV1nSivg(%T17struct_resilience26StructWithResilientStorageV* {{.*}})
 // CHECK: [[METADATA:%.*]] = call %swift.type* @_T017struct_resilience26StructWithResilientStorageVMa()
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
 // CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] 3
@@ -135,7 +135,7 @@ public struct StructWithIndirectResilientEnum {
 }
 
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc {{i32|i64}} @_T017struct_resilience31StructWithIndirectResilientEnumV1nSifg(%T17struct_resilience31StructWithIndirectResilientEnumV* {{.*}})
+// CHECK-LABEL: define{{( protected)?}} swiftcc {{i32|i64}} @_T017struct_resilience31StructWithIndirectResilientEnumV1nSivg(%T17struct_resilience31StructWithIndirectResilientEnumV* {{.*}})
 // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds %T17struct_resilience31StructWithIndirectResilientEnumV, %T17struct_resilience31StructWithIndirectResilientEnumV* %0, i32 0, i32 1
 // CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], [[INT]]* [[FIELD_PAYLOAD_PTR]]

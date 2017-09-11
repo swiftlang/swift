@@ -33,6 +33,7 @@ set(swift_runtime_objc_sources
 
 set(swift_runtime_sources
     AnyHashableSupport.cpp
+    Array.cpp
     Casting.cpp
     CygwinPort.cpp
     Demangle.cpp

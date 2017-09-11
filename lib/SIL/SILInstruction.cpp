@@ -168,6 +168,29 @@ void SILInstruction::dropAllReferences() {
   }
 }
 
+// Initialize the static members of SILInstruction.
+int SILInstruction::NumCreatedInstructions = 0;
+int SILInstruction::NumDeletedInstructions = 0;
+
+/// Map a SILInstruction name to its SILInstructionKind.
+SILInstructionKind swift::getSILInstructionKind(StringRef InstName) {
+  auto Kind = getSILValueKind(InstName);
+  if (Kind >= ValueKind::First_SILInstruction &&
+      Kind <= ValueKind::Last_SILInstruction)
+    return SILInstructionKind(Kind);
+
+#ifdef NDEBUG
+  llvm::errs() << "Unknown SIL instruction name\n";
+  abort();
+#endif
+  llvm_unreachable("Unknown SIL insruction name");
+}
+
+/// Map SILInstructionKind to a corresponding SILInstruction name.
+StringRef swift::getSILInstructionName(SILInstructionKind Kind) {
+  return getSILValueName(ValueKind(Kind));
+}
+
 namespace {
 class InstructionDestroyer
     : public SILInstructionVisitor<InstructionDestroyer> {

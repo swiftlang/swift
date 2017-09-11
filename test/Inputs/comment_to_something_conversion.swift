@@ -15,7 +15,7 @@
 
 /// Aaa.  subscript(i: Int).
 @objc public subscript(i: Int) -> Int {
-// CHECK: {{.*}}DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>subscript(_:)</Name><USR>s:14comment_to_xml21A010_AttachToEntitiesC9subscriptS2ici</USR><Declaration>@objc public subscript(i: Int) -&gt; Int { get set }</Declaration><CommentParts><Abstract><Para>Aaa.  subscript(i: Int).</Para></Abstract></CommentParts></Other>]
+// CHECK: {{.*}}DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>subscript(_:)</Name><USR>s:14comment_to_xml21A010_AttachToEntitiesCS2icip</USR><Declaration>@objc public subscript(i: Int) -&gt; Int { get set }</Declaration><CommentParts><Abstract><Para>Aaa.  subscript(i: Int).</Para></Abstract></CommentParts></Other>]
     get {
 // CHECK: {{.*}}DocCommentAsXML=none
       return 0

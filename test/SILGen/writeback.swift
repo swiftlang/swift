@@ -45,12 +45,12 @@ func bar(x x: inout Foo) {}
 x.foo()
 // CHECK: [[FOO:%.*]] = function_ref @_T09writeback3FooV3foo{{[_0-9a-zA-Z]*}}F : $@convention(method) (@inout Foo) -> ()
 // CHECK: [[X_TEMP:%.*]] = alloc_stack $Foo
-// CHECK: [[GET_X:%.*]] = function_ref @_T09writeback1xAA3FooVfg : $@convention(thin) () -> Foo
+// CHECK: [[GET_X:%.*]] = function_ref @_T09writeback1xAA3FooVvg : $@convention(thin) () -> Foo
 // CHECK: [[X:%.*]] = apply [[GET_X]]() : $@convention(thin) () -> Foo
 // CHECK: store [[X]] to [trivial] [[X_TEMP]]
 // CHECK: apply [[FOO]]([[X_TEMP]]) : $@convention(method) (@inout Foo) -> ()
 // CHECK: [[X1:%.*]] = load [trivial] [[X_TEMP]] : $*Foo
-// CHECK: [[SET_X:%.*]] = function_ref @_T09writeback1xAA3FooVfs : $@convention(thin) (Foo) -> ()
+// CHECK: [[SET_X:%.*]] = function_ref @_T09writeback1xAA3FooVvs : $@convention(thin) (Foo) -> ()
 // CHECK: apply [[SET_X]]([[X1]]) : $@convention(thin) (Foo) -> ()
 // CHECK: dealloc_stack [[X_TEMP]] : $*Foo
 
@@ -58,12 +58,12 @@ x.foo()
 bar(x: &x)
 // CHECK: [[BAR:%.*]] = function_ref @_T09writeback3baryAA3FooVz1x_tF : $@convention(thin) (@inout Foo) -> ()
 // CHECK: [[X_TEMP:%.*]] = alloc_stack $Foo
-// CHECK: [[GET_X:%.*]] = function_ref @_T09writeback1xAA3FooVfg : $@convention(thin) () -> Foo
+// CHECK: [[GET_X:%.*]] = function_ref @_T09writeback1xAA3FooVvg : $@convention(thin) () -> Foo
 // CHECK: [[X:%.*]] = apply [[GET_X]]() : $@convention(thin) () -> Foo
 // CHECK: store [[X]] to [trivial] [[X_TEMP]] : $*Foo
 // CHECK: apply [[BAR]]([[X_TEMP]]) : $@convention(thin) (@inout Foo) -> ()
 // CHECK: [[X1:%.*]] = load [trivial] [[X_TEMP]] : $*Foo
-// CHECK: [[SET_X:%.*]] = function_ref @_T09writeback1xAA3FooVfs : $@convention(thin) (Foo) -> ()
+// CHECK: [[SET_X:%.*]] = function_ref @_T09writeback1xAA3FooVvs : $@convention(thin) (Foo) -> ()
 // CHECK: apply [[SET_X]]([[X1]]) : $@convention(thin) (Foo) -> ()
 // CHECK: dealloc_stack [[X_TEMP]] : $*Foo
 
@@ -72,10 +72,10 @@ func zang(x x: Foo) {}
 // No writeback for pass-by-value argument
 zang(x: x)
 // CHECK:  function_ref @_T09writeback4zangyAA3FooV1x_tF : $@convention(thin) (Foo) -> ()
-// CHECK-NOT: @_T09writeback1xAA3FooVfs
+// CHECK-NOT: @_T09writeback1xAA3FooVvs
 zang(x: readonly)
 // CHECK:  function_ref @_T09writeback4zangyAA3FooV1x_tF : $@convention(thin) (Foo) -> ()
-// CHECK-NOT: @_T09writeback8readonlyAA3FooVfs
+// CHECK-NOT: @_T09writeback8readonlyAA3FooVvs
 
 func zung() -> Int { return 0 }
 
@@ -84,13 +84,13 @@ bar(x: &x[zung()])
 // CHECK: [[BAR:%.*]] = function_ref @_T09writeback3baryAA3FooVz1x_tF : $@convention(thin) (@inout Foo) -> ()
 // CHECK: [[ZUNG:%.*]] = function_ref @_T09writeback4zungSiyF : $@convention(thin) () -> Int
 // CHECK: [[INDEX:%.*]] = apply [[ZUNG]]() : $@convention(thin) () -> Int
-// CHECK: [[GET_X:%.*]] = function_ref @_T09writeback1xAA3FooVfg : $@convention(thin) () -> Foo
-// CHECK: [[GET_SUBSCRIPT:%.*]] = function_ref @_T09writeback3FooV9subscript{{[_0-9a-zA-Z]*}}fg : $@convention(method) (Int, Foo) -> Foo
+// CHECK: [[GET_X:%.*]] = function_ref @_T09writeback1xAA3FooVvg : $@convention(thin) () -> Foo
+// CHECK: [[GET_SUBSCRIPT:%.*]] = function_ref @_T09writeback3FooV{{[_0-9a-zA-Z]*}}ig : $@convention(method) (Int, Foo) -> Foo
 // CHECK: apply [[GET_SUBSCRIPT]]([[INDEX]], {{%.*}}) : $@convention(method) (Int, Foo) -> Foo
 // CHECK: apply [[BAR]]({{%.*}}) : $@convention(thin) (@inout Foo) -> ()
-// CHECK: [[SET_SUBSCRIPT:%.*]] = function_ref @_T09writeback3FooV9subscript{{[_0-9a-zA-Z]*}}fs : $@convention(method) (Foo, Int, @inout Foo) -> ()
+// CHECK: [[SET_SUBSCRIPT:%.*]] = function_ref @_T09writeback3FooV{{[_0-9a-zA-Z]*}}is : $@convention(method) (Foo, Int, @inout Foo) -> ()
 // CHECK: apply [[SET_SUBSCRIPT]]({{%.*}}, [[INDEX]], {{%.*}}) : $@convention(method) (Foo, Int, @inout Foo) -> ()
-// CHECK: function_ref @_T09writeback1xAA3FooVfs : $@convention(thin) (Foo) -> ()
+// CHECK: function_ref @_T09writeback1xAA3FooVvs : $@convention(thin) (Foo) -> ()
 
 protocol Fungible {}
 extension Foo : Fungible {}
@@ -107,10 +107,10 @@ func funge(x x: inout Fungible) {}
 funge(x: &addressOnly)
 // CHECK: [[FUNGE:%.*]] = function_ref @_T09writeback5fungeyAA8Fungible_pz1x_tF : $@convention(thin) (@inout Fungible) -> ()
 // CHECK: [[TEMP:%.*]] = alloc_stack $Fungible
-// CHECK: [[GET:%.*]] = function_ref @_T09writeback11addressOnlyAA8Fungible_pfg : $@convention(thin) () -> @out Fungible
+// CHECK: [[GET:%.*]] = function_ref @_T09writeback11addressOnlyAA8Fungible_pvg : $@convention(thin) () -> @out Fungible
 // CHECK: apply [[GET]]([[TEMP]]) : $@convention(thin) () -> @out Fungible
 // CHECK: apply [[FUNGE]]([[TEMP]]) : $@convention(thin) (@inout Fungible) -> ()
-// CHECK: [[SET:%.*]] = function_ref @_T09writeback11addressOnlyAA8Fungible_pfs : $@convention(thin) (@in Fungible) -> ()
+// CHECK: [[SET:%.*]] = function_ref @_T09writeback11addressOnlyAA8Fungible_pvs : $@convention(thin) (@in Fungible) -> ()
 // CHECK: apply [[SET]]([[TEMP]]) : $@convention(thin) (@in Fungible) -> ()
 // CHECK: dealloc_stack [[TEMP]] : $*Fungible
 

@@ -211,8 +211,15 @@ public:
   /// owned by the pass manager. Analysis passes will be kept.
   void resetAndRemoveTransformations();
 
-  // Sets the name of the current optimization stage used for debugging.
+  /// \brief Set the name of the current optimization stage.
+  ///
+  /// This is useful for debugging.
   void setStageName(llvm::StringRef NextStage = "");
+
+  /// \brief Get the name of the current optimization stage.
+  ///
+  /// This is useful for debugging.
+  StringRef getStageName() const;
 
   /// D'tor.
   ~SILPassManager();
