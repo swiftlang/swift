@@ -875,7 +875,7 @@ private:
   };
 
 
-  std::vector<Token> TokensInRange;
+  ArrayRef<Token> TokensInRange;
   SourceLoc Start;
   SourceLoc End;
 
@@ -1066,32 +1066,41 @@ public:
   createInstance(SourceFile &File, unsigned StartOff, unsigned Length) {
     SourceManager &SM = File.getASTContext().SourceMgr;
     unsigned BufferId = File.getBufferID().getValue();
-
-    LangOptions Opts = File.getASTContext().LangOpts;
-    Opts.AttachCommentsToDecls = true;
-    std::vector<Token> AllTokens = tokenize(Opts, SM, BufferId, 0, 0, false);
-    auto TokenComp = [&](Token &LHS, SourceLoc Loc) {
-      return SM.isBeforeInBuffer(LHS.getLoc(), Loc);
-    };
-
+    auto AllTokens = File.getAllTokens();
     SourceLoc StartRaw = SM.getLocForOffset(BufferId, StartOff);
     SourceLoc EndRaw = SM.getLocForOffset(BufferId, StartOff + Length);
 
     // This points to the first token after or on the start loc.
-    auto StartIt = std::lower_bound(AllTokens.begin(), AllTokens.end(), StartRaw,
-                                    TokenComp);
-    // This points to the first token after or on the end loc;
-    auto EndIt = std::lower_bound(AllTokens.begin(), AllTokens.end(), EndRaw,
-                                  TokenComp);
+    auto StartIt = token_lower_bound(AllTokens, StartRaw);
+
+    // Skip all the comments.
+    while(StartIt != AllTokens.end()) {
+      if (StartIt->getKind() != tok::comment)
+        break;
+      StartIt ++;
+    }
+
     // Erroneous case.
-    if (StartIt == AllTokens.end() || EndIt == AllTokens.begin())
+    if (StartIt == AllTokens.end())
       return nullptr;
 
-    // The start token is inclusive.
-    unsigned StartIdx = StartIt - AllTokens.begin();
+    // This points to the first token after or on the end loc;
+    auto EndIt = token_lower_bound(AllTokens, EndRaw);
 
+    // Adjust end token to skip comments.
+    while (EndIt != AllTokens.begin()) {
+      EndIt --;
+      if (EndIt->getKind() != tok::comment)
+        break;
+    }
+
+    // Erroneous case.
+    if (EndIt < StartIt)
+      return nullptr;
+
+    unsigned StartIdx = StartIt - AllTokens.begin();
     return std::unique_ptr<Implementation>(new Implementation(File,
-      llvm::makeArrayRef(AllTokens.data() + StartIdx, EndIt - StartIt)));
+      AllTokens.slice(StartIdx, EndIt - StartIt + 1)));
   }
 
   static std::unique_ptr<Implementation>
