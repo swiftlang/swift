@@ -942,12 +942,9 @@ void NominalTypeDecl::prepareConformanceTable() const {
   }
 
   // Add protocols for any synthesized protocol attributes.
-  for (auto attr : getAttrs()) {
-    if (auto synthesizedProto = dyn_cast<SynthesizedProtocolAttr>(attr)) {
-      if (auto proto = getASTContext().getProtocol(
-                         synthesizedProto->getProtocolKind())) {
-        ConformanceTable->addSynthesizedConformance(mutableThis, proto);
-      }
+  for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    if (auto proto = getASTContext().getProtocol(attr->getProtocolKind())) {
+      ConformanceTable->addSynthesizedConformance(mutableThis, proto);
     }
   }
 }

@@ -804,9 +804,8 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
 
     // Find the superclass type that matches where the conformance was
     // declared.
-    Type superclassTy = type->getSuperclass();
-    while (superclassTy->getAnyNominal() != conformingNominal)
-      superclassTy = superclassTy->getSuperclass();
+    auto *conformingClass = cast<ClassDecl>(conformingNominal);
+    Type superclassTy = type->getSuperclassForDecl(conformingClass);
 
     // Look up the inherited conformance.
     ModuleDecl *module = entry->getDeclContext()->getParentModule();
