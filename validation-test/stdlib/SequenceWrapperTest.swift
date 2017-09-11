@@ -19,7 +19,6 @@ struct BasicSequenceWrapper<
   Base_: Sequence
 > : _SequenceWrapper, Sequence {
   var _base: Base_
-  typealias Iterator = Base_.Iterator
 }
 
 var sequenceWrapperTests = TestSuite("SequenceWrapper")
