@@ -54,39 +54,6 @@ using namespace importer;
 using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
-ImportNameVersion
-importer::nameVersionFromOptions(const LangOptions &langOpts) {
-  auto languageVersion = langOpts.EffectiveLanguageVersion;
-  switch (languageVersion[0]) {
-  default:
-    llvm_unreachable("unknown swift language version");
-  case 1:
-  case 2:
-    return ImportNameVersion::Swift2;
-  case 3:
-    return ImportNameVersion::Swift3;
-  // Fixme: Figure out the importing story for 5 instead of falling back to 4.
-  case 4:
-  case 5:
-    return ImportNameVersion::Swift4;
-  }
-}
-
-unsigned importer::majorVersionNumberForNameVersion(ImportNameVersion version) {
-  switch (version) {
-  case ImportNameVersion::Raw:
-    return 0;
-  case ImportNameVersion::Swift2:
-    return 2;
-  case ImportNameVersion::Swift3:
-    return 3;
-  case ImportNameVersion::Swift4:
-    return 4;
-  }
-
-  llvm_unreachable("Unhandled ImportNameVersion in switch.");
-}
-
 
 /// Determine whether the given Clang selector matches the given
 /// selector pieces.
@@ -582,13 +549,13 @@ template <typename A>
 static bool matchesVersion(A *versionedAttr, ImportNameVersion version) {
   clang::VersionTuple attrVersion = versionedAttr->getVersion();
   if (attrVersion.empty())
-    return version == ImportNameVersion::LAST_VERSION;
-  return attrVersion.getMajor() == majorVersionNumberForNameVersion(version);
+    return version == ImportNameVersion::maxVersion();
+  return attrVersion.getMajor() == version.majorVersionNumber();
 }
 
-const clang::SwiftNameAttr *
-importer::findSwiftNameAttr(const clang::Decl *decl,
-                            ImportNameVersion version) {
+
+static const clang::SwiftNameAttr *
+findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
 #ifndef NDEBUG
   if (Optional<const clang::Decl *> def = getDefinitionForClangTypeDecl(decl)) {
     assert((*def == nullptr || *def == decl) &&
@@ -596,11 +563,11 @@ importer::findSwiftNameAttr(const clang::Decl *decl,
   }
 #endif
 
-  if (version == ImportNameVersion::Raw)
+  if (version == ImportNameVersion::raw())
     return nullptr;
 
   // Handle versioned API notes for Swift 3 and later. This is the common case.
-  if (version != ImportNameVersion::Swift2) {
+  if (version != ImportNameVersion::swift2()) {
     for (auto *attr : decl->attrs()) {
       if (auto *versionedAttr = dyn_cast<clang::SwiftVersionedAttr>(attr)) {
         if (!matchesVersion(versionedAttr, version))
@@ -843,7 +810,7 @@ NameImporter::determineEffectiveContext(const clang::NamedDecl *decl,
     case EnumKind::Enum:
     case EnumKind::Options:
       // Enums are mapped to Swift enums, Options to Swift option sets.
-      if (version != ImportNameVersion::Raw) {
+      if (version != ImportNameVersion::raw()) {
         res = cast<clang::DeclContext>(enumDecl);
         break;
       }
@@ -960,7 +927,7 @@ static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
     switch (nameImporter.getEnumKind(ED)) {
     case EnumKind::Enum:
     case EnumKind::Options:
-      if (version != ImportNameVersion::Raw)
+      if (version != ImportNameVersion::raw())
         break;
       LLVM_FALLTHROUGH;
     case EnumKind::Constants:
@@ -1125,7 +1092,7 @@ bool NameImporter::hasErrorMethodNameCollision(
 static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
                                         ImportNameVersion version,
                                         CtorInitializerKind initKind) {
-  return (version == ImportNameVersion::Raw || method->isPropertyAccessor()) &&
+  return (version == ImportNameVersion::raw() || method->isPropertyAccessor()) &&
          (initKind == CtorInitializerKind::Factory ||
           initKind == CtorInitializerKind::ConvenienceFactory);
 }
@@ -1136,7 +1103,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   ImportedName result;
 
   /// Whether we want a Swift 3 or later name
-  bool swift3OrLaterName = version >= ImportNameVersion::Swift3;
+  bool swift3OrLaterName = version > ImportNameVersion::swift2();
 
   // Objective-C categories and extensions don't have names, despite
   // being "named" declarations.
@@ -1516,7 +1483,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   // Enumeration constants may have common prefixes stripped.
   bool strippedPrefix = false;
-  if (version != ImportNameVersion::Raw && isa<clang::EnumConstantDecl>(D)) {
+  if (version != ImportNameVersion::raw() && isa<clang::EnumConstantDecl>(D)) {
     auto enumDecl = cast<clang::EnumDecl>(D->getDeclContext());
     auto enumInfo = getEnumInfo(enumDecl);
 

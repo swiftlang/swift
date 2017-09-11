@@ -1625,8 +1625,8 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   }
 
   // If we have a name to import as, add this entry to the table.
-  ImportNameVersion currentVersion =
-      nameVersionFromOptions(nameImporter.getLangOpts());
+  auto currentVersion =
+      ImportNameVersion::fromOptions(nameImporter.getLangOpts());
   if (auto importedName = nameImporter.importName(named, currentVersion)) {
     SmallPtrSet<DeclName, 8> distinctNames;
     distinctNames.insert(importedName.getDeclName());
@@ -1640,9 +1640,8 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
                               ArrayRef<Identifier>()),
                      named, importedName.getEffectiveContext());
 
-    forEachImportNameVersion([&] (ImportNameVersion alternateVersion) {
-      if (alternateVersion == currentVersion)
-        return;
+    currentVersion.forEachOtherImportNameVersion(
+        [&](ImportNameVersion alternateVersion) {
       auto alternateName = nameImporter.importName(named, alternateVersion);
       if (!alternateName)
         return;

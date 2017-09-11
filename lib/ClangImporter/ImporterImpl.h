@@ -1232,8 +1232,8 @@ public:
   /// If \p action returns false, the current name will \e not be added to the
   /// set of seen names.
   ///
-  /// The names are generated in the same order as
-  /// forEachImportNameVersionFromCurrent. The current name is always first.
+  /// The active name is always first, followed by the other names in the order
+  /// of ImportNameVersion::forEachOtherImportNameVersion.
   void forEachDistinctName(
       const clang::NamedDecl *decl,
       llvm::function_ref<bool(importer::ImportedName,

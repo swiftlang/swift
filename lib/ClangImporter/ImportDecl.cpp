@@ -351,8 +351,14 @@ void ClangImporter::Implementation::forEachDistinctName(
     llvm::function_ref<bool(ImportedName, ImportNameVersion)> action) {
   using ImportNameKey = std::pair<DeclName, EffectiveClangContext>;
   SmallVector<ImportNameKey, 8> seenNames;
-  forEachImportNameVersionFromCurrent(CurrentVersion,
-                                      [&](ImportNameVersion nameVersion) {
+
+  ImportedName newName = importFullName(decl, CurrentVersion);
+  ImportNameKey key(newName, newName.getEffectiveContext());
+  if (action(newName, CurrentVersion))
+    seenNames.push_back(key);
+
+  CurrentVersion.forEachOtherImportNameVersion(
+      [&](ImportNameVersion nameVersion) {
     // Check to see if the name is different.
     ImportedName newName = importFullName(decl, nameVersion);
     ImportNameKey key(newName, newName.getEffectiveContext());
@@ -1947,7 +1953,7 @@ namespace {
                                 Optional<ImportedName> &correctSwiftName) {
       ImportNameVersion canonicalVersion = getActiveSwiftVersion();
       if (isa<clang::TypeDecl>(D) || isa<clang::ObjCContainerDecl>(D)) {
-        canonicalVersion = ImportNameVersion::ForTypes;
+        canonicalVersion = ImportNameVersion::forTypes();
       }
       correctSwiftName = None;
 
@@ -2133,36 +2139,38 @@ namespace {
         // If we're importing a global as a member, we need to provide the
         // effective context.
         Impl.printSwiftName(
-            correctSwiftName,
+            correctSwiftName, getActiveSwiftVersion(),
             /*fullyQualified=*/correctSwiftName.importAsMember(), os);
       }
 
-      unsigned majorVersion = majorVersionNumberForNameVersion(getVersion());
       DeclAttribute *attr;
-      if (isActiveSwiftVersion() || getVersion() == ImportNameVersion::Raw) {
+      if (isActiveSwiftVersion() || getVersion() == ImportNameVersion::raw()) {
         // "Raw" is the Objective-C name, which was never available in Swift.
         // Variants within the active version are usually declarations that
         // have been superseded, like the accessors of a property.
         attr = AvailableAttr::createPlatformAgnostic(
             ctx, /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
             PlatformAgnosticAvailabilityKind::UnavailableInSwift);
-      } else if (getVersion() < getActiveSwiftVersion()) {
-        // A Swift 2 name, for example, was obsoleted in Swift 3.
-        attr = AvailableAttr::createPlatformAgnostic(
-            ctx, /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
-            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
-            clang::VersionTuple(majorVersion + 1));
       } else {
-        // Future names are introduced in their future version.
-        assert(getVersion() > getActiveSwiftVersion());
-        attr = new (ctx) AvailableAttr(
-            SourceLoc(), SourceRange(), PlatformKind::none,
-            /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
-            /*Introduced*/clang::VersionTuple(majorVersion), SourceRange(),
-            /*Deprecated*/clang::VersionTuple(), SourceRange(),
-            /*Obsoleted*/clang::VersionTuple(), SourceRange(),
-            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
-            /*Implicit*/false);
+        unsigned majorVersion = getVersion().majorVersionNumber();
+        if (getVersion() < getActiveSwiftVersion()) {
+          // A Swift 2 name, for example, was obsoleted in Swift 3.
+          attr = AvailableAttr::createPlatformAgnostic(
+              ctx, /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
+              PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
+              clang::VersionTuple(majorVersion + 1));
+        } else {
+          // Future names are introduced in their future version.
+          assert(getVersion() > getActiveSwiftVersion());
+          attr = new (ctx) AvailableAttr(
+              SourceLoc(), SourceRange(), PlatformKind::none,
+              /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
+              /*Introduced*/clang::VersionTuple(majorVersion), SourceRange(),
+              /*Deprecated*/clang::VersionTuple(), SourceRange(),
+              /*Obsoleted*/clang::VersionTuple(), SourceRange(),
+              PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
+              /*Implicit*/false);
+        }
       }
 
       decl->getAttrs().add(attr);
@@ -4854,7 +4862,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   // we don't care.
   Decl *importedDecl = nullptr;
   if (getVersion() >= getActiveSwiftVersion())
-    importedDecl = Impl.importDecl(decl, ImportNameVersion::ForTypes);
+    importedDecl = Impl.importDecl(decl, ImportNameVersion::forTypes());
   if (!importedDecl && getVersion() != getActiveSwiftVersion())
     importedDecl = Impl.importDecl(decl, getActiveSwiftVersion());
   auto typeDecl = dyn_cast_or_null<TypeDecl>(importedDecl);

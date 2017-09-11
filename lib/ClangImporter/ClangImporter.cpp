@@ -1650,7 +1650,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       BridgingHeaderExplicitlyRequested(!opts.BridgingHeader.empty()),
       DisableAdapterModules(opts.DisableAdapterModules),
       IsReadingBridgingPCH(false),
-      CurrentVersion(nameVersionFromOptions(ctx.LangOpts)),
+      CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
       platformAvailability(ctx.LangOpts),
       nameImporter() {}
@@ -3152,10 +3152,8 @@ void ClangImporter::Implementation::lookupValue(
         const clang::NamedDecl *recentClangDecl =
             clangDecl->getMostRecentDecl();
 
-        forEachImportNameVersionFromCurrent(CurrentVersion,
-                                            [&](ImportNameVersion nameVersion) {
-          if (nameVersion == CurrentVersion)
-            return;
+        CurrentVersion.forEachOtherImportNameVersion(
+            [&](ImportNameVersion nameVersion) {
           if (anyMatching)
             return;
 
