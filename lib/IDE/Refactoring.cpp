@@ -1257,15 +1257,10 @@ struct SimilarExprCollector: public SourceEntityWalker {
 
   /// Find all tokens included by an expression.
   llvm::ArrayRef<Token> getExprSlice(Expr *E) {
-    auto TokenComp = [&](const Token &LHS, SourceLoc Loc) {
-      return SM.isBeforeInBuffer(LHS.getLoc(), Loc);
-    };
     SourceLoc StartLoc = E->getStartLoc();
     SourceLoc EndLoc = E->getEndLoc();
-    auto StartIt = std::lower_bound(AllTokens.begin(), AllTokens.end(),
-                                    StartLoc, TokenComp);
-    auto EndIt = std::lower_bound(AllTokens.begin(), AllTokens.end(),
-                                  EndLoc, TokenComp);
+    auto StartIt = token_lower_bound(AllTokens, StartLoc);
+    auto EndIt = token_lower_bound(AllTokens, EndLoc);
     assert(StartIt->getLoc() == StartLoc);
     assert(EndIt->getLoc() == EndLoc);
     return AllTokens.slice(StartIt - AllTokens.begin(), EndIt - StartIt + 1);
