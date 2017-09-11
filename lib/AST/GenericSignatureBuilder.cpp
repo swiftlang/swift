@@ -194,7 +194,7 @@ namespace {
 
     friend bool operator!=(const EquivalenceClassVizIterator &lhs,
                            const EquivalenceClassVizIterator &rhs) {
-      return lhs.getBase() != rhs.getBase();
+      return !(lhs == rhs);
     }
   };
 }
