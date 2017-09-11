@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol _UnicodeEncoding_ {
+public protocol _UnicodeEncoding {
   /// The basic unit of encoding
   associatedtype CodeUnit : UnsignedInteger, FixedWidthInteger
   
@@ -49,7 +49,7 @@ public protocol _UnicodeEncoding_ {
   /// A type that can be used to parse a reversed sequence of
   /// `CodeUnits` into `EncodedScalar`s.
   associatedtype ReverseParser : Unicode.Parser
-  // where ReverseParser.Encoding == Self
+    where ReverseParser.Encoding == Self
 
   //===--------------------------------------------------------------------===//
   // FIXME: this requirement shouldn't be here and is mitigated by the default
@@ -60,15 +60,10 @@ public protocol _UnicodeEncoding_ {
   static func _isScalar(_ x: CodeUnit) -> Bool
 }
 
-extension _UnicodeEncoding_ {
+extension _UnicodeEncoding {
   // See note on declaration of requirement, above
   public static func _isScalar(_ x: CodeUnit) -> Bool { return false }
-}
 
-public protocol _UnicodeEncoding : _UnicodeEncoding_
-where ForwardParser.Encoding == Self, ReverseParser.Encoding == Self {}
-
-extension _UnicodeEncoding_ {
   public static func transcode<FromEncoding : Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
