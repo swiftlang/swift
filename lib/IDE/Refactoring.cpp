@@ -2135,10 +2135,8 @@ resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs, SourceFile &SF,
     });
   }
 
-  std::vector<Token> Tokens =
-      swift::tokenize(SF.getASTContext().LangOpts, SM, BufferID, 0, 0, true);
   NameMatcher Resolver(SF);
-  return Resolver.resolve(UnresolvedLocs, Tokens);
+  return Resolver.resolve(UnresolvedLocs, SF.getAllTokens());
 }
 
 int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
