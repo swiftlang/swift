@@ -3323,3 +3323,16 @@ importName(const clang::NamedDecl *D,
   return Impl.importFullName(D, Impl.CurrentVersion, preferredName).
     getDeclName();
 }
+
+bool swift::isInOverlayModuleForImportedModule(DeclContext *overlayDC,
+                                               DeclContext *importedDC) {
+  overlayDC = overlayDC->getModuleScopeContext();
+  importedDC = importedDC->getModuleScopeContext();
+
+  auto importedClangModuleUnit = dyn_cast<ClangModuleUnit>(importedDC);
+  if (!importedClangModuleUnit)
+    return false;
+
+  auto overlayModule = overlayDC->getParentModule();
+  return overlayModule == importedClangModuleUnit->getAdapterModule();
+}
