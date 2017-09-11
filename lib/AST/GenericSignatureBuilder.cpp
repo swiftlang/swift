@@ -5345,7 +5345,9 @@ static void collapseSameTypeComponentsThroughDelayedRequirements(
 
     // Collapse the sets
     if (unionSets(collapsedParents, lhsComponent, rhsComponent,
-                  numCollapsedParents))
+                  numCollapsedParents) &&
+        lhsComponent < numCollapsedParents &&
+        rhsComponent < numCollapsedParents)
       --remainingComponents;
   }
 
