@@ -608,6 +608,10 @@ func keywordInCaseAndLocalArgLabel(_ for: Int, for in: Int, class _: Int) {
   }
 }
 
+#if os(macOS)
+#endif
+// CHECK: <#kw>#if</#kw> <#id>os</#id>(<#id>macOS</#id>)
+
 // Keep this as the last test
 /**
   Trailing off ...

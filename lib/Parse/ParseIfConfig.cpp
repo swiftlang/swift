@@ -306,11 +306,11 @@ public:
 
     // FIXME: Perform the replacement macOS -> OSX elsewhere.
     if (Kind == PlatformConditionKind::OS && *ArgStr == "macOS") {
-      *ArgStr = "OSX";
       ArgP->setSubExpr(
           new (Ctx) UnresolvedDeclRefExpr(Ctx.getIdentifier(*ArgStr),
                                           DeclRefKind::Ordinary,
                                           DeclNameLoc(Arg->getLoc())));
+      *ArgStr = "OSX";
     }
 
     std::vector<StringRef> suggestions;
