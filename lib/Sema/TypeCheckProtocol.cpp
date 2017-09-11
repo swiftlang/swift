@@ -4157,6 +4157,96 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
   return TC.compareDeclarations(DC, decl1, decl2);
 }
 
+/// Determine the best associated type from which to infer a default associated
+/// type,
+///
+/// \param adoptee The type that's adopting a protocol whose type witnesses
+/// require a default.
+///
+/// \param homeAssocType The associated type within the protocol whose type
+/// witnesses are being inferred.
+///
+/// \returns the associated type from which we should infer a default, or
+/// \c nullptr if there is no associated type with a default.
+static AssociatedTypeDecl *getBestAssociatedTypeDefault(
+                                          TypeChecker &tc,
+                                          Type adoptee,
+                                          AssociatedTypeDecl *homeAssocType) {
+  Identifier name = homeAssocType->getName();
+  ProtocolDecl *homeProtocol = homeAssocType->getProtocol();
+
+  auto nominalAdoptee = adoptee->getAnyNominal();
+  if (!nominalAdoptee) return nullptr;
+
+  // Keep track of the associated types that have defaults and that we can use.
+  SmallVector<AssociatedTypeDecl *, 2> defaultedAssocTypes;
+
+  // Add a new associated type that is known to have a default of some sort.
+  auto addAssocType = [&](AssociatedTypeDecl *assocType) {
+    tc.validateDecl(assocType);
+
+    // FIXME: Reject default definitions that involve any type parameter
+    // other than 'Self'.
+    bool hasDependentMemberType =
+      assocType->getDefaultDefinitionLoc().getType().findIf(
+                                    [](Type type) {
+                                      return type->is<DependentMemberType>();
+                                    });
+    if (hasDependentMemberType) return;
+
+    // If the owning protocol inherits from the owning protocol of any of
+    // the existing, defaulted associated types, remove them; they aren't
+    // as specific.
+    auto proto = assocType->getProtocol();
+    bool isWorseThanExisting = false;
+    defaultedAssocTypes.erase(
+        std::remove_if(defaultedAssocTypes.begin(),
+                       defaultedAssocTypes.end(),
+                       [&](AssociatedTypeDecl *otherAssoc) {
+                         if (proto->inheritsFrom(otherAssoc->getProtocol()))
+                           return true;
+
+                         if (otherAssoc->getProtocol()->inheritsFrom(proto))
+                           isWorseThanExisting = true;
+
+                         return false;
+                       }),
+        defaultedAssocTypes.end());
+
+    if (!isWorseThanExisting)
+      defaultedAssocTypes.push_back(assocType);
+  };
+
+  // If the "home" associated type has a default, start with that.
+  bool homeAssocTypeHasDefault =
+    !homeAssocType->getDefaultDefinitionLoc().getType().isNull();
+  if (homeAssocTypeHasDefault)
+    defaultedAssocTypes.push_back(homeAssocType);
+
+  for (auto proto : nominalAdoptee->getAllProtocols()) {
+    if (proto == homeProtocol) continue;
+
+    for (auto member : proto->lookupDirect(name)) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        // We only care about associated types with default definitions.
+        if (assocType->getDefaultDefinitionLoc().getType().isNull())
+          continue;
+
+        // If this associated type's protocol inherits from the home protocol,
+        // consider it as a better match.
+        if (assocType->getProtocol()->inheritsFrom(homeProtocol)) {
+          addAssocType(assocType);
+        }
+      }
+    }
+  }
+
+  if (defaultedAssocTypes.size() == 1)
+    return defaultedAssocTypes.front();
+
+  return homeAssocTypeHasDefault ? homeAssocType : nullptr;
+}
+
 void ConformanceChecker::resolveTypeWitnesses() {
   llvm::SetVector<AssociatedTypeDecl *> unresolvedAssocTypes;
 
@@ -4231,22 +4321,36 @@ void ConformanceChecker::resolveTypeWitnesses() {
   Type failedDefaultedWitness;
   CheckTypeWitnessResult failedDefaultedResult;
 
+  // Retrieve the best associated type default.
+  llvm::SmallDenseMap<AssociatedTypeDecl *, AssociatedTypeDecl *> bestDefaults;
+  auto getBestAssociatedTypeDefault = [&](AssociatedTypeDecl *assocType) {
+    auto known = bestDefaults.find(assocType);
+    if (known != bestDefaults.end())
+      return known->second;
+
+    return (bestDefaults[assocType]
+              = ::getBestAssociatedTypeDefault(TC, Adoptee, assocType));
+  };
+
   // Local function to compute the default type of an associated type.
   auto computeDefaultTypeWitness = [&](AssociatedTypeDecl *assocType) -> Type {
+    assocType = getBestAssociatedTypeDefault(assocType);
+
     // If we don't have a default definition, we're done.
-    if (assocType->getDefaultDefinitionLoc().isNull())
+    if (!assocType)
       return Type();
 
-    auto selfType = Proto->getSelfInterfaceType();
+    auto assocTypeProto = assocType->getProtocol();
+    auto selfType = assocTypeProto->getSelfInterfaceType();
 
     // Create a set of type substitutions for all known associated type.
     // FIXME: Base this on dependent types rather than archetypes?
     TypeSubstitutionMap substitutions;
-    substitutions[Proto->mapTypeIntoContext(selfType)
+    substitutions[assocTypeProto->mapTypeIntoContext(selfType)
         ->castTo<ArchetypeType>()] = Adoptee;
-    for (auto member : Proto->getMembers()) {
+    for (auto member : assocTypeProto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        auto archetype = Proto->mapTypeIntoContext(
+        auto archetype = assocTypeProto->mapTypeIntoContext(
             assocType->getDeclaredInterfaceType())
                 ->getAs<ArchetypeType>();
         if (!archetype)
@@ -4278,7 +4382,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
     if (!defaultType)
       return Type();
 
-    if (auto failed = checkTypeWitness(TC, DC, Proto, assocType, defaultType)) {
+    if (auto failed = checkTypeWitness(TC, DC, assocTypeProto, assocType,
+                                       defaultType)) {
       // Record the failure, if we haven't seen one already.
       if (!failedDefaultedAssocType) {
         failedDefaultedAssocType = assocType;
