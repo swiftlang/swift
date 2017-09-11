@@ -308,10 +308,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
   llvm::DenseMap<const void*, tok> TokenKindChangeMap;
 
   std::vector<Token>::iterator lower_bound(SourceLoc Loc) {
-    return std::lower_bound(Bag.begin(), Bag.end(), Loc,
-      [](const Token &T, SourceLoc L) {
-        return T.getLoc().getOpaquePointerValue() < L.getOpaquePointerValue();
-    });
+    return token_lower_bound(Bag, Loc);
   }
 
   std::vector<Token>::iterator lower_bound(Token Tok) {
@@ -400,7 +397,6 @@ public:
     llvm::SmallVector<Token, 4> TokensToConsume;
     if (Tok.hasComment()) {
       relexComment(Tok.getCommentRange(), TokensToConsume);
-      Tok.clearCommentLength();
     }
 
     TokensToConsume.push_back(Tok);
