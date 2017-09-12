@@ -4157,6 +4157,60 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
   return TC.compareDeclarations(DC, decl1, decl2);
 }
 
+/// "Sanitize" requirements for conformance checking, removing any requirements
+/// that unnecessarily refer to associated types of other protocols.
+static void sanitizeProtocolRequirements(
+                                     ProtocolDecl *proto,
+                                     ArrayRef<Requirement> requirements,
+                                     SmallVectorImpl<Requirement> &sanitized) {
+  std::function<Type(Type)> sanitizeType;
+  sanitizeType = [&](Type outerType) {
+    return outerType.transformRec([&] (TypeBase *type) -> Optional<Type> {
+      if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
+        if (!depMemTy->getAssocType() ||
+            depMemTy->getAssocType()->getProtocol() != proto) {
+          for (auto member : proto->lookupDirect(depMemTy->getName())) {
+            if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+              return Type(DependentMemberType::get(
+                                           sanitizeType(depMemTy->getBase()),
+                                           assocType));
+            }
+          }
+
+          if (depMemTy->getBase()->is<GenericTypeParamType>())
+            return Type();
+        }
+      }
+
+      return None;
+    });
+  };
+
+  for (const auto &req : requirements) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::SameType:
+    case RequirementKind::Superclass: {
+      Type firstType = sanitizeType(req.getFirstType());
+      Type secondType = sanitizeType(req.getSecondType());
+      if (firstType && secondType) {
+        sanitized.push_back({req.getKind(), firstType, secondType});
+      }
+      break;
+    }
+
+    case RequirementKind::Layout: {
+      Type firstType = sanitizeType(req.getFirstType());
+      if (firstType) {
+        sanitized.push_back({req.getKind(), firstType,
+                             req.getLayoutConstraint()});
+      }
+      break;
+    }
+    }
+  }
+}
+
 void ConformanceChecker::resolveTypeWitnesses() {
   llvm::SetVector<AssociatedTypeDecl *> unresolvedAssocTypes;
 
@@ -4424,9 +4478,12 @@ void ConformanceChecker::resolveTypeWitnesses() {
                                           Proto, Conformance->getType(),
                                           ProtocolConformanceRef(Conformance));
 
+      SmallVector<Requirement, 4> sanitizedRequirements;
+      sanitizeProtocolRequirements(Proto, Proto->getRequirementSignature(),
+                                   sanitizedRequirements);
       auto requirementSig =
         GenericSignature::get({Proto->getProtocolSelfType()},
-                              Proto->getRequirementSignature());
+                               sanitizedRequirements);
       auto result =
         TC.checkGenericArguments(DC, SourceLoc(), SourceLoc(),
                                  Conformance->getType(), requirementSig,

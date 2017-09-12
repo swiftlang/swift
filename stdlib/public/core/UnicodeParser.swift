@@ -43,7 +43,7 @@ extension Unicode {
 /// scalar values.
 public protocol _UnicodeParser {
   /// The encoding with which this parser is associated
-  associatedtype Encoding : _UnicodeEncoding_
+  associatedtype Encoding : _UnicodeEncoding
 
   /// Constructs an instance that can be used to begin parsing `CodeUnit`s at
   /// any Unicode scalar boundary.

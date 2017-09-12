@@ -50,7 +50,7 @@ protocol Refined : Associated {
 }
 
 extension Refined {
-  // CHECK-LABEL: sil hidden @_T021same_type_abstraction7RefinedPAAEx3KeyQz12withElements_tcfC : $@convention(method) <Self where Self : Refined> (@in Self.Key, @thick Self.Type) -> @out Self
+  // CHECK-LABEL: sil hidden @_T021same_type_abstraction7RefinedPAAEx5AssocQz12withElements_tcfC : $@convention(method) <Self where Self : Refined> (@in Self.Assoc, @thick Self.Type) -> @out Self
   init(withElements newElements: Key) {
     self.init()
   }
