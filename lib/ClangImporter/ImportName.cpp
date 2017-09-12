@@ -545,12 +545,58 @@ determineCtorInitializerKind(const clang::ObjCMethodDecl *method) {
   return None;
 }
 
-template <typename A>
-static bool matchesVersion(A *versionedAttr, ImportNameVersion version) {
-  clang::VersionTuple attrVersion = versionedAttr->getVersion();
-  if (attrVersion.empty())
-    return version == ImportNameVersion::maxVersion();
-  return attrVersion.getMajor() == version.majorVersionNumber();
+namespace {
+/// Aggregate struct for the common members of clang::SwiftVersionedAttr and
+/// clang::SwiftVersionedRemovalAttr.
+///
+/// For a SwiftVersionedRemovalAttr, the Attr member will be null.
+struct VersionedSwiftNameInfo {
+  const clang::SwiftNameAttr *Attr;
+  clang::VersionTuple Version;
+  bool IsReplacedByActive;
+};
+
+/// The action to take upon seeing a particular versioned swift_name annotation.
+enum class VersionedSwiftNameAction {
+  /// This annotation is not interesting.
+  Ignore,
+  /// This annotation is better than whatever we have so far.
+  Use,
+  /// This annotation is better than nothing, but that's all; don't bother
+  /// recording its version.
+  UseAsFallback,
+  /// This annotation itself isn't interesting, but its version shows that the
+  /// correct answer is whatever's currently active.
+  ResetToActive
+};
+} // end anonymous namespace
+
+static VersionedSwiftNameAction
+checkVersionedSwiftName(VersionedSwiftNameInfo info,
+                        clang::VersionTuple bestSoFar,
+                        ImportNameVersion requestedVersion) {
+  if (!bestSoFar.empty() && bestSoFar <= info.Version)
+    return VersionedSwiftNameAction::Ignore;
+
+  if (info.IsReplacedByActive) {
+    // We know that there are no versioned names between the active version and
+    // a replacement version, because otherwise /that/ name would be active.
+    // So if replacement < requested, we want to use the old value that was
+    // replaced (but with very low priority), and otherwise we want to use the
+    // new value that is now active. (Special case: replacement = 0 means that
+    // a header annotation was replaced by an unversioned API notes annotation.)
+    if (info.Version.empty() ||
+        info.Version.getMajor() >= requestedVersion.majorVersionNumber()) {
+      return VersionedSwiftNameAction::ResetToActive;
+    }
+    if (bestSoFar.empty())
+      return VersionedSwiftNameAction::UseAsFallback;
+    return VersionedSwiftNameAction::Ignore;
+  }
+
+  if (info.Version.getMajor() < requestedVersion.majorVersionNumber())
+    return VersionedSwiftNameAction::Ignore;
+  return VersionedSwiftNameAction::Use;
 }
 
 
@@ -567,26 +613,60 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
     return nullptr;
 
   // Handle versioned API notes for Swift 3 and later. This is the common case.
-  if (version != ImportNameVersion::swift2()) {
+  if (version > ImportNameVersion::swift2()) {
+    const auto *activeAttr = decl->getAttr<clang::SwiftNameAttr>();
+    const clang::SwiftNameAttr *result = activeAttr;
+    clang::VersionTuple bestSoFar;
     for (auto *attr : decl->attrs()) {
+      VersionedSwiftNameInfo info;
+
       if (auto *versionedAttr = dyn_cast<clang::SwiftVersionedAttr>(attr)) {
-        if (!matchesVersion(versionedAttr, version))
+        auto *added =
+          dyn_cast<clang::SwiftNameAttr>(versionedAttr->getAttrToAdd());
+        if (!added)
           continue;
-        if (auto *added =
-              dyn_cast<clang::SwiftNameAttr>(versionedAttr->getAttrToAdd())) {
-          return added;
-        }
+
+        info = {added, versionedAttr->getVersion(),
+                versionedAttr->getIsReplacedByActive()};
+
+      } else if (auto *removeAttr =
+                   dyn_cast<clang::SwiftVersionedRemovalAttr>(attr)) {
+        if (removeAttr->getAttrKindToRemove() != clang::attr::SwiftName)
+          continue;
+        info = {nullptr, removeAttr->getVersion(),
+                removeAttr->getIsReplacedByActive()};
+
+      } else {
+        continue;
       }
 
-      if (auto *removeAttr = dyn_cast<clang::SwiftVersionedRemovalAttr>(attr)) {
-        if (!matchesVersion(removeAttr, version))
-          continue;
-        if (removeAttr->getAttrKindToRemove() == clang::attr::SwiftName)
-          return nullptr;
+      switch (checkVersionedSwiftName(info, bestSoFar, version)) {
+      case VersionedSwiftNameAction::Ignore:
+        continue;
+      case VersionedSwiftNameAction::Use:
+        result = info.Attr;
+        bestSoFar = info.Version;
+        break;
+      case VersionedSwiftNameAction::UseAsFallback:
+        // HACK: If there's a swift_name attribute in the headers /and/ in the
+        // unversioned API notes /and/ in the active versioned API notes, there
+        // will be two "replacement" attributes, one for each of the first two
+        // cases. Prefer the first one we see, because that turns out to be the
+        // one from the API notes, which matches the semantics when there are no
+        // versioned API notes. (This isn't very principled but there's at least
+        // a test to tell us if it changes.)
+        if (result == activeAttr)
+          result = info.Attr;
+        assert(bestSoFar.empty());
+        break;
+      case VersionedSwiftNameAction::ResetToActive:
+        result = activeAttr;
+        bestSoFar = info.Version;
+        break;
       }
     }
 
-    return decl->getAttr<clang::SwiftNameAttr>();
+    return result;
   }
 
   // The remainder of this function emulates the limited form of swift_name

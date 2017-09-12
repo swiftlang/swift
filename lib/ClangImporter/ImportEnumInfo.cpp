@@ -68,7 +68,7 @@ void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
   // If API notes have /removed/ a FlagEnum or EnumExtensibility attribute,
   // then we don't need to check the macros.
   for (auto *attr : decl->specific_attrs<clang::SwiftVersionedAttr>()) {
-    if (!attr->getVersion().empty())
+    if (!attr->getIsReplacedByActive())
       continue;
     if (isa<clang::FlagEnumAttr>(attr->getAttrToAdd()) ||
         isa<clang::EnumExtensibilityAttr>(attr->getAttrToAdd())) {
