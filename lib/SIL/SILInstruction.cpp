@@ -928,6 +928,7 @@ bool SILInstruction::mayRelease() const {
     return true;
 
   case ValueKind::UnconditionalCheckedCastAddrInst:
+  case ValueKind::UnconditionalCheckedCastValueInst:
     return true;
 
   case ValueKind::CheckedCastAddrBranchInst: {
