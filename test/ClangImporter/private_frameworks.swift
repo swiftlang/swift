@@ -7,9 +7,10 @@
 // Use the overlay with private frameworks.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/privateframeworks/withprivate -I %t %s -verify
 
+// Use the overlay without private frameworks.
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/privateframeworks/withoutprivate -I %t %s -verify
+
 import SomeKit
-
-
 
 func testWidget(widget: SKWidget) {
   _ = widget.extensionMethod()
