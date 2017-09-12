@@ -23,6 +23,7 @@ import Darwin
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension VNFaceLandmarkRegion2D {
+  #if false
   @nonobjc
   public var normalizedPoints: [CGPoint] {
     let pointsBuffer = UnsafeBufferPointer<CGPoint>(
@@ -37,6 +38,7 @@ extension VNFaceLandmarkRegion2D {
       count: Int(self.pointCount))
     return Array(pointsBuffer)
   }
+  #endif
 }
 
 #endif
