@@ -110,7 +110,7 @@ public:
   /// FIXME: All other version information is in Version.h. Can this go there
   /// instead?
   static constexpr inline ImportNameVersion maxVersion() {
-    return ImportNameVersion{4, AsConstExpr};
+    return ImportNameVersion{5, AsConstExpr};
   }
 
   /// The version which should be used for importing types, which need to have
