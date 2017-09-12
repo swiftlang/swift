@@ -5411,8 +5411,9 @@ static void collapseSameTypeComponents(
               llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
               std::vector<IntercomponentEdge> &sameTypeEdges) {
   SmallVector<unsigned, 4> collapsedParents;
-  for (unsigned i : indices(equivClass->derivedSameTypeComponents))
+  for (unsigned i : indices(equivClass->derivedSameTypeComponents)) {
     collapsedParents.push_back(i);
+  }
 
   unsigned remainingComponents = equivClass->derivedSameTypeComponents.size();
   for (unsigned edgeIndex : indices(sameTypeEdges)) {
