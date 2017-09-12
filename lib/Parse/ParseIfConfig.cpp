@@ -304,15 +304,6 @@ public:
       return nullptr;
     }
 
-    // FIXME: Perform the replacement macOS -> OSX elsewhere.
-    if (Kind == PlatformConditionKind::OS && *ArgStr == "macOS") {
-      ArgP->setSubExpr(
-          new (Ctx) UnresolvedDeclRefExpr(Ctx.getIdentifier(*ArgStr),
-                                          DeclRefKind::Ordinary,
-                                          DeclNameLoc(Arg->getLoc())));
-      *ArgStr = "OSX";
-    }
-
     std::vector<StringRef> suggestions;
     if (!LangOptions::checkPlatformConditionSupported(*Kind, *ArgStr,
                                                       suggestions)) {
