@@ -2193,11 +2193,10 @@ public:
         if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
           paramType = var->getDeclContext()->mapTypeIntoContext(paramType);
           if (!paramType->isEqual(typeForAccessors)) {
-            Out << "property and setter param have mismatched types: '";
-            typeForAccessors.print(Out);
-            Out << "' vs. '";
-            paramType.print(Out);
-            Out << "'\n";
+            Out << "property and setter param have mismatched types:\n";
+            typeForAccessors.dump(Out, 2);
+            Out << "vs.\n";
+            paramType.dump(Out, 2);
             abort();
           }
         }

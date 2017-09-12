@@ -5194,6 +5194,15 @@ public:
     if (auto storage = FD->getAccessorStorageDecl()) {
       TC.validateDecl(storage);
 
+      // Note that it's important for correctness that we're filling in
+      // empty TypeLocs, because otherwise revertGenericFuncSignature might
+      // erase the types we set, causing them to be re-validated in a later
+      // pass.  That later validation might be incorrect even if the TypeLocs
+      // are a clone of the type locs from which we derived the value type,
+      // because the rules for interpreting types in parameter contexts
+      // are sometimes different from the rules elsewhere; for example,
+      // function types default to non-escaping.
+
       auto valueParams = FD->getParameterList(FD->getParent()->isTypeContext());
 
       // Determine the value type.
@@ -5228,10 +5237,13 @@ public:
       case AccessorKind::NotAccessor:
         llvm_unreachable("not an accessor");
 
+      // For getters, set the result type to the value type.
       case AccessorKind::IsGetter:
         FD->getBodyResultTypeLoc().setType(valueIfaceTy, true);
         break;
 
+      // For setters and observers, set the old/new value parameter's type
+      // to the value type.
       case AccessorKind::IsDidSet:
       case AccessorKind::IsWillSet:
       case AccessorKind::IsSetter: {
@@ -5242,10 +5254,16 @@ public:
         break;
       }
 
-      // These don't mention the value types directly.
-      case AccessorKind::IsMaterializeForSet:
+      // Addressor result types can get complicated because of the owner.
       case AccessorKind::IsAddressor:
       case AccessorKind::IsMutableAddressor:
+        if (Type resultType = buildAddressorResultType(FD, valueIfaceTy)) {
+          FD->getBodyResultTypeLoc().setType(resultType, true);
+        }
+        break;
+
+      // These don't mention the value types directly.
+      case AccessorKind::IsMaterializeForSet:
         break;
       }
     }
@@ -5416,6 +5434,61 @@ public:
         makeFinal(TC.Context, FD);
       }
     }
+  }
+
+  Type buildAddressorResultType(FuncDecl *addressor, Type valueType) {
+    assert(addressor->getAccessorKind() == AccessorKind::IsAddressor ||
+           addressor->getAccessorKind() == AccessorKind::IsMutableAddressor);
+
+    Type pointerType =
+      (addressor->getAccessorKind() == AccessorKind::IsAddressor)
+        ? TC.getUnsafePointerType(addressor->getLoc(), valueType)
+        : TC.getUnsafeMutablePointerType(addressor->getLoc(), valueType);
+    if (!pointerType) return Type();
+
+    switch (addressor->getAddressorKind()) {
+    case AddressorKind::NotAddressor:
+      llvm_unreachable("addressor without addressor kind");
+
+    // For unsafe addressors, it's just the pointer type.
+    case AddressorKind::Unsafe:
+      return pointerType;
+
+    // For non-native owning addressors, the return type is actually
+    //   (Unsafe{,Mutable}Pointer<T>, Builtin.UnknownObject)
+    case AddressorKind::Owning: {
+      TupleTypeElt elts[] = {
+        pointerType,
+        TC.Context.TheUnknownObjectType
+      };
+      return TupleType::get(elts, TC.Context);
+    }
+
+    // For native owning addressors, the return type is actually
+    //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
+    case AddressorKind::NativeOwning: {
+      TupleTypeElt elts[] = {
+        pointerType,
+        TC.Context.TheNativeObjectType
+      };
+      return TupleType::get(elts, TC.Context);
+    }
+
+    // For native pinning addressors, the return type is actually
+    //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
+    case AddressorKind::NativePinning: {
+      Type pinTokenType =
+        TC.getOptionalType(addressor->getLoc(), TC.Context.TheNativeObjectType);
+      if (!pinTokenType) return Type();
+
+      TupleTypeElt elts[] = {
+        pointerType,
+        pinTokenType
+      };
+      return TupleType::get(elts, TC.Context);
+    }
+    }
+    llvm_unreachable("bad addressor kind");
   }
 
   void visitModuleDecl(ModuleDecl *) { }
