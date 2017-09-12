@@ -1,11 +1,11 @@
-// RUN: %swift -typecheck -swift-version 3 %s -verify
+// RUN: %swift -typecheck -swift-version 4 %s -verify
 
 func testPopFirst() {
   var str = "abc"
-  _ = str.popFirst() // expected-warning{{'popFirst()' is deprecated: Please use 'first', 'dropFirst()', or 'Substring.popFirst()'}}
+  _ = str.popFirst() // expected-error{{'popFirst()' is unavailable: Please use 'first', 'dropFirst()', or 'Substring.popFirst()'}}
   _ = str.characters.popFirst() // expected-warning{{'characters' is deprecated: Please use String or Substring directly}}
-    // expected-warning@-1{{'popFirst()' is deprecated: Please use 'first', 'dropFirst()', or 'Substring.CharacterView.popFirst()'}}
-  _ = str.unicodeScalars.popFirst() // expected-warning{{'popFirst()' is deprecated: Please use 'first', 'dropFirst()', or 'Substring.UnicodeScalarView.popFirst()'}}
+  _ = str.popFirst() // expected-error{{'popFirst()' is unavailable: Please use 'first', 'dropFirst()', or 'Substring.popFirst()'}}
+  _ = str.unicodeScalars.popFirst() // expected-error{{'popFirst()' is unavailable: Please use 'first', 'dropFirst()', or 'Substring.UnicodeScalarView.popFirst()'}}
 
   var charView: String.CharacterView // expected-warning{{'CharacterView' is deprecated: Please use String or Substring directly}}
   charView = str.characters // expected-warning{{'characters' is deprecated: Please use String or Substring directly}}
@@ -20,7 +20,10 @@ func testPopFirst() {
   charSubView = substr.characters // expected-warning{{'characters' is deprecated: Please use String or Substring directly}}
   dump(charSubView)
 
-  var _ = String(str.utf8) ?? "" // expected-warning{{'init' is deprecated: Failable initializer was removed in Swift 4. When upgrading to Swift 4, please use non-failable String.init(_:UTF8View)}}
-  var _: String = String(str.utf8) // expected-error{{'init' is unavailable: Please use failable String.init?(_:UTF8View) when in Swift 3.2 mode}}
+  var _ = String(str.utf8) ?? "" // expected-warning{{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}}
+  var _: String = String(str.utf8)! // expected-error{{'init' is unavailable: Please use non-failable String.init(_:UTF8View) instead}}
+  var _: String = String(str.utf8) // ok
 }
+
+
 
