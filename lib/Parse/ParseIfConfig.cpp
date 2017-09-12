@@ -304,6 +304,15 @@ public:
       return nullptr;
     }
 
+    // FIXME: Perform the replacement macOS -> OSX elsewhere.
+    if (Kind == PlatformConditionKind::OS && *ArgStr == "macOS") {
+      *ArgStr = "OSX";
+      ArgP->setSubExpr(
+          new (Ctx) UnresolvedDeclRefExpr(Ctx.getIdentifier(*ArgStr),
+                                          DeclRefKind::Ordinary,
+                                          DeclNameLoc(Arg->getLoc())));
+    }
+
     std::vector<StringRef> suggestions;
     if (!LangOptions::checkPlatformConditionSupported(*Kind, *ArgStr,
                                                       suggestions)) {
@@ -451,7 +460,8 @@ public:
 
     auto Val = getDeclRefStr(Arg);
     auto Kind = getPlatformConditionKind(KindName).getValue();
-    return Ctx.LangOpts.checkPlatformCondition(Kind, Val);
+    auto Target = Ctx.LangOpts.getPlatformConditionValue(Kind);
+    return Target == Val;
   }
 
   bool visitPrefixUnaryExpr(PrefixUnaryExpr *E) {
