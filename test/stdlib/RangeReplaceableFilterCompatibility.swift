@@ -2,6 +2,8 @@
 // RUN: %target-build-swift %s -o %t/a.out3 -swift-version 3 && %target-run %t/a.out3
 // RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-run %t/a.out4
 
+// REQUIRES: executable_test
+
 import StdlibUnittest
 
 var tests = TestSuite("RangeReplaceableFilterCompatibility")
