@@ -2300,7 +2300,7 @@ public:
 
       // If the conformance is lazily resolved, don't check it; that can cause
       // massive deserialization at a point where the compiler cannot handle it.
-      if (normal->isLazilyResolved()) return;
+      if (normal->isLazilyLoaded()) return;
 
       // Translate the owning declaration into a DeclContext.
       auto *nominal = dyn_cast<NominalTypeDecl>(decl);

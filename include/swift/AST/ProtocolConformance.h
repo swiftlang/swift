@@ -349,8 +349,13 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// requirement signature of the protocol.
   ArrayRef<ProtocolConformanceRef> SignatureConformances;
 
-  LazyMemberLoader *Resolver = nullptr;
-  uint64_t ResolverContextData;
+  /// The lazy member loader provides callbacks for populating imported and
+  /// deserialized conformances.
+  ///
+  /// This is not use for parsed conformances -- those are lazily populated
+  /// by the ASTContext's LazyResolver, which is really a Sema instance.
+  LazyConformanceLoader *Loader = nullptr;
+  uint64_t LoaderContextData;
 
   friend class ASTContext;
 
@@ -412,10 +417,10 @@ public:
     ContextAndInvalid.setInt(true);
   }
 
-  /// Determine whether this conformance is lazily resolved.
+  /// Determine whether this conformance is lazily loaded.
   ///
   /// This only matters to the AST verifier.
-  bool isLazilyResolved() const { return Resolver != nullptr; }
+  bool isLazilyLoaded() const { return Loader != nullptr; }
 
   /// True if the conformance describes a property behavior.
   bool isBehaviorConformance() const {
@@ -460,7 +465,7 @@ public:
   /// Determine whether the protocol conformance has a witness for the given
   /// requirement.
   bool hasWitness(ValueDecl *requirement) const {
-    if (Resolver)
+    if (Loader)
       resolveLazyInfo();
     return Mapping.count(requirement) > 0;
   }
@@ -499,7 +504,7 @@ public:
   /// protocol, which line up with the conformance constraints in the
   /// protocol's requirement signature.
   ArrayRef<ProtocolConformanceRef> getSignatureConformances() const {
-    if (Resolver)
+    if (Loader)
       resolveLazyInfo();
     return SignatureConformances;
   }
@@ -518,7 +523,7 @@ public:
     return false;
   }
 
-  void setLazyLoader(LazyMemberLoader *resolver, uint64_t contextData);
+  void setLazyLoader(LazyConformanceLoader *resolver, uint64_t contextData);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getProtocol(), getDeclContext());

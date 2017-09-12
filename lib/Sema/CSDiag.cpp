@@ -8190,7 +8190,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     contextualElementType =
         ProtocolConformanceRef::getTypeWitnessByName(
             contextualType, *Conformance,
-            CS.getASTContext().getIdentifier("ArrayLiteralElement"), &CS.TC)
+            CS.getASTContext().Id_ArrayLiteralElement, &CS.TC)
             ->getDesugaredType();
     elementTypePurpose = CTP_ArrayElement;
   }

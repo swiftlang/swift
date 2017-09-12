@@ -204,6 +204,7 @@ public:
 /// A class that can lazily load members from a serialized format.
 class alignas(void*) LazyMemberLoader {
   virtual void anchor();
+
 public:
   virtual ~LazyMemberLoader() = default;
 
@@ -220,11 +221,6 @@ public:
   loadAllConformances(const Decl *D, uint64_t contextData,
                       SmallVectorImpl<ProtocolConformance *> &Conformances) = 0;
 
-  /// Populates the given vector with all conformances for \p D.
-  virtual void
-  finishNormalConformance(NormalProtocolConformance *conformance,
-                          uint64_t contextData) = 0;
-
   /// Returns the default definition type for \p ATD.
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                             uint64_t contextData) = 0;
@@ -232,6 +228,19 @@ public:
   /// Returns the generic environment.
   virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
                                                      uint64_t contextData) = 0;
+};
+
+/// A class that can lazily load conformances from a serialized format.
+class alignas(void*) LazyConformanceLoader {
+  virtual void anchor();
+
+public:
+  virtual ~LazyConformanceLoader() = default;
+
+  /// Populates the given protocol conformance.
+  virtual void
+  finishNormalConformance(NormalProtocolConformance *conformance,
+                          uint64_t contextData) = 0;
 };
 
 }
