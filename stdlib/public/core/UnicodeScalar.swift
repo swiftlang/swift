@@ -187,9 +187,7 @@ extension Unicode.Scalar :
       if nibble < 10 {
         return String(Unicode.Scalar(nibble+48)!)    // 48 = '0'
       } else {
-        // FIXME: was Unicode.Scalar(nibble-10+65), which is now
-        // ambiguous.  <rdar://problem/18506025>
-        return String(Unicode.Scalar(nibble+65-10)!) // 65 = 'A'
+        return String(Unicode.Scalar(nibble-10+65)!) // 65 = 'A'
       }
     }
 
