@@ -501,10 +501,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // Decrement our iterator (carefully, to avoid going off the front) so it
       // is valid after inlining is done.  Inlining deletes the apply, and can
       // introduce multiple new basic blocks.
-      if (II != ApplyBlock->begin())
-        --II;
-      else
-        II = ApplyBlock->end();
+      II = prev_or_default(II, ApplyBlock->begin(), ApplyBlock->end());
 
       Inliner.inlineFunction(InnerAI, FullArgs);
 
