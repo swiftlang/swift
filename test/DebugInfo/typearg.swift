@@ -36,7 +36,7 @@ class Foo<Bar> {
 // Verify that the backend doesn't elide the debug intrinsics.
 // RUN: %target-swift-frontend %s -c -g -o %t.o
 // RUN: %llvm-dwarfdump %t.o | %FileCheck %s --check-prefix=CHECK-LLVM
-// CHECK-LLVM-DAG:  .debug_str[{{.*}}] = "x"
-// CHECK-LLVM-DAG:  .debug_str[{{.*}}] = "$swift.type.T"
-// CHECK- FIXME -LLVM-DAG:  .debug_str[{{.*}}] = "$swift.type.Bar"
-// CHECK-LLVM-DAG:  .debug_str[{{.*}}] = "$swift.type.Baz"
+// CHECK-LLVM-DAG:  DW_AT_name ("x")
+// CHECK-LLVM-DAG:  DW_AT_name ("$swift.type.T")
+// CHECK- FIXME -LLVM-DAG:  DW_AT_name ("$swift.type.Bar")
+// CHECK-LLVM-DAG:  DW_AT_name ("$swift.type.Baz")

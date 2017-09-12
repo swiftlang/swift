@@ -31,7 +31,7 @@ count()
 // End-to-end test:
 // RUN: llc %t.ll -filetype=obj -o - | %llvm-dwarfdump - | %FileCheck %s --check-prefix DWARF-CHECK
 // DWARF-CHECK:  DW_TAG_variable
-// DWARF-CHECK:  DW_AT_name {{.*}} "letter"
+// DWARF-CHECK:  DW_AT_name ("letter")
 //
 // DWARF-CHECK:  DW_TAG_variable
-// DWARF-CHECK:  DW_AT_name {{.*}} "i"
+// DWARF-CHECK:  DW_AT_name ("i")
