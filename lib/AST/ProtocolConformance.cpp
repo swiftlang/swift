@@ -427,6 +427,12 @@ static bool resolveKnownTypeWitness(NormalProtocolConformance *conformance,
     return resolveViaLookup();
   }
 
+  // ExpressibleByArrayLiteral.ArrayLiteralElement
+  if (*knownKind == KnownProtocolKind::ExpressibleByArrayLiteral) {
+    assert(assocType->getName() == ctx.getIdentifier("ArrayLiteralElement"));
+    return resolveViaLookup();
+  }
+
   // _ObjectiveCBridgeable._ObjectiveCType
   if (*knownKind == KnownProtocolKind::ObjectiveCBridgeable) {
     assert(assocType->getName() == ctx.Id_ObjectiveCType);
