@@ -121,6 +121,10 @@ Should only be used if necessary. This has the effect of forcing inlining to occ
 
 Use of this attribute imposes limitations on what can be in the body. For more details, refer to the [documentation](https://github.com/apple/swift/blob/master/docs/TransparentAttr.rst).
 
+#### `@unsafe_no_objc_tagged_pointer`
+
+This is currently used in the standard library as an additional annotation applied to @objc protocols signifying that any objects which conform to this protocol are not tagged. This means that (on Darwin platforms) such references, unlike AnyObject, have spare bits available from things like restricted memory spaces or alignment.
+
 ### Internal structures
 
 #### `_FixedArray`
