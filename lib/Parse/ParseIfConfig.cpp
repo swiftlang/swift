@@ -460,8 +460,7 @@ public:
 
     auto Val = getDeclRefStr(Arg);
     auto Kind = getPlatformConditionKind(KindName).getValue();
-    auto Target = Ctx.LangOpts.getPlatformConditionValue(Kind);
-    return Target == Val;
+    return Ctx.LangOpts.checkPlatformConditionAndValue(Kind, Val);
   }
 
   bool visitPrefixUnaryExpr(PrefixUnaryExpr *E) {

@@ -116,6 +116,17 @@ LangOptions::getPlatformConditionValue(PlatformConditionKind Kind) const {
   return StringRef();
 }
 
+bool LangOptions::
+checkPlatformConditionAndValue(PlatformConditionKind Kind,
+                               StringRef Value) const {
+  for (auto &Opt : reversed(PlatformConditionValues)) {
+    if (Opt.first == Kind)
+      if (Opt.second == Value)
+        return true;
+  }
+  return false;
+}
+
 bool LangOptions::isCustomConditionalCompilationFlagSet(StringRef Name) const {
   return std::find(CustomConditionalCompilationFlags.begin(),
                    CustomConditionalCompilationFlags.end(), Name)
@@ -146,9 +157,10 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   bool UnsupportedOS = false;
 
   // Set the "os" platform condition.
-  if (Target.isMacOSX())
+  if (Target.isMacOSX()) {
     addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
-  else if (triple.isTvOS())
+    addPlatformConditionValue(PlatformConditionKind::OS, "macOS");
+  } else if (triple.isTvOS())
     addPlatformConditionValue(PlatformConditionKind::OS, "tvOS");
   else if (triple.isWatchOS())
     addPlatformConditionValue(PlatformConditionKind::OS, "watchOS");
