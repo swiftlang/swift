@@ -216,12 +216,12 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
 ///
 /// In the case that a non-null value is returned, FullArgs contains effective
 /// argument operands for the callee function.
-static SILFunction *
-getCalleeFunction(FullApplySite AI, bool &IsThick,
-                  SmallVectorImpl<SILValue>& CaptureArgs,
-                  SmallVectorImpl<SILValue>& FullArgs,
-                  PartialApplyInst *&PartialApply,
-                  SILModule::LinkingMode Mode) {
+static SILFunction *getCalleeFunction(SILFunction *F, FullApplySite AI,
+                                      bool &IsThick,
+                                      SmallVectorImpl<SILValue> &CaptureArgs,
+                                      SmallVectorImpl<SILValue> &FullArgs,
+                                      PartialApplyInst *&PartialApply,
+                                      SILModule::LinkingMode Mode) {
   IsThick = false;
   PartialApply = nullptr;
   CaptureArgs.clear();
@@ -276,8 +276,7 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
   // We are allowed to see through exactly one "partial apply" instruction or
   // one "thin to thick function" instructions, since those are the patterns
   // generated when using auto closures.
-  if (PartialApplyInst *PAI =
-        dyn_cast<PartialApplyInst>(CalleeValue)) {
+  if (auto *PAI = dyn_cast<PartialApplyInst>(CalleeValue)) {
     for (const auto &Arg : PAI->getArguments()) {
       CaptureArgs.push_back(Arg);
       FullArgs.push_back(Arg);
@@ -286,14 +285,12 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
     CalleeValue = PAI->getCallee();
     IsThick = true;
     PartialApply = PAI;
-  } else if (ThinToThickFunctionInst *TTTFI =
-               dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
+  } else if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
     CalleeValue = TTTFI->getOperand();
     IsThick = true;
   }
 
   auto *FRI = dyn_cast<FunctionRefInst>(CalleeValue);
-
   if (!FRI)
     return nullptr;
 
@@ -318,6 +315,22 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
   if (CalleeFunction->empty()
       && !AI.getModule().linkFunction(CalleeFunction, Mode))
     return nullptr;
+
+  // If the CalleeFunction is a not-transparent definition, we can not process
+  // it.
+  if (CalleeFunction->isTransparent() == IsNotTransparent)
+    return nullptr;
+
+  if (F->isSerialized() && !CalleeFunction->hasValidLinkageForFragileRef()) {
+    if (!CalleeFunction->hasValidLinkageForFragileInline()) {
+      llvm::errs() << "caller: " << F->getName() << "\n";
+      llvm::errs() << "callee: " << CalleeFunction->getName() << "\n";
+      llvm_unreachable("Should never be inlining a resilient function into "
+                       "a fragile function");
+    }
+    return nullptr;
+  }
+
   return CalleeFunction;
 }
 
@@ -407,24 +420,10 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       SILValue CalleeValue = InnerAI.getCallee();
       bool IsThick;
       PartialApplyInst *PAI;
-      SILFunction *CalleeFunction = getCalleeFunction(InnerAI, IsThick,
-                                                      CaptureArgs, FullArgs,
-                                                      PAI,
-                                                      Mode);
-      if (!CalleeFunction ||
-          CalleeFunction->isTransparent() == IsNotTransparent)
+      SILFunction *CalleeFunction = getCalleeFunction(
+          F, InnerAI, IsThick, CaptureArgs, FullArgs, PAI, Mode);
+      if (!CalleeFunction)
         continue;
-
-      if (F->isSerialized() &&
-          !CalleeFunction->hasValidLinkageForFragileRef()) {
-        if (!CalleeFunction->hasValidLinkageForFragileInline()) {
-          llvm::errs() << "caller: " << F->getName() << "\n";
-          llvm::errs() << "callee: " << CalleeFunction->getName() << "\n";
-          llvm_unreachable("Should never be inlining a resilient function into "
-                           "a fragile function");
-        }
-        continue;
-      }
 
       // Then recursively process it first before trying to inline it.
       if (!runOnFunctionRecursively(CalleeFunction, InnerAI, Mode,
