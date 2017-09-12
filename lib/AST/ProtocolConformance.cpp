@@ -306,14 +306,11 @@ void NormalProtocolConformance::setSignatureConformances(
 
 void NormalProtocolConformance::resolveLazyInfo() const {
   assert(Loader);
-  assert(isComplete());
 
   auto *loader = Loader;
   auto *mutableThis = const_cast<NormalProtocolConformance *>(this);
   mutableThis->Loader = nullptr;
-  mutableThis->setState(ProtocolConformanceState::Incomplete);
   loader->finishNormalConformance(mutableThis, LoaderContextData);
-  mutableThis->setState(ProtocolConformanceState::Complete);
 }
 
 void NormalProtocolConformance::setLazyLoader(LazyConformanceLoader *loader,

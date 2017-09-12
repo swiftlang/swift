@@ -35,6 +35,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
@@ -7367,6 +7368,12 @@ void ClangImporter::Implementation::finishNormalConformance(
   PrettyStackTraceType trace(SwiftContext, "completing conformance for",
                              conformance->getType());
   PrettyStackTraceDecl traceTo("... to", proto);
+
+  if (!proto->isObjC())
+    return;
+
+  assert(conformance->isComplete());
+  conformance->setState(ProtocolConformanceState::Incomplete);
 
   // Create witnesses for requirements not already met.
   for (auto req : proto->getMembers()) {
