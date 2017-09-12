@@ -305,22 +305,22 @@ void NormalProtocolConformance::setSignatureConformances(
 }
 
 void NormalProtocolConformance::resolveLazyInfo() const {
-  assert(Resolver);
+  assert(Loader);
   assert(isComplete());
 
-  auto *resolver = Resolver;
+  auto *loader = Loader;
   auto *mutableThis = const_cast<NormalProtocolConformance *>(this);
-  mutableThis->Resolver = nullptr;
+  mutableThis->Loader = nullptr;
   mutableThis->setState(ProtocolConformanceState::Incomplete);
-  resolver->finishNormalConformance(mutableThis, ResolverContextData);
+  loader->finishNormalConformance(mutableThis, LoaderContextData);
   mutableThis->setState(ProtocolConformanceState::Complete);
 }
 
-void NormalProtocolConformance::setLazyLoader(LazyMemberLoader *resolver,
+void NormalProtocolConformance::setLazyLoader(LazyConformanceLoader *loader,
                                               uint64_t contextData) {
-  assert(!Resolver && "already has a resolver");
-  Resolver = resolver;
-  ResolverContextData = contextData;
+  assert(!Loader && "already has a loader");
+  Loader = loader;
+  LoaderContextData = contextData;
 }
 
 namespace {
@@ -346,7 +346,7 @@ namespace {
 
 bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
                                                LazyResolver *resolver) const {
-  if (Resolver)
+  if (Loader)
     resolveLazyInfo();
 
   if (TypeWitnesses.find(assocType) != TypeWitnesses.end()) {
@@ -404,26 +404,18 @@ static bool resolveKnownTypeWitness(NormalProtocolConformance *conformance,
   // RawRepresentable.RawValue.
   if (*knownKind == KnownProtocolKind::RawRepresentable) {
     assert(assocType->getName() == ctx.Id_RawValue);
-    if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-      // First, try to resolve via lookup, so we get the declaration.
-      if (resolveViaLookup()) return true;
-
-      // Otherwise, use the raw type.
-      if (enumDecl->hasRawType()) {
-        conformance->setTypeWitness(assocType, enumDecl->getRawType(), nullptr);
-        return true;
-      }
-
-      return false;
-    }
-
-    // All other cases resolve via lookup.
     return resolveViaLookup();
   }
 
   // OptionSet.Element.
   if (*knownKind == KnownProtocolKind::OptionSet) {
     assert(assocType->getName() == ctx.Id_Element);
+    return resolveViaLookup();
+  }
+
+  // ExpressibleByArrayLiteral.ArrayLiteralElement
+  if (*knownKind == KnownProtocolKind::ExpressibleByArrayLiteral) {
+    assert(assocType->getName() == ctx.Id_ArrayLiteralElement);
     return resolveViaLookup();
   }
 
@@ -452,7 +444,7 @@ std::pair<Type, TypeDecl *>
 NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                                                  LazyResolver *resolver,
                                                  SubstOptions options) const {
-  if (Resolver)
+  if (Loader)
     resolveLazyInfo();
 
   // Check whether we already have a type witness.
@@ -598,7 +590,7 @@ Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
   assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
   assert(requirement->isProtocolRequirement() && "Not a requirement");
 
-  if (Resolver)
+  if (Loader)
     resolveLazyInfo();
 
   auto known = Mapping.find(requirement);
@@ -936,12 +928,9 @@ void NominalTypeDecl::prepareConformanceTable() const {
   }
 
   // Add protocols for any synthesized protocol attributes.
-  for (auto attr : getAttrs()) {
-    if (auto synthesizedProto = dyn_cast<SynthesizedProtocolAttr>(attr)) {
-      if (auto proto = getASTContext().getProtocol(
-                         synthesizedProto->getProtocolKind())) {
-        ConformanceTable->addSynthesizedConformance(mutableThis, proto);
-      }
+  for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    if (auto proto = getASTContext().getProtocol(attr->getProtocolKind())) {
+      ConformanceTable->addSynthesizedConformance(mutableThis, proto);
     }
   }
 }
