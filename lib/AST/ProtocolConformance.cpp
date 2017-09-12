@@ -429,7 +429,7 @@ static bool resolveKnownTypeWitness(NormalProtocolConformance *conformance,
 
   // ExpressibleByArrayLiteral.ArrayLiteralElement
   if (*knownKind == KnownProtocolKind::ExpressibleByArrayLiteral) {
-    assert(assocType->getName() == ctx.getIdentifier("ArrayLiteralElement"));
+    assert(assocType->getName() == ctx.Id_ArrayLiteralElement);
     return resolveViaLookup();
   }
 

@@ -5223,10 +5223,8 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   makeStructRawValued(Impl, structDecl, underlyingType,
                       {KnownProtocolKind::OptionSet}, protocols);
   auto selfType = structDecl->getDeclaredInterfaceType();
-  addSynthesizedTypealias(structDecl, ctx.Id_Element,
-                          selfType);
-  addSynthesizedTypealias(structDecl, ctx.getIdentifier("ArrayLiteralElement"),
-                          selfType);
+  addSynthesizedTypealias(structDecl, ctx.Id_Element, selfType);
+  addSynthesizedTypealias(structDecl, ctx.Id_ArrayLiteralElement, selfType);
   return structDecl;
 }
 
