@@ -7369,6 +7369,43 @@ void ClangImporter::Implementation::finishNormalConformance(
                              conformance->getType());
   PrettyStackTraceDecl traceTo("... to", proto);
 
+  // And make sure any inherited conformances also get completed, if necessary.
+  SmallVector<ProtocolDecl *, 8> inheritedProtos;
+  for (auto *inherited : proto->getInheritedProtocols()) {
+    inheritedProtos.push_back(inherited);
+  }
+  // Sort for deterministic import.
+  ProtocolType::canonicalizeProtocols(inheritedProtos);
+
+  // Schedule any that aren't complete.
+  for (auto *inherited : inheritedProtos) {
+    ModuleDecl *M = conformance->getDeclContext()->getParentModule();
+    auto inheritedConformance = M->lookupConformance(conformance->getType(),
+                                                     inherited);
+    assert(inheritedConformance && inheritedConformance->isConcrete() &&
+           "inherited conformance not found");
+  }
+
+  // Collect conformances for the requirement signature.
+  SmallVector<ProtocolConformanceRef, 4> reqConformances;
+  for (const auto &req : proto->getRequirementSignature()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    assert(req.getFirstType()->isEqual(proto->getSelfInterfaceType()));
+    auto reqProto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+
+    ModuleDecl *M = conformance->getDeclContext()->getParentModule();
+    auto reqConformance = M->lookupConformance(conformance->getType(),
+                                               reqProto);
+    assert(reqConformance && reqConformance->isConcrete() &&
+           "required conformance not found");
+    reqConformances.push_back(*reqConformance);
+  }
+  conformance->setSignatureConformances(reqConformances);
+
+  // Imported conformances to @objc protocols also require additional
+  // initialization to complete the requirement to witness mapping.
   if (!proto->isObjC())
     return;
 
@@ -7404,41 +7441,6 @@ void ClangImporter::Implementation::finishNormalConformance(
       }
     }
   }
-
-  // And make sure any inherited conformances also get completed, if necessary.
-  SmallVector<ProtocolDecl *, 8> inheritedProtos;
-  for (auto *inherited : proto->getInheritedProtocols()) {
-    inheritedProtos.push_back(inherited);
-  }
-  // Sort for deterministic import.
-  ProtocolType::canonicalizeProtocols(inheritedProtos);
-
-  // Schedule any that aren't complete.
-  for (auto *inherited : inheritedProtos) {
-    ModuleDecl *M = conformance->getDeclContext()->getParentModule();
-    auto inheritedConformance = M->lookupConformance(conformance->getType(),
-                                                     inherited);
-    assert(inheritedConformance && inheritedConformance->isConcrete() &&
-           "inherited conformance not found");
-  }
-
-  // Collect conformances for the requirement signature.
-  SmallVector<ProtocolConformanceRef, 4> reqConformances;
-  for (const auto &req : proto->getRequirementSignature()) {
-    if (req.getKind() != RequirementKind::Conformance)
-      continue;
-
-    assert(req.getFirstType()->isEqual(proto->getSelfInterfaceType()));
-    auto reqProto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
-
-    ModuleDecl *M = conformance->getDeclContext()->getParentModule();
-    auto reqConformance = M->lookupConformance(conformance->getType(),
-                                               reqProto);
-    assert(reqConformance && reqConformance->isConcrete() &&
-           "required conformance not found");
-    reqConformances.push_back(*reqConformance);
-  }
-  conformance->setSignatureConformances(reqConformances);
 
   conformance->setState(ProtocolConformanceState::Complete);
 }
