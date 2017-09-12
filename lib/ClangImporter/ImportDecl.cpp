@@ -7359,6 +7359,42 @@ void ClangImporter::Implementation::finishPendingActions() {
   }
 }
 
+/// Look up associated type requirements in the conforming type.
+static void finishTypeWitnesses(
+    NormalProtocolConformance *conformance) {
+  auto *proto = conformance->getProtocol();
+  auto *nominal = conformance->getType()->getAnyNominal();
+
+  for (auto *req : proto->getMembers()) {
+    if (auto *assocType = dyn_cast<AssociatedTypeDecl>(req)) {
+      // FIXME: This should not happen?
+      if (conformance->hasTypeWitness(assocType)) continue;
+
+      bool satisfied = false;
+
+      for (auto member : nominal->lookupDirect(assocType->getFullName())) {
+        auto memberType = dyn_cast<TypeDecl>(member);
+        if (!memberType) continue;
+
+        conformance->setTypeWitness(assocType,
+                                    nominal->mapTypeIntoContext(
+                                      memberType->getDeclaredInterfaceType()),
+                                    memberType);
+        satisfied = true;
+        break;
+      }
+
+      if (!satisfied) {
+        llvm::errs() << ("Cannot look up associated type for "
+                         "imported conformance:\n");
+        conformance->getType().dump(llvm::errs());
+        assocType->dump(llvm::errs());
+        abort();
+      }
+    }
+  }
+}
+
 /// Make sure any inherited conformances also get completed, if necessary.
 static void finishInheritedConformances(
     NormalProtocolConformance *conformance) {
@@ -7449,6 +7485,7 @@ void ClangImporter::Implementation::finishNormalConformance(
                              conformance->getType());
   PrettyStackTraceDecl traceTo("... to", proto);
 
+  finishTypeWitnesses(conformance);
   finishInheritedConformances(conformance);
   finishSignatureConformances(conformance);
 
