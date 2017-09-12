@@ -404,20 +404,6 @@ static bool resolveKnownTypeWitness(NormalProtocolConformance *conformance,
   // RawRepresentable.RawValue.
   if (*knownKind == KnownProtocolKind::RawRepresentable) {
     assert(assocType->getName() == ctx.Id_RawValue);
-    if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-      // First, try to resolve via lookup, so we get the declaration.
-      if (resolveViaLookup()) return true;
-
-      // Otherwise, use the raw type.
-      if (enumDecl->hasRawType()) {
-        conformance->setTypeWitness(assocType, enumDecl->getRawType(), nullptr);
-        return true;
-      }
-
-      return false;
-    }
-
-    // All other cases resolve via lookup.
     return resolveViaLookup();
   }
 
