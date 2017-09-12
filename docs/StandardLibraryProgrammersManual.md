@@ -27,7 +27,10 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
     1. Resilience, ABI stability, `@_inlineable`, `@_versioned`, etc
     1. Strings and ICU
     1. Lifetimes
-        1. withExtendedLifetime, withUnsafe..., 
+        1. withExtendedLifetime, withUnsafe...,
+    1. Bridging
+        1. Tagged pointers
+        1. Specific structures, i.e. Array, Dictionary, String
 1. Coding Standards
     1. High level concerns
     1. Best practices
@@ -123,7 +126,7 @@ Use of this attribute imposes limitations on what can be in the body. For more d
 
 #### `@unsafe_no_objc_tagged_pointer`
 
-This is currently used in the standard library as an additional annotation applied to @objc protocols signifying that any objects which conform to this protocol are not tagged. This means that (on Darwin platforms) such references, unlike AnyObject, have spare bits available from things like restricted memory spaces or alignment.
+This is currently used in the standard library as an additional annotation applied to @objc protocols signifying that any objects which conform to this protocol are not represented as a tagged pointer. This means that (on Darwin platforms) such references, unlike AnyObject, have spare bits available from things like restricted memory spaces or alignment.
 
 ### Internal structures
 
