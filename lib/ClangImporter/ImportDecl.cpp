@@ -7411,20 +7411,7 @@ void ClangImporter::Implementation::finishNormalConformance(
     inheritedProtos.push_back(inherited);
   }
   // Sort for deterministic import.
-  llvm::array_pod_sort(inheritedProtos.begin(),
-                       inheritedProtos.end(),
-                       [](ProtocolDecl * const *left,
-                          ProtocolDecl * const *right) -> int {
-    // We know all Objective-C protocols in a translation unit have unique
-    // names, so go by the Objective-C name.
-    auto getDeclName = [](const ProtocolDecl *proto) -> StringRef {
-      if (auto *objCAttr = proto->getAttrs().getAttribute<ObjCAttr>())
-        if (auto name = objCAttr->getName())
-          return name.getValue().getSelectorPieces().front().str();
-      return proto->getName().str();
-    };
-    return getDeclName(*left).compare(getDeclName(*right));
-  });
+  ProtocolType::canonicalizeProtocols(inheritedProtos);
 
   // Schedule any that aren't complete.
   for (auto *inherited : inheritedProtos) {
