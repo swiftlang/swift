@@ -7359,21 +7359,15 @@ void ClangImporter::Implementation::finishPendingActions() {
   }
 }
 
-void ClangImporter::Implementation::finishNormalConformance(
-    NormalProtocolConformance *conformance,
-    uint64_t unused) {
-  (void)unused;
-  const ProtocolDecl *proto = conformance->getProtocol();
+/// Make sure any inherited conformances also get completed, if necessary.
+static void finishInheritedConformances(
+    NormalProtocolConformance *conformance) {
+  auto *proto = conformance->getProtocol();
 
-  PrettyStackTraceType trace(SwiftContext, "completing conformance for",
-                             conformance->getType());
-  PrettyStackTraceDecl traceTo("... to", proto);
-
-  // And make sure any inherited conformances also get completed, if necessary.
-  SmallVector<ProtocolDecl *, 8> inheritedProtos;
-  for (auto *inherited : proto->getInheritedProtocols()) {
+  SmallVector<ProtocolDecl *, 2> inheritedProtos;
+  for (auto *inherited : proto->getInheritedProtocols())
     inheritedProtos.push_back(inherited);
-  }
+
   // Sort for deterministic import.
   ProtocolType::canonicalizeProtocols(inheritedProtos);
 
@@ -7385,8 +7379,13 @@ void ClangImporter::Implementation::finishNormalConformance(
     assert(inheritedConformance && inheritedConformance->isConcrete() &&
            "inherited conformance not found");
   }
+}
 
-  // Collect conformances for the requirement signature.
+/// Collect conformances for the requirement signature.
+static void finishSignatureConformances(
+    NormalProtocolConformance *conformance) {
+  auto *proto = conformance->getProtocol();
+
   SmallVector<ProtocolConformanceRef, 4> reqConformances;
   for (const auto &req : proto->getRequirementSignature()) {
     if (req.getKind() != RequirementKind::Conformance)
@@ -7403,16 +7402,13 @@ void ClangImporter::Implementation::finishNormalConformance(
     reqConformances.push_back(*reqConformance);
   }
   conformance->setSignatureConformances(reqConformances);
+}
 
-  // Imported conformances to @objc protocols also require additional
-  // initialization to complete the requirement to witness mapping.
-  if (!proto->isObjC())
-    return;
+/// Create witnesses for requirements not already met.
+static void finishMissingOptionalWitnesses(
+    NormalProtocolConformance *conformance) {
+  auto *proto = conformance->getProtocol();
 
-  assert(conformance->isComplete());
-  conformance->setState(ProtocolConformanceState::Incomplete);
-
-  // Create witnesses for requirements not already met.
   for (auto req : proto->getMembers()) {
     auto valueReq = dyn_cast<ValueDecl>(req);
     if (!valueReq)
@@ -7435,12 +7431,36 @@ void ClangImporter::Implementation::finishNormalConformance(
       auto witness = conformance->getWitness(valueReq, nullptr).getDecl();
       if (auto ctor = dyn_cast_or_null<ConstructorDecl>(witness)) {
         if (!ctor->getAttrs().hasAttribute<RequiredAttr>()) {
-          ctor->getAttrs().add(
-            new (SwiftContext) RequiredAttr(/*IsImplicit=*/true));
+          auto &ctx = proto->getASTContext();
+          ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/true));
         }
       }
     }
   }
+}
+
+void ClangImporter::Implementation::finishNormalConformance(
+    NormalProtocolConformance *conformance,
+    uint64_t unused) {
+  (void)unused;
+
+  auto *proto = conformance->getProtocol();
+  PrettyStackTraceType trace(SwiftContext, "completing conformance for",
+                             conformance->getType());
+  PrettyStackTraceDecl traceTo("... to", proto);
+
+  finishInheritedConformances(conformance);
+  finishSignatureConformances(conformance);
+
+  // Imported conformances to @objc protocols also require additional
+  // initialization to complete the requirement to witness mapping.
+  if (!proto->isObjC())
+    return;
+
+  assert(conformance->isComplete());
+  conformance->setState(ProtocolConformanceState::Incomplete);
+
+  finishMissingOptionalWitnesses(conformance);
 
   conformance->setState(ProtocolConformanceState::Complete);
 }
