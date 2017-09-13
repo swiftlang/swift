@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -S %s | %FileCheck %s --check-prefix=TAILCALL
 
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
@@ -15,7 +16,7 @@ sil_stage canonical
 
 import Swift
 
-class C {}
+public class C {}
 sil_vtable C {}
 sil @_T04weak1CCfD : $@convention(method) (C) -> ()
 
@@ -23,7 +24,7 @@ protocol P : class {
   func explode()
 }
 
-struct A {
+public struct A {
   weak var x : C?
 }
 
@@ -113,12 +114,18 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
+// TAILCALL: __T04weak1AVwCP:
+// TAILCALL:  jmp     _swift_weakCopyInit
+
 //   destroy
 // CHECK:    define linkonce_odr hidden void @_T04weak1AVwxx([[OPAQUE]]* noalias [[ARG:%.*]], [[TYPE]]*
 // CHECK:      [[T0:%.*]] = bitcast [[OPAQUE]]* [[ARG]] to [[A]]*
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[T0]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakDestroy([[WEAK]]* [[T1]])
 // CHECK-NEXT: ret void
+
+// TAILCALL: __T04weak1AVwxx:
+// TAILCALL:  jmp     _swift_weakDestroy
 
 //   initializeWithCopy
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_T04weak1AVwcp([[OPAQUE]]* noalias [[DEST_OPQ:%.*]], [[OPAQUE]]* noalias [[SRC_OPQ:%.*]], [[TYPE]]*
@@ -130,6 +137,9 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
+// TAILCALL: __T04weak1AVwcp:
+// TAILCALL:  jmp     _swift_weakCopyInit
+
 //   assignWithCopy
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_T04weak1AVwca([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
@@ -140,6 +150,9 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
+// TAILCALL: __T04weak1AVwca:
+// TAILCALL:  jmp     _swift_weakCopyAssign
+
 //   assignWithTake
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_T04weak1AVwta([[OPAQUE]]* noalias [[DEST_OPQ:%.*]], [[OPAQUE]]* noalias [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
@@ -149,3 +162,12 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: call [[WEAK]]* @swift_weakTakeAssign([[WEAK]]* [[DEST_X]], [[WEAK]]* [[SRC_X]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
+
+// TAILCALL: __T04weak1AVwtk:
+// TAILCALL:  jmp     _swift_weakTakeInit
+
+// TAILCALL: __T04weak1AVwta:
+// TAILCALL:  jmp     _swift_weakTakeAssign
+
+// TAILCALL: __T04weak1AVwTK:
+// TAILCALL:  jmp     _swift_weakTakeInit
