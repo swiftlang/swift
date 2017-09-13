@@ -1420,7 +1420,7 @@ WARNING(requirement_restricts_self_swift3,none,
         "requirement %1 is deprecated in Swift 3",
         (DescriptiveDeclKind, DeclName, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
-      "%select{method|initializer}0 %1 has different argument names from those "
+      "%select{method|initializer}0 %1 has different argument labels from those "
       "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
 ERROR(witness_initializer_not_required,none,
       "initializer requirement %0 can only be satisfied by a `required` "
@@ -1773,7 +1773,7 @@ ERROR(override_multiple_decls_base,none,
       "declaration %0 cannot override more than one superclass declaration",
       (DeclName))
 ERROR(override_multiple_decls_arg_mismatch,none,
-      "declaration %0 has different argument names from any potential "
+      "declaration %0 has different argument labels from any potential "
       "overrides", (DeclName))
 NOTE(overridden_near_match_here,none,
      "potential overridden %0 %1 here",
@@ -1868,7 +1868,7 @@ ERROR(override_mutable_with_readonly_property,none,
       "cannot override mutable property with read-only property %0",
       (Identifier))
 ERROR(override_argument_name_mismatch,none,
-      "argument names for %select{method|initializer}0 %1 do not match those "
+      "argument labels for %select{method|initializer}0 %1 do not match those "
       "of overridden %select{method|initializer}0 %2",
       (bool, DeclName, DeclName))
 ERROR(override_ownership_mismatch,none,
@@ -3238,7 +3238,7 @@ ERROR(objc_name_deinit,none,
       "'@objc' deinitializer cannot have a name", ())
 ERROR(objc_name_func_mismatch,none,
       "'@objc' %select{initializer|method}0 name provides "
-      "%select{one argument name|names for %1 arguments}2, but "
+      "%select{one argument label|names for %1 arguments}2, but "
       "%select{initializer|method}0 has %select{one parameter|%3 parameters}4"
       "%select{| (%select{|including }4the error parameter)}5",
       (bool, unsigned, bool, unsigned, bool, bool))
