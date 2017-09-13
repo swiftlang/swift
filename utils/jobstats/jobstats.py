@@ -163,7 +163,7 @@ def load_stats_dir(path, select_module=[]):
     """Loads all stats-files found in path into a list of JobStats objects"""
     jobstats = []
     auxpat = (r"(?P<module>[^-]+)-(?P<input>[^-]+)-(?P<triple>[^-]+)" +
-              r"-(?P<out>[^-]+)-(?P<opt>[^-]+)")
+              r"-(?P<out>[^-]*)-(?P<opt>[^-]+)")
     fpat = (r"^stats-(?P<start>\d+)-swift-(?P<kind>\w+)-" +
             auxpat +
             r"-(?P<pid>\d+)(-.*)?.json$")
