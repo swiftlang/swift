@@ -669,17 +669,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
-  // do {
-//     var a = getBridgedVerbatimArray([])
-//     var identity1 = a._rawIdentifier()
-//     expectTrue(isCocoaArray(a))
-//     expectEqual(0, a.count)
-//
-//     a.removeAll()
-//     expectEqual(identity1, a._rawIdentifier())
-//     expectEqual(0, a.count)
-//   }
-
   do {
     var a = getBridgedVerbatimArray()
     var identity1 = a._rawIdentifier()
@@ -748,17 +737,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
-  // do {
-  //   var a = getBridgedNonverbatimArray([])
-  //   var identity1 = a._rawIdentifier()
-  //   expectTrue(isNativeArray(a))
-  //   expectEqual(0, a.count)
-  //
-  //   a.removeAll()
-  //   expectEqual(identity1, a._rawIdentifier())
-  //   expectEqual(0, a.count)
-  // }
-
   do {
     var a = getBridgedNonverbatimArray()
     var identity1 = a._rawIdentifier()
@@ -1074,6 +1052,649 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
   helper([1010, 1020, 1030],
          [1010, 1020, 1030, 1040],
          false)
+}
+
+//===---
+// Array -> NSArray bridging tests.
+//
+// Values are bridged verbatim.
+//===---
+
+func _expectAutoreleasedKeysAndValues(
+  opt: (Int, Int) = (0, 0), unopt: (Int, Int) = (0, 0)) {
+  var expectedKeys = 0
+  var expectedValues = 0
+#if arch(i386)
+  (expectedKeys, expectedValues) = unopt
+#else
+  (expectedKeys, expectedValues) = opt
+#endif
+
+  TestObjCValueTy.objectCount -= expectedValues
+}
+
+/// Expect some number of autoreleased value objects.
+///
+/// - parameter opt: applies to platforms that have the return-autoreleased
+///   optimization.
+///
+/// - parameter unopt: applies to platforms that don't.
+///
+/// FIXME: Some non-zero `opt` might be cases of missed return-autorelease.
+func expectAutoreleasedValues(
+  opt: Int = 0, unopt: Int = 0) {
+  _expectAutoreleasedKeysAndValues(opt: (0, opt), unopt: (0, unopt))
+}
+
+func isNativeNSArray(_ d: NSArray) -> Bool {
+  let className: NSString = NSStringFromClass(type(of: d)) as NSString
+  return ["_SwiftDeferredNSArray", "_ContiguousArray", "_EmptyArray"].contains {
+    className.range(of: $0).length > 0
+  }
+}
+
+func getBridgedNSArrayOfRefTypesBridgedVerbatim() -> NSArray {
+  expectTrue(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
+
+  var a = Array<TestObjCValueTy>()
+  a.reserveCapacity(32)
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  let bridged =
+    unsafeBitCast(convertArrayToNSArray(a), to: NSArray.self)
+
+  assert(isNativeNSArray(bridged))
+
+  return bridged
+}
+
+func getBridgedEmptyNSArray() -> NSArray {
+  let a = Array<TestObjCValueTy>()
+
+  let bridged =
+    unsafeBitCast(convertArrayToNSArray(a), to: NSArray.self)
+  assert(isNativeNSArray(bridged))
+
+  return bridged
+}
+
+func _makeExpectedArrayContents(
+  _ expected: [Int]
+) -> [ExpectedArrayElement] {
+  var result = [ExpectedArrayElement]()
+  for value in expected {
+    result.append(ExpectedArrayElement(value: value))
+  }
+  return result
+}
+
+func _equalsWithoutElementIdentity(
+  _ lhs: [ExpectedArrayElement], _ rhs: [ExpectedArrayElement]
+) -> Bool {
+  func stripIdentity(
+    _ list: [ExpectedArrayElement]
+  ) -> [ExpectedArrayElement] {
+    return list.map { ExpectedArrayElement(value: $0.value) }
+  }
+
+  return stripIdentity(lhs).elementsEqual(stripIdentity(rhs))
+}
+
+struct ExpectedArrayElement : Comparable, CustomStringConvertible {
+  var value: Int
+  var valueIdentity: UInt
+
+  init(value: Int, valueIdentity: UInt = 0) {
+    self.value = value
+    self.valueIdentity = valueIdentity
+  }
+
+  var description: String {
+    return "(\(value), \(valueIdentity))"
+  }
+}
+
+func == (
+  lhs: ExpectedArrayElement,
+  rhs: ExpectedArrayElement
+) -> Bool {
+  return
+    lhs.value == rhs.value &&
+    lhs.valueIdentity == rhs.valueIdentity
+}
+
+func < (
+  lhs: ExpectedArrayElement,
+  rhs: ExpectedArrayElement
+) -> Bool {
+  let lhsElements = [ lhs.value, Int(bitPattern: lhs.valueIdentity) ]
+  let rhsElements = [ rhs.value, Int(bitPattern: rhs.valueIdentity) ]
+  return lhsElements.lexicographicallyPrecedes(rhsElements)
+}
+
+ func _checkArrayFastEnumerationImpl(
+  _ expected: [Int],
+  _ a: NSArray,
+  _ makeEnumerator: () -> NSFastEnumeration,
+  _ useEnumerator: (NSArray, NSFastEnumeration, (AnyObject) -> ()) -> Void,
+  _ convertValue: @escaping (AnyObject) -> Int
+) {
+  let expectedContentsWithoutIdentity =
+  _makeExpectedArrayContents(expected)
+  
+  var expectedContents = [ExpectedArrayElement]()
+  
+  for i in 0..<3 {
+    var actualContents = [ExpectedArrayElement]()
+    let sink = {
+      (value: AnyObject) in
+      actualContents.append(ExpectedArrayElement(
+        value: convertValue(value),
+        valueIdentity: unsafeBitCast(value, to: UInt.self)))
+    }
+
+    useEnumerator(a, makeEnumerator(), sink)
+
+    expectTrue(
+      _equalsWithoutElementIdentity(
+        expectedContentsWithoutIdentity, actualContents),
+      "expected: \(expectedContentsWithoutIdentity)\n" +
+      "actual: \(actualContents)\n")
+
+    if i == 0 {
+      expectedContents = actualContents
+    }
+    
+    expectEqualSequence(expectedContents, actualContents)
+  }
+}
+
+ func slurpFastEnumerationFromObjC(
+  _ a: NSArray, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void
+) {
+  let objcValues = NSMutableArray()
+  slurpFastEnumerationOfArrayFromObjCImpl(a, fe, objcValues)
+  for value in objcValues {
+    sink(value as AnyObject)
+  }
+}
+
+import SlurpFastEnumeration
+
+ func slurpFastEnumerationFromSwift(
+  _ a: NSArray, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void,
+  maxItems: Int? = nil
+) {
+  var state = NSFastEnumerationState()
+
+  let stackBufLength = 3
+  let stackBuf = _HeapBuffer<(), AnyObject?>(
+    _HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
+
+  var itemsReturned = 0
+  while true {
+    let returnedCount = fe.countByEnumerating(
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      count: stackBufLength)
+    expectNotEqual(0, state.state)
+    expectNotNil(state.mutationsPtr)
+    if returnedCount == 0 {
+      break
+    }
+    for i in 0..<returnedCount {
+      let value: AnyObject = state.itemsPtr![i]!
+      sink(value)
+      itemsReturned += 1
+    }
+    if maxItems != nil && itemsReturned >= maxItems! {
+      return
+    }
+  }
+
+  for _ in 0..<3 {
+    let returnedCount = fe.countByEnumerating(
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      count: stackBufLength)
+    expectNotEqual(0, state.state)
+    expectNotNil(state.mutationsPtr)
+    expectEqual(0, returnedCount)
+  }
+}
+
+ func checkArrayFastEnumerationFromSwift(
+  _ expected: [Int],
+  _ a: NSArray, _ makeEnumerator: () -> NSFastEnumeration,
+  _ convertValue: @escaping (AnyObject) -> Int
+) {
+  _checkArrayFastEnumerationImpl(
+    expected, a, makeEnumerator,
+    { (a, fe, sink) in
+      slurpFastEnumerationFromSwift(a, fe, sink)
+    },
+    convertValue)
+}
+
+ func checkArrayFastEnumerationFromObjC(
+  _ expected: [Int],
+  _ a: NSArray, _ makeEnumerator: () -> NSFastEnumeration,
+  _ convertValue: @escaping (AnyObject) -> Int
+) {
+  _checkArrayFastEnumerationImpl(
+    expected, a, makeEnumerator,
+    { (a, fe, sink) in
+      slurpFastEnumerationFromObjC(a, fe, sink)
+    },
+    convertValue)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.Count") {
+  let d = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  assert(d.count == 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
+  let a = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  var v: AnyObject? = a.object(at: 0) as AnyObject
+  expectEqual(1010, (v as! TestObjCValueTy).value)
+  let idValue10 = unsafeBitCast(v, to: UInt.self)
+
+  v = a.object(at: 1) as AnyObject
+  expectEqual(1020, (v as! TestObjCValueTy).value)
+  let idValue20 = unsafeBitCast(v, to: UInt.self)
+
+  v = a.object(at: 2) as AnyObject
+  expectEqual(1030, (v as! TestObjCValueTy).value)
+  let idValue30 = unsafeBitCast(v, to: UInt.self)
+
+  for i in 0..<3 {
+    expectEqual(idValue10, unsafeBitCast(
+      a.object(at: 0) as AnyObject, to: UInt.self))
+
+    expectEqual(idValue20, unsafeBitCast(
+      a.object(at: 1) as AnyObject, to: UInt.self))
+
+    expectEqual(idValue30, unsafeBitCast(
+      a.object(at: 2) as AnyObject, to: UInt.self))
+  }
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject") {
+  let a = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  var capturedIdentities = Array<UInt>()
+
+  for _ in 0..<3 {
+    let enumerator = a.objectEnumerator()
+
+    var values = Array<Int>()
+    var identities = Array<UInt>()
+    while let value = enumerator.nextObject() {
+      let valueObj = (value as! TestObjCValueTy)
+      values.append(valueObj.value)
+
+      let identity = unsafeBitCast(valueObj, to: UInt.self)
+      identities.append(identity)
+    }
+    expectEqual([ 1010, 1020, 1030 ], values)
+
+    if capturedIdentities.isEmpty {
+      capturedIdentities = identities
+    } else {
+      expectEqual(capturedIdentities, identities)
+    }
+
+    expectNil(enumerator.nextObject())
+    expectNil(enumerator.nextObject())
+    expectNil(enumerator.nextObject())
+  }
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.NextObject_Empty") {
+  let a = getBridgedEmptyNSArray()
+  let enumerator = a.objectEnumerator()
+
+  expectNil(enumerator.nextObject())
+  expectNil(enumerator.nextObject())
+  expectNil(enumerator.nextObject())
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFromSwift") {
+  let a = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  checkArrayFastEnumerationFromSwift(
+    [ 1010, 1020, 1030 ],
+    a, { a.objectEnumerator() },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFromObjC") {
+  let a = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  checkArrayFastEnumerationFromObjC(
+    [ 1010, 1020, 1030 ],
+    a, { a.objectEnumerator() },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration_Empty") {
+  let a = getBridgedEmptyNSArray()
+
+  checkArrayFastEnumerationFromSwift(
+    [], a, { a.objectEnumerator() },
+    { ($0 as! TestObjCValueTy).value })
+
+  checkArrayFastEnumerationFromObjC(
+    [], a, { a.objectEnumerator() },
+    { ($0 as! TestObjCValueTy).value })
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromSwift") {
+  let a = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  checkArrayFastEnumerationFromSwift(
+    [ 1010, 1020, 1030 ],
+    a, { a },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromObjC") {
+  let a = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  checkArrayFastEnumerationFromObjC(
+    [ 1010, 1020, 1030 ],
+    a, { a },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration_Empty") {
+  let a = getBridgedEmptyNSArray()
+
+  checkArrayFastEnumerationFromSwift(
+    [], a, { a },
+    { ($0 as! TestObjCValueTy).value })
+
+  checkArrayFastEnumerationFromObjC(
+    [], a, { a },
+    { ($0 as! TestObjCValueTy).value })
+}
+
+//===---
+// Array -> NSArray bridging tests.
+//
+// Values are bridged non-verbatim.
+//===---
+
+func getBridgedNSArrayOfObjValue_ValueTypesCustomBridged(
+  numElements: Int = 3
+) -> NSArray {
+  expectFalse(_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
+
+  var a = Array<TestBridgedValueTy>()
+  for i in 1..<(numElements + 1) {
+    a.append(TestBridgedValueTy(i * 10 + 1000))
+  }
+
+  let bridged = convertArrayToNSArray(a)
+  expectTrue(isNativeNSArray(bridged))
+
+  return bridged
+}
+
+ func checkArrayEnumeratorPartialFastEnumerationFromSwift(
+  _ expected: [Int],
+  _ a: NSArray,
+  maxFastEnumerationItems: Int,
+  _ convertValue: @escaping (AnyObject) -> Int
+) {
+  _checkArrayFastEnumerationImpl(
+    expected, a, { a.objectEnumerator() },
+    { (a, fe, sink) in
+      slurpFastEnumerationOfNSEnumeratorFromSwift(
+        a, fe as! NSEnumerator, sink,
+        maxFastEnumerationItems: maxFastEnumerationItems)
+    },
+    convertValue)
+}
+
+ func slurpFastEnumerationOfNSEnumeratorFromSwift(
+  _ a: NSArray, _ enumerator: NSEnumerator, _ sink: (AnyObject) -> Void,
+  maxFastEnumerationItems: Int
+) {
+  slurpFastEnumerationFromSwift(
+    a, enumerator, sink, maxItems: maxFastEnumerationItems)
+  while let value = enumerator.nextObject() {
+    sink(value as AnyObject)
+  }
+}
+
+ArrayTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
+  let enumerator = a.objectEnumerator()
+
+  var values = Array<Int>()
+  while let valueObj = enumerator.nextObject() {
+    let value: AnyObject = valueObj as! AnyObject
+    let v = (value as! TestObjCValueTy).value
+    values.append(v)
+  }
+  expectEqual([ 1010, 1020, 1030 ], values)
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromSwift") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
+
+  checkArrayFastEnumerationFromSwift(
+    [ 1010, 1020, 1030 ],
+    a, { a.objectEnumerator() },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromSwift.Partial") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged(
+    numElements: 9)
+
+  checkArrayEnumeratorPartialFastEnumerationFromSwift(
+    [ 1010, 1020, 1030, 1040, 1050,
+      1060, 1070, 1080, 1090 ],
+    a, maxFastEnumerationItems: 5,
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 9)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromObjC") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
+
+  checkArrayFastEnumerationFromObjC(
+    [ 1010, 1020, 1030 ],
+    a, { a.objectEnumerator() },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromSwift") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
+
+  checkArrayFastEnumerationFromSwift(
+    [ 1010, 1020, 1030 ],
+    a, { a },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromObjC") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
+
+  checkArrayFastEnumerationFromObjC(
+    [ 1010, 1020, 1030 ],
+    a, { a },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged(
+    numElements: 0)
+
+  checkArrayFastEnumerationFromSwift(
+    [], a, { a },
+    { ($0 as! TestObjCValueTy).value })
+
+  checkArrayFastEnumerationFromObjC(
+    [], a, { a },
+    { ($0 as! TestObjCValueTy).value })
+}
+
+func getBridgedNSArrayOfObj_ValueTypeCustomBridged() -> NSArray {
+  expectTrue(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
+
+  var a = Array<TestObjCValueTy>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  let bridged = convertArrayToNSArray(a)
+  expectTrue(isNativeNSArray(bridged))
+
+  return bridged
+}
+
+ArrayTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
+  let a = getBridgedNSArrayOfObj_ValueTypeCustomBridged()
+  let enumerator = a.objectEnumerator()
+
+  var values = Array<Int>()
+  while let valueObj = enumerator.nextObject() {
+    let value: AnyObject = valueObj as! AnyObject
+    let v = (value as! TestObjCValueTy).value
+    values.append(v)
+  }
+  expectEqual([ 1010, 1020, 1030 ], values)
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+func getBridgedNSArrayOfValue_ValueTypeCustomBridged() -> NSArray {
+  expectFalse(_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
+
+  var a = Array<TestBridgedValueTy>()
+  a.append(TestBridgedValueTy(1010))
+  a.append(TestBridgedValueTy(1020))
+  a.append(TestBridgedValueTy(1030))
+
+  let bridged = convertArrayToNSArray(a)
+  expectTrue(isNativeNSArray(bridged))
+
+  return bridged
+}
+
+ArrayTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
+  let a = getBridgedNSArrayOfValue_ValueTypeCustomBridged()
+  let enumerator = a.objectEnumerator()
+
+  var values = Array<Int>()
+  while let valueObj = enumerator.nextObject() {
+    let value: AnyObject = valueObj as! AnyObject
+    let v = (value as! TestObjCValueTy).value
+    values.append(v)
+  }
+  expectEqual([ 1010, 1020, 1030 ], values)
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+//===---
+// NSArray -> Array -> NSArray bridging tests.
+//===---
+
+func isCocoaNSArray(_ a: NSArray) -> Bool {
+  let className: NSString = NSStringFromClass(type(of: a)) as NSString
+  return className.range(of: "NSArray").length > 0 ||
+    className.range(of: "NSCFArray").length > 0
+}
+
+func getRoundtripBridgedNSArray() -> NSArray {
+  let values = [ 1010, 1020, 1030 ].map { TestObjCValueTy($0) }
+
+  let nsa = NSArray(array: values)
+
+  let a: Array<AnyObject> = convertNSArrayToArray(nsa)
+
+  let bridgedBack = convertArrayToNSArray(a)
+  expectTrue(isCocoaNSArray(bridgedBack))
+  expectEqual(unsafeBitCast(nsa, to: Int.self), unsafeBitCast(bridgedBack, to: Int.self))
+
+  return bridgedBack
+}
+
+ArrayTestSuite.test("BridgingRoundtrip") {
+  let a = getRoundtripBridgedNSArray()
+  let enumerator = a.objectEnumerator()
+
+  var values = Array<Int>()
+  while let valueObj = enumerator.nextObject() {
+    let value: AnyObject = valueObj as! AnyObject
+    let v = (value as! TestObjCValueTy).value
+    values.append(v)
+  }
+  expectEqual([ 1010, 1020, 1030 ], values)
+}
+
+//===---
+// NSArray -> Array implicit conversion.
+//===---
+
+ArrayTestSuite.test("NSArrayToArrayConversion") {
+  let values = [ 1010, 1020, 1030 ].map { TestObjCValueTy($0) }
+
+  let nsa = NSArray(array: values)
+
+  let a: Array = nsa as Array
+
+  var bridgedValues = Array<Int>()
+  for value in a {
+    let v = (value as! TestObjCValueTy).value
+    bridgedValues.append(v)
+  }
+  expectEqual([ 1010, 1020, 1030 ], bridgedValues)
+}
+
+ArrayTestSuite.test("ArrayToNSArrayConversion") {
+  var a = Array<TestObjCValueTy>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+  let nsa: NSArray = a as NSArray
+
+  checkArrayFastEnumerationFromSwift(
+    [ 1010, 1020, 1030 ],
+    a as NSArray, { a as NSArray },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
 }
 
 #endif
