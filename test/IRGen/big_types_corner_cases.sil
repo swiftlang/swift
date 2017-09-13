@@ -139,3 +139,76 @@ sil private @part_apply_callee : $@convention(thin) (@owned Builtin.Int64, () ->
 bb0(%0 : $Builtin.Int64, %1 : $() -> @owned BigStruct):
   return undef : $BigStruct
 }
+
+//////////////////////
+// Autoclosure Test //
+//////////////////////
+
+class SuperBase {
+}
+
+class SuperSub : SuperBase {
+}
+
+sil @boom : $@convention(thin) (@guaranteed SuperBase) -> BigStruct
+
+sil [transparent] @autoclosure_rhs : $@convention(thin) (@owned SuperSub) -> (BigStruct, @error Error) {
+bb0(%0 : $SuperSub):
+  strong_retain %0 : $SuperSub
+  %5 = upcast %0 : $SuperSub to $SuperBase
+  %6 = function_ref @boom : $@convention(thin) (@guaranteed SuperBase) -> BigStruct
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed SuperBase) -> BigStruct
+  strong_release %5 : $SuperBase
+  strong_release %0 : $SuperSub
+  return %7 : $BigStruct
+}
+
+sil @get_optional_none : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
+sil @short_circuit_operation : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+sil @autoclosure_partialapply : $@convention(thin) (@owned @callee_owned () -> (BigStruct, @error Error)) -> (@out BigStruct, @error Error)
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @closure(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, %T22big_types_corner_cases8SuperSubC*) #0 {
+// CHECK-64: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK-64: [[ALLOC4:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK-64: call swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_AFyKXKfu_TA(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture swifterror %swifterror)
+// CHECK: ret void
+sil @closure : $@convention(thin) (@owned SuperSub) -> BigStruct {
+bb0(%0 : $SuperSub):
+  %2 = function_ref @short_circuit_operation : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+  %3 = alloc_stack $BigStruct
+  %4 = function_ref @get_optional_none : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
+  %5 = alloc_stack $Optional<BigStruct>
+  %6 = metatype $@thin Optional<BigStruct>.Type
+  %7 = apply %4<BigStruct>(%5, %6) : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
+  %8 = load %5 : $*Optional<BigStruct>
+  %9 = alloc_stack $Optional<BigStruct>
+  store %8 to %9 : $*Optional<BigStruct>
+
+  %11 = function_ref @autoclosure_rhs : $@convention(thin) (@owned SuperSub) -> (BigStruct, @error Error)
+  strong_retain %0 : $SuperSub
+  %13 = partial_apply %11(%0) : $@convention(thin) (@owned SuperSub) -> (BigStruct, @error Error)
+
+  %14 = function_ref @autoclosure_partialapply : $@convention(thin) (@owned @callee_owned () -> (BigStruct, @error Error)) -> (@out BigStruct, @error Error)
+  %15 = partial_apply %14(%13) : $@convention(thin) (@owned @callee_owned () -> (BigStruct, @error Error)) -> (@out BigStruct, @error Error)
+  try_apply %2<BigStruct>(%3, %9, %15) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal bb1, error bb2
+
+bb1(%17 : $()):
+  dealloc_stack %9 : $*Optional<BigStruct>
+  dealloc_stack %5 : $*Optional<BigStruct>
+  %20 = load %3 : $*BigStruct
+  dealloc_stack %3 : $*BigStruct
+  strong_release %0 : $SuperSub
+  return %20 : $BigStruct
+
+bb2(%24 : $Error):
+  unreachable
+}
+
+sil_vtable SuperBase {
+}
+
+sil_vtable SuperSub {
+}
+
