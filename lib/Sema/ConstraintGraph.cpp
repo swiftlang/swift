@@ -702,8 +702,7 @@ bool ConstraintGraph::contractEdges() {
         if (isParamBindingConstraint) {
           auto *node = tyvar1->getImpl().getGraphNode();
           auto constraints = node->getConstraints();
-          if (std::any_of(constraints.begin(), constraints.end(),
-                          [](Constraint *constraint) {
+          if (llvm::any_of(constraints, [](Constraint *constraint) {
                             return isStrictInoutSubtypeConstraint(constraint);
                           })) {
             continue;
