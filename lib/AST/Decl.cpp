@@ -4509,12 +4509,13 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   DefaultValueAndIsVariadic.getPointer()->InitContext = initContext;
 }
 
-void DefaultArgumentInitializer::changeFunction(AbstractFunctionDecl *parent) {
-  assert(parent->isLocalContext());
-  setParent(parent);
+void DefaultArgumentInitializer::changeFunction(DeclContext *parent, MutableArrayRef<ParameterList *> paramLists) {
+  if (parent->isLocalContext()) {
+    setParent(parent);
+  }
 
   unsigned offset = getIndex();
-  for (auto list : parent->getParameterLists()) {
+  for (auto list : paramLists) {
     if (offset < list->size()) {
       auto param = list->get(offset);
       if (param->getDefaultValue())

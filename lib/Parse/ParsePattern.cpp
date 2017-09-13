@@ -56,9 +56,9 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
-void Parser::DefaultArgumentInfo::setFunctionContext(AbstractFunctionDecl *AFD){
+void Parser::DefaultArgumentInfo::setFunctionContext(DeclContext *DC, MutableArrayRef<ParameterList *> paramList){
   for (auto context : ParsedContexts) {
-    context->changeFunction(AFD);
+    context->changeFunction(DC, paramList);
   }
 }
 

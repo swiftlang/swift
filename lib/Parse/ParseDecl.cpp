@@ -5178,7 +5178,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     if (SignatureHasCodeCompletion)
       CodeCompletion->setParsedDecl(FD);
 
-    DefaultArgs.setFunctionContext(FD);
+    DefaultArgs.setFunctionContext(FD, FD->getParameterLists());
     for (auto PL : FD->getParameterLists())
       addParametersToScope(PL);
     setLocalDiscriminator(FD);
@@ -5430,8 +5430,8 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     // See if there's a following argument type.
     ParserResult<ParameterList> ArgParams;
     SmallVector<Identifier, 4> argumentNames;
+    DefaultArgumentInfo DefaultArgs(/*inTypeContext*/false);
     if (Tok.isFollowingLParen()) {
-      DefaultArgumentInfo DefaultArgs(/*inTypeContext*/true);
       ArgParams = parseSingleParameterClause(ParameterContextKind::EnumElement,
                                            &argumentNames, &DefaultArgs);
       if (ArgParams.isNull() || ArgParams.hasCodeCompletion())
@@ -5500,6 +5500,11 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
                                                  EqualsLoc,
                                                  LiteralRawValueExpr,
                                                  CurDeclContext);
+
+    if (auto params = ArgParams.getPtrOrNull()) {
+      DefaultArgs.setFunctionContext(result->getDeclContext(), params);
+    }
+
     if (NameLoc == CaseLoc) {
       result->setImplicit(); // Parse error
     }
@@ -6043,7 +6048,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // No need to setLocalDiscriminator.
 
-  DefaultArgs.setFunctionContext(CD);
+  DefaultArgs.setFunctionContext(CD, CD->getParameterLists());
 
   // Pass the function signature to code completion.
   if (SignatureHasCodeCompletion)
