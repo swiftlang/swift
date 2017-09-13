@@ -2140,7 +2140,8 @@ static void concretizeNestedTypeFromConcreteParent(
     witnessType =
       conformance.getConcrete()
         ->getTypeWitness(assocType, builder.getLazyResolver());
-    if (!witnessType) return;
+    if (!witnessType || witnessType->hasError())
+      return; // FIXME: should we delay here?
   } else {
     witnessType = DependentMemberType::get(concreteParent, assocType);
   }
