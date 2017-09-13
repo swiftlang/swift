@@ -4642,6 +4642,11 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   PrettyStackTraceDecl traceTo("... to", conformance->getProtocol());
   ++NumNormalProtocolConformancesCompleted;
 
+  assert(conformance->isComplete());
+
+  conformance->setState(ProtocolConformanceState::Incomplete);
+  SWIFT_DEFER { conformance->setState(ProtocolConformanceState::Complete); };
+
   // Find the conformance record.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(contextData);
