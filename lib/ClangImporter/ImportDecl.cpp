@@ -1212,27 +1212,10 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   return constructor;
 }
 
-/// Add protocol conformances and synthesized protocol attributes
-static void
-populateInheritedTypes(ClangImporter::Implementation &Impl,
-                       NominalTypeDecl *nominal,
-                       ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-                       Type superclass = Type()) {
-  SmallVector<TypeLoc, 4> inheritedTypes;
-  if (superclass)
-    inheritedTypes.push_back(TypeLoc::withoutLoc(superclass));
-
-  for (auto protoKind : synthesizedProtocolAttrs) {
-    if (auto *protoDecl = Impl.SwiftContext.getProtocol(protoKind)) {
-      auto protoType = protoDecl->getDeclaredType();
-      inheritedTypes.push_back(TypeLoc::withoutLoc(protoType));
-    }
-  }
-
-  nominal->setInherited(nominal->getASTContext().AllocateCopy(inheritedTypes));
-  nominal->setCheckedInheritanceClause();
-
-  // Note synthesized protocols
+static void addSynthesizedProtocolAttrs(
+    ClangImporter::Implementation &Impl,
+    NominalTypeDecl *nominal,
+    ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs) {
   for (auto kind : synthesizedProtocolAttrs) {
     nominal->getAttrs().add(new (Impl.SwiftContext)
                                  SynthesizedProtocolAttr(kind, &Impl));
@@ -1275,7 +1258,7 @@ static void makeStructRawValued(
     AccessLevel setterAccess = AccessLevel::Private) {
   auto &ctx = Impl.SwiftContext;
 
-  populateInheritedTypes(Impl, structDecl, synthesizedProtocolAttrs);
+  addSynthesizedProtocolAttrs(Impl, structDecl, synthesizedProtocolAttrs);
 
   // Create a variable to store the underlying value.
   VarDecl *var;
@@ -1366,7 +1349,7 @@ static void makeStructRawValuedWithBridge(
     bool makeUnlabeledValueInit = false) {
   auto &ctx = Impl.SwiftContext;
 
-  populateInheritedTypes(Impl, structDecl, synthesizedProtocolAttrs);
+  addSynthesizedProtocolAttrs(Impl, structDecl, synthesizedProtocolAttrs);
 
   auto storedVarName = ctx.getIdentifier("_rawValue");
   auto computedVarName = ctx.Id_rawValue;
@@ -2434,6 +2417,7 @@ namespace {
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
           AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
         structDecl->computeType();
+        structDecl->setCheckedInheritanceClause();
 
         auto options = getDefaultMakeStructRawValuedOptions();
         options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
@@ -2485,8 +2469,8 @@ namespace {
           errorWrapper->setAccess(AccessLevel::Public);
 
           // Add inheritance clause.
-          populateInheritedTypes(Impl, errorWrapper,
-                                 {KnownProtocolKind::BridgedStoredNSError});
+          addSynthesizedProtocolAttrs(Impl, errorWrapper,
+                                      {KnownProtocolKind::BridgedStoredNSError});
 
           // Create the _nsError member.
           //   public let _nsError: NSError
@@ -2545,16 +2529,17 @@ namespace {
         // Add protocol declarations to the enum declaration.
         SmallVector<TypeLoc, 2> inheritedTypes;
         inheritedTypes.push_back(TypeLoc::withoutLoc(underlyingType));
-        if (errorWrapper) {
-          inheritedTypes.push_back(
-            TypeLoc::withoutLoc(errorCodeProto->getDeclaredType()));
-
-          enumDecl->getAttrs().add(new (Impl.SwiftContext)
-                  SynthesizedProtocolAttr(KnownProtocolKind::ErrorCodeProtocol,
-                                          &Impl));
-        }
         enumDecl->setInherited(C.AllocateCopy(inheritedTypes));
         enumDecl->setCheckedInheritanceClause();
+
+        if (errorWrapper) {
+          addSynthesizedProtocolAttrs(Impl, enumDecl,
+                                      {KnownProtocolKind::ErrorCodeProtocol,
+                                       KnownProtocolKind::RawRepresentable});
+        } else {
+          addSynthesizedProtocolAttrs(Impl, enumDecl,
+                                      {KnownProtocolKind::RawRepresentable});
+        }
 
         // Provide custom implementations of the init(rawValue:) and rawValue
         // conversions that just do a bitcast. We can't reliably filter a
@@ -4787,14 +4772,19 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   theClass->computeType();
   theClass->setCircularityCheck(CircularityCheck::Checked);
   theClass->setSuperclass(superclass);
-  theClass->setCheckedInheritanceClause();
   theClass->setAddedImplicitInitializers(); // suppress all initializers
   theClass->setForeignClassKind(ClassDecl::ForeignKind::CFType);
   addObjCAttribute(theClass, None);
   Impl.registerExternalDecl(theClass);
 
-  populateInheritedTypes(Impl, theClass, {KnownProtocolKind::CFObject},
-                         superclass);
+  if (superclass) {
+    SmallVector<TypeLoc, 4> inheritedTypes;
+    inheritedTypes.push_back(TypeLoc::withoutLoc(superclass));
+    theClass->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
+    theClass->setCheckedInheritanceClause();
+  }
+
+  addSynthesizedProtocolAttrs(Impl, theClass, {KnownProtocolKind::CFObject});
 
   // Look for bridging attributes on the clang record.  We can
   // just check the most recent redeclaration, which will inherit
@@ -4955,6 +4945,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
   structDecl->computeType();
+  structDecl->setCheckedInheritanceClause();
 
   // Import the type of the underlying storage
   auto storedUnderlyingType = Impl.importType(
@@ -5202,6 +5193,7 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
   structDecl->computeType();
+  structDecl->setCheckedInheritanceClause();
 
   makeStructRawValued(Impl, structDecl, underlyingType,
                       {KnownProtocolKind::OptionSet});
