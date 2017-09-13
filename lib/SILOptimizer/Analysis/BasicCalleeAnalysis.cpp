@@ -201,8 +201,8 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
     return CalleeList();
 
   case ValueKind::ThinToThickFunctionInst:
-    Callee = cast<ThinToThickFunctionInst>(Callee)->getOperand();
-    LLVM_FALLTHROUGH;
+    return getCalleeListForCalleeKind(
+        cast<ThinToThickFunctionInst>(Callee)->getOperand());
 
   case ValueKind::FunctionRefInst:
     return CalleeList(cast<FunctionRefInst>(Callee)->getReferencedFunction());
