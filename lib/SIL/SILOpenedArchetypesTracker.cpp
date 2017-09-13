@@ -28,7 +28,7 @@ void SILOpenedArchetypesTracker::addOpenedArchetypeDef(CanArchetypeType archetyp
       OldDef = SILValue();
     }
   }
-  assert(!OldDef &&
+  assert((!OldDef || OldDef == Def) &&
          "There can be only one definition of an opened archetype");
   OpenedArchetypeDefs[archetype] = Def;
 }
