@@ -1178,7 +1178,6 @@ self.test("\(testNamePrefix).OperatorPlus") {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) where
-    C.SubSequence : BidirectionalCollection & RangeReplaceableCollection,
     C.Indices : BidirectionalCollection,
     CollectionWithEquatableElement.Iterator.Element : Equatable {
 
@@ -1300,7 +1299,6 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) where
-    C.SubSequence : RandomAccessCollection & RangeReplaceableCollection,
     C.Indices : RandomAccessCollection,
     CollectionWithEquatableElement.Iterator.Element : Equatable {
 
