@@ -24,6 +24,8 @@ import sys
 import time
 import urllib
 import urllib2
+from collections import namedtuple
+from operator import attrgetter
 from jobstats import load_stats_dir, merge_all_jobstats
 
 
@@ -250,32 +252,39 @@ def set_csv_baseline(args):
     return 0
 
 
+OutputRow = namedtuple("OutputRow",
+                       ["name", "old", "new",
+                        "delta", "delta_pct"])
+
+
 def compare_stats(args, old_stats, new_stats):
-    for stat_name in sorted(old_stats.keys()):
-        old = old_stats[stat_name]
-        new = new_stats.get(stat_name, 0)
+    for name in sorted(old_stats.keys()):
+        old = old_stats[name]
+        new = new_stats.get(name, 0)
         (delta, delta_pct) = diff_and_pct(old, new)
-        if (stat_name.startswith("time.") and
+        if (name.startswith("time.") and
            abs(delta) < args.delta_usec_thresh):
             continue
         if abs(delta_pct) < args.delta_pct_thresh:
             continue
-        yield (stat_name, old, new, delta, delta_pct)
+        yield OutputRow(name=name,
+                        old=old, new=new, delta=delta,
+                        delta_pct=delta_pct)
 
 
 def write_comparison(args, old_stats, new_stats):
     regressions = 0
-    outfieldnames = ["old", "new", "delta_pct", "name"]
-    out = csv.DictWriter(args.output, outfieldnames, dialect='excel-tab')
+    out = csv.DictWriter(args.output, OutputRow._fields, dialect='excel-tab')
     out.writeheader()
 
-    for (stat_name, old, new, delta, delta_pct) in compare_stats(args,
-                                                                 old_stats,
-                                                                 new_stats):
-        out.writerow(dict(name=stat_name,
-                          old=int(old), new=int(new),
-                          delta_pct=delta_pct))
-        if delta > 0:
+    rows = list(compare_stats(args, old_stats, new_stats))
+    sort_key = (attrgetter('delta_pct')
+                if args.sort_by_delta_pct
+                else attrgetter('name'))
+    rows.sort(key=sort_key, reverse=args.sort_descending)
+    for row in rows:
+        out.writerow(row._asdict())
+        if row.delta > 0:
             regressions += 1
     return regressions
 
@@ -366,6 +375,14 @@ def main():
                         default=False,
                         action="store_true",
                         help="only select counters, exclude timers")
+    parser.add_argument("--sort-by-delta-pct",
+                        default=False,
+                        action="store_true",
+                        help="Sort comparison results by delta-%, not stat")
+    parser.add_argument("--sort-descending",
+                        default=False,
+                        action="store_true",
+                        help="Sort comparison results in descending order")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")
