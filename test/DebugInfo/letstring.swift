@@ -27,13 +27,13 @@ class AppDelegate {
 // End-to-end test:
 // RUN: llc %t.ll -filetype=obj -o %t.o
 // RUN: %llvm-dwarfdump %t.o | %FileCheck %s --check-prefix DWARF-CHECK
-// DWARF-CHECK: DW_AT_name {{.*}} "f"
+// DWARF-CHECK: DW_AT_name ("f")
 //
 // DWARF-CHECK: DW_TAG_formal_parameter
-// DWARF-CHECK:  DW_AT_name {{.*}} "self"
+// DWARF-CHECK:  DW_AT_name ("self")
 //
 // DWARF-CHECK:  DW_TAG_variable
-// DWARF-CHECK:  DW_AT_name {{.*}} "a"
+// DWARF-CHECK:  DW_AT_name ("a")
 //
 // DWARF-CHECK:  DW_TAG_variable
-// DWARF-CHECK:  DW_AT_name {{.*}} "b"
+// DWARF-CHECK:  DW_AT_name ("b")
