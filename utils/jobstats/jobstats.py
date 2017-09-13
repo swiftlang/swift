@@ -159,7 +159,7 @@ class JobStats(object):
         }
 
 
-def load_stats_dir(path, select_module=[]):
+def load_stats_dir(path, select_module=[], select_stat=[]):
     """Loads all stats-files found in path into a list of JobStats objects"""
     jobstats = []
     auxpat = (r"(?P<module>[^-]+)-(?P<input>[^-]+)-(?P<triple>[^-]+)" +
@@ -168,6 +168,8 @@ def load_stats_dir(path, select_module=[]):
             auxpat +
             r"-(?P<pid>\d+)(-.*)?.json$")
     fre = re.compile(fpat)
+    sre = re.compile('.*' if len(select_stat) == 0 else
+                     '|'.join(select_stat))
     for root, dirs, files in os.walk(path):
         for f in files:
             m = fre.match(f)
@@ -191,6 +193,8 @@ def load_stats_dir(path, select_module=[]):
             pat = re.compile(patstr)
             stats = dict()
             for (k, v) in j.items():
+                if sre.search(k) is None:
+                    continue
                 if k.startswith("time."):
                     v = int(1000000.0 * float(v))
                 stats[k] = v
