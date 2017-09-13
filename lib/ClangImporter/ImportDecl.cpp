@@ -7402,12 +7402,20 @@ static void finishSignatureConformances(
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 
-    assert(req.getFirstType()->isEqual(proto->getSelfInterfaceType()));
+    Type substTy;
+    auto origTy = req.getFirstType();
+    if (origTy->isEqual(proto->getSelfInterfaceType())) {
+      substTy = conformance->getType();
+    } else {
+      auto *depMemTy = origTy->castTo<DependentMemberType>();
+      assert(depMemTy->getBase()->isEqual(proto->getSelfInterfaceType()));
+      substTy = conformance->getTypeWitness(depMemTy->getAssocType(),
+                                            /*resolver=*/nullptr);
+    }
     auto reqProto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
 
     ModuleDecl *M = conformance->getDeclContext()->getParentModule();
-    auto reqConformance = M->lookupConformance(conformance->getType(),
-                                               reqProto);
+    auto reqConformance = M->lookupConformance(substTy, reqProto);
     assert(reqConformance && reqConformance->isConcrete() &&
            "required conformance not found");
     reqConformances.push_back(*reqConformance);
