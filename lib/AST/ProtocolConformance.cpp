@@ -304,6 +304,85 @@ void NormalProtocolConformance::setSignatureConformances(
 #endif
 }
 
+std::function<void(ProtocolConformanceRef)>
+NormalProtocolConformance::populateSignatureConformances() {
+  assert(SignatureConformances.empty());
+
+  class Writer {
+    NormalProtocolConformance *self;
+    ArrayRef<Requirement> requirementSignature;
+    MutableArrayRef<ProtocolConformanceRef> buffer;
+    mutable bool owning = true;
+
+    /// Skip any non-conformance requirements in the requirement signature.
+    void skipNonConformanceRequirements() {
+      while (!requirementSignature.empty() &&
+             requirementSignature.front().getKind()
+               != RequirementKind::Conformance)
+        requirementSignature = requirementSignature.drop_front();
+    }
+
+  public:
+    Writer(NormalProtocolConformance *self) : self(self) {
+      requirementSignature = self->getProtocol()->getRequirementSignature();
+
+      // Determine the number of conformance requirements we need.
+      unsigned numConformanceRequirements = 0;
+      for (const auto &req : requirementSignature) {
+        if (req.getKind() == RequirementKind::Conformance)
+          ++numConformanceRequirements;
+      }
+
+      // Allocate the buffer of conformance requirements.
+      auto &ctx = self->getProtocol()->getASTContext();
+      buffer = ctx.AllocateUninitialized<ProtocolConformanceRef>(numConformanceRequirements);
+
+      // Skip over any non-conformance requirements in the requirement
+      // signature.
+      skipNonConformanceRequirements();
+    };
+
+    Writer(Writer &&other)
+      : self(other.self),
+        requirementSignature(other.requirementSignature),
+        buffer(other.buffer)
+    {
+      other.owning = false;
+    }
+
+    Writer(const Writer &other)
+      : self(other.self),
+        requirementSignature(other.requirementSignature),
+        buffer(other.buffer) {
+      other.owning = false;
+    }
+
+    ~Writer() {
+      assert((!owning || self->isInvalid() || requirementSignature.empty()) &&
+             "signature conformances were not fully populated");
+    }
+
+    void operator()(ProtocolConformanceRef conformance){
+      // Make sure we have the right conformance.
+      assert(!requirementSignature.empty() && "Too many conformances?");
+      assert(conformance.getRequirement() ==
+               requirementSignature.front().getSecondType()->castTo<ProtocolType>()->getDecl());
+
+      // Add this conformance to the known signature conformances.
+      requirementSignature = requirementSignature.drop_front();
+      new (&buffer[self->SignatureConformances.size()])
+        ProtocolConformanceRef(conformance);
+      self->SignatureConformances =
+        buffer.slice(0, self->SignatureConformances.size() + 1);
+
+      // Skip over any non-conformance requirements.
+      skipNonConformanceRequirements();
+    }
+  };
+
+  return Writer(this);
+}
+
 void NormalProtocolConformance::resolveLazyInfo() const {
   assert(Loader);
 
