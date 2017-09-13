@@ -43,10 +43,6 @@ std::string IRGenMangler::mangleValueWitness(Type type, ValueWitness witness) {
     GET_MANGLING(InitializeWithTake) \
     GET_MANGLING(AssignWithTake) \
     GET_MANGLING(InitializeBufferWithTakeOfBuffer) \
-    GET_MANGLING(DestroyArray) \
-    GET_MANGLING(InitializeArrayWithCopy) \
-    GET_MANGLING(InitializeArrayWithTakeFrontToBack) \
-    GET_MANGLING(InitializeArrayWithTakeBackToFront)
     GET_MANGLING(StoreExtraInhabitant) \
     GET_MANGLING(GetExtraInhabitantIndex) \
     GET_MANGLING(GetEnumTag) \

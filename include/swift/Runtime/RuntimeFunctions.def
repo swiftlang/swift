@@ -693,6 +693,65 @@ FUNCTION(IsUniquelyReferencedOrPinned_nonNull_native,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ZExt))
 
+// void swift_arrayInitWithCopy(opaque*, opaque*, size_t, type*);
+FUNCTION(ArrayInitWithCopy, swift_arrayInitWithCopy, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_arrayInitWithTakeNoAlias(opaque*, opaque*, size_t, type*);
+FUNCTION(ArrayInitWithTakeNoAlias, swift_arrayInitWithTakeNoAlias, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_arrayInitWithTakeFrontToBack(opaque*, opaque*, size_t, type*);
+FUNCTION(ArrayInitWithTakeFrontToBack, swift_arrayInitWithTakeFrontToBack,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_arrayInitWithTakeBackToFront(opaque*, opaque*, size_t, type*);
+FUNCTION(ArrayInitWithTakeBackToFront, swift_arrayInitWithTakeBackToFront,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_arrayAssignWithCopyNoAlias(opaque*, opaque*, size_t, type*);
+FUNCTION(ArrayAssignWithCopyNoAlias, swift_arrayAssignWithCopyNoAlias,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_arrayAssignWithCopyFrontToBack(opaque*, opaque*, size_t, type*);
+FUNCTION(ArrayAssignWithCopyFrontToBack, swift_arrayAssignWithCopyFrontToBack,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_arrayAssignWithCopyBackToFront(opaque*, opaque*, size_t, type*);
+FUNCTION(ArrayAssignWithCopyBackToFront, swift_arrayAssignWithCopyBackToFront,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_arrayAssignWithTake(opaque*, opaque*, size_t, type*);
+FUNCTION(ArrayAssignWithTake, swift_arrayAssignWithTake, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_arrayDestroy(opaque*, size_t, type*);
+FUNCTION(ArrayDestroy, swift_arrayDestroy, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
 // Metadata *swift_getFunctionTypeMetadata(const void **args);
 FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, DefaultCC,
          RETURNS(TypeMetadataPtrTy),

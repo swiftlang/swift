@@ -413,6 +413,12 @@ public:
                                        llvm::Value *count, SILType T) const;
   
   /// Initialize an array of objects of this type in memory by taking the
+  /// values from another array. The array must not overlap.
+  virtual void initializeArrayWithTakeNoAlias(IRGenFunction &IGF,
+                                       Address dest, Address src,
+                                       llvm::Value *count, SILType T) const;
+
+  /// Initialize an array of objects of this type in memory by taking the
   /// values from another array. The destination array may overlap the head of
   /// the source array because the elements are taken as if in front-to-back
   /// order.
@@ -427,6 +433,34 @@ public:
   virtual void initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
                                        Address dest, Address src,
                                        llvm::Value *count, SILType T) const;
+
+  /// Assign to an array of objects of this type in memory by copying the
+  /// values from another array. The array must not overlap.
+  virtual void assignArrayWithCopyNoAlias(IRGenFunction &IGF, Address dest,
+                                          Address src, llvm::Value *count,
+                                          SILType T) const;
+
+  /// Assign to an array of objects of this type in memory by copying the
+  /// values from another array. The destination array may overlap the head of
+  /// the source array because the elements are taken as if in front-to-back
+  /// order.
+  virtual void assignArrayWithCopyFrontToBack(IRGenFunction &IGF, Address dest,
+                                              Address src, llvm::Value *count,
+                                              SILType T) const;
+
+  /// Assign to an array of objects of this type in memory by copying the
+  /// values from another array. The destination array may overlap the tail of
+  /// the source array because the elements are taken as if in back-to-front
+  /// order.
+  virtual void assignArrayWithCopyBackToFront(IRGenFunction &IGF, Address dest,
+                                              Address src, llvm::Value *count,
+                                              SILType T) const;
+
+  /// Assign to an array of objects of this type in memory by taking the
+  /// values from another array. The array must not overlap.
+  virtual void assignArrayWithTake(IRGenFunction &IGF, Address dest,
+                                   Address src, llvm::Value *count,
+                                   SILType T) const;
 
   /// Get the native (abi) convention for a return value of this type.
   const NativeConventionSchema &nativeReturnValueSchema(IRGenModule &IGM) const;

@@ -433,7 +433,12 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
     return optimizeBuiltinCanBeObjCClass(I);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayFrontToBack ||
       I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayBackToFront ||
-      I->getBuiltinInfo().ID == BuiltinValueKind::CopyArray)
+      I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayNoAlias ||
+      I->getBuiltinInfo().ID == BuiltinValueKind::CopyArray ||
+      I->getBuiltinInfo().ID == BuiltinValueKind::AssignCopyArrayNoAlias ||
+      I->getBuiltinInfo().ID == BuiltinValueKind::AssignCopyArrayFrontToBack ||
+      I->getBuiltinInfo().ID == BuiltinValueKind::AssignCopyArrayBackToFront ||
+      I->getBuiltinInfo().ID == BuiltinValueKind::AssignTakeArray)
     return optimizeBuiltinArrayOperation(I, Builder);
 
   if (I->getBuiltinInfo().ID == BuiltinValueKind::TruncOrBitCast) {
