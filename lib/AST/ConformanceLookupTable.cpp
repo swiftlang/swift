@@ -827,6 +827,33 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
     conformance = ctx.getConformance(conformingType, protocol, conformanceLoc,
                                      conformingDC,
                                      ProtocolConformanceState::Incomplete);
+
+    // If the conformance was synthesized by the ClangImporter, give it a
+    // lazy loader that will be used to populate the conformance.
+
+    // First, if this is a conformance to a base protocol of a derived
+    // protocol, find the most derived protocol.
+    auto *impliedEntry = entry;
+    while (impliedEntry->getKind() == ConformanceEntryKind::Implied)
+      impliedEntry = impliedEntry->Source.getImpliedSource();
+
+    // Check if this was a synthesized conformance.
+    if (impliedEntry->getKind() == ConformanceEntryKind::Synthesized) {
+      auto *impliedProto = impliedEntry->getProtocol();
+
+      // Find a SynthesizedProtocolAttr corresponding to the protocol.
+      for (auto attr : conformingNominal->getAttrs()
+             .getAttributes<SynthesizedProtocolAttr>()) {
+        auto otherProto = ctx.getProtocol(attr->getProtocolKind());
+        if (otherProto == impliedProto) {
+          // Set the conformance loader to the loader stashed inside
+          // the attribute.
+          cast<NormalProtocolConformance>(conformance)
+              ->setLazyLoader(attr->getLazyLoader(), /*context=*/0);
+          break;
+        }
+      }
+    }
   }
 
   // Record the conformance.
