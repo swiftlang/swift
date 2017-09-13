@@ -522,15 +522,12 @@ bb0(%0 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeOb
 // CHECK: bb2:
 // CHECK:   strong_retain [[ARG]]
 // CHECK:   strong_retain [[PAI]]
-// CHECK:   br bb3
-//
-// CHECK: bb3:
 // CHECK:   strong_retain [[ARG]]
 // CHECK:   strong_release [[PAI]]
 // CHECK:   [[FN2:%.*]] = function_ref @nativeobject_plus :
 // CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[ARG]], [[ARG]])
 //
-// CHECK: bb4:
+// CHECK: bb3:
 // CHECK:   strong_retain [[PAI]]
 // CHECK:   [[OPAQUE_FN:%.*]] = function_ref @partial_apply_user
 // CHECK:   apply [[OPAQUE_FN]]([[PAI]])
@@ -589,8 +586,10 @@ bb1:
   br bb3(%10 : $Bool)
 
 bb2:
+  %m2 = integer_literal $Builtin.Int32, 2 // Marker
   %12 = load %3a : $*@callee_owned () -> Bool
   strong_retain %12 : $@callee_owned () -> Bool
+  %m3 = integer_literal $Builtin.Int32, 3 // Marker
   %14 = apply %12() : $@callee_owned () -> Bool
   br bb3(%14 : $Bool)
 
@@ -619,20 +618,22 @@ sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
   // CHECK: br [[BB2:.*]](
 
 // CHECK: [[BB2]](
-  // CHECK: br [[BB5:.*]](
+  // CHECK: br [[BB4:.*]](
 
 // CHECK: bb3:
-  // CHECK: br bb4
-
-// CHECK: [[BB4]]:
+  // CHECK: [[OLD_CALLEE:%.*]] = load {{%[0-9]+}} :
+  // CHECK: strong_retain [[OLD_CALLEE]]
+  // Separation marker
+  // CHECK: integer_literal $Builtin.Int32, 3
   // CHECK: strong_retain [[VAL4:%[0-9]*]]
+  // CHECK: strong_release [[OLD_CALLEE]]
   // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[ADDR4]]
   // CHECK: strong_release [[VAL4]]
   // CHECK: br [[BB2]](
 
-// CHECK: [[BB5]](
+// CHECK: [[BB4]](
   // CHECK: strong_release [[VAL4]]
   // CHECK: return {{.*}}
 
@@ -648,6 +649,7 @@ bb0(%0 : $Bool, %1 : $Bool):
   %8 = function_ref @closure0 : $@convention(thin) (@owned { var Bool }) -> Bool
   strong_retain %3 : ${ var Bool }
   %10 = partial_apply %8(%3) : $@convention(thin) (@owned { var Bool }) -> Bool
+  %12 = integer_literal $Builtin.Int32, 1 // Marker
   %11 = apply %6(%7, %10) : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
   strong_release %3 : ${ var Bool }
   strong_release %2 : ${ var Bool }
@@ -666,11 +668,15 @@ sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: [[BB2]](
   // CHECK: br [[BB5:.*]](
 
-// CHECK: bb3:
-  // CHECK: br bb4
-
-// CHECK: [[BB4]]:
+// CHECK: [[BB3]]:
+  // Marker -
+  // CHECK: integer_literal $Builtin.Int32, 2
+  // CHECK: [[OLD_CALLEE:%.*]] = load {{%.*}}
+  // CHECK: strong_retain [[OLD_CALLEE]]
+  // Marker -
+  // CHECK: integer_literal $Builtin.Int32, 3
   // CHECK: strong_retain [[VAL4:%[0-9]*]]
+  // CHECK: strong_release [[OLD_CALLEE]]
   // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[ADDR4]]
@@ -968,8 +974,6 @@ bb0(%0 : $@callee_owned () -> Builtin.Int8):
 // CHECK-LABEL: sil @testouter_transparent
 sil @testouter_transparent : $@convention(thin) (Builtin.Int8) -> Builtin.Int8 {
 // CHECK: bb0
-// CHECK-NEXT: br bb1
-// CHECK: bb1
 // CHECK-NEXT: return
 bb0(%0 : $Builtin.Int8):
   %2 = function_ref @outer_transparent : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
