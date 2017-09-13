@@ -1608,6 +1608,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // If either (or both) types are type variables, unify the type variables.
   if (typeVar1 || typeVar2) {
+    // Handle the easy case of both being type variables, and being
+    // identical, first.
+    if (typeVar1 && typeVar2) {
+      auto rep1 = getRepresentative(typeVar1);
+      auto rep2 = getRepresentative(typeVar2);
+      if (rep1 == rep2) {
+        // We already merged these two types, so this constraint is
+        // trivially solved.
+        return SolutionKind::Solved;
+      }
+    }
+
     switch (kind) {
     case ConstraintKind::Bind:
     case ConstraintKind::BindToPointerType:
@@ -1615,11 +1627,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (typeVar1 && typeVar2) {
         auto rep1 = getRepresentative(typeVar1);
         auto rep2 = getRepresentative(typeVar2);
-        if (rep1 == rep2) {
-          // We already merged these two types, so this constraint is
-          // trivially solved.
-          return SolutionKind::Solved;
-        }
 
         // If exactly one of the type variables can bind to an lvalue, we
         // can't merge these two type variables.
@@ -1675,12 +1682,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           assignFixedType(typeVar1, type2);
         }
         return SolutionKind::Solved;
-      } else if (typeVar1 && typeVar2) {
-        auto rep1 = getRepresentative(typeVar1);
-        auto rep2 = getRepresentative(typeVar2);
-        if (rep1 == rep2) {
-          return SolutionKind::Solved;
-        }
       }
 
       return formUnsolvedResult();
@@ -1688,15 +1689,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::Conversion:
-      if (typeVar1 && typeVar2) {
-        auto rep1 = getRepresentative(typeVar1);
-        auto rep2 = getRepresentative(typeVar2);
-        if (rep1 == rep2) {
-          // We already merged these two types, so this constraint is
-          // trivially solved.
-          return SolutionKind::Solved;
-        }
-      }
       LLVM_FALLTHROUGH;
 
     case ConstraintKind::Subtype:
@@ -1739,12 +1731,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::OperatorArgumentConversion:
       // We couldn't solve this constraint. If only one of the types is a type
       // variable, perhaps we can do something with it below.
-      if (typeVar1 && typeVar2) {
-        if (typeVar1 == typeVar2) return SolutionKind::Solved;
-
+      if (typeVar1 && typeVar2)
         return formUnsolvedResult();
-      }
-        
       break;
 
     case ConstraintKind::ApplicableFunction:
