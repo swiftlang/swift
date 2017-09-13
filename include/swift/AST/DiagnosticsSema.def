@@ -3060,6 +3060,9 @@ ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
       "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"
       "Error}0 type", (unsigned))
+ERROR(pointer_type_not_found,none,
+      "broken standard library: cannot find "
+      "%select{UnsafePointer|UnsafeMutablePointer}0 type", (unsigned))
 ERROR(optional_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "Optional<T>", ())
