@@ -240,6 +240,13 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
     // If we haven't set the signature conformances yet, force the issue now.
     if (normal->getSignatureConformances().empty()) {
+      // If we're in the process of checking the type witnesses, fail
+      // gracefully.
+      // FIXME: Seems like we should be able to get at the intermediate state
+      // to use that.
+      if (normal->getState() == ProtocolConformanceState::CheckingTypeWitnesses)
+        return None;
+
       auto lazyResolver = type->getASTContext().getLazyResolver();
       if (lazyResolver == nullptr)
         return None;
