@@ -359,84 +359,6 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
   return false;
 }
 
-/// Directly resolve type witnesses that are known to the compiler because they
-/// were synthesized by the compiler.
-///
-/// FIXME: This is a hack to work around the fact that we don't have a
-/// TypeChecker when we need one.
-///
-/// \returns true if we resolved the type witness.
-static bool resolveKnownTypeWitness(NormalProtocolConformance *conformance,
-                                    AssociatedTypeDecl *assocType) {
-  auto nominal = conformance->getType()->getAnyNominal();
-  if (!nominal) return false;
-
-  if (!nominal->hasClangNode()) return false;
-
-  auto proto = conformance->getProtocol();
-  auto knownKind = proto->getKnownProtocolKind();
-  if (!knownKind) return false;
-
-  auto &ctx = nominal->getASTContext();
-  (void)ctx;
-
-  // Local function to handle resolution via lookup directly into the nominal
-  // type.
-  auto resolveViaLookup = [&] {
-    for (auto member : nominal->lookupDirect(assocType->getFullName())) {
-      auto memberType = dyn_cast<TypeDecl>(member);
-      if (!memberType) continue;
-      if (memberType->getDeclContext() != nominal) continue;
-
-      conformance->setTypeWitness(assocType,
-                                  nominal->mapTypeIntoContext(
-                                    memberType->getDeclaredInterfaceType()),
-                                  memberType);
-      return true;
-    }
-
-    return false;
-  };
-
-  // RawRepresentable.RawValue.
-  if (*knownKind == KnownProtocolKind::RawRepresentable) {
-    assert(assocType->getName() == ctx.Id_RawValue);
-    return resolveViaLookup();
-  }
-
-  // OptionSet.Element.
-  if (*knownKind == KnownProtocolKind::OptionSet) {
-    assert(assocType->getName() == ctx.Id_Element);
-    return resolveViaLookup();
-  }
-
-  // ExpressibleByArrayLiteral.ArrayLiteralElement
-  if (*knownKind == KnownProtocolKind::ExpressibleByArrayLiteral) {
-    assert(assocType->getName() == ctx.Id_ArrayLiteralElement);
-    return resolveViaLookup();
-  }
-
-  // _ObjectiveCBridgeable._ObjectiveCType
-  if (*knownKind == KnownProtocolKind::ObjectiveCBridgeable) {
-    assert(assocType->getName() == ctx.Id_ObjectiveCType);
-    return resolveViaLookup();
-  }
-
-  // _BridgedStoredNSError.Code
-  if (*knownKind == KnownProtocolKind::BridgedStoredNSError) {
-    assert(assocType->getName() == ctx.Id_Code);
-    return resolveViaLookup();
-  }
-
-  // ErrorCodeProtocol._ErrorType.
-  if (*knownKind == KnownProtocolKind::ErrorCodeProtocol) {
-    assert(assocType->getName() == ctx.Id_ErrorType);
-    return resolveViaLookup();
-  }
-
-  return false;
-}
-
 std::pair<Type, TypeDecl *>
 NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                                                  LazyResolver *resolver,
@@ -466,11 +388,9 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
 
   // Otherwise, resolve the type witness.
   PrettyStackTraceRequirement trace("resolving", this, assocType);
-  if (!resolveKnownTypeWitness(const_cast<NormalProtocolConformance *>(this),
-                               assocType)) {
-    assert(resolver && "Unable to resolve type witness");
-    resolver->resolveTypeWitness(this, assocType);
-  }
+  assert(resolver && "Unable to resolve type witness");
+  resolver->resolveTypeWitness(this, assocType);
+
   known = TypeWitnesses.find(assocType);
   assert(known != TypeWitnesses.end() && "Didn't resolve witness?");
   return known->second;
