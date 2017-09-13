@@ -5,7 +5,7 @@
 // RUN: %gyb %s -o %t.swift
 // RUN: %target-swift-frontend %t.swift -g -emit-ir -o - | %FileCheck %t.swift
 // RUN: %target-swift-frontend %t.swift -g -c -o %t.o
-// RUN: %llvm-dwarfdump --debug-dump=info %t.o \
+// RUN: %llvm-dwarfdump %t.o \
 // RUN:   | %FileCheck %t.swift --check-prefix=DWARF
 // RUN: %target-swift-frontend %t.swift -O -g -emit-ir -o - \
 // RUN:   | %FileCheck %t.swift --check-prefix=OPTZNS
@@ -47,7 +47,7 @@ public func constant_${name}() -> ${type} {
   // DWARF-NOT: DW_TAG
   // DWARF: {{(DW_AT_location)|(DW_AT_const_value)}}
   // DWARF-NOT: DW_TAG
-  // DWARF: DW_AT_name {{.*}}"v"
+  // DWARF: DW_AT_name ("v")
   return v
 }
 
@@ -61,7 +61,7 @@ public func constvar_${name}() {
   // DWARF-NOT: DW_TAG
   // DWARF: {{(DW_AT_location)|(DW_AT_const_value)}}
   // DWARF-NOT: DW_TAG
-  // DWARF: DW_AT_name {{.*}}"v"
+  // DWARF: DW_AT_name ("v")
   variable_use(&v)
 }
 
@@ -75,7 +75,7 @@ public func let_${name}() {
   // DWARF-NOT: DW_TAG
   // DWARF: {{(DW_AT_location)|(DW_AT_const_value)}}
   // DWARF-NOT: DW_TAG
-  // DWARF: DW_AT_name {{.*}}"v"
+  // DWARF: DW_AT_name ("v")
   use(v)
 }
 
