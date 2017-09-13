@@ -18,17 +18,3 @@ r32432145 { _ in let _ = 42 } // Ok in Swift 3
 r32432145 { _ in // Ok in Swift 3
   print("answer is 42")
 }
-
-// FIXME: rdar://problem/34137342: This should compile under
-// -swift-version 4 as well but does not currently.
-func sr3520_2<T>(_ item: T, _ update: (inout T) -> Void) {
-  var x = item
-  update(&x)
-}
-var sr3250_arg = 42
-sr3520_2(sr3250_arg) { $0 += 3 } // ok
-
-// FIXME: rdar://problem/34136625 - this crashes in diagnostics in -swift-version 4
-// SR-1976/SR-3073: Inference of inout
-func sr1976<T>(_ closure: (inout T) -> Void) {}
-sr1976({ $0 += 2 }) // ok
