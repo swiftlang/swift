@@ -151,7 +151,7 @@ func assign_test(_ value: Builtin.Int64, ptr: Builtin.RawPointer) {
 // CHECK: define hidden {{.*}}%swift.refcounted* @_T08builtins16load_object_test{{[_0-9a-zA-Z]*}}F
 func load_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[T0:%.*]] = load [[REFCOUNT]]*, [[REFCOUNT]]**
-  // CHECK: call void @swift_rt_swift_retain([[REFCOUNT]]* [[T0]])
+  // CHECK: call [[REFCOUNT]]* @swift_rt_swift_retain([[REFCOUNT]]* returned [[T0]])
   // CHECK: ret [[REFCOUNT]]* [[T0]]
   return Builtin.load(ptr)
 }
@@ -159,7 +159,7 @@ func load_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
 // CHECK: define hidden {{.*}}%swift.refcounted* @_T08builtins20load_raw_object_test{{[_0-9a-zA-Z]*}}F
 func load_raw_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[T0:%.*]] = load [[REFCOUNT]]*, [[REFCOUNT]]**
-  // CHECK: call void @swift_rt_swift_retain([[REFCOUNT]]* [[T0]])
+  // CHECK: call [[REFCOUNT]]* @swift_rt_swift_retain([[REFCOUNT]]* returned [[T0]])
   // CHECK: ret [[REFCOUNT]]* [[T0]]
   return Builtin.loadRaw(ptr)
 }
@@ -788,7 +788,7 @@ func is_same_metatype_test(_ t1: Any.Type, _ t2: Any.Type) {
 }
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_unsafeGuaranteed_test
-// CHECK:  call void @{{.*}}swift_{{.*}}etain({{.*}}* %0)
+// CHECK:  call {{.*}}* @{{.*}}swift_{{.*}}etain({{.*}}* returned %0)
 // CHECK:  call void @{{.*}}swift_{{.*}}elease({{.*}}* %0)
 // CHECK:  ret {{.*}}* %0
 func generic_unsafeGuaranteed_test<T: AnyObject>(_ t : T) -> T {
@@ -798,7 +798,7 @@ func generic_unsafeGuaranteed_test<T: AnyObject>(_ t : T) -> T {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteed_test
 // CHECK:  [[LOCAL:%.*]] = alloca %swift.refcounted*
-// CHECK:  call void @swift_rt_swift_retain(%swift.refcounted* %0)
+// CHECK:  call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned %0)
 // CHECK:  store %swift.refcounted* %0, %swift.refcounted** [[LOCAL]]
 // CHECK:  call void @swift_rt_swift_release(%swift.refcounted* %0)
 // CHECK:  ret %swift.refcounted* %0

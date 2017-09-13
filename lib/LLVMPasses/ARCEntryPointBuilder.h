@@ -29,6 +29,7 @@ namespace RuntimeConstants {
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
+  const auto FirstParamReturned = llvm::Attribute::Returned;
 }
 
 using namespace RuntimeConstants;
@@ -229,7 +230,6 @@ private:
     if (Retain)
       return Retain.get();
     auto *ObjectPtrTy = getObjectPtrTy();
-    auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
     Retain = getWrapperFn(
@@ -237,7 +237,8 @@ private:
         isNonAtomic(OrigI) ? "swift_nonatomic_retain" : "swift_retain",
         isNonAtomic(OrigI) ? SWIFT_RT_ENTRY_REF_AS_STR(swift_nonatomic_retain)
                            : SWIFT_RT_ENTRY_REF_AS_STR(swift_retain),
-        RegisterPreservingCC, {VoidTy}, {ObjectPtrTy}, {NoUnwind});
+        RegisterPreservingCC, {ObjectPtrTy}, {ObjectPtrTy},
+        {NoUnwind, FirstParamReturned});
 
     return Retain.get();
   }
@@ -285,7 +286,6 @@ private:
       return RetainN.get();
     auto *ObjectPtrTy = getObjectPtrTy();
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
-    auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
     RetainN = getWrapperFn(
@@ -293,7 +293,8 @@ private:
         isNonAtomic(OrigI) ? "swift_nonatomic_retain_n" : "swift_retain_n",
         isNonAtomic(OrigI) ? SWIFT_RT_ENTRY_REF_AS_STR(swift_nonatomic_retain_n)
                            : SWIFT_RT_ENTRY_REF_AS_STR(swift_retain_n),
-        RegisterPreservingCC, {VoidTy}, {ObjectPtrTy, Int32Ty}, {NoUnwind});
+        RegisterPreservingCC, {ObjectPtrTy}, {ObjectPtrTy, Int32Ty},
+        {NoUnwind, FirstParamReturned});
 
     return RetainN.get();
   }
@@ -324,14 +325,14 @@ private:
       return UnknownRetainN.get();
     auto *ObjectPtrTy = getObjectPtrTy();
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
-    auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
     UnknownRetainN =
         getRuntimeFn(getModule(), cache,
                      isNonAtomic(OrigI) ? "swift_nonatomic_unknownRetain_n"
                                         : "swift_unknownRetain_n",
-                     DefaultCC, {VoidTy}, {ObjectPtrTy, Int32Ty}, {NoUnwind});
+                     DefaultCC, {ObjectPtrTy}, {ObjectPtrTy, Int32Ty},
+                     {NoUnwind, FirstParamReturned});
 
     return UnknownRetainN.get();
   }

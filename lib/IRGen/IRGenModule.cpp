@@ -553,10 +553,14 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
 
 
     auto fnPtr = Builder.CreateLoad(globalFnPtr, "load");
+
     auto call = Builder.CreateCall(fnPtr, args);
     call->setCallingConv(cc);
     call->setTailCall(true);
-
+    for (auto Attr : attrs)
+      if (isReturnedAttribute(Attr)) {
+        call->addParamAttr(0, llvm::Attribute::Returned);
+      }
     auto VoidTy = llvm::Type::getVoidTy(Module.getContext());
     if (retTypes.size() == 1 && *retTypes.begin() == VoidTy)
       Builder.CreateRetVoid();

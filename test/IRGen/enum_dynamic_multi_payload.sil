@@ -408,7 +408,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        call %swift.opaque* %initializeWithCopy(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      <label>:[[RIGHT]]
-  // CHECK:        call void @swift_rt_swift_retain
+  // CHECK:        call %swift.refcounted* @swift_rt_swift_retain
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      <label>:[[TRIVIAL]]
   // CHECK:        call void @llvm.memcpy

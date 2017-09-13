@@ -11,9 +11,9 @@ declare %swift.refcounted* @swift_rt_swift_allocObject(%swift.heapmetadata* , i6
 declare %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge*)
 declare void @swift_bridgeObjectRelease(%swift.bridge* )
 declare void @swift_rt_swift_release(%swift.refcounted* nocapture)
-declare void @swift_rt_swift_retain(%swift.refcounted* ) nounwind
+declare %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* ) nounwind
 declare void @swift_unknownRelease(%swift.refcounted* nocapture)
-declare void @swift_unknownRetain(%swift.refcounted* ) nounwind
+declare %swift.refcounted* @swift_unknownRetain(%swift.refcounted* ) nounwind
 declare void @__swift_fixLifetime(%swift.refcounted*)
 declare void @noread_user(%swift.refcounted*) readnone
 declare void @user(%swift.refcounted*)
@@ -42,37 +42,37 @@ entry:
 ; CHECK: entry:
 ; CHECK-NEXT: br i1 undef
 ; CHECK: bb1:
-; CHECK-NEXT: tail call void @swift_rt_swift_retain_n(%swift.refcounted* %A, i32 2)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain_n(%swift.refcounted* %A, i32 2)
 ; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb2:
 ; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb3:
-; CHECK-NEXT: tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
 ; CHECK-NEXT: ret %swift.refcounted* %A
 define %swift.refcounted* @swift_contractRetainN(%swift.refcounted* %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @noread_user(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @noread_user(%swift.refcounted* %A)
   br label %bb3
 
 bb2:
   call void @noread_user(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @noread_user(%swift.refcounted* %A)
   br label %bb3
 
 bb3:
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   ret %swift.refcounted* %A
 }
 
@@ -80,31 +80,31 @@ bb3:
 ; CHECK: entry:
 ; CHECK-NEXT: br i1 undef
 ; CHECK: bb1:
-; CHECK-NEXT: tail call void @swift_rt_swift_retain_n(%swift.refcounted* %A, i32 2)
-; CHECK-NEXT: %0 = bitcast %swift.refcounted* %A to %swift.refcounted*
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain_n(%swift.refcounted* %A, i32 2)
+; CHECK-NEXT: %1 = bitcast %swift.refcounted* %A to %swift.refcounted*
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb2:
-; CHECK-NEXT: tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb3:
-; CHECK-NEXT: tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
 ; CHECK-NEXT: ret %swift.refcounted* %A
 define %swift.refcounted* @swift_contractRetainNWithRCIdentity(%swift.refcounted* %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
-  %0 = bitcast %swift.refcounted* %A to %swift.refcounted*
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %0)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
+  %1 = bitcast %swift.refcounted* %A to %swift.refcounted*
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %1)
   br label %bb3
 
 bb2:
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   br label %bb3
 
 bb3:
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   ret %swift.refcounted* %A
 }
 
@@ -189,20 +189,20 @@ entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
   br label %bb3
 
 bb2:
   call void @user(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
   br label %bb3
 
 bb3:
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   ret %swift.refcounted* %A
 }
 
@@ -233,53 +233,53 @@ bb3:
 ; But do make sure that we can form retainN, releaseN in between such uses
 ; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractRetainNInterleavedWithUnknown(%swift.refcounted* %A) {
 ; CHECK: bb1:
-; CHECK: tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+; CHECK: tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: tail call void @swift_rt_swift_retain_n(%swift.refcounted* %A, i32 3)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain_n(%swift.refcounted* %A, i32 3)
 ; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: tail call void @swift_rt_swift_retain_n(%swift.refcounted* %A, i32 2)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain_n(%swift.refcounted* %A, i32 2)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
 ; CHECK-NEXT: br label %bb3
 
 ; CHECK: bb2:
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
 ; CHECK-NEXT: br label %bb3
 
 ; CHECK: bb3:
-; CHECK-NEXT: tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
 ; CHECK-NEXT: ret %swift.refcounted* %A
 define %swift.refcounted* @swift_contractRetainNInterleavedWithUnknown(%swift.refcounted* %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @noread_user(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @noread_user(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   br label %bb3
 
 bb2:
   call void @user(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
   br label %bb3
 
 bb3:
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   ret %swift.refcounted* %A
 }
 
@@ -317,12 +317,12 @@ bb3:
 
 ; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractRetainReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
 ; CHECK: bb1:
-; CHECK-NEXT: tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
 ; CHECK-NEXT: tail call void @swift_rt_swift_release_n(%swift.refcounted* %A, i32 2)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: tail call void @swift_rt_swift_retain_n(%swift.refcounted* %A, i32 2)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_rt_swift_retain_n(%swift.refcounted* %A, i32 2)
 ; CHECK-NEXT: tail call void @swift_rt_swift_release(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
@@ -343,14 +343,14 @@ entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
   tail call void @swift_rt_swift_release(%swift.refcounted* %A)
   call void @noread_user(%swift.refcounted* %A)
   tail call void @swift_rt_swift_release(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
-  tail call void @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* %A)
   tail call void @swift_rt_swift_release(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
   tail call void @swift_rt_swift_release(%swift.refcounted* %A)
@@ -373,53 +373,53 @@ bb3:
 
 ; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractUnknownRetainNInterleavedWithUnknown(%swift.refcounted* %A) {
 ; CHECK: bb1:
-; CHECK: tail call void @swift_unknownRetain(%swift.refcounted* %A)
+; CHECK: tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: tail call void @swift_unknownRetain_n(%swift.refcounted* %A, i32 3)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_unknownRetain_n(%swift.refcounted* %A, i32 3)
 ; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: tail call void @swift_unknownRetain_n(%swift.refcounted* %A, i32 2)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_unknownRetain_n(%swift.refcounted* %A, i32 2)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: tail call void @swift_unknownRetain(%swift.refcounted* %A)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
 ; CHECK-NEXT: br label %bb3
 
 ; CHECK: bb2:
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: tail call void @swift_unknownRetain(%swift.refcounted* %A)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
 ; CHECK-NEXT: br label %bb3
 
 ; CHECK: bb3:
-; CHECK-NEXT: tail call void @swift_unknownRetain(%swift.refcounted* %A)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
 ; CHECK-NEXT: ret %swift.refcounted* %A
 define %swift.refcounted* @swift_contractUnknownRetainNInterleavedWithUnknown(%swift.refcounted* %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
-  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
   call void @noread_user(%swift.refcounted* %A)
-  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
   call void @noread_user(%swift.refcounted* %A)
-  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
-  tail call void @swift_unknownRetain(%swift.refcounted* %A)
-  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
-  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
   br label %bb3
 
 bb2:
   call void @user(%swift.refcounted* %A)
-  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
   br label %bb3
 
 bb3:
-  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
   ret %swift.refcounted* %A
 }
 
@@ -457,12 +457,12 @@ bb3:
 
 ; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractUnknownRetainReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
 ; CHECK: bb1:
-; CHECK-NEXT: tail call void @swift_unknownRetain(%swift.refcounted* %A)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
 ; CHECK-NEXT: tail call void @swift_unknownRelease_n(%swift.refcounted* %A, i32 2)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: tail call void @swift_unknownRetain_n(%swift.refcounted* %A, i32 2)
+; CHECK-NEXT: tail call %swift.refcounted* @swift_unknownRetain_n(%swift.refcounted* %A, i32 2)
 ; CHECK-NEXT: tail call void @swift_unknownRelease(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
@@ -483,14 +483,14 @@ entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
   tail call void @swift_unknownRelease(%swift.refcounted* %A)
   call void @noread_user(%swift.refcounted* %A)
   tail call void @swift_unknownRelease(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
-  tail call void @swift_unknownRetain(%swift.refcounted* %A)
-  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %A)
   tail call void @swift_unknownRelease(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A)
   tail call void @swift_unknownRelease(%swift.refcounted* %A)

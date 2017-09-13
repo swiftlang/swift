@@ -290,21 +290,22 @@ HeapObject *swift::swift_allocEmptyBox() {
 extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED 
 void _swift_release_dealloc(HeapObject *object) SWIFT_CC(RegisterPreservingCC_IMPL);
 
-void swift::swift_retain(HeapObject *object)
+HeapObject *swift::swift_retain(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  SWIFT_RT_ENTRY_REF(swift_retain)(object);
+  return SWIFT_RT_ENTRY_REF(swift_retain)(object);
 }
 
-void swift::swift_nonatomic_retain(HeapObject *object) {
-  SWIFT_RT_ENTRY_REF(swift_nonatomic_retain)(object);
+HeapObject *swift::swift_nonatomic_retain(HeapObject *object) {
+  return SWIFT_RT_ENTRY_REF(swift_nonatomic_retain)(object);
 }
 
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
-extern "C"
-void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain)(HeapObject *object) {
+extern "C" HeapObject *
+SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain)(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_retain);
   if (isValidPointerForNativeRetain(object))
     object->refCounts.incrementNonAtomic(1);
+  return object;
 }
 
 void swift::swift_nonatomic_release(HeapObject *object) {
@@ -321,39 +322,42 @@ void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_release)(HeapObject *object) {
 
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
-void SWIFT_RT_ENTRY_IMPL(swift_retain)(HeapObject *object)
+HeapObject *SWIFT_RT_ENTRY_IMPL(swift_retain)(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
   if (isValidPointerForNativeRetain(object))
     object->refCounts.increment(1);
+  return object;
 }
 
-void swift::swift_retain_n(HeapObject *object, uint32_t n)
+HeapObject *swift::swift_retain_n(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  SWIFT_RT_ENTRY_REF(swift_retain_n)(object, n);
+  return SWIFT_RT_ENTRY_REF(swift_retain_n)(object, n);
 }
 
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
-void SWIFT_RT_ENTRY_IMPL(swift_retain_n)(HeapObject *object, uint32_t n)
+HeapObject *SWIFT_RT_ENTRY_IMPL(swift_retain_n)(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain_n);
   if (isValidPointerForNativeRetain(object))
     object->refCounts.increment(n);
+  return object;
 }
 
-void swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n)
+HeapObject *swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  SWIFT_RT_ENTRY_REF(swift_nonatomic_retain_n)(object, n);
+  return SWIFT_RT_ENTRY_REF(swift_nonatomic_retain_n)(object, n);
 }
 
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
-extern "C"
-void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain_n)(HeapObject *object, uint32_t n)
+extern "C" HeapObject *
+SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain_n)(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_retain_n);
   if (isValidPointerForNativeRetain(object))
     object->refCounts.incrementNonAtomic(n);
+  return object;
 }
 
 void swift::swift_release(HeapObject *object)
@@ -411,13 +415,14 @@ size_t swift::swift_unownedRetainCount(HeapObject *object) {
   return object->refCounts.getUnownedCount();
 }
 
-void swift::swift_unownedRetain(HeapObject *object)
+HeapObject *swift::swift_unownedRetain(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetain);
   if (!isValidPointerForNativeRetain(object))
-    return;
+    return object;
 
   object->refCounts.incrementUnowned(1);
+  return object;
 }
 
 void swift::swift_unownedRelease(HeapObject *object)
@@ -439,13 +444,14 @@ void swift::swift_unownedRelease(HeapObject *object)
   }
 }
 
-void swift::swift_nonatomic_unownedRetain(HeapObject *object)
+void *swift::swift_nonatomic_unownedRetain(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_unownedRetain);
   if (!isValidPointerForNativeRetain(object))
-    return;
+    return object;
 
   object->refCounts.incrementUnownedNonAtomic(1);
+  return object;
 }
 
 void swift::swift_nonatomic_unownedRelease(HeapObject *object)
@@ -467,13 +473,14 @@ void swift::swift_nonatomic_unownedRelease(HeapObject *object)
   }
 }
 
-void swift::swift_unownedRetain_n(HeapObject *object, int n)
+HeapObject *swift::swift_unownedRetain_n(HeapObject *object, int n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetain_n);
   if (!isValidPointerForNativeRetain(object))
-    return;
+    return object;
 
   object->refCounts.incrementUnowned(n);
+  return object;
 }
 
 void swift::swift_unownedRelease_n(HeapObject *object, int n)
@@ -494,13 +501,14 @@ void swift::swift_unownedRelease_n(HeapObject *object, int n)
   }
 }
 
-void swift::swift_nonatomic_unownedRetain_n(HeapObject *object, int n)
+HeapObject *swift::swift_nonatomic_unownedRetain_n(HeapObject *object, int n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_unownedRetain_n);
   if (!isValidPointerForNativeRetain(object))
-    return;
+    return object;
 
   object->refCounts.incrementUnownedNonAtomic(n);
+  return object;
 }
 
 void swift::swift_nonatomic_unownedRelease_n(HeapObject *object, int n)
@@ -595,28 +603,30 @@ bool SWIFT_RT_ENTRY_IMPL(swift_isDeallocating)(HeapObject *object) {
   return object->refCounts.isDeiniting();
 }
 
-void swift::swift_unownedRetainStrong(HeapObject *object)
+HeapObject *swift::swift_unownedRetainStrong(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetainStrong);
   if (!isValidPointerForNativeRetain(object))
-    return;
+    return object;
   assert(object->refCounts.getUnownedCount() &&
          "object is not currently unowned-retained");
 
   if (! object->refCounts.tryIncrement())
     swift::swift_abortRetainUnowned(object);
+  return object;
 }
 
-void swift::swift_nonatomic_unownedRetainStrong(HeapObject *object)
+HeapObject *swift::swift_nonatomic_unownedRetainStrong(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_unownedRetainStrong);
   if (!isValidPointerForNativeRetain(object))
-    return;
+    return object;
   assert(object->refCounts.getUnownedCount() &&
          "object is not currently unowned-retained");
 
   if (! object->refCounts.tryIncrementNonAtomic())
     swift::swift_abortRetainUnowned(object);
+  return object;
 }
 
 void swift::swift_unownedRetainStrongAndRelease(HeapObject *object)

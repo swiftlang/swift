@@ -270,8 +270,10 @@ TEST(RefcountingTest, nonatomic_retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  swift_nonatomic_retain_n(object, 32);
-  swift_nonatomic_retain(object);
+  auto res = swift_nonatomic_retain_n(object, 32);
+  EXPECT_EQ(object, res);
+  res = swift_nonatomic_retain(object);
+  EXPECT_EQ(object, res);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(34u, swift_retainCount(object));
   swift_nonatomic_release_n(object, 31);
@@ -289,8 +291,10 @@ TEST(RefcountingTest, nonatomic_unknown_retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  swift_nonatomic_unknownRetain_n(object, 32);
-  swift_nonatomic_unknownRetain(object);
+  auto res = swift_nonatomic_unknownRetain_n(object, 32);
+  EXPECT_EQ(object, res);
+  res = swift_nonatomic_unknownRetain(object);
+  EXPECT_EQ(object, res);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(34u, swift_retainCount(object));
   swift_nonatomic_unknownRelease_n(object, 31);
