@@ -5149,21 +5149,31 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 
   CheckedRequirementSignature = true;
 
+  if (!Conformance->getSignatureConformances().empty())
+    return;
+
   auto reqSig = GenericSignature::get({proto->getProtocolSelfType()},
                                       proto->getRequirementSignature());
 
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
       proto, Conformance->getType(), ProtocolConformanceRef(Conformance));
 
+  // Create a writer to populate the signature conformances.
+  std::function<void(ProtocolConformanceRef)> writer
+    = Conformance->populateSignatureConformances();
+
   class GatherConformancesListener : public GenericRequirementsCheckListener {
+    std::function<void(ProtocolConformanceRef)> &writer;
   public:
-    SmallVector<ProtocolConformanceRef, 4> conformances;
+    GatherConformancesListener(
+                         std::function<void(ProtocolConformanceRef)> &writer)
+      : writer(writer) { }
 
     void satisfiedConformance(Type depTy, Type replacementTy,
                               ProtocolConformanceRef conformance) override {
-      conformances.push_back(conformance);
+      writer(conformance);
     }
-  } listener;
+  } listener(writer);
 
   auto result = TC.checkGenericArguments(
       Conformance->getDeclContext(), Loc, Loc,
@@ -5174,10 +5184,8 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       nullptr,
       ConformanceCheckFlags::Used, &listener);
 
-  // If there were no errors, record the conformances.
-  if (result == RequirementCheckResult::Success) {
-    Conformance->setSignatureConformances(listener.conformances);
-  } else {
+  // If there were errors, mark the conformance as invalid.
+  if (result != RequirementCheckResult::Success) {
     Conformance->setInvalid();
   }
 }
