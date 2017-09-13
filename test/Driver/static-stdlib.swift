@@ -1,6 +1,8 @@
 // Statically link a "hello world" program
 // XFAIL: linux
 // REQUIRES: static_stdlib
+// REQUIRES: executable_test
+
 print("hello world!")
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -static-stdlib -o %t/static-stdlib %s
