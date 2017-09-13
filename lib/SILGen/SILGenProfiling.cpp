@@ -355,6 +355,16 @@ struct PGOMapping : public ASTWalker {
       if (auto elseStmt = IS->getElseStmt()) {
         CounterMap[elseStmt] = parent;
         auto count = loadExecutionCount(elseStmt);
+        if (!parent) {
+          auto thenVal = thenCount.getValue();
+          for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
+            auto cCount = LoadedCounts->Counts[pCount];
+            if (cCount > thenVal) {
+              count = cCount;
+              break;
+            }
+          }
+        }
         LoadedCounterMap[elseStmt] = subtract(count, thenCount);
       }
     } else if (auto *US = dyn_cast<GuardStmt>(S)) {
@@ -421,6 +431,16 @@ struct PGOMapping : public ASTWalker {
       if (auto elseExpr = IE->getElseExpr()) {
         CounterMap[elseExpr] = parent;
         auto count = loadExecutionCount(elseExpr);
+        if (!parent) {
+          auto thenVal = thenCount.getValue();
+          for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
+            auto cCount = LoadedCounts->Counts[pCount];
+            if (cCount > thenVal) {
+              count = cCount;
+              break;
+            }
+          }
+        }
         LoadedCounterMap[elseExpr] = subtract(count, thenCount);
       }
     } else if (isa<AutoClosureExpr>(E) || isa<ClosureExpr>(E)) {
@@ -886,6 +906,12 @@ void SILGenProfiling::assignRegionCounters(Decl *Root) {
     auto LoadedCounts =
         SGM.PGOReader->getInstrProfRecord(PGOFuncName, FunctionHash);
     if (auto E = LoadedCounts.takeError()) {
+      llvm::handleAllErrors(std::move(E),
+                            [&E](const llvm::InstrProfError &Err) {
+                              Err.log(llvm::dbgs());
+                              return;
+                            });
+      llvm::dbgs() << PGOFuncName << "\n";
       return;
     }
     PGOMapping pgoMapper(PGORegionLoadedCounterMap, LoadedCounts);
