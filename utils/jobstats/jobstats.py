@@ -159,7 +159,8 @@ class JobStats(object):
         }
 
 
-def load_stats_dir(path, select_module=[], select_stat=[]):
+def load_stats_dir(path, select_module=[], select_stat=[],
+                   exclude_timers=False):
     """Loads all stats-files found in path into a list of JobStats objects"""
     jobstats = []
     auxpat = (r"(?P<module>[^-]+)-(?P<input>[^-]+)-(?P<triple>[^-]+)" +
@@ -197,6 +198,8 @@ def load_stats_dir(path, select_module=[], select_stat=[]):
                     continue
                 if k.startswith("time."):
                     v = int(1000000.0 * float(v))
+                    if exclude_timers:
+                        continue
                 stats[k] = v
                 tm = re.match(pat, k)
                 if tm:

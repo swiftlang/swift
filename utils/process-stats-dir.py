@@ -36,6 +36,7 @@ def load_paired_stats_dirs(args):
     paired_stats = []
     mod = args.select_module
     stat = args.select_stat
+    xt = args.exclude_timers
     (old, new) = args.remainder
     for p in sorted(os.listdir(old)):
         full_old = os.path.join(old, p)
@@ -45,10 +46,12 @@ def load_paired_stats_dirs(args):
             continue
         old_stats = load_stats_dir(full_old,
                                    select_module=mod,
-                                   select_stat=stat)
+                                   select_stat=stat,
+                                   exclude_timers=xt)
         new_stats = load_stats_dir(full_new,
                                    select_module=mod,
-                                   select_stat=stat)
+                                   select_stat=stat,
+                                   exclude_timers=xt)
         if len(old_stats) == 0 or len(new_stats) == 0:
             continue
         paired_stats.append((p, (old_stats, new_stats)))
@@ -60,7 +63,8 @@ def write_catapult_trace(args):
     for path in args.remainder:
         allstats += load_stats_dir(path,
                                    select_module=args.select_module,
-                                   select_stat=args.select_stat)
+                                   select_stat=args.select_stat,
+                                   exclude_timers=args.exclude_timers)
     json.dump([s.to_catapult_trace_obj() for s in allstats], args.output)
 
 
@@ -68,7 +72,8 @@ def write_lnt_values(args):
     for d in args.remainder:
         stats = load_stats_dir(d,
                                select_module=args.select_module,
-                               select_stat=args.select_stat)
+                               select_stat=args.select_stat,
+                               exclude_timers=args.exclude_timers)
         merged = merge_all_jobstats(stats,
                                     select_module=args.select_module,
                                     group_by_module=args.group_by_module)
@@ -132,7 +137,8 @@ def show_incrementality(args):
     for path in args.remainder:
         stats = load_stats_dir(path,
                                select_module=args.select_module,
-                               select_stat=args.select_stat)
+                               select_stat=args.select_stat,
+                               exclude_timers=args.exclude_timers)
         for s in stats:
             if s.is_driver_job():
                 pct = s.incrementality_percentage()
@@ -217,10 +223,12 @@ def set_csv_baseline(args):
                              quoting=csv.QUOTE_NONNUMERIC)
         mod = args.select_module
         stat = args.select_stat
+        xt = args.exclude_timers
         m = merge_all_jobstats((s for d in args.remainder
                                 for s in load_stats_dir(d,
                                                         select_module=mod,
-                                                        select_stat=stat)),
+                                                        select_stat=stat,
+                                                        exclude_timers=xt)),
                                select_module=mod,
                                group_by_module=args.group_by_module)
         changed = 0
@@ -276,10 +284,12 @@ def compare_to_csv_baseline(args):
     old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline)
     mod = args.select_module
     stat = args.select_stat
+    xt = args.exclude_timers
     m = merge_all_jobstats((s for d in args.remainder
                             for s in load_stats_dir(d,
                                                     select_module=mod,
-                                                    select_stat=stat)),
+                                                    select_stat=stat,
+                                                    exclude_timers=xt)),
                            select_module=mod,
                            group_by_module=args.group_by_module)
     old_stats = dict((k, v) for (k, (_, v)) in old_stats.items())
@@ -297,13 +307,15 @@ def compare_stats_dirs(args):
     old_stats = merge_all_jobstats(
         load_stats_dir(old,
                        select_module=args.select_module,
-                       select_stat=args.select_stat),
+                       select_stat=args.select_stat,
+                       exclude_timers=args.exclude_timers),
         select_module=args.select_module,
         group_by_module=args.group_by_module)
     new_stats = merge_all_jobstats(
         load_stats_dir(new,
                        select_module=args.select_module,
-                       select_stat=args.select_stat),
+                       select_stat=args.select_stat,
+                       exclude_timers=args.exclude_timers),
         select_module=args.select_module,
         group_by_module=args.group_by_module)
 
@@ -350,6 +362,10 @@ def main():
                         default=[],
                         action="append",
                         help="Select specific statistics")
+    parser.add_argument("--exclude-timers",
+                        default=False,
+                        action="store_true",
+                        help="only select counters, exclude timers")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")
