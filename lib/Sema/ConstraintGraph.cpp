@@ -700,18 +700,14 @@ bool ConstraintGraph::contractEdges() {
         // being present in this case, so it can generate the appropriate lvalue
         // wrapper for the argument type.
         if (isParamBindingConstraint) {
-          auto node = tyvar1->getImpl().getGraphNode();
-          auto hasDependentConstraint = false;
-
-          for (auto t1Constraint : node->getConstraints()) {
-            if (isStrictInoutSubtypeConstraint(t1Constraint)) {
-              hasDependentConstraint = true;
-              break;
-            }
-          }
-
-          if (hasDependentConstraint)
+          auto *node = tyvar1->getImpl().getGraphNode();
+          auto constraints = node->getConstraints();
+          if (std::any_of(constraints.begin(), constraints.end(),
+                          [](Constraint *constraint) {
+                            return isStrictInoutSubtypeConstraint(constraint);
+                          })) {
             continue;
+          }
         }
 
         auto rep1 = CS.getRepresentative(tyvar1);
