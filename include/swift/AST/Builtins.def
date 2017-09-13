@@ -478,11 +478,18 @@ BUILTIN_MISC_OPERATION(CondUnreachable, "conditionallyUnreachable", "", Special)
 /// DestroyArray has type (T.Type, Builtin.RawPointer, Builtin.Word) -> ()
 BUILTIN_MISC_OPERATION(DestroyArray, "destroyArray", "", Special)
 
-/// CopyArray, TakeArrayFrontToBack, and TakeArrayBackToFront all have type
+/// CopyArray, TakeArrayNoAlias, TakeArrayFrontToBack, and TakeArrayBackToFront
+/// AssignCopyArrayNoAlias, AssignCopyArrayFrontToBack,
+/// AssignCopyArrayBackToFront, AssignTakeArray all have type
 /// (T.Type, Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> ()
 BUILTIN_MISC_OPERATION(CopyArray, "copyArray", "", Special)
+BUILTIN_MISC_OPERATION(TakeArrayNoAlias, "takeArrayNoAlias", "", Special)
 BUILTIN_MISC_OPERATION(TakeArrayFrontToBack, "takeArrayFrontToBack", "", Special)
 BUILTIN_MISC_OPERATION(TakeArrayBackToFront, "takeArrayBackToFront", "", Special)
+BUILTIN_MISC_OPERATION(AssignCopyArrayNoAlias, "assignCopyArrayNoAlias", "", Special)
+BUILTIN_MISC_OPERATION(AssignCopyArrayFrontToBack, "assignCopyArrayFrontToBack", "", Special)
+BUILTIN_MISC_OPERATION(AssignCopyArrayBackToFront, "assignCopyArrayBackToFront", "", Special)
+BUILTIN_MISC_OPERATION(AssignTakeArray, "assignTakeArray", "", Special)
 
 // unsafeGuaranteed has type <T: AnyObject> T -> (T, Builtin.Int8)
 BUILTIN_MISC_OPERATION(UnsafeGuaranteed, "unsafeGuaranteed", "", Special)

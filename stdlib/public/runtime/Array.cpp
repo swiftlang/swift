@@ -58,27 +58,30 @@ static void array_pod_copy(ArrayCopy copyKind, OpaqueValue *dest,
   memmove(dest, src, stride * count);
 }
 
+namespace {
+typedef OpaqueValue *(*const WitnessFunction)(OpaqueValue *, OpaqueValue *,
+                                              const Metadata *);
+}
+
 template <ArrayDest destOp, ArraySource srcOp>
-static void witness_copy(const ValueWitnessTable *wtable, OpaqueValue *dest,
-                         OpaqueValue *src, const Metadata *self) {
+static WitnessFunction get_witness_function(const ValueWitnessTable *wtable) {
   if (destOp == ArrayDest::Init) {
     if (srcOp == ArraySource::Copy)
-      wtable->initializeWithCopy(dest, src, self);
+      return wtable->initializeWithCopy;
     else {
       assert(srcOp == ArraySource::Take);
-      wtable->initializeWithTake(dest, src, self);
+      return wtable->initializeWithTake;
     }
   } else {
     assert(destOp == ArrayDest::Assign);
     if (srcOp == ArraySource::Copy) {
-      wtable->assignWithCopy(dest, src, self);
+      return wtable->assignWithCopy;
     } else {
       assert(srcOp == ArraySource::Take);
-      wtable->assignWithTake(dest, src, self);
+      return wtable->assignWithTake;
     }
   }
 }
-
 template <ArrayDest destOp, ArraySource srcOp, ArrayCopy copyKind>
 static void array_copy_operation(OpaqueValue *dest, OpaqueValue *src,
                                  size_t count, const Metadata *self) {
@@ -107,11 +110,12 @@ static void array_copy_operation(OpaqueValue *dest, OpaqueValue *src,
 
   // Call the witness to do the copy.
   if (copyKind == ArrayCopy::NoAlias || copyKind == ArrayCopy::FrontToBack) {
+    auto copy = get_witness_function<destOp, srcOp>(wtable);
     for (size_t i = 0; i < count; ++i) {
       auto offset = i * stride;
       auto *from = reinterpret_cast<OpaqueValue *>((char *)src + offset);
       auto *to = reinterpret_cast<OpaqueValue *>((char *)dest + offset);
-      witness_copy<destOp, srcOp>(wtable, to, from, self);
+      copy(to, from, self);
     }
     return;
   }
@@ -120,12 +124,13 @@ static void array_copy_operation(OpaqueValue *dest, OpaqueValue *src,
   assert(copyKind == ArrayCopy::BackToFront);
   assert(count != 0);
 
+  auto copy = get_witness_function<destOp, srcOp>(wtable);
   size_t i = count;
   do {
     auto offset = --i * stride;
     auto *from = reinterpret_cast<OpaqueValue *>((char *)src + offset);
     auto *to = reinterpret_cast<OpaqueValue *>((char *)dest + offset);
-    witness_copy<destOp, srcOp>(wtable, to, from, self);
+    copy(to, from, self);
   } while (i != 0);
 }
 

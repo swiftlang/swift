@@ -26,60 +26,6 @@ namespace metadataimpl {
 /// A common base class for opaque-existential and class-existential boxes.
 template<typename Impl>
 struct LLVM_LIBRARY_VISIBILITY ExistentialBoxBase {
-  template <class Container, class... A>
-  static void destroyArray(Container *array, size_t n, A... args) {
-    size_t stride = Container::getContainerStride(args...);
-    char *bytes = (char*)array;
-    while (n--) {
-      Impl::destroy((Container*)bytes, args...);
-      bytes += stride;
-    }
-  }
-  
-  template <class Container, class... A>
-  static Container *initializeArrayWithCopy(Container *dest,
-                                            Container *src,
-                                            size_t n,
-                                            A... args) {
-    size_t stride = Container::getContainerStride(args...);
-    char *destBytes = (char*)dest, *srcBytes = (char*)src;
-    while (n--) {
-      Impl::initializeWithCopy((Container*)destBytes,
-                               (Container*)srcBytes, args...);
-      destBytes += stride; srcBytes += stride;
-    }
-    return dest;
-  }
-  
-  template <class Container, class... A>
-  static Container *initializeArrayWithTakeFrontToBack(Container *dest,
-                                                       Container *src,
-                                                       size_t n,
-                                                       A... args) {
-    size_t stride = Container::getContainerStride(args...);
-    char *destBytes = (char*)dest, *srcBytes = (char*)src;
-    while (n--) {
-      Impl::initializeWithTake((Container*)destBytes,
-                               (Container*)srcBytes, args...);
-      destBytes += stride; srcBytes += stride;
-    }
-    return dest;
-  }
-  
-  template <class Container, class... A>
-  static Container *initializeArrayWithTakeBackToFront(Container *dest,
-                                                       Container *src,
-                                                       size_t n,
-                                                       A... args) {
-    size_t stride = Container::getContainerStride(args...);
-    char *destBytes = (char*)dest + n * stride, *srcBytes = (char*)src + n * stride;
-    while (n--) {
-      destBytes -= stride; srcBytes -= stride;
-      Impl::initializeWithTake((Container*)destBytes,
-                               (Container*)srcBytes, args...);
-    }
-    return dest;
-  }
 };
 
 /// A common base class for fixed and non-fixed opaque-existential box

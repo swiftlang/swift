@@ -47,24 +47,6 @@ namespace irgen {
                                              ConstantStructBuilder &B,
                                              CanType abstractType);
 
-  /// Build a value witness that initializes an array front-to-back.
-  void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
-                                      const TypeInfo &type,
-                                      Address destArray,
-                                      Address srcArray,
-                                      llvm::Value *count,
-                                      SILType T,
-                                      IsTake_t take);
-
-  /// Build a value witness that initializes an array back-to-front.
-  void emitInitializeArrayBackToFront(IRGenFunction &IGF,
-                                      const TypeInfo &type,
-                                      Address destArray,
-                                      Address srcArray,
-                                      llvm::Value *count,
-                                      SILType T,
-                                      IsTake_t take);
-
 }
 }
 

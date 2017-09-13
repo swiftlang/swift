@@ -109,8 +109,7 @@
 
 ///   T *(*initializeBufferWithCopyOfBuffer)(B *dest, B *src, M *self);
 /// Given an invalid buffer, initialize it as a copy of the
-/// object in the source buffer.  This can be decomposed as:
-///   initializeWithCopy(self->allocateBuffer(dest, self), self->projectBuffer(src), self)
+/// object in the source buffer.
 FUNCTION_VALUE_WITNESS(initializeBufferWithCopyOfBuffer,
                        InitializeBufferWithCopyOfBuffer,
                        MUTABLE_VALUE_TYPE,
@@ -174,60 +173,14 @@ FUNCTION_VALUE_WITNESS(assignWithTake,
 
 ///   T *(*initializeBufferWithTakeOfBuffer)(B *dest, B *src, M *self);
 /// Given an invalid buffer, initialize it by taking the value out of
-/// the source buffer.  This can be (inefficiently) decomposed as:
-///   initializeWithTake(self->allocateBuffer(dest, self), self->projectBuffer(src), self)
-///   deallocateBuffer(src, self)
+/// the source buffer.
 FUNCTION_VALUE_WITNESS(initializeBufferWithTakeOfBuffer,
                        InitializeBufferWithTakeOfBuffer,
                        MUTABLE_VALUE_TYPE,
                        (MUTABLE_BUFFER_TYPE, MUTABLE_BUFFER_TYPE, TYPE_TYPE))
 
-///   void (*destroyArray)(T *object, size_t n, witness_t *self);
-///
-/// Given a valid array of n objects of this type, destroy the object, leaving
-/// the array invalid. This is useful when generically destroying an array of
-/// objects to avoid calling the scalar 'destroy' witness in a loop.
-FUNCTION_VALUE_WITNESS(destroyArray,
-                       DestroyArray,
-                       VOID_TYPE,
-                       (MUTABLE_VALUE_TYPE, SIZE_TYPE, TYPE_TYPE))
-
-///   T *(*initializeArrayWithCopy)(T *dest, T *src, size_t n, M *self);
-///
-/// Given an invalid array of n objects of this type, initialize the objects
-/// as a copy of the source array.  Returns the dest array.
-FUNCTION_VALUE_WITNESS(initializeArrayWithCopy,
-                       InitializeArrayWithCopy,
-                       MUTABLE_VALUE_TYPE,
-                       (MUTABLE_VALUE_TYPE, MUTABLE_VALUE_TYPE,
-                        SIZE_TYPE, TYPE_TYPE))
-
-///   T *(*initializeArrayWithTakeFrontToBack)(T *dest, T *src, size_t n, M *self);
-///
-/// Given an invalid array of n objects of this type, initialize the objects
-/// by taking them from the source array in front-to-back order.
-/// The source array becomes invalid.
-/// Returns the dest array.
-FUNCTION_VALUE_WITNESS(initializeArrayWithTakeFrontToBack,
-                       InitializeArrayWithTakeFrontToBack,
-                       MUTABLE_VALUE_TYPE,
-                       (MUTABLE_VALUE_TYPE, MUTABLE_VALUE_TYPE,
-                        SIZE_TYPE, TYPE_TYPE))
-
-///   T *(*initializeArrayWithTakeBackToFront)(T *dest, T *src, size_t n, M *self);
-///
-/// Given an invalid array of n objects of this type, initialize the objects
-/// by taking them from the source array in back-to-front order.
-/// The source array becomes invalid.
-/// Returns the dest array.
-FUNCTION_VALUE_WITNESS(initializeArrayWithTakeBackToFront,
-                       InitializeArrayWithTakeBackToFront,
-                       MUTABLE_VALUE_TYPE,
-                       (MUTABLE_VALUE_TYPE, MUTABLE_VALUE_TYPE,
-                        SIZE_TYPE, TYPE_TYPE))
-
 END_VALUE_WITNESS_RANGE(RequiredValueWitnessFunction,
-                        InitializeArrayWithTakeBackToFront)
+                        InitializeBufferWithTakeOfBuffer)
 
 ///   size_t size;
 ///
