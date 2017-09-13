@@ -660,7 +660,8 @@ static SILGlobalVariable *getVariableOfStaticInitializer(SILFunction *InitFunc,
       // global variable for now.
       if (!isa<StructInst>(InitVal) && !isa<TupleInst>(InitVal))
         return nullptr;
-    } else if (!SILGlobalVariable::isValidStaticInitializerInst(&I)) {
+    } else if (!SILGlobalVariable::isValidStaticInitializerInst(&I,
+                                                             I.getModule())) {
       return nullptr;
     }
   }
@@ -1008,7 +1009,7 @@ static void getFields(ClassDecl *Cl, SmallVectorImpl<VarDecl *> &Fields) {
 /// all it's operands.
 static bool isValidInitVal(SILValue V) {
   if (SILInstruction *I = dyn_cast<SILInstruction>(V)) {
-    if (!SILGlobalVariable::isValidStaticInitializerInst(I))
+    if (!SILGlobalVariable::isValidStaticInitializerInst(I, I->getModule()))
       return false;
 
     for (Operand &Op : I->getAllOperands()) {
