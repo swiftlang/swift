@@ -950,6 +950,8 @@ public:
   Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
   Type getOptionalType(SourceLoc loc, Type elementType);
   Type getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type elementType);
+  Type getUnsafePointerType(SourceLoc loc, Type pointeeType);
+  Type getUnsafeMutablePointerType(SourceLoc loc, Type pointeeType);
   Type getStringType(DeclContext *dc);
   Type getSubstringType(DeclContext *dc);
   Type getIntType(DeclContext *dc);

@@ -2216,15 +2216,7 @@
         key.usr: "s:8__main__16ComputedPropertyC5valueSivs",
         key.offset: 910,
         key.length: 49,
-        key.fully_annotated_decl: "<decl.function.accessor.setter><decl.name>set(newVal)</decl.name> {}</decl.function.accessor.setter>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.name: "newVal",
-            key.offset: 843,
-            key.length: 3
-          }
-        ]
+        key.fully_annotated_decl: "<decl.function.accessor.setter><decl.name>set(newVal)</decl.name> {}</decl.function.accessor.setter>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -2360,15 +2352,7 @@
         key.usr: "s:8__main__3CC2CS2icis",
         key.offset: 1193,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.function.accessor.setter><decl.name>set(vvv)</decl.name> {}</decl.function.accessor.setter>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.name: "vvv",
-            key.offset: 1152,
-            key.length: 3
-          }
-        ]
+        key.fully_annotated_decl: "<decl.function.accessor.setter><decl.name>set(vvv)</decl.name> {}</decl.function.accessor.setter>"
       }
     ]
   },
