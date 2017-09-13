@@ -226,7 +226,7 @@ public struct Mirror {
     ancestorRepresentation: AncestorRepresentation = .generated
   ) where C.Element == Child 
   // FIXME(ABI) (Revert Where Clauses): Remove these 
-  , C.SubSequence : Collection, C.SubSequence.Indices : Collection, C.Indices : Collection
+  , C.SubSequence.Indices : Collection, C.Indices : Collection
   {
 
     self.subjectType = Subject.self
@@ -277,7 +277,7 @@ public struct Mirror {
     ancestorRepresentation: AncestorRepresentation = .generated
   ) 
   // FIXME(ABI) (Revert Where Clauses): Remove these two clauses
-  where C.SubSequence : Collection, C.Indices : Collection
+  where C.Indices : Collection
   {
 
     self.subjectType = Subject.self
