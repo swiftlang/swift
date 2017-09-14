@@ -651,9 +651,12 @@ public protocol Collection : _Indexable, Sequence
   /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence
   // FIXME(ABI) (Revert Where Clauses): remove these conformances:
-  : _IndexableBase
+  : _IndexableBase, Sequence
      = Slice<Self>
-      where SubSequence.Index == Index
+      where SubSequence.SubSequence == SubSequence
+  // FIXME(ABI) (Revert Where Clauses): and this where clause:
+          , Element == SubSequence.Element
+          , SubSequence.Index == Index
             
   // FIXME(ABI)#98 (Recursive Protocol Constraints):
   // FIXME(ABI)#99 (Associated Types with where clauses):

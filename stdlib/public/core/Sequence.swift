@@ -331,9 +331,19 @@ public protocol Sequence {
   associatedtype Iterator : IteratorProtocol where Iterator.Element == Element
 
   /// A type that represents a subsequence of some of the sequence's elements.
-  associatedtype SubSequence : Sequence
-    where Element == SubSequence.Element,
-          SubSequence.SubSequence == SubSequence
+  associatedtype SubSequence
+  // FIXME(ABI)#104 (Recursive Protocol Constraints):
+  // FIXME(ABI)#105 (Associated Types with where clauses):
+  // associatedtype SubSequence : Sequence
+  //   where
+  //   Element == SubSequence.Element,
+  //   SubSequence.SubSequence == SubSequence
+  //
+  // (<rdar://problem/20715009> Implement recursive protocol
+  // constraints)
+  //
+  // These constraints allow processing collections in generic code by
+  // repeatedly slicing them in a loop.
 
   /// Returns an iterator over the elements of this sequence.
   func makeIterator() -> Iterator
@@ -1184,7 +1194,10 @@ extension Sequence where Element : Equatable {
   }
 }
 
-extension Sequence {
+extension Sequence where
+  SubSequence : Sequence,
+  SubSequence.Element == Element,
+  SubSequence.SubSequence == SubSequence {
 
   /// Returns a subsequence containing all but the given number of initial
   /// elements.
