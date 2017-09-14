@@ -1536,7 +1536,13 @@ extension TestSuite {
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
   ) where
-    SequenceWithEquatableElement.Iterator.Element : Equatable {
+    SequenceWithEquatableElement.Iterator.Element : Equatable,
+    SequenceWithEquatableElement.SubSequence : Sequence,
+    SequenceWithEquatableElement.SubSequence.Iterator.Element
+      == SequenceWithEquatableElement.Iterator.Element,
+    S.SubSequence : Sequence,
+    S.SubSequence.Iterator.Element == S.Iterator.Element,
+    S.SubSequence.SubSequence == S.SubSequence {
 
     var testNamePrefix = testNamePrefix
 
