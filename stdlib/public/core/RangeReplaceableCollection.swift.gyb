@@ -244,8 +244,7 @@ public protocol _RangeReplaceableIndexable : _Indexable {
 public protocol RangeReplaceableCollection
   : _RangeReplaceableIndexable, Collection
 {
-  // FIXME(ABI)#165 (Recursive Protocol Constraints): should require `RangeReplaceableCollection`.
-  associatedtype SubSequence : _RangeReplaceableIndexable /*: RangeReplaceableCollection*/
+  associatedtype SubSequence : RangeReplaceableCollection
     = RangeReplaceableSlice<Self>
 
   //===--- Fundamental Requirements ---------------------------------------===//
@@ -813,7 +812,6 @@ extension RangeReplaceableCollection {
 % for capability in ['', 'Bidirectional', 'RandomAccess']:
 %   if capability:
 extension RangeReplaceableCollection where
-    Self: ${capability}Collection,
     Self.SubSequence == RangeReplaceable${capability}Slice<Self> {
   public subscript(bounds: Range<Index>)
       -> RangeReplaceable${capability}Slice<Self> {
@@ -823,10 +821,6 @@ extension RangeReplaceableCollection where
 %   end
 
 extension RangeReplaceableCollection where
-  Self: MutableCollection,
-%   if capability:
-  Self: ${capability}Collection,
-%   end
   Self.SubSequence == MutableRangeReplaceable${capability}Slice<Self>
 {
   public subscript(bounds: Range<Index>)

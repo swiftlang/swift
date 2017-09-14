@@ -415,6 +415,7 @@ public:
   /// Mark this conformance as invalid.
   void setInvalid() {
     ContextAndInvalid.setInt(true);
+    SignatureConformances = {};
   }
 
   /// Determine whether this conformance is lazily loaded.
@@ -512,6 +513,16 @@ public:
   /// Copy the given protocol conformances for the requirement signature into
   /// the normal conformance.
   void setSignatureConformances(ArrayRef<ProtocolConformanceRef> conformances);
+
+  /// Retrieves a function object that should be called with each of the
+  /// conformances required by the requirement signature.
+  ///
+  /// This can be used to iteratively build up the signature conformances in
+  /// the type checker (rather than emitting them in a batch via
+  /// \c setSignatureConformances). The callee is responsible for calling
+  /// the returned function object with protocol conformances that line up
+  /// with the conformance requirements in the requirement signature (in order).
+  std::function<void(ProtocolConformanceRef)> populateSignatureConformances();
 
   /// Determine whether the witness for the given type requirement
   /// is the default definition.

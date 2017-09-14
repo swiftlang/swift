@@ -462,10 +462,8 @@ extension TestSuite {
     outOfBoundsIndexOffset: Int = 1,
     collectionIsBidirectional: Bool = false
   ) where
-    C.SubSequence : Collection,
     C.Indices : Collection,
-    CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithEquatableElement.SubSequence : Collection {
+    CollectionWithEquatableElement.Iterator.Element : Equatable {
 
     var testNamePrefix = testNamePrefix
 

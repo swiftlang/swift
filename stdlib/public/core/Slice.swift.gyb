@@ -15,6 +15,7 @@
 from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
+    defaultIndicesForTraversal,
     sliceTypeName,
     protocolsForCollectionFeatures
 )
@@ -96,13 +97,9 @@ def get_slice_doc_comment(Self):
 %   for Mutable in [ False, True ]:
 %     for RangeReplaceable in [ False, True ]:
 %       Self = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
-%       BaseRequirements = ['_' + collectionForTraversal(Traversal).replace('Collection', 'Indexable')]
-%       if Mutable:
-%         BaseRequirements.append('_MutableIndexable')
-%       if RangeReplaceable:
-%         BaseRequirements.append('_RangeReplaceableIndexable')
-%       BaseRequirements = ' & '.join(BaseRequirements)
+%       BaseRequirements = ' & '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 %       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
+%       Indices = defaultIndicesForTraversal(Traversal)
 
 ${get_slice_doc_comment(Self)}
 %     if Mutable:
@@ -119,6 +116,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
 
   public typealias Index = Base.Index
   public typealias IndexDistance = Base.IndexDistance
+  public typealias Indices = ${Indices}<${Self}<Base>>
 
   public var _startIndex: Index
   public var _endIndex: Index

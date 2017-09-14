@@ -388,10 +388,6 @@ public func expect${Mutable}CollectionType<X : ${Mutable}Collection>(
 ) where
   // FIXME(ABI)#2 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
-%   if Mutable == '':
-  X.SubSequence : Collection,
-%   end
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#3 (Recursive Protocol Constraints): can't have this constraint now.
   X.Indices : Collection {}
 % end
 
@@ -425,10 +421,6 @@ public func expectCollectionAssociatedTypes<X : Collection>(
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
 ) where
-  // FIXME(ABI)#6 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-  X.SubSequence : Collection,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#7 (Recursive Protocol Constraints): can't have this constraint now.
   X.Indices : Collection {}
 
 /// Check that all associated types of a `BidirectionalCollection` are what we
@@ -441,10 +433,6 @@ public func expectBidirectionalCollectionAssociatedTypes<X : BidirectionalCollec
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
 ) where
-  // FIXME(ABI)#8 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-  X.SubSequence : BidirectionalCollection,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#9 (Recursive Protocol Constraints): can't have this constraint now.
   X.Indices : BidirectionalCollection {}
 
 /// Check that all associated types of a `RandomAccessCollection` are what we
@@ -457,10 +445,6 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
 ) where
-  // FIXME(ABI)#10 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-  X.SubSequence : RandomAccessCollection,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#11 (Recursive Protocol Constraints): can't have this constraint now.
   X.Indices : RandomAccessCollection {}
 
 public struct AssertionResult : CustomStringConvertible {

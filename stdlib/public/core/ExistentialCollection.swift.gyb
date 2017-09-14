@@ -427,9 +427,8 @@ internal class _AnyRandomAccessCollectionBox<Element>
 @_versioned
 internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Element>
 // FIXME(ABI) (Revert Where Clauses): apply all this only to Sequence:
-%  if Kind != 'Sequence':
+%  if Kind != 'Sequence' and Kind != 'Collection':
   where
-  S.SubSequence : ${Kind},
   S.SubSequence.Indices : ${Kind},
   S.Indices : ${Kind}
 %  end
@@ -1006,8 +1005,8 @@ protocol _AnyCollectionProtocol : Collection {
 public struct ${Self}<Element>
   : _AnyCollectionProtocol, ${SelfProtocol} {
 
-//  public typealias Indices
-//    = Default${Traversal.replace('Forward', '')}Indices<${Self}>
+  public typealias Indices
+    = Default${Traversal.replace('Forward', '')}Indices<${Self}>
 
   public typealias Iterator = AnyIterator<Element>
 
@@ -1028,7 +1027,6 @@ public struct ${Self}<Element>
   public init<C : ${SubProtocol}>(_ base: C)
     where
     // FIXME(ABI) (Revert Where Clauses): remove next 3 lines
-    C.SubSequence : ${SubProtocol},
     C.SubSequence.Indices : ${SubProtocol},
     C.Indices : ${SubProtocol},
     // FIXME(ABI)#101 (Associated Types with where clauses): these constraints
