@@ -474,7 +474,6 @@ internal enum _SubSequenceSubscriptOnRangeMode {
     return '''
     C : %(protocol)s,
     CollectionWithEquatableElement : %(protocol)s,
-    C.Indices : %(protocol)s,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   ''' % locals()
 
