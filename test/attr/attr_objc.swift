@@ -1818,13 +1818,13 @@ class BadClass2 {
   @objc(foo) // expected-error{{'@objc' method name provides names for 0 arguments, but method has 2 parameters}}
   func noArgNamesTwoParams(_: Int, y: Int) { }
 
-  @objc(foo:) // expected-error{{'@objc' method name provides one argument label, but method has 2 parameters}}
+  @objc(foo:) // expected-error{{'@objc' method name provides one argument name, but method has 2 parameters}}
   func oneArgNameTwoParams(_: Int, y: Int) { }
 
-  @objc(foo:) // expected-error{{'@objc' method name provides one argument label, but method has 0 parameters}}
+  @objc(foo:) // expected-error{{'@objc' method name provides one argument name, but method has 0 parameters}}
   func oneArgNameNoParams() { }
 
-  @objc(foo:) // expected-error{{'@objc' initializer name provides one argument label, but initializer has 0 parameters}}
+  @objc(foo:) // expected-error{{'@objc' initializer name provides one argument name, but initializer has 0 parameters}}
   init() { }
 
   var _prop = 5

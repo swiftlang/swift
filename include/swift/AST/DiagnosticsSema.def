@@ -3238,7 +3238,7 @@ ERROR(objc_name_deinit,none,
       "'@objc' deinitializer cannot have a name", ())
 ERROR(objc_name_func_mismatch,none,
       "'@objc' %select{initializer|method}0 name provides "
-      "%select{one argument label|names for %1 arguments}2, but "
+      "%select{one argument name|names for %1 arguments}2, but "
       "%select{initializer|method}0 has %select{one parameter|%3 parameters}4"
       "%select{| (%select{|including }4the error parameter)}5",
       (bool, unsigned, bool, unsigned, bool, bool))
