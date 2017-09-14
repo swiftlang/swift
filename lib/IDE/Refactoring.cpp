@@ -1466,8 +1466,14 @@ bool RefactoringActionExtractRepeatedExpr::performChange() {
 struct CollapsibleNestedIfInfo {
   IfStmt *OuterIf;
   IfStmt *InnerIf;
-  CollapsibleNestedIfInfo(): OuterIf(nullptr), InnerIf(nullptr) {}
-  bool isValid() { return OuterIf && InnerIf; }
+  bool FinishedOuterIf;
+  bool FoundNonCollapsibleItem;
+  CollapsibleNestedIfInfo():
+    OuterIf(nullptr), InnerIf(nullptr),
+    FinishedOuterIf(false), FoundNonCollapsibleItem(false) {}
+  bool isValid() {
+    return OuterIf && InnerIf && FinishedOuterIf && !FoundNonCollapsibleItem;
+  }
 };
 
 static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
@@ -1477,10 +1483,21 @@ static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo Cur
     SourceLoc StartLoc;
     CollapsibleNestedIfInfo IfInfo;
     IfStmtFinder(SourceLoc StartLoc): StartLoc(StartLoc), IfInfo() {}
+    bool finishedInnerIfButNotFinishedOuterIf() {
+      return IfInfo.InnerIf && !IfInfo.FinishedOuterIf;
+    }
     bool walkToStmtPre(Stmt *S) {
-      if (IfInfo.OuterIf && S->getKind() == StmtKind::Brace) {
+      if (finishedInnerIfButNotFinishedOuterIf()) {
+        IfInfo.FoundNonCollapsibleItem = true;
+        return false;
+      }
+
+      bool StmtIsOuterIfBrace =
+        IfInfo.OuterIf && !IfInfo.InnerIf && S->getKind() == StmtKind::Brace;
+      if (StmtIsOuterIfBrace) {
         return true;
       }
+
       auto *IFS = dyn_cast<IfStmt>(S);
       if (!IFS) {
         return false;
@@ -1496,6 +1513,28 @@ static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo Cur
         return false;
       }
     }
+    bool walkToStmtPost(Stmt *S) {
+      assert(S != IfInfo.InnerIf && "Should not traverse inner if statement");
+      if (S == IfInfo.OuterIf) {
+        IfInfo.FinishedOuterIf = true;
+      }
+      return true;
+    }
+    bool walkToDeclPre(Decl *D, CharSourceRange Range) {
+      if (finishedInnerIfButNotFinishedOuterIf()) {
+        IfInfo.FoundNonCollapsibleItem = true;
+        return false;
+      }
+      return true;
+    }
+    bool walkToExprPre(Expr *E) {
+      if (finishedInnerIfButNotFinishedOuterIf()) {
+        IfInfo.FoundNonCollapsibleItem = true;
+        return false;
+      }
+      return true;
+    }
+
   } Walker(CursorInfo.TrailingStmt->getStartLoc());
   Walker.walk(CursorInfo.TrailingStmt);
   return Walker.IfInfo;
@@ -1512,15 +1551,21 @@ bool RefactoringActionCollapseNestedIfExpr::performChange() {
     auto OuterIfConditionals = Target.OuterIf->getCond().vec();
     auto InnerIfConditionals = Target.InnerIf->getCond().vec();
 
-    auto OuterIfConditionalText = Lexer::getCharSourceRangeFromSourceRange(SM, OuterIfConditionals[0].getSourceRange()).str();
-    auto InnerIfConditionalText = Lexer::getCharSourceRangeFromSourceRange(SM, InnerIfConditionals[0].getSourceRange()).str();
-    auto ThenStatementText = Lexer::getCharSourceRangeFromSourceRange(SM, Target.InnerIf->getThenStmt()->getSourceRange()).str();
+    auto OuterIfConditionalText = Lexer::getCharSourceRangeFromSourceRange(
+     SM, OuterIfConditionals[0].getSourceRange()).str();
+    auto InnerIfConditionalText = Lexer::getCharSourceRangeFromSourceRange(
+     SM, InnerIfConditionals[0].getSourceRange()).str();
+    auto ThenStatementText = Lexer::getCharSourceRangeFromSourceRange(
+     SM, Target.InnerIf->getThenStmt()->getSourceRange()).str();
 
     llvm::SmallString<64> DeclBuffer;
     llvm::raw_svector_ostream OS(DeclBuffer);
-    OS << tok::kw_if << " (" << OuterIfConditionalText << ") && (" << InnerIfConditionalText << ") " << ThenStatementText;
+    OS << tok::kw_if << " (" << OuterIfConditionalText << ") && (";
+    OS << InnerIfConditionalText << ") " << ThenStatementText;
 
-    EditConsumer.accept(SM, Lexer::getCharSourceRangeFromSourceRange(SM, Target.OuterIf->getSourceRange()), DeclBuffer.str());
+    auto SourceRange = Lexer::getCharSourceRangeFromSourceRange(
+      SM, Target.OuterIf->getSourceRange());
+    EditConsumer.accept(SM, SourceRange, DeclBuffer.str());
     return false;
 }
 

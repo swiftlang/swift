@@ -187,6 +187,22 @@ func testMultiConditionalNestedIf() {
     if a < 10 {}
   }
 }
+
+func testExtraDeclNestedIf() {
+  let a = 3
+  if a > 2 {
+    if a < 10 {}
+    let b = 0
+  }
+}
+
+func testExtraIfNestedIf() {
+  let a = 3
+  if a > 2 {
+    if a < 10 {}
+    let b = 0
+  }
+}
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -260,6 +276,8 @@ func testMultiConditionalNestedIf() {
 
 // RUN: %refactor -source-filename %s -pos=179:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF-EXPRESSION
 // RUN: %refactor -source-filename %s -pos=186:3 | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %refactor -source-filename %s -pos=193:3 | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %refactor -source-filename %s -pos=201:3 | %FileCheck %s -check-prefix=CHECK-NONE
 
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
