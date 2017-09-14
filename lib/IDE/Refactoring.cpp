@@ -1464,38 +1464,38 @@ bool RefactoringActionExtractRepeatedExpr::performChange() {
 }
 
 struct CollapsibleNestedIfInfo {
-    IfStmt *OuterIf;
-    IfStmt *InnerIf;
-    CollapsibleNestedIfInfo(): OuterIf(nullptr), InnerIf(nullptr) {}
-    bool isValid() { return OuterIf && InnerIf; }
+  IfStmt *OuterIf;
+  IfStmt *InnerIf;
+  CollapsibleNestedIfInfo(): OuterIf(nullptr), InnerIf(nullptr) {}
+  bool isValid() { return OuterIf && InnerIf; }
 };
 
 static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
-    if (CursorInfo.Kind != CursorInfoKind::StmtStart)
-        return CollapsibleNestedIfInfo();
-    struct IfStmtFinder: public SourceEntityWalker {
-        SourceLoc StartLoc;
-        CollapsibleNestedIfInfo IfInfo;
-        IfStmtFinder(SourceLoc StartLoc): StartLoc(StartLoc), IfInfo() {}
-        bool walkToStmtPre(Stmt *S) {
-            if (S->getKind() == StmtKind::If) {
-                if (!IfInfo.OuterIf) {
-                    IfInfo.OuterIf = dyn_cast<IfStmt>(S);
-                    return true;
-                }
-                if (S->getKind() == StmtKind::If) {
-                    IfInfo.InnerIf = dyn_cast<IfStmt>(S);
-                }
-                return false;
-            }
-            if (IfInfo.OuterIf && S->getKind() == StmtKind::Brace) {
-                return true;
-            }
-            return false;
-        }
-    } Walker(CursorInfo.TrailingStmt->getStartLoc());
-    Walker.walk(CursorInfo.TrailingStmt);
-    return Walker.IfInfo;
+  if (CursorInfo.Kind != CursorInfoKind::StmtStart)
+    return CollapsibleNestedIfInfo();
+  struct IfStmtFinder: public SourceEntityWalker {
+    SourceLoc StartLoc;
+    CollapsibleNestedIfInfo IfInfo;
+    IfStmtFinder(SourceLoc StartLoc): StartLoc(StartLoc), IfInfo() {}
+    bool walkToStmtPre(Stmt *S) {
+      if (IfInfo.OuterIf && S->getKind() == StmtKind::Brace) {
+        return true;
+      }
+      auto *IFS = dyn_cast<IfStmt>(S);
+      if (!IFS) {
+        return false;
+      }
+      if (!IfInfo.OuterIf) {
+        IfInfo.OuterIf = IFS;
+        return true;
+      } else {
+        IfInfo.InnerIf = IFS;
+        return false;
+      }
+    }
+  } Walker(CursorInfo.TrailingStmt->getStartLoc());
+  Walker.walk(CursorInfo.TrailingStmt);
+  return Walker.IfInfo;
 }
 
 bool RefactoringActionCollapseNestedIfExpr::isApplicable(ResolvedCursorInfo Tok) {
