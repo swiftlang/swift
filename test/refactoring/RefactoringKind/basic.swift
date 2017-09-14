@@ -174,6 +174,13 @@ func testStringLiteral() -> String {
   return "abc"
 }
 
+func testCollapseNestedIf() {
+  let a = 3
+  if a > 2 {
+    if a < 10 {}
+  }
+}
+
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -245,6 +252,8 @@ func testStringLiteral() -> String {
 
 // RUN: %refactor -source-filename %s -pos=173:3 -end-pos=173:27| %FileCheck %s -check-prefix=CHECK-EXTRCT-METHOD
 
+// RUN: %refactor -source-filename %s -pos=179:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF-EXPRESSION
+
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
 // CHECK1-NEXT: Action ends
@@ -279,3 +288,5 @@ func testStringLiteral() -> String {
 // CHECK-EXTRCT-METHOD-NEXT: Action ends
 
 // CHECK-LOCALIZE-STRING: Localize String
+
+// CHECK-COLLAPSE-NESTED-IF-EXPRESSION: Collapse Nested If Expression
