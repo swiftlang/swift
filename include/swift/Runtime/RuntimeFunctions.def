@@ -470,7 +470,7 @@ FUNCTION(NativeWeakInit, swift_weakInit, DefaultCC,
          ARGS(WeakReferencePtrTy, RefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned))
 
-// WeakReferencePtr *swift_weakAssign(WeakReference *object, void *value);
+// WeakReference *swift_weakAssign(WeakReference *object, void *value);
 FUNCTION(NativeWeakAssign, swift_weakAssign, DefaultCC,
          RETURNS(WeakReferencePtrTy),
          ARGS(WeakReferencePtrTy, RefCountedPtrTy),
