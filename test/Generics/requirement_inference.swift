@@ -190,7 +190,6 @@ func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3
 // CHECK-LABEL: RangeReplaceableCollection.f()@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RangeReplaceableCollection, τ_0_0.SubSequence == MutableRangeReplaceableSlice<τ_0_0>>
 extension RangeReplaceableCollection where
-  Self: MutableCollection,
   Self.SubSequence == MutableRangeReplaceableSlice<Self>
 {
 	func f() { }

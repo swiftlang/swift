@@ -86,16 +86,12 @@ public protocol BidirectionalCollection : _BidirectionalIndexable, Collection
 
   /// A sequence that can represent a contiguous subrange of the collection's
   /// elements.
-  associatedtype SubSequence
-  // FIXME(ABI) (Revert Where Clauses): Remove these conformances
-  : _BidirectionalIndexable, Collection
+  associatedtype SubSequence: BidirectionalCollection
     = BidirectionalSlice<Self>
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices 
-  // FIXME(ABI) (Revert Where Clauses): Remove these conformances
-  : _BidirectionalIndexable, Collection
+  associatedtype Indices : BidirectionalCollection
     = DefaultBidirectionalIndices<Self>
 
   /// The indices that are valid for subscripting the collection, in ascending
