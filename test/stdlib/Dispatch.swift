@@ -126,10 +126,24 @@ DispatchAPI.test("DispatchTime.addSubtract") {
 	expectEqual(DispatchTime(uptimeNanoseconds: 1), then)
 
 	then = DispatchTime.now() - Double.nan
+	expectEqual(DispatchTime.distantFuture, then)
+
+	then = DispatchTime.now() + Date.distantFuture.timeIntervalSinceNow
+	expectEqual(DispatchTime(uptimeNanoseconds: UInt64.max), then)
+
+	then = DispatchTime.now() + Date.distantPast.timeIntervalSinceNow
 	expectEqual(DispatchTime(uptimeNanoseconds: 1), then)
+
+	then = DispatchTime.now() - Date.distantFuture.timeIntervalSinceNow
+	expectEqual(DispatchTime(uptimeNanoseconds: 1), then)
+
+	then = DispatchTime.now() - Date.distantPast.timeIntervalSinceNow
+	expectEqual(DispatchTime(uptimeNanoseconds: UInt64.max), then)
 }
 
 DispatchAPI.test("DispatchWallTime.addSubtract") {
+	let distantPastRawValue = DispatchWallTime.distantFuture.rawValue - UInt64(1)
+
 	var then = DispatchWallTime.now() + Double.infinity
 	expectEqual(DispatchWallTime.distantFuture, then)
 
@@ -137,10 +151,22 @@ DispatchAPI.test("DispatchWallTime.addSubtract") {
 	expectEqual(DispatchWallTime.distantFuture, then)
 
 	then = DispatchWallTime.now() - Double.infinity
-	expectEqual(DispatchWallTime.distantFuture.rawValue - UInt64(1), then.rawValue)
+	expectEqual(distantPastRawValue, then.rawValue)
 
 	then = DispatchWallTime.now() - Double.nan
-	expectEqual(DispatchWallTime.distantFuture.rawValue - UInt64(1), then.rawValue)
+	expectEqual(DispatchWallTime.distantFuture, then)
+
+	then = DispatchWallTime.now() + Date.distantFuture.timeIntervalSinceNow
+	expectEqual(DispatchWallTime.distantFuture, then)
+
+	then = DispatchWallTime.now() + Date.distantPast.timeIntervalSinceNow
+	expectEqual(distantPastRawValue, then.rawValue)
+
+	then = DispatchWallTime.now() - Date.distantFuture.timeIntervalSinceNow
+	expectEqual(distantPastRawValue, then.rawValue)
+
+	then = DispatchWallTime.now() - Date.distantPast.timeIntervalSinceNow
+	expectEqual(DispatchWallTime.distantFuture, then)
 }
 
 DispatchAPI.test("DispatchTime.uptimeNanos") {
@@ -514,6 +540,35 @@ if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
 		let result = g.wait(timeout: DispatchTime.now() + .seconds(30))
 		expectTrue(result == .success)
 	}
+}
+
+DispatchAPI.test("DispatchTimeInterval") {
+	// Basic tests that the correct value is stored and the == method works
+	for i in stride(from:1, through: 100, by: 5) {
+		expectEqual(DispatchTimeInterval.seconds(i), DispatchTimeInterval.milliseconds(i * 1000))
+		expectEqual(DispatchTimeInterval.milliseconds(i), DispatchTimeInterval.microseconds(i * 1000))
+		expectEqual(DispatchTimeInterval.microseconds(i), DispatchTimeInterval.nanoseconds(i * 1000))
+	}
+
+
+	// Check some cases that used to cause arithmetic overflow when evaluating the rawValue for ==
+	var t = DispatchTimeInterval.seconds(Int.max)
+	expectTrue(t == t) // This would crash.
+
+	t = DispatchTimeInterval.seconds(-Int.max)
+	expectTrue(t == t) // This would crash.
+
+	t = DispatchTimeInterval.milliseconds(Int.max)
+	expectTrue(t == t) // This would crash.
+
+	t = DispatchTimeInterval.milliseconds(-Int.max)
+	expectTrue(t == t) // This would crash.
+
+	t = DispatchTimeInterval.microseconds(Int.max)
+	expectTrue(t == t) // This would crash.
+
+	t = DispatchTimeInterval.microseconds(-Int.max)
+	expectTrue(t == t) // This would crash.
 }
 
 #if swift(>=4.0)
