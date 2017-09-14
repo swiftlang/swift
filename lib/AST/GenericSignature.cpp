@@ -633,6 +633,63 @@ bool GenericSignature::areSameTypeParameterInContext(Type type1, Type type2) {
   return equivClass1 == equivClass2;
 }
 
+bool GenericSignature::isRequirementSatisfied(Requirement requirement) {
+  auto GSB = getGenericSignatureBuilder();
+
+  auto firstType = requirement.getFirstType();
+  auto canFirstType = getCanonicalTypeInContext(firstType);
+
+  switch (requirement.getKind()) {
+  case RequirementKind::Conformance: {
+    auto protocolType = requirement.getSecondType()->castTo<ProtocolType>();
+    auto protocol = protocolType->getDecl();
+
+    if (canFirstType->isTypeParameter())
+      return conformsToProtocol(canFirstType, protocol);
+    else
+      return (bool)GSB->lookupConformance(/*dependentType=*/CanType(),
+                                          canFirstType, protocolType);
+  }
+
+  case RequirementKind::SameType: {
+    auto canSecondType = getCanonicalTypeInContext(requirement.getSecondType());
+    return canFirstType->isEqual(canSecondType);
+  }
+
+  case RequirementKind::Superclass: {
+    auto requiredSuperclass =
+        getCanonicalTypeInContext(requirement.getSecondType());
+
+    // The requirement could be in terms of type parameters like a user-written
+    // requirement, but it could also be in terms of concrete types if it has
+    // been substituted/otherwise 'resolved', so we need to handle both.
+    auto baseType = canFirstType;
+    if (canFirstType->isTypeParameter()) {
+      auto directSuperclass = getSuperclassBound(baseType);
+      if (!directSuperclass)
+        return false;
+
+      baseType = getCanonicalTypeInContext(directSuperclass);
+    }
+
+    return requiredSuperclass->isExactSuperclassOf(baseType);
+  }
+
+  case RequirementKind::Layout: {
+    auto requiredLayout = requirement.getLayoutConstraint();
+
+    if (canFirstType->isTypeParameter())
+      return getLayoutConstraint(canFirstType) == requiredLayout;
+    else {
+      // The requirement is on a concrete type, so it's either globally correct
+      // or globally incorrect, independent of this generic context. The latter
+      // case should be diagnosed elsewhere, so let's assume it's correct.
+      return true;
+    }
+  }
+  }
+}
+
 bool GenericSignature::isCanonicalTypeInContext(Type type) {
   // If the type isn't independently canonical, it's certainly not canonical
   // in this context.

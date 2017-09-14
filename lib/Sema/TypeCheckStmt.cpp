@@ -613,7 +613,10 @@ public:
                               sequence->getLoc());
       if (!conformance)
         return nullptr;
-      
+
+      assert(conformance->getConditionalRequirements().empty() &&
+             "conditionally conforming to Sequence is not currently supported");
+
       generatorTy = TC.getWitnessType(sequenceType, sequenceProto,
                                       *conformance,
                                       TC.Context.Id_Iterator,
@@ -664,7 +667,10 @@ public:
                             sequence->getLoc());
     if (!genConformance)
       return nullptr;
-    
+    assert(
+        genConformance->getConditionalRequirements().empty() &&
+        "conditionally conforming to IteratorProtocol not currently supported");
+
     Type elementTy = TC.getWitnessType(generatorTy, generatorProto,
                                        *genConformance, TC.Context.Id_Element,
                                        diag::iterator_protocol_broken);

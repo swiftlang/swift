@@ -1593,6 +1593,9 @@ namespace {
       FuncDecl *fn = nullptr;
 
       if (bridgedToObjectiveCConformance) {
+        assert(bridgedToObjectiveCConformance->getConditionalRequirements()
+                   .empty() &&
+               "cannot conditionally conform to _BridgedToObjectiveC");
         // The conformance to _BridgedToObjectiveC is statically known.
         // Retrieve the bridging operation to be used if a static conformance
         // to _BridgedToObjectiveC can be proven.

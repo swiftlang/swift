@@ -2982,7 +2982,13 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     // primitive literal protocols.
     auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
         ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
-        return TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(), None);
+        auto conformance =
+            TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(), None);
+        if (conformance)
+          assert(conformance->getConditionalRequirements().empty() &&
+                 "conditionally conforming to literal protocol not currently "
+                 "supported");
+        return conformance;
     };
 
     static auto otherLiteralProtocolKinds = {
