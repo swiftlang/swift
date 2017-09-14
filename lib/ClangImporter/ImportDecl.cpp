@@ -2757,6 +2757,9 @@ namespace {
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->computeType();
 
+        // FIXME: Actually distinguish frozen and non-frozen enums.
+        enumDecl->getAttrs().add(new (C) FrozenAttr(/*implicit*/true));
+
         // Set up the C underlying type as its Swift raw type.
         enumDecl->setRawType(underlyingType);
 

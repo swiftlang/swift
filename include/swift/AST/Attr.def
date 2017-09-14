@@ -314,6 +314,8 @@ SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
                  UserInaccessible,
                  75)
 
+SIMPLE_DECL_ATTR(_frozen, Frozen, OnEnum | UserInaccessible, 76)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

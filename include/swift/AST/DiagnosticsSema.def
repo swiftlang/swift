@@ -1204,11 +1204,15 @@ WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
 
-// Indirect enums
+// Enum annotations
 ERROR(indirect_case_without_payload,none,
       "enum case %0 without associated value cannot be 'indirect'", (Identifier))
 ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
+WARNING(enum_frozen_nonresilient,none,
+        "%0 has no effect without -enable-resilience", (DeclAttribute))
+WARNING(enum_frozen_nonpublic,none,
+        "%0 has no effect on non-public enums", (DeclAttribute))
 
 // Variables (var and let).
 ERROR(unimplemented_static_var,none,
