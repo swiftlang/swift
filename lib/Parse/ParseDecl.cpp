@@ -2369,6 +2369,14 @@ Parser::parseDecl(ParseDeclOptions Flags,
         parseNewDeclAttribute(Attributes, SourceLoc(), *Kind);
         continue;
       }
+      if (Tok.isContextualKeyword("_exhaustive")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Exhaustive);
+        continue;
+      }
+      if (Tok.isContextualKeyword("_nonexhaustive")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonExhaustive);
+        continue;
+      }
 
       // Otherwise this is not a context-sensitive keyword.
       LLVM_FALLTHROUGH;
