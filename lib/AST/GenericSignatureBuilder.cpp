@@ -4577,7 +4577,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
           repConstraint =
             findRepresentativeConstraint<PotentialArchetype *>(
               pa->getSameTypeConstraints(),
-              [other](const Constraint<PotentialArchetype *> &constraint) {
+              [](const Constraint<PotentialArchetype *> &constraint) {
                 return true;
               });
         }
