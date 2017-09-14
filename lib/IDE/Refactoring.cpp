@@ -1328,15 +1328,11 @@ bool RefactoringActionExtractExprBase::performChange() {
     Collector.walk(BS);
 
     if (ExtractRepeated) {
-      // Tokenize the brace statement; all expressions should have their tokens
-      // in this array.
-      auto AllTokens = TheFile->getAllTokens();
-      auto StartIt = token_lower_bound(AllTokens, BS->getStartLoc());
-      auto EndIt = token_lower_bound(AllTokens, BS->getEndLoc());
-
       // Collect all expressions we are going to extract.
       SimilarExprCollector(SM, SelectedExpr,
-        AllTokens.slice(StartIt - AllTokens.begin(), EndIt - StartIt + 1),
+                           slice_token_array(TheFile->getAllTokens(),
+                                             BS->getStartLoc(),
+                                             BS->getEndLoc()),
                            AllExpressions).walk(BS);
     } else {
       AllExpressions.insert(SelectedExpr);

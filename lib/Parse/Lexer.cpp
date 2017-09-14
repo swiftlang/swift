@@ -2643,3 +2643,12 @@ StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc) {
 
   return StringRef(StartOfLine, EndOfIndentation - StartOfLine);
 }
+
+ArrayRef<Token> swift::
+slice_token_array(ArrayRef<Token> AllTokens, SourceLoc StartLoc,
+                  SourceLoc EndLoc) {
+  assert(StartLoc.isValid() && EndLoc.isValid());
+  auto StartIt = token_lower_bound(AllTokens, StartLoc);
+  auto EndIt = token_lower_bound(AllTokens, EndLoc);
+  return AllTokens.slice(StartIt - AllTokens.begin(), EndIt - EndIt + 1);
+}
