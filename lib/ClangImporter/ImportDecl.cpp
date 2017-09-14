@@ -4891,10 +4891,17 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
                                                const ProtocolDecl *proto,
                                                ModuleDecl *foundationModule,
                                                LazyResolver *resolver) {
+  auto &ctx = nominal->getASTContext();
+
   if (resolver)
     resolver->resolveInheritanceClause(nominal);
   if (inheritanceListContainsProtocol(nominal->getInherited(), proto))
     return true;
+
+  for (auto attr : nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>())
+    if (auto *otherProto = ctx.getProtocol(attr->getProtocolKind()))
+      if (otherProto == proto)
+        return true;
 
   // Only consider extensions from the original module...or from an overlay
   // or the Swift half of a mixed-source framework.
