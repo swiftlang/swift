@@ -338,10 +338,9 @@ void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
 
 bool swift::hasArchetypes(SubstitutionList Subs) {
   // Check whether any of the substitutions are dependent.
-  for (auto &sub : Subs)
-    if (sub.getReplacement()->hasArchetype())
-      return true;
-  return false;
+  return llvm::any_of(Subs, [](const Substitution &S) {
+    return S.getReplacement()->hasArchetype();
+  });
 }
 
 bool swift::mayBindDynamicSelf(SILFunction *F) {
