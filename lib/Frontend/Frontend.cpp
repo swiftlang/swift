@@ -288,9 +288,11 @@ static void addAdditionalInitialImportsTo(
   SF->addImports(additionalImports);
 }
 
-static bool shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(FrontendOptions::ActionType RequestedAction) {
-    return RequestedAction == FrontendOptions::ActionType::EmitObject || RequestedAction ==  FrontendOptions::ActionType::Immediate ||
-    RequestedAction ==  FrontendOptions::ActionType::EmitSIL;
+static bool shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(
+    FrontendOptions::ActionType RequestedAction) {
+  return RequestedAction == FrontendOptions::ActionType::EmitObject ||
+         RequestedAction == FrontendOptions::ActionType::Immediate ||
+         RequestedAction == FrontendOptions::ActionType::EmitSIL;
 }
 
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
@@ -304,7 +306,8 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
     return false;
   SILOptions::SILOptMode optimization = Invocation.getSILOptions().Optimization;
   if (optimization <= SILOptions::SILOptMode::None &&
-      shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(Invocation.getFrontendOptions().RequestedAction)) {
+      shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(
+          Invocation.getFrontendOptions().RequestedAction)) {
     return true;
   }
   return optimization == SILOptions::SILOptMode::None &&
@@ -502,8 +505,7 @@ void CompilerInstance::parseLibraryFile(
 
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
-  auto IsPrimary =
-      isWholeModuleCompilation() || BufferID == PrimaryBufferID;
+  auto IsPrimary = isWholeModuleCompilation() || BufferID == PrimaryBufferID;
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
   bool Done;
@@ -654,7 +656,8 @@ void CompilerInstance::parseAndTypeCheckMainFile(
   }
 }
 
-void CompilerInstance::forEachFileToTypeCheck(const llvm::function_ref<void(SourceFile &)> &fn) {
+void CompilerInstance::forEachFileToTypeCheck(
+    const llvm::function_ref<void(SourceFile &)> &fn) {
   if (isWholeModuleCompilation()) {
     MainModule->forEachSourceFile([&](SourceFile &SF) { fn(SF); });
   } else {

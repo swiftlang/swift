@@ -34,8 +34,8 @@
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
-#include "swift/Sema/SourceLoader.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -355,9 +355,7 @@ class CompilerInstance {
 
   /// PrimaryBufferID corresponds to PrimaryInput.
   unsigned PrimaryBufferID = NO_SUCH_BUFFER;
-  bool isWholeModuleCompilation() {
-    return PrimaryBufferID == NO_SUCH_BUFFER;
-  }
+  bool isWholeModuleCompilation() { return PrimaryBufferID == NO_SUCH_BUFFER; }
 
   SourceFile *PrimarySourceFile = nullptr;
 
@@ -492,14 +490,15 @@ private:
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
 
-    void forEachFileToTypeCheck(const llvm::function_ref<void(SourceFile &)> &fn);
+  void forEachFileToTypeCheck(const llvm::function_ref<void(SourceFile &)> &fn);
 
   void parseAndTypeCheckMainFile(PersistentParserState &PersistentState,
                                  DelayedParsingCallbacks *DelayedParseCB,
                                  OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performTypeCheckingAndDelayedParsing();
 
-  void finishTypeCheckingMainModule(OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void
+  finishTypeCheckingMainModule(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 };
 
 } // namespace swift
