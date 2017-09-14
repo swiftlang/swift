@@ -383,7 +383,7 @@ bool SILPerformanceInliner::isProfitableToInline(
       // If we have Callee count - use SI heuristic:
       auto calleCountVal = calleeCount.getValue();
       auto percent = (long double)callerCount / (long double)calleCountVal;
-      if (percent < 0.7) {
+      if (percent < 0.8) {
         DEBUG(dumpCaller(AI.getFunction());
               llvm::dbgs() << "profiled decision: NO"
                            << ", reason=SI " << std::to_string(percent) << "%"
