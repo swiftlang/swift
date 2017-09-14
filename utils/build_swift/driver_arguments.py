@@ -24,13 +24,31 @@ from . import defaults
 
 
 __all__ = [
-    'apply_default_arguments',
     'create_argument_parser',
 ]
 
 
-def apply_default_arguments(args):
-    """Preprocess argument namespace to apply default behaviors."""
+class _ApplyDefaultsArgumentParser(argparse.ArgumentParser):
+    """Wrapper class around the default ArgumentParser that allows for
+    post-processing the parsed argument namespace to apply default argument
+    transformations.
+    """
+
+    def __init__(self, apply_defaults=None, *args, **kwargs):
+        self._apply_defaults = apply_defaults
+        super(_ApplyDefaultsArgumentParser, self).__init__(*args, **kwargs)
+
+    def parse_known_args(self, args=None, namespace=None):
+        args, argv = super(_ApplyDefaultsArgumentParser, self)\
+            .parse_known_args(args, namespace)
+
+        self._apply_defaults(args)
+        return args, argv
+
+
+def _apply_default_arguments(args):
+    """Preprocess argument namespace to apply default behaviors.
+    """
 
     # Build cmark if any cmark-related options were specified.
     if (args.cmark_build_variant is not None):
@@ -245,7 +263,10 @@ def apply_default_arguments(args):
 
 
 def create_argument_parser():
-    parser = argparse.ArgumentParser(
+    """Return a configured argument parser."""
+
+    parser = _ApplyDefaultsArgumentParser(
+        apply_defaults=_apply_default_arguments,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=USAGE,
         description=DESCRIPTION,
@@ -1110,6 +1131,8 @@ iterations with -O",
 
     return parser
 
+
+# ----------------------------------------------------------------------------
 
 USAGE = """
   %(prog)s [-h | --help] [OPTION ...]
