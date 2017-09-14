@@ -57,6 +57,7 @@ public protocol _UnicodeParser {
 }
 
 extension _UnicodeParser {
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always)
   @discardableResult
@@ -83,6 +84,7 @@ extension _UnicodeParser {
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   @discardableResult
   public static func _decode<I: IteratorProtocol>(

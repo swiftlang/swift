@@ -21,12 +21,14 @@
 
 @_versioned
 internal enum _SipHashDetail {
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always)
   internal static func _rotate(_ x: UInt64, leftBy amount: Int) -> UInt64 {
     return (x &<< UInt64(amount)) | (x &>> UInt64(64 - amount))
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always)
   internal static func _loadUnalignedUInt64LE(
@@ -53,6 +55,7 @@ internal enum _SipHashDetail {
     return result
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always)
   internal static func _loadPartialUnalignedUInt64LE(
@@ -71,6 +74,7 @@ internal enum _SipHashDetail {
     return result
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always)
   internal static func _sipRound(
@@ -126,6 +130,7 @@ struct ${Self} {
   @_versioned
   internal var finalizedHash: UInt64?
 
+  @_inlineable // FIXME(sil-serialize-all)
   public init(key: (UInt64, UInt64)) {
     v3 ^= key.1
     v2 ^= key.0
@@ -134,12 +139,14 @@ struct ${Self} {
   }
 
   // FIXME(ABI)#62 (UnsafeRawBufferPointer): Use UnsafeRawBufferPointer.
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   mutating func append(_ data: UnsafeRawPointer, byteCount: Int) {
     _append_alwaysInline(data, byteCount: byteCount)
   }
 
   // FIXME(ABI)#63 (UnsafeRawBufferPointer): Use UnsafeRawBufferPointer.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always)
   internal mutating func _append_alwaysInline(
@@ -193,6 +200,7 @@ struct ${Self} {
 
   /// This function mixes in the given word directly into the state,
   /// ignoring `dataTail`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always)
   internal mutating func _appendDirectly(_ m: UInt64) {
@@ -205,6 +213,7 @@ struct ${Self} {
   }
 
 % for data_type in ['UInt', 'Int', 'UInt64', 'Int64', 'UInt32', 'Int32']:
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   mutating func append(_ data: ${data_type}) {
     var data = data
@@ -212,11 +221,13 @@ struct ${Self} {
   }
 % end
 
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   mutating func finalizeAndReturnHash() -> UInt64 {
     return _finalizeAndReturnHash_alwaysInline()
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always)
   internal mutating func _finalizeAndReturnHash_alwaysInline() -> UInt64 {
@@ -245,6 +256,8 @@ struct ${Self} {
     return finalizedHash!
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal mutating func _finalizeAndReturnIntHash() -> Int {
     let hash: UInt64 = finalizeAndReturnHash()
 #if arch(i386) || arch(arm)
@@ -255,6 +268,7 @@ struct ${Self} {
   }
 
   // FIXME(ABI)#64 (UnsafeRawBufferPointer): Use UnsafeRawBufferPointer.
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   static func hash(
     data: UnsafeRawPointer,
@@ -268,6 +282,7 @@ struct ${Self} {
   }
 
   // FIXME(ABI)#65 (UnsafeRawBufferPointer): Use UnsafeRawBufferPointer.
+  @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public // @testable
   static func _hash_alwaysInline(

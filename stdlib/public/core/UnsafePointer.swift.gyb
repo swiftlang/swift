@@ -282,6 +282,7 @@ public struct ${Self}<Pointee>
   public let _rawValue: Builtin.RawPointer
 
   /// Creates ${a_Self} from a builtin raw pointer.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ _rawValue : Builtin.RawPointer) {
     self._rawValue = _rawValue
@@ -290,6 +291,7 @@ public struct ${Self}<Pointee>
   /// Creates a new typed pointer from the given opaque pointer.
   ///
   /// - Parameter from: The opaque pointer to convert to a typed pointer.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ from : OpaquePointer) {
     _rawValue = from._rawValue
@@ -299,6 +301,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Parameter from: The opaque pointer to convert to a typed pointer. If
   ///   `from` is `nil`, the result of this initializer is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(_ from : OpaquePointer?) {
     guard let unwrapped = from else { return nil }
@@ -314,6 +317,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Parameter bitPattern: A bit pattern to use for the address of the new
   ///   pointer. If `bitPattern` is zero, the result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
@@ -329,6 +333,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Parameter bitPattern: A bit pattern to use for the address of the new
   ///   pointer. If `bitPattern` is zero, the result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
@@ -338,6 +343,7 @@ public struct ${Self}<Pointee>
   /// Creates a new pointer from the given typed pointer.
   ///
   /// - Parameter other: The typed pointer to convert.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ other: ${Self}<Pointee>) {
     self = other
@@ -347,6 +353,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(_ other: ${Self}<Pointee>?) {
     guard let unwrapped = other else { return nil }
@@ -358,6 +365,7 @@ public struct ${Self}<Pointee>
   /// immutable pointer.
   ///
   /// - Parameter other: The immutable pointer to convert.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(mutating other: UnsafePointer<Pointee>) {
     self._rawValue = other._rawValue
@@ -368,6 +376,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Parameter other: The immutable pointer to convert. If `other` is `nil`,
   ///   the result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(mutating other: UnsafePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
@@ -378,6 +387,7 @@ public struct ${Self}<Pointee>
   /// given mutable pointer.
   ///
   /// - Parameter other: The pointer to convert.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ other: UnsafeMutablePointer<Pointee>) {
     self._rawValue = other._rawValue
@@ -388,6 +398,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(_ other: UnsafeMutablePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
@@ -460,6 +471,7 @@ public struct ${Self}<Pointee>
   /// When reading from the `pointee` property, the instance referenced by
   /// this pointer must already be initialized.
 %  end
+  @_inlineable // FIXME(sil-serialize-all)
   public var pointee: Pointee {
 %  if mutable:
     @_transparent unsafeAddress {
@@ -878,12 +890,14 @@ public struct ${Self}<Pointee>
 
 extension ${Self} : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
+  @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
 }
 
 extension ${Self} : CustomReflectable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return Mirror(self, children: ["pointerValue": ptrValue])
@@ -891,12 +905,15 @@ extension ${Self} : CustomReflectable {
 }
 
 extension ${Self} : CustomPlaygroundQuickLookable {
-  var summary: String {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var summary: String {
     let selfType = "${Self}"
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return ptrValue == 0 ? "\(selfType)(nil)" : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(summary)
   }
@@ -912,6 +929,7 @@ extension ${Self} {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
   ///   otherwise, `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
@@ -929,6 +947,7 @@ extension ${Self} {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` references a memory address earlier than
   ///   `rhs`; otherwise, `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func < (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
     return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
@@ -951,6 +970,7 @@ extension ${Self} {
   ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
   /// - Returns: A pointer offset from `lhs` by `rhs` instances of the
   ///   `Pointee` type.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func + (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
     return ${Self}(Builtin.gep_Word(
@@ -970,6 +990,7 @@ extension ${Self} {
   ///   - rhs: A pointer.
   /// - Returns: A pointer offset from `rhs` by `lhs` instances of the
   ///   `Pointee` type.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func + (lhs: Int, rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
     return rhs + lhs
@@ -988,6 +1009,7 @@ extension ${Self} {
   ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
   /// - Returns: A pointer offset backward from `lhs` by `rhs` instances of
   ///   the `Pointee` type.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func - (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
     return lhs + -rhs
@@ -1009,6 +1031,7 @@ extension ${Self} {
   /// - Returns: The distance from `lhs` to `rhs`, in strides of the pointer's
   ///   `Pointee` type. To access the stride, use
   ///   `MemoryLayout<Pointee>.stride`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func - (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
     return
@@ -1028,6 +1051,7 @@ extension ${Self} {
   ///   - lhs: A pointer to advance in place.
   ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
   ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func += (lhs: inout ${Self}<Pointee>, rhs: Int) {
     lhs = lhs + rhs
@@ -1044,6 +1068,7 @@ extension ${Self} {
   ///   - lhs: A pointer to advance in place.
   ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
   ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func -= (lhs: inout ${Self}<Pointee>, rhs: Int) {
     lhs = lhs - rhs
@@ -1087,8 +1112,9 @@ extension UInt {
 }
 
 extension ${Self} {
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  static var _max : ${Self} {
+  internal static var _max : ${Self} {
     return ${Self}(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked

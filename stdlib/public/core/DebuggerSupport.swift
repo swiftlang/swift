@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 public enum _DebuggerSupport {
-  internal enum CollectionStatus {
+  // FIXME: should be `internal`. See <rdar://problem/34342955>
+  public enum CollectionStatus {
     case NotACollection
     case CollectionOfElements
     case CollectionOfPairs
@@ -19,10 +20,14 @@ public enum _DebuggerSupport {
     case Pair
     case ElementOfPair
   
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
     internal var isCollection: Bool {
       return self != .NotACollection
     }
   
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
     internal func getChildStatus(child: Mirror) -> CollectionStatus {
       let disposition = child.displayStyle ?? .struct
     
@@ -38,6 +43,8 @@ public enum _DebuggerSupport {
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static func isClass(_ value: Any) -> Bool {
     if let _ = type(of: value) as? AnyClass {
       return true
@@ -45,6 +52,8 @@ public enum _DebuggerSupport {
     return false
   }
   
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static func checkValue<T>(
     _ value: Any,
     ifClass: (AnyObject) -> T,
@@ -56,18 +65,24 @@ public enum _DebuggerSupport {
     return otherwise()
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static func asObjectIdentifier(_ value: Any) -> ObjectIdentifier? {
     return checkValue(value,
       ifClass: { return ObjectIdentifier($0) },
       otherwise: { return nil })
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static func asNumericValue(_ value: Any) -> Int {
     return checkValue(value,
       ifClass: { return unsafeBitCast($0, to: Int.self) },
       otherwise: { return 0 })
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static func asStringRepresentation(
     value: Any?,
     mirror: Mirror,
@@ -131,6 +146,8 @@ public enum _DebuggerSupport {
     return nil
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static func ivarCount(mirror: Mirror) -> Int {
     let count = Int(mirror.children.count)
     if let sc = mirror.superclassMirror {
@@ -141,6 +158,8 @@ public enum _DebuggerSupport {
   }
 
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static func shouldExpand(
     mirror: Mirror,
     collectionStatus: CollectionStatus,
@@ -156,6 +175,8 @@ public enum _DebuggerSupport {
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static func printForDebuggerImpl<StreamType : TextOutputStream>(
     value: Any?,
     mirror: Mirror,
@@ -286,6 +307,7 @@ public enum _DebuggerSupport {
   // LLDB uses this function in expressions, and if it is inlined the resulting
   // LLVM IR is enormous.  As a result, to improve LLDB performance we have made
   // this stdlib_binary_only, which prevents inlining.
+  @_inlineable // FIXME(sil-serialize-all)
   @_semantics("stdlib_binary_only")
   public static func stringForPrintObject(_ value: Any) -> String {
     var maxItemCounter = Int.max

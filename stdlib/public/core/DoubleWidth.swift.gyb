@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A fixed-width integer that is twice the size of its base type.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct DoubleWidth<Base : FixedWidthInteger> :
   FixedWidthInteger, _ExpressibleByBuiltinIntegerLiteral
   where Base.Words : Collection, Base.Magnitude.Words : Collection {
@@ -18,29 +19,35 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   public typealias High = Base
   public typealias Low = Base.Magnitude
 
+  @_versioned // FIXME(sil-serialize-all)
   internal var _storage: (high: Base, low: Base.Magnitude)
 
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   init(_ _value: (High, Low)) {
     self._storage = (high: _value.0, low: _value.1)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var high: High {
     return _storage.high
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var low: Low {
     return _storage.low
   }
 
   // Numeric
   //
+  @_inlineable // FIXME(sil-serialize-all)
   public init() {
     self.init((0, 0))
   }
 
   // BinaryInteger
   //
+  @_inlineable // FIXME(sil-serialize-all)
   public var magnitude: DoubleWidth<Low> {
     if Base.isSigned && _storage.high < (0 as High) {
       return self == .min
@@ -51,15 +58,19 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       _storage.high.magnitude, _storage.low.magnitude))
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(_ _magnitude: Magnitude) {
     self.init((High(_magnitude._storage.high), _magnitude._storage.low))
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static func ==(lhs: DoubleWidth, rhs: DoubleWidth) -> Bool {
     return (lhs._storage.high == rhs._storage.high) &&
       (lhs._storage.low == rhs._storage.low)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static func <(lhs: DoubleWidth, rhs: DoubleWidth) -> Bool {
     if lhs._storage.high < rhs._storage.high {
       return true
@@ -70,10 +81,12 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     return lhs._storage.low < rhs._storage.low
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public init<T : BinaryInteger>(_ source: T) {
     self.init(exactly: source)!
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public init?<T : BinaryInteger>(exactly source: T) {
     // Can't represent a negative 'source' if Base is unsigned
     guard source >= 0 || DoubleWidth.isSigned else { return nil }
@@ -97,14 +110,17 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public init<T : BinaryFloatingPoint>(_ source: T) {
     fatalError()
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public init?<T : BinaryFloatingPoint>(exactly source: T) {
     fatalError()
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public init<T : BinaryFloatingPoint>(_ source: T)
     where T.RawSignificand : FixedWidthInteger
   {
@@ -112,6 +128,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     self.init(exactly: source.rounded(.towardZero))!
   }
     
+  @_inlineable // FIXME(sil-serialize-all)
   public init?<T : BinaryFloatingPoint>(exactly source: T)
     where T.RawSignificand : FixedWidthInteger
   {
@@ -167,8 +184,10 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     public struct Index : Comparable {
       public var _value: _IndexValue
 
+      @_inlineable // FIXME(sil-serialize-all)
       public init(_ _value: _IndexValue) { self._value = _value }
 
+      @_inlineable // FIXME(sil-serialize-all)
       public static func ==(lhs: Index, rhs: Index) -> Bool {
         switch (lhs._value, rhs._value) {
         case let (.low(l), .low(r)): return l == r
@@ -177,6 +196,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
         }
       }
 
+      @_inlineable // FIXME(sil-serialize-all)
       public static func <(lhs: Index, rhs: Index) -> Bool {
         switch (lhs._value, rhs._value) {
         case let (.low(l), .low(r)): return l < r
@@ -190,6 +210,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     public var _high: Base.Words
     public var _low: Base.Magnitude.Words
 
+    @_inlineable // FIXME(sil-serialize-all)
     public init(_ value: DoubleWidth<Base>) {
       // multiples of word-size only
       guard Base.bitWidth == Base.Magnitude.bitWidth &&
@@ -202,19 +223,23 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       _sanityCheck(!_low.isEmpty)
     }
 
+    @_inlineable // FIXME(sil-serialize-all)
     public var startIndex: Index {
       return Index(.low(_low.startIndex))
     }
 
+    @_inlineable // FIXME(sil-serialize-all)
     public var endIndex: Index {
       return Index(.high(_high.endIndex))
     }
     
+    @_inlineable // FIXME(sil-serialize-all)
     public var count: Int {
       if Base.bitWidth < UInt.bitWidth { return 1 }
       return Int(_low.count) + Int(_high.count)
     }
   
+    @_inlineable // FIXME(sil-serialize-all)
     public func index(after i: Index) -> Index {
       switch i._value {
       case let .low(li):
@@ -231,6 +256,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       }
     }
   
+    @_inlineable // FIXME(sil-serialize-all)
     public subscript(_ i: Index) -> UInt {
       if Base.bitWidth < UInt.bitWidth {
         _precondition(i == Index(.low(_low.startIndex)), "Invalid index")
@@ -244,30 +270,36 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var words: Words {
     return Words(self)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static var isSigned: Bool {
     return Base.isSigned
   }
 
   // fixed width
   //
+  @_inlineable // FIXME(sil-serialize-all)
   public static var max: DoubleWidth {
     return self.init((High.max, Low.max))
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static var min: DoubleWidth {
     return self.init((High.min, Low.min))
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static var bitWidth: Int {
     return 2 * Base.bitWidth
   }
 
 % for (operator, name) in [('+', 'adding'), ('-', 'subtracting')]:
 %   highAffectedByLowOverflow = 'Base.max' if operator == '+' else 'Base.min'
+  @_inlineable // FIXME(sil-serialize-all)
   public func ${name}ReportingOverflow(_ rhs: DoubleWidth)
     -> (partialValue: DoubleWidth, overflow: Bool) {
     let (low, lowOverflow) =
@@ -281,6 +313,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   }
 % end
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func multipliedReportingOverflow(
     by rhs: DoubleWidth
   ) -> (partialValue: DoubleWidth, overflow: Bool) {
@@ -302,6 +335,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   @_specialize(where Base == UInt)
   @_specialize(where Base == Int64)
   @_specialize(where Base == UInt64)
+  @_inlineable // FIXME(sil-serialize-all)
   public func quotientAndRemainder(dividingBy other: DoubleWidth)
     -> (quotient: DoubleWidth, remainder: DoubleWidth) {
     let isNegative = (self < (0 as DoubleWidth)) != (other < (0 as DoubleWidth))
@@ -350,6 +384,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func dividedReportingOverflow(by other: DoubleWidth)
     -> (partialValue: DoubleWidth, overflow: Bool) {
     if other == (0 as DoubleWidth) ||
@@ -361,6 +396,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     return (quotientAndRemainder(dividingBy: other).quotient, false)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func remainderReportingOverflow(dividingBy other: DoubleWidth)
     -> (partialValue: DoubleWidth, overflow: Bool) {
     if other == 0 ||
@@ -372,6 +408,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     return (quotientAndRemainder(dividingBy: other).remainder, false)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func multipliedFullWidth(by other: DoubleWidth)
     -> (high: DoubleWidth, low: DoubleWidth.Magnitude) {
     let isNegative = DoubleWidth.isSigned &&
@@ -413,6 +450,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func dividingFullWidth(
     _ dividend: (high: DoubleWidth, low: DoubleWidth.Magnitude)
   ) -> (quotient: DoubleWidth, remainder: DoubleWidth) {
@@ -425,6 +463,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   }
 
 % for operator in ['&', '|', '^']:
+  @_inlineable // FIXME(sil-serialize-all)
   public static func ${operator}=(
     lhs: inout DoubleWidth, rhs: DoubleWidth
   ) {
@@ -433,6 +472,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   }
 % end
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static func <<=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
     if rhs < (0 as DoubleWidth) {
       lhs >>= 0 - rhs
@@ -456,6 +496,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     lhs &<<= rhs
   }
   
+  @_inlineable // FIXME(sil-serialize-all)
   public static func >>=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
     if rhs < (0 as DoubleWidth) {
       lhs <<= 0 - rhs
@@ -482,6 +523,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     lhs &>>= rhs
   }
   
+  @_inlineable // FIXME(sil-serialize-all)
   public static func &<<=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
     // Need to use smart shifts here, since rhs can be > Base.bitWidth
     let rhs = rhs & DoubleWidth(DoubleWidth.bitWidth - 1)
@@ -496,6 +538,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     lhs._storage.low <<= rhs._storage.low
   }
   
+  @_inlineable // FIXME(sil-serialize-all)
   public static func &>>=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
     // Need to use smart shifts here, since rhs can be > Base.bitWidth
     let rhs = rhs & DoubleWidth(DoubleWidth.bitWidth - 1)
@@ -522,6 +565,7 @@ binaryOperators = [
 % for (operator, name, firstArg, kind) in binaryOperators:
 
   // FIXME(integers): remove this once the operators are back to Numeric
+  @_inlineable // FIXME(sil-serialize-all)
   public static func ${operator} (
     lhs: DoubleWidth, rhs: DoubleWidth
   ) -> DoubleWidth {
@@ -531,6 +575,7 @@ binaryOperators = [
   }
 
 %   argumentLabel = (firstArg + ':') if firstArg != '_' else ''
+  @_inlineable // FIXME(sil-serialize-all)
   public static func ${operator}=(
     lhs: inout DoubleWidth, rhs: DoubleWidth
   ) {
@@ -540,6 +585,7 @@ binaryOperators = [
   }
 % end
 
+  @_inlineable // FIXME(sil-serialize-all)
   public init(_truncatingBits bits: UInt) {
     _storage.low = Low(_truncatingBits: bits)
     _storage.high = High(_truncatingBits: bits >> UInt(Base.bitWidth))
@@ -547,35 +593,42 @@ binaryOperators = [
 
   // other
   //
+  @_inlineable // FIXME(sil-serialize-all)
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
     // FIXME: This won't work if `x` is out of range for `Int64`
     self.init(Int64(_builtinIntegerLiteral: x))
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var description: String {
     return "(\(_storage.high), \(_storage.low))"
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var leadingZeroBitCount: Int {
     return high == (0 as High)
       ? Base.bitWidth + low.leadingZeroBitCount
       : high.leadingZeroBitCount
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var trailingZeroBitCount: Int {
     return low == (0 as Low)
       ? Base.bitWidth + high.trailingZeroBitCount
       : low.trailingZeroBitCount
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var nonzeroBitCount: Int {
     return high.nonzeroBitCount + low.nonzeroBitCount
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return _mixInt(high.hashValue) ^ low.hashValue
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public var byteSwapped: DoubleWidth {
     return DoubleWidth((
@@ -607,6 +660,7 @@ extension DoubleWidth where Base : SignedInteger {
   /// - Returns: The additive inverse of this value.
   ///
   /// - SeeAlso: `negate()`
+  @_inlineable // FIXME(sil-serialize-all)
   public static prefix func - (_ operand: DoubleWidth) -> DoubleWidth {
     return 0 - operand
   }
@@ -621,6 +675,7 @@ extension DoubleWidth where Base : SignedInteger {
   ///     // x == -21
   ///
   /// - SeeAlso: The unary minus operator (`-`).
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func negate() {
     self = 0 - self
   }

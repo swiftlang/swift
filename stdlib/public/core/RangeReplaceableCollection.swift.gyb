@@ -815,6 +815,7 @@ extension RangeReplaceableCollection {
 extension RangeReplaceableCollection where
     Self: ${capability}Collection,
     Self.SubSequence == RangeReplaceable${capability}Slice<Self> {
+  @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>)
       -> RangeReplaceable${capability}Slice<Self> {
     return RangeReplaceable${capability}Slice(base: self, bounds: bounds)
@@ -829,6 +830,7 @@ extension RangeReplaceableCollection where
 %   end
   Self.SubSequence == MutableRangeReplaceable${capability}Slice<Self>
 {
+  @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>)
       -> MutableRangeReplaceable${capability}Slice<Self> {
     get {

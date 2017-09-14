@@ -759,6 +759,7 @@ extension Sequence {
   // The implementation of flatMap accepting a closure with an optional result.
   // Factored out into a separate functions in order to be used in multiple
   // overloads.
+  @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public func _flatMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?

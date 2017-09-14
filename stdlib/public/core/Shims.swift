@@ -28,10 +28,12 @@ internal func _makeSwiftNSFastEnumerationState()
 
 /// A dummy value to be used as the target for `mutationsPtr` in fast
 /// enumeration implementations.
-var _fastEnumerationStorageMutationsTarget: CUnsignedLong = 0
+@_versioned // FIXME(sil-serialize-all)
+internal var _fastEnumerationStorageMutationsTarget: CUnsignedLong = 0
 
 /// A dummy pointer to be used as `mutationsPtr` in fast enumeration
 /// implementations.
+@_inlineable // FIXME(sil-serialize-all)
 public // SPI(Foundation)
 var _fastEnumerationStorageMutationsPtr: UnsafeMutablePointer<CUnsignedLong> {
   return UnsafeMutablePointer(

@@ -23,6 +23,7 @@ import SwiftShims
 
 /// Returns `true` iff the given `index` is valid as a position, i.e. `0
 /// ≤ index ≤ count`.
+@_inlineable // FIXME(sil-serialize-all)
 @_versioned
 @_transparent
 internal func _isValidArrayIndex(_ index: Int, count: Int) -> Bool {
@@ -31,6 +32,7 @@ internal func _isValidArrayIndex(_ index: Int, count: Int) -> Bool {
 
 /// Returns `true` iff the given `index` is valid for subscripting, i.e.
 /// `0 ≤ index < count`.
+@_inlineable // FIXME(sil-serialize-all)
 @_versioned
 @_transparent
 internal func _isValidArraySubscript(_ index: Int, count: Int) -> Bool {
@@ -177,6 +179,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
     return nil
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @nonobjc
   internal init(_nativeStorage: _ContiguousArrayStorageBase) {
@@ -259,10 +262,10 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 #else
 // Empty shim version for non-objc platforms.
 @_versioned
-class _SwiftNativeNSArrayWithContiguousStorage {
+internal class _SwiftNativeNSArrayWithContiguousStorage {
   @_inlineable
   @_versioned
-  init() {}
+  internal init() {}
 }
 #endif
 
@@ -275,8 +278,10 @@ internal class _ContiguousArrayStorageBase
   @_versioned
   final var countAndCapacity: _ArrayBody
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   @nonobjc
-  init(_doNotCallMeBase: ()) {
+  internal init(_doNotCallMeBase: ()) {
     _sanityCheckFailure("creating instance of _ContiguousArrayStorageBase")
   }
   
@@ -296,6 +301,7 @@ internal class _ContiguousArrayStorageBase
   /// If the stored type is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
@@ -304,6 +310,7 @@ internal class _ContiguousArrayStorageBase
       "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @nonobjc
   internal func _getNonVerbatimBridgedCount() -> Int {
@@ -311,6 +318,7 @@ internal class _ContiguousArrayStorageBase
       "Concrete subclasses must implement _getNonVerbatimBridgedCount")
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal func _getNonVerbatimBridgedHeapBuffer() ->
     _HeapBuffer<Int, AnyObject> {
@@ -319,15 +327,17 @@ internal class _ContiguousArrayStorageBase
   }
 #endif
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
+  internal func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
     _sanityCheckFailure(
       "Concrete subclasses must implement canStoreElements(ofDynamicType:)")
   }
 
   /// A type that every element in the array is.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  var staticElementType: Any.Type {
+  internal var staticElementType: Any.Type {
     _sanityCheckFailure(
       "Concrete subclasses must implement staticElementType")
   }

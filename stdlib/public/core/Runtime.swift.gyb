@@ -20,6 +20,7 @@ import SwiftShims
 // Atomics
 //===----------------------------------------------------------------------===//
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtr(
@@ -64,6 +65,7 @@ func _stdlib_atomicCompareExchangeStrongPtr(
 /// If the conditions above are not met, the code will still compile, but the
 /// compare-and-exchange instruction will operate on the writeback buffer, and
 /// you will get a *race* while doing writeback into shared memory.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtr<T>(
@@ -82,6 +84,7 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
 }
 % end # optional
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 @discardableResult
 public // @testable
@@ -104,6 +107,7 @@ func _stdlib_atomicInitializeARCRef(
 
 % for bits in [ 32, 64 ]:
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongUInt${bits}(
@@ -117,6 +121,7 @@ func _stdlib_atomicCompareExchangeStrongUInt${bits}(
   return Bool(won)
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongInt${bits}(
@@ -130,6 +135,7 @@ func _stdlib_atomicCompareExchangeStrongInt${bits}(
   return Bool(won)
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _swift_stdlib_atomicStoreUInt${bits}(
@@ -139,13 +145,16 @@ func _swift_stdlib_atomicStoreUInt${bits}(
   Builtin.atomicstore_seqcst_Int${bits}(target._rawValue, desired._value)
 }
 
-func _swift_stdlib_atomicStoreInt${bits}(
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _swift_stdlib_atomicStoreInt${bits}(
   object target: UnsafeMutablePointer<Int${bits}>,
   desired: Int${bits}) {
 
   Builtin.atomicstore_seqcst_Int${bits}(target._rawValue, desired._value)
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 public // @testable
 func _swift_stdlib_atomicLoadUInt${bits}(
   object target: UnsafeMutablePointer<UInt${bits}>) -> UInt${bits} {
@@ -154,7 +163,9 @@ func _swift_stdlib_atomicLoadUInt${bits}(
   return UInt${bits}(value)
 }
 
-func _swift_stdlib_atomicLoadInt${bits}(
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _swift_stdlib_atomicLoadInt${bits}(
   object target: UnsafeMutablePointer<Int${bits}>) -> Int${bits} {
 
   let value = Builtin.atomicload_seqcst_Int${bits}(target._rawValue)
@@ -163,6 +174,7 @@ func _swift_stdlib_atomicLoadInt${bits}(
 
 %   for operation in ['Add', 'And', 'Or', 'Xor']:
 // Warning: no overflow checking.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _swift_stdlib_atomicFetch${operation}UInt${bits}(
@@ -176,7 +188,9 @@ func _swift_stdlib_atomicFetch${operation}UInt${bits}(
 }
 
 // Warning: no overflow checking.
-func _swift_stdlib_atomicFetch${operation}Int${bits}(
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _swift_stdlib_atomicFetch${operation}Int${bits}(
   object target: UnsafeMutablePointer<Int${bits}>,
   operand: Int${bits}) -> Int${bits} {
 
@@ -189,7 +203,9 @@ func _swift_stdlib_atomicFetch${operation}Int${bits}(
 
 % end
 
-func _stdlib_atomicCompareExchangeStrongInt(
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _stdlib_atomicCompareExchangeStrongInt(
   object target: UnsafeMutablePointer<Int>,
   expected: UnsafeMutablePointer<Int>,
   desired: Int) -> Bool {
@@ -204,7 +220,9 @@ func _stdlib_atomicCompareExchangeStrongInt(
   return Bool(won)
 }
 
-func _swift_stdlib_atomicStoreInt(
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _swift_stdlib_atomicStoreInt(
   object target: UnsafeMutablePointer<Int>,
   desired: Int) {
 #if arch(i386) || arch(arm)
@@ -214,6 +232,7 @@ func _swift_stdlib_atomicStoreInt(
 #endif
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func _swift_stdlib_atomicLoadInt(
   object target: UnsafeMutablePointer<Int>) -> Int {
@@ -226,6 +245,7 @@ public func _swift_stdlib_atomicLoadInt(
 #endif
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _stdlib_atomicLoadARCRef(
@@ -240,6 +260,7 @@ func _stdlib_atomicLoadARCRef(
 
 % for operation in ['Add', 'And', 'Or', 'Xor']:
 // Warning: no overflow checking.
+@_inlineable // FIXME(sil-serialize-all)
 public func _swift_stdlib_atomicFetch${operation}Int(
   object target: UnsafeMutablePointer<Int>,
   operand: Int) -> Int {
@@ -258,26 +279,33 @@ public func _swift_stdlib_atomicFetch${operation}Int(
 % end
 
 public final class _stdlib_AtomicInt {
-  var _value: Int
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _value: Int
 
-  var _valuePtr: UnsafeMutablePointer<Int> {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _valuePtr: UnsafeMutablePointer<Int> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: Int.self)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public init(_ value: Int = 0) {
     _value = value
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func store(_ desired: Int) {
     return _swift_stdlib_atomicStoreInt(object: _valuePtr, desired: desired)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func load() -> Int {
     return _swift_stdlib_atomicLoadInt(object: _valuePtr)
   }
 
 % for operation_name, operation in [ ('Add', '+'), ('And', '&'), ('Or', '|'), ('Xor', '^') ]:
+  @_inlineable // FIXME(sil-serialize-all)
   @discardableResult
   public func fetchAnd${operation_name}(_ operand: Int) -> Int {
     return _swift_stdlib_atomicFetch${operation_name}Int(
@@ -285,11 +313,13 @@ public final class _stdlib_AtomicInt {
       operand: operand)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func ${operation_name.lower()}AndFetch(_ operand: Int) -> Int {
     return fetchAnd${operation_name}(operand) ${operation} operand
   }
 % end
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
     var expectedVar = expected
     let result = _stdlib_atomicCompareExchangeStrongInt(
@@ -306,12 +336,20 @@ public final class _stdlib_AtomicInt {
 //===----------------------------------------------------------------------===//
 
 /// A 32 byte buffer.
+@_fixed_layout // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 internal struct _Buffer32 {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init() {}
 % for i in range(32):
+  @_versioned // FIXME(sil-serialize-all)
   internal var _x${i}: UInt8 = 0
 % end
 
-  mutating func withBytes<Result>(
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result
   {
@@ -322,12 +360,20 @@ internal struct _Buffer32 {
 }
 
 /// A 72 byte buffer.
+@_fixed_layout // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 internal struct _Buffer72 {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init() {}
 % for i in range(72):
+  @_versioned // FIXME(sil-serialize-all)
   internal var _x${i}: UInt8 = 0
 % end
 
-  mutating func withBytes<Result>(
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result
   {
@@ -343,14 +389,20 @@ internal struct _Buffer72 {
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_float${bits}ToString")
-func _float${bits}ToStringImpl(
+internal func _float${bits}ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: Float${bits},
   _ debug: Bool
 ) -> UInt
 
-func _float${bits}ToString(_ value: Float${bits}, debug: Bool) -> String {
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _float${bits}ToString(
+  _ value: Float${bits}, debug: Bool
+) -> String {
 
   if !value.isFinite {
     let significand = value.significandBitPattern
@@ -392,14 +444,18 @@ func _float${bits}ToString(_ value: Float${bits}, debug: Bool) -> String {
 
 % end
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_int64ToString")
-func _int64ToStringImpl(
+internal func _int64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: Int64,
   _ radix: Int64, _ uppercase: Bool
 ) -> UInt
 
-func _int64ToString(
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _int64ToString(
   _ value: Int64, radix: Int64 = 10, uppercase: Bool = false
 ) -> String {
   if radix >= 10 {
@@ -423,12 +479,15 @@ func _int64ToString(
   }
 }
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_uint64ToString")
-func _uint64ToStringImpl(
+internal func _uint64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: UInt64, _ radix: Int64, _ uppercase: Bool
 ) -> UInt
 
+@_inlineable // FIXME(sil-serialize-all)
 public // @testable
 func _uint64ToString(
     _ value: UInt64, radix: Int64 = 10, uppercase: Bool = false
@@ -456,7 +515,7 @@ func _uint64ToString(
 
 @_inlineable
 @_versioned
-func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
+internal func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
     UInt64(
       UInt(bitPattern: UnsafeRawPointer(value))),
@@ -477,17 +536,40 @@ func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
 // allows us to subclass an Objective-C class and still use the fast Swift
 // memory allocator.
 
+@_versioned // FIXME(sil-serialize-all)
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSArrayBase)
-class _SwiftNativeNSArray {}
+internal class _SwiftNativeNSArray {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init() {}
+}
 
+@_versioned // FIXME(sil-serialize-all)
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSDictionaryBase)
-class _SwiftNativeNSDictionary {}
+internal class _SwiftNativeNSDictionary {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  @objc
+  internal init() {}
+}
 
+@_versioned // FIXME(sil-serialize-all)
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSSetBase)
-class _SwiftNativeNSSet {}
+internal class _SwiftNativeNSSet {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  @objc
+  internal init() {}
+}
 
+@_versioned // FIXME(sil-serialize-all)
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSEnumeratorBase)
-class _SwiftNativeNSEnumerator {}
+internal class _SwiftNativeNSEnumerator {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  @objc
+  internal init() {}
+}
 
 // FIXME(ABI)#60 : move into the Foundation overlay and remove 'open'
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSDataBase)
@@ -499,15 +581,27 @@ open class _SwiftNativeNSData {
 // Support for reliable testing of the return-autoreleased optimization
 //===----------------------------------------------------------------------===//
 
-@objc internal class _stdlib_ReturnAutoreleasedDummy {
+@_versioned // FIXME(sil-serialize-all)
+@objc
+internal class _stdlib_ReturnAutoreleasedDummy {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  @objc
+  internal init() {}
   // Use 'dynamic' to force Objective-C dispatch, which uses the
   // return-autoreleased call sequence.
-  @objc dynamic func returnsAutoreleased(_ x: AnyObject) -> AnyObject {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  @objc
+  internal dynamic func returnsAutoreleased(_ x: AnyObject) -> AnyObject {
     return x
   }
 
   // Use 'dynamic' to prevent this call to be duplicated into other modules.
-  @objc dynamic func initializeReturnAutoreleased() {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  @objc
+  internal dynamic func initializeReturnAutoreleased() {
     // On x86_64 it is sufficient to perform one cycle of return-autoreleased
     // call sequence in order to initialize all required PLT entries.
     _ = self.returnsAutoreleased(self)
@@ -526,6 +620,7 @@ open class _SwiftNativeNSData {
 /// separate for each dylib.
 ///
 /// Call this function in a fresh autorelease pool.
+@_inlineable // FIXME(sil-serialize-all)
 public func _stdlib_initializeReturnAutoreleased() {
 //  _stdlib_initializeReturnAutoreleasedImpl()
 #if arch(x86_64)
@@ -534,8 +629,23 @@ public func _stdlib_initializeReturnAutoreleased() {
 }
 #else
 
-class _SwiftNativeNSArray {}
-class _SwiftNativeNSDictionary {}
-class _SwiftNativeNSSet {}
+@_versioned // FIXME(sil-serialize-all)
+internal class _SwiftNativeNSArray {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init() {}
+}
+@_versioned // FIXME(sil-serialize-all)
+internal class _SwiftNativeNSDictionary {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init() {}
+}
+@_versioned // FIXME(sil-serialize-all)
+internal class _SwiftNativeNSSet {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init() {}
+}
 
 #endif

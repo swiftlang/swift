@@ -62,6 +62,7 @@ def TypedUnaryIntrinsicFunctions():
 // Unary intrinsic functions
 // Note these have a corresponding LLVM intrinsic
 % for T, CT, bits, ufunc in TypedUnaryIntrinsicFunctions():
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func _${ufunc}(_ x: ${T}) -> ${T} {
   return ${T}(_bits: Builtin.int_${ufunc}_FPIEEE${bits}(x._value))

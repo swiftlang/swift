@@ -231,6 +231,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The pointer to convert.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ other: Unsafe${Mutable}RawPointer) {
     self = other
@@ -244,6 +245,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(_ other: Unsafe${Mutable}RawPointer?) {
     guard let unwrapped = other else { return nil }
@@ -251,6 +253,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 
   /// Creates a new raw pointer from a builtin raw pointer.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
@@ -263,6 +266,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The opaque pointer to convert.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ other: OpaquePointer) {
     _rawValue = other._rawValue
@@ -276,6 +280,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Parameter other: The opaque pointer to convert. If `other` is `nil`,
   ///   the result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(_ other: OpaquePointer?) {
     guard let unwrapped = other else { return nil }
@@ -287,6 +292,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Parameter bitPattern: A bit pattern to use for the address of the new
   ///   raw pointer. If `bitPattern` is zero, the result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
@@ -298,6 +304,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Parameter bitPattern: A bit pattern to use for the address of the new
   ///   raw pointer. If `bitPattern` is zero, the result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
@@ -311,6 +318,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The typed pointer to convert.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init<T>(_ other: Unsafe${Mutable}Pointer<T>) {
     _rawValue = other._rawValue
@@ -324,6 +332,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?<T>(_ other: Unsafe${Mutable}Pointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -338,6 +347,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The immutable raw pointer to convert.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(mutating other: UnsafeRawPointer) {
     _rawValue = other._rawValue
@@ -351,6 +361,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Parameter other: The immutable raw pointer to convert. If `other` is
   ///   `nil`, the result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(mutating other: UnsafeRawPointer?) {
     guard let unwrapped = other else { return nil }
@@ -364,6 +375,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The mutable raw pointer to convert.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ other: UnsafeMutableRawPointer) {
     _rawValue = other._rawValue
@@ -377,6 +389,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Parameter other: The mutable raw pointer to convert. If `other` is
   ///   `nil`, the result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(_ other: UnsafeMutableRawPointer?) {
     guard let unwrapped = other else { return nil }
@@ -390,6 +403,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The typed pointer to convert.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init<T>(_ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
@@ -403,6 +417,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?<T>(_ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -487,6 +502,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   region is bound to `T`, but has not been modified in any other way.
   ///   The number of bytes in this region is
   ///   `count * MemoryLayout<T>.stride`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   @discardableResult
   public func bindMemory<T>(
@@ -507,6 +523,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Parameter to: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public func assumingMemoryBound<T>(to: T.Type) -> Unsafe${Mutable}Pointer<T> {
     return Unsafe${Mutable}Pointer<T>(_rawValue)
@@ -916,6 +933,7 @@ extension ${Self} {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
   ///   otherwise, `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
@@ -931,6 +949,7 @@ extension ${Self} {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` references a memory address earlier than
   ///   `rhs`; otherwise, `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
@@ -939,12 +958,14 @@ extension ${Self} {
 
 extension Unsafe${Mutable}RawPointer : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
+  @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
 }
 
 extension Unsafe${Mutable}RawPointer : CustomReflectable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     let ptrValue = UInt64(
       bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
@@ -953,7 +974,9 @@ extension Unsafe${Mutable}RawPointer : CustomReflectable {
 }
 
 extension Unsafe${Mutable}RawPointer : CustomPlaygroundQuickLookable {
-  var summary: String {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var summary: String {
     let selfType = "${Self}"
     let ptrValue = UInt64(
       bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
@@ -962,6 +985,7 @@ extension Unsafe${Mutable}RawPointer : CustomPlaygroundQuickLookable {
     : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(summary)
   }

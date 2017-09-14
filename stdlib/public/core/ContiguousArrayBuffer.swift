@@ -26,14 +26,14 @@ internal final class _EmptyArrayStorage
   @_inlineable
   @_versioned
   @nonobjc
-  init(_doNotCallMe: ()) {
+  internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("creating instance of _EmptyArrayStorage")
   }
   
 #if _runtime(_ObjC)
   @_inlineable
   @_versioned
-  override func _withVerbatimBridgedUnsafeBuffer<R>(
+  override internal func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
     return try body(UnsafeBufferPointer(start: nil, count: 0))
@@ -42,13 +42,13 @@ internal final class _EmptyArrayStorage
   @_inlineable
   @_versioned
   @nonobjc
-  override func _getNonVerbatimBridgedCount() -> Int {
+  override internal func _getNonVerbatimBridgedCount() -> Int {
     return 0
   }
 
   @_inlineable
   @_versioned
-  override func _getNonVerbatimBridgedHeapBuffer() -> _HeapBuffer<Int, AnyObject> {
+  override internal func _getNonVerbatimBridgedHeapBuffer() -> _HeapBuffer<Int, AnyObject> {
     return _HeapBuffer<Int, AnyObject>(
       _HeapBufferStorage<Int, AnyObject>.self, 0, 0)
   }
@@ -56,14 +56,14 @@ internal final class _EmptyArrayStorage
 
   @_inlineable
   @_versioned
-  override func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
+  override internal func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
     return false
   }
 
   /// A type that every element in the array is.
   @_inlineable
   @_versioned
-  override var staticElementType: Any.Type {
+  override internal var staticElementType: Any.Type {
     return Void.self
   }
 }
@@ -79,7 +79,9 @@ internal var _emptyArrayStorage : _EmptyArrayStorage {
 
 // The class that implements the storage for a ContiguousArray<Element>
 @_versioned
-final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorageBase {
+internal final class _ContiguousArrayStorage<
+  Element
+> : _ContiguousArrayStorageBase {
 
   deinit {
     _elementPointer.deinitialize(count: countAndCapacity.count)
@@ -92,7 +94,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorageBase {
   /// Otherwise, return `nil`.
   @_inlineable
   @_versioned
-  final override func _withVerbatimBridgedUnsafeBuffer<R>(
+  internal final override func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
     var result: R?
@@ -160,7 +162,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorageBase {
   /// all of the elements can be destroyed as `Element`.
   @_inlineable
   @_versioned
-  override func canStoreElements(
+  internal override func canStoreElements(
     ofDynamicType proposedElementType: Any.Type
   ) -> Bool {
 #if _runtime(_ObjC)
@@ -175,7 +177,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorageBase {
   /// A type that every element in the array is.
   @_inlineable
   @_versioned
-  override var staticElementType: Any.Type {
+  internal override var staticElementType: Any.Type {
     return Element.self
   }
 
@@ -405,7 +407,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   @_inlineable
   @_versioned
   @inline(__always)
-  func _checkValidSubscript(_ index : Int) {
+  internal func _checkValidSubscript(_ index : Int) {
     _precondition(
       (index >= 0) && (index < count),
       "Index out of range"
@@ -535,7 +537,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// - Complexity: O(*n*)
   @_inlineable
   @_versioned
-  func storesOnlyElementsOfType<U>(
+  internal func storesOnlyElementsOfType<U>(
     _: U.Type
   ) -> Bool {
     _sanityCheck(_isClassOrObjCExistential(U.self))
@@ -717,9 +719,10 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
 
   /// Initialize the buffer with an initial size of `initialCapacity`
   /// elements.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always) // For performance reasons.
-  init(initialCapacity: Int) {
+  internal init(initialCapacity: Int) {
     if initialCapacity == 0 {
       result = _ContiguousArrayBuffer()
     } else {
@@ -733,9 +736,10 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   }
 
   /// Add an element to the buffer, reallocating if necessary.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always) // For performance reasons.
-  mutating func add(_ element: Element) {
+  internal mutating func add(_ element: Element) {
     if remainingCapacity == 0 {
       // Reallocate.
       let newCapacity = max(_growArrayCapacity(result.capacity), 1)
@@ -752,9 +756,10 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   }
 
   /// Add an element to the buffer, which must have remaining capacity.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always) // For performance reasons.
-  mutating func addWithExistingCapacity(_ element: Element) {
+  internal mutating func addWithExistingCapacity(_ element: Element) {
     _sanityCheck(remainingCapacity > 0,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity")
     remainingCapacity -= 1
@@ -768,9 +773,10 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   ///
   /// Returns the fully-initialized buffer. `self` is reset to contain an
   /// empty buffer and cannot be used afterward.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always) // For performance reasons.
-  mutating func finish() -> ContiguousArray<Element> {
+  internal mutating func finish() -> ContiguousArray<Element> {
     // Adjust the initialized count of the buffer.
     result.count = result.capacity - remainingCapacity
 
@@ -783,9 +789,10 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   ///
   /// Returns the fully-initialized buffer. `self` is reset to contain an
   /// empty buffer and cannot be used afterward.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always) // For performance reasons.
-  mutating func finishWithOriginalCount() -> ContiguousArray<Element> {
+  internal mutating func finishWithOriginalCount() -> ContiguousArray<Element> {
     _sanityCheck(remainingCapacity == result.capacity - result.count,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has incorrect count")
     var finalResult = _ContiguousArrayBuffer<Element>()
