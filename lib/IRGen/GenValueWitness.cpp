@@ -1329,7 +1329,7 @@ void TypeInfo::assignArrayWithCopyBackToFront(IRGenFunction &IGF, Address dest,
 void TypeInfo::assignArrayWithTake(IRGenFunction &IGF, Address dest,
                                               Address src, llvm::Value *count,
                                               SILType T) const {
-  if (isBitwiseTakable(ResilienceExpansion::Maximal)) {
+  if (isPOD(ResilienceExpansion::Maximal)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
     IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(), byteCount,

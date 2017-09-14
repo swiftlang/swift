@@ -494,8 +494,7 @@ func copyPODArray(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Bu
 // CHECK:         call void @swift_arrayAssignWithCopyNoAlias(
 // CHECK:         call void @swift_arrayAssignWithCopyFrontToBack(
 // CHECK:         call void @swift_arrayAssignWithCopyBackToFront(
-// CHECK:         mul nuw i64 8, %2
-// CHECK:         call void @llvm.memcpy.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 8, i1 false)
+// CHECK:         call void @swift_arrayAssignWithTake(
 func copyBTArray(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.copyArray(C.self, dest, src, count)
   Builtin.takeArrayFrontToBack(C.self, dest, src, count)
@@ -544,10 +543,10 @@ func copyGenArray<T>(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count:
   Builtin.copyArray(T.self, dest, src, count)
   Builtin.takeArrayFrontToBack(T.self, dest, src, count)
   Builtin.takeArrayBackToFront(T.self, dest, src, count)
-  Builtin.assignCopyArrayNoAlias(W.self, dest, src, count)
-  Builtin.assignCopyArrayFrontToBack(W.self, dest, src, count)
-  Builtin.assignCopyArrayBackToFront(W.self, dest, src, count)
-  Builtin.assignTakeArray(W.self, dest, src, count)
+  Builtin.assignCopyArrayNoAlias(T.self, dest, src, count)
+  Builtin.assignCopyArrayFrontToBack(T.self, dest, src, count)
+  Builtin.assignCopyArrayBackToFront(T.self, dest, src, count)
+  Builtin.assignTakeArray(T.self, dest, src, count)
 }
 
 // CHECK-LABEL: define hidden {{.*}}void @_T08builtins24conditionallyUnreachableyyF
