@@ -637,6 +637,11 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
   assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
 }
 
+SubstitutionMap SpecializedProtocolConformance::getSubstitutionMap() const {
+  auto *genericSig = GenericConformance->getGenericSignature();
+  return genericSig->getSubstitutionMap(GenericSubstitutions);
+}
+
 bool SpecializedProtocolConformance::hasTypeWitness(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver) const {
@@ -683,8 +688,7 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
   auto substitutionMap = genericSig->getSubstitutionMap(GenericSubstitutions);
 
   // Apply the substitution we computed above
-  auto specializedType
-    = genericWitness.subst(substitutionMap, options);
+  auto specializedType = genericWitness.subst(getSubstitutionMap(), options);
   if (!specializedType) {
     if (isTentativeWitness())
       return { Type(), nullptr };
@@ -708,8 +712,7 @@ SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
   ProtocolConformanceRef conformance =
     GenericConformance->getAssociatedConformance(assocType, protocol, resolver);
 
-  auto genericSig = GenericConformance->getGenericSignature();
-  auto subMap = genericSig->getSubstitutionMap(GenericSubstitutions);
+  auto subMap = getSubstitutionMap();
 
   Type origType =
     (conformance.isConcrete()
@@ -728,9 +731,7 @@ SpecializedProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
   if (!baseWitness || !baseWitness.isSpecialized())
     return baseWitness;
 
-  auto genericSig = GenericConformance->getGenericSignature();
-  auto specializationMap =
-    genericSig->getSubstitutionMap(GenericSubstitutions);
+  auto specializationMap = getSubstitutionMap();
 
   auto witnessDecl = baseWitness.getDecl();
   auto witnessSig =
@@ -858,11 +859,8 @@ ProtocolConformance::subst(Type substType,
   case ProtocolConformanceKind::Specialized: {
     // Substitute the substitutions in the specialized conformance.
     auto spec = cast<SpecializedProtocolConformance>(this);
-    auto genericConformance
-      = cast<SpecializedProtocolConformance>(this)->getGenericConformance();
-    auto subMap =
-      genericConformance->getGenericSignature()
-        ->getSubstitutionMap(spec->getGenericSubstitutions());
+    auto genericConformance = spec->getGenericConformance();
+    auto subMap = spec->getSubstitutionMap();
 
     return substType->getASTContext()
       .getSpecializedConformance(substType, genericConformance,
