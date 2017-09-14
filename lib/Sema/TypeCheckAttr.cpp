@@ -84,6 +84,7 @@ public:
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Inline)
   IGNORED_ATTR(Inlineable)
+  IGNORED_ATTR(NonExhaustive)
   IGNORED_ATTR(NonObjC)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
@@ -241,6 +242,11 @@ public:
     if (!D->getDeclContext()->isTypeContext()) {
       diagnoseAndRemoveAttr(attr, diag::attr_methods_only, attr);
     }
+  }
+
+  void visitExhaustiveAttr(ExhaustiveAttr *attr) {
+    if (D->getAttrs().hasAttribute<NonExhaustiveAttr>())
+      diagnoseAndRemoveAttr(attr, diag::enum_exhaustive_and_nonexhaustive);
   }
 
   void visitIBActionAttr(IBActionAttr *attr);
@@ -875,6 +881,10 @@ public:
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
+
+  void checkExhaustivity(DeclAttribute *attr);
+  void visitExhaustiveAttr(ExhaustiveAttr *attr);
+  void visitNonExhaustiveAttr(NonExhaustiveAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2020,6 +2030,22 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
                 diag::implements_attr_non_protocol_type)
       .highlight(ProtoTypeLoc.getTypeRepr()->getSourceRange());
   }
+}
+
+void AttributeChecker::checkExhaustivity(DeclAttribute *attr) {
+  if (cast<EnumDecl>(D)->getFormalAccess() >= AccessLevel::Public)
+    return;
+  if (D->getAttrs().hasAttribute<VersionedAttr>())
+    return;
+  diagnoseAndRemoveAttr(attr, diag::enum_exhaustive_nonpublic, attr);
+}
+
+void AttributeChecker::visitExhaustiveAttr(ExhaustiveAttr *attr) {
+  checkExhaustivity(attr);
+}
+
+void AttributeChecker::visitNonExhaustiveAttr(NonExhaustiveAttr *attr) {
+  checkExhaustivity(attr);
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

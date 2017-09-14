@@ -96,6 +96,9 @@
       ],
       key.attributes: [
         {
+          key.attribute: source.decl.attribute._exhaustive
+        },
+        {
           key.attribute: source.decl.attribute.public
         }
       ]

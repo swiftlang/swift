@@ -37,3 +37,6 @@ public enum Breakfast<Champions> : Int {
   case Bacon
   case Coffee
 }
+
+public _exhaustive enum Exhaustive {}
+public _nonexhaustive enum NonExhaustive {}

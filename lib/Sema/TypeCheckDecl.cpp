@@ -6521,6 +6521,9 @@ public:
     UNINTERESTING_ATTR(DowngradeExhaustivityCheck)
     UNINTERESTING_ATTR(ImplicitlyUnwrappedOptional)
     UNINTERESTING_ATTR(ClangImporterSynthesizedType)
+
+    UNINTERESTING_ATTR(Exhaustive)
+    UNINTERESTING_ATTR(NonExhaustive)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -7647,6 +7650,24 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // need to force the values to be checked.
       if (ED->isObjC())
         checkEnumRawValues(*this, ED);
+
+      // Public enums may be used in inlinable code, so we need to resolve their
+      // exhaustiveness.
+      if (ED->getFormalAccess() >= AccessLevel::Public ||
+          ED->getAttrs().hasAttribute<VersionedAttr>()) {
+        if (!ED->getAttrs().hasAttribute<ExhaustiveAttr>() &&
+            !ED->getAttrs().hasAttribute<NonExhaustiveAttr>()) {
+          if (Context.isSwiftVersionAtLeast(5) ||
+              ED->getModuleContext()->getResilienceStrategy() ==
+                ResilienceStrategy::Resilient) {
+            ED->getAttrs().add(
+                new (Context) NonExhaustiveAttr(/*implicit*/true));
+          } else {
+            ED->getAttrs().add(
+                new (Context) ExhaustiveAttr(/*implicit*/true));
+          }
+        }
+      }
     }
 
     if (!isa<ClassDecl>(nominal))

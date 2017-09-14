@@ -2755,6 +2755,9 @@ namespace {
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->computeType();
 
+        // FIXME: Actually distinguish exhaustive and non-exhaustive enums.
+        enumDecl->getAttrs().add(new (C) ExhaustiveAttr(/*implicit*/true));
+
         // Set up the C underlying type as its Swift raw type.
         enumDecl->setRawType(underlyingType);
 
