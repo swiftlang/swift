@@ -108,11 +108,6 @@ def apply_default_arguments(args):
         raise ValueError("error: --watchos-all is unavailable in open-source "
                          "Swift.\nUse --watchos to skip watchOS device tests.")
 
-    ninja_required = (
-        args.cmake_generator == 'Ninja' or args.build_foundation)
-    if ninja_required:
-        args.build_ninja = ninja_required
-
     # SwiftPM and XCTest have a dependency on Foundation.
     # On OS X, Foundation is built automatically using xcodebuild.
     # On Linux, we must ensure that it is built manually.
