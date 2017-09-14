@@ -33,3 +33,66 @@ func _findStringSwitchCase(
   return -1
 }
 
+public // used by COMPILER_INTRINSIC
+struct _OpaqueStringSwitchCache {
+  var a: Builtin.Word
+  var b: Builtin.Word
+}
+
+internal typealias _StringSwitchCache = Dictionary<String, Int>
+
+internal struct _StringSwitchContext {
+  let cases: [StaticString]
+  let cachePtr: UnsafeMutablePointer<_StringSwitchCache>
+}
+
+/// The compiler intrinsic which is called to lookup a string in a table
+/// of static string case values.
+///
+/// The first time this function is called, a cache is built and stored
+/// in \p cache. Consecutive calls use the cache for faster lookup.
+/// The \p cases array must not change between subsequent calls with the
+/// same \p cache.
+@_semantics("stdlib_binary_only")
+@_semantics("findStringSwitchCaseWithCache")
+public // COMPILER_INTRINSIC
+func _findStringSwitchCaseWithCache(
+  cases: [StaticString],
+  string: String,
+  cache: inout _OpaqueStringSwitchCache) -> Int {
+
+  return withUnsafeMutableBytes(of: &cache) {
+    (bufPtr: UnsafeMutableRawBufferPointer) -> Int in
+
+    let oncePtr = bufPtr.baseAddress!
+    let cacheRawPtr = oncePtr + MemoryLayout<Builtin.Word>.stride
+    let cachePtr = cacheRawPtr.bindMemory(to: _StringSwitchCache.self, capacity: 1)
+    var context = _StringSwitchContext(cases: cases, cachePtr: cachePtr)
+    withUnsafeMutablePointer(to: &context) { (context) -> () in
+      Builtin.onceWithContext(oncePtr._rawValue, _createStringTableCache,
+                              context._rawValue)
+    }
+    let cache = cachePtr.pointee;
+    if let idx = cache[string] {
+      return idx
+    }
+    return -1
+  }
+}
+
+/// Builds the string switch case.
+internal func _createStringTableCache(_ cacheRawPtr: Builtin.RawPointer) {
+  let context = UnsafePointer<_StringSwitchContext>(cacheRawPtr).pointee
+  var cache = _StringSwitchCache()
+  cache.reserveCapacity(context.cases.count)
+  assert(MemoryLayout<_StringSwitchCache>.size <= MemoryLayout<Builtin.Word>.size)
+
+  for (idx, s) in context.cases.enumerated() {
+    let key = String(_builtinStringLiteral: s.utf8Start._rawValue,
+                     utf8CodeUnitCount: s._utf8CodeUnitCount,
+                     isASCII: s.isASCII._value)
+    cache[key] = idx
+  }
+  context.cachePtr.initialize(to: cache)
+}
+

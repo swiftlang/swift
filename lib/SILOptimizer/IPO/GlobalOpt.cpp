@@ -98,15 +98,19 @@ protected:
     return type.getNominalOrBoundGenericNominal() == ArrayDecl;
   }
 
-  bool isValidUseOfObject(SILInstruction *Val, bool isCOWObject);
+  bool isValidUseOfObject(SILInstruction *Val, bool isCOWObject,
+                          ApplyInst **FindStringCall = nullptr);
 
   bool getObjectInitVals(SILValue Val,
                          llvm::DenseMap<VarDecl *, StoreInst *> &MemberStores,
-                         llvm::SmallVectorImpl<StoreInst *> &TailStores);
+                         llvm::SmallVectorImpl<StoreInst *> &TailStores,
+                         ApplyInst **FindStringCall);
   bool handleTailAddr(int TailIdx, SILInstruction *I,
                       llvm::SmallVectorImpl<StoreInst *> &TailStores);
 
   void optimizeObjectAllocation(AllocRefInst *ARI);
+  void replaceFindStringCall(ApplyInst *FindStringCall);
+
   SILGlobalVariable *getVariableOfGlobalInit(SILFunction *AddrF);
   bool isInLoop(SILBasicBlock *CurBB);
   void placeInitializers(SILFunction *InitF, ArrayRef<ApplyInst*> Calls);
@@ -1038,7 +1042,10 @@ static bool isEmptyInitVal(SILValue V) {
 ///
 /// If \p isCOWObject is true, then the object reference is wrapped into a
 /// COW container. Currently this is just Array<T>.
-bool SILGlobalOpt::isValidUseOfObject(SILInstruction *I, bool isCOWObject) {
+/// If a use is a call to the findStringSwitchCase semantic call, the apply
+/// is returned in \p FindStringCall.
+bool SILGlobalOpt::isValidUseOfObject(SILInstruction *I, bool isCOWObject,
+                                      ApplyInst **FindStringCall) {
   switch (I->getKind()) {
     case ValueKind::DebugValueAddrInst:
     case ValueKind::DebugValueInst:
@@ -1049,7 +1056,6 @@ bool SILGlobalOpt::isValidUseOfObject(SILInstruction *I, bool isCOWObject) {
       return true;
 
     case ValueKind::ReturnInst:
-    case ValueKind::ApplyInst:
     case ValueKind::TryApplyInst:
     case ValueKind::PartialApplyInst:
     case ValueKind::StoreInst:
@@ -1057,6 +1063,16 @@ bool SILGlobalOpt::isValidUseOfObject(SILInstruction *I, bool isCOWObject) {
       /// ad-hoc testing: We can ignore uses of a COW object if any use after
       /// this will do a uniqueness checking before the object is modified.
       return isCOWObject;
+
+    case ValueKind::ApplyInst:
+      if (!isCOWObject)
+        return false;
+      // There should only be a single call to findStringSwitchCase. But even
+      // if there are multiple calls, it's not problem - we'll just optimize the
+      // last one we find.
+      if (cast<ApplyInst>(I)->hasSemantics("findStringSwitchCase"))
+        *FindStringCall = cast<ApplyInst>(I);
+      return true;
 
     case ValueKind::StructInst:
       if (isCOWType(I->getType())) {
@@ -1098,7 +1114,7 @@ bool SILGlobalOpt::isValidUseOfObject(SILInstruction *I, bool isCOWObject) {
   }
 
   for (Operand *Use : getNonDebugUses(I)) {
-    if (!isValidUseOfObject(Use->getUser(), isCOWObject))
+    if (!isValidUseOfObject(Use->getUser(), isCOWObject, FindStringCall))
       return false;
   }
   return true;
@@ -1126,12 +1142,13 @@ bool SILGlobalOpt::handleTailAddr(int TailIdx, SILInstruction *TailAddr,
 /// Get the init values for an object's stored properties and its tail elements.
 bool SILGlobalOpt::getObjectInitVals(SILValue Val,
                         llvm::DenseMap<VarDecl *, StoreInst *> &MemberStores,
-                        llvm::SmallVectorImpl<StoreInst *> &TailStores) {
+                        llvm::SmallVectorImpl<StoreInst *> &TailStores,
+                        ApplyInst **FindStringCall) {
   for (Operand *Use : Val->getUses()) {
     SILInstruction *User = Use->getUser();
     if (auto *UC = dyn_cast<UpcastInst>(User)) {
       // Upcast is transparent.
-      if (!getObjectInitVals(UC, MemberStores, TailStores))
+      if (!getObjectInitVals(UC, MemberStores, TailStores, FindStringCall))
         return false;
     } else if (auto *REA = dyn_cast<RefElementAddrInst>(User)) {
       // The address of a stored property.
@@ -1166,7 +1183,7 @@ bool SILGlobalOpt::getObjectInitVals(SILValue Val,
           return false;
         }
       }
-    } else if (!isValidUseOfObject(User, /*isCOWObject*/false)) {
+    } else if (!isValidUseOfObject(User, /*isCOWObject*/false, FindStringCall)) {
       return false;
     }
   }
@@ -1175,11 +1192,16 @@ bool SILGlobalOpt::getObjectInitVals(SILValue Val,
 
 class GlobalVariableMangler : public Mangle::ASTMangler {
 public:
-  std::string mangleOutlinedVariable(SILFunction *Context, int Idx) {
-    beginManglingWithoutPrefix();
-    appendOperator(Context->getName());
-    appendOperator("Tv", Index(Idx));
-    return finalize();
+  std::string mangleOutlinedVariable(SILFunction *F, int &uniqueIdx) {
+    std::string GlobName;
+    do {
+      beginManglingWithoutPrefix();
+      appendOperator(F->getName());
+      appendOperator("Tv", Index(uniqueIdx++));
+      GlobName = finalize();
+    } while (F->getModule().lookUpGlobalVariable(GlobName));
+
+    return GlobName;
   }
 };
 
@@ -1226,7 +1248,8 @@ void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
   llvm::DenseMap<VarDecl *, StoreInst *> MemberStores;
   llvm::SmallVector<StoreInst *, 16> TailStores;
   TailStores.resize(NumTailElems);
-  if (!getObjectInitVals(ARI, MemberStores, TailStores))
+  ApplyInst *FindStringCall = nullptr;
+  if (!getObjectInitVals(ARI, MemberStores, TailStores, &FindStringCall))
     return;
 
   // Is there a store for all the class properties?
@@ -1244,10 +1267,8 @@ void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
 
   // Create a name for the outlined global variable.
   GlobalVariableMangler Mangler;
-  std::string GlobName;
-  do {
-    GlobName = Mangler.mangleOutlinedVariable(ARI->getFunction(), GlobIdx++);
-  } while (Module->lookUpGlobalVariable(GlobName));
+  std::string GlobName =
+    Mangler.mangleOutlinedVariable(ARI->getFunction(), GlobIdx);
 
   SILGlobalVariable *Glob =
     SILGlobalVariable::create(*Module, SILLinkage::Private, IsNotSerialized,
@@ -1299,9 +1320,82 @@ void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
         Use->set(GVI);
     }
   }
+  if (FindStringCall && NumTailElems > 16) {
+    assert(&*std::next(ARI->getIterator()) != FindStringCall &&
+           "FindStringCall must not be the next instruction after ARI because "
+           "deleting it would invalidate the instruction iterator");
+    replaceFindStringCall(FindStringCall);
+  }
+
   ARI->eraseFromParent();
 
   HasChanged = true;
+}
+
+/// Replaces a call to _findStringSwitchCase with a call to
+/// _findStringSwitchCaseWithCache which builds a cache (e.g. a Dictionary) and
+/// stores it into a global variable. Then subsequent calls to this function can
+/// do a fast lookup using the cache.
+void SILGlobalOpt::replaceFindStringCall(ApplyInst *FindStringCall) {
+  // Find the replacement function in the swift stdlib.
+  SmallVector<ValueDecl *, 1> results;
+  Module->getASTContext().lookupInSwiftModule("_findStringSwitchCaseWithCache",
+                                              results);
+  if (results.size() != 1)
+    return;
+
+  auto *FD = dyn_cast<FuncDecl>(results.front());
+  if (!FD)
+    return;
+
+  std::string Mangled = SILDeclRef(FD, SILDeclRef::Kind::Func).mangle();
+  SILFunction *replacementFunc = Module->findFunction(Mangled,
+                                                    SILLinkage::PublicExternal);
+  if (!replacementFunc)
+    return;
+
+  SILFunctionType *FTy = replacementFunc->getLoweredFunctionType();
+  if (FTy->getNumParameters() != 3)
+    return;
+
+  SILType cacheType = FTy->getParameters()[2].getSILStorageType().getObjectType();
+  NominalTypeDecl *cacheDecl = cacheType.getNominalOrBoundGenericNominal();
+  if (!cacheDecl)
+    return;
+  SILType wordTy = cacheType.getFieldType(
+                            cacheDecl->getStoredProperties().front(), *Module);
+
+  GlobalVariableMangler Mangler;
+  std::string GlobName =
+    Mangler.mangleOutlinedVariable(FindStringCall->getFunction(), GlobIdx);
+
+  // Create an "opaque" global variable which is passed as inout to
+  // _findStringSwitchCaseWithCache and into which the function stores the
+  // "cache".
+  SILGlobalVariable *CacheVar =
+    SILGlobalVariable::create(*Module, SILLinkage::Private, IsNotSerialized,
+                              GlobName, cacheType);
+
+  SILLocation Loc = FindStringCall->getLoc();
+  SILBuilder StaticInitBuilder(CacheVar);
+  auto *Zero = StaticInitBuilder.createIntegerLiteral(Loc, wordTy, 0);
+  StaticInitBuilder.createStruct(ArtificialUnreachableLocation(), cacheType,
+                                 {Zero, Zero});
+
+  SILBuilder B(FindStringCall);
+  GlobalAddrInst *CacheAddr = B.createGlobalAddr(FindStringCall->getLoc(),
+                                                 CacheVar);
+  FunctionRefInst *FRI = B.createFunctionRef(FindStringCall->getLoc(),
+                                             replacementFunc);
+  ApplyInst *NewCall = B.createApply(FindStringCall->getLoc(), FRI,
+                                     FindStringCall->getSubstitutions(),
+                                     { FindStringCall->getArgument(0),
+                                       FindStringCall->getArgument(1),
+                                       CacheAddr },
+                                     FindStringCall->isNonThrowing());
+
+  FindStringCall->replaceAllUsesWith(NewCall);
+  FindStringCall->eraseFromParent();
 }
 
 /// Optimize access to the global variable, which is known
