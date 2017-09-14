@@ -275,18 +275,29 @@ def compare_stats(args, old_stats, new_stats):
 
 def write_comparison(args, old_stats, new_stats):
     regressions = 0
-    out = csv.DictWriter(args.output, OutputRow._fields, dialect='excel-tab')
-    out.writeheader()
-
     rows = list(compare_stats(args, old_stats, new_stats))
     sort_key = (attrgetter('delta_pct')
                 if args.sort_by_delta_pct
                 else attrgetter('name'))
     rows.sort(key=sort_key, reverse=args.sort_descending)
-    for row in rows:
-        out.writerow(row._asdict())
-        if row.delta > 0:
-            regressions += 1
+    regressions = sum(1 for row in rows if row.delta > 0)
+
+    if args.markdown:
+        out = args.output
+        out.write(' | '.join(OutputRow._fields))
+        out.write('\n')
+        out.write(' | '.join('---:' for _ in OutputRow._fields))
+        out.write('\n')
+        for row in rows:
+            out.write(' | '.join(str(v) for v in row))
+            out.write('\n')
+    else:
+        out = csv.DictWriter(args.output, OutputRow._fields,
+                             dialect='excel-tab')
+        out.writeheader()
+        for row in rows:
+            out.writerow(row._asdict())
+
     return regressions
 
 
@@ -384,6 +395,10 @@ def main():
                         default=False,
                         action="store_true",
                         help="Sort comparison results in descending order")
+    parser.add_argument("--markdown",
+                        default=False,
+                        action="store_true",
+                        help="Write output in markdown table format")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")
