@@ -472,6 +472,18 @@ extension ProtocolWithExtension1 {
   static var fooExtStatic = 4 // expected-error{{static stored properties not supported in generic types}}
 }
 
+protocol ProtocolWithExtension2 {
+  var bar: String { get }
+}
+
+struct StructureImplementingProtocolWithExtension2: ProtocolWithExtension2 {
+  let bar: String
+}
+
+extension Foo {
+  static let baz: Foo = StructureImplementingProtocolWithExtension2(bar: "baz") // expected-error{{static stored properties not supported in protocol extensios}}
+}
+
 func getS() -> S {
   let s: S
   return s
