@@ -200,8 +200,9 @@ static bool expandRetainValue(RetainValueInst *CV) {
 
   // If we have an address only type, do nothing.
   SILType Type = Value->getType();
-  assert(Type.isLoadable(Module) && "Copy Value can only be called on loadable "
-         "types.");
+  assert(!SILModuleConventions(Module).useLoweredAddresses()
+         || Type.isLoadable(Module) &&
+         "Copy Value can only be called on loadable types.");
 
   if (!shouldExpand(Module, Type.getObjectType()))
     return false;
