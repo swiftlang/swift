@@ -140,22 +140,22 @@ class G {
 }
 
 class H : G {
-  override func f1(_: Int, _: Int) { } // expected-error{{argument names for method 'f1' do not match those of overridden method 'f1(_:int:)'}}{{28-28=int }}
-  override func f2(_: Int, value: Int) { } // expected-error{{argument names for method 'f2(_:value:)' do not match those of overridden method 'f2(_:int:)'}}{{28-28=int }}
-  override func f3(_: Int, value int: Int) { } // expected-error{{argument names for method 'f3(_:value:)' do not match those of overridden method 'f3(_:int:)'}}{{28-34=}}
-  override func f4(_: Int, _ int: Int) { } // expected-error{{argument names for method 'f4' do not match those of overridden method 'f4(_:int:)'}}{{28-30=}}
-  override func f5(_: Int, value inValue: Int) { } // expected-error{{argument names for method 'f5(_:value:)' do not match those of overridden method 'f5(_:int:)'}}{{28-33=int}}
-  override func f6(_: Int, _ inValue: Int) { } // expected-error{{argument names for method 'f6' do not match those of overridden method 'f6(_:int:)'}}{{28-29=int}}
+  override func f1(_: Int, _: Int) { } // expected-error{{argument labels for method 'f1' do not match those of overridden method 'f1(_:int:)'}}{{28-28=int }}
+  override func f2(_: Int, value: Int) { } // expected-error{{argument labels for method 'f2(_:value:)' do not match those of overridden method 'f2(_:int:)'}}{{28-28=int }}
+  override func f3(_: Int, value int: Int) { } // expected-error{{argument labels for method 'f3(_:value:)' do not match those of overridden method 'f3(_:int:)'}}{{28-34=}}
+  override func f4(_: Int, _ int: Int) { } // expected-error{{argument labels for method 'f4' do not match those of overridden method 'f4(_:int:)'}}{{28-30=}}
+  override func f5(_: Int, value inValue: Int) { } // expected-error{{argument labels for method 'f5(_:value:)' do not match those of overridden method 'f5(_:int:)'}}{{28-33=int}}
+  override func f6(_: Int, _ inValue: Int) { } // expected-error{{argument labels for method 'f6' do not match those of overridden method 'f6(_:int:)'}}{{28-29=int}}
 
   override func f7(_: Int, int value: Int) { } // okay
 
-  override func g1(_: Int, s: String) { } // expected-error{{declaration 'g1(_:s:)' has different argument names from any potential overrides}}{{none}}
+  override func g1(_: Int, s: String) { } // expected-error{{declaration 'g1(_:s:)' has different argument labels from any potential overrides}}{{none}}
   override func g2(_: Int, string: Int) { } // expected-error{{method does not override any method from its superclass}} {{none}}
   override func g3(_: Int, path: Int) { } // expected-error{{method does not override any method from its superclass}} {{none}}
-  override func g4(_: Int, string: Int) { } // expected-error{{argument names for method 'g4(_:string:)' do not match those of overridden method 'g4'}} {{28-28=_ }}
+  override func g4(_: Int, string: Int) { } // expected-error{{argument labels for method 'g4(_:string:)' do not match those of overridden method 'g4'}} {{28-28=_ }}
 
-  override init(x: Int) {} // expected-error{{argument names for initializer 'init(x:)' do not match those of overridden initializer 'init(a:)'}} {{17-17=a }}
-  override init(x: String) {} // expected-error{{declaration 'init(x:)' has different argument names from any potential overrides}} {{none}}
+  override init(x: Int) {} // expected-error{{argument labels for initializer 'init(x:)' do not match those of overridden initializer 'init(a:)'}} {{17-17=a }}
+  override init(x: String) {} // expected-error{{declaration 'init(x:)' has different argument labels from any potential overrides}} {{none}}
   override init(a: Double) {} // expected-error{{initializer does not override a designated initializer from its superclass}} {{none}}
   override init(b: Double) {} // expected-error{{initializer does not override a designated initializer from its superclass}} {{none}}
 }
