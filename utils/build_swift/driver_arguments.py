@@ -12,6 +12,8 @@ import platform
 
 import android.adb.commands
 
+from . import defaults
+
 from swift_build_support.swift_build_support import arguments
 from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
@@ -826,7 +828,8 @@ iterations with -O",
         help="enable code coverage analysis in Swift (false, not-merged, "
              "merged).",
         choices=["false", "not-merged", "merged"],
-        default="false",  # so CMake can see the inert mode as a false value
+        # so CMake can see the inert mode as a false value
+        default=defaults.SWIFT_ANALYZE_CODE_COVERAGE,
         dest="swift_analyze_code_coverage")
 
     parser.add_argument(
@@ -855,7 +858,7 @@ iterations with -O",
     parser.add_argument(
         "--darwin-xcrun-toolchain",
         help="the name of the toolchain to use on Darwin",
-        default="default")
+        default=defaults.DARWIN_XCRUN_TOOLCHAIN)
     parser.add_argument(
         "--cmake",
         help="the path to a CMake executable that will be used to build "
@@ -975,7 +978,7 @@ iterations with -O",
     parser.add_argument(
         "--compiler-vendor",
         choices=["none", "apple"],
-        default="none",
+        default=defaults.COMPILER_VENDOR,
         help="Compiler vendor name")
     parser.add_argument(
         "--clang-compiler-version",
@@ -986,7 +989,7 @@ iterations with -O",
         "--clang-user-visible-version",
         help="User-visible version of the embedded Clang and LLVM compilers",
         type=arguments.type.clang_compiler_version,
-        default="5.0.0",
+        default=defaults.CLANG_USER_VISIBLE_VERSION,
         metavar="MAJOR.MINOR.PATCH")
     parser.add_argument(
         "--swift-compiler-version",
@@ -997,29 +1000,29 @@ iterations with -O",
         "--swift-user-visible-version",
         help="User-visible version of the embedded Swift compiler",
         type=arguments.type.swift_compiler_version,
-        default="4.1",
+        default=defaults.SWIFT_USER_VISIBLE_VERSION,
         metavar="MAJOR.MINOR")
 
     parser.add_argument(
         "--darwin-deployment-version-osx",
         help="minimum deployment target version for OS X",
         metavar="MAJOR.MINOR",
-        default="10.9")
+        default=defaults.DARWIN_DEPLOYMENT_VERSION_OSX)
     parser.add_argument(
         "--darwin-deployment-version-ios",
         help="minimum deployment target version for iOS",
         metavar="MAJOR.MINOR",
-        default="7.0")
+        default=defaults.DARWIN_DEPLOYMENT_VERSION_IOS)
     parser.add_argument(
         "--darwin-deployment-version-tvos",
         help="minimum deployment target version for tvOS",
         metavar="MAJOR.MINOR",
-        default="9.0")
+        default=defaults.DARWIN_DEPLOYMENT_VERSION_TVOS)
     parser.add_argument(
         "--darwin-deployment-version-watchos",
         help="minimum deployment target version for watchOS",
         metavar="MAJOR.MINOR",
-        default="2.0")
+        default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS)
 
     parser.add_argument(
         "--extra-cmake-options",
