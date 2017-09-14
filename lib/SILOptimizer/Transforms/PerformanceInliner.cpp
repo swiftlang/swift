@@ -383,8 +383,7 @@ bool SILPerformanceInliner::isProfitableToInline(
       // If we have Callee count - use SI heuristic:
       auto calleCountVal = calleeCount.getValue();
       auto percent = (long double)callerCount / (long double)calleCountVal;
-      if (percent < 0.8) {
-        // Magic number for SI :)
+      if (percent < 0.7) {
         DEBUG(dumpCaller(AI.getFunction());
               llvm::dbgs() << "profiled decision: NO"
                            << ", reason=SI " << std::to_string(percent) << "%"
@@ -396,16 +395,20 @@ bool SILPerformanceInliner::isProfitableToInline(
                          << ", reason=SI " << std::to_string(percent) << "%"
                          << '\n';);
     } else {
+      // TODO: Make sure IHF works - its results are bad - (partial) disable for now
       // No callee count - use a "modified" aggressive IHF for now
-      if (callerCount < 20) {
+      if (callerCount < 2) {
         DEBUG(dumpCaller(AI.getFunction());
               llvm::dbgs() << "profiled decision: NO"
                            << ", reason=IHF " << callerCount << '\n';);
         return false;
       }
-      DEBUG(dumpCaller(AI.getFunction());
+      /*DEBUG(dumpCaller(AI.getFunction());
             llvm::dbgs() << "profiled decision: YES"
-                         << ", reason=IHF " << callerCount << '\n';);
+                         << ", reason=IHF " << callerCount << '\n';);*/
+      if (CalleeCost > Benefit) {
+        return false;
+      }
     }
     // We're gonna inline!
     NumCallerBlocks += Callee->size();
