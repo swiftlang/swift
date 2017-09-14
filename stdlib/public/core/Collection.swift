@@ -356,10 +356,7 @@ public protocol _Indexable : _IndexableBase {
 ///     // Prints "20.0"
 @_fixed_layout
 public struct IndexingIterator<
-  Elements : _IndexableBase
-  // FIXME(ABI)#97 (Recursive Protocol Constraints):
-  // Should be written as:
-  // Elements : Collection
+  Elements : Collection
 > : IteratorProtocol, Sequence {
 
   @_inlineable
@@ -654,8 +651,6 @@ public protocol Collection : _Indexable, Sequence
 
   // FIXME(ABI)#99 (Associated Types with where clauses):
   //   where SubSequence.Indices == Indices,
-
-
   //
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)

@@ -176,7 +176,7 @@ extension RangeReplaceableCollection where
 // CHECK-LABEL: X14.recursiveConcreteSameType
 // CHECK: Generic signature: <T, V where T == CountableRange<Int>>
 // CHECK-NEXT: Canonical generic signature: <τ_0_0, τ_1_0 where τ_0_0 == CountableRange<Int>>
-struct X14<T: Collection> where T.Iterator == IndexingIterator<T> {
+struct X14<T> where T.Iterator == IndexingIterator<T> {
 	func recursiveConcreteSameType<V>(_: V) where T == CountableRange<Int> { }
 }
 

@@ -31,10 +31,7 @@ from gyb_stdlib_support import (
 /// A collection of indices for an arbitrary ${collection}.
 @_fixed_layout
 public struct ${Self}<
-  Elements : _${collectionForTraversal(Traversal).replace('Collection', 'Indexable')}
-  // FIXME(ABI)#43 (Recursive Protocol Constraints):
-  // Elements : Collection
-  // rdar://problem/20531108
+  Elements : ${collectionForTraversal(Traversal)}
 > : ${collectionForTraversal(Traversal)} {
 
   // FIXME(compiler limitation): this typealias should be inferred.
