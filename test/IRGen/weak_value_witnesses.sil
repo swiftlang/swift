@@ -30,7 +30,7 @@ struct Gen<T> {
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [24 x i8]* %src to %T20weak_value_witnesses8JustWeakV*
 // CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds %T20weak_value_witnesses8JustWeakV, %T20weak_value_witnesses8JustWeakV* [[DEST]], i32 0, i32 0
 // CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds %T20weak_value_witnesses8JustWeakV, %T20weak_value_witnesses8JustWeakV* [[SRC]], i32 0, i32 0
-// CHECK-NEXT: call void @swift_weakTakeInit(%swift.weak* [[DEST_X]], %swift.weak* [[SRC_X]])
+// CHECK-NEXT: call %swift.weak* @swift_weakTakeInit(%swift.weak* [[DEST_X]], %swift.weak* [[SRC_X]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast %T20weak_value_witnesses8JustWeakV* [[DEST]] to %swift.opaque*
 // CHECK-NEXT: ret %swift.opaque* [[T0]]
 
@@ -41,7 +41,7 @@ struct Gen<T> {
 
 // Weak references must be taken by swift_weakTakeInit.
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T020weak_value_witnesses8SomeWeakVwtk(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %SomeWeak)
-// CHECK:         call void @swift_weakTakeInit
+// CHECK:         call %swift.weak* @swift_weakTakeInit
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T020weak_value_witnesses8SomeWeakVwTK(
 // CHECK:      [[DEST:%.*]] = bitcast [24 x i8]* %dest to %T20weak_value_witnesses8SomeWeakV*
@@ -52,7 +52,7 @@ struct Gen<T> {
 // CHECK-NEXT: store %T20weak_value_witnesses1CC* [[T0]], %T20weak_value_witnesses1CC** [[DEST_X]], align 8
 // CHECK-NEXT: [[DEST_Y:%.*]] = getelementptr inbounds %T20weak_value_witnesses8SomeWeakV, %T20weak_value_witnesses8SomeWeakV* [[DEST]], i32 0, i32 1
 // CHECK-NEXT: [[SRC_Y:%.*]] = getelementptr inbounds %T20weak_value_witnesses8SomeWeakV, %T20weak_value_witnesses8SomeWeakV* [[SRC]], i32 0, i32 1
-// CHECK-NEXT: call void @swift_weakTakeInit(%swift.weak* [[DEST_Y]], %swift.weak* [[SRC_Y]])
+// CHECK-NEXT: call %swift.weak* @swift_weakTakeInit(%swift.weak* [[DEST_Y]], %swift.weak* [[SRC_Y]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast %T20weak_value_witnesses8SomeWeakV* [[DEST]] to %swift.opaque*
 // CHECK-NEXT: ret %swift.opaque* [[T0]]
 

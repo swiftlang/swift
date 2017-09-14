@@ -66,7 +66,8 @@ TEST(WeakTest, simple_swift) {
   ASSERT_NE(o2, nullptr);
 
   WeakReference ref1;
-  swift_weakInit(&ref1, o1);
+  auto res = swift_weakInit(&ref1, o1);
+  ASSERT_EQ(res, &ref1);
 
   HeapObject *tmp = swift_weakLoadStrong(&ref1);
   ASSERT_EQ(tmp, o1);
@@ -76,7 +77,8 @@ TEST(WeakTest, simple_swift) {
   ASSERT_EQ(o1, tmp);
   swift_release(tmp);
 
-  swift_weakAssign(&ref1, o2);
+  res = swift_weakAssign(&ref1, o2);
+  ASSERT_EQ(res, &ref1);
   tmp = swift_weakLoadStrong(&ref1);
   ASSERT_EQ(o2, tmp);
   swift_release(tmp);
@@ -97,7 +99,28 @@ TEST(WeakTest, simple_swift) {
   ASSERT_EQ(nullptr, tmp);
   swift_release(tmp);
 
+  WeakReference ref2;
+  res = swift_weakCopyInit(&ref2, &ref1);
+  ASSERT_EQ(res, &ref2);
+
+  WeakReference ref3;
+  res = swift_weakTakeInit(&ref3, &ref2);
+  ASSERT_EQ(res, &ref3);
+
+  HeapObject *o3 = make_swift_object();
+  WeakReference ref4; // ref4 = init
+  res = swift_weakInit(&ref4, o3);
+  ASSERT_EQ(res, &ref4);
+
+  res = swift_weakCopyAssign(&ref4, &ref3);
+  ASSERT_EQ(res, &ref4);
+
+  res = swift_weakTakeAssign(&ref4, &ref3);
+  ASSERT_EQ(res, &ref4);
+
+  swift_weakDestroy(&ref4);
   swift_weakDestroy(&ref1);
+  swift_release(o3);
 }
 
 TEST(WeakTest, simple_objc) {

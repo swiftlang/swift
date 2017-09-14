@@ -829,13 +829,14 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
   }
 }
 
-
-void swift::swift_weakInit(WeakReference *ref, HeapObject *value) {
+WeakReference *swift::swift_weakInit(WeakReference *ref, HeapObject *value) {
   ref->nativeInit(value);
+  return ref;
 }
 
-void swift::swift_weakAssign(WeakReference *ref, HeapObject *value) {
+WeakReference *swift::swift_weakAssign(WeakReference *ref, HeapObject *value) {
   ref->nativeAssign(value);
+  return ref;
 }
 
 HeapObject *swift::swift_weakLoadStrong(WeakReference *ref) {
@@ -850,19 +851,27 @@ void swift::swift_weakDestroy(WeakReference *ref) {
   ref->nativeDestroy();
 }
 
-void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
+WeakReference *swift::swift_weakCopyInit(WeakReference *dest,
+                                         WeakReference *src) {
   dest->nativeCopyInit(src);
+  return dest;
 }
 
-void swift::swift_weakTakeInit(WeakReference *dest, WeakReference *src) {
+WeakReference *swift::swift_weakTakeInit(WeakReference *dest,
+                                         WeakReference *src) {
   dest->nativeTakeInit(src);
+  return dest;
 }
 
-void swift::swift_weakCopyAssign(WeakReference *dest, WeakReference *src) {
+WeakReference *swift::swift_weakCopyAssign(WeakReference *dest,
+                                           WeakReference *src) {
   dest->nativeCopyAssign(src);
+  return dest;
 }
 
-void swift::swift_weakTakeAssign(WeakReference *dest, WeakReference *src) {
+WeakReference *swift::swift_weakTakeAssign(WeakReference *dest,
+                                           WeakReference *src) {
   dest->nativeTakeAssign(src);
+  return dest;
 }
 

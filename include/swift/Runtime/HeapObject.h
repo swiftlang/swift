@@ -673,15 +673,17 @@ class WeakReference;
 ///
 /// \param ref - never null
 /// \param value - can be null
+/// \return ref
 SWIFT_RUNTIME_EXPORT
-void swift_weakInit(WeakReference *ref, HeapObject *value);
+WeakReference *swift_weakInit(WeakReference *ref, HeapObject *value);
 
 /// Assign a new value to a weak reference.
 ///
 /// \param ref - never null
 /// \param value - can be null
+/// \return ref
 SWIFT_RUNTIME_EXPORT
-void swift_weakAssign(WeakReference *ref, HeapObject *value);
+WeakReference *swift_weakAssign(WeakReference *ref, HeapObject *value);
 
 /// Load a value from a weak reference.  If the current value is a
 /// non-null object that has begun deallocation, returns null;
@@ -710,29 +712,33 @@ void swift_weakDestroy(WeakReference *ref);
 ///
 /// \param dest - never null, but can refer to a null object
 /// \param src - never null, but can refer to a null object
+/// \return dest
 SWIFT_RUNTIME_EXPORT
-void swift_weakCopyInit(WeakReference *dest, WeakReference *src);
+WeakReference *swift_weakCopyInit(WeakReference *dest, WeakReference *src);
 
 /// Take initialize a weak reference.
 ///
 /// \param dest - never null, but can refer to a null object
 /// \param src - never null, but can refer to a null object
+/// \return dest
 SWIFT_RUNTIME_EXPORT
-void swift_weakTakeInit(WeakReference *dest, WeakReference *src);
+WeakReference *swift_weakTakeInit(WeakReference *dest, WeakReference *src);
 
 /// Copy assign a weak reference.
 ///
 /// \param dest - never null, but can refer to a null object
 /// \param src - never null, but can refer to a null object
+/// \return dest
 SWIFT_RUNTIME_EXPORT
-void swift_weakCopyAssign(WeakReference *dest, WeakReference *src);
+WeakReference *swift_weakCopyAssign(WeakReference *dest, WeakReference *src);
 
 /// Take assign a weak reference.
 ///
 /// \param dest - never null, but can refer to a null object
 /// \param src - never null, but can refer to a null object
+/// \return dest
 SWIFT_RUNTIME_EXPORT
-void swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
+WeakReference *swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
 
 /*****************************************************************************/
 /************************* OTHER REFERENCE-COUNTING **************************/
