@@ -7337,8 +7337,12 @@ void ClangImporter::Implementation::finishPendingActions() {
 /// Look up associated type requirements in the conforming type.
 static void finishTypeWitnesses(
     NormalProtocolConformance *conformance) {
+  auto *dc = conformance->getDeclContext();
+  auto *module = dc->getParentModule();
+  auto &ctx = module->getASTContext();
+
   auto *proto = conformance->getProtocol();
-  auto *nominal = conformance->getType()->getAnyNominal();
+  auto selfType = conformance->getType();
 
   for (auto *req : proto->getMembers()) {
     if (auto *assocType = dyn_cast<AssociatedTypeDecl>(req)) {
@@ -7347,14 +7351,22 @@ static void finishTypeWitnesses(
 
       bool satisfied = false;
 
-      for (auto member : nominal->lookupDirect(assocType->getFullName())) {
-        auto memberType = dyn_cast<TypeDecl>(member);
-        if (!memberType) continue;
+      SmallVector<ValueDecl *, 4> lookupResults;
+      NLOptions options = (NL_QualifiedDefault |
+                           NL_OnlyTypes |
+                           NL_ProtocolMembers);
 
-        conformance->setTypeWitness(assocType,
-                                    nominal->mapTypeIntoContext(
-                                      memberType->getDeclaredInterfaceType()),
-                                    memberType);
+      dc->lookupQualified(selfType, assocType->getFullName(), options,
+                          ctx.getLazyResolver(), lookupResults);
+      for (auto member : lookupResults) {
+        auto typeDecl = cast<TypeDecl>(member);
+        if (isa<AssociatedTypeDecl>(typeDecl)) continue;
+
+        auto memberType = typeDecl->getDeclaredInterfaceType();
+        auto subMap = selfType->getContextSubstitutionMap(
+            module, typeDecl->getDeclContext());
+        memberType = memberType.subst(subMap);
+        conformance->setTypeWitness(assocType, memberType, typeDecl);
         satisfied = true;
         break;
       }
