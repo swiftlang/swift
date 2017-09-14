@@ -160,7 +160,7 @@ class JobStats(object):
 
 
 def load_stats_dir(path, select_module=[], select_stat=[],
-                   exclude_timers=False):
+                   exclude_timers=False, **kwargs):
     """Loads all stats-files found in path into a list of JobStats objects"""
     jobstats = []
     auxpat = (r"(?P<module>[^-]+)-(?P<input>[^-]+)-(?P<triple>[^-]+)" +
@@ -213,7 +213,8 @@ def load_stats_dir(path, select_module=[], select_stat=[],
     return jobstats
 
 
-def merge_all_jobstats(jobstats, select_module=[], group_by_module=False):
+def merge_all_jobstats(jobstats, select_module=[], group_by_module=False,
+                       **kwargs):
     """Does a pairwise merge of the elements of list of jobs"""
     m = None
     if len(select_module) > 0:
