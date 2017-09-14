@@ -474,12 +474,11 @@ class CustomImmutableNSArray : NSArray {
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
   var (a, nsa) = getBridgedVerbatimArrayAndNSMutableArray()
-  var identity1 = a._rawIdentifier()
   expectTrue(isCocoaArray(a))
 
   // Find an existing value.
   do {
-    var v = a[0]
+    let v = a[0]
     expectEqual(1010, v.value)
   }
 
@@ -488,19 +487,18 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
 
   // Find an existing value, again.
   do {
-    var v = a[0]
+    let v = a[0]
     expectEqual(1010, v.value)
   }
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
   var (a, nsa) = getBridgedNonverbatimArrayAndNSMutableArray()
-  var identity1 = a._rawIdentifier()
   expectTrue(isNativeArray(a))
 
   // Find an existing value.
   do {
-    var v = a[0]
+    let v = a[0]
     expectEqual(1010, v.value)
   }
 
@@ -509,19 +507,19 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
 
   // Find an existing value, again.
   do {
-    var v = a[0]
+    let v = a[0]
     expectEqual(1010, v.value)
   }
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
-  var nsa: NSArray = autoreleasepool {
+  let nsa: NSArray = autoreleasepool {
     NSArray(array: getAsNSArray([1010, 1020, 1030]))
   }
   
-  var a: [AnyObject] = convertNSArrayToArray(nsa)
+  let a: [AnyObject] = convertNSArrayToArray(nsa)
   
-  var bridgedBack: NSArray = convertArrayToNSArray(a)
+  let bridgedBack: NSArray = convertArrayToNSArray(a)
   
   expectEqual(
     unsafeBitCast(nsa, to: Int.self),
@@ -533,13 +531,13 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
-  var nsa: NSArray = autoreleasepool {
+  let nsa: NSArray = autoreleasepool {
     NSArray(array: getAsNSArray([1010, 1020, 1030]))
   }
   
-  var a: [TestBridgedValueTy] = convertNSArrayToArray(nsa)
+  let a: [TestBridgedValueTy] = convertNSArrayToArray(nsa)
   
-  var bridgedBack: NSArray = convertArrayToNSArray(a)
+  let bridgedBack: NSArray = convertArrayToNSArray(a)
   
   expectNotEqual(
     unsafeBitCast(nsa, to: Int.self),
@@ -551,19 +549,19 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
-  var nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
+  let nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
   
   CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
   CustomImmutableNSArray.timesObjectAtIndexWasCalled = 0
   CustomImmutableNSArray.timesObjectEnumeratorWasCalled = 0
   CustomImmutableNSArray.timesCountWasCalled = 0
-  var a: [AnyObject] = convertNSArrayToArray(nsa)
+  let a: [AnyObject] = convertNSArrayToArray(nsa)
   expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
   expectEqual(0, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
   expectEqual(0, CustomImmutableNSArray.timesObjectEnumeratorWasCalled)
   expectEqual(0, CustomImmutableNSArray.timesCountWasCalled)
   
-  var bridgedBack: NSArray = convertArrayToNSArray(a)
+  let bridgedBack: NSArray = convertArrayToNSArray(a)
   expectEqual(
     unsafeBitCast(nsa, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
@@ -574,21 +572,21 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
-  var nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
+  let nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
 
   CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
   CustomImmutableNSArray.timesObjectAtIndexWasCalled = 0
   CustomImmutableNSArray.timesObjectEnumeratorWasCalled = 0
   CustomImmutableNSArray.timesCountWasCalled = 0
   TestBridgedValueTy.bridgeOperations = 0
-  var a: [TestBridgedValueTy] = convertNSArrayToArray(nsa)
+  let a: [TestBridgedValueTy] = convertNSArrayToArray(nsa)
   //FIXME: Why is this copied?
   expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
   expectEqual(3, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
   expectNotEqual(0, CustomImmutableNSArray.timesCountWasCalled)
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
 
-  var bridgedBack: NSArray = convertArrayToNSArray(a)
+  let bridgedBack: NSArray = convertArrayToNSArray(a)
   expectNotEqual(
     unsafeBitCast(nsa, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
@@ -599,8 +597,8 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.Subscript") {
-  var a = getBridgedVerbatimArray()
-  var identity1 = a._rawIdentifier()
+  let a = getBridgedVerbatimArray()
+  let identity1 = a._rawIdentifier()
   expectTrue(isCocoaArray(a))
 
   // Find an existing value.
@@ -619,7 +617,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Subscript") {
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Subscript") {
   var a = getBridgedNonverbatimArray()
-  var identity1 = a._rawIdentifier()
+  let identity1 = a._rawIdentifier()
   expectTrue(isNativeArray(a))
 
   // Find an existing value.
@@ -638,7 +636,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Subscript") {
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   var a = getBridgedVerbatimArray()
-  var identity = a._rawIdentifier()
+  let identity = a._rawIdentifier()
   expectTrue(isCocoaArray(a))
 
   let index = 0
@@ -654,7 +652,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
   var a = getBridgedNonverbatimArray()
-  var identity = a._rawIdentifier()
+  let identity = a._rawIdentifier()
   expectTrue(isNativeArray(a))
 
   let index = 0
@@ -671,7 +669,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var a = getBridgedVerbatimArray()
-    var identity1 = a._rawIdentifier()
+    let identity1 = a._rawIdentifier()
     expectTrue(isCocoaArray(a))
     let originalCapacity = a.count
     expectEqual(3, a.count)
@@ -685,7 +683,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
   do {
     var a = getBridgedVerbatimArray()
-    var identity1 = a._rawIdentifier()
+    let identity1 = a._rawIdentifier()
     expectTrue(isCocoaArray(a))
     let originalCapacity = a.count
     expectEqual(3, a.count)
@@ -699,7 +697,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
   do {
     var a1 = getBridgedVerbatimArray()
-    var identity1 = a1._rawIdentifier()
+    let identity1 = a1._rawIdentifier()
     expectTrue(isCocoaArray(a1))
     let originalCapacity = a1.count
     expectEqual(3, a1.count)
@@ -707,7 +705,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
     var a2 = a1
     a2.removeAll()
-    var identity2 = a2._rawIdentifier()
+    let identity2 = a2._rawIdentifier()
     expectEqual(identity1, a1._rawIdentifier())
     expectNotEqual(identity2, identity1)
     expectEqual(3, a1.count)
@@ -718,7 +716,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
   do {
     var a1 = getBridgedVerbatimArray()
-    var identity1 = a1._rawIdentifier()
+    let identity1 = a1._rawIdentifier()
     expectTrue(isCocoaArray(a1))
     let originalCapacity = a1.count
     expectEqual(3, a1.count)
@@ -726,7 +724,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
     var a2 = a1
     a2.removeAll(keepingCapacity: true)
-    var identity2 = a2._rawIdentifier()
+    let identity2 = a2._rawIdentifier()
     expectEqual(identity1, a1._rawIdentifier())
     expectNotEqual(identity2, identity1)
     expectEqual(3, a1.count)
@@ -739,7 +737,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var a = getBridgedNonverbatimArray()
-    var identity1 = a._rawIdentifier()
+    let identity1 = a._rawIdentifier()
     expectTrue(isNativeArray(a))
     let originalCapacity = a.count
     expectEqual(3, a.count)
@@ -753,7 +751,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
   do {
     var a = getBridgedNonverbatimArray()
-    var identity1 = a._rawIdentifier()
+    let identity1 = a._rawIdentifier()
     expectTrue(isNativeArray(a))
     let originalCapacity = a.count
     expectEqual(3, a.count)
@@ -767,7 +765,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
   do {
     var a1 = getBridgedNonverbatimArray()
-    var identity1 = a1._rawIdentifier()
+    let identity1 = a1._rawIdentifier()
     expectTrue(isNativeArray(a1))
     let originalCapacity = a1.count
     expectEqual(3, a1.count)
@@ -775,7 +773,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
     var a2 = a1
     a2.removeAll()
-    var identity2 = a2._rawIdentifier()
+    let identity2 = a2._rawIdentifier()
     expectEqual(identity1, a1._rawIdentifier())
     expectNotEqual(identity2, identity1)
     expectEqual(3, a1.count)
@@ -786,7 +784,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
   do {
     var a1 = getBridgedNonverbatimArray()
-    var identity1 = a1._rawIdentifier()
+    let identity1 = a1._rawIdentifier()
     expectTrue(isNativeArray(a1))
     let originalCapacity = a1.count
     expectEqual(3, a1.count)
@@ -794,7 +792,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
     var a2 = a1
     a2.removeAll(keepingCapacity: true)
-    var identity2 = a2._rawIdentifier()
+    let identity2 = a2._rawIdentifier()
     expectEqual(identity1, a1._rawIdentifier())
     expectNotEqual(identity2, identity1)
     expectEqual(3, a1.count)
@@ -805,8 +803,8 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.Count") {
-  var a = getBridgedVerbatimArray()
-  var identity1 = a._rawIdentifier()
+  let a = getBridgedVerbatimArray()
+  let identity1 = a._rawIdentifier()
   expectTrue(isCocoaArray(a))
 
   expectEqual(3, a.count)
@@ -814,8 +812,8 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Count") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
-  var a = getBridgedNonverbatimArray()
-  var identity1 = a._rawIdentifier()
+  let a = getBridgedNonverbatimArray()
+  let identity1 = a._rawIdentifier()
   expectTrue(isNativeArray(a))
 
   expectEqual(3, a.count)
@@ -823,8 +821,8 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
-  var a = getBridgedVerbatimArray()
-  var identity1 = a._rawIdentifier()
+  let a = getBridgedVerbatimArray()
+  let identity1 = a._rawIdentifier()
   expectTrue(isCocoaArray(a))
 
   var iter = a.makeIterator()
@@ -842,8 +840,8 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
-  var a = getBridgedNonverbatimArray()
-  var identity1 = a._rawIdentifier()
+  let a = getBridgedNonverbatimArray()
+  let identity1 = a._rawIdentifier()
   expectTrue(isNativeArray(a))
 
   var iter = a.makeIterator()
@@ -861,8 +859,8 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
-  var a = getBridgedVerbatimArray([])
-  var identity1 = a._rawIdentifier()
+  let a = getBridgedVerbatimArray([])
+  let identity1 = a._rawIdentifier()
   expectTrue(isCocoaArray(a))
 
   var iter = a.makeIterator()
@@ -876,8 +874,8 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
-  var a = getBridgedNonverbatimArray([])
-  var identity1 = a._rawIdentifier()
+  let a = getBridgedNonverbatimArray([])
+  let identity1 = a._rawIdentifier()
   expectTrue(isNativeArray(a))
 
   var iter = a.makeIterator()
@@ -891,8 +889,8 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
-  var a = getHugeBridgedVerbatimArray()
-  var identity1 = a._rawIdentifier()
+  let a = getHugeBridgedVerbatimArray()
+  let identity1 = a._rawIdentifier()
   expectTrue(isCocoaArray(a))
 
   var iter = a.makeIterator()
@@ -914,8 +912,8 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
-  var a = getHugeBridgedNonverbatimArray()
-  var identity1 = a._rawIdentifier()
+  let a = getHugeBridgedNonverbatimArray()
+  let identity1 = a._rawIdentifier()
   expectTrue(isNativeArray(a))
 
   var iter = a.makeIterator()
@@ -937,12 +935,12 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
-  var a1 = getBridgedVerbatimEquatableArray([])
-  var identity1 = a1._rawIdentifier()
+  let a1 = getBridgedVerbatimEquatableArray([])
+  let identity1 = a1._rawIdentifier()
   expectTrue(isCocoaArray(a1))
 
-  var a2 = getBridgedVerbatimEquatableArray([])
-  var identity2 = a2._rawIdentifier()
+  let a2 = getBridgedVerbatimEquatableArray([])
+  let identity2 = a2._rawIdentifier()
   expectTrue(isCocoaArray(a2))
 
   // We can't check that `identity1 != identity2` because Foundation might be
@@ -957,11 +955,11 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   var a1 = getBridgedNonverbatimEquatableArray([])
   a1.append(TestBridgedEquatableValueTy(1))
   a1.removeLast()
-  var identity1 = a1._rawIdentifier()
+  let identity1 = a1._rawIdentifier()
   expectTrue(isNativeArray(a1))
 
-  var a2 = getBridgedNonverbatimEquatableArray([])
-  var identity2 = a2._rawIdentifier()
+  let a2 = getBridgedNonverbatimEquatableArray([])
+  let identity2 = a2._rawIdentifier()
   expectTrue(isNativeArray(a2))
   expectNotEqual(identity1, identity2)
 
@@ -1102,8 +1100,7 @@ func getBridgedNSArrayOfRefTypesBridgedVerbatim() -> NSArray {
   a.append(TestObjCValueTy(1020))
   a.append(TestObjCValueTy(1030))
 
-  let bridged =
-    unsafeBitCast(convertArrayToNSArray(a), to: NSArray.self)
+  let bridged = convertArrayToNSArray(a)
 
   assert(isNativeNSArray(bridged))
 
@@ -1113,8 +1110,7 @@ func getBridgedNSArrayOfRefTypesBridgedVerbatim() -> NSArray {
 func getBridgedEmptyNSArray() -> NSArray {
   let a = Array<TestObjCValueTy>()
 
-  let bridged =
-    unsafeBitCast(convertArrayToNSArray(a), to: NSArray.self)
+  let bridged = convertArrayToNSArray(a)
   assert(isNativeNSArray(bridged))
 
   return bridged
@@ -1310,7 +1306,7 @@ ArrayTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
   expectEqual(1030, (v as! TestObjCValueTy).value)
   let idValue30 = unsafeBitCast(v, to: UInt.self)
 
-  for i in 0..<3 {
+  for _ in 0..<3 {
     expectEqual(idValue10, unsafeBitCast(
       a.object(at: 0) as AnyObject, to: UInt.self))
 
@@ -1489,7 +1485,7 @@ ArrayTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
 
   var values = Array<Int>()
   while let valueObj = enumerator.nextObject() {
-    let value: AnyObject = valueObj as! AnyObject
+    let value: AnyObject = valueObj as AnyObject
     let v = (value as! TestObjCValueTy).value
     values.append(v)
   }
@@ -1588,7 +1584,7 @@ ArrayTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
 
   var values = Array<Int>()
   while let valueObj = enumerator.nextObject() {
-    let value: AnyObject = valueObj as! AnyObject
+    let value: AnyObject = valueObj as AnyObject
     let v = (value as! TestObjCValueTy).value
     values.append(v)
   }
@@ -1617,7 +1613,7 @@ ArrayTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
 
   var values = Array<Int>()
   while let valueObj = enumerator.nextObject() {
-    let value: AnyObject = valueObj as! AnyObject
+    let value: AnyObject = valueObj as AnyObject
     let v = (value as! TestObjCValueTy).value
     values.append(v)
   }
@@ -1656,7 +1652,7 @@ ArrayTestSuite.test("BridgingRoundtrip") {
 
   var values = Array<Int>()
   while let valueObj = enumerator.nextObject() {
-    let value: AnyObject = valueObj as! AnyObject
+    let value: AnyObject = valueObj as AnyObject
     let v = (value as! TestObjCValueTy).value
     values.append(v)
   }
@@ -1691,7 +1687,7 @@ ArrayTestSuite.test("ArrayToNSArrayConversion") {
 
   checkArrayFastEnumerationFromSwift(
     [ 1010, 1020, 1030 ],
-    a as NSArray, { a as NSArray },
+    nsa, { a as NSArray },
     { ($0 as! TestObjCValueTy).value })
 
   expectAutoreleasedValues(unopt: 3)
@@ -1881,7 +1877,7 @@ ArrayTestSuite.test("ArrayDowncastConditional") {
   // Unsuccessful downcast
   a[0] = 17 as NSNumber
   a[1] = "hello" as NSString
-  if let aCC = a as? Array<TestObjCValueTy> {
+  if let _ = a as? Array<TestObjCValueTy> {
     expectTrue(false)
   }
 }
@@ -2123,7 +2119,7 @@ class COWBox<
 
 ArrayTestSuite.test("COW.Smoke") {
   var a1 = Array<COWBox<Int>>(repeating: COWBox(0), count: 10)
-  var identity1 = a1._rawIdentifier()
+  let identity1 = a1._rawIdentifier()
   
   a1[0] = COWBox(1)
   a1[1] = COWBox(2)
@@ -2162,8 +2158,8 @@ func getCOWSlowArray() -> Array<COWBox<Int>> {
 
 ArrayTestSuite.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
   var a = getCOWFastArray()
-  var identity1 = a._rawIdentifier()
-  var startIndex = a.startIndex
+  let identity1 = a._rawIdentifier()
+  let startIndex = a.startIndex
 
   expectNotEqual(0, a[startIndex])
   expectEqual(identity1, a._rawIdentifier())
@@ -2171,8 +2167,8 @@ ArrayTestSuite.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
 
 ArrayTestSuite.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
   var a = getCOWSlowArray()
-  var identity1 = a._rawIdentifier()
-  var startIndex = a.startIndex
+  let identity1 = a._rawIdentifier()
+  let startIndex = a.startIndex
 
   expectNotEqual(0, a[startIndex].value)
   expectEqual(identity1, a._rawIdentifier())
@@ -2181,7 +2177,7 @@ ArrayTestSuite.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
 ArrayTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
   do {
     var a = getCOWFastArray()
-    var identity1 = a._rawIdentifier()
+    let identity1 = a._rawIdentifier()
 
     let index1 = 1
     expectEqual(identity1, a._rawIdentifier())
@@ -2195,14 +2191,14 @@ ArrayTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
   }
 
   do {
-    var a1 = getCOWFastArray()
-    var identity1 = a1._rawIdentifier()
+    let a1 = getCOWFastArray()
+    let identity1 = a1._rawIdentifier()
 
     var a2 = a1
     expectEqual(identity1, a1._rawIdentifier())
     expectEqual(identity1, a2._rawIdentifier())
 
-    var index1 = 1
+    let index1 = 1
     expectEqual(2, a2[index1])
     expectEqual(identity1, a1._rawIdentifier())
     expectEqual(identity1, a2._rawIdentifier())
@@ -2218,7 +2214,7 @@ ArrayTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
 ArrayTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
   do {
     var a = getCOWSlowArray()
-    var identity1 = a._rawIdentifier()
+    let identity1 = a._rawIdentifier()
 
     let index1 = 1
     expectEqual(identity1, a._rawIdentifier())
@@ -2232,14 +2228,14 @@ ArrayTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
   }
 
   do {
-    var a1 = getCOWSlowArray()
-    var identity1 = a1._rawIdentifier()
+    let a1 = getCOWSlowArray()
+    let identity1 = a1._rawIdentifier()
 
     var a2 = a1
     expectEqual(identity1, a1._rawIdentifier())
     expectEqual(identity1, a2._rawIdentifier())
 
-    var index1 = 1
+    let index1 = 1
     expectEqual(2, a2[index1].value)
     expectEqual(identity1, a1._rawIdentifier())
     expectEqual(identity1, a2._rawIdentifier())
@@ -2260,7 +2256,7 @@ ArrayTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     expectEqual(2, a[1])
 
     a.removeAll()
-    var identity1 = a._rawIdentifier()
+    let identity1 = a._rawIdentifier()
     expectLT(a.capacity, originalCapacity)
     expectEqual(0, a.count)
     expectEqual(identity1, a._rawIdentifier())
@@ -2268,7 +2264,7 @@ ArrayTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 
   do {
     var a = getCOWFastArray()
-    var identity1 = a._rawIdentifier()
+    let identity1 = a._rawIdentifier()
     let originalCapacity = a.capacity
     expectEqual(3, a.count)
     expectEqual(2, a[1])
@@ -2281,13 +2277,13 @@ ArrayTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 
   do {
     var a1 = getCOWFastArray()
-    var identity1 = a1._rawIdentifier()
+    let identity1 = a1._rawIdentifier()
     expectEqual(3, a1.count)
     expectEqual(2, a1[1])
 
     var a2 = a1
     a2.removeAll()
-    var identity2 = a2._rawIdentifier()
+    let identity2 = a2._rawIdentifier()
     expectEqual(identity1, a1._rawIdentifier())
     expectNotEqual(identity2, identity1)
     expectEqual(3, a1.count)
@@ -2301,14 +2297,14 @@ ArrayTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 
   do {
     var a1 = getCOWFastArray()
-    var identity1 = a1._rawIdentifier()
+    let identity1 = a1._rawIdentifier()
     let originalCapacity = a1.capacity
     expectEqual(3, a1.count)
     expectEqual(2, a1[1])
 
     var a2 = a1
     a2.removeAll(keepingCapacity: true)
-    var identity2 = a2._rawIdentifier()
+    let identity2 = a2._rawIdentifier()
     expectEqual(identity1, a1._rawIdentifier())
     expectNotEqual(identity2, identity1)
     expectEqual(3, a1.count)
@@ -2330,7 +2326,7 @@ ArrayTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     expectEqual(2, a[1].value)
 
     a.removeAll()
-    var identity1 = a._rawIdentifier()
+    let identity1 = a._rawIdentifier()
     expectLT(a.capacity, originalCapacity)
     expectEqual(0, a.count)
     expectEqual(identity1, a._rawIdentifier())
@@ -2338,7 +2334,7 @@ ArrayTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
 
   do {
     var a = getCOWSlowArray()
-    var identity1 = a._rawIdentifier()
+    let identity1 = a._rawIdentifier()
     let originalCapacity = a.capacity
     expectEqual(3, a.count)
     expectEqual(2, a[1].value)
@@ -2351,13 +2347,13 @@ ArrayTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
 
   do {
     var a1 = getCOWSlowArray()
-    var identity1 = a1._rawIdentifier()
+    let identity1 = a1._rawIdentifier()
     expectEqual(3, a1.count)
     expectEqual(2, a1[1].value)
 
     var a2 = a1
     a2.removeAll()
-    var identity2 = a2._rawIdentifier()
+    let identity2 = a2._rawIdentifier()
     expectEqual(identity1, a1._rawIdentifier())
     expectNotEqual(identity2, identity1)
     expectEqual(3, a1.count)
@@ -2371,14 +2367,14 @@ ArrayTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
 
   do {
     var a1 = getCOWSlowArray()
-    var identity1 = a1._rawIdentifier()
+    let identity1 = a1._rawIdentifier()
     let originalCapacity = a1.capacity
     expectEqual(3, a1.count)
     expectEqual(2, a1[1].value)
 
     var a2 = a1
     a2.removeAll(keepingCapacity: true)
-    var identity2 = a2._rawIdentifier()
+    let identity2 = a2._rawIdentifier()
     expectEqual(identity1, a1._rawIdentifier())
     expectNotEqual(identity2, identity1)
     expectEqual(3, a1.count)
@@ -2393,24 +2389,24 @@ ArrayTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
 }
 
 ArrayTestSuite.test("COW.Fast.CountDoesNotReallocate") {
-  var a = getCOWFastArray()
-  var identity1 = a._rawIdentifier()
+  let a = getCOWFastArray()
+  let identity1 = a._rawIdentifier()
 
   expectEqual(3, a.count)
   expectEqual(identity1, a._rawIdentifier())
 }
 
 ArrayTestSuite.test("COW.Slow.CountDoesNotReallocate") {
-  var a = getCOWSlowArray()
-  var identity1 = a._rawIdentifier()
+  let a = getCOWSlowArray()
+  let identity1 = a._rawIdentifier()
 
   expectEqual(3, a.count)
   expectEqual(identity1, a._rawIdentifier())
 }
 
 ArrayTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
-  var a = getCOWFastArray()
-  var identity1 = a._rawIdentifier()
+  let a = getCOWFastArray()
+  let identity1 = a._rawIdentifier()
 
   var iter = a.makeIterator()
   var copy = Array<Int>()
@@ -2422,8 +2418,8 @@ ArrayTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
 }
 
 ArrayTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
-  var a = getCOWSlowArray()
-  var identity1 = a._rawIdentifier()
+  let a = getCOWSlowArray()
+  let identity1 = a._rawIdentifier()
 
   var iter = a.makeIterator()
   var copy = Array<Int>()
@@ -2435,11 +2431,11 @@ ArrayTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
 }
 
 ArrayTestSuite.test("COW.Fast.EqualityTestDoesNotReallocate") {
-  var a1 = getCOWFastArray()
-  var identity1 = a1._rawIdentifier()
+  let a1 = getCOWFastArray()
+  let identity1 = a1._rawIdentifier()
 
   var a2 = getCOWFastArray()
-  var identity2 = a2._rawIdentifier()
+  let identity2 = a2._rawIdentifier()
 
   expectEqual(a1, a2)
   expectEqual(identity1, a1._rawIdentifier())
@@ -2452,11 +2448,11 @@ ArrayTestSuite.test("COW.Fast.EqualityTestDoesNotReallocate") {
 }
 
 ArrayTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
-  var a1 = getCOWSlowArray()
-  var identity1 = a1._rawIdentifier()
+  let a1 = getCOWSlowArray()
+  let identity1 = a1._rawIdentifier()
 
   var a2 = getCOWSlowArray()
-  var identity2 = a2._rawIdentifier()
+  let identity2 = a2._rawIdentifier()
 
   expectEqual(a1, a2)
   expectEqual(identity1, a1._rawIdentifier())
@@ -3024,7 +3020,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
     .code {
       let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
       var a = Array((0..<200).lazy.map { LifetimeTracked($0) })
-      var b = a
+      let b = a
       if expectedToFail {
         expectCrashLater()
       }
