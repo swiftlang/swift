@@ -41,31 +41,21 @@ class ParserError(Exception):
 
 
 @contextmanager
-def quiet_stderr():
-    devnull = open(os.devnull, 'w')
-    old_stderr, sys.stderr = sys.stderr, devnull
+def redirect_stderr(stream=None):
+    stream = stream or StringIO()
+    old_stderr, sys.stderr = sys.stderr, stream
     try:
-        yield devnull
+        yield stream
     finally:
         sys.stderr = old_stderr
 
 
 @contextmanager
-def quiet_stdout():
-    devnull = open(os.devnull, 'w')
-    old_stdout, sys.stdout = sys.stdout, devnull
+def redirect_stdout(stream=None):
+    stream = stream or StringIO()
+    old_stdout, sys.stdout = sys.stdout, stream
     try:
-        yield devnull
-    finally:
-        sys.stdout = old_stdout
-
-
-@contextmanager
-def redirect_stdout():
-    output = StringIO()
-    old_stdout, sys.stdout = sys.stdout, output
-    try:
-        yield output
+        yield stream
     finally:
         sys.stdout = old_stdout
 
@@ -269,21 +259,22 @@ class TestDriverArgumentParser(unittest.TestCase):
         if error_message is None:
             error_message = 'failed to parse arguments: ' + str(args)
 
-        try:
-            with quiet_stderr(), quiet_stdout():
-                namespace = migration.parse_args(self.parser, args)
-        except (SystemExit, ValueError) as e:
-            raise ParserError(error_message, e)
+        with open(os.devnull, 'w') as devnull:
+            try:
+                with redirect_stderr(devnull), redirect_stdout(devnull):
+                    namespace = migration.parse_args(self.parser, args)
+            except (SystemExit, ValueError) as e:
+                raise ParserError(error_message, e)
 
-        if not namespace.build_script_impl_args and not check_impl_args:
-            return namespace
+            if not namespace.build_script_impl_args and not check_impl_args:
+                return namespace
 
-        try:
-            with quiet_stderr(), quiet_stdout():
-                migration.check_impl_args(BUILD_SCRIPT_IMPL,
-                                          namespace.build_script_impl_args)
-        except (SystemExit, ValueError) as e:
-            raise ParserError(error_message, e)
+            try:
+                with redirect_stderr(devnull), redirect_stdout(devnull):
+                    migration.check_impl_args(BUILD_SCRIPT_IMPL,
+                                              namespace.build_script_impl_args)
+            except (SystemExit, ValueError) as e:
+                raise ParserError(error_message, e)
 
         return namespace
 
@@ -307,7 +298,9 @@ class TestDriverArgumentParser(unittest.TestCase):
             if default_value.__class__ is str:
                 parsed_value = str(parsed_value)
 
-            self.assertEqual(default_value, parsed_value)
+            self.assertEqual(default_value, parsed_value,
+                             'Invalid default value for "{}": {} != {}'
+                             .format(dest, default_value, parsed_value))
 
     # -------------------------------------------------------------------------
     # Manual option tests

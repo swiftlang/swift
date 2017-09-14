@@ -46,7 +46,7 @@ EXPECTED_DEFAULTS = {
     'build_libicu': False,
     'build_llbuild': False,
     'build_lldb': False,
-    'build_ninja': True,
+    'build_ninja': False,
     'build_playgroundlogger': False,
     'build_playgroundsupport': False,
     'build_runtime_with_host_compiler': False,
