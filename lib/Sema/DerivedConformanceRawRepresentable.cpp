@@ -22,6 +22,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "llvm/ADT/APInt.h"
 #include "DerivedConformances.h"
 
 using namespace swift;
@@ -194,13 +195,27 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
   }
 #endif
 
+  bool isStringEnum =
+    (rawTy->getNominalOrBoundGenericNominal() == C.getStringDecl());
+  llvm::SmallVector<Expr *, 16> stringExprs;
+
   Type enumType = parentDC->getDeclaredTypeInContext();
 
   auto selfDecl = cast<ConstructorDecl>(initDecl)->getImplicitSelfDecl();
   
   SmallVector<ASTNode, 4> cases;
+  unsigned Idx = 0;
   for (auto elt : enumDecl->getAllElements()) {
-    auto litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
+    LiteralExpr *litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
+    if (isStringEnum) {
+      // In case of a string enum we are calling the _findStringSwitchCase
+      // function from the library and switching on the returned Int value.
+      stringExprs.push_back(litExpr);
+      llvm::SmallString<16> IdxAsStringBuffer;
+      APInt(64, Idx).toStringUnsigned(IdxAsStringBuffer);
+      StringRef IndexAsString(C.AllocateCopy(IdxAsStringBuffer.str()));
+      litExpr = new (C) IntegerLiteralExpr(IndexAsString, SourceLoc());
+    }
     auto litPat = new (C) ExprPattern(litExpr, /*isResolved*/ true,
                                       nullptr, nullptr);
     litPat->setImplicit();
@@ -225,6 +240,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
                                      body));
+    Idx++;
   }
 
   auto anyPat = new (C) AnyPattern(SourceLoc());
@@ -241,7 +257,22 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
 
   auto rawDecl = initDecl->getParameterList(1)->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), rawRef,
+  Expr *switchArg = rawRef;
+  if (isStringEnum) {
+    // Call _findStringSwitchCase with an array of strings as argument.
+    auto *Fun = new (C) UnresolvedDeclRefExpr(
+                  C.getIdentifier("_findStringSwitchCase"),
+                  DeclRefKind::Ordinary, DeclNameLoc());
+    auto *strArray = ArrayExpr::create(C, SourceLoc(), stringExprs, {},
+                                       SourceLoc());;
+    Identifier tableId = C.getIdentifier("cases");
+    Identifier strId = C.getIdentifier("string");
+    auto *Args = TupleExpr::createImplicit(C, {strArray, rawRef},
+                                              {tableId, strId});
+    auto *CallExpr = CallExpr::create(C, Fun, Args, {}, {}, false, false);
+    switchArg = CallExpr;
+  }
+  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), switchArg,
                                        SourceLoc(), cases, SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(switchStmt),

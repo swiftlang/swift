@@ -22,6 +22,7 @@
     "StringInterpolation.swift",
     "StringLegacy.swift",
     "StringRangeReplaceableCollection.swift",
+    "StringSwitch.swift",
     "StringUTF16.swift",
     "StringUTF8.swift",
     "StringUnicodeScalarView.swift",
