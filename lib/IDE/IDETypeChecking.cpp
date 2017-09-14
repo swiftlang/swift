@@ -368,13 +368,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
     ExtensionMergeInfoMap MergeInfoMap;
     std::vector<NominalTypeDecl*> Unhandled;
-    auto addTypeLocNominal = [&](TypeLoc TL) {
-      if (TL.getType()) {
-        if (auto D = TL.getType()->getAnyNominal()) {
-          Unhandled.push_back(D);
-        }
-      }
-    };
 
     auto handleExtension = [&](ExtensionDecl *E, bool Synthesized) {
       if (Options.shouldPrint(E)) {
@@ -386,19 +379,25 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
     };
 
-    for (auto TL : Target->getInherited()) {
-      if (!isEnumRawType(Target, TL))
-        addTypeLocNominal(TL);
+    for (auto *Conf : Target->getLocalConformances()) {
+      Unhandled.push_back(Conf->getProtocol());
+    }
+    if (auto *CD = dyn_cast<ClassDecl>(Target)) {
+      if (auto Super = CD->getSuperclass())
+        Unhandled.push_back(Super->getAnyNominal());
     }
     while (!Unhandled.empty()) {
       NominalTypeDecl* Back = Unhandled.back();
       Unhandled.pop_back();
       for (ExtensionDecl *E : Back->getExtensions()) {
         handleExtension(E, true);
-        for (auto TL : Back->getInherited()) {
-          if (!isEnumRawType(Target, TL))
-            addTypeLocNominal(TL);
-        }
+      }
+      for (auto *Conf : Back->getLocalConformances()) {
+        Unhandled.push_back(Conf->getProtocol());
+      }
+      if (auto *CD = dyn_cast<ClassDecl>(Back)) {
+        if (auto Super = CD->getSuperclass())
+          Unhandled.push_back(Super->getAnyNominal());
       }
     }
 
