@@ -233,6 +233,9 @@ def set_csv_baseline(args):
                                                         exclude_timers=xt)),
                                select_module=mod,
                                group_by_module=args.group_by_module)
+        if m is None:
+            print "no stats found"
+            return 1
         changed = 0
         newepoch = int(time.time())
         for name in sorted(m.stats.keys()):
