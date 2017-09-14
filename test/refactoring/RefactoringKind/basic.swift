@@ -181,6 +181,12 @@ func testCollapseNestedIf() {
   }
 }
 
+func testMultiConditionalNestedIf() {
+  let a = 3
+  if a > 2, a != 4 {
+    if a < 10 {}
+  }
+}
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -253,6 +259,7 @@ func testCollapseNestedIf() {
 // RUN: %refactor -source-filename %s -pos=173:3 -end-pos=173:27| %FileCheck %s -check-prefix=CHECK-EXTRCT-METHOD
 
 // RUN: %refactor -source-filename %s -pos=179:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF-EXPRESSION
+// RUN: %refactor -source-filename %s -pos=186:3 | %FileCheck %s -check-prefix=CHECK-NONE
 
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method

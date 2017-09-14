@@ -1485,6 +1485,9 @@ static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo Cur
       if (!IFS) {
         return false;
       }
+      if (IFS->getCond().size() != 1) {
+        return false;
+      }
       if (!IfInfo.OuterIf) {
         IfInfo.OuterIf = IFS;
         return true;
