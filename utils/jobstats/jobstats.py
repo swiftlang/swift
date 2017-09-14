@@ -221,6 +221,7 @@ def merge_all_jobstats(jobstats, select_module=[], group_by_module=False):
     if group_by_module:
         def keyfunc(j):
             return j.module
+        jobstats = list(jobstats)
         jobstats.sort(key=keyfunc)
         prefixed = []
         for mod, group in itertools.groupby(jobstats, keyfunc):
