@@ -10,6 +10,8 @@
 // Use the overlay without private frameworks.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/privateframeworks/withoutprivate -I %t %s -verify
 
+// REQUIRES: objc_interop
+
 import SomeKit
 
 func testWidget(widget: SKWidget) {
