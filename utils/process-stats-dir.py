@@ -268,7 +268,8 @@ def compare_stats(args, old_stats, new_stats):
         if abs(delta_pct) < args.delta_pct_thresh:
             continue
         yield OutputRow(name=name,
-                        old=old, new=new, delta=delta,
+                        old=int(old), new=int(new),
+                        delta=int(delta),
                         delta_pct=delta_pct)
 
 
