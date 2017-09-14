@@ -12,8 +12,7 @@
 
 %{
 from gyb_stdlib_support import (
-    collectionForTraversal,
-    sliceTypeName
+    collectionForTraversal
 )
 }%
 
@@ -115,7 +114,6 @@ public typealias LazyFilterIndex<Base : Collection> = Base.Index
 
 % for Traversal in ['Forward', 'Bidirectional']:
 %   Self = "LazyFilter" + collectionForTraversal(Traversal)
-%   Slice = sliceTypeName(traversal=Traversal, mutable=False, rangeReplaceable=False)
 
 /// A lazy `Collection` wrapper that includes the elements of an
 /// underlying collection that satisfy a predicate.
@@ -224,9 +222,11 @@ public struct ${Self}<
     return _base[position]
   }
 
+  public typealias SubSequence = ${Self}<Base.SubSequence>
+
   @_inlineable // FIXME(sil-serialize-all)
-  public subscript(bounds: Range<Index>) -> ${Slice}<${Self}<Base>> {
-    return ${Slice}(base: self, bounds: bounds)
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    return SubSequence(_base: _base[bounds], _predicate)
   }
 
   // Any estimate of the number of elements that pass `_predicate` requires
@@ -246,16 +246,6 @@ public struct ${Self}<
     // sequence and only rely on underestimated count.
     return _copySequenceToContiguousArray(self)
   }
-
-  // FIXME(ABI)#28 (Associated Types with where clauses): we actually want to add:
-  //
-  //   typealias SubSequence = ${Self}<Base.SubSequence>
-  //
-  // so that all slicing optimizations of the base collection can kick in.
-  //
-  // We can't do that right now though, because that would force a lot of
-  // constraints on `Base.SubSequence`, limiting the possible contexts where
-  // the `.lazy.filter` API can be used.
 
   /// Returns an iterator over the elements of this sequence.
   ///
