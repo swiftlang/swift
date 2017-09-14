@@ -110,7 +110,7 @@ struct BadBidirectionalIndexable : BidirectionalIndexable {
   // This is a poor error message; it would be better to get a message
   // that index(before:) was missing.
   //
-  // expected-error@+1 {{'index(after:)' has different argument names from those required by protocol '_BidirectionalIndexable' ('index(before:)'}}
+  // expected-error@+1 {{'index(after:)' has different argument labels from those required by protocol '_BidirectionalIndexable' ('index(before:)'}}
   func index(after i: Int) -> Int { return 0 }
 }
 
