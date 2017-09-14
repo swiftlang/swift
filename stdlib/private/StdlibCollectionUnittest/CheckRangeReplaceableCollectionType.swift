@@ -462,7 +462,6 @@ extension TestSuite {
     outOfBoundsIndexOffset: Int = 1,
     collectionIsBidirectional: Bool = false
   ) where
-    C.Indices : Collection,
     CollectionWithEquatableElement.Iterator.Element : Equatable {
 
     var testNamePrefix = testNamePrefix
@@ -1178,7 +1177,6 @@ self.test("\(testNamePrefix).OperatorPlus") {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) where
-    C.Indices : BidirectionalCollection,
     CollectionWithEquatableElement.Iterator.Element : Equatable {
 
     var testNamePrefix = testNamePrefix
@@ -1299,7 +1297,6 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) where
-    C.Indices : RandomAccessCollection,
     CollectionWithEquatableElement.Iterator.Element : Equatable {
 
     var testNamePrefix = testNamePrefix

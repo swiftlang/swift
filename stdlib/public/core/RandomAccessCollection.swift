@@ -56,10 +56,8 @@ public protocol RandomAccessCollection :
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices 
-    // FIXME(ABI) (Revert Where Clauses): Remove these two constraints:
-    : _RandomAccessIndexable, BidirectionalCollection
-      = DefaultRandomAccessIndices<Self>
+  associatedtype Indices : RandomAccessCollection
+    = DefaultRandomAccessIndices<Self>
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.

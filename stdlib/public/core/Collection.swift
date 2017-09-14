@@ -711,20 +711,11 @@ public protocol Collection : _Indexable, Sequence
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices
-  // FIXME(ABI) (Revert Where Clauses): Remove these two conformances 
-  : _Indexable, Sequence
-    = DefaultIndices<Self>
+  associatedtype Indices : Collection = DefaultIndices<Self>
     where Indices.Element == Index, 
-          Indices.Index == Index
-  // FIXME(ABI) (Revert Where Clauses): Remove this where clause
-        , Indices.SubSequence == Indices
+          Indices.Index == Index,
+          Indices.SubSequence == Indices
         
-  // FIXME(ABI)#100 (Recursive Protocol Constraints):
-  // associatedtype Indices : Collection
-  //   where
-  //   = DefaultIndices<Self>
-
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
   ///

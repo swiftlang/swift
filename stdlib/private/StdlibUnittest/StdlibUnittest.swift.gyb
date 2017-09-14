@@ -385,10 +385,7 @@ public func expectSequenceType<X : Sequence>(_ x: X) -> X {
 % for Mutable in ['', 'Mutable']:
 public func expect${Mutable}CollectionType<X : ${Mutable}Collection>(
   _ x: X.Type
-) where
-  // FIXME(ABI)#2 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-  X.Indices : Collection {}
+) {}
 % end
 
 /// A slice is a `Collection` that when sliced returns an instance of
@@ -420,8 +417,7 @@ public func expectCollectionAssociatedTypes<X : Collection>(
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) where
-  X.Indices : Collection {}
+) {}
 
 /// Check that all associated types of a `BidirectionalCollection` are what we
 /// expect them to be.
@@ -432,8 +428,7 @@ public func expectBidirectionalCollectionAssociatedTypes<X : BidirectionalCollec
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) where
-  X.Indices : BidirectionalCollection {}
+) {}
 
 /// Check that all associated types of a `RandomAccessCollection` are what we
 /// expect them to be.
@@ -444,8 +439,7 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) where
-  X.Indices : RandomAccessCollection {}
+) {}
 
 public struct AssertionResult : CustomStringConvertible {
   init(isPass: Bool) {
