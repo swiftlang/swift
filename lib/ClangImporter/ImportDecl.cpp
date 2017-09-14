@@ -7487,6 +7487,9 @@ void ClangImporter::Implementation::finishNormalConformance(
                              conformance->getType());
   PrettyStackTraceDecl traceTo("... to", proto);
 
+  if (!proto->isRequirementSignatureComputed())
+    proto->computeRequirementSignature();
+
   finishTypeWitnesses(conformance);
   finishInheritedConformances(conformance);
   finishSignatureConformances(conformance);
