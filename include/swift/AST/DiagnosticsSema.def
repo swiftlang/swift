@@ -1195,7 +1195,7 @@ ERROR(indirect_case_in_indirect_enum,none,
 // Variables (var and let).
 ERROR(unimplemented_static_var,none,
       "%select{ERROR|static|class}1 stored properties not supported"
-      "%select{ in this context| in generic types| in classes}0"
+      "%select{ in this context| in generic types| in classes| in protocol extensions}0"
       "%select{|; did you mean 'static'?}2",
       (unsigned, StaticSpellingKind, unsigned))
 ERROR(observingprop_requires_initializer,none,
