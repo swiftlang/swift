@@ -93,11 +93,6 @@ public:
     return NumElements - unsigned(false);
   }
 
-  /// emitElementAddress - Given an element number (in the flattened sense)
-  /// return a pointer to a leaf element of the specified number.
-  SILValue emitElementAddress(unsigned TupleEltNo, SILLocation Loc,
-                              SILBuilder &B) const;
-
   /// getElementType - Return the swift type of the specified element.
   SILType getElementType(unsigned EltNo) const;
 
@@ -194,10 +189,7 @@ struct DIMemoryUse {
 /// and storing the information found into the Uses and Releases lists.
 void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                               SmallVectorImpl<DIMemoryUse> &Uses,
-                              SmallVectorImpl<TermInst*> &FailableInits,
-                              SmallVectorImpl<SILInstruction*> &Releases,
-                              bool isDefiniteInitFinished,
-                              bool TreatAddressToPointerAsInout);
+                              SmallVectorImpl<SILInstruction *> &Releases);
 
 } // end namespace swift
 
