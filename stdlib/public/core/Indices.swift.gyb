@@ -144,6 +144,7 @@ extension ${collectionForTraversal(Traversal)}
   ///         i = c.index(after: i)
   ///     }
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
+  @_inlineable // FIXME(sil-serialize-all)
   public var indices: ${Self}<Self> {
     return ${Self}(
       _elements: self,

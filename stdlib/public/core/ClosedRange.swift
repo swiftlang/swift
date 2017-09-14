@@ -434,6 +434,7 @@ public struct ClosedRange<
 /// - Parameters:
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func ... <Bound>(minimum: Bound, maximum: Bound)
   -> ClosedRange<Bound> {
@@ -464,6 +465,7 @@ public func ... <Bound>(minimum: Bound, maximum: Bound)
 /// - Parameters:
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func ... <Bound>(
   minimum: Bound, maximum: Bound

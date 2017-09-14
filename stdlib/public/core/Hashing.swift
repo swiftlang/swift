@@ -26,6 +26,7 @@ import SwiftShims
 public // @testable
 struct _Hashing {
   // FIXME(ABI)#41 : make this an actual public API.
+  @_inlineable // FIXME(sil-serialize-all)
   public // SPI
   static var secretKey: (UInt64, UInt64) {
     get {
@@ -47,6 +48,7 @@ struct _Hashing {
 public // @testable
 struct _HashingDetail {
 
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   static var fixedSeedOverride: UInt64 {
     get {
@@ -60,18 +62,20 @@ struct _HashingDetail {
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @_transparent
-  static func getExecutionSeed() -> UInt64 {
+  internal static func getExecutionSeed() -> UInt64 {
     // FIXME: This needs to be a per-execution seed. This is just a placeholder
     // implementation.
     let seed: UInt64 = 0xff51afd7ed558ccd
     return _HashingDetail.fixedSeedOverride == 0 ? seed : fixedSeedOverride
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @_transparent
-  static func hash16Bytes(_ low: UInt64, _ high: UInt64) -> UInt64 {
+  internal static func hash16Bytes(_ low: UInt64, _ high: UInt64) -> UInt64 {
     // Murmur-inspired hashing.
     let mul: UInt64 = 0x9ddfea08eb382d69
     var a: UInt64 = (low ^ high) &* mul
@@ -92,6 +96,7 @@ struct _HashingDetail {
 // their inputs and just exhibit avalanche effect.
 //
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixUInt32(_ value: UInt32) -> UInt32 {
@@ -105,12 +110,14 @@ func _mixUInt32(_ value: UInt32) -> UInt32 {
   return UInt32((extendedResult >> 3) & 0xffff_ffff)
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixInt32(_ value: Int32) -> Int32 {
   return Int32(bitPattern: _mixUInt32(UInt32(bitPattern: value)))
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixUInt64(_ value: UInt64) -> UInt64 {
@@ -121,12 +128,14 @@ func _mixUInt64(_ value: UInt64) -> UInt64 {
   return _HashingDetail.hash16Bytes(seed &+ (low << 3), high)
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixInt64(_ value: Int64) -> Int64 {
   return Int64(bitPattern: _mixUInt64(UInt64(bitPattern: value)))
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixUInt(_ value: UInt) -> UInt {
@@ -137,6 +146,7 @@ func _mixUInt(_ value: UInt) -> UInt {
 #endif
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixInt(_ value: Int) -> Int {
@@ -165,6 +175,7 @@ func _mixInt(_ value: Int) -> Int {
 /// hash value does not change anything fundamentally: collisions are still
 /// possible, and it does not prevent malicious users from constructing data
 /// sets that will exhibit pathological collisions.
+@_inlineable // FIXME(sil-serialize-all)
 public // @testable
 func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
   _sanityCheck(_isPowerOf2(upperBound))

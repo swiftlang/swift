@@ -38,6 +38,7 @@
 ///   returns the next element.
 /// - Returns: A sequence that starts with `first` and continues with every
 ///   value returned by passing the previous element to `next`.
+@_inlineable // FIXME(sil-serialize-all)
 public func sequence<T>(first: T, next: @escaping (T) -> T?) -> UnfoldFirstSequence<T> {
   // The trivial implementation where the state is the next value to return
   // has the downside of being unnecessarily eager (it evaluates `next` one
@@ -82,6 +83,7 @@ public func sequence<T>(first: T, next: @escaping (T) -> T?) -> UnfoldFirstSeque
 /// - Parameter next: A closure that accepts an `inout` state and returns the
 ///   next element of the sequence.
 /// - Returns: A sequence that yields each successive value from `next`.
+@_inlineable // FIXME(sil-serialize-all)
 public func sequence<T, State>(state: State, next: @escaping (inout State) -> T?)
   -> UnfoldSequence<T, State> {
   return UnfoldSequence(_state: state, _next: next)
@@ -99,6 +101,7 @@ public typealias UnfoldFirstSequence<T> = UnfoldSequence<T, (T?, Bool)>
 /// Instances of `UnfoldSequence` are created with the functions
 /// `sequence(first:next:)` and `sequence(state:next:)`.
 public struct UnfoldSequence<Element, State> : Sequence, IteratorProtocol {
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func next() -> Element? {
     guard !_done else { return nil }
     if let elt = _next(&_state) {
@@ -109,12 +112,17 @@ public struct UnfoldSequence<Element, State> : Sequence, IteratorProtocol {
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(_state: State, _next: @escaping (inout State) -> Element?) {
     self._state = _state
     self._next = _next
   }
 
+  @_versioned // FIXME(sil-serialize-all)
   internal var _state: State
+  @_versioned // FIXME(sil-serialize-all)
   internal let _next: (inout State) -> Element?
+  @_versioned // FIXME(sil-serialize-all)
   internal var _done = false
 }

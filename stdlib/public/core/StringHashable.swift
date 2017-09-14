@@ -13,17 +13,29 @@
 import SwiftShims
 
 #if _runtime(_ObjC)
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHashValue")
-func _stdlib_NSStringHashValue(_ str: AnyObject, _ isASCII: Bool) -> Int
+internal func _stdlib_NSStringHashValue(
+  _ str: AnyObject, _ isASCII: Bool) -> Int
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHashValuePointer")
-func _stdlib_NSStringHashValuePointer(_ str: OpaquePointer, _ isASCII: Bool) -> Int
+internal func _stdlib_NSStringHashValuePointer(
+  _ str: OpaquePointer, _ isASCII: Bool) -> Int
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_CFStringHashCString")
-func _stdlib_CFStringHashCString(_ str: OpaquePointer, _ len: Int) -> Int
+internal func _stdlib_CFStringHashCString(
+  _ str: OpaquePointer, _ len: Int) -> Int
 #endif
 
 extension Unicode {
+  // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
+  // @_inlineable // FIXME(sil-serialize-all)
+  // @_versioned // FIXME(sil-serialize-all)
   internal static func hashASCII(
     _ string: UnsafeBufferPointer<UInt8>
   ) -> Int {
@@ -41,6 +53,9 @@ extension Unicode {
     return hasher._finalizeAndReturnIntHash()
   }
 
+  // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
+  // @_inlineable // FIXME(sil-serialize-all)
+  // @_versioned // FIXME(sil-serialize-all)
   internal static func hashUTF16(
     _ string: UnsafeBufferPointer<UInt16>
   ) -> Int {
@@ -67,6 +82,9 @@ extension Unicode {
   }
 }
 
+// FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
+// @_inlineable // FIXME(sil-serialize-all)
+// @_versioned // FIXME(sil-serialize-all)
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _hashString(_ string: String) -> Int {
   let core = string._core
@@ -113,6 +131,8 @@ extension String : Hashable {
   ///
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
+  // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
+  // @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return _hashString(self)
   }

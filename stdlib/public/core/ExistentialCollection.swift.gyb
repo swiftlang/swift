@@ -24,6 +24,7 @@ from gyb_stdlib_support import (
 
 import SwiftShims
 
+@_inlineable // FIXME(sil-serialize-all)
 @_versioned
 @inline(never)
 internal func _abstract(
@@ -137,6 +138,7 @@ internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
   /// Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Note: Subclasses must override this method.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal func next() -> Element? { _abstract() }
 }
@@ -356,6 +358,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   var isEmpty: Bool { get }
   */
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal var _count: Int64 { _abstract() }
 
@@ -364,6 +367,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   func _customIndexOfEquatableElement(element: Element) -> Index??
   */
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal var _first: Element? { _abstract() }
 
@@ -406,6 +410,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   internal var _last: Element? { _abstract() }
 %   end
 }
+
 % end
 
 % for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
@@ -555,8 +560,8 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     self._base = _base
   }
 %   else:
-  @_versioned
   @_inlineable
+  @_versioned
   internal init(_base: S) {
     self._base = _base
     super.init(
