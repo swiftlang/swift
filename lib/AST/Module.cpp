@@ -1214,7 +1214,7 @@ bool ModuleDecl::walk(ASTWalker &Walker) {
   return false;
 }
 
-const clang::Module *ModuleDecl::findUnderlyingClangModule() {
+const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
   for (auto *FU : getFiles()) {
     if (auto *Mod = FU->getUnderlyingClangModule())
       return Mod;

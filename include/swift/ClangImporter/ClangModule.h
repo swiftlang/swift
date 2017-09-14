@@ -102,7 +102,7 @@ public:
 
   virtual StringRef getFilename() const override;
 
-  virtual const clang::Module *getUnderlyingClangModule() override {
+  virtual const clang::Module *getUnderlyingClangModule() const override {
     return getClangModule();
   }
 
