@@ -588,3 +588,14 @@ SR5202<()>().map{ return 0 }
 SR5202<()>().map{ _ in return 0 }
 SR5202<Void>().map{ return 0 }
 SR5202<Void>().map{ _ in return 0 }
+
+func sr3520_2<T>(_ item: T, _ update: (inout T) -> Void) {
+  var x = item
+  update(&x)
+}
+var sr3250_arg = 42
+sr3520_2(sr3250_arg) { $0 += 3 } // ok
+
+// SR-1976/SR-3073: Inference of inout
+func sr1976<T>(_ closure: (inout T) -> Void) {}
+sr1976({ $0 += 2 }) // ok
