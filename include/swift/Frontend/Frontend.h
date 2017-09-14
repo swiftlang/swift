@@ -34,8 +34,8 @@
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/Sema/SourceLoader.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -353,9 +353,9 @@ class CompilerInstance {
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
   unsigned MainBufferID = NO_SUCH_BUFFER;
 
-  /// Corresponds to PrimaryInput
+  /// PrimaryBufferID corresponds to PrimaryInput.
   unsigned PrimaryBufferID = NO_SUCH_BUFFER;
-  bool generateOutputForTheWholeModule() {
+  bool isWholeModuleCompilation() {
     return PrimaryBufferID == NO_SUCH_BUFFER;
   }
 
@@ -451,7 +451,7 @@ public:
   void freeContextAndSIL();
 
 private:
-  /// Load stdlib & true if should continue, i.e. no error
+  /// Load stdlib & return true if should continue, i.e. no error
   bool loadStdlib();
   ModuleDecl *importUnderlyingModule();
   ModuleDecl *importBridgingHeader();
@@ -470,7 +470,7 @@ public: // for static functions in Frontend.cpp
   };
 
 private:
-  void createREPLFile(ImplicitImports &implicitImports);
+  void createREPLFile(ImplicitImports &implicitImports) const;
   std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
 
   void addMainFileToModule(ImplicitImports &implicitImports);
@@ -492,14 +492,14 @@ private:
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
 
-  void forEachFileToTypeCheck(const std::function<void(SourceFile &)> &fn);
+    void forEachFileToTypeCheck(const llvm::function_ref<void(SourceFile &)> &fn);
 
   void parseAndTypeCheckMainFile(PersistentParserState &PersistentState,
                                  DelayedParsingCallbacks *DelayedParseCB,
                                  OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performTypeCheckingAndDelayedParsing();
 
-  void typeCheckMainModule(OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void finishTypeCheckingMainModule(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 };
 
 } // namespace swift

@@ -536,7 +536,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
-  SharedTimer timer("Type checking");
+  SharedTimer timer("performTypeChecking");
 
   auto &Ctx = SF.getASTContext();
 

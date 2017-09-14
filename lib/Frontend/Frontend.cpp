@@ -288,6 +288,11 @@ static void addAdditionalInitialImportsTo(
   SF->addImports(additionalImports);
 }
 
+static bool shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(FrontendOptions::ActionType RequestedAction) {
+    return RequestedAction == FrontendOptions::ActionType::EmitObject || RequestedAction ==  FrontendOptions::ActionType::Immediate ||
+    RequestedAction ==  FrontendOptions::ActionType::EmitSIL;
+}
+
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -299,8 +304,7 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
     return false;
   SILOptions::SILOptMode optimization = Invocation.getSILOptions().Optimization;
   if (optimization <= SILOptions::SILOptMode::None &&
-      Invocation.getFrontendOptions()
-          .shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization()) {
+      shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(Invocation.getFrontendOptions().RequestedAction)) {
     return true;
   }
   return optimization == SILOptions::SILOptMode::None &&
@@ -427,7 +431,7 @@ void CompilerInstance::getImplicitlyImportedModules(
   }
 }
 
-void CompilerInstance::createREPLFile(ImplicitImports &implicitImports) {
+void CompilerInstance::createREPLFile(ImplicitImports &implicitImports) const {
   SharedTimer timer("performSema-createREPLFile");
   auto *SingleInputFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind);
@@ -499,7 +503,7 @@ void CompilerInstance::parseLibraryFile(
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
   auto IsPrimary =
-      generateOutputForTheWholeModule() || BufferID == PrimaryBufferID;
+      isWholeModuleCompilation() || BufferID == PrimaryBufferID;
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
   bool Done;
@@ -517,7 +521,7 @@ void CompilerInstance::parseLibraryFile(
 
 OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
   OptionSet<TypeCheckingFlags> TypeCheckOptions;
-  if (generateOutputForTheWholeModule()) {
+  if (isWholeModuleCompilation()) {
     TypeCheckOptions |= TypeCheckingFlags::DelayWholeModuleChecking;
   }
   const auto &options = Invocation.getFrontendOptions();
@@ -592,7 +596,7 @@ void CompilerInstance::checkTypesWhileParsingMain(
     performDelayedParsing(MainModule, PersistentState,
                           Invocation.getCodeCompletionFactory());
   }
-  typeCheckMainModule(TypeCheckOptions);
+  finishTypeCheckingMainModule(TypeCheckOptions);
 }
 
 void CompilerInstance::parseAndTypeCheckMainFile(
@@ -602,7 +606,7 @@ void CompilerInstance::parseAndTypeCheckMainFile(
   SharedTimer timer(
       "performSema-checkTypesWhileParsingMain-parseAndTypeCheckMainFile");
   bool mainIsPrimary =
-      (generateOutputForTheWholeModule() || MainBufferID == PrimaryBufferID);
+      (isWholeModuleCompilation() || MainBufferID == PrimaryBufferID);
 
   SourceFile &MainFile =
       MainModule->getMainSourceFile(Invocation.getSourceFileKind());
@@ -650,16 +654,15 @@ void CompilerInstance::parseAndTypeCheckMainFile(
   }
 }
 
-void CompilerInstance::forEachFileToTypeCheck(
-    const std::function<void(SourceFile &)> &fn) {
-  if (generateOutputForTheWholeModule()) {
+void CompilerInstance::forEachFileToTypeCheck(const llvm::function_ref<void(SourceFile &)> &fn) {
+  if (isWholeModuleCompilation()) {
     MainModule->forEachSourceFile([&](SourceFile &SF) { fn(SF); });
   } else {
     fn(*PrimarySourceFile);
   }
 }
 
-void CompilerInstance::typeCheckMainModule(
+void CompilerInstance::finishTypeCheckingMainModule(
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
     MainModule->forEachSourceFile(
