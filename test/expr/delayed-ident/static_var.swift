@@ -35,12 +35,3 @@ struct Foo {
 func & (x: Foo, y: Foo) -> Foo { }
 
 var fooValue: Foo = .Bar & .Wibble
-
-
-public protocol P1 {
-    var bar: String { get }
-}
-
-public extension P1 {
-    public static let baz = "Test" // expected-error {{static stored properties not supported in protocol extensions}}
-}
