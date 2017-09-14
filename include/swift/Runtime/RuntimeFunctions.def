@@ -464,17 +464,17 @@ FUNCTION(NativeWeakDestroy, swift_weakDestroy, DefaultCC,
          ARGS(WeakReferencePtrTy),
          ATTRS(NoUnwind))
 
-// void swift_weakInit(WeakReference *object, void *value);
+// WeakReference *swift_weakInit(WeakReference *object, void *value);
 FUNCTION(NativeWeakInit, swift_weakInit, DefaultCC,
-         RETURNS(VoidTy),
+         RETURNS(WeakReferencePtrTy),
          ARGS(WeakReferencePtrTy, RefCountedPtrTy),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
-// void swift_weakAssign(WeakReference *object, void *value);
+// WeakReferencePtr *swift_weakAssign(WeakReference *object, void *value);
 FUNCTION(NativeWeakAssign, swift_weakAssign, DefaultCC,
-         RETURNS(VoidTy),
+         RETURNS(WeakReferencePtrTy),
          ARGS(WeakReferencePtrTy, RefCountedPtrTy),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
 // void *swift_weakLoadStrong(WeakReference *object);
 FUNCTION(NativeWeakLoadStrong, swift_weakLoadStrong,DefaultCC,
@@ -488,29 +488,29 @@ FUNCTION(NativeWeakTakeStrong, swift_weakTakeStrong,DefaultCC,
          ARGS(WeakReferencePtrTy),
          ATTRS(NoUnwind))
 
-// void swift_weakCopyInit(WeakReference *dest, WeakReference *src);
+// WeakReference *swift_weakCopyInit(WeakReference *dest, WeakReference *src);
 FUNCTION(NativeWeakCopyInit, swift_weakCopyInit, DefaultCC,
-         RETURNS(VoidTy),
+         RETURNS(WeakReferencePtrTy),
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
-// void swift_weakTakeInit(WeakReference *dest, WeakReference *src);
+// WeakReference *swift_weakTakeInit(WeakReference *dest, WeakReference *src);
 FUNCTION(NativeWeakTakeInit, swift_weakTakeInit, DefaultCC,
-         RETURNS(VoidTy),
+         RETURNS(WeakReferencePtrTy),
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
-// void swift_weakCopyAssign(WeakReference *dest, WeakReference *src);
+// WeakReference *swift_weakCopyAssign(WeakReference *dest, WeakReference *src);
 FUNCTION(NativeWeakCopyAssign, swift_weakCopyAssign, DefaultCC,
-         RETURNS(VoidTy),
+         RETURNS(WeakReferencePtrTy),
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
-// void swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
+// WeakReference *swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
 FUNCTION(NativeWeakTakeAssign, swift_weakTakeAssign, DefaultCC,
-         RETURNS(VoidTy),
+         RETURNS(WeakReferencePtrTy),
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
 // void swift_unknownWeakDestroy(WeakReference *object);
 FUNCTION(UnknownWeakDestroy, swift_unknownWeakDestroy, DefaultCC,

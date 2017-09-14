@@ -428,6 +428,7 @@ namespace RuntimeConstants {
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
+  const auto FirstParamReturned = llvm::Attribute::Returned;
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -435,6 +436,11 @@ namespace RuntimeConstants {
 // associated with the return type not the function type.
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr) {
   return Attr == llvm::Attribute::ZExt;
+}
+// Similar to the 'return' attribute we assume that the 'returned' attributed is
+// associated with the first function parameter.
+static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr) {
+  return Attr == llvm::Attribute::Returned;
 }
 
 llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
@@ -471,15 +477,19 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
 
     llvm::AttrBuilder buildFnAttr;
     llvm::AttrBuilder buildRetAttr;
+    llvm::AttrBuilder buildFirstParamAttr;
 
     for (auto Attr : attrs) {
       if (isReturnAttribute(Attr))
         buildRetAttr.addAttribute(Attr);
+      else if (isReturnedAttribute(Attr))
+        buildFirstParamAttr.addAttribute(Attr);
       else
         buildFnAttr.addAttribute(Attr);
     }
     fn->addAttributes(llvm::AttributeList::FunctionIndex, buildFnAttr);
     fn->addAttributes(llvm::AttributeList::ReturnIndex, buildRetAttr);
+    fn->addParamAttrs(0, buildFirstParamAttr);
   }
 
   return cache;
