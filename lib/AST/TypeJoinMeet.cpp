@@ -17,9 +17,151 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
+
+struct TypeJoin : TypeVisitor<TypeJoin, Type> {
+  Type First;
+
+  static Type getSuperclassJoin(Type first, Type second);
+
+  Type visitClassType(Type second);
+  Type visitBoundGenericClassType(Type second);
+  Type visitArchetypeType(Type second);
+  Type visitDynamicSelfType(Type second);
+  Type visitMetatypeType(Type second);
+  Type visitExistentialMetatypeType(Type second);
+  Type visitBoundGenericEnumType(Type second);
+
+  Type visitOptionalType(Type second);
+
+  Type visitType(Type second) {
+    // FIXME: Make this unreachable by implementing all possible
+    //        combinations.
+    return nullptr;
+  }
+public:
+  TypeJoin(Type First) : First(First) {}
+};
+
+Type TypeJoin::getSuperclassJoin(Type first, Type second) {
+  // FIXME: Return Any
+  if (!first->mayHaveSuperclass() || !second->mayHaveSuperclass())
+    return nullptr;
+
+  /// Walk the superclasses of type1 looking for second. Record them for our
+  /// second step.
+  llvm::SmallPtrSet<CanType, 8> superclassesOfFirst;
+  CanType canSecond = second->getCanonicalType();
+  for (Type super = first; super; super = super->getSuperclass()) {
+    CanType canSuper = super->getCanonicalType();
+
+    // If we have found the second type, we're done.
+    if (canSuper == canSecond) return super;
+
+    superclassesOfFirst.insert(canSuper);
+  }
+
+  // Look through the superclasses of second to determine if any were also
+  // superclasses of first.
+  for (Type super = second; super; super = super->getSuperclass()) {
+    CanType canSuper = super->getCanonicalType();
+
+    // If we found the first type, we're done.
+    if (superclassesOfFirst.count(canSuper)) return super;
+  }
+
+  // FIXME: Return Any
+  // There is no common superclass; we're done.
+  return nullptr;
+}
+
+Type TypeJoin::visitClassType(Type second) {
+  return getSuperclassJoin(First, second);
+}
+
+Type TypeJoin::visitBoundGenericClassType(Type second) {
+  return getSuperclassJoin(First, second);
+}
+
+Type TypeJoin::visitArchetypeType(Type second) {
+  return getSuperclassJoin(First, second);
+}
+
+Type TypeJoin::visitDynamicSelfType(Type second) {
+  return getSuperclassJoin(First, second);
+}
+
+Type TypeJoin::visitMetatypeType(Type second) {
+  assert(!First->mayHaveSuperclass() && !second->mayHaveSuperclass());
+
+  // FIXME: Return Any
+  if (First->getKind() != second->getKind())
+    return nullptr;
+
+  auto firstInstance = First->castTo<AnyMetatypeType>()->getInstanceType();
+  auto secondInstance = second->castTo<AnyMetatypeType>()->getInstanceType();
+
+  auto joinInstance = TypeJoin(firstInstance).visit(secondInstance);
+
+  // FIXME: Return Any
+  if (!joinInstance)
+    return nullptr;
+
+  return MetatypeType::get(joinInstance);
+}
+
+Type TypeJoin::visitExistentialMetatypeType(Type second) {
+  assert(!First->mayHaveSuperclass() && !second->mayHaveSuperclass());
+
+  // FIXME: Return Any
+  if (First->getKind() != second->getKind())
+    return nullptr;
+
+  auto firstInstance = First->castTo<AnyMetatypeType>()->getInstanceType();
+  auto secondInstance = second->castTo<AnyMetatypeType>()->getInstanceType();
+
+  auto joinInstance = TypeJoin(firstInstance).visit(secondInstance);
+
+  // FIXME: Return Any
+  if (!joinInstance)
+    return nullptr;
+
+  return ExistentialMetatypeType::get(joinInstance);
+}
+
+Type TypeJoin::visitBoundGenericEnumType(Type second) {
+  // FIXME: Return Any
+  if (First->getKind() != second->getKind())
+    return nullptr;
+
+  OptionalTypeKind otk1, otk2;
+  Type objectType1 = First->getAnyOptionalObjectType(otk1);
+  Type objectType2 = second->getAnyOptionalObjectType(otk2);
+  if (otk1 == OTK_Optional || otk2 == OTK_Optional) {
+    // Compute the join of the unwrapped type. If there is none, we're done.
+    Type unwrappedJoin = Type::join(objectType1 ? objectType1 : First,
+                                    objectType2 ? objectType2 : second);
+    // FIXME: More general joins of enums need to be handled.
+    if (!unwrappedJoin) return nullptr;
+
+    return OptionalType::get(unwrappedJoin);
+  }
+
+  // FIXME: More general joins of enums need to be handled, and
+  //        then Any should be returned when there is no better
+  //        choice.
+  return nullptr;
+}
+
+Type TypeJoin::visitOptionalType(Type second) {
+  auto canFirst = First->getCanonicalType();
+  auto canSecond = second->getCanonicalType();
+
+  return TypeJoin(canFirst).visit(canSecond);
+}
 
 Type Type::join(Type type1, Type type2) {
   assert(!type1->hasTypeVariable() && !type2->hasTypeVariable() &&
@@ -38,79 +180,11 @@ Type Type::join(Type type1, Type type2) {
   if (type1->isEqual(type2))
     return type1;
 
-  // If both are class metatypes, compute the join of the instance type and
-  // wrap the result in a metatype.
-  if (auto *metatype1 = type1->getAs<MetatypeType>()) {
-    if (auto *metatype2 = type2->getAs<MetatypeType>()) {
-      auto instance1 = metatype1->getInstanceType();
-      auto instance2 = metatype2->getInstanceType();
-      if (instance1->mayHaveSuperclass() &&
-          instance2->mayHaveSuperclass()) {
-        auto result = Type::join(instance1, instance2);
-        if (!result)
-          return result;
-        return MetatypeType::get(result);
-      }
-    }
-  }
+  // Until we handle all the combinations of joins, we need to make
+  // sure we visit the optional side.
+  OptionalTypeKind otk;
+  if (type2->getAnyOptionalObjectType(otk))
+    return TypeJoin(type1).visit(type2);
 
-  // If both are existential metatypes, compute the join of the instance type
-  // and wrap the result in an existential metatype.
-  if (auto *metatype1 = type1->getAs<ExistentialMetatypeType>()) {
-    if (auto *metatype2 = type2->getAs<ExistentialMetatypeType>()) {
-      auto instance1 = metatype1->getInstanceType();
-      auto instance2 = metatype2->getInstanceType();
-      auto result = Type::join(instance1, instance2);
-      if (!result)
-        return result;
-      return ExistentialMetatypeType::get(result);
-    }
-  }
-
-  // If both are class types or opaque types that potentially have superclasses,
-  // find the common superclass.
-  if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass()) {
-    /// Walk the superclasses of type1 looking for type2. Record them for our
-    /// second step.
-    llvm::SmallPtrSet<CanType, 8> superclassesOfType1;
-    CanType canType2 = type2->getCanonicalType();
-    for (Type super1 = type1; super1; super1 = super1->getSuperclass()) {
-      CanType canSuper1 = super1->getCanonicalType();
-
-      // If we have found the second type, we're done.
-      if (canSuper1 == canType2) return super1;
-
-      superclassesOfType1.insert(canSuper1);
-    }
-
-    // Look through the superclasses of type2 to determine if any were also
-    // superclasses of type1.
-    for (Type super2 = type2; super2; super2 = super2->getSuperclass()) {
-      CanType canSuper2 = super2->getCanonicalType();
-
-      // If we found the first type, we're done.
-      if (superclassesOfType1.count(canSuper2)) return super2;
-    }
-
-    // There is no common superclass; we're done.
-    return nullptr;
-  }
-
-  // If one or both of the types are optional types, look at the underlying
-  // object type.
-  OptionalTypeKind otk1, otk2;
-  Type objectType1 = type1->getAnyOptionalObjectType(otk1);
-  Type objectType2 = type2->getAnyOptionalObjectType(otk2);
-  if (otk1 == OTK_Optional || otk2 == OTK_Optional) {
-    // Compute the join of the unwrapped type. If there is none, we're done.
-    Type unwrappedJoin = join(objectType1 ? objectType1 : type1,
-                              objectType2 ? objectType2 : type2);
-    if (!unwrappedJoin) return nullptr;
-
-    return OptionalType::get(unwrappedJoin);
-  }
-
-  // The join can only be an existential.
-  return nullptr;
+  return TypeJoin(type2).visit(type1);
 }
-
