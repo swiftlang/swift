@@ -1697,6 +1697,359 @@ ArrayTestSuite.test("ArrayToNSArrayConversion") {
   expectAutoreleasedValues(unopt: 3)
 }
 
+//===---
+// Array upcasts
+//===---
+
+ArrayTestSuite.test("ArrayUpcastEntryPoint") {
+  var a = Array<TestObjCValueTy>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  var aAsAnyObject: Array<AnyObject> = _arrayForceCast(a)
+
+  expectEqual(3, aAsAnyObject.count)
+  var v: AnyObject = aAsAnyObject[0]
+  expectEqual(1010, (v as! TestObjCValueTy).value)
+
+  v = aAsAnyObject[1]
+  expectEqual(1020, (v as! TestObjCValueTy).value)
+
+  v = aAsAnyObject[2]
+  expectEqual(1030, (v as! TestObjCValueTy).value)
+}
+
+ArrayTestSuite.test("ArrayUpcast") {
+  var a = Array<TestObjCValueTy>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  var dAsAnyObject: Array<AnyObject> = a
+
+  expectEqual(3, dAsAnyObject.count)
+  var v: AnyObject = dAsAnyObject[0]
+  expectEqual(1010, (v as! TestObjCValueTy).value)
+
+  v = dAsAnyObject[1]
+  expectEqual(1020, (v as! TestObjCValueTy).value)
+
+  v = dAsAnyObject[2]
+  expectEqual(1030, (v as! TestObjCValueTy).value)
+}
+
+ArrayTestSuite.test("ArrayUpcastBridgedEntryPoint") {
+  var a = Array<TestBridgedValueTy>()
+  a.append(TestBridgedValueTy(1010))
+  a.append(TestBridgedValueTy(1020))
+  a.append(TestBridgedValueTy(1030))
+
+  do {
+    var aOO: Array<AnyObject> = _arrayConditionalCast(a)!
+
+    expectEqual(3, aOO.count)
+    var v: AnyObject = aOO[0]
+    expectEqual(1010, (v as! TestBridgedValueTy).value)
+
+    v = aOO[1]
+    expectEqual(1020, (v as! TestBridgedValueTy).value)
+
+    v = aOO[2]
+    expectEqual(1030, (v as! TestBridgedValueTy).value)
+  }
+}
+
+ArrayTestSuite.test("ArrayUpcastBridged") {
+  var a = Array<TestBridgedValueTy>()
+  a.append(TestBridgedValueTy(1010))
+  a.append(TestBridgedValueTy(1020))
+  a.append(TestBridgedValueTy(1030))
+
+  do {
+    var aOO = a as Array<AnyObject>
+
+    expectEqual(3, aOO.count)
+    var v: AnyObject = aOO[0]
+    expectEqual(1010, (v as! TestBridgedValueTy).value)
+
+    v = aOO[1]
+    expectEqual(1020, (v as! TestBridgedValueTy).value)
+
+    v = aOO[2]
+    expectEqual(1030, (v as! TestBridgedValueTy).value)
+  }
+}
+
+//===---
+// Array downcasts
+//===---
+
+ArrayTestSuite.test("ArrayDowncastEntryPoint") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  let aCC: Array<TestObjCValueTy> = _arrayForceCast(a)
+  expectEqual(3, aCC.count)
+  var v = aCC[0]
+  expectEqual(1010, v.value)
+
+  v = aCC[1]
+  expectEqual(1020, v.value)
+
+  v = aCC[2]
+  expectEqual(1030, v.value)
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("ArrayDowncast") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  let aCC = a as! Array<TestObjCValueTy>
+  expectEqual(3, aCC.count)
+  var v = aCC[0]
+  expectEqual(1010, v.value)
+
+  v = aCC[1]
+  expectEqual(1020, v.value)
+
+  v = aCC[2]
+  expectEqual(1030, v.value)
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("ArrayDowncastConditionalEntryPoint") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  if let aCC
+       = _arrayConditionalCast(a) as Array<TestObjCValueTy>? {
+    expectEqual(3, aCC.count)
+    var v = aCC[0]
+    expectEqual(1010, v.value)
+
+    v = aCC[1]
+    expectEqual(1020, v.value)
+
+    v = aCC[2]
+    expectEqual(1030, v.value)
+  } else {
+    expectTrue(false)
+  }
+
+  // Unsuccessful downcast
+  a[0] = 17 as NSNumber
+  a[1] = "hello" as NSString
+  if let _ = _arrayConditionalCast(a) as Array<TestObjCValueTy>? {
+    expectTrue(false)
+  }
+}
+
+ArrayTestSuite.test("ArrayDowncastConditional") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  if let aCC = a as? Array<TestObjCValueTy> {
+    expectEqual(3, aCC.count)
+    var v = aCC[0]
+    expectEqual(1010, v.value)
+
+    v = aCC[1]
+    expectEqual(1020, v.value)
+
+    v = aCC[2]
+    expectEqual(1030, v.value)
+  } else {
+    expectTrue(false)
+  }
+
+  // Unsuccessful downcast
+  a[0] = 17 as NSNumber
+  a[1] = "hello" as NSString
+  if let aCC = a as? Array<TestObjCValueTy> {
+    expectTrue(false)
+  }
+}
+
+ArrayTestSuite.test("ArrayBridgeFromObjectiveCEntryPoint") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  let aCV: Array<TestBridgedValueTy> = _arrayConditionalCast(a)!
+  do {
+    expectEqual(3, aCV.count)
+    var v = aCV[0]
+    expectEqual(1010, v.value)
+
+    v = aCV[1]
+    expectEqual(1020, v.value)
+
+    v = aCV[2]
+    expectEqual(1030, v.value)
+  }
+
+  // // Successful downcast.
+  let aVC: Array<TestObjCValueTy> = _arrayConditionalCast(a)!
+  do {
+    expectEqual(3, aVC.count)
+    var v = aVC[0]
+    expectEqual(1010, v.value)
+
+    v = aVC[1]
+    expectEqual(1020, v.value)
+
+    v = aVC[2]
+    expectEqual(1030, v.value)
+  }
+}
+
+ArrayTestSuite.test("ArrayBridgeFromObjectiveC") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  let aCV = a as! Array<TestBridgedValueTy>
+  do {
+    expectEqual(3, aCV.count)
+    var v = aCV[0]
+    expectEqual(1010, v.value)
+
+    v = aCV[1]
+    expectEqual(1020, v.value)
+
+    v = aCV[2]
+    expectEqual(1030, v.value)
+  }
+
+  // Successful downcast.
+  let aVC = a as! Array<TestObjCValueTy>
+  do {
+    expectEqual(3, aVC.count)
+    var v = aVC[0]
+    expectEqual(1010, v.value)
+
+    v = aVC[1]
+    expectEqual(1020, v.value)
+
+    v = aVC[2]
+    expectEqual(1030, v.value)
+  }
+}
+
+ArrayTestSuite.test("ArrayBridgeFromObjectiveCConditionalEntryPoint") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  if let aCV = _arrayConditionalCast(a) as Array<TestBridgedValueTy>? {
+    expectEqual(3, aCV.count)
+    var v = aCV[0]
+    expectEqual(1010, v.value)
+
+    v = aCV[1]
+    expectEqual(1020, v.value)
+
+    v = aCV[2]
+    expectEqual(1030, v.value)
+  } else {
+    expectTrue(false)
+  }
+
+  // Successful downcast.
+  if let aVC = _arrayConditionalCast(a) as Array<TestObjCValueTy>? {
+    expectEqual(3, aVC.count)
+    var v = aVC[0]
+    expectEqual(1010, v.value)
+
+    v = aVC[1]
+    expectEqual(1020, v.value)
+
+    v = aVC[2]
+    expectEqual(1030, v.value)
+  } else {
+    expectTrue(false)
+  }
+
+  // Unsuccessful downcasts
+  a[0] = 17 as NSNumber
+  a[1] = "hello" as NSString
+  if let aCV = _arrayConditionalCast(a) as Array<TestBridgedValueTy>? {
+    expectTrue(false)
+  }
+  if let aVC = _arrayConditionalCast(a) as Array<TestObjCValueTy>? {
+    expectTrue(false)
+  }
+}
+
+ArrayTestSuite.test("ArrayBridgeFromObjectiveCConditional") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  if let aCV = a as? Array<TestBridgedValueTy> {
+    expectEqual(3, aCV.count)
+    var v = aCV[0]
+    expectEqual(1010, v.value)
+
+    v = aCV[1]
+    expectEqual(1020, v.value)
+
+    v = aCV[2]
+    expectEqual(1030, v.value)
+  } else {
+    expectTrue(false)
+  }
+
+  // Successful downcast.
+  if let aVC = a as? Array<TestObjCValueTy> {
+    expectEqual(3, aVC.count)
+    var v = aVC[0]
+    expectEqual(1010, v.value)
+
+    v = aVC[1]
+    expectEqual(1020, v.value)
+
+    v = aVC[2]
+    expectEqual(1030, v.value)
+  } else {
+    expectTrue(false)
+  }
+
+  // Unsuccessful downcasts
+  a[0] = 17 as NSNumber
+  a[1] = "hello" as NSString
+  if let aCV = a as? Array<TestBridgedValueTy> {
+    expectTrue(false)
+  }
+  if let aVC = a as? Array<TestObjCValueTy> {
+    expectTrue(false)
+  }
+}
+
 #endif
 
 //===----------------------------------------------------------------------===//
