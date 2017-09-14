@@ -959,11 +959,12 @@ bool AllocOptimize::doIt() {
   for (unsigned i = 0; i != Uses.size(); ++i) {
     auto &Use = Uses[i];
     // Ignore entries for instructions that got expanded along the way.
-    if (Use.Inst && Use.Kind == DIUseKind::Load)
+    if (Use.Inst && Use.Kind == DIUseKind::Load) {
       if (promoteLoad(Use.Inst)) {
         Uses[i].Inst = nullptr;  // remove entry if load got deleted.
         Changed = true;
       }
+    }
   }
   
   // destroy_addr(p) is strong_release(load(p)), try to promote it too.
@@ -975,11 +976,9 @@ bool AllocOptimize::doIt() {
         Changed = true;
       }
   }
-  
+
   // If this is an allocation, try to remove it completely.
-  if (!isa<MarkUninitializedInst>(TheMemory)
-      && !isa<MarkUninitializedBehaviorInst>(TheMemory))
-    Changed |= tryToRemoveDeadAllocation();
+  Changed |= tryToRemoveDeadAllocation();
 
   return Changed;
  }
@@ -1001,13 +1000,11 @@ static bool optimizeMemoryAllocations(SILFunction &Fn) {
 
       // Set up the datastructure used to collect the uses of the allocation.
       SmallVector<DIMemoryUse, 16> Uses;
-      SmallVector<TermInst*, 1> FailableInits;
       SmallVector<SILInstruction*, 4> Releases;
       
       // Walk the use list of the pointer, collecting them.
-      collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, true,
-                               /*TreatAddressToPointerAsInout*/ false);
-      
+      collectDIElementUsesFrom(MemInfo, Uses, Releases);
+
       Changed |= AllocOptimize(Inst, Uses, Releases).doIt();
       
       // Carefully move iterator to avoid invalidation problems.
