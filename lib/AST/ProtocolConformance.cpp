@@ -896,37 +896,37 @@ void NominalTypeDecl::prepareConformanceTable() const {
     return;
   }
 
-  // Add any synthesized conformances.
+  SmallPtrSet<ProtocolDecl *, 2> protocols;
+
+  auto addSynthesized = [&](KnownProtocolKind kind) {
+    if (auto *proto = getASTContext().getProtocol(kind)) {
+      if (protocols.count(proto) == 0) {
+        ConformanceTable->addSynthesizedConformance(mutableThis, proto);
+        protocols.insert(proto);
+      }
+    }
+  };
+
+  // Add protocols for any synthesized protocol attributes.
+  for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    addSynthesized(attr->getProtocolKind());
+  }
+
+  // Add any implicit conformances.
   if (auto theEnum = dyn_cast<EnumDecl>(mutableThis)) {
     if (theEnum->hasCases() && theEnum->hasOnlyCasesWithoutAssociatedValues()) {
       // Simple enumerations conform to Equatable.
-      if (auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable)) {
-        ConformanceTable->addSynthesizedConformance(mutableThis, equatable);
-      }
+      addSynthesized(KnownProtocolKind::Equatable);
 
       // Simple enumerations conform to Hashable.
-      if (auto hashable = getASTContext().getProtocol(
-                            KnownProtocolKind::Hashable)) {
-        ConformanceTable->addSynthesizedConformance(mutableThis, hashable);
-      }
+      addSynthesized(KnownProtocolKind::Hashable);
     }
 
     // Enumerations with a raw type conform to RawRepresentable.
     if (resolver)
       resolver->resolveRawType(theEnum);
     if (theEnum->hasRawType()) {
-      if (auto rawRepresentable =
-            ctx.getProtocol(KnownProtocolKind::RawRepresentable)) {
-        ConformanceTable->addSynthesizedConformance(mutableThis,
-                                                    rawRepresentable);
-      }
-    }
-  }
-
-  // Add protocols for any synthesized protocol attributes.
-  for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
-    if (auto proto = getASTContext().getProtocol(attr->getProtocolKind())) {
-      ConformanceTable->addSynthesizedConformance(mutableThis, proto);
+      addSynthesized(KnownProtocolKind::RawRepresentable);
     }
   }
 }
