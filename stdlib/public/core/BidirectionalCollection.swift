@@ -66,8 +66,6 @@ public protocol _BidirectionalIndexable : _Indexable {
 /// - If `i > c.startIndex && i <= c.endIndex`
 ///   `c.index(after: c.index(before: i)) == i`.
 public protocol BidirectionalCollection : _BidirectionalIndexable, Collection 
-// FIXME(ABI) (Revert Where Clauses): Restore these 
-// where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection
 {
 
 // TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex

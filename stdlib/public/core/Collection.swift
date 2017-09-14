@@ -619,8 +619,6 @@ public struct IndexingIterator<
 /// the number of contained elements, accessing its `count` property is an
 /// O(*n*) operation.
 public protocol Collection : _Indexable, Sequence
-// FIXME(ABI) (Revert Where Clauses): Restore this
-// where Indices: Collection,
 {
   /// A type that represents the number of steps between a pair of
   /// indices.
@@ -648,15 +646,6 @@ public protocol Collection : _Indexable, Sequence
   /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence : Collection = Slice<Self>
     where SubSequence.Index == Index
-
-  // FIXME(ABI)#99 (Associated Types with where clauses):
-  //   where SubSequence.Indices == Indices,
-  //
-  // (<rdar://problem/20715009> Implement recursive protocol
-  // constraints)
-  //
-  // These constraints allow processing collections in generic code by
-  // repeatedly slicing them in a loop.
 
   /// Accesses the element at the specified position.
   ///
