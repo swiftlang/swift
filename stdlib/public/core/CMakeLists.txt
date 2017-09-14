@@ -107,6 +107,7 @@ set(SWIFTLIB_ESSENTIAL
   REPL.swift
   Reverse.swift
   Runtime.swift.gyb
+  RuntimeFunctionCounters.swift
   SipHash.swift.gyb
   SentinelCollection.swift
   Sequence.swift
