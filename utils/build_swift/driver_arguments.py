@@ -12,8 +12,6 @@ import platform
 
 import android.adb.commands
 
-from . import defaults
-
 from swift_build_support.swift_build_support import arguments
 from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
@@ -21,6 +19,8 @@ from swift_build_support.swift_build_support import workspace
 
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
+
+from . import defaults
 
 
 __all__ = [
