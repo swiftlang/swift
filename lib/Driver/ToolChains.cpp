@@ -687,14 +687,6 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   // serialized ASTs.
   Arguments.push_back("-parse-as-library");
 
-  // Merge serialized SIL from partial modules.
-  Arguments.push_back("-sil-merge-partial-modules");
-
-  // Disable SIL optimization passes; we've already optimized the code in each
-  // partial mode.
-  Arguments.push_back("-disable-diagnostic-passes");
-  Arguments.push_back("-disable-sil-perf-optzns");
-
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         Arguments);
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
