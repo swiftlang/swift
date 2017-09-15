@@ -7,9 +7,9 @@
 /// Test functionality related to the runtime function counters.
 
 class C {
-    var next: C? = nil
-    func test(_ c: C) {
-    }
+  var next: C? = nil
+  func test(_ c: C) {
+  }
 }
 
 struct MyStruct {
@@ -105,7 +105,7 @@ func testRuntimeCounters() {
 
   let globalCounters2 = _GlobalRuntimeFunctionCountersState()
 
-  globalCounters1.dumpDiff(globalCounters2)
+  globalCounters1.dumpDiff(globalCounters2, skipUnchanged: true)
 }
 
 /// Test finding references inside a String object.
@@ -117,7 +117,7 @@ func testString(_ s: String) {
   let objectCounters1 = _ObjectRuntimeFunctionCountersState(refs[0])
   let _ = [String](repeating: s, count: 4)
   let objectCounters2 = _ObjectRuntimeFunctionCountersState(refs[0])
-  objectCounters1.dumpDiff(objectCounters2)
+  objectCounters1.dumpDiff(objectCounters2, skipUnchanged: true)
 }
 
 /// Test finding references inside a Dictionary object.
@@ -132,7 +132,7 @@ func testDict(_ _dint: [Int : Int]) {
   dint[222] = 222
   dint[2222] = 2222
   let objectCounters2 = _ObjectRuntimeFunctionCountersState(refs[0])
-  objectCounters1.dumpDiff(objectCounters2)
+  objectCounters1.dumpDiff(objectCounters2, skipUnchanged: true)
 }
 
 /// Test finding references inside an object graph with a cycle.
@@ -225,6 +225,7 @@ func updatesHandler(object: UnsafeRawPointer, functionId: Int64) {
 /// CHECK: End handler
 /// Test that you can provide custom handlers for runtime functions counters
 /// updates.
+var globalC: C? = nil
 @inline(never)
 func testFunctionRuntimeCountersUpdateHandler() {
   print("TEST: Provide runtime function counters update handler")
@@ -232,7 +233,8 @@ func testFunctionRuntimeCountersUpdateHandler() {
   let oldHandler =
     _RuntimeFunctionCounters.setGlobalRuntimeFunctionCountersUpdateHandler(
       handler: updatesHandler)
-  let c = C()
+  globalC = C()
+  globalC = nil
   let len = length(l!)
   _ = _RuntimeFunctionCounters.setGlobalRuntimeFunctionCountersUpdateHandler(
     handler: oldHandler)
