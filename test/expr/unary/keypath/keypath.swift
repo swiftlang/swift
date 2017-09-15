@@ -1,10 +1,21 @@
-// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-experimental-keypath-components  %s -verify
+// RUN: %target-swift-frontend -typecheck -parse-as-library %s -verify
 
-struct Sub {}
-struct OptSub {}
+struct Sub: Hashable {
+  static func ==(_: Sub, _: Sub) -> Bool { return true }
+  var hashValue: Int { return 0 }
+}
+struct OptSub: Hashable {
+  static func ==(_: OptSub, _: OptSub) -> Bool { return true }
+  var hashValue: Int { return 0 }
+}
+struct NonHashableSub {}
+
 struct Prop {
   subscript(sub: Sub) -> A { get { return A() } set { } }
   subscript(optSub: OptSub) -> A? { get { return A() } set { } }
+  subscript(nonHashableSub: NonHashableSub) -> A { get { return A() } set { } }
+  subscript(a: Sub, b: Sub) -> A { get { return A() } set { } }
+  subscript(a: Sub, b: NonHashableSub) -> A { get { return A() } set { } }
 
   var nonMutatingProperty: B {
     get { fatalError() }
@@ -27,8 +38,10 @@ struct A: Hashable {
 struct B {}
 struct C<T> {
   var value: T
+  subscript() -> T { get { return value } }
   subscript(sub: Sub) -> T { get { return value } set { } }
-  subscript<U>(sub: U) -> U { get { return sub } set { } }
+  subscript<U: Hashable>(sub: U) -> U { get { return sub } set { } }
+  subscript<X>(noHashableConstraint sub: X) -> X { get { return sub } set { } }
 }
 
 extension Array where Element == A {
@@ -39,7 +52,8 @@ struct Exactly<T> {}
 
 func expect<T>(_ x: inout T, toHaveType _: Exactly<T>.Type) {}
 
-func testKeyPath(sub: Sub, optSub: OptSub, x: Int) {
+func testKeyPath(sub: Sub, optSub: OptSub,
+                 nonHashableSub: NonHashableSub, x: Int) {
   var a = \A.property
   expect(&a, toHaveType: Exactly<WritableKeyPath<A, Prop>>.self)
 
@@ -152,6 +166,21 @@ func testKeyPath(sub: Sub, optSub: OptSub, x: Int) {
   let _: AnyKeyPath = \.property // expected-error{{ambiguous}}
   let _: AnyKeyPath = \C.value // expected-error{{cannot convert}} (need to improve diagnostic)
   let _: AnyKeyPath = \.value // expected-error{{ambiguous}}
+
+  let _ = \Prop.[nonHashableSub] // expected-error{{subscript index of type 'NonHashableSub' in a key path must be Hashable}}
+  let _ = \Prop.[sub, sub]
+  let _ = \Prop.[sub, nonHashableSub] // expected-error{{subscript index of type 'NonHashableSub' in a key path must be Hashable}}
+
+  let _ = \C<Int>.[]
+  let _ = \C<Int>.[sub]
+  let _ = \C<Int>.[noHashableConstraint: sub]
+  let _ = \C<Int>.[noHashableConstraint: nonHashableSub] // expected-error{{subscript index of type 'NonHashableSub' in a key path must be Hashable}}
+}
+
+func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
+  let _ = \C<Int>.[hashable]
+  let _ = \C<Int>.[noHashableConstraint: hashable]
+  let _ = \C<Int>.[noHashableConstraint: anything] // expected-error{{subscript index of type 'X' in a key path must be Hashable}}
 }
 
 func testDisembodiedStringInterpolation(x: Int) {

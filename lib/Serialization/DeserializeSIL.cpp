@@ -2106,7 +2106,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto valueTy = MF->getType(ListOfValues[nextValue++]);
     auto numComponents = ListOfValues[nextValue++];
     auto numOperands = ListOfValues[nextValue++];
-    assert(numOperands == 0 && "operands not implemented yet");
     auto numSubstitutions = ListOfValues[nextValue++];
     auto objcString = MF->getIdentifier(ListOfValues[nextValue++]).str();
     auto numGenericParams = ListOfValues[nextValue++];
@@ -2118,6 +2117,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     
     SmallVector<KeyPathPatternComponent, 4> components;
+    components.reserve(numComponents);
     while (numComponents-- > 0) {
       auto kind =
         (KeyPathComponentKindEncoding)ListOfValues[nextValue++];
@@ -2142,6 +2142,36 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         }
       };
       
+      ArrayRef<KeyPathPatternComponent::Index> indices;
+      SILFunction *indicesEquals = nullptr;
+      SILFunction *indicesHash = nullptr;
+      
+      auto handleComputedIndices = [&] {
+        SmallVector<KeyPathPatternComponent::Index, 4> indicesBuf;
+        auto numIndexes = ListOfValues[nextValue++];
+        indicesBuf.reserve(numIndexes);
+        while (numIndexes-- > 0) {
+          unsigned operand = ListOfValues[nextValue++];
+          auto formalType = MF->getType(ListOfValues[nextValue++]);
+          auto loweredType = MF->getType(ListOfValues[nextValue++]);
+          auto loweredCategory = (SILValueCategory)ListOfValues[nextValue++];
+          auto conformance = MF->readConformance(SILCursor);
+          indicesBuf.push_back({
+            operand, formalType->getCanonicalType(),
+            SILType::getPrimitiveType(loweredType->getCanonicalType(),
+                                      loweredCategory),
+            conformance});
+        }
+        
+        indices = MF->getContext().AllocateCopy(indicesBuf);
+        if (!indices.empty()) {
+          auto indicesEqualsName = MF->getIdentifier(ListOfValues[nextValue++]);
+          auto indicesHashName = MF->getIdentifier(ListOfValues[nextValue++]);
+          indicesEquals = getFuncForReference(indicesEqualsName.str());
+          indicesHash = getFuncForReference(indicesHashName.str());
+        }
+      };
+      
       switch (kind) {
       case KeyPathComponentKindEncoding::StoredProperty: {
         auto decl = cast<VarDecl>(MF->getDecl(ListOfValues[nextValue++]));
@@ -2153,9 +2183,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         auto id = handleComputedId();
         auto getterName = MF->getIdentifier(ListOfValues[nextValue++]);
         auto getter = getFuncForReference(getterName.str());
+        handleComputedIndices();
         components.push_back(
-          KeyPathPatternComponent::forComputedGettableProperty(id, getter, {},
-                                                               type));
+          KeyPathPatternComponent::forComputedGettableProperty(
+            id, getter, indices, indicesEquals, indicesHash, type));
         break;
       }
       case KeyPathComponentKindEncoding::SettableProperty: {
@@ -2164,10 +2195,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         auto getter = getFuncForReference(getterName.str());
         auto setterName = MF->getIdentifier(ListOfValues[nextValue++]);
         auto setter = getFuncForReference(setterName.str());
+        handleComputedIndices();
         components.push_back(
-          KeyPathPatternComponent::forComputedSettableProperty(id,
-                                                               getter, setter,
-                                                               {}, type));
+          KeyPathPatternComponent::forComputedSettableProperty(
+            id, getter, setter, indices, indicesEquals, indicesHash, type));
         break;
       }
       case KeyPathComponentKindEncoding::OptionalChain:
@@ -2205,7 +2236,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                        components,
                                        objcString);
     
-    ResultVal = Builder.createKeyPath(Loc, pattern, substitutions, kpTy);
+    SmallVector<SILValue, 4> operands;
+    
+    operands.reserve(numOperands);
+    while (numOperands-- > 0) {
+      auto opValue = ListOfValues[nextValue++];
+      auto opTy = MF->getType(ListOfValues[nextValue++]);
+      auto opCat = (SILValueCategory)ListOfValues[nextValue++];
+      operands.push_back(getLocalValue(opValue, getSILType(opTy, opCat)));
+    }
+    
+    ResultVal = Builder.createKeyPath(Loc, pattern,
+                                      substitutions, operands, kpTy);
     break;
   }
   case ValueKind::MarkUninitializedBehaviorInst:
