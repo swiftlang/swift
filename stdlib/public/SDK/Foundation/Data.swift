@@ -1862,7 +1862,7 @@ extension Data : CustomStringConvertible, CustomDebugStringConvertible, CustomRe
         
         // Minimal size data is output as an array
         if nBytes < 64 {
-            children.append((label: "bytes", value: Array(self[0..<nBytes])))
+            children.append((label: "bytes", value: Array(self[startIndex..<Swift.min(nBytes + startIndex, endIndex)])))
         }
         
         let m = Mirror(self, children:children, displayStyle: Mirror.DisplayStyle.struct)
