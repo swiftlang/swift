@@ -1356,6 +1356,10 @@ public:
           << getIDAndType(CI->getDest()) << ", "
           << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
+    if (CI->getTrueBBCount())
+      *this << " !true_count(" << CI->getTrueBBCount().getValue() << ")";
+    if (CI->getFalseBBCount())
+      *this << " !false_count(" << CI->getFalseBBCount().getValue() << ")";
   }
 
   void printUncheckedConversionInst(ConversionInst *CI, SILValue operand) {

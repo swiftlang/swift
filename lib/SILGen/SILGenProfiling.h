@@ -45,6 +45,7 @@ private:
   std::string PGOFuncName;
   llvm::DenseMap<ASTNode, unsigned> RegionCounterMap;
   llvm::DenseMap<ASTNode, Optional<uint64_t>> PGORegionLoadedCounterMap;
+  llvm::DenseMap<ASTNode, ASTNode> PGORegionCondToParentMap;
 
   std::vector<std::tuple<std::string, uint64_t, std::string>> CoverageData;
 
@@ -59,6 +60,10 @@ public:
   /// Get previously Loaded the execution count corresponding to \p Node
   /// from a profile, if one is available.
   Optional<uint64_t> getExecutionCount(ASTNode Node);
+
+  /// Get PGORegion's parent ASTNode
+  /// used to get a condition's parent IfStmt or IfCond
+  Optional<ASTNode> getPGOParent(ASTNode Node);
 
 private:
   /// Map counters to ASTNodes and set them up for profiling the given function.

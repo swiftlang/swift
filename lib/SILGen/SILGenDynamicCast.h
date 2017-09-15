@@ -25,13 +25,11 @@ RValue emitUnconditionalCheckedCast(SILGenFunction &SGF,
                                     CheckedCastKind castKind,
                                     SGFContext C);
 
-RValue emitConditionalCheckedCast(SILGenFunction &SGF,
-                                  SILLocation loc,
-                                  ManagedValue operand,
-                                  Type operandType,
-                                  Type targetType,
-                                  CheckedCastKind castKind,
-                                  SGFContext C);
+RValue emitConditionalCheckedCast(SILGenFunction &SGF, SILLocation loc,
+                                  ManagedValue operand, Type operandType,
+                                  Type targetType, CheckedCastKind castKind,
+                                  SGFContext C, Optional<uint64_t> TrueCount,
+                                  Optional<uint64_t> FalseCount);
 
 SILValue emitIsa(SILGenFunction &SGF, SILLocation loc,
                  Expr *operand, Type targetType,

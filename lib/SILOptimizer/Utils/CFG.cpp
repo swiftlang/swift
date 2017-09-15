@@ -280,10 +280,12 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
     auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
     auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
+    auto TrueCount = CBI->getTrueBBCount();
+    auto FalseCount = CBI->getFalseBBCount();
     B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
                                   CBI->getSrc(), CBI->getSourceType(),
                                   CBI->getDest(), CBI->getTargetType(),
-                                  SuccessBB, FailureBB);
+                                  SuccessBB, FailureBB, TrueCount, FalseCount);
     CBI->eraseFromParent();
     return;
   }
@@ -451,10 +453,12 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     assert(OldDest == CBI->getSuccessBB() || OldDest == CBI->getFailureBB() && "Invalid edge index");
     auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
     auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
+    auto TrueCount = CBI->getTrueBBCount();
+    auto FalseCount = CBI->getFalseBBCount();
     B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
-        CBI->getSrc(), CBI->getSourceType(),
-        CBI->getDest(), CBI->getTargetType(),
-        SuccessBB, FailureBB);
+                                  CBI->getSrc(), CBI->getSourceType(),
+                                  CBI->getDest(), CBI->getTargetType(),
+                                  SuccessBB, FailureBB, TrueCount, FalseCount);
     CBI->eraseFromParent();
     return;
   }

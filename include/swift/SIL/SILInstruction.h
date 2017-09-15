@@ -6459,11 +6459,14 @@ class CheckedCastAddrBranchInst
   CheckedCastAddrBranchInst(SILDebugLocation DebugLoc,
                             CastConsumptionKind consumptionKind, SILValue src,
                             CanType srcType, SILValue dest, CanType targetType,
-                            SILBasicBlock *successBB, SILBasicBlock *failureBB)
+                            SILBasicBlock *successBB, SILBasicBlock *failureBB,
+                            Optional<uint64_t> Target1Count,
+                            Optional<uint64_t> Target2Count)
       : InstructionBase(DebugLoc),
         ConsumptionKind(consumptionKind), Operands{this, src, dest},
-        DestBBs{{this, successBB}, {this, failureBB}}, SourceType(srcType),
-        TargetType(targetType) {}
+        DestBBs{{this, successBB, Target1Count},
+                {this, failureBB, Target2Count}},
+        SourceType(srcType), TargetType(targetType) {}
 
 public:
   CastConsumptionKind getConsumptionKind() const { return ConsumptionKind; }
@@ -6488,6 +6491,11 @@ public:
   const SILBasicBlock *getSuccessBB() const { return DestBBs[0]; }
   SILBasicBlock *getFailureBB() { return DestBBs[1]; }
   const SILBasicBlock *getFailureBB() const { return DestBBs[1]; }
+
+  /// The number of times the True branch was executed.
+  Optional<uint64_t> getTrueBBCount() const { return DestBBs[0].getCount(); }
+  /// The number of times the False branch was executed.
+  Optional<uint64_t> getFalseBBCount() const { return DestBBs[1].getCount(); }
 };
 
 /// A private abstract class to store the destinations of a TryApplyInst.

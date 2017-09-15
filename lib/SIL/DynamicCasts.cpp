@@ -1175,14 +1175,12 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
 
 /// Carry out the operations required for an indirect conditional cast
 /// using a scalar cast operation.
-void swift::
-emitIndirectConditionalCastWithScalar(SILBuilder &B, ModuleDecl *M,
-                                      SILLocation loc,
-                                      CastConsumptionKind consumption,
-                                      SILValue src, CanType sourceType,
-                                      SILValue dest, CanType targetType,
-                                      SILBasicBlock *indirectSuccBB,
-                                      SILBasicBlock *indirectFailBB) {
+void swift::emitIndirectConditionalCastWithScalar(
+    SILBuilder &B, ModuleDecl *M, SILLocation loc,
+    CastConsumptionKind consumption, SILValue src, CanType sourceType,
+    SILValue dest, CanType targetType, SILBasicBlock *indirectSuccBB,
+    SILBasicBlock *indirectFailBB, Optional<uint64_t> TrueCount,
+    Optional<uint64_t> FalseCount) {
   assert(canUseScalarCheckedCastInstructions(B.getModule(),
                                              sourceType, targetType));
 

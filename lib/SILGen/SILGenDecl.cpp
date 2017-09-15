@@ -908,12 +908,12 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
   // Try to perform the cast to the destination type, producing an optional that
   // indicates whether we succeeded.
   auto destType = OptionalType::get(pattern->getCastTypeLoc().getType());
-  
+
   value = emitConditionalCheckedCast(SGF, loc, value, pattern->getType(),
                                      destType, pattern->getCastKind(),
-                                     SGFContext())
-            .getAsSingleValue(SGF, loc);
-  
+                                     SGFContext(), None, None)
+              .getAsSingleValue(SGF, loc);
+
   // Now that we have our result as an optional, we can use an enum projection
   // to do all the work.
   EnumElementPatternInitialization::

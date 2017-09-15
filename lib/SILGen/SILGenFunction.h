@@ -1449,11 +1449,13 @@ public:
   ///                     terminated.
   /// \param handleFalse  A callback to invoke in the failure path.  The
   ///                     current BB should be terminated.
-  void emitCheckedCastBranch(
-      SILLocation loc, ConsumableManagedValue src, Type sourceType,
-      CanType targetType, SGFContext C,
-      std::function<void(ManagedValue)> handleTrue,
-      std::function<void(Optional<ManagedValue>)> handleFalse);
+  void
+  emitCheckedCastBranch(SILLocation loc, ConsumableManagedValue src,
+                        Type sourceType, CanType targetType, SGFContext C,
+                        std::function<void(ManagedValue)> handleTrue,
+                        std::function<void(Optional<ManagedValue>)> handleFalse,
+                        Optional<uint64_t> TrueCount = None,
+                        Optional<uint64_t> FalseCount = None);
 
   /// A form of checked cast branch that uses the old non-ownership preserving
   /// semantics.
@@ -1464,7 +1466,9 @@ public:
   void emitCheckedCastBranchOld(SILLocation loc, Expr *source, Type targetType,
                                 SGFContext ctx,
                                 std::function<void(ManagedValue)> handleTrue,
-                                std::function<void()> handleFalse);
+                                std::function<void()> handleFalse,
+                                Optional<uint64_t> TrueCount = None,
+                                Optional<uint64_t> FalseCount = None);
 
   /// \brief Emit a conditional checked cast branch, starting from an
   /// expression.  Terminates the current BB.
@@ -1478,10 +1482,13 @@ public:
   ///                     terminated.
   /// \param handleFalse  A callback to invoke in the failure path.  The
   ///                     current BB should be terminated.
-  void emitCheckedCastBranch(
-      SILLocation loc, Expr *src, Type targetType, SGFContext C,
-      std::function<void(ManagedValue)> handleTrue,
-      std::function<void(Optional<ManagedValue>)> handleFalse);
+  void
+  emitCheckedCastBranch(SILLocation loc, Expr *src, Type targetType,
+                        SGFContext C,
+                        std::function<void(ManagedValue)> handleTrue,
+                        std::function<void(Optional<ManagedValue>)> handleFalse,
+                        Optional<uint64_t> TrueCount = None,
+                        Optional<uint64_t> FalseCount = None);
 
   /// A form of checked cast branch that uses the old non-ownership preserving
   /// semantics.
@@ -1493,7 +1500,9 @@ public:
                                 Type sourceType, CanType targetType,
                                 SGFContext ctx,
                                 std::function<void(ManagedValue)> handleTrue,
-                                std::function<void()> handleFalse);
+                                std::function<void()> handleFalse,
+                                Optional<uint64_t> TrueCount = None,
+                                Optional<uint64_t> FalseCount = None);
 
   /// Emit the control flow for an optional 'bind' operation, branching to the
   /// active failure destination if the optional value addressed by optionalAddr

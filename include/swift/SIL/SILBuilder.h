@@ -1713,10 +1713,12 @@ public:
   createCheckedCastAddrBranch(SILLocation Loc, CastConsumptionKind consumption,
                               SILValue src, CanType sourceType, SILValue dest,
                               CanType targetType, SILBasicBlock *successBB,
-                              SILBasicBlock *failureBB) {
+                              SILBasicBlock *failureBB,
+                              Optional<uint64_t> Target1Count = None,
+                              Optional<uint64_t> Target2Count = None) {
     return insertTerminator(new (getModule()) CheckedCastAddrBranchInst(
         getSILDebugLocation(Loc), consumption, src, sourceType, dest,
-        targetType, successBB, failureBB));
+        targetType, successBB, failureBB, Target1Count, Target2Count));
   }
 
   //===--------------------------------------------------------------------===//

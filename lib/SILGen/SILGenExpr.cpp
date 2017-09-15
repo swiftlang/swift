@@ -2170,9 +2170,23 @@ RValue RValueEmitter::visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
 RValue RValueEmitter::
 visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                 SGFContext C) {
+  Optional<uint64_t> trueCount = None;
+  Optional<uint64_t> falseCount = None;
+  auto parent = SGF.SGM.getPGOParent(E);
+  if (parent) {
+    auto &Node = parent.getValue();
+    auto *NodeS = Node.get<Stmt *>();
+    if (auto *IS = dyn_cast<IfStmt>(NodeS)) {
+      trueCount = SGF.SGM.loadProfilerCount(IS->getThenStmt());
+      if (auto *ElseStmt = IS->getElseStmt()) {
+        falseCount = SGF.SGM.loadProfilerCount(ElseStmt);
+      }
+    }
+  }
   ManagedValue operand = SGF.emitRValueAsSingleValue(E->getSubExpr());
   return emitConditionalCheckedCast(SGF, E, operand, E->getSubExpr()->getType(),
-                                    E->getType(), E->getCastKind(), C);
+                                    E->getType(), E->getCastKind(), C,
+                                    trueCount, falseCount);
 }
 
 RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {

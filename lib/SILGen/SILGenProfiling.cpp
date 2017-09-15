@@ -280,12 +280,14 @@ struct PGOMapping : public ASTWalker {
   /// The map of statements to counters.
   llvm::DenseMap<ASTNode, Optional<uint64_t>> &LoadedCounterMap;
   llvm::Expected<llvm::InstrProfRecord> &LoadedCounts;
+  llvm::DenseMap<ASTNode, ASTNode> &CondToParentMap;
   llvm::DenseMap<ASTNode, unsigned> CounterMap;
 
   PGOMapping(llvm::DenseMap<ASTNode, Optional<uint64_t>> &LoadedCounterMap,
-             llvm::Expected<llvm::InstrProfRecord> &LoadedCounts)
+             llvm::Expected<llvm::InstrProfRecord> &LoadedCounts,
+             llvm::DenseMap<ASTNode, ASTNode> &PGORegionCondToParentMap)
       : NextCounter(0), LoadedCounterMap(LoadedCounterMap),
-        LoadedCounts(LoadedCounts) {}
+        LoadedCounts(LoadedCounts), CondToParentMap(PGORegionCondToParentMap) {}
 
   unsigned getParentCounter() const {
     if (Parent.isNull())
@@ -366,6 +368,13 @@ struct PGOMapping : public ASTWalker {
           }
         }
         LoadedCounterMap[elseStmt] = subtract(count, thenCount);
+        auto Cond = IS->getCond();
+        for (const auto &elt : Cond) {
+          if (elt.getKind() ==
+              StmtConditionElement::ConditionKind::CK_PatternBinding) {
+            CondToParentMap[elt.getInitializer()] = IS;
+          }
+        }
       }
     } else if (auto *US = dyn_cast<GuardStmt>(S)) {
       auto guardBody = US->getBody();
@@ -914,7 +923,8 @@ void SILGenProfiling::assignRegionCounters(Decl *Root) {
       llvm::dbgs() << PGOFuncName << "\n";
       return;
     }
-    PGOMapping pgoMapper(PGORegionLoadedCounterMap, LoadedCounts);
+    PGOMapping pgoMapper(PGORegionLoadedCounterMap, LoadedCounts,
+                         PGORegionCondToParentMap);
     walkForProfiling(Root, pgoMapper);
   }
 }
@@ -925,6 +935,17 @@ Optional<uint64_t> SILGenProfiling::getExecutionCount(ASTNode Node) {
   }
   auto it = PGORegionLoadedCounterMap.find(Node);
   if (it == PGORegionLoadedCounterMap.end()) {
+    return None;
+  }
+  return it->getSecond();
+}
+
+Optional<ASTNode> SILGenProfiling::getPGOParent(ASTNode Node) {
+  if (!Node) {
+    return None;
+  }
+  auto it = PGORegionCondToParentMap.find(Node);
+  if (it == PGORegionCondToParentMap.end()) {
     return None;
   }
   return it->getSecond();

@@ -72,6 +72,13 @@ public:
     return None;
   }
 
+  /// Get the PGO's node parent
+  Optional<ASTNode> getPGOParent(ASTNode Node) {
+    if (PGOReader && Profiler && Profiler->hasRegionCounters())
+      return Profiler->getPGOParent(Node);
+    return None;
+  }
+
   /// Mapping from SILDeclRefs to emitted SILFunctions.
   llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
   /// Mapping from ProtocolConformances to emitted SILWitnessTables.
