@@ -91,6 +91,11 @@ class TestDriverArgumentParserMeta(type):
     """
 
     def __new__(cls, name, bases, attrs):
+        # Generate tests for each default value
+        for dest, value in expected_options.EXPECTED_DEFAULTS.items():
+            test_name = 'test_default_value_' + dest
+            attrs[test_name] = cls.generate_default_value_test(dest, value)
+
         # Generate tests for each expected option
         for option in expected_options.EXPECTED_OPTIONS:
             test_name = 'test_option_' + option.sanitized_str()
@@ -105,6 +110,22 @@ class TestDriverArgumentParserMeta(type):
 
         return super(TestDriverArgumentParserMeta, cls).__new__(
             cls, name, bases, attrs)
+
+    @classmethod
+    def generate_default_value_test(cls, dest, default_value):
+        def test(self):
+            with self.assertNotRaises(ParserError):
+                parsed_values = self.parse_args([])
+
+            parsed_value = getattr(parsed_values, dest)
+            if default_value.__class__ is str:
+                parsed_value = str(parsed_value)
+
+            self.assertEqual(default_value, parsed_value,
+                             'Invalid default value for "{}": {} != {}'
+                             .format(dest, default_value, parsed_value))
+
+        return test
 
     @classmethod
     def _generate_option_test(cls, option):
@@ -298,18 +319,6 @@ class TestDriverArgumentParser(unittest.TestCase):
 
     def setUp(self):
         self.parser = driver_arguments.create_argument_parser()
-
-    def test_option_default_values(self):
-        parsed_values = self.parse_args([]).__dict__
-
-        for dest, default_value in expected_options.EXPECTED_DEFAULTS.items():
-            parsed_value = parsed_values[dest]
-            if default_value.__class__ is str:
-                parsed_value = str(parsed_value)
-
-            self.assertEqual(default_value, parsed_value,
-                             'Invalid default value for "{}": {} != {}'
-                             .format(dest, default_value, parsed_value))
 
     # -------------------------------------------------------------------------
     # Manual option tests
