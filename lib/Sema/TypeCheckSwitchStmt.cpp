@@ -74,11 +74,11 @@ namespace {
   /// condition is empty.
   struct SpaceEngine {
     enum class SpaceKind : uint8_t {
-      Empty           = 1 << 0,
-      Type            = 1 << 1,
-      Constructor     = 1 << 2,
-      Disjunct        = 1 << 3,
-      BooleanConstant = 1 << 4,
+      Empty,
+      Type,
+      Constructor,
+      Disjunct,
+      BooleanConstant
     };
 
     /// A data structure for conveniently pattern-matching on the kinds of
