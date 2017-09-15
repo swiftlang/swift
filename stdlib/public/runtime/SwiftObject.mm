@@ -869,7 +869,8 @@ static bool isObjCForUnownedReference(void *value) {
           !objectUsesNativeSwiftReferenceCounting(value));
 }
 
-void swift::swift_unknownUnownedInit(UnownedReference *dest, void *value) {
+UnownedReference *swift::swift_unknownUnownedInit(UnownedReference *dest,
+                                                  void *value) {
   if (!value) {
     dest->Value = nullptr;
   } else if (isObjCForUnownedReference(value)) {
@@ -877,9 +878,11 @@ void swift::swift_unknownUnownedInit(UnownedReference *dest, void *value) {
   } else {
     swift_unownedInit(dest, (HeapObject*) value);
   }
+  return dest;
 }
 
-void swift::swift_unknownUnownedAssign(UnownedReference *dest, void *value) {
+UnownedReference *swift::swift_unknownUnownedAssign(UnownedReference *dest,
+                                                    void *value) {
   if (!value) {
     swift_unknownUnownedDestroy(dest);
     dest->Value = nullptr;
@@ -898,6 +901,7 @@ void swift::swift_unknownUnownedAssign(UnownedReference *dest, void *value) {
       swift_unownedAssign(dest, (HeapObject*) value);
     }
   }
+  return dest;
 }
 
 void *swift::swift_unknownUnownedLoadStrong(UnownedReference *ref) {
@@ -941,8 +945,8 @@ void swift::swift_unknownUnownedDestroy(UnownedReference *ref) {
   }
 }
 
-void swift::swift_unknownUnownedCopyInit(UnownedReference *dest,
-                                         UnownedReference *src) {
+UnownedReference *swift::swift_unknownUnownedCopyInit(UnownedReference *dest,
+                                                      UnownedReference *src) {
   assert(dest != src);
   if (!src->Value) {
     dest->Value = nullptr;
@@ -951,17 +955,19 @@ void swift::swift_unknownUnownedCopyInit(UnownedReference *dest,
   } else {
     swift_unownedCopyInit(dest, src);
   }
+  return dest;
 }
 
-void swift::swift_unknownUnownedTakeInit(UnownedReference *dest,
-                                         UnownedReference *src) {
+UnownedReference *swift::swift_unknownUnownedTakeInit(UnownedReference *dest,
+                                                      UnownedReference *src) {
   assert(dest != src);
   dest->Value = src->Value;
+  return dest;
 }
 
-void swift::swift_unknownUnownedCopyAssign(UnownedReference *dest,
-                                           UnownedReference *src) {
-  if (dest == src) return;
+UnownedReference *swift::swift_unknownUnownedCopyAssign(UnownedReference *dest,
+                                                        UnownedReference *src) {
+  if (dest == src) return dest;
 
   if (auto objcSrc = dyn_cast<ObjCUnownedReference>(src)) {
     if (auto objcDest = dyn_cast<ObjCUnownedReference>(dest)) {
@@ -969,7 +975,7 @@ void swift::swift_unknownUnownedCopyAssign(UnownedReference *dest,
       objc_destroyWeak(&objcDest->storage()->WeakRef);
       objc_copyWeak(&objcDest->storage()->WeakRef,
                     &objcSrc->storage()->WeakRef);
-      return;
+      return dest;
     }
 
     swift_unownedDestroy(dest);
@@ -982,15 +988,17 @@ void swift::swift_unknownUnownedCopyAssign(UnownedReference *dest,
       swift_unownedCopyAssign(dest, src);
     }
   }
+  return dest;
 }
 
-void swift::swift_unknownUnownedTakeAssign(UnownedReference *dest,
-                                           UnownedReference *src) {
+UnownedReference *swift::swift_unknownUnownedTakeAssign(UnownedReference *dest,
+                                                        UnownedReference *src) {
   assert(dest != src);
 
   // There's not really anything more efficient to do here than this.
   swift_unknownUnownedDestroy(dest);
   dest->Value = src->Value;
+  return dest;
 }
 
 bool swift::swift_unknownUnownedIsEqual(UnownedReference *ref, void *value) {
@@ -1012,12 +1020,14 @@ bool swift::swift_unknownUnownedIsEqual(UnownedReference *ref, void *value) {
 /************************** UNKNOWN WEAK REFERENCES **************************/
 /*****************************************************************************/
 
-void swift::swift_unknownWeakInit(WeakReference *ref, void *value) {
-  return ref->unknownInit(value);
+WeakReference *swift::swift_unknownWeakInit(WeakReference *ref, void *value) {
+  ref->unknownInit(value);
+  return ref;
 }
 
-void swift::swift_unknownWeakAssign(WeakReference *ref, void *value) {
-  return ref->unknownAssign(value);
+WeakReference *swift::swift_unknownWeakAssign(WeakReference *ref, void *value) {
+  ref->unknownAssign(value);
+  return ref;
 }
 
 void *swift::swift_unknownWeakLoadStrong(WeakReference *ref) {
@@ -1032,19 +1042,25 @@ void swift::swift_unknownWeakDestroy(WeakReference *ref) {
   ref->unknownDestroy();
 }
 
-void swift::swift_unknownWeakCopyInit(WeakReference *dest, WeakReference *src) {
+WeakReference *swift::swift_unknownWeakCopyInit(WeakReference *dest,
+                                                WeakReference *src) {
   dest->unknownCopyInit(src);
+  return dest;
 }
-void swift::swift_unknownWeakTakeInit(WeakReference *dest, WeakReference *src) {
+WeakReference *swift::swift_unknownWeakTakeInit(WeakReference *dest,
+                                                WeakReference *src) {
   dest->unknownTakeInit(src);
+  return dest;
 }
-void swift::swift_unknownWeakCopyAssign(WeakReference *dest,
-                                        WeakReference *src) {
+WeakReference *swift::swift_unknownWeakCopyAssign(WeakReference *dest,
+                                                  WeakReference *src) {
   dest->unknownCopyAssign(src);
+  return dest;
 }
-void swift::swift_unknownWeakTakeAssign(WeakReference *dest,
-                                        WeakReference *src) {
+WeakReference *swift::swift_unknownWeakTakeAssign(WeakReference *dest,
+                                                  WeakReference *src) {
   dest->unknownTakeAssign(src);
+  return dest;
 }
 
 // SWIFT_OBJC_INTEROP

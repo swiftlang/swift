@@ -80,7 +80,7 @@ entry(%s : $CP):
   // CHECK: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[U1]], i32 0, i32 1
   // CHECK: store i8** %1, i8*** [[T0]], align 8
   // CHECK: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[U1]], i32 0, i32 0
-  // CHECK: call void @swift_unknownUnownedInit(%swift.unowned* [[T0]], %objc_object* %0)
+  // CHECK: call %swift.unowned* @swift_unknownUnownedInit(%swift.unowned* [[T0]], %objc_object* %0)
 
   // CHECK: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[U1]], i32 0, i32 0
   // CHECK: [[T1:%.*]] = call %objc_object* @swift_unknownUnownedLoadStrong(%swift.unowned* [[T0]])
@@ -112,7 +112,7 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
   // CHECK: store i8** [[SRC_WITNESS]], i8*** [[DEST_WITNESS_ADDR]]
   // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call void @swift_unknownWeakInit(%swift.weak* [[DEST_REF_ADDR]], %objc_object* [[SRC_REF]])
+  // CHECK: call %swift.weak* @swift_unknownWeakInit(%swift.weak* [[DEST_REF_ADDR]], %objc_object* [[SRC_REF]])
   store_weak %a to [initialization] %w : $*@sil_weak CP?
 
   // CHECK: [[SRC_REF:%.*]] = inttoptr {{.*}} %objc_object*
@@ -120,7 +120,7 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
   // CHECK: store i8** [[SRC_WITNESS]], i8*** [[DEST_WITNESS_ADDR]]
   // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call void @swift_unknownWeakAssign(%swift.weak* [[DEST_REF_ADDR]], %objc_object* [[SRC_REF]])
+  // CHECK: call %swift.weak* @swift_unknownWeakAssign(%swift.weak* [[DEST_REF_ADDR]], %objc_object* [[SRC_REF]])
   store_weak %a to                  %w : $*@sil_weak CP?
 
   // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
@@ -137,7 +137,7 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
 
   // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
   // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call void @swift_unknownWeakTakeInit(%swift.weak* [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
+  // CHECK: call %swift.weak* @swift_unknownWeakTakeInit(%swift.weak* [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
   // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
   // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
   // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
@@ -146,7 +146,7 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
 
   // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
   // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call void @swift_unknownWeakTakeAssign(%swift.weak* [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
+  // CHECK: call %swift.weak* @swift_unknownWeakTakeAssign(%swift.weak* [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
   // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
   // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
   // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
@@ -155,7 +155,7 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
 
   // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
   // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call void @swift_unknownWeakCopyInit(%swift.weak* [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
+  // CHECK: call %swift.weak* @swift_unknownWeakCopyInit(%swift.weak* [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
   // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
   // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
   // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
@@ -164,7 +164,7 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
 
   // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
   // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call void @swift_unknownWeakCopyAssign(%swift.weak* [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
+  // CHECK: call %swift.weak* @swift_unknownWeakCopyAssign(%swift.weak* [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
   // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
   // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
   // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
