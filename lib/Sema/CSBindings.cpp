@@ -142,37 +142,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
 
   PotentialBindings result;
-  Optional<unsigned> lastSupertypeIndex;
-
-  // Local function to add a potential binding to the list of bindings,
-  // coalescing supertype bounds when we are able to compute the meet.
-  auto addPotentialBinding = [&](PotentialBinding binding,
-                                 bool allowJoinMeet = true) {
-    assert(!binding.BindingType->is<ErrorType>());
-    // If this is a non-defaulted supertype binding, check whether we can
-    // combine it with another supertype binding by computing the 'join' of the
-    // types.
-    if (binding.Kind == AllowedBindingKind::Supertypes &&
-        !binding.BindingType->hasTypeVariable() && !binding.DefaultedProtocol &&
-        !binding.isDefaultableBinding() && allowJoinMeet) {
-      if (lastSupertypeIndex) {
-        // Can we compute a join?
-        auto &lastBinding = result.Bindings[*lastSupertypeIndex];
-        auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
-        auto bindingType = binding.BindingType->getWithoutSpecifierType();
-        if (auto join = Type::join(lastType, bindingType)) {
-          // Replace the last supertype binding with the join. We're done.
-          lastBinding.BindingType = join;
-          return;
-        }
-      }
-
-      // Record this as the most recent supertype index.
-      lastSupertypeIndex = result.Bindings.size();
-    }
-
-    result.Bindings.push_back(std::move(binding));
-  };
 
   // Consider each of the constraints related to this type variable.
   llvm::SmallPtrSet<CanType, 4> exactTypes;
@@ -284,8 +253,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
           continue;
 
         result.foundLiteralBinding(constraint->getProtocol());
-        addPotentialBinding({defaultType, AllowedBindingKind::Subtypes,
-                             constraint->getProtocol()});
+        result.addPotentialBinding({defaultType, AllowedBindingKind::Subtypes,
+                                    constraint->getProtocol()});
         continue;
       }
 
@@ -311,8 +280,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       if (!matched) {
         result.foundLiteralBinding(constraint->getProtocol());
         exactTypes.insert(defaultType->getCanonicalType());
-        addPotentialBinding({defaultType, AllowedBindingKind::Subtypes,
-                             constraint->getProtocol()});
+        result.addPotentialBinding({defaultType, AllowedBindingKind::Subtypes,
+                                    constraint->getProtocol()});
       }
 
       continue;
@@ -484,10 +453,12 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     }
 
     if (exactTypes.insert(type->getCanonicalType()).second)
-      addPotentialBinding({type, kind, None}, /*allowJoinMeet=*/!adjustedIUO);
+      result.addPotentialBinding({type, kind, None},
+                                 /*allowJoinMeet=*/!adjustedIUO);
     if (alternateType &&
         exactTypes.insert(alternateType->getCanonicalType()).second)
-      addPotentialBinding({alternateType, kind, None}, /*allowJoinMeet=*/false);
+      result.addPotentialBinding({alternateType, kind, None},
+                                 /*allowJoinMeet=*/false);
   }
 
   // If we have any literal constraints, check whether there is already a
@@ -565,7 +536,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       continue;
 
     ++result.NumDefaultableBindings;
-    addPotentialBinding(
+    result.addPotentialBinding(
         {type, AllowedBindingKind::Exact, None, constraint->getLocator()});
   }
 
