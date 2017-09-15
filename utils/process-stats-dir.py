@@ -349,6 +349,10 @@ def main():
                         default=False,
                         action="store_true",
                         help="Sort comparison results in descending order")
+    parser.add_argument("--merge-by",
+                        default="sum",
+                        type=str,
+                        help="Merge identical metrics by (sum|min|max)")
     parser.add_argument("--markdown",
                         default=False,
                         action="store_true",
