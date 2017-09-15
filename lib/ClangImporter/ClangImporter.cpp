@@ -3324,8 +3324,8 @@ importName(const clang::NamedDecl *D,
     getDeclName();
 }
 
-bool swift::isInOverlayModuleForImportedModule(DeclContext *overlayDC,
-                                               DeclContext *importedDC) {
+bool swift::isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
+                                               const DeclContext *importedDC) {
   overlayDC = overlayDC->getModuleScopeContext();
   importedDC = importedDC->getModuleScopeContext();
 
