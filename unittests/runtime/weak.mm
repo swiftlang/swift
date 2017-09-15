@@ -960,7 +960,7 @@ TEST(WeakTest, unknownWeak) {
   res = swift_unknownWeakTakeAssign(&ref3, &ref1);
   ASSERT_EQ(&ref3, res);
 
-  swift_weakDestroy(&ref3);
+  swift_unknownWeakDestroy(&ref3);
 
   swift_release(swift1);
   swift_unknownRelease(objc1);
