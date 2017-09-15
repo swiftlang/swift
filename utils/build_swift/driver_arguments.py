@@ -194,53 +194,53 @@ def _apply_default_arguments(args):
 
     # If none of tests specified skip swift stdlib test on all platforms
     if not args.test and not args.validation_test and not args.long_test:
-        args.skip_test_linux = True
-        args.skip_test_freebsd = True
-        args.skip_test_cygwin = True
-        args.skip_test_osx = True
-        args.skip_test_ios = True
-        args.skip_test_tvos = True
-        args.skip_test_watchos = True
+        args.test_linux = False
+        args.test_freebsd = False
+        args.test_cygwin = False
+        args.test_osx = False
+        args.test_ios = False
+        args.test_tvos = False
+        args.test_watchos = False
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
-    if args.skip_test_ios:
-        args.skip_test_ios_host = True
-        args.skip_test_ios_simulator = True
+    if not args.test_ios:
+        args.test_ios_device = False
+        args.test_ios_simulator = False
     # --skip-test-tvos is merely a shorthand for host and simulator tests.
-    if args.skip_test_tvos:
-        args.skip_test_tvos_host = True
-        args.skip_test_tvos_simulator = True
+    if not args.test_tvos:
+        args.test_tvos_device = False
+        args.test_tvos_simulator = False
     # --skip-test-watchos is merely a shorthand for host and simulator
     # --tests.
-    if args.skip_test_watchos:
-        args.skip_test_watchos_host = True
-        args.skip_test_watchos_simulator = True
+    if not args.test_watchos:
+        args.test_watchos_device = False
+        args.test_watchos_simulator = False
 
     # --skip-build-{ios,tvos,watchos}-{device,simulator} implies
     # --skip-test-{ios,tvos,watchos}-{host,simulator}
     if not args.build_ios_device:
-        args.skip_test_ios_host = True
+        args.test_ios_device = False
     if not args.build_ios_simulator:
-        args.skip_test_ios_simulator = True
+        args.test_ios_simulator = False
 
     if not args.build_tvos_device:
-        args.skip_test_tvos_host = True
+        args.test_tvos_device = False
     if not args.build_tvos_simulator:
-        args.skip_test_tvos_simulator = True
+        args.test_tvos_simulator = False
 
     if not args.build_watchos_device:
-        args.skip_test_watchos_host = True
+        args.test_watchos_device = False
     if not args.build_watchos_simulator:
-        args.skip_test_watchos_simulator = True
+        args.test_watchos_simulator = False
 
     if not args.build_android:
-        args.skip_test_android_host = True
+        args.test_android_device = False
 
     if not args.host_test:
-        args.skip_test_ios_host = True
-        args.skip_test_tvos_host = True
-        args.skip_test_watchos_host = True
-        args.skip_test_android_host = True
+        args.test_ios_device = False
+        args.test_tvos_device = False
+        args.test_watchos_device = False
+        args.test_android_device = False
 
     if args.build_subdir is None:
         args.build_subdir = \
@@ -616,20 +616,24 @@ iterations with -O",
         iterations with -Onone", metavar='N', type=int, default=3)
     run_tests_group.add_argument(
         "--skip-test-osx",
-        help="skip testing Swift stdlibs for Mac OS X",
-        action=arguments.action.optional_bool)
+        dest='test_osx',
+        action=arguments.action.optional_false,
+        help="skip testing Swift stdlibs for Mac OS X")
     run_tests_group.add_argument(
         "--skip-test-linux",
-        help="skip testing Swift stdlibs for Linux",
-        action=arguments.action.optional_bool)
+        dest='test_linux',
+        action=arguments.action.optional_false,
+        help="skip testing Swift stdlibs for Linux")
     run_tests_group.add_argument(
         "--skip-test-freebsd",
-        help="skip testing Swift stdlibs for FreeBSD",
-        action=arguments.action.optional_bool)
+        dest='test_freebsd',
+        action=arguments.action.optional_false,
+        help="skip testing Swift stdlibs for FreeBSD")
     run_tests_group.add_argument(
         "--skip-test-cygwin",
-        help="skip testing Swift stdlibs for Cygwin",
-        action=arguments.action.optional_bool)
+        dest='test_cygwin',
+        action=arguments.action.optional_false,
+        help="skip testing Swift stdlibs for Cygwin")
     parser.add_argument(
         "--build-runtime-with-host-compiler",
         help="Use the host compiler, not the self-built one to compile the "
@@ -755,56 +759,66 @@ iterations with -O",
         title="Skip testing specified targets")
     skip_test_group.add_argument(
         "--skip-test-ios",
+        dest='test_ios',
+        action=arguments.action.optional_false,
         help="skip testing all iOS targets. Equivalent to specifying both "
-             "--skip-test-ios-simulator and --skip-test-ios-host",
-        action=arguments.action.optional_bool)
+             "--skip-test-ios-simulator and --skip-test-ios-host")
     skip_test_group.add_argument(
         "--skip-test-ios-simulator",
-        help="skip testing iOS simulator targets",
-        action=arguments.action.optional_bool)
+        dest='test_ios_simulator',
+        action=arguments.action.optional_false,
+        help="skip testing iOS simulator targets")
     skip_test_group.add_argument(
         "--skip-test-ios-32bit-simulator",
-        help="skip testing iOS 32 bit simulator targets",
-        action=arguments.action.optional_bool,
-        default=False)
+        dest='test_ios_32bit_simulator',
+        action=arguments.action.optional_false,
+        help="skip testing iOS 32 bit simulator targets")
     skip_test_group.add_argument(
         "--skip-test-ios-host",
+        dest='test_ios_device',
+        action=arguments.action.optional_false,
         help="skip testing iOS device targets on the host machine (the phone "
-             "itself)",
-        action=arguments.action.optional_bool)
+             "itself)")
     skip_test_group.add_argument(
         "--skip-test-tvos",
+        dest='test_tvos',
+        action=arguments.action.optional_false,
         help="skip testing all tvOS targets. Equivalent to specifying both "
-             "--skip-test-tvos-simulator and --skip-test-tvos-host",
-        action=arguments.action.optional_bool)
+             "--skip-test-tvos-simulator and --skip-test-tvos-host")
     skip_test_group.add_argument(
         "--skip-test-tvos-simulator",
-        help="skip testing tvOS simulator targets",
-        action=arguments.action.optional_bool)
+        dest='test_tvos_simulator',
+        action=arguments.action.optional_false,
+        help="skip testing tvOS simulator targets")
     skip_test_group.add_argument(
         "--skip-test-tvos-host",
+        dest='test_tvos_device',
+        action=arguments.action.optional_false,
         help="skip testing tvOS device targets on the host machine (the TV "
-             "itself)",
-        action=arguments.action.optional_bool)
+             "itself)")
     skip_test_group.add_argument(
         "--skip-test-watchos",
+        dest='test_watchos',
+        action=arguments.action.optional_false,
         help="skip testing all tvOS targets. Equivalent to specifying both "
-             "--skip-test-watchos-simulator and --skip-test-watchos-host",
-        action=arguments.action.optional_bool)
+             "--skip-test-watchos-simulator and --skip-test-watchos-host")
     skip_test_group.add_argument(
         "--skip-test-watchos-simulator",
-        help="skip testing watchOS simulator targets",
-        action=arguments.action.optional_bool)
+        dest='test_watchos_simulator',
+        action=arguments.action.optional_false,
+        help="skip testing watchOS simulator targets")
     skip_test_group.add_argument(
         "--skip-test-watchos-host",
+        dest='test_watchos_device',
+        action=arguments.action.optional_false,
         help="skip testing watchOS device targets on the host machine (the "
-             "watch itself)",
-        action=arguments.action.optional_bool)
+             "watch itself)")
     skip_test_group.add_argument(
         "--skip-test-android-host",
+        dest='test_android_device',
+        action=arguments.action.optional_false,
         help="skip testing Android device targets on the host machine (the "
-             "phone itself)",
-        action=arguments.action.optional_bool)
+             "phone itself)")
 
     parser.add_argument(
         "-i", "--ios",
