@@ -37,7 +37,6 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializationOptions.h"
 
-#include "clang/Basic/Module.h"
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
 #include "clang/Frontend/CompilerInstance.h"
@@ -533,13 +532,14 @@ IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
 
   // If we're referring to a member of a private module that will be
   // re-exported via a public module, record the public module's name.
-  if (auto clangModule = M->findUnderlyingClangModule()) {
-    if (!clangModule->ExportAsModule.empty()) {
-      auto publicModuleName =
-        M->getASTContext().getIdentifier(clangModule->ExportAsModule);
-      return addDeclBaseNameRef(publicModuleName);
-    }
+  if (auto clangModuleUnit =
+        dyn_cast<ClangModuleUnit>(M->getFiles().front())) {
+    auto exportedModuleName =
+        M->getASTContext().getIdentifier(
+                                 clangModuleUnit->getExportedModuleName());
+    return addDeclBaseNameRef(exportedModuleName);
   }
+
   assert(!M->getName().empty());
   return addDeclBaseNameRef(M->getName());
 }

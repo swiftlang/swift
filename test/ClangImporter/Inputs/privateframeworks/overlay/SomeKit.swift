@@ -15,13 +15,13 @@ extension NSObject {
   public func doSomethingElse(_: SKWidget) { }
 }
 
-extension SKWidgetError {
-  public func getCode(from widget: SKWidget) -> SKWidgetError.Code {
+extension SKWidget.Error {
+  public func getCode(from widget: SKWidget) -> SKWidget.Error.Code {
     return widget.getCurrentError()
   }
 }
 
-extension SKWidgetError.Code {
+extension SKWidget.Error.Code {
   public var isBoom: Bool {
     return self == .boom
   }
@@ -42,7 +42,7 @@ public func inlineWidgetOperations(_ widget: SKWidget) {
   widget.doSomethingElse(widget)
   let obj = widget.anObject
   widget.anObject = obj
-  _ = SKWidgetError(.boom).getCode(from: widget).isBoom
+  _ = SKWidget.Error(.boom).getCode(from: widget).isBoom
   var hao: HasAnObject = widget
   someKitGlobalFunc()
   hao.anObject = widget

@@ -14,7 +14,7 @@
 @end
 
 extern NSString * _Nonnull const SKWidgetErrorDomain;
-typedef enum __attribute__((ns_error_domain(SKWidgetErrorDomain))) SKWidgetErrorCode : NSInteger {
+typedef enum __attribute__((ns_error_domain(SKWidgetErrorDomain))) __attribute__((swift_name("SKWidget.Error"))) SKWidgetErrorCode : NSInteger {
   SKWidgetErrorNone = 0,
   SKWidgetErrorBoom = 1
 } SKWidgetErrorCode;

@@ -40,7 +40,7 @@ func testWidget(widget: SKWidget) {
 }
 
 func testError(widget: SKWidget) {
-  let c: SKWidgetError.Code = SKWidgetError(.boom).getCode(from: widget)
+  let c: SKWidget.Error.Code = SKWidget.Error(.boom).getCode(from: widget)
   if c.isBoom { }
 }
 
