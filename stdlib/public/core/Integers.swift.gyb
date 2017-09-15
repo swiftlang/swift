@@ -1343,9 +1343,7 @@ extension Numeric {
 ///     }
 ///     // Prints "23 is greater than -23."
 public protocol BinaryInteger :
-  Hashable, Numeric, CustomStringConvertible, Strideable
-  where Magnitude : BinaryInteger, Magnitude.Magnitude == Magnitude
-{
+  Hashable, Numeric, CustomStringConvertible, Strideable {
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
   /// *Signed* integer types can represent both positive and negative values.
@@ -1948,9 +1946,7 @@ extension BinaryInteger {
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
 public protocol FixedWidthInteger :
-  BinaryInteger, LosslessStringConvertible, _BitwiseOperations
-  where Magnitude : FixedWidthInteger
-  {
+  BinaryInteger, LosslessStringConvertible, _BitwiseOperations {
   /// The number of bits used for the underlying binary representation of
   /// values of this type.
   ///
@@ -2267,7 +2263,10 @@ ${operatorComment(x.nonMaskingOperator, True)}
 % end # maskingShifts
 }
 
-extension FixedWidthInteger {
+extension FixedWidthInteger where
+  Magnitude : FixedWidthInteger,
+  Magnitude.Magnitude == Magnitude {
+
   @_semantics("optimize.sil.specialize.generic.partial.never")
   public // @testable
   static func _convert<Source : BinaryFloatingPoint>(
@@ -2354,6 +2353,9 @@ extension FixedWidthInteger {
     }
     self = value
   }
+}
+
+extension FixedWidthInteger {
 
   /// Creates a new instance with the representable value that's closest to the
   /// given integer.
@@ -2502,7 +2504,8 @@ ${operatorComment('&' + x.operator, True)}
 //===----------------------------------------------------------------------===//
 
 /// An integer type that can represent only nonnegative values.
-public protocol UnsignedInteger : BinaryInteger { }
+public protocol UnsignedInteger : BinaryInteger
+  where Magnitude : BinaryInteger { }
 
 extension UnsignedInteger {
   /// The magnitude of this value.
@@ -2623,7 +2626,8 @@ extension UnsignedInteger where Self : FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 /// An integer type that can represent both positive and negative values.
-public protocol SignedInteger : BinaryInteger, SignedNumeric {
+public protocol SignedInteger : BinaryInteger, SignedNumeric
+  where Magnitude : BinaryInteger {
   // These requirements are for the source code compatibility with Swift 3
   static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self
   static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self
