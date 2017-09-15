@@ -245,8 +245,6 @@ class BuildScriptInvocation(object):
 
     @staticmethod
     def apply_default_arguments(toolchain, args):
-        driver_arguments.apply_default_arguments(args)
-
         # infer if ninja is required
         ninja_required = (
             args.cmake_generator == 'Ninja' or args.build_foundation)
