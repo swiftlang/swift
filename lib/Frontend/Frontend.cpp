@@ -437,7 +437,8 @@ void CompilerInstance::getImplicitlyImportedModules(
 void CompilerInstance::createREPLFile(ImplicitImports &implicitImports) const {
   SharedTimer timer("performSema-createREPLFile");
   auto *SingleInputFile = new (*Context) SourceFile(
-      *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind, Invocation.getLangOptions().KeepTokensInSourceFile);
+      *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind,
+      Invocation.getLangOptions().KeepTokensInSourceFile);
   MainModule->addFile(*SingleInputFile);
   addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
 }
@@ -462,10 +463,10 @@ void CompilerInstance::addMainFileToModule(ImplicitImports &implicitImports) {
 
   if (Kind == InputFileKind::IFK_Swift)
     SourceMgr.setHashbangBufferID(MainBufferID);
-  
-  auto *MainFile = new (*Context) SourceFile(*MainModule,
-                                             Invocation.getSourceFileKind(),
-                                             MainBufferID, implicitImports.kind, Invocation.getLangOptions().KeepTokensInSourceFile);
+
+  auto *MainFile = new (*Context) SourceFile(
+      *MainModule, Invocation.getSourceFileKind(), MainBufferID,
+      implicitImports.kind, Invocation.getLangOptions().KeepTokensInSourceFile);
   MainModule->addFile(*MainFile);
   addAdditionalInitialImportsTo(MainFile, implicitImports);
 
@@ -496,7 +497,8 @@ void CompilerInstance::parseLibraryFile(
   SharedTimer timer("performSema-parseLibraryFile");
 
   auto *NextInput = new (*Context) SourceFile(
-      *MainModule, SourceFileKind::Library, BufferID, implicitImports.kind, Invocation.getLangOptions().KeepTokensInSourceFile);
+      *MainModule, SourceFileKind::Library, BufferID, implicitImports.kind,
+      Invocation.getLangOptions().KeepTokensInSourceFile);
   MainModule->addFile(*NextInput);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
@@ -695,8 +697,9 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
     assert(Kind == InputFileKind::IFK_Swift);
     SourceMgr.setHashbangBufferID(MainBufferID);
 
-    auto *MainFile = new (*Context) SourceFile(
-        *MainModule, Invocation.getSourceFileKind(), MainBufferID, implicitModuleImportKind, KeepTokens);
+    auto *MainFile = new (*Context)
+        SourceFile(*MainModule, Invocation.getSourceFileKind(), MainBufferID,
+                   implicitModuleImportKind, KeepTokens);
     MainModule->addFile(*MainFile);
 
     if (MainBufferID == PrimaryBufferID)
@@ -711,7 +714,8 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
       continue;
 
     auto *NextInput = new (*Context)
-        SourceFile(*MainModule, SourceFileKind::Library, BufferID, implicitModuleImportKind, KeepTokens);
+        SourceFile(*MainModule, SourceFileKind::Library, BufferID,
+                   implicitModuleImportKind, KeepTokens);
     MainModule->addFile(*NextInput);
     if (BufferID == PrimaryBufferID)
       setPrimarySourceFile(NextInput);
