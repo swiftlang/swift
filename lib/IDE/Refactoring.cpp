@@ -1502,9 +1502,6 @@ static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo Cur
       if (!IFS) {
         return false;
       }
-      if (IFS->getCond().size() != 1) {
-        return false;
-      }
       if (!IfInfo.OuterIf) {
         IfInfo.OuterIf = IFS;
         return true;
@@ -1541,32 +1538,36 @@ static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo Cur
 }
 
 bool RefactoringActionCollapseNestedIfExpr::isApplicable(ResolvedCursorInfo Tok) {
-    return findCollapseNestedIfTarget(Tok).isValid();
+  return findCollapseNestedIfTarget(Tok).isValid();
 }
 
 bool RefactoringActionCollapseNestedIfExpr::performChange() {
-    auto Target = findCollapseNestedIfTarget(CursorInfo);
-    if (!Target.isValid())
-        return true;
-    auto OuterIfConditionals = Target.OuterIf->getCond().vec();
-    auto InnerIfConditionals = Target.InnerIf->getCond().vec();
+  auto Target = findCollapseNestedIfTarget(CursorInfo);
+  if (!Target.isValid())
+    return true;
+  auto OuterIfConds = Target.OuterIf->getCond().vec();
+  auto InnerIfConds = Target.InnerIf->getCond().vec();
 
-    auto OuterIfConditionalText = Lexer::getCharSourceRangeFromSourceRange(
-     SM, OuterIfConditionals[0].getSourceRange()).str();
-    auto InnerIfConditionalText = Lexer::getCharSourceRangeFromSourceRange(
-     SM, InnerIfConditionals[0].getSourceRange()).str();
-    auto ThenStatementText = Lexer::getCharSourceRangeFromSourceRange(
-     SM, Target.InnerIf->getThenStmt()->getSourceRange()).str();
+  llvm::SmallString<64> DeclBuffer;
+  llvm::raw_svector_ostream OS(DeclBuffer);
+  OS << tok::kw_if << " ";
+  for (auto CI = OuterIfConds.begin(); CI != OuterIfConds.end(); ++CI) {
+    OS << (CI != OuterIfConds.begin() ? ", " : "");
+    OS << Lexer::getCharSourceRangeFromSourceRange(
+      SM, CI->getSourceRange()).str();
+  }
+  for (auto CI = InnerIfConds.begin(); CI != InnerIfConds.end(); ++CI) {
+    OS << ", " << Lexer::getCharSourceRangeFromSourceRange(
+      SM, CI->getSourceRange()).str();
+  }
+  auto ThenStatementText = Lexer::getCharSourceRangeFromSourceRange(
+    SM, Target.InnerIf->getThenStmt()->getSourceRange()).str();
+  OS << " " << ThenStatementText;
 
-    llvm::SmallString<64> DeclBuffer;
-    llvm::raw_svector_ostream OS(DeclBuffer);
-    OS << tok::kw_if << " (" << OuterIfConditionalText << ") && (";
-    OS << InnerIfConditionalText << ") " << ThenStatementText;
-
-    auto SourceRange = Lexer::getCharSourceRangeFromSourceRange(
-      SM, Target.OuterIf->getSourceRange());
-    EditConsumer.accept(SM, SourceRange, DeclBuffer.str());
-    return false;
+  auto SourceRange = Lexer::getCharSourceRangeFromSourceRange(
+    SM, Target.OuterIf->getSourceRange());
+  EditConsumer.accept(SM, SourceRange, DeclBuffer.str());
+  return false;
 }
 
 /// The helper class analyzes a given nominal decl or an extension decl to
