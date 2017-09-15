@@ -1460,12 +1460,6 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
         expr = UDE->getBase();
       } else if (auto SE = dyn_cast<SubscriptExpr>(expr)) {
-        if (!TC.Context.LangOpts.EnableExperimentalKeyPathComponents) {
-          TC.diagnose(SE->getLoc(),
-                      diag::expr_swift_keypath_unimplemented_component,
-                      "subscript");
-        }
-      
         // .[0] or just plain [0]
         components.push_back(
             KeyPathExpr::Component::forUnresolvedSubscriptWithPrebuiltIndexExpr(

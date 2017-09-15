@@ -1534,11 +1534,13 @@ public:
     OptionalWrap,
   };
   
-  // The pair of a captured index value and its Hashable conformance for a
+  // Description of a captured index value and its Hashable conformance for a
   // subscript keypath.
-  struct IndexPair {
+  struct Index {
     unsigned Operand;
-    ProtocolConformance *Hashable;
+    CanType FormalType;
+    SILType LoweredType;
+    ProtocolConformanceRef Hashable;
   };
   
 private:
@@ -1555,7 +1557,9 @@ private:
                        ComputedPropertyId::KindType>
     SetterAndIdKind;
   ComputedPropertyId::ValueType IdValue;
-  ArrayRef<IndexPair> Indices;
+  ArrayRef<Index> Indices;
+  SILFunction *IndicesEqual;
+  SILFunction *IndicesHash;
   CanType ComponentType;
   
   unsigned kindForPacking(Kind k) {
@@ -1579,13 +1583,21 @@ private:
   KeyPathPatternComponent(ComputedPropertyId id, Kind kind,
                           SILFunction *getter,
                           SILFunction *setter,
-                          ArrayRef<IndexPair> indices,
+                          ArrayRef<Index> indices,
+                          SILFunction *indicesEqual,
+                          SILFunction *indicesHash,
                           CanType ComponentType)
     : ValueAndKind(getter, kindForPacking(kind)),
       SetterAndIdKind(setter, id.Kind),
       IdValue(id.Value),
       Indices(indices),
-      ComponentType(ComponentType) {}
+      IndicesEqual(indicesEqual),
+      IndicesHash(indicesHash),
+      ComponentType(ComponentType) {
+    assert(indices.empty() == !indicesEqual
+           && indices.empty() == !indicesHash
+           && "must have equals/hash functions iff there are indices");
+  }
 
 public:
   KeyPathPatternComponent() : ValueAndKind(nullptr, 0) {}
@@ -1661,7 +1673,7 @@ public:
     llvm_unreachable("unhandled kind");
   }
   
-  ArrayRef<IndexPair> getComputedPropertyIndices() const {
+  ArrayRef<Index> getComputedPropertyIndices() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -1674,6 +1686,13 @@ public:
     }
   }
   
+  SILFunction *getComputedPropertyIndexEquals() const {
+    return IndicesEqual;
+  }
+  SILFunction *getComputedPropertyIndexHash() const {
+    return IndicesHash;
+  }
+
   bool isComputedSettablePropertyMutating() const;
   
   static KeyPathPatternComponent forStoredProperty(VarDecl *property,
@@ -1684,20 +1703,26 @@ public:
   static KeyPathPatternComponent
   forComputedGettableProperty(ComputedPropertyId identifier,
                               SILFunction *getter,
-                              ArrayRef<IndexPair> indices,
+                              ArrayRef<Index> indices,
+                              SILFunction *indicesEquals,
+                              SILFunction *indicesHash,
                               CanType ty) {
     return KeyPathPatternComponent(identifier, Kind::GettableProperty,
-                                   getter, nullptr, indices, ty);
+                                   getter, nullptr, indices,
+                                   indicesEquals, indicesHash, ty);
   }
 
   static KeyPathPatternComponent
   forComputedSettableProperty(ComputedPropertyId identifier,
                               SILFunction *getter,
                               SILFunction *setter,
-                              ArrayRef<IndexPair> indices,
+                              ArrayRef<Index> indices,
+                              SILFunction *indicesEquals,
+                              SILFunction *indicesHash,
                               CanType ty) {
     return KeyPathPatternComponent(identifier, Kind::SettableProperty,
-                                   getter, setter, indices, ty);
+                                   getter, setter, indices,
+                                   indicesEquals, indicesHash, ty);
   }
   
   static KeyPathPatternComponent
@@ -1797,32 +1822,40 @@ public:
 /// Instantiates a key path object.
 class KeyPathInst final
   : public SILInstruction,
-    private llvm::TrailingObjects<KeyPathInst, Substitution>
+    private llvm::TrailingObjects<KeyPathInst, Substitution, Operand>
 {
   friend SILBuilder;
   friend TrailingObjects;
   
   KeyPathPattern *Pattern;
-  unsigned NumSubstitutions;
+  unsigned NumSubstitutions, NumOperands;
   
   static KeyPathInst *create(SILDebugLocation Loc,
                              KeyPathPattern *Pattern,
                              SubstitutionList Subs,
+                             ArrayRef<SILValue> Args,
                              SILType Ty,
                              SILFunction &F);
   
   KeyPathInst(SILDebugLocation Loc,
               KeyPathPattern *Pattern,
               SubstitutionList Subs,
+              ArrayRef<SILValue> Args,
               SILType Ty);
+  
+  size_t numTrailingObjects(OverloadToken<Substitution>) const {
+    return NumSubstitutions;
+  }
+  size_t numTrailingObjects(OverloadToken<Operand>) const {
+    return NumOperands;
+  }
   
 public:
   KeyPathPattern *getPattern() const;
   bool hasPattern() const { return (bool)Pattern; }
 
   ArrayRef<Operand> getAllOperands() const {
-    // TODO: Subscript keypaths will have operands.
-    return {};
+    return const_cast<KeyPathInst*>(this)->getAllOperands();
   }
   MutableArrayRef<Operand> getAllOperands();
 

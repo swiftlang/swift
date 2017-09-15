@@ -326,15 +326,13 @@ class Operand {
   /// FIXME: this could be space-compressed.
   SILInstruction *Owner;
 
+public:
   Operand(SILInstruction *owner) : Owner(owner) {}
   Operand(SILInstruction *owner, SILValue theValue)
       : TheValue(theValue), Owner(owner) {
     insertIntoCurrent();
   }
-  template<unsigned N> friend class FixedOperandList;
-  template<unsigned N> friend class TailAllocatedOperandList;
 
-public:
   /// Operands are not copyable.
   Operand(const Operand &use) = delete;
   Operand &operator=(const Operand &use) = delete;

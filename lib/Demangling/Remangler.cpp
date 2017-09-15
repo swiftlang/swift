@@ -1517,6 +1517,16 @@ void Remangler::mangleKeyPathSetterThunkHelper(Node *node) {
   Buffer << "Tk";
 }
 
+void Remangler::mangleKeyPathEqualsThunkHelper(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "TH";
+}
+
+void Remangler::mangleKeyPathHashThunkHelper(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Th";
+}
+
 void Remangler::mangleReturnType(Node *node) {
   mangleArgumentTuple(node);
 }

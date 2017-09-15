@@ -114,12 +114,18 @@ public:
                                              Type FromType, Type ToType,
                                              ModuleDecl *Module);
   
-  std::string mangleKeyPathGetterThunkHelper(const VarDecl *property,
+  std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature *signature,
-                                             CanType baseType);
-  std::string mangleKeyPathSetterThunkHelper(const VarDecl *property,
+                                             CanType baseType,
+                                             ArrayRef<CanType> subs);
+  std::string mangleKeyPathSetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature *signature,
-                                             CanType baseType);
+                                             CanType baseType,
+                                             ArrayRef<CanType> subs);
+  std::string mangleKeyPathEqualsHelper(ArrayRef<CanType> indices,
+                                        GenericSignature *signature);
+  std::string mangleKeyPathHashHelper(ArrayRef<CanType> indices,
+                                      GenericSignature *signature);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC,
                                     GenericEnvironment *GE);
