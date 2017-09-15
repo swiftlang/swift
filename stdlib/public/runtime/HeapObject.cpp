@@ -84,6 +84,8 @@ SWIFT_RT_ENTRY_IMPL(swift_allocObject)(HeapMetadata const *metadata,
   // If leak tracking is enabled, start tracking this object.
   SWIFT_LEAKS_START_TRACKING_OBJECT(object);
 
+  SWIFT_RT_TRACK_INVOCATION(object, swift_allocObject);
+
   return object;
 }
 
@@ -93,6 +95,7 @@ swift::swift_initStackObject(HeapMetadata const *metadata,
   object->metadata = metadata;
   object->refCounts.initForNotFreeing();
 
+  SWIFT_RT_TRACK_INVOCATION(object, swift_initStackObject);
   return object;
 }
 
@@ -113,6 +116,7 @@ static void initStaticObjectWithContext(void *OpaqueCtx) {
 HeapObject *
 swift::swift_initStaticObject(HeapMetadata const *metadata,
                               HeapObject *object) {
+  SWIFT_RT_TRACK_INVOCATION(object, swift_initStaticObject);
   // The token is located at a negative offset from the object header.
   swift_once_t *token = ((swift_once_t *)object) - 1;
 
@@ -765,6 +769,7 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   assert(isAlignmentMask(allocatedAlignMask));
   assert(object->refCounts.isDeiniting());
+  SWIFT_RT_TRACK_INVOCATION(object, swift_deallocObject);
 #ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
   memset_pattern8((uint8_t *)object + sizeof(HeapObject),
                   "\xAB\xAD\x1D\xEA\xF4\xEE\xD0\bB9",

@@ -215,9 +215,14 @@ func updatesHandler(object: UnsafeRawPointer, functionId: Int64) {
   _RuntimeFunctionCounters.enableRuntimeFunctionCountersUpdates(mode: savedMode)
 }
 
+/// Check that it is possible to set your own runtime functions counters
+/// updates handler and this handler is invoked at runtime.
 /// CHECK-LABEL: TEST: Provide runtime function counters update handler
-/// TEST: Start handler
-/// TEST: End handler
+/// CHECK: Start handler
+/// Check that allocations and deallocations are intercepted too.
+/// CHECK: swift_allocObject
+/// CHECK: swift_deallocObject
+/// CHECK: End handler
 /// Test that you can provide custom handlers for runtime functions counters
 /// updates.
 @inline(never)
@@ -227,6 +232,7 @@ func testFunctionRuntimeCountersUpdateHandler() {
   let oldHandler =
     _RuntimeFunctionCounters.setGlobalRuntimeFunctionCountersUpdateHandler(
       handler: updatesHandler)
+  let c = C()
   let len = length(l!)
   _ = _RuntimeFunctionCounters.setGlobalRuntimeFunctionCountersUpdateHandler(
     handler: oldHandler)

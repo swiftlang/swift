@@ -58,6 +58,10 @@ struct HeapObject;
   RT_FUNCTION_TO_TRACK(object, swift_unownedRelease_n)                         \
   RT_FUNCTION_TO_TRACK(object, swift_nonatomic_unownedRetain_n)                \
   RT_FUNCTION_TO_TRACK(object, swift_nonatomic_unownedRelease_n)               \
+  RT_FUNCTION_TO_TRACK(object, swift_allocObject)                              \
+  RT_FUNCTION_TO_TRACK(object, swift_deallocObject)                            \
+  RT_FUNCTION_TO_TRACK(object, swift_initStackObject)                          \
+  RT_FUNCTION_TO_TRACK(object, swift_initStaticObject)                         \
   RT_FUNCTION_TO_TRACK(object, swift_tryPin)                                   \
   RT_FUNCTION_TO_TRACK(object, swift_unpin)                                    \
   RT_FUNCTION_TO_TRACK(object, swift_nonatomic_tryPin)                         \
