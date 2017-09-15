@@ -13,6 +13,8 @@ __all__ = [
     'Option',
     'AppendOption',
     'ChoicesOption',
+    'HelpOption',
+    'IgnoreOption',
     'IntOption',
     'PathOption',
     'StrOption',
@@ -208,6 +210,12 @@ class Option(_BaseOption):
         super(Option, self).__init__(*args, **kwargs)
 
 
+class HelpOption(_BaseOption):
+    """Option that prints the help message and exits."""
+
+    pass
+
+
 class ToggleOption(_BaseOption):
     """Option that accepts no argument or an optional bool argument."""
 
@@ -252,16 +260,25 @@ class UnsupportedOption(_BaseOption):
     """Option that is not supported."""
 
     def __init__(self, *args, **kwargs):
-        kwargs['dest'] = kwargs.get('dest')
+        kwargs['dest'] = kwargs.pop('dest', None)
         super(UnsupportedOption, self).__init__(*args, **kwargs)
+
+
+class IgnoreOption(_BaseOption):
+    """Option that should be ignored when generating tests. Instead a test
+    should be written manually as the behavior cannot or should not be auto-
+    generated.
+    """
+
+    pass
 
 
 # -----------------------------------------------------------------------------
 
 EXPECTED_OPTIONS = [
     # Ignore the help options since they always call sys.exit(0)
-    _BaseOption('-h', dest='help', default=argparse.SUPPRESS),
-    _BaseOption('--help', dest='help', default=argparse.SUPPRESS),
+    HelpOption('-h', dest='help', default=argparse.SUPPRESS),
+    HelpOption('--help', dest='help', default=argparse.SUPPRESS),
 
     Option('--assertions', dest='assertions', value=True),
     Option('--benchmark', dest='benchmark', value=True),
@@ -476,19 +493,19 @@ EXPECTED_OPTIONS = [
     UnsupportedOption('--watchos-all'),
     UnsupportedOption('-I'),
 
-    # FIXME: LTO flag is a special case that acts both as an option and has
+    # NOTE: LTO flag is a special case that acts both as an option and has
     # valid choices
     Option('--lto', dest='lto_type'),
     ChoicesOption('--lto', dest='lto_type', choices=['thin', 'full']),
 
     # NOTE: We'll need to manually test the behavior of these since they
     # validate compiler version strings.
-    _BaseOption('--clang-compiler-version',
-                dest='clang_compiler_version'),
-    _BaseOption('--clang-user-visible-version',
-                dest='clang_user_visible_version'),
-    _BaseOption('--swift-compiler-version',
-                dest='swift_compiler_version'),
-    _BaseOption('--swift-user-visible-version',
-                dest='swift_user_visible_version'),
+    IgnoreOption('--clang-compiler-version',
+                 dest='clang_compiler_version'),
+    IgnoreOption('--clang-user-visible-version',
+                 dest='clang_user_visible_version'),
+    IgnoreOption('--swift-compiler-version',
+                 dest='swift_compiler_version'),
+    IgnoreOption('--swift-user-visible-version',
+                 dest='swift_user_visible_version'),
 ]

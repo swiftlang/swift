@@ -143,6 +143,13 @@ class TestDriverArgumentParserMeta(type):
         return test
 
     @classmethod
+    def _generate_help_option_test(cls, option):
+        def test(self):
+            with redirect_stdout() as output, self.assertRaises(ParserError):
+                self.parse_args([option.option_string])
+                self.assertNotEmpty(output)
+
+    @classmethod
     def _generate_int_option_test(cls, option):
         def test(self):
             with self.assertNotRaises(ParserError):
@@ -220,6 +227,8 @@ class TestDriverArgumentParserMeta(type):
             return cls._generate_append_option_test(option)
         elif option.__class__ is expected_options.ChoicesOption:
             return cls._generate_choices_option_test(option)
+        elif option.__class__ is expected_options.HelpOption:
+            return cls._generate_help_option_test(option)
         elif option.__class__ is expected_options.IntOption:
             return cls._generate_int_option_test(option)
         elif option.__class__ is expected_options.PathOption:
@@ -231,8 +240,8 @@ class TestDriverArgumentParserMeta(type):
         elif option.__class__ is expected_options.UnsupportedOption:
             return cls._generate_unsupported_option_test(option)
 
-        # Ignore all _BaseOption tests since they should be manually tested
-        elif option.__class__ is expected_options._BaseOption:
+        # Ignore all IgnoreOption tests since they should be manually tested
+        elif option.__class__ is expected_options.IgnoreOption:
             return lambda self: None
 
         # Catch-all meaningless test
@@ -304,15 +313,6 @@ class TestDriverArgumentParser(unittest.TestCase):
 
     # -------------------------------------------------------------------------
     # Manual option tests
-
-    def test_help_options(self):
-        with redirect_stdout() as output, self.assertRaises(ParserError):
-            self.parse_args(['-h'])
-            self.assertNotEmpty(output)
-
-        with redirect_stdout() as output, self.assertRaises(ParserError):
-            self.parse_args(['--help'])
-            self.assertNotEmpty(output)
 
     def test_option_clang_compiler_version(self):
         option_string = '--clang-compiler-version'
