@@ -98,6 +98,8 @@ STATISTIC(NumDelayedRequirementResolved,
           "Delayed requirements resolved");
 STATISTIC(NumDelayedRequirementUnresolved,
           "Delayed requirements left unresolved");
+STATISTIC(NumConditionalRequirementsAdded,
+          "# of conditional requirements added");
 
 struct GenericSignatureBuilder::Implementation {
   /// Allocator.
@@ -2058,6 +2060,23 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
   }
 }
 
+// Function for feeding through any other requirements that the conformance
+// requires to be satisfied. These are things we're inferring.
+static void addConditionalRequirements(GenericSignatureBuilder &builder,
+                                       ProtocolConformanceRef conformance) {
+  // Abstract conformances don't have associated decl-contexts/modules, but also
+  // don't have conditional requirements.
+  if (conformance.isConcrete()) {
+    auto mod = conformance.getConcrete()->getDeclContext()->getParentModule();
+    auto source = FloatingRequirementSource::forInferred(nullptr);
+    for (auto requirement : conformance.getConditionalRequirements()) {
+      builder.addRequirement(requirement, source,
+                             /*inferForModule=*/mod);
+      ++NumConditionalRequirementsAdded;
+    }
+  }
+}
+
 const RequirementSource *
 GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
                                                     ProtocolDecl *proto) {
@@ -2097,6 +2116,9 @@ GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
   concreteSource = concreteSource->viaConcrete(*this, *conformance);
   paEquivClass->conformsTo[proto].push_back({pa, proto, concreteSource});
   ++NumConformanceConstraints;
+
+  addConditionalRequirements(*this, *conformance);
+
   return concreteSource;
 }
 
@@ -2129,6 +2151,9 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
     superclassSource->viaSuperclass(*this, *conformance);
   paEquivClass->conformsTo[proto].push_back({pa, proto, superclassSource});
   ++NumConformanceConstraints;
+
+  addConditionalRequirements(*this, *conformance);
+
   return superclassSource;
 }
 
@@ -3596,10 +3621,9 @@ toRequirementRHS(GenericSignatureBuilder::UnresolvedType unresolved) {
 }
 
 ConstraintResult GenericSignatureBuilder::addTypeRequirement(
-                             UnresolvedType subject,
-                             UnresolvedType constraint,
-                             FloatingRequirementSource source,
-                             UnresolvedHandlingKind unresolvedHandling) {
+    UnresolvedType subject, UnresolvedType constraint,
+    FloatingRequirementSource source, UnresolvedHandlingKind unresolvedHandling,
+    ModuleDecl *inferForModule) {
   // Resolve the constraint.
   auto resolvedConstraint = resolve(constraint, source);
   if (!resolvedConstraint) {
@@ -3650,21 +3674,43 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                                      unresolvedHandling);
   }
 
-  // If the resolved subject is a type, we can probably perform diagnostics
-  // here.
+  // If the resolved subject is a type, there may be things we can infer (if it
+  // conditionally conforms to the protocol), and we can probably perform
+  // diagnostics here.
   if (resolvedSubject->isType()) {
+    auto subjectType = resolvedSubject->getType();
+
+    if (constraintType->isExistentialType()) {
+      auto layout = constraintType->getExistentialLayout();
+      for (auto *proto : layout.getProtocols()) {
+        // We have a pure concrete type, and there's no guarantee of dependent
+        // type that makes sense to use here, but, in practice, all
+        // getLookupConformanceFns used in here don't use that parameter anyway.
+        auto dependentType = CanType();
+        auto conformance =
+            getLookupConformanceFn()(dependentType, subjectType, proto);
+
+        // FIXME: diagnose if there's no conformance.
+        if (conformance) {
+          auto inferredSource = FloatingRequirementSource::forInferred(nullptr);
+          for (auto req : conformance->getConditionalRequirements()) {
+            addRequirement(req, inferredSource, inferForModule);
+          }
+        }
+      }
+    }
+
     // One cannot explicitly write a constraint on a concrete type.
     if (source.isExplicit()) {
       if (source.getLoc().isValid()) {
         Impl->HadAnyError = true;
         Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
-                       TypeLoc::withoutLoc(resolvedSubject->getType()));
+                       TypeLoc::withoutLoc(subjectType));
       }
 
       return ConstraintResult::Concrete;
     }
 
-    // FIXME: Check the constraint now.
     return ConstraintResult::Resolved;
   }
 
@@ -4108,10 +4154,10 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                         getFloatingSource(typeRepr, /*forInferred=*/true));
     }
 
-    return addTypeRequirement(type, inheritedType,
-                              getFloatingSource(typeRepr,
-                                                /*forInferred=*/false),
-                              UnresolvedHandlingKind::GenerateConstraints);
+    return addTypeRequirement(
+        type, inheritedType, getFloatingSource(typeRepr,
+                                               /*forInferred=*/false),
+        UnresolvedHandlingKind::GenerateConstraints, inferForModule);
   };
 
   return visitInherited(decl->getInherited(), visitType);
@@ -4172,7 +4218,8 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
                                       Req->getConstraintLoc().getTypeRepr()));
     }
     return addTypeRequirement(subject, constraint, source,
-                              UnresolvedHandlingKind::GenerateConstraints);
+                              UnresolvedHandlingKind::GenerateConstraints,
+                              inferForModule);
   }
 
   case RequirementReprKind::SameType: {
@@ -4246,7 +4293,8 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
     }
 
     return addTypeRequirement(firstType, secondType, source,
-                              UnresolvedHandlingKind::GenerateConstraints);
+                              UnresolvedHandlingKind::GenerateConstraints,
+                              inferForModule);
   }
 
   case RequirementKind::Layout: {
@@ -4794,9 +4842,10 @@ void GenericSignatureBuilder::processDelayedRequirements() {
       ConstraintResult reqResult;
       switch (req.kind) {
       case DelayedRequirement::Type:
-        reqResult = addTypeRequirement(
-                       req.lhs, asUnresolvedType(req.rhs), req.source,
-                       UnresolvedHandlingKind::GenerateUnresolved);
+        reqResult =
+            addTypeRequirement(req.lhs, asUnresolvedType(req.rhs), req.source,
+                               UnresolvedHandlingKind::GenerateUnresolved,
+                               /*inferForModule=*/nullptr);
         break;
 
       case DelayedRequirement::Layout:

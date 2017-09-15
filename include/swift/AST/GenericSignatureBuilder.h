@@ -412,11 +412,14 @@ private:
 
   /// \brief Add a new type requirement specifying that the given
   /// type conforms-to or is a superclass of the second type.
-  ConstraintResult addTypeRequirement(
-                          UnresolvedType subject,
-                          UnresolvedType constraint,
-                          FloatingRequirementSource source,
-                          UnresolvedHandlingKind unresolvedHandling);
+  ///
+  /// \param inferForModule Infer additional requirements from the types
+  /// relative to the given module.
+  ConstraintResult addTypeRequirement(UnresolvedType subject,
+                                      UnresolvedType constraint,
+                                      FloatingRequirementSource source,
+                                      UnresolvedHandlingKind unresolvedHandling,
+                                      ModuleDecl *inferForModule);
 
   /// Note that we have added the nested type nestedPA
   void addedNestedType(PotentialArchetype *nestedPA);
