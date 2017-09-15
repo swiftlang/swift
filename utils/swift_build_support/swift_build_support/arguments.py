@@ -190,6 +190,7 @@ class _OptionalBoolAction(argparse.Action):
                  option_strings,
                  dest,
                  default=False,
+                 const=True,
                  metavar="BOOL",
                  help=None):
         super(_OptionalBoolAction, self).__init__(
@@ -200,10 +201,30 @@ class _OptionalBoolAction(argparse.Action):
             nargs="?",
             type=type.bool,
             help=help,
-            const=True)
+            const=const)
 
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, values)
 
 
 _register(action, 'optional_bool', _OptionalBoolAction)
+
+
+class _OptionalTrueAction(_OptionalBoolAction):
+    def __init__(self, *args, **kwargs):
+        kwargs['const'] = True
+        kwargs['default'] = kwargs.pop('default', False)
+        super(_OptionalTrueAction, self).__init__(*args, **kwargs)
+
+
+_register(action, 'optional_true', _OptionalTrueAction)
+
+
+class _OptionalFalseAction(_OptionalBoolAction):
+    def __init__(self, *args, **kwargs):
+        kwargs['const'] = False
+        kwargs['default'] = kwargs.pop('default', True)
+        super(_OptionalFalseAction, self).__init__(*args, **kwargs)
+
+
+_register(action, 'optional_false', _OptionalFalseAction)
