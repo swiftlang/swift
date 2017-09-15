@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -sil-serialize-witness-tables -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 public protocol P {
   func publicRequirement()
@@ -39,4 +39,4 @@ public struct S : R {}
 // the use of the 'public' keyword inside an extension of 'R'
 // should generate a warning, since it has no effect.
 
-// CHECK-LABEL: sil [transparent] [thunk] @_T021witness_accessibility1SVAA1PA2aDP17publicRequirementyyFTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T021witness_accessibility1SVAA1PA2aDP17publicRequirementyyFTW

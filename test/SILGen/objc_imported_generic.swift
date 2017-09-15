@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -sil-serialize-witness-tables %s -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s -enable-sil-ownership | %FileCheck %s
 // For integration testing, ensure we get through IRGen too.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -verify -DIRGEN_INTEGRATION_TEST %s
 

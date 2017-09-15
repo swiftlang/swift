@@ -4034,7 +4034,14 @@ IRGenFunction::emitValueWitnessTableRef(SILType type,
 std::pair<llvm::Value *, llvm::Value *>
 irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                                 ClassDecl *theClass,
-                                                llvm::Value *metadata) {  
+                                                llvm::Value *metadata) {
+  // FIXME: The below checks should capture this property already, but
+  // resilient class metadata layout is not fully implemented yet.
+  auto expansion = IGF.IGM.getResilienceExpansionForLayout(theClass);
+  if (IGF.IGM.isResilient(theClass, expansion)) {
+    return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass, metadata);
+  }
+
   // If the class has fragile fixed layout, return the constant size and
   // alignment.
   if (llvm::Constant *size
