@@ -61,7 +61,10 @@ extern int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
 extern int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
                              void *MainAddr);
 
-/// Determine if the given invocation should run as a subcommand.
+/// Determine if the given invocation should run as a "subcommand".
+/// Examples of "subcommands" are 'swift build' or 'swift-test', which are
+/// usually used to invoke the Swift package manager executables 'swift-build'
+/// and 'swift-test', respectively.
 ///
 /// \param ExecName The name of the argv[0] we were invoked as.
 /// \param SubcommandName On success, the full name of the subcommand to invoke.
@@ -72,9 +75,10 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
                                   SmallVectorImpl<const char *> &Args) {
   assert(Args.size() > 0);
 
-  // If we are not run as 'swift', don't do anything special. This doesn't work
-  // with symlinks with alternate names, but we can't detect 'swift' vs 'swiftc'
-  // if we try and resolve using the actual executable path.
+  // We only recognize subcommands in the form of 'swift <name-of-subcommand>'.
+  // If we are being run as an executable named something other than 'swift',
+  // we do not run a subcommand. This means we do not recognize symlinks with
+  // alternate names, for example 'swiftc build', as subcommands.
   if (ExecName != "swift")
     return false;
 
