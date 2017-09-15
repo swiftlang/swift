@@ -58,14 +58,13 @@
 // After opening the parameter list (without closing it)
 
 // CHECK: {{^}}{
-// CHECK-NEXT: key.offset: 57,
-// CHECK-NEXT: key.length: 6,
+// CHECK-NEXT: key.offset: 12,
+// CHECK-NEXT: key.length: 51,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.identifier,
-// CHECK-NEXT:     key.offset: 57,
+// CHECK-NEXT:     key.offset: 12,
 // CHECK-NEXT:     key.length: 6
 // CHECK-NEXT:   }
-// CHECK-NEXT: ],
 
