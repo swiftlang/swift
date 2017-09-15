@@ -227,6 +227,7 @@ static const char *const RegexStrRadarURL =
   "radar:[a-zA-Z0-9;/?:@\\&=+$,\\-_.!~*'()%#]+";
 
 class ModelASTWalker : public ASTWalker {
+  ArrayRef<Token> AllTokensInFile;
   const LangOptions &LangOpts;
   const SourceManager &SM;
   unsigned BufferID;
@@ -242,9 +243,12 @@ public:
   SyntaxModelWalker &Walker;
   ArrayRef<SyntaxNode> TokenNodes;
 
-  ModelASTWalker(const LangOptions &LangOpts, const SourceManager &SM,
-                 unsigned BufferID, SyntaxModelWalker &Walker)
-      : LangOpts(LangOpts), SM(SM), BufferID(BufferID), Walker(Walker) { }
+  ModelASTWalker(const SourceFile &File, SyntaxModelWalker &Walker)
+      : AllTokensInFile(File.getAllTokens()),
+        LangOpts(File.getASTContext().LangOpts),
+        SM(File.getASTContext().SourceMgr),
+        BufferID(File.getBufferID().getValue()),
+        Walker(Walker) { }
 
   void visitSourceFile(SourceFile &SrcFile, ArrayRef<SyntaxNode> Tokens);
 
@@ -267,7 +271,7 @@ private:
   typedef std::pair<const DeclAttribute *, SourceRange> DeclAttributeAndRange;
 
   bool handleSpecialDeclAttribute(const DeclAttribute *Decl,
-                                  std::vector<Token> &Toks);
+                                  ArrayRef<Token> Toks);
   bool handleAttrRanges(ArrayRef<DeclAttributeAndRange> DeclRanges);
 
   bool shouldPassBraceStructureNode(BraceStmt *S);
@@ -383,8 +387,7 @@ static void setDecl(SyntaxStructureNode &N, Decl *D) {
 } // anonymous namespace
 
 bool SyntaxModelContext::walk(SyntaxModelWalker &Walker) {
-  ModelASTWalker ASTWalk(Impl.LangOpts, Impl.SrcMgr,
-                         *Impl.SrcFile.getBufferID(), Walker);
+  ModelASTWalker ASTWalk(Impl.SrcFile, Walker);
   ASTWalk.visitSourceFile(Impl.SrcFile, Impl.TokenNodes);
   return true;
 }
@@ -947,7 +950,7 @@ bool ModelASTWalker::annotateIfConfigConditionIdentifiers(Expr *Cond) {
 }
 
 bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
-                                                std::vector<Token> &Toks) {
+                                                ArrayRef<Token> Toks) {
   if (!D)
     return false;
   if (isa<AvailableAttr>(D)) {
@@ -1004,12 +1007,8 @@ bool ModelASTWalker::handleAttrRanges(ArrayRef<DeclAttributeAndRange> DeclRanges
 
   SourceLoc BeginLoc = DeclRanges.front().second.Start;
 
-  std::vector<Token> Toks = swift::tokenize(
-      LangOpts, SM, BufferID,
-      SM.getLocOffsetInBuffer(BeginLoc, BufferID),
-      SM.getLocOffsetInBuffer(DeclRanges.back().second.End, BufferID),
-      /*KeepComments=*/true,
-      /*TokenizeInterpolatedString=*/false);
+  auto Toks = slice_token_array(AllTokensInFile, BeginLoc,
+                                DeclRanges.back().second.End);
 
   auto passAttrNode = [&](SourceRange AttrRange) -> bool {
     SourceRange Range = AttrRange;

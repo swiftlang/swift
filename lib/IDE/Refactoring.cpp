@@ -1257,13 +1257,7 @@ struct SimilarExprCollector: public SourceEntityWalker {
 
   /// Find all tokens included by an expression.
   llvm::ArrayRef<Token> getExprSlice(Expr *E) {
-    SourceLoc StartLoc = E->getStartLoc();
-    SourceLoc EndLoc = E->getEndLoc();
-    auto StartIt = token_lower_bound(AllTokens, StartLoc);
-    auto EndIt = token_lower_bound(AllTokens, EndLoc);
-    assert(StartIt->getLoc() == StartLoc);
-    assert(EndIt->getLoc() == EndLoc);
-    return AllTokens.slice(StartIt - AllTokens.begin(), EndIt - StartIt + 1);
+    return slice_token_array(AllTokens, E->getStartLoc(), E->getEndLoc());
   }
 
   SimilarExprCollector(SourceManager &SM, Expr* SelectedExpr,
@@ -1328,15 +1322,11 @@ bool RefactoringActionExtractExprBase::performChange() {
     Collector.walk(BS);
 
     if (ExtractRepeated) {
-      // Tokenize the brace statement; all expressions should have their tokens
-      // in this array.
-      auto AllTokens = TheFile->getAllTokens();
-      auto StartIt = token_lower_bound(AllTokens, BS->getStartLoc());
-      auto EndIt = token_lower_bound(AllTokens, BS->getEndLoc());
-
       // Collect all expressions we are going to extract.
       SimilarExprCollector(SM, SelectedExpr,
-        AllTokens.slice(StartIt - AllTokens.begin(), EndIt - StartIt + 1),
+                           slice_token_array(TheFile->getAllTokens(),
+                                             BS->getStartLoc(),
+                                             BS->getEndLoc()),
                            AllExpressions).walk(BS);
     } else {
       AllExpressions.insert(SelectedExpr);
