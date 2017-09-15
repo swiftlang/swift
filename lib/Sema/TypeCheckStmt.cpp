@@ -942,7 +942,7 @@ public:
     }
 
     if (!S->isImplicit()) {
-      TC.checkSwitchExhaustiveness(S, /*limitChecking*/hadError);
+      TC.checkSwitchExhaustiveness(S, DC, /*limitChecking*/hadError);
     }
 
     return S;
