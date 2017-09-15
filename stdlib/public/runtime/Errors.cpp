@@ -141,7 +141,7 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
     fprintf(stderr, "%s`%s + %td", libraryName.data(), symbolName.c_str(),
             offset);
   } else {
-    constexpr const char *format = "%-4u %-34s 0x%0.16lx %s + %td\n";
+    constexpr const char *format = "%-4u %-34s 0x%0.16tx %s + %td\n";
     fprintf(stderr, format, index, libraryName.data(), symbolAddr,
             symbolName.c_str(), offset);
   }
@@ -149,8 +149,8 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   if (shortOutput) {
     fprintf(stderr, "<unavailable>");
   } else {
-    constexpr const char *format = "%-4u 0x%0.16lx\n";
-    fprintf(stderr, format, index, framePC);
+    constexpr const char *format = "%-4u 0x%0.16tx\n";
+    fprintf(stderr, format, index, reinterpret_cast<uintptr_t>(framePC));
   }
 #endif
 }
