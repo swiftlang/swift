@@ -3443,7 +3443,7 @@ class TestData : TestDataSuper {
         holdReference(data) {
             let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
             data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
-            expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0])) /// FAILS
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0])) 
         }
     }
     
@@ -3453,7 +3453,7 @@ class TestData : TestDataSuper {
         holdReference(data) {
             let range: CountableRange<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
             data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
-            expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0])) /// FAILS
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0])) 
         }
     }
     
@@ -3464,7 +3464,7 @@ class TestData : TestDataSuper {
             let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
             let bytes: [UInt8] = [0xFF, 0xFF]
             bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0) }
-            expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0])) /// FAILS
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0])) 
         }
     }
     
@@ -3474,7 +3474,7 @@ class TestData : TestDataSuper {
         holdReference(data) {
             let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
             data.replaceSubrange(range, with: [0xFF, 0xFF])
-            expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0])) /// FAILS
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0])) 
         }
     }
     
@@ -3485,7 +3485,7 @@ class TestData : TestDataSuper {
             let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
             let bytes: [UInt8] = [0xFF, 0xFF]
             bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0.baseAddress!, count: $0.count) }
-            expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0])) /// FAILS
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0])) 
         }
     }
     
