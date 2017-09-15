@@ -397,5 +397,5 @@ protocol P30 {
 protocol P31 { }
 
 // CHECK-LABEL: .sameTypeNameMatch1@
-// Generic signature: <T where T : P29, T : P30, T.X : P31, T.X == T.X>
+// CHECK: Generic signature: <T where T : P29, T : P30, T.X : P31, T.X == T.X>
 func sameTypeNameMatch1<T: P29 & P30>(_: T) where T.X: P31 { }
