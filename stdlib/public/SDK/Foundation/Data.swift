@@ -444,8 +444,6 @@ public final class _DataStorage {
         
     }
     
-    ////////////***** AUDITED UP TO HERE
-    
     // fast-path for appending directly from another data storage
     @inline(__always)
     public func append(_ otherData: _DataStorage, startingAt start: Int, endingAt end: Int) {
@@ -1469,13 +1467,19 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inline(__always)
     public mutating func append<S : Sequence>(contentsOf newElements: S) where S.Iterator.Element == Iterator.Element {
         let estimatedCount = newElements.underestimatedCount
-        var ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: estimatedCount)
-        defer { ptr.deallocate(capacity: estimatedCount) }
-        let buffer = UnsafeMutableBufferPointer(start: ptr, count: estimatedCount)
-        var (iterator, endPoint)  = newElements._copyContents(initializing: buffer)
-        append(ptr, count: endPoint - buffer.startIndex)
-        while let byte = iterator.next() {
-            append(byte)
+        guard estimatedCount > 0 else {
+            for byte in newElements {
+                append(byte)
+            }
+            return
+        }
+        _withStackOrHeapBuffer(estimatedCount) { allocation in
+            let buffer = UnsafeMutableBufferPointer(start: allocation.pointee.memory.assumingMemoryBound(to: UInt8.self), count: estimatedCount)
+            var (iterator, endPoint) = newElements._copyContents(initializing: buffer)
+            append(buffer.baseAddress!, count: endPoint - buffer.startIndex)
+            while let byte = iterator.next() {
+                append(byte)
+            }
         }
     }
     
