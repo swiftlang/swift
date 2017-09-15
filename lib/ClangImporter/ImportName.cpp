@@ -54,39 +54,6 @@ using namespace importer;
 using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
-ImportNameVersion
-importer::nameVersionFromOptions(const LangOptions &langOpts) {
-  auto languageVersion = langOpts.EffectiveLanguageVersion;
-  switch (languageVersion[0]) {
-  default:
-    llvm_unreachable("unknown swift language version");
-  case 1:
-  case 2:
-    return ImportNameVersion::Swift2;
-  case 3:
-    return ImportNameVersion::Swift3;
-  // Fixme: Figure out the importing story for 5 instead of falling back to 4.
-  case 4:
-  case 5:
-    return ImportNameVersion::Swift4;
-  }
-}
-
-unsigned importer::majorVersionNumberForNameVersion(ImportNameVersion version) {
-  switch (version) {
-  case ImportNameVersion::Raw:
-    return 0;
-  case ImportNameVersion::Swift2:
-    return 2;
-  case ImportNameVersion::Swift3:
-    return 3;
-  case ImportNameVersion::Swift4:
-    return 4;
-  }
-
-  llvm_unreachable("Unhandled ImportNameVersion in switch.");
-}
-
 
 /// Determine whether the given Clang selector matches the given
 /// selector pieces.
@@ -318,10 +285,9 @@ static bool shouldLowercaseValueName(StringRef name) {
 
 /// Will recursively print out the fully qualified context for the given name.
 /// Ends with a trailing "."
-static void
-printFullContextPrefix(ImportedName name,
-                       llvm::raw_ostream &os,
-                       ClangImporter::Implementation &Impl) {
+static void printFullContextPrefix(ImportedName name, ImportNameVersion version,
+                                   llvm::raw_ostream &os,
+                                   ClangImporter::Implementation &Impl) {
   const clang::NamedDecl *newDeclContextNamed = nullptr;
   switch (name.getEffectiveContext().getKind()) {
   case EffectiveClangContext::UnresolvedContext:
@@ -347,12 +313,13 @@ printFullContextPrefix(ImportedName name,
 
   // Now, let's print out the parent
   assert(newDeclContextNamed && "should of been set");
-  auto parentName = Impl.importFullName(newDeclContextNamed, name.getVersion());
-  printFullContextPrefix(parentName, os, Impl);
+  auto parentName = Impl.importFullName(newDeclContextNamed, version);
+  printFullContextPrefix(parentName, version, os, Impl);
   os << parentName.getDeclName() << ".";
 }
 
 void ClangImporter::Implementation::printSwiftName(ImportedName name,
+                                                   ImportNameVersion version,
                                                    bool fullyQualified,
                                                    llvm::raw_ostream &os) {
   // Property accessors.
@@ -376,7 +343,7 @@ void ClangImporter::Implementation::printSwiftName(ImportedName name,
   }
 
   if (fullyQualified)
-    printFullContextPrefix(name, os, *this);
+    printFullContextPrefix(name, version, os, *this);
 
   // Base name.
   os << name.getDeclName().getBaseName();
@@ -578,17 +545,63 @@ determineCtorInitializerKind(const clang::ObjCMethodDecl *method) {
   return None;
 }
 
-template <typename A>
-static bool matchesVersion(A *versionedAttr, ImportNameVersion version) {
-  clang::VersionTuple attrVersion = versionedAttr->getVersion();
-  if (attrVersion.empty())
-    return version == ImportNameVersion::LAST_VERSION;
-  return attrVersion.getMajor() == majorVersionNumberForNameVersion(version);
+namespace {
+/// Aggregate struct for the common members of clang::SwiftVersionedAttr and
+/// clang::SwiftVersionedRemovalAttr.
+///
+/// For a SwiftVersionedRemovalAttr, the Attr member will be null.
+struct VersionedSwiftNameInfo {
+  const clang::SwiftNameAttr *Attr;
+  clang::VersionTuple Version;
+  bool IsReplacedByActive;
+};
+
+/// The action to take upon seeing a particular versioned swift_name annotation.
+enum class VersionedSwiftNameAction {
+  /// This annotation is not interesting.
+  Ignore,
+  /// This annotation is better than whatever we have so far.
+  Use,
+  /// This annotation is better than nothing, but that's all; don't bother
+  /// recording its version.
+  UseAsFallback,
+  /// This annotation itself isn't interesting, but its version shows that the
+  /// correct answer is whatever's currently active.
+  ResetToActive
+};
+} // end anonymous namespace
+
+static VersionedSwiftNameAction
+checkVersionedSwiftName(VersionedSwiftNameInfo info,
+                        clang::VersionTuple bestSoFar,
+                        ImportNameVersion requestedVersion) {
+  if (!bestSoFar.empty() && bestSoFar <= info.Version)
+    return VersionedSwiftNameAction::Ignore;
+
+  if (info.IsReplacedByActive) {
+    // We know that there are no versioned names between the active version and
+    // a replacement version, because otherwise /that/ name would be active.
+    // So if replacement < requested, we want to use the old value that was
+    // replaced (but with very low priority), and otherwise we want to use the
+    // new value that is now active. (Special case: replacement = 0 means that
+    // a header annotation was replaced by an unversioned API notes annotation.)
+    if (info.Version.empty() ||
+        info.Version.getMajor() >= requestedVersion.majorVersionNumber()) {
+      return VersionedSwiftNameAction::ResetToActive;
+    }
+    if (bestSoFar.empty())
+      return VersionedSwiftNameAction::UseAsFallback;
+    return VersionedSwiftNameAction::Ignore;
+  }
+
+  if (info.Version.getMajor() < requestedVersion.majorVersionNumber())
+    return VersionedSwiftNameAction::Ignore;
+  return VersionedSwiftNameAction::Use;
 }
 
-const clang::SwiftNameAttr *
-importer::findSwiftNameAttr(const clang::Decl *decl,
-                            ImportNameVersion version) {
+
+static const clang::SwiftNameAttr *
+findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
 #ifndef NDEBUG
   if (Optional<const clang::Decl *> def = getDefinitionForClangTypeDecl(decl)) {
     assert((*def == nullptr || *def == decl) &&
@@ -596,30 +609,64 @@ importer::findSwiftNameAttr(const clang::Decl *decl,
   }
 #endif
 
-  if (version == ImportNameVersion::Raw)
+  if (version == ImportNameVersion::raw())
     return nullptr;
 
   // Handle versioned API notes for Swift 3 and later. This is the common case.
-  if (version != ImportNameVersion::Swift2) {
+  if (version > ImportNameVersion::swift2()) {
+    const auto *activeAttr = decl->getAttr<clang::SwiftNameAttr>();
+    const clang::SwiftNameAttr *result = activeAttr;
+    clang::VersionTuple bestSoFar;
     for (auto *attr : decl->attrs()) {
+      VersionedSwiftNameInfo info;
+
       if (auto *versionedAttr = dyn_cast<clang::SwiftVersionedAttr>(attr)) {
-        if (!matchesVersion(versionedAttr, version))
+        auto *added =
+          dyn_cast<clang::SwiftNameAttr>(versionedAttr->getAttrToAdd());
+        if (!added)
           continue;
-        if (auto *added =
-              dyn_cast<clang::SwiftNameAttr>(versionedAttr->getAttrToAdd())) {
-          return added;
-        }
+
+        info = {added, versionedAttr->getVersion(),
+                versionedAttr->getIsReplacedByActive()};
+
+      } else if (auto *removeAttr =
+                   dyn_cast<clang::SwiftVersionedRemovalAttr>(attr)) {
+        if (removeAttr->getAttrKindToRemove() != clang::attr::SwiftName)
+          continue;
+        info = {nullptr, removeAttr->getVersion(),
+                removeAttr->getIsReplacedByActive()};
+
+      } else {
+        continue;
       }
 
-      if (auto *removeAttr = dyn_cast<clang::SwiftVersionedRemovalAttr>(attr)) {
-        if (!matchesVersion(removeAttr, version))
-          continue;
-        if (removeAttr->getAttrKindToRemove() == clang::attr::SwiftName)
-          return nullptr;
+      switch (checkVersionedSwiftName(info, bestSoFar, version)) {
+      case VersionedSwiftNameAction::Ignore:
+        continue;
+      case VersionedSwiftNameAction::Use:
+        result = info.Attr;
+        bestSoFar = info.Version;
+        break;
+      case VersionedSwiftNameAction::UseAsFallback:
+        // HACK: If there's a swift_name attribute in the headers /and/ in the
+        // unversioned API notes /and/ in the active versioned API notes, there
+        // will be two "replacement" attributes, one for each of the first two
+        // cases. Prefer the first one we see, because that turns out to be the
+        // one from the API notes, which matches the semantics when there are no
+        // versioned API notes. (This isn't very principled but there's at least
+        // a test to tell us if it changes.)
+        if (result == activeAttr)
+          result = info.Attr;
+        assert(bestSoFar.empty());
+        break;
+      case VersionedSwiftNameAction::ResetToActive:
+        result = activeAttr;
+        bestSoFar = info.Version;
+        break;
       }
     }
 
-    return decl->getAttr<clang::SwiftNameAttr>();
+    return result;
   }
 
   // The remainder of this function emulates the limited form of swift_name
@@ -843,7 +890,7 @@ NameImporter::determineEffectiveContext(const clang::NamedDecl *decl,
     case EnumKind::Enum:
     case EnumKind::Options:
       // Enums are mapped to Swift enums, Options to Swift option sets.
-      if (version != ImportNameVersion::Raw) {
+      if (version != ImportNameVersion::raw()) {
         res = cast<clang::DeclContext>(enumDecl);
         break;
       }
@@ -960,7 +1007,7 @@ static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
     switch (nameImporter.getEnumKind(ED)) {
     case EnumKind::Enum:
     case EnumKind::Options:
-      if (version != ImportNameVersion::Raw)
+      if (version != ImportNameVersion::raw())
         break;
       LLVM_FALLTHROUGH;
     case EnumKind::Constants:
@@ -1125,7 +1172,7 @@ bool NameImporter::hasErrorMethodNameCollision(
 static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
                                         ImportNameVersion version,
                                         CtorInitializerKind initKind) {
-  return (version == ImportNameVersion::Raw || method->isPropertyAccessor()) &&
+  return (version == ImportNameVersion::raw() || method->isPropertyAccessor()) &&
          (initKind == CtorInitializerKind::Factory ||
           initKind == CtorInitializerKind::ConvenienceFactory);
 }
@@ -1136,7 +1183,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   ImportedName result;
 
   /// Whether we want a Swift 3 or later name
-  bool swift3OrLaterName = version >= ImportNameVersion::Swift3;
+  bool swift3OrLaterName = version > ImportNameVersion::swift2();
 
   // Objective-C categories and extensions don't have names, despite
   // being "named" declarations.
@@ -1516,7 +1563,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   // Enumeration constants may have common prefixes stripped.
   bool strippedPrefix = false;
-  if (version != ImportNameVersion::Raw && isa<clang::EnumConstantDecl>(D)) {
+  if (version != ImportNameVersion::raw() && isa<clang::EnumConstantDecl>(D)) {
     auto enumDecl = cast<clang::EnumDecl>(D->getDeclContext());
     auto enumInfo = getEnumInfo(enumDecl);
 
@@ -1723,7 +1770,6 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   }
   ++ImportNameNumCacheMisses;
   auto res = importNameImpl(decl, version, givenName);
-  res.setVersion(version);
   if (!givenName)
     importNameCache[key] = res;
   return res;

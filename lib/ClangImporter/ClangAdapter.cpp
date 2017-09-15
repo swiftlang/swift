@@ -438,7 +438,7 @@ clang::SwiftNewtypeAttr *
 importer::getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
                               ImportNameVersion version) {
   // Newtype was introduced in Swift 3
-  if (version < ImportNameVersion::Swift3 )
+  if (version <= ImportNameVersion::swift2())
     return nullptr;
   return retrieveNewTypeAttr(decl);
 }
@@ -449,7 +449,7 @@ clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
                                                    clang::Sema &clangSema,
                                                    ImportNameVersion version) {
   // Newtype was introduced in Swift 3
-  if (version < ImportNameVersion::Swift3 )
+  if (version <= ImportNameVersion::swift2())
     return nullptr;
 
   auto varDecl = dyn_cast<clang::VarDecl>(decl);
