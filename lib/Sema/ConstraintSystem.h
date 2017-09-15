@@ -2575,6 +2575,9 @@ private:
     /// Is this type variable on the RHS of a BindParam constraint?
     bool IsRHSOfBindParam = false;
 
+    /// Tracks the position of the last known supertype in the group.
+    Optional<unsigned> lastSupertypeIndex;
+
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
 
@@ -2617,6 +2620,38 @@ private:
           LiteralBinding = LiteralBindingKind::Atom;
         break;
       }
+    }
+
+    /// \brief Add a potential binding to the list of bindings,
+    /// coalescing supertype bounds when we are able to compute the meet.
+    void addPotentialBinding(PotentialBinding binding,
+                             bool allowJoinMeet = true) {
+      assert(!binding.BindingType->is<ErrorType>());
+
+      // If this is a non-defaulted supertype binding,
+      // check whether we can combine it with another
+      // supertype binding by computing the 'join' of the types.
+      if (binding.Kind == AllowedBindingKind::Supertypes &&
+          !binding.BindingType->hasTypeVariable() &&
+          !binding.DefaultedProtocol && !binding.isDefaultableBinding() &&
+          allowJoinMeet) {
+        if (lastSupertypeIndex) {
+          // Can we compute a join?
+          auto &lastBinding = Bindings[*lastSupertypeIndex];
+          auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
+          auto bindingType = binding.BindingType->getWithoutSpecifierType();
+          if (auto join = Type::join(lastType, bindingType)) {
+            // Replace the last supertype binding with the join. We're done.
+            lastBinding.BindingType = join;
+            return;
+          }
+        }
+
+        // Record this as the most recent supertype index.
+        lastSupertypeIndex = Bindings.size();
+      }
+
+      Bindings.push_back(std::move(binding));
     }
 
     void dump(llvm::raw_ostream &out,

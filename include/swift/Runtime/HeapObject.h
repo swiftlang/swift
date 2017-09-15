@@ -889,13 +889,15 @@ static inline void swift_nonatomic_unknownRelease_n(void *value, int n)
 ///
 /// \param ref - never null
 /// \param value - not necessarily a native Swift object; can be null
+/// \return ref
 SWIFT_RUNTIME_EXPORT
-void swift_unknownWeakInit(WeakReference *ref, void *value);
+WeakReference *swift_unknownWeakInit(WeakReference *ref, void *value);
 
 #else
 
-static inline void swift_unknownWeakInit(WeakReference *ref, void *value) {
-  swift_weakInit(ref, static_cast<HeapObject *>(value));
+static inline WeakReference *swift_unknownWeakInit(WeakReference *ref,
+                                                   void *value) {
+  return swift_weakInit(ref, static_cast<HeapObject *>(value));
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -906,13 +908,15 @@ static inline void swift_unknownWeakInit(WeakReference *ref, void *value) {
 ///
 /// \param ref - never null
 /// \param value - not necessarily a native Swift object; can be null
+/// \return ref
 SWIFT_RUNTIME_EXPORT
-void swift_unknownWeakAssign(WeakReference *ref, void *value);
+WeakReference *swift_unknownWeakAssign(WeakReference *ref, void *value);
 
 #else
 
-static inline void swift_unknownWeakAssign(WeakReference *ref, void *value) {
-  swift_weakAssign(ref, static_cast<HeapObject *>(value));
+static inline WeakReference *swift_unknownWeakAssign(WeakReference *ref,
+                                                     void *value) {
+  return swift_weakAssign(ref, static_cast<HeapObject *>(value));
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -973,15 +977,16 @@ static inline void swift_unknownWeakDestroy(WeakReference *object) {
 
 /// Copy-initialize a weak reference variable from one that might not
 /// refer to a native Swift object.
+/// \return dest
 SWIFT_RUNTIME_EXPORT
-void swift_unknownWeakCopyInit(WeakReference *dest,
-                               WeakReference *src);
+WeakReference *swift_unknownWeakCopyInit(WeakReference *dest,
+                                         WeakReference *src);
 
 #else
 
-static inline void swift_unknownWeakCopyInit(WeakReference *dest,
-                                             WeakReference *src) {
-  swift_weakCopyInit(dest, src);
+static inline WeakReference *swift_unknownWeakCopyInit(WeakReference *dest,
+                                                       WeakReference *src) {
+  return swift_weakCopyInit(dest, src);
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -990,15 +995,16 @@ static inline void swift_unknownWeakCopyInit(WeakReference *dest,
 
 /// Take-initialize a weak reference variable from one that might not
 /// refer to a native Swift object.
+/// \return dest
 SWIFT_RUNTIME_EXPORT
-void swift_unknownWeakTakeInit(WeakReference *dest,
-                               WeakReference *src);
+WeakReference *swift_unknownWeakTakeInit(WeakReference *dest,
+                                         WeakReference *src);
 
 #else
 
-static inline void swift_unknownWeakTakeInit(WeakReference *dest,
-                                             WeakReference *src) {
-  swift_weakTakeInit(dest, src);
+static inline WeakReference *swift_unknownWeakTakeInit(WeakReference *dest,
+                                                       WeakReference *src) {
+  return swift_weakTakeInit(dest, src);
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -1007,15 +1013,16 @@ static inline void swift_unknownWeakTakeInit(WeakReference *dest,
 
 /// Copy-assign a weak reference variable from another when either
 /// or both variables might not refer to a native Swift object.
+/// \return dest
 SWIFT_RUNTIME_EXPORT
-void swift_unknownWeakCopyAssign(WeakReference *dest,
-                                 WeakReference *src);
+WeakReference *swift_unknownWeakCopyAssign(WeakReference *dest,
+                                           WeakReference *src);
 
 #else
 
-static inline void swift_unknownWeakCopyAssign(WeakReference *dest,
-                                               WeakReference *src) {
-  swift_weakCopyAssign(dest, src);
+static inline WeakReference *swift_unknownWeakCopyAssign(WeakReference *dest,
+                                                         WeakReference *src) {
+  return swift_weakCopyAssign(dest, src);
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -1024,15 +1031,16 @@ static inline void swift_unknownWeakCopyAssign(WeakReference *dest,
 
 /// Take-assign a weak reference variable from another when either
 /// or both variables might not refer to a native Swift object.
+/// \return dest
 SWIFT_RUNTIME_EXPORT
-void swift_unknownWeakTakeAssign(WeakReference *dest,
-                                 WeakReference *src);
+WeakReference *swift_unknownWeakTakeAssign(WeakReference *dest,
+                                           WeakReference *src);
 
 #else
 
-static inline void swift_unknownWeakTakeAssign(WeakReference *dest,
-                                               WeakReference *src) {
-  swift_weakTakeAssign(dest, src);
+static inline WeakReference *swift_unknownWeakTakeAssign(WeakReference *dest,
+                                                         WeakReference *src) {
+  return swift_weakTakeAssign(dest, src);
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -1045,14 +1053,16 @@ static inline void swift_unknownWeakTakeAssign(WeakReference *dest,
 
 /// Initialize an unowned reference to an object with unknown reference
 /// counting.
+/// \return ref
 SWIFT_RUNTIME_EXPORT
-void swift_unknownUnownedInit(UnownedReference *ref, void *value);
+UnownedReference *swift_unknownUnownedInit(UnownedReference *ref, void *value);
 
 #else
 
-static inline void swift_unknownUnownedInit(UnownedReference *ref,
-                                            void *value) {
+static inline UnownedReference *swift_unknownUnownedInit(UnownedReference *ref,
+                                                         void *value) {
   swift_unownedInit(ref, static_cast<HeapObject*>(value));
+  return ref;
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -1061,14 +1071,17 @@ static inline void swift_unknownUnownedInit(UnownedReference *ref,
 
 /// Assign to an unowned reference holding an object with unknown reference
 /// counting.
+/// \return ref
 SWIFT_RUNTIME_EXPORT
-void swift_unknownUnownedAssign(UnownedReference *ref, void *value);
+UnownedReference *swift_unknownUnownedAssign(UnownedReference *ref,
+                                             void *value);
 
 #else
 
-static inline void swift_unknownUnownedAssign(UnownedReference *ref,
-                                              void *value) {
+static inline UnownedReference *
+swift_unknownUnownedAssign(UnownedReference *ref, void *value) {
   swift_unownedAssign(ref, static_cast<HeapObject*>(value));
+  return ref;
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -1121,15 +1134,17 @@ static inline void swift_unknownUnownedDestroy(UnownedReference *ref) {
 
 /// Copy-initialize an unowned reference variable from one that might not
 /// refer to a native Swift object.
+/// \return dest
 SWIFT_RUNTIME_EXPORT
-void swift_unknownUnownedCopyInit(UnownedReference *dest,
-                                  UnownedReference *src);
+UnownedReference *swift_unknownUnownedCopyInit(UnownedReference *dest,
+                                               UnownedReference *src);
 
 #else
 
-static inline void swift_unknownUnownedCopyInit(UnownedReference *dest,
-                                                UnownedReference *src) {
+static inline UnownedReference *
+swift_unknownUnownedCopyInit(UnownedReference *dest, UnownedReference *src) {
   swift_unownedCopyInit(dest, src);
+  return dest;
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -1139,14 +1154,15 @@ static inline void swift_unknownUnownedCopyInit(UnownedReference *dest,
 /// Take-initialize an unowned reference variable from one that might not
 /// refer to a native Swift object.
 SWIFT_RUNTIME_EXPORT
-void swift_unknownUnownedTakeInit(UnownedReference *dest,
-                                             UnownedReference *src);
+UnownedReference *swift_unknownUnownedTakeInit(UnownedReference *dest,
+                                               UnownedReference *src);
 
 #else
 
-static inline void swift_unknownUnownedTakeInit(UnownedReference *dest,
-                                                UnownedReference *src) {
+static inline UnownedReference *
+swift_unknownUnownedTakeInit(UnownedReference *dest, UnownedReference *src) {
   swift_unownedTakeInit(dest, src);
+  return dest;
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -1155,15 +1171,17 @@ static inline void swift_unknownUnownedTakeInit(UnownedReference *dest,
 
 /// Copy-assign an unowned reference variable from another when either
 /// or both variables might not refer to a native Swift object.
+/// \return dest
 SWIFT_RUNTIME_EXPORT
-void swift_unknownUnownedCopyAssign(UnownedReference *dest,
-                                               UnownedReference *src);
+UnownedReference *swift_unknownUnownedCopyAssign(UnownedReference *dest,
+                                                 UnownedReference *src);
 
 #else
 
-static inline void swift_unknownUnownedCopyAssign(UnownedReference *dest,
-                                                  UnownedReference *src) {
+static inline UnownedReference *
+swift_unknownUnownedCopyAssign(UnownedReference *dest, UnownedReference *src) {
   swift_unownedCopyAssign(dest, src);
+  return dest;
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -1172,15 +1190,17 @@ static inline void swift_unknownUnownedCopyAssign(UnownedReference *dest,
 
 /// Take-assign an unowned reference variable from another when either
 /// or both variables might not refer to a native Swift object.
+/// \return dest
 SWIFT_RUNTIME_EXPORT
-void swift_unknownUnownedTakeAssign(UnownedReference *dest,
-                                               UnownedReference *src);
+UnownedReference *swift_unknownUnownedTakeAssign(UnownedReference *dest,
+                                                 UnownedReference *src);
 
 #else
 
-static inline void swift_unknownUnownedTakeAssign(UnownedReference *dest,
-                                                  UnownedReference *src) {
+static inline UnownedReference *
+swift_unknownUnownedTakeAssign(UnownedReference *dest, UnownedReference *src) {
   swift_unownedTakeAssign(dest, src);
+  return dest;
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
