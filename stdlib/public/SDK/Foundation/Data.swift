@@ -910,18 +910,6 @@ public final class _DataStorage {
         }
     }
     
-    public var hashValue: Int {
-        switch _backing {
-        case .customReference(let d):
-            return d.hash
-        case .customMutableReference(let d):
-            return d.hash
-        default:
-            let len = _length
-            return Int(bitPattern: CFHashBytes(_bytes?.assumingMemoryBound(to: UInt8.self).advanced(by: -_offset), Swift.min(len, 80)))
-        }
-    }
-    
     public func subdata(in range: Range<Data.Index>) -> Data {
         switch _backing {
         case .customReference(let d):
@@ -1625,7 +1613,15 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     /// The hash value for the data.
     public var hashValue: Int {
-        return _backing.hashValue
+        var hashValue = 0
+        let hashRange: Range<Int> = _sliceRange.lowerBound..<Swift.min(_sliceRange.lowerBound + 80, _sliceRange.upperBound)
+        _withStackOrHeapBuffer(hashRange.count) { buffer in
+            _backing.withUnsafeBytes(in: hashRange) {
+                memcpy(buffer.pointee.memory, $0.baseAddress!, hashRange.count)
+            }
+            hashValue = Int(bitPattern: CFHashBytes(buffer.pointee.memory.assumingMemoryBound(to: UInt8.self), hashRange.count))
+        }
+        return hashValue
     }
     
     @inline(__always)
@@ -1842,7 +1838,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 extension Data : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     /// A human-readable description for the data.
     public var description: String {
-        return "\(self.count) bytes"
+        // return "\(self.count) bytes"
+        return "Data(bytes: [" + map { "0x\(String($0, radix: 16))" }.joined(separator: ", ") + "])"
     }
     
     /// A human-readable debug description for the data.
