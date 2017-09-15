@@ -1502,9 +1502,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             _backing = _backing.mutableCopy(_sliceRange)
         }
         _backing.resetBytes(in: range)
-        if _sliceRange.upperBound < range.location + range.length {
-            let newLength = range.location + range.length
-            _sliceRange = _sliceRange.lowerBound..<(_sliceRange.lowerBound + newLength)
+        if _sliceRange.upperBound < range.upperBound {
+            _sliceRange = _sliceRange.lowerBound..<range.upperBound
         }
     }
     

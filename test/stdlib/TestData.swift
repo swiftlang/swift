@@ -3635,6 +3635,12 @@ class TestData : TestDataSuper {
         expectEqual(slice1.hashValue, slice2.hashValue)
         expectEqual(slice2.hashValue, slice3.hashValue)
     }
+
+    func test_slice_resize_growth() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        data.resetBytes(in: data.endIndex.advanced(by: -1)..<data.endIndex.advanced(by: 1))
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 0, 0]))
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -3943,7 +3949,7 @@ DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubr
 DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithCollection() }
 DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithBytes() }
 DataTests.test("test_sliceHash") { TestData().test_sliceHash() }
-
+DataTests.test("test_slice_resize_growth") { TestData().test_slice_resize_growth() }
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
     let data = "Hello World".data(using: .utf8)!
