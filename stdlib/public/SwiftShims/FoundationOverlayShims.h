@@ -45,10 +45,12 @@ static inline _Bool _resizeConditionalAllocationBuffer(_ConditionalAllocationBuf
     void *newMemory;
     if (buffer->onStack) {
         newMemory = malloc(amount);
+        if (newMemory == NULL) { return false; }
         memcpy(newMemory, buffer->memory, buffer->capacity);
         buffer->onStack = false;
     } else {
         newMemory = realloc(buffer->memory, amount);
+        if (newMemory == NULL) { return false; }
     }
     if (newMemory == NULL) { return false; }
     buffer->memory = newMemory;
