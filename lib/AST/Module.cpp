@@ -663,11 +663,13 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   if (auto inherited = dyn_cast<InheritedProtocolConformance>(conformance)) {
     // Dig out the conforming nominal type.
     auto rootConformance = inherited->getRootNormalConformance();
-    auto conformingClass
+    auto conformingNominal
       = rootConformance->getType()->getClassOrBoundGenericClass();
 
     // Map up to our superclass's type.
-    auto superclassTy = type->getSuperclassForDecl(conformingClass);
+    Type superclassTy = type->getSuperclass();
+    while (superclassTy->getAnyNominal() != conformingNominal)
+      superclassTy = superclassTy->getSuperclass();
 
     // Compute the conformance for the inherited type.
     auto inheritedConformance = lookupConformance(superclassTy, protocol);
