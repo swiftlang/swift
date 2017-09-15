@@ -4251,7 +4251,8 @@ namespace {
         for (auto indexType : indexTypes) {
           auto conformance =
             cs.TC.conformsToProtocol(indexType.getType(), hashable,
-                                     cs.DC, ConformanceCheckFlags::Used);
+                                     cs.DC, ConformanceCheckFlags::Used
+                                          |ConformanceCheckFlags::InExpression);
           if (!conformance) {
             cs.TC.diagnose(component.getIndexExpr()->getLoc(),
                            diag::expr_keypath_subscript_index_not_hashable,
