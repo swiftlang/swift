@@ -349,11 +349,17 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
 
 void ClangImporter::Implementation::forEachDistinctName(
     const clang::NamedDecl *decl,
-    llvm::function_ref<void(ImportedName, ImportNameVersion)> action) {
+    llvm::function_ref<bool(ImportedName, ImportNameVersion)> action) {
   using ImportNameKey = std::pair<DeclName, EffectiveClangContext>;
   SmallVector<ImportNameKey, 8> seenNames;
-  forEachImportNameVersionFromCurrent(CurrentVersion,
-                                      [&](ImportNameVersion nameVersion) {
+
+  ImportedName newName = importFullName(decl, CurrentVersion);
+  ImportNameKey key(newName, newName.getEffectiveContext());
+  if (action(newName, CurrentVersion))
+    seenNames.push_back(key);
+
+  CurrentVersion.forEachOtherImportNameVersion(
+      [&](ImportNameVersion nameVersion) {
     // Check to see if the name is different.
     ImportedName newName = importFullName(decl, nameVersion);
     ImportNameKey key(newName, newName.getEffectiveContext());
@@ -365,8 +371,8 @@ void ClangImporter::Implementation::forEachDistinctName(
     });
     if (seen)
       return;
-    seenNames.push_back(key);
-    action(newName, nameVersion);
+    if (action(newName, nameVersion))
+      seenNames.push_back(key);
   });
 }
 
@@ -1927,7 +1933,7 @@ namespace {
                                 Optional<ImportedName> &correctSwiftName) {
       ImportNameVersion canonicalVersion = getActiveSwiftVersion();
       if (isa<clang::TypeDecl>(D) || isa<clang::ObjCContainerDecl>(D)) {
-        canonicalVersion = ImportNameVersion::ForTypes;
+        canonicalVersion = ImportNameVersion::forTypes();
       }
       correctSwiftName = None;
 
@@ -2113,36 +2119,38 @@ namespace {
         // If we're importing a global as a member, we need to provide the
         // effective context.
         Impl.printSwiftName(
-            correctSwiftName,
+            correctSwiftName, getActiveSwiftVersion(),
             /*fullyQualified=*/correctSwiftName.importAsMember(), os);
       }
 
-      unsigned majorVersion = majorVersionNumberForNameVersion(getVersion());
       DeclAttribute *attr;
-      if (isActiveSwiftVersion() || getVersion() == ImportNameVersion::Raw) {
+      if (isActiveSwiftVersion() || getVersion() == ImportNameVersion::raw()) {
         // "Raw" is the Objective-C name, which was never available in Swift.
         // Variants within the active version are usually declarations that
         // have been superseded, like the accessors of a property.
         attr = AvailableAttr::createPlatformAgnostic(
             ctx, /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
             PlatformAgnosticAvailabilityKind::UnavailableInSwift);
-      } else if (getVersion() < getActiveSwiftVersion()) {
-        // A Swift 2 name, for example, was obsoleted in Swift 3.
-        attr = AvailableAttr::createPlatformAgnostic(
-            ctx, /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
-            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
-            clang::VersionTuple(majorVersion + 1));
       } else {
-        // Future names are introduced in their future version.
-        assert(getVersion() > getActiveSwiftVersion());
-        attr = new (ctx) AvailableAttr(
-            SourceLoc(), SourceRange(), PlatformKind::none,
-            /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
-            /*Introduced*/clang::VersionTuple(majorVersion), SourceRange(),
-            /*Deprecated*/clang::VersionTuple(), SourceRange(),
-            /*Obsoleted*/clang::VersionTuple(), SourceRange(),
-            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
-            /*Implicit*/false);
+        unsigned majorVersion = getVersion().majorVersionNumber();
+        if (getVersion() < getActiveSwiftVersion()) {
+          // A Swift 2 name, for example, was obsoleted in Swift 3.
+          attr = AvailableAttr::createPlatformAgnostic(
+              ctx, /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
+              PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
+              clang::VersionTuple(majorVersion + 1));
+        } else {
+          // Future names are introduced in their future version.
+          assert(getVersion() > getActiveSwiftVersion());
+          attr = new (ctx) AvailableAttr(
+              SourceLoc(), SourceRange(), PlatformKind::none,
+              /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
+              /*Introduced*/clang::VersionTuple(majorVersion), SourceRange(),
+              /*Deprecated*/clang::VersionTuple(), SourceRange(),
+              /*Obsoleted*/clang::VersionTuple(), SourceRange(),
+              PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
+              /*Implicit*/false);
+        }
       }
 
       decl->getAttrs().add(attr);
@@ -2663,31 +2671,33 @@ namespace {
         case EnumKind::Unknown:
           Impl.forEachDistinctName(constant,
                                    [&](ImportedName newName,
-                                       ImportNameVersion nameVersion) {
+                                       ImportNameVersion nameVersion) -> bool {
             Decl *imported = Impl.importDecl(constant, nameVersion);
             if (!imported)
-              return;
+              return false;
             if (nameVersion == getActiveSwiftVersion())
               enumeratorDecl = imported;
             else
               variantDecls.push_back(imported);
+            return true;
           });
           break;
         case EnumKind::Options:
           Impl.forEachDistinctName(constant,
                                    [&](ImportedName newName,
-                                       ImportNameVersion nameVersion) {
+                                       ImportNameVersion nameVersion) -> bool {
             if (!contextIsEnum(newName))
-              return;
+              return true;
             SwiftDeclConverter converter(Impl, nameVersion);
             Decl *imported =
                 converter.importOptionConstant(constant, decl, result);
             if (!imported)
-              return;
+              return false;
             if (nameVersion == getActiveSwiftVersion())
               enumeratorDecl = imported;
             else
               variantDecls.push_back(imported);
+            return true;
           });
           break;
         case EnumKind::Enum: {
@@ -2735,18 +2745,19 @@ namespace {
 
           Impl.forEachDistinctName(constant,
                                    [&](ImportedName newName,
-                                       ImportNameVersion nameVersion) {
+                                       ImportNameVersion nameVersion) -> bool {
             if (nameVersion == getActiveSwiftVersion())
-              return;
+              return true;
             if (!contextIsEnum(newName))
-              return;
+              return true;
             SwiftDeclConverter converter(Impl, nameVersion);
             Decl *imported =
                 converter.importEnumCase(constant, decl, cast<EnumDecl>(result),
                                          enumeratorDecl);
             if (!imported)
-              return;
+              return false;
             variantDecls.push_back(imported);
+            return true;
           });
           break;
         }
@@ -4823,7 +4834,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   // we don't care.
   Decl *importedDecl = nullptr;
   if (getVersion() >= getActiveSwiftVersion())
-    importedDecl = Impl.importDecl(decl, ImportNameVersion::ForTypes);
+    importedDecl = Impl.importDecl(decl, ImportNameVersion::forTypes());
   if (!importedDecl && getVersion() != getActiveSwiftVersion())
     importedDecl = Impl.importDecl(decl, getActiveSwiftVersion());
   auto typeDecl = dyn_cast_or_null<TypeDecl>(importedDecl);
@@ -6894,9 +6905,7 @@ getSwiftNameFromClangName(StringRef replacement) {
   {
     // Render a swift_name string.
     llvm::raw_svector_ostream os(renamed);
-    printSwiftName(importedName,
-                   /*fullyQualified=*/true,
-                   os);
+    printSwiftName(importedName, CurrentVersion, /*fullyQualified=*/true, os);
   }
 
   return SwiftContext.AllocateCopy(StringRef(renamed));
@@ -8023,9 +8032,9 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(
       continue;
 
     forEachDistinctName(
-        decl, [&](ImportedName newName, ImportNameVersion nameVersion) {
-          addMemberAndAlternatesToExtension(decl, newName, nameVersion, ext);
-        });
+        decl, [&](ImportedName newName, ImportNameVersion nameVersion) -> bool {
+      return addMemberAndAlternatesToExtension(decl, newName, nameVersion, ext);
+    });
   }
 }
 
@@ -8043,29 +8052,30 @@ static Decl *findMemberThatWillLandInAnExtensionContext(Decl *member) {
   return result;
 }
 
-void ClangImporter::Implementation::addMemberAndAlternatesToExtension(
+bool ClangImporter::Implementation::addMemberAndAlternatesToExtension(
     clang::NamedDecl *decl, ImportedName newName, ImportNameVersion nameVersion,
     ExtensionDecl *ext) {
   // Quickly check the context and bail out if it obviously doesn't
   // belong here.
   if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
     if (importDC->isTranslationUnit())
-      return;
+      return true;
 
   // Then try to import the decl under the specified name.
   auto *member = importDecl(decl, nameVersion);
   if (!member)
-    return;
+    return false;
 
   member = findMemberThatWillLandInAnExtensionContext(member);
   if (!member || member->getDeclContext() != ext)
-    return;
+    return true;
   ext->addMember(member);
 
   for (auto alternate : getAlternateDecls(member)) {
     if (alternate->getDeclContext() == ext)
       ext->addMember(alternate);
   }
+  return true;
 }
 
 static ExtensionDecl *
@@ -8127,26 +8137,27 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
     const clang::NamedDecl *nd, SmallVectorImpl<Decl *> &members) {
   llvm::SmallPtrSet<Decl *, 4> knownAlternateMembers;
   forEachDistinctName(
-      nd, [&](ImportedName name, ImportNameVersion nameVersion) {
-        auto member = importDecl(nd, nameVersion);
-        if (!member)
-          return;
+      nd, [&](ImportedName name, ImportNameVersion nameVersion) -> bool {
+    auto member = importDecl(nd, nameVersion);
+    if (!member)
+      return false;
 
-        // If there are alternate declarations for this member, add them.
-        for (auto alternate : getAlternateDecls(member)) {
-          if (alternate->getDeclContext() == member->getDeclContext() &&
-              knownAlternateMembers.insert(alternate).second) {
-            members.push_back(alternate);
-          }
-        }
+    // If there are alternate declarations for this member, add them.
+    for (auto alternate : getAlternateDecls(member)) {
+      if (alternate->getDeclContext() == member->getDeclContext() &&
+          knownAlternateMembers.insert(alternate).second) {
+        members.push_back(alternate);
+      }
+    }
 
-        // If this declaration shouldn't be visible, don't add it to
-        // the list.
-        if (shouldSuppressDeclImport(nd))
-          return;
+    // If this declaration shouldn't be visible, don't add it to
+    // the list.
+    if (shouldSuppressDeclImport(nd))
+      return true;
 
-        members.push_back(member);
-      });
+    members.push_back(member);
+    return true;
+  });
 }
 
 void ClangImporter::Implementation::collectMembersToAdd(

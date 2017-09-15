@@ -786,6 +786,24 @@ inline OutputIterator transform(const Container &C, OutputIterator result,
   return std::transform(C.begin(), C.end(), result, op);
 }
 
+/// Provides default implementations of !=, <=, >, and >= based on == and <.
+template <typename T>
+class RelationalOperationsBase {
+public:
+  friend bool operator>(const T &left, const T &right) {
+    return right < left;
+  }
+  friend bool operator>=(const T &left, const T &right) {
+    return !(left < right);
+  }
+  friend bool operator<=(const T &left, const T &right) {
+    return !(right < left);
+  }
+  friend bool operator!=(const T &left, const T &right) {
+    return !(left == right);
+  }
+};
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_INTERLEAVE_H
