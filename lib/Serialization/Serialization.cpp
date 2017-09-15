@@ -531,6 +531,15 @@ IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
   if (M == clangImporter->getImportedHeaderModule())
     return OBJC_HEADER_MODULE_ID;
 
+  // If we're referring to a member of a private module that will be
+  // re-exported via a public module, record the public module's name.
+  if (auto clangModule = M->findUnderlyingClangModule()) {
+    if (!clangModule->ExportAsModule.empty()) {
+      auto publicModuleName =
+        M->getASTContext().getIdentifier(clangModule->ExportAsModule);
+      return addDeclBaseNameRef(publicModuleName);
+    }
+  }
   assert(!M->getName().empty());
   return addDeclBaseNameRef(M->getName());
 }
