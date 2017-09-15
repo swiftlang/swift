@@ -60,9 +60,9 @@ enum: uint32_t {
 
 using namespace swift;
 
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
-
   // If we failed to find a symbol and thus dlinfo->dli_sname is nullptr, we
   // need to use the hex address.
   bool hasUnavailableAddress = syminfo.symbolName == nullptr;
@@ -97,6 +97,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
       Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
   return true;
 }
+#endif
 
 void swift::dumpStackTraceEntry(unsigned index, void *framePC,
                                 bool shortOutput) {
