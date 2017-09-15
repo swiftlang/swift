@@ -21,6 +21,24 @@
 
 using namespace swift;
 
+#define SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION)                 \
+  invocationCounter_##RT_FUNCTION
+
+#define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
+  uint32_t SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION) = 0;
+
+namespace swift {
+
+// Define counters used for tracking the total number of invocations of runtime
+// functions.
+struct RuntimeFunctionCountersState {
+  // Provide one counter per runtime function being tracked.
+#include "RuntimeInvocationsTracking.def"
+};
+
+} // end namespace swift
+
+
 /// If set, global runtime function counters should be tracked.
 static bool UpdatePerObjectRuntimeFunctionCounters = false;
 /// If set, per object runtime function counters should be tracked.
@@ -36,24 +54,23 @@ static RuntimeFunctionCountersState RuntimeGlobalFunctionCountersState;
 static llvm::DenseMap<HeapObject *, RuntimeFunctionCountersState> RuntimeObjectStateCache;
 
 /// Define names of runtime functions.
-#undef RT_FUNCTION_TO_TRACK
-#define RT_FUNCTION_TO_TRACK(OBJ, RT_FUNCTION) #RT_FUNCTION,
+#define FUNCTION_TO_TRACK(RT_FUNCTION) #RT_FUNCTION,
 
 static const char *RuntimeFunctionNames[] {
-  RT_FUNCTIONS_TO_TRACK
+  #include "RuntimeInvocationsTracking.def"
   nullptr
 };
 
 #define RT_FUNCTION_ID(RT_FUNCTION) ID_##RT_FUNCTION
 
-#undef RT_FUNCTION_TO_TRACK
-#define RT_FUNCTION_TO_TRACK(OBJ, RT_FUNCTION) RT_FUNCTION_ID(RT_FUNCTION),
+/// Defines names of enum cases for each function being tracked.
+#define FUNCTION_TO_TRACK(RT_FUNCTION) RT_FUNCTION_ID(RT_FUNCTION),
 
 /// Define an enum where each enumerator corresponds to a runtime function being
 /// tracked. Their order is the same as the order of the counters in the
 /// RuntimeObjectState structure.
 enum RuntimeFunctionNamesIDs : uint32_t {
-  RT_FUNCTIONS_TO_TRACK
+  #include "RuntimeInvocationsTracking.def"
   ID_LastRuntimeFunctionName,
 };
 
@@ -61,23 +78,22 @@ enum RuntimeFunctionNamesIDs : uint32_t {
 static RuntimeFunctionCountersUpdateHandler
     GlobalRuntimeFunctionCountersUpdateHandler;
 
-#undef RT_FUNCTION_TO_TRACK
-#define RT_FUNCTION_TO_TRACK(OBJ, RT_FUNCTION)                                 \
+/// Define offset for each function being tracked.
+#define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
   (sizeof(uint16_t) * (unsigned)RT_FUNCTION_ID(RT_FUNCTION)),
 
 /// The offsets of the runtime function counters being tracked inside the
 /// RuntimeObjectState structure. The array is indexed by
 /// the enumerators from RuntimeFunctionNamesIDs.
 static uint16_t RuntimeFunctionCountersOffsets[] = {
-  RT_FUNCTIONS_TO_TRACK
+  #include "RuntimeInvocationsTracking.def"
 };
 
 /// Define implementations of tracking functions.
 /// TODO: Track only objects that were registered for tracking?
 /// TODO: Perform atomic increments?
-#undef RT_FUNCTION_TO_TRACK
-#define RT_FUNCTION_TO_TRACK(OBJ, RT_FUNCTION)                                 \
-  void SWIFT_RT_TRACK_INVOCATION_NAME(RT_FUNCTION, OBJ)(HeapObject * OBJ) {    \
+#define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
+  void SWIFT_RT_TRACK_INVOCATION_NAME(RT_FUNCTION)(HeapObject * object) {      \
     /* Update global counters. */                                              \
     if (UpdateGlobalRuntimeFunctionCounters) {                                 \
       RuntimeGlobalFunctionCountersState                                       \
@@ -86,49 +102,49 @@ static uint16_t RuntimeFunctionCountersOffsets[] = {
         auto oldGlobalMode = setGlobalRuntimeFunctionCountersMode(0);          \
         auto oldPerObjectMode = setPerObjectRuntimeFunctionCountersMode(0);    \
         GlobalRuntimeFunctionCountersUpdateHandler(                            \
-            OBJ, RT_FUNCTION_ID(RT_FUNCTION));                                 \
+            object, RT_FUNCTION_ID(RT_FUNCTION));                              \
         setGlobalRuntimeFunctionCountersMode(oldGlobalMode);                   \
         setPerObjectRuntimeFunctionCountersMode(oldPerObjectMode);             \
       }                                                                        \
     }                                                                          \
     /* Update per object counters. */                                          \
-    if (UpdatePerObjectRuntimeFunctionCounters && OBJ) {                       \
-      RuntimeObjectStateCache[OBJ].SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(  \
-          RT_FUNCTION)++;                                                      \
+    if (UpdatePerObjectRuntimeFunctionCounters && object) {                    \
+      RuntimeObjectStateCache[object]                                          \
+          .SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION)++;           \
       /* TODO: Remember the order/history of operations? */                    \
     }                                                                          \
   }
 
-RT_FUNCTIONS_TO_TRACK
+#include "RuntimeInvocationsTracking.def"
 
 /// Public APIs
 
 /// Get the runtime object state associated with an object.
 SWIFT_RT_ENTRY_VISIBILITY
 void getObjectRuntimeFunctionCounters(HeapObject *object,
-                                      RuntimeFunctionCountersState &result) {
-  result = RuntimeObjectStateCache[object];
+                                      RuntimeFunctionCountersState *result) {
+  *result = RuntimeObjectStateCache[object];
 }
 
 /// Set the runtime object state associated with an object from a provided
 /// state.
 SWIFT_RT_ENTRY_VISIBILITY
 void setObjectRuntimeFunctionCounters(HeapObject *object,
-                                      RuntimeFunctionCountersState &state) {
-  RuntimeObjectStateCache[object] = state;
+                                      RuntimeFunctionCountersState *state) {
+  RuntimeObjectStateCache[object] = *state;
 }
 
 /// Get the global runtime state containing the total numbers of invocations for
 /// each runtime function of interest.
 SWIFT_RT_ENTRY_VISIBILITY
-void getGlobalRuntimeFunctionCounters(RuntimeFunctionCountersState &result) {
-  result = RuntimeGlobalFunctionCountersState;
+void getGlobalRuntimeFunctionCounters(RuntimeFunctionCountersState *result) {
+  *result = RuntimeGlobalFunctionCountersState;
 }
 
 /// Set the global runtime state of function pointers from a provided state.
 SWIFT_RT_ENTRY_VISIBILITY
-void setGlobalRuntimeFunctionCounters(RuntimeFunctionCountersState &state) {
-  RuntimeGlobalFunctionCountersState = state;
+void setGlobalRuntimeFunctionCounters(RuntimeFunctionCountersState *state) {
+  RuntimeGlobalFunctionCountersState = *state;
 }
 
 /// Return the names of the runtime functions being tracked.
@@ -153,16 +169,16 @@ uint64_t getNumRuntimeFunctionCounters() {
   return ID_LastRuntimeFunctionName;
 }
 
-#undef RT_FUNCTION_TO_TRACK
-#define RT_FUNCTION_TO_TRACK(OBJ, RT_FUNCTION)                                 \
-  tmp = State.SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION);          \
+/// Define how to dump the counter for a given runtime function.
+#define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
+  tmp = State->SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION);         \
   if (tmp != 0)                                                                \
     printf("%s = %d\n",                                                        \
            RuntimeFunctionNames[(int)RT_FUNCTION_ID(RT_FUNCTION)], tmp);
 
-static void dumpRuntimeCounters(RuntimeFunctionCountersState &State) {
+static void dumpRuntimeCounters(RuntimeFunctionCountersState *State) {
   uint32_t tmp;
-  RT_FUNCTIONS_TO_TRACK
+  #include "RuntimeInvocationsTracking.def"
 }
 
 /// Dump all per-object runtime function pointers.
@@ -170,7 +186,7 @@ SWIFT_RT_ENTRY_VISIBILITY
 void dumpObjectsRuntimeFunctionPointers() {
   for (auto &Pair : RuntimeObjectStateCache) {
     printf("\n\nRuntime counters for object at address %p:\n", Pair.getFirst());
-    dumpRuntimeCounters(Pair.getSecond());
+    dumpRuntimeCounters(&Pair.getSecond());
     printf("\n");
   }
 }
