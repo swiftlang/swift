@@ -3,9 +3,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/TestableMultifileHelper.swift -enable-testing -enable-sil-ownership -o %t
 
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -sil-serialize-witness-tables -I %t %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -sil-serialize-witness-tables -I %t %S/testable-multifile-other.swift %s -module-name main | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -sil-serialize-witness-tables -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %t %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %t %S/testable-multifile-other.swift %s -module-name main | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
 
 // Just make sure we don't crash later on.
 // RUN: %target-swift-frontend -enable-sil-ownership -emit-ir -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
@@ -62,6 +62,6 @@ public class PublicSub: Base {
 // CHECK-NEXT:  method #Fooable.foo!1: {{.*}} : @_T04main7FooImplVAA7FooableA2aDP3fooyyFTW
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil_witness_table [serialized] PublicFooImpl: Fooable module main {
+// CHECK-LABEL: sil_witness_table PublicFooImpl: Fooable module main {
 // CHECK-NEXT:  method #Fooable.foo!1: {{.*}} : @_T04main13PublicFooImplVAA7FooableA2aDP3fooyyFTW
 // CHECK-NEXT: }
