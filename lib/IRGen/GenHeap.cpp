@@ -837,7 +837,7 @@ static llvm::FunctionType *getTypeOfFunction(llvm::Constant *fn) {
 
 /// Emit a unary call to perform a ref-counting operation.
 ///
-/// \param fn - expected signature 'void (T)'
+/// \param fn - expected signature 'void (T)' or 'T (T)'
 static void emitUnaryRefCountCall(IRGenFunction &IGF,
                                   llvm::Constant *fn,
                                   llvm::Value *value) {
@@ -847,9 +847,13 @@ static void emitUnaryRefCountCall(IRGenFunction &IGF,
 
   // Instead of casting the input, we cast the function type.
   // This tends to produce less IR, but might be evil.
-  if (value->getType() != getTypeOfFunction(fn)->getParamType(0)) {
+  auto origFnType = getTypeOfFunction(fn);
+  if (value->getType() != origFnType->getParamType(0)) {
+    auto resultTy = origFnType->getReturnType() == IGF.IGM.VoidTy
+                        ? IGF.IGM.VoidTy
+                        : value->getType();
     llvm::FunctionType *fnType =
-      llvm::FunctionType::get(IGF.IGM.VoidTy, value->getType(), false);
+      llvm::FunctionType::get(resultTy, value->getType(), false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
   
@@ -861,7 +865,7 @@ static void emitUnaryRefCountCall(IRGenFunction &IGF,
 
 /// Emit a copy-like call to perform a ref-counting operation.
 ///
-/// \param fn - expected signature 'void (T, T)'
+/// \param fn - expected signature 'void (T, T)' or 'T (T, T)'
 static void emitCopyLikeCall(IRGenFunction &IGF,
                              llvm::Constant *fn,
                              llvm::Value *dest,
@@ -875,10 +879,14 @@ static void emitCopyLikeCall(IRGenFunction &IGF,
 
   // Instead of casting the inputs, we cast the function type.
   // This tends to produce less IR, but might be evil.
-  if (dest->getType() != getTypeOfFunction(fn)->getParamType(0)) {
+  auto origFnType = getTypeOfFunction(fn);
+  if (dest->getType() != origFnType->getParamType(0)) {
     llvm::Type *paramTypes[] = { dest->getType(), dest->getType() };
+    auto resultTy = origFnType->getReturnType() == IGF.IGM.VoidTy
+                        ? IGF.IGM.VoidTy
+                        : dest->getType();
     llvm::FunctionType *fnType =
-      llvm::FunctionType::get(IGF.IGM.VoidTy, paramTypes, false);
+      llvm::FunctionType::get(resultTy, paramTypes, false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
   
@@ -923,7 +931,7 @@ static llvm::Value *emitLoadWeakLikeCall(IRGenFunction &IGF,
 
 /// Emit a call to a function with a storeWeak-like signature.
 ///
-/// \param fn - expected signature 'void (Weak*, T)'
+/// \param fn - expected signature 'void (Weak*, T)' or 'Weak* (Weak*, T)'
 static void emitStoreWeakLikeCall(IRGenFunction &IGF,
                                   llvm::Constant *fn,
                                   llvm::Value *addr,
@@ -938,10 +946,14 @@ static void emitStoreWeakLikeCall(IRGenFunction &IGF,
 
   // Instead of casting the inputs, we cast the function type.
   // This tends to produce less IR, but might be evil.
-  if (value->getType() != getTypeOfFunction(fn)->getParamType(1)) {
+  auto origFnType = getTypeOfFunction(fn);
+  if (value->getType() != origFnType->getParamType(1)) {
     llvm::Type *paramTypes[] = { addr->getType(), value->getType() };
+    auto resultTy = origFnType->getReturnType() == IGF.IGM.VoidTy
+                        ? IGF.IGM.VoidTy
+                        : addr->getType();
     llvm::FunctionType *fnType =
-      llvm::FunctionType::get(IGF.IGM.VoidTy, paramTypes, false);
+      llvm::FunctionType::get(resultTy, paramTypes, false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
 
