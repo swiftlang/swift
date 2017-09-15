@@ -144,15 +144,15 @@ def _apply_default_arguments(args):
 
     # Propagate global --skip-build
     if args.skip_build:
-        args.skip_build_linux = True
-        args.skip_build_freebsd = True
-        args.skip_build_cygwin = True
-        args.skip_build_osx = True
-        args.skip_build_ios = True
-        args.skip_build_tvos = True
-        args.skip_build_watchos = True
-        args.skip_build_android = True
-        args.skip_build_benchmarks = True
+        args.build_linux = False
+        args.build_freebsd = False
+        args.build_cygwin = False
+        args.build_osx = False
+        args.build_ios = False
+        args.build_tvos = False
+        args.build_watchos = False
+        args.build_android = False
+        args.build_benchmarks = False
         args.build_lldb = False
         args.build_llbuild = False
         args.build_swiftpm = False
@@ -165,20 +165,20 @@ def _apply_default_arguments(args):
 
     # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
     # merely shorthands for --skip-build-{**os}-{device,simulator}
-    if not args.ios or args.skip_build_ios:
-        args.skip_build_ios_device = True
-        args.skip_build_ios_simulator = True
+    if not args.ios or not args.build_ios:
+        args.build_ios_device = False
+        args.build_ios_simulator = False
 
-    if not args.tvos or args.skip_build_tvos:
-        args.skip_build_tvos_device = True
-        args.skip_build_tvos_simulator = True
+    if not args.tvos or not args.build_tvos:
+        args.build_tvos_device = False
+        args.build_tvos_simulator = False
 
-    if not args.watchos or args.skip_build_watchos:
-        args.skip_build_watchos_device = True
-        args.skip_build_watchos_simulator = True
+    if not args.watchos or not args.build_watchos:
+        args.build_watchos_device = False
+        args.build_watchos_simulator = False
 
-    if not args.android or args.skip_build_android:
-        args.skip_build_android = True
+    if not args.android or not args.build_android:
+        args.build_android = False
 
     # --validation-test implies --test.
     if args.validation_test:
@@ -218,22 +218,22 @@ def _apply_default_arguments(args):
 
     # --skip-build-{ios,tvos,watchos}-{device,simulator} implies
     # --skip-test-{ios,tvos,watchos}-{host,simulator}
-    if args.skip_build_ios_device:
+    if not args.build_ios_device:
         args.skip_test_ios_host = True
-    if args.skip_build_ios_simulator:
+    if not args.build_ios_simulator:
         args.skip_test_ios_simulator = True
 
-    if args.skip_build_tvos_device:
+    if not args.build_tvos_device:
         args.skip_test_tvos_host = True
-    if args.skip_build_tvos_simulator:
+    if not args.build_tvos_simulator:
         args.skip_test_tvos_simulator = True
 
-    if args.skip_build_watchos_device:
+    if not args.build_watchos_device:
         args.skip_test_watchos_host = True
-    if args.skip_build_watchos_simulator:
+    if not args.build_watchos_simulator:
         args.skip_test_watchos_simulator = True
 
-    if args.skip_build_android:
+    if not args.build_android:
         args.skip_test_android_host = True
 
     if not args.host_test:
@@ -259,7 +259,7 @@ def _apply_default_arguments(args):
                     if StdlibDeploymentTarget.Android.contains(tgt)]
     if not args.android and len(android_tgts) > 0:
         args.android = True
-        args.skip_build_android = True
+        args.build_android = False
 
 
 def create_argument_parser():
@@ -666,75 +666,90 @@ iterations with -O",
         action="store_true")
     run_build_group.add_argument(
         "--skip-build-linux",
-        help="skip building Swift stdlibs for Linux",
-        action=arguments.action.optional_bool)
+        dest='build_linux',
+        action=arguments.action.optional_false,
+        help="skip building Swift stdlibs for Linux")
     run_build_group.add_argument(
         "--skip-build-freebsd",
-        help="skip building Swift stdlibs for FreeBSD",
-        action=arguments.action.optional_bool)
+        dest='build_freebsd',
+        action=arguments.action.optional_false,
+        help="skip building Swift stdlibs for FreeBSD")
     run_build_group.add_argument(
         "--skip-build-cygwin",
-        help="skip building Swift stdlibs for Cygwin",
-        action=arguments.action.optional_bool)
+        dest='build_cygwin',
+        action=arguments.action.optional_false,
+        help="skip building Swift stdlibs for Cygwin")
     run_build_group.add_argument(
         "--skip-build-osx",
-        help="skip building Swift stdlibs for MacOSX",
-        action=arguments.action.optional_bool)
+        dest='build_osx',
+        action=arguments.action.optional_false,
+        help="skip building Swift stdlibs for MacOSX")
 
     run_build_group.add_argument(
         "--skip-build-ios",
-        help="skip building Swift stdlibs for iOS",
-        action=arguments.action.optional_bool)
+        dest='build_ios',
+        action=arguments.action.optional_false,
+        help="skip building Swift stdlibs for iOS")
     run_build_group.add_argument(
         "--skip-build-ios-device",
+        dest='build_ios_device',
+        action=arguments.action.optional_false,
         help="skip building Swift stdlibs for iOS devices "
-             "(i.e. build simulators only)",
-        action=arguments.action.optional_bool)
+             "(i.e. build simulators only)")
     run_build_group.add_argument(
         "--skip-build-ios-simulator",
+        dest='build_ios_simulator',
+        action=arguments.action.optional_false,
         help="skip building Swift stdlibs for iOS simulator "
-             "(i.e. build devices only)",
-        action=arguments.action.optional_bool)
+             "(i.e. build devices only)")
 
     run_build_group.add_argument(
         "--skip-build-tvos",
-        help="skip building Swift stdlibs for tvOS",
-        action=arguments.action.optional_bool)
+        dest='build_tvos',
+        action=arguments.action.optional_false,
+        help="skip building Swift stdlibs for tvOS")
     run_build_group.add_argument(
         "--skip-build-tvos-device",
+        dest='build_tvos_device',
+        action=arguments.action.optional_false,
         help="skip building Swift stdlibs for tvOS devices "
-             "(i.e. build simulators only)",
-        action=arguments.action.optional_bool)
+             "(i.e. build simulators only)")
     run_build_group.add_argument(
         "--skip-build-tvos-simulator",
+        dest='build_tvos_simulator',
+        action=arguments.action.optional_false,
         help="skip building Swift stdlibs for tvOS simulator "
-             "(i.e. build devices only)",
-        action=arguments.action.optional_bool)
+             "(i.e. build devices only)")
 
     run_build_group.add_argument(
         "--skip-build-watchos",
-        help="skip building Swift stdlibs for watchOS",
-        action=arguments.action.optional_bool)
+        dest='build_watchos',
+        action=arguments.action.optional_false,
+        help="skip building Swift stdlibs for watchOS")
     run_build_group.add_argument(
         "--skip-build-watchos-device",
+        dest='build_watchos_device',
+        action=arguments.action.optional_false,
         help="skip building Swift stdlibs for watchOS devices "
-             "(i.e. build simulators only)",
-        action=arguments.action.optional_bool)
+             "(i.e. build simulators only)")
     run_build_group.add_argument(
         "--skip-build-watchos-simulator",
+        dest='build_watchos_simulator',
+        action=arguments.action.optional_false,
         help="skip building Swift stdlibs for watchOS simulator "
-             "(i.e. build devices only)",
-        action=arguments.action.optional_bool)
+             "(i.e. build devices only)")
 
     run_build_group.add_argument(
         "--skip-build-android",
-        help="skip building Swift stdlibs for Android",
-        action=arguments.action.optional_bool)
+        dest='build_android',
+        action=arguments.action.optional_false,
+        help="skip building Swift stdlibs for Android")
 
     run_build_group.add_argument(
         "--skip-build-benchmarks",
-        help="skip building Swift Benchmark Suite",
-        action=arguments.action.optional_bool)
+        dest='build_benchmarks',
+        action=arguments.action.optional_false,
+        help="skip building Swift Benchmark Suite")
 
     skip_test_group = parser.add_argument_group(
         title="Skip testing specified targets")

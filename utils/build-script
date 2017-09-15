@@ -268,30 +268,30 @@ class BuildScriptInvocation(object):
         # iterate over all supported platforms.
 
         self.platforms_to_skip_build = set()
-        if args.skip_build_linux:
+        if not args.build_linux:
             self.platforms_to_skip_build.add(StdlibDeploymentTarget.Linux)
-        if args.skip_build_freebsd:
+        if not args.build_freebsd:
             self.platforms_to_skip_build.add(StdlibDeploymentTarget.FreeBSD)
-        if args.skip_build_cygwin:
+        if not args.build_cygwin:
             self.platforms_to_skip_build.add(StdlibDeploymentTarget.Cygwin)
-        if args.skip_build_osx:
+        if not args.build_osx:
             self.platforms_to_skip_build.add(StdlibDeploymentTarget.OSX)
-        if args.skip_build_ios_device:
+        if not args.build_ios_device:
             self.platforms_to_skip_build.add(StdlibDeploymentTarget.iOS)
-        if args.skip_build_ios_simulator:
+        if not args.build_ios_simulator:
             self.platforms_to_skip_build.add(
                 StdlibDeploymentTarget.iOSSimulator)
-        if args.skip_build_tvos_device:
+        if not args.build_tvos_device:
             self.platforms_to_skip_build.add(StdlibDeploymentTarget.AppleTV)
-        if args.skip_build_tvos_simulator:
+        if not args.build_tvos_simulator:
             self.platforms_to_skip_build.add(
                 StdlibDeploymentTarget.AppleTVSimulator)
-        if args.skip_build_watchos_device:
+        if not args.build_watchos_device:
             self.platforms_to_skip_build.add(StdlibDeploymentTarget.AppleWatch)
-        if args.skip_build_watchos_simulator:
+        if not args.build_watchos_simulator:
             self.platforms_to_skip_build.add(
                 StdlibDeploymentTarget.AppleWatchSimulator)
-        if args.skip_build_android:
+        if not args.build_android:
             self.platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
 
         self.platforms_to_skip_test = set()
@@ -501,7 +501,7 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-cmark",
                           "--skip-build-llvm",
                           "--skip-build-swift"]
-        if args.skip_build_benchmarks:
+        if not args.build_benchmarks:
             impl_args += ["--skip-build-benchmarks"]
         if not args.build_foundation:
             impl_args += ["--skip-build-foundation"]
@@ -532,27 +532,27 @@ class BuildScriptInvocation(object):
         if args.build_swift_static_sdk_overlay:
             impl_args += ["--build-swift-static-sdk-overlay"]
 
-        if args.skip_build_linux:
+        if not args.build_linux:
             impl_args += ["--skip-build-linux"]
-        if args.skip_build_freebsd:
+        if not args.build_freebsd:
             impl_args += ["--skip-build-freebsd"]
-        if args.skip_build_cygwin:
+        if not args.build_cygwin:
             impl_args += ["--skip-build-cygwin"]
-        if args.skip_build_osx:
+        if not args.build_osx:
             impl_args += ["--skip-build-osx"]
-        if args.skip_build_ios_device:
+        if not args.build_ios_device:
             impl_args += ["--skip-build-ios-device"]
-        if args.skip_build_ios_simulator:
+        if not args.build_ios_simulator:
             impl_args += ["--skip-build-ios-simulator"]
-        if args.skip_build_tvos_device:
+        if not args.build_tvos_device:
             impl_args += ["--skip-build-tvos-device"]
-        if args.skip_build_tvos_simulator:
+        if not args.build_tvos_simulator:
             impl_args += ["--skip-build-tvos-simulator"]
-        if args.skip_build_watchos_device:
+        if not args.build_watchos_device:
             impl_args += ["--skip-build-watchos-device"]
-        if args.skip_build_watchos_simulator:
+        if not args.build_watchos_simulator:
             impl_args += ["--skip-build-watchos-simulator"]
-        if args.skip_build_android:
+        if not args.build_android:
             impl_args += ["--skip-build-android"]
 
         if not args.test and not args.long_test:

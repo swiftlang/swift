@@ -418,16 +418,16 @@ class TestDriverArgumentParser(unittest.TestCase):
         with self.assertNotRaises(ParserError):
             args = self.parse_args(['--skip-build'])
 
-            self.assertTrue(args.skip_build_benchmarks)
+            self.assertFalse(args.build_benchmarks)
 
-            self.assertTrue(args.skip_build_linux)
-            self.assertTrue(args.skip_build_android)
-            self.assertTrue(args.skip_build_freebsd)
-            self.assertTrue(args.skip_build_cygwin)
-            self.assertTrue(args.skip_build_osx)
-            self.assertTrue(args.skip_build_ios)
-            self.assertTrue(args.skip_build_tvos)
-            self.assertTrue(args.skip_build_watchos)
+            self.assertFalse(args.build_linux)
+            self.assertFalse(args.build_android)
+            self.assertFalse(args.build_freebsd)
+            self.assertFalse(args.build_cygwin)
+            self.assertFalse(args.build_osx)
+            self.assertFalse(args.build_ios)
+            self.assertFalse(args.build_tvos)
+            self.assertFalse(args.build_watchos)
 
             self.assertFalse(args.build_foundation)
             self.assertFalse(args.build_libdispatch)
@@ -442,8 +442,8 @@ class TestDriverArgumentParser(unittest.TestCase):
     def test_implied_defaults_skip_build_ios(self):
         with self.assertNotRaises(ParserError):
             args = self.parse_args(['--skip-build-ios'])
-            self.assertTrue(args.skip_build_ios_device)
-            self.assertTrue(args.skip_build_ios_simulator)
+            self.assertFalse(args.build_ios_device)
+            self.assertFalse(args.build_ios_simulator)
 
             # Also implies that the tests should be skipped
             self.assertTrue(args.skip_test_ios_host)
@@ -452,8 +452,8 @@ class TestDriverArgumentParser(unittest.TestCase):
     def test_implied_defaults_skip_build_tvos(self):
         with self.assertNotRaises(ParserError):
             args = self.parse_args(['--skip-build-tvos'])
-            self.assertTrue(args.skip_build_tvos_device)
-            self.assertTrue(args.skip_build_tvos_simulator)
+            self.assertFalse(args.build_tvos_device)
+            self.assertFalse(args.build_tvos_simulator)
 
             # Also implies that the tests should be skipped
             self.assertTrue(args.skip_test_tvos_host)
@@ -462,8 +462,8 @@ class TestDriverArgumentParser(unittest.TestCase):
     def test_implied_defaults_skip_build_watchos(self):
         with self.assertNotRaises(ParserError):
             args = self.parse_args(['--skip-build-watchos'])
-            self.assertTrue(args.skip_build_watchos_device)
-            self.assertTrue(args.skip_build_watchos_simulator)
+            self.assertFalse(args.build_watchos_device)
+            self.assertFalse(args.build_watchos_simulator)
 
             # Also implies that the tests should be skipped
             self.assertTrue(args.skip_test_watchos_host)
