@@ -1221,6 +1221,10 @@ FUNCTION(GetKeyPath, swift_getKeyPath, C_CC,
          RETURNS(RefCountedPtrTy),
          ARGS(Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
+FUNCTION(CopyKeyPathTrivialIndices, swift_copyKeyPathTrivialIndices, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, Int8PtrTy, SizeTy),
+         ATTRS(NoUnwind))
 
 #if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)
 
