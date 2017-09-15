@@ -1842,8 +1842,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 extension Data : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     /// A human-readable description for the data.
     public var description: String {
-        // return "\(self.count) bytes"
-        return "Data(bytes: [" + map { "0x\(String($0, radix: 16))" }.joined(separator: ", ") + "])"
+        return "\(self.count) bytes"
     }
     
     /// A human-readable debug description for the data.
