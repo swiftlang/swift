@@ -1,12 +1,12 @@
 func testCollapseNestedIf() {
   let a = 3
-  if a > 2, a < 10 {}
+  if a > 2 {
+    if a < 10 {}
+  }
 }
 func testMultiConditionalNestedIf() {
   let a = 3
-  if a > 2, a != 4 {
-    if a < 10, a != 5 {}
-  }
+  if a > 2, a != 4, a < 10, a != 5 {}
 }
 func testLetNestedIf() {
   let a: Int? = 3

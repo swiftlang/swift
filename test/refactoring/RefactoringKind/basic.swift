@@ -275,7 +275,7 @@ func testExtraIfNestedIf() {
 // RUN: %refactor -source-filename %s -pos=173:3 -end-pos=173:27| %FileCheck %s -check-prefix=CHECK-EXTRCT-METHOD
 
 // RUN: %refactor -source-filename %s -pos=179:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF-EXPRESSION
-// RUN: %refactor -source-filename %s -pos=186:3 | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %refactor -source-filename %s -pos=186:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF-EXPRESSION
 // RUN: %refactor -source-filename %s -pos=193:3 | %FileCheck %s -check-prefix=CHECK-NONE
 // RUN: %refactor -source-filename %s -pos=201:3 | %FileCheck %s -check-prefix=CHECK-NONE
 

@@ -1,6 +1,8 @@
 func testCollapseNestedIf() {
   let a = 3
-  if a > 2, a < 10 {}
+  if a > 2 {
+    if a < 10 {}
+  }
 }
 func testMultiConditionalNestedIf() {
   let a = 3
@@ -16,7 +18,5 @@ func testLetNestedIf() {
 }
 func testCaseLetNestedIf() {
   let a: Int? = 3
-  if case .some(let b) = a {
-    if b != 5 {}
-  }
+  if case .some(let b) = a, b != 5 {}
 }
