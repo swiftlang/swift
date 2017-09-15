@@ -38,22 +38,27 @@ internal func _collectAllReferencesInsideObjectImpl(
   let count = mirror.children.count
 
   let id: ObjectIdentifier?
-  let toAnyObject: AnyObject?
+  let ref: UnsafeRawPointer?
   if type(of: value) is AnyObject.Type {
     // Object is a class (but not an ObjC-bridged struct)
-    toAnyObject = _unsafeDowncastToAnyObject(fromAny: value)
-    id = ObjectIdentifier(toAnyObject!)
-  } else if type(of: value) is Builtin.BridgeObject.Type ||
-    type(of: value) is Builtin.NativeObject.Type  {
-    toAnyObject = _unsafeDowncastToAnyObject(fromAny: value)
-    id = ObjectIdentifier(toAnyObject!)
+    let toAnyObject = _unsafeDowncastToAnyObject(fromAny: value)
+    ref = UnsafeRawPointer(Unmanaged.passUnretained(toAnyObject).toOpaque())
+    id = ObjectIdentifier(toAnyObject)
+  } else if type(of: value) is Builtin.BridgeObject.Type {
+    ref = UnsafeRawPointer(
+      Builtin.bridgeToRawPointer(value as! Builtin.BridgeObject))
+    id = nil
+  } else if type(of: value) is Builtin.NativeObject.Type  {
+    ref = UnsafeRawPointer(
+      Builtin.bridgeToRawPointer(value as! Builtin.NativeObject))
+    id = nil
   } else if let metatypeInstance = value as? Any.Type {
     // Object is a metatype
     id = ObjectIdentifier(metatypeInstance)
-    toAnyObject = nil
+    ref = nil
   } else {
     id = nil
-    toAnyObject = nil
+    ref = nil
   }
 
   if let theId = id {
@@ -67,9 +72,8 @@ internal func _collectAllReferencesInsideObjectImpl(
   }
 
   // If it is a reference, add it to the result.
-  if let toAnyObject = toAnyObject {
-    references.append(
-      UnsafeRawPointer(Unmanaged.passUnretained(toAnyObject).toOpaque()))
+  if let ref = ref {
+    references.append(ref)
   }
 
   // Recursively visit the children of the current value.
