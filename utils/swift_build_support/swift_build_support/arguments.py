@@ -211,6 +211,11 @@ _register(action, 'optional_bool', _OptionalBoolAction)
 
 
 class _OptionalTrueAction(_OptionalBoolAction):
+    """Action that defaults to False when absent and to True when parsed with
+    the option to override the value by passing a bool-like value as an
+    argument.
+    """
+
     def __init__(self, *args, **kwargs):
         kwargs['const'] = True
         kwargs['default'] = kwargs.pop('default', False)
@@ -221,6 +226,11 @@ _register(action, 'optional_true', _OptionalTrueAction)
 
 
 class _OptionalFalseAction(_OptionalBoolAction):
+    """Action that defaults to True when absent and to False when parsed with
+    the option to override the value by passing a bool-like value as an
+    argument.
+    """
+
     def __init__(self, *args, **kwargs):
         kwargs['const'] = False
         kwargs['default'] = kwargs.pop('default', True)
