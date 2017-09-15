@@ -170,6 +170,8 @@ class TestDriverArgumentParserMeta(type):
                 self.parse_args([option.option_string])
                 self.assertNotEmpty(output)
 
+        return test
+
     @classmethod
     def _generate_int_option_test(cls, option):
         def test(self):
