@@ -2048,6 +2048,62 @@ ArrayTestSuite.test("ArrayBridgeFromObjectiveCConditional") {
 
 #endif
 
+func getDerivedAPIsArray() -> Array<Int> {
+  var a = Array<Int>()
+  a.append(1010)
+  a.append(1020)
+  a.append(1030)
+  return a
+}
+
+//===---
+// Check that iterators traverse a snapshot of the collection.
+//===---
+
+ArrayTestSuite.test("mutationDoesNotAffectIterator/subscript/store") {
+  var array = getDerivedAPIsArray()
+  var iter = array.makeIterator()
+  array[0] = 1011
+
+  expectEqual([1010 ,1020, 1030], Array(IteratorSequence(iter)))
+}
+
+ArrayTestSuite.test("mutationDoesNotAffectIterator/removeAt,1") {
+  var array = getDerivedAPIsArray()
+  var iter = array.makeIterator()
+  expectEqual(1010, array.remove(at: 0))
+
+  expectEqual([1010 ,1020, 1030], Array(IteratorSequence(iter)))
+}
+
+ArrayTestSuite.test("mutationDoesNotAffectIterator/removeAt,all") {
+  var array = getDerivedAPIsArray()
+  var iter = array.makeIterator()
+  expectEqual(1010, array.remove(at: 0))
+  expectEqual(1020, array.remove(at: 0))
+  expectEqual(1030, array.remove(at: 0))
+
+  expectEqual([1010 ,1020, 1030], Array(IteratorSequence(iter)))
+}
+
+ArrayTestSuite.test(
+  "mutationDoesNotAffectIterator/removeAll,keepingCapacity=false") {
+  var array = getDerivedAPIsArray()
+  var iter = array.makeIterator()
+  array.removeAll(keepingCapacity: false)
+
+  expectEqual([1010 ,1020, 1030], Array(IteratorSequence(iter)))
+}
+
+ArrayTestSuite.test(
+  "mutationDoesNotAffectIterator/removeAll,keepingCapacity=true") {
+  var array = getDerivedAPIsArray()
+  var iter = array.makeIterator()
+  array.removeAll(keepingCapacity: true)
+
+  expectEqual([1010 ,1020, 1030], Array(IteratorSequence(iter)))
+}
+
 //===----------------------------------------------------------------------===//
 // Native array tests
 // FIXME: incomplete.
