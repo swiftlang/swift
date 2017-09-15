@@ -48,6 +48,9 @@ extension Array where Element == A {
   var property: Prop { fatalError() }
 }
 
+protocol P { var member: String { get } }
+extension B : P { var member : String { return "Member Value" } }
+
 struct Exactly<T> {}
 
 func expect<T>(_ x: inout T, toHaveType _: Exactly<T>.Type) {}
@@ -354,6 +357,11 @@ func testKeyPathSubscriptTuple(readonly: (Z,Z), writable: inout (Z,Z),
 func testKeyPathSubscriptLValue(base: Z, kp: inout KeyPath<Z, Z>) {
   _ = base[keyPath: kp]
 }
+
+func testKeyPathSubscriptExistentialBase(base: B, kp: KeyPath<P, String>) {
+  _ = base[keyPath: kp]
+}
+
 
 struct AA {
   subscript(x: Int) -> Int { return x }
