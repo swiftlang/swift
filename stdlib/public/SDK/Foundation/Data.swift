@@ -1226,7 +1226,11 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         } else if let buffer = elements as? UnsafeMutableBufferPointer<UInt8> {
             self.init(buffer: buffer)
         } else if let data = elements as? Data {
-            self.init(backing: data._backing.mutableCopy(data._sliceRange), range: 0..<data.count)
+            let len = data.count
+            let backing = data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) in
+                return _DataStorage(bytes: bytes, length: len)
+            }
+            self.init(backing: backing, range: 0..<len)
         } else {
             let underestimatedCount = elements.underestimatedCount
             self.init(count: underestimatedCount)
