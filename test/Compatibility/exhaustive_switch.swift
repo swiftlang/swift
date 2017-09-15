@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience
+// RUN: %target-typecheck-verify-swift -swift-version 3 -enable-resilience
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience
 
 func foo(a: Int?, b: Int?) -> Int {
   switch (a, b) {
@@ -460,7 +461,6 @@ func quiteBigEnough() -> Bool {
   case (.case11, .case11): return true
   }
 
-  // No diagnostic
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{do you want to add a default clause?}}
   case (.case0, _): return true
@@ -509,7 +509,7 @@ func quiteBigEnough() -> Bool {
   case (_, .case11): return true
   }
 
-  // No diagnostic
+  // No diagnostic 
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) {
   case (_, _): return true
   }
@@ -523,7 +523,7 @@ func quiteBigEnough() -> Bool {
   case _: return true
   }
   
-  // No diagnostic
+  // No diagnostic 
   switch ContainsOverlyLargeEnum.one(.case0) {
   case .one: return true
   case .two: return true
@@ -801,15 +801,6 @@ func sr6975() {
   case .a: // expected-warning {{case is already handled by previous patterns; consider removing it}}
     print("second a")
   }
-
-  func foo(_ str: String) -> Int {
-    switch str { // expected-error {{switch must be exhaustive}}
-    // expected-note@-1 {{do you want to add a default clause?}}
-    case let (x as Int) as Any:
-      return x
-    }
-  }
-  _ = foo("wtf")
 }
 
 public enum NonExhaustive {
@@ -829,11 +820,11 @@ public enum NonExhaustive {
 // case.
 @_inlineable
 public func testNonExhaustive(_ value: NonExhaustive, for interval: TemporalProxy, flag: Bool) {
-  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{do you want to add a default clause?}} {{3-3=default:\n<#code#>\n}}
+  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{do you want to add a default clause?}} {{3-3=default:\n<#code#>\n}}
   case .a: break
   }
 
-  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{do you want to add a default clause?}} {{3-3=default:\n<#code#>\n}}
+  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{do you want to add a default clause?}} {{3-3=default:\n<#code#>\n}}
   case .a: break
   case .b: break
   }
@@ -845,7 +836,7 @@ public func testNonExhaustive(_ value: NonExhaustive, for interval: TemporalProx
   }
 
   // Test being part of other spaces.
-  switch value as Optional { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.some(_)'}}
+  switch value as Optional { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.some(_)'}}
   case .a?: break
   case .b?: break
   case nil: break
@@ -856,20 +847,20 @@ public func testNonExhaustive(_ value: NonExhaustive, for interval: TemporalProx
   case nil: break
   } // no-warning
 
-  switch (value, flag) { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(_, false)'}}
+  switch (value, flag) { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(_, false)'}}
   case (.a, _): break
   case (.b, false): break
   case (_, true): break
   }
 
-  switch (flag, value) { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(false, _)'}}
+  switch (flag, value) { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(false, _)'}}
   case (_, .a): break
   case (false, .b): break
   case (true, _): break
   }
 
   // Test interaction with @_downgrade_exhaustivity_check.
-  switch (value, interval) { // expected-error {{switch must be exhaustive}} {{none}}
+  switch (value, interval) { // expected-warning {{switch must be exhaustive}} {{none}}
   // expected-note@-1 {{add missing case: '(_, .milliseconds(_))'}}
   // expected-note@-2 {{add missing case: '(_, .microseconds(_))'}}
   // expected-note@-3 {{add missing case: '(_, .nanoseconds(_))'}}
@@ -879,7 +870,7 @@ public func testNonExhaustive(_ value: NonExhaustive, for interval: TemporalProx
   case (.b, _): break
   }
 
-  switch (value, interval) { // expected-error {{switch must be exhaustive}} {{none}}
+  switch (value, interval) { // expected-warning {{switch must be exhaustive}} {{none}}
   // expected-note@-1 {{add missing case: '(_, .seconds(_))'}}
   // expected-note@-2 {{add missing case: '(_, .milliseconds(_))'}}
   // expected-note@-3 {{add missing case: '(_, .microseconds(_))'}}

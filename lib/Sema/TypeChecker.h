@@ -1731,10 +1731,12 @@ public:
   ///
   /// \param stmt The switch statement to be type-checked.  No modification of
   /// the statement occurs.
+  /// \param DC The decl context containing \p stmt.
   /// \param limitChecking The checking process relies on the switch statement
   /// being well-formed.  If it is not, pass true to this flag to run a limited
   /// form of analysis.
-  void checkSwitchExhaustiveness(SwitchStmt *stmt, bool limitChecking);
+  void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
+                                 bool limitChecking);
 
   /// \brief Type check the given expression as a condition, which converts
   /// it to a logic value.
