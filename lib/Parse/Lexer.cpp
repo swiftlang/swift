@@ -2650,5 +2650,6 @@ slice_token_array(ArrayRef<Token> AllTokens, SourceLoc StartLoc,
   assert(StartLoc.isValid() && EndLoc.isValid());
   auto StartIt = token_lower_bound(AllTokens, StartLoc);
   auto EndIt = token_lower_bound(AllTokens, EndLoc);
-  return AllTokens.slice(StartIt - AllTokens.begin(), EndIt - EndIt + 1);
+  assert(StartIt->getLoc() == StartLoc && EndIt->getLoc() == EndLoc);
+  return AllTokens.slice(StartIt - AllTokens.begin(), EndIt - StartIt + 1);
 }
