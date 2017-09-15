@@ -1014,6 +1014,15 @@ static uint8_t getRawStableAddressorKind(swift::AddressorKind kind) {
   llvm_unreachable("bad addressor kind");
 }
 
+static uint8_t getRawStableResilienceExpansion(swift::ResilienceExpansion e) {
+  switch (e) {
+  case swift::ResilienceExpansion::Minimal:
+    return uint8_t(serialization::ResilienceExpansion::Minimal);
+  case swift::ResilienceExpansion::Maximal:
+    return uint8_t(serialization::ResilienceExpansion::Maximal);
+  }
+}
+
 void Serializer::writeParameterList(const ParameterList *PL) {
   using namespace decls_block;
 
@@ -2959,6 +2968,9 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
     uint8_t rawAddressorKind =
       getRawStableAddressorKind(fn->getAddressorKind());
+    uint8_t rawDefaultArgumentResilienceExpansion =
+      getRawStableResilienceExpansion(
+          fn->getDefaultArgumentResilienceExpansion());
     Type ty = fn->getInterfaceType();
 
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
@@ -2987,6 +2999,7 @@ void Serializer::writeDecl(const Decl *D) {
                            rawAddressorKind,
                            rawAccessLevel,
                            fn->needsNewVTableEntry(),
+                           rawDefaultArgumentResilienceExpansion,
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -3099,6 +3112,9 @@ void Serializer::writeDecl(const Decl *D) {
       nameComponentsAndDependencies.push_back(addTypeRef(dependency));
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(ctor->getFormalAccess());
+    uint8_t rawDefaultArgumentResilienceExpansion =
+        getRawStableResilienceExpansion(
+            ctor->getDefaultArgumentResilienceExpansion());
 
     bool firstTimeRequired = ctor->isRequired();
     if (auto *overridden = ctor->getOverriddenDecl())
@@ -3122,6 +3138,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
+                                  rawDefaultArgumentResilienceExpansion,
                                   firstTimeRequired,
                                   ctor->getFullName().getArgumentNames().size(),
                                   nameComponentsAndDependencies);
