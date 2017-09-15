@@ -614,7 +614,7 @@ StringRef SerializedASTFile::getFilename() const {
   return File.getModuleFilename();
 }
 
-const clang::Module *SerializedASTFile::getUnderlyingClangModule() {
+const clang::Module *SerializedASTFile::getUnderlyingClangModule() const {
   if (auto *ShadowedModule = File.getShadowedModule())
     return ShadowedModule->findUnderlyingClangModule();
   return nullptr;

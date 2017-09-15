@@ -23,7 +23,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -1563,6 +1563,15 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
 
   if (nominal->getParent()->isModuleScopeContext()) {
     Identifier moduleName = nominal->getParentModule()->getName();
+
+    // If the originating module is a private module whose interface is
+    // re-exported via public module, check the name of the public module.
+    if (auto clangModule
+          = nominal->getParentModule()->findUnderlyingClangModule()) {
+      if (!clangModule->ExportAsModule.empty())
+        moduleName = getContext().getIdentifier(clangModule->ExportAsModule);
+    }
+
     for (auto item : *iter) {
       if (item.first != moduleName.str())
         continue;

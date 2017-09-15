@@ -3323,3 +3323,23 @@ importName(const clang::NamedDecl *D,
   return Impl.importFullName(D, Impl.CurrentVersion, preferredName).
     getDeclName();
 }
+
+bool swift::isInOverlayModuleForImportedModule(DeclContext *overlayDC,
+                                               DeclContext *importedDC) {
+  overlayDC = overlayDC->getModuleScopeContext();
+  importedDC = importedDC->getModuleScopeContext();
+
+  auto importedClangModuleUnit = dyn_cast<ClangModuleUnit>(importedDC);
+  if (!importedClangModuleUnit)
+    return false;
+
+  auto overlayModule = overlayDC->getParentModule();
+  if (overlayModule == importedClangModuleUnit->getAdapterModule())
+    return true;
+
+  // Is this a private module that's re-exported to the public (overlay) name?
+  auto clangModule =
+    importedClangModuleUnit->getClangModule()->getTopLevelModule();
+  return !clangModule->ExportAsModule.empty() &&
+    clangModule->ExportAsModule == overlayModule->getName().str();
+}

@@ -488,7 +488,7 @@ public:
   }
 
   /// Returns the associated clang module if one exists.
-  const clang::Module *findUnderlyingClangModule();
+  const clang::Module *findUnderlyingClangModule() const;
 
   SourceRange getSourceRange() const { return SourceRange(); }
 
@@ -719,7 +719,9 @@ public:
   }
 
   /// Returns the associated clang module if one exists.
-  virtual const clang::Module *getUnderlyingClangModule() { return nullptr; }
+  virtual const clang::Module *getUnderlyingClangModule() const {
+    return nullptr;
+  }
 
   /// Traverse the decls within this file.
   ///
