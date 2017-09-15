@@ -437,7 +437,7 @@ void CompilerInstance::getImplicitlyImportedModules(
 void CompilerInstance::createREPLFile(ImplicitImports &implicitImports) const {
   SharedTimer timer("performSema-createREPLFile");
   auto *SingleInputFile = new (*Context) SourceFile(
-      *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind);
+      *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind, Invocation.getLangOptions().KeepTokensInSourceFile);
   MainModule->addFile(*SingleInputFile);
   addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
 }
@@ -465,7 +465,7 @@ void CompilerInstance::addMainFileToModule(ImplicitImports &implicitImports) {
   
   auto *MainFile = new (*Context) SourceFile(*MainModule,
                                              Invocation.getSourceFileKind(),
-                                             MainBufferID, implicitModuleImportKind, Invocation.getLangOptions().KeepTokensInSourceFile);
+                                             MainBufferID, implicitImports.kind, Invocation.getLangOptions().KeepTokensInSourceFile);
   MainModule->addFile(*MainFile);
   addAdditionalInitialImportsTo(MainFile, implicitImports);
 
@@ -581,6 +581,7 @@ void CompilerInstance::checkTypesWhileParsingMain(
                               TypeCheckOptions);
   }
 
+  const auto &options = Invocation.getFrontendOptions();
   forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF, PersistentState.getTopLevelContext(),
                         TypeCheckOptions, /*curElem*/ 0,
@@ -629,6 +630,7 @@ void CompilerInstance::parseAndTypeCheckMainFile(
                         TheSILModule ? &SILContext : nullptr, &PersistentState,
                         DelayedParseCB);
     if (mainIsPrimary) {
+      const auto &options = Invocation.getFrontendOptions();
       performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
                           TypeCheckOptions, CurTUElem,
                           options.WarnLongFunctionBodies,
