@@ -61,11 +61,22 @@ class JobStats(object):
         assert(self.is_driver_job())
         return self.driver_jobs_ran() + self.driver_jobs_skipped()
 
-    def merged_with(self, other):
+    def merged_with(self, other, merge_by="sum"):
         """Return a new JobStats, holding the merger of self and other"""
         merged_stats = {}
+        ops = {"sum": lambda a, b: a + b,
+               # Because 0 is also a sentinel on counters we do a modified
+               # "nonzero-min" here. Not ideal but best we can do.
+               "min": lambda a, b: (min(a, b)
+                                    if a != 0 and b != 0
+                                    else max(a, b)),
+               "max": lambda a, b: max(a, b)}
+        op = ops[merge_by]
         for k, v in self.stats.items() + other.stats.items():
-            merged_stats[k] = v + merged_stats.get(k, 0.0)
+            if k in merged_stats:
+                merged_stats[k] = op(v, merged_stats[k])
+            else:
+                merged_stats[k] = v
         merged_kind = self.jobkind
         if other.jobkind != merged_kind:
             merged_kind = "<merged>"
@@ -160,7 +171,7 @@ class JobStats(object):
 
 
 def load_stats_dir(path, select_module=[], select_stat=[],
-                   exclude_timers=False):
+                   exclude_timers=False, **kwargs):
     """Loads all stats-files found in path into a list of JobStats objects"""
     jobstats = []
     auxpat = (r"(?P<module>[^-]+)-(?P<input>[^-]+)-(?P<triple>[^-]+)" +
@@ -213,7 +224,8 @@ def load_stats_dir(path, select_module=[], select_stat=[],
     return jobstats
 
 
-def merge_all_jobstats(jobstats, select_module=[], group_by_module=False):
+def merge_all_jobstats(jobstats, select_module=[], group_by_module=False,
+                       merge_by="sum", **kwargs):
     """Does a pairwise merge of the elements of list of jobs"""
     m = None
     if len(select_module) > 0:
@@ -221,15 +233,16 @@ def merge_all_jobstats(jobstats, select_module=[], group_by_module=False):
     if group_by_module:
         def keyfunc(j):
             return j.module
+        jobstats = list(jobstats)
         jobstats.sort(key=keyfunc)
         prefixed = []
         for mod, group in itertools.groupby(jobstats, keyfunc):
-            groupmerge = merge_all_jobstats(group)
+            groupmerge = merge_all_jobstats(group, merge_by=merge_by)
             prefixed.append(groupmerge.prefixed_by(mod))
         jobstats = prefixed
     for j in jobstats:
         if m is None:
             m = j
         else:
-            m = m.merged_with(j)
+            m = m.merged_with(j, merge_by=merge_by)
     return m
