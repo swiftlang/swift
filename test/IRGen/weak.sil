@@ -47,9 +47,9 @@ bb0(%0 : $*A, %1 : $Optional<C>):
 // CHECK-NEXT: [[T0:%.*]] = call [[C]]* bitcast ([[REF]]* ([[WEAK]]*)* @swift_weakLoadStrong to [[C]]* ([[WEAK]]*)*)([[WEAK]]* [[X]])
 // CHECK-NEXT: %3 = ptrtoint  %T4weak1CC* %2 to i64
 // CHECK-NEXT: %4 = inttoptr
-// CHECK-NEXT: call void bitcast ([[WEAK]]* ([[WEAK]]*, [[REF]]*)* @swift_weakAssign to void ([[WEAK]]*, [[C]]*)*)([[WEAK]]* [[X]], [[C]]* %4)
-// CHECK-NEXT: %5 = inttoptr i64 %3 to %swift.refcounted*
-// CHECK-NEXT: call void @swift_rt_swift_release([[REF]]* %5)
+// CHECK-NEXT: call [[WEAK]]* bitcast ([[WEAK]]* ([[WEAK]]*, [[REF]]*)* @swift_weakAssign to [[WEAK]]* ([[WEAK]]*, [[C]]*)*)([[WEAK]]* [[X]], [[C]]* %4)
+// CHECK-NEXT: %6 = inttoptr i64 %3 to %swift.refcounted*
+// CHECK-NEXT: call void @swift_rt_swift_release([[REF]]* %6)
 // CHECK-NEXT: ret void
 
 struct B {
