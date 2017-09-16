@@ -707,7 +707,7 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
          "Expect 5 numbers for SILDeclRef");
   SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[NextIdx])),
                   (SILDeclRef::Kind)ListOfValues[NextIdx+1],
-                  (ResilienceExpansion)ListOfValues[NextIdx+2],
+                  (swift::ResilienceExpansion)ListOfValues[NextIdx+2],
                   /*isCurried=*/false, ListOfValues[NextIdx+4] > 0);
   if (ListOfValues[NextIdx+3] < DRef.getUncurryLevel())
     DRef = DRef.asCurried();

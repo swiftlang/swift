@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 365; // KeyPathInst operands
+const uint16_t VERSION_MINOR = 366; // Last change: default argument resilience expansion
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -386,6 +386,13 @@ enum class EnumElementRawValueKind : uint8_t {
   /// Integer literal.
   IntegerLiteral,
   /// TODO: Float, string, char, etc.
+};
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class ResilienceExpansion : uint8_t {
+  Minimal = 0,
+  Maximal,
 };
 
 using EnumElementRawValueKindField = BCFixed<4>;
@@ -893,6 +900,7 @@ namespace decls_block {
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
+    BCFixed<1>,   // default argument resilience expansion
     BCFixed<1>,   // 'required' but overridden is not (used for recovery)
     BCVBR<5>,     // number of parameter name components
     BCArray<IdentifierIDField> // name components,
@@ -957,6 +965,7 @@ namespace decls_block {
     AddressorKindField, // addressor kind
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
+    BCFixed<1>,   // default argument resilience expansion
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:

@@ -519,8 +519,10 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
   for (const auto *dc = this; dc->isLocalContext(); dc = dc->getParent()) {
     // Default argument initializer contexts have their resilience expansion
     // set when they're type checked.
-    if (auto *DAI = dyn_cast<DefaultArgumentInitializer>(dc))
-      return DAI->getResilienceExpansion();
+    if (auto *DAI = dyn_cast<DefaultArgumentInitializer>(dc)) {
+      return cast<AbstractFunctionDecl>(dc->getParent())
+          ->getDefaultArgumentResilienceExpansion();
+    }
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
       // If the function is a nested function, we will serialize its body if
