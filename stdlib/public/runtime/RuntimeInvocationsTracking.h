@@ -23,13 +23,13 @@ struct HeapObject;
 struct RuntimeFunctionCountersState;
 } // end namespace swift
 
-/// Instrument the runtime functions only if we are building with
-/// assertions enabled.
-#if !defined(NDEBUG)
-
 /// The name of a helper function for tracking the calls of a runtime function.
 #define SWIFT_RT_TRACK_INVOCATION_NAME(RT_FUNCTION)                            \
   swift_trackRuntimeInvocation_##RT_FUNCTION
+
+/// Instrument the runtime functions only if we are building with
+/// assertions enabled.
+#if !defined(NDEBUG)
 
 /// Invoke a helper function for tracking the calls of a runtime function.
 #define SWIFT_RT_TRACK_INVOCATION(OBJ, RT_FUNCTION)                            \
