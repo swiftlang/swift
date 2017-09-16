@@ -1933,7 +1933,8 @@ UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
 CheckedCastBranchInst *CheckedCastBranchInst::create(
     SILDebugLocation DebugLoc, bool IsExact, SILValue Operand, SILType DestTy,
     SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB, SILFunction &F,
-    SILOpenedArchetypesState &OpenedArchetypes) {
+    SILOpenedArchetypesState &OpenedArchetypes, Optional<uint64_t> Target1Count,
+    Optional<uint64_t> Target2Count) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -1941,9 +1942,9 @@ CheckedCastBranchInst *CheckedCastBranchInst::create(
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(CheckedCastBranchInst));
-  return ::new (Buffer) CheckedCastBranchInst(DebugLoc, IsExact, Operand,
-                                              TypeDependentOperands, DestTy,
-                                              SuccessBB, FailureBB);
+  return ::new (Buffer) CheckedCastBranchInst(
+      DebugLoc, IsExact, Operand, TypeDependentOperands, DestTy, SuccessBB,
+      FailureBB, Target1Count, Target2Count);
 }
 
 CheckedCastValueBranchInst *

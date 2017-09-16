@@ -1330,6 +1330,10 @@ public:
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getCastType()
           << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
+    if (CI->getTrueBBCount())
+      *this << " !true_count(" << CI->getTrueBBCount().getValue() << ")";
+    if (CI->getFalseBBCount())
+      *this << " !false_count(" << CI->getFalseBBCount().getValue() << ")";
   }
 
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CI) {

@@ -1691,13 +1691,15 @@ public:
                               Member, HasMethodBB, NoMethodBB, getFunction()));
   }
 
-  CheckedCastBranchInst *createCheckedCastBranch(SILLocation Loc, bool isExact,
-                                                 SILValue op, SILType destTy,
-                                                 SILBasicBlock *successBB,
-                                                 SILBasicBlock *failureBB) {
+  CheckedCastBranchInst *
+  createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op,
+                          SILType destTy, SILBasicBlock *successBB,
+                          SILBasicBlock *failureBB,
+                          Optional<uint64_t> Target1Count = None,
+                          Optional<uint64_t> Target2Count = None) {
     return insertTerminator(CheckedCastBranchInst::create(
         getSILDebugLocation(Loc), isExact, op, destTy, successBB, failureBB,
-        getFunction(), OpenedArchetypes));
+        getFunction(), OpenedArchetypes, Target1Count, Target2Count));
   }
 
   CheckedCastValueBranchInst *

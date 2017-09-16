@@ -157,7 +157,7 @@ namespace {
         }
         SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, operandValue,
                                       origTargetTL.getLoweredType(), trueBB,
-                                      falseBB);
+                                      falseBB, TrueCount, FalseCount);
       }
 
       // Emit the success block.
@@ -431,8 +431,8 @@ namespace {
               Loc, scalarOperandValue, LoadOwnershipQualifier::Take);
         }
         SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, scalarOperandValue,
-                                      origTargetTL.getLoweredType(),
-                                      trueBB, falseBB);
+                                      origTargetTL.getLoweredType(), trueBB,
+                                      falseBB, TrueCount, FalseCount);
       }
 
       // Emit the success block.
@@ -550,7 +550,7 @@ void SILGenFunction::emitCheckedCastBranchOld(
   CheckedCastEmitterOld emitter(*this, loc, source->getType(), targetType);
   ManagedValue operand = emitter.emitOperand(source);
   emitter.emitConditional(operand, CastConsumptionKind::TakeAlways, ctx,
-                          handleTrue, handleFalse);
+                          handleTrue, handleFalse, TrueCount, FalseCount);
 }
 
 void SILGenFunction::emitCheckedCastBranchOld(
@@ -561,7 +561,7 @@ void SILGenFunction::emitCheckedCastBranchOld(
     Optional<uint64_t> FalseCount) {
   CheckedCastEmitterOld emitter(*this, loc, sourceType, targetType);
   emitter.emitConditional(src.getFinalManagedValue(), src.getFinalConsumption(),
-                          ctx, handleTrue, handleFalse);
+                          ctx, handleTrue, handleFalse, TrueCount, FalseCount);
 }
 
 /// Emit a collection downcast expression.

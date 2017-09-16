@@ -558,9 +558,12 @@ ManagedValue SILGenBuilder::createUnconditionalCheckedCast(SILLocation loc,
 void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                                             ManagedValue operand, SILType type,
                                             SILBasicBlock *trueBlock,
-                                            SILBasicBlock *falseBlock) {
+                                            SILBasicBlock *falseBlock,
+                                            Optional<uint64_t> Target1Count,
+                                            Optional<uint64_t> Target2Count) {
   SILBuilder::createCheckedCastBranch(loc, isExact, operand.forward(SGF), type,
-                                      trueBlock, falseBlock);
+                                      trueBlock, falseBlock, Target1Count,
+                                      Target2Count);
 }
 
 void SILGenBuilder::createCheckedCastValueBranch(SILLocation loc,

@@ -259,7 +259,8 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
     auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
     B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
-                              CBI->getCastType(), SuccessBB, FailureBB);
+                              CBI->getCastType(), SuccessBB, FailureBB,
+                              CBI->getTrueBBCount(), CBI->getFalseBBCount());
     CBI->eraseFromParent();
     return;
   }
@@ -429,7 +430,8 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
     auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
     B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
-        CBI->getCastType(), SuccessBB, FailureBB);
+                              CBI->getCastType(), SuccessBB, FailureBB,
+                              CBI->getTrueBBCount(), CBI->getFalseBBCount());
     CBI->eraseFromParent();
     return;
   }
