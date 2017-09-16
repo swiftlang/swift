@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/test_runtime_function_counters
 // RUN: %target-run %t/test_runtime_function_counters 2>&1 | %FileCheck %s
-// REQUIRES: asserts
+// REQUIRES: swift_stdlib_asserts
 // REQUIRES: executable_test
 
 /// Test functionality related to the runtime function counters.
