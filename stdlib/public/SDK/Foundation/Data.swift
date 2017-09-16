@@ -274,29 +274,33 @@ public final class _DataStorage {
     }
     
     public func enumerateBytes(in range: Range<Int>, _ block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Data.Index, _ stop: inout Bool) -> Void) {
-        var stop: Bool = false
+        var stopv: Bool = false
+        var data: NSData
         switch _backing {
         case .swift: fallthrough
         case .immutable: fallthrough
         case .mutable: 
-            block(UnsafeBufferPointer<UInt8>(start: _bytes?.advanced(by: range.lowerBound - _offset).assumingMemoryBound(to: UInt8.self), count: Swift.min(range.count, _length)), 0, &stop)
+            block(UnsafeBufferPointer<UInt8>(start: _bytes?.advanced(by: range.lowerBound - _offset).assumingMemoryBound(to: UInt8.self), count: Swift.min(range.count, _length)), 0, &stopv)
+            return
         case .customReference(let d):
-            d.enumerateBytes { (ptr, range, stop) in
-                var stopv = false
-                let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: range.length)
-                block(UnsafeBufferPointer(start: bytePtr, count: range.length), range.location - _offset, &stopv)
-                if stopv {
-                    stop.pointee = true
-                }
-            }
+            data = d
+            break
         case .customMutableReference(let d):
-            d.enumerateBytes { (ptr, range, stop) in
-                var stopv = false
-                let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: range.length)
-                block(UnsafeBufferPointer(start: bytePtr, count: range.length), range.location - _offset, &stopv)
-                if stopv {
-                    stop.pointee = true
-                }
+            data = d
+            break
+        }
+        data.enumerateBytes { (ptr, region, stop) in
+            // any region that is not in the range should be skipped
+            guard range.contains(region.lowerBound) || range.contains(region.upperBound) else { return }
+            var regionAdjustment = 0
+            if region.lowerBound < range.lowerBound {
+                regionAdjustment = range.lowerBound - (region.lowerBound - _offset)
+            }
+            let bytePtr  = ptr.advanced(by: regionAdjustment).assumingMemoryBound(to: UInt8.self)
+            let effectiveLength = Swift.min((region.location - _offset) + region.length, range.upperBound) - (region.location - _offset)
+            block(UnsafeBufferPointer(start: bytePtr, count: effectiveLength - regionAdjustment), region.location + regionAdjustment - _offset, &stopv)
+            if stopv {
+                stop.pointee = true
             }
         }
     }

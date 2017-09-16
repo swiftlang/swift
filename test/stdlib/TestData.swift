@@ -3641,6 +3641,28 @@ class TestData : TestDataSuper {
         data.resetBytes(in: data.endIndex.advanced(by: -1)..<data.endIndex.advanced(by: 1))
         expectEqual(data, Data(bytes: [4, 5, 6, 7, 0, 0]))
     }
+
+    func test_sliceEnumeration() {
+        var base = DispatchData.empty
+        let bytes: [UInt8] = [0, 1, 2, 3, 4]
+        base.append(bytes.withUnsafeBytes { DispatchData(bytes: $0) })
+        base.append(bytes.withUnsafeBytes { DispatchData(bytes: $0) })
+        base.append(bytes.withUnsafeBytes { DispatchData(bytes: $0) })
+        let data = ((base as AnyObject) as! Data)[3..<11]
+        var regionRanges: [Range<Int>] = []
+        var regionData: [Data] = []
+        data.enumerateBytes { (buffer, index, _) in
+            regionData.append(Data(bytes: buffer.baseAddress!, count: buffer.count))
+            regionRanges.append(index..<index + buffer.count)
+        }
+        expectEqual(regionRanges.count, 3)
+        expectEqual(Range<Data.Index>(3..<5), regionRanges[0])
+        expectEqual(Range<Data.Index>(5..<10), regionRanges[1])
+        expectEqual(Range<Data.Index>(10..<11), regionRanges[2])
+        expectEqual(Data(bytes: [3, 4]), regionData[0]) //fails
+        expectEqual(Data(bytes: [0, 1, 2, 3, 4]), regionData[1]) //passes
+        expectEqual(Data(bytes: [0]), regionData[2]) //fails
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -3950,6 +3972,8 @@ DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubr
 DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithBytes() }
 DataTests.test("test_sliceHash") { TestData().test_sliceHash() }
 DataTests.test("test_slice_resize_growth") { TestData().test_slice_resize_growth() }
+DataTests.test("test_sliceEnumeration") { TestData().test_sliceEnumeration() }
+
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
     let data = "Hello World".data(using: .utf8)!
