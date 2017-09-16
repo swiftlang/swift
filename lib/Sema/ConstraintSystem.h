@@ -2551,8 +2551,8 @@ private:
   };
 
   struct PotentialBindings {
-    typedef std::tuple<bool, bool, bool, bool, unsigned char,
-                       bool, unsigned int> BindingScore;
+    typedef std::tuple<bool, bool, bool, bool, bool,
+                       unsigned char, unsigned int> BindingScore;
 
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
@@ -2591,8 +2591,8 @@ private:
                              b.FullyBound,
                              b.IsRHSOfBindParam,
                              b.SubtypeOfExistentialType,
-                             static_cast<unsigned char>(b.LiteralBinding),
                              b.InvolvesTypeVariables,
+                             static_cast<unsigned char>(b.LiteralBinding),
                              -(b.Bindings.size() - b.NumDefaultableBindings));
     }
 
