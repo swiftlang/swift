@@ -2128,13 +2128,15 @@ void
 SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
   SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
+  auto TrueCount = Inst->getTrueBBCount();
+  auto FalseCount = Inst->getFalseBBCount();
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
-       getBuilder().createCheckedCastBranch(getOpLocation(Inst->getLoc()),
-                                            Inst->isExact(),
-                                            getOpValue(Inst->getOperand()),
-                                            getOpType(Inst->getCastType()),
-                                            OpSuccBB, OpFailBB));
+                getBuilder().createCheckedCastBranch(
+                    getOpLocation(Inst->getLoc()), Inst->isExact(),
+                    getOpValue(Inst->getOperand()),
+                    getOpType(Inst->getCastType()), OpSuccBB, OpFailBB,
+                    TrueCount, FalseCount));
 }
 
 template <typename ImplClass>

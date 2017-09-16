@@ -6346,17 +6346,21 @@ class CheckedCastBranchInst final:
   CheckedCastBranchInst(SILDebugLocation DebugLoc, bool IsExact,
                         SILValue Operand,
                         ArrayRef<SILValue> TypeDependentOperands,
-                        SILType DestTy,
-                        SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB)
+                        SILType DestTy, SILBasicBlock *SuccessBB,
+                        SILBasicBlock *FailureBB,
+                        Optional<uint64_t> Target1Count,
+                        Optional<uint64_t> Target2Count)
       : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                                               TypeDependentOperands),
-        DestTy(DestTy), IsExact(IsExact),
-        DestBBs{{this, SuccessBB}, {this, FailureBB}} {}
+                                                      TypeDependentOperands),
+        DestTy(DestTy),
+        IsExact(IsExact), DestBBs{{this, SuccessBB, Target1Count},
+                                  {this, FailureBB, Target2Count}} {}
 
   static CheckedCastBranchInst *
   create(SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
          SILType DestTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+         Optional<uint64_t> Target1Count, Optional<uint64_t> Target2Count);
 
 public:
   bool isExact() const { return IsExact; }
@@ -6383,6 +6387,11 @@ public:
   const SILBasicBlock *getSuccessBB() const { return DestBBs[0]; }
   SILBasicBlock *getFailureBB() { return DestBBs[1]; }
   const SILBasicBlock *getFailureBB() const { return DestBBs[1]; }
+
+  /// The number of times the True branch was executed.
+  Optional<uint64_t> getTrueBBCount() const { return DestBBs[0].getCount(); }
+  /// The number of times the False branch was executed.
+  Optional<uint64_t> getFalseBBCount() const { return DestBBs[1].getCount(); }
 };
 
 /// Perform a checked cast operation and branch on whether the cast succeeds.

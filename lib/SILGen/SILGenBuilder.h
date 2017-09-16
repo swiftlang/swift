@@ -257,7 +257,9 @@ public:
   void createCheckedCastBranch(SILLocation loc, bool isExact,
                                ManagedValue operand, SILType type,
                                SILBasicBlock *trueBlock,
-                               SILBasicBlock *falseBlock);
+                               SILBasicBlock *falseBlock,
+                               Optional<uint64_t> Target1Count,
+                               Optional<uint64_t> Target2Count);
 
   using SILBuilder::createCheckedCastValueBranch;
   void createCheckedCastValueBranch(SILLocation loc, ManagedValue operand,

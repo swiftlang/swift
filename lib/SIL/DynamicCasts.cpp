@@ -1205,7 +1205,7 @@ void swift::emitIndirectConditionalCastWithScalar(
 
   SILType targetValueType = dest->getType().getObjectType();
   B.createCheckedCastBranch(loc, /*exact*/ false, srcValue, targetValueType,
-                            scalarSuccBB, scalarFailBB);
+                            scalarSuccBB, scalarFailBB, TrueCount, FalseCount);
 
   // Emit the success block.
   B.setInsertionPoint(scalarSuccBB); {

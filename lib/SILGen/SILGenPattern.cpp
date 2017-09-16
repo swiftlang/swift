@@ -1665,7 +1665,7 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
         assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
       },
       // Failure block: branch out to the continuation block.
-      [&] { (*innerFailure)(loc); });
+      [&] { (*innerFailure)(loc); }, rows[0].Count);
 }
 
 /// Perform specialized dispatch for a sequence of EnumElementPattern or an
