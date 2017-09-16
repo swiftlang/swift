@@ -53,8 +53,7 @@ swift::createIncrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
 
   // If Ptr is refcounted itself, create the strong_retain and
   // return.
-  auto &TL = B.getModule().getTypeLowering(Ptr->getType());
-  if (!TL.isAddressOnly() && TL.isReferenceCounted())
+  if (Ptr->getType().isReferenceCounted(B.getModule()))
     return B.createStrongRetain(Loc, Ptr, B.getDefaultAtomicity());
 
   // Otherwise, create the retain_value.
@@ -74,8 +73,7 @@ swift::createDecrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
   auto Loc = RegularLocation(SourceLoc());
 
   // If Ptr has reference semantics itself, create a strong_release.
-  auto &TL = B.getModule().getTypeLowering(Ptr->getType());
-  if (!TL.isAddressOnly() && TL.isReferenceCounted())
+  if (Ptr->getType().isReferenceCounted(B.getModule()))
     return B.createStrongRelease(Loc, Ptr, B.getDefaultAtomicity());
 
   // Otherwise create a release value.
