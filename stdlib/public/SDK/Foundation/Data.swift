@@ -418,7 +418,7 @@ public final class _DataStorage {
     
     @inline(__always)
     public func append(_ bytes: UnsafeRawPointer, length: Int) {
-        precondition(length >= 0, "Length of appending bytes must be positive")
+        precondition(length >= 0, "Length of appending bytes must not be negative")
         switch _backing {
         case .swift:
             let origLength = _length
@@ -1275,7 +1275,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
         @inline(__always)
         set {
-            precondition(count >= 0, "count must be positive")
+            precondition(count >= 0, "count must not be negative")
             if !isKnownUniquelyReferenced(&_backing) {
                 _backing = _backing.mutableCopy(_sliceRange)
             }
@@ -1319,7 +1319,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - warning: This method does not verify that the contents at pointer have enough space to hold `count` bytes.
     @inline(__always)
     public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, count: Int) {
-        precondition(count >= 0, "count of bytes to copy must be positive")
+        precondition(count >= 0, "count of bytes to copy must not be negative")
         if count == 0 { return }
         _backing.withUnsafeBytes(in: _sliceRange) {
             memcpy(UnsafeMutableRawPointer(pointer), $0.baseAddress!, Swift.min(count, $0.count))
@@ -1503,8 +1503,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inline(__always)
     public mutating func resetBytes(in range: Range<Index>) {
         // it is worth noting that the range here may be out of bounds of the Data itself (which triggers a growth)
-        precondition(range.lowerBound >= 0, "Ranges must be positive bounds")
-        precondition(range.upperBound >= 0, "Ranges must be positive bounds")
+        precondition(range.lowerBound >= 0, "Ranges must not be negative bounds")
+        precondition(range.upperBound >= 0, "Ranges must not be negative bounds")
         let range = NSMakeRange(range.lowerBound, range.upperBound - range.lowerBound)
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
