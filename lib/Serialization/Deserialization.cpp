@@ -1942,6 +1942,17 @@ getActualSelfAccessKind(uint8_t raw) {
   return None;
 }
 
+static
+Optional<swift::ResilienceExpansion> getActualResilienceExpansion(uint8_t raw) {
+  switch (serialization::ResilienceExpansion(raw)) {
+  case serialization::ResilienceExpansion::Minimal:
+    return swift::ResilienceExpansion::Minimal;
+  case serialization::ResilienceExpansion::Maximal:
+    return swift::ResilienceExpansion::Maximal;
+  }
+  return None;
+}
+
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   unsigned rawStorageKind,
                                   serialization::DeclID getter,
@@ -2570,6 +2581,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     TypeID interfaceID;
     DeclID overriddenID;
     bool needsNewVTableEntry, firstTimeRequired;
+    uint8_t rawDefaultArgumentResilienceExpansion;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
@@ -2581,6 +2593,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                overriddenID,
                                                rawAccessLevel,
                                                needsNewVTableEntry,
+                                               rawDefaultArgumentResilienceExpansion,
                                                firstTimeRequired,
                                                numArgNames,
                                                argNameAndDependencyIDs);
@@ -2687,6 +2700,16 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (auto overriddenCtor = cast_or_null<ConstructorDecl>(overridden.get()))
       ctor->setOverriddenDecl(overriddenCtor);
     ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
+
+    if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
+            rawDefaultArgumentResilienceExpansion)) {
+      ctor->setDefaultArgumentResilienceExpansion(
+          *defaultArgumentResilienceExpansion);
+    } else {
+      error();
+      return nullptr;
+    }
+
     break;
   }
 
@@ -2825,6 +2848,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
     bool needsNewVTableEntry;
+    uint8_t rawDefaultArgumentResilienceExpansion;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
@@ -2837,6 +2861,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                         numNameComponentsBiased,
                                         rawAddressorKind, rawAccessLevel,
                                         needsNewVTableEntry,
+                                        rawDefaultArgumentResilienceExpansion,
                                         nameAndDependencyIDs);
 
     // Resolve the name ids.
@@ -2974,6 +2999,16 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       fn->setImplicit();
     fn->setDynamicSelf(hasDynamicSelf);
     fn->setNeedsNewVTableEntry(needsNewVTableEntry);
+
+    if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
+            rawDefaultArgumentResilienceExpansion)) {
+      fn->setDefaultArgumentResilienceExpansion(
+          *defaultArgumentResilienceExpansion);
+    } else {
+      error();
+      return nullptr;
+    }
+
     break;
   }
 

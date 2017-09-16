@@ -154,25 +154,15 @@ class DefaultArgumentInitializer : public Initializer {
 public:
   explicit DefaultArgumentInitializer(DeclContext *parent, unsigned index)
       : Initializer(InitializerKind::DefaultArgument, parent) {
-    SpareBits = (unsigned(ResilienceExpansion::Maximal) | index << 1);
+    SpareBits = index;
   }
 
-  unsigned getIndex() const { return SpareBits >> 1; }
-
-  ResilienceExpansion getResilienceExpansion() const {
-    return ResilienceExpansion(SpareBits & 1);
-  }
+  unsigned getIndex() const { return SpareBits; }
 
   /// Change the parent of this context.  This is necessary because
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
   void changeFunction(AbstractFunctionDecl *parent);
-
-  /// Change the resilience expansion of this context, necessary
-  /// for the same reason as above.
-  void changeResilienceExpansion(ResilienceExpansion expansion) {
-    SpareBits = (SpareBits & ~1) | unsigned(expansion);
-  }
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))
