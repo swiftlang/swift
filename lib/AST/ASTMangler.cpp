@@ -159,11 +159,15 @@ std::string ASTMangler::mangleGlobalGetterEntity(const ValueDecl *decl,
   return finalize();
 }
 
-std::string ASTMangler::mangleDefaultArgumentEntity(const DeclContext *func,
+std::string ASTMangler::mangleDefaultArgumentEntity(const ValueDecl *decl,
                                                     unsigned index,
                                                     SymbolKind SKind) {
   beginMangling();
-  appendDefaultArgumentEntity(func, index);
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
+    appendDefaultArgumentEntity(AFD, index);
+  } else {
+    appendDefaultArgumentEntity(decl->getDeclContext(), index);
+  }
   appendSymbolKind(SKind);
   return finalize();
 }

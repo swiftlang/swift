@@ -647,8 +647,11 @@ public:
       auto constantInfo = SGF.getConstantInfo(*constant);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
-    case Kind::EnumElement:
-      llvm_unreachable("Should have been curried");
+    case Kind::EnumElement: {
+      // Emit a direct call to the element constructor thunk.
+      auto constantInfo = SGF.getConstantInfo(*constant);
+      return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
+    }
     case Kind::ClassMethod: {
       auto constantInfo = SGF.SGM.Types.getConstantOverrideInfo(*constant);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
@@ -3478,6 +3481,10 @@ public:
     extraSites.push_back(std::move(site));
   }
 
+  bool isArgTupleShuffle() const {
+    return ArgValue.isTupleShuffleExpr();
+  }
+  
   /// Add a level of function application by passing in its possibly
   /// unevaluated arguments and their formal type
   template<typename...T>
@@ -3632,7 +3639,10 @@ CallEmission::applyFirstLevelCallee(SGFContext C) {
     return applyPartiallyAppliedSuperMethod(C);
   }
 
-  if (isEnumElementConstructor()) {
+
+  if (isEnumElementConstructor() && llvm::all_of(uncurriedSites, [](const CallSite &s){
+     return !s.isArgTupleShuffle();
+   })) {
     return applyEnumElementConstructor(C);
   }
 

@@ -1428,7 +1428,7 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
   bool defaultNoEscape =
     !options.contains(TypeResolutionFlags::EnumCase) &&
     (options.contains(TypeResolutionFlags::FunctionInput) ||
-     options.contains(TypeResolutionFlags::ImmediateFunctionInput);
+     options.contains(TypeResolutionFlags::ImmediateFunctionInput));
 
   // Desugar here
   auto *funcTy = ty->castTo<FunctionType>();

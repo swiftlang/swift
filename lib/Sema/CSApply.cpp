@@ -4965,7 +4965,20 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
                     unsigned index) {
   auto &tc = cs.getTypeChecker();
 
-  auto defArg = getDefaultArgumentInfo(cast<ValueDecl>(owner.getDecl()), index);
+  std::pair<DefaultArgumentKind, Type> defArg;
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(owner.getDecl())) {
+    auto paramLists = AFD->getParameterLists();
+
+    // Skip the 'self' parameter; it is not counted.
+    if (AFD->getImplicitSelfDecl())
+      paramLists = paramLists.slice(1);
+
+    defArg = getDefaultArgumentInfo(paramLists, index);
+  } else {
+    defArg = getDefaultArgumentInfo(
+                 cast<EnumElementDecl>(owner.getDecl())->getParameterList(),
+                 index);
+  }
   Expr *init = nullptr;
   switch (defArg.first) {
   case DefaultArgumentKind::None:

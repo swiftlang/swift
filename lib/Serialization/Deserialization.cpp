@@ -3722,6 +3722,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     bool isImplicit; bool isNegative;
     unsigned rawValueKindID;
     IdentifierID blobData;
+    uint8_t rawDefaultArgumentResilienceExpansion;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
@@ -3730,6 +3731,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
                                                isImplicit, rawValueKindID,
                                                isNegative,
                                                blobData,
+                                               rawDefaultArgumentResilienceExpansion,
                                                numArgNames,
                                                argNameAndDependencyIDs);
 
@@ -3782,6 +3784,15 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       elem->setImplicit();
     elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
+
+    if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
+            rawDefaultArgumentResilienceExpansion)) {
+      elem->setDefaultArgumentResilienceExpansion(
+          *defaultArgumentResilienceExpansion);
+    } else {
+      error();
+      return nullptr;
+    }
 
     break;
   }

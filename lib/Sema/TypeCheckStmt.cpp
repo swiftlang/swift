@@ -1347,8 +1347,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 /// Check the default arguments that occur within this pattern.
 static void checkDefaultArguments(TypeChecker &tc,
                                   ParameterList *params,
-                                  unsigned &nextArgIndex,
-                                  AbstractFunctionDecl *func) {
+                                  unsigned &nextArgIndex) {
   for (auto &param : *params) {
     ++nextArgIndex;
     if (!param->getDefaultValue() || !param->hasType() ||
@@ -1389,11 +1388,20 @@ void TypeChecker::checkDefaultArguments(ArrayRef<ParameterList *> paramLists,
       expansion = ResilienceExpansion::Minimal;
 
     func->setDefaultArgumentResilienceExpansion(expansion);
+  } else {
+    auto *EED = cast<EnumElementDecl>(VD);
+    auto expansion = EED->getParentEnum()->getResilienceExpansion();
+    if (!Context.isSwiftVersion3() &&
+        EED->getFormalAccessScope(/*useDC=*/nullptr,
+                                   /*respectVersionedAttr=*/true).isPublic())
+      expansion = ResilienceExpansion::Minimal;
+
+    EED->setDefaultArgumentResilienceExpansion(expansion);
   }
 
   unsigned nextArgIndex = 0;
   for (auto *paramList : paramLists)
-    checkDefaultArguments(*this, paramList, nextArgIndex, func);
+    ::checkDefaultArguments(*this, paramList, nextArgIndex);
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,

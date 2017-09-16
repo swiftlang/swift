@@ -223,7 +223,17 @@ public:
   bool isRValue() const & { return StoredKind == Kind::RValue; }
   bool isLValue() const & { return StoredKind == Kind::LValue; }
   bool isTuple() const & { return StoredKind == Kind::Tuple; }
-
+  bool isTupleShuffleExpr() const & {
+    if (StoredKind == Kind::Expr) {
+      if (auto *TSE = dyn_cast<TupleShuffleExpr>(asKnownExpr())) {
+        return llvm::any_of(TSE->getElementMapping(), [](const int &i) {
+          return i == TupleShuffleExpr::DefaultInitialize;
+        });
+      }
+    }
+    return false;
+  }
+  
   /// Given that this source is storing an RValue, extract and clear
   /// that value.
   RValue &&asKnownRValue(SILGenFunction &SGF) && {

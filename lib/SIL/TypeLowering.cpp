@@ -1725,7 +1725,20 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      ValueDecl *VD,
                                                      DeclContext *DC,
                                                      unsigned DefaultArgIndex) {
-  auto resultTy = getDefaultArgumentInfo(VD, DefaultArgIndex).second;
+  Type resultTy;
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    ArrayRef<const ParameterList *> paramLists = AFD->getParameterLists();
+
+    // Skip the 'self' parameter; it is not counted.
+    if (AFD->getImplicitSelfDecl())
+      paramLists = paramLists.slice(1);
+
+    resultTy = getDefaultArgumentInfo(paramLists, DefaultArgIndex).second;
+  } else {
+    resultTy = getDefaultArgumentInfo(
+                 cast<EnumElementDecl>(VD)->getParameterList(),
+                 DefaultArgIndex).second;
+  }
   assert(resultTy && "Didn't find default argument?");
 
   // The result type might be written in terms of type parameters

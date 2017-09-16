@@ -351,14 +351,14 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 3,
-    /// \brief Whether or not this element has an associated value.
-    HasArgumentType : 1,
+    /// \brief The ResilienceExpansion to use for default arguments.
+    DefaultArgumentResilienceExpansion : 1,
 
     /// \brief Whether or not this element directly or indirectly references
     /// the enum type.
     Recursiveness : 2
   );
-  
+
   SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
@@ -5758,6 +5758,8 @@ public:
   {
     Bits.EnumElementDecl.Recursiveness =
         static_cast<unsigned>(ElementRecursiveness::NotRecursive);
+    EnumElementDeclBits.DefaultArgumentResilienceExpansion =
+        static_cast<unsigned>(ResilienceExpansion::Maximal);
   }
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
@@ -5807,6 +5809,21 @@ public:
   
   void setRecursiveness(ElementRecursiveness recursiveness) {
     Bits.EnumElementDecl.Recursiveness = static_cast<unsigned>(recursiveness);
+  }
+
+    /// The ResilienceExpansion for default arguments.
+  ///
+  /// In Swift 4 mode, default argument expressions are serialized, and must
+  /// obey the restrictions imposed upon inlineable function bodies.
+  ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
+    return ResilienceExpansion(
+        EnumElementDeclBits.DefaultArgumentResilienceExpansion);
+  }
+
+  /// Set the ResilienceExpansion for default arguments.
+  void setDefaultArgumentResilienceExpansion(ResilienceExpansion expansion) {
+    EnumElementDeclBits.DefaultArgumentResilienceExpansion =
+        unsigned(expansion);
   }
 
   bool hasAssociatedValues() const {
@@ -6677,7 +6694,7 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
 /// \returns the default argument kind and, if there is a default argument,
 /// the type of the corresponding parameter.
 std::pair<DefaultArgumentKind, Type>
-getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
+getDefaultArgumentInfo(ArrayRef<const ParameterList *> paramLists, unsigned Index);
 
 } // end namespace swift
 

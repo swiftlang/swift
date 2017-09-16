@@ -1080,6 +1080,7 @@ namespace decls_block {
     EnumElementRawValueKindField,  // raw value kind
     BCFixed<1>,  // negative raw value?
     IdentifierIDField, // raw value
+    BCFixed<1>,   // default argument resilience expansion
     BCVBR<5>, // number of parameter name components
     BCArray<IdentifierIDField> // name components,
 

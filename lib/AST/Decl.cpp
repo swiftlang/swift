@@ -4682,18 +4682,8 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
 }
 
 std::pair<DefaultArgumentKind, Type>
-swift::getDefaultArgumentInfo(ValueDecl *source, unsigned Index) {
-  ArrayRef<const ParameterList *> paramLists;
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(source)) {
-    paramLists = AFD->getParameterLists();
-
-    // Skip the 'self' parameter; it is not counted.
-    if (AFD->getImplicitSelfDecl())
-      paramLists = paramLists.slice(1);
-  } else {
-    paramLists = cast<EnumElementDecl>(source)->getParameterList();
-  }
-
+swift::getDefaultArgumentInfo(ArrayRef<const ParameterList *> paramLists,
+                              unsigned Index) {
   for (auto paramList : paramLists) {
     if (Index < paramList->size()) {
       auto param = paramList->get(Index);
