@@ -1715,6 +1715,10 @@ public:
                      ConstraintLocatorBuilder locator,
                      bool isFavored = false);
 
+  /// \brief Add a requirement as a constraint to the constraint system.
+  void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
+                     bool isFavored = false);
+
   /// \brief Add a key path application constraint to the constraint system.
   void addKeyPathApplicationConstraint(Type keypath, Type root, Type value,
                                        ConstraintLocatorBuilder locator,
