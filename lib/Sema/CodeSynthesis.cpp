@@ -2109,6 +2109,12 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   access = std::min(access, superclassCtor->getFormalAccess());
   ctor->setAccess(access);
 
+  // Inherit the @_versioned attribute.
+  if (superclassCtor->getAttrs().hasAttribute<VersionedAttr>()) {
+    auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
+    ctor->getAttrs().add(clonedAttr);
+  }
+
   // Make sure the constructor is only as available as its superclass's
   // constructor.
   AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
@@ -2123,7 +2129,6 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
       if (objcAttr->hasName()) {
         auto *clonedAttr = objcAttr->clone(ctx);
-        // Set it to implicit to disable printing it for SIL.
         clonedAttr->setImplicit(true);
         ctor->getAttrs().add(clonedAttr);
       }
