@@ -1923,6 +1923,64 @@ bool RefactoringActionLocalizeString::performChange() {
   return false;
 }
 
+static std::unique_ptr<CharSourceRange>
+  findSourceRangeToWrapInCatch(ResolvedCursorInfo CursorInfo,
+                               SourceFile *TheFile,
+                               SourceManager &SM) {
+  Expr *E = CursorInfo.TrailingExpr;
+  if (!E)
+    return nullptr;
+  auto Node = ASTNode(E);
+  auto NodeChecker = [](ASTNode N) {
+    return N.isStmt(StmtKind::Brace);
+  };
+  ContextFinder Finder(*TheFile, Node, NodeChecker);
+  Finder.resolve();
+  auto Contexts = Finder.getContexts();
+  if (Contexts.size() == 0)
+    return nullptr;
+  auto TargetNode = Contexts.back();
+  Stmt *S = TargetNode.dyn_cast<Stmt*>();
+  BraceStmt *BStmt = dyn_cast<BraceStmt>(S);
+  auto ConvertToCharRange = [&SM](SourceRange SR) {
+    return Lexer::getCharSourceRangeFromSourceRange(SM, SR);
+  };
+  if (!BStmt)
+    return nullptr;
+  auto ExprRange = ConvertToCharRange(E->getSourceRange());
+  // Check elements of the deepest BraceStmt, pick one that covers expression.
+  for (auto Elem: BStmt->getElements()) {
+    auto ElemRange = ConvertToCharRange(Elem.getSourceRange());
+    if (ElemRange.contains(ExprRange))
+      TargetNode = Elem;
+  }
+  auto ResultRange = ConvertToCharRange(TargetNode.getSourceRange());
+  return llvm::make_unique<CharSourceRange>(ResultRange);
+}
+
+bool RefactoringActionConvertToTryCatch::isApplicable(ResolvedCursorInfo Tok) {
+  if (!Tok.TrailingExpr)
+    return false;
+  return isa<ForceTryExpr>(Tok.TrailingExpr);
+}
+
+bool RefactoringActionConvertToTryCatch::performChange() {
+  auto Range = findSourceRangeToWrapInCatch(CursorInfo, TheFile, SM);
+  if (!Range)
+    return true;
+  // Wrap given range in do catch block.
+  EditConsumer.accept(SM, Range->getStart(), "do {\n");
+  EditConsumer.accept(SM, Range->getEnd(), "\n} catch {\n<#code#>\n}");
+
+  // Delete ! from try! expression
+  auto *TryExpr = dyn_cast<ForceTryExpr>(CursorInfo.TrailingExpr);
+  if (!TryExpr)
+    return true;
+  auto ExclaimRange = CharSourceRange(TryExpr->getExclaimLoc(), 1);
+  EditConsumer.accept(SM, ExclaimRange, "");
+  return false;
+}
+
 /// Given a cursor position, this function tries to collect a number literal
 /// expression immediately following the cursor.
 static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfo Tok) {

@@ -211,6 +211,11 @@ func testStringInterpolation() -> String {
   let _ = name + "Bourne"
   let _ = name + one
 }
+
+func testForceTry() {
+  func throwingFunc() throws -> Int { return 3 }
+  let _ = try! throwingFunc()
+}
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -291,6 +296,10 @@ func testStringInterpolation() -> String {
 // RUN: %refactor -source-filename %s -pos=211:11 -end-pos=211:26 | %FileCheck %s -check-prefix=CHECK-STRINGS-INTERPOLATION
 // RUN: %refactor -source-filename %s -pos=212:11 -end-pos=212:21 | %FileCheck %s -check-prefix=CHECK-STRINGS-INTERPOLATION
 
+// RUN: %refactor -source-filename %s -pos=217:11 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
+// RUN: %refactor -source-filename %s -pos=217:12 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
+// RUN: %refactor -source-filename %s -pos=217:13 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
+
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
 // CHECK1-NEXT: Action ends
@@ -329,4 +338,6 @@ func testStringInterpolation() -> String {
 // CHECK-COLLAPSE-NESTED-IF-EXPRESSION: Collapse Nested If Expression
 
 // CHECK-STRINGS-INTERPOLATION: Convert to String Interpolation
+
+// CHECK-TRY-CATCH: Convert To Try Catch
 
