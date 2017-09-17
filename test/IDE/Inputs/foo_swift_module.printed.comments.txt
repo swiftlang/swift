@@ -11,11 +11,11 @@ postfix operator =->
 
 postfix operator =>
 
-func %%%(lhs: Int, rhs: Int) -> Int
+func %%% (lhs: Int, rhs: Int) -> Int
 
-postfix func =->(lhs: Int) -> Int
+postfix func =-> (lhs: Int) -> Int
 
-postfix func =>(lhs: Int) -> Int
+postfix func => (lhs: Int) -> Int
 
 struct BarGenericSwiftStruct1<T> {
   init(t: T)

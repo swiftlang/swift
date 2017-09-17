@@ -87,7 +87,7 @@ prefix operator ***
 
 // CHECK-LABEL: extension WrappedInt : WrappedProto {
 // CHECK-NEXT: func wrappedMethod()
-// CHECK-NEXT: prefix static func ***(x: WrappedInt)
+// CHECK-NEXT: prefix static func *** (x: WrappedInt)
 // CHECK-NEXT: }
 // CHECK-RECOVERY-NEGATIVE-NOT: extension WrappedInt
 extension WrappedInt: WrappedProto {
@@ -96,11 +96,11 @@ extension WrappedInt: WrappedProto {
 }
 // CHECK-LABEL: extension Int32 : UnwrappedProto {
 // CHECK-NEXT: func unwrappedMethod()
-// CHECK-NEXT: prefix static func ***(x: UnwrappedInt)
+// CHECK-NEXT: prefix static func *** (x: UnwrappedInt)
 // CHECK-NEXT: }
 // CHECK-RECOVERY-LABEL: extension Int32 : UnwrappedProto {
 // CHECK-RECOVERY-NEXT: func unwrappedMethod()
-// CHECK-RECOVERY-NEXT: prefix static func ***(x: Int32)
+// CHECK-RECOVERY-NEXT: prefix static func *** (x: Int32)
 // CHECK-RECOVERY-NEXT: }
 // CHECK-RECOVERY-NEGATIVE-NOT: extension UnwrappedInt
 extension UnwrappedInt: UnwrappedProto {

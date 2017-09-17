@@ -2503,10 +2503,13 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       printContextIfNeeded(decl);
       recordDeclLoc(decl,
         [&]{ // Name
-          if (!decl->hasName())
+          if (!decl->hasName()) {
             Printer << "<anonymous>";
-          else
+          } else {
             Printer.printName(decl->getName());
+            if (decl->isOperator())
+              Printer << " ";
+          }
         }, [&] { // Parameters
           if (decl->isGeneric())
             if (auto *genericSig = decl->getGenericSignature())
