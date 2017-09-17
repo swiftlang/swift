@@ -157,6 +157,15 @@ int main(int argc_, const char **argv_) {
   if (argv.size() > 1) {
     StringRef FirstArg(argv[1]);
     if (FirstArg == "-frontend") {
+      /* SR-5860: This is hit the second time through, at which point we have a
+       new set of arguments in argv so the "-e" arguments are seemingly lost.
+       
+       I'm not grasping how to access the previous argv arguments so that they
+       can be conveyed to the frontend job.
+       
+       Presumably they need to be attached to the Job, but I'm not seeing how
+       that can be done.
+       */
       return performFrontend(llvm::makeArrayRef(argv.data()+2,
                                                 argv.data()+argv.size()),
                              argv[0], (void *)(intptr_t)getExecutablePath);
@@ -200,6 +209,8 @@ int main(int argc_, const char **argv_) {
     return 1;
 
   if (C) {
+    /* SR-5860: This is hit the first time through; argv contains the "-e"
+     arguments. */
     return C->performJobs();
   }
 
