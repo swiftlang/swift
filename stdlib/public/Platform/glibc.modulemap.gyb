@@ -428,6 +428,12 @@ module SwiftGlibc [system] {
         export *
       }
     }
+% if CMAKE_SDK in ["LINUX", "FREEBSD"]:
+    module sysexits {
+      header "${GLIBC_INCLUDE_PATH}/sysexits.h"
+      export *
+    }
+% end
     module termios {
       header "${GLIBC_INCLUDE_PATH}/termios.h"
       export *
