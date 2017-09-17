@@ -20,11 +20,10 @@
 using namespace swift;
 using namespace constraints;
 
-std::pair<ConstraintSystem::PotentialBindings, TypeVariableType *>
+Optional<ConstraintSystem::PotentialBindings>
 ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
-  TypeVariableType *bestTypeVar = nullptr;
-  PotentialBindings bestBindings;
+  Optional<PotentialBindings> bestBindings;
   for (auto typeVar : getTypeVariables()) {
     // Skip any type variables that are bound.
     if (typeVar->getImpl().hasRepresentativeOrFixed())
@@ -42,13 +41,11 @@ ConstraintSystem::determineBestBindings() {
 
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
-    if (!bestTypeVar || bindings < bestBindings) {
+    if (!bestBindings || bindings < *bestBindings)
       bestBindings = std::move(bindings);
-      bestTypeVar = typeVar;
-    }
   }
 
-  return std::make_pair(bestBindings, bestTypeVar);
+  return bestBindings;
 }
 
 /// Find the set of type variables that are inferable from the given type.
@@ -141,7 +138,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   getConstraintGraph().gatherConstraints(
       typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
 
-  PotentialBindings result;
+  PotentialBindings result(typeVar);
 
   // Consider each of the constraints related to this type variable.
   llvm::SmallPtrSet<CanType, 4> exactTypes;
@@ -196,7 +193,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       auto dynamicType = constraint->getFirstType();
       if (auto *tv = dynamicType->getAs<TypeVariableType>()) {
         if (tv->getImpl().getRepresentative(nullptr) == typeVar)
-          return {};
+          return {typeVar};
       }
 
       // This is right-hand side, let's continue.
