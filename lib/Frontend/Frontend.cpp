@@ -601,7 +601,7 @@ void CompilerInstance::checkTypesWhileParsingMain(
     performDelayedParsing(MainModule, PersistentState,
                           Invocation.getCodeCompletionFactory());
   }
-  finishTypeCheckingMainModule(TypeCheckOptions);
+  finishTypeChecking(TypeCheckOptions);
 }
 
 void CompilerInstance::parseAndTypeCheckMainFile(
@@ -669,7 +669,7 @@ void CompilerInstance::forEachFileToTypeCheck(
   }
 }
 
-void CompilerInstance::finishTypeCheckingMainModule(
+void CompilerInstance::finishTypeChecking(
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
     MainModule->forEachSourceFile(
