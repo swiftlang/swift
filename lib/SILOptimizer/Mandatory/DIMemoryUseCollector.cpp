@@ -337,15 +337,15 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
     if (isa<StrongReleaseInst>(User))
       continue;
 
-    if (auto project = dyn_cast<ProjectBoxInst>(User)) {
-      collectUses(project, project->getFieldIndex());
+    if (auto *PBI = dyn_cast<ProjectBoxInst>(User)) {
+      collectUses(User, PBI->getFieldIndex());
       continue;
     }
 
     // Other uses of the container are considered escapes of the values.
-    for (unsigned field : indices(ABI->getBoxType()->getLayout()->getFields()))
-      addElementUses(field,
-                     ABI->getBoxType()->getFieldType(ABI->getModule(), field),
+    for (unsigned Field : indices(ABI->getBoxType()->getLayout()->getFields()))
+      addElementUses(Field,
+                     ABI->getBoxType()->getFieldType(ABI->getModule(), Field),
                      User, DIUseKind::Escape);
   }
 }
@@ -440,7 +440,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    if (auto *SWI = dyn_cast<StoreWeakInst>(User))
+    if (auto *SWI = dyn_cast<StoreWeakInst>(User)) {
       if (UI->getOperandNumber() == 1) {
         DIUseKind Kind;
         if (InStructSubElement)
@@ -452,8 +452,9 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, 1));
         continue;
       }
+    }
 
-    if (auto *SUI = dyn_cast<StoreUnownedInst>(User))
+    if (auto *SUI = dyn_cast<StoreUnownedInst>(User)) {
       if (UI->getOperandNumber() == 1) {
         DIUseKind Kind;
         if (InStructSubElement)
@@ -465,6 +466,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, 1));
         continue;
       }
+    }
 
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       // If this is a copy of a tuple, we should scalarize it so that we don't

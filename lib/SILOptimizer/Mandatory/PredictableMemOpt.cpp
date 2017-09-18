@@ -611,7 +611,6 @@ AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
 /// cross element accesses have been scalarized.
 ///
 /// This returns true if the load has been removed from the program.
-///
 bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   // Note that we intentionally don't support forwarding of weak pointers,
   // because the underlying value may drop be deallocated at any time.  We would
@@ -965,7 +964,7 @@ bool AllocOptimize::doIt() {
       }
     }
   }
-  
+
   // destroy_addr(p) is strong_release(load(p)), try to promote it too.
   for (unsigned i = 0; i != Releases.size(); ++i) {
     if (auto *DAI = dyn_cast_or_null<DestroyAddrInst>(Releases[i]))
@@ -1019,18 +1018,21 @@ static bool optimizeMemoryAllocations(SILFunction &Fn) {
   return Changed;
 }
 
-namespace {
-class PredictableMemoryOptimizations : public SILFunctionTransform {
+//===----------------------------------------------------------------------===//
+//                            Top Level Entrypoint
+//===----------------------------------------------------------------------===//
 
+namespace {
+
+class PredictableMemoryOptimizations : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     if (optimizeMemoryAllocations(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
-
 };
-} // end anonymous namespace
 
+} // end anonymous namespace
 
 SILTransform *swift::createPredictableMemoryOptimizations() {
   return new PredictableMemoryOptimizations();

@@ -26,7 +26,8 @@
 #include "swift/SIL/SILType.h"
 
 namespace swift {
-  class SILBuilder;
+
+class SILBuilder;
 
 /// DIMemoryObjectInfo - This struct holds information about the memory object
 /// being analyzed that is required to correctly break it down into elements.
@@ -62,7 +63,6 @@ public:
   /// tuples, this is the flattened element count.  For 'self' members in init
   /// methods, this is the local field count (+1 for derive classes).
   unsigned NumElements;
-public:
 
   DIMemoryObjectInfo(SingleValueInstruction *MemoryInst);
 
