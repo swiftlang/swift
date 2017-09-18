@@ -111,7 +111,8 @@ getAccessorForComputedComponent(IRGenModule &IGM,
     return accessorFn;
   }
 
-  auto accessorFnTy = accessorFn->getType()->getPointerElementType();
+  auto accessorFnTy = cast<llvm::FunctionType>(
+    accessorFn->getType()->getPointerElementType());;
   
   // Otherwise, we need a thunk to unmarshal the generic environment from the
   // argument area. It'd be nice to have a good way to represent this
@@ -140,7 +141,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
 
   SmallVector<llvm::Type *, 4> thunkParams;
   for (unsigned i = 0; i < numArgsToForward; ++i)
-    thunkParams.push_back(accessorFnTy->getFunctionParamType(i));
+    thunkParams.push_back(accessorFnTy->getParamType(i));
   
   switch (whichAccessor) {
   case Getter:
@@ -153,7 +154,8 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   }
   thunkParams.push_back(IGM.SizeTy);
 
-  auto thunkType = llvm::FunctionType::get(IGM.VoidTy, thunkParams,
+  auto thunkType = llvm::FunctionType::get(accessorFnTy->getReturnType(),
+                                           thunkParams,
                                            /*vararg*/ false);
   
   auto accessorThunk = llvm::Function::Create(thunkType,
@@ -228,9 +230,12 @@ getAccessorForComputedComponent(IRGenModule &IGM,
                              forwardedArgs);
     auto fnPtr = FunctionPointer::forDirect(IGM, accessorFn,
                                           accessor->getLoweredFunctionType());
-    IGF.Builder.CreateCall(fnPtr, forwardedArgs.claimAll());
+    auto call = IGF.Builder.CreateCall(fnPtr, forwardedArgs.claimAll());
     
-    IGF.Builder.CreateRetVoid();
+    if (call->getType()->isVoidTy())
+      IGF.Builder.CreateRetVoid();
+    else
+      IGF.Builder.CreateRet(call);
   }
   
   return accessorThunk;
