@@ -660,10 +660,19 @@ void CompilerInstance::parseAndTypeCheckMainFile(
   }
 }
 
+
+static void forEachSourceFileIn(ModuleDecl *module, const llvm::function_ref<void(SourceFile &)> &fn) {
+    for (auto File : module->getFiles()) {
+        if (auto SF = dyn_cast<SourceFile>(File))
+            fn(*SF);
+    }
+}
+
+
 void CompilerInstance::forEachFileToTypeCheck(
     const llvm::function_ref<void(SourceFile &)> &fn) {
   if (isWholeModuleCompilation()) {
-    MainModule->forEachSourceFile([&](SourceFile &SF) { fn(SF); });
+    forEachSourceFileIn(MainModule, [&](SourceFile &SF) { fn(SF); });
   } else {
     fn(*PrimarySourceFile);
   }
@@ -672,7 +681,7 @@ void CompilerInstance::forEachFileToTypeCheck(
 void CompilerInstance::finishTypeChecking(
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
-    MainModule->forEachSourceFile(
+    forEachSourceFileIn(MainModule,
         [&](SourceFile &SF) { performWholeModuleTypeChecking(SF); });
   }
   forEachFileToTypeCheck([&](SourceFile &SF) { finishTypeCheckingOfFile(SF); });

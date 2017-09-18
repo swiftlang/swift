@@ -226,13 +226,6 @@ public:
     return { Files.begin(), Files.size() };
   }
 
-  void forEachSourceFile(const llvm::function_ref<void(SourceFile &)> &fn) {
-    for (auto File : getFiles()) {
-      if (auto SF = dyn_cast<SourceFile>(File))
-        fn(*SF);
-    }
-  }
-
   void addFile(FileUnit &newFile);
   void removeFile(FileUnit &existingFile);
 
