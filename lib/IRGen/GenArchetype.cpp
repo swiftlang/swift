@@ -318,7 +318,9 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // representation.
   if (layout && layout->isFixedSizeTrivial()) {
     Size size(layout->getTrivialSizeInBytes());
-    Alignment align(layout->getTrivialSizeInBytes());
+    auto layoutAlignment = layout->getAlignmentInBytes();
+    assert(layoutAlignment && "layout constraint alignment should not be 0");
+    Alignment align(layoutAlignment);
     auto spareBits =
       SpareBitVector::getConstant(size.getValueInBits(), false);
     // Get an integer type of the required size.
