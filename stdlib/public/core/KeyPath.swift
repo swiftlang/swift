@@ -472,9 +472,6 @@ internal enum KeyPathComponent: Hashable {
         return false
       }
       if let arg1 = argument1, let arg2 = argument2 {
-        // TODO: Sizes may differ if one key path was formed in a context
-        // capturing generic arguments and one wasn't.
-        _sanityCheck(arg1.data.count == arg2.data.count)
         return arg1.witnesses.pointee.equals(
           arg1.data.baseAddress.unsafelyUnwrapped,
           arg2.data.baseAddress.unsafelyUnwrapped,
@@ -556,23 +553,26 @@ internal final class ClassHolder {
 internal final class MutatingWritebackBuffer<CurValue, NewValue> {
   let previous: AnyObject?
   let base: UnsafeMutablePointer<CurValue>
-  let set: @convention(thin) (NewValue, inout CurValue, UnsafeRawPointer) -> ()
+  let set: @convention(thin) (NewValue, inout CurValue, UnsafeRawPointer, Int) -> ()
   let argument: UnsafeRawPointer
+  let argumentSize: Int
   var value: NewValue
 
   deinit {
-    set(value, &base.pointee, argument)
+    set(value, &base.pointee, argument, argumentSize)
   }
 
   init(previous: AnyObject?,
        base: UnsafeMutablePointer<CurValue>,
-       set: @escaping @convention(thin) (NewValue, inout CurValue, UnsafeRawPointer) -> (),
+       set: @escaping @convention(thin) (NewValue, inout CurValue, UnsafeRawPointer, Int) -> (),
        argument: UnsafeRawPointer,
+       argumentSize: Int,
        value: NewValue) {
     self.previous = previous
     self.base = base
     self.set = set
     self.argument = argument
+    self.argumentSize = argumentSize
     self.value = value
   }
 }
@@ -581,23 +581,26 @@ internal final class MutatingWritebackBuffer<CurValue, NewValue> {
 internal final class NonmutatingWritebackBuffer<CurValue, NewValue> {
   let previous: AnyObject?
   let base: CurValue
-  let set: @convention(thin) (NewValue, CurValue, UnsafeRawPointer) -> ()
+  let set: @convention(thin) (NewValue, CurValue, UnsafeRawPointer, Int) -> ()
   let argument: UnsafeRawPointer
+  let argumentSize: Int
   var value: NewValue
 
   deinit {
-    set(value, base, argument)
+    set(value, base, argument, argumentSize)
   }
 
   init(previous: AnyObject?,
        base: CurValue,
-       set: @escaping @convention(thin) (NewValue, CurValue, UnsafeRawPointer) -> (),
+       set: @escaping @convention(thin) (NewValue, CurValue, UnsafeRawPointer, Int) -> (),
        argument: UnsafeRawPointer,
+       argumentSize: Int,
        value: NewValue) {
     self.previous = previous
     self.base = base
     self.set = set
     self.argument = argument
+    self.argumentSize = argumentSize
     self.value = value
   }
 }
@@ -929,7 +932,6 @@ internal struct RawKeyPathComponent {
     case .computed:
       // Fields are pointer-aligned after the header
       componentSize += Header.pointerAlignmentSkew
-      // TODO: nontrivial arguments need to be copied by value witness
       buffer.storeBytes(of: _computedIDValue,
                         toByteOffset: MemoryLayout<Int>.size,
                         as: Int.self)
@@ -1015,9 +1017,11 @@ internal struct RawKeyPathComponent {
          .mutatingGetSet(id: _, get: let rawGet, set: _, argument: let argument),
          .nonmutatingGetSet(id: _, get: let rawGet, set: _, argument: let argument):
       typealias Getter
-        = @convention(thin) (CurValue, UnsafeRawPointer) -> NewValue
+        = @convention(thin) (CurValue, UnsafeRawPointer, Int) -> NewValue
       let get = unsafeBitCast(rawGet, to: Getter.self)
-      return .continue(get(base, argument?.data.baseAddress ?? rawGet))
+      return .continue(get(base,
+                           argument?.data.baseAddress ?? rawGet,
+                           argument?.data.count ?? 0))
 
     case .optionalChain:
       // TODO: IUO shouldn't be a first class type
@@ -1079,9 +1083,9 @@ internal struct RawKeyPathComponent {
     case .mutatingGetSet(id: _, get: let rawGet, set: let rawSet,
                          argument: let argument):
       typealias Getter
-        = @convention(thin) (CurValue, UnsafeRawPointer) -> NewValue
+        = @convention(thin) (CurValue, UnsafeRawPointer, Int) -> NewValue
       typealias Setter
-        = @convention(thin) (NewValue, inout CurValue, UnsafeRawPointer) -> ()
+        = @convention(thin) (NewValue, inout CurValue, UnsafeRawPointer, Int) -> ()
       let get = unsafeBitCast(rawGet, to: Getter.self)
       let set = unsafeBitCast(rawSet, to: Setter.self)
 
@@ -1089,11 +1093,13 @@ internal struct RawKeyPathComponent {
         mutating: base.assumingMemoryBound(to: CurValue.self))
 
       let argValue = argument?.data.baseAddress ?? rawGet
+      let argSize = argument?.data.count ?? 0
       let writeback = MutatingWritebackBuffer(previous: keepAlive,
-                                       base: baseTyped,
-                                       set: set,
-                                       argument: argValue,
-                                       value: get(baseTyped.pointee, argValue))
+                               base: baseTyped,
+                               set: set,
+                               argument: argValue,
+                               argumentSize: argSize,
+                               value: get(baseTyped.pointee, argValue, argSize))
       keepAlive = writeback
       // A maximally-abstracted, final, stored class property should have
       // a stable address.
@@ -1107,20 +1113,22 @@ internal struct RawKeyPathComponent {
            "nonmutating component should not appear in the middle of mutation")
 
       typealias Getter
-        = @convention(thin) (CurValue, UnsafeRawPointer) -> NewValue
+        = @convention(thin) (CurValue, UnsafeRawPointer, Int) -> NewValue
       typealias Setter
-        = @convention(thin) (NewValue, CurValue, UnsafeRawPointer) -> ()
+        = @convention(thin) (NewValue, CurValue, UnsafeRawPointer, Int) -> ()
 
       let get = unsafeBitCast(rawGet, to: Getter.self)
       let set = unsafeBitCast(rawSet, to: Setter.self)
 
       let baseValue = base.assumingMemoryBound(to: CurValue.self).pointee
       let argValue = argument?.data.baseAddress ?? rawGet
+      let argSize = argument?.data.count ?? 0
       let writeback = NonmutatingWritebackBuffer(previous: keepAlive,
-                                             base: baseValue,
-                                             set: set,
-                                             argument: argValue,
-                                             value: get(baseValue, argValue))
+                                       base: baseValue,
+                                       set: set,
+                                       argument: argValue,
+                                       argumentSize: argSize,
+                                       value: get(baseValue, argValue, argSize))
       keepAlive = writeback
       // A maximally-abstracted, final, stored class property should have
       // a stable address.

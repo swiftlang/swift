@@ -546,6 +546,11 @@ Iterator token_lower_bound(ArrayTy &Array, SourceLoc Loc) {
   });
 }
 
+/// Given an ordered token array \param AllTokens , get the slice of the array
+/// where front() locates at \param StartLoc and back() locates at \param EndLoc .
+ArrayRef<Token> slice_token_array(ArrayRef<Token> AllTokens, SourceLoc StartLoc,
+                                  SourceLoc EndLoc);
+
 } // end namespace swift
 
 #endif

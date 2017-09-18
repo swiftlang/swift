@@ -342,6 +342,8 @@ private:
     case Node::Kind::Initializer:
     case Node::Kind::KeyPathGetterThunkHelper:
     case Node::Kind::KeyPathSetterThunkHelper:
+    case Node::Kind::KeyPathEqualsThunkHelper:
+    case Node::Kind::KeyPathHashThunkHelper:
     case Node::Kind::LazyProtocolWitnessTableAccessor:
     case Node::Kind::LazyProtocolWitnessTableCacheVariable:
     case Node::Kind::LocalDeclName:
@@ -1238,6 +1240,29 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       print(Node->getChild(2));
     }
     return nullptr;
+  case Node::Kind::KeyPathEqualsThunkHelper:
+  case Node::Kind::KeyPathHashThunkHelper: {
+    Printer << "key path index "
+         << (Node->getKind() == Node::Kind::KeyPathEqualsThunkHelper
+               ? "equality" : "hash")
+         << " operator for ";
+   
+    auto lastChild = Node->getChild(Node->getNumChildren() - 1);
+    auto lastType = Node->getNumChildren();
+    if (lastChild->getKind() == Node::Kind::DependentGenericSignature) {
+      print(lastChild);
+      lastType--;
+    }
+    
+    Printer << "(";
+    for (unsigned i = 0; i < lastType; ++i) {
+      if (i != 0)
+        Printer << ", ";
+      print(Node->getChild(i));
+    }
+    Printer << ")";
+    return nullptr;
+  }
   case Node::Kind::FieldOffset: {
     print(Node->getChild(0)); // directness
     Printer << "field offset for ";

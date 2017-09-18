@@ -317,6 +317,15 @@ public:
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
                              ArrayRef<clang::Module *> Exported);
-}
+
+/// Determine whether \c overlayDC is within an overlay module for the
+/// imported context enclosing \c importedDC.
+///
+/// This routine is used for various hacks that are only permitted within
+/// overlays of imported modules, e.g., Objective-C bridging conformances.
+bool isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
+                                        const DeclContext *importedDC);
+
+} // end namespace swift
 
 #endif

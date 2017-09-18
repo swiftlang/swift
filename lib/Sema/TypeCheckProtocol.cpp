@@ -5429,9 +5429,9 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   if (Proto->isSpecificProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
     if (auto nominal = Adoptee->getAnyNominal()) {
       if (!TC.Context.isTypeBridgedInExternalModule(nominal)) {
-        auto nominalModule = nominal->getParentModule();
-        auto conformanceModule = DC->getParentModule();
-        if (nominalModule->getName() != conformanceModule->getName()) {
+        if (nominal->getParentModule() != DC->getParentModule() &&
+            !isInOverlayModuleForImportedModule(DC, nominal)) {
+          auto nominalModule = nominal->getParentModule();
           TC.diagnose(Loc, diag::nonlocal_bridged_to_objc, nominal->getName(),
                       Proto->getName(), nominalModule->getName());
         }

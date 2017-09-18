@@ -1716,6 +1716,16 @@ void Remangler::mangleKeyPathSetterThunkHelper(Node *node) {
   mangleChildNodes(node);
 }
 
+void Remangler::mangleKeyPathEqualsThunkHelper(Node *node) {
+  Out << "TH";
+  mangleChildNodes(node);
+}
+
+void Remangler::mangleKeyPathHashThunkHelper(Node *node) {
+  Out << "Th";
+  mangleChildNodes(node);
+}
+
 void Remangler::mangleProtocolListWithClass(Node *node) {
   Out << "Xc";
   mangleChildNode(node, 1);

@@ -577,9 +577,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
       FormalEvaluationScope writebackScope(*this);
       ManagedValue nsError =
-          emitRValueForPropertyLoad(
+          emitRValueForStorageLoad(
               loc, nativeError, concreteFormalType,
-              /*super*/ false, nsErrorVar, nsErrorVarSubstitutions,
+              /*super*/ false, nsErrorVar, RValue(), nsErrorVarSubstitutions,
               AccessSemantics::Ordinary, nsErrorType, SGFContext())
               .getAsSingleValue(*this, loc);
 

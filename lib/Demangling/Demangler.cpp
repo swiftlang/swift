@@ -1297,15 +1297,65 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'k': {
       auto nodeKind = c == 'K' ? Node::Kind::KeyPathGetterThunkHelper
                                : Node::Kind::KeyPathSetterThunkHelper;
-      auto type = popNode();
-      auto sigOrDecl = popNode();
-      if (sigOrDecl &&
-          sigOrDecl->getKind() == Node::Kind::DependentGenericSignature) {
-        auto decl = popNode();
-        return createWithChildren(nodeKind, decl, sigOrDecl, type);
+      std::vector<NodePointer> types;
+      auto node = popNode();
+      if (!node || node->getKind() != Node::Kind::Type)
+        return nullptr;
+      do {
+        types.push_back(node);
+        node = popNode();
+      } while (node && node->getKind() == Node::Kind::Type);
+      
+      NodePointer result;
+      if (node) {
+        if (node->getKind() == Node::Kind::DependentGenericSignature) {
+          auto decl = popNode();
+          result = createWithChildren(nodeKind, decl, /*sig*/ node);
+        } else {
+          result = createWithChild(nodeKind, /*decl*/ node);
+        }
       } else {
-        return createWithChildren(nodeKind, sigOrDecl, type);
+        return nullptr;
       }
+      for (auto i = types.rbegin(), e = types.rend(); i != e; ++i) {
+        result->addChild(*i, *this);
+      }
+      return result;
+    }
+    case 'H':
+    case 'h': {
+      auto nodeKind = c == 'H' ? Node::Kind::KeyPathEqualsThunkHelper
+                               : Node::Kind::KeyPathHashThunkHelper;
+      NodePointer genericSig = nullptr;
+      std::vector<NodePointer> types;
+      
+      auto node = popNode();
+      if (node) {
+        if (node->getKind() == Node::Kind::DependentGenericSignature) {
+          genericSig = node;
+        } else if (node->getKind() == Node::Kind::Type) {
+          types.push_back(node);
+        } else {
+          return nullptr;
+        }
+      } else {
+        return nullptr;
+      }
+      
+      while (auto node = popNode()) {
+        if (node->getKind() != Node::Kind::Type) {
+          return nullptr;
+        }
+        types.push_back(node);
+      }
+      
+      NodePointer result = createNode(nodeKind);
+      for (auto i = types.rbegin(), e = types.rend(); i != e; ++i) {
+        result->addChild(*i, *this);
+      }
+      if (genericSig)
+        result->addChild(genericSig, *this);
+      return result;
     }
     case 'v': {
       int Idx = demangleIndex();

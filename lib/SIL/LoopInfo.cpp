@@ -60,10 +60,11 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
   }
 
   // We can't have a phi of two openexistential instructions of different UUID.
-  SILInstruction *OEI = dyn_cast<OpenExistentialAddrInst>(I);
-  if (OEI || (OEI = dyn_cast<OpenExistentialRefInst>(I)) ||
-      (OEI = dyn_cast<OpenExistentialMetatypeInst>(I))) {
-    for (auto *UI : OEI->getUses())
+  if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
+      isa<OpenExistentialMetatypeInst>(I) ||
+      isa<OpenExistentialValueInst>(I) || isa<OpenExistentialBoxInst>(I) ||
+      isa<OpenExistentialBoxValueInst>(I)) {
+    for (auto *UI : I->getUses())
       if (!contains(UI->getUser()))
         return false;
     return true;

@@ -129,6 +129,9 @@ struct ASTContext::Implementation {
   DECL_CLASS *NAME##Decl = nullptr;
 #include "swift/AST/KnownStdlibTypes.def"
 
+  /// The declaration of '+' function for two RangeReplaceableCollection.
+  FuncDecl *PlusFunctionOnRangeReplaceableCollection = nullptr;
+
   /// The declaration of Swift.Optional<T>.Some.
   EnumElementDecl *OptionalSomeDecl = nullptr;
 
@@ -544,6 +547,30 @@ static NominalTypeDecl *findStdlibType(const ASTContext &ctx, StringRef name,
   }
   return nullptr;
 }
+
+FuncDecl *ASTContext::getPlusFunctionOnRangeReplaceableCollection() const {
+  if (Impl.PlusFunctionOnRangeReplaceableCollection) {
+    return Impl.PlusFunctionOnRangeReplaceableCollection;
+  }
+  // Find all of the declarations with this name in the Swift module.
+  SmallVector<ValueDecl *, 1> Results;
+  lookupInSwiftModule("+", Results);
+  for (auto Result : Results) {
+    if (auto *FD = dyn_cast<FuncDecl>(Result)) {
+      if(!FD->getOperatorDecl())
+        continue;
+      for (auto Req: FD->getGenericRequirements()) {
+        if (Req.getKind() == RequirementKind::Conformance &&
+              Req.getSecondType()->getNominalOrBoundGenericNominal() ==
+            getRangeReplaceableCollectionDecl()) {
+          Impl.PlusFunctionOnRangeReplaceableCollection = FD;
+        }
+      }
+    }
+  }
+  return Impl.PlusFunctionOnRangeReplaceableCollection;
+}
+
 
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   DECL_CLASS *ASTContext::get##NAME##Decl() const { \

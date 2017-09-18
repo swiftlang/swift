@@ -20,6 +20,10 @@
 #  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
 #endif
 
+#if defined(_WIN32)
+#include <mutex>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,13 +34,17 @@
 #include <unistd.h>
 #endif
 #include <stdarg.h>
+
 #include "ImageInspection.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
-#if !defined(_MSC_VER)
+
+#if defined(_MSC_VER)
+#include <DbgHelp.h>
+#else
 #include <cxxabi.h>
 #endif
 
@@ -60,9 +68,9 @@ enum: uint32_t {
 
 using namespace swift;
 
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
-
   // If we failed to find a symbol and thus dlinfo->dli_sname is nullptr, we
   // need to use the hex address.
   bool hasUnavailableAddress = syminfo.symbolName == nullptr;
@@ -78,17 +86,39 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   // demangle with swift. We are taking advantage of __cxa_demangle actually
   // providing failure status instead of just returning the original string like
   // swift demangle.
+#if defined(_WIN32)
+  DWORD dwFlags = UNDNAME_COMPLETE;
+#if !defined(_WIN64)
+  dwFlags |= UNDNAME_32_BIT_DECODE;
+#endif
+  static std::mutex mutex;
+
+  char szUndName[1024];
+  DWORD dwResult;
+
+  {
+    std::lock_guard<std::mutex> lock(m);
+    dwResult = UnDecorateSymbolName(syminfo.symbolName, szUndName,
+                                    sizeof(szUndName), dwFlags);
+  }
+
+  if (dwResult == TRUE) {
+    symbolName += szUndName;
+    return true;
+  }
+#else
   int status;
   char *demangled = abi::__cxa_demangle(syminfo.symbolName, 0, 0, &status);
   if (status == 0) {
-    assert(demangled != nullptr && "If __cxa_demangle succeeds, demangled "
-                                   "should never be nullptr");
+    assert(demangled != nullptr &&
+           "If __cxa_demangle succeeds, demangled should never be nullptr");
     symbolName += demangled;
     free(demangled);
     return true;
   }
-  assert(demangled == nullptr && "If __cxa_demangle fails, demangled should "
-                                 "be a nullptr");
+  assert(demangled == nullptr &&
+         "If __cxa_demangle fails, demangled should be a nullptr");
+#endif
 
   // Otherwise, try to demangle with swift. If swift fails to demangle, it will
   // just pass through the original output.
@@ -97,6 +127,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
       Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
   return true;
 }
+#endif
 
 void swift::dumpStackTraceEntry(unsigned index, void *framePC,
                                 bool shortOutput) {
@@ -140,7 +171,7 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
     fprintf(stderr, "%s`%s + %td", libraryName.data(), symbolName.c_str(),
             offset);
   } else {
-    constexpr const char *format = "%-4u %-34s 0x%0.16lx %s + %td\n";
+    constexpr const char *format = "%-4u %-34s 0x%0.16tx %s + %td\n";
     fprintf(stderr, format, index, libraryName.data(), symbolAddr,
             symbolName.c_str(), offset);
   }
@@ -148,8 +179,8 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   if (shortOutput) {
     fprintf(stderr, "<unavailable>");
   } else {
-    constexpr const char *format = "%-4u 0x%0.16lx\n";
-    fprintf(stderr, format, index, framePC);
+    constexpr const char *format = "%-4u 0x%0.16tx\n";
+    fprintf(stderr, format, index, reinterpret_cast<uintptr_t>(framePC));
   }
 #endif
 }

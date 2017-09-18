@@ -51,11 +51,11 @@ func resyncParser2() {}
 // RUN: %sourcekitd-test -req=cursor -pos=18:6 %s -- %s | %FileCheck -check-prefix=EQEQ1 %s
 // RUN: %sourcekitd-test -req=cursor -pos=19:6 %s -- %s | %FileCheck -check-prefix=EQEQ1 %s
 // Note: we can't find the operator decl so the decl kind is a fallback.
-// EQEQ1: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>==</decl.name>()
+// EQEQ1: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>== </decl.name>()
 
 // RUN: %sourcekitd-test -req=cursor -pos=20:6 %s -- %s | %FileCheck -check-prefix=EQEQ2 %s
 // Note: we can't find the operator decl so the decl kind is a fallback.
-// EQEQ2: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>==</decl.name>(<decl.var.parameter><decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:14cursor_invalid1CC">C</ref.class></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
+// EQEQ2: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>== </decl.name>(<decl.var.parameter><decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:14cursor_invalid1CC">C</ref.class></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=21:6 %s -- %s | %FileCheck -check-prefix=EQEQ3 %s
-// EQEQ3: <decl.function.operator.infix><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>==</decl.name>(<decl.var.parameter><decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:14cursor_invalid1CC">C</ref.class></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>y</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:14cursor_invalid1CC">C</ref.class></decl.var.parameter.type></decl.var.parameter>)</decl.function.operator.infix>
+// EQEQ3: <decl.function.operator.infix><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>== </decl.name>(<decl.var.parameter><decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:14cursor_invalid1CC">C</ref.class></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>y</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:14cursor_invalid1CC">C</ref.class></decl.var.parameter.type></decl.var.parameter>)</decl.function.operator.infix>

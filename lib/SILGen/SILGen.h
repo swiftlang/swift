@@ -271,9 +271,9 @@ public:
   /// Emits the stored property initializer for the given pattern.
   void emitStoredPropertyInitialization(PatternBindingDecl *pd, unsigned i);
 
-  /// Emits the default argument generator for the given function.
+  /// Emits default argument generators for the given parameter list.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
-                                ArrayRef<ParameterList*> paramLists);
+                                ParameterList *paramList);
 
   /// Emits the curry thunk between two uncurry levels of a function.
   void emitCurryThunk(SILDeclRef thunk);

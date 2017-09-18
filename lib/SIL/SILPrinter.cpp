@@ -1907,8 +1907,26 @@ public:
           *this << " : "
                 << component.getComputedPropertySetter()->getLoweredType();
         }
-        assert(component.getComputedPropertyIndices().empty()
-               && "todo");
+        
+        if (!component.getComputedPropertyIndices().empty()) {
+          *this << ", indices [";
+          interleave(component.getComputedPropertyIndices(),
+            [&](const KeyPathPatternComponent::Index &i) {
+              *this << "%$" << i.Operand << " : $"
+                    << i.FormalType << " : "
+                    << i.LoweredType;
+            }, [&]{
+              *this << ", ";
+            });
+          *this << "], indices_equals ";
+          component.getComputedPropertyIndexEquals()->printName(PrintState.OS);
+          *this << " : "
+                << component.getComputedPropertyIndexEquals()->getLoweredType();
+          *this << ", indices_hash ";
+          component.getComputedPropertyIndexHash()->printName(PrintState.OS);
+          *this << " : "
+                << component.getComputedPropertyIndexHash()->getLoweredType();
+        }
         break;
       }
       case KeyPathPatternComponent::Kind::OptionalWrap:
@@ -1937,6 +1955,18 @@ public:
     if (!KPI->getSubstitutions().empty()) {
       *this << ' ';
       printSubstitutions(KPI->getSubstitutions());
+    }
+    if (!KPI->getAllOperands().empty()) {
+      *this << " (";
+      
+      interleave(KPI->getAllOperands(),
+        [&](const Operand &operand) {
+          *this << Ctx.getID(operand.get());
+        }, [&]{
+          *this << ", ";
+        });
+      
+      *this << ")";
     }
   }
 };

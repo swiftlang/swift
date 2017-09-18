@@ -20,6 +20,7 @@
 #include "ImportEnumInfo.h"
 #include "SwiftLookupTable.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Version.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -40,77 +41,87 @@ enum class ImportedAccessorKind : unsigned {
 enum { NumImportedAccessorKindBits = 3 };
 
 /// The name version
-enum class ImportNameVersion : unsigned {
-  /// Names as they appear in C/ObjC
-  Raw = 0,
+class ImportNameVersion : public RelationalOperationsBase<ImportNameVersion> {
+  unsigned rawValue;
+  friend llvm::DenseMapInfo<ImportNameVersion>;
 
-  /// Names as they appeared in Swift 2 family
-  Swift2,
+  enum AsConstExpr_t { AsConstExpr };
 
-  /// Names as they appeared in Swift 3 family
-  Swift3,
+  constexpr ImportNameVersion() : rawValue(0) {}
+  constexpr ImportNameVersion(unsigned version, AsConstExpr_t)
+      : rawValue(version) {}
+  explicit ImportNameVersion(unsigned version) : rawValue(version) {
+    assert(version >= 2 && "only Swift 2 and later are supported");
+  }
+public:
+  /// Map a language version into an import name version.
+  static ImportNameVersion fromOptions(const LangOptions &langOpts) {
+    return ImportNameVersion(langOpts.EffectiveLanguageVersion[0]);
+  }
 
-  /// Names as they appeared in Swift 4 family
-  Swift4,
+  unsigned majorVersionNumber() const {
+    assert(*this != ImportNameVersion::raw());
+    return rawValue;
+  }
 
-  /// A placeholder for the latest version, to be used in loops and such.
-  LAST_VERSION = Swift4,
+  bool operator==(ImportNameVersion other) const {
+    return rawValue == other.rawValue;
+  }
+  bool operator<(ImportNameVersion other) const {
+    return rawValue < other.rawValue;
+  }
+
+  /// Calls \p action for each name version other than this one, first going
+  /// backwards until ImportNameVersion::raw(), and then going forwards to
+  /// ImportNameVersion::maxVersion().
+  ///
+  /// This is the most useful order for importing compatibility stubs.
+  void forEachOtherImportNameVersion(
+      llvm::function_ref<void(ImportNameVersion)> action) const {
+    assert(*this >= ImportNameVersion::swift2());
+
+    ImportNameVersion nameVersion = *this;
+    while (nameVersion > ImportNameVersion::swift2()) {
+      --nameVersion.rawValue;
+      action(nameVersion);
+    }
+
+    action(ImportNameVersion::raw());
+
+    nameVersion = *this;
+    while (nameVersion < ImportNameVersion::maxVersion()) {
+      ++nameVersion.rawValue;
+      action(nameVersion);
+    }
+  }
+
+  /// Names as they appear in C/ObjC.
+  static constexpr inline ImportNameVersion raw() {
+    return ImportNameVersion{};
+  }
+
+  /// Names as they appeared in Swift 2 family.
+  static constexpr inline ImportNameVersion swift2() {
+    return ImportNameVersion{2, AsConstExpr};
+  }
+
+  /// The latest supported version.
+  ///
+  /// FIXME: All other version information is in Version.h. Can this go there
+  /// instead?
+  static constexpr inline ImportNameVersion maxVersion() {
+    return ImportNameVersion{5, AsConstExpr};
+  }
 
   /// The version which should be used for importing types, which need to have
   /// one canonical definition.
   ///
   /// FIXME: Is this supposed to be the /newest/ version, or a canonical
   /// version that lasts forever as part of the ABI?
-  ForTypes = Swift4
+  static constexpr inline ImportNameVersion forTypes() {
+    return ImportNameVersion::maxVersion();
+  }
 };
-
-static inline ImportNameVersion &operator++(ImportNameVersion &value) {
-  assert(value != ImportNameVersion::LAST_VERSION);
-  value = static_cast<ImportNameVersion>(static_cast<unsigned>(value) + 1);
-  return value;
-}
-
-static inline ImportNameVersion &operator--(ImportNameVersion &value) {
-  assert(value != ImportNameVersion::Raw);
-  value = static_cast<ImportNameVersion>(static_cast<unsigned>(value) - 1);
-  return value;
-}
-
-/// Calls \p action for each name version, starting with \p current, then going
-/// backwards until ImportNameVersion::Raw, and then finally going forwards to
-/// ImportNameVersion::LAST_VERSION.
-///
-/// This is the most useful order for importing compatibility stubs.
-static inline void forEachImportNameVersionFromCurrent(
-    ImportNameVersion current,
-    llvm::function_ref<void(ImportNameVersion)> action) {
-  action(current);
-  ImportNameVersion nameVersion = current;
-  while (nameVersion != ImportNameVersion::Raw) {
-    --nameVersion;
-    action(nameVersion);
-  }
-  nameVersion = current;
-  while (nameVersion != ImportNameVersion::LAST_VERSION) {
-    ++nameVersion;
-    action(nameVersion);
-  }
-}
-
-/// Calls \p action for each name version, starting with ImportNameVersion::Raw
-/// and going forwards.
-static inline void
-forEachImportNameVersion(llvm::function_ref<void(ImportNameVersion)> action) {
-  auto limit = static_cast<unsigned>(ImportNameVersion::LAST_VERSION);
-  for (unsigned raw = 0; raw <= limit; ++raw)
-    action(static_cast<ImportNameVersion>(raw));
-}
-
-/// Map a language version into an import name version.
-ImportNameVersion nameVersionFromOptions(const LangOptions &langOpts);
-
-/// Map an import name version into a language version.
-unsigned majorVersionNumberForNameVersion(ImportNameVersion version);
 
 /// Describes a name that was imported from Clang.
 class ImportedName {
@@ -141,11 +152,6 @@ class ImportedName {
     /// For an initializer, the kind of initializer to import.
     CtorInitializerKind initKind;
 
-    /// The version of Swift this name corresponds to.
-    ///
-    /// \see ImportNameVersion
-    unsigned rawVersion : 2;
-
     /// What kind of accessor this name refers to, if any.
     ImportedAccessorKind accessorKind : NumImportedAccessorKindBits;
 
@@ -167,9 +173,9 @@ class ImportedName {
 
     Info()
         : errorInfo(), selfIndex(), initKind(CtorInitializerKind::Designated),
-          rawVersion(), accessorKind(ImportedAccessorKind::None),
-          hasCustomName(false), droppedVariadic(false), importAsMember(false),
-          hasSelfIndex(false), hasErrorInfo(false) {}
+          accessorKind(ImportedAccessorKind::None), hasCustomName(false),
+          droppedVariadic(false), importAsMember(false), hasSelfIndex(false),
+          hasErrorInfo(false) {}
   } info;
 
 public:
@@ -187,16 +193,6 @@ public:
   }
   void setEffectiveContext(EffectiveClangContext ctx) {
     effectiveContext = ctx;
-  }
-
-  /// The highest version of Swift that this name comes from
-  ImportNameVersion getVersion() const {
-    return static_cast<ImportNameVersion>(info.rawVersion);
-  }
-
-  void setVersion(ImportNameVersion version) {
-    info.rawVersion = static_cast<unsigned>(version);
-    assert(getVersion() == version && "not enough bits");
   }
 
   /// For an initializer, the kind of initializer to import.
@@ -271,11 +267,6 @@ public:
 /// Strips a trailing "Notification", if present. Returns {} if name doesn't end
 /// in "Notification", or it there would be nothing left.
 StringRef stripNotification(StringRef name);
-
-/// Find the swift_name attribute associated with this declaration, if any,
-/// appropriate for \p version.
-const clang::SwiftNameAttr *findSwiftNameAttr(const clang::Decl *decl,
-                                              ImportNameVersion version);
 
 /// Class to determine the Swift name of foreign entities. Currently fairly
 /// stateless and borrows from the ClangImporter::Implementation, but in the
@@ -387,7 +378,7 @@ template <> struct DenseMapInfo<swift::importer::ImportNameVersion> {
     return (ImportNameVersion)DMIU::getTombstoneKey();
   }
   static unsigned getHashValue(const ImportNameVersion &Val) {
-    return DMIU::getHashValue((unsigned)Val);
+    return DMIU::getHashValue(Val.rawValue);
   }
   static bool isEqual(const ImportNameVersion &LHS,
                       const ImportNameVersion &RHS) {

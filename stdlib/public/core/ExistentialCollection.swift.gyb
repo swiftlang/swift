@@ -556,7 +556,7 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   }
 %   else:
   @_versioned
-  //@_inlineable
+  @_inlineable
   internal init(_base: S) {
     self._base = _base
     super.init(

@@ -1101,7 +1101,7 @@ protocol d2600_ProtocolWithOperator1 {
   static postfix func <*>(_: Self)
 }
 // PASS_2500: {{^}}protocol d2600_ProtocolWithOperator1 {{{$}}
-// PASS_2500-NEXT: {{^}}  postfix static func <*>(_: Self){{$}}
+// PASS_2500-NEXT: {{^}}  postfix static func <*> (_: Self){{$}}
 // PASS_2500-NEXT: {{^}}}{{$}}
 
 struct d2601_TestAssignment {}
@@ -1110,7 +1110,7 @@ func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
   return 0
 }
 // PASS_2500-LABEL: {{^}}infix operator %%%{{$}}
-// PASS_2500: {{^}}func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
+// PASS_2500: {{^}}func %%% (lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
 
 precedencegroup BoringPrecedence {
 // PASS_2500-LABEL: {{^}}precedencegroup BoringPrecedence {{{$}}

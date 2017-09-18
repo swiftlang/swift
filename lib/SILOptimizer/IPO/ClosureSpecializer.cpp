@@ -49,9 +49,10 @@
 ///    that the release occurs in the epilog after any retains associated with
 ///    @owned return values.
 ///
-/// 3. We do not support specialization of closures with arguments passed using
-///    any indirect calling conventions besides @inout and @inout_aliasable.
-///    This is a temporary limitation.
+/// 3. In !useLoweredAddresses mode, we do not support specialization of closures
+///    with arguments passed using any indirect calling conventions besides
+///    @inout and @inout_aliasable.  This is a temporary limitation that goes
+///    away with sil-opaque-values.
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "closure-specialization"
@@ -581,8 +582,9 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
     ParameterConvention ParamConv;
     if (PInfo.isFormalIndirect()) {
       ParamConv = PInfo.getConvention();
-      assert(ParamConv == ParameterConvention::Indirect_Inout ||
-             ParamConv == ParameterConvention::Indirect_InoutAliasable);
+      assert(!SILModuleConventions(M).useLoweredAddresses()
+             || ParamConv == ParameterConvention::Indirect_Inout
+             || ParamConv == ParameterConvention::Indirect_InoutAliasable);
     } else {
       ParamConv = ClosedOverFunConv.getSILType(PInfo).isTrivial(M)
                       ? ParameterConvention::Direct_Unowned

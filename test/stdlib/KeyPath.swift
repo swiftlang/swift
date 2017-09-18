@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -Xfrontend -enable-sil-ownership -Xfrontend -enable-experimental-keypath-components -o %t/a.out
+// RUN: %target-build-swift %s -Xfrontend -enable-sil-ownership -Xfrontend -g -o %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
@@ -546,4 +546,125 @@ keyPath.test("IUO and key paths") {
   expectEqual(kp1.hashValue, kp2.hashValue)
 }
 
+struct SubscriptResult<T: Hashable, U: Hashable> {
+  var canary = LifetimeTracked(3333)
+  var left: T
+  var right: U
+
+  init(left: T, right: U) {
+    self.left = left
+    self.right = right
+  }
+
+  subscript(left: T) -> Bool {
+    return self.left == left
+  }
+  subscript(right: U) -> Bool {
+    return self.right == right
+  }
+}
+
+struct Subscripts<T: Hashable> {
+  var canary = LifetimeTracked(4444)
+
+  subscript<U: Hashable>(x: T, y: U) -> SubscriptResult<T, U> {
+    return SubscriptResult(left: x, right: y)
+  }
+
+  subscript(x: Int, y: Int) -> Int {
+    return x + y
+  }
+}
+
+struct KeyA: Hashable {
+  var canary = LifetimeTracked(1111)
+  var value: String
+
+  init(value: String) { self.value = value }
+
+  static func ==(a: KeyA, b: KeyA) -> Bool { return a.value == b.value }
+  var hashValue: Int { return value.hashValue }
+}
+struct KeyB: Hashable {
+  var canary = LifetimeTracked(2222)
+
+  var value: Int
+
+  init(value: Int) { self.value = value }
+
+  static func ==(a: KeyB, b: KeyB) -> Bool { return a.value == b.value }
+  var hashValue: Int { return value.hashValue }
+}
+
+func fullGenericContext<T: Hashable, U: Hashable>(x: T, y: U) -> KeyPath<Subscripts<T>, SubscriptResult<T, U>> {
+  return \Subscripts<T>.[x, y]
+}
+
+func halfGenericContext<U: Hashable>(x: KeyA, y: U) -> KeyPath<Subscripts<KeyA>, SubscriptResult<KeyA, U>> {
+  return \Subscripts<KeyA>.[x, y]
+}
+
+func nonGenericContext(x: KeyA, y: KeyB) -> KeyPath<Subscripts<KeyA>, SubscriptResult<KeyA, KeyB>> {
+  return \Subscripts<KeyA>.[x, y]
+}
+
+keyPath.test("subscripts") {
+  let a = fullGenericContext(x: KeyA(value: "hey"), y: KeyB(value: 1738))
+  let b = halfGenericContext(x: KeyA(value: "hey"), y: KeyB(value: 1738))
+  let c = nonGenericContext(x: KeyA(value: "hey"), y: KeyB(value: 1738))
+
+  expectEqual(a, b)
+  expectEqual(a, c)
+  expectEqual(b, a)
+  expectEqual(b, c)
+  expectEqual(c, a)
+  expectEqual(c, b)
+  expectEqual(a.hashValue, b.hashValue)
+  expectEqual(a.hashValue, c.hashValue)
+  expectEqual(b.hashValue, a.hashValue)
+  expectEqual(b.hashValue, c.hashValue)
+  expectEqual(c.hashValue, a.hashValue)
+  expectEqual(c.hashValue, b.hashValue)
+
+  let base = Subscripts<KeyA>()
+
+  let kp2 = \SubscriptResult<KeyA, KeyB>.[KeyA(value: "hey")]
+
+  for kp in [a, b, c] {
+    let projected = base[keyPath: kp]
+    expectEqual(projected.left.value, "hey")
+    expectEqual(projected.right.value, 1738)
+
+    expectEqual(projected[keyPath: kp2], true)
+
+    let kp12 =
+      \Subscripts<KeyA>.[KeyA(value: "hey"), KeyB(value: 1738)][KeyA(value: "hey")]
+
+    let kp12a = kp.appending(path: kp2)
+
+    expectEqual(kp12, kp12a)
+    expectEqual(kp12a, kp12)
+    expectEqual(kp12.hashValue, kp12a.hashValue)
+  }
+
+  let ints = \Subscripts<KeyA>.[17, 38]
+  let ints2 = \Subscripts<KeyA>.[17, 38]
+  let ints3 = \Subscripts<KeyA>.[38, 17]
+  expectEqual(base[keyPath: ints], 17 + 38)
+
+  expectEqual(ints, ints2)
+  expectEqual(ints2, ints)
+  expectNotEqual(ints, ints3)
+  expectNotEqual(ints2, ints3)
+  expectNotEqual(ints3, ints)
+  expectNotEqual(ints3, ints2)
+
+  expectEqual(ints.hashValue, ints2.hashValue)
+
+  let ints_be = ints.appending(path: \Int.bigEndian)
+
+  expectEqual(base[keyPath: ints_be], (17 + 38).bigEndian)
+}
+
 runAllTests()
+

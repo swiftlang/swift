@@ -470,6 +470,8 @@ ERROR(expr_string_interpolation_outside_string,none,
       "string interpolation can only appear inside a string literal", ())
 ERROR(unsupported_keypath_tuple_element_reference,none,
       "key path cannot reference tuple elements", ())
+ERROR(expr_keypath_subscript_index_not_hashable, none,
+      "subscript index of type %0 in a key path must be Hashable", (Type))
 
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
@@ -1934,6 +1936,8 @@ WARNING(override_swift3_objc_inference,none,
 // Inheritance
 ERROR(duplicate_inheritance,none,
   "duplicate inheritance from %0", (Type))
+WARNING(duplicate_anyobject_class_inheritance,none,
+  "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(non_class_inheritance,none,

@@ -117,16 +117,12 @@ swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
   if (C->isBehaviorConformance())
     return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
 
-  ModuleDecl *conformanceModule = C->getDeclContext()->getParentModule();
-
   // If the conformance was synthesized by the ClangImporter, give it
   // shared linkage.
-  auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
-  auto typeUnit = typeDecl->getModuleScopeContext();
-  if (isa<ClangModuleUnit>(typeUnit)
-      && conformanceModule == typeUnit->getParentModule())
+  if (isa<ClangModuleUnit>(C->getDeclContext()->getModuleScopeContext()))
     return SILLinkage::Shared;
 
+  auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
   AccessLevel access = std::min(C->getProtocol()->getEffectiveAccess(),
                                 typeDecl->getEffectiveAccess());
   switch (access) {
