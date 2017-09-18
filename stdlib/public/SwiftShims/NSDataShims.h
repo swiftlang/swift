@@ -20,4 +20,8 @@ FOUNDATION_EXPORT const NSDataDeallocator NSDataDeallocatorUnmap;
 FOUNDATION_EXPORT const NSDataDeallocator NSDataDeallocatorFree;
 FOUNDATION_EXPORT const NSDataDeallocator NSDataDeallocatorNone;
 
+@interface NSData (FoundationSPI)
+- (BOOL)_isCompact;
+@end
+
 NS_END_DECLS

@@ -1314,6 +1314,7 @@ namespace {
           ->getElementType(0);
         
         Type valueTy;
+        Type baseTy;
         bool resultIsLValue;
         
         if (auto nom = keyPathTTy->getAs<NominalType>()) {
@@ -1324,12 +1325,14 @@ namespace {
             valueTy = OptionalType::get(valueTy);
             resultIsLValue = false;
             base = cs.coerceToRValue(base);
+            baseTy = cs.getType(base);
           } else {
             llvm_unreachable("unknown key path class!");
           }
         } else {
           auto keyPathBGT = keyPathTTy->castTo<BoundGenericType>();
-          
+          baseTy = keyPathBGT->getGenericArgs()[0];
+
           if (keyPathBGT->getDecl()
                 == cs.getASTContext().getPartialKeyPathDecl()) {
             // PartialKeyPath<T> is rvalue T -> rvalue Any
@@ -1356,6 +1359,12 @@ namespace {
             } else {
               llvm_unreachable("unknown key path class!");
             }
+          }
+
+          // Coerce the base if its anticipated type doesn't match - say we're
+          // applying a keypath with an existential base to a concrete base.
+          if (baseTy->isExistentialType() && !cs.getType(base)->isExistentialType()) {
+            base = coerceToType(base, baseTy, locator);
           }
         }
         if (resultIsLValue)
@@ -4251,7 +4260,8 @@ namespace {
         for (auto indexType : indexTypes) {
           auto conformance =
             cs.TC.conformsToProtocol(indexType.getType(), hashable,
-                                     cs.DC, ConformanceCheckFlags::Used);
+                                     cs.DC, ConformanceCheckFlags::Used
+                                          |ConformanceCheckFlags::InExpression);
           if (!conformance) {
             cs.TC.diagnose(component.getIndexExpr()->getLoc(),
                            diag::expr_keypath_subscript_index_not_hashable,

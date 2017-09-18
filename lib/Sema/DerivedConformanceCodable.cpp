@@ -802,8 +802,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
   }
 
   encodeDecl->setInterfaceType(interfaceType);
-  encodeDecl->setAccess(std::max(target->getFormalAccess(),
-                                 AccessLevel::Internal));
+  encodeDecl->setAccess(target->getFormalAccess());
 
   // If the type was not imported, the derived conformance is either from the
   // type itself or an extension, in which case we will emit the declaration
@@ -1149,8 +1148,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
 
   initDecl->setInterfaceType(interfaceType);
   initDecl->setInitializerInterfaceType(initializerType);
-  initDecl->setAccess(std::max(target->getFormalAccess(),
-                               AccessLevel::Internal));
+  initDecl->setAccess(target->getFormalAccess());
 
   // If the type was not imported, the derived conformance is either from the
   // type itself or an extension, in which case we will emit the declaration
