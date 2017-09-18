@@ -1,8 +1,8 @@
 import Swift
 import StdlibUnittest
-import Foundation
 #if _runtime(_ObjC)
 import Darwin
+import Foundation
 #endif
 
 
