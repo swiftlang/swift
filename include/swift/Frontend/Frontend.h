@@ -497,8 +497,7 @@ private:
                                  OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performTypeCheckingAndDelayedParsing();
 
-  void
-  finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 };
 
 } // namespace swift
