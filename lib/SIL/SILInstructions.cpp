@@ -2045,18 +2045,19 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
     switch (component.getComputedPropertyId().getKind()) {
     case KeyPathPatternComponent::ComputedPropertyId::DeclRef:
       // Mark the vtable entry as used somehow?
-      return;
+      break;
     case KeyPathPatternComponent::ComputedPropertyId::Function:
       forFunction(component.getComputedPropertyId().getFunction());
-      return;
+      break;
     case KeyPathPatternComponent::ComputedPropertyId::Property:
-      return;
+      break;
     }
     
     if (auto equals = component.getComputedPropertyIndexEquals())
       forFunction(equals);
     if (auto hash = component.getComputedPropertyIndexHash())
       forFunction(hash);
+    return;
   }
 }
 
