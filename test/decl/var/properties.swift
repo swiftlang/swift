@@ -480,7 +480,7 @@ struct StructureImplementingProtocolWithExtension2: ProtocolWithExtension2 {
   let bar: String
 }
 
-extension Foo {
+extension ProtocolWithExtension2 {
   static let baz: Foo = StructureImplementingProtocolWithExtension2(bar: "baz") // expected-error{{static stored properties not supported in protocol extensios}}
 }
 
