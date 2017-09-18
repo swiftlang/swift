@@ -482,6 +482,13 @@ void CompilerInstance::parseAndCheckTypes(ImplicitImports &implicitImports) {
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(
       implicitImports, PersistentState, DelayedCB.get());
+  if (Invocation.isCodeCompletion()) {
+    // When we are doing code completion, make sure to emit at least one
+    // diagnostic, so that ASTContext is marked as erroneous.  In this case
+    // various parts of the compiler (for example, AST verifier) have less
+    // strict assumptions about the AST.
+    Diagnostics.diagnose(SourceLoc(), diag::error_doing_code_completion);
+  }
   if (hadLoadError)
     return;
 
@@ -560,13 +567,6 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
       parseLibraryFile(BufferID, implicitImports, PersistentState,
                        DelayedParseCB);
     }
-  }
-  if (Invocation.isCodeCompletion()) {
-    // When we are doing code completion, make sure to emit at least one
-    // diagnostic, so that ASTContext is marked as erroneous.  In this case
-    // various parts of the compiler (for example, AST verifier) have less
-    // strict assumptions about the AST.
-    Diagnostics.diagnose(SourceLoc(), diag::error_doing_code_completion);
   }
   return hadLoadError;
 }
