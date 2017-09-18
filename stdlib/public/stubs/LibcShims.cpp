@@ -15,10 +15,12 @@
 #include <cmath>
 #if defined(_WIN32)
 #include <io.h>
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #else
 #include <unistd.h>
-#endif
 #include <pthread.h>
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -60,7 +62,7 @@ __swift_size_t swift::_swift_stdlib_strlen(const char *s) {
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_size_t swift::_swift_stdlib_strlen_unsigned(const unsigned char *s) {
-  return strlen((char *)s);
+  return strlen(reinterpret_cast<const char *>(s));
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -98,34 +100,57 @@ int swift::_swift_stdlib_close(int fd) {
 #endif
 }
 
-// Guard compilation on the typedef for __swift_pthread_key_t in LibcShims.h
+#if defined(_WIN32)
+static_assert(std::is_same<__swift_thread_key_t, DWORD>::value,
+              "__swift_thread_key_t is not a DWORD");
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int
+swift::_swift_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
+                                       void (* _Nullable destructor)(void *)) {
+  // TODO(compnerd) account for x86 CC violation (__stdcall)
+  *key = FlsAlloc(reinterpret_cast<PFLS_CALLBACK_FUNCTION>(destructor));
+  return *key != FLS_OUT_OF_INDEXES;
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void * _Nullable
+swift::_swift_stdlib_thread_getspecific(__swift_thread_key_t key) {
+  return FlsGetValue(key);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int swift::_swift_stdlib_thread_setspecific(__swift_thread_key_t key,
+                                            const void * _Nullable value) {
+  return FlsSetValue(key, const_cast<void *>(value)) == TRUE;
+}
+#else
+// Guard compilation on the typedef for __swift_thread_key_t in LibcShims.h
 // being identical to the platform's pthread_key_t
-static_assert(std::is_same<__swift_pthread_key_t, pthread_key_t>::value,
+static_assert(std::is_same<__swift_thread_key_t, pthread_key_t>::value,
               "This platform's pthread_key_t differs. If you hit this assert, "
               "fix __swift_pthread_key_t's typedef in LibcShims.h by adding an "
               "#if guard and definition for your platform");
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int swift::_swift_stdlib_pthread_key_create(
-  __swift_pthread_key_t * _Nonnull key,
-  void (* _Nullable destructor)(void *)
-) {
+int
+swift::_swift_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
+                                       void (* _Nullable destructor)(void *)) {
   return pthread_key_create(key, destructor);
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-void * _Nullable swift::_swift_stdlib_pthread_getspecific(
-  __swift_pthread_key_t key
-) {
+void * _Nullable
+swift::_swift_stdlib_thread_getspecific(__swift_thread_key_t key) {
   return pthread_getspecific(key);
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int swift::_swift_stdlib_pthread_setspecific(
-  __swift_pthread_key_t key, const void * _Nullable value
-) {
+int swift::_swift_stdlib_thread_setspecific(__swift_thread_key_t key,
+                                            const void * _Nullable value) {
   return pthread_setspecific(key, value);
 }
+#endif
 
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
