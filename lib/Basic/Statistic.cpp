@@ -124,6 +124,7 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef AuxName,
                                            StringRef Directory)
   : Filename(Directory),
+    StartedTime(llvm::TimeRecord::getCurrentTime()),
     Timer(make_unique<NamedRegionTimer>(AuxName,
                                         "Building Target",
                                         ProgramName, "Running Program"))
@@ -161,6 +162,8 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
     auto &C = getFrontendCounters();
 
     PUBLISH_STAT(C, "AST", NumSourceBuffers);
+    PUBLISH_STAT(C, "AST", NumSourceLines);
+    PUBLISH_STAT(C, "AST", NumSourceLinesPerSecond);
     PUBLISH_STAT(C, "AST", NumLinkLibraries);
     PUBLISH_STAT(C, "AST", NumLoadedModules);
     PUBLISH_STAT(C, "AST", NumImportedExternalDefinitions);
@@ -251,6 +254,8 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
     auto &C = getFrontendCounters();
 
     PRINT_STAT(OS, delim, C, "AST", NumSourceBuffers);
+    PRINT_STAT(OS, delim, C, "AST", NumSourceLines);
+    PRINT_STAT(OS, delim, C, "AST", NumSourceLinesPerSecond);
     PRINT_STAT(OS, delim, C, "AST", NumLinkLibraries);
     PRINT_STAT(OS, delim, C, "AST", NumLoadedModules);
     PRINT_STAT(OS, delim, C, "AST", NumImportedExternalDefinitions);
@@ -339,9 +344,22 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   // we're repurposing a bit here.
   Timer.reset();
 
+  // We currently do this by manual TimeRecord keeping because LLVM has decided
+  // not to allow access to the Timers inside NamedRegionTimers.
+  auto ElapsedTime = llvm::TimeRecord::getCurrentTime();
+  ElapsedTime -= StartedTime;
+
   if (DriverCounters) {
     auto &C = getDriverCounters();
     C.ChildrenMaxRSS = getChildrenMaxResidentSetSize();
+  }
+
+  if (FrontendCounters) {
+    auto &C = getFrontendCounters();
+    // Convenience calculation for crude top-level "absolute speed".
+    if (C.NumSourceLines != 0 && ElapsedTime.getProcessTime() != 0.0)
+      C.NumSourceLinesPerSecond = (size_t) (((double)C.NumSourceLines) /
+                                            ElapsedTime.getProcessTime());
   }
 
   std::error_code EC;
