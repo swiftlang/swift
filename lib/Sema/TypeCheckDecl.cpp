@@ -4132,6 +4132,7 @@ public:
         };
 
         auto DC = VD->getDeclContext();
+
         // Non-stored properties are fine.
         if (!PBD->hasStorage()) {
           // do nothing
@@ -4139,7 +4140,7 @@ public:
         // Stored type variables in a generic context need to logically
         // occur once per instantiation, which we don't yet handle.
         } else if (DC->getAsProtocolExtensionContext()) {
-          unimplementedStatic(ProtocolExtensions);
+            unimplementedStatic(ProtocolExtensions);
         } else if (DC->isGenericContext()
                && !DC->getGenericSignatureOfContext()->areAllParamsConcrete()) {
           unimplementedStatic(GenericTypes);
