@@ -21,7 +21,7 @@
   asdf asdf asdf asdf
 #endif
 
-#if swift(>=4.0.1)
+#if swift(>=4.0.2)
   // This shouldn't emit any diagnostics.
   asdf asdf asdf asdf
 #else
