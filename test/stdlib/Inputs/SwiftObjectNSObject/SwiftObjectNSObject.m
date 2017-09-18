@@ -405,6 +405,12 @@ void TestSwiftObjectNSObject(id c, id d)
   expectTrue ([[C_meta description] isEqual:@"SwiftObjectNSObject.C"]);
   expectTrue ([[S_meta description] isEqual:@"SwiftObject"]);
 
+  // NSLog() calls -description and also some private methods.
+  // This output is checked by FileCheck in SwiftObjectNSObject.swift.
+  NSLog(@"c ##%@##", c);
+  NSLog(@"d ##%@##", d);
+  NSLog(@"S ##%@##", S);
+
 
   printf("NSObjectProtocol.debugDescription\n");
 
