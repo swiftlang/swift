@@ -675,7 +675,7 @@ void CompilerInstance::finishTypeCheckingMainModule(
     MainModule->forEachSourceFile(
         [&](SourceFile &SF) { performWholeModuleTypeChecking(SF); });
   }
-  forEachFileToTypeCheck([&](SourceFile &SF) { finishTypeChecking(SF); });
+  forEachFileToTypeCheck([&](SourceFile &SF) { finishTypeCheckingOfFile(SF); });
 }
 
 void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
