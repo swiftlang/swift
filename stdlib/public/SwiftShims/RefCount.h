@@ -742,7 +742,7 @@ class RefCounts {
   // Out-of-line slow paths.
 
   LLVM_ATTRIBUTE_NOINLINE
-  void incrementSlow(RefCountBits oldbits, uint32_t inc);
+  void incrementSlow(RefCountBits oldbits, uint32_t inc) SWIFT_CC(PreserveMost);
 
   LLVM_ATTRIBUTE_NOINLINE
   void incrementNonAtomicSlow(RefCountBits oldbits, uint32_t inc);

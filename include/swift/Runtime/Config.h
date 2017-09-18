@@ -190,6 +190,15 @@
 
 #endif
 
+// The runtime implementation uses the preserve_most convention to save
+// registers spills on the hot path.
+#if __has_attribute(preserve_most) &&                                          \
+    (defined(__aarch64__) || defined(__x86_64__))
+#define SWIFT_CC_PreserveMost __attribute__((preserve_most))
+#else
+#define SWIFT_CC_PreserveMost
+#endif
+
 // Generates a name of the runtime entry's implementation by
 // adding an underscore as a prefix and a suffix.
 #define SWIFT_RT_ENTRY_IMPL(Name) _##Name##_
