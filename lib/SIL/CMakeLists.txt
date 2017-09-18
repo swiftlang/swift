@@ -7,6 +7,7 @@ add_swift_library(swiftSIL STATIC
   InstructionUtils.cpp
   Linker.cpp
   LoopInfo.cpp
+  OptimizationRemark.cpp
   PrettyStackTrace.cpp
   Projection.cpp
   SIL.cpp

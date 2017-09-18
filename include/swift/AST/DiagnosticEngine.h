@@ -435,6 +435,7 @@ namespace swift {
       Unspecified,
       Ignore,
       Note,
+      Remark,
       Warning,
       Error,
       Fatal,

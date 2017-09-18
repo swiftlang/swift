@@ -55,6 +55,7 @@ public:
       case DiagnosticKind::Error: OS << "error: "; break;
       case DiagnosticKind::Warning: OS << "warning: "; break;
       case DiagnosticKind::Note: OS << "note: "; break;
+      case DiagnosticKind::Remark: OS << "remark: "; break;
     }
     DiagnosticEngine::formatDiagnosticText(OS, FormatString, FormatArgs);
   }
