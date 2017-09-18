@@ -1,7 +1,12 @@
 import Swift
-import Darwin
 import StdlibUnittest
 import Foundation
+#if _runtime(_ObjC)
+import Darwin
+#endif
+
+
+#if _runtime(_ObjC)
 
 /// Expect some number of autoreleased value objects.
 ///
@@ -15,8 +20,6 @@ func expectAutoreleasedValues(
   opt: Int = 0, unopt: Int = 0) {
   _expectAutoreleasedKeysAndValues(opt: (0, opt), unopt: (0, unopt))
 }
-
-#if _runtime(_ObjC)
 
 func isNativeNSArray(_ d: NSArray) -> Bool {
   let className: NSString = NSStringFromClass(type(of: d)) as NSString
@@ -120,6 +123,7 @@ func < (
   return lhsElements.lexicographicallyPrecedes(rhsElements)
 }
 
+#if _runtime(_ObjC)
  func _checkArrayFastEnumerationImpl(
   _ expected: [Int],
   _ a: NSArray,
@@ -156,6 +160,7 @@ func < (
     expectEqualSequence(expectedContents, actualContents)
   }
 }
+#endif
 
 func getCOWFastArray() -> Array<Int> {
   var a = Array<Int>()
