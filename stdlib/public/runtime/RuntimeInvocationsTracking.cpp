@@ -19,20 +19,18 @@
 #include "RuntimeInvocationsTracking.h"
 #include "swift/Runtime/HeapObject.h"
 
-using namespace swift;
-
 #define SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION)                 \
   invocationCounter_##RT_FUNCTION
-
-#define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
-  uint32_t SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION) = 0;
 
 namespace swift {
 
 // Define counters used for tracking the total number of invocations of runtime
 // functions.
 struct RuntimeFunctionCountersState {
-  // Provide one counter per runtime function being tracked.
+#define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
+  uint32_t SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION) = 0;
+
+// Provide one counter per runtime function being tracked.
 #include "RuntimeInvocationsTracking.def"
 };
 
@@ -53,24 +51,24 @@ static RuntimeFunctionCountersState RuntimeGlobalFunctionCountersState;
 /// TODO: Do we need to make it thread-safe?
 static llvm::DenseMap<HeapObject *, RuntimeFunctionCountersState> RuntimeObjectStateCache;
 
+static const char *RuntimeFunctionNames[] {
 /// Define names of runtime functions.
 #define FUNCTION_TO_TRACK(RT_FUNCTION) #RT_FUNCTION,
 
-static const char *RuntimeFunctionNames[] {
-  #include "RuntimeInvocationsTracking.def"
+#include "RuntimeInvocationsTracking.def"
   nullptr
 };
 
 #define RT_FUNCTION_ID(RT_FUNCTION) ID_##RT_FUNCTION
 
-/// Defines names of enum cases for each function being tracked.
-#define FUNCTION_TO_TRACK(RT_FUNCTION) RT_FUNCTION_ID(RT_FUNCTION),
-
 /// Define an enum where each enumerator corresponds to a runtime function being
 /// tracked. Their order is the same as the order of the counters in the
 /// RuntimeObjectState structure.
 enum RuntimeFunctionNamesIDs : uint32_t {
-  #include "RuntimeInvocationsTracking.def"
+/// Defines names of enum cases for each function being tracked.
+#define FUNCTION_TO_TRACK(RT_FUNCTION) RT_FUNCTION_ID(RT_FUNCTION),
+
+#include "RuntimeInvocationsTracking.def"
   ID_LastRuntimeFunctionName,
 };
 
@@ -78,15 +76,15 @@ enum RuntimeFunctionNamesIDs : uint32_t {
 static RuntimeFunctionCountersUpdateHandler
     GlobalRuntimeFunctionCountersUpdateHandler;
 
-/// Define offset for each function being tracked.
-#define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
-  (sizeof(uint16_t) * (unsigned)RT_FUNCTION_ID(RT_FUNCTION)),
-
 /// The offsets of the runtime function counters being tracked inside the
 /// RuntimeObjectState structure. The array is indexed by
 /// the enumerators from RuntimeFunctionNamesIDs.
 static uint16_t RuntimeFunctionCountersOffsets[] = {
-  #include "RuntimeInvocationsTracking.def"
+/// Define offset for each function being tracked.
+#define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
+  (sizeof(uint16_t) * (unsigned)RT_FUNCTION_ID(RT_FUNCTION)),
+
+#include "RuntimeInvocationsTracking.def"
 };
 
 /// Define implementations of tracking functions.
@@ -149,7 +147,7 @@ void setGlobalRuntimeFunctionCounters(RuntimeFunctionCountersState *state) {
 
 /// Return the names of the runtime functions being tracked.
 /// Their order is the same as the order of the counters in the
-/// RuntimeObjectState structure.
+/// RuntimeObjectState structure. All these strings are null terminated.
 SWIFT_RT_ENTRY_VISIBILITY
 const char **getRuntimeFunctionNames() {
   return RuntimeFunctionNames;
@@ -169,6 +167,8 @@ uint64_t getNumRuntimeFunctionCounters() {
   return ID_LastRuntimeFunctionName;
 }
 
+static void dumpRuntimeCounters(RuntimeFunctionCountersState *State) {
+  uint32_t tmp;
 /// Define how to dump the counter for a given runtime function.
 #define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
   tmp = State->SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION);         \
@@ -176,9 +176,7 @@ uint64_t getNumRuntimeFunctionCounters() {
     printf("%s = %d\n",                                                        \
            RuntimeFunctionNames[(int)RT_FUNCTION_ID(RT_FUNCTION)], tmp);
 
-static void dumpRuntimeCounters(RuntimeFunctionCountersState *State) {
-  uint32_t tmp;
-  #include "RuntimeInvocationsTracking.def"
+#include "RuntimeInvocationsTracking.def"
 }
 
 /// Dump all per-object runtime function pointers.
