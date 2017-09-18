@@ -16,6 +16,8 @@ class B: A {}
 class C<T> {}
 class D: C<Int> {}
 
+class N<T> {}
+
 func castAToB(a: A) -> B {
   // expected-warning@+1{{'unsafeBitCast' from 'A' to 'B' can be replaced with 'unsafeDowncast'}} {{7-20=unsafeDowncast}}
   _ = unsafeBitCast(a, to: B.self)
@@ -27,6 +29,10 @@ func castAToB(a: A) -> B {
 func castCToD<T>(c: C<T>) -> D {
   // expected-warning@+1{{'unsafeBitCast' from 'C<T>' to 'D' can be replaced with 'unsafeDowncast'}} {{10-23=unsafeDowncast}}
   return unsafeBitCast(c, to: D.self)
+}
+
+func castNToD<T>(n: N<T>) -> D {
+  return unsafeBitCast(n, to: D.self) // CHECK-NOT: warning
 }
 
 func castDToC<T>(d: D) -> (C<T>, C<Int>) {
