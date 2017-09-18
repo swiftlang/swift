@@ -2746,20 +2746,16 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       }
 
       // Check whether the instance member is declared on parent context and if so
-      // provide more specialized message
+      // provide more specialized message.
       auto memberTypeContext = member->getDeclContext()->getInnermostTypeContext();
       auto currentTypeContext = CS.DC->getInnermostTypeContext();
-      if (memberTypeContext->getSemanticDepth() <
-          currentTypeContext->getSemanticDepth()) {
-        diagnose(loc, diag::could_not_use_instance_member_of_outer_type_on_nested_type,
-                 memberTypeContext->getDeclaredTypeOfContext(), memberName,
-                 currentTypeContext->getDeclaredTypeOfContext())
-          .highlight(baseRange).highlight(nameLoc.getSourceRange());
-        return;
-      }
+      auto IsMemberOnOuterScope = memberTypeContext->getSemanticDepth() <
+        currentTypeContext->getSemanticDepth();
 
       diagnose(loc, diag::could_not_use_instance_member_on_type,
-               instanceTy, memberName)
+               currentTypeContext->getDeclaredInterfaceType(), memberName,
+               memberTypeContext->getDeclaredTypeOfContext(),
+               IsMemberOnOuterScope)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
     }
@@ -5041,12 +5037,15 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
       }
 
       // Otherwise, complain about use of instance value on type.
-      auto diagnostic = isa<TypeExpr>(baseExpr)
-                            ? diag::instance_member_use_on_type
-                            : diag::could_not_use_instance_member_on_type;
-
-      TC.diagnose(UDE->getLoc(), diagnostic, instanceType, UDE->getName())
+      if (isa<TypeExpr>(baseExpr)) {
+        TC.diagnose(UDE->getLoc(), diag::instance_member_use_on_type,
+                    instanceType, UDE->getName())
           .highlight(baseExpr->getSourceRange());
+      } else {
+        TC.diagnose(UDE->getLoc(), diag::could_not_use_instance_member_on_type,
+                    instanceType, UDE->getName(), instanceType, false)
+          .highlight(baseExpr->getSourceRange());
+      }
       return true;
     }
   }
