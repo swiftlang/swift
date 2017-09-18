@@ -564,19 +564,31 @@ static bool containsWeight(TermInst *inst) {
 }
 
 static void
+addToBBCounts(llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap,
+              unsigned long long numToAdd, swift::TermInst *termInst) {
+  for (auto &succ : termInst->getSuccessors()) {
+    auto *currBB = succ.getBB();
+    assert(BBToWeightMap.find(currBB) != BBToWeightMap.end() &&
+           "Expected to find block in map");
+    BBToWeightMap[currBB] += numToAdd;
+  }
+}
+
+static void
 calculateBBWeights(SILFunction *Caller, DominanceInfo *DT,
                    llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
   auto entryCount = Caller->getEntryCount();
   if (!entryCount) {
+    // No profile for function - return
     return;
+  }
+  // Add all blocks to BBToWeightMap without count 0
+  for (auto &block : Caller->getBlocks()) {
+    BBToWeightMap[&block] = 0;
   }
   BBToWeightMap[Caller->getEntryBlock()] = entryCount.getValue();
   DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
   while (SILBasicBlock *block = domOrder.getNext()) {
-    if (BBToWeightMap.find(block) == BBToWeightMap.end()) {
-      // TODO: something better than this hack
-      BBToWeightMap[block] = 0;
-    }
     auto bbIt = BBToWeightMap.find(block);
     assert(bbIt != BBToWeightMap.end() && "Expected to find block in map");
     auto bbCount = bbIt->getSecond();
@@ -587,9 +599,8 @@ calculateBBWeights(SILFunction *Caller, DominanceInfo *DT,
       uint64_t blocksWithoutCount = 0;
       for (auto &succ : termInst->getSuccessors()) {
         auto *currBB = succ.getBB();
-        if (BBToWeightMap.find(currBB) == BBToWeightMap.end()) {
-          BBToWeightMap[currBB] = 0;
-        }
+        assert(BBToWeightMap.find(currBB) != BBToWeightMap.end() &&
+               "Expected to find block in map");
         auto currCount = succ.getCount();
         if (!currCount) {
           ++blocksWithoutCount;
@@ -600,6 +611,7 @@ calculateBBWeights(SILFunction *Caller, DominanceInfo *DT,
         BBToWeightMap[currBB] += currCountVal;
       }
       if (countSum < bbCount) {
+        // inaccurate profile - fill in the gaps for BBs without a count:
         if (blocksWithoutCount > 0) {
           auto numToAdd = (bbCount - countSum) / blocksWithoutCount;
           for (auto &succ : termInst->getSuccessors()) {
@@ -612,32 +624,19 @@ calculateBBWeights(SILFunction *Caller, DominanceInfo *DT,
         }
       } else {
         auto numOfSucc = termInst->getSuccessors().size();
-        if (numOfSucc == 0) {
-          numOfSucc = 1;
-        }
+        assert(numOfSucc > 0 && "Expected successors > 0");
         auto numToAdd = (countSum - bbCount) / numOfSucc;
-        for (auto &succ : termInst->getSuccessors()) {
-          auto *currBB = succ.getBB();
-          auto currCount = succ.getCount();
-          BBToWeightMap[currBB] += numToAdd;
-        }
+        addToBBCounts(BBToWeightMap, numToAdd, termInst);
       }
     } else {
       // Fill counters speculatively
       auto numOfSucc = termInst->getSuccessors().size();
       if (numOfSucc == 0) {
-        numOfSucc = 1;
+        // No successors to fill
+        continue;
       }
       auto numToAdd = bbCount / numOfSucc;
-      for (auto &succ : termInst->getSuccessors()) {
-        auto *currBB = succ.getBB();
-        assert(!succ.getCount() && "Did not expect a count");
-        if (BBToWeightMap.find(currBB) == BBToWeightMap.end()) {
-          BBToWeightMap[currBB] = numToAdd;
-          continue;
-        }
-        BBToWeightMap[currBB] += numToAdd;
-      }
+      addToBBCounts(BBToWeightMap, numToAdd, termInst);
     }
     domOrder.pushChildrenIf(block, [&](SILBasicBlock *child) { return true; });
   }
