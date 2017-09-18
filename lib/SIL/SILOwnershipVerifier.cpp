@@ -402,8 +402,6 @@ NO_OPERAND_INST(StrongRetain)
 NO_OPERAND_INST(StrongRetainUnowned)
 NO_OPERAND_INST(UnownedRetain)
 NO_OPERAND_INST(Unreachable)
-// TODO: Some key path components will have operands
-NO_OPERAND_INST(KeyPath)
 #undef NO_OPERAND_INST
 
 /// Instructions whose arguments are always compatible with one convention.
@@ -982,6 +980,18 @@ OwnershipCompatibilityUseChecker::visitMarkDependenceInst(
   // We always treat mark dependence as a use that keeps a value alive. We will
   // be introducing a begin_dependence/end_dependence version of this later.
   return {true, false};
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitKeyPathInst(KeyPathInst *I) {
+  // KeyPath moves the value in memory out of address operands, but the
+  // ownership checker doesn't reason about that yet.
+  if (isAddressOrTrivialType()) {
+    return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
+            false};
+  }
+  return {compatibleWithOwnership(ValueOwnershipKind::Owned),
+          true};
 }
 
 //===----------------------------------------------------------------------===//

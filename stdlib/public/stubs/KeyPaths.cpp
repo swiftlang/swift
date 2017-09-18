@@ -15,8 +15,8 @@
 #include <cstdint>
 #include <cstring>
 
-SWIFT_CC(swift)
-static void copyGenericArguments(const void *src, void *dest, size_t bytes) {
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+void swift_copyKeyPathTrivialIndices(const void *src, void *dest, size_t bytes) {
   memcpy(dest, src, bytes);
 }
 
@@ -42,7 +42,7 @@ static intptr_t hashGenericArguments(const void *src, size_t bytes) {
 SWIFT_RUNTIME_EXPORT
 void *(swift_keyPathGenericWitnessTable[]) = {
   nullptr, // no destructor necessary
-  (void*)(uintptr_t)copyGenericArguments,
+  (void*)(uintptr_t)swift_copyKeyPathTrivialIndices,
   (void*)(uintptr_t)equateGenericArguments,
   (void*)(uintptr_t)hashGenericArguments,
 };

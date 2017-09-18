@@ -3757,8 +3757,7 @@ public:
           
         case KeyPathPatternComponent::Kind::GettableProperty:
         case KeyPathPatternComponent::Kind::SettableProperty: {
-          require(component.getComputedPropertyIndices().empty(),
-                  "subscripts not implemented");
+          bool hasIndices = !component.getComputedPropertyIndices().empty();
         
           // Getter should be <Sig...> @convention(thin) (@in Base) -> @out Result
           {
@@ -3769,14 +3768,25 @@ public:
                       SILFunctionTypeRepresentation::Thin,
                     "getter should be a thin function");
             
-              // TODO: indexes
-            require(substGetterType->getNumParameters() == 1,
+            require(substGetterType->getNumParameters() == 1 + hasIndices,
                     "getter should have one parameter");
-            auto baseParam = substGetterType->getSelfParameter();
-            require(baseParam.getConvention() == ParameterConvention::Indirect_In,
+            auto baseParam = substGetterType->getParameters()[0];
+            require(baseParam.getConvention() ==
+                      ParameterConvention::Indirect_In,
                     "getter base parameter should be @in");
             require(baseParam.getType() == loweredBaseTy.getSwiftRValueType(),
                     "getter base parameter should match base of component");
+            
+            if (hasIndices) {
+              auto indicesParam = substGetterType->getParameters()[1];
+              require(indicesParam.getConvention()
+                        == ParameterConvention::Direct_Unowned,
+                      "indices pointer should be trivial");
+              require(indicesParam.getType()->getAnyNominal()
+                        == C.getUnsafeRawPointerDecl(),
+                      "indices pointer should be an UnsafeRawPointer");
+            }
+
             require(substGetterType->getNumResults() == 1,
                     "getter should have one result");
             auto result = substGetterType->getResults()[0];
@@ -3797,22 +3807,33 @@ public:
             
             require(substSetterType->getRepresentation() ==
                       SILFunctionTypeRepresentation::Thin,
-                    "getter should be a thin function");
+                    "setter should be a thin function");
             
-            // TODO: indexes
-            require(substSetterType->getNumParameters() == 2,
+            require(substSetterType->getNumParameters() == 2 + hasIndices,
                     "setter should have two parameters");
-            auto baseParam = substSetterType->getSelfParameter();
+
+            auto newValueParam = substSetterType->getParameters()[0];
+            require(newValueParam.getConvention() ==
+                      ParameterConvention::Indirect_In,
+                    "setter value parameter should be @in");
+
+            auto baseParam = substSetterType->getParameters()[1];
             require(baseParam.getConvention() ==
                       ParameterConvention::Indirect_In
                     || baseParam.getConvention() ==
                         ParameterConvention::Indirect_Inout,
                     "setter base parameter should be @in or @inout");
-            auto newValueParam = substSetterType->getParameters()[0];
-            require(newValueParam.getConvention() ==
-                      ParameterConvention::Indirect_In,
-                    "setter value parameter should be @in");
             
+            if (hasIndices) {
+              auto indicesParam = substSetterType->getParameters()[2];
+              require(indicesParam.getConvention()
+                        == ParameterConvention::Direct_Unowned,
+                      "indices pointer should be trivial");
+              require(indicesParam.getType()->getAnyNominal()
+                        == C.getUnsafeRawPointerDecl(),
+                      "indices pointer should be an UnsafeRawPointer");
+            }
+
             require(newValueParam.getType() ==
                       loweredComponentTy.getSwiftRValueType(),
                     "setter value should match the maximal abstraction of the "
@@ -3820,6 +3841,86 @@ public:
             
             require(substSetterType->getNumResults() == 0,
                     "setter should have no results");
+          }
+          
+          for (auto &index : component.getComputedPropertyIndices()) {
+            auto opIndex = index.Operand;
+            auto contextType =
+              index.LoweredType.subst(F.getModule(), patternSubs);
+            requireSameType(contextType,
+                            KPI->getAllOperands()[opIndex].get()->getType(),
+                            "operand must match type required by pattern");
+            require(isLoweringOf(index.LoweredType, index.FormalType),
+                    "pattern index formal type doesn't match lowered type");
+          }
+          
+          if (!component.getComputedPropertyIndices().empty()) {
+            // Equals should be
+            // <Sig...> @convention(thin) (RawPointer, RawPointer) -> Bool
+            {
+              auto equals = component.getComputedPropertyIndexEquals();
+              require(equals, "key path pattern with indexes must have equals "
+                              "operator");
+              
+              auto substEqualsType = equals->getLoweredFunctionType()
+                ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
+              
+              require(substEqualsType->getParameters().size() == 2,
+                      "must have two arguments");
+              for (unsigned i = 0; i < 2; ++i) {
+                auto param = substEqualsType->getParameters()[i];
+                require(param.getConvention()
+                          == ParameterConvention::Direct_Unowned,
+                        "indices pointer should be trivial");
+                require(param.getType()->getAnyNominal()
+                          == C.getUnsafeRawPointerDecl(),
+                        "indices pointer should be an UnsafeRawPointer");
+              }
+              
+              require(substEqualsType->getResults().size() == 1,
+                      "must have one result");
+              
+              require(substEqualsType->getResults()[0].getConvention()
+                        == ResultConvention::Unowned,
+                      "result should be unowned");
+              require(substEqualsType->getResults()[0].getType()->getAnyNominal()
+                        == C.getBoolDecl(),
+                      "result should be Bool");
+            }
+            {
+              // Hash should be
+              // <Sig...> @convention(thin) (RawPointer) -> Int
+              auto hash = component.getComputedPropertyIndexHash();
+              require(hash, "key path pattern with indexes must have hash "
+                            "operator");
+              
+              auto substHashType = hash->getLoweredFunctionType()
+                ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
+              
+              require(substHashType->getParameters().size() == 1,
+                      "must have two arguments");
+              auto param = substHashType->getParameters()[0];
+              require(param.getConvention()
+                        == ParameterConvention::Direct_Unowned,
+                      "indices pointer should be trivial");
+              require(param.getType()->getAnyNominal()
+                        == C.getUnsafeRawPointerDecl(),
+                      "indices pointer should be an UnsafeRawPointer");
+              
+              require(substHashType->getResults().size() == 1,
+                      "must have one result");
+              
+              require(substHashType->getResults()[0].getConvention()
+                        == ResultConvention::Unowned,
+                      "result should be unowned");
+              require(substHashType->getResults()[0].getType()->getAnyNominal()
+                        == C.getIntDecl(),
+                      "result should be Int");
+            }
+          } else {
+            require(!component.getComputedPropertyIndexEquals()
+                    && !component.getComputedPropertyIndexHash(),
+                    "component without indexes must not have equals/hash");
           }
 
           break;

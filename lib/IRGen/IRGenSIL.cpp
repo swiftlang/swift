@@ -4664,25 +4664,76 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
   // Build up the argument vector to instantiate the pattern here.
   llvm::Value *args;
-  if (!I->getSubstitutions().empty()) {
+  if (!I->getSubstitutions().empty() || !I->getAllOperands().empty()) {
     auto sig = I->getPattern()->getGenericSignature();
-    auto subs = sig->getSubstitutionMap(I->getSubstitutions());
+    SubstitutionMap subs;
+    if (sig)
+      subs = sig->getSubstitutionMap(I->getSubstitutions());
 
     SmallVector<GenericRequirement, 4> requirements;
     enumerateGenericSignatureRequirements(sig,
             [&](GenericRequirement reqt) { requirements.push_back(reqt); });
 
-    auto argsBufTy = llvm::ArrayType::get(IGM.TypeMetadataPtrTy,
-                                          requirements.size());
-    auto argsBuf = createAlloca(argsBufTy, IGM.getPointerAlignment(),
-                                "keypath_args");
-    emitInitOfGenericRequirementsBuffer(*this, requirements, argsBuf,
-      [&](GenericRequirement reqt) -> llvm::Value * {
-        return emitGenericRequirementFromSubstitutions(*this, sig,
-                                         *IGM.getSwiftModule(),
-                                         reqt, subs);
-      });
-    args = Builder.CreateBitCast(argsBuf.getAddress(), IGM.Int8PtrTy);
+    llvm::Value *argsBufSize;
+    llvm::Value *argsBufAlign;
+    
+    if (!I->getSubstitutions().empty()) {
+      argsBufSize = llvm::ConstantInt::get(IGM.SizeTy,
+                       IGM.getPointerSize().getValue() * requirements.size());
+      argsBufAlign = llvm::ConstantInt::get(IGM.SizeTy,
+                       IGM.getPointerAlignment().getMaskValue());
+    } else {
+      argsBufSize = llvm::ConstantInt::get(IGM.SizeTy, 0);
+      argsBufAlign = llvm::ConstantInt::get(IGM.SizeTy, 0);
+    }
+    
+    SmallVector<llvm::Value *, 4> operandOffsets;
+    for (unsigned i : indices(I->getAllOperands())) {
+      auto operand = I->getAllOperands()[i].get();
+      auto &ti = getTypeInfo(operand->getType());
+      auto ty = operand->getType();
+      auto alignMask = ti.getAlignmentMask(*this, ty);
+      if (i != 0) {
+        auto notAlignMask = Builder.CreateNot(alignMask);
+        argsBufSize = Builder.CreateAdd(argsBufSize, alignMask);
+        argsBufSize = Builder.CreateAnd(argsBufSize, notAlignMask);
+      }
+      operandOffsets.push_back(argsBufSize);
+      auto size = ti.getSize(*this, ty);
+      argsBufSize = Builder.CreateAdd(argsBufSize, size);
+      argsBufAlign = Builder.CreateOr(argsBufAlign, alignMask);
+    }
+
+    auto argsBufInst = Builder.CreateAlloca(IGM.Int8Ty, argsBufSize);
+    // TODO: over-alignment?
+    argsBufInst->setAlignment(16);
+    
+    Address argsBuf(argsBufInst, Alignment(16));
+    
+    if (!I->getSubstitutions().empty()) {
+      emitInitOfGenericRequirementsBuffer(*this, requirements, argsBuf,
+        [&](GenericRequirement reqt) -> llvm::Value * {
+          return emitGenericRequirementFromSubstitutions(*this, sig,
+                                           *IGM.getSwiftModule(),
+                                           reqt, subs);
+        });
+    }
+    
+    for (unsigned i : indices(I->getAllOperands())) {
+      auto operand = I->getAllOperands()[i].get();
+      auto &ti = getTypeInfo(operand->getType());
+      auto ptr = Builder.CreateInBoundsGEP(argsBufInst, operandOffsets[i]);
+      auto addr = ti.getAddressForPointer(
+        Builder.CreateBitCast(ptr, ti.getStorageType()->getPointerTo()));
+      if (operand->getType().isAddress()) {
+        ti.initializeWithTake(*this, addr, getLoweredAddress(operand),
+                              operand->getType());
+      } else {
+        Explosion operandValue = getLoweredExplosion(operand);
+        cast<LoadableTypeInfo>(ti).initialize(*this, operandValue, addr);
+      }
+    }
+    args = argsBufInst;
   } else {
     // No arguments necessary, so the argument ought to be ignored by any
     // callbacks in the pattern.

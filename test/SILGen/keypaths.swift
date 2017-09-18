@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-keypath-components -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 struct S<T> {
   var x: T
@@ -253,7 +253,7 @@ struct IUOBlob {
   }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}iuoKeyPaths
+// CHECK-LABEL: sil hidden @{{.*}}11iuoKeyPaths
 func iuoKeyPaths() {
   // CHECK: = keypath $WritableKeyPath<IUOProperty, Int>,
   // CHECK-SAME: stored_property #IUOProperty.iuo
@@ -265,4 +265,60 @@ func iuoKeyPaths() {
   // CHECK-SAME: optional_force
   // CHECK-SAME: stored_property #IUOBlob.x
   _ = \IUOProperty.iuo!.x
+}
+
+struct Subscripts<T> {
+  subscript() -> T {
+    get { fatalError() }
+    set { fatalError() }
+  }
+  subscript(generic x: T) -> T {
+    get { fatalError() }
+    set { fatalError() }
+  }
+  subscript(concrete x: String) -> String {
+    get { fatalError() }
+    set { fatalError() }
+  }
+  subscript(x: String, y: String) -> String {
+    get { fatalError() }
+    set { fatalError() }
+  }
+  subscript<U>(subGeneric z: U) -> U {
+    get { fatalError() }
+    set { fatalError() }
+  }
+  subscript(mutable x: T) -> T {
+    get { fatalError() }
+    set { fatalError() }
+  }
+}
+
+// CHECK-LABEL: sil hidden @{{.*}}10subscripts
+func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
+  _ = \Subscripts<T>.[]
+  _ = \Subscripts<T>.[generic: x]
+  _ = \Subscripts<T>.[concrete: s]
+  _ = \Subscripts<T>.[s, s]
+  _ = \Subscripts<T>.[subGeneric: s]
+  _ = \Subscripts<T>.[subGeneric: x]
+  _ = \Subscripts<T>.[subGeneric: y]
+
+  _ = \Subscripts<U>.[]
+  _ = \Subscripts<U>.[generic: y]
+  _ = \Subscripts<U>.[concrete: s]
+  _ = \Subscripts<U>.[s, s]
+  _ = \Subscripts<U>.[subGeneric: s]
+  _ = \Subscripts<U>.[subGeneric: x]
+  _ = \Subscripts<U>.[subGeneric: y]
+
+  _ = \Subscripts<String>.[]
+  _ = \Subscripts<String>.[generic: s]
+  _ = \Subscripts<String>.[concrete: s]
+  _ = \Subscripts<String>.[s, s]
+  _ = \Subscripts<String>.[subGeneric: s]
+  _ = \Subscripts<String>.[subGeneric: x]
+  _ = \Subscripts<String>.[subGeneric: y]
+
+  _ = \Subscripts<T>.[s, s].count
 }

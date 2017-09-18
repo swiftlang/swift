@@ -3,19 +3,25 @@
 sil_stage canonical
 import Swift
 
-struct S {
+struct S: Hashable {
   var x: Int
   let y: String
   var z: C
   var reabstracted: () -> ()
+
+  var hashValue: Int { get }
+  static func ==(_: S, _: S) -> Bool
 }
-class C {
+class C: Hashable {
   final var x: Int
   final let y: String
   final var z: S
   var w: Int { get set }
 
   init()
+
+  var hashValue: Int { get }
+  static func ==(_: C, _: C) -> Bool
 }
 
 sil_vtable C {}
@@ -257,23 +263,20 @@ struct Foo<T> {
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @stored_property_generics(%swift.type* %T, %swift.type* %U)
 sil @stored_property_generics : $@convention(thin) <T, U> () -> () {
 entry:
-  // CHECK: [[PTR:%.*]] = bitcast [1 x %swift.type*]* [[ARGS:%.*]] to
+  // CHECK: [[PTR:%.*]] = bitcast i8* [[ARGS:%.*]] to
   // CHECK: store %swift.type* %T, %swift.type** [[PTR]]
-  // CHECK: [[ARGS_I8:%.*]] = bitcast [1 x %swift.type*]* [[ARGS]] to
-  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_I]] to i8*), i8* [[ARGS_I8]])
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_I]] to i8*), i8* [[ARGS]])
   %i = keypath $KeyPath<Gen<T,T>, T>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <T>
 
-  // CHECK: [[PTR:%.*]] = bitcast [1 x %swift.type*]* [[ARGS:%.*]] to
+  // CHECK: [[PTR:%.*]] = bitcast i8* [[ARGS:%.*]] to
   // CHECK: store %swift.type* %U, %swift.type** [[PTR]]
-  // CHECK: [[ARGS_I8:%.*]] = bitcast [1 x %swift.type*]* [[ARGS]] to
-  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_J]] to i8*), i8* [[ARGS_I8]])
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_J]] to i8*), i8* [[ARGS]])
   %j = keypath $KeyPath<Gen<U,U>, U>, <A> (root $Gen<A, A>; stored_property #Gen.y : $A) <U>
 
-  // CHECK: [[PTR:%.*]] = bitcast [1 x %swift.type*]* [[ARGS:%.*]] to
+  // CHECK: [[PTR:%.*]] = bitcast i8* [[ARGS:%.*]] to
   // CHECK: [[FOO_T:%.*]] = call %swift.type* @_T08keypaths3FooVMa(%swift.type* %T)
   // CHECK: store %swift.type* [[FOO_T]], %swift.type** [[PTR]]
-  // CHECK: [[ARGS_I8:%.*]] = bitcast [1 x %swift.type*]* [[ARGS]] to
-  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_I]] to i8*), i8* [[ARGS_I8]])
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_I]] to i8*), i8* [[ARGS]])
   %i2 = keypath $KeyPath<Gen<Foo<T>,Foo<T>>, Foo<T>>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <Foo<T>>
 
   return undef : $()
@@ -301,3 +304,105 @@ entry:
 
 sil @n_get : $@convention(thin) <UU, TT> (@in TT) -> @out UU
 sil @n_set : $@convention(thin) <UU, TT> (@in UU, @in TT) -> ()
+
+sil @computed_property_indices : $@convention(thin) (C, S, C, S, C, S) -> () {
+entry(%0 : $C, %1 : $S, %2 : $C, %3 : $S, %4 : $C, %5 : $S):
+  %o = keypath $WritableKeyPath<S, C>, (
+    root $S;
+    settable_property $C,
+      id @o_get : $@convention(thin) (@in S, UnsafeRawPointer) -> @out C,
+      getter @o_get : $@convention(thin) (@in S, UnsafeRawPointer) -> @out C,
+      setter @o_set : $@convention(thin) (@in C, @in S, UnsafeRawPointer) -> (),
+      indices [%$0 : $C : $C],
+      indices_equals @o_equals : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
+      indices_hash @o_hash : $@convention(thin) (UnsafeRawPointer) -> Int
+  ) (%0)
+  %p = keypath $WritableKeyPath<S, C>, (
+    root $S;
+    settable_property $C,
+      id @o_get : $@convention(thin) (@in S, UnsafeRawPointer) -> @out C,
+      getter @o_get : $@convention(thin) (@in S, UnsafeRawPointer) -> @out C,
+      setter @o_set : $@convention(thin) (@in C, @in S, UnsafeRawPointer) -> (),
+      indices [%$0 : $S : $S, %$1 : $C : $C],
+      indices_equals @o_equals : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
+      indices_hash @o_hash : $@convention(thin) (UnsafeRawPointer) -> Int
+  ) (%1, %2)
+  %r = keypath $WritableKeyPath<S, S>, (
+    root $S;
+    settable_property $C,
+      id @o_get : $@convention(thin) (@in S, UnsafeRawPointer) -> @out C,
+      getter @o_get : $@convention(thin) (@in S, UnsafeRawPointer) -> @out C,
+      setter @o_set : $@convention(thin) (@in C, @in S, UnsafeRawPointer) -> (),
+      indices [%$0 : $S : $S, %$1 : $C : $C],
+      indices_equals @o_equals : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
+      indices_hash @o_hash : $@convention(thin) (UnsafeRawPointer) -> Int;
+    settable_property $S,
+      id @r_get : $@convention(thin) (@in C, UnsafeRawPointer) -> @out S,
+      getter @r_get : $@convention(thin) (@in C, UnsafeRawPointer) -> @out S,
+      setter @r_set : $@convention(thin) (@in S, @in C, UnsafeRawPointer) -> (),
+      indices [%$2 : $S : $S],
+      indices_equals @o_equals : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
+      indices_hash @o_hash : $@convention(thin) (UnsafeRawPointer) -> Int
+  ) (%3, %4, %5)
+
+  return undef : $()
+}
+
+sil @o_get : $@convention(thin) (@in S, UnsafeRawPointer) -> @out C
+sil @o_set : $@convention(thin) (@in C, @in S, UnsafeRawPointer) -> ()
+sil @o_equals : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool
+sil @o_hash : $@convention(thin) (UnsafeRawPointer) -> Int
+
+sil @r_get : $@convention(thin) (@in C, UnsafeRawPointer) -> @out S
+sil @r_set : $@convention(thin) (@in S, @in C, UnsafeRawPointer) -> ()
+
+sil @generic_computed_property_indices : $@convention(thin) <A: Hashable, B: Hashable> (@in A, @in B, @in A, @in B, @in A, @in B) -> () {
+entry(%0 : $*A, %1 : $*B, %2 : $*A, %3 : $*B, %4 : $*A, %5 : $*B):
+  %s = keypath $WritableKeyPath<A, B>, <X: Hashable, Y: Hashable> (
+    root $X;
+    settable_property $Y,
+      id @s_get : $@convention(thin) <T: Hashable, U: Hashable> (@in T, UnsafeRawPointer) -> @out U,
+      getter @s_get : $@convention(thin) <T: Hashable, U: Hashable> (@in T, UnsafeRawPointer) -> @out U,
+      setter @s_set : $@convention(thin) <T: Hashable, U: Hashable> (@in U, @in T, UnsafeRawPointer) -> (),
+      indices [%$0 : $X : $*X],
+      indices_equals @s_equals : $@convention(thin) <T: Hashable, U: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
+      indices_hash @s_hash : $@convention(thin) <T: Hashable, U: Hashable> (UnsafeRawPointer) -> Int
+  ) <A, B> (%0)
+  %t = keypath $WritableKeyPath<A, B>, <X: Hashable, Y: Hashable> (
+    root $X;
+    settable_property $Y,
+      id @s_get : $@convention(thin) <T: Hashable, U: Hashable> (@in T, UnsafeRawPointer) -> @out U,
+      getter @s_get : $@convention(thin) <T: Hashable, U: Hashable> (@in T, UnsafeRawPointer) -> @out U,
+      setter @s_set : $@convention(thin) <T: Hashable, U: Hashable> (@in U, @in T, UnsafeRawPointer) -> (),
+      indices [%$0 : $Y : $*Y, %$1 : $X : $*X],
+      indices_equals @s_equals : $@convention(thin) <T: Hashable, U: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
+      indices_hash @s_hash : $@convention(thin) <T: Hashable, U: Hashable> (UnsafeRawPointer) -> Int
+  ) <A, B> (%1, %2)
+  %v = keypath $WritableKeyPath<A, A>, <X: Hashable, Y: Hashable> (
+    root $X;
+    settable_property $Y,
+      id @s_get : $@convention(thin) <T: Hashable, U: Hashable> (@in T, UnsafeRawPointer) -> @out U,
+      getter @s_get : $@convention(thin) <T: Hashable, U: Hashable> (@in T, UnsafeRawPointer) -> @out U,
+      setter @s_set : $@convention(thin) <T: Hashable, U: Hashable> (@in U, @in T, UnsafeRawPointer) -> (),
+      indices [%$0 : $Y : $*Y, %$1 : $X : $*X],
+      indices_equals @s_equals : $@convention(thin) <T: Hashable, U: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
+      indices_hash @s_hash : $@convention(thin) <T: Hashable, U: Hashable> (UnsafeRawPointer) -> Int;
+    settable_property $X,
+      id @v_get : $@convention(thin) <T: Hashable, U: Hashable> (@in U, UnsafeRawPointer) -> @out T,
+      getter @v_get : $@convention(thin) <T: Hashable, U: Hashable> (@in U, UnsafeRawPointer) -> @out T,
+      setter @v_set : $@convention(thin) <T: Hashable, U: Hashable> (@in T, @in U, UnsafeRawPointer) -> (),
+      indices [%$2 : $Y : $*Y],
+      indices_equals @s_equals : $@convention(thin) <T: Hashable, U: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
+      indices_hash @s_hash : $@convention(thin) <T: Hashable, U: Hashable> (UnsafeRawPointer) -> Int
+  ) <A, B> (%3, %4, %5)
+
+  return undef : $()
+}
+
+sil @s_get : $@convention(thin) <A: Hashable, B: Hashable> (@in A, UnsafeRawPointer) -> @out B
+sil @s_set : $@convention(thin) <A: Hashable, B: Hashable> (@in B, @in A, UnsafeRawPointer) -> ()
+sil @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool
+sil @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int
+
+sil @v_get : $@convention(thin) <A: Hashable, B: Hashable> (@in B, UnsafeRawPointer) -> @out A
+sil @v_set : $@convention(thin) <A: Hashable, B: Hashable> (@in A, @in B, UnsafeRawPointer) -> ()
