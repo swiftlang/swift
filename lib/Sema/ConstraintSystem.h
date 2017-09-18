@@ -2551,8 +2551,10 @@ private:
   };
 
   struct PotentialBindings {
-    typedef std::tuple<bool, bool, bool, bool, unsigned char,
-                       bool, unsigned int> BindingScore;
+    typedef std::tuple<bool, bool, bool, bool, bool,
+                       unsigned char, unsigned int> BindingScore;
+
+    TypeVariableType *TypeVar;
 
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
@@ -2578,6 +2580,8 @@ private:
     /// Tracks the position of the last known supertype in the group.
     Optional<unsigned> lastSupertypeIndex;
 
+    PotentialBindings(TypeVariableType *typeVar) : TypeVar(typeVar) {}
+
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
 
@@ -2591,8 +2595,8 @@ private:
                              b.FullyBound,
                              b.IsRHSOfBindParam,
                              b.SubtypeOfExistentialType,
-                             static_cast<unsigned char>(b.LiteralBinding),
                              b.InvolvesTypeVariables,
+                             static_cast<unsigned char>(b.LiteralBinding),
                              -(b.Bindings.size() - b.NumDefaultableBindings));
     }
 
@@ -2717,7 +2721,7 @@ private:
 
   Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type,
                                     bool *isNilLiteral = nullptr);
-  std::pair<PotentialBindings, TypeVariableType *> determineBestBindings();
+  Optional<PotentialBindings> determineBestBindings();
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
 
   bool
