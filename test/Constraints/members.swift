@@ -450,6 +450,8 @@ func rdar33914444() {
   // expected-error@-1 {{type 'A.R<A.S.E>' has no member 'e1'}}
 }
 
+// SR-5324: Better diagnostic when instance member of outer type is referenced from nested type
+
 struct Outer {
   var outer: Int
 
