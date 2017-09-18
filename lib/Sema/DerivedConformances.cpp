@@ -171,7 +171,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     interfaceType = FunctionType::get({selfParam}, interfaceType,
                                       FunctionType::ExtInfo());
   getterDecl->setInterfaceType(interfaceType);
-  getterDecl->setAccess(typeDecl->getFormalAccess());
+  copyFormalAccess(getterDecl, typeDecl);
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -201,7 +201,7 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
   propDecl->setImplicit();
   propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                          SourceLoc());
-  propDecl->setAccess(getterDecl->getFormalAccess());
+  copyFormalAccess(propDecl, typeDecl);
   propDecl->setInterfaceType(propertyInterfaceType);
 
   // If this is supposed to be a final property, mark it as such.
@@ -223,4 +223,15 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
   pbDecl->setImplicit();
 
   return {propDecl, pbDecl};
+}
+
+void DerivedConformance::copyFormalAccess(ValueDecl *dest, ValueDecl *source) {
+  dest->setAccess(source->getFormalAccess());
+
+  // Inherit the @_versioned attribute.
+  if (source->getAttrs().hasAttribute<VersionedAttr>()) {
+    auto &ctx = source->getASTContext();
+    auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
+    dest->getAttrs().add(clonedAttr);
+  }
 }
