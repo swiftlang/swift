@@ -18,6 +18,10 @@
 /// FUNCTION_TO_TRACK(Id)
 /// Id is the name of the runtime function to be tracked.
 
+#ifndef FUNCTION_TO_TRACK
+#error "Must define FUNCTION_TO_TRACK to include RuntimeInvocationsTracking.def"
+#endif
+
 /// Set of runtime functions that whose invocations need to be tracked.
 /// Edit this list to add new runtime functions or remove the old ones.
 FUNCTION_TO_TRACK(swift_retain)
