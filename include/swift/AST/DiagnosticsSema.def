@@ -1936,6 +1936,8 @@ WARNING(override_swift3_objc_inference,none,
 // Inheritance
 ERROR(duplicate_inheritance,none,
   "duplicate inheritance from %0", (Type))
+WARNING(duplicate_anyobject_class_inheritance,none,
+  "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(non_class_inheritance,none,

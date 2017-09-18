@@ -2861,6 +2861,13 @@ clang::ASTContext &ClangModuleUnit::getClangASTContext() const {
   return owner.getClangASTContext();
 }
 
+std::string ClangModuleUnit::getExportedModuleName() const {
+  if (clangModule && !clangModule->ExportAsModule.empty())
+    return clangModule->ExportAsModule;
+
+  return getParentModule()->getName().str();
+}
+
 ModuleDecl *ClangModuleUnit::getAdapterModule() const {
   if (!clangModule)
     return nullptr;
@@ -3325,8 +3332,8 @@ importName(const clang::NamedDecl *D,
     getDeclName();
 }
 
-bool swift::isInOverlayModuleForImportedModule(DeclContext *overlayDC,
-                                               DeclContext *importedDC) {
+bool swift::isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
+                                               const DeclContext *importedDC) {
   overlayDC = overlayDC->getModuleScopeContext();
   importedDC = importedDC->getModuleScopeContext();
 

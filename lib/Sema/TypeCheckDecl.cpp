@@ -440,7 +440,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   Type superclassTy;
   SourceRange superclassRange;
   llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
-  llvm::SmallDenseMap<CanType, SourceRange> inheritedTypes;
+  llvm::SmallDenseMap<CanType, std::pair<unsigned, SourceRange>> inheritedTypes;
   addImplicitConformances(*this, decl, allProtocols);
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
@@ -475,15 +475,33 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
     auto knownType = inheritedTypes.find(inheritedCanTy);
     if (knownType != inheritedTypes.end()) {
+      // If the duplicated type is 'AnyObject', check whether the first was
+      // written as 'class'. Downgrade the error to a warning in such cases
+      // for backward compatibility with Swift <= 4.
+      if (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
+          inheritedTy->isAnyObject() &&
+          (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+          Lexer::getTokenAtLocation(Context.SourceMgr,
+                                    knownType->second.second.Start)
+            .is(tok::kw_class)) {
+        SourceLoc classLoc = knownType->second.second.Start;
+        SourceRange removeRange = getRemovalRange(knownType->second.first);
+
+        diagnose(classLoc, diag::duplicate_anyobject_class_inheritance)
+          .fixItRemoveChars(removeRange.Start, removeRange.End);
+        inherited.setInvalidType(Context);
+        continue;
+      }
+
       auto removeRange = getRemovalRange(i);
       diagnose(inherited.getSourceRange().Start,
                diag::duplicate_inheritance, inheritedTy)
         .fixItRemoveChars(removeRange.Start, removeRange.End)
-        .highlight(knownType->second);
+        .highlight(knownType->second.second);
       inherited.setInvalidType(Context);
       continue;
     }
-    inheritedTypes[inheritedCanTy] = inherited.getSourceRange();
+    inheritedTypes[inheritedCanTy] = { i, inherited.getSourceRange() };
 
     // If this is a protocol or protocol composition type, record the
     // protocols.
