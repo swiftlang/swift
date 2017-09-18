@@ -1060,9 +1060,9 @@ void IRGenModule::emitEnableReportErrorsToDebugger() {
   llvm::Function *NewFn = llvm::Function::Create(
       llvm::FunctionType::get(VoidTy, false), llvm::GlobalValue::PrivateLinkage,
       "_swift_enable_report_errors_to_debugger");
+  Module.getFunctionList().push_back(NewFn);
   IRGenFunction NewIGF(*this, NewFn);
   NewFn->setAttributes(constructInitialAttributes());
-  Module.getFunctionList().push_back(NewFn);
   NewFn->setCallingConv(DefaultCC);
 
   llvm::Value *addr =
