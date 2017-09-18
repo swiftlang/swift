@@ -2749,17 +2749,18 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       // provide more specialized message
       auto memberTypeContext = member->getDeclContext()->getInnermostTypeContext();
       auto currentTypeContext = CS.DC->getInnermostTypeContext();
-      if (memberTypeContext->getSyntacticDepth() < currentTypeContext->getSyntacticDepth()) {
+      if (memberTypeContext->getSemanticDepth() <
+          currentTypeContext->getSemanticDepth()) {
         diagnose(loc, diag::could_not_use_instance_member_of_outer_type_on_nested_type,
                  memberTypeContext->getDeclaredTypeOfContext(), memberName,
-                 currentTypeContext->getDeclaredTypeOfContext()
-         ).highlight(baseRange).highlight(nameLoc.getSourceRange());
+                 currentTypeContext->getDeclaredTypeOfContext())
+          .highlight(baseRange).highlight(nameLoc.getSourceRange());
         return;
       }
 
       diagnose(loc, diag::could_not_use_instance_member_on_type,
                instanceTy, memberName)
-      .highlight(baseRange).highlight(nameLoc.getSourceRange());
+        .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
     }
 
