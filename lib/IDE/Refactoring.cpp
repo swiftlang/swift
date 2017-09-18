@@ -1574,7 +1574,8 @@ static std::unique_ptr<llvm::SetVector<Expr*>>
       if (!Expr)
         return false;
       auto *FD = dyn_cast<FuncDecl>(Expr->getDecl());
-      if (FD == nullptr || FD != Ctx.getPlusFunctionOnString()) {
+      if (FD == nullptr || FD != Ctx.getPlusFunctionOnString() ||
+          FD != Ctx.getPlusFunctionOnRangeReplaceableCollection()) {
         return false;
       }
       return true;
@@ -1622,18 +1623,21 @@ static std::unique_ptr<llvm::SetVector<Expr*>>
   return std::move(Walker.Bucket);
 }
 
-static std::string interpolatedExpressionForm(Expr* E, SourceManager& SM) {
+static void interpolatedExpressionForm(Expr* E, SourceManager& SM,
+                                              llvm::raw_svector_ostream& OS) {
   if (auto *Literal = dyn_cast<StringLiteralExpr>(E)) {
-    return Literal->getValue();
+    OS << Literal->getValue();
+    return;
   }
   auto ExpStr = Lexer::getCharSourceRangeFromSourceRange(SM,
     E->getSourceRange()).str().str();
   if (auto *Interpolation = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
     ExpStr.erase(0, 1);
     ExpStr.pop_back();
-    return ExpStr;
+    OS << ExpStr;
+    return;
   }
-  return "\\(" + ExpStr + ")";
+  OS << "\\(" << ExpStr << ")";
 }
 
 bool RefactoringActionConvertStringsConcatenationToInterpolation::
@@ -1646,12 +1650,14 @@ bool RefactoringActionConvertStringsConcatenationToInterpolation::performChange(
   auto Expressions = findConcatenatedExpressions(RangeInfo, Ctx);
   if (!Expressions)
     return true;
-  std::string Replacement = "\"";
+  llvm::SmallString<64> Buffer;
+  llvm::raw_svector_ostream OS(Buffer);
+  OS << "\"";
   for (auto It = Expressions->begin(); It != Expressions->end(); It++) {
-    Replacement.append(interpolatedExpressionForm(*It, SM));
+    interpolatedExpressionForm(*It, SM, OS);
   }
-  Replacement.append("\"");
-  EditConsumer.accept(SM, RangeInfo.ContentRange, StringRef(Replacement));
+  OS << "\"";
+  EditConsumer.accept(SM, RangeInfo.ContentRange, Buffer);
   return false;
 }
 

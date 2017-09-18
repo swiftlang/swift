@@ -591,14 +591,12 @@ FuncDecl *ASTContext::getPlusFunctionOnString() const {
       auto ParamLists = FD->getParameterLists();
       if (ParamLists.size() != 2 || ParamLists[1]->size() != 2)
         continue;
-      auto FirstParam = ParamLists[1]->get(0);
-      auto SecondParam = ParamLists[1]->get(1);
-      auto FirstParamType =
-      FirstParam->getInterfaceType()->getNominalOrBoundGenericNominal();
-      auto SecondParamType =
-      SecondParam->getInterfaceType()->getNominalOrBoundGenericNominal();
-      auto StringDecl = getStringDecl();
-      if (FirstParamType == StringDecl && SecondParamType == StringDecl) {
+      auto CheckIfStringParam = [this](ParamDecl* Param) {
+        auto Type = Param->getInterfaceType()->getNominalOrBoundGenericNominal();
+        return Type == getStringDecl();
+      };
+      if (CheckIfStringParam(ParamLists[1]->get(0)) &&
+          CheckIfStringParam(ParamLists[1]->get(1))) {
         Impl.PlusFunctionOnString = FD;
         break;
       }
