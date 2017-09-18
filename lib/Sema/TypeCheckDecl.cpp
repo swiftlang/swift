@@ -477,8 +477,9 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (knownType != inheritedTypes.end()) {
       // If the duplicated type is 'AnyObject', check whether the first was
       // written as 'class'. Downgrade the error to a warning in such cases
-      // for backward compatibility.
-      if (inheritedTy->isAnyObject() &&
+      // for backward compatibility with Swift <= 4.
+      if (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
+          inheritedTy->isAnyObject() &&
           (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
           Lexer::getTokenAtLocation(Context.SourceMgr,
                                     knownType->second.second.Start)
