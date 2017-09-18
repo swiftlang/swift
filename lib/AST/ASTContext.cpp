@@ -36,6 +36,7 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h" // bad dependency
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
@@ -1310,6 +1311,7 @@ void ASTContext::loadObjCMethods(
 
 void ASTContext::verifyAllLoadedModules() const {
 #ifndef NDEBUG
+  SharedTimer("verifyAllLoadedModules");
   for (auto &loader : Impl.ModuleLoaders)
     loader->verifyAllModules();
 

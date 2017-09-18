@@ -536,8 +536,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
-  SharedTimer timer("performTypeChecking");
-
   auto &Ctx = SF.getASTContext();
 
   // Make sure we have a type checker.
@@ -680,6 +678,7 @@ void swift::finishTypeChecking(SourceFile &SF) {
 }
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
+  SharedTimer("performWholeModuleTypeChecking");
   auto &Ctx = SF.getASTContext();
   Ctx.diagnoseAttrsRequiringFoundation(SF);
   Ctx.diagnoseObjCMethodConflicts(SF);
