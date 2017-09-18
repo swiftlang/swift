@@ -202,6 +202,9 @@ WARNING(cannot_assign_value_to_conditional_compilation_flag,none,
         "conditional compilation flags do not have values in Swift; they are "
         "either present or absent (rather than '%0')", (StringRef))
 
+ERROR(error_optimization_remark_pattern, none, "%0 in '%1'",
+      (StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

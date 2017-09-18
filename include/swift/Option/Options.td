@@ -321,6 +321,16 @@ def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
   Alias<warn_swift3_objc_inference_complete>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
 
+def Rpass_EQ : Joined<["-"], "Rpass=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Report performed transformations by optimization passes whose "
+           "name matches the given POSIX regular expression">;
+
+def Rpass_missed_EQ : Joined<["-"], "Rpass-missed=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Report missed transformations by optimization passes whose "
+           "name matches the given POSIX regular expression">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,

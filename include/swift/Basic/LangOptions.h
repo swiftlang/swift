@@ -27,6 +27,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
 #include <vector>
@@ -235,7 +236,13 @@ namespace swift {
 
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;
-    
+
+    /// Regex for the passes that should report passed and missed optimizations.
+    ///
+    /// These are shared_ptrs so that this class remains copyable.
+    std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
+    std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
+
     /// When a conversion from String to Substring fails, emit a fix-it to append
     /// the void subscript '[]'.
     /// FIXME: Remove this flag when void subscripts are implemented.
