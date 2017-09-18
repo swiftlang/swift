@@ -1057,7 +1057,17 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   if (driverKind == DriverKind::Interactive) {
     OI.CompilerMode = OutputInfo::Mode::Immediate;
-    if (Inputs.empty())
+    /* SR-5860: For "-e" we need to stay in Immediate mode, otherwise down in
+     buildActions(...) we construct a REPLJobAction instead of the intended
+     InputJobAction, which later results in us dropping down into the REPL (if
+     I'm correctly understanding how this mechanism works).
+
+     So I **think** we'll need to have this check here because the OutputInfo
+     that's passed in to Driver::buildActions(...) is \const\, thus we can't
+     switch it to Immediate from within there (and demoting it to a variable
+     in order to mutate it within buildActions is wrong in my book).
+     */
+    if (Inputs.empty() && !Args.hasArg(options::OPT_e))
       OI.CompilerMode = OutputInfo::Mode::REPL;
     OI.CompilerOutputType = types::TY_Nothing;
 
@@ -1518,7 +1528,10 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     break;
   }
   case OutputInfo::Mode::Immediate: {
-    if (Inputs.empty())
+    /* SR-5860: For "-e" since we're in Immediate mode we can construct the
+     InterpretJobAction here. We expect Inputs to be empty, hence the
+     additional check for the arg being "-e". */
+    if (Inputs.empty() && !Args.hasArg(options::OPT_e))
       return;
 
     assert(OI.CompilerOutputType == types::TY_Nothing);
@@ -1634,6 +1647,11 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
 
   if (Args.hasArg(options::OPT_v)) {
     printVersion(TC, llvm::errs());
+    SuppressNoInputFilesError = true;
+  }
+  
+  /* SR-5860: "-e" doesn't expect any Input Files */
+  if (Args.hasArg(options::OPT_e)) {
     SuppressNoInputFilesError = true;
   }
 
@@ -2335,6 +2353,15 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     llvm::outs() << '\n';
   }
 
+  /* SR-5860: At this point we still have access to the "-e" arguments
+   (via C.getArgs()).
+   
+   J->getArguments() contains the arguments to be passed on into
+   driver::performFrontend(...) in driver.cpp.
+   
+   What I'm not grasping is how to copy those arguments in Compilation into
+   the Job we're returning here.
+   */
   return J;
 }
 

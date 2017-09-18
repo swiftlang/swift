@@ -435,13 +435,21 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       return true;
     }
   } else if (Opts.RequestedAction != FrontendOptions::NoneAction) {
+    /* SR-5860: For "-e", without this commented out we log the error & bail.
+    
     if (Opts.InputFilenames.empty()) {
       Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
       return true;
     }
+     
+     If I'm correct in that we'll be passing in the "-e" arguments I'll need to
+     add a check for those "-e" args above to ensure we don't log & bail.
+     */
   }
 
   if (Opts.RequestedAction == FrontendOptions::Immediate) {
+    /* SR-5860: For "-e", without this commented out this assert fails.
+     
     assert(!Opts.InputFilenames.empty());
     Opts.ImmediateArgv.push_back(Opts.InputFilenames[0]); // argv[0]
     if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
@@ -449,6 +457,23 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         Opts.ImmediateArgv.push_back(A->getValue(i));
       }
     }
+     
+     Again if we have access to knowing if any "-e" arguments have been passed
+     in I'll want to wrap that assert in an if so it doesn't trigger.
+     
+     I'm guessing this is where I'd want to construct the MemoryBuffer,
+     assuming I've found the way to properly pass in all of the "-e" arguments
+     from driver.cpp, correct?
+     
+     If so, I should be attaching that buffer to Opts.InputBuffers, right?
+     
+     Note that without this assert failing, the execution continues until it
+     eventually faults in GlobalValue::getValueType(), which is invoked via
+     Immediate.cpp's swift::RunImmediately(...).
+   
+     Presumably once the MemoryBuffers are attached the fault won't be
+     encountered, but I'll cross that bridge when I come to it.
+     */
   }
 
   if (TreatAsSIL)
