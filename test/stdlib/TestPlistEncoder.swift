@@ -170,6 +170,34 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     _testRoundTrip(of: topLevel, in: .xml, expectedPlist: try! PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0))
   }
 
+  // MARK: - Type coercion
+  func testTypeCoercion() {
+    _testRoundTripTypeCoercionFailure(of: [false, true], as: [Int].self)
+    _testRoundTripTypeCoercionFailure(of: [false, true], as: [Int8].self)
+    _testRoundTripTypeCoercionFailure(of: [false, true], as: [Int16].self)
+    _testRoundTripTypeCoercionFailure(of: [false, true], as: [Int32].self)
+    _testRoundTripTypeCoercionFailure(of: [false, true], as: [Int64].self)
+    _testRoundTripTypeCoercionFailure(of: [false, true], as: [UInt].self)
+    _testRoundTripTypeCoercionFailure(of: [false, true], as: [UInt8].self)
+    _testRoundTripTypeCoercionFailure(of: [false, true], as: [UInt16].self)
+    _testRoundTripTypeCoercionFailure(of: [false, true], as: [UInt32].self)
+    _testRoundTripTypeCoercionFailure(of: [false, true], as: [UInt64].self)
+    _testRoundTripTypeCoercionFailure(of: [false, true], as: [Float].self)
+    _testRoundTripTypeCoercionFailure(of: [false, true], as: [Double].self)
+    _testRoundTripTypeCoercionFailure(of: [0, 1] as [Int], as: [Bool].self)
+    _testRoundTripTypeCoercionFailure(of: [0, 1] as [Int8], as: [Bool].self)
+    _testRoundTripTypeCoercionFailure(of: [0, 1] as [Int16], as: [Bool].self)
+    _testRoundTripTypeCoercionFailure(of: [0, 1] as [Int32], as: [Bool].self)
+    _testRoundTripTypeCoercionFailure(of: [0, 1] as [Int64], as: [Bool].self)
+    _testRoundTripTypeCoercionFailure(of: [0, 1] as [UInt], as: [Bool].self)
+    _testRoundTripTypeCoercionFailure(of: [0, 1] as [UInt8], as: [Bool].self)
+    _testRoundTripTypeCoercionFailure(of: [0, 1] as [UInt16], as: [Bool].self)
+    _testRoundTripTypeCoercionFailure(of: [0, 1] as [UInt32], as: [Bool].self)
+    _testRoundTripTypeCoercionFailure(of: [0, 1] as [UInt64], as: [Bool].self)
+    _testRoundTripTypeCoercionFailure(of: [0.0, 1.0] as [Float], as: [Bool].self)
+    _testRoundTripTypeCoercionFailure(of: [0.0, 1.0] as [Double], as: [Bool].self)
+  }
+
   // MARK: - Helper Functions
   private var _plistEmptyDictionaryBinary: Data {
     return Data(base64Encoded: "YnBsaXN0MDDQCAAAAAAAAAEBAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAJ")!
@@ -210,6 +238,14 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     } catch {
       expectUnreachable("Failed to decode \(T.self) from plist: \(error)")
     }
+  }
+
+  private func _testRoundTripTypeCoercionFailure<T,U>(of value: T, as type: U.Type) where T : Codable, U : Codable {
+    do {
+      let data = try PropertyListEncoder().encode(value)
+      let _ = try PropertyListDecoder().decode(U.self, from: data)
+      expectUnreachable("Coercion from \(T.self) to \(U.self) was expected to fail.")
+    } catch {}
   }
 }
 
@@ -694,5 +730,6 @@ PropertyListEncoderTests.test("testSuperEncoderCodingPaths") { TestPropertyListE
 PropertyListEncoderTests.test("testEncodingTopLevelData") { TestPropertyListEncoder().testEncodingTopLevelData() }
 PropertyListEncoderTests.test("testInterceptData") { TestPropertyListEncoder().testInterceptData() }
 PropertyListEncoderTests.test("testInterceptDate") { TestPropertyListEncoder().testInterceptDate() }
+PropertyListEncoderTests.test("testTypeCoercion") { TestPropertyListEncoder().testTypeCoercion() }
 runAllTests()
 #endif
