@@ -579,6 +579,32 @@ static PotentialArchetype *replaceSelfWithPotentialArchetype(
   return selfPA;
 }
 
+/// Determine whether the given protocol requirement is self-derived when it
+/// occurs within the requirement signature of its own protocol.
+static bool isSelfDerivedProtocolRequirementInProtocol(
+                                             const RequirementSource *source,
+                                             ProtocolDecl *selfProto,
+                                             GenericSignatureBuilder &builder) {
+  assert(source->isProtocolRequirement());
+
+  // This can only happen if the requirement points comes from the protocol
+  // itself.
+  if (source->getProtocolDecl() != selfProto) return false;
+
+  // This only applies if the parent is not the anchor for computing the
+  // requirement signature. Anywhere else, we can use the protocol requirement.
+  if (source->parent->kind == RequirementSource::RequirementSignatureSelf)
+    return false;
+
+  // If the relative type of the protocol requirement itself is in the
+  // same equivalence class as what we've proven with this requirement,
+  // it's a self-derived requirement.
+  return
+    source->getAffectedPotentialArchetype()->getEquivalenceClassIfPresent() ==
+      builder.resolveEquivalenceClass(source->getStoredType(),
+                                      ArchetypeResolutionKind::AlreadyKnown);
+}
+
 const RequirementSource *RequirementSource::getMinimalConformanceSource(
                                              PotentialArchetype *currentPA,
                                              ProtocolDecl *proto,
@@ -607,6 +633,7 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
   };
 
   bool sawProtocolRequirement = false;
+  ProtocolDecl *requirementSignatureSelfProto = nullptr;
 
   PotentialArchetype *rootPA = nullptr;
   Optional<std::pair<const RequirementSource *, const RequirementSource *>>
@@ -625,14 +652,25 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
 
       // The parent potential archetype must conform to the protocol in which
       // this requirement resides. Add this constraint.
-      auto startOfPath =
-        addConstraint(parentPA, source->getProtocolDecl(), source->parent);
-      if (!startOfPath) return false;
+      if (auto startOfPath =
+              addConstraint(parentPA, source->getProtocolDecl(),
+                            source->parent)) {
+        // We found a redundant subpath; record it and stop the algorithm.
+        assert(startOfPath != source->parent);
+        redundantSubpath = { startOfPath, source->parent };
+        return true;
+      }
 
-      // We found a redundant subpath; record it and stop the algorithm.
-      assert(startOfPath != source->parent);
-      redundantSubpath = { startOfPath, source->parent };
-      return true;
+      // If this is a self-derived protocol requirement, fail.
+      if (requirementSignatureSelfProto &&
+          isSelfDerivedProtocolRequirementInProtocol(
+                                               source,
+                                               requirementSignatureSelfProto,
+                                               *currentPA->getBuilder()))
+        return true;
+
+      // No redundancy thus far.
+      return false;
     }
 
     case Parent:
@@ -645,12 +683,17 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
     case EquivalentType:
       return false;
 
+    case RequirementSignatureSelf:
+      // Note the protocol whose requirement signature the requirement is
+      // based on.
+      requirementSignatureSelfProto = source->getProtocolDecl();
+      LLVM_FALLTHROUGH;
+
     case Explicit:
     case Inferred:
     case QuietlyInferred:
     case NestedTypeNameMatch:
     case ConcreteTypeBinding:
-    case RequirementSignatureSelf:
       rootPA = parentPA;
       return false;
     }
@@ -4712,7 +4755,8 @@ namespace {
   template<typename T>
   bool removeSelfDerived(std::vector<Constraint<T>> &constraints,
                          ProtocolDecl *proto,
-                         bool dropDerivedViaConcrete = true) {
+                         bool dropDerivedViaConcrete = true,
+                         bool allCanBeSelfDerived = false) {
     bool anyDerivedViaConcrete = false;
     Optional<Constraint<T>> remainingConcrete;
     SmallVector<Constraint<T>, 4> minimalSources;
@@ -4780,7 +4824,8 @@ namespace {
     if (constraints.empty() && remainingConcrete)
       constraints.push_back(*remainingConcrete);
 
-    assert(!constraints.empty() && "All constraints were self-derived!");
+    assert((!constraints.empty() || allCanBeSelfDerived) &&
+           "All constraints were self-derived!");
     return anyDerivedViaConcrete;
   }
 } // end anonymous namespace
@@ -5536,7 +5581,8 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 
     // Remove self-derived constraints.
     if (removeSelfDerived(constraints, /*proto=*/nullptr,
-                          /*dropDerivedViaConcrete=*/false))
+                          /*dropDerivedViaConcrete=*/false,
+                          /*allCanBeSelfDerived=*/true))
       anyDerivedViaConcrete = true;
 
     // Sort the constraints, so we get a deterministic ordering of diagnostics.
@@ -5633,7 +5679,9 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       auto &constraints = entry.second;
 
       // Remove derived-via-concrete constraints.
-      (void)removeSelfDerived(constraints, /*proto=*/nullptr);
+      (void)removeSelfDerived(constraints, /*proto=*/nullptr,
+                              /*dropDerivedViaConcrete=*/true,
+                              /*allCanBeSelfDerived=*/true);
     }
   }
 
