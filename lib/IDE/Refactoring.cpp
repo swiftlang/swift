@@ -1448,6 +1448,113 @@ bool RefactoringActionExtractRepeatedExpr::performChange() {
                                           EditConsumer).performChange();
 }
 
+struct CollapsibleNestedIfInfo {
+  IfStmt *OuterIf;
+  IfStmt *InnerIf;
+  bool FinishedOuterIf;
+  bool FoundNonCollapsibleItem;
+  CollapsibleNestedIfInfo():
+    OuterIf(nullptr), InnerIf(nullptr),
+    FinishedOuterIf(false), FoundNonCollapsibleItem(false) {}
+  bool isValid() {
+    return OuterIf && InnerIf && FinishedOuterIf && !FoundNonCollapsibleItem;
+  }
+};
+
+static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
+  if (CursorInfo.Kind != CursorInfoKind::StmtStart)
+    return CollapsibleNestedIfInfo();
+  struct IfStmtFinder: public SourceEntityWalker {
+    SourceLoc StartLoc;
+    CollapsibleNestedIfInfo IfInfo;
+    IfStmtFinder(SourceLoc StartLoc): StartLoc(StartLoc), IfInfo() {}
+    bool finishedInnerIfButNotFinishedOuterIf() {
+      return IfInfo.InnerIf && !IfInfo.FinishedOuterIf;
+    }
+    bool walkToStmtPre(Stmt *S) {
+      if (finishedInnerIfButNotFinishedOuterIf()) {
+        IfInfo.FoundNonCollapsibleItem = true;
+        return false;
+      }
+
+      bool StmtIsOuterIfBrace =
+        IfInfo.OuterIf && !IfInfo.InnerIf && S->getKind() == StmtKind::Brace;
+      if (StmtIsOuterIfBrace) {
+        return true;
+      }
+
+      auto *IFS = dyn_cast<IfStmt>(S);
+      if (!IFS) {
+        return false;
+      }
+      if (!IfInfo.OuterIf) {
+        IfInfo.OuterIf = IFS;
+        return true;
+      } else {
+        IfInfo.InnerIf = IFS;
+        return false;
+      }
+    }
+    bool walkToStmtPost(Stmt *S) {
+      assert(S != IfInfo.InnerIf && "Should not traverse inner if statement");
+      if (S == IfInfo.OuterIf) {
+        IfInfo.FinishedOuterIf = true;
+      }
+      return true;
+    }
+    bool walkToDeclPre(Decl *D, CharSourceRange Range) {
+      if (finishedInnerIfButNotFinishedOuterIf()) {
+        IfInfo.FoundNonCollapsibleItem = true;
+        return false;
+      }
+      return true;
+    }
+    bool walkToExprPre(Expr *E) {
+      if (finishedInnerIfButNotFinishedOuterIf()) {
+        IfInfo.FoundNonCollapsibleItem = true;
+        return false;
+      }
+      return true;
+    }
+
+  } Walker(CursorInfo.TrailingStmt->getStartLoc());
+  Walker.walk(CursorInfo.TrailingStmt);
+  return Walker.IfInfo;
+}
+
+bool RefactoringActionCollapseNestedIfExpr::isApplicable(ResolvedCursorInfo Tok) {
+  return findCollapseNestedIfTarget(Tok).isValid();
+}
+
+bool RefactoringActionCollapseNestedIfExpr::performChange() {
+  auto Target = findCollapseNestedIfTarget(CursorInfo);
+  if (!Target.isValid())
+    return true;
+  auto OuterIfConds = Target.OuterIf->getCond().vec();
+  auto InnerIfConds = Target.InnerIf->getCond().vec();
+
+  llvm::SmallString<64> DeclBuffer;
+  llvm::raw_svector_ostream OS(DeclBuffer);
+  OS << tok::kw_if << " ";
+  for (auto CI = OuterIfConds.begin(); CI != OuterIfConds.end(); ++CI) {
+    OS << (CI != OuterIfConds.begin() ? ", " : "");
+    OS << Lexer::getCharSourceRangeFromSourceRange(
+      SM, CI->getSourceRange()).str();
+  }
+  for (auto CI = InnerIfConds.begin(); CI != InnerIfConds.end(); ++CI) {
+    OS << ", " << Lexer::getCharSourceRangeFromSourceRange(
+      SM, CI->getSourceRange()).str();
+  }
+  auto ThenStatementText = Lexer::getCharSourceRangeFromSourceRange(
+    SM, Target.InnerIf->getThenStmt()->getSourceRange()).str();
+  OS << " " << ThenStatementText;
+
+  auto SourceRange = Lexer::getCharSourceRangeFromSourceRange(
+    SM, Target.OuterIf->getSourceRange());
+  EditConsumer.accept(SM, SourceRange, DeclBuffer.str());
+  return false;
+}
+
 /// The helper class analyzes a given nominal decl or an extension decl to
 /// decide whether stubs are required to filled in and the context in which
 /// these stubs should be filled.
