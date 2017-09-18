@@ -2749,14 +2749,21 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       // provide more specialized message.
       auto memberTypeContext = member->getDeclContext()->getInnermostTypeContext();
       auto currentTypeContext = CS.DC->getInnermostTypeContext();
-      auto IsMemberOnOuterScope = memberTypeContext->getSemanticDepth() <
-        currentTypeContext->getSemanticDepth();
-
-      diagnose(loc, diag::could_not_use_instance_member_on_type,
-               currentTypeContext->getDeclaredInterfaceType(), memberName,
-               memberTypeContext->getDeclaredTypeOfContext(),
-               IsMemberOnOuterScope)
-        .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      if (memberTypeContext && currentTypeContext &&
+          memberTypeContext->getSemanticDepth() <
+          currentTypeContext->getSemanticDepth()) {
+        diagnose(loc, diag::could_not_use_instance_member_on_type,
+                 currentTypeContext->getDeclaredInterfaceType(), memberName,
+                 memberTypeContext->getDeclaredTypeOfContext(),
+                 true)
+          .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      } else {
+        diagnose(loc, diag::could_not_use_instance_member_on_type,
+                 instanceTy, memberName,
+                 instanceTy,
+                 false)
+         .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      }
       return;
     }
 

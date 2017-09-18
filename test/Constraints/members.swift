@@ -460,7 +460,7 @@ struct Outer {
 
     func sum() -> Int {
       return inner + outer
-      // expected-error{{instance member 'outer' of type 'Outer' cannot be used on instance of nested type 'Outer.Inner'}}
+      // expected-error@-1 {{instance member 'outer' of type 'Outer' cannot be used on instance of nested type 'Outer.Inner'}}
     }
   }
 }
