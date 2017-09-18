@@ -29,7 +29,6 @@ namespace swift {
 struct RuntimeFunctionCountersState {
 #define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
   uint32_t SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION) = 0;
-
 // Provide one counter per runtime function being tracked.
 #include "RuntimeInvocationsTracking.def"
 };
@@ -54,7 +53,6 @@ static llvm::DenseMap<HeapObject *, RuntimeFunctionCountersState> RuntimeObjectS
 static const char *RuntimeFunctionNames[] {
 /// Define names of runtime functions.
 #define FUNCTION_TO_TRACK(RT_FUNCTION) #RT_FUNCTION,
-
 #include "RuntimeInvocationsTracking.def"
   nullptr
 };
@@ -67,7 +65,6 @@ static const char *RuntimeFunctionNames[] {
 enum RuntimeFunctionNamesIDs : uint32_t {
 /// Defines names of enum cases for each function being tracked.
 #define FUNCTION_TO_TRACK(RT_FUNCTION) RT_FUNCTION_ID(RT_FUNCTION),
-
 #include "RuntimeInvocationsTracking.def"
   ID_LastRuntimeFunctionName,
 };
@@ -83,7 +80,6 @@ static uint16_t RuntimeFunctionCountersOffsets[] = {
 /// Define offset for each function being tracked.
 #define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
   (sizeof(uint16_t) * (unsigned)RT_FUNCTION_ID(RT_FUNCTION)),
-
 #include "RuntimeInvocationsTracking.def"
 };
 
@@ -112,7 +108,6 @@ static uint16_t RuntimeFunctionCountersOffsets[] = {
       /* TODO: Remember the order/history of operations? */                    \
     }                                                                          \
   }
-
 #include "RuntimeInvocationsTracking.def"
 
 /// Public APIs
@@ -175,7 +170,6 @@ static void dumpRuntimeCounters(RuntimeFunctionCountersState *State) {
   if (tmp != 0)                                                                \
     printf("%s = %d\n",                                                        \
            RuntimeFunctionNames[(int)RT_FUNCTION_ID(RT_FUNCTION)], tmp);
-
 #include "RuntimeInvocationsTracking.def"
 }
 

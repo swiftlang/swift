@@ -49,7 +49,6 @@ struct RuntimeFunctionCountersState;
 
 #define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
   extern void SWIFT_RT_TRACK_INVOCATION_NAME(RT_FUNCTION)(HeapObject * OBJ);
-
 /// Declarations of external functions for invocations tracking.
 #include "RuntimeInvocationsTracking.def"
 
