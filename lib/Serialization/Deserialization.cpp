@@ -24,6 +24,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Basic/Defer.h"
@@ -1098,6 +1099,23 @@ getActualCtorInitializerKind(uint8_t raw) {
   return None;
 }
 
+/// Determine whether the two modules are re-exported to the same module.
+static bool reExportedToSameModule(const ModuleDecl *fromModule,
+                                   const ModuleDecl *toModule) {
+  auto fromClangModule
+    = dyn_cast<ClangModuleUnit>(fromModule->getFiles().front());
+  if (!fromClangModule)
+    return false;
+
+  auto toClangModule
+  = dyn_cast<ClangModuleUnit>(toModule->getFiles().front());
+  if (!toClangModule)
+    return false;
+
+  return fromClangModule->getExportedModuleName() ==
+    toClangModule->getExportedModuleName();
+}
+
 /// Remove values from \p values that don't match the expected type or module.
 ///
 /// Any of \p expectedTy, \p expectedModule, or \p expectedGenericSig can be
@@ -1130,7 +1148,8 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
     // FIXME: Should be able to move a value from an extension in a derived
     // module to the original definition in a base module.
     if (expectedModule && !value->hasClangNode() &&
-        value->getModuleContext() != expectedModule)
+        value->getModuleContext() != expectedModule &&
+        !reExportedToSameModule(value->getModuleContext(), expectedModule))
       return true;
 
     // If we're expecting a member within a constrained extension with a

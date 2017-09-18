@@ -323,8 +323,8 @@ ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
 ///
 /// This routine is used for various hacks that are only permitted within
 /// overlays of imported modules, e.g., Objective-C bridging conformances.
-bool isInOverlayModuleForImportedModule(DeclContext *overlayDC,
-                                        DeclContext *importedDC);
+bool isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
+                                        const DeclContext *importedDC);
 
 } // end namespace swift
 
