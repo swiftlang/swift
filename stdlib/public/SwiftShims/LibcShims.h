@@ -124,16 +124,16 @@ typedef unsigned long __swift_pthread_key_t;
 #endif
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int _swift_stdlib_pthread_key_create(
+int _swift_stdlib_tls_key_create(
   __swift_pthread_key_t * _Nonnull key, void
   (* _Nullable destructor)(void * _Nullable )
 );
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-void * _Nullable _swift_stdlib_pthread_getspecific(__swift_pthread_key_t key);
+void * _Nullable _swift_stdlib_tls_getspecific(__swift_pthread_key_t key);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int _swift_stdlib_pthread_setspecific(
+int _swift_stdlib_tls_setspecific(
   __swift_pthread_key_t key, const void * _Nullable value
 );
 

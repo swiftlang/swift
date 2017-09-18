@@ -15,10 +15,14 @@
 #include <cmath>
 #if defined(_WIN32)
 #include <io.h>
+#define WIN32_LEAN_AND_MEAN
+#define VC_EXTRALEAN
+#define NOMINMAX
+#include <windows.h>
 #else
 #include <unistd.h>
-#endif
 #include <pthread.h>
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -98,33 +102,57 @@ int swift::_swift_stdlib_close(int fd) {
 #endif
 }
 
+#if !defined(_WIN32)
 // Guard compilation on the typedef for __swift_pthread_key_t in LibcShims.h
 // being identical to the platform's pthread_key_t
 static_assert(std::is_same<__swift_pthread_key_t, pthread_key_t>::value,
               "This platform's pthread_key_t differs. If you hit this assert, "
               "fix __swift_pthread_key_t's typedef in LibcShims.h by adding an "
               "#if guard and definition for your platform");
+#endif
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int swift::_swift_stdlib_pthread_key_create(
+int swift::_swift_stdlib_tls_key_create(
   __swift_pthread_key_t * _Nonnull key,
   void (* _Nullable destructor)(void *)
 ) {
-  return pthread_key_create(key, destructor);
+  #if defined(_WIN32)
+    // We're using the Fls- (Fiber) instead of Tls- (Thread) functions since
+    // on Windows, "If no fiber switching occurs, FLS acts exactly the same 
+    // as thread local storage," and FlsAlloc takes a destructor while
+    // TlsAlloc doesn't.
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/ms682661.aspx
+    __swift_pthread_key_t result = FlsAlloc(destructor);
+    if (result != FLS_OUT_OF_INDEXES) {
+      *key = result;
+      return 0;
+    }
+    return result;
+  #else
+    return pthread_key_create(key, destructor);
+  #endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-void * _Nullable swift::_swift_stdlib_pthread_getspecific(
+void * _Nullable swift::_swift_stdlib_tls_getspecific(
   __swift_pthread_key_t key
 ) {
-  return pthread_getspecific(key);
+  #if defined(_WIN32)
+    return FlsGetValue(key);
+  #else
+    return pthread_getspecific(key);
+  #endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int swift::_swift_stdlib_pthread_setspecific(
+int swift::_swift_stdlib_tls_setspecific(
   __swift_pthread_key_t key, const void * _Nullable value
 ) {
-  return pthread_setspecific(key, value);
+  #if defined(_WIN32)
+    return FlsSetValue(key, const_cast<void*>(value));
+  #else
+    return pthread_setspecific(key, value);
+  #endif
 }
 
 #if defined(__APPLE__)
