@@ -94,7 +94,7 @@ private enum DA_PrivateEnum {
   case Foo, Bar
   // CHECK: internal init()
   init() { self = .Foo }
-  // CHECK: internal var hashValue
+  // CHECK: private var hashValue
 } // CHECK: {{^[}]}}
 
 // CHECK-LABEL: internal{{(\*/)?}} enum DB_InternalEnum {
