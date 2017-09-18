@@ -19,6 +19,11 @@
 #include "RuntimeInvocationsTracking.h"
 #include "swift/Runtime/HeapObject.h"
 
+// This file is compiled always, even if assertions are disabled and no runtime
+// functions are being tracked. This is done to avoid recompiling Swift clients
+// using these APIs. They should be able to link against the standard library
+// independent of the fact whether assertions are enabled or not.
+
 #define SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION)                 \
   invocationCounter_##RT_FUNCTION
 
