@@ -23,11 +23,11 @@ entry(%x : $@convention(thin) () -> ()):
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @thick_func_value(i8*, %swift.refcounted*) {{.*}} {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    call void @swift_rt_swift_retain(%swift.refcounted* %1) {{#[0-9]+}}
+// CHECK-NEXT:    call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned %1) {{#[0-9]+}}
 // CHECK-NEXT:    call void @swift_rt_swift_release(%swift.refcounted* %1) {{#[0-9]+}}
-// CHECK-NEXT:    %2 = insertvalue { i8*, %swift.refcounted* } undef, i8* %0, 0
-// CHECK-NEXT:    %3 = insertvalue { i8*, %swift.refcounted* } %2, %swift.refcounted* %1, 1
-// CHECK-NEXT:    ret { i8*, %swift.refcounted* } %3
+// CHECK-NEXT:    %3 = insertvalue { i8*, %swift.refcounted* } undef, i8* %0, 0
+// CHECK-NEXT:    %4 = insertvalue { i8*, %swift.refcounted* } %3, %swift.refcounted* %1, 1
+// CHECK-NEXT:    ret { i8*, %swift.refcounted* } %4
 // CHECK-NEXT:  }
 sil @thick_func_value : $@convention(thin) (@owned () -> ()) -> @owned () -> () {
 entry(%x : $() -> ()):

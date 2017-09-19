@@ -842,7 +842,8 @@ static void emitUnaryRefCountCall(IRGenFunction &IGF,
                                   llvm::Constant *fn,
                                   llvm::Value *value) {
   auto cc = IGF.IGM.DefaultCC;
-  if (auto fun = dyn_cast<llvm::Function>(fn))
+  auto fun = dyn_cast<llvm::Function>(fn);
+  if (fun)
     cc = fun->getCallingConv();
 
   // Instead of casting the input, we cast the function type.
@@ -859,6 +860,8 @@ static void emitUnaryRefCountCall(IRGenFunction &IGF,
   
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
+  if (fun && fun->hasParamAttribute(0, llvm::Attribute::Returned))
+    call->addParamAttr(0, llvm::Attribute::Returned);
   call->setCallingConv(cc);
   call->setDoesNotThrow();
 }
@@ -874,7 +877,8 @@ static void emitCopyLikeCall(IRGenFunction &IGF,
          "type mismatch in binary refcounting operation");
 
   auto cc = IGF.IGM.DefaultCC;
-  if (auto fun = dyn_cast<llvm::Function>(fn))
+  auto fun = dyn_cast<llvm::Function>(fn);
+  if (fun)
     cc = fun->getCallingConv();
 
   // Instead of casting the inputs, we cast the function type.
@@ -892,6 +896,8 @@ static void emitCopyLikeCall(IRGenFunction &IGF,
   
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, {dest, src});
+  if (fun && fun->hasParamAttribute(0, llvm::Attribute::Returned))
+    call->addParamAttr(0, llvm::Attribute::Returned);
   call->setCallingConv(cc);
   call->setDoesNotThrow();
 }
@@ -941,7 +947,8 @@ static void emitStoreWeakLikeCall(IRGenFunction &IGF,
          "address is not of a weak or unowned reference");
 
   auto cc = IGF.IGM.DefaultCC;
-  if (auto fun = dyn_cast<llvm::Function>(fn))
+  auto fun = dyn_cast<llvm::Function>(fn);
+  if (fun)
     cc = fun->getCallingConv();
 
   // Instead of casting the inputs, we cast the function type.
@@ -959,6 +966,8 @@ static void emitStoreWeakLikeCall(IRGenFunction &IGF,
 
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, {addr, value});
+  if (fun && fun->hasParamAttribute(0, llvm::Attribute::Returned))
+    call->addParamAttr(0, llvm::Attribute::Returned);
   call->setCallingConv(cc);
   call->setDoesNotThrow();
 }
@@ -979,6 +988,7 @@ void IRGenFunction::emitNativeStrongRetain(llvm::Value *value,
                                        : IGM.getNativeNonAtomicStrongRetainFn(),
       value);
   call->setDoesNotThrow();
+  call->addParamAttr(0, llvm::Attribute::Returned);
 }
 
 /// Emit a store of a live value to the given retaining variable.

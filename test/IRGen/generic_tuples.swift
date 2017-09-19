@@ -49,7 +49,7 @@ func dupC<T : C>(_ x: T) -> (T, T) { return (x, x) }
 // CHECK-LABEL: define hidden swiftcc { %T14generic_tuples1CC*, %T14generic_tuples1CC* } @_T014generic_tuples4dupCx_xtxAA1CCRbzlF(%T14generic_tuples1CC*, %swift.type* %T)
 // CHECK-NEXT: entry:
 // CHECK:      [[REF:%.*]] = bitcast %T14generic_tuples1CC* %0 to %swift.refcounted*
-// CHECK-NEXT: call void @swift_rt_swift_retain(%swift.refcounted* [[REF]])
+// CHECK-NEXT: call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[REF]])
 // CHECK-NEXT: [[TUP1:%.*]] = insertvalue { %T14generic_tuples1CC*, %T14generic_tuples1CC* } undef, %T14generic_tuples1CC* %0, 0
 // CHECK-NEXT: [[TUP2:%.*]] = insertvalue { %T14generic_tuples1CC*, %T14generic_tuples1CC* } [[TUP1:%.*]], %T14generic_tuples1CC* %0, 1
 // CHECK-NEXT: ret { %T14generic_tuples1CC*, %T14generic_tuples1CC* } [[TUP2]]
@@ -58,15 +58,15 @@ func callDupC(_ c: C) { _ = dupC(c) }
 // CHECK-LABEL: define hidden swiftcc void @_T014generic_tuples8callDupCyAA1CCF(%T14generic_tuples1CC*)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[REF:%.*]] = bitcast %T14generic_tuples1CC* %0 to %swift.refcounted*
-// CHECK-NEXT: call void @swift_rt_swift_retain(%swift.refcounted* [[REF]])
+// CHECK-NEXT: call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[REF]])
 // CHECK-NEXT: [[METATYPE:%.*]] = call %swift.type* @_T014generic_tuples1CCMa()
 // CHECK-NEXT: [[TUPLE:%.*]] = call swiftcc { %T14generic_tuples1CC*, %T14generic_tuples1CC* } @_T014generic_tuples4dupCx_xtxAA1CCRbzlF(%T14generic_tuples1CC* %0, %swift.type* [[METATYPE]])
 // CHECK-NEXT: [[LEFT:%.*]] = extractvalue { %T14generic_tuples1CC*, %T14generic_tuples1CC* } [[TUPLE]], 0
 // CHECK-NEXT: [[RIGHT:%.*]] = extractvalue { %T14generic_tuples1CC*, %T14generic_tuples1CC* } [[TUPLE]], 1
 // CHECK-NEXT: [[LEFT_CAST:%.*]] = bitcast %T14generic_tuples1CC* [[LEFT]] to %swift.refcounted*
-// CHECK-NEXT: call void @swift_rt_swift_retain(%swift.refcounted* [[LEFT_CAST]]
+// CHECK-NEXT: call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[LEFT_CAST]]
 // CHECK-NEXT: [[RIGHT_CAST:%.*]] = bitcast %T14generic_tuples1CC* [[RIGHT]] to %swift.refcounted*
-// CHECK-NEXT: call void @swift_rt_swift_retain(%swift.refcounted* [[RIGHT_CAST]]
+// CHECK-NEXT: call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[RIGHT_CAST]]
 // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T14generic_tuples1CC*)*)(%T14generic_tuples1CC* [[LEFT]])
 // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T14generic_tuples1CC*)*)(%T14generic_tuples1CC* [[RIGHT]])
 // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T14generic_tuples1CC*)*)(%T14generic_tuples1CC* [[RIGHT]])
