@@ -179,7 +179,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///     let possibleNumber: Int? = Int("42")
   ///     let nonOverflowingSquare = possibleNumber.flatMap { x -> Int? in
   ///         let (result, overflowed) = x.multipliedReportingOverflow(by: x)
-  ///         return overflowed == .overflow ? nil : result
+  ///         return overflowed ? nil : result
   ///     }
   ///     print(nonOverflowingSquare)
   ///     // Prints "Optional(1764)"

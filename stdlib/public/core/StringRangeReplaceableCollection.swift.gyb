@@ -26,7 +26,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// For example, use this initializer to create a string with ten `"0"`
   /// characters in a row.
   ///
-  ///     let zeroes = String("0" as Character, count: 10)
+  ///     let zeroes = String(repeating: "0" as Character, count: 10)
   ///     print(zeroes)
   ///     // Prints "0000000000"
   public init(repeating repeatedValue: Character, count: Int) {

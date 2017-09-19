@@ -527,11 +527,11 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///   buffer, and a typed buffer of the written elements. The returned
   ///   buffer references memory starting at the same base address as this
   ///   buffer.
-  // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
   @_inlineable
   public func initializeMemory<S: Sequence>(
     as type: S.Element.Type, from source: S
   ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Element>) {
+    // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
 
     var it = source.makeIterator()
     var idx = startIndex
