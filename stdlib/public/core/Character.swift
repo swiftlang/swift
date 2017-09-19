@@ -25,29 +25,29 @@
 ///     // Prints "Length: 8"
 ///
 /// Because each character in a string can be made up of one or more Unicode
-/// code points, the number of characters in a string may not match the length
-/// of the Unicode code point representation or the length of the string in a
-/// particular binary representation.
+/// scalar values, the number of characters in a string may not match the
+/// length of the Unicode scalar value representation or the length of the
+/// string in a particular binary representation.
 ///
-///     print("Unicode code point count: \(greeting.unicodeScalars.count)")
-///     // Prints "Unicode code point count: 15"
+///     print("Unicode scalar value count: \(greeting.unicodeScalars.count)")
+///     // Prints "Unicode scalar value count: 15"
 ///
 ///     print("UTF-8 representation count: \(greeting.utf8.count)")
 ///     // Prints "UTF-8 representation count: 18"
 ///
-/// Every `Character` instance is composed of one or more Unicode code points
+/// Every `Character` instance is composed of one or more Unicode scalar values
 /// that are grouped together as an *extended grapheme cluster*. The way these
-/// code points are grouped is defined by a canonical, localized, or otherwise
-/// tailored Unicode segmentation algorithm.
+/// scalar values are grouped is defined by a canonical, localized, or
+/// otherwise tailored Unicode segmentation algorithm.
 ///
 /// For example, a country's Unicode flag character is made up of two regional
-/// indicator code points that correspond to that country's ISO 3166-1 alpha-2
-/// code. The alpha-2 code for The United States is "US", so its flag
-/// character is made up of the Unicode code points `"\u{1F1FA}"` (REGIONAL
+/// indicator scalar values that correspond to that country's ISO 3166-1
+/// alpha-2 code. The alpha-2 code for The United States is "US", so its flag
+/// character is made up of the Unicode scalar values `"\u{1F1FA}"` (REGIONAL
 /// INDICATOR SYMBOL LETTER U) and `"\u{1F1F8}"` (REGIONAL INDICATOR SYMBOL
-/// LETTER S). When placed next to each other in a Swift string literal, these
-/// two code points are combined into a single grapheme cluster, represented
-/// by a `Character` instance in Swift.
+/// LETTER S). When placed next to each other in a string literal, these two
+/// scalar values are combined into a single grapheme cluster, represented by
+/// a `Character` instance in Swift.
 ///
 ///     let usFlag: Character = "\u{1F1FA}\u{1F1F8}"
 ///     print(usFlag)

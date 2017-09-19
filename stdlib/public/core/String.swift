@@ -363,7 +363,7 @@ extension String {
 ///
 ///     let banner = """
 ///               __,
-///              (          o   /) _/_
+///              (           o  /) _/_
 ///               `.  , , , ,  //  /
 ///             (___)(_(_/_(_ //_ (__
 ///                          /)
@@ -393,9 +393,9 @@ extension String {
 ///     print(cafe1 == cafe2)
 ///     // Prints "true"
 ///
-/// The Unicode code point `"\u{301}"` modifies the preceding character to
+/// The Unicode scalar value `"\u{301}"` modifies the preceding character to
 /// include an accent, so `"e\u{301}"` has the same canonical representation
-/// as the single Unicode code point `"é"`.
+/// as the single Unicode scalar value `"é"`.
 ///
 /// Basic string operations are not sensitive to locale settings, ensuring that
 /// string comparisons and other operations always have a single, stable
@@ -407,10 +407,10 @@ extension String {
 ///
 /// A string is a collection of *extended grapheme clusters*, which approximate
 /// human-readable characters. Many individual characters, such as "é", "김",
-/// and "🇮🇳", can be made up of multiple Unicode code points. These code points
-/// are combined by Unicode's boundary algorithms into extended grapheme
-/// clusters, represented by the Swift `Character` type. Each element of a
-/// string is represented by a `Character` instance.
+/// and "🇮🇳", can be made up of multiple Unicode scalar values. These scalar
+/// values are combined by Unicode's boundary algorithms into extended
+/// grapheme clusters, represented by the Swift `Character` type. Each element
+/// of a string is represented by a `Character` instance.
 ///
 /// For example, to retrieve the first word of a longer string, you can search
 /// for a space and then create a substring from a prefix of the string up to
@@ -468,9 +468,9 @@ extension String {
 ///
 /// The `unicodeScalars` view's elements comprise each Unicode scalar value in
 /// the `cafe` string. In particular, because `cafe` was declared using the
-/// decomposed form of the `"é"` character, `unicodeScalars` contains the code
-/// points for both the letter `"e"` (101) and the accent character `"´"`
-/// (769).
+/// decomposed form of the `"é"` character, `unicodeScalars` contains the
+/// scalar values for both the letter `"e"` (101) and the accent character
+/// `"´"` (769).
 ///
 /// UTF-16 View
 /// -----------

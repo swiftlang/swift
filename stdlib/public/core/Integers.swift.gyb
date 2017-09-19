@@ -88,7 +88,7 @@ extension ExpressibleByIntegerLiteral
 }
 
 //===----------------------------------------------------------------------===//
-//===--- Documentation Helpers --------------------------------------------===//
+//===--- Operator Documentation -------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
 %{
@@ -1587,6 +1587,20 @@ extension BinaryInteger {
     return it.next() ?? 0
   }
 
+  /// Returns the quotient and remainder of this value divided by the given
+  /// value.
+  ///
+  /// Use this method to calculate the quotient and remainder of a division at
+  /// the same time.
+  ///
+  ///     let x = 1_000_000
+  ///     let (q, r) = x.quotientAndRemainder(dividingBy: 933)
+  ///     // q == 1071
+  ///     // r == 757
+  ///
+  /// - Parameter rhs: The value to divide this value by.
+  /// - Returns: A tuple containing the quotient and remainder of this value
+  ///   divided by `rhs`.
   public func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self) {
     return (self / rhs, self % rhs)
@@ -2007,8 +2021,8 @@ ${overflowOperationComment(x.operator)}
   /// - Parameter other: The value to multiply this value by.
   /// - Returns: A tuple containing the high and low parts of the result of
   ///   multiplying this value and `other`.
-  // FIXME(integers): figure out how to return DoubleWidth<Self>
   func multipliedFullWidth(by other: Self) -> (high: Self, low: Self.Magnitude)
+  // FIXME(integers): figure out how to return DoubleWidth<Self>
 
   /// Returns a tuple containing the quotient and remainder of dividing the
   /// given value by this value.
@@ -2113,6 +2127,11 @@ extension FixedWidthInteger {
   @_inlineable
   public var bitWidth: Int { return Self.bitWidth }
 
+  /// Creates an integer from its little-endian representation, changing the
+  /// byte order if necessary.
+  ///
+  /// - Parameter value: A value to use as the little-endian representation of
+  ///   the new integer.
   public init(littleEndian value: Self) {
 #if _endian(little)
     self = value
@@ -2121,6 +2140,11 @@ extension FixedWidthInteger {
 #endif
   }
 
+  /// Creates an integer from its big-endian representation, changing the byte
+  /// order if necessary.
+  ///
+  /// - Parameter value: A value to use as the big-endian representation of the
+  ///   new integer.
   public init(bigEndian value: Self) {
 #if _endian(big)
     self = value
@@ -2129,6 +2153,11 @@ extension FixedWidthInteger {
 #endif
   }
 
+  /// The little-endian representation of this integer.
+  ///
+  /// If necessary, the byte order of this value is reversed from the typical
+  /// byte order of this integer type. On a little-endian platform, for any
+  /// integer `x`, `x == x.littleEndian`.
   public var littleEndian: Self {
 #if _endian(little)
     return self
@@ -2137,6 +2166,11 @@ extension FixedWidthInteger {
 #endif
   }
 
+  /// The big-endian representation of this integer.
+  ///
+  /// If necessary, the byte order of this value is reversed from the typical
+  /// byte order of this integer type. On a big-endian platform, for any
+  /// integer `x`, `x == x.bigEndian`.
   public var bigEndian: Self {
 #if _endian(big)
     return self
@@ -2552,6 +2586,25 @@ extension UnsignedInteger {
 }
 
 extension UnsignedInteger where Self : FixedWidthInteger {
+  /// Creates a new instance from the given integer.
+  ///
+  /// Use this initializer to convert from another integer type when you know
+  /// the value is within the bounds of this type. Passing a value that can't
+  /// be represented in this type results in a runtime error.
+  ///
+  /// In the following example, the constant `y` is successfully created from
+  /// `x`, an `Int` instance with a value of `100`. Because the `Int8` type
+  /// can represent `127` at maximum, the attempt to create `z` with a value
+  /// of `1000` results in a runtime error.
+  ///
+  ///     let x = 100
+  ///     let y = Int8(x)
+  ///     // y == 100
+  ///     let z = Int8(x * 10)
+  ///     // Error: Not enough bits to represent the given value
+  ///
+  /// - Parameter source: A value to convert to this type of integer. The value
+  ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
@@ -2646,6 +2699,25 @@ extension SignedInteger {
 }
 
 extension SignedInteger where Self : FixedWidthInteger {
+  /// Creates a new instance from the given integer.
+  ///
+  /// Use this initializer to convert from another integer type when you know
+  /// the value is within the bounds of this type. Passing a value that can't
+  /// be represented in this type results in a runtime error.
+  ///
+  /// In the following example, the constant `y` is successfully created from
+  /// `x`, an `Int` instance with a value of `100`. Because the `Int8` type
+  /// can represent `127` at maximum, the attempt to create `z` with a value
+  /// of `1000` results in a runtime error.
+  ///
+  ///     let x = 100
+  ///     let y = Int8(x)
+  ///     // y == 100
+  ///     let z = Int8(x * 10)
+  ///     // Error: Not enough bits to represent the given value
+  ///
+  /// - Parameter source: A value to convert to this type of integer. The value
+  ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
@@ -3154,9 +3226,9 @@ ${assignmentOperatorComment(x.operator, True)}
   /// - Parameter other: The value to multiply this value by.
   /// - Returns: A tuple containing the high and low parts of the result of
   ///   multiplying this value and `other`.
-  // FIXME(integers): tests
   public func multipliedFullWidth(by other: ${Self})
-  -> (high: ${Self}, low: ${Self}.Magnitude) {
+    -> (high: ${Self}, low: ${Self}.Magnitude) {
+    // FIXME(integers): tests
 %   # 128 bit types are not provided by the 32-bit LLVM
 %   if word_bits == 32 and bits == 64:
     // FIXME(integers): implement
@@ -3186,10 +3258,10 @@ ${assignmentOperatorComment(x.operator, True)}
   ///   sign, if the type is signed.
   /// - Returns: A tuple containing the quotient and remainder of `dividend`
   ///   divided by this value.
-  // FIXME(integers): tests
   public func dividingFullWidth(
     _ dividend: (high: ${Self}, low: ${Self}.Magnitude)
   ) -> (quotient: ${Self}, remainder: ${Self}) {
+    // FIXME(integers): tests
 %   # 128 bit types are not provided by the 32-bit LLVM
 %   #if word_bits == 32 and bits == 64:
 %   if bits == 64:

@@ -363,15 +363,15 @@ public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
 /// A type that can be initialized with a string literal containing a single
 /// extended grapheme cluster.
 ///
-/// An *extended grapheme cluster* is a group of one or more Unicode code
-/// points that approximates a single user-perceived character.  Many
+/// An *extended grapheme cluster* is a group of one or more Unicode scalar
+/// values that approximates a single user-perceived character.  Many
 /// individual characters, such as "é", "김", and "🇮🇳", can be made up of
-/// multiple Unicode code points. These code points are combined by Unicode's
-/// boundary algorithms into extended grapheme clusters.
+/// multiple Unicode scalar values. These code points are combined by
+/// Unicode's boundary algorithms into extended grapheme clusters.
 ///
 /// The `String`, `StaticString`, and `Character` types conform to the
-/// `ExpressibleByExtendedGraphemeClusterLiteral` protocol. You can initialize a
-/// variable or constant of any of these types using a string literal that
+/// `ExpressibleByExtendedGraphemeClusterLiteral` protocol. You can initialize
+/// a variable or constant of any of these types using a string literal that
 /// holds a single character.
 ///
 ///     let snowflake: Character = "❄︎"
@@ -505,8 +505,8 @@ extension ExpressibleByStringLiteral
 ///   initialize a type that conforms to `ExpressibleByArrayLiteral` simply by
 ///   assigning an existing array.
 ///
-///         let anotherSet: Set = employeesArray
-///         // error: cannot convert value of type '[String]' to specified type 'Set'
+///       let anotherSet: Set = employeesArray
+///       // error: cannot convert value of type '[String]' to specified type 'Set'
 ///
 /// Type Inference of Array Literals
 /// ================================
