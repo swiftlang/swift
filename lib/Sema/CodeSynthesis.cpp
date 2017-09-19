@@ -1699,7 +1699,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
         getter->setAccess(var->getFormalAccess());
 
         // Make a setter if the behavior property has one.
-        if (auto valueSetter = valueProp->getSetter()) {
+        if (valueProp->getSetter()) {
           ParamDecl *newValueParam = nullptr;
           setter = createSetterPrototype(var, newValueParam, TC);
           if (mightBeMutating && valueProp->isSetterMutating())
