@@ -550,6 +550,14 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
+  if (auto CBI = dyn_cast<CheckedCastValueBranchInst>(T)) {
+    auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
+    if (!SuccBB->getNumArguments())
+      return;
+    Args.push_back(NewEdgeBB->createPHIArgument(
+        SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+    return;
+  }
 
   if (auto *TAI = dyn_cast<TryApplyInst>(T)) {
     auto *SuccBB = EdgeIdx == 0 ? TAI->getNormalBB() : TAI->getErrorBB();
