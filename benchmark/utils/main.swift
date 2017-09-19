@@ -109,6 +109,7 @@ import StrComplexWalk
 import StrToInt
 import StringBuilder
 import StringEdits
+import StringEnum
 import StringInterpolation
 import StringMatch
 import StringTests
@@ -417,6 +418,7 @@ addTo(&precommitTests, "StringAdder", run_StringAdder)
 addTo(&precommitTests, "StringBuilder", run_StringBuilder)
 addTo(&precommitTests, "StringBuilderLong", run_StringBuilderLong)
 addTo(&precommitTests, "StringEdits", run_StringEdits)
+addTo(&precommitTests, "StringEnumRawValueInitialization", run_StringEnumRawValueInitialization)
 addTo(&precommitTests, "StringEqualPointerComparison", run_StringEqualPointerComparison)
 addTo(&precommitTests, "StringFromLongWholeSubstring", run_StringFromLongWholeSubstring)
 addTo(&precommitTests, "StringFromLongWholeSubstringGeneric", run_StringFromLongWholeSubstringGeneric)

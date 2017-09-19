@@ -131,6 +131,7 @@ set(SWIFTLIB_ESSENTIAL
   StringInterpolation.swift
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
+  StringSwitch.swift
   StringIndexConversions.swift
   StringUnicodeScalarView.swift
   StringUTF16.swift

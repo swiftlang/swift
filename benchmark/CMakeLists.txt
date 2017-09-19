@@ -104,6 +104,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StrToInt
     single-source/StringBuilder
     single-source/StringEdits
+    single-source/StringEnum
     single-source/StringInterpolation
     single-source/StringMatch
     single-source/StringTests
