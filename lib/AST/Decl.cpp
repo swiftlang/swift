@@ -1973,17 +1973,31 @@ Accessibility ValueDecl::getEffectiveAccess() const {
     break;
   }
 
+  auto restrictToEnclosing =
+      [this](Accessibility effectiveAccess,
+             Accessibility enclosingAccess) -> Accessibility {
+    if (effectiveAccess == Accessibility::Open &&
+        enclosingAccess == Accessibility::Public &&
+        isa<NominalTypeDecl>(this)) {
+      // Special case: an open class may be contained in a public
+      // class/struct/enum. Leave effectiveAccess as is.
+      return effectiveAccess;
+    }
+    return std::min(effectiveAccess, enclosingAccess);
+  };
+
   if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(getDeclContext())) {
-    effectiveAccess = std::min(effectiveAccess,
-                               enclosingNominal->getEffectiveAccess());
+    effectiveAccess =
+        restrictToEnclosing(effectiveAccess,
+                            enclosingNominal->getEffectiveAccess());
 
   } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(getDeclContext())) {
     // Just check the base type. If it's a constrained extension, Sema should
     // have already enforced access more strictly.
     if (auto extendedTy = enclosingExt->getExtendedType()) {
       if (auto nominal = extendedTy->getAnyNominal()) {
-        effectiveAccess = std::min(effectiveAccess,
-                                   nominal->getEffectiveAccess());
+        effectiveAccess =
+            restrictToEnclosing(effectiveAccess, nominal->getEffectiveAccess());
       }
     }
 
