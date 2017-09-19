@@ -3817,6 +3817,27 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
                              genericFn->getExtInfo());
   }
 
+  // Remap associated types that reference other protocols into this
+  // protocol.
+  auto proto = conformance->getProtocol();
+  type = type.transformRec([proto](TypeBase *type) -> Optional<Type> {
+    if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
+      if (depMemTy->getAssocType() &&
+          depMemTy->getAssocType()->getProtocol() != proto) {
+        for (auto member : proto->lookupDirect(depMemTy->getName())) {
+          if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+            auto origProto = depMemTy->getAssocType()->getProtocol();
+            if (proto->inheritsFrom(origProto))
+              return Type(DependentMemberType::get(depMemTy->getBase(),
+                                                   assocType));
+          }
+        }
+      }
+    }
+
+    return None;
+  });
+
   ModuleDecl *module = conformance->getDeclContext()->getParentModule();
   auto resultType = type.subst(QueryTypeSubstitutionMap{substitutions},
                                LookUpConformanceInModule(module),
