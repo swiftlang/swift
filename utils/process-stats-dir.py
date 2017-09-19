@@ -344,7 +344,7 @@ def main():
     parser.add_argument("--sort-by-delta-pct",
                         default=False,
                         action="store_true",
-                        help="Sort comparison results by delta-%, not stat")
+                        help="Sort comparison results by delta-%%, not stat")
     parser.add_argument("--sort-descending",
                         default=False,
                         action="store_true",
