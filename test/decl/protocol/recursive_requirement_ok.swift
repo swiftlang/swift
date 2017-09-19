@@ -84,3 +84,11 @@ protocol P11 {
   // CHECK: Generic signature: <Self, T where Self : P11, T : P11, Self.Q == T.Q>
   func map<T>(_: T.Type) where T : P11, Q == T.Q
 }
+
+// Redundances within a requirement signature.
+protocol P12 { }
+
+protocol P13 {
+  associatedtype AT1 : P12
+  associatedtype AT2: P13 where AT2.AT1 == AT1
+}
