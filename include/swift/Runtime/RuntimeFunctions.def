@@ -1314,6 +1314,12 @@ FUNCTION(Swift3ImplicitObjCEntrypoint, swift_objc_swift3ImplicitObjCEntrypoint,
 
 #endif
 
+FUNCTION(VerifyTypeLayoutAttribute, _swift_debug_verifyTypeLayoutAttribute,
+         C_CC,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, Int8PtrTy, Int8PtrTy, SizeTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS
