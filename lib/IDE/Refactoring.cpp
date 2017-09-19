@@ -1574,8 +1574,8 @@ static std::unique_ptr<llvm::SetVector<Expr*>>
       if (!Expr)
         return false;
       auto *FD = dyn_cast<FuncDecl>(Expr->getDecl());
-      if (FD == nullptr || FD != Ctx.getPlusFunctionOnString() ||
-          FD != Ctx.getPlusFunctionOnRangeReplaceableCollection()) {
+      if (FD == nullptr || (FD != Ctx.getPlusFunctionOnString() &&
+          FD != Ctx.getPlusFunctionOnRangeReplaceableCollection())) {
         return false;
       }
       return true;
@@ -1642,8 +1642,12 @@ static void interpolatedExpressionForm(Expr* E, SourceManager& SM,
 
 bool RefactoringActionConvertStringsConcatenationToInterpolation::
 isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
-  auto Type = Info.getType();
-  return findConcatenatedExpressions(Info, Type->getASTContext()) != nullptr;
+  auto RangeContext = Info.RangeContext;
+  if (RangeContext) {
+    auto &Ctx = Info.RangeContext->getASTContext();
+    return findConcatenatedExpressions(Info, Ctx) != nullptr;
+  }
+  return false;
 }
 
 bool RefactoringActionConvertStringsConcatenationToInterpolation::performChange() {
