@@ -1264,7 +1264,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         return status;
       case RequirementCheckResult::Success:
         // Report the conformance.
-        if (listener) {
+        if (listener && valid) {
           listener->satisfiedConformance(rawReq.getFirstType(), firstType,
                                          result.getConformance());
         }
