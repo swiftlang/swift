@@ -1624,7 +1624,7 @@ static std::unique_ptr<llvm::SetVector<Expr*>>
 }
 
 static void interpolatedExpressionForm(Expr *E, SourceManager &SM,
-                                              llvm::raw_svector_ostream &OS) {
+                                              llvm::raw_ostream &OS) {
   if (auto *Literal = dyn_cast<StringLiteralExpr>(E)) {
     OS << Literal->getValue();
     return;
