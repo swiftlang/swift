@@ -46,6 +46,7 @@ RANGE_REFACTORING(ExtractFunction, "Extract Method", extract.function)
 
 RANGE_REFACTORING(ExtractRepeatedExpr, "Extract Repeated Expression", extract.expr.repeated)
 
+RANGE_REFACTORING(ConvertStringsConcatenationToInterpolation, "Convert to String Interpolation", convert.string-concatenation.interpolation)
 #undef CURSOR_REFACTORING
 #undef RANGE_REFACTORING
 #undef SEMANTIC_REFACTORING
