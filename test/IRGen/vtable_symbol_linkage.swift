@@ -9,4 +9,5 @@ import BaseModule
 public class Derived : Base {
 }
 
-
+public class DerivedNested : Namespace.Nested {}
+public class DerivedExtNested : Namespace.ExtNested {}
