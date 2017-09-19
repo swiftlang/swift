@@ -154,7 +154,8 @@ public:
 
   /// Returns true if \p I is a valid instruction to be contained in the
   /// static initializer.
-  static bool isValidStaticInitializerInst(const SILInstruction *I);
+  static bool isValidStaticInitializerInst(const SILInstruction *I,
+                                           SILModule &M);
 
   void dropAllReferences() {
     StaticInitializerBlock.dropAllReferences();
