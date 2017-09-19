@@ -313,9 +313,9 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
     unsafeBitCast(nsa, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
 
-  _fixLifetime(nsa)
-  _fixLifetime(a)
-  _fixLifetime(bridgedBack)
+  _blackHole(nsa)
+  _blackHole(a)
+  _blackHole(bridgedBack)
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.Subscript") {
@@ -432,7 +432,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     expectNotEqual(identity2, identity1)
     expectEqual(3, a1.count)
     expectEqual(1010, (a1[0] as! TestObjCValueTy).value)
-    assert(a2._buffer.capacity < originalCapacity)
+    expectLT(a2._buffer.capacity, originalCapacity)
     expectEqual(0, a2.count)
   }
 
@@ -500,7 +500,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     expectNotEqual(identity2, identity1)
     expectEqual(3, a1.count)
     expectEqual(1010, a1[0].value)
-    assert(a2._buffer.capacity < originalCapacity)
+    expectLT(a2._buffer.capacity, originalCapacity)
     expectEqual(0, a2.count)
   }
 
@@ -519,7 +519,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     expectNotEqual(identity2, identity1)
     expectEqual(3, a1.count)
     expectEqual(1010, a1[0].value)
-    assert(a2._buffer.capacity >= originalCapacity)
+    expectGE(a2._buffer.capacity, originalCapacity)
     expectEqual(0, a2.count)
   }
 }
@@ -553,8 +553,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
     values.append((value as! TestObjCValueTy).value)
   }
   expectEqual(values, [1010, 1020, 1030])
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   expectNil(iter.next())
   expectNil(iter.next())
   expectNil(iter.next())
@@ -783,7 +781,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
 ArrayTestSuite.test("BridgedToObjC.Verbatim.Count") {
   let d = getBridgedNSArrayOfRefTypesBridgedVerbatim()
 
-  assert(d.count == 3)
+  expectEqual(3, d.count)
 }
 
 ArrayTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
