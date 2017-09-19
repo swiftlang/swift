@@ -773,8 +773,9 @@ calculateContentRange(ArrayRef<Token> Tokens) {
   auto StartLoc = StartTok.hasComment() ?
     StartTok.getCommentStart() : StartTok.getLoc();
   auto EndLoc = EndTok.getRange().getEnd();
-  return CharSourceRange(StartLoc, (char*)EndLoc.getOpaquePointerValue() -
-    (char*)StartLoc.getOpaquePointerValue());
+  auto Length = static_cast<const char *>(EndLoc.getOpaquePointerValue()) -
+                static_cast<const char *>(StartLoc.getOpaquePointerValue());
+  return CharSourceRange(StartLoc, Length);
 }
 
 bool DeclaredDecl::operator==(const DeclaredDecl& Other) {

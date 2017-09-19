@@ -325,7 +325,7 @@ void Lexer::skipUpToEndOfLine() {
         return;
       default:
         // If this is a "high" UTF-8 character, validate it.
-        if (*((signed char *)CurPtr) < 0) {
+        if (*reinterpret_cast<const signed char *>(CurPtr) < 0) {
           const char *CharStart = CurPtr;
           if (validateUTF8CharacterAndAdvance(CurPtr, BufferEnd) == ~0U)
             diagnose(CharStart, diag::lex_invalid_utf8);
