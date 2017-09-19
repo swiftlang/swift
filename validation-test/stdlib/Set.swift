@@ -1965,8 +1965,6 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
     members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   expectNil(iter.next())
   expectNil(iter.next())
   expectNil(iter.next())
@@ -1984,8 +1982,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
     members.append(member.value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   expectNil(iter.next())
   expectNil(iter.next())
   expectNil(iter.next())
@@ -1999,8 +1995,6 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
 
   var iter = s.makeIterator()
   expectNil(iter.next())
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   expectNil(iter.next())
   expectNil(iter.next())
   expectNil(iter.next())
@@ -2014,8 +2008,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
 
   var iter = s.makeIterator()
   expectNil(iter.next())
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   expectNil(iter.next())
   expectNil(iter.next())
   expectNil(iter.next())
@@ -2033,8 +2025,6 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
     members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, hugeNumberArray))
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   expectNil(iter.next())
   expectNil(iter.next())
   expectNil(iter.next())
@@ -2052,8 +2042,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
     members.append((member as! TestBridgedKeyTy).value)
   }
   expectTrue(equalsUnordered(members, hugeNumberArray))
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   expectNil(iter.next())
   expectNil(iter.next())
   expectNil(iter.next())

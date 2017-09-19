@@ -570,8 +570,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
     values.append(value.value)
   }
   expectEqual(values, [1010, 1020, 1030])
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   expectNil(iter.next())
   expectNil(iter.next())
   expectNil(iter.next())
@@ -585,8 +583,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
 
   var iter = a.makeIterator()
   expectNil(iter.next())
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   expectNil(iter.next())
   expectNil(iter.next())
   expectNil(iter.next())
@@ -600,8 +596,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
 
   var iter = a.makeIterator()
   expectNil(iter.next())
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   expectNil(iter.next())
   expectNil(iter.next())
   expectNil(iter.next())
@@ -623,8 +617,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
     expectedValues += [1000 + i]
   }
   expectEqual(values, expectedValues)
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   expectNil(iter.next())
   expectNil(iter.next())
   expectNil(iter.next())
@@ -646,8 +638,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
     expectedValues += [1000 + i]
   }
   expectEqual(values, expectedValues)
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   expectNil(iter.next())
   expectNil(iter.next())
   expectNil(iter.next())
