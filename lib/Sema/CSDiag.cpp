@@ -2698,7 +2698,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
                instanceTy, memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
-    case MemberLookupResult::UR_InstanceMemberOnType:
+    case MemberLookupResult::UR_InstanceMemberOnType: {
       // If the base is an implicit self type reference, and we're in a
       // an initializer, then the user wrote something like:
       //
@@ -2744,11 +2744,28 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
           return;
         }
       }
-        
-      diagnose(loc, diag::could_not_use_instance_member_on_type,
-               instanceTy, memberName)
-        .highlight(baseRange).highlight(nameLoc.getSourceRange());
+
+      // Check whether the instance member is declared on parent context and if so
+      // provide more specialized message.
+      auto memberTypeContext = member->getDeclContext()->getInnermostTypeContext();
+      auto currentTypeContext = CS.DC->getInnermostTypeContext();
+      if (memberTypeContext && currentTypeContext &&
+          memberTypeContext->getSemanticDepth() <
+          currentTypeContext->getSemanticDepth()) {
+        diagnose(loc, diag::could_not_use_instance_member_on_type,
+                 currentTypeContext->getDeclaredInterfaceType(), memberName,
+                 memberTypeContext->getDeclaredTypeOfContext(),
+                 true)
+          .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      } else {
+        diagnose(loc, diag::could_not_use_instance_member_on_type,
+                 instanceTy, memberName,
+                 instanceTy,
+                 false)
+         .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      }
       return;
+    }
 
     case MemberLookupResult::UR_TypeMemberOnInstance:
       diagnoseTypeMemberOnInstanceLookup(baseObjTy, baseExpr,
@@ -5027,12 +5044,15 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
       }
 
       // Otherwise, complain about use of instance value on type.
-      auto diagnostic = isa<TypeExpr>(baseExpr)
-                            ? diag::instance_member_use_on_type
-                            : diag::could_not_use_instance_member_on_type;
-
-      TC.diagnose(UDE->getLoc(), diagnostic, instanceType, UDE->getName())
+      if (isa<TypeExpr>(baseExpr)) {
+        TC.diagnose(UDE->getLoc(), diag::instance_member_use_on_type,
+                    instanceType, UDE->getName())
           .highlight(baseExpr->getSourceRange());
+      } else {
+        TC.diagnose(UDE->getLoc(), diag::could_not_use_instance_member_on_type,
+                    instanceType, UDE->getName(), instanceType, false)
+          .highlight(baseExpr->getSourceRange());
+      }
       return true;
     }
   }
