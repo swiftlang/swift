@@ -468,20 +468,21 @@ public: // for static functions in Frontend.cpp
   };
 
 private:
-  void createREPLFile(ImplicitImports &implicitImports) const;
+  void createREPLFile(const ImplicitImports &implicitImports) const;
   std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
 
-  void addMainFileToModule(ImplicitImports &implicitImports);
+  void addMainFileToModule(const ImplicitImports &implicitImports);
 
-  void parseAndCheckTypes(ImplicitImports &implicitImports);
+  void parseAndCheckTypes(const ImplicitImports &implicitImports);
 
-  void parseLibraryFile(unsigned BufferID, ImplicitImports &implicitImports,
+  void parseLibraryFile(unsigned BufferID,
+                        const ImplicitImports &implicitImports,
                         PersistentParserState &PersistentState,
                         DelayedParsingCallbacks *DelayedParseCB);
 
   /// Return true if had load error
   bool
-  parsePartialModulesAndLibraryFiles(ImplicitImports &implicitImports,
+  parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports,
                                      PersistentParserState &PersistentState,
                                      DelayedParsingCallbacks *DelayedParseCB);
 
