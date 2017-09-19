@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Config.h"
 #include "../SwiftShims/LibcShims.h"
 #include "llvm/Support/DataTypes.h"
 
@@ -104,12 +105,22 @@ int swift::_swift_stdlib_close(int fd) {
 static_assert(std::is_same<__swift_thread_key_t, DWORD>::value,
               "__swift_thread_key_t is not a DWORD");
 
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_stdlib_destroyTLS(void *);
+
+static void
+#if defined(_M_X86)
+__stdcall
+#endif
+_swift_stdlib_destroyTLS_CCAdjustmentThunk(void *ptr) {
+  _swift_stdlib_destroyTLS(ptr);
+}
+
 SWIFT_RUNTIME_STDLIB_INTERFACE
 int
 swift::_swift_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
                                        void (* _Nullable destructor)(void *)) {
-  // TODO(compnerd) account for x86 CC violation (__stdcall)
-  *key = FlsAlloc(reinterpret_cast<PFLS_CALLBACK_FUNCTION>(destructor));
+  *key = FlsAlloc(_swift_stdlib_destroyTLS_CCAdjustmentThunk);
   return *key != FLS_OUT_OF_INDEXES;
 }
 
