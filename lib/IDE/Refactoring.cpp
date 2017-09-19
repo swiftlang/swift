@@ -1556,7 +1556,7 @@ bool RefactoringActionCollapseNestedIfExpr::performChange() {
 }
 
 static std::unique_ptr<llvm::SetVector<Expr*>>
-  findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext& Ctx) {
+  findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
   if (Info.Kind != RangeKind::SingleExpression
       && Info.Kind != RangeKind::PartOfExpression)
     return nullptr;
@@ -1565,10 +1565,10 @@ static std::unique_ptr<llvm::SetVector<Expr*>>
   struct StringInterpolationExprFinder: public SourceEntityWalker {
     std::unique_ptr<llvm::SetVector<Expr*>> Bucket = llvm::
     make_unique<llvm::SetVector<Expr*>>();
-    ASTContext& Ctx;
+    ASTContext &Ctx;
 
     bool IsValidInterpolation = true;
-    StringInterpolationExprFinder(ASTContext& Ctx): Ctx(Ctx) {}
+    StringInterpolationExprFinder(ASTContext &Ctx): Ctx(Ctx) {}
 
     bool isConcatenationExpr(DeclRefExpr* Expr) {
       if (!Expr)
@@ -1623,8 +1623,8 @@ static std::unique_ptr<llvm::SetVector<Expr*>>
   return std::move(Walker.Bucket);
 }
 
-static void interpolatedExpressionForm(Expr* E, SourceManager& SM,
-                                              llvm::raw_svector_ostream& OS) {
+static void interpolatedExpressionForm(Expr *E, SourceManager &SM,
+                                              llvm::raw_svector_ostream &OS) {
   if (auto *Literal = dyn_cast<StringLiteralExpr>(E)) {
     OS << Literal->getValue();
     return;
