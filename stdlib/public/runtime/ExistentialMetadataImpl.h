@@ -561,16 +561,17 @@ struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
 
   template <class Container, class... A>
   static void storeExtraInhabitant(Container *dest, int index, A... args) {
-    swift_storeHeapObjectExtraInhabitant((HeapObject**) dest->getValueSlot(),
+    Metadata **MD = const_cast<Metadata **>(dest->getValueSlot());
+    swift_storeHeapObjectExtraInhabitant(reinterpret_cast<HeapObject **>(MD),
                                          index);
   }
 
   template <class Container, class... A>
   static int getExtraInhabitantIndex(const Container *src, A... args) {
+    Metadata **MD = const_cast<Metadata **>(src->getValueSlot());
     return swift_getHeapObjectExtraInhabitantIndex(
-                                  (HeapObject* const *) src->getValueSlot());
+        reinterpret_cast<HeapObject *const *>(MD));
   }
-  
 };
 
 /// A box implementation class for an existential metatype container
