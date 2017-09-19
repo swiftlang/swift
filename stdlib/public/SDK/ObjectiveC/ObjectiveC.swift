@@ -216,6 +216,64 @@ public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
 
+internal struct _NSObjectProtocolAnyHashableBox : _AnyHashableBox {
+  internal let _baseObject: NSObjectProtocol
+
+  internal init(_ base: NSObjectProtocol) {
+    self._baseObject = base
+  }
+  
+  internal var _typeID: ObjectIdentifier {
+    return ObjectIdentifier(type(of: _baseObject))
+  }
+
+  internal func _unbox<T : Hashable>() -> T? {
+    return _baseObject as? T
+  }
+
+  internal func _isEqual(to rhs: _AnyHashableBox) -> Bool? {
+    if let rhs = rhs._base as? NSObjectProtocol {
+      return _baseObject.isEqual(rhs)
+    }
+    return nil
+  }
+
+  internal var _hashValue: Int {
+    return _baseObject.hash
+  }
+
+  internal var _base: Any {
+    return _baseObject
+  }
+
+  internal
+  func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
+    guard let value = _baseObject as? T else { return false }
+    result.initialize(to: value)
+    return true
+  }
+}
+
+extension AnyHashable {
+  public init<B : Hashable & NSObjectProtocol>(_ base: B) {
+    self.init(_base: base, ())
+  }
+
+  public init(_ base: NSObjectProtocol) {
+    if let base = base as? NSObject {
+      self.init(_base: base, ())
+    }
+    else if let box = (base as?
+      _HasCustomAnyHashableRepresentation)?._toCustomAnyHashable() {
+      self.init(0 as Int)
+      self = box
+    }
+    else {
+      self.init(_box: _NSObjectProtocolAnyHashableBox(base))
+    }
+  }
+}
+
 extension NSObject : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs

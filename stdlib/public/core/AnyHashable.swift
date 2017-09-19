@@ -37,7 +37,7 @@ public protocol _HasCustomAnyHashableRepresentation {
   func _toCustomAnyHashable() -> AnyHashable?
 }
 
-internal protocol _AnyHashableBox {
+public protocol _AnyHashableBox {
   var _typeID: ObjectIdentifier { get }
   func _unbox<T : Hashable>() -> T?
 
@@ -124,6 +124,21 @@ public struct AnyHashable {
   internal var _box: _AnyHashableBox
   internal var _usedCustomRepresentation: Bool
 
+  public init<H : Hashable>(_base: H, _ dummy: Void) {
+    if let customRepresentation =
+      (_base as? _HasCustomAnyHashableRepresentation)?._toCustomAnyHashable() {
+      self = customRepresentation
+      self._usedCustomRepresentation = true
+      return
+    }
+
+    self._box = _ConcreteHashableBox(0 as Int)
+    self._usedCustomRepresentation = false
+    _stdlib_makeAnyHashableUpcastingToHashableBaseType(
+      _base,
+      storingResultInto: &self)
+  }
+  
   /// Creates a type-erased hashable value that wraps the given instance.
   ///
   /// The following example creates two type-erased hashable values: `x` wraps
@@ -143,23 +158,17 @@ public struct AnyHashable {
   ///
   /// - Parameter base: A hashable value to wrap.
   public init<H : Hashable>(_ base: H) {
-    if let customRepresentation =
-      (base as? _HasCustomAnyHashableRepresentation)?._toCustomAnyHashable() {
-      self = customRepresentation
-      self._usedCustomRepresentation = true
-      return
-    }
-
-    self._box = _ConcreteHashableBox(0 as Int)
-    self._usedCustomRepresentation = false
-    _stdlib_makeAnyHashableUpcastingToHashableBaseType(
-      base,
-      storingResultInto: &self)
+    self.init(_base: base, ())
   }
 
   internal init<H : Hashable>(_usingDefaultRepresentationOf base: H) {
     self._box = _ConcreteHashableBox(base)
     self._usedCustomRepresentation = false
+  }
+
+  public init(_box: _AnyHashableBox) {
+    self._box = _box
+    self._usedCustomRepresentation = true
   }
 
   /// The value wrapped by this instance.
