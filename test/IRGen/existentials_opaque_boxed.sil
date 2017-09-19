@@ -325,7 +325,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[SRC_REFADDR:%.*]] = bitcast [{{(24|12)}} x i8]* [[SRC_BUFFERADDR]] to %swift.refcounted**
 // CHECK:   [[DEST_REF:%.*]] = load %swift.refcounted*, %swift.refcounted** [[DEST_REFADDR]]
 // CHECK:   [[SRC_REF:%.*]] = load %swift.refcounted*, %swift.refcounted** [[SRC_REFADDR]]
-// CHECK:   call void @swift_rt_swift_retain(%swift.refcounted* [[SRC_REF]])
+// CHECK:   call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[SRC_REF]])
 // CHECK:   call void @swift_rt_swift_release(%swift.refcounted* [[DEST_REF]])
 // CHECK:   store %swift.refcounted* [[SRC_REF]], %swift.refcounted** [[DEST_REFADDR]]
 // CHECK:   br label %done
@@ -382,7 +382,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[DEST_REFADDR:%.*]] = bitcast [{{(24|12)}} x i8]* [[DEST_BUFFERADDR]] to %swift.refcounted**
 // CHECK:   [[SRC_REFADDR:%.*]] = bitcast [{{(24|12)}} x i8]* [[SRC_BUFFERADDR]] to %swift.refcounted**
 // CHECK:   [[SRC_REF:%.*]] = load %swift.refcounted*, %swift.refcounted** [[SRC_REFADDR]]
-// CHECK:   call void @swift_rt_swift_retain(%swift.refcounted* [[SRC_REF]])
+// CHECK:   call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[SRC_REF]])
 // CHECK:   store %swift.refcounted* [[SRC_REF]], %swift.refcounted** [[DEST_REFADDR]]
 // CHECK:   br label %dest-inline-cont
 //
@@ -418,7 +418,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[DEST_REFADDR:%.*]] = bitcast [{{(24|12)}} x i8]* [[DEST_BUFFERADDR]] to %swift.refcounted**
 // CHECK:   [[SRC_REFADDR:%.*]] = bitcast [{{(24|12)}} x i8]* [[SRC_BUFFERADDR]] to %swift.refcounted**
 // CHECK:   [[SRC_REF:%.*]] = load %swift.refcounted*, %swift.refcounted** [[SRC_REFADDR]]
-// CHECK:   call void @swift_rt_swift_retain(%swift.refcounted* [[SRC_REF]])
+// CHECK:   call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[SRC_REF]])
 // CHECK:   store %swift.refcounted* [[SRC_REF]], %swift.refcounted** [[DEST_REFADDR]]
 // CHECK:   br label %dest-outline-cont
 //

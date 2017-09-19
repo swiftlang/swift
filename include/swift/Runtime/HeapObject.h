@@ -204,6 +204,10 @@ void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask)
 ///
 /// \param object - may be null, in which case this is a no-op
 ///
+/// \return object - we return the object because this enables tail call
+/// optimization and the argument register to be live through the call on
+/// architectures whose argument and return register is the same register.
+///
 /// POSSIBILITIES: We may end up wanting a bunch of different variants:
 ///  - the general version which correctly handles null values, swift
 ///     objects, and ObjC objects
@@ -213,34 +217,35 @@ void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask)
 /// It may also prove worthwhile to have this use a custom CC
 /// which preserves a larger set of registers.
 SWIFT_RT_ENTRY_VISIBILITY
-void swift_retain(HeapObject *object)
+HeapObject *swift_retain(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC);
 
 SWIFT_RUNTIME_EXPORT
-void (*SWIFT_CC(RegisterPreservingCC) _swift_retain)(HeapObject *object);
+HeapObject *(*SWIFT_CC(RegisterPreservingCC) _swift_retain)(HeapObject *object);
 
 SWIFT_RT_ENTRY_VISIBILITY
-void swift_retain_n(HeapObject *object, uint32_t n)
+HeapObject *swift_retain_n(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC);
 
 SWIFT_RUNTIME_EXPORT
-void (*SWIFT_CC(RegisterPreservingCC) _swift_retain_n)(HeapObject *object,
-                                                       uint32_t n);
+HeapObject *(*SWIFT_CC(RegisterPreservingCC)
+                 _swift_retain_n)(HeapObject *object, uint32_t n);
 
 SWIFT_RT_ENTRY_VISIBILITY
-void swift_nonatomic_retain(HeapObject *object)
+HeapObject *swift_nonatomic_retain(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC);
 
 SWIFT_RUNTIME_EXPORT
-void (*SWIFT_CC(RegisterPreservingCC) _swift_nonatomic_retain)(HeapObject *object);
+HeapObject *(*SWIFT_CC(RegisterPreservingCC)
+                 _swift_nonatomic_retain)(HeapObject *object);
 
 SWIFT_RT_ENTRY_VISIBILITY
-void swift_nonatomic_retain_n(HeapObject *object, uint32_t n)
+HeapObject* swift_nonatomic_retain_n(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC);
 
 SWIFT_RUNTIME_EXPORT
-void (*SWIFT_CC(RegisterPreservingCC) _swift_nonatomic_retain_n)(HeapObject *object,
-                                                       uint32_t n);
+HeapObject *(*SWIFT_CC(RegisterPreservingCC)
+                 _swift_nonatomic_retain_n)(HeapObject *object, uint32_t n);
 
 /// Atomically increments the reference count of an object, unless it has
 /// already been destroyed. Returns nil if the object is dead.
@@ -525,7 +530,7 @@ struct UnownedReference {
 
 /// Increment the unowned retain count.
 SWIFT_RT_ENTRY_VISIBILITY
-void swift_unownedRetain(HeapObject *value)
+HeapObject *swift_unownedRetain(HeapObject *value)
     SWIFT_CC(RegisterPreservingCC);
 
 /// Decrement the unowned retain count.
@@ -535,7 +540,7 @@ void swift_unownedRelease(HeapObject *value)
 
 /// Increment the unowned retain count.
 SWIFT_RT_ENTRY_VISIBILITY
-void swift_nonatomic_unownedRetain(HeapObject *value)
+void *swift_nonatomic_unownedRetain(HeapObject *value)
     SWIFT_CC(RegisterPreservingCC);
 
 /// Decrement the unowned retain count.
@@ -545,7 +550,7 @@ void swift_nonatomic_unownedRelease(HeapObject *value)
 
 /// Increment the unowned retain count by n.
 SWIFT_RT_ENTRY_VISIBILITY
-void swift_unownedRetain_n(HeapObject *value, int n)
+HeapObject *swift_unownedRetain_n(HeapObject *value, int n)
     SWIFT_CC(RegisterPreservingCC);
 
 /// Decrement the unowned retain count by n.
@@ -555,7 +560,7 @@ void swift_unownedRelease_n(HeapObject *value, int n)
 
 /// Increment the unowned retain count by n.
 SWIFT_RT_ENTRY_VISIBILITY
-void swift_nonatomic_unownedRetain_n(HeapObject *value, int n)
+HeapObject *swift_nonatomic_unownedRetain_n(HeapObject *value, int n)
     SWIFT_CC(RegisterPreservingCC);
 
 /// Decrement the unowned retain count by n.
@@ -566,13 +571,13 @@ void swift_nonatomic_unownedRelease_n(HeapObject *value, int n)
 /// Increment the strong retain count of an object, aborting if it has
 /// been deallocated.
 SWIFT_RT_ENTRY_VISIBILITY
-void swift_unownedRetainStrong(HeapObject *value)
+HeapObject *swift_unownedRetainStrong(HeapObject *value)
     SWIFT_CC(RegisterPreservingCC);
 
 /// Increment the strong retain count of an object, aborting if it has
 /// been deallocated.
 SWIFT_RT_ENTRY_VISIBILITY
-void swift_nonatomic_unownedRetainStrong(HeapObject *value)
+HeapObject *swift_nonatomic_unownedRetainStrong(HeapObject *value)
     SWIFT_CC(RegisterPreservingCC);
 
 /// Increment the strong retain count of an object which may have been
@@ -770,46 +775,46 @@ void *swift_nonatomic_bridgeObjectRetain_n(void *value, int n)
 /// Increment the strong retain count of an object which might not be a native
 /// Swift object.
 SWIFT_RUNTIME_EXPORT
-void swift_unknownRetain(void *value)
+void *swift_unknownRetain(void *value)
     SWIFT_CC(DefaultCC);
 /// Increment the strong retain count of an object which might not be a native
 /// Swift object by n.
 SWIFT_RUNTIME_EXPORT
-void swift_unknownRetain_n(void *value, int n)
+void *swift_unknownRetain_n(void *value, int n)
     SWIFT_CC(DefaultCC);
 
 /// Increment the strong retain count of an object which might not be a native
 /// Swift object.
 SWIFT_RUNTIME_EXPORT
-void swift_nonatomic_unknownRetain(void *value)
+void *swift_nonatomic_unknownRetain(void *value)
     SWIFT_CC(DefaultCC);
 /// Increment the strong retain count of an object which might not be a native
 /// Swift object by n.
 SWIFT_RUNTIME_EXPORT
-void swift_nonatomic_unknownRetain_n(void *value, int n)
+void *swift_nonatomic_unknownRetain_n(void *value, int n)
     SWIFT_CC(DefaultCC);
 
 
 #else
 
-static inline void swift_unknownRetain(void *value)
+static inline void *swift_unknownRetain(void *value)
     SWIFT_CC(DefaultCC) {
-  swift_retain(static_cast<HeapObject *>(value));
+  return swift_retain(static_cast<HeapObject *>(value));
 }
 
-static inline void swift_unknownRetain_n(void *value, int n)
+static inline void *swift_unknownRetain_n(void *value, int n)
     SWIFT_CC(DefaultCC) {
-  swift_retain_n(static_cast<HeapObject *>(value), n);
+  return swift_retain_n(static_cast<HeapObject *>(value), n);
 }
 
-static inline void swift_nonatomic_unknownRetain(void *value)
+static inline void *swift_nonatomic_unknownRetain(void *value)
     SWIFT_CC(DefaultCC) {
-  swift_nonatomic_retain(static_cast<HeapObject *>(value));
+  return swift_nonatomic_retain(static_cast<HeapObject *>(value));
 }
 
-static inline void swift_nonatomic_unknownRetain_n(void *value, int n)
+static inline void *swift_nonatomic_unknownRetain_n(void *value, int n)
     SWIFT_CC(DefaultCC) {
-  swift_nonatomic_retain_n(static_cast<HeapObject *>(value), n);
+  return swift_nonatomic_retain_n(static_cast<HeapObject *>(value), n);
 }
 
 

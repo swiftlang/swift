@@ -492,15 +492,16 @@ static uintptr_t const objectPointerIsObjCBit = 0x4000000000000000ULL;
 static uintptr_t const objectPointerIsObjCBit = 0x00000002U;
 #endif
 
-void swift::swift_unknownRetain_n(void *object, int n)
+void *swift::swift_unknownRetain_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
-  if (isObjCTaggedPointerOrNull(object)) return;
+  if (isObjCTaggedPointerOrNull(object)) return object;
   if (objectUsesNativeSwiftReferenceCounting(object)) {
-    swift_retain_n(static_cast<HeapObject *>(object), n);
-    return;
+    return swift_retain_n(static_cast<HeapObject *>(object), n);
   }
   for (int i = 0; i < n; ++i)
     objc_retain(static_cast<id>(object));
+
+  return object;
 }
 
 void swift::swift_unknownRelease_n(void *object, int n)
@@ -512,14 +513,13 @@ void swift::swift_unknownRelease_n(void *object, int n)
     objc_release(static_cast<id>(object));
 }
 
-void swift::swift_unknownRetain(void *object)
+void *swift::swift_unknownRetain(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
-  if (isObjCTaggedPointerOrNull(object)) return;
+  if (isObjCTaggedPointerOrNull(object)) return object;
   if (objectUsesNativeSwiftReferenceCounting(object)) {
-    swift_retain(static_cast<HeapObject *>(object));
-    return;
+    return swift_retain(static_cast<HeapObject *>(object));
   }
-  objc_retain(static_cast<id>(object));
+  return objc_retain(static_cast<id>(object));
 }
 
 void swift::swift_unknownRelease(void *object)
@@ -530,15 +530,15 @@ void swift::swift_unknownRelease(void *object)
   return objc_release(static_cast<id>(object));
 }
 
-void swift::swift_nonatomic_unknownRetain_n(void *object, int n)
+void *swift::swift_nonatomic_unknownRetain_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
-  if (isObjCTaggedPointerOrNull(object)) return;
+  if (isObjCTaggedPointerOrNull(object)) return object;
   if (objectUsesNativeSwiftReferenceCounting(object)) {
-    swift_nonatomic_retain_n(static_cast<HeapObject *>(object), n);
-    return;
+    return swift_nonatomic_retain_n(static_cast<HeapObject *>(object), n);
   }
   for (int i = 0; i < n; ++i)
     objc_retain(static_cast<id>(object));
+  return object;
 }
 
 void swift::swift_nonatomic_unknownRelease_n(void *object, int n)
@@ -550,14 +550,13 @@ void swift::swift_nonatomic_unknownRelease_n(void *object, int n)
     objc_release(static_cast<id>(object));
 }
 
-void swift::swift_nonatomic_unknownRetain(void *object)
+void *swift::swift_nonatomic_unknownRetain(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
-  if (isObjCTaggedPointerOrNull(object)) return;
+  if (isObjCTaggedPointerOrNull(object)) return object;
   if (objectUsesNativeSwiftReferenceCounting(object)) {
-    swift_nonatomic_retain(static_cast<HeapObject *>(object));
-    return;
+    return swift_nonatomic_retain(static_cast<HeapObject *>(object));
   }
-  objc_retain(static_cast<id>(object));
+  return objc_retain(static_cast<id>(object));
 }
 
 void swift::swift_nonatomic_unknownRelease(void *object)
