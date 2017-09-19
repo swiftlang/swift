@@ -10,3 +10,18 @@ open class Base {
   private var privateVar: Int = 29
   internal var internalVar: Int = 30
 }
+
+
+public struct Namespace {
+  open class Nested {
+    public init() {}
+    var storedProp: Int?
+  }
+}
+
+extension Namespace {
+  open class ExtNested {
+    public init() {}
+    var storedProp: Int?
+  }
+}
