@@ -481,7 +481,7 @@ struct StructureImplementingProtocolWithExtension2: ProtocolWithExtension2 {
 }
 
 extension ProtocolWithExtension2 {
-  static let baz: ProtocolWithExtension2 = StructureImplementingProtocolWithExtension2(bar: "baz") // expected-error{{static stored properties not supported in protocol extensios}}
+  static let baz: ProtocolWithExtension2 = StructureImplementingProtocolWithExtension2(bar: "baz") // expected-error{{static stored properties not supported in protocol extensions}}
 }
 
 func getS() -> S {
