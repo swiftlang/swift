@@ -854,10 +854,6 @@ public:
 
 } // end anonymous namespace
 
-SILGenProfiling::SILGenProfiling(SILGenModule &SGM, bool EmitCoverageMapping)
-    : SGM(SGM), EmitCoverageMapping(EmitCoverageMapping), NumRegionCounters(0),
-      FunctionHash(0) {}
-
 static llvm::GlobalValue::LinkageTypes
 getEquivalentPGOLinkage(FormalLinkage Linkage) {
   switch (Linkage) {
@@ -880,10 +876,6 @@ void SILGenProfiling::assignRegionCounters(Decl *Root) {
   if (auto *ParentFile = cast<DeclContext>(Root)->getParentSourceFile())
     CurrentFileName = ParentFile->getFilename();
 
-  PGOFuncName = llvm::getPGOFuncName(
-      CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
-      CurrentFileName);
-
   MapRegionCounters Mapper(RegionCounterMap);
 
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(Root)) {
@@ -895,6 +887,10 @@ void SILGenProfiling::assignRegionCounters(Decl *Root) {
     TLCD->getStartLoc().printLineAndColumn(OS, SM);
     CurrentFuncLinkage = FormalLinkage::HiddenUnique;
   }
+
+  PGOFuncName = llvm::getPGOFuncName(
+      CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
+      CurrentFileName);
 
   walkForProfiling(Root, Mapper);
 
@@ -971,6 +967,10 @@ void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
 
   auto Int32Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(32, C));
   auto Int64Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(64, C));
+
+  std::string PGOFuncName = llvm::getPGOFuncName(
+      CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
+      CurrentFileName);
 
   SILLocation Loc = getLocation(Node);
   SILValue Args[] = {

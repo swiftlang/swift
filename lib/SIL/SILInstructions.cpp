@@ -1089,8 +1089,8 @@ CondBranchInst::CondBranchInst(SILDebugLocation Loc, SILValue Condition,
                                unsigned NumFalse,
                                Optional<uint64_t> TrueBBCount,
                                Optional<uint64_t> FalseBBCount)
-    : TermInst(ValueKind::CondBranchInst, Loc),
-      DestBBs{{this, TrueBB, TrueBBCount}, {this, FalseBB, FalseBBCount}},
+    : InstructionBase(Loc), DestBBs{{this, TrueBB, TrueBBCount},
+                                    {this, FalseBB, FalseBBCount}},
       NumTrueArgs(NumTrue), NumFalseArgs(NumFalse),
       Operands(this, Args, Condition) {
   assert(Args.size() == (NumTrueArgs + NumFalseArgs) &&

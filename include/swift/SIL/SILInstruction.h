@@ -6388,9 +6388,9 @@ public:
   SILBasicBlock *getFailureBB() { return DestBBs[1]; }
   const SILBasicBlock *getFailureBB() const { return DestBBs[1]; }
 
-  /// The number of times the True branch was executed.
+  /// The number of times the True branch was executed
   Optional<uint64_t> getTrueBBCount() const { return DestBBs[0].getCount(); }
-  /// The number of times the False branch was executed.
+  /// The number of times the False branch was executed
   Optional<uint64_t> getFalseBBCount() const { return DestBBs[1].getCount(); }
 };
 
