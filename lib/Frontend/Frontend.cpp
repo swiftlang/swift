@@ -265,7 +265,7 @@ ModuleDecl *CompilerInstance::getMainModule() {
 }
 
 static void addAdditionalInitialImportsTo(
-    SourceFile *SF, CompilerInstance::ImplicitImports &implicitImports) {
+    SourceFile *SF, const CompilerInstance::ImplicitImports &implicitImports) {
   using ImportPair =
       std::pair<ModuleDecl::ImportedModule, SourceFile::ImportOptions>;
   SmallVector<ImportPair, 4> additionalImports;
@@ -334,7 +334,7 @@ void CompilerInstance::performSema() {
         SWIFT_ONONE_SUPPORT);
   }
 
-  ImplicitImports implicitImports(*this);
+  const ImplicitImports implicitImports(*this);
 
   if (Invocation.getInputKind() == InputFileKind::IFK_Swift_REPL) {
     createREPLFile(implicitImports);
@@ -434,7 +434,7 @@ void CompilerInstance::getImplicitlyImportedModules(
   }
 }
 
-void CompilerInstance::createREPLFile(ImplicitImports &implicitImports) const {
+void CompilerInstance::createREPLFile(const ImplicitImports &implicitImports) const {
   SharedTimer timer("performSema-createREPLFile");
   auto *SingleInputFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind,
@@ -445,17 +445,15 @@ void CompilerInstance::createREPLFile(ImplicitImports &implicitImports) const {
 
 std::unique_ptr<DelayedParsingCallbacks>
 CompilerInstance::computeDelayedParsingCallback() {
-  DelayedParsingCallbacks *cb = nullptr;
   if (Invocation.isCodeCompletion())
-    cb = new CodeCompleteDelayedCallbacks(SourceMgr.getCodeCompletionLoc());
-  else if (Invocation.isDelayedFunctionBodyParsing())
-    cb = new AlwaysDelayedCallbacks;
-
-  std::unique_ptr<DelayedParsingCallbacks> up(cb);
-  return up;
+    return llvm::make_unique<CodeCompleteDelayedCallbacks>(
+                                                         SourceMgr.getCodeCompletionLoc());
+  if (Invocation.isDelayedFunctionBodyParsing())
+    return llvm::make_unique<AlwaysDelayedCallbacks>();
+  return nullptr;
 }
 
-void CompilerInstance::addMainFileToModule(ImplicitImports &implicitImports) {
+void CompilerInstance::addMainFileToModule(const ImplicitImports &implicitImports) {
   SharedTimer timer("performSema-addMainFileToModule");
 
   const InputFileKind Kind = Invocation.getInputKind();
@@ -474,7 +472,8 @@ void CompilerInstance::addMainFileToModule(ImplicitImports &implicitImports) {
     setPrimarySourceFile(MainFile);
 }
 
-void CompilerInstance::parseAndCheckTypes(ImplicitImports &implicitImports) {
+void CompilerInstance::parseAndCheckTypes(const ImplicitImports &implicitImports) {
+  SharedTimer timer("performSema-parseAndCheckTypes");
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB{
       computeDelayedParsingCallback()};
 
@@ -498,7 +497,8 @@ void CompilerInstance::parseAndCheckTypes(ImplicitImports &implicitImports) {
 }
 
 void CompilerInstance::parseLibraryFile(
-    unsigned BufferID, ImplicitImports &implicitImports,
+    unsigned BufferID,
+    const ImplicitImports &implicitImports,
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB) {
   SharedTimer timer("performSema-parseLibraryFile");
@@ -549,7 +549,7 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
 }
 
 bool CompilerInstance::parsePartialModulesAndLibraryFiles(
-    ImplicitImports &implicitImports, PersistentParserState &PersistentState,
+    const ImplicitImports &implicitImports, PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB) {
   SharedTimer timer("performSema-parsePartialModulesAndLibraryFiles");
   bool hadLoadError = false;
