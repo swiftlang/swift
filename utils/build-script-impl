@@ -2867,11 +2867,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 continue
                 ;;
             libdispatch)
+                if [[ "${SKIP_TEST_LIBDISPATCH}" ]]; then
+                    continue
+                fi
+
                 case "${host}" in
                 macosx-*)
-                  if [[ "${SKIP_TEST_LIBDISPATCH}" ]]; then
-                      continue
-                  fi
                   LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                   echo "--- Running tests for ${product} ---"
                   with_pushd "${LIBDISPATCH_BUILD_DIR}" \
@@ -3127,11 +3128,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 continue
                 ;;
             libdispatch)
+                if [[ -z "${INSTALL_LIBDISPATCH}" ]] ; then
+                    continue
+                fi
+
                 case "${host}" in
                 macosx-*)
-                  if [[ -z "${INSTALL_LIBDISPATCH}" ]] ; then
-                      continue
-                  fi
                   if [[ -z "${INSTALL_DESTDIR}" ]] ; then
                       echo "--install-destdir is required to install products."
                       exit 1
