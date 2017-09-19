@@ -39,7 +39,7 @@ constexpr const char TypeMetadataRecordSection[] = "__swift2_types";
 template<const char *SECTION_NAME,
          void CONSUME_BLOCK(const void *start, uintptr_t size)>
 void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
-#ifdef __LP64__
+#if __POINTER_WIDTH__ == 64
   using mach_header_platform = mach_header_64;
   assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
 #else

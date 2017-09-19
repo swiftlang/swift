@@ -1194,7 +1194,7 @@ namespace {
     uint32_t Flags;
     uint32_t InstanceStart;
     uint32_t InstanceSize;
-#ifdef __LP64__
+#if __POINTER_WIDTH__ == 64
     uint32_t Reserved;
 #endif
     const uint8_t *IvarLayout;

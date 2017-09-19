@@ -733,14 +733,14 @@ class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
 template <typename RefCountBits>
 class RefCounts {
   std::atomic<RefCountBits> refCounts;
-#if !__LP64__
+#if __POINTER_WIDTH__ == 32
   // FIXME: hack - something somewhere is assuming a 3-word header on 32-bit
   // See also other fixmes marked "small header for 32-bit"
   uintptr_t unused SWIFT_ATTRIBUTE_UNAVAILABLE;
 #endif
 
   // Out-of-line slow paths.
-  
+
   LLVM_ATTRIBUTE_NOINLINE
   void incrementSlow(RefCountBits oldbits, uint32_t inc);
 
@@ -773,7 +773,7 @@ class RefCounts {
   // Refcount of a new object is 1.
   constexpr RefCounts(Initialized_t)
     : refCounts(RefCountBits(0, 1))
-#if !__LP64__ && !__has_attribute(unavailable)
+#if __POINTER_WIDTH__ == 32 && !__has_attribute(unavailable)
       , unused(0)
 #endif
   { }
