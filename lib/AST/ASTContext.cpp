@@ -132,6 +132,9 @@ struct ASTContext::Implementation {
   /// The declaration of '+' function for two RangeReplaceableCollection.
   FuncDecl *PlusFunctionOnRangeReplaceableCollection = nullptr;
 
+  /// The declaration of '+' function for two String.
+  FuncDecl *PlusFunctionOnString = nullptr;
+
   /// The declaration of Swift.Optional<T>.Some.
   EnumElementDecl *OptionalSomeDecl = nullptr;
 
@@ -557,7 +560,7 @@ FuncDecl *ASTContext::getPlusFunctionOnRangeReplaceableCollection() const {
   lookupInSwiftModule("+", Results);
   for (auto Result : Results) {
     if (auto *FD = dyn_cast<FuncDecl>(Result)) {
-      if(!FD->getOperatorDecl())
+      if (!FD->getOperatorDecl())
         continue;
       for (auto Req: FD->getGenericRequirements()) {
         if (Req.getKind() == RequirementKind::Conformance &&
@@ -571,6 +574,36 @@ FuncDecl *ASTContext::getPlusFunctionOnRangeReplaceableCollection() const {
   return Impl.PlusFunctionOnRangeReplaceableCollection;
 }
 
+FuncDecl *ASTContext::getPlusFunctionOnString() const {
+  if (Impl.PlusFunctionOnString) {
+    return Impl.PlusFunctionOnString;
+  }
+  // Find all of the declarations with this name in the Swift module.
+  SmallVector<ValueDecl *, 1> Results;
+  lookupInSwiftModule("+", Results);
+  for (auto Result : Results) {
+    if (auto *FD = dyn_cast<FuncDecl>(Result)) {
+      if (!FD->getOperatorDecl())
+        continue;
+      auto ResultType = FD->getResultInterfaceType();
+      if (ResultType->getNominalOrBoundGenericNominal() != getStringDecl())
+        continue;
+      auto ParamLists = FD->getParameterLists();
+      if (ParamLists.size() != 2 || ParamLists[1]->size() != 2)
+        continue;
+      auto CheckIfStringParam = [this](ParamDecl* Param) {
+        auto Type = Param->getInterfaceType()->getNominalOrBoundGenericNominal();
+        return Type == getStringDecl();
+      };
+      if (CheckIfStringParam(ParamLists[1]->get(0)) &&
+          CheckIfStringParam(ParamLists[1]->get(1))) {
+        Impl.PlusFunctionOnString = FD;
+        break;
+      }
+    }
+  }
+  return Impl.PlusFunctionOnString;
+}
 
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   DECL_CLASS *ASTContext::get##NAME##Decl() const { \
