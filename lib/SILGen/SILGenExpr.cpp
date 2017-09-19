@@ -3322,12 +3322,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
     
     auto name = Mangle::ASTMangler().mangleKeyPathEqualsHelper(indexTypes,
                                                                genericSig);
-    equals = SGM.M.getOrCreateSharedFunction(loc, name,
-                                             signature,
-                                             IsBare,
-                                             IsNotTransparent,
-                                             IsNotSerialized,
-                                             IsThunk);
+    equals = SGM.M.getOrCreateSharedFunction(loc, name, signature, IsBare,
+                                             IsNotTransparent, IsNotSerialized,
+                                             None, IsThunk);
     if (!equals->empty()) {
       return;
     }
@@ -3490,12 +3487,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
     
     auto name = Mangle::ASTMangler().mangleKeyPathHashHelper(indexTypes,
                                                              genericSig);
-    hash = SGM.M.getOrCreateSharedFunction(loc, name,
-                                           signature,
-                                           IsBare,
-                                           IsNotTransparent,
-                                           IsNotSerialized,
-                                           IsThunk);
+    hash = SGM.M.getOrCreateSharedFunction(loc, name, signature, IsBare,
+                                           IsNotTransparent, IsNotSerialized,
+                                           None, IsThunk);
     if (!hash->empty()) {
       return;
     }

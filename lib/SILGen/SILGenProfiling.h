@@ -50,7 +50,9 @@ private:
   std::vector<std::tuple<std::string, uint64_t, std::string>> CoverageData;
 
 public:
-  SILGenProfiling(SILGenModule &SGM, bool EmitCoverageMapping);
+  SILGenProfiling(SILGenModule &SGM, bool EmitCoverageMapping)
+      : SGM(SGM), EmitCoverageMapping(EmitCoverageMapping),
+        NumRegionCounters(0), FunctionHash(0) {}
 
   bool hasRegionCounters() const { return NumRegionCounters != 0; }
 

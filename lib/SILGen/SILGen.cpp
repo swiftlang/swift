@@ -45,9 +45,9 @@ SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
   SILOptions &Opts = M.getOptions();
   if (!Opts.UseProfile.empty()) {
     auto ReaderOrErr = llvm::IndexedInstrProfReader::create(Opts.UseProfile);
-    if (auto E = ReaderOrErr.getError()) {
+    if (auto E = ReaderOrErr.takeError()) {
       diagnose(SourceLoc(), diag::profile_read_error, Opts.UseProfile,
-               E.message());
+               llvm::toString(std::move(E)));
       Opts.UseProfile.erase();
     }
     PGOReader = std::move(ReaderOrErr.get());
