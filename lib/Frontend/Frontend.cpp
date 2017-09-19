@@ -490,10 +490,35 @@ void CompilerInstance::parseAndCheckTypes(const ImplicitImports &implicitImports
   }
   if (hadLoadError)
     return;
-
+  
+  OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions();
+  
   // Parse main file last in order to make sure that it can use decls from other
   // files in the module.
-  checkTypesWhileParsingMain(PersistentState, DelayedCB.get());
+  if (MainBufferID != NO_SUCH_BUFFER) {
+    parseAndTypeCheckMainFile(PersistentState, DelayedCB.get(),
+                              TypeCheckOptions);
+  }
+  
+  const auto &options = Invocation.getFrontendOptions();
+  forEachFileToTypeCheck([&](SourceFile &SF) {
+    performTypeChecking(SF, PersistentState.getTopLevelContext(),
+                        TypeCheckOptions, /*curElem*/ 0,
+                        options.WarnLongFunctionBodies,
+                        options.WarnLongExpressionTypeChecking,
+                        options.SolverExpressionTimeThreshold);
+  });
+  
+  // Even if there were no source files, we should still record known
+  // protocols.
+  if (auto *stdlib = Context->getStdlibModule())
+    Context->recordKnownProtocols(stdlib);
+  
+  if (DelayedCB.get()) {
+    performDelayedParsing(MainModule, PersistentState,
+                          Invocation.getCodeCompletionFactory());
+  }
+  finishTypeChecking(TypeCheckOptions);
 }
 
 void CompilerInstance::parseLibraryFile(
@@ -571,39 +596,6 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   return hadLoadError;
 }
 
-void CompilerInstance::checkTypesWhileParsingMain(
-    PersistentParserState &PersistentState,
-    DelayedParsingCallbacks *DelayedParseCB) {
-  SharedTimer timer("performSema-checkTypesWhileParsingMain");
-  OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions();
-
-  // Parse the main file last.
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    parseAndTypeCheckMainFile(PersistentState, DelayedParseCB,
-                              TypeCheckOptions);
-  }
-
-  const auto &options = Invocation.getFrontendOptions();
-  forEachFileToTypeCheck([&](SourceFile &SF) {
-    performTypeChecking(SF, PersistentState.getTopLevelContext(),
-                        TypeCheckOptions, /*curElem*/ 0,
-                        options.WarnLongFunctionBodies,
-                        options.WarnLongExpressionTypeChecking,
-                        options.SolverExpressionTimeThreshold);
-  });
-
-  // Even if there were no source files, we should still record known
-  // protocols.
-  if (auto *stdlib = Context->getStdlibModule())
-    Context->recordKnownProtocols(stdlib);
-
-  if (DelayedParseCB) {
-    performDelayedParsing(MainModule, PersistentState,
-                          Invocation.getCodeCompletionFactory());
-  }
-  finishTypeChecking(TypeCheckOptions);
-}
-
 void CompilerInstance::parseAndTypeCheckMainFile(
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB,
@@ -670,7 +662,7 @@ forEachSourceFileIn(ModuleDecl *module,
 }
 
 void CompilerInstance::forEachFileToTypeCheck(
-    const llvm::function_ref<void(SourceFile &)> &fn) {
+    llvm::function_ref<void(SourceFile &)> fn) {
   if (isWholeModuleCompilation()) {
     forEachSourceFileIn(MainModule, [&](SourceFile &SF) { fn(SF); });
   } else {

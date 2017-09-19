@@ -486,12 +486,9 @@ private:
                                      PersistentParserState &PersistentState,
                                      DelayedParsingCallbacks *DelayedParseCB);
 
-  void checkTypesWhileParsingMain(PersistentParserState &PersistentState,
-                                  DelayedParsingCallbacks *DelayedParseCB);
-
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
 
-  void forEachFileToTypeCheck(const llvm::function_ref<void(SourceFile &)> &fn);
+  void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
   void parseAndTypeCheckMainFile(PersistentParserState &PersistentState,
                                  DelayedParsingCallbacks *DelayedParseCB,
