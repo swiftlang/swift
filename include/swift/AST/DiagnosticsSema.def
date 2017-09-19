@@ -105,8 +105,10 @@ ERROR(could_not_use_type_member_on_protocol_metatype,none,
       "static member %1 cannot be used on protocol metatype %0",
       (Type, DeclName))
 ERROR(could_not_use_instance_member_on_type,none,
-      "instance member %1 cannot be used on type %0",
-      (Type, DeclName))
+      "instance member %1"
+      "%select{| of type %2}3 cannot be used on"
+      "%select{| instance of nested}3 type %0",
+      (Type, DeclName, Type, bool))
 ERROR(could_not_use_member_on_existential,none,
       "member %1 cannot be used on value of protocol type %0; use a generic"
       " constraint instead",

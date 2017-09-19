@@ -449,3 +449,18 @@ func rdar33914444() {
   _ = A.S(e: .e1)
   // expected-error@-1 {{type 'A.R<A.S.E>' has no member 'e1'}}
 }
+
+// SR-5324: Better diagnostic when instance member of outer type is referenced from nested type
+
+struct Outer {
+  var outer: Int
+
+  struct Inner {
+    var inner: Int
+
+    func sum() -> Int {
+      return inner + outer
+      // expected-error@-1 {{instance member 'outer' of type 'Outer' cannot be used on instance of nested type 'Outer.Inner'}}
+    }
+  }
+}
