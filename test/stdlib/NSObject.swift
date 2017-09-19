@@ -133,9 +133,9 @@ print("\(s1.hashValue)")
 print("\(s1.hash)")
 print("done NSMutableString hashValue")
 // CHECK: NSMutableString hashValue
-// CHECK-NEXT: [[H1:[0-9]+]]
+// CHECK-NEXT: [[H1:(-)?[0-9]+]]
 // CHECK-NEXT: [[H1]]
-// CHECK-NEXT: [[H2:[0-9]+]]
+// CHECK-NEXT: [[H2:(-)?[0-9]+]]
 // CHECK-NEXT: [[H2]]
 // CHECK-NEXT: done NSMutableString hashValue
 
@@ -153,7 +153,7 @@ printHashValue(nh, "nh")
 print("done NoisyHash hashValue")
 // CHECK: NoisyHash hashValue
 // CHECK-NEXT: so hash
-// CHECK-NEXT: nh hashes to {{[0-9]+}}
+// CHECK-NEXT: nh hashes to {{(-)?[0-9]+}}
 // CHECK: done NoisyHash hashValue
 
 
