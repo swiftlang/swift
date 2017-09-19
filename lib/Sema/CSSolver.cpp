@@ -673,7 +673,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
           = *((*binding.DefaultedProtocol)->getKnownProtocolKind());
         for (auto altType : getAlternativeLiteralTypes(knownKind)) {
           if (exploredTypes.insert(altType->getCanonicalType()).second)
-            newBindings.push_back({altType, AllowedBindingKind::Subtypes, 
+            newBindings.push_back({altType, AllowedBindingKind::Subtypes,
                                    binding.DefaultedProtocol});
         }
       }
@@ -686,7 +686,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
         // Try lvalue qualification in addition to rvalue qualification.
         auto subtype = LValueType::get(type);
         if (exploredTypes.insert(subtype->getCanonicalType()).second)
-          newBindings.push_back({subtype, binding.Kind, None});
+          newBindings.push_back({subtype, binding.Kind});
       }
 
       if (binding.Kind == AllowedBindingKind::Subtypes) {
@@ -695,7 +695,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
           if (scalarIdx >= 0) {
             auto eltType = tupleTy->getElementType(scalarIdx);
             if (exploredTypes.insert(eltType->getCanonicalType()).second)
-              newBindings.push_back({eltType, binding.Kind, None});
+              newBindings.push_back({eltType, binding.Kind});
           }
         }
 
@@ -709,10 +709,10 @@ bool ConstraintSystem::tryTypeVariableBindings(
             if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
               if (typeVar->getImpl().canBindToLValue() ==
                   otherTypeVar->getImpl().canBindToLValue()) {
-                newBindings.push_back({objTy, binding.Kind, None});
+                newBindings.push_back({objTy, binding.Kind});
               }
             } else {
-              newBindings.push_back({objTy, binding.Kind, None});
+              newBindings.push_back({objTy, binding.Kind});
             }
           }
         }
@@ -729,7 +729,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
 
         // If we haven't seen this supertype, add it.
         if (exploredTypes.insert((*simpleSuper)->getCanonicalType()).second)
-          newBindings.push_back({*simpleSuper, binding.Kind, None});
+          newBindings.push_back({*simpleSuper, binding.Kind});
       }
     }
 

@@ -1019,7 +1019,7 @@ StringTests.test(
   .skip(.nativeRuntime("String._compareASCII undefined without _runtime(_ObjC)"))
   .code {
 #if _runtime(_ObjC)
-  let asciiDomain = (0..<128).map({ String(UnicodeScalar($0)) })
+  let asciiDomain = (0..<128).map({ String(UnicodeScalar($0)!) })
   expectEqualMethodsForDomain(
     asciiDomain, asciiDomain, 
     String._compareDeterministicUnicodeCollation, String._compareASCII)
