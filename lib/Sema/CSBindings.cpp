@@ -334,6 +334,10 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
                ConstraintClassification::Relational &&
            "only relational constraints handled here");
 
+    // Recording this relational constraint as a
+    // source of the bindings for current type variable.
+    result.Sources.insert(constraint);
+
     auto first = simplifyType(constraint->getFirstType());
     auto second = simplifyType(constraint->getSecondType());
 
@@ -397,7 +401,13 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
         continue;
       }
 
-      result.InvolvesTypeVariables = true;
+      // BindParam constraint is going to bind one side to another
+      // if there is a concrete type associated with either side, so
+      // let's not try to mark result as involving type variables
+      // purely based on presence of this constraint.
+      if (constraint->getKind() != ConstraintKind::BindParam)
+        result.InvolvesTypeVariables = true;
+
       continue;
     }
 
@@ -427,6 +437,22 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       }
     }
 
+    // If this is an argument conversion where argument is a type variable,
+    // let's check what is on the other (parameter) side, if that's `inout`
+    // type, binding type has to be adjusted to `l-value`, because argument
+    // type for `inout` parameter type is always `l-value`.
+    // This happens when shorthand arguments are used in trailing closures:
+    // { $0 += 42 }, `$0` is going to an argument to `+=` which expects an
+    // `inout` parameter type for it, so we need to make sure that type of
+    // argument is properly adjusted.
+    if (kind == AllowedBindingKind::Subtypes &&
+        (constraint->getKind() == ConstraintKind::ArgumentConversion ||
+         constraint->getKind() == ConstraintKind::OperatorArgumentConversion)) {
+      if (auto *IOT = type->getAs<InOutType>()) {
+        type = LValueType::get(IOT->getObjectType());
+      }
+    }
+
     // Make sure we aren't trying to equate type variables with different
     // lvalue-binding rules.
     if (auto otherTypeVar = type->getAs<TypeVariableType>()) {
@@ -450,11 +476,11 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     }
 
     if (exactTypes.insert(type->getCanonicalType()).second)
-      result.addPotentialBinding({type, kind, None},
+      result.addPotentialBinding({type, kind},
                                  /*allowJoinMeet=*/!adjustedIUO);
     if (alternateType &&
         exactTypes.insert(alternateType->getCanonicalType()).second)
-      result.addPotentialBinding({alternateType, kind, None},
+      result.addPotentialBinding({alternateType, kind},
                                  /*allowJoinMeet=*/false);
   }
 

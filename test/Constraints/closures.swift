@@ -599,3 +599,45 @@ sr3520_2(sr3250_arg) { $0 += 3 } // ok
 // SR-1976/SR-3073: Inference of inout
 func sr1976<T>(_ closure: (inout T) -> Void) {}
 sr1976({ $0 += 2 }) // ok
+
+// rdar://problem/33429010
+
+struct I_33429010 : IteratorProtocol {
+    func next() -> Int? {
+        fatalError()
+    }
+}
+
+extension Sequence {
+    public func rdar33429010<Result>(into initialResult: Result,
+                                     _ nextPartialResult: (_ partialResult: inout Result, Iterator.Element) throws -> ()
+        ) rethrows -> Result {
+        return initialResult
+    }
+}
+
+extension Int {
+   public mutating func rdar33429010_incr(_ inc: Int) {
+     self += inc
+   }
+}
+
+func rdar33429010_2() {
+  let iter = I_33429010()
+  var acc: Int = 0 // expected-warning {{}}
+  let _: Int = AnySequence { iter }.rdar33429010(into: acc, { $0 + $1 })
+  // expected-warning@-1 {{result of operator '+' is unused}}
+  let _: Int = AnySequence { iter }.rdar33429010(into: acc, { $0.rdar33429010_incr($1) })
+}
+
+class P_33429010 {
+  var name: String = "foo"
+}
+
+class C_33429010 : P_33429010 {
+}
+
+func rdar33429010_3() {
+ let arr = [C_33429010()]
+ let _ = arr.map({ ($0.name, $0 as P_33429010) }) // Ok
+}

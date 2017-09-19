@@ -18,23 +18,24 @@
 #ifndef SWIFT_SEMA_CONSTRAINT_SYSTEM_H
 #define SWIFT_SEMA_CONSTRAINT_SYSTEM_H
 
-#include "TypeChecker.h"
 #include "Constraint.h"
 #include "ConstraintGraph.h"
 #include "ConstraintGraphScope.h"
 #include "ConstraintLocator.h"
 #include "OverloadChoice.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/Basic/OptionSet.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
-#include "llvm/ADT/ilist.h"
+#include "swift/AST/Types.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/ilist.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -2580,6 +2581,9 @@ private:
     /// Tracks the position of the last known supertype in the group.
     Optional<unsigned> lastSupertypeIndex;
 
+    /// A set of all constraint which contribute to pontential bindings.
+    llvm::SmallPtrSet<Constraint *, 8> Sources;
+
     PotentialBindings(TypeVariableType *typeVar) : TypeVar(typeVar) {}
 
     /// Determine whether the set of bindings is non-empty.
@@ -2591,10 +2595,8 @@ private:
     }
 
     static BindingScore formBindingScore(const PotentialBindings &b) {
-      return std::make_tuple(!b.hasNonDefaultableBindings(),
-                             b.FullyBound,
-                             b.IsRHSOfBindParam,
-                             b.SubtypeOfExistentialType,
+      return std::make_tuple(b.IsRHSOfBindParam, !b.hasNonDefaultableBindings(),
+                             b.FullyBound, b.SubtypeOfExistentialType,
                              b.InvolvesTypeVariables,
                              static_cast<unsigned char>(b.LiteralBinding),
                              -(b.Bindings.size() - b.NumDefaultableBindings));
@@ -2604,6 +2606,29 @@ private:
     /// \c x is a better set of bindings that \c y.
     friend bool operator<(const PotentialBindings &x,
                           const PotentialBindings &y) {
+      llvm::SmallPtrSet<Constraint *, 8> intersection(x.Sources);
+      llvm::set_intersect(intersection, y.Sources);
+
+      // Some relational constraints dictate certain
+      // ordering when it comes to attempting binding
+      // of type variables, where left-hand side is
+      // always more preferrable than right-hand side.
+      for (const auto *constraint : intersection) {
+        switch (constraint->getKind()) {
+        case ConstraintKind::BindParam:
+          break;
+
+        default:
+          continue;
+        }
+
+        auto lhs = constraint->getFirstType();
+        if (auto *typeVar = lhs->getAs<TypeVariableType>())
+          return x.TypeVar == typeVar;
+      }
+
+      // If there is nothing that indicates priority,
+      // let's attempt to do a score comparison.
       return formBindingScore(x) < formBindingScore(y);
     }
 
