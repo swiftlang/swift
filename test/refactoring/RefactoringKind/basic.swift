@@ -328,5 +328,5 @@ func testStringInterpolation() -> String {
 
 // CHECK-COLLAPSE-NESTED-IF-EXPRESSION: Collapse Nested If Expression
 
-// CHECK-STRINGS-INTERPOLATION: Convert to Strings Interpolation
+// CHECK-STRINGS-INTERPOLATION: Convert to String Interpolation
 

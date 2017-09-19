@@ -1631,7 +1631,7 @@ static void interpolatedExpressionForm(Expr* E, SourceManager& SM,
   }
   auto ExpStr = Lexer::getCharSourceRangeFromSourceRange(SM,
     E->getSourceRange()).str().str();
-  if (auto *Interpolation = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+  if (isa<InterpolatedStringLiteralExpr>(E)) {
     ExpStr.erase(0, 1);
     ExpStr.pop_back();
     OS << ExpStr;
