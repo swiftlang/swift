@@ -37,7 +37,7 @@
 using namespace std;
 using namespace llvm;
 
-#ifdef __LP64__
+#if __POINTER_WIDTH__ == 64
 #define ELFCLASS ELFCLASS64
 typedef Elf64_Ehdr Elf_Ehdr;
 typedef Elf64_Shdr Elf_Shdr;
