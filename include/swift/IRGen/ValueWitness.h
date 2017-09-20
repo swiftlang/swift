@@ -132,13 +132,14 @@ enum {
 };
 
 static inline bool isValueWitnessFunction(ValueWitness witness) {
-  auto ord = unsigned(witness);
-  return ord < NumRequiredValueWitnessFunctions
-    || (ord >= unsigned(ValueWitness::First_ExtraInhabitantValueWitness)
-        && ord <= unsigned(
-                       ValueWitness::Last_ExtraInhabitantValueWitnessFunction))
-    || (ord >= unsigned(ValueWitness::First_EnumValueWitness)
-        && ord <= unsigned(ValueWitness::Last_EnumValueWitness));
+#define WANT_ALL_VALUE_WITNESSES 1
+#define FUNCTION_VALUE_WITNESS(name, Name, ret, args) \
+  if (witness == ValueWitness::Name) \
+    return true;
+#define DATA_VALUE_WITNESS(name, Name, ty)
+#include "swift/ABI/ValueWitness.def"
+
+  return false;
 }
 
 const char *getValueWitnessName(ValueWitness witness);

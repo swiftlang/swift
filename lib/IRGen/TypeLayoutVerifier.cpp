@@ -20,6 +20,7 @@
 #include "llvm/IR/Module.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
+#include "EnumPayload.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "GenOpaque.h"
@@ -32,21 +33,7 @@ using namespace irgen;
 void
 irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
                               ArrayRef<CanType> formalTypes) {
-  llvm::Type *verifierArgTys[] = {
-    IGF.IGM.TypeMetadataPtrTy,
-    IGF.IGM.Int8PtrTy,
-    IGF.IGM.Int8PtrTy,
-    IGF.IGM.SizeTy,
-    IGF.IGM.Int8PtrTy,
-  };
-  auto verifierFnTy = llvm::FunctionType::get(IGF.IGM.VoidTy,
-                                              verifierArgTys,
-                                              /*var arg*/ false);
-  auto verifierFn = IGF.IGM.Module.getOrInsertFunction(
-      "_swift_debug_verifyTypeLayoutAttribute", verifierFnTy);
-  if (IGF.IGM.useDllStorage()) 
-    if (auto *F = dyn_cast<llvm::Function>(verifierFn))
-      F->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+  auto verifierFn = IGF.IGM.getVerifyTypeLayoutAttributeFn();
 
   struct VerifierArgumentBuffers {
     Address runtimeBuf, staticBuf;
@@ -69,154 +56,170 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
   for (auto formalType : formalTypes) {
     // Runtime type metadata always represents the maximal abstraction level of
     // the type.
-    auto anyTy = IGF.IGM.Context.TheAnyType;
-    auto openedAnyTy = ArchetypeType::getOpened(anyTy);
-    auto maxAbstraction = AbstractionPattern(openedAnyTy);
+    auto maxAbstraction = AbstractionPattern::getOpaque();
     auto &ti = IGF.getTypeInfoForUnlowered(maxAbstraction, formalType);
     
-    // If there's no fixed type info, we rely on the runtime anyway, so there's
-    // nothing to verify.
-    // TODO: There are some traits of partially-fixed layouts we could check too.
-    auto *fixedTI = dyn_cast<FixedTypeInfo>(&ti);
-    if (!fixedTI)
-      return;
+    // Check type metrics for fixed-layout types.
+    // If there's no fixed type info, we rely on the runtime for type metrics,
+    // so there's no compile-time values to validate against.
+    if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&ti)) {
+      auto metadata = IGF.emitTypeMetadataRef(formalType);
     
-    auto metadata = IGF.emitTypeMetadataRef(formalType);
-    
-    auto verify = [&](llvm::Value *runtimeVal,
-                      llvm::Value *staticVal,
-                      const llvm::Twine &description) {
-      assert(runtimeVal->getType() == staticVal->getType());
-      // Get or create buffers for the arguments.
-      VerifierArgumentBuffers bufs;
-      auto foundBufs = verifierArgBufs.find(runtimeVal->getType());
-      if (foundBufs != verifierArgBufs.end()) {
-        bufs = foundBufs->second;
-      } else {
-        Address runtimeBuf = IGF.createAlloca(runtimeVal->getType(),
-                                              IGF.IGM.getPointerAlignment(),
-                                              "runtime");
-        Address staticBuf = IGF.createAlloca(staticVal->getType(),
-                                             IGF.IGM.getPointerAlignment(),
-                                             "static");
-        bufs = {runtimeBuf, staticBuf};
-        verifierArgBufs[runtimeVal->getType()] = bufs;
-      }
-      
-      IGF.Builder.CreateStore(runtimeVal, bufs.runtimeBuf);
-      IGF.Builder.CreateStore(staticVal, bufs.staticBuf);
-      
-      auto runtimePtr = IGF.Builder.CreateBitCast(bufs.runtimeBuf.getAddress(),
-                                                  IGF.IGM.Int8PtrTy);
-      auto staticPtr = IGF.Builder.CreateBitCast(bufs.staticBuf.getAddress(),
-                                                 IGF.IGM.Int8PtrTy);
-      auto count = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                    IGF.IGM.DataLayout.getTypeStoreSize(runtimeVal->getType()));
-      auto msg
-        = IGF.IGM.getAddrOfGlobalString(description.str());
-      
-      IGF.Builder.CreateCall(
-          verifierFn, {metadata, runtimePtr, staticPtr, count, msg});
-    };
-
-    // Check that the fixed layout matches the runtime layout.
-    SILType layoutType = SILType::getPrimitiveObjectType(formalType);
-    verify(emitLoadOfSize(IGF, layoutType),
-           getSizeConstant(fixedTI->getFixedSize()),
-           "size");
-    verify(emitLoadOfAlignmentMask(IGF, layoutType),
-           getAlignmentMaskConstant(fixedTI->getFixedAlignment()),
-           "alignment mask");
-    verify(emitLoadOfStride(IGF, layoutType),
-           getSizeConstant(fixedTI->getFixedStride()),
-           "stride");
-    verify(emitLoadOfIsInline(IGF, layoutType),
-           getBoolConstant(fixedTI->getFixedPacking(IGF.IGM)
-                             == FixedPacking::OffsetZero),
-           "is-inline bit");
-    verify(emitLoadOfIsPOD(IGF, layoutType),
-           getBoolConstant(fixedTI->isPOD(ResilienceExpansion::Maximal)),
-           "is-POD bit");
-    verify(emitLoadOfIsBitwiseTakable(IGF, layoutType),
-           getBoolConstant(fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal)),
-           "is-bitwise-takable bit");
-    unsigned xiCount = fixedTI->getFixedExtraInhabitantCount(IGF.IGM);
-    verify(emitLoadOfHasExtraInhabitants(IGF, layoutType),
-           getBoolConstant(xiCount != 0),
-           "has-extra-inhabitants bit");
-
-    // Check extra inhabitants.
-    if (xiCount > 0) {
-      verify(emitLoadOfExtraInhabitantCount(IGF, layoutType),
-             getSizeConstant(Size(xiCount)),
-             "extra inhabitant count");
-      
-      // Verify that the extra inhabitant representations are consistent.
-      
-      // TODO: Update for EnumPayload implementation changes.
-#if 0
-      auto xiBuf = IGF.createAlloca(fixedTI->getStorageType(),
-                                    fixedTI->getFixedAlignment(),
-                                    "extra-inhabitant");
-      auto xiOpaque = IGF.Builder.CreateBitCast(xiBuf, IGF.IGM.OpaquePtrTy);
-      
-      // TODO: Randomize the set of extra inhabitants we check.
-      unsigned bits = fixedTI->getFixedSize().getValueInBits();
-      for (unsigned i = 0, e = std::min(xiCount, 1024u);
-           i < e; ++i) {
-        // Initialize the buffer with junk, to help ensure we're insensitive to
-        // insignificant bits.
-        // TODO: Randomize the filler.
-        IGF.Builder.CreateMemSet(xiBuf.getAddress(),
-                                 llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0x5A),
-                                 fixedTI->getFixedSize().getValue(),
-                                 fixedTI->getFixedAlignment().getValue());
-        
-        // Ask the runtime to store an extra inhabitant.
-        auto index = llvm::ConstantInt::get(IGF.IGM.Int32Ty, i);
-        emitStoreExtraInhabitantCall(IGF, layoutType, index,
-                                     xiOpaque.getAddress());
-        
-        // Compare the stored extra inhabitant against the fixed extra
-        // inhabitant pattern.
-        auto fixedXI = fixedTI->getFixedExtraInhabitantValue(IGF.IGM, bits, i);
-        auto xiBuf2 = IGF.Builder.CreateBitCast(xiBuf,
-                                            fixedXI->getType()->getPointerTo());
-        llvm::Value *runtimeXI = IGF.Builder.CreateLoad(xiBuf2);
-        runtimeXI = fixedTI->maskFixedExtraInhabitant(IGF, runtimeXI);
-        
-        numberBuf.clear();
-        {
-          llvm::raw_svector_ostream os(numberBuf);
-          os << i;
-          os.flush();
+      auto verifyValues = [&](llvm::Value *runtimeVal,
+                        llvm::Value *staticVal,
+                        const llvm::Twine &description) {
+        assert(runtimeVal->getType() == staticVal->getType());
+        // Get or create buffers for the arguments.
+        VerifierArgumentBuffers bufs;
+        auto foundBufs = verifierArgBufs.find(runtimeVal->getType());
+        if (foundBufs != verifierArgBufs.end()) {
+          bufs = foundBufs->second;
+        } else {
+          Address runtimeBuf = IGF.createAlloca(runtimeVal->getType(),
+                                                IGF.IGM.getPointerAlignment(),
+                                                "runtime");
+          Address staticBuf = IGF.createAlloca(staticVal->getType(),
+                                               IGF.IGM.getPointerAlignment(),
+                                               "static");
+          bufs = {runtimeBuf, staticBuf};
+          verifierArgBufs[runtimeVal->getType()] = bufs;
         }
         
-        verify(runtimeXI, fixedXI,
-               llvm::Twine("stored extra inhabitant ") + numberBuf.str());
+        IGF.Builder.CreateStore(runtimeVal, bufs.runtimeBuf);
+        IGF.Builder.CreateStore(staticVal, bufs.staticBuf);
         
-        // Now store the fixed extra inhabitant and ask the runtime to identify
-        // it.
-        // Mask in junk to make sure the runtime correctly ignores it.
-        auto xiMask = fixedTI->getFixedExtraInhabitantMask(IGF.IGM).asAPInt();
-        auto maskVal = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), xiMask);
-        auto notMaskVal
-          = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), ~xiMask);
-        // TODO: Randomize the filler.
-        auto xiFill = llvm::ConstantInt::getAllOnesValue(fixedXI->getType());
-        llvm::Value *xiFillMask = IGF.Builder.CreateAnd(notMaskVal, xiFill);
-        llvm::Value *xiValMask = IGF.Builder.CreateAnd(maskVal, fixedXI);
-        llvm::Value *filledXI = IGF.Builder.CreateOr(xiFillMask, xiValMask);
+        auto runtimePtr = IGF.Builder.CreateBitCast(bufs.runtimeBuf.getAddress(),
+                                                    IGF.IGM.Int8PtrTy);
+        auto staticPtr = IGF.Builder.CreateBitCast(bufs.staticBuf.getAddress(),
+                                                   IGF.IGM.Int8PtrTy);
+        auto count = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                      IGF.IGM.DataLayout.getTypeStoreSize(runtimeVal->getType()));
+        auto msg
+          = IGF.IGM.getAddrOfGlobalString(description.str());
         
-        IGF.Builder.CreateStore(filledXI, xiBuf2);
+        IGF.Builder.CreateCall(
+            verifierFn, {metadata, runtimePtr, staticPtr, count, msg});
+      };
+
+      auto verifyBuffers = [&](Address runtimeBuf,
+                               Address staticBuf,
+                               Size size,
+                               const llvm::Twine &description) {
+        auto runtimePtr = IGF.Builder.CreateBitCast(runtimeBuf.getAddress(),
+                                                    IGF.IGM.Int8PtrTy);
+        auto staticPtr = IGF.Builder.CreateBitCast(staticBuf.getAddress(),
+                                                   IGF.IGM.Int8PtrTy);
+        auto count = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                            size.getValue());
+        auto msg
+          = IGF.IGM.getAddrOfGlobalString(description.str());
+  
+        IGF.Builder.CreateCall(
+            verifierFn, {metadata, runtimePtr, staticPtr, count, msg});
+      };
+      // Check that the fixed layout matches the runtime layout.
+      SILType layoutType = SILType::getPrimitiveObjectType(formalType);
+      verifyValues(emitLoadOfSize(IGF, layoutType),
+             getSizeConstant(fixedTI->getFixedSize()),
+             "size");
+      verifyValues(emitLoadOfAlignmentMask(IGF, layoutType),
+             getAlignmentMaskConstant(fixedTI->getFixedAlignment()),
+             "alignment mask");
+      verifyValues(emitLoadOfStride(IGF, layoutType),
+             getSizeConstant(fixedTI->getFixedStride()),
+             "stride");
+      verifyValues(emitLoadOfIsInline(IGF, layoutType),
+             getBoolConstant(fixedTI->getFixedPacking(IGF.IGM)
+                               == FixedPacking::OffsetZero),
+             "is-inline bit");
+      verifyValues(emitLoadOfIsPOD(IGF, layoutType),
+             getBoolConstant(fixedTI->isPOD(ResilienceExpansion::Maximal)),
+             "is-POD bit");
+      verifyValues(emitLoadOfIsBitwiseTakable(IGF, layoutType),
+             getBoolConstant(fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal)),
+             "is-bitwise-takable bit");
+      unsigned xiCount = fixedTI->getFixedExtraInhabitantCount(IGF.IGM);
+      verifyValues(emitLoadOfHasExtraInhabitants(IGF, layoutType),
+             getBoolConstant(xiCount != 0),
+             "has-extra-inhabitants bit");
+
+      // Check extra inhabitants.
+      if (xiCount > 0) {
+        verifyValues(emitLoadOfExtraInhabitantCount(IGF, layoutType),
+               getSizeConstant(Size(xiCount)),
+               "extra inhabitant count");
         
-        auto runtimeIndex = emitGetExtraInhabitantIndexCall(IGF, layoutType,
-                                                        xiOpaque.getAddress());
-        verify(runtimeIndex, index,
-               llvm::Twine("extra inhabitant index calculation ")
-                 + numberBuf.str());
+        // Verify that the extra inhabitant representations are consistent.
+        
+        // TODO: Update for EnumPayload implementation changes.
+        auto xiBuf = IGF.createAlloca(fixedTI->getStorageType(),
+                                      fixedTI->getFixedAlignment(),
+                                      "extra-inhabitant");
+        auto fixedXIBuf = IGF.createAlloca(fixedTI->getStorageType(),
+                                           fixedTI->getFixedAlignment(),
+                                           "extra-inhabitant");
+        auto xiOpaque = IGF.Builder.CreateBitCast(xiBuf, IGF.IGM.OpaquePtrTy);
+        auto fixedXIOpaque = IGF.Builder.CreateBitCast(fixedXIBuf,
+                                                       IGF.IGM.OpaquePtrTy);
+        auto xiMask = fixedTI->getFixedExtraInhabitantMask(IGF.IGM);
+        auto xiSchema = EnumPayloadSchema::withBitSize(xiMask.getBitWidth());
+
+        // TODO: Randomize the set of extra inhabitants we check.
+        unsigned bits = fixedTI->getFixedSize().getValueInBits();
+        for (unsigned i = 0, e = std::min(xiCount, 256u);
+             i < e; ++i) {
+          // Initialize the buffer with junk, to help ensure we're insensitive to
+          // insignificant bits.
+          // TODO: Randomize the filler.
+          IGF.Builder.CreateMemSet(xiBuf.getAddress(),
+                                   llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0x5A),
+                                   fixedTI->getFixedSize().getValue(),
+                                   fixedTI->getFixedAlignment().getValue());
+          
+          // Ask the runtime to store an extra inhabitant.
+          auto index = llvm::ConstantInt::get(IGF.IGM.Int32Ty, i);
+          emitStoreExtraInhabitantCall(IGF, layoutType, index, xiOpaque);
+          
+          // Compare the stored extra inhabitant against the fixed extra
+          // inhabitant pattern.
+          auto fixedXIValue
+             = fixedTI->getFixedExtraInhabitantValue(IGF.IGM, bits, i);
+          auto fixedXIPayload =
+            EnumPayload::fromBitPattern(IGF.IGM, fixedXIValue,
+                                        xiSchema);
+          fixedXIPayload.store(IGF, fixedXIBuf);
+          
+          auto runtimeXIPayload = EnumPayload::load(IGF, xiBuf, xiSchema);
+          runtimeXIPayload.emitApplyAndMask(IGF, xiMask);
+          runtimeXIPayload.store(IGF, xiBuf);
+
+          numberBuf.clear();
+          {
+            llvm::raw_svector_ostream os(numberBuf);
+            os << i;
+          }
+          
+          verifyBuffers(xiBuf, fixedXIBuf, fixedTI->getFixedSize(),
+                 llvm::Twine("stored extra inhabitant ") + numberBuf.str());
+          
+          // Now ask the runtime to identify the fixed extra inhabitant value.
+          // Mask in junk to make sure the runtime correctly ignores it.
+          // TODO: Randomize the filler.
+          auto xiFill = ~APInt(fixedXIValue.getBitWidth(), 0);
+          xiFill &= ~xiMask;
+          fixedXIValue |= xiFill;
+
+          auto maskedXIPayload = EnumPayload::fromBitPattern(IGF.IGM,
+            fixedXIValue, xiSchema);
+          maskedXIPayload.store(IGF, fixedXIBuf);
+          
+          auto runtimeIndex = emitGetExtraInhabitantIndexCall(IGF, layoutType,
+                                                              fixedXIOpaque);
+          verifyValues(runtimeIndex, index,
+                       llvm::Twine("extra inhabitant index calculation ")
+                         + numberBuf.str());
+        }
       }
-#endif
     }
 
     // TODO: Verify interesting layout properties specific to the kind of type,
