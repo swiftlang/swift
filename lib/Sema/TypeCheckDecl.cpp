@@ -5229,10 +5229,18 @@ public:
       // Revert the types within the signature so it can be type-checked with
       // archetypes below.
       TC.revertGenericFuncSignature(FD);
-    } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
-      (void)TC.validateGenericFuncSignature(FD);
-      // Revert all of the types within the signature of the function.
-      TC.revertGenericFuncSignature(FD);
+    } else if (auto genericSig =
+                 FD->getDeclContext()->getGenericSignatureOfContext()) {
+      if (!FD->getAccessorStorageDecl()) {
+        (void)TC.validateGenericFuncSignature(FD);
+
+        // Revert all of the types within the signature of the function.
+        TC.revertGenericFuncSignature(FD);
+      } else {
+        // We've inherited all of the type information already.
+        TC.configureInterfaceType(FD, genericSig);
+      }
+
       FD->setGenericEnvironment(
           FD->getDeclContext()->getGenericEnvironmentOfContext());
     }
