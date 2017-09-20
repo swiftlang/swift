@@ -50,6 +50,8 @@
           key.namelength: 10,
           key.attributes: [
             {
+              key.offset: 41,
+              key.length: 9,
               key.attribute: source.decl.attribute.iboutlet
             }
           ]
@@ -105,6 +107,8 @@
           key.bodylength: 5,
           key.attributes: [
             {
+              key.offset: 136,
+              key.length: 9,
               key.attribute: source.decl.attribute.ibaction
             }
           ]
@@ -124,6 +128,8 @@
       key.bodylength: 0,
       key.attributes: [
         {
+          key.offset: 175,
+          key.length: 13,
           key.attribute: source.decl.attribute.ibdesignable
         }
       ]
@@ -152,6 +158,8 @@
           key.namelength: 17,
           key.attributes: [
             {
+              key.offset: 221,
+              key.length: 14,
               key.attribute: source.decl.attribute.ibinspectable
             }
           ]
@@ -168,6 +176,8 @@
           key.namelength: 17,
           key.attributes: [
             {
+              key.offset: 268,
+              key.length: 14,
               key.attribute: source.decl.attribute.gkinspectable
             }
           ]
@@ -938,6 +948,8 @@
       ],
       key.attributes: [
         {
+          key.offset: 1406,
+          key.length: 5,
           key.attribute: source.decl.attribute.objc
         }
       ],
@@ -961,6 +973,8 @@
           key.bodylength: 0,
           key.attributes: [
             {
+              key.offset: 1449,
+              key.length: 5,
               key.attribute: source.decl.attribute.objc
             }
           ]
@@ -985,6 +999,8 @@
       ],
       key.attributes: [
         {
+          key.offset: 1474,
+          key.length: 11,
           key.attribute: source.decl.attribute.objc.name
         }
       ],
@@ -1008,6 +1024,8 @@
           key.bodylength: 0,
           key.attributes: [
             {
+              key.offset: 1524,
+              key.length: 10,
               key.attribute: source.decl.attribute.objc.name
             }
           ]

@@ -218,7 +218,7 @@ public:
                                          StringRef RuntimeName,
                                          StringRef SelectorName,
                                          ArrayRef<StringRef> InheritedTypes,
-                                         ArrayRef<UIdent> Attrs) = 0;
+                                         ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) = 0;
 
   virtual bool endDocumentSubStructure() = 0;
 

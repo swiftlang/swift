@@ -59,7 +59,7 @@ class NullEditorConsumer : public EditorConsumer {
                                  StringRef RuntimeName,
                                  StringRef SelectorName,
                                  ArrayRef<StringRef> InheritedTypes,
-                                 ArrayRef<UIdent> Attrs) override {
+                                 ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override {
     return false;
   }
 

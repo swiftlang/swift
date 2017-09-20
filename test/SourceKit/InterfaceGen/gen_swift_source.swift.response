@@ -449,6 +449,8 @@ internal enum Colors {
         key.namelength: 3,
         key.attributes: [
           {
+            key.offset: 319,
+            key.length: 8,
             key.attribute: source.decl.attribute.override
           }
         ]

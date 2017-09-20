@@ -5380,6 +5380,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 21,
         key.attributes: [
           {
+            key.offset: 3991,
+            key.length: 11,
             key.attribute: source.decl.attribute.convenience
           }
         ],
@@ -5975,6 +5977,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 10,
         key.attributes: [
           {
+            key.offset: 6061,
+            key.length: 15,
             key.attribute: source.decl.attribute.weak
           }
         ]
@@ -5991,6 +5995,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 16,
         key.attributes: [
           {
+            key.offset: 6114,
+            key.length: 15,
             key.attribute: source.decl.attribute.weak
           }
         ]
@@ -6040,6 +6046,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 7,
         key.attributes: [
           {
+            key.offset: 6263,
+            key.length: 4,
             key.attribute: source.decl.attribute.weak
           }
         ]
@@ -6091,6 +6099,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 19,
         key.attributes: [
           {
+            key.offset: 6390,
+            key.length: 11,
             key.attribute: source.decl.attribute.convenience
           }
         ],
@@ -6116,6 +6126,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 12,
         key.attributes: [
           {
+            key.offset: 6432,
+            key.length: 39,
             key.attribute: source.decl.attribute.available
           }
         ]
@@ -6130,6 +6142,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 24,
         key.attributes: [
           {
+            key.offset: 6509,
+            key.length: 23,
             key.attribute: source.decl.attribute.available
           }
         ]
@@ -6144,6 +6158,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 27,
         key.attributes: [
           {
+            key.offset: 6582,
+            key.length: 47,
             key.attribute: source.decl.attribute.available
           }
         ]
@@ -6179,6 +6195,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     ],
     key.attributes: [
       {
+        key.offset: 6703,
+        key.length: 63,
         key.attribute: source.decl.attribute.available
       }
     ],
@@ -6285,6 +6303,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 3,
         key.attributes: [
           {
+            key.offset: 7094,
+            key.length: 8,
             key.attribute: source.decl.attribute.override
           }
         ]
