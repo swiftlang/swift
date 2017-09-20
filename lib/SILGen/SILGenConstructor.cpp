@@ -354,11 +354,10 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 }
 
 void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
-  CanType enumTy = element->getParentEnum()
-                      ->getDeclaredTypeInContext()
-                      ->getCanonicalType();
   CanType enumIfaceTy = element->getParentEnum()
                       ->getDeclaredInterfaceType()
+                      ->getCanonicalType();
+  CanType enumTy = F.mapTypeIntoContext(enumIfaceTy)
                       ->getCanonicalType();
   auto &enumTI = getTypeLowering(enumTy);
 

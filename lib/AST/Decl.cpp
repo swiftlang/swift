@@ -993,7 +993,7 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() {
     auto *DC = singleVar->getDeclContext();
     if (singleVar->getAttrs().hasAttribute<LazyAttr>() &&
         DC->isTypeContext()) {
-      bool isInOut = !DC->getDeclaredTypeOfContext()->hasReferenceSemantics();
+      bool isInOut = !DC->getDeclaredInterfaceType()->hasReferenceSemantics();
       SelfParam = ParamDecl::createSelf(SourceLoc(), DC,
                                         singleVar->isStatic(),
                                         isInOut);
@@ -1350,10 +1350,10 @@ bool AbstractStorageDecl::hasFixedLayout() const {
   auto *dc = getDeclContext();
 
   if (dc->isTypeContext()) {
-    auto declaredType = dc->getDeclaredTypeOfContext();
-    if (declaredType->hasError())
+    auto *nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (nominalDecl == nullptr)
       return true;
-    return declaredType->getAnyNominal()->hasFixedLayout();
+    return nominalDecl->hasFixedLayout();
   }
 
   // Private and (unversioned) internal variables always have a
@@ -1731,12 +1731,8 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
 
   // Dynamic lookup can only find class and protocol members, or extensions of
   // classes.
-  auto declaredType = getDeclContext()->getDeclaredTypeOfContext();
-  
-  if (!declaredType)
-    return false;
-  
-  auto nominalDC = declaredType->getAnyNominal();
+  auto nominalDC =
+    getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!nominalDC ||
       (!isa<ClassDecl>(nominalDC) && !isa<ProtocolDecl>(nominalDC)))
     return false;
@@ -2264,9 +2260,14 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   DeclContext *dc = decl->getDeclContext();
   if (dc->isTypeContext()) {
     switch (kind) {
-    case DeclTypeKind::DeclaredType:
-      Ty = dc->getDeclaredTypeOfContext();
+    case DeclTypeKind::DeclaredType: {
+      auto *nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+      if (nominal)
+        Ty = nominal->getDeclaredType();
+      else
+        Ty = ErrorType::get(ctx);
       break;
+    }
     case DeclTypeKind::DeclaredTypeInContext:
       llvm_unreachable("Handled above");
     case DeclTypeKind::DeclaredInterfaceType:
@@ -2431,10 +2432,15 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
 
 UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
   assert(getGenericParams());
+
+  Type parentTy;
+  auto parentDC = getDeclContext();
+  if (auto nominal = parentDC->getAsNominalTypeOrNominalTypeExtensionContext())
+    parentTy = nominal->getDeclaredType();
+
   return UnboundGenericType::get(
       const_cast<TypeAliasDecl *>(this),
-      getDeclContext()->getDeclaredTypeOfContext(),
-      getASTContext());
+      parentTy, getASTContext());
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {

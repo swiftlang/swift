@@ -543,11 +543,10 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
     return DC->isLocalContext();
   }
 
-  auto declaredType = DC->getDeclaredTypeOfContext();
-  if (!declaredType || declaredType->hasError())
+  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (nominal == nullptr)
     return false;
 
-  auto *nominal = declaredType->getAnyNominal();
   if (nominal->getFormalAccess() <= AccessLevel::FilePrivate)
     return true;
   return isInPrivateOrLocalContext(nominal);

@@ -147,14 +147,6 @@ static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
   llvm_unreachable("Unhandled DeclTypeKind in switch.");
 }
 
-Type DeclContext::getDeclaredTypeOfContext() const {
-  if (auto *ED = dyn_cast<ExtensionDecl>(this))
-    return computeExtensionType(ED, DeclTypeKind::DeclaredType);
-  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
-    return NTD->getDeclaredType();
-  return Type();
-}
-
 Type DeclContext::getDeclaredTypeInContext() const {
   if (auto *ED = dyn_cast<ExtensionDecl>(this))
     return computeExtensionType(ED, DeclTypeKind::DeclaredTypeInContext);

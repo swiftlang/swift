@@ -2754,7 +2754,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
           currentTypeContext->getSemanticDepth()) {
         diagnose(loc, diag::could_not_use_instance_member_on_type,
                  currentTypeContext->getDeclaredInterfaceType(), memberName,
-                 memberTypeContext->getDeclaredTypeOfContext(),
+                 memberTypeContext->getDeclaredInterfaceType(),
                  true)
           .highlight(baseRange).highlight(nameLoc.getSourceRange());
       } else {

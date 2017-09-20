@@ -8504,7 +8504,7 @@ static void diagnoseMissingRequiredInitializer(
   // Complain.
   TC.diagnose(insertionLoc, diag::required_initializer_missing,
               superInitializer->getFullName(),
-              superInitializer->getDeclContext()->getDeclaredTypeOfContext())
+              superInitializer->getDeclContext()->getDeclaredInterfaceType())
     .fixItInsert(insertionLoc, initializerText);
 
   TC.diagnose(findNonImplicitRequiredInit(superInitializer),

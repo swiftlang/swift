@@ -3678,7 +3678,7 @@ namespace {
                                       ImportedName importedName,
                                       ObjCSelector selector,
                                       bool forceClassMethod) {
-      assert(dc->getDeclaredTypeOfContext() && "Method in non-type context?");
+      assert(dc->isTypeContext() && "Method in non-type context?");
       assert(isa<ClangModuleUnit>(dc->getModuleScopeContext()) &&
              "Clang method in Swift context?");
 
@@ -5324,7 +5324,7 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
   // instance of the type we're importing onto. Importing this as a method means
   // that the method should be treated as mutating in this situation.
   bool selfIsInOut = false;
-  if (selfIdx && !dc->getDeclaredTypeOfContext()->hasReferenceSemantics()) {
+  if (selfIdx && !dc->getDeclaredInterfaceType()->hasReferenceSemantics()) {
     auto selfParam = decl->getParamDecl(*selfIdx);
     auto selfParamTy = selfParam->getType();
     if ((selfParamTy->isPointerType() || selfParamTy->isReferenceType()) &&
