@@ -671,7 +671,7 @@ ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc,
                                   SourceLoc NameLoc, Identifier Name,
                                   SourceLoc RParenLoc) {
   void *mem = Ctx.Allocate(totalSizeToAlloc<SourceLoc>(3), alignof(ObjCAttr));
-  return new (mem) ObjCAttr(AtLoc, SourceRange(ObjCLoc),
+  return new (mem) ObjCAttr(AtLoc, SourceRange(ObjCLoc, RParenLoc),
                             ObjCSelector(Ctx, 0, Name),
                             SourceRange(LParenLoc, RParenLoc),
                             NameLoc);
@@ -690,7 +690,7 @@ ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc,
   assert(NameLocs.size() == Names.size());
   void *mem = Ctx.Allocate(totalSizeToAlloc<SourceLoc>(NameLocs.size() + 2),
                            alignof(ObjCAttr));
-  return new (mem) ObjCAttr(AtLoc, SourceRange(ObjCLoc),
+  return new (mem) ObjCAttr(AtLoc, SourceRange(ObjCLoc, RParenLoc),
                             ObjCSelector(Ctx, Names.size(), Names),
                             SourceRange(LParenLoc, RParenLoc),
                             NameLocs);

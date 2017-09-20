@@ -591,53 +591,37 @@ swift::ide::NameKind SwiftLangSupport::getNameKindForUID(SourceKit::UIdent Id) {
   return swift::ide::NameKind::Swift;
 }
 
-std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttributes &Attrs) {
-  std::vector<UIdent> AttrUIDs;
-
-#define ATTR(X) \
-  if (Attrs.has(AK_##X)) { \
-    static UIdent Attr_##X("source.decl.attribute."#X); \
-    AttrUIDs.push_back(Attr_##X); \
-  }
-#include "swift/AST/Attr.def"
-
-  for (auto Attr : Attrs) {
-    // Check special-case names first.
-    switch (Attr->getKind()) {
+Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttribute *Attr) {
+  // Check special-case names first.
+  switch (Attr->getKind()) {
     case DAK_IBAction: {
       static UIdent Attr_IBAction("source.decl.attribute.ibaction");
-      AttrUIDs.push_back(Attr_IBAction);
-      continue;
+      return Attr_IBAction;
     }
     case DAK_IBOutlet: {
       static UIdent Attr_IBOutlet("source.decl.attribute.iboutlet");
-      AttrUIDs.push_back(Attr_IBOutlet);
-      continue;
+      return Attr_IBOutlet;
     }
     case DAK_IBDesignable: {
       static UIdent Attr_IBDesignable("source.decl.attribute.ibdesignable");
-      AttrUIDs.push_back(Attr_IBDesignable);
-      continue;
+      return Attr_IBDesignable;
     }
     case DAK_IBInspectable: {
       static UIdent Attr_IBInspectable("source.decl.attribute.ibinspectable");
-      AttrUIDs.push_back(Attr_IBInspectable);
-      continue;
+      return Attr_IBInspectable;
     }
     case DAK_GKInspectable: {
       static UIdent Attr_GKInspectable("source.decl.attribute.gkinspectable");
-      AttrUIDs.push_back(Attr_GKInspectable);
-      continue;
+      return Attr_GKInspectable;
     }
     case DAK_ObjC: {
       static UIdent Attr_Objc("source.decl.attribute.objc");
       static UIdent Attr_ObjcNamed("source.decl.attribute.objc.name");
       if (cast<ObjCAttr>(Attr)->hasName()) {
-        AttrUIDs.push_back(Attr_ObjcNamed);
+        return Attr_ObjcNamed;
       } else {
-        AttrUIDs.push_back(Attr_Objc);
+        return Attr_Objc;
       }
-      continue;
     }
 
     // We handle access control explicitly.
@@ -647,21 +631,31 @@ std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttribute
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
     case DAK_DowngradeExhaustivityCheck:
-      continue;
+      return None;
     default:
       break;
-    }
+  }
 
-    switch (Attr->getKind()) {
+  switch (Attr->getKind()) {
     case DAK_Count:
       break;
 #define DECL_ATTR(X, CLASS, ...)\
     case DAK_##CLASS: {\
       static UIdent Attr_##X("source.decl.attribute."#X); \
-      AttrUIDs.push_back(Attr_##X); \
-      break;\
+      return Attr_##X; \
     }
 #include "swift/AST/Attr.def"
+  }
+
+  return None;
+}
+
+std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttributes &Attrs) {
+  std::vector<UIdent> AttrUIDs;
+
+  for (auto Attr : Attrs) {
+    if (auto AttrUID = getUIDForDeclAttribute(Attr)) {
+      AttrUIDs.push_back(AttrUID.getValue());
     }
   }
 

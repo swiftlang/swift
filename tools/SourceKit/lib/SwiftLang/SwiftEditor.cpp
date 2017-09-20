@@ -1237,7 +1237,27 @@ public:
     SmallString<64> SelectorNameBuf;
     StringRef SelectorName = getObjCSelectorName(Node.Dcl, SelectorNameBuf);
 
-    std::vector<UIdent> Attrs = SwiftLangSupport::UIDsFromDeclAttributes(Node.Attrs);
+    std::vector<std::tuple<UIdent, unsigned, unsigned>> Attrs;
+
+    for (auto Attr : Node.Attrs) {
+      if (auto AttrUID = SwiftLangSupport::getUIDForDeclAttribute(Attr)) {
+        unsigned AttrOffset = 0;
+        unsigned AttrEnd = 0;
+        auto AttrRange = Attr->getRangeWithAt();
+        if (AttrRange.isValid()) {
+          auto CharRange = Lexer::getCharSourceRangeFromSourceRange(SrcManager,
+                                                                    AttrRange);
+          AttrOffset = SrcManager.getLocOffsetInBuffer(CharRange.getStart(),
+                                                       BufferID);
+          AttrEnd = SrcManager.getLocOffsetInBuffer(CharRange.getEnd(),
+                                                    BufferID);
+        }
+
+        auto AttrTuple = std::make_tuple(AttrUID.getValue(), AttrOffset,
+                                         AttrEnd - AttrOffset);
+        Attrs.push_back(AttrTuple);
+      }
+    }
 
     Consumer.beginDocumentSubStructure(StartOffset, EndOffset - StartOffset,
                                        Kind, AccessLevel, SetterAccessLevel,
