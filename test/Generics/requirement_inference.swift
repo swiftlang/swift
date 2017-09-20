@@ -54,11 +54,9 @@ class Fox : P1 {
   func p1() {}
 }
 
-class Box<T : Fox> {
-// CHECK-LABEL: .unpack@
-// CHECK-NEXT: Requirements:
-// CHECK-NEXT:   τ_0_0 : Fox [τ_0_0: Explicit]
+class Box<T : Fox, U> {
   func unpack(_ x: X1<T>) {}
+  func unpackFail(_ X: X1<U>) { } // expected-error{{type 'U' does not conform to protocol 'P1'}}
 }
 
 // ----------------------------------------------------------------------------
@@ -152,7 +150,7 @@ protocol P7 : P6 {
   associatedtype AssocP7: P6
 }
 
-// CHECK-LABEL: P7.nestedSameType1()@
+// CHECK-LABEL: P7@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P7, τ_0_0.AssocP6.Element : P6, τ_0_0.AssocP6.Element == τ_0_0.AssocP7.AssocP6.Element>
 extension P7 where AssocP6.Element : P6, // expected-note{{conformance constraint 'Self.AssocP6.Element': 'P6' written here}}
         AssocP7.AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP6.Element': 'P6'}}
@@ -187,7 +185,7 @@ func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3
 
 // Note: a standard-library-based stress test to make sure we don't inject
 // any additional requirements.
-// CHECK-LABEL: RangeReplaceableCollection.f()@
+// CHECK-LABEL: RangeReplaceableCollection
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RangeReplaceableCollection, τ_0_0.SubSequence == MutableRangeReplaceableSlice<τ_0_0>>
 extension RangeReplaceableCollection where
   Self: MutableCollection,
