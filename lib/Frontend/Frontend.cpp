@@ -434,7 +434,8 @@ void CompilerInstance::getImplicitlyImportedModules(
   }
 }
 
-void CompilerInstance::createREPLFile(const ImplicitImports &implicitImports) const {
+void CompilerInstance::createREPLFile(
+    const ImplicitImports &implicitImports) const {
   SharedTimer timer("performSema-createREPLFile");
   auto *SingleInputFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind,
@@ -447,13 +448,14 @@ std::unique_ptr<DelayedParsingCallbacks>
 CompilerInstance::computeDelayedParsingCallback() {
   if (Invocation.isCodeCompletion())
     return llvm::make_unique<CodeCompleteDelayedCallbacks>(
-                                                         SourceMgr.getCodeCompletionLoc());
+        SourceMgr.getCodeCompletionLoc());
   if (Invocation.isDelayedFunctionBodyParsing())
     return llvm::make_unique<AlwaysDelayedCallbacks>();
   return nullptr;
 }
 
-void CompilerInstance::addMainFileToModule(const ImplicitImports &implicitImports) {
+void CompilerInstance::addMainFileToModule(
+    const ImplicitImports &implicitImports) {
   SharedTimer timer("performSema-addMainFileToModule");
 
   const InputFileKind Kind = Invocation.getInputKind();
@@ -472,7 +474,8 @@ void CompilerInstance::addMainFileToModule(const ImplicitImports &implicitImport
     setPrimarySourceFile(MainFile);
 }
 
-void CompilerInstance::parseAndCheckTypes(const ImplicitImports &implicitImports) {
+void CompilerInstance::parseAndCheckTypes(
+    const ImplicitImports &implicitImports) {
   SharedTimer timer("performSema-parseAndCheckTypes");
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB{
       computeDelayedParsingCallback()};
@@ -490,16 +493,16 @@ void CompilerInstance::parseAndCheckTypes(const ImplicitImports &implicitImports
   }
   if (hadLoadError)
     return;
-  
+
   OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions();
-  
+
   // Parse main file last in order to make sure that it can use decls from other
   // files in the module.
   if (MainBufferID != NO_SUCH_BUFFER) {
     parseAndTypeCheckMainFile(PersistentState, DelayedCB.get(),
                               TypeCheckOptions);
   }
-  
+
   const auto &options = Invocation.getFrontendOptions();
   forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF, PersistentState.getTopLevelContext(),
@@ -508,12 +511,12 @@ void CompilerInstance::parseAndCheckTypes(const ImplicitImports &implicitImports
                         options.WarnLongExpressionTypeChecking,
                         options.SolverExpressionTimeThreshold);
   });
-  
+
   // Even if there were no source files, we should still record known
   // protocols.
   if (auto *stdlib = Context->getStdlibModule())
     Context->recordKnownProtocols(stdlib);
-  
+
   if (DelayedCB.get()) {
     performDelayedParsing(MainModule, PersistentState,
                           Invocation.getCodeCompletionFactory());
@@ -522,8 +525,7 @@ void CompilerInstance::parseAndCheckTypes(const ImplicitImports &implicitImports
 }
 
 void CompilerInstance::parseLibraryFile(
-    unsigned BufferID,
-    const ImplicitImports &implicitImports,
+    unsigned BufferID, const ImplicitImports &implicitImports,
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB) {
   SharedTimer timer("performSema-parseLibraryFile");
@@ -574,7 +576,8 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
 }
 
 bool CompilerInstance::parsePartialModulesAndLibraryFiles(
-    const ImplicitImports &implicitImports, PersistentParserState &PersistentState,
+    const ImplicitImports &implicitImports,
+    PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB) {
   SharedTimer timer("performSema-parsePartialModulesAndLibraryFiles");
   bool hadLoadError = false;
