@@ -1307,23 +1307,20 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     auto *DC = CurDeclContext->getInnermostTypeContext();
     if (!DC)
       return;
-    Type DT = DC->getDeclaredTypeOfContext();
-    if (DT.isNull() || DT->is<ErrorType>())
+    auto *CD = DC->getAsClassOrClassExtensionContext();
+    if (CD == nullptr)
       return;
-    Type ST = DT->getSuperclass();
+    Type ST = CD->getSuperclass();
     if (ST.isNull() || ST->is<ErrorType>())
       return;
-    if (ST->getNominalOrBoundGenericNominal()) {
-      CodeCompletionResultBuilder Builder(Sink,
-                                          CodeCompletionResult::ResultKind::Keyword,
-                                          SemanticContextKind::CurrentNominal,
-                                          {});
-      Builder.setKeywordKind(CodeCompletionKeywordKind::kw_super);
-      Builder.addTextChunk("super");
-      ST = ST->getReferenceStorageReferent();
-      assert(!ST->isVoid() && "Cannot get type name.");
-      Builder.addTypeAnnotation(ST.getString());
-    }
+
+    CodeCompletionResultBuilder Builder(Sink,
+                                        CodeCompletionResult::ResultKind::Keyword,
+                                        SemanticContextKind::CurrentNominal,
+                                        {});
+    Builder.setKeywordKind(CodeCompletionKeywordKind::kw_super);
+    Builder.addTextChunk("super");
+    Builder.addTypeAnnotation(ST.getString());
   }
 
   /// \brief Set to true when we have delivered code completion results
