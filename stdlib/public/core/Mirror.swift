@@ -28,9 +28,8 @@ public struct Mirror {
   /// Note that the effect of this setting goes no deeper than the
   /// nearest descendant class that overrides `customMirror`, which
   /// in turn can determine representation of *its* descendants.
-  // FIXME: Should be internal, but synthesized == does not inherit the
-  // @_versioned attribute. See <rdar://problem/34342955>
-  public enum _DefaultDescendantRepresentation {
+  @_versioned // FIXME(sil-serialize-all)
+  internal enum _DefaultDescendantRepresentation {
     /// Generate a default mirror for descendant classes that don't
     /// override `customMirror`.
     ///

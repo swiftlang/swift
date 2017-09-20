@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 public enum _DebuggerSupport {
-  // FIXME: should be `internal`. See <rdar://problem/34342955>
-  public enum CollectionStatus {
+  @_versioned // FIXME(sil-serialize-all)
+  internal enum CollectionStatus {
     case NotACollection
     case CollectionOfElements
     case CollectionOfPairs
