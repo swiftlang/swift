@@ -161,6 +161,8 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   for (unsigned i = 0, e = Invocation.getInputBuffers().size(); i != e; ++i) {
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
     auto *InputBuffer = Invocation.getInputBuffers()[i];
+    
+    // SR-5860: It crashes here, on the InputBuffer->getBuffer()
     auto Copy = std::unique_ptr<llvm::MemoryBuffer>(
         llvm::MemoryBuffer::getMemBufferCopy(
             InputBuffer->getBuffer(), InputBuffer->getBufferIdentifier()));
