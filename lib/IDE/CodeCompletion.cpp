@@ -2537,7 +2537,7 @@ public:
     }
 
     // If we won't be able to provide a result, bail out.
-    if (MemberType->is<ErrorType>() && addName.empty() && !needInit)
+    if (MemberType->hasError() && addName.empty() && !needInit)
       return;
 
     // Add the constructor, possibly including any default arguments.
