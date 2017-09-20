@@ -4846,8 +4846,18 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
+  // Create the decl for the func and add it to the parent scope.
+  auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
+                        FuncLoc, FullName, NameLoc,
+                        /*Throws=*/throwsLoc.isValid(), throwsLoc,
+                        /*AccessorKeywordLoc=*/SourceLoc(),
+                        nullptr, BodyParams, FuncRetTy,
+                        CurDeclContext);
+
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
+    ContextChange CC(*this, FD);
+
     auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
     SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -4855,6 +4865,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
       return whereStatus;
     }
   }
+
+  FD->setGenericParams(GenericParams);
   
   // Protocol method arguments may not have default values.
   if (Flags.contains(PD_InProtocol) && DefaultArgs.HasDefaultArgument) {
@@ -4870,18 +4882,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
   // duplication.
-  FuncDecl *FD;
   {
     Scope S(this, ScopeKind::FunctionBody);
 
-    // Create the decl for the func and add it to the parent scope.
-    FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
-                          FuncLoc, FullName, NameLoc,
-                          /*Throws=*/throwsLoc.isValid(), throwsLoc,
-                          /*AccessorKeywordLoc=*/SourceLoc(),
-                          GenericParams, BodyParams, FuncRetTy,
-                          CurDeclContext);
-    
     diagnoseOperatorFixityAttributes(*this, Attributes, FD);
     
     // Add the attributes here so if we need them while parsing the body
@@ -5016,7 +5019,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   }
 
   EnumDecl *ED = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
-                                        { }, GenericParams, CurDeclContext);
+                                        { }, nullptr, CurDeclContext);
   setLocalDiscriminator(ED);
   ED->getAttrs() = Attributes;
 
@@ -5041,8 +5044,9 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
-    ED->setGenericParams(GenericParams);
   }
+
+  ED->setGenericParams(GenericParams);
 
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
@@ -5277,7 +5281,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   StructDecl *SD = new (Context) StructDecl(StructLoc, StructName,
                                             StructNameLoc,
                                             { },
-                                            GenericParams,
+                                            nullptr,
                                             CurDeclContext);
   setLocalDiscriminator(SD);
   SD->getAttrs() = Attributes;
@@ -5303,9 +5307,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
-    SD->setGenericParams(GenericParams);
   }
-  
+
+  SD->setGenericParams(GenericParams);
+
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
     LBLoc = PreviousLoc;
@@ -5363,7 +5368,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
 
   // Create the class.
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
-                                          { }, GenericParams, CurDeclContext);
+                                          { }, nullptr, CurDeclContext);
   setLocalDiscriminator(CD);
 
   // Attach attributes.
@@ -5390,8 +5395,9 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
-    CD->setGenericParams(GenericParams);
   }
+
+  CD->setGenericParams(GenericParams);
 
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
@@ -5563,8 +5569,20 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
+  // Build an AST for the subscript declaration.
+  DeclName name = DeclName(Context, DeclBaseName::createSubscript(),
+                           argumentNames);
+  auto *Subscript = new (Context) SubscriptDecl(name,
+                                                SubscriptLoc, Indices.get(),
+                                                ArrowLoc, ElementTy.get(),
+                                                CurDeclContext,
+                                                nullptr);
+  Subscript->getAttrs() = Attributes;
+
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
+    ContextChange CC(*this, Subscript);
+
     auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
     SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -5573,15 +5591,7 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
     }
   }
 
-  // Build an AST for the subscript declaration.
-  DeclName name = DeclName(Context, DeclBaseName::createSubscript(),
-                           argumentNames);
-  auto *Subscript = new (Context) SubscriptDecl(name,
-                                                SubscriptLoc, Indices.get(),
-                                                ArrowLoc, ElementTy.get(),
-                                                CurDeclContext,
-                                                GenericParams);
-  Subscript->getAttrs() = Attributes;
+  Subscript->setGenericParams(GenericParams);
 
   // Pass the function signature to code completion.
   if (SignatureHasCodeCompletion)
@@ -5690,8 +5700,19 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
+  auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
+  DeclName FullName(Context, Context.Id_init, namePieces);
+
+  auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
+                                           Failability, FailabilityLoc,
+                                           throwsLoc.isValid(), throwsLoc,
+                                           SelfDecl, Params.get(), nullptr,
+                                           CurDeclContext);
+
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
+    ContextChange(*this, CD);
+
     auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
     SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -5699,18 +5720,10 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       return whereStatus;
     }
   }
-  
-  auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
-  DeclName FullName(Context, Context.Id_init, namePieces);
+
+  CD->setGenericParams(GenericParams);
 
   Scope S2(this, ScopeKind::ConstructorBody);
-  auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
-                                           Failability, FailabilityLoc,
-                                           throwsLoc.isValid(), throwsLoc,
-                                           SelfDecl, Params.get(),
-                                           GenericParams,
-                                           CurDeclContext);
-  
   CtorInitializerKind initKind = CtorInitializerKind::Designated;
   if (Attributes.hasAttribute<ConvenienceAttr>())
     initKind = CtorInitializerKind::Convenience;
