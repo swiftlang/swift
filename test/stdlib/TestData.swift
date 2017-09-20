@@ -31,7 +31,71 @@ class TestDataSuper { }
 
 class TestData : TestDataSuper {
 
-    // This is a type of Data that starts off as a storage of all 0x01s, but it only creates that buffer when needed. When mutated it converts into a more traditional data storage backed by a buffer.
+    class AllOnesImmutableData : NSData {
+        private var _length : Int
+        var _pointer : UnsafeMutableBufferPointer<UInt8>? {
+            willSet {
+                if let p = _pointer { free(p.baseAddress) }
+            }
+        }
+        
+        init(length : Int) {
+            _length = length
+            super.init()
+        }
+        
+        required init?(coder aDecoder: NSCoder) {
+            // Not tested
+            fatalError()
+        }
+        
+        deinit {
+            if let p = _pointer {
+                free(p.baseAddress)
+            }
+        }
+        
+        override var length : Int {
+            get {
+                return _length
+            }
+        }
+        
+        override var bytes : UnsafeRawPointer {
+            if let d = _pointer {
+                return UnsafeRawPointer(d.baseAddress!)
+            } else {
+                // Need to allocate the buffer now.
+                // It doesn't matter if the buffer is uniquely referenced or not here.
+                let buffer = malloc(length)
+                memset(buffer, 1, length)
+                let bytePtr = buffer!.bindMemory(to: UInt8.self, capacity: length)
+                let result = UnsafeMutableBufferPointer(start: bytePtr, count: length)
+                _pointer = result
+                return UnsafeRawPointer(result.baseAddress!)
+            }
+        }
+        
+        override func getBytes(_ buffer: UnsafeMutableRawPointer, length: Int) {
+            if let d = _pointer {
+                // Get the real data from the buffer
+                memmove(buffer, d.baseAddress, length)
+            } else {
+                // A more efficient implementation of getBytes in the case where no one has asked for our backing bytes
+                memset(buffer, 1, length)
+            }
+        }
+        
+        override func copy(with zone: NSZone? = nil) -> Any {
+            return self
+        }
+        
+        override func mutableCopy(with zone: NSZone? = nil) -> Any {
+            return AllOnesData(length: _length)
+        }
+    }
+    
+    
     class AllOnesData : NSMutableData {
         
         private var _length : Int
@@ -73,9 +137,8 @@ class TestData : TestDataSuper {
                     }
                     let bytePtr = newBuffer.bindMemory(to: UInt8.self, capacity: newValue)
                     _pointer = UnsafeMutableBufferPointer(start: bytePtr, count: newValue)
-                } else {
-                    _length = newValue
                 }
+                _length = newValue
             }
         }
         
@@ -120,6 +183,15 @@ class TestData : TestDataSuper {
                 memset(buffer, 1, length)
             }
         }
+    }
+
+    var heldData: Data?
+    
+    // this holds a reference while applying the function which forces the internal ref type to become non-uniquely referenced
+    func holdReference(_ data: Data, apply: () -> Void) {
+        heldData = data
+        apply()
+        heldData = nil
     }
 
     // MARK: -
@@ -1208,6 +1280,2382 @@ class TestData : TestDataSuper {
         data.replaceSubrange(4 ..< 4, with: Data(bytes: []))
         expectEqual(expected, data.count)
     }
+
+        func test_validateMutation_withUnsafeMutableBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 5).pointee = 0xFF
+        }
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 4, 0xFF, 6, 7, 8, 9]))
+    }
+    
+    func test_validateMutation_appendBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        data.append("hello", count: 5)
+        expectEqual(data[data.startIndex.advanced(by: 5)], 0x5)
+    }
+    
+    func test_validateMutation_appendData() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let other = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        data.append(other)
+        expectEqual(data[data.startIndex.advanced(by: 9)], 9)
+        expectEqual(data[data.startIndex.advanced(by: 10)], 0)
+    }
+    
+    func test_validateMutation_appendBuffer() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let bytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        bytes.withUnsafeBufferPointer { data.append($0) }
+        expectEqual(data[data.startIndex.advanced(by: 9)], 9)
+        expectEqual(data[data.startIndex.advanced(by: 10)], 0)
+    }
+    
+    func test_validateMutation_appendSequence() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let seq = repeatElement(UInt8(1), count: 10)
+        data.append(contentsOf: seq)
+        expectEqual(data[data.startIndex.advanced(by: 9)], 9)
+        expectEqual(data[data.startIndex.advanced(by: 10)], 1)
+    }
+    
+    func test_validateMutation_appendContentsOf() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let bytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        data.append(contentsOf: bytes)
+        expectEqual(data[data.startIndex.advanced(by: 9)], 9)
+        expectEqual(data[data.startIndex.advanced(by: 10)], 0)
+    }
+    
+    func test_validateMutation_resetBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        data.resetBytes(in: 5..<8)
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 4, 0, 0, 0, 8, 9]))
+    }
+    
+    func test_validateMutation_replaceSubrange() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+        let replacement = Data(bytes: [0xFF, 0xFF])
+        data.replaceSubrange(range, with: replacement)
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 0xFF, 0xFF, 9]))
+    }
+    
+    func test_validateMutation_replaceSubrangeCountableRange() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let range: CountableRange<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+        let replacement = Data(bytes: [0xFF, 0xFF])
+        data.replaceSubrange(range, with: replacement)
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 0xFF, 0xFF, 9]))
+    }
+    
+    func test_validateMutation_replaceSubrangeWithBuffer() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer {
+            data.replaceSubrange(range, with: $0)
+        }
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 0xFF, 0xFF, 9]))
+    }
+    
+    func test_validateMutation_replaceSubrangeWithCollection() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        data.replaceSubrange(range, with: bytes)
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 0xFF, 0xFF, 9]))
+    }
+    
+    func test_validateMutation_replaceSubrangeWithBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBytes {
+            data.replaceSubrange(range, with: $0.baseAddress!, count: 2)
+        }
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 0xFF, 0xFF, 9]))
+    }
+    
+    func test_validateMutation_slice_withUnsafeMutableBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 1).pointee = 0xFF
+        }
+        expectEqual(data, Data(bytes: [4, 0xFF, 6, 7, 8]))
+    }
+    
+    func test_validateMutation_slice_appendBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0.baseAddress!, count: $0.count) }
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_appendData() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        let other = Data(bytes: [0xFF, 0xFF])
+        data.append(other)
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_appendBuffer() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0) }
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_appendSequence() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        let seq = repeatElement(UInt8(0xFF), count: 2)
+        data.append(contentsOf: seq)
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_appendContentsOf() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        data.append(contentsOf: bytes)
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_resetBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        data.resetBytes(in: 5..<8)
+        expectEqual(data, Data(bytes: [4, 0, 0, 0, 8]))
+    }
+    
+    func test_validateMutation_slice_replaceSubrange() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let replacement = Data(bytes: [0xFF, 0xFF])
+        data.replaceSubrange(range, with: replacement)
+        expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+    }
+    
+    func test_validateMutation_slice_replaceSubrangeCountableRange() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        let range: CountableRange<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let replacement = Data(bytes: [0xFF, 0xFF])
+        data.replaceSubrange(range, with: replacement)
+        expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+    }
+    
+    func test_validateMutation_slice_replaceSubrangeWithBuffer() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer {
+            data.replaceSubrange(range, with: $0)
+        }
+        expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+    }
+    
+    func test_validateMutation_slice_replaceSubrangeWithCollection() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        data.replaceSubrange(range, with: bytes)
+        expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+    }
+    
+    func test_validateMutation_slice_replaceSubrangeWithBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBytes {
+            data.replaceSubrange(range, with: $0.baseAddress!, count: 2)
+        }
+        expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+    }
+    
+    func test_validateMutation_cow_withUnsafeMutableBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        holdReference(data) {
+            data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+                ptr.advanced(by: 5).pointee = 0xFF
+            }
+            expectEqual(data, Data(bytes: [0, 1, 2, 3, 4, 0xFF, 6, 7, 8, 9]))
+        }
+    }
+    
+    func test_validateMutation_cow_appendBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        holdReference(data) {
+            data.append("hello", count: 5)
+            expectEqual(data[data.startIndex.advanced(by: 9)], 0x9)
+            expectEqual(data[data.startIndex.advanced(by: 10)], 0x68)
+        }
+    }
+    
+    func test_validateMutation_cow_appendData() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        holdReference(data) {
+            let other = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+            data.append(other)
+            expectEqual(data[data.startIndex.advanced(by: 9)], 9)
+            expectEqual(data[data.startIndex.advanced(by: 10)], 0)
+        }
+    }
+    
+    func test_validateMutation_cow_appendBuffer() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        holdReference(data) {
+            let bytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+            bytes.withUnsafeBufferPointer { data.append($0) }
+            expectEqual(data[data.startIndex.advanced(by: 9)], 9)
+            expectEqual(data[data.startIndex.advanced(by: 10)], 0)
+        }
+    }
+    
+    func test_validateMutation_cow_appendSequence() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        holdReference(data) {
+            let seq = repeatElement(UInt8(1), count: 10)
+            data.append(contentsOf: seq)
+            expectEqual(data[data.startIndex.advanced(by: 9)], 9)
+            expectEqual(data[data.startIndex.advanced(by: 10)], 1)
+        }
+    }
+    
+    func test_validateMutation_cow_appendContentsOf() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        holdReference(data) {
+            let bytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+            data.append(contentsOf: bytes)
+            expectEqual(data[data.startIndex.advanced(by: 9)], 9)
+            expectEqual(data[data.startIndex.advanced(by: 10)], 0)
+        }
+    }
+    
+    func test_validateMutation_cow_resetBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        holdReference(data) {
+            data.resetBytes(in: 5..<8)
+            expectEqual(data, Data(bytes: [0, 1, 2, 3, 4, 0, 0, 0, 8, 9]))
+        }
+    }
+    
+    func test_validateMutation_cow_replaceSubrange() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+            let replacement = Data(bytes: [0xFF, 0xFF])
+            data.replaceSubrange(range, with: replacement)
+            expectEqual(data, Data(bytes: [0, 1, 2, 3, 0xFF, 0xFF, 9]))
+        }
+    }
+    
+    func test_validateMutation_cow_replaceSubrangeCountableRange() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        holdReference(data) {
+            let range: CountableRange<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+            let replacement = Data(bytes: [0xFF, 0xFF])
+            data.replaceSubrange(range, with: replacement)
+            expectEqual(data, Data(bytes: [0, 1, 2, 3, 0xFF, 0xFF, 9]))
+        }
+    }
+    
+    func test_validateMutation_cow_replaceSubrangeWithBuffer() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer {
+                data.replaceSubrange(range, with: $0)
+            }
+            expectEqual(data, Data(bytes: [0, 1, 2, 3, 0xFF, 0xFF, 9]))
+        }
+    }
+    
+    func test_validateMutation_cow_replaceSubrangeWithCollection() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            data.replaceSubrange(range, with: bytes)
+            expectEqual(data, Data(bytes: [0, 1, 2, 3, 0xFF, 0xFF, 9]))
+        }
+    }
+    
+    func test_validateMutation_cow_replaceSubrangeWithBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBytes {
+                data.replaceSubrange(range, with: $0.baseAddress!, count: 2)
+            }
+            expectEqual(data, Data(bytes: [0, 1, 2, 3, 0xFF, 0xFF, 9]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_withUnsafeMutableBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        holdReference(data) {
+            data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+                ptr.advanced(by: 1).pointee = 0xFF
+            }
+            expectEqual(data, Data(bytes: [4, 0xFF, 6, 7, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_appendBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        holdReference(data) {
+            data.append("hello", count: 5)
+            expectEqual(data[data.startIndex.advanced(by: 4)], 0x8)
+            expectEqual(data[data.startIndex.advanced(by: 5)], 0x68)
+        }
+    }
+    
+    func test_validateMutation_slice_cow_appendData() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        holdReference(data) {
+            let other = Data(bytes: [0xFF, 0xFF])
+            data.append(other)
+            expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_appendBuffer() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.append($0) }
+            expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_appendSequence() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        holdReference(data) {
+            let seq = repeatElement(UInt8(0xFF), count: 2)
+            data.append(contentsOf: seq)
+            expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_appendContentsOf() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            data.append(contentsOf: bytes)
+            expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_resetBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        holdReference(data) {
+            data.resetBytes(in: 5..<8)
+            expectEqual(data, Data(bytes: [4, 0, 0, 0, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_replaceSubrange() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let replacement = Data(bytes: [0xFF, 0xFF])
+            data.replaceSubrange(range, with: replacement)
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_replaceSubrangeCountableRange() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        holdReference(data) {
+            let range: CountableRange<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let replacement = Data(bytes: [0xFF, 0xFF])
+            data.replaceSubrange(range, with: replacement)
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_replaceSubrangeWithBuffer() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer {
+                data.replaceSubrange(range, with: $0)
+            }
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_replaceSubrangeWithCollection() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            data.replaceSubrange(range, with: bytes)
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_replaceSubrangeWithBytes() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBytes {
+                data.replaceSubrange(range, with: $0.baseAddress!, count: 2)
+            }
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_immutableBacking_withUnsafeMutableBytes() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 5).pointee = 0xFF
+        }
+        expectEqual(data[data.startIndex.advanced(by: 5)], 0xFF)
+    }
+    
+    func test_validateMutation_immutableBacking_appendBytes() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append("hello", count: 5)
+        expectEqual(data[data.startIndex.advanced(by: 10)], 0x64)
+        expectEqual(data[data.startIndex.advanced(by: 11)], 0x68)
+    }
+    
+    func test_validateMutation_immutableBacking_appendData() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        let other = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        data.append(other)
+        expectEqual(data[data.startIndex.advanced(by: 10)], 0x64)
+        expectEqual(data[data.startIndex.advanced(by: 11)], 0)
+    }
+    
+    func test_validateMutation_immutableBacking_appendBuffer() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        let bytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        bytes.withUnsafeBufferPointer { data.append($0) }
+        expectEqual(data[data.startIndex.advanced(by: 10)], 0x64)
+        expectEqual(data[data.startIndex.advanced(by: 11)], 0)
+    }
+    
+    func test_validateMutation_immutableBacking_appendSequence() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        let seq = repeatElement(UInt8(1), count: 10)
+        data.append(contentsOf: seq)
+        expectEqual(data[data.startIndex.advanced(by: 10)], 0x64)
+        expectEqual(data[data.startIndex.advanced(by: 11)], 1)
+    }
+    
+    func test_validateMutation_immutableBacking_appendContentsOf() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        let bytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        data.append(contentsOf: bytes)
+        expectEqual(data[data.startIndex.advanced(by: 10)], 0x64)
+        expectEqual(data[data.startIndex.advanced(by: 11)], 0)
+    }
+    
+    func test_validateMutation_immutableBacking_resetBytes() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.resetBytes(in: 5..<8)
+        expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x00, 0x00, 0x00, 0x72, 0x6c, 0x64]))
+    }
+    
+    func test_validateMutation_immutableBacking_replaceSubrange() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+        let replacement = Data(bytes: [0xFF, 0xFF])
+        data.replaceSubrange(range, with: replacement)
+        expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0xFF, 0xFF, 0x6c, 0x64]))
+    }
+    
+    func test_validateMutation_immutableBacking_replaceSubrangeCountableRange() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        let range: CountableRange<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+        let replacement = Data(bytes: [0xFF, 0xFF])
+        data.replaceSubrange(range, with: replacement)
+        expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0xFF, 0xFF, 0x6c, 0x64]))
+    }
+    
+    func test_validateMutation_immutableBacking_replaceSubrangeWithBuffer() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer {
+            data.replaceSubrange(range, with: $0)
+        }
+        expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0xFF, 0xFF, 0x6c, 0x64]))
+    }
+    
+    func test_validateMutation_immutableBacking_replaceSubrangeWithCollection() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        data.replaceSubrange(range, with: bytes)
+        expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0xFF, 0xFF, 0x6c, 0x64]))
+    }
+    
+    func test_validateMutation_immutableBacking_replaceSubrangeWithBytes() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        data.replaceSubrange(range, with: bytes)
+        expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0xFF, 0xFF, 0x6c, 0x64]))
+    }
+    
+    func test_validateMutation_slice_immutableBacking_withUnsafeMutableBytes() {
+        var data = (NSData(bytes: "hello world", length: 11) as Data)[4..<9]
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 1).pointee = 0xFF
+        }
+        expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
+    }
+    
+    func test_validateMutation_slice_immutableBacking_appendBytes() {
+        let base: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = base.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0.baseAddress!, count: $0.count) }
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_immutableBacking_appendData() {
+        let base: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = base.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        data.append(Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_immutableBacking_appendBuffer() {
+        let base: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = base.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0) }
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_immutableBacking_appendSequence() {
+        let base: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = base.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        data.append(contentsOf: repeatElement(UInt8(0xFF), count: 2))
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_immutableBacking_appendContentsOf() {
+        let base: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = base.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        data.append(contentsOf: [0xFF, 0xFF])
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_immutableBacking_resetBytes() {
+        let base: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = base.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        data.resetBytes(in: 5..<8)
+        expectEqual(data, Data(bytes: [4, 0, 0, 0, 8]))
+    }
+    
+    func test_validateMutation_slice_immutableBacking_replaceSubrange() {
+        let base: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = base.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+    }
+    
+    func test_validateMutation_slice_immutableBacking_replaceSubrangeCountableRange() {
+        let base: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = base.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        let range: CountableRange<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+    }
+    
+    func test_validateMutation_slice_immutableBacking_replaceSubrangeWithBuffer() {
+        let base: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = base.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        let replacement: [UInt8] = [0xFF, 0xFF]
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        replacement.withUnsafeBufferPointer { (buffer: UnsafeBufferPointer<UInt8>) in
+            data.replaceSubrange(range, with: buffer)
+        }
+        expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+    }
+    
+    func test_validateMutation_slice_immutableBacking_replaceSubrangeWithCollection() {
+        let base: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = base.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let replacement: [UInt8] = [0xFF, 0xFF]
+        data.replaceSubrange(range, with:replacement)
+        expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+    }
+    
+    func test_validateMutation_slice_immutableBacking_replaceSubrangeWithBytes() {
+        let base: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = base.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        let replacement: [UInt8] = [0xFF, 0xFF]
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        replacement.withUnsafeBytes {
+            data.replaceSubrange(range, with: $0.baseAddress!, count: 2)
+        }
+        expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+    }
+    
+    func test_validateMutation_cow_immutableBacking_withUnsafeMutableBytes() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        holdReference(data) {
+            data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+                ptr.advanced(by: 5).pointee = 0xFF
+            }
+            expectEqual(data[data.startIndex.advanced(by: 5)], 0xFF)
+        }
+    }
+    
+    func test_validateMutation_cow_immutableBacking_appendBytes() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        holdReference(data) {
+            data.append("hello", count: 5)
+            expectEqual(data[data.startIndex.advanced(by: 10)], 0x64)
+            expectEqual(data[data.startIndex.advanced(by: 11)], 0x68)
+        }
+    }
+    
+    func test_validateMutation_cow_immutableBacking_appendData() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        holdReference(data) {
+            let other = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+            data.append(other)
+            expectEqual(data[data.startIndex.advanced(by: 10)], 0x64)
+            expectEqual(data[data.startIndex.advanced(by: 11)], 0)
+        }
+    }
+    
+    func test_validateMutation_cow_immutableBacking_appendBuffer() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        holdReference(data) {
+            let bytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+            bytes.withUnsafeBufferPointer { data.append($0) }
+            expectEqual(data[data.startIndex.advanced(by: 10)], 0x64)
+            expectEqual(data[data.startIndex.advanced(by: 11)], 0)
+        }
+    }
+    
+    func test_validateMutation_cow_immutableBacking_appendSequence() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        holdReference(data) {
+            let seq = repeatElement(UInt8(1), count: 10)
+            data.append(contentsOf: seq)
+            expectEqual(data[data.startIndex.advanced(by: 10)], 0x64)
+            expectEqual(data[data.startIndex.advanced(by: 11)], 1)
+        }
+    }
+    
+    func test_validateMutation_cow_immutableBacking_appendContentsOf() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        holdReference(data) {
+            let bytes: [UInt8] = [1, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+            data.append(contentsOf: bytes)
+            expectEqual(data[data.startIndex.advanced(by: 10)], 0x64)
+            expectEqual(data[data.startIndex.advanced(by: 11)], 1)
+        }
+    }
+    
+    func test_validateMutation_cow_immutableBacking_resetBytes() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        holdReference(data) {
+            data.resetBytes(in: 5..<8)
+            expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x00, 0x00, 0x00, 0x72, 0x6c, 0x64]))
+        }
+    }
+    
+    func test_validateMutation_cow_immutableBacking_replaceSubrange() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+            let replacement = Data(bytes: [0xFF, 0xFF])
+            data.replaceSubrange(range, with: replacement)
+            expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0xff, 0xff, 0x6c, 0x64]))
+        }
+    }
+    
+    func test_validateMutation_cow_immutableBacking_replaceSubrangeCountableRange() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        holdReference(data) {
+            let range: CountableRange<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+            let replacement = Data(bytes: [0xFF, 0xFF])
+            data.replaceSubrange(range, with: replacement)
+            expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0xff, 0xff, 0x6c, 0x64]))
+        }
+    }
+    
+    func test_validateMutation_cow_immutableBacking_replaceSubrangeWithBuffer() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        holdReference(data) {
+            let replacement: [UInt8] = [0xFF, 0xFF]
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            replacement.withUnsafeBufferPointer { (buffer: UnsafeBufferPointer<UInt8>) in
+                data.replaceSubrange(range, with: buffer)
+            }
+            expectEqual(data, Data(bytes: [0x68, 0xff, 0xff, 0x64]))
+        }
+    }
+    
+    func test_validateMutation_cow_immutableBacking_replaceSubrangeWithCollection() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        holdReference(data) {
+            let replacement: [UInt8] = [0xFF, 0xFF]
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: replacement)
+            expectEqual(data, Data(bytes: [0x68, 0xff, 0xff, 0x64]))
+        }
+    }
+    
+    func test_validateMutation_cow_immutableBacking_replaceSubrangeWithBytes() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        holdReference(data) {
+            let replacement: [UInt8] = [0xFF, 0xFF]
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            replacement.withUnsafeBytes {
+                data.replaceSubrange(range, with: $0.baseAddress!, count: 2)
+            }
+            expectEqual(data, Data(bytes: [0x68, 0xff, 0xff, 0x64]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_immutableBacking_withUnsafeMutableBytes() {
+        var data = (NSData(bytes: "hello world", length: 11) as Data)[4..<9]
+        holdReference(data) {
+            data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+                ptr.advanced(by: 1).pointee = 0xFF
+            }
+            expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
+        }
+    }
+    
+    func test_validateMutation_slice_cow_immutableBacking_appendBytes() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.append($0.baseAddress!, count: $0.count) }
+            expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_immutableBacking_appendData() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        holdReference(data) {
+            data.append(Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_immutableBacking_appendBuffer() {
+        var data = (NSData(bytes: "hello world", length: 11) as Data)[4..<9]
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer{ data.append($0) }
+            expectEqual(data, Data(bytes: [0x6f, 0x20, 0x77, 0x6f, 0x72, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_immutableBacking_appendSequence() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        holdReference(data) {
+            let bytes = repeatElement(UInt8(0xFF), count: 2)
+            data.append(contentsOf: bytes)
+            expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_immutableBacking_appendContentsOf() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            data.append(contentsOf: bytes)
+            expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_immutableBacking_resetBytes() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        holdReference(data) {
+            data.resetBytes(in: 5..<8)
+            expectEqual(data, Data(bytes: [4, 0, 0, 0, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_immutableBacking_replaceSubrange() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_immutableBacking_replaceSubrangeCountableRange() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        holdReference(data) {
+            let range: CountableRange<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_immutableBacking_replaceSubrangeWithBuffer() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0) }
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_immutableBacking_replaceSubrangeWithCollection() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            data.replaceSubrange(range, with: bytes)
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_immutableBacking_replaceSubrangeWithBytes() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return (NSData(bytes: $0.baseAddress!, length: $0.count) as Data)[4..<9]
+        }
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBytes { data.replaceSubrange(range, with: $0.baseAddress!, count: 2) }
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_mutableBacking_withUnsafeMutableBytes() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        data.append(contentsOf: [7, 8, 9])
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 5).pointee = 0xFF
+        }
+        expectEqual(data[data.startIndex.advanced(by: 5)], 0xFF)
+    }
+    
+    func test_validateMutation_mutableBacking_appendBytes() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        data.append(contentsOf: [7, 8, 9])
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0.baseAddress!, count: $0.count) }
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_mutableBacking_appendData() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        data.append(contentsOf: [7, 8, 9])
+        data.append(Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_mutableBacking_appendBuffer() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        data.append(contentsOf: [7, 8, 9])
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0) }
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_mutableBacking_appendSequence() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        data.append(contentsOf: [7, 8, 9])
+        data.append(contentsOf: repeatElement(UInt8(0xFF), count: 2))
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_mutableBacking_appendContentsOf() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        data.append(contentsOf: [7, 8, 9])
+        data.append(contentsOf: [0xFF, 0xFF])
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_mutableBacking_resetBytes() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        data.append(contentsOf: [7, 8, 9])
+        data.resetBytes(in: 5..<8)
+        expectEqual(data, Data(bytes: [0, 1, 2, 3, 4, 0, 0, 0, 8, 9]))
+    }
+    
+    func test_validateMutation_mutableBacking_replaceSubrange() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        data.append(contentsOf: [7, 8, 9])
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let replacement = Data(bytes: [0xFF, 0xFF])
+        data.replaceSubrange(range, with: replacement)
+        expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 9]))
+    }
+    
+    func test_validateMutation_mutableBacking_replaceSubrangeCountableRange() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        data.append(contentsOf: [7, 8, 9])
+        let range: CountableRange<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let replacement = Data(bytes: [0xFF, 0xFF])
+        data.replaceSubrange(range, with: replacement)
+        expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 9]))
+    }
+    
+    func test_validateMutation_mutableBacking_replaceSubrangeWithBuffer() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        data.append(contentsOf: [7, 8, 9])
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer {
+            data.replaceSubrange(range, with: $0)
+        }
+        expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 9]))
+    }
+    
+    func test_validateMutation_mutableBacking_replaceSubrangeWithCollection() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        data.append(contentsOf: [7, 8, 9])
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: [0xFF, 0xFF])
+        expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 9]))
+    }
+    
+    func test_validateMutation_mutableBacking_replaceSubrangeWithBytes() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var data = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        data.append(contentsOf: [7, 8, 9])
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBytes {
+            data.replaceSubrange(range, with: $0.baseAddress!, count: $0.count)
+        }
+        expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 9]))
+    }
+    
+    func test_validateMutation_slice_mutableBacking_withUnsafeMutableBytes() {
+        var base = NSData(bytes: "hello world", length: 11) as Data
+        base.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        var data = base[4..<9]
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 1).pointee = 0xFF
+        }
+        expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
+    }
+    
+    func test_validateMutation_slice_mutableBacking_appendBytes() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0.baseAddress!, count: $0.count) }
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_mutableBacking_appendData() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        data.append(Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_mutableBacking_appendBuffer() {
+        var base = NSData(bytes: "hello world", length: 11) as Data
+        base.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        var data = base[4..<9]
+        let bytes: [UInt8] = [1, 2, 3]
+        bytes.withUnsafeBufferPointer { data.append($0) }
+        expectEqual(data, Data(bytes: [0x6f, 0x20, 0x77, 0x6f, 0x72, 0x1, 0x2, 0x3]))
+    }
+    
+    func test_validateMutation_slice_mutableBacking_appendSequence() {
+        var base = NSData(bytes: "hello world", length: 11) as Data
+        base.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        var data = base[4..<9]
+        let seq = repeatElement(UInt8(1), count: 3)
+        data.append(contentsOf: seq)
+        expectEqual(data, Data(bytes: [0x6f, 0x20, 0x77, 0x6f, 0x72, 0x1, 0x1, 0x1]))
+    }
+    
+    func test_validateMutation_slice_mutableBacking_appendContentsOf() {
+        var base = NSData(bytes: "hello world", length: 11) as Data
+        base.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        var data = base[4..<9]
+        let bytes: [UInt8] = [1, 2, 3]
+        data.append(contentsOf: bytes)
+        expectEqual(data, Data(bytes: [0x6f, 0x20, 0x77, 0x6f, 0x72, 0x1, 0x2, 0x3]))
+    }
+    
+    func test_validateMutation_slice_mutableBacking_resetBytes() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        data.resetBytes(in: 5..<8)
+        expectEqual(data, Data(bytes: [4, 0, 0, 0, 8]))
+    }
+    
+    func test_validateMutation_slice_mutableBacking_replaceSubrange() {
+        var base = NSData(bytes: "hello world", length: 11) as Data
+        base.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        var data = base[4..<9]
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [0x6f, 0xFF, 0xFF, 0x72]))
+    }
+    
+    func test_validateMutation_slice_mutableBacking_replaceSubrangeCountableRange() {
+        var base = NSData(bytes: "hello world", length: 11) as Data
+        base.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        var data = base[4..<9]
+        let range: CountableRange<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [0x6f, 0xFF, 0xFF, 0x72]))
+    }
+    
+    func test_validateMutation_slice_mutableBacking_replaceSubrangeWithBuffer() {
+        var base = NSData(bytes: "hello world", length: 11) as Data
+        base.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        var data = base[4..<9]
+        let replacement: [UInt8] = [0xFF, 0xFF]
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        replacement.withUnsafeBufferPointer { (buffer: UnsafeBufferPointer<UInt8>) in
+            data.replaceSubrange(range, with: buffer)
+        }
+        expectEqual(data, Data(bytes: [0x6f, 0xFF, 0xFF, 0x72]))
+    }
+    
+    func test_validateMutation_slice_mutableBacking_replaceSubrangeWithCollection() {
+        var base = NSData(bytes: "hello world", length: 11) as Data
+        base.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        var data = base[4..<9]
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let replacement: [UInt8] = [0xFF, 0xFF]
+        data.replaceSubrange(range, with:replacement)
+        expectEqual(data, Data(bytes: [0x6f, 0xFF, 0xFF, 0x72]))
+    }
+    
+    func test_validateMutation_slice_mutableBacking_replaceSubrangeWithBytes() {
+        var base = NSData(bytes: "hello world", length: 11) as Data
+        base.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        var data = base[4..<9]
+        let replacement: [UInt8] = [0xFF, 0xFF]
+        let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        replacement.withUnsafeBytes {
+            data.replaceSubrange(range, with: $0.baseAddress!, count: 2)
+        }
+        expectEqual(data, Data(bytes: [0x6f, 0xFF, 0xFF, 0x72]))
+    }
+    
+    func test_validateMutation_cow_mutableBacking_withUnsafeMutableBytes() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        holdReference(data) {
+            data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+                ptr.advanced(by: 5).pointee = 0xFF
+            }
+            expectEqual(data[data.startIndex.advanced(by: 5)], 0xFF)
+        }
+    }
+    
+    func test_validateMutation_cow_mutableBacking_appendBytes() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        holdReference(data) {
+            data.append("hello", count: 5)
+            expectEqual(data[data.startIndex.advanced(by: 16)], 6)
+            expectEqual(data[data.startIndex.advanced(by: 17)], 0x68)
+        }
+    }
+    
+    func test_validateMutation_cow_mutableBacking_appendData() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        holdReference(data) {
+            data.append("hello", count: 5)
+            expectEqual(data[data.startIndex.advanced(by: 16)], 6)
+            expectEqual(data[data.startIndex.advanced(by: 17)], 0x68)
+        }
+    }
+    
+    func test_validateMutation_cow_mutableBacking_appendBuffer() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        holdReference(data) {
+            let other = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+            data.append(other)
+            expectEqual(data[data.startIndex.advanced(by: 16)], 6)
+            expectEqual(data[data.startIndex.advanced(by: 17)], 0)
+        }
+    }
+    
+    func test_validateMutation_cow_mutableBacking_appendSequence() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        holdReference(data) {
+            let seq = repeatElement(UInt8(1), count: 10)
+            data.append(contentsOf: seq)
+            expectEqual(data[data.startIndex.advanced(by: 16)], 6)
+            expectEqual(data[data.startIndex.advanced(by: 17)], 1)
+        }
+    }
+    
+    func test_validateMutation_cow_mutableBacking_appendContentsOf() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        holdReference(data) {
+            let bytes: [UInt8] = [1, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+            data.append(contentsOf: bytes)
+            expectEqual(data[data.startIndex.advanced(by: 16)], 6)
+            expectEqual(data[data.startIndex.advanced(by: 17)], 1)
+        }
+    }
+    
+    func test_validateMutation_cow_mutableBacking_resetBytes() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        holdReference(data) {
+            data.resetBytes(in: 5..<8)
+            expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x00, 0x00, 0x00, 0x72, 0x6c, 0x64, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06]))
+        }
+    }
+    
+    func test_validateMutation_cow_mutableBacking_replaceSubrange() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+            let replacement = Data(bytes: [0xFF, 0xFF])
+            data.replaceSubrange(range, with: replacement)
+            expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0xff, 0xff, 0x6c, 0x64, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06]))
+        }
+    }
+    
+    func test_validateMutation_cow_mutableBacking_replaceSubrangeCountableRange() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        holdReference(data) {
+            let range: CountableRange<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+            let replacement = Data(bytes: [0xFF, 0xFF])
+            data.replaceSubrange(range, with: replacement)
+            expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0xff, 0xff, 0x6c, 0x64, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06]))
+        }
+    }
+    
+    func test_validateMutation_cow_mutableBacking_replaceSubrangeWithBuffer() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+            let replacement: [UInt8] = [0xFF, 0xFF]
+            replacement.withUnsafeBufferPointer { (buffer: UnsafeBufferPointer<UInt8>) in
+                data.replaceSubrange(range, with: buffer)
+            }
+            expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0xff, 0xff, 0x6c, 0x64, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06]))
+        }
+    }
+    
+    func test_validateMutation_cow_mutableBacking_replaceSubrangeWithCollection() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        holdReference(data) {
+            let replacement: [UInt8] = [0xFF, 0xFF]
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+            data.replaceSubrange(range, with: replacement)
+            expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0xff, 0xff, 0x6c, 0x64, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06]))
+        }
+    }
+    
+    func test_validateMutation_cow_mutableBacking_replaceSubrangeWithBytes() {
+        var data = NSData(bytes: "hello world", length: 11) as Data
+        data.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        holdReference(data) {
+            let replacement: [UInt8] = [0xFF, 0xFF]
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 4)..<data.startIndex.advanced(by: 9)
+            replacement.withUnsafeBytes {
+                data.replaceSubrange(range, with: $0.baseAddress!, count: 2)
+            }
+            expectEqual(data, Data(bytes: [0x68, 0x65, 0x6c, 0x6c, 0xff, 0xff, 0x6c, 0x64, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_mutableBacking_withUnsafeMutableBytes() {
+        var base = NSData(bytes: "hello world", length: 11) as Data
+        base.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        var data = base[4..<9]
+        holdReference(data) {
+            data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+                ptr.advanced(by: 1).pointee = 0xFF
+            }
+            expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
+        }
+    }
+    
+    func test_validateMutation_slice_cow_mutableBacking_appendBytes() {
+        let bytes: [UInt8] = [0, 1, 2]
+        var base = bytes.withUnsafeBytes { (ptr) in
+            return NSData(bytes: ptr.baseAddress!, length: ptr.count) as Data
+        }
+        base.append(contentsOf: [3, 4, 5])
+        var data = base[1..<4]
+        holdReference(data) {
+            let bytesToAppend: [UInt8] = [6, 7, 8]
+            bytesToAppend.withUnsafeBytes { (ptr) in
+                data.append(ptr.baseAddress!.assumingMemoryBound(to: UInt8.self), count: ptr.count)
+            }
+            expectEqual(data, Data(bytes: [1, 2, 3, 6, 7, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_mutableBacking_appendData() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        holdReference(data) {
+            data.append(Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_mutableBacking_appendBuffer() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer{ data.append($0) }
+            expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_mutableBacking_appendSequence() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        holdReference(data) {
+            let bytes = repeatElement(UInt8(0xFF), count: 2)
+            data.append(contentsOf: bytes)
+            expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_mutableBacking_appendContentsOf() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            data.append(contentsOf: bytes)
+            expectEqual(data, Data(bytes: [4, 5, 6, 7, 8, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_mutableBacking_resetBytes() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        holdReference(data) {
+            data.resetBytes(in: 5..<8)
+            expectEqual(data, Data(bytes: [4, 0, 0, 0, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_mutableBacking_replaceSubrange() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_mutableBacking_replaceSubrangeCountableRange() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        holdReference(data) {
+            let range: CountableRange<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_mutableBacking_replaceSubrangeWithBuffer() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0) }
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_mutableBacking_replaceSubrangeWithCollection() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            data.replaceSubrange(range, with: bytes)
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_mutableBacking_replaceSubrangeWithBytes() {
+        let baseBytes: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+        var base = baseBytes.withUnsafeBufferPointer {
+            return NSData(bytes: $0.baseAddress!, length: $0.count) as Data
+        }
+        base.append(contentsOf: [7, 8, 9])
+        var data = base[4..<9]
+        holdReference(data) {
+            let range: Range<Data.Index> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBytes { data.replaceSubrange(range, with: $0.baseAddress!, count: 2) }
+            expectEqual(data, Data(bytes: [4, 0xFF, 0xFF, 8]))
+        }
+    }
+    
+    func test_validateMutation_customBacking_withUnsafeMutableBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 5).pointee = 0xFF
+        }
+        expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0xFF, 1, 1, 1, 1]))
+    }
+    
+    func test_validateMutation_customBacking_appendBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0.baseAddress!, count: $0.count) }
+        expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_customBacking_appendData() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        data.append(Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_customBacking_appendBuffer() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { (buffer) in
+            data.append(buffer)
+        }
+        expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0xFF, 0xFF]))
+        
+    }
+    
+    func test_validateMutation_customBacking_appendSequence() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        data.append(contentsOf: repeatElement(UInt8(0xFF), count: 2))
+        expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_customBacking_appendContentsOf() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        data.append(contentsOf: [0xFF, 0xFF])
+        expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_customBacking_resetBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        data.resetBytes(in: 5..<8)
+        expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0, 0, 0, 1, 1]))
+    }
+    
+    func test_validateMutation_customBacking_replaceSubrange() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        let range: Range<Int> = 1..<4
+        data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1, 1, 1, 1, 1, 1]))
+    }
+    
+    func test_validateMutation_customBacking_replaceSubrangeCountableRange() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        let range: CountableRange<Int> = 1..<4
+        data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1, 1, 1, 1, 1, 1]))
+    }
+    
+    func test_validateMutation_customBacking_replaceSubrangeWithBuffer() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        let range: Range<Int> = 1..<4
+        bytes.withUnsafeBufferPointer { (buffer) in
+            data.replaceSubrange(range, with: buffer)
+        }
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1, 1, 1, 1, 1, 1]))
+    }
+    
+    func test_validateMutation_customBacking_replaceSubrangeWithCollection() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        let range: Range<Int> = 1..<4
+        data.replaceSubrange(range, with: [0xFF, 0xFF])
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1, 1, 1, 1, 1, 1]))
+    }
+    
+    func test_validateMutation_customBacking_replaceSubrangeWithBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        let range: Range<Int> = 1..<5
+        bytes.withUnsafeBufferPointer { (buffer) in
+            data.replaceSubrange(range, with: buffer.baseAddress!, count: buffer.count)
+        }
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1, 1, 1, 1, 1]))
+    }
+    
+    func test_validateMutation_slice_customBacking_withUnsafeMutableBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 1).pointee = 0xFF
+        }
+        expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
+    }
+    
+    func test_validateMutation_slice_customBacking_appendBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBytes { ptr in
+            data.append(ptr.baseAddress!.assumingMemoryBound(to: UInt8.self), count: ptr.count)
+        }
+        expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_customBacking_appendData() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        data.append(Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_customBacking_appendBuffer() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { (buffer) in
+            data.append(buffer)
+        }
+        expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_customBacking_appendSequence() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        let seq = repeatElement(UInt8(0xFF), count: 2)
+        data.append(contentsOf: seq)
+        expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_customBacking_appendContentsOf() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        data.append(contentsOf: [0xFF, 0xFF])
+        expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_customBacking_resetBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        data.resetBytes(in: 5..<8)
+        expectEqual(data, Data(bytes: [1, 0, 0, 0, 1]))
+    }
+    
+    func test_validateMutation_slice_customBacking_replaceSubrange() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+    }
+    
+    func test_validateMutation_slice_customBacking_replaceSubrangeCountableRange() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        let range: CountableRange<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+    }
+    
+    func test_validateMutation_slice_customBacking_replaceSubrangeWithBuffer() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { (buffer) in
+            data.replaceSubrange(range, with: buffer)
+        }
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+    }
+    
+    func test_validateMutation_slice_customBacking_replaceSubrangeWithCollection() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: [0xFF, 0xFF])
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+    }
+    
+    func test_validateMutation_slice_customBacking_replaceSubrangeWithBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBytes { buffer in
+            data.replaceSubrange(range, with: buffer.baseAddress!, count: 2)
+        }
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+    }
+    
+    func test_validateMutation_cow_customBacking_withUnsafeMutableBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        holdReference(data) {
+            data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+                ptr.advanced(by: 5).pointee = 0xFF
+            }
+            expectEqual(data[data.startIndex.advanced(by: 5)], 0xFF)
+        }
+    }
+    
+    func test_validateMutation_cow_customBacking_appendBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { (buffer) in
+                data.append(buffer.baseAddress!, count: buffer.count)
+            }
+            expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_cow_customBacking_appendData() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        holdReference(data) {
+            data.append(Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_cow_customBacking_appendBuffer() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.append($0) }
+            expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_cow_customBacking_appendSequence() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        holdReference(data) {
+            data.append(contentsOf: repeatElement(UInt8(0xFF), count: 2))
+            expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_cow_customBacking_appendContentsOf() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        holdReference(data) {
+            data.append(contentsOf: [0xFF, 0xFF])
+            expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_cow_customBacking_resetBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        holdReference(data) {
+            data.resetBytes(in: 5..<8)
+            expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0, 0, 0, 1, 1]))
+        }
+    }
+    
+    func test_validateMutation_cow_customBacking_replaceSubrange() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+        }
+    }
+    
+    func test_validateMutation_cow_customBacking_replaceSubrangeCountableRange() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        holdReference(data) {
+            let range: CountableRange<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+        }
+    }
+    
+    func test_validateMutation_cow_customBacking_replaceSubrangeWithBuffer() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0) }
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+        }
+    }
+    
+    func test_validateMutation_cow_customBacking_replaceSubrangeWithCollection() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: [0xFF, 0xFF])
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+        }
+    }
+    
+    func test_validateMutation_cow_customBacking_replaceSubrangeWithBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            bytes.withUnsafeBytes {
+                data.replaceSubrange(range, with: $0.baseAddress!, count: $0.count)
+            }
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customBacking_withUnsafeMutableBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        holdReference(data) {
+            data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+                ptr.advanced(by: 1).pointee = 0xFF
+            }
+            expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customBacking_appendBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { (buffer) in
+                data.append(buffer.baseAddress!, count: buffer.count)
+            }
+            expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customBacking_appendData() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        holdReference(data) {
+            data.append(Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customBacking_appendBuffer() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.append($0) }
+            expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customBacking_appendSequence() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        holdReference(data) {
+            data.append(contentsOf: repeatElement(UInt8(0xFF), count: 2))
+            expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customBacking_appendContentsOf() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        holdReference(data) {
+            data.append(contentsOf: [0xFF, 0xFF])
+            expectEqual(data, Data(bytes: [1, 1, 1, 1, 1, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customBacking_resetBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        holdReference(data) {
+            data.resetBytes(in: 5..<8)
+            expectEqual(data, Data(bytes: [1, 0, 0, 0, 1]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customBacking_replaceSubrange() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customBacking_replaceSubrangeCountableRange() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        holdReference(data) {
+            let range: CountableRange<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customBacking_replaceSubrangeWithBuffer() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0) }
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customBacking_replaceSubrangeWithCollection() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: [0xFF, 0xFF])
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customBacking_replaceSubrangeWithBytes() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<9]
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBytes {
+                data.replaceSubrange(range, with: $0.baseAddress!, count: $0.count)
+            }
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 1]))
+        }
+    }
+    
+    func test_validateMutation_customMutableBacking_withUnsafeMutableBytes() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 5).pointee = 0xFF
+        }
+        expectEqual(data[data.startIndex.advanced(by: 5)], 0xFF)
+    }
+    
+    func test_validateMutation_customMutableBacking_appendBytes() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0.baseAddress!, count: $0.count) }
+        expectEqual(data, Data(bytes: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_customMutableBacking_appendData() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        data.append(Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_customMutableBacking_appendBuffer() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0) }
+        expectEqual(data, Data(bytes: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_customMutableBacking_appendSequence() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        data.append(contentsOf: repeatElement(UInt8(0xFF), count: 2))
+        expectEqual(data, Data(bytes: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_customMutableBacking_appendContentsOf() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        data.append(contentsOf: [0xFF, 0xFF])
+        expectEqual(data, Data(bytes: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_customMutableBacking_resetBytes() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        data.resetBytes(in: 5..<8)
+        expectEqual(data.count, 10)
+        expectEqual(data[data.startIndex.advanced(by: 0)], 1)
+        expectEqual(data[data.startIndex.advanced(by: 5)], 0)
+        expectEqual(data[data.startIndex.advanced(by: 6)], 0)
+        expectEqual(data[data.startIndex.advanced(by: 7)], 0)
+    }
+    
+    func test_validateMutation_customMutableBacking_replaceSubrange() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0]))
+    }
+    
+    func test_validateMutation_customMutableBacking_replaceSubrangeCountableRange() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        let range: CountableRange<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0]))
+    }
+    
+    func test_validateMutation_customMutableBacking_replaceSubrangeWithBuffer() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0) }
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0]))
+    }
+    
+    func test_validateMutation_customMutableBacking_replaceSubrangeWithCollection() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: [0xFF, 0xFF])
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0]))
+    }
+    
+    func test_validateMutation_customMutableBacking_replaceSubrangeWithBytes() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0.baseAddress!, count: $0.count) }
+        expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0]))
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 1).pointee = 0xFF
+        }
+        expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_appendBytes() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0.baseAddress!, count: $0.count) }
+        expectEqual(data, Data(bytes: [0, 0, 0, 0, 0, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_appendData() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        data.append(Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [0, 0, 0, 0, 0, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_appendBuffer() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0) }
+        expectEqual(data, Data(bytes: [0, 0, 0, 0, 0, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_appendSequence() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.append($0) }
+        expectEqual(data, Data(bytes: [0, 0, 0, 0, 0, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_appendContentsOf() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        data.append(contentsOf: [0xFF, 0xFF])
+        expectEqual(data, Data(bytes: [0, 0, 0, 0, 0, 0xFF, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_resetBytes() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        data.resetBytes(in: 5..<8)
+        
+        expectEqual(data[data.startIndex.advanced(by: 1)], 0)
+        expectEqual(data[data.startIndex.advanced(by: 2)], 0)
+        expectEqual(data[data.startIndex.advanced(by: 3)], 0)
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_replaceSubrange() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0]))
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_replaceSubrangeCountableRange() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        let range: CountableRange<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+        expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0]))
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_replaceSubrangeWithBuffer() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0) }
+        expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0]))
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_replaceSubrangeWithCollection() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        data.replaceSubrange(range, with: [0xFF, 0xFF])
+        expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0]))
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_replaceSubrangeWithBytes() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+        let bytes: [UInt8] = [0xFF, 0xFF]
+        bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0.baseAddress!, count: $0.count) }
+        expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0]))
+    }
+    
+    func test_validateMutation_cow_customMutableBacking_withUnsafeMutableBytes() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        holdReference(data) {
+            data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+                ptr.advanced(by: 5).pointee = 0xFF
+            }
+            expectEqual(data[data.startIndex.advanced(by: 5)], 0xFF)
+        }
+    }
+    
+    func test_validateMutation_cow_customMutableBacking_appendBytes() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.append($0.baseAddress!, count: $0.count) }
+            expectEqual(data, Data(bytes: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_cow_customMutableBacking_appendData() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        holdReference(data) {
+            data.append(Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_cow_customMutableBacking_appendBuffer() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.append($0) }
+            expectEqual(data, Data(bytes: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_cow_customMutableBacking_appendSequence() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        holdReference(data) {
+            data.append(contentsOf: repeatElement(UInt8(0xFF), count: 2))
+            expectEqual(data, Data(bytes: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_cow_customMutableBacking_appendContentsOf() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        holdReference(data) {
+            data.append(contentsOf: [0xFF, 0xFF])
+            expectEqual(data, Data(bytes: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_cow_customMutableBacking_resetBytes() {
+        var data = Data(referencing: AllOnesData(length: 10))
+        holdReference(data) {
+            data.resetBytes(in: 5..<8)
+            expectEqual(data.count, 10)
+            expectEqual(data[data.startIndex.advanced(by: 0)], 1)
+            expectEqual(data[data.startIndex.advanced(by: 5)], 0)
+            expectEqual(data[data.startIndex.advanced(by: 6)], 0)
+            expectEqual(data[data.startIndex.advanced(by: 7)], 0)
+        }
+    }
+    
+    func test_validateMutation_cow_customMutableBacking_replaceSubrange() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0])) 
+        }
+    }
+    
+    func test_validateMutation_cow_customMutableBacking_replaceSubrangeCountableRange() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        holdReference(data) {
+            let range: CountableRange<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0])) 
+        }
+    }
+    
+    func test_validateMutation_cow_customMutableBacking_replaceSubrangeWithBuffer() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0) }
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0])) 
+        }
+    }
+    
+    func test_validateMutation_cow_customMutableBacking_replaceSubrangeWithCollection() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: [0xFF, 0xFF])
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0])) 
+        }
+    }
+    
+    func test_validateMutation_cow_customMutableBacking_replaceSubrangeWithBytes() {
+        var data = Data(referencing: AllOnesData(length: 1))
+        data.count = 10
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0.baseAddress!, count: $0.count) }
+            expectEqual(data, Data(bytes: [1, 0xFF, 0xFF, 0])) 
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customMutableBacking_withUnsafeMutableBytes() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        holdReference(data) {
+            data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+                ptr.advanced(by: 1).pointee = 0xFF
+            }
+            expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customMutableBacking_appendBytes() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.append($0.baseAddress!, count: $0.count) }
+            expectEqual(data, Data(bytes: [0, 0, 0, 0, 0, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customMutableBacking_appendData() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        holdReference(data) {
+            data.append(Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [0, 0, 0, 0, 0, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customMutableBacking_appendBuffer() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        holdReference(data) {
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.append($0) }
+            expectEqual(data, Data(bytes: [0, 0, 0, 0, 0, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customMutableBacking_appendSequence() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        holdReference(data) {
+            data.append(contentsOf: repeatElement(UInt8(0xFF), count: 2))
+            expectEqual(data, Data(bytes: [0, 0, 0, 0, 0, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customMutableBacking_appendContentsOf() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        holdReference(data) {
+            data.append(contentsOf: [0xFF, 0xFF])
+            expectEqual(data, Data(bytes: [0, 0, 0, 0, 0, 0xFF, 0xFF]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customMutableBacking_resetBytes() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        holdReference(data) {
+            data.resetBytes(in: 5..<8)
+            expectEqual(data[data.startIndex.advanced(by: 1)], 0)
+            expectEqual(data[data.startIndex.advanced(by: 2)], 0)
+            expectEqual(data[data.startIndex.advanced(by: 3)], 0)
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customMutableBacking_replaceSubrange() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeCountableRange() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        holdReference(data) {
+            let range: CountableRange<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: Data(bytes: [0xFF, 0xFF]))
+            expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithBuffer() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0) }
+            expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithCollection() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            data.replaceSubrange(range, with: [0xFF, 0xFF])
+            expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0]))
+        }
+    }
+    
+    func test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithBytes() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<9]
+        holdReference(data) {
+            let range: Range<Int> = data.startIndex.advanced(by: 1)..<data.endIndex.advanced(by: -1)
+            let bytes: [UInt8] = [0xFF, 0xFF]
+            bytes.withUnsafeBufferPointer { data.replaceSubrange(range, with: $0.baseAddress!, count: $0.count) }
+            expectEqual(data, Data(bytes: [0, 0xFF, 0xFF, 0]))
+        }
+    }
+    
+    func test_sliceHash() {
+        let base1 = Data(bytes: [0, 0xFF, 0xFF, 0])
+        let base2 = Data(bytes: [0, 0xFF, 0xFF, 0])
+        let base3 = Data(bytes: [0xFF, 0xFF, 0xFF, 0])
+        let sliceEmulation = Data(bytes: [0xFF, 0xFF])
+        expectEqual(base1.hashValue, base2.hashValue)
+        let slice1 = base1[base1.startIndex.advanced(by: 1)..<base1.endIndex.advanced(by: -1)]
+        let slice2 = base2[base2.startIndex.advanced(by: 1)..<base2.endIndex.advanced(by: -1)]
+        let slice3 = base3[base3.startIndex.advanced(by: 1)..<base3.endIndex.advanced(by: -1)]
+        expectEqual(slice1.hashValue, sliceEmulation.hashValue)
+        expectEqual(slice1.hashValue, slice2.hashValue)
+        expectEqual(slice2.hashValue, slice3.hashValue)
+    }
+
+    func test_slice_resize_growth() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<9]
+        data.resetBytes(in: data.endIndex.advanced(by: -1)..<data.endIndex.advanced(by: 1))
+        expectEqual(data, Data(bytes: [4, 5, 6, 7, 0, 0]))
+    }
+
+    func test_sliceEnumeration() {
+        var base = DispatchData.empty
+        let bytes: [UInt8] = [0, 1, 2, 3, 4]
+        base.append(bytes.withUnsafeBytes { DispatchData(bytes: $0) })
+        base.append(bytes.withUnsafeBytes { DispatchData(bytes: $0) })
+        base.append(bytes.withUnsafeBytes { DispatchData(bytes: $0) })
+        let data = ((base as AnyObject) as! Data)[3..<11]
+        var regionRanges: [Range<Int>] = []
+        var regionData: [Data] = []
+        data.enumerateBytes { (buffer, index, _) in
+            regionData.append(Data(bytes: buffer.baseAddress!, count: buffer.count))
+            regionRanges.append(index..<index + buffer.count)
+        }
+        expectEqual(regionRanges.count, 3)
+        expectEqual(Range<Data.Index>(3..<5), regionRanges[0])
+        expectEqual(Range<Data.Index>(5..<10), regionRanges[1])
+        expectEqual(Range<Data.Index>(10..<11), regionRanges[2])
+        expectEqual(Data(bytes: [3, 4]), regionData[0]) //fails
+        expectEqual(Data(bytes: [0, 1, 2, 3, 4]), regionData[1]) //passes
+        expectEqual(Data(bytes: [0]), regionData[2]) //fails
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -1275,6 +3723,249 @@ DataTests.test("test_reversedDataInit") { TestData().test_reversedDataInit() }
 DataTests.test("test_replaceSubrangeReferencingMutable") { TestData().test_replaceSubrangeReferencingMutable() }
 DataTests.test("test_replaceSubrangeReferencingImmutable") { TestData().test_replaceSubrangeReferencingImmutable() }
 DataTests.test("test_replaceSubrangeFromBridged") { TestData().test_replaceSubrangeFromBridged() }
+DataTests.test("test_validateMutation_withUnsafeMutableBytes") { TestData().test_validateMutation_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_appendBytes") { TestData().test_validateMutation_appendBytes() }
+DataTests.test("test_validateMutation_appendData") { TestData().test_validateMutation_appendData() }
+DataTests.test("test_validateMutation_appendBuffer") { TestData().test_validateMutation_appendBuffer() }
+DataTests.test("test_validateMutation_appendSequence") { TestData().test_validateMutation_appendSequence() }
+DataTests.test("test_validateMutation_appendContentsOf") { TestData().test_validateMutation_appendContentsOf() }
+DataTests.test("test_validateMutation_resetBytes") { TestData().test_validateMutation_resetBytes() }
+DataTests.test("test_validateMutation_replaceSubrange") { TestData().test_validateMutation_replaceSubrange() }
+DataTests.test("test_validateMutation_replaceSubrangeCountableRange") { TestData().test_validateMutation_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_replaceSubrangeWithBuffer") { TestData().test_validateMutation_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_replaceSubrangeWithCollection") { TestData().test_validateMutation_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_replaceSubrangeWithBytes") { TestData().test_validateMutation_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_slice_withUnsafeMutableBytes") { TestData().test_validateMutation_slice_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_slice_appendBytes") { TestData().test_validateMutation_slice_appendBytes() }
+DataTests.test("test_validateMutation_slice_appendData") { TestData().test_validateMutation_slice_appendData() }
+DataTests.test("test_validateMutation_slice_appendBuffer") { TestData().test_validateMutation_slice_appendBuffer() }
+DataTests.test("test_validateMutation_slice_appendSequence") { TestData().test_validateMutation_slice_appendSequence() }
+DataTests.test("test_validateMutation_slice_appendContentsOf") { TestData().test_validateMutation_slice_appendContentsOf() }
+DataTests.test("test_validateMutation_slice_resetBytes") { TestData().test_validateMutation_slice_resetBytes() }
+DataTests.test("test_validateMutation_slice_replaceSubrange") { TestData().test_validateMutation_slice_replaceSubrange() }
+DataTests.test("test_validateMutation_slice_replaceSubrangeCountableRange") { TestData().test_validateMutation_slice_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_slice_replaceSubrangeWithBuffer") { TestData().test_validateMutation_slice_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_slice_replaceSubrangeWithCollection") { TestData().test_validateMutation_slice_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_slice_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_cow_withUnsafeMutableBytes") { TestData().test_validateMutation_cow_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_cow_appendBytes") { TestData().test_validateMutation_cow_appendBytes() }
+DataTests.test("test_validateMutation_cow_appendData") { TestData().test_validateMutation_cow_appendData() }
+DataTests.test("test_validateMutation_cow_appendBuffer") { TestData().test_validateMutation_cow_appendBuffer() }
+DataTests.test("test_validateMutation_cow_appendSequence") { TestData().test_validateMutation_cow_appendSequence() }
+DataTests.test("test_validateMutation_cow_appendContentsOf") { TestData().test_validateMutation_cow_appendContentsOf() }
+DataTests.test("test_validateMutation_cow_resetBytes") { TestData().test_validateMutation_cow_resetBytes() }
+DataTests.test("test_validateMutation_cow_replaceSubrange") { TestData().test_validateMutation_cow_replaceSubrange() }
+DataTests.test("test_validateMutation_cow_replaceSubrangeCountableRange") { TestData().test_validateMutation_cow_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_cow_replaceSubrangeWithBuffer") { TestData().test_validateMutation_cow_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_cow_replaceSubrangeWithCollection") { TestData().test_validateMutation_cow_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_cow_replaceSubrangeWithBytes") { TestData().test_validateMutation_cow_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_slice_cow_withUnsafeMutableBytes") { TestData().test_validateMutation_slice_cow_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_slice_cow_appendBytes") { TestData().test_validateMutation_slice_cow_appendBytes() }
+DataTests.test("test_validateMutation_slice_cow_appendData") { TestData().test_validateMutation_slice_cow_appendData() }
+DataTests.test("test_validateMutation_slice_cow_appendBuffer") { TestData().test_validateMutation_slice_cow_appendBuffer() }
+DataTests.test("test_validateMutation_slice_cow_appendSequence") { TestData().test_validateMutation_slice_cow_appendSequence() }
+DataTests.test("test_validateMutation_slice_cow_appendContentsOf") { TestData().test_validateMutation_slice_cow_appendContentsOf() }
+DataTests.test("test_validateMutation_slice_cow_resetBytes") { TestData().test_validateMutation_slice_cow_resetBytes() }
+DataTests.test("test_validateMutation_slice_cow_replaceSubrange") { TestData().test_validateMutation_slice_cow_replaceSubrange() }
+DataTests.test("test_validateMutation_slice_cow_replaceSubrangeCountableRange") { TestData().test_validateMutation_slice_cow_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_slice_cow_replaceSubrangeWithBuffer") { TestData().test_validateMutation_slice_cow_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_slice_cow_replaceSubrangeWithCollection") { TestData().test_validateMutation_slice_cow_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_slice_cow_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_cow_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_immutableBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_immutableBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_immutableBacking_appendBytes") { TestData().test_validateMutation_immutableBacking_appendBytes() }
+DataTests.test("test_validateMutation_immutableBacking_appendData") { TestData().test_validateMutation_immutableBacking_appendData() }
+DataTests.test("test_validateMutation_immutableBacking_appendBuffer") { TestData().test_validateMutation_immutableBacking_appendBuffer() }
+DataTests.test("test_validateMutation_immutableBacking_appendSequence") { TestData().test_validateMutation_immutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_immutableBacking_appendContentsOf") { TestData().test_validateMutation_immutableBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_immutableBacking_resetBytes") { TestData().test_validateMutation_immutableBacking_resetBytes() }
+DataTests.test("test_validateMutation_immutableBacking_replaceSubrange") { TestData().test_validateMutation_immutableBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_immutableBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_immutableBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_immutableBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_immutableBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_immutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_immutableBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_immutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_immutableBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_slice_immutableBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_slice_immutableBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_slice_immutableBacking_appendBytes") { TestData().test_validateMutation_slice_immutableBacking_appendBytes() }
+DataTests.test("test_validateMutation_slice_immutableBacking_appendData") { TestData().test_validateMutation_slice_immutableBacking_appendData() }
+DataTests.test("test_validateMutation_slice_immutableBacking_appendBuffer") { TestData().test_validateMutation_slice_immutableBacking_appendBuffer() }
+DataTests.test("test_validateMutation_slice_immutableBacking_appendSequence") { TestData().test_validateMutation_slice_immutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_slice_immutableBacking_appendContentsOf") { TestData().test_validateMutation_slice_immutableBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_slice_immutableBacking_resetBytes") { TestData().test_validateMutation_slice_immutableBacking_resetBytes() }
+DataTests.test("test_validateMutation_slice_immutableBacking_replaceSubrange") { TestData().test_validateMutation_slice_immutableBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_slice_immutableBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_slice_immutableBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_slice_immutableBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_slice_immutableBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_slice_immutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_slice_immutableBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_slice_immutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_immutableBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_cow_immutableBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_cow_immutableBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_cow_immutableBacking_appendBytes") { TestData().test_validateMutation_cow_immutableBacking_appendBytes() }
+DataTests.test("test_validateMutation_cow_immutableBacking_appendData") { TestData().test_validateMutation_cow_immutableBacking_appendData() }
+DataTests.test("test_validateMutation_cow_immutableBacking_appendBuffer") { TestData().test_validateMutation_cow_immutableBacking_appendBuffer() }
+DataTests.test("test_validateMutation_cow_immutableBacking_appendSequence") { TestData().test_validateMutation_cow_immutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_cow_immutableBacking_appendContentsOf") { TestData().test_validateMutation_cow_immutableBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_cow_immutableBacking_resetBytes") { TestData().test_validateMutation_cow_immutableBacking_resetBytes() }
+DataTests.test("test_validateMutation_cow_immutableBacking_replaceSubrange") { TestData().test_validateMutation_cow_immutableBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_cow_immutableBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_cow_immutableBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_cow_immutableBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_cow_immutableBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_cow_immutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_cow_immutableBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_cow_immutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_cow_immutableBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_slice_cow_immutableBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_slice_cow_immutableBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_slice_cow_immutableBacking_appendBytes") { TestData().test_validateMutation_slice_cow_immutableBacking_appendBytes() }
+DataTests.test("test_validateMutation_slice_cow_immutableBacking_appendData") { TestData().test_validateMutation_slice_cow_immutableBacking_appendData() }
+DataTests.test("test_validateMutation_slice_cow_immutableBacking_appendBuffer") { TestData().test_validateMutation_slice_cow_immutableBacking_appendBuffer() }
+DataTests.test("test_validateMutation_slice_cow_immutableBacking_appendSequence") { TestData().test_validateMutation_slice_cow_immutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_slice_cow_immutableBacking_appendContentsOf") { TestData().test_validateMutation_slice_cow_immutableBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_slice_cow_immutableBacking_resetBytes") { TestData().test_validateMutation_slice_cow_immutableBacking_resetBytes() }
+DataTests.test("test_validateMutation_slice_cow_immutableBacking_replaceSubrange") { TestData().test_validateMutation_slice_cow_immutableBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_slice_cow_immutableBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_slice_cow_immutableBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_slice_cow_immutableBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_slice_cow_immutableBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_slice_cow_immutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_slice_cow_immutableBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_slice_cow_immutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_cow_immutableBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_mutableBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_mutableBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_mutableBacking_appendBytes") { TestData().test_validateMutation_mutableBacking_appendBytes() }
+DataTests.test("test_validateMutation_mutableBacking_appendData") { TestData().test_validateMutation_mutableBacking_appendData() }
+DataTests.test("test_validateMutation_mutableBacking_appendBuffer") { TestData().test_validateMutation_mutableBacking_appendBuffer() }
+DataTests.test("test_validateMutation_mutableBacking_appendSequence") { TestData().test_validateMutation_mutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_mutableBacking_appendContentsOf") { TestData().test_validateMutation_mutableBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_mutableBacking_resetBytes") { TestData().test_validateMutation_mutableBacking_resetBytes() }
+DataTests.test("test_validateMutation_mutableBacking_replaceSubrange") { TestData().test_validateMutation_mutableBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_mutableBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_mutableBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_mutableBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_mutableBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_mutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_mutableBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_mutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_mutableBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_slice_mutableBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_slice_mutableBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_slice_mutableBacking_appendBytes") { TestData().test_validateMutation_slice_mutableBacking_appendBytes() }
+DataTests.test("test_validateMutation_slice_mutableBacking_appendData") { TestData().test_validateMutation_slice_mutableBacking_appendData() }
+DataTests.test("test_validateMutation_slice_mutableBacking_appendBuffer") { TestData().test_validateMutation_slice_mutableBacking_appendBuffer() }
+DataTests.test("test_validateMutation_slice_mutableBacking_appendSequence") { TestData().test_validateMutation_slice_mutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_slice_mutableBacking_appendContentsOf") { TestData().test_validateMutation_slice_mutableBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_slice_mutableBacking_resetBytes") { TestData().test_validateMutation_slice_mutableBacking_resetBytes() }
+DataTests.test("test_validateMutation_slice_mutableBacking_replaceSubrange") { TestData().test_validateMutation_slice_mutableBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_slice_mutableBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_slice_mutableBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_slice_mutableBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_slice_mutableBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_slice_mutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_slice_mutableBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_slice_mutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_mutableBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_cow_mutableBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_cow_mutableBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_cow_mutableBacking_appendBytes") { TestData().test_validateMutation_cow_mutableBacking_appendBytes() }
+DataTests.test("test_validateMutation_cow_mutableBacking_appendData") { TestData().test_validateMutation_cow_mutableBacking_appendData() }
+DataTests.test("test_validateMutation_cow_mutableBacking_appendBuffer") { TestData().test_validateMutation_cow_mutableBacking_appendBuffer() }
+DataTests.test("test_validateMutation_cow_mutableBacking_appendSequence") { TestData().test_validateMutation_cow_mutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_cow_mutableBacking_appendContentsOf") { TestData().test_validateMutation_cow_mutableBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_cow_mutableBacking_resetBytes") { TestData().test_validateMutation_cow_mutableBacking_resetBytes() }
+DataTests.test("test_validateMutation_cow_mutableBacking_replaceSubrange") { TestData().test_validateMutation_cow_mutableBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_cow_mutableBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_cow_mutableBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_cow_mutableBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_cow_mutableBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_cow_mutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_cow_mutableBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_cow_mutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_cow_mutableBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_slice_cow_mutableBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_slice_cow_mutableBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_slice_cow_mutableBacking_appendBytes") { TestData().test_validateMutation_slice_cow_mutableBacking_appendBytes() }
+DataTests.test("test_validateMutation_slice_cow_mutableBacking_appendData") { TestData().test_validateMutation_slice_cow_mutableBacking_appendData() }
+DataTests.test("test_validateMutation_slice_cow_mutableBacking_appendBuffer") { TestData().test_validateMutation_slice_cow_mutableBacking_appendBuffer() }
+DataTests.test("test_validateMutation_slice_cow_mutableBacking_appendSequence") { TestData().test_validateMutation_slice_cow_mutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_slice_cow_mutableBacking_appendContentsOf") { TestData().test_validateMutation_slice_cow_mutableBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_slice_cow_mutableBacking_resetBytes") { TestData().test_validateMutation_slice_cow_mutableBacking_resetBytes() }
+DataTests.test("test_validateMutation_slice_cow_mutableBacking_replaceSubrange") { TestData().test_validateMutation_slice_cow_mutableBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_slice_cow_mutableBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_slice_cow_mutableBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_slice_cow_mutableBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_slice_cow_mutableBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_slice_cow_mutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_slice_cow_mutableBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_slice_cow_mutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_cow_mutableBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_customBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_customBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_customBacking_appendBytes") { TestData().test_validateMutation_customBacking_appendBytes() }
+DataTests.test("test_validateMutation_customBacking_appendData") { TestData().test_validateMutation_customBacking_appendData() }
+DataTests.test("test_validateMutation_customBacking_appendBuffer") { TestData().test_validateMutation_customBacking_appendBuffer() }
+DataTests.test("test_validateMutation_customBacking_appendSequence") { TestData().test_validateMutation_customBacking_appendSequence() }
+DataTests.test("test_validateMutation_customBacking_appendContentsOf") { TestData().test_validateMutation_customBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_customBacking_resetBytes") { TestData().test_validateMutation_customBacking_resetBytes() }
+DataTests.test("test_validateMutation_customBacking_replaceSubrange") { TestData().test_validateMutation_customBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_customBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_customBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_customBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_customBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_customBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_customBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_customBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_customBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_slice_customBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_slice_customBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_slice_customBacking_appendBytes") { TestData().test_validateMutation_slice_customBacking_appendBytes() }
+DataTests.test("test_validateMutation_slice_customBacking_appendData") { TestData().test_validateMutation_slice_customBacking_appendData() }
+DataTests.test("test_validateMutation_slice_customBacking_appendBuffer") { TestData().test_validateMutation_slice_customBacking_appendBuffer() }
+DataTests.test("test_validateMutation_slice_customBacking_appendSequence") { TestData().test_validateMutation_slice_customBacking_appendSequence() }
+DataTests.test("test_validateMutation_slice_customBacking_appendContentsOf") { TestData().test_validateMutation_slice_customBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_slice_customBacking_resetBytes") { TestData().test_validateMutation_slice_customBacking_resetBytes() }
+DataTests.test("test_validateMutation_slice_customBacking_replaceSubrange") { TestData().test_validateMutation_slice_customBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_slice_customBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_slice_customBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_slice_customBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_slice_customBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_slice_customBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_slice_customBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_slice_customBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_customBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_cow_customBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_cow_customBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_cow_customBacking_appendBytes") { TestData().test_validateMutation_cow_customBacking_appendBytes() }
+DataTests.test("test_validateMutation_cow_customBacking_appendData") { TestData().test_validateMutation_cow_customBacking_appendData() }
+DataTests.test("test_validateMutation_cow_customBacking_appendBuffer") { TestData().test_validateMutation_cow_customBacking_appendBuffer() }
+DataTests.test("test_validateMutation_cow_customBacking_appendSequence") { TestData().test_validateMutation_cow_customBacking_appendSequence() }
+DataTests.test("test_validateMutation_cow_customBacking_appendContentsOf") { TestData().test_validateMutation_cow_customBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_cow_customBacking_resetBytes") { TestData().test_validateMutation_cow_customBacking_resetBytes() }
+DataTests.test("test_validateMutation_cow_customBacking_replaceSubrange") { TestData().test_validateMutation_cow_customBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_cow_customBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_cow_customBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_cow_customBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_cow_customBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_cow_customBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_cow_customBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_cow_customBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_cow_customBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_slice_cow_customBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_slice_cow_customBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_slice_cow_customBacking_appendBytes") { TestData().test_validateMutation_slice_cow_customBacking_appendBytes() }
+DataTests.test("test_validateMutation_slice_cow_customBacking_appendData") { TestData().test_validateMutation_slice_cow_customBacking_appendData() }
+DataTests.test("test_validateMutation_slice_cow_customBacking_appendBuffer") { TestData().test_validateMutation_slice_cow_customBacking_appendBuffer() }
+DataTests.test("test_validateMutation_slice_cow_customBacking_appendSequence") { TestData().test_validateMutation_slice_cow_customBacking_appendSequence() }
+DataTests.test("test_validateMutation_slice_cow_customBacking_appendContentsOf") { TestData().test_validateMutation_slice_cow_customBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_slice_cow_customBacking_resetBytes") { TestData().test_validateMutation_slice_cow_customBacking_resetBytes() }
+DataTests.test("test_validateMutation_slice_cow_customBacking_replaceSubrange") { TestData().test_validateMutation_slice_cow_customBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_slice_cow_customBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_slice_cow_customBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_slice_cow_customBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_slice_cow_customBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_slice_cow_customBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_slice_cow_customBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_slice_cow_customBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_cow_customBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_customMutableBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_customMutableBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_customMutableBacking_appendBytes") { TestData().test_validateMutation_customMutableBacking_appendBytes() }
+DataTests.test("test_validateMutation_customMutableBacking_appendData") { TestData().test_validateMutation_customMutableBacking_appendData() }
+DataTests.test("test_validateMutation_customMutableBacking_appendBuffer") { TestData().test_validateMutation_customMutableBacking_appendBuffer() }
+DataTests.test("test_validateMutation_customMutableBacking_appendSequence") { TestData().test_validateMutation_customMutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_customMutableBacking_appendContentsOf") { TestData().test_validateMutation_customMutableBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_customMutableBacking_resetBytes") { TestData().test_validateMutation_customMutableBacking_resetBytes() }
+DataTests.test("test_validateMutation_customMutableBacking_replaceSubrange") { TestData().test_validateMutation_customMutableBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_customMutableBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_customMutableBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_customMutableBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_customMutableBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_customMutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_customMutableBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_customMutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_customMutableBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_appendBytes") { TestData().test_validateMutation_slice_customMutableBacking_appendBytes() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_appendData") { TestData().test_validateMutation_slice_customMutableBacking_appendData() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_appendBuffer") { TestData().test_validateMutation_slice_customMutableBacking_appendBuffer() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_appendSequence") { TestData().test_validateMutation_slice_customMutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_appendContentsOf") { TestData().test_validateMutation_slice_customMutableBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_resetBytes") { TestData().test_validateMutation_slice_customMutableBacking_resetBytes() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_replaceSubrange") { TestData().test_validateMutation_slice_customMutableBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_slice_customMutableBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_slice_customMutableBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_slice_customMutableBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_customMutableBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_cow_customMutableBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_cow_customMutableBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_cow_customMutableBacking_appendBytes") { TestData().test_validateMutation_cow_customMutableBacking_appendBytes() }
+DataTests.test("test_validateMutation_cow_customMutableBacking_appendData") { TestData().test_validateMutation_cow_customMutableBacking_appendData() }
+DataTests.test("test_validateMutation_cow_customMutableBacking_appendBuffer") { TestData().test_validateMutation_cow_customMutableBacking_appendBuffer() }
+DataTests.test("test_validateMutation_cow_customMutableBacking_appendSequence") { TestData().test_validateMutation_cow_customMutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_cow_customMutableBacking_appendContentsOf") { TestData().test_validateMutation_cow_customMutableBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_cow_customMutableBacking_resetBytes") { TestData().test_validateMutation_cow_customMutableBacking_resetBytes() }
+DataTests.test("test_validateMutation_cow_customMutableBacking_replaceSubrange") { TestData().test_validateMutation_cow_customMutableBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_cow_customMutableBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_cow_customMutableBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_cow_customMutableBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_cow_customMutableBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_cow_customMutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_cow_customMutableBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_cow_customMutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_cow_customMutableBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_validateMutation_slice_cow_customMutableBacking_withUnsafeMutableBytes") { TestData().test_validateMutation_slice_cow_customMutableBacking_withUnsafeMutableBytes() }
+DataTests.test("test_validateMutation_slice_cow_customMutableBacking_appendBytes") { TestData().test_validateMutation_slice_cow_customMutableBacking_appendBytes() }
+DataTests.test("test_validateMutation_slice_cow_customMutableBacking_appendData") { TestData().test_validateMutation_slice_cow_customMutableBacking_appendData() }
+DataTests.test("test_validateMutation_slice_cow_customMutableBacking_appendBuffer") { TestData().test_validateMutation_slice_cow_customMutableBacking_appendBuffer() }
+DataTests.test("test_validateMutation_slice_cow_customMutableBacking_appendSequence") { TestData().test_validateMutation_slice_cow_customMutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_slice_cow_customMutableBacking_appendContentsOf") { TestData().test_validateMutation_slice_cow_customMutableBacking_appendContentsOf() }
+DataTests.test("test_validateMutation_slice_cow_customMutableBacking_resetBytes") { TestData().test_validateMutation_slice_cow_customMutableBacking_resetBytes() }
+DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubrange") { TestData().test_validateMutation_slice_cow_customMutableBacking_replaceSubrange() }
+DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeCountableRange") { TestData().test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeCountableRange() }
+DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithBuffer") { TestData().test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithBuffer() }
+DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithCollection") { TestData().test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithCollection() }
+DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithBytes() }
+DataTests.test("test_sliceHash") { TestData().test_sliceHash() }
+DataTests.test("test_slice_resize_growth") { TestData().test_slice_resize_growth() }
+DataTests.test("test_sliceEnumeration") { TestData().test_sliceEnumeration() }
 
 
 // XCTest does not have a crash detection, whereas lit does
