@@ -5121,8 +5121,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (ParsedDecl && !typecheckParsedDecl())
     return;
 
-  if (auto *DC = dyn_cast_or_null<DeclContext>(ParsedDecl))
-    CurDeclContext = DC;
+  if (auto *DC = dyn_cast_or_null<DeclContext>(ParsedDecl)) {
+    if (DC->isChildContextOf(CurDeclContext))
+      CurDeclContext = DC;
+  }
 
   Optional<Type> ExprType;
   ConcreteDeclRef ReferencedDecl = nullptr;
