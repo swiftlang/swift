@@ -283,10 +283,10 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
         continue;
 
       for (ValueDecl *vd : member.second) {
-        Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
-        if (auto nominal = ty->getAnyNominal())
-          if (nominal->getName() == accessPath.front().first)
-            consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
+        auto *nominal = vd->getDeclContext()
+           ->getAsNominalTypeOrNominalTypeExtensionContext();
+        if (nominal && nominal->getName() == accessPath.front().first)
+          consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
       }
     }
     return;
@@ -318,10 +318,10 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
   
   if (!accessPath.empty()) {
     for (ValueDecl *vd : iter->second) {
-      Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
-      if (auto nominal = ty->getAnyNominal())
-        if (nominal->getName() == accessPath.front().first)
-          results.push_back(vd);
+      auto *nominal = vd->getDeclContext()
+         ->getAsNominalTypeOrNominalTypeExtensionContext();
+      if (nominal && nominal->getName() == accessPath.front().first)
+        results.push_back(vd);
     }
     return;
   }
