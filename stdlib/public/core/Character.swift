@@ -259,8 +259,8 @@ public struct Character :
     _representation = .large(nativeString._core.nativeBuffer!._storage)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  // FIXME(sil-serialize-all): Should be @_inlineable  @_versioned
+  // <rdar://problem/34557187>
   internal static func _smallValue(_ value: Builtin.Int63) -> UInt64 {
     return UInt64(Builtin.zext_Int63_Int64(value))
   }
@@ -348,8 +348,8 @@ extension String {
 /// 0x7FFFFFFFFFFFFF80 or greater is an invalid UTF-8 sequence, we know if a
 /// value is ASCII by checking if it is greater than or equal to
 /// 0x7FFFFFFFFFFFFF00.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+// FIXME(sil-serialize-all): Should be @_inlineable  @_versioned
+// <rdar://problem/34557187>
 internal var _minASCIICharReprBuiltin: Builtin.Int63 {
   @inline(__always) get {
     let x: Int64 = 0x7FFFFFFFFFFFFF00
