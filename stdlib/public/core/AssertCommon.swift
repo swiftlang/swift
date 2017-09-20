@@ -12,6 +12,16 @@
 
 import SwiftShims
 
+/// Last chance handler for "fatal" errors that in a server
+/// environment the user might want to do something creative
+/// like canceling the thread or long jumping to a save point.
+public var _swift_stdlib_errorHandler: ((_: StaticString, _: String,
+                        _: StaticString, _: UInt, _: UInt32, _: Int32) -> ())?
+
+// Is Int32(Builtin.assert_configuration()) a constant?
+// Is it related to the toolchain or the application compile?
+public let _swift_stdlib_assertConfig = Int32(Builtin.assert_configuration())
+
 // Implementation Note: this file intentionally uses very LOW-LEVEL
 // CONSTRUCTS, so that assert and fatal may be used liberally in
 // building library abstractions without fear of infinite recursion.
@@ -26,7 +36,8 @@ func _isDebugAssertConfiguration() -> Bool {
   // 0: Debug
   // 1: Release
   // 2: Fast
-  return Int32(Builtin.assert_configuration()) == 0
+  return _swift_stdlib_assertConfig == 0 || _swift_stdlib_errorHandler != nil
+    // When function above, traps compiler at DeadCodeElimination.cpp, line 656.
 }
 
 @_versioned
@@ -85,6 +96,8 @@ func _assertionFailure(
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
+  _swift_stdlib_errorHandler?(prefix, message.description, file, line, flags,
+                              _swift_stdlib_assertConfig)
   prefix.withUTF8Buffer {
     (prefix) -> Void in
     message.withUTF8Buffer {
@@ -116,6 +129,8 @@ func _assertionFailure(
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
+  _swift_stdlib_errorHandler?(prefix, message, file, line, flags,
+                              _swift_stdlib_assertConfig)
   prefix.withUTF8Buffer {
     (prefix) -> Void in
     message._withUnsafeBufferPointerToUTF8 {
@@ -148,6 +163,8 @@ func _fatalErrorMessage(
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
+  _swift_stdlib_errorHandler?(prefix, message.description, file, line, flags,
+                              _swift_stdlib_assertConfig)
 #if INTERNAL_CHECKS_ENABLED
   prefix.withUTF8Buffer {
     (prefix) in
