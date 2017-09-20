@@ -158,9 +158,8 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
 public class PartialKeyPath<Root>: AnyKeyPath { }
 
 // MARK: Concrete implementations
-// FIXME: Should be internal, but synthesized == does not inherit the
-// @_versioned attribute. See <rdar://problem/34342955>
-public enum _KeyPathKind { case readOnly, value, reference }
+@_versioned // FIXME(sil-serialize-all)
+internal enum KeyPathKind { case readOnly, value, reference }
 
 /// A key path from a specific root type to a specific resulting value type.
 public class KeyPath<Root, Value>: PartialKeyPath<Root> {
@@ -176,7 +175,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   }
   
   // MARK: Implementation
-  internal typealias Kind = _KeyPathKind
+  internal typealias Kind = KeyPathKind
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal class var kind: Kind { return .readOnly }
@@ -391,9 +390,8 @@ public class ReferenceWritableKeyPath<
 
 // MARK: Implementation details
 
-// FIXME: Should be internal, but synthesized == does not inherit the
-// @_versioned attribute. See <rdar://problem/34342955>
-public enum _KeyPathComponentKind {
+@_versioned // FIXME(sil-serialize-all)
+internal enum KeyPathComponentKind {
   /// The keypath projects within the storage of the outer value, like a
   /// stored property in a struct.
   case `struct`
@@ -872,7 +870,7 @@ internal struct RawKeyPathComponent {
 
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal var kind: _KeyPathComponentKind {
+    internal var kind: KeyPathComponentKind {
       switch (discriminator, payload) {
       case (Header.structTag, _):
         return .struct
@@ -2176,7 +2174,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
 
   // Scan the pattern to figure out the dynamic capability of the key path.
   // Start off assuming the key path is writable.
-  var capability: _KeyPathKind = .value
+  var capability: KeyPathKind = .value
 
   let bufferPtr = pattern.advanced(by: keyPathObjectHeaderSize)
   var buffer = KeyPathBuffer(base: bufferPtr)
