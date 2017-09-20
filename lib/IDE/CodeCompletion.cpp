@@ -2537,7 +2537,7 @@ public:
     }
 
     // If we won't be able to provide a result, bail out.
-    if (MemberType->is<ErrorType>() && addName.empty() && !needInit)
+    if (MemberType->hasError() && addName.empty() && !needInit)
       return;
 
     // Add the constructor, possibly including any default arguments.
@@ -5121,8 +5121,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (ParsedDecl && !typecheckParsedDecl())
     return;
 
-  if (auto *DC = dyn_cast_or_null<DeclContext>(ParsedDecl))
-    CurDeclContext = DC;
+  if (auto *DC = dyn_cast_or_null<DeclContext>(ParsedDecl)) {
+    if (DC->isChildContextOf(CurDeclContext))
+      CurDeclContext = DC;
+  }
 
   Optional<Type> ExprType;
   ConcreteDeclRef ReferencedDecl = nullptr;

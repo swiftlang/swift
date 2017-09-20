@@ -722,13 +722,16 @@ public:
   Type BaseTy;
   const DeclContext *DC;
   LazyResolver *TypeResolver;
+  bool IsTypeLookup = false;
 
   OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC,
                             LazyResolver *resolver)
       : BaseTy(BaseTy), DC(DC), TypeResolver(resolver) {
     assert(!BaseTy->hasLValueType());
-    if (auto *MetaTy = BaseTy->getAs<AnyMetatypeType>())
+    if (auto *MetaTy = BaseTy->getAs<AnyMetatypeType>()) {
       BaseTy = MetaTy->getInstanceType();
+      IsTypeLookup = true;
+    }
     assert(DC && BaseTy);
   }
 
@@ -781,7 +784,7 @@ public:
 
     // Don't pass UnboundGenericType here. If you see this assertion
     // being hit, fix the caller, don't remove it.
-    assert(!BaseTy->hasUnboundGenericType());
+    assert(IsTypeLookup || !BaseTy->hasUnboundGenericType());
 
     // If the base type is AnyObject, we might be doing a dynamic
     // lookup, so the base type won't match the type of the member's
