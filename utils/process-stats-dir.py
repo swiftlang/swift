@@ -20,6 +20,7 @@ import csv
 import json
 import os
 import platform
+import re
 import sys
 import time
 import urllib
@@ -154,15 +155,19 @@ def update_epoch_value(d, name, epoch, value):
     return (epoch, value, changed)
 
 
-def read_stats_dict_from_csv(f):
+def read_stats_dict_from_csv(f, select_stat=''):
     infieldnames = ["epoch", "name", "value"]
     c = csv.DictReader(f, infieldnames,
                        dialect='excel-tab',
                        quoting=csv.QUOTE_NONNUMERIC)
     d = {}
+    sre = re.compile('.*' if len(select_stat) == 0 else
+                     '|'.join(select_stat))
     for row in c:
         epoch = int(row["epoch"])
         name = row["name"]
+        if sre.search(name) is None:
+            continue
         value = int(row["value"])
         update_epoch_value(d, name, epoch, value)
     return d
@@ -189,7 +194,8 @@ def set_csv_baseline(args):
     existing = None
     if os.path.exists(args.set_csv_baseline):
         with open(args.set_csv_baseline, "r") as f:
-            existing = read_stats_dict_from_csv(f)
+            existing = read_stats_dict_from_csv(f,
+                                                select_stat=args.select_stat)
             print ("updating %d baseline entries in %s" %
                    (len(existing), args.set_csv_baseline))
     else:
@@ -273,7 +279,8 @@ def write_comparison(args, old_stats, new_stats):
 
 
 def compare_to_csv_baseline(args):
-    old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline)
+    old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline,
+                                         select_stat=args.select_stat)
     m = merge_all_jobstats((s for d in args.remainder
                             for s in load_stats_dir(d, **vars(args))),
                            **vars(args))
@@ -344,7 +351,7 @@ def main():
     parser.add_argument("--sort-by-delta-pct",
                         default=False,
                         action="store_true",
-                        help="Sort comparison results by delta-%, not stat")
+                        help="Sort comparison results by delta-%%, not stat")
     parser.add_argument("--sort-descending",
                         default=False,
                         action="store_true",
