@@ -716,7 +716,7 @@ void processFuncStatsChanges(SILFunction *F, FunctionStat &OldStat,
   // TODO: handle cases where a function got smaller.
   if ((SILStatsDumpAll &&
        (DeltaBlockCount != 0.0 || OldStat.BlockCount == 0)) ||
-      (abs(DeltaBlockCount) > FuncBlockCountDeltaThreshold &&
+      (std::abs(DeltaBlockCount) > FuncBlockCountDeltaThreshold &&
        OldStat.BlockCount > FuncBlockCountMinThreshold)) {
     stats_os() << nl.get();
     printCounterChange("function", "block", DeltaBlockCount, OldStat.BlockCount,
@@ -724,7 +724,7 @@ void processFuncStatsChanges(SILFunction *F, FunctionStat &OldStat,
   }
 
   if ((SILStatsDumpAll && (DeltaInstCount != 0.0 || OldStat.InstCount == 0)) ||
-      (abs(DeltaInstCount) > FuncInstCountDeltaThreshold &&
+      (std::abs(DeltaInstCount) > FuncInstCountDeltaThreshold &&
        OldStat.InstCount > FuncInstCountMinThreshold)) {
     stats_os() << nl.get();
     printCounterChange("function", "inst", DeltaInstCount, OldStat.InstCount,
@@ -760,7 +760,7 @@ void processModuleStatsChanges(ModuleStat &OldStat, ModuleStat &NewStat,
   if ((SILStatsDumpAll &&
        (DeltaBlockCount != 0.0 ||
         isFirstTimeData(OldStat.BlockCount, NewStat.BlockCount))) ||
-      (abs(DeltaBlockCount) > BlockCountDeltaThreshold)) {
+      (std::abs(DeltaBlockCount) > BlockCountDeltaThreshold)) {
     stats_os() << nl.get();
     printCounterChange("module", "block", DeltaBlockCount, OldStat.BlockCount,
                        NewStat.BlockCount, Ctx);
@@ -771,7 +771,7 @@ void processModuleStatsChanges(ModuleStat &OldStat, ModuleStat &NewStat,
   if ((SILStatsDumpAll &&
        (DeltaInstCount != 0.0 ||
         isFirstTimeData(OldStat.InstCount, NewStat.InstCount))) ||
-      (abs(DeltaInstCount) > InstCountDeltaThreshold)) {
+      (std::abs(DeltaInstCount) > InstCountDeltaThreshold)) {
     stats_os() << nl.get();
     printCounterChange("module", "inst", DeltaInstCount, OldStat.InstCount,
                        NewStat.InstCount, Ctx);
@@ -782,7 +782,7 @@ void processModuleStatsChanges(ModuleStat &OldStat, ModuleStat &NewStat,
   if ((SILStatsDumpAll &&
        (DeltaFunctionCount != 0.0 ||
         isFirstTimeData(OldStat.FunctionCount, NewStat.FunctionCount))) ||
-      (abs(DeltaFunctionCount) > FunctionCountDeltaThreshold)) {
+      (std::abs(DeltaFunctionCount) > FunctionCountDeltaThreshold)) {
     stats_os() << nl.get();
     printCounterChange("module", "functions", DeltaFunctionCount,
                        OldStat.FunctionCount, NewStat.FunctionCount, Ctx);
@@ -791,9 +791,9 @@ void processModuleStatsChanges(ModuleStat &OldStat, ModuleStat &NewStat,
   // Print delta for the used memory only if it is above a threshold or we are
   // asked to dump all changes.
   if ((SILStatsDumpAll &&
-       (abs(DeltaUsedMemory) > UsedMemoryMinDeltaThreshold ||
+       (std::abs(DeltaUsedMemory) > UsedMemoryMinDeltaThreshold ||
         isFirstTimeData(OldStat.UsedMemory, NewStat.UsedMemory))) ||
-      (abs(DeltaUsedMemory) > UsedMemoryDeltaThreshold)) {
+      (std::abs(DeltaUsedMemory) > UsedMemoryDeltaThreshold)) {
     stats_os() << nl.get();
     printCounterChange("module", "memory", DeltaUsedMemory, OldStat.UsedMemory,
                        NewStat.UsedMemory, Ctx);

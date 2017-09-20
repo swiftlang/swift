@@ -1327,13 +1327,13 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// to the \c Consumer.
   bool DeliveredResults = false;
 
-  bool typecheckContextImpl(DeclContext *DC) {
+  bool typecheckContext(DeclContext *DC) {
     // Nothing to type check in module context.
     if (DC->isModuleScopeContext())
       return true;
 
     // Type check the parent context.
-    if (!typecheckContextImpl(DC->getParent()))
+    if (!typecheckContext(DC->getParent()))
       return false;
 
     // Type-check this context.
@@ -1368,17 +1368,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     }
 
     llvm_unreachable("Unhandled DeclContextKind in switch.");
-  }
-
-  /// \returns true on success, false on failure.
-  bool typecheckContext() {
-    return typecheckContextImpl(CurDeclContext);
-  }
-
-  /// \returns true on success, false on failure.
-  bool typecheckParsedDecl() {
-    assert(ParsedDecl && "should have a parsed decl");
-    return typeCheckCompletionDecl(ParsedDecl);
   }
 
   Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
@@ -5115,16 +5104,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   // Add keywords even if type checking fails completely.
   addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
-  if (!typecheckContext())
-    return;
-
-  if (ParsedDecl && !typecheckParsedDecl())
-    return;
-
   if (auto *DC = dyn_cast_or_null<DeclContext>(ParsedDecl)) {
     if (DC->isChildContextOf(CurDeclContext))
       CurDeclContext = DC;
   }
+
+  if (!typecheckContext(CurDeclContext))
+    return;
 
   Optional<Type> ExprType;
   ConcreteDeclRef ReferencedDecl = nullptr;

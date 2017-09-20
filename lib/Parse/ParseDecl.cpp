@@ -4848,11 +4848,11 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
   // Create the decl for the func and add it to the parent scope.
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
-                        FuncLoc, FullName, NameLoc,
-                        /*Throws=*/throwsLoc.isValid(), throwsLoc,
-                        /*AccessorKeywordLoc=*/SourceLoc(),
-                        nullptr, BodyParams, FuncRetTy,
-                        CurDeclContext);
+                              FuncLoc, FullName, NameLoc,
+                              /*Throws=*/throwsLoc.isValid(), throwsLoc,
+                              /*AccessorKeywordLoc=*/SourceLoc(),
+                              nullptr, BodyParams, FuncRetTy,
+                              CurDeclContext);
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
