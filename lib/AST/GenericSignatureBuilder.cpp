@@ -4568,7 +4568,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
     if (archetype != archetype->getRepresentative()) return;
 
-    if (auto equivClass = archetype->getEquivalenceClassIfPresent())
+    if (archetype->getEquivalenceClassIfPresent())
       checkSameTypeConstraints(genericParams, archetype);
   });
 
