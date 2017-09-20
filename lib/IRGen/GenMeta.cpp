@@ -4563,7 +4563,7 @@ namespace {
                                           NominalTypeDecl *decl,
                                           bool &dependent) {
     CanType unboundType
-      = decl->getDeclaredTypeOfContext()->getCanonicalType();
+      = decl->getDeclaredType()->getCanonicalType();
     
     dependent = hasDependentValueWitnessTable(IGM, unboundType);    
     if (dependent)
@@ -4611,7 +4611,7 @@ namespace {
                         
     void addDependentValueWitnessTablePattern() {
       emitDependentValueWitnessTablePattern(IGM, B,
-                        Target->getDeclaredTypeOfContext()->getCanonicalType());
+                        Target->getDeclaredType()->getCanonicalType());
     }
                         
     void emitInitializeMetadata(IRGenFunction &IGF,
@@ -4779,7 +4779,7 @@ public:
   
   void addDependentValueWitnessTablePattern() {
     emitDependentValueWitnessTablePattern(IGM, B,
-                        Target->getDeclaredTypeOfContext()->getCanonicalType());
+                        Target->getDeclaredType()->getCanonicalType());
   }
   
   void addPayloadSize() {
