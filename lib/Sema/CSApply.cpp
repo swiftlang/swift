@@ -710,7 +710,7 @@ namespace {
       // better SILGen.
       if (isLValue &&
           (isNonMutatingMember(member) ||
-           member->getDeclContext()->getDeclaredTypeOfContext()
+           member->getDeclContext()->getDeclaredInterfaceType()
              ->hasReferenceSemantics())) {
         base = cs.coerceToRValue(base);
         isLValue = false;
@@ -2480,11 +2480,9 @@ namespace {
           // Determine whether 'super' would have made sense as a base.
           bool hasSuper = false;
           if (auto func = cs.DC->getInnermostMethodContext()) {
-            if (auto nominalType
-                       = func->getDeclContext()->getDeclaredTypeOfContext()) {
-              if (auto classDecl = nominalType->getClassOrBoundGenericClass()) {
-                hasSuper = classDecl->hasSuperclass();
-              }
+            if (auto classDecl = func->getDeclContext()
+                    ->getAsClassOrClassExtensionContext()) {
+              hasSuper = classDecl->hasSuperclass();
             }
           }
 

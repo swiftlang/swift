@@ -2040,11 +2040,13 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   //
   // FIXME: Remove this when lookup of initializers becomes restricted to our
   // immediate superclass.
-  Type superclassTyInCtor = superclassCtor->getDeclContext()->getDeclaredTypeOfContext();
+  auto *superclassCtorDecl =
+      superclassCtor->getDeclContext()
+          ->getAsNominalTypeOrNominalTypeExtensionContext();
   Type superclassTy = classDecl->getSuperclass();
   Type superclassTyInContext = classDecl->mapTypeIntoContext(superclassTy);
   NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
-  if (superclassTyInCtor->getAnyNominal() != superclassDecl) {
+  if (superclassCtorDecl != superclassDecl) {
     return nullptr;
   }
 
