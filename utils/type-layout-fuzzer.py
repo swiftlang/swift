@@ -4,16 +4,32 @@
 # which can be used for ABI or layout algorithm fuzzing.
 
 # TODO: generate types with generics, existentials, compositions
-# TODO: prevent cycles in inline storage
 
-import collections
+from __future__ import print_function
+
 import random
+import sys
 
 maxDepth = 5
 maxMembers = 5
-typesToDefine = collections.deque([0])
-nextName = 1
+typesDefined = []
+classesDefined = []
+nextToDefine = 0
+objcInterop = False
+
+if len(sys.argv) >= 2:
+    if sys.argv[1] == "--objc":
+        objcInterop = True
+    if sys.argv[1] == "--help":
+        print("Usage: " + sys.argv[0] + " [--objc]", file=sys.stderr)
+        print("", file=sys.stderr)
+        print("  --objc          Include ObjC-interop types", file=sys.stderr)
+        sys.exit(2)
+
 random.seed()
+if objcInterop:
+    print("import Foundation")
+    print()
 
 
 def randomTypeList(depth):
@@ -29,14 +45,19 @@ def randomTypeList(depth):
 
 def randomTypeReference(depth):
     def nominal():
-        global nextName
-        global typesToDefine
-        which = random.randint(0,
-                               nextName if depth < maxDepth else nextName - 1)
-        if which == nextName:
-            typesToDefine.append(which)
-            nextName += 1
-        return "T" + str(which)
+        global typesDefined
+        allowNew = depth < maxDepth
+        bound = len(classesDefined) if allowNew else len(classesDefined) - 1
+        which = random.randint(0, bound)
+        if which < len(classesDefined):
+            return classesDefined[which]
+        newName = "T" + str(len(typesDefined))
+
+        def defineRandomRelatedType(name):
+            defineRandomNominalType(name, depth)
+
+        typesDefined.append((newName, defineRandomRelatedType))
+        return newName
 
     def tuple():
         return randomTypeList(depth + 1)
@@ -45,7 +66,10 @@ def randomTypeReference(depth):
         return "(" + randomTypeReference(depth + 1) + ").Type"
 
     def leaf():
-        leaves = ["Int", "String", "Int8", "Int16", "Int32", "Int64"]
+        leaves = ["Int", "String", "Int8", "Int16", "Int32", "Int64",
+                  "(() -> ())", "(@convention(c) () -> ())", "AnyObject"]
+        if objcInterop:
+            leaves += ["NSObject", "(@convention(block) () -> ())"]
         return random.choice(leaves)
 
     if depth < maxDepth:
@@ -55,43 +79,81 @@ def randomTypeReference(depth):
     return random.choice(kinds)()
 
 
-def defineRandomProduct(kind, name, depth):
-    print(kind + " " + name + " {")
-    # Suppress errors about missing initializers
-    print("  init() { fatalError() }")
-
+def defineRandomFields(depth, basename):
     numMembers = random.randint(0, maxMembers)
     for i in xrange(numMembers):
-        print("  var x" + str(i) + ": " + randomTypeReference(depth + 1))
+        print("  var " + basename + str(i) + ": " +
+              randomTypeReference(depth + 1))
 
+
+def defineRandomClass(name, depth):
+    global classesDefined
+    classesDefined.append(name)
+    print("class " + name, end="")
+
+    def inheritNSObject():
+        print(": NSObject", end="")
+
+    def inheritsOtherClass():
+        print(": ", end="")
+        name = "T" + str(len(typesDefined))
+
+        def defineRandomBaseClass(name):
+            defineRandomClass(name, depth)
+
+        typesDefined.append((name, defineRandomBaseClass))
+        print(name, end="")
+
+    def inheritsNothing():
+        pass
+
+    inheritances = [inheritsNothing]
+    if depth == 0:
+        # The contents of classes are interesting only for top-level type
+        inheritances += [inheritsOtherClass]
+
+    if objcInterop:
+        inheritances += [inheritNSObject]
+    random.choice(inheritances)()
+
+    print(" {")
+    # Prevent errors about lack of initializers
+    print("  init(" + name + ": ()) { fatalError() }")
+    # The contents of classes are interesting only for top-level type
+    if depth == 0:
+        defineRandomFields(depth, "x" + name)
     print("}")
+    print()
 
 
-def defineRandomEnum(name, depth):
-    # TODO: indirect cases
-    print("enum " + name + " {")
-
-    numCases = random.randint(0, maxMembers)
-    for i in xrange(numCases):
-        print("  case x" + str(i) + randomTypeList(depth + 1))
-
-    print("}")
-
-
-def defineRandomType(name, depth):
+def defineRandomNominalType(name, depth=0):
     def struct():
-        defineRandomProduct("struct", name, depth)
+        print("struct " + name + " {")
+        defineRandomFields(depth, "x")
+        print("}")
+        print()
 
     def clas():
-        defineRandomProduct("class", name, depth)
+        defineRandomClass(name, depth)
 
     def enum():
-        defineRandomEnum(name, depth)
+        # TODO: indirect cases
+        print("enum " + name + " {")
+
+        numCases = random.randint(0, maxMembers)
+        for i in xrange(numCases):
+            print("  case x" + str(i) + randomTypeList(depth + 1))
+
+        print("}")
+        print()
 
     kinds = [struct, clas, enum]
     return random.choice(kinds)()
 
 
-while len(typesToDefine) > 0:
-    ty = typesToDefine.popleft()
-    defineRandomType("T" + str(ty), 0)
+typesDefined.append(("Generated", defineRandomNominalType))
+
+while nextToDefine < len(typesDefined):
+    name, definer = typesDefined[nextToDefine]
+    definer(name)
+    nextToDefine += 1
