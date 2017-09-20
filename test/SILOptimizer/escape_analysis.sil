@@ -1430,6 +1430,17 @@ bb3(%6: $X):
   return %8 : $()
 }
 
+// CHECK-LABEL: CG of check_look_through_thin_to_thick
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @check_look_through_thin_to_thick: $(@convention(thin) () -> ()) -> () {
+bb0(%0 : $@convention(thin) () -> ()):
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> () to $@callee_owned () -> ()
+  %2 = apply %1() : $@callee_owned () -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
 // X.deinit
 // CHECK-LABEL: CG of _T04main1XCfD
 // CHECK:        Arg %0 Esc: A, Succ:
