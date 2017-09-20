@@ -435,18 +435,31 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       return true;
     }
   } else if (Opts.RequestedAction != FrontendOptions::NoneAction) {
-    if (Opts.InputFilenames.empty()) {
+    if (Opts.InputFilenames.empty() && !Args.hasArg(OPT_e)) {
       Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
       return true;
     }
   }
 
   if (Opts.RequestedAction == FrontendOptions::Immediate) {
-    assert(!Opts.InputFilenames.empty());
-    Opts.ImmediateArgv.push_back(Opts.InputFilenames[0]); // argv[0]
-    if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
-      for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
-        Opts.ImmediateArgv.push_back(A->getValue(i));
+    if (Args.hasArg(OPT_e)) {
+      for (const Arg *A : Args.filtered(OPT_e)) {
+        if (A->getNumValues() > 0) {
+          std::string rawInput = A->getValue();
+          StringRef inputItem = StringRef(rawInput += "\n");
+          StringRef bufferID = "immediate_execution";
+          std::unique_ptr<llvm::MemoryBuffer> buffer =
+            llvm::MemoryBuffer::getMemBuffer(inputItem, bufferID, false);
+          Opts.InputBuffers.push_back(buffer.get());
+        }
+      }
+    } else {
+      assert(!Opts.InputFilenames.empty());
+      Opts.ImmediateArgv.push_back(Opts.InputFilenames[0]); // argv[0]
+      if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
+        for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
+          Opts.ImmediateArgv.push_back(A->getValue(i));
+        }
       }
     }
   }
