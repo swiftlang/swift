@@ -115,26 +115,26 @@ ArrayTestSuite.test("valueDestruction") {
 
 ArrayTestSuite.test("capacity/reserveCapacity(_:)") {
   var a1 = [1010, 1020, 1030]
-  expectEqual(3, a1.capacity)
+  expectGE(a1.capacity, 3)
   a1.append(1040)
-  expectEqual(6, a1.capacity)
+  expectGT(a1.capacity, 3)
 
   // Reserving new capacity jumps up to next limit.
   a1.reserveCapacity(7)
-  expectEqual(8, a1.capacity)
+  expectGE(a1.capacity, 7)
 
   // Can reserve right up to a limit.
   a1.reserveCapacity(24)
-  expectEqual(24, a1.capacity)
+  expectGE(a1.capacity, 24)
 
   // Fill up to the limit, no reallocation.
   for v in stride(from: 50, through: 240, by: 10).lazy.map({ 1000 + $0 }) {
     a1.append(v)
   }
   expectEqual(24, a1.count)
-  expectEqual(24, a1.capacity)
+  expectGE(a1.capacity, 24)
   a1.append(1250)
-  expectEqual(48, a1.capacity)
+  expectGT(a1.capacity, 24)
 }
 
 ArrayTestSuite.test("init(arrayLiteral:)") {
