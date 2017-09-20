@@ -1132,6 +1132,94 @@ VarDecl *PatternBindingDecl::getSingleVar() const {
   return nullptr;
 }
 
+/// Check whether the given type representation will be
+/// default-initializable.
+static bool isDefaultInitializable(const TypeRepr *typeRepr) {
+  // Look through most attributes.
+  if (const auto attributed = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+    // Weak ownership implies optionality.
+    if (attributed->getAttrs().getOwnership() == Ownership::Weak)
+      return true;
+
+    return isDefaultInitializable(attributed->getTypeRepr());
+  }
+
+  // Optional types are default-initializable.
+  if (isa<OptionalTypeRepr>(typeRepr) ||
+      isa<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))
+    return true;
+
+  // Tuple types are default-initializable if all of their element
+  // types are.
+  if (const auto tuple = dyn_cast<TupleTypeRepr>(typeRepr)) {
+    // ... but not variadic ones.
+    if (tuple->hasEllipsis())
+      return false;
+
+    for (const auto elt : tuple->getElements()) {
+      if (!isDefaultInitializable(elt.Type))
+        return false;
+    }
+
+    return true;
+  }
+
+  // Not default initializable.
+  return false;
+}
+
+// @NSManaged properties never get default initialized, nor do debugger
+// variables and immutable properties.
+bool isNeverDefaultInitializable(const Pattern *p) {
+  bool result = false;
+
+  p->forEachVariable([&](const VarDecl *var) {
+    if (var->getAttrs().hasAttribute<NSManagedAttr>())
+      return;
+
+    if (var->isDebuggerVar() ||
+        var->isLet())
+      result = true;
+  });
+
+  return result;
+}
+
+bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
+  const auto entry = getPatternList()[i];
+
+  // If it has an initializer expression, this is trivially true.
+  if (entry.getInit())
+    return true;
+
+  if (isNeverDefaultInitializable(entry.getPattern()))
+    return false;
+
+  // If the pattern is typed as optional (or tuples thereof), it is
+  // default initializable.
+  if (const auto typedPattern = dyn_cast<TypedPattern>(entry.getPattern())) {
+    if (const auto typeRepr = typedPattern->getTypeLoc().getTypeRepr()) {
+      if (::isDefaultInitializable(typeRepr))
+        return true;
+    } else if (typedPattern->isImplicit()) {
+      // Lazy vars have implicit storage assigned to back them. Because the
+      // storage is implicit, the pattern is typed and has a TypeLoc, but not a
+      // TypeRepr.
+      //
+      // All lazy storage is implicitly default initializable, though, because
+      // lazy backing storage is optional.
+      if (const auto *varDecl = typedPattern->getSingleVar())
+        // Lazy storage is never user accessible.
+        if (!varDecl->isUserAccessible())
+          if (typedPattern->getTypeLoc().getType()->getAnyOptionalObjectType())
+            return true;
+    }
+  }
+
+  // Otherwise, we can't default initialize this binding.
+  return false;
+}
+
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
   return Body->getStartLoc();
 }

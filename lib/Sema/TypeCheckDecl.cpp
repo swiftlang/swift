@@ -840,88 +840,6 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
   return parentEnv;
 }
 
-/// Check whether the given type representation will be
-/// default-initializable.
-static bool isDefaultInitializable(TypeRepr *typeRepr) {
-  // Look through most attributes.
-  if (auto attributed = dyn_cast<AttributedTypeRepr>(typeRepr)) {
-    // Weak ownership implies optionality.
-    if (attributed->getAttrs().getOwnership() == Ownership::Weak)
-      return true;
-    
-    return isDefaultInitializable(attributed->getTypeRepr());
-  }
-
-  // Optional types are default-initializable.
-  if (isa<OptionalTypeRepr>(typeRepr) ||
-      isa<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))
-    return true;
-
-  // Tuple types are default-initializable if all of their element
-  // types are.
-  if (auto tuple = dyn_cast<TupleTypeRepr>(typeRepr)) {
-    // ... but not variadic ones.
-    if (tuple->hasEllipsis())
-      return false;
-
-    for (auto elt : tuple->getElements()) {
-      if (!isDefaultInitializable(elt.Type))
-        return false;
-    }
-
-    return true;
-  }
-
-  // Not default initializable.
-  return false;
-}
-
-// @NSManaged properties never get default initialized, nor do debugger
-// variables and immutable properties.
-static bool isNeverDefaultInitializable(Pattern *p) {
-  bool result = false;
-
-  p->forEachVariable([&](VarDecl *var) {
-    if (var->getAttrs().hasAttribute<NSManagedAttr>())
-      return;
-
-    if (var->isDebuggerVar() ||
-        var->isLet())
-      result = true;
-  });
-
-  return result;
-}
-
-/// Determine whether the given pattern binding declaration either has
-/// an initializer expression, or is default initialized, without performing
-/// any type checking on it.
-static bool isDefaultInitializable(PatternBindingDecl *pbd) {
-  assert(pbd->hasStorage());
-
-  for (auto entry : pbd->getPatternList()) {
-    // If it has an initializer expression, this is trivially true.
-    if (entry.getInit())
-      continue;
-
-    if (isNeverDefaultInitializable(entry.getPattern()))
-      return false;
-
-    // If the pattern is typed as optional (or tuples thereof), it is
-    // default initializable.
-    if (auto typedPattern = dyn_cast<TypedPattern>(entry.getPattern())) {
-      if (auto typeRepr = typedPattern->getTypeLoc().getTypeRepr())
-        if (isDefaultInitializable(typeRepr))
-          continue;
-    }
-
-    // Otherwise, we can't default initialize this binding.
-    return false;
-  }
-  
-  return true;
-}
-
 /// Build a default initializer for the given type.
 static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
   // Default-initialize optional types and weak values to 'nil'.
@@ -4225,7 +4143,7 @@ public:
             TC.checkTypeModifyingDeclAttributes(var);
 
           // Decide whether we should suppress default initialization.
-          if (isNeverDefaultInitializable(PBD->getPattern(i)))
+          if (!PBD->isDefaultInitializable(i))
             continue;
 
           auto type = PBD->getPattern(i)->getType();
@@ -4602,7 +4520,7 @@ public:
         continue;
 
       if (pbd->isStatic() || !pbd->hasStorage() || 
-          isDefaultInitializable(pbd) || pbd->isInvalid())
+          pbd->isDefaultInitializable() || pbd->isInvalid())
         continue;
 
       // The variables in this pattern have not been
@@ -8375,8 +8293,8 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
     if (!pbd)
       continue;
 
-    if (pbd->isStatic() || !pbd->hasStorage() || isDefaultInitializable(pbd) ||
-        pbd->isInvalid())
+    if (pbd->isStatic() || !pbd->hasStorage() ||
+        pbd->isDefaultInitializable() || pbd->isInvalid())
       continue;
    
     for (auto entry : pbd->getPatternList()) {
@@ -8659,7 +8577,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
           
           // If we cannot default initialize the property, we cannot
           // synthesize a default initializer for the class.
-          if (CheckDefaultInitializer && !isDefaultInitializable(pbd))
+          if (CheckDefaultInitializer && !pbd->isDefaultInitializable())
             SuppressDefaultInitializer = true;
         }
       continue;
