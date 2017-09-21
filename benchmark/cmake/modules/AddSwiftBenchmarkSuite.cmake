@@ -19,6 +19,59 @@ function(runcmd)
   set(${RUNCMD_VARIABLE} ${${RUNCMD_VARIABLE}} PARENT_SCOPE)
 endfunction(runcmd)
 
+function (add_swift_benchmark_library objfile_out sibfile_out)
+  cmake_parse_arguments(BENCHLIB "" "MODULE_PATH;SOURCE_DIR;OBJECT_DIR" "SOURCES;LIBRARY_FLAGS" ${ARGN})
+
+  precondition(BENCHLIB_MODULE_PATH)
+  precondition(BENCHLIB_SOURCE_DIR)
+  precondition(BENCHLIB_OBJECT_DIR)
+  precondition(BENCHLIB_SOURCES)
+
+  set(module_name_path "${BENCHLIB_MODULE_PATH}")
+  get_filename_component(module_name "${module_name_path}" NAME)
+  set(srcdir "${BENCHLIB_SOURCE_DIR}")
+  set(objdir "${BENCHLIB_OBJECT_DIR}")
+  set(sources "${BENCHLIB_SOURCES}")
+
+  set(objfile "${objdir}/${module_name}.o")
+  set(swiftmodule "${objdir}/${module_name}.swiftmodule")
+
+  precondition(objfile_out)
+  add_custom_command(
+    OUTPUT "${objfile}"
+    DEPENDS ${stdlib_dependencies} ${sources}
+    COMMAND "${SWIFT_EXEC}"
+      ${BENCHLIB_LIBRARY_FLAGS}
+      "-force-single-frontend-invocation"
+      "-parse-as-library"
+      "-module-name" "${module_name}"
+      "-emit-module" "-emit-module-path" "${swiftmodule}"
+      "-I" "${objdir}"
+      "-o" "${objfile}"
+      ${sources})
+  set(${objfile_out} "${objfile}" PARENT_SCOPE)
+
+  if(SWIFT_BENCHMARK_EMIT_SIB)
+    precondition(sibfile_out)
+    set(sibfile "${objdir}/${module_name}.sib")
+
+    add_custom_command(
+      OUTPUT "${sibfile}"
+      DEPENDS
+      ${stdlib_dependencies} ${sources}
+      COMMAND "${SWIFT_EXEC}"
+        ${BENCHLIB_LIBRARY_FLAGS}
+        "-force-single-frontend-invocation"
+        "-parse-as-library"
+        "-module-name" "${module_name}"
+        "-emit-sib"
+        "-I" "${objdir}"
+        "-o" "${sibfile}"
+        ${sources})
+    set(sibfile_out "${sibfile}" PARENT_SCOPE)
+  endif()
+endfunction()
+
 function (swift_benchmark_compile_archopts)
   cmake_parse_arguments(BENCH_COMPILE_ARCHOPTS "" "PLATFORM;ARCH;OPT" "" ${ARGN})
   set(sdk ${${BENCH_COMPILE_ARCHOPTS_PLATFORM}_sdk})
@@ -65,49 +118,7 @@ function (swift_benchmark_compile_archopts)
 
   set(bench_library_objects)
   set(bench_library_sibfiles)
-  foreach(module_name_path ${BENCH_DRIVER_LIBRARY_MODULES})
-    get_filename_component(module_name "${module_name_path}" NAME)
-
-    if("${module_name}" STREQUAL "DriverUtils")
-      set(extra_sources "${srcdir}/utils/ArgParse.swift")
-    endif()
-
-    set(objfile "${objdir}/${module_name}.o")
-    set(swiftmodule "${objdir}/${module_name}.swiftmodule")
-    list(APPEND bench_library_objects "${objfile}")
-    set(source "${srcdir}/${module_name_path}.swift")
-    add_custom_command(
-        OUTPUT "${objfile}"
-        DEPENDS ${stdlib_dependencies} "${source}" ${extra_sources}
-        COMMAND "${SWIFT_EXEC}"
-        ${common_options_driver}
-        ${BENCH_DRIVER_LIBRARY_FLAGS}
-        "-force-single-frontend-invocation"
-        "-parse-as-library"
-        "-module-name" "${module_name}"
-        "-emit-module" "-emit-module-path" "${swiftmodule}"
-        "-o" "${objfile}"
-        "${source}" ${extra_sources})
-    if(SWIFT_BENCHMARK_EMIT_SIB)
-      set(sibfile "${objdir}/${module_name}.sib")
-      list(APPEND bench_library_sibfiles "${sibfile}")
-      add_custom_command(
-          OUTPUT "${sibfile}"
-          DEPENDS
-            ${stdlib_dependencies} "${srcdir}/${module_name_path}.swift"
-            ${extra_sources}
-          COMMAND "${SWIFT_EXEC}"
-          ${common_options_driver}
-          ${BENCH_DRIVER_LIBRARY_FLAGS}
-          "-force-single-frontend-invocation"
-          "-parse-as-library"
-          "-module-name" "${module_name}"
-          "-emit-sib"
-          "-o" "${sibfile}"
-          "${source}" ${extra_sources})
-    endif()
-  endforeach()
-
+  # Build libraries used by the driver and benchmarks.
   foreach(module_name_path ${BENCH_LIBRARY_MODULES})
     get_filename_component(module_name "${module_name_path}" NAME)
 
@@ -118,8 +129,7 @@ function (swift_benchmark_compile_archopts)
     add_custom_command(
         OUTPUT "${objfile}"
         DEPENDS
-          ${stdlib_dependencies} "${srcdir}/${module_name_path}.swift"
-          ${extra_sources}
+          ${stdlib_dependencies} "${source}" ${extra_sources}
         COMMAND "${SWIFT_EXEC}"
         ${common_options}
         "-force-single-frontend-invocation"
@@ -142,6 +152,55 @@ function (swift_benchmark_compile_archopts)
           "-parse-as-library"
           "-module-name" "${module_name}"
           "-emit-sib"
+          "-o" "${sibfile}"
+          "${source}" ${extra_sources})
+    endif()
+  endforeach()
+
+  set(bench_driver_objects)
+  set(bench_driver_sibfiles)
+  foreach(module_name_path ${BENCH_DRIVER_LIBRARY_MODULES})
+    get_filename_component(module_name "${module_name_path}" NAME)
+
+    if("${module_name}" STREQUAL "DriverUtils")
+      set(extra_sources "${srcdir}/utils/ArgParse.swift")
+    endif()
+
+    set(objfile "${objdir}/${module_name}.o")
+    set(swiftmodule "${objdir}/${module_name}.swiftmodule")
+    list(APPEND bench_driver_objects "${objfile}")
+    set(source "${srcdir}/${module_name_path}.swift")
+    add_custom_command(
+        OUTPUT "${objfile}"
+        DEPENDS
+          ${stdlib_dependencies} ${bench_library_objects} ${source}
+          ${extra_sources}
+        COMMAND "${SWIFT_EXEC}"
+        ${common_options_driver}
+        ${BENCH_DRIVER_LIBRARY_FLAGS}
+        "-force-single-frontend-invocation"
+        "-parse-as-library"
+        "-module-name" "${module_name}"
+        "-emit-module" "-emit-module-path" "${swiftmodule}"
+        "-I" "${objdir}"
+        "-o" "${objfile}"
+        "${source}" ${extra_sources})
+    if(SWIFT_BENCHMARK_EMIT_SIB)
+      set(sibfile "${objdir}/${module_name}.sib")
+      list(APPEND bench_driver_sibfiles "${sibfile}")
+      add_custom_command(
+          OUTPUT "${sibfile}"
+          DEPENDS
+            ${stdlib_dependencies} ${bench_library_objects} ${source}
+            ${extra_sources}
+          COMMAND "${SWIFT_EXEC}"
+          ${common_options_driver}
+          ${BENCH_DRIVER_LIBRARY_FLAGS}
+          "-force-single-frontend-invocation"
+          "-parse-as-library"
+          "-module-name" "${module_name}"
+          "-emit-sib"
+          "-I" "${objdir}"
           "-o" "${sibfile}"
           "${source}" ${extra_sources})
     endif()
@@ -279,8 +338,9 @@ function (swift_benchmark_compile_archopts)
       OUTPUT "${objdir}/${module_name}.o"
       DEPENDS
         ${stdlib_dependencies}
-        ${bench_library_objects} ${SWIFT_BENCH_OBJFILES}
-        ${bench_library_sibfiles} ${SWIFT_BENCH_SIBFILES} "${source}"
+        ${bench_library_objects} ${bench_driver_objects} ${SWIFT_BENCH_OBJFILES}
+        ${bench_library_sibfiles} ${bench_driver_sibfiles}
+        ${SWIFT_BENCH_SIBFILES} "${source}"
       COMMAND "${SWIFT_EXEC}"
       ${common_options}
       "-force-single-frontend-invocation"
@@ -322,7 +382,7 @@ function (swift_benchmark_compile_archopts)
   add_custom_command(
       OUTPUT "${OUTPUT_EXEC}"
       DEPENDS
-        ${bench_library_objects} ${SWIFT_BENCH_OBJFILES}
+        ${bench_library_objects} ${bench_driver_objects} ${SWIFT_BENCH_OBJFILES}
         "${objcfile}"
       COMMAND
         "${CLANG_EXEC}"
@@ -343,6 +403,7 @@ function (swift_benchmark_compile_archopts)
         "-Xlinker" "-rpath"
         "-Xlinker" "@executable_path/../lib/swift/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
         ${bench_library_objects}
+        ${bench_driver_objects}
         ${SWIFT_BENCH_OBJFILES}
         ${objcfile}
         "-o" "${OUTPUT_EXEC}"
