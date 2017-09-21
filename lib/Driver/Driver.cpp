@@ -1057,7 +1057,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   if (driverKind == DriverKind::Interactive) {
     OI.CompilerMode = OutputInfo::Mode::Immediate;
-    if (Inputs.empty())
+    if (Inputs.empty() && !Args.hasArg(options::OPT_e))
       OI.CompilerMode = OutputInfo::Mode::REPL;
     OI.CompilerOutputType = types::TY_Nothing;
 
@@ -1518,7 +1518,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     break;
   }
   case OutputInfo::Mode::Immediate: {
-    if (Inputs.empty())
+    if (Inputs.empty() && !Args.hasArg(options::OPT_e))
       return;
 
     assert(OI.CompilerOutputType == types::TY_Nothing);
@@ -1634,6 +1634,12 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
 
   if (Args.hasArg(options::OPT_v)) {
     printVersion(TC, llvm::errs());
+    SuppressNoInputFilesError = true;
+  }
+
+  if (Args.hasArg(options::OPT_e)) {
+    // TODO: this is just a placeholder for now; it should emit a diagnostic
+    // ("-e can't have input files") | add to DiagnosticsDriver.def
     SuppressNoInputFilesError = true;
   }
 
