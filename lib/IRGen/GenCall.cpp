@@ -170,7 +170,7 @@ void IRGenModule::addSwiftErrorAttributes(llvm::AttributeSet &attrs,
   // We create a shadow stack location of the swifterror parameter for the
   // debugger on such platforms and so we can't mark the parameter with a
   // swifterror attribute.
-  if (!UseSwiftCC || !this->IsSwiftErrorInRegister)
+  if (!this->IsSwiftErrorInRegister)
     return;
 
   static const llvm::Attribute::AttrKind attrKinds[] = {
