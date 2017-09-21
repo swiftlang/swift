@@ -827,7 +827,8 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     prepareGenericParamList(genericParams, DC);
 
     parentEnv = checkGenericEnvironment(genericParams, DC, parentSig,
-                                        /*allowConcreteGenericParams=*/true);
+                                        /*allowConcreteGenericParams=*/true,
+                                        /*ext=*/nullptr);
     parentSig = parentEnv->getGenericSignature();
 
     // Compute the final set of archetypes.
@@ -8047,7 +8048,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   auto *env = tc.checkGenericEnvironment(genericParams,
                                          ext->getDeclContext(), nullptr,
                                          /*allowConcreteGenericParams=*/true,
-                                         inferExtendedTypeReqs);
+                                         ext, inferExtendedTypeReqs);
 
   // Validate the generic parameters for the last time, to splat down
   // actual archetypes.
