@@ -1174,7 +1174,7 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
       unsigned alignment = 0;
       if (layout->isKnownSizeTrivial()) {
         size = layout->getTrivialSizeInBits();
-        alignment = layout->getAlignment();
+        alignment = layout->getAlignmentInBits();
       }
       LayoutRequirementKind rawKind = LayoutRequirementKind::UnknownLayout;
       switch (layout->getKind()) {

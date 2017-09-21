@@ -2042,18 +2042,18 @@ void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {
     appendOperatorParam("T");
     break;
   case LayoutConstraintKind::TrivialOfExactSize:
-    if (!layout->getAlignment())
+    if (!layout->getAlignmentInBits())
       appendOperatorParam("e", Index(layout->getTrivialSizeInBits()));
     else
       appendOperatorParam("E", Index(layout->getTrivialSizeInBits()),
-                     Index(layout->getAlignment()));
+                          Index(layout->getAlignmentInBits()));
     break;
   case LayoutConstraintKind::TrivialOfAtMostSize:
-    if (!layout->getAlignment())
+    if (!layout->getAlignmentInBits())
       appendOperatorParam("m", Index(layout->getTrivialSizeInBits()));
     else
       appendOperatorParam("M", Index(layout->getTrivialSizeInBits()),
-                     Index(layout->getAlignment()));
+                          Index(layout->getAlignmentInBits()));
     break;
   }
 }

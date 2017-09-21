@@ -4033,6 +4033,17 @@ TypeTraitResult TypeBase::canBeClass() {
 
   CanType self = getCanonicalType();
 
+  // Archetypes with a trivial layout constraint can never
+  // represent a class.
+  if (auto Archetype = dyn_cast<ArchetypeType>(self)) {
+    if (auto Layout = Archetype->getLayoutConstraint()) {
+      if (Layout->isTrivial())
+        return TypeTraitResult::IsNot;
+      if (Layout->isClass())
+        return TypeTraitResult::Is;
+    }
+  }
+
   // Dependent types might be bound to classes.
   if (isa<SubstitutableType>(self))
     return TypeTraitResult::CanBe;

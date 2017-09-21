@@ -859,6 +859,51 @@ bb0(%0 : $Int):
   return %4 : $Int8                               // id: %5
 }
 
+// An archetype with a trivial layout constraint can never be a class.
+// CHECK-LABEL: sil @is_trivial_layout_constraint_class
+sil @is_trivial_layout_constraint_class : $@convention(thin) <T where T: _Trivial> (@in T) -> Int8 {
+bb0(%0 : $*T):
+  %1 = metatype $@thick T.Type
+// CHECK-NOT: builtin "canBeClass"
+// CHECK-NOT: apply
+  %3 = builtin "canBeClass"<T>(%1 : $@thick T.Type) : $Builtin.Int8
+// CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int8, 0
+// CHECK: [[RESULT:%[a-zA-Z0-9]+]] = struct $Int8 ([[LITERAL]] : $Builtin.Int8)
+  %4 = struct $Int8 (%3 : $Builtin.Int8)
+// CHECK: return [[RESULT]] : $Int8
+  return %4 : $Int8
+}
+
+// An archetype with a _Class layout constraint is always a class.
+// CHECK-LABEL: sil @is_class_layout_constraint_class
+sil @is_class_layout_constraint_class : $@convention(thin) <T where T: _Class> (@in T) -> Int8 {
+bb0(%0 : $*T):
+  %1 = metatype $@thick T.Type
+// CHECK-NOT: builtin "canBeClass"
+// CHECK-NOT: apply
+  %3 = builtin "canBeClass"<T>(%1 : $@thick T.Type) : $Builtin.Int8
+// CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECK: [[RESULT:%[a-zA-Z0-9]+]] = struct $Int8 ([[LITERAL]] : $Builtin.Int8)
+  %4 = struct $Int8 (%3 : $Builtin.Int8)
+// CHECK: return [[RESULT]] : $Int8
+  return %4 : $Int8
+}
+
+// An archetype with a _NativeClass layout constraint is always a class.
+// CHECK-LABEL: sil @is_native_class_layout_constraint_class
+sil @is_native_class_layout_constraint_class : $@convention(thin) <T where T: _NativeClass> (@in T) -> Int8 {
+bb0(%0 : $*T):
+  %1 = metatype $@thick T.Type
+// CHECK-NOT: builtin "canBeClass"
+// CHECK-NOT: apply
+  %3 = builtin "canBeClass"<T>(%1 : $@thick T.Type) : $Builtin.Int8
+// CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECK: [[RESULT:%[a-zA-Z0-9]+]] = struct $Int8 ([[LITERAL]] : $Builtin.Int8)
+  %4 = struct $Int8 (%3 : $Builtin.Int8)
+// CHECK: return [[RESULT]] : $Int8
+  return %4 : $Int8
+}
+
 @objc class MyClass {
 }
 
