@@ -3722,9 +3722,9 @@ WARNING(pbd_never_used_stmtcond, none,
         "with boolean test",
         (Identifier))
 WARNING(unused_setter_newvalue, none,
-        "setter argument %0 was never used, but the getter was accessed; "
-        "consider using %0 or removing %1",
-        (Identifier, Identifier))
+        "setter argument %0 was never used; did you mean to use it "
+        "instead of accessing the property's current value?",
+        (Identifier))
 
 WARNING(pbd_never_used, none,
         "initialization of %select{variable|immutable value}1 %0 was never used"
