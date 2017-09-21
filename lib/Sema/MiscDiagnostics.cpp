@@ -2342,7 +2342,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         auto getter = dyn_cast<VarDecl>(FD->getAccessorStorageDecl());
         if ((access & RK_Read) == 0 && (VarDecls[getter] & RK_Read) != 0) {
           Diags.diagnose(var->getLoc(), diag::unused_setter_newvalue,
-                         var->getName(), getter->getName());
+                         var->getName());
         }
       }
       continue;

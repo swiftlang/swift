@@ -283,11 +283,11 @@ func sr964() {
   }
   var suspiciousSetter: String {
     get { return "" }
-    set { print(suspiciousSetter) } // expected-warning {{setter argument 'newValue' was never used, but the getter was accessed; consider using 'newValue' or removing 'suspiciousSetter'}}
+    set { print(suspiciousSetter) } // expected-warning {{setter argument 'newValue' was never used; did you mean to use it instead of accessing the property's current value?}}
   }
   var namedSuspiciousSetter: String {
     get { return "" }
-    set(parameter) { print(namedSuspiciousSetter) } // expected-warning {{setter argument 'parameter' was never used, but the getter was accessed; consider using 'parameter' or removing 'namedSuspiciousSetter'}}
+    set(parameter) { print(namedSuspiciousSetter) } // expected-warning {{setter argument 'parameter' was never used; did you mean to use it instead of accessing the property's current value?}}
   }
   var okSetter: String {
     get { return "" }
