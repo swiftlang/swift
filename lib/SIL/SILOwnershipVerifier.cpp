@@ -191,23 +191,23 @@ static bool isValueAddressOrTrivial(SILValue V, SILModule &M) {
 }
 
 // These operations forward both owned and guaranteed ownership.
-static bool isOwnershipForwardingValueKind(ValueKind K) {
+static bool isOwnershipForwardingValueKind(SILNodeKind K) {
   switch (K) {
-  case ValueKind::TupleInst:
-  case ValueKind::StructInst:
-  case ValueKind::EnumInst:
-  case ValueKind::OpenExistentialRefInst:
-  case ValueKind::UpcastInst:
-  case ValueKind::UncheckedRefCastInst:
-  case ValueKind::ConvertFunctionInst:
-  case ValueKind::RefToBridgeObjectInst:
-  case ValueKind::BridgeObjectToRefInst:
-  case ValueKind::UnconditionalCheckedCastInst:
-  case ValueKind::UncheckedEnumDataInst:
-  case ValueKind::MarkUninitializedInst:
-  case ValueKind::SelectEnumInst:
-  case ValueKind::SwitchEnumInst:
-  case ValueKind::CheckedCastBranchInst:
+  case SILNodeKind::TupleInst:
+  case SILNodeKind::StructInst:
+  case SILNodeKind::EnumInst:
+  case SILNodeKind::OpenExistentialRefInst:
+  case SILNodeKind::UpcastInst:
+  case SILNodeKind::UncheckedRefCastInst:
+  case SILNodeKind::ConvertFunctionInst:
+  case SILNodeKind::RefToBridgeObjectInst:
+  case SILNodeKind::BridgeObjectToRefInst:
+  case SILNodeKind::UnconditionalCheckedCastInst:
+  case SILNodeKind::UncheckedEnumDataInst:
+  case SILNodeKind::MarkUninitializedInst:
+  case SILNodeKind::SelectEnumInst:
+  case SILNodeKind::SwitchEnumInst:
+  case SILNodeKind::CheckedCastBranchInst:
     return true;
   default:
     return false;
@@ -216,12 +216,12 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
 
 // These operations forward guaranteed ownership, but don't necessarily forward
 // owned values.
-static bool isGuaranteedForwardingValueKind(ValueKind K) {
+static bool isGuaranteedForwardingValueKind(SILNodeKind K) {
   switch (K) {
-  case ValueKind::TupleExtractInst:
-  case ValueKind::StructExtractInst:
-  case ValueKind::OpenExistentialValueInst:
-  case ValueKind::OpenExistentialBoxValueInst:
+  case SILNodeKind::TupleExtractInst:
+  case SILNodeKind::StructExtractInst:
+  case SILNodeKind::OpenExistentialValueInst:
+  case SILNodeKind::OpenExistentialBoxValueInst:
     return true;
   default:
     return isOwnershipForwardingValueKind(K);
@@ -229,15 +229,15 @@ static bool isGuaranteedForwardingValueKind(ValueKind K) {
 }
 
 static bool isGuaranteedForwardingValue(SILValue V) {
-  return isGuaranteedForwardingValueKind(V->getKind());
+  return isGuaranteedForwardingValueKind(SILNodeKind(V->getKind()));
 }
 
 static bool isGuaranteedForwardingInst(SILInstruction *I) {
-  return isGuaranteedForwardingValueKind(I->getKind());
+  return isGuaranteedForwardingValueKind(SILNodeKind(I->getKind()));
 }
 
 static bool isOwnershipForwardingInst(SILInstruction *I) {
-  return isOwnershipForwardingValueKind(I->getKind());
+  return isOwnershipForwardingValueKind(SILNodeKind(I->getKind()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -403,17 +403,13 @@ public:
     return Result.ShouldCheckForDataflowViolations;
   }
 
-  OwnershipUseCheckerResult visitValueBase(ValueBase *) {
-    llvm_unreachable("Unimplemented?!");
-  }
-
   OwnershipUseCheckerResult visitCallee(CanSILFunctionType SubstCalleeType);
   OwnershipUseCheckerResult
   checkTerminatorArgumentMatchesDestBB(SILBasicBlock *DestBB, unsigned OpIndex);
 
 // Create declarations for all instructions, so we get a warning at compile
 // time if any instructions do not have an implementation.
-#define INST(Id, Parent, TextualName, MemBehavior, MayRelease)                 \
+#define INST(Id, Parent) \
   OwnershipUseCheckerResult visit##Id(Id *);
 #include "swift/SIL/SILNodes.def"
 };
@@ -1691,20 +1687,28 @@ void SILValueOwnershipChecker::gatherUsers(
     // or trivial. We now split into two cases, if the user is a terminator or
     // not. If we do not have a terminator, then just add User->getUses() to the
     // worklist.
-    auto *TI = dyn_cast<TermInst>(User);
-    if (!TI) {
-      if (SILValue(User).getOwnershipKind() == ValueOwnershipKind::Trivial) {
+    if (auto *value = dyn_cast<SingleValueInstruction>(User)) {
+      if (SILValue(value).getOwnershipKind() == ValueOwnershipKind::Trivial) {
         continue;
       }
 
       // Now, we /must/ have a guaranteed subobject, so lets assert that the
       // user
       // is actually guaranteed and add the subobject's users to our worklist.
-      assert(SILValue(User).getOwnershipKind() ==
+      assert(SILValue(value).getOwnershipKind() ==
                  ValueOwnershipKind::Guaranteed &&
              "Our value is guaranteed and this is a forwarding instruction. "
              "Should have guaranteed ownership as well.");
-      std::copy(User->use_begin(), User->use_end(), std::back_inserter(Users));
+      std::copy(value->use_begin(), value->use_end(),
+                std::back_inserter(Users));
+      continue;
+    }
+
+    // TODO: MultiValueInstruction
+    assert(User->getResults().empty());
+
+    auto *TI = dyn_cast<TermInst>(User);
+    if (!TI) {
       continue;
     }
 

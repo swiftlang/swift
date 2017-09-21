@@ -62,8 +62,8 @@ public:
   bool needsNotifications() override { return true; }
 
   // Handle notifications about removals of instructions.
-  void handleDeleteNotification(swift::ValueBase *Value) override {
-    if (auto DeletedI = dyn_cast<SILInstruction>(Value)) {
+  void handleDeleteNotification(SILNode *node) override {
+    if (auto DeletedI = dyn_cast<SILInstruction>(node)) {
       if (CurrentI == SILBasicBlock::iterator(DeletedI)) {
         if (CurrentI != CurrentI->getParent()->begin()) {
           --CurrentI;
@@ -164,10 +164,10 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
                    ArrayRef<SILValue> FullArgs) {
   SmallVector<SILInstruction*, 16> InstsToDelete;
   for (SILValue V : FullArgs) {
-    if (auto *I = dyn_cast<SILInstruction>(V))
-      if (I != CalleeValue &&
-          isInstructionTriviallyDead(I))
-        InstsToDelete.push_back(I);
+    if (V != CalleeValue)
+      if (auto *I = V->getDefiningInstruction())
+        if (isInstructionTriviallyDead(I))
+          InstsToDelete.push_back(I);
   }
   recursivelyDeleteTriviallyDeadInstructions(InstsToDelete, true);
 
@@ -337,11 +337,11 @@ tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
     return std::make_tuple(InnerAI, I);
 
   replaceDeadApply(InnerAI, NewInst);
-  if (auto *II = dyn_cast<SILInstruction>(NewInst))
-    I = II->getIterator();
-  else
-    I = NewInst->getParentBlock()->begin();
-  auto NewAI = FullApplySite::isa(NewInstPair.second.getInstruction());
+
+  auto newApplyAI = NewInstPair.second.getInstruction();
+  assert(newApplyAI && "devirtualized but removed apply site?");
+  I = newApplyAI->getIterator();
+  auto NewAI = FullApplySite::isa(newApplyAI);
   // *NOTE*, it is important that we return I here since we may have
   // devirtualized but not have a full apply site anymore.
   if (!NewAI)

@@ -19,7 +19,7 @@ bb0:
   %1 = mark_uninitialized [var] %0a : $*Int // expected-note {{variable defined here}}
   %4 = load [trivial] %1 : $*Int                // expected-error {{variable '<unknown>' used before being initialized}}
   destroy_value %0 : $<τ_0_0> { var τ_0_0 } <Int>
-  %9 = return %4 : $Int
+  return %4 : $Int
 }
 
 // CHECK-LABEL: @inout_uninit
@@ -50,7 +50,7 @@ bb0(%0 : @trivial $Int):
   %91 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %91a = project_box %91 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %1 = mark_uninitialized [var] %91a : $*Int
-  %2 = store %0 to [trivial] %1 : $*Int
+  store %0 to [trivial] %1 : $*Int
 
   %3 = load [trivial] %1 : $*Int
   %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
@@ -58,7 +58,7 @@ bb0(%0 : @trivial $Int):
   %7 = load [trivial] %1 : $*Int
   %8 = tuple (%3 : $Int, %7 : $Int)
   destroy_value %91 : $<τ_0_0> { var τ_0_0 } <Int>
-  %11 = return %8 : $(Int, Int)
+  return %8 : $(Int, Int)
 }
 
 struct AddressOnlyStruct {

@@ -64,8 +64,8 @@ static void tryRemoveRetainReleasePairsBetween(
     auto *CurInst = &*It++;
     if (CurInst != Retain &&
         (isa<StrongRetainInst>(CurInst) || isa<RetainValueInst>(CurInst)) &&
-        RCFI.getRCIdentityRoot(CurInst->getOperand(0)) ==
-            SILValue(UnsafeGuaranteedI)) {
+        RCFI.getRCIdentityRoot(CurInst->getOperand(0))
+          ->getDefiningInstruction() == UnsafeGuaranteedI) {
       CandidateRetain = CurInst;
       continue;
     }
@@ -80,8 +80,8 @@ static void tryRemoveRetainReleasePairsBetween(
 
     if (CandidateRetain != nullptr && CurInst != Release &&
         (isa<StrongReleaseInst>(CurInst) || isa<ReleaseValueInst>(CurInst)) &&
-        RCFI.getRCIdentityRoot(CurInst->getOperand(0)) ==
-            SILValue(UnsafeGuaranteedI)) {
+        RCFI.getRCIdentityRoot(CurInst->getOperand(0))
+          ->getDefiningInstruction() == UnsafeGuaranteedI) {
       // Delete the retain/release pair.
       InstsToDelete.push_back(CandidateRetain);
       InstsToDelete.push_back(CurInst);
@@ -155,8 +155,8 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
       //  %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo)
       //  %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
       //  %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-      SILInstruction *UnsafeGuaranteedValue;
-      SILInstruction *UnsafeGuaranteedToken;
+      SingleValueInstruction *UnsafeGuaranteedValue;
+      SingleValueInstruction *UnsafeGuaranteedToken;
       std::tie(UnsafeGuaranteedValue, UnsafeGuaranteedToken) =
           getSingleUnsafeGuaranteedValueResult(UnsafeGuaranteedI);
 

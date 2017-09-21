@@ -77,7 +77,6 @@ void AccessMarkerElimination::replaceBeginAccessUsers(
 
     // Delete any associated end_access instructions.
     if (auto endAccess = dyn_cast<EndAccessInst>(op->getUser())) {
-      assert(endAccess->use_empty() && "found use of end_access");
       endAccess->eraseFromParent();
 
       // Forward all other uses to the original address.
@@ -123,7 +122,6 @@ bool AccessMarkerElimination::checkAndEliminateMarker(SILInstruction *inst) {
     if (shouldPreserveAccess(BUA->getEnforcement()))
       return false;
 
-    BUA->replaceAllUsesWith(BUA->getSource());
     return true;
   }
   // end_unpaired_access instructions will be directly removed and
@@ -132,7 +130,6 @@ bool AccessMarkerElimination::checkAndEliminateMarker(SILInstruction *inst) {
     if (shouldPreserveAccess(EUA->getEnforcement()))
       return false;
 
-    assert(EUA->use_empty() && "use of end_unpaired_access");
     return true;
   }
   return false;

@@ -1327,15 +1327,15 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
         continue;
 
       // Look through upcasts.
-      if (isa<UpcastInst>(BBIOpUser)) {
-        std::copy(BBIOpUser->use_begin(), BBIOpUser->use_end(),
+      if (auto upcast = dyn_cast<UpcastInst>(BBIOpUser)) {
+        std::copy(upcast->use_begin(), upcast->use_end(),
                   std::back_inserter(Worklist));
         continue;
       }
 
       // Look through unchecked_ref_cast.
-      if (isa<UncheckedRefCastInst>(BBIOpUser)) {
-        std::copy(BBIOpUser->use_begin(), BBIOpUser->use_end(),
+      if (auto cast = dyn_cast<UncheckedRefCastInst>(BBIOpUser)) {
+        std::copy(cast->use_begin(), cast->use_end(),
                   std::back_inserter(Worklist));
         continue;
       }
@@ -1496,7 +1496,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
     auto *LI = Inst;
     bool hasReturnUse = false, hasUnknownUses = false;
     
-    for (auto LoadUse : LI->getUses()) {
+    for (auto LoadUse : cast<SingleValueInstruction>(LI)->getUses()) {
       auto *User = LoadUse->getUser();
       
       // Ignore retains of the struct/enum before the return.
@@ -1892,7 +1892,7 @@ void LifetimeChecker::deleteDeadRelease(unsigned ReleaseID) {
   SILInstruction *Release = Destroys[ReleaseID];
   if (isa<DestroyAddrInst>(Release)) {
     SILValue Addr = Release->getOperand(0);
-    if (auto *AddrI = dyn_cast<SILInstruction>(Addr))
+    if (auto *AddrI = Addr->getDefiningInstruction())
       recursivelyDeleteTriviallyDeadInstructions(AddrI);
   }
   Release->eraseFromParent();

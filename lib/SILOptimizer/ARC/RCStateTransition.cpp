@@ -42,25 +42,25 @@ static bool isAutoreleasePoolCall(SILInstruction *I) {
 //                           RCStateTransitionKind
 //===----------------------------------------------------------------------===//
 
-RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
-  switch (V->getKind()) {
-  case ValueKind::StrongRetainInst:
-  case ValueKind::RetainValueInst:
+RCStateTransitionKind swift::getRCStateTransitionKind(SILNode *N) {
+  switch (N->getKind()) {
+  case SILNodeKind::StrongRetainInst:
+  case SILNodeKind::RetainValueInst:
     return RCStateTransitionKind::StrongIncrement;
 
-  case ValueKind::StrongReleaseInst:
-  case ValueKind::ReleaseValueInst:
+  case SILNodeKind::StrongReleaseInst:
+  case SILNodeKind::ReleaseValueInst:
     return RCStateTransitionKind::StrongDecrement;
 
-  case ValueKind::SILFunctionArgument: {
-    auto *Arg = cast<SILFunctionArgument>(V);
+  case SILNodeKind::SILFunctionArgument: {
+    auto *Arg = cast<SILFunctionArgument>(N);
     if (Arg->hasConvention(SILArgumentConvention::Direct_Owned))
       return RCStateTransitionKind::StrongEntrance;
     return RCStateTransitionKind::Unknown;
   }
 
-  case ValueKind::ApplyInst: {
-    auto *AI = cast<ApplyInst>(V);
+  case SILNodeKind::ApplyInst: {
+    auto *AI = cast<ApplyInst>(N);
     if (isAutoreleasePoolCall(AI))
       return RCStateTransitionKind::AutoreleasePoolCall;
 
@@ -78,13 +78,13 @@ RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
     return RCStateTransitionKind::Unknown;
   }
 
-  case ValueKind::AllocRefInst:
-  case ValueKind::AllocRefDynamicInst:
+  case SILNodeKind::AllocRefInst:
+  case SILNodeKind::AllocRefDynamicInst:
     // AllocRef* are always allocating new classes so they are introducing new
     // values at +1.
     return RCStateTransitionKind::StrongEntrance;
 
-  case ValueKind::AllocBoxInst:
+  case SILNodeKind::AllocBoxInst:
     // AllocBox introduce their container result at +1.
     return RCStateTransitionKind::StrongEntrance;
 

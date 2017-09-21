@@ -43,29 +43,33 @@ class ValueOwnershipKindDumper : public SILFunctionTransform {
     for (auto &BB : *F) {
       // We only verify instructions right now.
       for (auto &II : BB) {
-        // If the instruction doesn't have a value, bail.
-        if (!II.hasValue())
-          continue;
-        SILValue V(&II);
-        llvm::outs() << "Visiting: " << II;
-        auto Kind = V.getOwnershipKind();
-        llvm::outs() << "    " << Kind << "\n";
-        if (Kind == ValueOwnershipKind::Any)
+        // If the instruction doesn't have any results, bail.
+        auto results = II.getResults();
+        if (results.empty())
           continue;
 
-        if (Kind == ValueOwnershipKind::Trivial) {
-          if (auto *EI = dyn_cast<EnumInst>(V)) {
-            checkEnumInstIsTrivial(EI);
+        llvm::outs() << "Visiting: " << II;
+
+        for (auto V : results) {
+          auto Kind = V.getOwnershipKind();
+          llvm::outs() << "    " << Kind << "\n";
+          if (Kind == ValueOwnershipKind::Any)
             continue;
-          }
-          SILType Ty = V->getType();
-          if (!Ty.isTrivial(M) && !Ty.isAddress()) {
-            llvm_unreachable("Error! Trivial ownership without trivial type\n");
-          }
-        } else {
-          if (V->getType().isTrivial(M)) {
-            llvm_unreachable(
-                "Error! Non Trivial ownership with trivial type\n");
+
+          if (Kind == ValueOwnershipKind::Trivial) {
+            if (auto *EI = dyn_cast<EnumInst>(V)) {
+              checkEnumInstIsTrivial(EI);
+              continue;
+            }
+            SILType Ty = V->getType();
+            if (!Ty.isTrivial(M) && !Ty.isAddress()) {
+              llvm_unreachable("Error! Trivial ownership without trivial type\n");
+            }
+          } else {
+            if (V->getType().isTrivial(M)) {
+              llvm_unreachable(
+                  "Error! Non Trivial ownership with trivial type\n");
+            }
           }
         }
       }

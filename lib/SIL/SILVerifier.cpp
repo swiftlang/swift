@@ -79,11 +79,11 @@ namespace {
 
 /// Metaprogramming-friendly base class.
 template <class Impl>
-class SILVerifierBase : public SILVisitor<Impl> {
+class SILVerifierBase : public SILInstructionVisitor<Impl> {
 public:
   // visitCLASS calls visitPARENT and checkCLASS.
   // checkCLASS does nothing by default.
-#define VALUE(CLASS, PARENT)                                    \
+#define INST(CLASS, PARENT)                                     \
   void visit##CLASS(CLASS *I) {                                 \
     static_cast<Impl*>(this)->visit##PARENT(I);                 \
     static_cast<Impl*>(this)->check##CLASS(I);                  \
@@ -91,10 +91,10 @@ public:
   void check##CLASS(CLASS *I) {}
 #include "swift/SIL/SILNodes.def"
 
-  void visitValueBase(ValueBase *V) {
-    static_cast<Impl*>(this)->checkValueBase(V);
+  void visitSILInstruction(SILInstruction *I) {
+    static_cast<Impl*>(this)->checkSILInstruction(I);
   }
-  void checkValueBase(ValueBase *V) {}
+  void checkSILInstruction(SILInstruction *I) {}
 };
 } // end anonymous namespace
 
@@ -471,23 +471,19 @@ public:
     // Check the SILLLocation attached to the instruction.
     checkInstructionsSILLocation(I);
 
-    checkLegalType(I->getFunction(), I, I);
-
     // Check ownership.
     SILFunction *F = I->getFunction();
     assert(F && "Expected value base with parent function");
 
-    // Check ownership.
-    checkValueBaseOwnership(I);
+    for (auto result : I->getResults()) {
+      checkLegalType(F, result, I);
+      checkValueBaseOwnership(result);
+    }
   }
 
   void checkValueBaseOwnership(ValueBase *V) {
     // If ownership is not enabled, bail.
     if (!isSILOwnershipEnabled())
-      return;
-
-    // If V does not have a value, bail.
-    if (!V->hasValue())
       return;
 
     SILFunction *F = V->getFunction();
@@ -518,32 +514,34 @@ public:
     }
 
     // Verify that all of our uses are in this function.
-    for (Operand *use : I->getUses()) {
-      auto user = use->getUser();
-      require(user, "instruction user is null?");
-      require(isa<SILInstruction>(user),
-              "instruction used by non-instruction");
-      auto userI = cast<SILInstruction>(user);
-      require(userI->getParent(),
-              "instruction used by unparented instruction");
-      if (I->isStaticInitializerInst()) {
-        require(userI->getParent() == BB,
-              "instruction used by instruction not in same static initializer");
-      } else {
-        require(userI->getFunction() == &F,
-                "instruction used by instruction in different function");
-      }
+    for (auto result : I->getResults()) {
+      for (Operand *use : result->getUses()) {
+        auto user = use->getUser();
+        require(user, "instruction user is null?");
+        require(isa<SILInstruction>(user),
+                "instruction used by non-instruction");
+        auto userI = cast<SILInstruction>(user);
+        require(userI->getParent(),
+                "instruction used by unparented instruction");
+        if (I->isStaticInitializerInst()) {
+          require(userI->getParent() == BB,
+                "instruction used by instruction not in same static initializer");
+        } else {
+          require(userI->getFunction() == &F,
+                  "instruction used by instruction in different function");
+        }
 
-      auto operands = userI->getAllOperands();
-      require(operands.begin() <= use && use <= operands.end(),
-              "use doesn't actually belong to instruction it claims to");
+        auto operands = userI->getAllOperands();
+        require(operands.begin() <= use && use <= operands.end(),
+                "use doesn't actually belong to instruction it claims to");
+      }
     }
 
     // Verify some basis structural stuff about an instruction's operands.
     for (auto &operand : I->getAllOperands()) {
       require(operand.get(), "instruction has null operand");
 
-      if (auto *valueI = dyn_cast<SILInstruction>(operand.get())) {
+      if (auto *valueI = operand.get()->getDefiningInstruction()) {
         require(valueI->getParent(),
                 "instruction uses value of unparented instruction");
         if (I->isStaticInitializerInst()) {
@@ -598,7 +596,7 @@ public:
     // Check the location kind.
     SILLocation L = I->getLoc();
     SILLocation::LocationKind LocKind = L.getKind();
-    ValueKind InstKind = I->getKind();
+    SILInstructionKind InstKind = I->getKind();
 
     // Check that there is at most one debug variable defined
     // for each argument slot. This catches SIL transformations
@@ -642,20 +640,20 @@ public:
     // Fix incoming.
     if (LocKind == SILLocation::CleanupKind ||
         LocKind == SILLocation::InlinedKind)
-      require(InstKind != ValueKind::ReturnInst ||
-              InstKind != ValueKind::AutoreleaseReturnInst,
+      require(InstKind != SILInstructionKind::ReturnInst ||
+              InstKind != SILInstructionKind::AutoreleaseReturnInst,
         "cleanup and inlined locations are not allowed on return instructions");
 #endif
 
     if (LocKind == SILLocation::ReturnKind ||
         LocKind == SILLocation::ImplicitReturnKind)
-      require(InstKind == ValueKind::BranchInst ||
-              InstKind == ValueKind::ReturnInst ||
-              InstKind == ValueKind::UnreachableInst,
+      require(InstKind == SILInstructionKind::BranchInst ||
+              InstKind == SILInstructionKind::ReturnInst ||
+              InstKind == SILInstructionKind::UnreachableInst,
         "return locations are only allowed on branch and return instructions");
 
     if (LocKind == SILLocation::ArtificialUnreachableKind)
-      require(InstKind == ValueKind::UnreachableInst,
+      require(InstKind == SILInstructionKind::UnreachableInst,
         "artificial locations are only allowed on Unreachable instructions");
   }
 
@@ -876,9 +874,9 @@ public:
         require((ValueBase *)V == AI->getFunction()->getSelfMetadataArgument(),
                 "wrong self metadata operand");
       } else {
-        require(isa<SILInstruction>(V),
+        require(isa<SingleValueInstruction>(V),
                 "opened archetype operand should refer to a SIL instruction");
-        auto Archetype = getOpenedArchetypeOf(cast<SILInstruction>(V));
+        auto Archetype = getOpenedArchetypeOf(cast<SingleValueInstruction>(V));
         require(Archetype,
                 "opened archetype operand should define an opened archetype");
         require(FoundOpenedArchetypes.count(Archetype),
@@ -1925,7 +1923,6 @@ public:
   }
 
   void checkBindMemoryInst(BindMemoryInst *BI) {
-    require(!BI->getType(), "BI must not produce a type");
     require(BI->getBoundType(), "BI must have a bound type");
     require(BI->getBase()->getType().is<BuiltinRawPointerType>(),
             "bind_memory base be a RawPointer");
@@ -2343,34 +2340,34 @@ public:
         if (inst->isTypeDependentOperand(*use))
           continue;
         switch (inst->getKind()) {
-        case ValueKind::ApplyInst:
-        case ValueKind::TryApplyInst:
-        case ValueKind::PartialApplyInst:
+        case SILInstructionKind::ApplyInst:
+        case SILInstructionKind::TryApplyInst:
+        case SILInstructionKind::PartialApplyInst:
           if (isConsumingOrMutatingApplyUse(use))
             return true;
           else
             break;
-        case ValueKind::CopyAddrInst:
+        case SILInstructionKind::CopyAddrInst:
           if (isConsumingOrMutatingCopyAddrUse(use))
             return true;
           else
             break;
-        case ValueKind::DestroyAddrInst:
+        case SILInstructionKind::DestroyAddrInst:
           return true;
-        case ValueKind::UncheckedAddrCastInst:
+        case SILInstructionKind::UncheckedAddrCastInst:
           // Escaping use lets be conservative here.
           return true;
-        case ValueKind::CheckedCastAddrBranchInst:
+        case SILInstructionKind::CheckedCastAddrBranchInst:
           if (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind() !=
               CastConsumptionKind::CopyOnSuccess)
             return true;
           break;
-        case ValueKind::LoadInst:
+        case SILInstructionKind::LoadInst:
           // A 'non-taking' value load is harmless.
           return cast<LoadInst>(inst)->getOwnershipQualifier() ==
                  LoadOwnershipQualifier::Take;
           break;
-        case ValueKind::DebugValueAddrInst:
+        case SILInstructionKind::DebugValueAddrInst:
           // Harmless use.
           break;
         default:
@@ -4072,7 +4069,7 @@ public:
   /// - flow-sensitive states must be equivalent on all paths into a block
   void verifyFlowSensitiveRules(SILFunction *F) {
     struct BBState {
-      std::vector<SILInstruction*> Stack;
+      std::vector<SingleValueInstruction*> Stack;
       std::set<BeginAccessInst*> Accesses;
     };
 
@@ -4090,7 +4087,7 @@ public:
         CurInstruction = &i;
 
         if (i.isAllocatingStack()) {
-          state.Stack.push_back(&i);
+          state.Stack.push_back(cast<SingleValueInstruction>(&i));
 
         } else if (i.isDeallocatingStack()) {
           SILValue op = i.getOperand(0);
@@ -4263,7 +4260,13 @@ public:
       require(FoundSelfInPredecessor, "Must be a successor of each predecessor.");
     }
     
-    SILVisitor::visitSILBasicBlock(BB);
+    SILInstructionVisitor::visitSILBasicBlock(BB);
+  }
+
+  void visitBasicBlockArguments(SILBasicBlock *BB) {
+    for (auto argI = BB->args_begin(), argEnd = BB->args_end(); argI != argEnd;
+         ++argI)
+      visitSILArgument(*argI);
   }
 
   void visitSILBasicBlocks(SILFunction *F) {
@@ -4496,11 +4499,12 @@ void SILGlobalVariable::verify() const {
   for (const SILInstruction &I : StaticInitializerBlock) {
     assert(isValidStaticInitializerInst(&I, getModule()) &&
            "illegal static initializer");
-    if (&I == &StaticInitializerBlock.back()) {
-      assert(I.use_empty() && "Init value must not have another use");
+    auto init = cast<SingleValueInstruction>(&I);
+    if (init == &StaticInitializerBlock.back()) {
+      assert(init->use_empty() && "Init value must not have another use");
     } else {
-      assert(!I.use_empty() && "dead instruction in static initializer");
-      assert(!isa<ObjectInst>(&I) &&
+      assert(!init->use_empty() && "dead instruction in static initializer");
+      assert(!isa<ObjectInst>(init) &&
              "object instruction is only allowed for final initial value");
     }
     assert(I.getParent() == &StaticInitializerBlock);

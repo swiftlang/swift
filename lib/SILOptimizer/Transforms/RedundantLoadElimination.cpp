@@ -98,12 +98,9 @@ using namespace swift;
 
 STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 
-/// Return the deallocate stack instructions corresponding to the given
-/// AllocStackInst.
-static SILInstruction *findAllocStackInst(SILInstruction *I) {
-  if (auto *DSI = dyn_cast<DeallocStackInst>(I))
-    return dyn_cast<SILInstruction>(DSI->getOperand());
-  return nullptr;
+static AllocStackInst *findAllocStackInst(DeallocStackInst *I) {
+  // It's allowed to be undef in unreachable code.
+  return dyn_cast<AllocStackInst>(I->getOperand());
 }
 
 /// ComputeAvailSetMax - If we ignore all unknown writes, what is the max
@@ -149,15 +146,15 @@ static bool inline isPerformingRLE(RLEKind Kind) {
 /// general sense but are inert from a load store perspective.
 static bool isRLEInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
-  case ValueKind::StrongRetainInst:
-  case ValueKind::StrongRetainUnownedInst:
-  case ValueKind::UnownedRetainInst:
-  case ValueKind::RetainValueInst:
-  case ValueKind::DeallocStackInst:
-  case ValueKind::CondFailInst:
-  case ValueKind::IsUniqueInst:
-  case ValueKind::IsUniqueOrPinnedInst:
-  case ValueKind::FixLifetimeInst:
+  case SILInstructionKind::StrongRetainInst:
+  case SILInstructionKind::StrongRetainUnownedInst:
+  case SILInstructionKind::UnownedRetainInst:
+  case SILInstructionKind::RetainValueInst:
+  case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::CondFailInst:
+  case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::IsUniqueOrPinnedInst:
+  case SILInstructionKind::FixLifetimeInst:
     return true;
   default:
     return false;
@@ -237,7 +234,7 @@ private:
 
   /// Keeps a list of replaceable instructions in the current basic block as
   /// well as their SILValue replacement.
-  llvm::DenseMap<SILInstruction *, SILValue> RedundantLoads;
+  llvm::DenseMap<SingleValueInstruction *, SILValue> RedundantLoads;
 
   /// LSLocation read or written has been extracted, expanded and mapped to the
   /// bit position in the bitvector. Update it in the ForwardSetIn of the
@@ -352,7 +349,9 @@ public:
 
   /// Returns the redundant loads and their replacement in the currently basic
   /// block.
-  llvm::DenseMap<SILInstruction *, SILValue> &getRL() { return RedundantLoads; }
+  llvm::DenseMap<SingleValueInstruction *, SILValue> &getRL() {
+    return RedundantLoads;
+  }
 
   /// Look into the value for the given LSLocation at end of the basic block,
   /// return one of the three ValueState type.
@@ -386,10 +385,10 @@ public:
   void processUnknownWriteInstForRLE(RLEContext &Ctx, SILInstruction *I);
 
 
-  void processDeallocStackInst(RLEContext &Ctx, SILInstruction *I,
+  void processDeallocStackInst(RLEContext &Ctx, DeallocStackInst *I,
                                RLEKind Kind);
-  void processDeallocStackInstForGenKillSet(RLEContext &Ctx, SILInstruction *I);
-  void processDeallocStackInstForRLE(RLEContext &Ctx, SILInstruction *I);
+  void processDeallocStackInstForGenKillSet(RLEContext &Ctx, DeallocStackInst *I);
+  void processDeallocStackInstForRLE(RLEContext &Ctx, DeallocStackInst *I);
 
   /// Process LoadInst. Extract LSLocations from LoadInst.
   void processLoadInst(RLEContext &Ctx, LoadInst *LI, RLEKind Kind);
@@ -723,7 +722,7 @@ bool BlockState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   // replace it with, we can record it for now and forwarded it after all the
   // forwardable values are recorded in the function.
   //
-  RedundantLoads[I] = TheForwardingValue;
+  RedundantLoads[cast<SingleValueInstruction>(I)] = TheForwardingValue;
 
   DEBUG(llvm::dbgs() << "FORWARD " << TheForwardingValue << "  to" << *I);
   return true;
@@ -1000,7 +999,7 @@ void BlockState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I,
 }
 
 void BlockState::
-processDeallocStackInstForGenKillSet(RLEContext &Ctx, SILInstruction *I) {
+processDeallocStackInstForGenKillSet(RLEContext &Ctx, DeallocStackInst *I) {
   SILValue ASI = findAllocStackInst(I);
   for (unsigned i = 0; i < LocationNum; ++i) {
     LSLocation &R = Ctx.getLocation(i);
@@ -1013,7 +1012,7 @@ processDeallocStackInstForGenKillSet(RLEContext &Ctx, SILInstruction *I) {
 }
 
 void BlockState::
-processDeallocStackInstForRLE(RLEContext &Ctx, SILInstruction *I) {
+processDeallocStackInstForRLE(RLEContext &Ctx, DeallocStackInst *I) {
   SILValue ASI = findAllocStackInst(I);
   for (unsigned i = 0; i < LocationNum; ++i) {
     LSLocation &R = Ctx.getLocation(i);
@@ -1026,7 +1025,7 @@ processDeallocStackInstForRLE(RLEContext &Ctx, SILInstruction *I) {
 }
 
 void BlockState::
-processDeallocStackInst(RLEContext &Ctx, SILInstruction *I, RLEKind Kind) {
+processDeallocStackInst(RLEContext &Ctx, DeallocStackInst *I, RLEKind Kind) {
   // Are we computing the genset and killset ?
   if (isComputeAvailGenKillSet(Kind)) {
     processDeallocStackInstForGenKillSet(Ctx, I);
@@ -1574,7 +1573,10 @@ bool RLEContext::run() {
     // NOTE: we could end up with different SIL depending on the ordering load
     // forwarding is performed.
     for (auto I = B.rbegin(), E = B.rend(); I != E; ++I) {
-      auto Iter = Loads.find(&*I);
+      auto V = dyn_cast<SingleValueInstruction>(&*I);
+      if (!V)
+        continue;
+      auto Iter = Loads.find(V);
       if (Iter == Loads.end())
         continue;
       DEBUG(llvm::dbgs() << "Replacing  " << SILValue(Iter->first) << "With "
@@ -1593,7 +1595,7 @@ bool RLEContext::run() {
     // used as the replacement Value, i.e. F.second, for some other RLE pairs.
     //
     // TODO: we should fix this, otherwise we are missing RLE opportunities.
-    if (!X->use_empty())
+    if (X->hasUsesOfAnyResult())
       continue;
     recursivelyDeleteTriviallyDeadInstructions(X, true);
   }

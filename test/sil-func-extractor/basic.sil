@@ -26,7 +26,7 @@ bb0:
   %3 = function_ref @inout_uninit : $@convention(thin)() -> ()
   apply %3() : $@convention(thin) () -> ()
   strong_release %1 : $<τ_0_0> { var τ_0_0 } <Int64>
-  %4 = return %2 : $Int64
+  return %2 : $Int64
 }
 
 // CHECK-NOT: sil @inout_uninit : $@convention(thin) () -> () {

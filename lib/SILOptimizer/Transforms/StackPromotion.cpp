@@ -115,10 +115,10 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
 
   // Collect all use-points of the allocation. These are refcount instructions
   // and apply instructions.
-  llvm::SmallVector<ValueBase *, 8> BaseUsePoints;
+  llvm::SmallVector<SILNode *, 8> BaseUsePoints;
   llvm::SmallVector<SILInstruction *, 8> UsePoints;
   ConGraph->getUsePoints(Node, BaseUsePoints);
-  for (ValueBase *UsePoint : BaseUsePoints) {
+  for (SILNode *UsePoint : BaseUsePoints) {
     if (SILInstruction *I = dyn_cast<SILInstruction>(UsePoint)) {
       UsePoints.push_back(I);
     } else {

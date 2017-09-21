@@ -511,6 +511,8 @@ ERROR(expected_sil_instr_start_of_line,none,
       "SIL instructions must be at the start of a line", ())
 ERROR(expected_equal_in_sil_instr,none,
       "expected '=' in SIL instruction", ())
+ERROR(wrong_result_count_in_sil_instr,none,
+      "wrong number of results for SIL instruction, expected %0", (unsigned))
 ERROR(expected_sil_instr_opcode,none,
       "expected SIL instruction opcode", ())
 ERROR(expected_tok_in_sil_instr,none,

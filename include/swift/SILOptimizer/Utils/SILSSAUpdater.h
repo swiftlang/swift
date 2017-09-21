@@ -31,7 +31,7 @@ class SILUndef;
 
 /// Independent utility that canonicalizes BB arguments by reusing structurally
 /// equivalent arguments and replacing the original arguments with casts.
-SILInstruction *replaceBBArgWithCast(SILPHIArgument *Arg);
+SILValue replaceBBArgWithCast(SILPHIArgument *Arg);
 
 /// This class updates SSA for a set of SIL instructions defined in multiple
 /// blocks.

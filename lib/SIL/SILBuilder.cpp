@@ -90,9 +90,9 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
 
 // If legal, create an unchecked_ref_cast from the given operand and result
 // type, otherwise return null.
-SILInstruction *SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc,
-                                                      SILValue Op,
-                                                      SILType ResultTy) {
+SingleValueInstruction *
+SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc, SILValue Op,
+                                      SILType ResultTy) {
   if (!SILType::canRefCast(Op->getType(), ResultTy, getModule()))
     return nullptr;
 
@@ -101,9 +101,8 @@ SILInstruction *SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc,
 }
 
 // Create the appropriate cast instruction based on result type.
-SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
-                                                   SILValue Op,
-                                                   SILType Ty) {
+SingleValueInstruction *
+SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
   if (Ty.isTrivial(getModule()))
     return insert(UncheckedTrivialBitCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(), OpenedArchetypes));
@@ -415,21 +414,24 @@ void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
 
   while (I && I->getNumOperands() == 1 &&
          I->getNumTypeDependentOperands() == 0) {
-    I = dyn_cast<SILInstruction>(I->getOperand(0));
-    if (!I || !Visited.insert(I).second)
+    // All the open instructions are single-value instructions.
+    auto SVI = dyn_cast<SingleValueInstruction>(I->getOperand(0));
+    if (!SVI || !Visited.insert(SVI).second)
       return;
     // If it is a definition of an opened archetype,
     // register it and exit.
-    auto Archetype = getOpenedArchetypeOf(I);
-    if (!Archetype)
+    auto Archetype = getOpenedArchetypeOf(SVI);
+    if (!Archetype) {
+      I = SVI;
       continue;
+    }
     auto Def = OpenedArchetypes.getOpenedArchetypeDef(Archetype);
     // Return if it is a known open archetype.
     if (Def)
       return;
     // Otherwise register it and return.
     if (OpenedArchetypesTracker)
-      OpenedArchetypesTracker->addOpenedArchetypeDef(Archetype, I);
+      OpenedArchetypesTracker->addOpenedArchetypeDef(Archetype, SVI);
     return;
   }
 

@@ -133,7 +133,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // CHECK: apply [[CHECKBOUNDS]]([[IDX4]], {{.*}}[[LD1]]
   %26 = ref_to_raw_pointer %5 : $Builtin.NativeObject to $Builtin.RawPointer
   %27 = pointer_to_address %26 : $Builtin.RawPointer to [strict] $*Builtin.Int32
-  %29 = store %x1 to %27 : $*Builtin.Int32
+  store %x1 to %27 : $*Builtin.Int32
   %l4 = load %0 : $*ArrayInt
   retain_value %5 : $Builtin.NativeObject
   %30 = apply %2(%i4, %102, %l4) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
@@ -141,7 +141,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // CHECK: [[LD4:%[0-9]+]] = load %0
   // CHECK: apply [[CHECKBOUNDS]]([[IDX4]], {{.*}}[[LD4]]
 
-  %98 = dealloc_stack %18 : $*Int32
+  dealloc_stack %18 : $*Int32
   %99 = tuple ()
   return %99 : $()
 // CHECK: return

@@ -192,11 +192,10 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
   // Process conditional branches with constant conditions.
   if (auto *CBI = dyn_cast<CondBranchInst>(TI)) {
     SILValue V = CBI->getCondition();
-    auto *CondI = dyn_cast<SILInstruction>(V);
     SILLocation Loc = CBI->getLoc();
 
     if (IntegerLiteralInst *ConstCond =
-          dyn_cast_or_null<IntegerLiteralInst>(CondI)) {
+          dyn_cast_or_null<IntegerLiteralInst>(V)) {
       SILBuilderWithScope B(&BB, CBI);
 
       // Determine which of the successors is unreachable and create a new
@@ -399,18 +398,20 @@ static bool isUserCode(const SILInstruction *I) {
 }
 
 static void setOutsideBlockUsesToUndef(SILInstruction *I) {
-  if (I->use_empty())
-      return;
+  if (!I->hasUsesOfAnyResult())
+    return;
 
   SILBasicBlock *BB = I->getParent();
   SILModule &Mod = BB->getModule();
 
   // Replace all uses outside of I's basic block by undef.
-  llvm::SmallVector<Operand *, 16> Uses(I->use_begin(), I->use_end());
+  llvm::SmallVector<Operand *, 16> Uses;
+  for (auto result : I->getResults())
+    Uses.append(result->use_begin(), result->use_end());
+
   for (auto *Use : Uses)
-    if (auto *User = dyn_cast<SILInstruction>(Use->getUser()))
-      if (User->getParent() != BB)
-        Use->set(SILUndef::get(Use->get()->getType(), Mod));
+    if (Use->getUser()->getParent() != BB)
+      Use->set(SILUndef::get(Use->get()->getType(), Mod));
 }
 
 static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {
