@@ -11,6 +11,7 @@ float cfunc4();
 void exit(int);
 
 double pow(double x, double y);
+long double powl(long double x, long double y);
 
 int puts(const char *);
 
