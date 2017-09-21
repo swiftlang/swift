@@ -516,9 +516,9 @@ bool ARCRegionState::processTopDown(
 
 static bool isStrongEntranceInstruction(const SILInstruction &I) {
   switch (I.getKind()) {
-  case ValueKind::AllocRefInst:
-  case ValueKind::AllocRefDynamicInst:
-  case ValueKind::AllocBoxInst:
+  case SILInstructionKind::AllocRefInst:
+  case SILInstructionKind::AllocRefDynamicInst:
+  case SILInstructionKind::AllocBoxInst:
     return true;
   default:
     return false;

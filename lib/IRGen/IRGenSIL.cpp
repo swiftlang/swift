@@ -2179,8 +2179,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   Explosion result;
   emission.emitToExplosion(result);
 
-  if (isa<ApplyInst>(i)) {
-    setLoweredExplosion(i, result);
+  if (auto apply = dyn_cast<ApplyInst>(i)) {
+    setLoweredExplosion(apply, result);
   } else {
     auto tryApplyInst = cast<TryApplyInst>(i);
 
@@ -3456,7 +3456,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   unsigned ArgNo = i->getVarInfo().ArgNo;
   emitDebugVariableDeclaration(
       emitShadowCopy(Addr, i->getDebugScope(), Name, ArgNo), DbgTy,
-      i->getType(), i->getDebugScope(), Decl, Name, ArgNo,
+      SILType(), i->getDebugScope(), Decl, Name, ArgNo,
       DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
 }
 
@@ -3692,8 +3692,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 
   (void) Decl;
 
-  bool isEntryBlock =
-      i->getParentBlock() == i->getFunction()->getEntryBlock();
+  bool isEntryBlock = (i->getParent() == i->getFunction()->getEntryBlock());
   auto addr =
       type.allocateStack(*this, i->getElementType(), isEntryBlock, dbgname);
 

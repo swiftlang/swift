@@ -212,7 +212,7 @@ sil @inline_test_existential_metatype : $@convention(thin) (@in SomeProtocol) ->
 bb0(%0 : $*SomeProtocol):
   %1 = function_ref @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
   %2 = apply %1(%0) : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
-  %3 = return %2 : $@thick SomeProtocol.Type
+  return %2 : $@thick SomeProtocol.Type
 }
 
 ////////////////////////

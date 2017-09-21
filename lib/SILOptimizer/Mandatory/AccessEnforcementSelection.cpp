@@ -175,7 +175,7 @@ public:
   void run();
 
 private:
-  void analyzeUsesOfBox(SILInstruction *source);
+  void analyzeUsesOfBox(SingleValueInstruction *source);
   void analyzeProjection(ProjectBoxInst *projection);
 
   /// Note that the given instruction is a use of the box (or a use of
@@ -214,7 +214,7 @@ void SelectEnforcement::run() {
 
 // FIXME: This should cover a superset of AllocBoxToStack's findUnexpectedBoxUse
 // to avoid perturbing codegen. They should be sharing the same analysis.
-void SelectEnforcement::analyzeUsesOfBox(SILInstruction *source) {
+void SelectEnforcement::analyzeUsesOfBox(SingleValueInstruction *source) {
   // Collect accesses rooted off of projections.
   for (auto use : source->getUses()) {
     auto user = use->getUser();

@@ -70,7 +70,7 @@ public:
   SILVTable *processClassDecl(const ClassDecl *C);
 
   /// We do not want to visit callee functions if we just have a value base.
-  bool visitValueBase(ValueBase *V) { return false; }
+  bool visitSILInstruction(SILInstruction *I) { return false; }
 
   bool visitApplyInst(ApplyInst *AI);
   bool visitPartialApplyInst(PartialApplyInst *PAI);

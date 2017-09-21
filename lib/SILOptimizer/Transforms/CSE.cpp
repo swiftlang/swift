@@ -82,7 +82,7 @@ class HashVisitor : public SILInstructionVisitor<HashVisitor, llvm::hash_code> {
   using hash_code = llvm::hash_code;
 
 public:
-  hash_code visitValueBase(ValueBase *) {
+  hash_code visitSILInstruction(SILInstruction *) {
     llvm_unreachable("No hash implemented for the given type");
   }
 
@@ -395,20 +395,18 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
   if (LHS.isSentinel() || RHS.isSentinel())
     return LHSI == RHSI;
 
-  if (isa<OpenExistentialRefInst>(LHSI) && isa<OpenExistentialRefInst>(RHSI)) {
-    if (LHSI->getNumOperands() != RHSI->getNumOperands())
-      return false;
-
+  auto LOpen = dyn_cast<OpenExistentialRefInst>(LHSI);
+  auto ROpen = dyn_cast<OpenExistentialRefInst>(RHSI);
+  if (LOpen && ROpen) {
     // Check operands.
-    for (unsigned i = 0, e = LHSI->getNumOperands(); i != e; ++i)
-      if (LHSI->getOperand(i) !=  RHSI->getOperand(i))
-        return false;
+    if (LOpen->getOperand() != ROpen->getOperand())
+      return false;
 
     // Consider the types of two open_existential_ref instructions to be equal,
     // if the sets of protocols they conform to are equal.
-    auto LHSArchetypeTy = LHSI->getType().castTo<ArchetypeType>();
+    auto LHSArchetypeTy = LOpen->getType().castTo<ArchetypeType>();
     auto LHSConformsTo = LHSArchetypeTy->getConformsTo();
-    auto RHSArchetypeTy = RHSI->getType().castTo<ArchetypeType>();
+    auto RHSArchetypeTy = ROpen->getType().castTo<ArchetypeType>();
     auto RHSConformsTo = RHSArchetypeTy->getConformsTo();
     return LHSConformsTo == RHSConformsTo;
   }
@@ -430,7 +428,7 @@ public:
   typedef llvm::ScopedHashTableVal<SimpleValue, ValueBase *> SimpleValueHTType;
   typedef llvm::RecyclingAllocator<llvm::BumpPtrAllocator, SimpleValueHTType>
   AllocatorTy;
-  typedef llvm::ScopedHashTable<SimpleValue, ValueBase *,
+  typedef llvm::ScopedHashTable<SimpleValue, SILInstruction *,
                                 llvm::DenseMapInfo<SimpleValue>,
                                 AllocatorTy> ScopedHTType;
 
@@ -507,7 +505,7 @@ private:
   };
 
   bool processNode(DominanceInfoNode *Node);
-  bool processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
+  bool processOpenExistentialRef(OpenExistentialRefInst *Inst, ValueBase *V,
                                  SILBasicBlock::iterator &I);
 };
 } // namespace swift
@@ -564,7 +562,7 @@ namespace {
   // is remapping the archetypes when it is required.
   class InstructionCloner : public SILCloner<InstructionCloner> {
     friend class SILCloner<InstructionCloner>;
-    friend class SILVisitor<InstructionCloner>;
+    friend class SILInstructionVisitor<InstructionCloner>;
     SILInstruction *Result = nullptr;
   public:
     InstructionCloner(SILFunction *F) : SILCloner(*F) {}
@@ -644,12 +642,15 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
 /// \Inst is the open_existential_ref instruction
 /// \V is the dominating open_existential_ref instruction
 /// \I is the iterator referring to the current instruction.
-bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
+bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst, ValueBase *V,
                                     SILBasicBlock::iterator &I) {
-  assert(isa<OpenExistentialRefInst>(Inst));
+  // All the open instructions are single-value instructions.
+  auto VI = dyn_cast<SingleValueInstruction>(V);
+  if (!VI) return false;
+
   llvm::SmallSetVector<SILInstruction *, 16> Candidates;
   auto OldOpenedArchetype = getOpenedArchetypeOf(Inst);
-  auto NewOpenedArchetype = getOpenedArchetypeOf(dyn_cast<SILInstruction>(V));
+  auto NewOpenedArchetype = getOpenedArchetypeOf(VI);
 
   // Collect all candidates that may contain opened archetypes
   // that need to be replaced.
@@ -684,7 +685,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   // TODO: Move it to CSE instance to avoid recreating it every time?
   SILOpenedArchetypesTracker OpenedArchetypesTracker(Inst->getFunction());
   // Register the new archetype to be used.
-  OpenedArchetypesTracker.registerOpenedArchetypes(dyn_cast<SILInstruction>(V));
+  OpenedArchetypesTracker.registerOpenedArchetypes(VI);
   // Use a cloner. It makes copying the instruction and remapping of
   // opened archetypes trivial.
   InstructionCloner Cloner(I->getFunction());
@@ -700,22 +701,31 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
     auto Candidate = Candidates.pop_back_val();
     if (Processed.count(Candidate))
       continue;
-    // True if a candidate depends on the old opened archetype.
-    bool DependsOnOldOpenedArchetype = !Candidate->getTypeDependentOperands().empty();
-    if (!Candidate->use_empty() &&
-        Candidate->getType().hasOpenedExistential()) {
-      // Check if the result type of the candidate depends on the opened
-      // existential in question.
+
+    // Compute if a candidate depends on the old opened archetype.
+    // It always does if it has any type-dependent operands.
+    bool DependsOnOldOpenedArchetype =
+      !Candidate->getTypeDependentOperands().empty();
+
+    // Look for dependencies propagated via the candidate's results.
+    for (auto CandidateResult : Candidate->getResults()) {
+      if (CandidateResult->use_empty() ||
+          !CandidateResult->getType().hasOpenedExistential())
+        continue;
+
+      // Check if the result type depends on this specific opened existential.
       auto ResultDependsOnOldOpenedArchetype =
-          Candidate->getType().getSwiftRValueType().findIf(
+          CandidateResult->getType().getSwiftRValueType().findIf(
               [&OldOpenedArchetype](Type t) -> bool {
                 return (CanType(t) == OldOpenedArchetype);
               });
+
+      // If it does, the candidate depends on the opened existential.
       if (ResultDependsOnOldOpenedArchetype) {
         DependsOnOldOpenedArchetype |= ResultDependsOnOldOpenedArchetype;
-        // We need to update uses of this candidate, because their types
-        // may be affected.
-        for (auto Use : Candidate->getUses()) {
+
+        // The users of this candidate are new candidates.
+        for (auto Use : CandidateResult->getUses()) {
           Candidates.insert(Use->getUser());
         }
       }
@@ -733,7 +743,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
     auto NewI = Cloner.clone(Candidate);
     // Result types of candidate's uses instructions may be using this archetype.
     // Thus, we need to try to replace it there.
-    Candidate->replaceAllUsesWith(NewI);
+    Candidate->replaceAllUsesPairwiseWith(NewI);
     if (I == Candidate->getIterator())
       I = NewI->getIterator();
     eraseFromParentWithDebugInsts(Candidate, I);
@@ -767,7 +777,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (SILValue V = simplifyInstruction(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
             << '\n');
-      Inst->replaceAllUsesWith(V);
+      cast<SingleValueInstruction>(Inst)->replaceAllUsesWith(V);
       Inst->eraseFromParent();
       Changed = true;
       ++NumSimplify;
@@ -786,14 +796,17 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 
     // Now that we know we have an instruction we understand see if the
     // instruction has an available value.  If so, use it.
-    if (ValueBase *V = AvailableValues->lookup(Inst)) {
-      DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: " << *V << '\n');
+    if (SILInstruction *AvailInst = AvailableValues->lookup(Inst)) {
+      DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: " << *AvailInst
+                         << '\n');
       // Instructions producing a new opened archetype need a special handling,
       // because replacing these instructions may require a replacement
       // of the opened archetype type operands in some of the uses.
       if (!isa<OpenExistentialRefInst>(Inst) ||
-          processOpenExistentialRef(Inst, V, I)) {
-        Inst->replaceAllUsesWith(V);
+          processOpenExistentialRef(cast<OpenExistentialRefInst>(Inst),
+                                    cast<OpenExistentialRefInst>(AvailInst),
+                                    I)) {
+        Inst->replaceAllUsesPairwiseWith(AvailInst);
         Inst->eraseFromParent();
         Changed = true;
         ++NumCSE;
@@ -859,58 +872,58 @@ bool CSE::canHandle(SILInstruction *Inst) {
     return !EMI->getOperand()->getType().isAddress();
   }
   switch (Inst->getKind()) {
-    case ValueKind::FunctionRefInst:
-    case ValueKind::GlobalAddrInst:
-    case ValueKind::IntegerLiteralInst:
-    case ValueKind::FloatLiteralInst:
-    case ValueKind::StringLiteralInst:
-    case ValueKind::StructInst:
-    case ValueKind::StructExtractInst:
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleInst:
-    case ValueKind::TupleExtractInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::MetatypeInst:
-    case ValueKind::ValueMetatypeInst:
-    case ValueKind::ObjCProtocolInst:
-    case ValueKind::RefElementAddrInst:
-    case ValueKind::RefTailAddrInst:
-    case ValueKind::ProjectBoxInst:
-    case ValueKind::IndexRawPointerInst:
-    case ValueKind::IndexAddrInst:
-    case ValueKind::PointerToAddressInst:
-    case ValueKind::AddressToPointerInst:
-    case ValueKind::CondFailInst:
-    case ValueKind::EnumInst:
-    case ValueKind::UncheckedEnumDataInst:
-    case ValueKind::IsNonnullInst:
-    case ValueKind::UncheckedTrivialBitCastInst:
-    case ValueKind::UncheckedBitwiseCastInst:
-    case ValueKind::RefToRawPointerInst:
-    case ValueKind::RawPointerToRefInst:
-    case ValueKind::RefToUnownedInst:
-    case ValueKind::UnownedToRefInst:
-    case ValueKind::RefToUnmanagedInst:
-    case ValueKind::UnmanagedToRefInst:
-    case ValueKind::UpcastInst:
-    case ValueKind::ThickToObjCMetatypeInst:
-    case ValueKind::ObjCToThickMetatypeInst:
-    case ValueKind::UncheckedRefCastInst:
-    case ValueKind::UncheckedAddrCastInst:
-    case ValueKind::ObjCMetatypeToObjectInst:
-    case ValueKind::ObjCExistentialMetatypeToObjectInst:
-    case ValueKind::SelectEnumInst:
-    case ValueKind::SelectValueInst:
-    case ValueKind::RefToBridgeObjectInst:
-    case ValueKind::BridgeObjectToRefInst:
-    case ValueKind::BridgeObjectToWordInst:
-    case ValueKind::ThinFunctionToPointerInst:
-    case ValueKind::PointerToThinFunctionInst:
-    case ValueKind::MarkDependenceInst:
-    case ValueKind::OpenExistentialRefInst:
-      return true;
-    default:
-      return false;
+  case SILInstructionKind::FunctionRefInst:
+  case SILInstructionKind::GlobalAddrInst:
+  case SILInstructionKind::IntegerLiteralInst:
+  case SILInstructionKind::FloatLiteralInst:
+  case SILInstructionKind::StringLiteralInst:
+  case SILInstructionKind::StructInst:
+  case SILInstructionKind::StructExtractInst:
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::TupleInst:
+  case SILInstructionKind::TupleExtractInst:
+  case SILInstructionKind::TupleElementAddrInst:
+  case SILInstructionKind::MetatypeInst:
+  case SILInstructionKind::ValueMetatypeInst:
+  case SILInstructionKind::ObjCProtocolInst:
+  case SILInstructionKind::RefElementAddrInst:
+  case SILInstructionKind::RefTailAddrInst:
+  case SILInstructionKind::ProjectBoxInst:
+  case SILInstructionKind::IndexRawPointerInst:
+  case SILInstructionKind::IndexAddrInst:
+  case SILInstructionKind::PointerToAddressInst:
+  case SILInstructionKind::AddressToPointerInst:
+  case SILInstructionKind::CondFailInst:
+  case SILInstructionKind::EnumInst:
+  case SILInstructionKind::UncheckedEnumDataInst:
+  case SILInstructionKind::IsNonnullInst:
+  case SILInstructionKind::UncheckedTrivialBitCastInst:
+  case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::RefToRawPointerInst:
+  case SILInstructionKind::RawPointerToRefInst:
+  case SILInstructionKind::RefToUnownedInst:
+  case SILInstructionKind::UnownedToRefInst:
+  case SILInstructionKind::RefToUnmanagedInst:
+  case SILInstructionKind::UnmanagedToRefInst:
+  case SILInstructionKind::UpcastInst:
+  case SILInstructionKind::ThickToObjCMetatypeInst:
+  case SILInstructionKind::ObjCToThickMetatypeInst:
+  case SILInstructionKind::UncheckedRefCastInst:
+  case SILInstructionKind::UncheckedAddrCastInst:
+  case SILInstructionKind::ObjCMetatypeToObjectInst:
+  case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
+  case SILInstructionKind::SelectEnumInst:
+  case SILInstructionKind::SelectValueInst:
+  case SILInstructionKind::RefToBridgeObjectInst:
+  case SILInstructionKind::BridgeObjectToRefInst:
+  case SILInstructionKind::BridgeObjectToWordInst:
+  case SILInstructionKind::ThinFunctionToPointerInst:
+  case SILInstructionKind::PointerToThinFunctionInst:
+  case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::OpenExistentialRefInst:
+    return true;
+  default:
+    return false;
   }
 }
 

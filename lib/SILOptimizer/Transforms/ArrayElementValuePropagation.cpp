@@ -190,7 +190,9 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
   for (auto *Opd : Def->getUses()) {
     auto *User = Opd->getUser();
     // Ignore reference counting and debug instructions.
-    if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User))
+    if (isa<RefCountingInst>(User) ||
+        isa<StrongPinInst>(User) ||
+        isa<DebugValueInst>(User))
       continue;
 
     // Array value projection.

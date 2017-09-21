@@ -2830,7 +2830,7 @@ bb2(%11 : $Builtin.Int32):
   br bb6(%15 : $Builtin.Int8)
 
 bb4:
-  %60 = debug_value %0 : $TestEnum
+  debug_value %0 : $TestEnum
   %22 = alloc_existential_box $Error, $MyError2
   %23 = project_existential_box $MyError2 in %22 : $Error
   switch_enum %0 : $TestEnum, case #TestEnum.none!enumelt: bbnone, case #TestEnum.int64!enumelt.1: bb7, case #TestEnum.string!enumelt.1: bb10

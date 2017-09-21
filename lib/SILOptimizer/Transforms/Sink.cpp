@@ -73,25 +73,27 @@ public:
 
     // TODO: We may want to delete debug instructions to allow us to sink more
     // instructions.
-    for (auto *Operand : II->getUses()) {
-      SILInstruction *User = Operand->getUser();
+    for (auto result : II->getResults()) {
+      for (auto *Operand : result->getUses()) {
+        SILInstruction *User = Operand->getUser();
 
-      // Check if the instruction is already in the user's block.
-      if (User->getParent() == CurrentBlock) return false;
+        // Check if the instruction is already in the user's block.
+        if (User->getParent() == CurrentBlock) return false;
 
-      // Record the block of the first user and move on to
-      // other users.
-      if (!Dest) {
-        Dest = User->getParent();
-        continue;
+        // Record the block of the first user and move on to
+        // other users.
+        if (!Dest) {
+          Dest = User->getParent();
+          continue;
+        }
+
+        // Find a location that dominates all users. If we did not find such
+        // a block or if it is the current block then bail out.
+        Dest = DT->findNearestCommonDominator(Dest, User->getParent());
+
+        if (!Dest || Dest == CurrentBlock)
+          return false;
       }
-
-      // Find a location that dominates all users. If we did not find such
-      // a block or if it is the current block then bail out.
-      Dest = DT->findNearestCommonDominator(Dest, User->getParent());
-
-      if (!Dest || Dest == CurrentBlock)
-        return false;
     }
 
     if (!Dest) return false;

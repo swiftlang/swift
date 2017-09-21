@@ -790,7 +790,7 @@ static AccessedStorage findAccessedStorage(SILValue Source) {
     case ValueKind::RefTailAddrInst:
     case ValueKind::TailAddrInst:
     case ValueKind::IndexAddrInst:
-      Iter = cast<SILInstruction>(Iter)->getOperand(0);
+      Iter = cast<SingleValueInstruction>(Iter)->getOperand(0);
       continue;
 
     // Base address producers.

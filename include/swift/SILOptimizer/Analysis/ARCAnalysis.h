@@ -376,12 +376,12 @@ bool isARCInertTrapBB(const SILBasicBlock *BB);
 /// Gets the (GuaranteedValue, Token) tuple from a call to "unsafeGuaranteed"
 /// if the tuple elements are identified by a single tuple_extract use.
 /// Otherwise, returns a (nullptr, nullptr) tuple.
-std::pair<SILInstruction *, SILInstruction *>
+std::pair<SingleValueInstruction *, SingleValueInstruction *>
 getSingleUnsafeGuaranteedValueResult(BuiltinInst *UnsafeGuaranteedInst);
 
 /// Get the single builtin "unsafeGuaranteedEnd" user of a builtin
 /// "unsafeGuaranteed"'s token.
-BuiltinInst *getUnsafeGuaranteedEndUser(SILInstruction *UnsafeGuaranteedToken);
+BuiltinInst *getUnsafeGuaranteedEndUser(SILValue UnsafeGuaranteedToken);
 
 /// Walk forwards from an unsafeGuaranteedEnd builtin instruction looking for a
 /// release on the reference returned by the matching unsafeGuaranteed builtin

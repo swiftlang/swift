@@ -1525,12 +1525,12 @@ public:
   // Create an UncheckedRefCast if the source and dest types are legal,
   // otherwise return null.
   // Unwrap or wrap optional types as needed.
-  SILInstruction *tryCreateUncheckedRefCast(SILLocation Loc, SILValue Op,
-                                            SILType ResultTy);
+  SingleValueInstruction *tryCreateUncheckedRefCast(SILLocation Loc, SILValue Op,
+                                                    SILType ResultTy);
 
   // Create the appropriate cast instruction based on result type.
-  SILInstruction *createUncheckedBitCast(SILLocation Loc, SILValue Op,
-                                         SILType Ty);
+  SingleValueInstruction *createUncheckedBitCast(SILLocation Loc, SILValue Op,
+                                                 SILType Ty);
 
   //===--------------------------------------------------------------------===//
   // Runtime failure

@@ -207,7 +207,7 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
 ///  bb10(%45 : $Optional<String>):
 class BridgedProperty : public OutlinePattern {
   std::string OutlinedName;
-  SILInstruction *FirstInst;
+  SingleValueInstruction *FirstInst; // A load or class_method
   SILBasicBlock *StartBB;
   SILBasicBlock *SomeBB;
   SILBasicBlock *NoneBB;

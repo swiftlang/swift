@@ -431,7 +431,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 
   // Erase the 'live-range'
   for (auto *Inst : ToDelete) {
-    Inst->replaceAllUsesWithUndef();
+    Inst->replaceAllUsesOfAllResultsWithUndef();
     eraseInstFromFunction(*Inst);
   }
   return eraseInstFromFunction(*AS);
@@ -477,7 +477,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // Given a load with multiple struct_extracts/tuple_extracts and no other
   // uses, canonicalize the load into several (struct_element_addr (load))
   // pairs.
-  using ProjInstPairTy = std::pair<Projection, SILInstruction *>;
+  using ProjInstPairTy = std::pair<Projection, SingleValueInstruction *>;
 
   // Go through the loads uses and add any users that are projections to the
   // projection list.
@@ -489,7 +489,8 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     if (!isa<StructExtractInst>(User) && !isa<TupleExtractInst>(User))
       return nullptr;
 
-    Projections.push_back({Projection(User), User});
+    auto extract = cast<SingleValueInstruction>(User);
+    Projections.push_back({Projection(extract), extract});
   }
 
   // The reason why we sort the list is so that we will process projections with
@@ -667,7 +668,7 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
 
   for (auto *Inst : ToRemove) {
     // Replace any still-remaining uses with undef and erase.
-    Inst->replaceAllUsesWithUndef();
+    Inst->replaceAllUsesOfAllResultsWithUndef();
     eraseInstFromFunction(*Inst);
   }
 
@@ -1055,7 +1056,7 @@ visitUnreachableInst(UnreachableInst *UI) {
 
   for (auto *Inst : ToRemove) {
     // Replace any still-remaining uses with undef values and erase.
-    Inst->replaceAllUsesWithUndef();
+    Inst->replaceAllUsesOfAllResultsWithUndef();
     eraseInstFromFunction(*Inst);
   }
 
@@ -1358,7 +1359,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
   if (auto *UC = dyn_cast<UpcastInst>(MDVal))
     MDVal = UC->getOperand();
 
-  SILInstruction *NewInst = nullptr;
+  SingleValueInstruction *NewInst = nullptr;
   if (auto *MI = dyn_cast<MetatypeInst>(MDVal)) {
     auto &Mod = ARDI->getModule();
     auto SILInstanceTy = MI->getType().getMetatypeInstanceType(Mod);

@@ -386,7 +386,7 @@ public:
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    SILInstruction *allocBox =
+    SILValue allocBox =
         SGF.B.createAllocBox(decl, boxType, {decl->isLet(), ArgNo});
 
     // Mark the memory as uninitialized, so DI will track it for us.

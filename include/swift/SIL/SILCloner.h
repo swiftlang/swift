@@ -35,11 +35,12 @@ namespace swift {
 /// basic block, or function; subclasses that want to handle those should
 /// implement the appropriate visit functions and/or provide other entry points.
 template<typename ImplClass>
-class SILCloner : protected SILVisitor<ImplClass> {
-  friend class SILVisitor<ImplClass, SILValue>;
+class SILCloner : protected SILInstructionVisitor<ImplClass> {
+  friend class SILVisitorBase<ImplClass>;
+  friend class SILInstructionVisitor<ImplClass>;
 
 public:
-  using SILVisitor<ImplClass>::asImpl;
+  using SILInstructionVisitor<ImplClass>::asImpl;
 
   explicit SILCloner(SILFunction &F,
                      SILOpenedArchetypesTracker &OpenedArchetypesTracker)
@@ -70,19 +71,13 @@ public:
   SILBuilder &getBuilder() { return Builder; }
 
 protected:
-  void beforeVisit(ValueBase *V) {
-    if (auto I = dyn_cast<SILInstruction>(V)) {
-      // Update the set of available opened archetypes with the opened
-      // archetypes used by the current instruction.
-     doPreProcess(I);
-    }
+  void beforeVisit(SILInstruction *I) {
+    // Update the set of available opened archetypes with the opened
+    // archetypes used by the current instruction.
+    doPreProcess(I);
   }
 
-#define VALUE(CLASS, PARENT) \
-  void visit##CLASS(CLASS *I) {                                       \
-    llvm_unreachable("SILCloner visiting non-instruction?");          \
-  }
-#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+#define INST(CLASS, PARENT) \
   void visit##CLASS(CLASS *I);
 #include "swift/SIL/SILNodes.def"
 
@@ -250,7 +245,6 @@ protected:
   SILBuilder Builder;
   SILBasicBlock *InsertBeforeBB;
   llvm::DenseMap<SILValue, SILValue> ValueMap;
-  llvm::DenseMap<SILInstruction*, SILInstruction*> InstructionMap;
 
   // Use MapVector to ensure that the order of block predecessors is
   // deterministic.
@@ -352,13 +346,6 @@ SILCloner<ImplClass>::remapValue(SILValue Value) {
   if (VI != ValueMap.end())
     return VI->second;
 
-  if (auto *I = dyn_cast<SILInstruction>(Value)) {
-    auto II = InstructionMap.find(I);
-    if (II != InstructionMap.end())
-      return SILValue(II->second);
-    llvm_unreachable("Unmapped instruction while cloning?");
-  }
-
   // If we have undef, just remap the type.
   if (auto *U = dyn_cast<SILUndef>(Value)) {
     auto type = getOpType(U->getType());
@@ -380,15 +367,26 @@ SILCloner<ImplClass>::remapBasicBlock(SILBasicBlock *BB) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::postProcess(SILInstruction *Orig,
-                                  SILInstruction *Cloned) {
-  assert((Orig->getDebugScope() ? Cloned->getDebugScope()!=nullptr : true) &&
+SILCloner<ImplClass>::postProcess(SILInstruction *orig,
+                                  SILInstruction *cloned) {
+  assert((orig->getDebugScope() ? cloned->getDebugScope()!=nullptr : true) &&
          "cloned function dropped debug scope");
-  // Remove any previous mappings for the Orig instruction.
-  // If this is not done and there is a mapping for Orig in the map already,
-  // then this new mapping will be silently ignored.
-  InstructionMap.erase(Orig);
-  InstructionMap.insert(std::make_pair(Orig, Cloned));
+
+  // It sometimes happens that an instruction with no results gets mapped
+  // to an instruction with results, e.g. when specializing a cast.
+  // Just ignore this.
+  auto origResults = orig->getResults();
+  if (origResults.empty()) return;
+
+  // Otherwise, map the results over one-by-one.
+  auto clonedResults = cloned->getResults();
+  assert(origResults.size() == clonedResults.size());
+  for (auto i : indices(origResults)) {
+    SILValue origResult = origResults[i], clonedResult = clonedResults[i];
+    auto insertion = ValueMap.insert(std::make_pair(origResult, clonedResult));
+    if (!insertion.second)
+      insertion.first->second = clonedResult;
+  }
 }
 
 /// \brief Recursively visit a callee's BBs in depth-first preorder (only
@@ -454,7 +452,7 @@ SILCloner<ImplClass>::cleanUp(SILFunction *F) {
 
       for (auto *Inst : ToRemove) {
         // Replace any non-dead results with SILUndef values
-        Inst->replaceAllUsesWithUndef();
+        Inst->replaceAllUsesOfAllResultsWithUndef();
         Inst->eraseFromParent();
       }
     }

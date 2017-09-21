@@ -59,13 +59,13 @@ static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
   FullApplySite NAI;
 
   switch (AI.getInstruction()->getKind()) {
-  case ValueKind::ApplyInst:
+  case SILInstructionKind::ApplyInst:
     NAI = Builder.createApply(AI.getLoc(), AI.getCallee(),
                                    AI.getSubstitutions(),
                                    Ret,
                                    cast<ApplyInst>(AI)->isNonThrowing());
     break;
-  case ValueKind::TryApplyInst: {
+  case SILInstructionKind::TryApplyInst: {
     auto *TryApplyI = cast<TryApplyInst>(AI.getInstruction());
     NAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
                                       AI.getSubstitutions(),
@@ -155,25 +155,26 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
       VirtBuilder.createUnreachable(AI.getLoc());
     } else {
       IdenBuilder.createBranch(AI.getLoc(), Continue,
-                               ArrayRef<SILValue>(IdenAI.getInstruction()));
+                               { cast<ApplyInst>(IdenAI) });
       VirtBuilder.createBranch(AI.getLoc(), Continue,
-                               ArrayRef<SILValue>(VirtAI.getInstruction()));
+                               { cast<ApplyInst>(VirtAI) });
     }
   }
 
   // Remove the old Apply instruction.
   assert(AI.getInstruction() == &Continue->front() &&
          "AI should be the first instruction in the split Continue block");
-  if (!isa<TryApplyInst>(AI)) {
-    AI.getInstruction()->replaceAllUsesWith(Arg);
-    AI.getInstruction()->eraseFromParent();
-    assert(!Continue->empty() &&
-           "There should be at least a terminator after AI");
-  } else {
+  if (isa<TryApplyInst>(AI)) {
     AI.getInstruction()->eraseFromParent();
     assert(Continue->empty() &&
            "There should not be an instruction after try_apply");
     Continue->eraseFromParent();
+  } else {
+    auto apply = cast<ApplyInst>(AI);
+    apply->replaceAllUsesWith(Arg);
+    apply->eraseFromParent();
+    assert(!Continue->empty() &&
+           "There should be at least a terminator after AI");
   }
 
   // Update the stats.

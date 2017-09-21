@@ -342,7 +342,9 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
   }
 
-  SilCombiner->replaceInstUsesWith(*AI.getInstruction(), NAI.getInstruction());
+  if (auto apply = dyn_cast<ApplyInst>(AI))
+    SilCombiner->replaceInstUsesWith(*apply,
+                                     cast<ApplyInst>(NAI.getInstruction()));
   SilCombiner->eraseInstFromFunction(*AI.getInstruction());
   return true;
 }
@@ -477,6 +479,7 @@ SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
   for (auto *Use : Value->getUses()) {
     SILInstruction *Inst = Use->getUser();
     if (isa<RefCountingInst>(Inst) ||
+        isa<StrongPinInst>(Inst) ||
         isa<DebugValueInst>(Inst)) {
       Uses.push_back(Inst);
       continue;
@@ -485,7 +488,7 @@ SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
         isa<StructExtractInst>(Inst) ||
         isa<PointerToAddressInst>(Inst)) {
       Uses.push_back(Inst);
-      if (recursivelyCollectARCUsers(Uses, Inst))
+      if (recursivelyCollectARCUsers(Uses, cast<SingleValueInstruction>(Inst)))
         continue;
     }
     return false;
@@ -616,7 +619,7 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
       return getAddressOfStackInit(ASI, CAI);
     return CAISrc;
   }
-  return SingleWrite;
+  return cast<InitExistentialAddrInst>(SingleWrite);
 }
 
 /// Find the init_existential, which could be used to determine a concrete
@@ -744,8 +747,8 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
     NewAI = Builder.createApply(AI.getLoc(), AI.getCallee(), Substitutions,
                                 Args, cast<ApplyInst>(AI)->isNonThrowing());
 
-  if (isa<ApplyInst>(NewAI))
-    replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction());
+  if (auto apply = dyn_cast<ApplyInst>(NewAI))
+    replaceInstUsesWith(*cast<ApplyInst>(AI.getInstruction()), apply);
   eraseInstFromFunction(*AI.getInstruction());
 
   return NewAI.getInstruction();
@@ -753,7 +756,8 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
 
 /// Derive a concrete type of self and conformance from the init_existential
 /// instruction.
-static Optional<std::tuple<ProtocolConformanceRef, CanType, SILValue, SILValue>>
+static Optional<std::tuple<ProtocolConformanceRef, CanType,
+                           SingleValueInstruction*, SILValue>>
 getConformanceAndConcreteType(ASTContext &Ctx,
                               FullApplySite AI,
                               SILInstruction *InitExistential,
@@ -763,7 +767,7 @@ getConformanceAndConcreteType(ASTContext &Ctx,
   CanType ConcreteType;
   // The existential type result of the found init_existential.
   CanType ExistentialType;
-  SILValue ConcreteTypeDef;
+  SingleValueInstruction *ConcreteTypeDef = nullptr;
   SILValue NewSelf;
 
   // FIXME: Factor this out. All we really need here is the ExistentialSig
@@ -812,7 +816,8 @@ getConformanceAndConcreteType(ASTContext &Ctx,
   if (ConcreteType->isOpenedExistential()) {
     assert(!InitExistential->getTypeDependentOperands().empty() &&
            "init_existential is supposed to have a typedef operand");
-    ConcreteTypeDef = InitExistential->getTypeDependentOperands()[0].get();
+    ConcreteTypeDef = cast<SingleValueInstruction>(
+      InitExistential->getTypeDependentOperands()[0].get());
   }
 
   return std::make_tuple(*ExactConformance, ConcreteType,
@@ -863,7 +868,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
 
   ProtocolConformanceRef Conformance = std::get<0>(*ConformanceAndConcreteType);
   CanType ConcreteType = std::get<1>(*ConformanceAndConcreteType);
-  SILValue ConcreteTypeDef = std::get<2>(*ConformanceAndConcreteType);
+  auto ConcreteTypeDef = std::get<2>(*ConformanceAndConcreteType);
   SILValue NewSelf = std::get<3>(*ConformanceAndConcreteType);
 
   SILOpenedArchetypesTracker *OldOpenedArchetypesTracker =

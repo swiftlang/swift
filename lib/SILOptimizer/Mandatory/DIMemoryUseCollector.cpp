@@ -43,7 +43,7 @@ static unsigned getElementCountRec(SILModule &Module, SILType T) {
 }
 
 
-DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
+DIMemoryObjectInfo::DIMemoryObjectInfo(SingleValueInstruction *MI) {
   auto &Module = MI->getModule();
 
   MemoryInst = MI;
@@ -338,7 +338,7 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
       continue;
 
     if (auto project = dyn_cast<ProjectBoxInst>(User)) {
-      collectUses(User, project->getFieldIndex());
+      collectUses(project, project->getFieldIndex());
       continue;
     }
 
@@ -392,8 +392,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     }
 
     // Look through begin_access.
-    if (isa<BeginAccessInst>(User)) {
-      collectUses(User, BaseEltNo);
+    if (auto I = dyn_cast<BeginAccessInst>(User)) {
+      collectUses(I, BaseEltNo);
       continue;
     }
 
@@ -550,14 +550,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // that is looking into the memory object (i.e., the memory object needs to
     // be explicitly initialized by a copy_addr or some other use of the
     // projected address).
-    if (isa<InitEnumDataAddrInst>(User)) {
+    if (auto I = dyn_cast<InitEnumDataAddrInst>(User)) {
       assert(!InStructSubElement &&
              "init_enum_data_addr shouldn't apply to struct subelements");
       // Keep track of the fact that we're inside of an enum.  This informs our
       // recursion that tuple stores are not scalarized outside, and that stores
       // should not be treated as partial stores.
       llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
-      collectUses(User, BaseEltNo);
+      collectUses(I, BaseEltNo);
       continue;
     }
 
@@ -609,7 +609,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   // Now that we've walked all of the immediate uses, scalarize any operations
   // working on tuples if we need to for canonicalization or analysis reasons.
   if (!UsesToScalarize.empty()) {
-    SILInstruction *PointerInst = cast<SILInstruction>(Pointer);
+    SILInstruction *PointerInst = Pointer->getDefiningInstruction();
     SmallVector<SILValue, 4> ElementAddrs;
     SILBuilderWithScope AddrBuilder(++SILBasicBlock::iterator(PointerInst),
                                     PointerInst);

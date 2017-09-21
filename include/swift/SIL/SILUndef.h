@@ -17,7 +17,9 @@
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
-  class SILModule;
+class SILArgument;
+class SILInstruction;
+class SILModule;
 
 class SILUndef : public ValueBase {
   void operator=(const SILArgument &) = delete;
@@ -32,8 +34,10 @@ public:
   template<class OwnerTy>
   static SILUndef *getSentinelValue(SILType Ty, OwnerTy Owner) { return new (*Owner) SILUndef(Ty); }
 
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::SILUndef;
+  static bool classof(const SILArgument *) = delete;
+  static bool classof(const SILInstruction *) = delete;
+  static bool classof(const SILNode *node) {
+    return node->getKind() == SILNodeKind::SILUndef;
   }
 };
 
