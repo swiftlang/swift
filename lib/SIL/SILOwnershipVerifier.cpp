@@ -1196,6 +1196,9 @@ public:
     return {true, UseLifetimeConstraint::MustBeLive};
   }
 
+    // BUILTIN_TYPE_CHECKER_OPERATION does not live past the type checker.
+#define BUILTIN_TYPE_CHECKER_OPERATION(ID, NAME)
+
 #define BUILTIN(ID, NAME, ATTRS)                                               \
   OwnershipUseCheckerResult visit##ID(BuiltinInst *BI, StringRef Attr);
 #include "swift/AST/Builtins.def"
