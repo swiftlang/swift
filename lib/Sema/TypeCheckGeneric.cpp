@@ -787,7 +787,6 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     if (Context.LangOpts.DebugGenericSignatures) {
       func->dumpRef(llvm::errs());
       llvm::errs() << "\n";
-      builder.dump(llvm::errs());
       llvm::errs() << "Generic signature: ";
       sig->print(llvm::errs());
       llvm::errs() << "\n";
@@ -1022,7 +1021,6 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     if (Context.LangOpts.DebugGenericSignatures) {
       subscript->dumpRef(llvm::errs());
       llvm::errs() << "\n";
-      builder.dump(llvm::errs());
       llvm::errs() << "Generic signature: ";
       sig->print(llvm::errs());
       llvm::errs() << "\n";
@@ -1173,7 +1171,6 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     if (Context.LangOpts.DebugGenericSignatures) {
       dc->printContext(llvm::errs());
       llvm::errs() << "\n";
-      builder.dump(llvm::errs());
       llvm::errs() << "Generic signature: ";
       sig->print(llvm::errs());
       llvm::errs() << "\n";
