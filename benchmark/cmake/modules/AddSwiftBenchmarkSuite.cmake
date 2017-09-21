@@ -1,7 +1,6 @@
 
 include(CMakeParseArguments)
 
-
 # Run a shell command and assign output to a variable or fail with an error.
 # Example usage:
 #   runcmd(COMMAND "xcode-select" "-p"
@@ -142,41 +141,19 @@ function (swift_benchmark_compile_archopts)
   endforeach()
 
   foreach(module_name_path ${BENCH_LIBRARY_MODULES})
-    get_filename_component(module_name "${module_name_path}" NAME)
+    set(sources "${srcdir}/${module_name_path}.swift")
 
-    set(objfile "${objdir}/${module_name}.o")
-    set(swiftmodule "${objdir}/${module_name}.swiftmodule")
-    set(source "${srcdir}/${module_name_path}.swift")
-    list(APPEND bench_library_objects "${objfile}")
-    add_custom_command(
-        OUTPUT "${objfile}"
-        DEPENDS
-          ${stdlib_dependencies} "${srcdir}/${module_name_path}.swift"
-          ${extra_sources}
-        COMMAND "${SWIFT_EXEC}"
-        ${common_options}
-        "-force-single-frontend-invocation"
-        "-parse-as-library"
-        "-module-name" "${module_name}"
-        "-emit-module" "-emit-module-path" "${swiftmodule}"
-        "-o" "${objfile}"
-        "${source}" ${extra_sources})
-    if (SWIFT_BENCHMARK_EMIT_SIB)
-      set(sibfile "${objdir}/${module_name}.sib")
-      list(APPEND bench_library_sibfiles "${sibfile}")
-      add_custom_command(
-          OUTPUT "${sibfile}"
-          DEPENDS
-            ${stdlib_dependencies} "${srcdir}/${module_name_path}.swift"
-            ${extra_sources}
-          COMMAND "${SWIFT_EXEC}"
-          ${common_options}
-          "-force-single-frontend-invocation"
-          "-parse-as-library"
-          "-module-name" "${module_name}"
-          "-emit-sib"
-          "-o" "${sibfile}"
-          "${source}" ${extra_sources})
+    swift_benchmark_library(objfile_out sibfile_out
+      MODULE_PATH "${module_name_path}"
+      SOURCE_DIR "${srcdir}"
+      OBJECT_DIR "${objdir}"
+      SOURCES ${sources}
+      LIBRARY_FLAGS ${common_options})
+    precondition(objfile_out)
+    list(APPEND bench_library_objects "${objfile_out}")
+    if (SWIFT_BENCHMARK_EMIT_SUB)
+      precondition(sibfile_out)
+      list(APPEND bench_library_subfiles "${sibfile_out}")
     endif()
   endforeach()
 
