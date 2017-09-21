@@ -62,7 +62,12 @@ public typealias CFloat = Float
 /// The C 'double' type.
 public typealias CDouble = Double
 
-// FIXME: long double
+/// The C 'long double' type.
+#if arch(x86_64) || arch(i386)
+public typealias CLongDouble = Float80
+#else
+public typealias CLongDouble = Double
+#endif
 
 // FIXME: Is it actually UTF-32 on Darwin?
 //
