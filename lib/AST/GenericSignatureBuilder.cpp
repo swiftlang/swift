@@ -2344,16 +2344,9 @@ PotentialArchetype *PotentialArchetype::getNestedType(
 }
 
 PotentialArchetype *PotentialArchetype::getNestedType(
-                                            AssociatedTypeDecl *assocType,
+                                            TypeDecl *type,
                                             GenericSignatureBuilder &builder) {
-  return updateNestedTypeForConformance(assocType,
-                                        ArchetypeResolutionKind::WellFormed);
-}
-
-PotentialArchetype *PotentialArchetype::getNestedType(
-                                            TypeDecl *getConcreteTypeDecl,
-                                            GenericSignatureBuilder &builder) {
-  return updateNestedTypeForConformance(getConcreteTypeDecl,
+  return updateNestedTypeForConformance(type,
                                         ArchetypeResolutionKind::WellFormed);
 }
 
@@ -2396,18 +2389,12 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 }
 
 PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
-                      PointerUnion<AssociatedTypeDecl *, TypeDecl *> type,
-                      ArchetypeResolutionKind kind) {
-  auto *assocType = type.dyn_cast<AssociatedTypeDecl *>();
-  auto *concreteDecl = type.dyn_cast<TypeDecl *>();
-  if (!assocType && !concreteDecl)
-    return nullptr;
+                                              TypeDecl *type,
+                                              ArchetypeResolutionKind kind) {
+  if (!type) return nullptr;
 
-  // FIXME: Silly hack for a bad interface.
-  if (concreteDecl && isa<AssociatedTypeDecl>(concreteDecl)) {
-    assocType = cast<AssociatedTypeDecl>(concreteDecl);
-    concreteDecl = nullptr;
-  }
+  AssociatedTypeDecl *assocType = dyn_cast<AssociatedTypeDecl>(type);
+  TypeDecl *concreteDecl = assocType ? nullptr : type;
 
   // If we were asked for a complete, well-formed archetype, make sure we
   // process delayed requirements if anything changed.
@@ -3668,13 +3655,8 @@ void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
   auto parentRepPA = parentPA->getRepresentative();
   if (parentPA == parentRepPA) return;
 
-  PotentialArchetype *existingPA;
-  if (auto assocType = nestedPA->getResolvedAssociatedType()) {
-    existingPA = parentRepPA->getNestedType(assocType, *this);
-  } else {
-    existingPA = parentRepPA->getNestedType(nestedPA->getConcreteTypeDecl(),
-                                            *this);
-  }
+  PotentialArchetype *existingPA =
+    parentRepPA->getNestedType(nestedPA->getResolvedType(), *this);
 
   auto sameNamedSource =
     FloatingRequirementSource::forNestedTypeNameMatch(
