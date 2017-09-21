@@ -215,6 +215,14 @@ public:
     /// a superclass requirement.
     bool isConformanceSatisfiedBySuperclass(ProtocolDecl *proto) const;
 
+    /// Lookup a nested type with the given name within this equivalence
+    /// class.
+    ///
+    /// \param otherConcreteTypes If non-null, will be filled in the all of the
+    /// concrete types we found (other than the result) with the same name.
+    TypeDecl *lookupNestedType(Identifier name,
+                               SmallVectorImpl<TypeDecl *> *otherConcreteTypes);
+
     /// Dump a debugging representation of this equivalence class.
     void dump(llvm::raw_ostream &out) const;
 
