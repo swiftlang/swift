@@ -21,6 +21,8 @@ CHANGELOG
 Swift 4.0
 ---------
 
+### 2017-09-19 (Xcode 9.0)
+
 * [SE-0165][] and [SE-0154][]
 
   The standard library's `Dictionary` and `Set` types have some new features. You can now create a new dictionary from a sequence of keys and values, and merge keys and values into an existing dictionary.
@@ -6710,3 +6712,9 @@ Swift 1.0
 [SE-0177]: <https://github.com/apple/swift-evolution/blob/master/proposals/0177-add-clamped-to-method.md>
 [SE-0178]: <https://github.com/apple/swift-evolution/blob/master/proposals/0178-character-unicode-view.md>
 [SE-0179]: <https://github.com/apple/swift-evolution/blob/master/proposals/0179-swift-run-command.md>
+[SE-0180]: <https://github.com/apple/swift-evolution/blob/master/proposals/0180-string-index-overhaul.md>
+[SE-0181]: <https://github.com/apple/swift-evolution/blob/master/proposals/0181-package-manager-cpp-language-version.md>
+[SE-0182]: <https://github.com/apple/swift-evolution/blob/master/proposals/0182-newline-escape-in-strings.md>
+[SE-0183]: <https://github.com/apple/swift-evolution/blob/master/proposals/0183-substring-affordances.md>
+[SE-0184]: <https://github.com/apple/swift-evolution/blob/master/proposals/0184-unsafe-pointers-add-missing.md>
+[SE-0185]: <https://github.com/apple/swift-evolution/blob/master/proposals/0185-synthesize-equatable-hashable.md>

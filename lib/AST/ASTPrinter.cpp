@@ -3921,7 +3921,7 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
     Printer << "(";
     Printer << SizeInBits;
     if (Alignment)
-      Printer << ", " << Alignment <<")";
+      Printer << ", " << Alignment;
     Printer << ")";
     break;
   }

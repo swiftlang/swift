@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer -sil-deadfuncelim  %s | %FileCheck --check-prefix=CHECK-DEADFUNCELIM %s
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer  %s -o %t.sil && %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer -sil-inline-generics=true -inline %s | %FileCheck --check-prefix=CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE %s
 
 sil_stage canonical
 
@@ -827,6 +828,27 @@ bb2(%10 : $Error):                                // Preds: bb0
   destroy_addr %0 : $*T
   throw %10 : $Error
 } // end sil function '_T034eager_specialize_throwing_function19ClassUsingThrowingPC1gs5Int64VxKAA0G1PRzlFZ'
+
+// Check that a specialization was produced and it is not inlined.
+// CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE-LABEL: sil{{.*}}@{{.*}}testSimpleGeneric{{.*}}where τ_0_0 : _Trivial(64, 64)
+// CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE-LABEL: sil{{.*}}@testSimpleGeneric :
+// CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE: [[METATYPE:%.*]] = metatype $@thick T.Type
+// CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE: [[SIZEOF:%.*]] = builtin "sizeof"<T>([[METATYPE]] : $@thick T.Type)
+// CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE: [[SIZE:%.*]] = integer_literal $Builtin.Word, 8
+// CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE: builtin "cmp_eq_Word"([[SIZEOF]] : $Builtin.Word, [[SIZE]] : $Builtin.Word)
+// Invoke the specialization, but do not inline it!
+// CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE: function_ref @{{.*}}testSimpleGeneric{{.*}}
+// CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE: apply
+// CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE: // end sil function 'testSimpleGeneric'
+
+sil [_specialize exported: false, kind: full, where T: _Trivial(64, 64)] @testSimpleGeneric : $@convention(thin) <T>(@in T) -> Builtin.Int64 {
+bb0(%0 : $*T):
+  %1 = metatype $@thick T.Type
+  %2 = builtin "sizeof"<T>(%1 : $@thick T.Type) : $Builtin.Word 
+  %8 = builtin "zextOrBitCast_Word_Int64"(%2 : $Builtin.Word) : $Builtin.Int64
+  destroy_addr %0 : $*T
+  return %8 : $Builtin.Int64
+}
 
 sil_vtable ClassUsingThrowingP {
   #ClassUsingThrowingP.init!allocator.1: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : _T034eager_specialize_throwing_function19ClassUsingThrowingPCACycfC	// ClassUsingThrowingP.__allocating_init()
