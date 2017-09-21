@@ -1498,6 +1498,12 @@ public:
     return parentOrBuilder.dyn_cast<PotentialArchetype *>();
   }
 
+  /// Retrieve the type declaration to which this nested type was resolved.
+  TypeDecl *getResolvedType() const {
+    assert(getParent() && "Not an associated type");
+    return identifier.assocTypeOrConcrete;
+  }
+
   /// Retrieve the associated type to which this potential archetype
   /// has been resolved.
   AssociatedTypeDecl *getResolvedAssociatedType() const {
@@ -1640,13 +1646,8 @@ public:
                                     ArchetypeResolutionKind kind,
                                     GenericSignatureBuilder &builder);
 
-  /// \brief Retrieve (or create) a nested type with a known associated type.
-  PotentialArchetype *getNestedType(AssociatedTypeDecl *assocType,
-                                    GenericSignatureBuilder &builder);
-
-  /// \brief Retrieve (or create) a nested type with a known concrete type
-  /// declaration.
-  PotentialArchetype *getNestedType(TypeDecl *concreteDecl,
+  /// \brief Retrieve (or create) a nested type with a known type.
+  PotentialArchetype *getNestedType(TypeDecl *type,
                                     GenericSignatureBuilder &builder);
 
   /// \brief Retrieve (or create) a nested type that is the current best
@@ -1666,8 +1667,8 @@ public:
   /// type or typealias of the given protocol, unless the \c kind implies that
   /// a potential archetype should not be created if it's missing.
   PotentialArchetype *updateNestedTypeForConformance(
-                      PointerUnion<AssociatedTypeDecl *, TypeDecl *> type,
-                      ArchetypeResolutionKind kind);
+                        TypeDecl *type,
+                        ArchetypeResolutionKind kind);
 
   /// Update the named nested type when we know this type conforms to the given
   /// protocol.
