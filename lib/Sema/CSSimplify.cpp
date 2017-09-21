@@ -1098,7 +1098,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // A non-throwing function can be a subtype of a throwing function.
   if (func1->throws() != func2->throws()) {
     // Cannot drop 'throws'.
-    if (func1->throws() || (func2->throws() && kind < ConstraintKind::Subtype))
+    if (func1->throws() || kind < ConstraintKind::Subtype)
       return SolutionKind::Error;
   }
 
