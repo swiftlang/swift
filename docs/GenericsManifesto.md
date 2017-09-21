@@ -27,7 +27,7 @@ There are a number of restrictions to the use of generics that fall out of the i
 
 ### Recursive protocol constraints (*)
 
-*The feature is being reviewed in [SE-0157](https://github.com/apple/swift-evolution/blob/master/proposals/0157-recursive-protocol-constraints.md).*
+*This feature has been accepted in [SE-0157](https://github.com/apple/swift-evolution/blob/master/proposals/0157-recursive-protocol-constraints.md) and is tracked by [SR-1445](https://bugs.swift.org/browse/SR-1445).*
 
 Currently, an associated type cannot be required to conform to its enclosing protocol (or any protocol that inherits that protocol). For example, in the standard library `SubSequence` type of a `Sequence` should itself be a `Sequence`:
 
@@ -90,7 +90,7 @@ var d2: Dictionary<String, Int> = d1 // okay: d1 and d2 have the same type, Dict
 
 ### Generic subscripts
 
-*This feature has been accepted in [SE-0148](https://github.com/apple/swift-evolution/blob/master/proposals/0148-generic-subscripts.md), is tracked by [SR-115](https://bugs.swift.org/browse/SR-115) and was released with Swift 4.*
+*This feature has been accepted in [SE-0148](https://github.com/apple/swift-evolution/blob/master/proposals/0148-generic-subscripts.md), was tracked by [SR-115](https://bugs.swift.org/browse/SR-115) and was released with Swift 4.*
 
 Subscripts could be allowed to have generic parameters. For example, we could introduce a generic subscript on a `Collection` that allows us to pull out the values at an arbitrary set of indices:
 
@@ -202,7 +202,7 @@ Hanging the `where` clause off the associated type protocol is not ideal, but th
 
 ### Typealiases in protocols and protocol extensions (*)
 
-*The feature has been accepted in [SE-0092](https://github.com/apple/swift-evolution/blob/master/proposals/0092-typealiases-in-protocols.md) and was released with Swift 3.*
+*This feature has been accepted in [SE-0092](https://github.com/apple/swift-evolution/blob/master/proposals/0092-typealiases-in-protocols.md) and was released with Swift 3.*
 
 Now that associated types have their own keyword (thanks!), it's reasonable to bring back `typealias`. Again with the `Sequence` protocol:
 
@@ -691,7 +691,7 @@ The generics system doesn't seem like a good candidate for a reduction in scope;
 
 ### Associated type inference
 
-*The feature has been rejected in [SE-0108](https://github.com/apple/swift-evolution/blob/master/proposals/0108-remove-assoctype-inference.md).*
+*This feature has been rejected in [SE-0108](https://github.com/apple/swift-evolution/blob/master/proposals/0108-remove-assoctype-inference.md).*
 
 Associated type inference is the process by which we infer the type bindings for associated types from other requirements. For example:
 
