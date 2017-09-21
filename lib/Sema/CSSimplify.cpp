@@ -1091,9 +1091,14 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintLocatorBuilder locator) {
   // An @autoclosure function type can be a subtype of a
   // non-@autoclosure function type.
-  if (func1->isAutoClosure() != func2->isAutoClosure() &&
-      kind < ConstraintKind::Subtype)
-    return SolutionKind::Error;
+  if (func1->isAutoClosure() != func2->isAutoClosure()) {
+    // If the 2nd type is an autoclosure, then the first type needs wrapping in a
+    // closure despite already being a function type.
+    if (func2->isAutoClosure())
+      return SolutionKind::Error;
+    if (kind < ConstraintKind::Subtype)
+      return SolutionKind::Error;
+  }
   
   // A non-throwing function can be a subtype of a throwing function.
   if (func1->throws() != func2->throws()) {
