@@ -1771,3 +1771,9 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
 
   return SILType();
 }
+
+void TypeInfo::verify(IRGenTypeVerifierFunction &IGF,
+                      llvm::Value *typeMetadata,
+                      SILType T) const {
+  // By default, no type-specific verifier behavior.
+}

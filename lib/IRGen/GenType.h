@@ -23,6 +23,7 @@
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
 #include "IRGenModule.h"
+#include "IRGenFunction.h"
 
 namespace swift {
   class GenericSignatureBuilder;
@@ -218,10 +219,6 @@ public:
   }
 };
 
-/// Generate code to verify that static type assumptions agree with the runtime.
-void emitTypeLayoutVerifier(IRGenFunction &IGF,
-                            ArrayRef<CanType> formalTypes);
-
 /// If a type is visibly a singleton aggregate (a tuple with one element, a
 /// struct with one field, or an enum with a single payload case), return the
 /// type of its field, which it is guaranteed to have identical layout to.
@@ -229,6 +226,37 @@ SILType getSingletonAggregateFieldType(IRGenModule &IGM,
                                        SILType t,
                                        ResilienceExpansion expansion);
 
+/// An IRGenFunction interface for generating type layout verifiers.
+class IRGenTypeVerifierFunction : public IRGenFunction {
+private:
+  llvm::Constant *VerifierFn;
+
+  struct VerifierArgumentBuffers {
+    Address runtimeBuf, staticBuf;
+  };
+  llvm::DenseMap<llvm::Type *, VerifierArgumentBuffers> VerifierArgBufs;
+
+public:
+  IRGenTypeVerifierFunction(IRGenModule &IGM, llvm::Function *f);
+  
+  void emit(ArrayRef<CanType> typesToVerify);
+  
+  /// Call a runtime function that verifies that the two LLVM values are
+  /// equivalent, logging a detailed error if they differ.
+  void verifyValues(llvm::Value *typeMetadata,
+                    llvm::Value *runtimeValue,
+                    llvm::Value *compilerValue,
+                    const llvm::Twine &description);
+  
+  /// Call a runtime function that verifies that the contents of the two
+  /// memory buffers are equivalent, logging a detailed error if they differ.
+  void verifyBuffers(llvm::Value *typeMetadata,
+                     Address runtimeValue,
+                     Address compilerValue,
+                     Size size,
+                     const llvm::Twine &description);
+};
+  
 } // end namespace irgen
 } // end namespace swift
 
