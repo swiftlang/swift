@@ -19,7 +19,7 @@ function(runcmd)
   set(${RUNCMD_VARIABLE} ${${RUNCMD_VARIABLE}} PARENT_SCOPE)
 endfunction(runcmd)
 
-function (swift_benchmark_library objfile_out sibfile_out)
+function (add_swift_benchmark_library objfile_out sibfile_out)
   cmake_parse_arguments(BENCHLIB "" "MODULE_PATH;SOURCE_DIR;OBJECT_DIR" "SOURCES;LIBRARY_FLAGS" ${ARGN})
 
   precondition(BENCHLIB_MODULE_PATH)
@@ -126,7 +126,7 @@ function (swift_benchmark_compile_archopts)
 
     set(objfile_out)
     set(sibfile_out)
-    swift_benchmark_library(objfile_out sibfile_out
+    add_swift_benchmark_library(objfile_out sibfile_out
       MODULE_PATH "${module_name_path}"
       SOURCE_DIR "${srcdir}"
       OBJECT_DIR "${objdir}"
@@ -143,7 +143,7 @@ function (swift_benchmark_compile_archopts)
   foreach(module_name_path ${BENCH_LIBRARY_MODULES})
     set(sources "${srcdir}/${module_name_path}.swift")
 
-    swift_benchmark_library(objfile_out sibfile_out
+    add_swift_benchmark_library(objfile_out sibfile_out
       MODULE_PATH "${module_name_path}"
       SOURCE_DIR "${srcdir}"
       OBJECT_DIR "${objdir}"
