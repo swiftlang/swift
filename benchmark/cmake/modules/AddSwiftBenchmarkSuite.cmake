@@ -1,7 +1,6 @@
 
 include(CMakeParseArguments)
 
-
 # Run a shell command and assign output to a variable or fail with an error.
 # Example usage:
 #   runcmd(COMMAND "xcode-select" "-p"
