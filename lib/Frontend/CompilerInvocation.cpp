@@ -447,7 +447,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         if (A->getNumValues() > 0) {
           auto sourceBuffer =
             llvm::MemoryBuffer::getMemBufferCopy(A->getValue(), "immediate");
-          Opts.InputBuffers.push_back(std::move(sourceBuffer).get());
+          Opts.InputBuffers.push_back(std::move(sourceBuffer.get()));
         }
       }
     } else {
