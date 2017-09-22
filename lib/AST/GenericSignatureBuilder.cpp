@@ -76,6 +76,10 @@ STATISTIC(NumArchetypeAnchorCacheHits,
           "# of hits in the archetype anchor cache");
 STATISTIC(NumArchetypeAnchorCacheMisses,
           "# of misses in the archetype anchor cache");
+STATISTIC(NumNestedTypeCacheHits,
+         "# of hits in the equivalence class nested type cache");
+STATISTIC(NumNestedTypeCacheMisses,
+         "# of misses in the equivalence class nested type cache");
 STATISTIC(NumProcessDelayedRequirements,
           "# of times we process delayed requirements");
 STATISTIC(NumProcessDelayedRequirementsUnchanged,
@@ -1579,6 +1583,38 @@ static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
 TypeDecl *EquivalenceClass::lookupNestedType(
                              Identifier name,
                              SmallVectorImpl<TypeDecl *> *otherConcreteTypes) {
+  // Populates the result structures from the given cache entry.
+  auto populateResult = [&](const CachedNestedType &cache) -> TypeDecl * {
+    if (otherConcreteTypes)
+      otherConcreteTypes->clear();
+
+    // If there aren't any types in the cache, we're done.
+    if (cache.types.empty()) return nullptr;
+
+    // The first type in the cache is always the final result.
+    // Collect the rest in the concrete-declarations list, if needed.
+    if (otherConcreteTypes) {
+      for (auto type : ArrayRef<TypeDecl *>(cache.types).slice(1)) {
+        otherConcreteTypes->push_back(type);
+      }
+    }
+
+    return cache.types.front();
+  };
+
+  // If we have a cached value that is up-to-date, use that.
+  auto cached = nestedTypeNameCache.find(name);
+  if (cached != nestedTypeNameCache.end() &&
+      cached->second.numConformancesPresent == conformsTo.size() &&
+      (!superclass ||
+       cached->second.superclassPresent == superclass->getCanonicalType())) {
+    ++NumNestedTypeCacheHits;
+    return populateResult(cached->second);
+  }
+
+  // Cache miss; go compute the result.
+  ++NumNestedTypeCacheMisses;
+
   // Look for types with the given name in protocols that we know about.
   AssociatedTypeDecl *bestAssocType = nullptr;
   SmallVector<TypeDecl *, 4> concreteDecls;
@@ -1647,34 +1683,32 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     }
   }
 
-  // If we have an associated type, that's our result.
+  // Form the new cache entry.
+  CachedNestedType entry;
+  entry.numConformancesPresent = conformsTo.size();
+  entry.superclassPresent =
+    superclass ? superclass->getCanonicalType() : CanType();
   if (bestAssocType) {
-    // Populate the list of concrete types, if requested.
-    if (otherConcreteTypes)
-      otherConcreteTypes->assign(concreteDecls.begin(), concreteDecls.end());
+    entry.types.push_back(bestAssocType);
+    entry.types.insert(entry.types.end(),
+                       concreteDecls.begin(), concreteDecls.end());
+  } else if (!concreteDecls.empty()) {
+    // Find the best concrete type.
+    auto bestConcreteTypeIter =
+      std::min_element(concreteDecls.begin(), concreteDecls.end(),
+                       [](TypeDecl *type1, TypeDecl *type2) {
+                         return TypeDecl::compare(type1, type2) < 0;
+                       });
 
-    return bestAssocType;
+    // Put the best concrete type first; the rest will follow.
+    entry.types.push_back(*bestConcreteTypeIter);
+    entry.types.insert(entry.types.end(),
+                       concreteDecls.begin(), bestConcreteTypeIter);
+    entry.types.insert(entry.types.end(),
+                       bestConcreteTypeIter + 1, concreteDecls.end());
   }
 
-  // If there were no concrete types either, lookup failed.
-  if (concreteDecls.empty())
-    return nullptr;
-
-  // Find the best concrete type.
-  auto bestConcreteTypeIter =
-    std::min_element(concreteDecls.begin(), concreteDecls.end(),
-                     [](TypeDecl *type1, TypeDecl *type2) {
-                       return TypeDecl::compare(type1, type2) < 0;
-                     });
-
-  // If were asked to provide all of the concrete types, do so now.
-  if (otherConcreteTypes) {
-    otherConcreteTypes->assign(concreteDecls.begin(), bestConcreteTypeIter);
-    otherConcreteTypes->insert(otherConcreteTypes->end(),
-                               bestConcreteTypeIter + 1, concreteDecls.end());
-  }
-
-  return *bestConcreteTypeIter;
+  return populateResult((nestedTypeNameCache[name] = std::move(entry)));
 }
 
 void EquivalenceClass::dump(llvm::raw_ostream &out) const {
