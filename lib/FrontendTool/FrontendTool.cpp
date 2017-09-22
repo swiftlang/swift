@@ -1360,13 +1360,17 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     StringRef OutFile = FEOpts.getSingleOutputFilename();
     StringRef OutputType = llvm::sys::path::extension(OutFile);
     std::string TripleName = LangOpts.Target.normalize();
+    auto &SM = Instance->getSourceMgr();
+    auto Trace = Invocation.getFrontendOptions().TraceStats;
     StatsReporter = llvm::make_unique<UnifiedStatsReporter>("swift-frontend",
                                                             FEOpts.ModuleName,
                                                             InputName,
                                                             TripleName,
                                                             OutputType,
                                                             OptType,
-                                                            StatsOutputDir);
+                                                            StatsOutputDir,
+                                                            &SM,
+                                                            Trace);
   }
 
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();

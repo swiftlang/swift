@@ -194,6 +194,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
   if (const Arg *A = Args.getLastArg(OPT_stats_output_dir)) {
     Opts.StatsOutputDir = A->getValue();
+    if (Args.getLastArg(OPT_trace_stats_events)) {
+      Opts.TraceStats = true;
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_validate_tbd_against_ir_EQ)) {
