@@ -15,24 +15,19 @@ public func makeAMetadata() {
 
 // Type constructor for OuterGenericStruct<Int>.InnerGenericStruct<String>
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T015nested_generics18OuterGenericStructV05InnerdE0VySi_SSGMa()
-// CHECK: call %swift.type* @_T015nested_generics18OuterGenericStructVySiGMa()
-// CHECK-NEXT: call %swift.type* @_T015nested_generics18OuterGenericStructV05InnerdE0VMa(%swift.type* {{.*}}, %swift.type* @_T0SiN, %swift.type* @_T0SSN)
+// CHECK: call %swift.type* @_T015nested_generics18OuterGenericStructV05InnerdE0VMa(%swift.type* @_T0SiN, %swift.type* @_T0SSN)
 // CHECK: ret %swift.type
 
-// Type constructor for OuterGenericStruct<T>
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T015nested_generics18OuterGenericStructVMa(%swift.type*)
-
 // Type constructor for OuterGenericStruct<T>.InnerGenericStruct<U>
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T015nested_generics18OuterGenericStructV05InnerdE0VMa(%swift.type*, %swift.type*, %swift.type*)
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T015nested_generics18OuterGenericStructV05InnerdE0VMa(%swift.type*, %swift.type*)
 
 // Type constructor for OuterGenericStruct<Int>.InnerConcreteStruct
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T015nested_generics18OuterGenericStructV013InnerConcreteE0VySi_GMa()
-// CHECK: call %swift.type* @_T015nested_generics18OuterGenericStructVySiGMa()
-// CHECK-NEXT: call %swift.type* @_T015nested_generics18OuterGenericStructV013InnerConcreteE0VMa(%swift.type* {{.*}}, %swift.type* @_T0SiN)
+// CHECK: call %swift.type* @_T015nested_generics18OuterGenericStructV013InnerConcreteE0VMa(%swift.type* @_T0SiN)
 // CHECK: ret %swift.type
 
 // Type constructor for OuterGenericStruct<T>.InnerConcreteStruct
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T015nested_generics18OuterGenericStructV013InnerConcreteE0VMa(%swift.type*, %swift.type*)
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T015nested_generics18OuterGenericStructV013InnerConcreteE0VMa(%swift.type*)
 
 public struct OuterGenericStruct<T> {
   public struct InnerGenericStruct<U> {
@@ -51,23 +46,24 @@ public struct OuterGenericStruct<T> {
 
 // Type constructor for OuterGenericClass<Int>.InnerGenericClass<String>
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T015nested_generics17OuterGenericClassC05InnerdE0CySi_SSGMa()
-// CHECK-LABEL: call %swift.type* @_T015nested_generics17OuterGenericClassCySiGMa()
-// CHECK-LABEL: call %swift.type* @_T015nested_generics17OuterGenericClassC05InnerdE0CMa(%swift.type* {{.*}}, %swift.type* @_T0SiN, %swift.type* @_T0SSN)
-
-// Type constructor for OuterGenericClass<T>
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T015nested_generics17OuterGenericClassCMa(%swift.type*)
+// CHECK: call %swift.type* @_T015nested_generics17OuterGenericClassC05InnerdE0CMa(%swift.type* @_T0SiN, %swift.type* @_T0SSN)
 
 // Type constructor for OuterGenericClass<T>.InnerGenericClass<U>
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T015nested_generics17OuterGenericClassC05InnerdE0CMa(%swift.type*, %swift.type*, %swift.type*)
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T015nested_generics17OuterGenericClassC05InnerdE0CMa(%swift.type*, %swift.type*)
 
 // Type constructor for OuterGenericClass<Int>.InnerConcreteClass
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T015nested_generics17OuterGenericClassC013InnerConcreteE0CySi_GMa()
-// CHECK: call %swift.type* @_T015nested_generics17OuterGenericClassCySiGMa()
-// CHECK-NEXT: call %swift.type* @_T015nested_generics17OuterGenericClassC013InnerConcreteE0CMa(%swift.type* {{.*}}, %swift.type* @_T0SiN)
+// CHECK: call %swift.type* @_T015nested_generics17OuterGenericClassC013InnerConcreteE0CMa(%swift.type* @_T0SiN)
 // CHECK: ret %swift.type
 
 // Type constructor for OuterGenericClass<T>.InnerConcreteClass
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T015nested_generics17OuterGenericClassC013InnerConcreteE0CMa(%swift.type*, %swift.type*)
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T015nested_generics17OuterGenericClassC013InnerConcreteE0CMa(%swift.type*)
+
+// Type constructor for OuterGenericStruct<T>
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T015nested_generics18OuterGenericStructVMa(%swift.type*)
+
+// Type constructor for OuterGenericClass<T>
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T015nested_generics17OuterGenericClassCMa(%swift.type*)
 
 public class OuterGenericClass<T> {
   public class InnerGenericClass<U> {
