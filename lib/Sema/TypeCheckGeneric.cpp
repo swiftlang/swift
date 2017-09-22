@@ -763,7 +763,8 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
     // The generic function signature is complete and well-formed. Determine
     // the type of the generic function.
-    sig = std::move(builder).computeGenericSignature(func->getLoc());
+    sig = std::move(builder).computeGenericSignature(*func->getParentModule(),
+                                                     func->getLoc());
 
     // The generic signature builder now has all of the requirements, although
     // there might still be errors that have not yet been diagnosed. Revert the
@@ -988,7 +989,9 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
 
     // The generic subscript signature is complete and well-formed. Determine
     // the type of the generic subscript.
-    sig = std::move(builder).computeGenericSignature(subscript->getLoc());
+    sig =
+      std::move(builder).computeGenericSignature(*subscript->getParentModule(),
+                                                 subscript->getLoc());
 
     // The generic signature builder now has all of the requirements, although
     // there might still be errors that have not yet been diagnosed. Revert the
@@ -1127,6 +1130,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 
     // Record the generic type parameter types and the requirements.
     sig = std::move(builder).computeGenericSignature(
+                                         *dc->getParentModule(),
                                          genericParams->getSourceRange().Start,
                                          allowConcreteGenericParams);
 
