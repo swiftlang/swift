@@ -240,6 +240,17 @@ public:
       /// anchor was cached.
       unsigned numMembers;
     } archetypeAnchorCache;
+
+    /// Describes a cached nested type.
+    struct CachedNestedType {
+      unsigned numConformancesPresent;
+      CanType superclassPresent;
+      llvm::TinyPtrVector<TypeDecl *> types;
+    };
+
+    /// Cached nested-type information, which contains the best declaration
+    /// for a given name.
+    llvm::SmallDenseMap<Identifier, CachedNestedType> nestedTypeNameCache;
   };
 
   friend class RequirementSource;
