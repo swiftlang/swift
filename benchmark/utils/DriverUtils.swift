@@ -16,6 +16,8 @@ import Glibc
 import Darwin
 #endif
 
+import TestsUtils
+
 struct BenchResults {
   var delim: String  = ","
   var sampleCount: UInt64 = 0
@@ -56,9 +58,13 @@ struct Test {
   let run: Bool
 }
 
+// Legacy test dictionaries.
 public var precommitTests: [String : (Int) -> ()] = [:]
 public var otherTests: [String : (Int) -> ()] = [:]
 public var stringTests: [String : (Int) -> ()] = [:]
+
+// We should migrate to a collection of BenchmarkInfo.
+public var registeredBenchmarks = [TestsUtils.BenchmarkInfo]()
 
 enum TestAction {
   case Run
@@ -93,6 +99,11 @@ struct TestConfig {
   /// Should we only run the "pre-commit" tests?
   var onlyPrecommit: Bool = true
 
+  /// Temporary option to only run tests that have been registered with
+  /// BenchmarkInfo. This will go away as soon as the benchmarks have been
+  /// categorized.
+  var onlyRegistered: Bool = false
+
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
   var afterRunSleep: Int?
@@ -103,7 +114,8 @@ struct TestConfig {
   mutating func processArguments() -> TestAction {
     let validOptions = [
       "--iter-scale", "--num-samples", "--num-iters",
-      "--verbose", "--delim", "--run-all", "--list", "--sleep"
+      "--verbose", "--delim", "--run-all", "--list", "--sleep",
+      "--registered"
     ]
     let maybeBenchArgs: Arguments? = parseArgs(validOptions)
     if maybeBenchArgs == nil {
@@ -157,14 +169,28 @@ struct TestConfig {
       return .ListTests
     }
 
+    if let _ = benchArgs.optionalArgsMap["--registered"] {
+      onlyRegistered = true
+    }
+
     return .Run
   }
 
   mutating func findTestsToRun() {
-    let allTests = [precommitTests, otherTests, stringTests]
-      .map { dictionary -> [(key: String, value: (Int)-> ())] in
-        Array(dictionary).sorted { $0.key < $1.key } } // by name
-      .joined()
+    var allTests: [(key: String, value: (Int)-> ())]
+
+    if onlyRegistered {
+      allTests = registeredBenchmarks.map {
+        bench -> (key: String, value: (Int)-> ()) in
+        (bench.name, bench.runFunction)
+      }
+    }
+    else {
+      allTests = [precommitTests, otherTests, stringTests]
+        .map { dictionary -> [(key: String, value: (Int)-> ())] in
+          Array(dictionary).sorted { $0.key < $1.key } } // by name
+        .flatMap { $0 }
+    }
 
     let included =
       !filters.isEmpty ? Set(filters)
