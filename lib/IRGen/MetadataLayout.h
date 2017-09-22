@@ -120,7 +120,6 @@ public:
 class NominalMetadataLayout : public MetadataLayout {
 protected:
   StoredOffset GenericRequirements;
-  StoredOffset Parent;
 
   NominalMetadataLayout(Kind kind) : MetadataLayout(kind) {}
 
@@ -133,8 +132,6 @@ public:
   Size getStaticGenericRequirementsOffset() const;
 
   Offset getGenericRequirementsOffset(IRGenFunction &IGF) const;
-
-  Offset getParentOffset(IRGenFunction &IGF) const;
 
   static bool classof(const MetadataLayout *layout) {
     return true; // No non-nominal metadata for now.
@@ -286,11 +283,6 @@ public:
     return layout->getKind() == Kind::Struct;
   }
 };
-
-/// Emit the address of the 'parent' slot in the given nominal-type metadata.
-Address emitAddressOfParentMetadataSlot(IRGenFunction &IGF,
-                                        llvm::Value *metadata,
-                                        NominalTypeDecl *decl);
 
 /// Emit the address of the field-offset slot in the given class metadata.
 Address emitAddressOfClassFieldOffset(IRGenFunction &IGF,

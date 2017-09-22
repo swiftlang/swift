@@ -32,7 +32,5 @@ bb0(%0 : $@thick Outer.Inner.Type):
 // CHECK-NEXT: ret %swift.type* [[T4]]
 
 // CHECK-LABEL: define private void @initialize_metadata_Inner
-// CHECK:      [[T0:%.*]] = call %swift.type* @_T012nested_types5OuterCMa()
-// CHECK-NEXT: store %swift.type* [[T0]], %swift.type** getelementptr inbounds (%swift.type*, %swift.type** bitcast ({{.*}} @_T012nested_types5OuterC5InnerVMf{{.*}}, [[INT:i[0-9]+]] 2), align
-// CHECK-NEXT: store atomic %swift.type* bitcast ({{.*}} @_T012nested_types5OuterC5InnerVMf{{.*}} to %swift.type*), %swift.type** @_T012nested_types5OuterC5InnerVML release, align
+// CHECK:      store atomic %swift.type* bitcast ({{.*}} @_T012nested_types5OuterC5InnerVMf{{.*}} to %swift.type*), %swift.type** @_T012nested_types5OuterC5InnerVML release, align
 // CHECK-NEXT: ret void

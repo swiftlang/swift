@@ -117,7 +117,7 @@ import Swift
 // --       Case type accessor
 // CHECK-SAME:   @get_field_types_DynamicSingleton
 // --       generic parameter vector offset
-// CHECK-SAME:   i32 3,
+// CHECK-SAME:   i32 2,
 // --       generic parameter vector length; witness table counts
 // CHECK-SAME:   i32 1, i32 1
 // --       nesting depth
@@ -179,7 +179,13 @@ import Swift
 // CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum20DynamicSinglePayloadOwxg to i8*)
 
 // CHECK: @_T04enum18MultiPayloadNestedOWV = internal constant [16 x i8*] [
-// CHECK-SAME:   i8* inttoptr ([[WORD]] 9 to i8*),
+// -- size
+// CHECK-32-SAME:   i8* inttoptr ([[WORD]] 5 to i8*),
+// CHECK-64-SAME:   i8* inttoptr ([[WORD]] 9 to i8*),
+// -- flags                 0x250003 - alignment 4
+// CHECK-32-SAME:   i8* inttoptr ([[WORD]] 2424835 to i8*)
+// -- flags                 0x200007 - alignment 8
+// CHECK-64-SAME:   i8* inttoptr ([[WORD]] 2097159 to i8*)
 // CHECK-SAME:   i8* inttoptr ([[WORD]] 16 to i8*)
 // CHECK-SAME: ]
 
@@ -2666,10 +2672,10 @@ entry(%x : $*MyOptional):
 // CHECK:   [[T:%T]] = load %swift.type*, %swift.type** [[T0]],
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 3
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 2
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[T]] to i8*
 // CHECK:   store i8* [[T0]], i8** [[T1]]
-// CHECK:   [[VWT:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 5
+// CHECK:   [[VWT:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 4
 // CHECK:   [[T0:%.*]] = bitcast i8** [[VWT]] to i8*
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -1
 // CHECK:   store i8* [[T0]], i8** [[T1]]

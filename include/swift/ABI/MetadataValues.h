@@ -307,8 +307,6 @@ enum class ProtocolDispatchStrategy: uint8_t {
 class GenericParameterDescriptorFlags {
   typedef uint16_t int_type;
   enum : int_type {
-    HasParent        = 0x0001,
-    HasGenericParent = 0x0002,
     HasVTable        = 0x0004,
   };
   int_type Data;
@@ -317,36 +315,9 @@ class GenericParameterDescriptorFlags {
 public:
   constexpr GenericParameterDescriptorFlags() : Data(0) {}
 
-  constexpr GenericParameterDescriptorFlags withHasParent(bool b) const {
-    return GenericParameterDescriptorFlags(b ? (Data | HasParent)
-                                             : (Data & ~HasParent));
-  }
-
-  constexpr GenericParameterDescriptorFlags withHasGenericParent(bool b) const {
-    return GenericParameterDescriptorFlags(b ? (Data | HasGenericParent)
-                                             : (Data & ~HasGenericParent));
-  }
-
   constexpr GenericParameterDescriptorFlags withHasVTable(bool b) const {
     return GenericParameterDescriptorFlags(b ? (Data | HasVTable)
                                              : (Data & ~HasVTable));
-  }
-
-  /// Does this type have a lexical parent type?
-  ///
-  /// For class metadata, if this is true, the storage for the parent type
-  /// appears immediately prior to the first generic argument.  Other
-  /// metadata always have a slot for their parent type.
-  bool hasParent() const {
-    return Data & HasParent;
-  }
-
-  /// Given that this type has a parent type, is that type generic?  If so,
-  /// it forms part of the key distinguishing this metadata from other
-  /// metadata, and the parent metadata will be the first argument to
-  /// the generic metadata access function.
-  bool hasGenericParent() const {
-    return Data & HasGenericParent;
   }
 
   /// If this type is a class, does it have a vtable?  If so, the number
