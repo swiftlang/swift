@@ -6299,8 +6299,17 @@ GenericSignature *GenericSignatureBuilder::getGenericSignature() {
 
 GenericSignature *GenericSignatureBuilder::computeGenericSignature(
                                           SourceLoc loc,
-                                          bool allowConcreteGenericParams) {
+                                          bool allowConcreteGenericParams) && {
+  // Finalize the builder, producing any necessary diagnostics.
   finalize(loc, Impl->GenericParams, allowConcreteGenericParams);
-  return getGenericSignature();
+
+  // Determine the generic signature.
+  auto sig = getGenericSignature();
+
+  // Wipe out the internal state, ensuring that nobody uses this builder for
+  // anything more.
+  Impl.reset();
+
+  return sig;
 }
 
