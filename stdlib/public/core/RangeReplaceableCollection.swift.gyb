@@ -1236,3 +1236,111 @@ extension RangeReplaceableCollection {
     return try Self(self.lazy.filter(isIncluded))
   }
 }
+
+extension RangeReplaceableCollection where Element:Equatable{
+    
+    /// Removes all occurences of the specified element in the collection.
+    ///
+    /// All the elements following the specified element's position are moved to close the
+    /// gap. This example shows how all occurences of the specified element is removed from an array of
+    /// measurements.
+    ///
+    ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.6]
+    ///     let removed = measurements.remove(1.2)
+    ///     print(measurements)
+    ///     // Prints "[1.5, 2.9, 1.6]"
+    ///
+    /// Calling this method may invalidate any existing indices for use with this
+    /// collection.
+    ///
+    /// - Parameter element: The element to remove.
+    
+    @_inlineable
+    public mutating func removeElement(_ element:Element){
+        
+        while contains(element){
+            
+            let position = index(of:element)!
+            
+            replaceSubrange(position..<index(after: position), with: EmptyCollection())
+        }
+    }
+    
+    /// Removes the specified element in a given subrange in the collection.
+    ///
+    /// All the elements following the specified element's positions are moved to close the
+    /// gap. This example shows how the specified element is removed from only the left half of the array of measurements.
+    ///
+    ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.6]
+    ///     let removed = measurements.removeElementInSubrange(1.2,in:measurements.startIndex...2)
+    ///     print(measurements)
+    ///     // Prints "[1.5, 2.9, 1.2, 1.6]"
+    ///
+    /// Calling this method may invalidate any existing indices for use with this
+    /// collection.
+    ///
+    /// - Parameter element: The element to remove.
+    /// - Parameter subrange: The range from which to remove the specified element in the collection.
+    
+    @_inlineable
+    public mutating func removeElementInSubrange(_ element:Element,in subrange:Range<Index>){
+        
+        while self.contains(element){
+            
+            let position = self.index(of:element)!
+            
+            if subrange.contains(position){
+                
+                replaceSubrange(position..<index(after: position), with: EmptyCollection())
+                
+            }else{
+                
+                break
+                
+            }
+            
+        }
+        
+    }
+    
+    
+    /// Removes the specified elements from the collection.
+    ///
+    /// All the elements following the positions of the specified elements are moved to close the
+    /// gap. This example shows how multiple elements are removed from the array of measurements.
+    ///
+    ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.6]
+    ///     let removed = measurements.removeContentsOf([2.9,1.6])
+    ///     print(measurements)
+    ///     // Prints "[1.2, 1.5, 1.2]"
+    ///
+    /// Calling this method may invalidate any existing indices for use with this
+    /// collection.
+    ///
+    /// - Parameter elementsToBeRemoved: The collection of elements to be removed.
+    
+    @_inlineable
+    public mutating func removeContentsOf<C : Collection>(_ elementsToBeRemoved: C)
+    where C.Element == Element{
+        
+        if !elementsToBeRemoved.isEmpty{
+            
+            for element in elementsToBeRemoved{
+                
+                while self.contains(element){
+                    
+                    let position = self.index(of:element)!
+                    
+                    replaceSubrange(position..<index(after: position), with: EmptyCollection())
+                    
+                    
+                }
+            }
+            
+            
+        }
+    }
+    
+    
+}
+
