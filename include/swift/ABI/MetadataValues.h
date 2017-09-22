@@ -305,11 +305,11 @@ enum class ProtocolDispatchStrategy: uint8_t {
 
 /// Flags in a generic nominal type descriptor.
 class GenericParameterDescriptorFlags {
-  typedef uint32_t int_type;
+  typedef uint16_t int_type;
   enum : int_type {
-    HasParent        = 0x01,
-    HasGenericParent = 0x02,
-    HasVTable        = 0x04,
+    HasParent        = 0x0001,
+    HasGenericParent = 0x0002,
+    HasVTable        = 0x0004,
   };
   int_type Data;
   

@@ -2193,14 +2193,57 @@ namespace {
         if (layout.getVTableSize() > 0)
           flags = flags.withHasVTable(true);
       }
-      B.addInt32(flags.getIntValue());
+
+      // Calculate the number of generic parameters at each nesting depth.
+      unsigned totalGenericParams = 0;
+      SmallVector<unsigned, 2> numPrimaryParams;
+      for (auto *outer = ntd; outer != nullptr;
+           outer = outer->getDeclContext()
+               ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+        unsigned genericParamsAtDepth = 0;
+        if (auto *genericParams = outer->getGenericParams()) {
+          for (auto *paramDecl : *genericParams) {
+            auto contextTy = ntd->mapTypeIntoContext(
+                paramDecl->getDeclaredInterfaceType());
+            // Skip parameters which have been made concrete, because they do
+            // not appear in type metadata.
+            //
+            // FIXME: We should emit information about same-type constraints
+            // as well as conformance constraints, so that clients can
+            // reconstruct the full generic signature of the type, including
+            // fully-concrete parameters.
+            if (contextTy->is<ArchetypeType>()) {
+              totalGenericParams++;
+              genericParamsAtDepth++;
+            }
+          }
+        }
+        numPrimaryParams.push_back(genericParamsAtDepth);
+      }
+
+      // This assertion will fail once we have generic types nested
+      // inside generic functions or other local generic contexts.
+      //
+      // FIXME: Enable this once we stop fulfilling generic parameters
+      // from parent type metadata.
+      //
+      // assert(totalGenericParams == requirements.getNumTypeRequirements());
+
+      // Emit the nesting depth.
+      B.addInt16(numPrimaryParams.size());
+
+      // Emit the flags.
+      B.addInt16(flags.getIntValue());
+
+      // Emit the number of generic parameters at each nesting depth.
+      std::reverse(numPrimaryParams.begin(), numPrimaryParams.end());
+      for (auto count : numPrimaryParams)
+        B.addInt32(count);
 
       // TODO: provide reflective descriptions of the type and
       // conformance requirements stored here.
-
-      // };
     }
-    
+
     llvm::Constant *emit() {
       asImpl().layout();
 

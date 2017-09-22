@@ -27,8 +27,12 @@ import Swift
 // CHECK-SAME:   i32 10,
 // --       generic parameter count, primary count
 // CHECK-SAME:   i32 1, i32 1,
+// --       nesting depth
+// CHECK-SAME:   i16 1,
 // --       flags -- has vtable
-// CHECK-SAME:   i32 4,
+// CHECK-SAME:   i16 4,
+// --       generic parameters at depth 0
+// CHECK-SAME:   i32 1,
 // --       vtable offset
 // CHECK-SAME:   i32 11,
 // --       vtable size
