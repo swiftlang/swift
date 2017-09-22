@@ -955,6 +955,8 @@ public:
   ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
 
   llvm::Constant *getSize(Size size);
+  llvm::Constant *getAlignment(Alignment align);
+  llvm::Constant *getBool(bool condition);
 
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect,
                                ForDefinition_t forDefinition);
