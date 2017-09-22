@@ -53,84 +53,16 @@ class UnifiedStatsReporter {
 public:
   struct AlwaysOnDriverCounters
   {
-    size_t NumDriverJobsRun;
-    size_t NumDriverJobsSkipped;
-
-    size_t DriverDepCascadingTopLevel;
-    size_t DriverDepCascadingDynamic;
-    size_t DriverDepCascadingNominal;
-    size_t DriverDepCascadingMember;
-    size_t DriverDepCascadingExternal;
-
-    size_t DriverDepTopLevel;
-    size_t DriverDepDynamic;
-    size_t DriverDepNominal;
-    size_t DriverDepMember;
-    size_t DriverDepExternal;
-
-    size_t ChildrenMaxRSS;
+#define DRIVER_STATISTIC(ID) size_t ID;
+#include "Statistics.def"
+#undef DRIVER_STATISTIC
   };
 
   struct AlwaysOnFrontendCounters
   {
-    size_t NumSourceBuffers;
-    size_t NumSourceLines;
-    size_t NumSourceLinesPerSecond;
-    size_t NumLinkLibraries;
-    size_t NumLoadedModules;
-    size_t NumImportedExternalDefinitions;
-    size_t NumTotalClangImportedEntities;
-    size_t NumASTBytesAllocated;
-    size_t NumDependencies;
-    size_t NumReferencedTopLevelNames;
-    size_t NumReferencedDynamicNames;
-    size_t NumReferencedMemberNames;
-    size_t NumDecls;
-    size_t NumLocalTypeDecls;
-    size_t NumObjCMethods;
-    size_t NumInfixOperators;
-    size_t NumPostfixOperators;
-    size_t NumPrefixOperators;
-    size_t NumPrecedenceGroups;
-    size_t NumUsedConformances;
-
-    size_t NumConformancesDeserialized;
-    size_t NumConstraintScopes;
-    size_t NumDeclsDeserialized;
-    size_t NumDeclsValidated;
-    size_t NumFunctionsTypechecked;
-    size_t NumGenericSignatureBuilders;
-    size_t NumLazyGenericEnvironments;
-    size_t NumLazyGenericEnvironmentsLoaded;
-    size_t NumLazyIterableDeclContexts;
-    size_t NominalTypeLookupDirectCount;
-    size_t NumTypesDeserialized;
-    size_t NumTypesValidated;
-    size_t NumUnloadedLazyIterableDeclContexts;
-
-    size_t NumSILGenFunctions;
-    size_t NumSILGenVtables;
-    size_t NumSILGenWitnessTables;
-    size_t NumSILGenDefaultWitnessTables;
-    size_t NumSILGenGlobalVariables;
-
-    size_t NumSILOptFunctions;
-    size_t NumSILOptVtables;
-    size_t NumSILOptWitnessTables;
-    size_t NumSILOptDefaultWitnessTables;
-    size_t NumSILOptGlobalVariables;
-
-    size_t NumIRGlobals;
-    size_t NumIRFunctions;
-    size_t NumIRAliases;
-    size_t NumIRIFuncs;
-    size_t NumIRNamedMetaData;
-    size_t NumIRValueSymbols;
-    size_t NumIRComdatSymbols;
-    size_t NumIRBasicBlocks;
-    size_t NumIRInsts;
-
-    size_t NumLLVMBytesOutput;
+#define FRONTEND_STATISTIC(NAME, ID) size_t ID;
+#include "Statistics.def"
+#undef FRONTEND_STATISTIC
   };
 
 private:
