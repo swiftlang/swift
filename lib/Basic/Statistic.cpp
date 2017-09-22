@@ -42,18 +42,32 @@ getChildrenMaxResidentSetSize() {
 }
 
 static std::string
-makeFileName(StringRef ProgramName,
-             StringRef AuxName) {
+makeFileName(StringRef Prefix,
+             StringRef ProgramName,
+             StringRef AuxName,
+             StringRef Suffix) {
   std::string tmp;
   raw_string_ostream stream(tmp);
   auto now = std::chrono::system_clock::now();
-  stream << "stats"
+  stream << Prefix
          << "-" << now.time_since_epoch().count()
          << "-" << ProgramName
          << "-" << AuxName
          << "-" << Process::GetRandomNumber()
-         << ".json";
+         << "." << Suffix;
   return stream.str();
+}
+
+static std::string
+makeStatsFileName(StringRef ProgramName,
+                  StringRef AuxName) {
+  return makeFileName("stats", ProgramName, AuxName, "json");
+}
+
+static std::string
+makeTraceFileName(StringRef ProgramName,
+                  StringRef AuxName) {
+  return makeFileName("trace", ProgramName, AuxName, "csv");
 }
 
 // LLVM's statistics-reporting machinery is sensitive to filenames containing
@@ -108,29 +122,39 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef TripleName,
                                            StringRef OutputType,
                                            StringRef OptType,
-                                           StringRef Directory)
+                                           StringRef Directory,
+                                           SourceManager *SM,
+                                           bool TraceEvents)
   : UnifiedStatsReporter(ProgramName,
                          auxName(ModuleName,
                                  InputName,
                                  TripleName,
                                  OutputType,
                                  OptType),
-                         Directory)
+                         Directory,
+                         SM, TraceEvents)
 {
 }
 
 UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef AuxName,
-                                           StringRef Directory)
-  : Filename(Directory),
+                                           StringRef Directory,
+                                           SourceManager *SM,
+                                           bool TraceEvents)
+  : StatsFilename(Directory),
+    TraceFilename(Directory),
     StartedTime(llvm::TimeRecord::getCurrentTime()),
     Timer(make_unique<NamedRegionTimer>(AuxName,
                                         "Building Target",
-                                        ProgramName, "Running Program"))
+                                        ProgramName, "Running Program")),
+    SourceMgr(SM)
 {
-  path::append(Filename, makeFileName(ProgramName, AuxName));
+  path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
+  path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
   EnableStatistics(/*PrintOnExit=*/false);
   SharedTimer::enableCompilationTimers();
+  if (TraceEvents)
+    LastTracedFrontendCounters = make_unique<AlwaysOnFrontendCounters>();
 }
 
 UnifiedStatsReporter::AlwaysOnDriverCounters &
@@ -204,6 +228,91 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
   OS.flush();
 }
 
+UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer(
+    StringRef Name,
+    SourceRange const &Range,
+    UnifiedStatsReporter *Reporter)
+  : Reporter(Reporter),
+    SavedTime(llvm::TimeRecord::getCurrentTime()),
+    Name(Name),
+    Range(Range)
+{
+  if (Reporter)
+    Reporter->saveAnyFrontendStatsEvents(*this, true);
+}
+
+UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer()
+  : Reporter(nullptr)
+{
+}
+
+UnifiedStatsReporter::FrontendStatsTracer&
+UnifiedStatsReporter::FrontendStatsTracer::operator=(
+    FrontendStatsTracer&& other)
+{
+  Reporter = other.Reporter;
+  SavedTime = other.SavedTime;
+  Name = other.Name;
+  Range = other.Range;
+  other.Reporter = nullptr;
+  return *this;
+}
+
+UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer(
+    FrontendStatsTracer&& other)
+  : Reporter(other.Reporter),
+    SavedTime(other.SavedTime),
+    Name(other.Name),
+    Range(other.Range)
+{
+  other.Reporter = nullptr;
+}
+
+UnifiedStatsReporter::FrontendStatsTracer::~FrontendStatsTracer()
+{
+  if (Reporter)
+    Reporter->saveAnyFrontendStatsEvents(*this, false);
+}
+
+UnifiedStatsReporter::FrontendStatsTracer
+UnifiedStatsReporter::getStatsTracer(StringRef N,
+                                     SourceRange const &R)
+{
+  if (LastTracedFrontendCounters)
+    // Return live tracer object.
+    return FrontendStatsTracer(N, R, this);
+  else
+    // Return inert tracer object.
+    return FrontendStatsTracer();
+}
+
+void
+UnifiedStatsReporter::saveAnyFrontendStatsEvents(
+    FrontendStatsTracer const& T,
+    bool IsEntry)
+{
+  if (!LastTracedFrontendCounters)
+    return;
+  auto Now = llvm::TimeRecord::getCurrentTime();
+  auto StartUS = uint64_t(1000000.0 * T.SavedTime.getProcessTime());
+  auto NowUS = uint64_t(1000000.0 * Now.getProcessTime());
+  auto LiveUS = IsEntry ? 0 : NowUS - StartUS;
+  auto &C = getFrontendCounters();
+#define FRONTEND_STATISTIC(TY, NAME)                          \
+  do {                                                        \
+    auto delta = C.NAME - LastTracedFrontendCounters->NAME;   \
+    static char const *name = #TY "." #NAME;                  \
+    if (delta != 0) {                                         \
+      LastTracedFrontendCounters->NAME = C.NAME;              \
+      FrontendStatsEvents.emplace_back(FrontendStatsEvent {   \
+          NowUS, LiveUS, IsEntry, T.Name, name,               \
+            delta, C.NAME, T.Range});                         \
+    }                                                         \
+  } while (0);
+#include "swift/Basic/Statistics.def"
+#undef FRONTEND_STATISTIC
+}
+
 UnifiedStatsReporter::~UnifiedStatsReporter()
 {
   // NB: Timer needs to be Optional<> because it needs to be destructed early;
@@ -232,7 +341,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   }
 
   std::error_code EC;
-  raw_fd_ostream ostream(Filename, EC, fs::F_Append | fs::F_Text);
+  raw_fd_ostream ostream(StatsFilename, EC, fs::F_Append | fs::F_Text);
   if (EC)
     return;
 
@@ -255,6 +364,27 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 #else
   printAlwaysOnStatsAndTimers(ostream);
 #endif
+
+  if (LastTracedFrontendCounters && SourceMgr) {
+    std::error_code EC;
+    raw_fd_ostream tstream(TraceFilename, EC, fs::F_Append | fs::F_Text);
+    if (EC)
+      return;
+    tstream << "Time,Live,IsEntry,EventName,CounterName,"
+            << "CounterDelta,CounterValue,SourceRange\n";
+    for (auto const &E : FrontendStatsEvents) {
+      tstream << E.TimeUSec << ','
+              << E.LiveUSec << ','
+              << (E.IsEntry ? "\"entry\"," : "\"exit\",")
+              << '"' << E.EventName << '"' << ','
+              << '"' << E.CounterName << '"' << ','
+              << E.CounterDelta << ','
+              << E.CounterValue << ',';
+      tstream << '"';
+      E.SourceRange.print(tstream, *SourceMgr, false);
+      tstream << '"' << '\n';
+    }
+  }
 }
 
 } // namespace swift
