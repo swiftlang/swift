@@ -2550,13 +2550,6 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // Construct a representative function type.
   auto generics = ncGenerics->getCanonicalSignature();
   CanSILFunctionType fnType = [&]() -> CanSILFunctionType {
-    CanType type = typeDecl->getDeclaredInterfaceType()->getCanonicalType();
-    if (auto nominal = dyn_cast<NominalType>(type)) {
-      ParentType = nominal.getParent();
-    } else {
-      ParentType = cast<BoundGenericType>(type).getParent();
-    }
-
     return SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
                                 /*callee*/ ParameterConvention::Direct_Unowned,
                                 /*params*/ {}, /*results*/ {}, /*error*/ None,
