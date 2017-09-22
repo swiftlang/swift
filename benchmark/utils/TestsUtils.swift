@@ -17,16 +17,6 @@ import Darwin
 #endif
 
 public enum BenchmarkCategories {
-// Optimized benchmarks cover performance areas that have already been
-// investigated and optimized to some reasonable level. We expect these to be
-// "representative" of Swift perforance.
-case optimized
-
-// Most benchmarks are assumed to be "stable" and will be regularly tracked at
-// each commit. A handful may be marked unstable if continually tracking them is
-// counterproductive.
-case unstable
-
 // Validation "micro" benchmarks test a specific operation or critical path that
 // we know is important to measure.
 case validation
@@ -53,9 +43,28 @@ case miniapplication
 // report. We want to make sure the optimizer as a whole continues to handle
 // this case, but don't know how applicable it is to general Swift performance
 // relative to the other micro-benchmarks. In particular, these aren't weighted
-// as highly as "validation" benchmarks and likely won't be the subject of future
-// investigation unless they significantly regress.
+// as highly as "validation" benchmarks and likely won't be the subject of
+// future investigation unless they significantly regress.
 case regression
+
+// Most benchmarks are assumed to be "stable" and will be regularly tracked at
+// each commit. A handful may be marked unstable if continually tracking them is
+// counterproductive.
+case unstable
+
+// CPU benchmarks represent instrinsic Swift performance. They are useful for
+// measuring a fully baked Swift implementation across different platforms and
+// hardware. The benchmark should also be reasonably applicable to real Swift
+// code--it should exercise a known performance critical area. Typically these
+// will be drawn from the validation benchmarks once the language and standard
+// library implementation of the benchmark meets a reasonable efficiency
+// baseline. A benchmark should only be tagged "cpubench" after a full
+// performance investigation of the benchmark has been completed to determine
+// that it is a good representation of future Swift performance. Benchmarks
+// should not be tagged if they make use of an API that we plan on
+// reimplementing or call into code paths that have known opportunities for
+// significant optimization.
+case cpubench
 }
 
 public struct BenchmarkInfo {
