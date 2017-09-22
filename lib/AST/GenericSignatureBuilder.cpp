@@ -3888,8 +3888,10 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
                                  UnresolvedHandlingKind unresolvedHandling) {
   return addSameTypeRequirement(paOrT1, paOrT2, source, unresolvedHandling,
                                 [&](Type type1, Type type2) {
-      Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
-                     type1, type2);
+      if (source.getLoc().isValid()) {
+        Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
+                       type1, type2);
+      }
     });
 }
 
@@ -4165,9 +4167,10 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
         firstType, secondType, source,
         UnresolvedHandlingKind::GenerateConstraints,
         [&](Type type1, Type type2) {
-          if (source.getLoc().isValid())
+          if (source.getLoc().isValid()) {
             Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
                            type1, type2);
+          }
         });
   }
   }
