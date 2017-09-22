@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
-
 // REQUIRES: executable-test
+
+import StdlibUnittest
 
 enum Token: Hashable {
   case string(String)
@@ -9,34 +10,6 @@ enum Token: Hashable {
   case colon
 }
 
-guard Token.string("foo") == .string("foo") else { fatalError() }
-guard Token.string("foo") != .string("bar") else { fatalError() }
-guard Token.string("foo") != .number(5) else { fatalError() }
-guard Token.string("foo") != .comma else { fatalError() }
-guard Token.string("foo") != .colon else { fatalError() }
-guard Token.number(10) == .number(10) else { fatalError() }
-guard Token.number(10) != .number(20) else { fatalError() }
-guard Token.number(10) != .comma else { fatalError() }
-guard Token.number(10) != .colon else { fatalError() }
-guard Token.comma == .comma else { fatalError() }
-guard Token.comma != .colon else { fatalError() }
-guard Token.comma == .comma else { fatalError() }
-_ = Token.string("foo").hashValue
-_ = Token.number(5).hashValue
-_ = Token.comma.hashValue
-_ = Token.colon.hashValue
-
-// Verify that the hash value also depends on the payload. This depends on
-// _mixInt not giving us a collision for the values we use below.
-struct FixedHashValue: Hashable {
-  let hashValue: Int
-}
-enum Foo: Hashable {
-  case a(FixedHashValue)
-}
-guard Foo.a(FixedHashValue(hashValue: 1)) != .a(FixedHashValue(hashValue: 2)) else { fatalError() }
-
-// Try something a little more complex.
 enum Combo<T: Hashable, U: Hashable>: Hashable {
   case none
   case first(T)
@@ -44,23 +17,40 @@ enum Combo<T: Hashable, U: Hashable>: Hashable {
   case both(T, U)
 }
 
-guard Combo<String, Int>.none == .none else { fatalError() }
-guard Combo<String, Int>.none != .first("foo") else { fatalError() }
-guard Combo<String, Int>.none != .second(5) else { fatalError() }
-guard Combo<String, Int>.none != .both("foo", 5) else { fatalError() }
-guard Combo<String, Int>.first("a") == .first("a") else { fatalError() }
-guard Combo<String, Int>.first("a") != .first("b") else { fatalError() }
-guard Combo<String, Int>.first("a") != .second(5) else { fatalError() }
-guard Combo<String, Int>.second(3) != .second(5) else { fatalError() }
-guard Combo<String, Int>.second(5) == .second(5) else { fatalError() }
-guard Combo<String, Int>.both("foo", 5) == .both("foo", 5) else { fatalError() }
-guard Combo<String, Int>.both("bar", 5) != .both("foo", 5) else { fatalError() }
-guard Combo<String, Int>.both("foo", 3) != .both("foo", 5) else { fatalError() }
-guard Combo<String, Int>.both("bar", 3) != .both("foo", 5) else { fatalError() }
-_ = Combo<String, Int>.none.hashValue
-_ = Combo<String, Int>.first("a").hashValue
-_ = Combo<String, Int>.second(5).hashValue
-_ = Combo<String, Int>.both("foo", 5).hashValue
+var EnumSynthesisTests = TestSuite("EnumSynthesis")
+
+EnumSynthesisTests.test("BasicEquatability/Hashability") {
+  checkHashable([
+    Token.string("foo"),
+    Token.number(10),
+    Token.comma,
+    Token.colon,
+  ], equalityOracle: { $0 == $1 })
+}
+
+// Not guaranteed by the semantics of Hashable, but we sanity check that the
+// synthesized hash function is good enough to not let nearby values collide.
+EnumSynthesisTests.test("CloseValuesDoNotCollide") {
+  expectNotEqual(Token.string("foo").hashValue, Token.string("goo").hashValue)
+  expectNotEqual(Token.number(10).hashValue, Token.number(11).hashValue)
+}
+
+EnumSynthesisTests.test("GenericEquatability/Hashability") {
+  checkHashable([
+    Combo<String, Int>.none,
+    Combo<String, Int>.first("a"),
+    Combo<String, Int>.second(5),
+    Combo<String, Int>.both("foo", 5),
+  ], equalityOracle: { $0 == $1 })
+}
+
+EnumSynthesisTests.test("CloseGenericValuesDoNotCollide") {
+  expectNotEqual(Combo<String, Int>.first("foo").hashValue, Combo<String, Int>.first("goo").hashValue)
+  expectNotEqual(Combo<String, Int>.second(3).hashValue, Combo<String, Int>.second(4).hashValue)
+  expectNotEqual(Combo<String, Int>.both("foo", 3).hashValue, Combo<String, Int>.both("goo", 3).hashValue)
+  expectNotEqual(Combo<String, Int>.both("foo", 3).hashValue, Combo<String, Int>.both("foo", 4).hashValue)
+  expectNotEqual(Combo<String, Int>.both("foo", 3).hashValue, Combo<String, Int>.both("goo", 4).hashValue)
+}
 
 // Make sure that if the user overrides the synthesized member, that one gets
 // used instead.
@@ -69,9 +59,11 @@ enum Overrides: Hashable {
   var hashValue: Int { return 2 }
   static func == (lhs: Overrides, rhs: Overrides) -> Bool { return true }
 }
-guard Overrides.a(4) == .b("foo") else { fatalError() }
-guard Overrides.a(4).hashValue == 2 else { fatalError() }
-guard Overrides.b("foo").hashValue == 2 else { fatalError() }
+
+EnumSynthesisTests.test("ExplicitOverridesSynthesized") {
+  checkHashable(expectedEqual: true, Overrides.a(4), .b("foo"))
+  expectEqual(Overrides.a(4).hashValue, 2)
+}
 
 // ...even in an extension.
 enum OverridesInExtension: Hashable {
@@ -81,18 +73,24 @@ extension OverridesInExtension {
   var hashValue: Int { return 2 }
   static func == (lhs: OverridesInExtension, rhs: OverridesInExtension) -> Bool { return true }
 }
-guard OverridesInExtension.a(4) == .b("foo") else { fatalError() }
-guard OverridesInExtension.a(4).hashValue == 2 else { fatalError() }
-guard OverridesInExtension.b("foo").hashValue == 2 else { fatalError() }
+
+EnumSynthesisTests.test("ExplicitOverridesSynthesizedInExtension") {
+  checkHashable(expectedEqual: true, OverridesInExtension.a(4), .b("foo"))
+  expectEqual(OverridesInExtension.a(4).hashValue, 2)
+}
 
 // Try an indirect enum.
 enum BinaryTree<Element: Hashable>: Hashable {
   indirect case tree(BinaryTree, BinaryTree)
   case leaf(Element)
 }
-let one = BinaryTree<Int>.tree(.leaf(10), .leaf(20))
-let two = BinaryTree<Int>.tree(.leaf(10), .leaf(20))
-let three = BinaryTree<Int>.tree(.leaf(20), .leaf(30))
-guard one == two else { fatalError() }
-guard one != three else { fatalError() }
-guard one.hashValue == two.hashValue else { fatalError() }
+
+EnumSynthesisTests.test("IndirectEquatability/Hashability") {
+  let one = BinaryTree<Int>.tree(.leaf(10), .leaf(20))
+  let two = BinaryTree<Int>.tree(.leaf(10), .leaf(30))
+  let three = BinaryTree<Int>.tree(.leaf(15), .leaf(20))
+  let four = BinaryTree<Int>.tree(.leaf(15), .leaf(30))
+  checkHashable([one, two, three, four], equalityOracle: { $0 == $1 })
+}
+
+runAllTests()

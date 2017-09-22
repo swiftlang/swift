@@ -1,27 +1,44 @@
 // RUN: %target-run-simple-swift
-
 // REQUIRES: executable-test
+
+import StdlibUnittest
 
 struct Value: Hashable {
   let v: Int
 }
 
-guard Value(v: 1) == Value(v: 1) else { fatalError() }
-guard Value(v: 1) != Value(v: 2) else { fatalError() }
-_ = Value(v: 1).hashValue
-_ = Value(v: 2).hashValue
-
-// Try something a little more complex.
 struct Pair<T: Hashable, U: Hashable>: Hashable {
   let a: T
   let b: U
 }
 typealias PSI = Pair<String, Int>
 
-guard PSI(a: "foo", b: 0) == PSI(a: "foo", b: 0) else { fatalError() }
-guard PSI(a: "foo", b: 0) != PSI(a: "foo", b: 5) else { fatalError() }
-guard PSI(a: "foo", b: 0) != PSI(a: "bar", b: 0) else { fatalError() }
-_ = PSI(a: "foo", b: 0).hashValue
+var StructSynthesisTests = TestSuite("StructSynthesis")
+
+StructSynthesisTests.test("BasicEquatability/Hashability") {
+  checkHashable([Value(v: 1), Value(v: 2)], equalityOracle: { $0 == $1 })
+}
+
+// Not guaranteed by the semantics of Hashable, but we sanity check that the
+// synthesized hash function is good enough to not let nearby values collide.
+StructSynthesisTests.test("CloseValuesDoNotCollide") {
+  expectNotEqual(Value(v: 1).hashValue, Value(v: 2).hashValue)
+}
+
+StructSynthesisTests.test("GenericEquatability/Hashability") {
+  checkHashable([
+    PSI(a: "foo", b: 0),
+    PSI(a: "bar", b: 0),
+    PSI(a: "foo", b: 5),
+    PSI(a: "bar", b: 5),
+  ], equalityOracle: { $0 == $1 })
+}
+
+StructSynthesisTests.test("CloseGenericValuesDoNotCollide") {
+  expectNotEqual(PSI(a: "foo", b: 0).hashValue, PSI(a: "goo", b: 0).hashValue)
+  expectNotEqual(PSI(a: "foo", b: 0).hashValue, PSI(a: "foo", b: 1).hashValue)
+  expectNotEqual(PSI(a: "foo", b: 0).hashValue, PSI(a: "goo", b: 1).hashValue)
+}
 
 // Make sure that if the user overrides the synthesized member, that one gets
 // used instead.
@@ -30,9 +47,11 @@ struct Overrides: Hashable {
   var hashValue: Int { return 2 }
   static func == (lhs: Overrides, rhs: Overrides) -> Bool { return true }
 }
-guard Overrides(a: 4) == Overrides(a: 5) else { fatalError() }
-guard Overrides(a: 4).hashValue == 2 else { fatalError() }
-guard Overrides(a: 5).hashValue == 2 else { fatalError() }
+
+StructSynthesisTests.test("ExplicitOverridesSynthesized") {
+  checkHashable(expectedEqual: true, Overrides(a: 4), Overrides(a: 5))
+  expectEqual(Overrides(a: 4).hashValue, 2)
+}
 
 // ...even in an extension.
 struct OverridesInExtension: Hashable {
@@ -42,6 +61,10 @@ extension OverridesInExtension {
   var hashValue: Int { return 2 }
   static func == (lhs: OverridesInExtension, rhs: OverridesInExtension) -> Bool { return true }
 }
-guard OverridesInExtension(a: 4) == OverridesInExtension(a: 5) else { fatalError() }
-guard OverridesInExtension(a: 4).hashValue == 2 else { fatalError() }
-guard OverridesInExtension(a: 5).hashValue == 2 else { fatalError() }
+
+StructSynthesisTests.test("ExplicitOverridesSynthesizedInExtension") {
+  checkHashable(expectedEqual: true, OverridesInExtension(a: 4), OverridesInExtension(a: 5))
+  expectEqual(OverridesInExtension(a: 4).hashValue, 2)
+}
+
+runAllTests()
