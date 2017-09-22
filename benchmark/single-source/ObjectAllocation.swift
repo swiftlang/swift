@@ -10,8 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-// This test checks the performance of allocations.
 import TestsUtils
+
+// This test checks the performance of allocations.
+public var ObjectAllocation = BenchmarkInfo(
+  name: "ObjectAllocation",
+  runFunction: run_ObjectAllocation,
+  tags: [.runtime]
+)
 
 final class XX {
   var xx: Int
