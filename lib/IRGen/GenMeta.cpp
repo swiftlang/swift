@@ -2223,11 +2223,7 @@ namespace {
 
       // This assertion will fail once we have generic types nested
       // inside generic functions or other local generic contexts.
-      //
-      // FIXME: Enable this once we stop fulfilling generic parameters
-      // from parent type metadata.
-      //
-      // assert(totalGenericParams == requirements.getNumTypeRequirements());
+      assert(totalGenericParams == requirements.getNumTypeRequirements());
 
       // Emit the nesting depth.
       B.addInt16(numPrimaryParams.size());
