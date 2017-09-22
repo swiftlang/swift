@@ -1533,8 +1533,10 @@ bool RefactoringActionCollapseNestedIfExpr::performChange() {
   auto OuterIfConds = Target.OuterIf->getCond().vec();
   auto InnerIfConds = Target.InnerIf->getCond().vec();
 
-  llvm::SmallString<64> DeclBuffer;
-  llvm::raw_svector_ostream OS(DeclBuffer);
+  EditorConsumerInsertStream OS(EditConsumer, SM,
+    Lexer::getCharSourceRangeFromSourceRange(
+    SM, Target.OuterIf->getSourceRange()));
+
   OS << tok::kw_if << " ";
   for (auto CI = OuterIfConds.begin(); CI != OuterIfConds.end(); ++CI) {
     OS << (CI != OuterIfConds.begin() ? ", " : "");
@@ -1548,10 +1550,6 @@ bool RefactoringActionCollapseNestedIfExpr::performChange() {
   auto ThenStatementText = Lexer::getCharSourceRangeFromSourceRange(
     SM, Target.InnerIf->getThenStmt()->getSourceRange()).str();
   OS << " " << ThenStatementText;
-
-  auto SourceRange = Lexer::getCharSourceRangeFromSourceRange(
-    SM, Target.OuterIf->getSourceRange());
-  EditConsumer.accept(SM, SourceRange, DeclBuffer.str());
   return false;
 }
 
@@ -1654,14 +1652,12 @@ bool RefactoringActionConvertStringsConcatenationToInterpolation::performChange(
   auto Expressions = findConcatenatedExpressions(RangeInfo, Ctx);
   if (!Expressions)
     return true;
-  llvm::SmallString<64> Buffer;
-  llvm::raw_svector_ostream OS(Buffer);
+  EditorConsumerInsertStream OS(EditConsumer, SM, RangeInfo.ContentRange);
   OS << "\"";
   for (auto It = Expressions->begin(); It != Expressions->end(); It++) {
     interpolatedExpressionForm(*It, SM, OS);
   }
   OS << "\"";
-  EditConsumer.accept(SM, RangeInfo.ContentRange, Buffer);
   return false;
 }
 
@@ -1884,11 +1880,10 @@ bool RefactoringActionExpandDefault::performChange() {
   }
 
   // Good to go, change the code!
-  SmallString<64> Buffer;
-  llvm::raw_svector_ostream OS(Buffer);
+  EditorConsumerInsertStream OS(EditConsumer, SM,
+                                Lexer::getCharSourceRangeFromSourceRange(SM,
+                                  CS->getLabelItemsRange()));
   printEnumElementsAsCases(UnhandledElements, OS);
-  EditConsumer.accept(SM, Lexer::getCharSourceRangeFromSourceRange(SM,
-    CS->getLabelItemsRange()), Buffer.str());
   return false;
 }
 
@@ -2008,13 +2003,13 @@ isApplicable(ResolvedCursorInfo Tok) {
 
 bool RefactoringActionSimplifyNumberLiteral::performChange() {
   if (auto *Literal = getTrailingNumberLiteral(CursorInfo)) {
-    llvm::SmallString<64> Buffer;
-    llvm::raw_svector_ostream OS(Buffer);
+
+    EditorConsumerInsertStream OS(EditConsumer, SM,
+                                  CharSourceRange(SM, Literal->getDigitsLoc(),
+                                  Lexer::getLocForEndOfToken(SM,
+                                    Literal->getEndLoc())));
     StringRef Digits = Literal->getDigitsText();
     insertUnderscoreInDigits(Digits, OS);
-    EditConsumer.accept(SM, CharSourceRange(SM, Literal->getDigitsLoc(),
-                          Lexer::getLocForEndOfToken(SM, Literal->getEndLoc())),
-                        OS.str());
     return false;
   }
   return true;
