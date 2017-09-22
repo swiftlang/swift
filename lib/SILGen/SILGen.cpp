@@ -60,11 +60,11 @@ SILGenModule::~SILGenModule() {
 }
 
 EnumElementDecl *SILGenModule::getLoweredEnumElementDecl(EnumElementDecl *elt) {
-  auto &ctx = getASTContext();
   if (elt->getParentEnum()->classifyAsOptionalType()
         != OTK_ImplicitlyUnwrappedOptional)
     return elt;
 
+  auto &ctx = getASTContext();
   if (elt == ctx.getImplicitlyUnwrappedOptionalSomeDecl()) {
     return ctx.getOptionalSomeDecl();
   } else {

@@ -3080,6 +3080,11 @@ bool EnumDecl::isExhaustive(const DeclContext *useDC) const {
   if (!accessScope.isPublic())
     return true;
 
+  // Using from an arbitrary module must assume the enum is non-exhaustive at
+  // this point.
+  if (!useDC)
+    return false;
+
   // Enums in the same module are exhaustive /unless/ the use site is inlinable.
   const ModuleDecl *containingModule = getModuleContext();
   if (useDC->getResilienceExpansion() == ResilienceExpansion::Maximal)
