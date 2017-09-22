@@ -626,7 +626,9 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
         ReInfo.createSpecializedType(SubstitutedType, Builder.getModule());
   }
 
-  assert(OrigArgs.size() == ReInfo.getNumArguments() && "signature mismatch");
+  assert(!substConv.useLoweredAddresses()
+         || OrigArgs.size() == ReInfo.getNumArguments() &&
+         "signature mismatch");
 
   CallArgs.reserve(OrigArgs.size());
   SILValue StoreResultTo;

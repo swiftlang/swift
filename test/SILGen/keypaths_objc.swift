@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-keypath-components -emit-silgen -import-objc-header %S/Inputs/keypaths_objc.h %s | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-keypath-components -emit-ir -import-objc-header %S/Inputs/keypaths_objc.h %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -import-objc-header %S/Inputs/keypaths_objc.h %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -import-objc-header %S/Inputs/keypaths_objc.h %s
 // REQUIRES: objc_interop
 
 import Foundation

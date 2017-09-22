@@ -2000,7 +2000,7 @@ public:
                                  StringRef RuntimeName,
                                  StringRef SelectorName,
                                  ArrayRef<StringRef> InheritedTypes,
-                                 ArrayRef<UIdent> Attrs) override;
+                                 ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override;
 
   bool endDocumentSubStructure() override;
 
@@ -2227,7 +2227,7 @@ SKEditorConsumer::beginDocumentSubStructure(unsigned Offset,
                                             StringRef RuntimeName,
                                             StringRef SelectorName,
                                             ArrayRef<StringRef> InheritedTypes,
-                                            ArrayRef<UIdent> Attrs) {
+                                            ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) {
   if (EnableStructure) {
     DocStructure.beginSubStructure(
         Offset, Length, Kind, AccessLevel, SetterAccessLevel, NameOffset,

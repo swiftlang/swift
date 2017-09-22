@@ -73,7 +73,7 @@ public:
 
   std::string mangleAccessorEntity(AccessorKind kind,
                                    AddressorKind addressorKind,
-                                   const ValueDecl *decl,
+                                   const AbstractStorageDecl *decl,
                                    bool isStatic,
                                    SymbolKind SKind);
 
@@ -114,12 +114,18 @@ public:
                                              Type FromType, Type ToType,
                                              ModuleDecl *Module);
   
-  std::string mangleKeyPathGetterThunkHelper(const VarDecl *property,
+  std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature *signature,
-                                             CanType baseType);
-  std::string mangleKeyPathSetterThunkHelper(const VarDecl *property,
+                                             CanType baseType,
+                                             ArrayRef<CanType> subs);
+  std::string mangleKeyPathSetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature *signature,
-                                             CanType baseType);
+                                             CanType baseType,
+                                             ArrayRef<CanType> subs);
+  std::string mangleKeyPathEqualsHelper(ArrayRef<CanType> indices,
+                                        GenericSignature *signature);
+  std::string mangleKeyPathHashHelper(ArrayRef<CanType> indices,
+                                      GenericSignature *signature);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC,
                                     GenericEnvironment *GE);
@@ -138,7 +144,7 @@ public:
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         AddressorKind addressorKind,
-                                        const ValueDecl *decl,
+                                        const AbstractStorageDecl *decl,
                                         StringRef USRPrefix);
 
 protected:
@@ -225,10 +231,12 @@ protected:
   
   void appendDestructorEntity(const DestructorDecl *decl, bool isDeallocating);
 
-  void appendAccessorEntity(AccessorKind kind,
-                            AddressorKind addressorKind,
-                            const ValueDecl *decl,
-                            bool isStatic);
+  /// \param accessorKindCode The code to describe the accessor and addressor
+  /// kind. Usually retrieved using getCodeForAccessorKind.
+  /// \param decl The storage decl for which to mangle the accessor
+  /// \param isStatic Whether or not the accessor is static
+  void appendAccessorEntity(StringRef accessorKindCode,
+                            const AbstractStorageDecl *decl, bool isStatic);
 
   void appendEntity(const ValueDecl *decl, StringRef EntityOp, bool isStatic);
 

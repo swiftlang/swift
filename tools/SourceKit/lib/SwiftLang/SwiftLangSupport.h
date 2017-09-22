@@ -305,6 +305,8 @@ public:
 
   static SourceKit::UIdent getUIDForRefactoringRangeKind(swift::ide::RefactoringRangeKind Kind);
 
+  static Optional<UIdent> getUIDForDeclAttribute(const swift::DeclAttribute *Attr);
+
   static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
 
   static SourceKit::UIdent getUIDForNameKind(swift::ide::NameKind Kind);

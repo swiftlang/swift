@@ -188,12 +188,12 @@ func inoutToPointer() {
   }
   takesMutablePointer(&logicalInt)
   // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_T018pointer_conversion19takesMutablePointer{{[_0-9a-zA-Z]*}}F
-  // CHECK: [[GETTER:%.*]] = function_ref @_T018pointer_conversion14inoutToPointeryyF10logicalIntL_Sifg
+  // CHECK: [[GETTER:%.*]] = function_ref @_T018pointer_conversion14inoutToPointeryyF10logicalIntL_Sivg
   // CHECK: apply [[GETTER]]
   // CHECK: [[CONVERT:%.*]] = function_ref @_T0s30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>>
   // CHECK: apply [[TAKES_MUTABLE]]
-  // CHECK: [[SETTER:%.*]] = function_ref @_T018pointer_conversion14inoutToPointeryyF10logicalIntL_Sifs
+  // CHECK: [[SETTER:%.*]] = function_ref @_T018pointer_conversion14inoutToPointeryyF10logicalIntL_Sivs
   // CHECK: apply [[SETTER]]
 
   takesMutableRawPointer(&int)
@@ -206,12 +206,12 @@ func inoutToPointer() {
 
   takesMutableRawPointer(&logicalInt)
   // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_T018pointer_conversion22takesMutableRawPointer{{[_0-9a-zA-Z]*}}F
-  // CHECK: [[GETTER:%.*]] = function_ref @_T018pointer_conversion14inoutToPointeryyF10logicalIntL_Sifg
+  // CHECK: [[GETTER:%.*]] = function_ref @_T018pointer_conversion14inoutToPointeryyF10logicalIntL_Sivg
   // CHECK: apply [[GETTER]]
   // CHECK: [[CONVERT:%.*]] = function_ref @_T0s30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutableRawPointer>
   // CHECK: apply [[TAKES_MUTABLE]]
-  // CHECK: [[SETTER:%.*]] = function_ref @_T018pointer_conversion14inoutToPointeryyF10logicalIntL_Sifs
+  // CHECK: [[SETTER:%.*]] = function_ref @_T018pointer_conversion14inoutToPointeryyF10logicalIntL_Sivs
   // CHECK: apply [[SETTER]]
 }
 

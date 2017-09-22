@@ -262,6 +262,25 @@ protected:
     super::visitUpcastInst(Upcast);
   }
 
+  void visitCopyValueInst(CopyValueInst *Copy) {
+    // If the substituted type is trivial, ignore the copy.
+    SILType copyTy = getOpType(Copy->getType());
+    if (copyTy.isTrivial(Copy->getModule())) {
+      ValueMap.insert({SILValue(Copy), getOpValue(Copy->getOperand())});
+      return;
+    }
+    super::visitCopyValueInst(Copy);
+  }
+
+  void visitDestroyValueInst(DestroyValueInst *Destroy) {
+    // If the substituted type is trivial, ignore the destroy.
+    SILType destroyTy = getOpType(Destroy->getOperand()->getType());
+    if (destroyTy.isTrivial(Destroy->getModule())) {
+      return;
+    }
+    super::visitDestroyValueInst(Destroy);
+  }
+
   /// The Swift module that the cloned function belongs to.
   ModuleDecl *SwiftMod;
   /// The substitutions list for the specialization.

@@ -182,3 +182,40 @@ ValueOwnershipKind SILValue::getOwnershipKind() const {
   sil::ValueOwnershipKindClassifier Classifier;
   return Classifier.visit(const_cast<ValueBase *>(Value));
 }
+
+/// Map a SILValue mnemonic name to its ValueKind.
+ValueKind swift::getSILValueKind(StringRef Name) {
+#define INST(Id, Parent, TextualName, MemoryBehavior, ReleasingBehavior)       \
+  if (Name == #TextualName)                                                    \
+    return ValueKind::Id;
+
+#define VALUE(Id, Parent)                                                      \
+  if (Name == #Id)                                                             \
+    return ValueKind::Id;
+
+#include "swift/SIL/SILNodes.def"
+
+#ifdef NDEBUG
+  llvm::errs()
+    << "Unknown SILValue name\n";
+  abort();
+#endif
+  llvm_unreachable("Unknown SILValue name");
+}
+
+/// Map ValueKind to a corresponding mnemonic name.
+StringRef swift::getSILValueName(ValueKind Kind) {
+  switch (Kind) {
+#define INST(Id, Parent, TextualName, MemoryBehavior, ReleasingBehavior)       \
+  case ValueKind::Id:                                                          \
+    return #TextualName;                                                       \
+    break;
+
+#define VALUE(Id, Parent)                                                      \
+  case ValueKind::Id:                                                          \
+    return #Id;                                                                \
+    break;
+
+#include "swift/SIL/SILNodes.def"
+  }
+}

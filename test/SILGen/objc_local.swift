@@ -5,7 +5,7 @@
 import Foundation
 
 func foo() {
-  // CHECK-LABEL: sil private [thunk] @_T010objc_local3fooyyF3FooL_C1xSifgTo
-  // CHECK-LABEL: sil private [thunk] @_T010objc_local3fooyyF3FooL_C1xSifsTo
+  // CHECK-LABEL: sil private [thunk] @_T010objc_local3fooyyF3FooL_C1xSivgTo
+  // CHECK-LABEL: sil private [thunk] @_T010objc_local3fooyyF3FooL_C1xSivsTo
   class Foo : NSObject { @objc var x: Int = 0 }
 }

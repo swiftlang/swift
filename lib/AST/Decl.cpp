@@ -993,7 +993,7 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() {
     auto *DC = singleVar->getDeclContext();
     if (singleVar->getAttrs().hasAttribute<LazyAttr>() &&
         DC->isTypeContext()) {
-      bool isInOut = !DC->getDeclaredTypeOfContext()->hasReferenceSemantics();
+      bool isInOut = !DC->getDeclaredInterfaceType()->hasReferenceSemantics();
       SelfParam = ParamDecl::createSelf(SourceLoc(), DC,
                                         singleVar->isStatic(),
                                         isInOut);
@@ -1130,6 +1130,94 @@ VarDecl *PatternBindingDecl::getSingleVar() const {
   if (getNumPatternEntries() == 1)
     return getPatternList()[0].getPattern()->getSingleVar();
   return nullptr;
+}
+
+/// Check whether the given type representation will be
+/// default-initializable.
+static bool isDefaultInitializable(const TypeRepr *typeRepr) {
+  // Look through most attributes.
+  if (const auto attributed = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+    // Weak ownership implies optionality.
+    if (attributed->getAttrs().getOwnership() == Ownership::Weak)
+      return true;
+
+    return isDefaultInitializable(attributed->getTypeRepr());
+  }
+
+  // Optional types are default-initializable.
+  if (isa<OptionalTypeRepr>(typeRepr) ||
+      isa<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))
+    return true;
+
+  // Tuple types are default-initializable if all of their element
+  // types are.
+  if (const auto tuple = dyn_cast<TupleTypeRepr>(typeRepr)) {
+    // ... but not variadic ones.
+    if (tuple->hasEllipsis())
+      return false;
+
+    for (const auto elt : tuple->getElements()) {
+      if (!isDefaultInitializable(elt.Type))
+        return false;
+    }
+
+    return true;
+  }
+
+  // Not default initializable.
+  return false;
+}
+
+// @NSManaged properties never get default initialized, nor do debugger
+// variables and immutable properties.
+bool isNeverDefaultInitializable(const Pattern *p) {
+  bool result = false;
+
+  p->forEachVariable([&](const VarDecl *var) {
+    if (var->getAttrs().hasAttribute<NSManagedAttr>())
+      return;
+
+    if (var->isDebuggerVar() ||
+        var->isLet())
+      result = true;
+  });
+
+  return result;
+}
+
+bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
+  const auto entry = getPatternList()[i];
+
+  // If it has an initializer expression, this is trivially true.
+  if (entry.getInit())
+    return true;
+
+  if (isNeverDefaultInitializable(entry.getPattern()))
+    return false;
+
+  // If the pattern is typed as optional (or tuples thereof), it is
+  // default initializable.
+  if (const auto typedPattern = dyn_cast<TypedPattern>(entry.getPattern())) {
+    if (const auto typeRepr = typedPattern->getTypeLoc().getTypeRepr()) {
+      if (::isDefaultInitializable(typeRepr))
+        return true;
+    } else if (typedPattern->isImplicit()) {
+      // Lazy vars have implicit storage assigned to back them. Because the
+      // storage is implicit, the pattern is typed and has a TypeLoc, but not a
+      // TypeRepr.
+      //
+      // All lazy storage is implicitly default initializable, though, because
+      // lazy backing storage is optional.
+      if (const auto *varDecl = typedPattern->getSingleVar())
+        // Lazy storage is never user accessible.
+        if (!varDecl->isUserAccessible())
+          if (typedPattern->getTypeLoc().getType()->getAnyOptionalObjectType())
+            return true;
+    }
+  }
+
+  // Otherwise, we can't default initialize this binding.
+  return false;
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
@@ -1350,10 +1438,10 @@ bool AbstractStorageDecl::hasFixedLayout() const {
   auto *dc = getDeclContext();
 
   if (dc->isTypeContext()) {
-    auto declaredType = dc->getDeclaredTypeOfContext();
-    if (declaredType->hasError())
+    auto *nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (nominalDecl == nullptr)
       return true;
-    return declaredType->getAnyNominal()->hasFixedLayout();
+    return nominalDecl->hasFixedLayout();
   }
 
   // Private and (unversioned) internal variables always have a
@@ -1731,12 +1819,8 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
 
   // Dynamic lookup can only find class and protocol members, or extensions of
   // classes.
-  auto declaredType = getDeclContext()->getDeclaredTypeOfContext();
-  
-  if (!declaredType)
-    return false;
-  
-  auto nominalDC = declaredType->getAnyNominal();
+  auto nominalDC =
+    getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!nominalDC ||
       (!isa<ClassDecl>(nominalDC) && !isa<ProtocolDecl>(nominalDC)))
     return false;
@@ -1953,17 +2037,30 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
     break;
   }
 
+  auto restrictToEnclosing = [this](AccessLevel effectiveAccess,
+                                    AccessLevel enclosingAccess) -> AccessLevel{
+    if (effectiveAccess == AccessLevel::Open &&
+        enclosingAccess == AccessLevel::Public &&
+        isa<NominalTypeDecl>(this)) {
+      // Special case: an open class may be contained in a public
+      // class/struct/enum. Leave effectiveAccess as is.
+      return effectiveAccess;
+    }
+    return std::min(effectiveAccess, enclosingAccess);
+  };
+
   if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(getDeclContext())) {
-    effectiveAccess = std::min(effectiveAccess,
-                               enclosingNominal->getEffectiveAccess());
+    effectiveAccess =
+        restrictToEnclosing(effectiveAccess,
+                            enclosingNominal->getEffectiveAccess());
 
   } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(getDeclContext())) {
     // Just check the base type. If it's a constrained extension, Sema should
     // have already enforced access more strictly.
     if (auto extendedTy = enclosingExt->getExtendedType()) {
       if (auto nominal = extendedTy->getAnyNominal()) {
-        effectiveAccess = std::min(effectiveAccess,
-                                   nominal->getEffectiveAccess());
+        effectiveAccess =
+            restrictToEnclosing(effectiveAccess, nominal->getEffectiveAccess());
       }
     }
 
@@ -2185,9 +2282,14 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   DeclContext *dc = decl->getDeclContext();
   if (dc->isTypeContext()) {
     switch (kind) {
-    case DeclTypeKind::DeclaredType:
-      Ty = dc->getDeclaredTypeOfContext();
+    case DeclTypeKind::DeclaredType: {
+      auto *nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+      if (nominal)
+        Ty = nominal->getDeclaredType();
+      else
+        Ty = ErrorType::get(ctx);
       break;
+    }
     case DeclTypeKind::DeclaredTypeInContext:
       llvm_unreachable("Handled above");
     case DeclTypeKind::DeclaredInterfaceType:
@@ -2352,10 +2454,15 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
 
 UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
   assert(getGenericParams());
+
+  Type parentTy;
+  auto parentDC = getDeclContext();
+  if (auto nominal = parentDC->getAsNominalTypeOrNominalTypeExtensionContext())
+    parentTy = nominal->getDeclaredType();
+
   return UnboundGenericType::get(
       const_cast<TypeAliasDecl *>(this),
-      getDeclContext()->getDeclaredTypeOfContext(),
-      getASTContext());
+      parentTy, getASTContext());
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
@@ -3284,63 +3391,6 @@ void ProtocolDecl::setDefaultWitness(ValueDecl *requirement, Witness witness) {
   auto pair = DefaultWitnesses.insert(std::make_pair(requirement, witness));
   assert(pair.second && "Already have a default witness!");
   (void) pair;
-}
-
-/// \brief Return true if the 'getter' is mutating, i.e. that it requires an
-/// lvalue base to be accessed.
-bool AbstractStorageDecl::isGetterMutating() const {
-  switch (getStorageKind()) {
-  case AbstractStorageDecl::Stored:
-    return false;
-    
-  case AbstractStorageDecl::StoredWithObservers:
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-  case AbstractStorageDecl::InheritedWithObservers:
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-  case AbstractStorageDecl::Computed:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::AddressedWithObservers:
-    assert(getGetter());
-    return getGetter()->isMutating();
-    
-  case AbstractStorageDecl::Addressed:
-    assert(getAddressor());
-    return getAddressor()->isMutating();
-  }
-
-  llvm_unreachable("Unhandled AbstractStorageDecl in switch.");
-}
-
-/// \brief Return true if the 'setter' is nonmutating, i.e. that it can be
-/// called even on an immutable base value.
-bool AbstractStorageDecl::isSetterNonMutating() const {
-  // Setters declared in reference type contexts are never mutating.
-  if (auto contextType = getDeclContext()->getDeclaredInterfaceType()) {
-    if (contextType->hasReferenceSemantics())
-      return true;
-  }
-
-  switch (getStorageKind()) {
-  case AbstractStorageDecl::Stored:
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-    // Instance member setters are mutating; static property setters and
-    // top-level setters are not.
-    return !isInstanceMember();
-    
-  case AbstractStorageDecl::StoredWithObservers:
-  case AbstractStorageDecl::InheritedWithObservers:
-  case AbstractStorageDecl::Computed:
-    assert(getSetter());
-    return !getSetter()->isMutating();
-    
-  case AbstractStorageDecl::Addressed:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::AddressedWithObservers:
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-    assert(getMutableAddressor());
-    return !getMutableAddressor()->isMutating();
-  }
-  llvm_unreachable("bad storage kind");
 }
 
 FuncDecl *AbstractStorageDecl::getAccessorFunction(AccessorKind kind) const {

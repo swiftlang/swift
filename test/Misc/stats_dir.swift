@@ -3,6 +3,14 @@
 // RUN: %utils/process-stats-dir.py --set-csv-baseline %t/frontend.csv %t
 // RUN: %FileCheck -input-file %t/frontend.csv %s
 // RUN: rm -rf %t && mkdir -p %t
+// RUN: %target-swift-frontend -c -o %t/out.o -stats-output-dir %t %s
+// RUN: %utils/process-stats-dir.py --set-csv-baseline %t/frontend.csv --exclude-timers %t
+// RUN: %FileCheck -input-file %t/frontend.csv --implicit-check-not '{{time.swift}}' %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %target-swift-frontend -c -o %t/out.o -stats-output-dir %t %s
+// RUN: %utils/process-stats-dir.py --set-csv-baseline %t/frontend.csv --select-stat NumSourceLines --select-stat NumIRFunctions --select-stat NumLLVMBytesOutput %t
+// RUN: %FileCheck -input-file %t/frontend.csv %s
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -c -wmo -num-threads 4 -o %t/out.o -stats-output-dir %t %s
 // RUN: %utils/process-stats-dir.py --set-csv-baseline %t/frontend.csv %t
 // RUN: %FileCheck -input-file %t/frontend.csv %s

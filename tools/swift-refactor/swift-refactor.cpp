@@ -38,8 +38,12 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                       "expand-default", "Perform expand default statement refactoring"),
            clEnumValN(RefactoringKind::LocalizeString,
                       "localize-string", "Perform string localization refactoring"),
+           clEnumValN(RefactoringKind::CollapseNestedIfExpr,
+                       "collapse-nested-if", "Perform collapse nested if statements"),
            clEnumValN(RefactoringKind::SimplifyNumberLiteral,
                       "simplify-long-number", "Perform simplify long number literal refactoring"),
+           clEnumValN(RefactoringKind::ConvertStringsConcatenationToInterpolation,
+                     "strings-concatenation-to-interpolation", "Perform strings concatenation to interpolation refactoring"),
            clEnumValN(RefactoringKind::ExtractFunction,
                       "extract-function", "Perform extract function refactoring"),
            clEnumValN(RefactoringKind::GlobalRename,
@@ -219,6 +223,7 @@ int main(int argc, char *argv[]) {
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
   Invocation.addInputFilename(options::SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
+  Invocation.getLangOptions().KeepTokensInSourceFile = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.addInputFilename(FileName);

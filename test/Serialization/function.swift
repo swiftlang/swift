@@ -13,7 +13,7 @@ func useEq<T: EqualOperator>(_ x: T, y: T) -> Bool {
 }
 
 // SIL: sil @main
-// SIL:   [[RAW:%.+]] = global_addr @_T08function3rawSiv : $*Int
+// SIL:   [[RAW:%.+]] = global_addr @_T08function3rawSivp : $*Int
 // SIL:   [[ZERO:%.+]] = function_ref @_T08def_func7getZeroSiyF : $@convention(thin) () -> Int
 // SIL:   [[RESULT:%.+]] = apply [[ZERO]]() : $@convention(thin) () -> Int
 // SIL:   store [[RESULT]] to [trivial] [[RAW]] : $*Int

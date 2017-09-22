@@ -212,7 +212,22 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
       if (auto *S = ESD.dyn_cast<Stmt*>()) {
         if (S->isImplicit()) continue;
       } else if (auto *E = ESD.dyn_cast<Expr*>()) {
-        if (E->isImplicit()) continue;
+        // Optional chaining expressions are wrapped in a structure like.
+        //
+        // (optional_evaluation_expr implicit type='T?'
+        //   (call_expr type='T?'
+        //     (exprs...
+        //
+        // Walk through it to find out if the statement is actually implicit.
+        if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(E)) {
+          if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr()))
+            if (IIO->getSubExpr()->isImplicit()) continue;
+          if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr()))
+            if (C->isImplicit()) continue;
+        } else if (E->isImplicit()) {
+          // Ignore all other implicit expressions.
+          continue;
+        }
       }
       
       if (StmtType != UnknownStmtType) {
@@ -748,7 +763,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   SILValue addrOnlyBuf;
   ManagedValue nextBufOrValue;
 
-  if (optTL.isAddressOnly())
+  if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses())
     addrOnlyBuf = SGF.emitTemporaryAllocation(S, optTL.getLoweredType());
 
   // Create a new basic block and jump into it.
@@ -763,7 +778,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   //
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
-  if (optTL.isAddressOnly()) {
+  if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
     Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
     auto nextInit = SGF.useBufferAsTemporary(addrOnlyBuf, optTL);
     SGF.emitExprInto(S->getIteratorNext(), nextInit.get());
@@ -815,7 +830,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           //
           // *NOTE* If we do not have an address only value, then inputValue is
           // *already properly unwrapped.
-          if (optTL.isAddressOnly()) {
+          if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
             inputValue =
                 SGF.emitManagedBufferWithCleanup(nextBufOrValue.getValue());
             inputValue = SGF.emitUncheckedGetOptionalValueFrom(

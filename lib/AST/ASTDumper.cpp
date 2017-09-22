@@ -2743,7 +2743,7 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
 
     printCommon("normal");
     // Maybe print information about the conforming context?
-    if (normal->isLazilyResolved()) {
+    if (normal->isLazilyLoaded()) {
       out << " lazy";
     } else {
       forEachTypeWitness(nullptr, [&](const AssociatedTypeDecl *req,

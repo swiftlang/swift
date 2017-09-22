@@ -24,6 +24,7 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringSwitch.h"
 #include <utility>
 
 using namespace swift;
@@ -962,6 +963,7 @@ namespace {
 } // end anonymous namespace
 
 namespace {
+
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
     DeclContext *CurDC;
@@ -1489,6 +1491,13 @@ namespace {
     }
 
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
+      // If this is Builtin.type_join*, just return any type and move
+      // on since we're going to discard this, and creating any type
+      // variables for the reference will cause problems.
+      auto typeOperation = getTypeOperation(expr, CS.getASTContext());
+      if (typeOperation != TypeOperation::None)
+        return CS.getASTContext().TheAnyType;
+
       // Open a member constraint for constructor delegations on the
       // subexpr type.
       if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)) {
@@ -2349,9 +2358,15 @@ namespace {
 
     Type visitApplyExpr(ApplyExpr *expr) {
       Type outputTy;
-      
+
       auto fnExpr = expr->getFn();
-      
+
+      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
+        auto typeOperation = getTypeOperation(UDE, CS.getASTContext());
+        if (typeOperation != TypeOperation::None)
+          return resultOfTypeOperation(typeOperation, expr->getArg());
+      }
+
       if (isa<DeclRefExpr>(fnExpr)) {
         if (auto fnType = CS.getType(fnExpr)->getAs<AnyFunctionType>()) {
           outputTy = fnType->getResult();
@@ -2910,6 +2925,104 @@ namespace {
     Type visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }
+
+    enum class TypeOperation { None, Join, JoinInout, JoinMeta };
+
+    static TypeOperation getTypeOperation(UnresolvedDotExpr *UDE,
+                                          ASTContext &Context) {
+      auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase());
+      if (!DRE)
+        return TypeOperation::None;
+
+      if (DRE->getDecl() != Context.TheBuiltinModule)
+        return TypeOperation::None;
+
+      return llvm::StringSwitch<TypeOperation>(
+                 UDE->getName().getBaseIdentifier().str())
+          .Case("type_join", TypeOperation::Join)
+          .Case("type_join_inout", TypeOperation::JoinInout)
+          .Case("type_join_meta", TypeOperation::JoinMeta)
+          .Default(TypeOperation::None);
+    }
+
+    Type resultOfTypeOperation(TypeOperation op, Expr *Arg) {
+      auto *tuple = dyn_cast<TupleExpr>(Arg);
+      assert(tuple && "Expected argument tuple for join operations!");
+
+      auto *lhs = tuple->getElement(0);
+      auto *rhs = tuple->getElement(1);
+
+      switch (op) {
+      case TypeOperation::None:
+        llvm_unreachable(
+            "We should have a valid type operation at this point!");
+
+      case TypeOperation::Join: {
+        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
+        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
+        if (!lhsMeta || !rhsMeta)
+          llvm_unreachable("Unexpected argument types for Builtin.type_join!");
+
+        auto &ctx = lhsMeta->getASTContext();
+
+        auto join =
+            Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
+
+        // We will hit this assert today due to implemenation details
+        // of Type::join, but the intent is to define join to always
+        // result in a type.
+        assert(join && "Unexpected null type returned from Type::join!");
+
+        if (!join)
+          return ErrorType::get(ctx);
+
+        return MetatypeType::get(join, ctx)->getCanonicalType();
+      }
+
+      case TypeOperation::JoinInout: {
+        auto lhsInOut = CS.getType(lhs)->getAs<InOutType>();
+        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
+        if (!lhsInOut || !rhsMeta)
+          llvm_unreachable("Unexpected argument types for Builtin.type_join!");
+
+        auto &ctx = lhsInOut->getASTContext();
+
+        auto join =
+            Type::join(lhsInOut, rhsMeta->getInstanceType());
+
+        // We will hit this assert today due to implemenation details
+        // of Type::join, but the intent is to define join to always
+        // result in a type.
+        assert(join && "Unexpected null type returned from Type::join!");
+
+        if (!join)
+          return ErrorType::get(ctx);
+
+        return MetatypeType::get(join, ctx)->getCanonicalType();
+      }
+
+      case TypeOperation::JoinMeta: {
+        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
+        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
+        if (!lhsMeta || !rhsMeta)
+          llvm_unreachable("Unexpected argument types for Builtin.type_join!");
+
+        auto &ctx = lhsMeta->getASTContext();
+
+        auto join = Type::join(lhsMeta, rhsMeta);
+
+        // We will hit this assert today due to implemenation details
+        // of Type::join, but the intent is to define join to always
+        // result in a type.
+        assert(join && "Unexpected null type returned from Type::join!");
+
+        if (!join)
+          return ErrorType::get(ctx);
+
+        return join;
+      }
+      }
+    }
   };
 
   /// \brief AST walker that "sanitizes" an expression for the
@@ -3055,6 +3168,35 @@ namespace {
     /// \brief Once we've visited the children of the given expression,
     /// generate constraints from the expression.
     Expr *walkToExprPost(Expr *expr) override {
+
+      // Handle the Builtin.type_join* family of calls by replacing
+      // them with dot_self_expr of type_expr with the type being the
+      // result of the join.
+      if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
+        auto fnExpr = apply->getFn();
+        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
+          auto &CS = CG.getConstraintSystem();
+          auto typeOperation =
+              ConstraintGenerator::getTypeOperation(UDE, CS.getASTContext());
+
+          if (typeOperation != ConstraintGenerator::TypeOperation::None) {
+            auto joinMetaTy =
+                CG.resultOfTypeOperation(typeOperation, apply->getArg());
+            auto joinTy = joinMetaTy->castTo<MetatypeType>()->getInstanceType();
+
+            auto *TE = TypeExpr::createImplicit(joinTy, CS.getASTContext());
+            CS.cacheType(TE);
+
+            auto *DSE = new (CS.getASTContext())
+                DotSelfExpr(TE, SourceLoc(), SourceLoc(), CS.getType(TE));
+            DSE->setImplicit();
+            CS.cacheType(DSE);
+
+            return DSE;
+          }
+        }
+      }
+
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         if (closure->hasSingleExpressionBody()) {
           CG.exitClosure(closure);

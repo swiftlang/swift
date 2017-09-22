@@ -83,9 +83,7 @@ class ClassWithComputedPropertyDeprecatedIn10_51 {
     }
   }
 
-  // We really shouldn't be emitting three warnings here. It looks like
-  // we are emitting one for each of the setter and getter, as well.
-  var unannotatedPropertyDeprecatedIn10_51 : ClassDeprecatedIn10_51 { // expected-warning 3{{ClassDeprecatedIn10_51' was deprecated in OS X 10.51}}
+  var unannotatedPropertyDeprecatedIn10_51 : ClassDeprecatedIn10_51 { // expected-warning {{ClassDeprecatedIn10_51' was deprecated in OS X 10.51}}
     get {
       return ClassDeprecatedIn10_51() // expected-warning {{ClassDeprecatedIn10_51' was deprecated in OS X 10.51}}
     }

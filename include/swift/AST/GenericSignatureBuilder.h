@@ -317,6 +317,15 @@ private:
                                              const RequirementSource *Source);
 
 public:
+  /// "Expand" the conformance of the given \c pa to the protocol \c proto,
+  /// adding the requirements from its requirement signature, rooted at
+  /// the given requirement \c source.
+  ConstraintResult expandConformanceRequirement(
+                                      PotentialArchetype *pa,
+                                      ProtocolDecl *proto,
+                                      const RequirementSource *source,
+                                      bool onlySameTypeConstraints);
+
   /// \brief Add a new same-type requirement between two fully resolved types
   /// (output of \c GenericSignatureBuilder::resolve).
   ///
@@ -824,6 +833,11 @@ public:
     /// A requirement that was resolved based on structural derivation from
     /// another requirement.
     Derived,
+
+    /// A requirement that was provided for another potential archetype in the
+    /// same equivalence class, but which we want to "re-root" on a new
+    /// potential archetype.
+    EquivalentType,
   };
 
   /// The kind of requirement source.
@@ -882,6 +896,7 @@ private:
     case Parent:
     case Concrete:
     case Derived:
+    case EquivalentType:
       return 0;
     }
 
@@ -927,6 +942,7 @@ private:
     case Parent:
     case Concrete:
     case Derived:
+    case EquivalentType:
       return false;
     }
 
@@ -1011,6 +1027,18 @@ public:
            "RequirementSource kind/storageKind mismatch");
   }
 
+  RequirementSource(Kind kind, const RequirementSource *parent,
+                    PotentialArchetype *newPA)
+    : kind(kind), storageKind(StorageKind::RootArchetype),
+      hasTrailingWrittenRequirementLoc(false),
+      usesRequirementSignature(false), parent(parent) {
+    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
+           "Root RequirementSource should not have parent (or vice versa)");
+    assert(isAcceptableStorageKind(kind, storageKind) &&
+           "RequirementSource kind/storageKind mismatch");
+    storage.rootArchetype = newPA;
+  }
+
 public:
   /// Retrieve an abstract requirement source.
   static const RequirementSource *forAbstract(PotentialArchetype *root);
@@ -1075,6 +1103,11 @@ public:
   /// A constraint source that describes a constraint that is structurally
   /// derived from another constraint but does not require further information.
   const RequirementSource *viaDerived(GenericSignatureBuilder &builder) const;
+
+  /// A constraint source that describes a constraint that is structurally
+  /// derived from another constraint but does not require further information.
+  const RequirementSource *viaEquivalentType(GenericSignatureBuilder &builder,
+                                             PotentialArchetype *newPA) const;
 
   /// Form a new requirement source without the subpath [start, end).
   ///
@@ -1427,10 +1460,12 @@ class GenericSignatureBuilder::PotentialArchetype {
   {
   }
 
+public:
   /// \brief Retrieve the representative for this archetype, performing
   /// path compression on the way.
   PotentialArchetype *getRepresentative() const;
 
+private:
   /// Retrieve the generic signature builder with which this archetype is
   /// associated.
   GenericSignatureBuilder *getBuilder() const {
@@ -1695,6 +1730,12 @@ public:
   UnresolvedType lhs;
   RequirementRHS rhs;
   FloatingRequirementSource source;
+
+  /// Dump a debugging representation of this delayed requirement class.
+  void dump(llvm::raw_ostream &out) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "only for use in the debugger");
 };
 
 /// Whether the given constraint result signals an error.

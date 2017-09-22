@@ -1612,9 +1612,22 @@ public:
 /// subscript is available.
 class DynamicLookupExpr : public Expr {
 protected:
-  explicit DynamicLookupExpr(ExprKind kind) : Expr(kind, /*Implicit=*/false) { }
+  Expr *Base;
+  ConcreteDeclRef Member;
+
+  explicit DynamicLookupExpr(ExprKind kind, ConcreteDeclRef member, Expr *base)
+    : Expr(kind, /*Implicit=*/false), Base(base), Member(member) { }
 
 public:
+  /// Retrieve the member to which this access refers.
+  ConcreteDeclRef getMember() const { return Member; }
+
+  /// Retrieve the base of the expression.
+  Expr *getBase() const { return Base; }
+
+  /// Replace the base of the expression.
+  void setBase(Expr *base) { Base = base; }
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_DynamicLookupExpr &&
            E->getKind() <= ExprKind::Last_DynamicLookupExpr;
@@ -1637,8 +1650,6 @@ public:
 /// print(x.foo!(17)) // x.foo has type ((i : Int) -> String)?
 /// \endcode
 class DynamicMemberRefExpr : public DynamicLookupExpr {
-  Expr *Base;
-  ConcreteDeclRef Member;
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
 
@@ -1646,18 +1657,9 @@ public:
   DynamicMemberRefExpr(Expr *base, SourceLoc dotLoc,
                        ConcreteDeclRef member,
                        DeclNameLoc nameLoc)
-    : DynamicLookupExpr(ExprKind::DynamicMemberRef),
-      Base(base), Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
+    : DynamicLookupExpr(ExprKind::DynamicMemberRef, member, base),
+      DotLoc(dotLoc), NameLoc(nameLoc) {
     }
-
-  /// Retrieve the base of the expression.
-  Expr *getBase() const { return Base; }
-
-  /// Replace the base of the expression.
-  void setBase(Expr *base) { Base = base; }
-
-  /// Retrieve the member to which this access refers.
-  ConcreteDeclRef getMember() const { return Member; }
 
   /// Retrieve the location of the member name.
   DeclNameLoc getNameLoc() const { return NameLoc; }
@@ -1707,9 +1709,7 @@ class DynamicSubscriptExpr final
       public TrailingCallArguments<DynamicSubscriptExpr> {
   friend TrailingCallArguments;
 
-  Expr *Base;
   Expr *Index;
-  ConcreteDeclRef Member;
 
   DynamicSubscriptExpr(Expr *base, Expr *index, ArrayRef<Identifier> argLabels,
                        ArrayRef<SourceLoc> argLabelLocs,
@@ -1761,9 +1761,6 @@ public:
   bool hasTrailingClosure() const {
     return DynamicSubscriptExprBits.HasTrailingClosure;
   }
-
-  /// Retrieve the member to which this access refers.
-  ConcreteDeclRef getMember() const { return Member; }
 
   SourceLoc getLoc() const { return Index->getStartLoc(); }
 
@@ -4677,6 +4674,7 @@ public:
     
     llvm::PointerIntPair<Expr *, 3, Kind> SubscriptIndexExprAndKind;
     ArrayRef<Identifier> SubscriptLabels;
+    ArrayRef<ProtocolConformanceRef> SubscriptHashableConformances;
     Type ComponentType;
     SourceLoc Loc;
     
@@ -4684,20 +4682,22 @@ public:
                        DeclNameOrRef decl,
                        Expr *indexExpr,
                        ArrayRef<Identifier> subscriptLabels,
+                       ArrayRef<ProtocolConformanceRef> indexHashables,
                        Kind kind,
                        Type type,
                        SourceLoc loc);
     
   public:
     Component()
-      : Component(nullptr, {}, nullptr, {}, Kind::Invalid, Type(), SourceLoc())
+      : Component(nullptr, {}, nullptr, {}, {}, Kind::Invalid,
+                  Type(), SourceLoc())
     {}
     
     /// Create an unresolved component for a property.
     static Component forUnresolvedProperty(DeclName UnresolvedName,
                                            SourceLoc Loc) {
       return Component(nullptr,
-                       UnresolvedName, nullptr, {},
+                       UnresolvedName, nullptr, {}, {},
                        Kind::UnresolvedProperty,
                        Type(),
                        Loc);
@@ -4723,13 +4723,14 @@ public:
                                          SourceLoc loc) {
       
       return Component(&context,
-                       {}, index, subscriptLabels, Kind::UnresolvedSubscript,
+                       {}, index, subscriptLabels, {},
+                       Kind::UnresolvedSubscript,
                        Type(), loc);
     }
     
     /// Create an unresolved optional force `!` component.
     static Component forUnresolvedOptionalForce(SourceLoc BangLoc) {
-      return Component(nullptr, {}, nullptr, {},
+      return Component(nullptr, {}, nullptr, {}, {},
                        Kind::OptionalForce,
                        Type(),
                        BangLoc);
@@ -4737,7 +4738,7 @@ public:
     
     /// Create an unresolved optional chain `?` component.
     static Component forUnresolvedOptionalChain(SourceLoc QuestionLoc) {
-      return Component(nullptr, {}, nullptr, {},
+      return Component(nullptr, {}, nullptr, {}, {},
                        Kind::OptionalChain,
                        Type(),
                        QuestionLoc);
@@ -4747,7 +4748,7 @@ public:
     static Component forProperty(ConcreteDeclRef property,
                                  Type propertyType,
                                  SourceLoc loc) {
-      return Component(nullptr, property, nullptr, {},
+      return Component(nullptr, property, nullptr, {}, {},
                        Kind::Property,
                        propertyType,
                        loc);
@@ -4755,14 +4756,15 @@ public:
     
     /// Create a component for a subscript.
     static Component forSubscript(ASTContext &ctx,
-                                  ConcreteDeclRef subscript,
-                                  SourceLoc lSquareLoc,
-                                  ArrayRef<Expr *> indexArgs,
-                                  ArrayRef<Identifier> indexArgLabels,
-                                  ArrayRef<SourceLoc> indexArgLabelLocs,
-                                  SourceLoc rSquareLoc,
-                                  Expr *trailingClosure,
-                                  Type elementType);
+                              ConcreteDeclRef subscript,
+                              SourceLoc lSquareLoc,
+                              ArrayRef<Expr *> indexArgs,
+                              ArrayRef<Identifier> indexArgLabels,
+                              ArrayRef<SourceLoc> indexArgLabelLocs,
+                              SourceLoc rSquareLoc,
+                              Expr *trailingClosure,
+                              Type elementType,
+                              ArrayRef<ProtocolConformanceRef> indexHashables);
 
     /// Create a component for a subscript.
     ///
@@ -4770,11 +4772,12 @@ public:
     /// list of index arguments.
     static Component forSubscriptWithPrebuiltIndexExpr(
        ConcreteDeclRef subscript, Expr *index, ArrayRef<Identifier> labels,
-       Type elementType, SourceLoc loc);
+       Type elementType, SourceLoc loc,
+       ArrayRef<ProtocolConformanceRef> indexHashables);
     
     /// Create an optional-forcing `!` component.
     static Component forOptionalForce(Type forcedType, SourceLoc bangLoc) {
-      return Component(nullptr, {}, nullptr, {},
+      return Component(nullptr, {}, nullptr, {}, {},
                        Kind::OptionalForce, forcedType,
                        bangLoc);
     }
@@ -4782,7 +4785,7 @@ public:
     /// Create an optional-chaining `?` component.
     static Component forOptionalChain(Type unwrappedType,
                                       SourceLoc questionLoc) {
-      return Component(nullptr, {}, nullptr, {},
+      return Component(nullptr, {}, nullptr, {}, {},
                        Kind::OptionalChain, unwrappedType,
                        questionLoc);
     }
@@ -4791,7 +4794,7 @@ public:
     /// syntax but may appear when the non-optional result of an optional chain
     /// is implicitly wrapped.
     static Component forOptionalWrap(Type wrappedType) {
-      return Component(nullptr, {}, nullptr, {},
+      return Component(nullptr, {}, nullptr, {}, {},
                        Kind::OptionalWrap, wrappedType,
                        SourceLoc());
     }
@@ -4858,6 +4861,26 @@ public:
         llvm_unreachable("no subscript labels for this kind");
       }
     }
+    
+    ArrayRef<ProtocolConformanceRef>
+    getSubscriptIndexHashableConformances() const {
+      switch (getKind()) {
+      case Kind::Subscript:
+        return SubscriptHashableConformances;
+        
+      case Kind::UnresolvedSubscript:
+      case Kind::Invalid:
+      case Kind::OptionalChain:
+      case Kind::OptionalWrap:
+      case Kind::OptionalForce:
+      case Kind::UnresolvedProperty:
+      case Kind::Property:
+        llvm_unreachable("no hashable conformances for this kind");
+      }
+    }
+    
+    void setSubscriptIndexHashableConformances(
+      ArrayRef<ProtocolConformanceRef> hashables);
 
     DeclName getUnresolvedDeclName() const {
       switch (getKind()) {

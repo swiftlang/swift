@@ -2502,7 +2502,7 @@ markBaseOfAbstractStorageDeclStore(Expr *base, ConcreteDeclRef decl) {
   // If the store is to a non-mutating member, then this is just a load, even
   // if the base is an inout expr.
   auto *ASD = cast<AbstractStorageDecl>(decl.getDecl());
-  if (ASD->isSettable(nullptr) && ASD->isSetterNonMutating()) {
+  if (ASD->isSettable(nullptr) && !ASD->isSetterMutating()) {
     // Sema conservatively converts the base to inout expr when it is an lvalue.
     // Look through it because we know it isn't actually doing a load/store.
     if (auto *ioe = dyn_cast<InOutExpr>(base))
@@ -2998,7 +2998,9 @@ public:
       if (!ctor) return { true, expr };
 
       // Make sure the constructor is within Selector.
-      auto ctorContextType = ctor->getDeclContext()->getDeclaredTypeOfContext();
+      auto ctorContextType = ctor->getDeclContext()
+          ->getAsNominalTypeOrNominalTypeExtensionContext()
+          ->getDeclaredType();
       if (!ctorContextType || !ctorContextType->isEqual(SelectorTy))
         return { true, expr };
 

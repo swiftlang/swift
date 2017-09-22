@@ -1091,14 +1091,19 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintLocatorBuilder locator) {
   // An @autoclosure function type can be a subtype of a
   // non-@autoclosure function type.
-  if (func1->isAutoClosure() != func2->isAutoClosure() &&
-      kind < ConstraintKind::Subtype)
-    return SolutionKind::Error;
+  if (func1->isAutoClosure() != func2->isAutoClosure()) {
+    // If the 2nd type is an autoclosure, then the first type needs wrapping in a
+    // closure despite already being a function type.
+    if (func2->isAutoClosure())
+      return SolutionKind::Error;
+    if (kind < ConstraintKind::Subtype)
+      return SolutionKind::Error;
+  }
   
   // A non-throwing function can be a subtype of a throwing function.
   if (func1->throws() != func2->throws()) {
     // Cannot drop 'throws'.
-    if (func1->throws() || (func2->throws() && kind < ConstraintKind::Subtype))
+    if (func1->throws() || kind < ConstraintKind::Subtype)
       return SolutionKind::Error;
   }
 
@@ -1473,6 +1478,65 @@ static bool isBindable(TypeVariableType *typeVar, Type type) {
          !type->is<DependentMemberType>();
 }
 
+ConstraintSystem::SolutionKind ConstraintSystem::matchTypesBindTypeVar(
+    TypeVariableType *typeVar, Type type, ConstraintKind kind,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator,
+    std::function<SolutionKind()> formUnsolvedResult) {
+  assert(typeVar->is<TypeVariableType>() && "Expected a type variable!");
+  // FIXME: Due to some SE-0110 related code farther up we can end
+  // up with type variables wrapped in parens that will trip this
+  // assert. For now, maintain the existing behavior.
+  // assert(!type->is<TypeVariableType>() && "Expected a non-type variable!");
+
+  // Simplify the right-hand type and perform the "occurs" check.
+  typeVar = getRepresentative(typeVar);
+  type = simplifyType(type, flags);
+  if (!isBindable(typeVar, type))
+    return formUnsolvedResult();
+
+  // Equal constraints allow mixed LValue/RValue bindings, but
+  // if we bind a type to a type variable that can bind to
+  // LValues as part of simplifying the Equal constraint we may
+  // later block a binding of the opposite "LValue-ness" to the
+  // same type variable that happens as part of simplifying
+  // another constraint.
+  if (kind == ConstraintKind::Equal) {
+    if (typeVar->getImpl().canBindToLValue())
+      return formUnsolvedResult();
+
+    type = type->getRValueType();
+  }
+
+  // If the left-hand type variable cannot bind to an lvalue,
+  // but we still have an lvalue, fail.
+  if (!typeVar->getImpl().canBindToLValue() && type->hasLValueType())
+    return SolutionKind::Error;
+
+  // Okay. Bind below.
+
+  // Check whether the type variable must be bound to a materializable
+  // type.
+  if (typeVar->getImpl().mustBeMaterializable()) {
+    if (!type->isMaterializable())
+      return SolutionKind::Error;
+
+    setMustBeMaterializableRecursive(type);
+  }
+
+  // A constraint that binds any pointer to a void pointer is
+  // ineffective, since any pointer can be converted to a void pointer.
+  if (kind == ConstraintKind::BindToPointerType && type->isVoid()) {
+    // Bind type1 to Void only as a last resort.
+    addConstraint(ConstraintKind::Defaultable, typeVar, type,
+                  getConstraintLocator(locator));
+    return SolutionKind::Solved;
+  }
+
+  assignFixedType(typeVar, type);
+
+  return SolutionKind::Solved;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
@@ -1549,6 +1613,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // If either (or both) types are type variables, unify the type variables.
   if (typeVar1 || typeVar2) {
+    // Handle the easy case of both being type variables, and being
+    // identical, first.
+    if (typeVar1 && typeVar2) {
+      auto rep1 = getRepresentative(typeVar1);
+      auto rep2 = getRepresentative(typeVar2);
+      if (rep1 == rep2) {
+        // We already merged these two types, so this constraint is
+        // trivially solved.
+        return SolutionKind::Solved;
+      }
+    }
+
     switch (kind) {
     case ConstraintKind::Bind:
     case ConstraintKind::BindToPointerType:
@@ -1556,11 +1632,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (typeVar1 && typeVar2) {
         auto rep1 = getRepresentative(typeVar1);
         auto rep2 = getRepresentative(typeVar2);
-        if (rep1 == rep2) {
-          // We already merged these two types, so this constraint is
-          // trivially solved.
-          return SolutionKind::Solved;
-        }
 
         // If exactly one of the type variables can bind to an lvalue, we
         // can't merge these two type variables.
@@ -1573,86 +1644,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return SolutionKind::Solved;
       }
 
-      // Provide a fixed type for the type variable.
-      if (typeVar1) {
-        // Simplify the right-hand type and perform the "occurs" check.
-        typeVar1 = getRepresentative(typeVar1);
-        type2 = simplifyType(type2, flags);
-        if (!isBindable(typeVar1, type2))
-          return formUnsolvedResult();
+      assert((type1->is<TypeVariableType>() || type2->is<TypeVariableType>()) &&
+             "Expected a type variable!");
+      // FIXME: Due to some SE-0110 related code farther up we can end
+      // up with type variables wrapped in parens that will trip this
+      // assert. For now, maintain the existing behavior.
+      // assert(
+      //     (!type1->is<TypeVariableType>() || !type2->is<TypeVariableType>())
+      //     && "Expected a non-type variable!");
 
-        // Equal constraints allow mixed LValue/RValue bindings, but
-        // if we bind a type to a type variable that can bind to
-        // LValues as part of simplifying the Equal constraint we may
-        // later block a binding of the opposite "LValue-ness" to the
-        // same type variable that happens as part of simplifying
-        // another constraint.
-        if (kind == ConstraintKind::Equal) {
-          if (typeVar1->getImpl().canBindToLValue())
-            return formUnsolvedResult();
+      auto *typeVar = typeVar1 ? typeVar1 : typeVar2;
+      auto type = typeVar1 ? type2 : type1;
 
-          type2 = type2->getRValueType();
-        }
-
-        // If the left-hand type variable cannot bind to an lvalue,
-        // but we still have an lvalue, fail.
-        if (!typeVar1->getImpl().canBindToLValue() &&
-            type2->hasLValueType())
-          return SolutionKind::Error;
-
-        // Okay. Bind below.
-
-        // Check whether the type variable must be bound to a materializable
-        // type.
-        if (typeVar1->getImpl().mustBeMaterializable()) {
-          if (!type2->isMaterializable())
-            return SolutionKind::Error;
-
-          setMustBeMaterializableRecursive(type2);
-        }
-
-        // A constraint that binds any pointer to a void pointer is
-        // ineffective, since any pointer can be converted to a void pointer.
-        if (kind == ConstraintKind::BindToPointerType && type2->isVoid()) {
-          // Bind type1 to Void only as a last resort.
-          addConstraint(ConstraintKind::Defaultable, typeVar1, type2,
-                        getConstraintLocator(locator));
-          return SolutionKind::Solved;
-        }
-
-        assignFixedType(typeVar1, type2);
-
-        return SolutionKind::Solved;
-      }
-
-      // Simplify the left-hand type and perform the "occurs" check.
-      typeVar2 = getRepresentative(typeVar2);
-      type1 = simplifyType(type1, flags);
-      if (!isBindable(typeVar2, type1))
-        return formUnsolvedResult();
-
-      // Equal constraints allow mixed LValue/RValue bindings, but
-      // if we bind a type to a type variable that can bind to
-      // LValues as part of simplifying the Equal constraint we may
-      // later block a binding of the opposite "LValue-ness" to the
-      // same type variable that happens as part of simplifying
-      // another constraint.
-      if (kind == ConstraintKind::Equal) {
-        if (typeVar2->getImpl().canBindToLValue())
-          return formUnsolvedResult();
-
-        type1 = type1->getRValueType();
-      }
-
-      if (!typeVar2->getImpl().canBindToLValue() &&
-          type1->hasLValueType()) {
-        return SolutionKind::Error;
-        
-        // Okay. Bind below.
-      }
-
-      assignFixedType(typeVar2, type1);
-      return SolutionKind::Solved;
+      return matchTypesBindTypeVar(typeVar, type, kind, flags, locator,
+                                   formUnsolvedResult);
     }
 
     case ConstraintKind::BindParam: {
@@ -1682,12 +1687,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           assignFixedType(typeVar1, type2);
         }
         return SolutionKind::Solved;
-      } else if (typeVar1 && typeVar2) {
-        auto rep1 = getRepresentative(typeVar1);
-        auto rep2 = getRepresentative(typeVar2);
-        if (rep1 == rep2) {
-          return SolutionKind::Solved;
-        }
       }
 
       return formUnsolvedResult();
@@ -1695,63 +1694,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::Conversion:
-      if (typeVar1 && typeVar2) {
-        auto rep1 = getRepresentative(typeVar1);
-        auto rep2 = getRepresentative(typeVar2);
-        if (rep1 == rep2) {
-          // We already merged these two types, so this constraint is
-          // trivially solved.
-          return SolutionKind::Solved;
-        }
-      }
       LLVM_FALLTHROUGH;
 
     case ConstraintKind::Subtype:
-      // Subtype constraints are subject for edge contraction,
-      // which is inappropriate in this case, because it's going to
-      // erase/lose 'inout' modifier after merging equivalence classes
-      // (if inout constraints type var, see ConstraintGraph::contractEdges()),
-      // since right-hand side type variable must not be materializable
-      // it can simply get left-hand side as a fixed binding, otherwise fail.
-      if (type1->is<InOutType>() &&
-          type1->getInOutObjectType()->isTypeVariableOrMember() && typeVar2) {
-        // Left-hand side type is not materializable, so we need to
-        // check if it's even appropriate to have such a constraint
-        // between these two types, or fail early otherwise if right-hand
-        // side must be materializable.
-        if (typeVar2->getImpl().mustBeMaterializable())
-          return SolutionKind::Error;
-
-        // Constraints like `inout T0 subtype T1` where (T0 must be
-        // materializable) are created when closures are part of the generic
-        // function parameters e.g. `func foo<T>(_ t: T, (inout T) -> Void) {}`
-        // so when such function gets called e.g.
-        // ```
-        //  var x = 42
-        //  foo(x) { $0 = 0 }
-        // ```
-        // it's going to try and map closure parameters type (inout T0), where
-        // T0 is opened generic parameter T, to argument type (T1), which can
-        // be 'inout' but it's uncertain at this stage, but since closure
-        // 'declaration' `{ $0 = 0 }` is wrapped inside of a function call,
-        // it has to 'map' parameters to arguments instead of converting them,
-        // see `ConstraintSystem::matchFunctionTypes`.
-        assignFixedType(typeVar2, type1);
-        return SolutionKind::Solved;
-      }
-      LLVM_FALLTHROUGH;
-
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
       // We couldn't solve this constraint. If only one of the types is a type
       // variable, perhaps we can do something with it below.
-      if (typeVar1 && typeVar2) {
-        if (typeVar1 == typeVar2) return SolutionKind::Solved;
-
+      if (typeVar1 && typeVar2)
         return formUnsolvedResult();
-      }
-        
       break;
 
     case ConstraintKind::ApplicableFunction:
@@ -3971,7 +3923,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
         continue;
       }
       // A nonmutating setter indicates a reference-writable base.
-      if (storage->isSetterNonMutating()) {
+      if (!storage->isSetterMutating()) {
         capability = ReferenceWritable;
         continue;
       }

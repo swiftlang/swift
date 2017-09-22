@@ -2270,6 +2270,14 @@ public:
                                      TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
 
+  /// \brief Subroutine of \c matchTypes(), used to bind a type to a
+  /// type variable.
+  SolutionKind
+  matchTypesBindTypeVar(TypeVariableType *typeVar, Type type,
+                        ConstraintKind kind, TypeMatchOptions flags,
+                        ConstraintLocatorBuilder locator,
+                        std::function<SolutionKind()> formUnsolvedResult);
+
 public: // FIXME: public due to statics in CSSimplify.cpp
   /// \brief Attempt to match up types \c type1 and \c type2, which in effect
   /// is solving the given type constraint between these two types.
@@ -2543,8 +2551,10 @@ private:
   };
 
   struct PotentialBindings {
-    typedef std::tuple<bool, bool, bool, bool, unsigned char,
-                       bool, unsigned int> BindingScore;
+    typedef std::tuple<bool, bool, bool, bool, bool,
+                       unsigned char, unsigned int> BindingScore;
+
+    TypeVariableType *TypeVar;
 
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
@@ -2567,6 +2577,11 @@ private:
     /// Is this type variable on the RHS of a BindParam constraint?
     bool IsRHSOfBindParam = false;
 
+    /// Tracks the position of the last known supertype in the group.
+    Optional<unsigned> lastSupertypeIndex;
+
+    PotentialBindings(TypeVariableType *typeVar) : TypeVar(typeVar) {}
+
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
 
@@ -2580,8 +2595,8 @@ private:
                              b.FullyBound,
                              b.IsRHSOfBindParam,
                              b.SubtypeOfExistentialType,
-                             static_cast<unsigned char>(b.LiteralBinding),
                              b.InvolvesTypeVariables,
+                             static_cast<unsigned char>(b.LiteralBinding),
                              -(b.Bindings.size() - b.NumDefaultableBindings));
     }
 
@@ -2609,6 +2624,38 @@ private:
           LiteralBinding = LiteralBindingKind::Atom;
         break;
       }
+    }
+
+    /// \brief Add a potential binding to the list of bindings,
+    /// coalescing supertype bounds when we are able to compute the meet.
+    void addPotentialBinding(PotentialBinding binding,
+                             bool allowJoinMeet = true) {
+      assert(!binding.BindingType->is<ErrorType>());
+
+      // If this is a non-defaulted supertype binding,
+      // check whether we can combine it with another
+      // supertype binding by computing the 'join' of the types.
+      if (binding.Kind == AllowedBindingKind::Supertypes &&
+          !binding.BindingType->hasTypeVariable() &&
+          !binding.DefaultedProtocol && !binding.isDefaultableBinding() &&
+          allowJoinMeet) {
+        if (lastSupertypeIndex) {
+          // Can we compute a join?
+          auto &lastBinding = Bindings[*lastSupertypeIndex];
+          auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
+          auto bindingType = binding.BindingType->getWithoutSpecifierType();
+          if (auto join = Type::join(lastType, bindingType)) {
+            // Replace the last supertype binding with the join. We're done.
+            lastBinding.BindingType = join;
+            return;
+          }
+        }
+
+        // Record this as the most recent supertype index.
+        lastSupertypeIndex = Bindings.size();
+      }
+
+      Bindings.push_back(std::move(binding));
     }
 
     void dump(llvm::raw_ostream &out,
@@ -2674,7 +2721,7 @@ private:
 
   Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type,
                                     bool *isNilLiteral = nullptr);
-  std::pair<PotentialBindings, TypeVariableType *> determineBestBindings();
+  Optional<PotentialBindings> determineBestBindings();
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
 
   bool

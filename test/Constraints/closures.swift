@@ -264,6 +264,10 @@ func someFunc(_ foo: ((String) -> String)?,
     let _: (String) -> String = foo ?? bar
 }
 
+func verify_NotAC_to_AC_failure(_ arg: () -> ()) {
+  func takesAC(_ arg: @autoclosure () -> ()) {}
+  takesAC(arg) // expected-error {{function produces expected type '()'; did you mean to call it with '()'?}}
+}
 
 // SR-1069 - Error diagnostic refers to wrong argument
 class SR1069_W<T> {
@@ -588,3 +592,14 @@ SR5202<()>().map{ return 0 }
 SR5202<()>().map{ _ in return 0 }
 SR5202<Void>().map{ return 0 }
 SR5202<Void>().map{ _ in return 0 }
+
+func sr3520_2<T>(_ item: T, _ update: (inout T) -> Void) {
+  var x = item
+  update(&x)
+}
+var sr3250_arg = 42
+sr3520_2(sr3250_arg) { $0 += 3 } // ok
+
+// SR-1976/SR-3073: Inference of inout
+func sr1976<T>(_ closure: (inout T) -> Void) {}
+sr1976({ $0 += 2 }) // ok

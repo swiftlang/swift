@@ -1591,6 +1591,10 @@ void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
 }
 
 void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
+  // In some cases, we won't have validated the signature
+  // by the time we got here.
+  if (!fn->hasInterfaceType()) return;
+
   CheckErrorCoverage checker(*this, Context::forFunction(fn));
 
   // If this is a debugger function, suppress 'try' marking at the top level.

@@ -66,7 +66,8 @@ TEST(WeakTest, simple_swift) {
   ASSERT_NE(o2, nullptr);
 
   WeakReference ref1;
-  swift_weakInit(&ref1, o1);
+  auto res = swift_weakInit(&ref1, o1);
+  ASSERT_EQ(res, &ref1);
 
   HeapObject *tmp = swift_weakLoadStrong(&ref1);
   ASSERT_EQ(tmp, o1);
@@ -76,7 +77,8 @@ TEST(WeakTest, simple_swift) {
   ASSERT_EQ(o1, tmp);
   swift_release(tmp);
 
-  swift_weakAssign(&ref1, o2);
+  res = swift_weakAssign(&ref1, o2);
+  ASSERT_EQ(res, &ref1);
   tmp = swift_weakLoadStrong(&ref1);
   ASSERT_EQ(o2, tmp);
   swift_release(tmp);
@@ -97,7 +99,28 @@ TEST(WeakTest, simple_swift) {
   ASSERT_EQ(nullptr, tmp);
   swift_release(tmp);
 
+  WeakReference ref2;
+  res = swift_weakCopyInit(&ref2, &ref1);
+  ASSERT_EQ(res, &ref2);
+
+  WeakReference ref3;
+  res = swift_weakTakeInit(&ref3, &ref2);
+  ASSERT_EQ(res, &ref3);
+
+  HeapObject *o3 = make_swift_object();
+  WeakReference ref4; // ref4 = init
+  res = swift_weakInit(&ref4, o3);
+  ASSERT_EQ(res, &ref4);
+
+  res = swift_weakCopyAssign(&ref4, &ref3);
+  ASSERT_EQ(res, &ref4);
+
+  res = swift_weakTakeAssign(&ref4, &ref3);
+  ASSERT_EQ(res, &ref4);
+
+  swift_weakDestroy(&ref4);
   swift_weakDestroy(&ref1);
+  swift_release(o3);
 }
 
 TEST(WeakTest, simple_objc) {
@@ -254,7 +277,8 @@ TEST(WeakTest, simple_objc_and_swift) {
   DestroyedObjCCount = 0;
 
   WeakReference ref1;
-  swift_unknownWeakInit(&ref1, o1);
+  auto res = swift_unknownWeakInit(&ref1, o1);
+  ASSERT_EQ(&ref1, res);
 
   void *tmp = swift_unknownWeakLoadStrong(&ref1);
   ASSERT_EQ(tmp, o1);
@@ -412,7 +436,8 @@ TEST(WeakTest, objc_unowned_copyInit_nil) {
   ASSERT_EQ(nullptr, result);
 
   // ref2 = ref1 (nil -> nil)
-  swift_unknownUnownedCopyInit(&ref2, &ref1);
+  auto res = swift_unknownUnownedCopyInit(&ref2, &ref1);
+  ASSERT_EQ(&ref2, res);
   result = swift_unknownUnownedLoadStrong(&ref1);
   ASSERT_EQ(nullptr, result);
   result = swift_unknownUnownedLoadStrong(&ref2);
@@ -512,7 +537,8 @@ TEST(WeakTest, objc_unowned_takeInit_nil) {
   ASSERT_EQ(nullptr, result);
 
   // ref2 = ref1 (nil -> nil)
-  swift_unknownUnownedTakeInit(&ref2, &ref1);
+  auto res = swift_unknownUnownedTakeInit(&ref2, &ref1);
+  ASSERT_EQ(&ref2, res);
   result = swift_unknownUnownedLoadStrong(&ref2);
   ASSERT_EQ(nullptr, result);
   swift_unknownUnownedDestroy(&ref2);
@@ -615,7 +641,8 @@ TEST(WeakTest, objc_unowned_copyAssign) {
   swift_unknownRelease(result);
 
   // ref1 = ref2 (objc self transition)
-  swift_unknownUnownedCopyAssign(&ref1, &ref2);
+  auto res = swift_unknownUnownedCopyAssign(&ref1, &ref2);
+  ASSERT_EQ(&ref1, res);
   result = swift_unknownUnownedLoadStrong(&ref1);
   ASSERT_EQ(objc1, result);
   swift_unknownRelease(result);
@@ -743,7 +770,8 @@ TEST(WeakTest, objc_unowned_takeAssign) {
   void *result;
 
   // ref1 = objc1
-  swift_unknownUnownedInit(&ref1, objc1);
+  auto res = swift_unknownUnownedInit(&ref1, objc1);
+  ASSERT_EQ(&ref1, res);
   result = swift_unknownUnownedLoadStrong(&ref1);
   ASSERT_EQ(objc1, result);
   swift_unknownRelease(result);
@@ -755,7 +783,8 @@ TEST(WeakTest, objc_unowned_takeAssign) {
   swift_unknownRelease(result);
 
   // ref1 = ref2 (objc self transition)
-  swift_unknownUnownedTakeAssign(&ref1, &ref2);
+  res = swift_unknownUnownedTakeAssign(&ref1, &ref2);
+  ASSERT_EQ(&ref1, res);
   result = swift_unknownUnownedLoadStrong(&ref1);
   ASSERT_EQ(objc1, result);
   swift_unknownRelease(result);
@@ -904,4 +933,35 @@ TEST(WeakTest, objc_unowned_isEqual_DeathTest) {
 
   swift_unownedDestroy(&ref1);
   swift_unknownUnownedDestroy(&ref2);
+}
+
+TEST(WeakTest, unknownWeak) {
+  void *objc1 = make_objc_object();
+  HeapObject *swift1 = make_swift_object();
+
+  WeakReference ref1;
+  auto res = swift_unknownWeakInit(&ref1, objc1);
+  ASSERT_EQ(&ref1, res);
+
+  WeakReference ref2;
+  res = swift_unknownWeakCopyInit(&ref2, &ref1);
+  ASSERT_EQ(&ref2, res);
+
+  WeakReference ref3; // ref2 dead.
+  res = swift_unknownWeakTakeInit(&ref3, &ref2);
+  ASSERT_EQ(&ref3, res);
+
+  res = swift_unknownWeakAssign(&ref3, swift1);
+  ASSERT_EQ(&ref3, res);
+
+  res = swift_unknownWeakCopyAssign(&ref3, &ref1);
+  ASSERT_EQ(&ref3, res);
+
+  res = swift_unknownWeakTakeAssign(&ref3, &ref1);
+  ASSERT_EQ(&ref3, res);
+
+  swift_unknownWeakDestroy(&ref3);
+
+  swift_release(swift1);
+  swift_unknownRelease(objc1);
 }

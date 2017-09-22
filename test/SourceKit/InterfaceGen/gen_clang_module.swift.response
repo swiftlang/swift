@@ -13,7 +13,7 @@ import SwiftOnoneSupport
 // Yo.
 
 /// Aaa.  FooEnum1.  Bbb.
-public struct FooEnum1 : RawRepresentable, Equatable {
+public struct FooEnum1 : Equatable, RawRepresentable {
 
     public init(_ rawValue: UInt32)
 
@@ -25,7 +25,7 @@ public struct FooEnum1 : RawRepresentable, Equatable {
 /// Aaa.  FooEnum1X.  Bbb.
 public var FooEnum1X: FooEnum1 { get }
 
-public struct FooEnum2 : RawRepresentable, Equatable {
+public struct FooEnum2 : Equatable, RawRepresentable {
 
     public init(_ rawValue: UInt32)
 
@@ -35,7 +35,7 @@ public struct FooEnum2 : RawRepresentable, Equatable {
 }
 public var FooEnum2X: FooEnum2 { get }
 public var FooEnum2Y: FooEnum2 { get }
-public struct FooEnum3 : RawRepresentable, Equatable {
+public struct FooEnum3 : Equatable, RawRepresentable {
 
     public init(_ rawValue: UInt32)
 
@@ -447,12 +447,12 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 233,
-    key.length: 16
+    key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 251,
-    key.length: 9
+    key.offset: 244,
+    key.length: 16
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -567,12 +567,12 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 463,
-    key.length: 16
+    key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 481,
-    key.length: 9
+    key.offset: 474,
+    key.length: 16
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -707,12 +707,12 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 703,
-    key.length: 16
+    key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 721,
-    key.length: 9
+    key.offset: 714,
+    key.length: 16
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -3644,13 +3644,13 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.ref.protocol,
     key.offset: 233,
-    key.length: 16,
+    key.length: 9,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.protocol,
-    key.offset: 251,
-    key.length: 9,
+    key.offset: 244,
+    key.length: 16,
     key.is_system: 1
   },
   {
@@ -3679,13 +3679,13 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.ref.protocol,
     key.offset: 463,
-    key.length: 16,
+    key.length: 9,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.protocol,
-    key.offset: 481,
-    key.length: 9,
+    key.offset: 474,
+    key.length: 16,
     key.is_system: 1
   },
   {
@@ -3719,13 +3719,13 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.ref.protocol,
     key.offset: 703,
-    key.length: 16,
+    key.length: 9,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.protocol,
-    key.offset: 721,
-    key.length: 9,
+    key.offset: 714,
+    key.length: 16,
     key.is_system: 1
   },
   {
@@ -4264,22 +4264,22 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.doclength: 26,
     key.inheritedtypes: [
       {
-        key.name: "RawRepresentable"
+        key.name: "Equatable"
       },
       {
-        key.name: "Equatable"
+        key.name: "RawRepresentable"
       }
     ],
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
         key.offset: 233,
-        key.length: 16
+        key.length: 9
       },
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 251,
-        key.length: 9
+        key.offset: 244,
+        key.length: 16
       }
     ],
     key.substructure: [
@@ -4361,22 +4361,22 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.bodylength: 106,
     key.inheritedtypes: [
       {
-        key.name: "RawRepresentable"
+        key.name: "Equatable"
       },
       {
-        key.name: "Equatable"
+        key.name: "RawRepresentable"
       }
     ],
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
         key.offset: 463,
-        key.length: 16
+        key.length: 9
       },
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 481,
-        key.length: 9
+        key.offset: 474,
+        key.length: 16
       }
     ],
     key.substructure: [
@@ -4467,22 +4467,22 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.bodylength: 106,
     key.inheritedtypes: [
       {
-        key.name: "RawRepresentable"
+        key.name: "Equatable"
       },
       {
-        key.name: "Equatable"
+        key.name: "RawRepresentable"
       }
     ],
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
         key.offset: 703,
-        key.length: 16
+        key.length: 9
       },
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 721,
-        key.length: 9
+        key.offset: 714,
+        key.length: 16
       }
     ],
     key.substructure: [
@@ -5380,6 +5380,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 21,
         key.attributes: [
           {
+            key.offset: 3991,
+            key.length: 11,
             key.attribute: source.decl.attribute.convenience
           }
         ],
@@ -5975,6 +5977,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 10,
         key.attributes: [
           {
+            key.offset: 6061,
+            key.length: 15,
             key.attribute: source.decl.attribute.weak
           }
         ]
@@ -5991,6 +5995,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 16,
         key.attributes: [
           {
+            key.offset: 6114,
+            key.length: 15,
             key.attribute: source.decl.attribute.weak
           }
         ]
@@ -6040,6 +6046,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 7,
         key.attributes: [
           {
+            key.offset: 6263,
+            key.length: 4,
             key.attribute: source.decl.attribute.weak
           }
         ]
@@ -6091,6 +6099,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 19,
         key.attributes: [
           {
+            key.offset: 6390,
+            key.length: 11,
             key.attribute: source.decl.attribute.convenience
           }
         ],
@@ -6116,6 +6126,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 12,
         key.attributes: [
           {
+            key.offset: 6432,
+            key.length: 39,
             key.attribute: source.decl.attribute.available
           }
         ]
@@ -6130,6 +6142,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 24,
         key.attributes: [
           {
+            key.offset: 6509,
+            key.length: 23,
             key.attribute: source.decl.attribute.available
           }
         ]
@@ -6144,6 +6158,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 27,
         key.attributes: [
           {
+            key.offset: 6582,
+            key.length: 47,
             key.attribute: source.decl.attribute.available
           }
         ]
@@ -6179,6 +6195,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     ],
     key.attributes: [
       {
+        key.offset: 6703,
+        key.length: 63,
         key.attribute: source.decl.attribute.available
       }
     ],
@@ -6285,6 +6303,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 3,
         key.attributes: [
           {
+            key.offset: 7094,
+            key.length: 8,
             key.attribute: source.decl.attribute.override
           }
         ]

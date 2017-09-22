@@ -607,39 +607,50 @@ ManagedValue Transform::transformMetatype(ManagedValue meta,
 ///
 /// If the tuple is in memory, the result elements will also be in
 /// memory.
-typedef std::pair<ManagedValue, const TypeLowering *> ManagedValueAndType;
-static void explodeTuple(SILGenFunction &SGF,
-                         SILLocation loc,
+static void explodeTuple(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue managedTuple,
-                         SmallVectorImpl<ManagedValueAndType> &out) {
-  // None of the operations we do here can fail, so we can atomically
-  // disable the tuple's cleanup and then create cleanups for all the
-  // elements.
-  SILValue tuple = managedTuple.forward(SGF);
+                         SmallVectorImpl<ManagedValue> &out) {
 
-  auto tupleSILType = tuple->getType();
+  assert(managedTuple.getOwnershipKind() == ValueOwnershipKind::Trivial
+         || managedTuple.hasCleanup());
+
+  // For non-address types, borrow the tuple before extracting and copying its
+  // elements. Creating a scope here ensures that the end_borrow is inserted
+  // correctly and prevents any other cleanup activity from taking meanwhile. We
+  // allow the incoming managedTuple to be destroyed later in its original
+  // scope.
+  //
+  // SEMANTIC SIL TODO: Once we support a SIL "destructure" instruction, we can
+  // remove this borrow scope and all element copies. Instead directly forward
+  // managedTuple into its destructure.
+  Scope destructureScope(SGF, loc);
+  ManagedValue tuple =
+      managedTuple.getType().isAddress()
+          ? ManagedValue::forUnmanaged(managedTuple.forward(SGF))
+          : managedTuple.borrow(SGF, loc);
+
+  auto tupleSILType = tuple.getType();
   auto tupleType = tupleSILType.castTo<TupleType>();
 
-  out.reserve(tupleType->getNumElements());
+  llvm::SmallVector<ManagedValue, 16> elements;
+  elements.reserve(tupleType->getNumElements());
 
   for (auto index : indices(tupleType.getElementTypes())) {
     // We're starting with a SIL-lowered tuple type, so the elements
     // must also all be SIL-lowered.
     SILType eltType = tupleSILType.getTupleElementType(index);
 
-    auto &eltTL = SGF.getTypeLowering(eltType);
-
-    ManagedValue elt;
     if (tupleSILType.isAddress()) {
-      auto addr = SGF.B.createTupleElementAddr(loc, tuple, index, eltType);
-      elt = SGF.emitManagedBufferWithCleanup(addr, eltTL);
+      elements.push_back(
+          SGF.B.createTupleElementAddr(loc, tuple, index, eltType));
     } else {
-      auto value = SGF.B.createTupleExtract(loc, tuple, index, eltType);
-      elt = SGF.emitManagedRValueWithCleanup(value, eltTL);
+      ManagedValue extract =
+          SGF.B.createTupleExtract(loc, tuple, index, eltType);
+      elements.push_back(extract.copy(SGF, loc));
     }
-
-    out.push_back(ManagedValueAndType(elt, &eltTL));
   }
+  out.resize(elements.size());
+  destructureScope.popPreservingValues(elements, out);
 }
 
 /// Apply this transformation to all the elements of a tuple value,
@@ -673,7 +684,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
                                             ctxt);
 
   // Explode the tuple into individual managed values.
-  SmallVector<ManagedValueAndType, 4> inputElts;
+  SmallVector<ManagedValue, 4> inputElts;
   explodeTuple(SGF, Loc, inputTuple, inputElts);
 
   // Track all the managed elements whether or not we're actually
@@ -681,8 +692,8 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
   SmallVector<ManagedValue, 4> outputElts;
 
   for (auto index : indices(inputType->getElementTypes())) {
-    auto &inputEltTL = *inputElts[index].second;
-    ManagedValue inputElt = inputElts[index].first;
+    auto &inputEltTL = SGF.getTypeLowering(inputElts[index].getType());
+    ManagedValue inputElt = inputElts[index];
     if (inputElt.getType().isAddress() && !inputEltTL.isAddressOnly()) {
       inputElt = emitManagedLoad(SGF, Loc, inputElt, inputEltTL);
     }
@@ -1179,7 +1190,7 @@ namespace {
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
-      SmallVector<ManagedValueAndType, 4> inputEltAddrs;
+      SmallVector<ManagedValue, 4> inputEltAddrs;
       explodeTuple(SGF, Loc, inputTupleAddr, inputEltAddrs);
       assert(inputEltAddrs.size() == outputSubstType->getNumElements());
 
@@ -1188,7 +1199,7 @@ namespace {
         auto inputEltSubstType = inputSubstType.getElementType(index);
         auto outputEltOrigType = outputOrigType.getTupleElementType(index);
         auto outputEltSubstType = outputSubstType.getElementType(index);
-        auto inputEltAddr = inputEltAddrs[index].first;
+        auto inputEltAddr = inputEltAddrs[index];
         assert(inputEltAddr.getType().isAddress() ||
                !SGF.silConv.useLoweredAddresses());
 

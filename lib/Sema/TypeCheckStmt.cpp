@@ -1181,7 +1181,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     // Other unused constructor calls.
     if (callee && isa<ConstructorDecl>(callee) && !call->isImplicit()) {
       diagnose(fn->getLoc(), diag::expression_unused_init_result,
-               callee->getDeclContext()->getDeclaredTypeOfContext())
+               callee->getDeclContext()->getDeclaredInterfaceType())
         .highlight(call->getArg()->getSourceRange());
       return;
     }
@@ -1279,14 +1279,6 @@ static void checkDefaultArguments(TypeChecker &tc,
                                   ParameterList *params,
                                   unsigned &nextArgIndex,
                                   AbstractFunctionDecl *func) {
-  // In Swift 4 mode, default argument bodies are inlined into the
-  // caller.
-  auto expansion = func->getResilienceExpansion();
-  if (!tc.Context.isSwiftVersion3() &&
-      func->getFormalAccessScope(/*useDC=*/nullptr,
-                                 /*respectVersionedAttr=*/true).isPublic())
-    expansion = ResilienceExpansion::Minimal;
-
   for (auto &param : *params) {
     ++nextArgIndex;
     if (!param->getDefaultValue() || !param->hasType() ||
@@ -1295,9 +1287,6 @@ static void checkDefaultArguments(TypeChecker &tc,
     
     Expr *e = param->getDefaultValue();
     auto initContext = param->getDefaultArgumentInitContext();
-
-    cast<DefaultArgumentInitializer>(initContext)
-        ->changeResilienceExpansion(expansion);
 
     // Type-check the initializer, then flag that we did so.
     auto resultTy = tc.typeCheckExpression(
@@ -1315,6 +1304,24 @@ static void checkDefaultArguments(TypeChecker &tc,
     // we saw there.
     (void)tc.contextualizeInitializer(initContext, e);
   }
+}
+
+/// Check the default arguments that occur within this pattern.
+static void checkDefaultArguments(TypeChecker &tc,
+                                  AbstractFunctionDecl *func) {
+  // In Swift 4 mode, default argument bodies are inlined into the
+  // caller.
+  auto expansion = func->getResilienceExpansion();
+  if (!tc.Context.isSwiftVersion3() &&
+      func->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*respectVersionedAttr=*/true).isPublic())
+    expansion = ResilienceExpansion::Minimal;
+
+  func->setDefaultArgumentResilienceExpansion(expansion);
+
+  unsigned nextArgIndex = 0;
+  for (auto paramList : func->getParameterLists())
+    checkDefaultArguments(tc, paramList, nextArgIndex, func);
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
@@ -1358,10 +1365,7 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
 // named function or an anonymous func expression.
 bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                              SourceLoc EndTypeCheckLoc) {
-  // Check the default argument definitions.
-  unsigned nextArgIndex = 0;
-  for (auto paramList : FD->getParameterLists())
-    checkDefaultArguments(*this, paramList, nextArgIndex, FD);
+  checkDefaultArguments(*this, FD);
 
   // Clang imported inline functions do not have a Swift body to
   // typecheck.
@@ -1464,10 +1468,7 @@ static bool isKnownEndOfConstructor(ASTNode N) {
 
 bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
-  // Check the default argument definitions.
-  unsigned nextArgIndex = 0;
-  for (auto paramList : ctor->getParameterLists())
-    checkDefaultArguments(*this, paramList, nextArgIndex, ctor);
+  checkDefaultArguments(*this, ctor);
 
   BraceStmt *body = ctor->getBody();
   if (!body)

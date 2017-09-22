@@ -102,7 +102,7 @@ struct HasVarInit {
   static var state = true && false
 }
 // CHECK-LABEL: // function_ref implicit closure #1 : @autoclosure () throws -> Swift.Bool in variable initialization expression of static mangling.HasVarInit.state : Swift.Bool
-// CHECK-NEXT:  function_ref @_T08mangling10HasVarInitV5stateSbvZfiSbyKXKfu_
+// CHECK-NEXT:  function_ref @_T08mangling10HasVarInitV5stateSbvpZfiSbyKXKfu_
 
 // auto_closures should not collide with the equivalent non-auto_closure
 // function type.
@@ -139,15 +139,15 @@ func ??(x: Int, y: Int) {}
 
 struct InstanceAndClassProperty {
   var property: Int {
-    // CHECK-LABEL: sil hidden @_T08mangling24InstanceAndClassPropertyV8propertySifg
+    // CHECK-LABEL: sil hidden @_T08mangling24InstanceAndClassPropertyV8propertySivg
     get { return 0 }
-    // CHECK-LABEL: sil hidden @_T08mangling24InstanceAndClassPropertyV8propertySifs
+    // CHECK-LABEL: sil hidden @_T08mangling24InstanceAndClassPropertyV8propertySivs
     set {}
   }
   static var property: Int {
-    // CHECK-LABEL: sil hidden @_T08mangling24InstanceAndClassPropertyV8propertySifgZ
+    // CHECK-LABEL: sil hidden @_T08mangling24InstanceAndClassPropertyV8propertySivgZ
     get { return 0 }
-    // CHECK-LABEL: sil hidden @_T08mangling24InstanceAndClassPropertyV8propertySifsZ
+    // CHECK-LABEL: sil hidden @_T08mangling24InstanceAndClassPropertyV8propertySivsZ
     set {}
   }
 }

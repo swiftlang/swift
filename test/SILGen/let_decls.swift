@@ -153,7 +153,7 @@ struct GetOnlySubscriptStruct {
 func testGetOnlySubscript(_ x : GetOnlySubscriptStruct, idx : Int) -> Int {
   return x[idx]
   
-  // CHECK: [[SUBFN:%[0-9]+]] = function_ref @{{.*}}9subscript
+  // CHECK: [[SUBFN:%[0-9]+]] = function_ref @{{.*}}i
   // CHECK-NEXT: [[CALL:%[0-9]+]] = apply [[SUBFN]](
   // CHECK: return [[CALL]]
 }
@@ -192,7 +192,7 @@ struct GenericTestStruct<T> {
 
 // CHECK-LABEL: sil hidden @{{.*}}pass_address_only_rvalue_result
 // CHECK: bb0(%0 : @trivial $*T,
-// CHECK: [[FN:%[0-9]+]] = function_ref @{{.*}}GenericTestStructV9subscript{{.*}}fg
+// CHECK: [[FN:%[0-9]+]] = function_ref @{{.*}}GenericTestStructV{{.*}}ig
 // CHECK: apply [[FN]]<T>(%0,
 
 
@@ -211,7 +211,7 @@ func produceNMSubscriptableRValue() -> NonMutableSubscriptable {}
 // CHECK: bb0(%0 : @trivial $Int):
 // CHECK: [[FR1:%[0-9]+]] = function_ref @{{.*}}produceNMSubscriptableRValue
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
-// CHECK: [[GETFN:%[0-9]+]] = function_ref @_T09let_decls23NonMutableSubscriptableV9subscript{{[_0-9a-zA-Z]*}}fg
+// CHECK: [[GETFN:%[0-9]+]] = function_ref @_T09let_decls23NonMutableSubscriptableV{{[_0-9a-zA-Z]*}}ig
 // CHECK-NEXT: [[RES2:%[0-9]+]] = apply [[GETFN]](%0, [[RES]])
 // CHECK-NEXT: return [[RES2]]
 func test_nm_subscript_get(_ a : Int) -> Int {
@@ -222,7 +222,7 @@ func test_nm_subscript_get(_ a : Int) -> Int {
 // CHECK: bb0(%0 : @trivial $Int):
 // CHECK: [[FR1:%[0-9]+]] = function_ref @{{.*}}produceNMSubscriptableRValue
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
-// CHECK: [[SETFN:%[0-9]+]] = function_ref @_T09let_decls23NonMutableSubscriptableV9subscript{{[_0-9a-zA-Z]*}}fs
+// CHECK: [[SETFN:%[0-9]+]] = function_ref @_T09let_decls23NonMutableSubscriptableV{{[_0-9a-zA-Z]*}}is
 // CHECK-NEXT: [[RES2:%[0-9]+]] = apply [[SETFN]](%0, %0, [[RES]])
 func test_nm_subscript_set(_ a : Int) {
   produceNMSubscriptableRValue()[a] = a
@@ -248,13 +248,13 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   // The setter isn't mutating, so we need to load the box.
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
   // CHECK: [[VVAL:%[0-9]+]] = load [trivial] [[READ]]
-  // CHECK: [[SETFN:%[0-9]+]] = function_ref @_T09let_decls17WeirdPropertyTestV1pSifs
+  // CHECK: [[SETFN:%[0-9]+]] = function_ref @_T09let_decls17WeirdPropertyTestV1pSivs
   // CHECK: apply [[SETFN]](%1, [[VVAL]])
   v.p = i
   
   // The getter is mutating, so it takes the box address.
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
-  // CHECK: [[GETFN:%[0-9]+]] = function_ref @_T09let_decls17WeirdPropertyTestV1pSifg
+  // CHECK: [[GETFN:%[0-9]+]] = function_ref @_T09let_decls17WeirdPropertyTestV1pSivg
   // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[GETFN]]([[WRITE]])
   // CHECK: return [[RES]]
   return v.p
@@ -496,7 +496,7 @@ var addressOnlyGetOnlyGlobalProperty : SimpleProtocol { get {} }
 // CHECK-LABEL: sil hidden @_T09let_decls018testAddressOnlyGetE14GlobalPropertyAA14SimpleProtocol_pyF
 // CHECK: bb0(%0 : @trivial $*SimpleProtocol):
 // CHECK-NEXT:   // function_ref
-// CHECK-NEXT:  %1 = function_ref @_T09let_decls014addressOnlyGetD14GlobalPropertyAA14SimpleProtocol_pfg
+// CHECK-NEXT:  %1 = function_ref @_T09let_decls014addressOnlyGetD14GlobalPropertyAA14SimpleProtocol_pvg
 // CHECK-NEXT:  %2 = apply %1(%0) : $@convention(thin) () -> @out SimpleProtocol
 // CHECK-NEXT:  %3 = tuple ()
 // CHECK-NEXT:  return %3 : $()

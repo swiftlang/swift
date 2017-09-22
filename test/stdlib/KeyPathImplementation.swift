@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -g -Xfrontend -enable-experimental-keypath-components -o %t/a.out
+// RUN: %target-build-swift %s -g -o %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 

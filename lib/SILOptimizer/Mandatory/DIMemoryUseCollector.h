@@ -77,8 +77,7 @@ public:
   }
 
   SILInstruction *getAddress() const {
-    if (isa<MarkUninitializedInst>(MemoryInst) ||
-        isa<AllocStackInst>(MemoryInst))
+    if (isa<AllocStackInst>(MemoryInst))
       return MemoryInst;
     assert(false);
     return nullptr;
@@ -91,104 +90,8 @@ public:
   /// getNumMemoryElements - Return the number of elements, without the extra
   /// "super.init" tracker in initializers of derived classes.
   unsigned getNumMemoryElements() const {
-    return NumElements - (unsigned)isDerivedClassSelf();
+    return NumElements - unsigned(false);
   }
-
-  /// isAnyInitSelf - Return true if this is 'self' in any kind of initializer.
-  bool isAnyInitSelf() const {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      return !MUI->isVar();
-    return false;
-  }
-
-  /// True if the memory object is the 'self' argument of an initializer in a
-  /// protocol extension.
-  bool isProtocolInitSelf() const {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->isRootSelf() && isa<ArchetypeType>(getType()))
-        return true;
-    return false;
-  }
-
-  /// True if the memory object is the 'self' argument of an enum initializer.
-  bool isEnumInitSelf() const {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->isRootSelf())
-        if (auto decl = getType()->getAnyNominal())
-          if (isa<EnumDecl>(decl))
-        return true;
-    return false;
-  }
-  
-  /// True if the memory object is the 'self' argument of a struct initializer.
-  bool isStructInitSelf() const {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->isRootSelf())
-        if (auto decl = getType()->getAnyNominal())
-          if (isa<StructDecl>(decl))
-        return true;
-    return false;
-  }
-
-  /// True if the memory object is the 'self' argument of a class initializer.
-  bool isClassInitSelf() const {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (!MUI->isVar())
-        if (auto decl = getType()->getAnyNominal())
-          if (isa<ClassDecl>(decl))
-            return true;
-    return false;
-  }
-
-  /// isDerivedClassSelf - Return true if this memory object is the 'self' of
-  /// a derived class init method.
-  bool isDerivedClassSelf() const {
-    if (auto MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      return MUI->isDerivedClassSelf();
-    return false;
-  }
-
-  /// isDerivedClassSelfOnly - Return true if this memory object is the 'self'
-  /// of a derived class init method for which we can assume that all ivars
-  /// have been initialized.
-  bool isDerivedClassSelfOnly() const {
-    if (auto MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      return MUI->isDerivedClassSelfOnly();
-    return false;
-  }
-
-  /// True if this memory object is the 'self' of a derived class init method,
-  /// regardless of whether we're tracking ivar initializations or not.
-  bool isAnyDerivedClassSelf() const {
-    if (auto MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      return MUI->isDerivedClassSelf() || MUI->isDerivedClassSelfOnly();
-    return false;
-  }
-
-  /// isDelegatingInit - True if this is a delegating initializer, one that
-  /// calls 'self.init'.
-  bool isDelegatingInit() const {
-    if (auto MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-       return MUI->isDelegatingSelf();
-    return false;
-  }
-
-  /// isNonDelegatingInit - True if this is an initializer that initializes
-  /// stored properties.
-  bool isNonDelegatingInit() const {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst)) {
-      if (MUI->isDerivedClassSelf() ||
-          MUI->isDerivedClassSelfOnly() ||
-          (MUI->isRootSelf() && !isEnumInitSelf()))
-        return true;
-    }
-    return false;
-  }
-
-  /// emitElementAddress - Given an element number (in the flattened sense)
-  /// return a pointer to a leaf element of the specified number.
-  SILValue emitElementAddress(unsigned TupleEltNo, SILLocation Loc,
-                              SILBuilder &B) const;
 
   /// getElementType - Return the swift type of the specified element.
   SILType getElementType(unsigned EltNo) const;
@@ -286,10 +189,7 @@ struct DIMemoryUse {
 /// and storing the information found into the Uses and Releases lists.
 void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                               SmallVectorImpl<DIMemoryUse> &Uses,
-                              SmallVectorImpl<TermInst*> &FailableInits,
-                              SmallVectorImpl<SILInstruction*> &Releases,
-                              bool isDefiniteInitFinished,
-                              bool TreatAddressToPointerAsInout);
+                              SmallVectorImpl<SILInstruction *> &Releases);
 
 } // end namespace swift
 

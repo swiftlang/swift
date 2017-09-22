@@ -152,6 +152,7 @@ KNOWN_SETTINGS=(
     skip-test-android-host      ""               "set to skip testing the host parts of the Android toolchain"
     validation-test             "0"              "set to run the validation test suite"
     long-test                   "0"              "set to run the long test suite"
+    test-paths                  ""               "run tests located in specific directories and/or files"
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
     skip-test-optimize-for-size ""               "set to skip testing the test suite in optimize for size mode"
@@ -1698,6 +1699,7 @@ function cmake_config_opt() {
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
                 ;;
             libdispatch)
+                echo "--config ${LIBDISPATCH_BUILD_TYPE}"
                 ;;
             libicu)
                 ;;
@@ -2447,41 +2449,61 @@ for host in "${ALL_HOSTS[@]}"; do
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 LLVM_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
 
-                if [[ "${RECONFIGURE}" || ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
-                    echo "Reconfiguring libdispatch"
-                    # First time building; need to run autotools and configure
-                    if [[ "$LIBDISPATCH_BUILD_TYPE" == "Release" ]] ; then
-                        dispatch_build_variant_arg="release"
-                    elif [[ "$LIBDISPATCH_BUILD_TYPE" == "RelWithDebInfo" ]]; then
-                        dispatch_build_variant_arg="releasedebuginfo"
-                    else
-                        dispatch_build_variant_arg="debug"
-                    fi
+                case "${host}" in
+                macosx-*)
+                  if [[ "${RECONFIGURE}" || ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
+                      echo "Reconfiguring libdispatch"
+                      # First time building; need to run autotools and configure
+                      if [[ "$LIBDISPATCH_BUILD_TYPE" == "Release" ]] ; then
+                          dispatch_build_variant_arg="release"
+                      elif [[ "$LIBDISPATCH_BUILD_TYPE" == "RelWithDebInfo" ]]; then
+                          dispatch_build_variant_arg="releasedebuginfo"
+                      else
+                          dispatch_build_variant_arg="debug"
+                      fi
 
-                    if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
-                        libdispatch_enable_static="--enable-static=yes"
-                    else
-                        libdispatch_enable_static=""
-                    fi
+                      if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
+                          libdispatch_enable_static="--enable-static=yes"
+                      else
+                          libdispatch_enable_static=""
+                      fi
 
-                    call mkdir -p "${LIBDISPATCH_BUILD_DIR}"
-                    with_pushd "${LIBDISPATCH_SOURCE_DIR}" \
-                        call autoreconf -fvi
-                    with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                        call env CC="${LLVM_BIN}/clang" CXX="${LLVM_BIN}/clang++" SWIFTC="${SWIFTC_BIN}" \
-                            "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
-                            --with-build-variant=$dispatch_build_variant_arg \
-                            --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})" ${libdispatch_enable_static}
-                else
-                    echo "Skipping reconfiguration of libdispatch"
-                fi
-                with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                    call make
-                with_pushd "${LIBDISPATCH_BUILD_DIR}/tests" \
-                    call make build-tests
+                      call mkdir -p "${LIBDISPATCH_BUILD_DIR}"
+                      with_pushd "${LIBDISPATCH_SOURCE_DIR}" \
+                          call autoreconf -fvi
+                      with_pushd "${LIBDISPATCH_BUILD_DIR}" \
+                          call env CC="${LLVM_BIN}/clang" CXX="${LLVM_BIN}/clang++" SWIFTC="${SWIFTC_BIN}" \
+                              "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
+                              --with-build-variant=$dispatch_build_variant_arg \
+                              --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})" ${libdispatch_enable_static}
+                  else
+                      echo "Skipping reconfiguration of libdispatch"
+                  fi
+                  with_pushd "${LIBDISPATCH_BUILD_DIR}" \
+                      call make
+                  with_pushd "${LIBDISPATCH_BUILD_DIR}/tests" \
+                      call make build-tests
 
-                # libdispatch builds itself and doesn't use cmake
-                continue
+                  # libdispatch builds itself and doesn't use cmake
+                  continue
+                ;;
+                *)
+                  cmake_options=(
+                    ${cmake_options[@]}
+                    -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
+                    -DCMAKE_C_COMPILER:PATH="${LLVM_BIN}/clang"
+                    -DCMAKE_CXX_COMPILER:PATH="${LLVM_BIN}/clang++"
+                    -DCMAKE_SWIFT_COMPILER:PATH="${SWIFTC_BIN}"
+                    -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
+
+                    -DENABLE_SWIFT=YES
+                    -DSWIFT_RUNTIME_LIBDIR:PATH="${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+
+                    -DENABLE_TESTING=YES
+                  )
+                ;;
+                esac
+
                 ;;
             libicu)
                 SWIFT_BUILD_PATH=$(build_directory ${host} swift)
@@ -2849,12 +2871,21 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ "${SKIP_TEST_LIBDISPATCH}" ]]; then
                     continue
                 fi
-                LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
-                echo "--- Running tests for ${product} ---"
-                with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                    call env VERBOSE=1 make check
-                echo "--- Finished tests for ${product} ---"
-                continue
+
+                case "${host}" in
+                macosx-*)
+                  LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
+                  echo "--- Running tests for ${product} ---"
+                  with_pushd "${LIBDISPATCH_BUILD_DIR}" \
+                      call env VERBOSE=1 make check
+                  echo "--- Finished tests for ${product} ---"
+                  continue
+                ;;
+                *)
+                  results_targets=( "test" )
+                  executable_target=""
+                ;;
+                esac
                 ;;
             libicu)
                 if [[ "${SKIP_TEST_LIBICU}" ]]; then
@@ -2908,6 +2939,20 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- ${target} ---"
                 trap "tests_busted ${product} '(${target})'" ERR
 
+                test_target="$target"
+                test_paths=()
+
+                if [[ ${test_target} == check-swift* ]]; then
+                    if [[ "${TEST_PATHS}" ]]; then
+                        test_target="${test_target}-custom"
+                        for path in ${TEST_PATHS}; do
+                            test_paths+=(
+                                "${build_dir}/$(echo ${path} | sed -E "s/^(validation-test|test)/\1-${host}/")"
+                            )
+                        done
+                    fi
+                fi
+
                 # NOTE: In dry-run mode, build_dir might not exist yet. In that
                 #       case, -n query will fail. So, in dry-run mode,
                 #       we don't expand test script.
@@ -2920,12 +2965,17 @@ for host in "${ALL_HOSTS[@]}"; do
                     # shell to execute that.
                     # However, if we do this in a subshell in the ``sh -e -x -c`` line,
                     # errors in the command will not stop the script as they should.
-                    echo "Generating dry run test command from: ${build_cmd[@]} -n -v ${target}"
-                    dry_run_command_output="$(${build_cmd[@]} -n -v ${target} | sed -e 's/[^]]*] //')"
+                    echo "Generating dry run test command from: ${build_cmd[@]} -n -v ${test_target}"
+                    dry_run_command_output="$(${build_cmd[@]} -n -v ${test_target} | sed -e 's/[^]]*] //')"
                     echo "Test command: ${dry_run_command_output}"
-                    sh -e -x -c "${dry_run_command_output}"
+
+                    if [[ ! "${test_paths}" ]]; then
+                        sh -e -x -c "${dry_run_command_output}"
+                    else
+                        sh -e -x -c "${dry_run_command_output} $(echo ${test_paths[@]})"
+                    fi
                 else
-                    call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${target}
+                    call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${test_target}
                 fi
                 echo "-- ${target} finished --"
             fi
@@ -3101,22 +3151,29 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ -z "${INSTALL_LIBDISPATCH}" ]] ; then
                     continue
                 fi
-                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
-                    echo "--install-destdir is required to install products."
-                    exit 1
-                fi
-                echo "--- Installing ${product} ---"
-                LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
-                with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                    call make install
-                DISPATCH_LIBDIR="${host_install_destdir}${host_install_prefix}/lib/swift/${SWIFT_HOST_VARIANT}"
-                DISPATCH_LIBDIR_STATIC="${host_install_destdir}${host_install_prefix}/lib/swift_static/${SWIFT_HOST_VARIANT}"
-                if [ -f "$DISPATCH_LIBDIR/libdispatch.a" ]; then
-                    mv "$DISPATCH_LIBDIR/libdispatch.a" "$DISPATCH_LIBDIR_STATIC"
-                fi
 
-                # As libdispatch installation is self-contained, we break early here.
-                continue
+                case "${host}" in
+                macosx-*)
+                  if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+                      echo "--install-destdir is required to install products."
+                      exit 1
+                  fi
+                  echo "--- Installing ${product} ---"
+                  LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
+                  with_pushd "${LIBDISPATCH_BUILD_DIR}" \
+                      call make install
+                  DISPATCH_LIBDIR="${host_install_destdir}${host_install_prefix}/lib/swift/${SWIFT_HOST_VARIANT}"
+                  DISPATCH_LIBDIR_STATIC="${host_install_destdir}${host_install_prefix}/lib/swift_static/${SWIFT_HOST_VARIANT}"
+                  if [ -f "$DISPATCH_LIBDIR/libdispatch.a" ]; then
+                      mv "$DISPATCH_LIBDIR/libdispatch.a" "$DISPATCH_LIBDIR_STATIC"
+                  fi
+
+                  # As libdispatch installation is self-contained, we break early here.
+                  continue
+                ;;
+                *)
+                ;;
+                esac
                 ;;
             libicu)
                 if [[ -z "${INSTALL_LIBICU}" ]]; then

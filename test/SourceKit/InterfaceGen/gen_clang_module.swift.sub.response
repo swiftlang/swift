@@ -5,7 +5,7 @@ import SwiftOnoneSupport
 
 public func fooSubFunc1(_ a: Int32) -> Int32
 
-public struct FooSubEnum1 : RawRepresentable, Equatable {
+public struct FooSubEnum1 : Equatable, RawRepresentable {
 
     public init(_ rawValue: UInt32)
 
@@ -102,12 +102,12 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 129,
-    key.length: 16
+    key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 147,
-    key.length: 9
+    key.offset: 140,
+    key.length: 16
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -281,13 +281,13 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.offset: 129,
-    key.length: 16,
+    key.length: 9,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.protocol,
-    key.offset: 147,
-    key.length: 9,
+    key.offset: 140,
+    key.length: 16,
     key.is_system: 1
   },
   {
@@ -359,22 +359,22 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
     key.bodylength: 106,
     key.inheritedtypes: [
       {
-        key.name: "RawRepresentable"
+        key.name: "Equatable"
       },
       {
-        key.name: "Equatable"
+        key.name: "RawRepresentable"
       }
     ],
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
         key.offset: 129,
-        key.length: 16
+        key.length: 9
       },
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 147,
-        key.length: 9
+        key.offset: 140,
+        key.length: 16
       }
     ],
     key.substructure: [

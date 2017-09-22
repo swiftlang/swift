@@ -677,7 +677,7 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
   // getter and setter are nonmutating.
   return !storage->hasStorage() &&
       !storage->isGetterMutating() &&
-      storage->isSetterNonMutating();
+      !storage->isSetterMutating();
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
@@ -1225,7 +1225,7 @@ ConstraintSystem::getTypeOfMemberReference(
     // If self is a value type and the base type is an lvalue, wrap it in an
     // inout type.
     auto selfFlags = ParameterTypeFlags();
-    if (!outerDC->getDeclaredTypeOfContext()->hasReferenceSemantics() &&
+    if (!outerDC->getDeclaredInterfaceType()->hasReferenceSemantics() &&
         baseTy->is<LValueType>() &&
         !selfTy->hasError())
       selfFlags = selfFlags.withInOut(true);

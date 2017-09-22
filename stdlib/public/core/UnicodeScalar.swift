@@ -68,13 +68,8 @@ extension Unicode.Scalar :
 
   /// Creates a Unicode scalar with the specified numeric value.
   ///
-  /// - Parameter v: The Unicode code point to use for the scalar. `v` must be
-  ///   a valid Unicode scalar value, in the range `0...0xD7FF` or
-  ///   `0xE000...0x10FFFF`. In case of an invalid unicode scalar value, nil is
-  ///   returned.
-  ///
-  /// For example, the following code sample creates a `Unicode.Scalar` instance
-  /// with a value of an emoji character:
+  /// For example, the following code sample creates a `Unicode.Scalar`
+  /// instance with a value of an emoji character:
   ///
   ///     let codepoint: UInt32 = 127881
   ///     let emoji = Unicode.Scalar(codepoint)
@@ -83,12 +78,17 @@ extension Unicode.Scalar :
   ///
   /// In case of an invalid input value, nil is returned.
   ///
-  ///     let codepoint: UInt32 = extValue // This might be an invalid value. 
+  ///     let codepoint: UInt32 = extValue   // This might be an invalid value
   ///     if let emoji = Unicode.Scalar(codepoint) {
   ///       print(emoji)
   ///     } else {
   ///       // Do something else
   ///     }
+  ///
+  /// - Parameter v: The Unicode code point to use for the scalar. The
+  ///   initializer succeeds if `v` is a valid Unicode scalar value---that is,
+  ///   if `v` is in the range `0...0xD7FF` or `0xE000...0x10FFFF`. If `v` is
+  ///   an invalid Unicode scalar value, the result is `nil`.
   public init?(_ v: UInt32) {
     // Unicode 6.3.0:
     //
@@ -109,39 +109,39 @@ extension Unicode.Scalar :
 
   /// Creates a Unicode scalar with the specified numeric value.
   ///
-  /// - Parameter v: The Unicode code point to use for the scalar. `v` must be
-  ///   a valid Unicode scalar value, in the range `0...0xD7FF` or
-  ///   `0xE000...0xFFFF`. In case of an invalid unicode scalar value, nil is
-  ///   returned.
-  ///
-  /// For example, the following code sample creates a `Unicode.Scalar` instance
-  /// with a value of `밥`, the Korean word for rice:
+  /// For example, the following code sample creates a `Unicode.Scalar`
+  /// instance with a value of `"밥"`, the Korean word for rice:
   ///
   ///     let codepoint: UInt16 = 48165
   ///     let bap = Unicode.Scalar(codepoint)
   ///     print(bap!)
   ///     // Prints "밥"
   ///
-  /// In case of an invalid input value, nil is returned.
+  /// In case of an invalid input value, the result is `nil`.
   ///
-  ///     let codepoint: UInt32 = extValue // This might be an invalid value. 
+  ///     let codepoint: UInt16 = extValue   // This might be an invalid value
   ///     if let bap = Unicode.Scalar(codepoint) {
-  ///       print(bap)
+  ///         print(bap)
   ///     } else {
-  ///       // Do something else
+  ///         // Do something else
   ///     }
+  ///
+  /// - Parameter v: The Unicode code point to use for the scalar. The
+  ///   initializer succeeds if `v` is a valid Unicode scalar value, in the
+  ///   range `0...0xD7FF` or `0xE000...0x10FFFF`. If `v` is an invalid
+  ///   unicode scalar value, the result is `nil`.
   public init?(_ v: UInt16) {
     self.init(UInt32(v))
   }
 
   /// Creates a Unicode scalar with the specified numeric value.
   ///
-  /// For example, the following code sample creates a `Unicode.Scalar` instance
-  /// with a value of `7`:
+  /// For example, the following code sample creates a `Unicode.Scalar`
+  /// instance with a value of `"7"`:
   ///
   ///     let codepoint: UInt8 = 55
   ///     let seven = Unicode.Scalar(codepoint)
-  ///     print(seven!)
+  ///     print(seven)
   ///     // Prints "7"
   ///
   /// - Parameter v: The code point to use for the scalar.
@@ -187,9 +187,7 @@ extension Unicode.Scalar :
       if nibble < 10 {
         return String(Unicode.Scalar(nibble+48)!)    // 48 = '0'
       } else {
-        // FIXME: was Unicode.Scalar(nibble-10+65), which is now
-        // ambiguous.  <rdar://problem/18506025>
-        return String(Unicode.Scalar(nibble+65-10)!) // 65 = 'A'
+        return String(Unicode.Scalar(nibble-10+65)!) // 65 = 'A'
       }
     }
 

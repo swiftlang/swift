@@ -789,7 +789,7 @@ bool RValue::isPlusOne(SILGenFunction &SGF) const & {
 }
 
 bool RValue::isPlusZero(SILGenFunction &SGF) const & {
-  return llvm::none_of(values, [&SGF](ManagedValue mv) -> bool {
+  return llvm::none_of(values, [](ManagedValue mv) -> bool {
     return mv.hasCleanup();
   });
 }

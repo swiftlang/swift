@@ -536,6 +536,21 @@ private:
   bool tryLexConflictMarker();
 };
   
+/// Given an ordered token \param Array , get the iterator pointing to the first
+/// token that is not before \param Loc .
+template<typename ArrayTy, typename Iterator = typename ArrayTy::iterator>
+Iterator token_lower_bound(ArrayTy &Array, SourceLoc Loc) {
+  return std::lower_bound(Array.begin(), Array.end(), Loc,
+    [](const Token &T, SourceLoc L) {
+      return T.getLoc().getOpaquePointerValue() < L.getOpaquePointerValue();
+  });
+}
+
+/// Given an ordered token array \param AllTokens , get the slice of the array
+/// where front() locates at \param StartLoc and back() locates at \param EndLoc .
+ArrayRef<Token> slice_token_array(ArrayRef<Token> AllTokens, SourceLoc StartLoc,
+                                  SourceLoc EndLoc);
+
 } // end namespace swift
 
 #endif

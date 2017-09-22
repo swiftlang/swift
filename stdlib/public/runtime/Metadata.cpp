@@ -592,25 +592,6 @@ static void tuple_destroy(OpaqueValue *tuple, const Metadata *_metadata) {
   }
 }
 
-/// Generic tuple value witness for 'destroyArray'.
-template <bool IsPOD, bool IsInline>
-static void tuple_destroyArray(OpaqueValue *array, size_t n,
-                               const Metadata *_metadata) {
-  auto &metadata = *(const TupleTypeMetadata*) _metadata;
-  assert(IsPOD == tuple_getValueWitnesses(&metadata)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(&metadata)->isValueInline());
-
-  if (IsPOD) return;
-
-  size_t stride = tuple_getValueWitnesses(&metadata)->stride;
-  char *bytes = (char*)array;
-
-  while (n--) {
-    tuple_destroy<IsPOD, IsInline>((OpaqueValue*)bytes, _metadata);
-    bytes += stride;
-  }
-}
-
 // The operation doesn't have to be initializeWithCopy, but they all
 // have basically the same type.
 typedef value_witness_types::initializeWithCopy forEachOperation;
@@ -639,24 +620,6 @@ static OpaqueValue *tuple_memcpy(OpaqueValue *dest,
   return (OpaqueValue*)
     memcpy(dest, src, metatype->getValueWitnesses()->getSize());
 }
-/// Perform a naive memcpy of n tuples from src into dest.
-static OpaqueValue *tuple_memcpy_array(OpaqueValue *dest,
-                                       OpaqueValue *src,
-                                       size_t n,
-                                       const Metadata *metatype) {
-  assert(metatype->getValueWitnesses()->isPOD());
-  return (OpaqueValue*)
-    memcpy(dest, src, metatype->getValueWitnesses()->stride * n);
-}
-/// Perform a naive memmove of n tuples from src into dest.
-static OpaqueValue *tuple_memmove_array(OpaqueValue *dest,
-                                        OpaqueValue *src,
-                                        size_t n,
-                                        const Metadata *metatype) {
-  assert(metatype->getValueWitnesses()->isPOD());
-  return (OpaqueValue*)
-    memmove(dest, src, metatype->getValueWitnesses()->stride * n);
-}
 
 /// Generic tuple value witness for 'initializeWithCopy'.
 template <bool IsPOD, bool IsInline>
@@ -673,31 +636,6 @@ static OpaqueValue *tuple_initializeWithCopy(OpaqueValue *dest,
   });
 }
 
-/// Generic tuple value witness for 'initializeArrayWithCopy'.
-template <bool IsPOD, bool IsInline>
-static OpaqueValue *tuple_initializeArrayWithCopy(OpaqueValue *dest,
-                                                  OpaqueValue *src,
-                                                  size_t n,
-                                                  const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-
-  if (IsPOD) return tuple_memcpy_array(dest, src, n, metatype);
-
-  char *destBytes = (char*)dest;
-  char *srcBytes = (char*)src;
-  size_t stride = tuple_getValueWitnesses(metatype)->stride;
-
-  while (n--) {
-    tuple_initializeWithCopy<IsPOD, IsInline>((OpaqueValue*)destBytes,
-                                              (OpaqueValue*)srcBytes,
-                                              metatype);
-    destBytes += stride; srcBytes += stride;
-  }
-
-  return dest;
-}
-
 /// Generic tuple value witness for 'initializeWithTake'.
 template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeWithTake(OpaqueValue *dest,
@@ -711,58 +649,6 @@ static OpaqueValue *tuple_initializeWithTake(OpaqueValue *dest,
       [](OpaqueValue *dest, OpaqueValue *src, const Metadata *eltType) {
     return eltType->vw_initializeWithTake(dest, src);
   });
-}
-
-/// Generic tuple value witness for 'initializeArrayWithTakeFrontToBack'.
-template <bool IsPOD, bool IsInline>
-static OpaqueValue *tuple_initializeArrayWithTakeFrontToBack(
-                                             OpaqueValue *dest,
-                                             OpaqueValue *src,
-                                             size_t n,
-                                             const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-
-  if (IsPOD) return tuple_memmove_array(dest, src, n, metatype);
-
-  char *destBytes = (char*)dest;
-  char *srcBytes = (char*)src;
-  size_t stride = tuple_getValueWitnesses(metatype)->stride;
-
-  while (n--) {
-    tuple_initializeWithTake<IsPOD, IsInline>((OpaqueValue*)destBytes,
-                                              (OpaqueValue*)srcBytes,
-                                              metatype);
-    destBytes += stride; srcBytes += stride;
-  }
-
-  return dest;
-}
-
-/// Generic tuple value witness for 'initializeArrayWithTakeBackToFront'.
-template <bool IsPOD, bool IsInline>
-static OpaqueValue *tuple_initializeArrayWithTakeBackToFront(
-                                             OpaqueValue *dest,
-                                             OpaqueValue *src,
-                                             size_t n,
-                                             const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-
-  if (IsPOD) return tuple_memmove_array(dest, src, n, metatype);
-
-  size_t stride = tuple_getValueWitnesses(metatype)->stride;
-  char *destBytes = (char*)dest + n * stride;
-  char *srcBytes = (char*)src + n * stride;
-
-  while (n--) {
-    destBytes -= stride; srcBytes -= stride;
-    tuple_initializeWithTake<IsPOD, IsInline>((OpaqueValue*)destBytes,
-                                              (OpaqueValue*)srcBytes,
-                                              metatype);
-  }
-
-  return dest;
 }
 
 /// Generic tuple value witness for 'assignWithCopy'.
@@ -1153,36 +1039,6 @@ static OpaqueValue *pod_direct_initializeWithCopy(OpaqueValue *dest,
 #define pod_direct_assignWithTake pod_direct_initializeWithCopy
 #define pod_indirect_assignWithTake pod_direct_initializeWithCopy
 
-static void pod_direct_destroyArray(OpaqueValue *, size_t, const Metadata *) {
-  // noop
-}
-#define pod_indirect_destroyArray pod_direct_destroyArray
-
-static OpaqueValue *pod_direct_initializeArrayWithCopy(OpaqueValue *dest,
-                                                       OpaqueValue *src,
-                                                       size_t n,
-                                                       const Metadata *self) {
-  auto totalSize = self->getValueWitnesses()->stride * n;
-  memcpy(dest, src, totalSize);
-  return dest;
-}
-#define pod_indirect_initializeArrayWithCopy pod_direct_initializeArrayWithCopy
-
-static OpaqueValue *pod_direct_initializeArrayWithTakeFrontToBack(
-                                                        OpaqueValue *dest,
-                                                        OpaqueValue *src,
-                                                        size_t n,
-                                                        const Metadata *self) {
-  auto totalSize = self->getValueWitnesses()->stride * n;
-  memmove(dest, src, totalSize);
-  return dest;
-}
-#define pod_direct_initializeArrayWithTakeBackToFront \
-  pod_direct_initializeArrayWithTakeFrontToBack
-#define pod_indirect_initializeArrayWithTakeFrontToBack \
-  pod_direct_initializeArrayWithTakeFrontToBack
-#define pod_indirect_initializeArrayWithTakeBackToFront \
-  pod_direct_initializeArrayWithTakeFrontToBack
 
 static constexpr uint64_t sizeWithAlignmentMask(uint64_t size,
                                                 uint64_t alignmentMask) {
@@ -1253,18 +1109,10 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
       vwtable->initializeWithTake = pod_direct_initializeWithTake;
       vwtable->initializeBufferWithTakeOfBuffer
         = pod_direct_initializeBufferWithTakeOfBuffer;
-      vwtable->initializeArrayWithTakeFrontToBack
-        = pod_direct_initializeArrayWithTakeFrontToBack;
-      vwtable->initializeArrayWithTakeBackToFront
-        = pod_direct_initializeArrayWithTakeBackToFront;
     } else {
       vwtable->initializeWithTake = pod_indirect_initializeWithTake;
       vwtable->initializeBufferWithTakeOfBuffer
         = pod_indirect_initializeBufferWithTakeOfBuffer;
-      vwtable->initializeArrayWithTakeFrontToBack
-        = pod_indirect_initializeArrayWithTakeFrontToBack;
-      vwtable->initializeArrayWithTakeBackToFront
-        = pod_indirect_initializeArrayWithTakeBackToFront;
     }
     return;
   }
@@ -1346,7 +1194,7 @@ namespace {
     uint32_t Flags;
     uint32_t InstanceStart;
     uint32_t InstanceSize;
-#ifdef __LP64__
+#if __POINTER_WIDTH__ == 64
     uint32_t Reserved;
 #endif
     const uint8_t *IvarLayout;

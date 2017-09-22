@@ -975,6 +975,8 @@ TypeDecl* UnqualifiedLookup::getSingleTypeResult() {
 
 void LazyMemberLoader::anchor() {}
 
+void LazyConformanceLoader::anchor() {}
+
 /// Lookup table used to store members of a nominal type (and its extensions)
 /// for fast retrieval.
 class swift::MemberLookupTable {

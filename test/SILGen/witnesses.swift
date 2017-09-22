@@ -319,9 +319,9 @@ protocol ReadOnlyRequirement {
 }
 
 struct ImmutableModel: ReadOnlyRequirement {
-  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses14ImmutableModelVAA19ReadOnlyRequirementA2aDP4propSSfgTW : $@convention(witness_method) (@in_guaranteed ImmutableModel) -> @owned String
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses14ImmutableModelVAA19ReadOnlyRequirementA2aDP4propSSvgTW : $@convention(witness_method) (@in_guaranteed ImmutableModel) -> @owned String
   let prop: String = "a"
-  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses14ImmutableModelVAA19ReadOnlyRequirementA2aDP4propSSfgZTW : $@convention(witness_method) (@thick ImmutableModel.Type) -> @owned String
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses14ImmutableModelVAA19ReadOnlyRequirementA2aDP4propSSvgZTW : $@convention(witness_method) (@thick ImmutableModel.Type) -> @owned String
   static let prop: String = "b"
 }
 
@@ -462,7 +462,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
 
   // If the witness is in a base class of the conforming class, make sure we have a bit_cast in there:
 
-  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0A2aDP5widthSifmTW : {{.*}} {
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0A2aDP5widthSivmTW : {{.*}} {
   // CHECK: bb0({{.*}} : @trivial $Builtin.RawPointer, {{.*}} : @trivial $*Builtin.UnsafeValueBuffer, [[ARG2:%.*]] : @trivial $*PropertyRequirementWitnessFromBase):
   // CHECK-NEXT: [[ARG2_LOADED:%[0-9][0-9]*]] = load [copy] [[ARG2]]
   // CHECK-NEXT: [[CAST_ARG2_LOADED:%[0-9][0-9]*]] = upcast [[ARG2_LOADED]] : $PropertyRequirementWitnessFromBase to $PropertyRequirementBase
@@ -476,16 +476,16 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: destroy_value [[CAST_ARG2_LOADED]]
   // CHECK-NEXT: return [[TUPLE]]
 
-  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0A2aDP6heightSifmZTW : {{.*}} {
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0A2aDP6heightSivmZTW : {{.*}} {
   // CHECK: [[OBJ:%.*]] = upcast %2 : $@thick PropertyRequirementWitnessFromBase.Type to $@thick PropertyRequirementBase.Type
-  // CHECK: [[METH:%.*]] = function_ref @_T09witnesses23PropertyRequirementBaseC6heightSifmZ
+  // CHECK: [[METH:%.*]] = function_ref @_T09witnesses23PropertyRequirementBaseC6heightSivmZ
   // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]
   // CHECK-NEXT: [[CAR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 0
   // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
   // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CADR]] : {{.*}})
   // CHECK-NEXT: return [[TUPLE]]
 
-  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0A2aDP5depthSifmTW
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0A2aDP5depthSivmTW
   // CHECK: bb0({{.*}} : @trivial $Builtin.RawPointer, {{.*}} : @trivial $*Builtin.UnsafeValueBuffer, [[ARG2:%.*]] : @trivial $*PropertyRequirementWitnessFromBase):
   // CHECK: [[ARG2_LOADED:%[0-9][0-9]*]] = load [copy] [[ARG2]]
   // CHECK: [[METH:%.*]] = class_method [[ARG2_LOADED]] : $PropertyRequirementWitnessFromBase, #PropertyRequirementWitnessFromBase.depth!materializeForSet.1

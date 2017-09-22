@@ -710,7 +710,7 @@ namespace {
       // better SILGen.
       if (isLValue &&
           (isNonMutatingMember(member) ||
-           member->getDeclContext()->getDeclaredTypeOfContext()
+           member->getDeclContext()->getDeclaredInterfaceType()
              ->hasReferenceSemantics())) {
         base = cs.coerceToRValue(base);
         isLValue = false;
@@ -1314,6 +1314,7 @@ namespace {
           ->getElementType(0);
         
         Type valueTy;
+        Type baseTy;
         bool resultIsLValue;
         
         if (auto nom = keyPathTTy->getAs<NominalType>()) {
@@ -1324,12 +1325,14 @@ namespace {
             valueTy = OptionalType::get(valueTy);
             resultIsLValue = false;
             base = cs.coerceToRValue(base);
+            baseTy = cs.getType(base);
           } else {
             llvm_unreachable("unknown key path class!");
           }
         } else {
           auto keyPathBGT = keyPathTTy->castTo<BoundGenericType>();
-          
+          baseTy = keyPathBGT->getGenericArgs()[0];
+
           if (keyPathBGT->getDecl()
                 == cs.getASTContext().getPartialKeyPathDecl()) {
             // PartialKeyPath<T> is rvalue T -> rvalue Any
@@ -1356,6 +1359,12 @@ namespace {
             } else {
               llvm_unreachable("unknown key path class!");
             }
+          }
+
+          // Coerce the base if its anticipated type doesn't match - say we're
+          // applying a keypath with an existential base to a concrete base.
+          if (baseTy->isExistentialType() && !cs.getType(base)->isExistentialType()) {
+            base = coerceToType(base, baseTy, locator);
           }
         }
         if (resultIsLValue)
@@ -2471,11 +2480,9 @@ namespace {
           // Determine whether 'super' would have made sense as a base.
           bool hasSuper = false;
           if (auto func = cs.DC->getInnermostMethodContext()) {
-            if (auto nominalType
-                       = func->getDeclContext()->getDeclaredTypeOfContext()) {
-              if (auto classDecl = nominalType->getClassOrBoundGenericClass()) {
-                hasSuper = classDecl->hasSuperclass();
-              }
+            if (auto classDecl = func->getDeclContext()
+                    ->getAsClassOrClassExtensionContext()) {
+              hasSuper = classDecl->hasSuperclass();
             }
           }
 
@@ -3886,6 +3893,7 @@ namespace {
       assert(method && "Didn't find a method?");
 
       // The declaration we found must be exposed to Objective-C.
+      tc.validateDecl(method);
       if (!method->isObjC()) {
         tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
                     foundDecl->getDescriptiveKind(), foundDecl->getFullName())
@@ -3918,7 +3926,12 @@ namespace {
       E->setMethod(method);
       return E;
     }
-
+    
+  private:
+    // Key path components we need to
+    SmallVector<std::pair<KeyPathExpr *, unsigned>, 4>
+      KeyPathSubscriptComponents;
+  public:
     Expr *visitKeyPathExpr(KeyPathExpr *E) {
       if (E->isObjC()) {
         cs.setType(E, cs.getType(E->getObjCStringLiteralExpr()));
@@ -3984,8 +3997,7 @@ namespace {
           } else {
             // Key paths don't work with mutating-get properties.
             auto varDecl = cast<VarDecl>(property);
-            if (varDecl->hasAccessorFunctions()
-                && varDecl->getGetter()->isMutating()) {
+            if (varDecl->isGetterMutating()) {
               cs.TC.diagnose(origComponent.getLoc(),
                              diag::expr_keypath_mutating_getter,
                              property->getFullName());
@@ -4038,7 +4050,7 @@ namespace {
             break;
           }
           auto subscript = cast<SubscriptDecl>(foundDecl->choice.getDecl());
-          if (subscript->getGetter()->isMutating()) {
+          if (subscript->isGetterMutating()) {
             cs.TC.diagnose(origComponent.getLoc(),
                            diag::expr_keypath_mutating_getter,
                            subscript->getFullName());
@@ -4069,12 +4081,17 @@ namespace {
           resolvedTy = simplifyType(resolvedTy);
           
           auto ref = ConcreteDeclRef(cs.getASTContext(), subscript, subs);
+          
           component = KeyPathExpr::Component
             ::forSubscriptWithPrebuiltIndexExpr(ref,
                                             origComponent.getIndexExpr(),
                                             origComponent.getSubscriptLabels(),
                                             resolvedTy,
-                                            origComponent.getLoc());
+                                            origComponent.getLoc(),
+                                            {});
+          // Save a reference to the component so we can do a post-pass to check
+          // the Hashable conformance of the indexes.
+          KeyPathSubscriptComponents.push_back({E, resolvedComponents.size()});
           break;
         }
         case KeyPathExpr::Component::Kind::OptionalChain: {
@@ -4215,6 +4232,47 @@ namespace {
         tc.diagnose(cast->getStartLoc(), diag::silence_inject_forced_downcast)
           .fixItInsert(cast->getStartLoc(), "(")
           .fixItInsertAfter(cast->getEndLoc(), ")");
+      }
+      
+      // Look at key path subscript components to verify that they're hashable.
+      for (auto componentRef : KeyPathSubscriptComponents) {
+        auto &component = componentRef.first
+                                  ->getMutableComponents()[componentRef.second];
+        // We need to be able to hash the captured index values in order for
+        // KeyPath itself to be hashable, so check that all of the subscript
+        // index components are hashable and collect their conformances here.
+        SmallVector<ProtocolConformanceRef, 2> hashables;
+        bool allIndexesHashable = true;
+        ArrayRef<TupleTypeElt> indexTypes;
+        TupleTypeElt singleIndexTypeBuf;
+        if (auto tup = component.getIndexExpr()->getType()
+                                               ->getAs<TupleType>()) {
+          indexTypes = tup->getElements();
+        } else {
+          singleIndexTypeBuf = component.getIndexExpr()->getType();
+          indexTypes = singleIndexTypeBuf;
+        }
+      
+        auto hashable =
+          cs.getASTContext().getProtocol(KnownProtocolKind::Hashable);
+        for (auto indexType : indexTypes) {
+          auto conformance =
+            cs.TC.conformsToProtocol(indexType.getType(), hashable,
+                                     cs.DC, ConformanceCheckFlags::Used
+                                          |ConformanceCheckFlags::InExpression);
+          if (!conformance) {
+            cs.TC.diagnose(component.getIndexExpr()->getLoc(),
+                           diag::expr_keypath_subscript_index_not_hashable,
+                           indexType.getType());
+            allIndexesHashable = false;
+            continue;
+          }
+          hashables.push_back(*conformance);
+        }
+
+        if (allIndexesHashable) {
+          component.setSubscriptIndexHashableConformances(hashables);
+        }
       }
 
       // Set the final types on the expression.
@@ -6350,7 +6408,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
     // If neither the property's getter nor its setter are mutating, the base
     // can be an rvalue.
     if (!SD->isGetterMutating()
-        && (!isSettableFromHere || SD->isSetterNonMutating()))
+        && (!isSettableFromHere || !SD->isSetterMutating()))
       return baseObjectTy;
 
     // If we're calling an accessor, keep the base as an inout type, because the

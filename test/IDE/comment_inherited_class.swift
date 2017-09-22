@@ -17,13 +17,13 @@ class Base {
   var varNoDerivedComment: Bool {
     return false
   }
-  // CHECK: Var/Base.varNoDerivedComment {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>varNoDerivedComment</Name><USR>s:14swift_ide_test4BaseC19varNoDerivedCommentSbv</USR><Declaration>var varNoDerivedComment: Bool { get }</Declaration><CommentParts><Abstract><Para>Base</Para></Abstract></CommentParts></Other>]
+  // CHECK: Var/Base.varNoDerivedComment {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>varNoDerivedComment</Name><USR>s:14swift_ide_test4BaseC19varNoDerivedCommentSbvp</USR><Declaration>var varNoDerivedComment: Bool { get }</Declaration><CommentParts><Abstract><Para>Base</Para></Abstract></CommentParts></Other>]
 
   /// Base
   var varWithDerivedComment: Bool {
     return false
   }
-  // CHECK: Var/Base.varWithDerivedComment {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>varWithDerivedComment</Name><USR>s:14swift_ide_test4BaseC21varWithDerivedCommentSbv</USR><Declaration>var varWithDerivedComment: Bool { get }</Declaration><CommentParts><Abstract><Para>Base</Para></Abstract></CommentParts></Other>]
+  // CHECK: Var/Base.varWithDerivedComment {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>varWithDerivedComment</Name><USR>s:14swift_ide_test4BaseC21varWithDerivedCommentSbvp</USR><Declaration>var varWithDerivedComment: Bool { get }</Declaration><CommentParts><Abstract><Para>Base</Para></Abstract></CommentParts></Other>]
 }
 
 class Derived : Base {
@@ -40,12 +40,12 @@ class Derived : Base {
   override var varNoDerivedComment: Bool {
     return false
   }
-  // CHECK: Var/Derived.varNoDerivedComment {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>varNoDerivedComment</Name><USR>s:14swift_ide_test7DerivedC05varNoD7CommentSbv</USR><Declaration>override var varNoDerivedComment: Bool { get }</Declaration><CommentParts><Abstract><Para>Base</Para></Abstract><Discussion><Note><Para>This documentation comment was inherited from <codeVoice>Base</codeVoice>.</Para></Note></Discussion></CommentParts></Other>]
+  // CHECK: Var/Derived.varNoDerivedComment {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>varNoDerivedComment</Name><USR>s:14swift_ide_test7DerivedC05varNoD7CommentSbvp</USR><Declaration>override var varNoDerivedComment: Bool { get }</Declaration><CommentParts><Abstract><Para>Base</Para></Abstract><Discussion><Note><Para>This documentation comment was inherited from <codeVoice>Base</codeVoice>.</Para></Note></Discussion></CommentParts></Other>]
 
   // Derived
   override var varWithDerivedComment : Bool {
     return true
   }
-  // CHECK: Var/Derived.varWithDerivedComment {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>varWithDerivedComment</Name><USR>s:14swift_ide_test7DerivedC07varWithD7CommentSbv</USR><Declaration>override var varWithDerivedComment: Bool { get }</Declaration><CommentParts><Abstract><Para>Base</Para></Abstract><Discussion><Note><Para>This documentation comment was inherited from <codeVoice>Base</codeVoice>.</Para></Note></Discussion></CommentParts></Other>]
+  // CHECK: Var/Derived.varWithDerivedComment {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>varWithDerivedComment</Name><USR>s:14swift_ide_test7DerivedC07varWithD7CommentSbvp</USR><Declaration>override var varWithDerivedComment: Bool { get }</Declaration><CommentParts><Abstract><Para>Base</Para></Abstract><Discussion><Note><Para>This documentation comment was inherited from <codeVoice>Base</codeVoice>.</Para></Note></Discussion></CommentParts></Other>]
 }
 

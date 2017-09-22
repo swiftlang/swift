@@ -21,9 +21,9 @@ import Lib
 // CHECK-SIL-LABEL: sil hidden @_T08typedefs11testSymbolsyyF
 func testSymbols() {
   // Check that the symbols are not using 'Bool'.
-  // CHECK-SIL: function_ref @_T03Lib1xs5Int32Vfau
+  // CHECK-SIL: function_ref @_T03Lib1xs5Int32Vvau
   _ = Lib.x
-  // CHECK-SIL: function_ref @_T03Lib9usesAssocs5Int32VSgfau
+  // CHECK-SIL: function_ref @_T03Lib9usesAssocs5Int32VSgvau
   _ = Lib.usesAssoc
 } // CHECK-SIL: end sil function '_T08typedefs11testSymbolsyyF'
 
@@ -87,7 +87,7 @@ prefix operator ***
 
 // CHECK-LABEL: extension WrappedInt : WrappedProto {
 // CHECK-NEXT: func wrappedMethod()
-// CHECK-NEXT: prefix static func ***(x: WrappedInt)
+// CHECK-NEXT: prefix static func *** (x: WrappedInt)
 // CHECK-NEXT: }
 // CHECK-RECOVERY-NEGATIVE-NOT: extension WrappedInt
 extension WrappedInt: WrappedProto {
@@ -96,11 +96,11 @@ extension WrappedInt: WrappedProto {
 }
 // CHECK-LABEL: extension Int32 : UnwrappedProto {
 // CHECK-NEXT: func unwrappedMethod()
-// CHECK-NEXT: prefix static func ***(x: UnwrappedInt)
+// CHECK-NEXT: prefix static func *** (x: UnwrappedInt)
 // CHECK-NEXT: }
 // CHECK-RECOVERY-LABEL: extension Int32 : UnwrappedProto {
 // CHECK-RECOVERY-NEXT: func unwrappedMethod()
-// CHECK-RECOVERY-NEXT: prefix static func ***(x: Int32)
+// CHECK-RECOVERY-NEXT: prefix static func *** (x: Int32)
 // CHECK-RECOVERY-NEXT: }
 // CHECK-RECOVERY-NEGATIVE-NOT: extension UnwrappedInt
 extension UnwrappedInt: UnwrappedProto {

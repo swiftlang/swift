@@ -274,7 +274,8 @@ using LookupTableMap = llvm::StringMap<std::unique_ptr<SwiftLookupTable>>;
 
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
-  : public LazyMemberLoader
+  : public LazyMemberLoader,
+    public LazyConformanceLoader
 {
   friend class ClangImporter;
   using Version = importer::ImportNameVersion;
@@ -640,7 +641,9 @@ public:
 
   /// Print an imported name as a string suitable for the swift_name attribute,
   /// or the 'Rename' field of AvailableAttr.
-  void printSwiftName(importer::ImportedName, bool fullyQualified,
+  void printSwiftName(importer::ImportedName name,
+                      importer::ImportNameVersion version,
+                      bool fullyQualified,
                       llvm::raw_ostream &os);
 
   /// \brief Import the given Clang identifier into Swift.
@@ -1129,7 +1132,14 @@ private:
   void insertMembersAndAlternates(const clang::NamedDecl *nd,
                                   SmallVectorImpl<Decl *> &members);
   void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
-  void addMemberAndAlternatesToExtension(
+
+  /// Imports \p decl under \p nameVersion with the name \p newName, and adds
+  /// it and its alternates to \p ext.
+  ///
+  /// \returns true if \p decl was successfully imported, whether or not it was
+  /// ultimately added to \p ext. This matches the behavior of
+  /// forEachDistinctName's callback.
+  bool addMemberAndAlternatesToExtension(
       clang::NamedDecl *decl, importer::ImportedName newName,
       importer::ImportNameVersion nameVersion, ExtensionDecl *ext);
 
@@ -1220,11 +1230,14 @@ public:
   /// will eventually reference that declaration, the contexts will still be
   /// considered distinct.
   ///
-  /// The names are generated in the same order as
-  /// forEachImportNameVersionFromCurrent. The current name is always first.
+  /// If \p action returns false, the current name will \e not be added to the
+  /// set of seen names.
+  ///
+  /// The active name is always first, followed by the other names in the order
+  /// of ImportNameVersion::forEachOtherImportNameVersion.
   void forEachDistinctName(
       const clang::NamedDecl *decl,
-      llvm::function_ref<void(importer::ImportedName,
+      llvm::function_ref<bool(importer::ImportedName,
                               importer::ImportNameVersion)> action);
 
   /// Dump the Swift-specific name lookup tables we generate.

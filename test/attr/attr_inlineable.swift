@@ -182,3 +182,22 @@ enum InternalEnum {
   let _: VersionedEnum = .orange
   _ = VersionedEnum.persimmon
 }
+
+// Inherited initializers - <rdar://problem/34398148>
+@_versioned
+class Base {
+  @_versioned
+  init(x: Int) {}
+}
+
+@_versioned
+class Middle : Base {}
+
+@_versioned
+class Derived : Middle {
+  @_versioned
+  @_inlineable
+  init(y: Int) {
+    super.init(x: y)
+  }
+}

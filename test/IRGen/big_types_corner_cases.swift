@@ -152,7 +152,7 @@ public func enumCallee(_ x: LargeEnum) {
 // CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK-64: [[ALLOC4:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
-// CHECK-64: call swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_AFyKXKfu_TA(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture swifterror %swifterror)
+// CHECK-64: call swiftcc void @_T022big_types_corner_cases9SuperBaseC4boomAA9BigStructVyF(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %T22big_types_corner_cases9SuperBaseC* swiftself {{.*}})
 // CHECK: ret void
 class SuperBase {
   func boom() -> BigStruct {
@@ -171,10 +171,10 @@ class SuperSub : SuperBase {
   }
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10MUseStructV16superclassMirrorAA03BigF0VSgfg(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret, %T22big_types_corner_cases10MUseStructV* noalias nocapture swiftself dereferenceable({{.*}})) #0 {
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10MUseStructV16superclassMirrorAA03BigF0VSgvg(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret, %T22big_types_corner_cases10MUseStructV* noalias nocapture swiftself dereferenceable({{.*}})) #0 {
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK: [[LOAD:%.*]] = load %swift.refcounted*, %swift.refcounted** %.callInternalLet.data
-// CHECK: call swiftcc void %6(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret [[ALLOC]], %swift.refcounted* swiftself [[LOAD]])
+// CHECK: call swiftcc void %7(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret [[ALLOC]], %swift.refcounted* swiftself [[LOAD]])
 // CHECK: ret void
 public struct MUseStruct {
   var x = BigStruct()

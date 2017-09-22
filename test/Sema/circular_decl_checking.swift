@@ -27,7 +27,7 @@ class HasProp {
   var HasProp: HasProp {
     return HasProp() // expected-error {{cannot call value of non-function type 'HasProp'}}{{19-21=}}
   }
-  var SomethingElse: SomethingElse? { // expected-error 2 {{use of undeclared type 'SomethingElse'}}
+  var SomethingElse: SomethingElse? { // expected-error {{use of undeclared type 'SomethingElse'}}
     return nil
   }
 }
@@ -40,7 +40,7 @@ protocol ReferenceSomeProtocol {
 func TopLevelFunc(x: TopLevelFunc) -> TopLevelFunc { return x } // expected-error 2 {{use of undeclared type 'TopLevelFunc'}}'
 func TopLevelGenericFunc<TopLevelGenericFunc : TopLevelGenericFunc>(x: TopLevelGenericFunc) -> TopLevelGenericFunc { return x } // expected-error {{inheritance from non-protocol, non-class type 'TopLevelGenericFunc'}}
 func TopLevelGenericFunc2<T : TopLevelGenericFunc2>(x: T) -> T { return x} // expected-error {{use of undeclared type 'TopLevelGenericFunc2'}}
-var TopLevelVar: TopLevelVar? { return nil } // expected-error 2 {{use of undeclared type 'TopLevelVar'}}
+var TopLevelVar: TopLevelVar? { return nil } // expected-error {{use of undeclared type 'TopLevelVar'}}
 
 
 // FIXME: The first error is redundant, isn't correct in what it states, and

@@ -15,6 +15,8 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Initializer.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILLinkage.h"
@@ -538,6 +540,19 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     dc = closure->getLocalContext();
   else {
     auto *d = getDecl();
+
+    // Default argument generators are serialized if the function was
+    // type-checked in Swift 4 mode.
+    if (kind == SILDeclRef::Kind::DefaultArgGenerator) {
+      auto *afd = cast<AbstractFunctionDecl>(d);
+      switch (afd->getDefaultArgumentResilienceExpansion()) {
+      case ResilienceExpansion::Minimal:
+        return IsSerialized;
+      case ResilienceExpansion::Maximal:
+        return IsNotSerialized;
+      }
+    }
+
     dc = getDecl()->getInnermostDeclContext();
 
     // Enum element constructors are serialized if the enum is
@@ -757,7 +772,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     assert(!isCurried);
     return mangler.mangleAccessorEntity(AccessorKind::IsMutableAddressor,
                                         AddressorKind::Unsafe,
-                                        getDecl(),
+                                        cast<AbstractStorageDecl>(getDecl()),
                                         /*isStatic*/ false,
                                         SKind);
 

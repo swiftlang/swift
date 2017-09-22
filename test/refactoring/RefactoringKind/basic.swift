@@ -174,6 +174,43 @@ func testStringLiteral() -> String {
   return "abc"
 }
 
+func testCollapseNestedIf() {
+  let a = 3
+  if a > 2 {
+    if a < 10 {}
+  }
+}
+
+func testMultiConditionalNestedIf() {
+  let a = 3
+  if a > 2, a != 4 {
+    if a < 10 {}
+  }
+}
+
+func testExtraDeclNestedIf() {
+  let a = 3
+  if a > 2 {
+    if a < 10 {}
+    let b = 0
+  }
+}
+
+func testExtraIfNestedIf() {
+  let a = 3
+  if a > 2 {
+    if a < 10 {}
+    let b = 0
+  }
+}
+
+func testStringInterpolation() -> String {
+  let name = "Jason"
+  let one = "\(1)"
+  let _ = "aaa" + "bbb"
+  let _ = name + "Bourne"
+  let _ = name + one
+}
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -245,6 +282,15 @@ func testStringLiteral() -> String {
 
 // RUN: %refactor -source-filename %s -pos=173:3 -end-pos=173:27| %FileCheck %s -check-prefix=CHECK-EXTRCT-METHOD
 
+// RUN: %refactor -source-filename %s -pos=179:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF-EXPRESSION
+// RUN: %refactor -source-filename %s -pos=186:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF-EXPRESSION
+// RUN: %refactor -source-filename %s -pos=193:3 | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %refactor -source-filename %s -pos=201:3 | %FileCheck %s -check-prefix=CHECK-NONE
+
+// RUN: %refactor -source-filename %s -pos=210:11 -end-pos=210:24 | %FileCheck %s -check-prefix=CHECK-STRINGS-INTERPOLATION
+// RUN: %refactor -source-filename %s -pos=211:11 -end-pos=211:26 | %FileCheck %s -check-prefix=CHECK-STRINGS-INTERPOLATION
+// RUN: %refactor -source-filename %s -pos=212:11 -end-pos=212:21 | %FileCheck %s -check-prefix=CHECK-STRINGS-INTERPOLATION
+
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
 // CHECK1-NEXT: Action ends
@@ -279,3 +325,8 @@ func testStringLiteral() -> String {
 // CHECK-EXTRCT-METHOD-NEXT: Action ends
 
 // CHECK-LOCALIZE-STRING: Localize String
+
+// CHECK-COLLAPSE-NESTED-IF-EXPRESSION: Collapse Nested If Expression
+
+// CHECK-STRINGS-INTERPOLATION: Convert to String Interpolation
+

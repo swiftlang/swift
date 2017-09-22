@@ -183,7 +183,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   SmallVector<ParameterList*, 2> params;
 
   bool isStatic = storage->isStatic();
-  bool isMutating = !storage->isSetterNonMutating();
+  bool isMutating = storage->isSetterMutating();
 
   // The implicit 'self' argument if in a type context.
   if (storage->getDeclContext()->isTypeContext()) {
@@ -342,7 +342,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   Type contextTy = DC->getDeclaredInterfaceType();
   if (contextTy && !contextTy->hasReferenceSemantics() &&
       !setter->getAttrs().hasAttribute<NonMutatingAttr>() &&
-      !storage->isSetterNonMutating())
+      storage->isSetterMutating())
     materializeForSet->setSelfAccessKind(SelfAccessKind::Mutating);
 
   materializeForSet->setStatic(storage->isStatic());
@@ -378,6 +378,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   // definition to be compiled.
   if (needsToBeRegisteredAsExternalDecl(storage))
     TC.Context.addExternalDecl(materializeForSet);
+  TC.DeclsToFinalize.insert(materializeForSet);
   
   return materializeForSet;
 }
@@ -715,6 +716,7 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
     TC.Context.addExternalDecl(getter);
+  TC.DeclsToFinalize.insert(getter);
 }
 
 /// Synthesize the body of a trivial setter.
@@ -743,6 +745,7 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
     TC.Context.addExternalDecl(setter);
+  TC.DeclsToFinalize.insert(setter);
 }
 
 /// Does a storage decl currently lacking accessor functions require a
@@ -884,19 +887,21 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
 
 /// The specified AbstractStorageDecl was just found to satisfy a
 /// protocol property requirement.  Ensure that it has the full
-/// complement of accessors, and validate them.
+/// complement of accessors.
 void TypeChecker::synthesizeWitnessAccessorsForStorage(
                                              AbstractStorageDecl *requirement,
                                              AbstractStorageDecl *storage) {
   // If the decl is stored, convert it to StoredWithTrivialAccessors
   // by synthesizing the full set of accessors.
   if (!storage->hasAccessorFunctions()) {
-    addTrivialAccessorsToStorage(storage, *this);
+    // Don't do this if the declaration is lazy or NSManaged.
+    // This must be a re-entrant attempt to synthesize accessors
+    // before validateDecl has finished.
+    if (storage->getAttrs().hasAttribute<LazyAttr>() ||
+        storage->getAttrs().hasAttribute<NSManagedAttr>())
+      return;
 
-    if (auto getter = storage->getGetter())
-      validateDecl(getter);
-    if (auto setter = storage->getSetter())
-      validateDecl(setter);
+    addTrivialAccessorsToStorage(storage, *this);
   }
 
   // @objc protocols don't need a materializeForSet since ObjC doesn't
@@ -907,9 +912,6 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
   // If we want wantMaterializeForSet, create it now.
   if (wantMaterializeForSet && !storage->getMaterializeForSetFunc())
     addMaterializeForSet(storage, *this);
-
-  if (auto materializeForSet = storage->getMaterializeForSetFunc())
-    validateDecl(materializeForSet);
 }
 
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
@@ -1682,7 +1684,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
     bool mightBeMutating = dc->isTypeContext()
       && !var->isStatic()
-      && !dc->getDeclaredInterfaceType()->getClassOrBoundGenericClass();
+      && !dc->getDeclaredInterfaceType()->hasReferenceSemantics();
 
     auto makeBehaviorAccessors = [&]{
       FuncDecl *getter;
@@ -1691,16 +1693,16 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
         getter = createGetterPrototype(var, TC);
         // The getter is mutating if the behavior implementation is, unless
         // we're in a class or non-instance context.
-        if (mightBeMutating && valueProp->getGetter()->isMutating())
+        if (mightBeMutating && valueProp->isGetterMutating())
           getter->setSelfAccessKind(SelfAccessKind::Mutating);
 
         getter->setAccess(var->getFormalAccess());
 
         // Make a setter if the behavior property has one.
-        if (auto valueSetter = valueProp->getSetter()) {
+        if (valueProp->getSetter()) {
           ParamDecl *newValueParam = nullptr;
           setter = createSetterPrototype(var, newValueParam, TC);
-          if (mightBeMutating && valueSetter->isMutating())
+          if (mightBeMutating && valueProp->isSetterMutating())
             setter->setSelfAccessKind(SelfAccessKind::Mutating);
           // TODO: max of property and implementation setter visibility?
           setter->setAccess(var->getFormalAccess());
@@ -1784,6 +1786,10 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       }
       
       TC.validateDecl(valueProp);
+      var->setIsGetterMutating(mightBeMutating &&
+                               valueProp->isGetterMutating());
+      var->setIsSetterMutating(mightBeMutating &&
+                               valueProp->isSetterMutating());
       
       // Set up a conformance to represent the behavior instantiation.
       // The conformance will be on the containing 'self' type, or '()' if the
@@ -1810,8 +1816,10 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
   if (var->getAttrs().hasAttribute<LazyAttr>()) {
     auto *getter = createGetterPrototype(var, TC);
     // lazy getters are mutating on an enclosing value type.
-    if (!dc->getAsClassOrClassExtensionContext())
+    if (!dc->getAsClassOrClassExtensionContext()) {
       getter->setSelfAccessKind(SelfAccessKind::Mutating);
+      var->setIsGetterMutating(true);
+    }
     getter->setAccess(var->getFormalAccess());
 
     ParamDecl *newValueParam = nullptr;
@@ -2032,11 +2040,13 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   //
   // FIXME: Remove this when lookup of initializers becomes restricted to our
   // immediate superclass.
-  Type superclassTyInCtor = superclassCtor->getDeclContext()->getDeclaredTypeOfContext();
+  auto *superclassCtorDecl =
+      superclassCtor->getDeclContext()
+          ->getAsNominalTypeOrNominalTypeExtensionContext();
   Type superclassTy = classDecl->getSuperclass();
   Type superclassTyInContext = classDecl->mapTypeIntoContext(superclassTy);
   NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
-  if (superclassTyInCtor->getAnyNominal() != superclassDecl) {
+  if (superclassCtorDecl != superclassDecl) {
     return nullptr;
   }
 
@@ -2101,6 +2111,12 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   access = std::min(access, superclassCtor->getFormalAccess());
   ctor->setAccess(access);
 
+  // Inherit the @_versioned attribute.
+  if (superclassCtor->getAttrs().hasAttribute<VersionedAttr>()) {
+    auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
+    ctor->getAttrs().add(clonedAttr);
+  }
+
   // Make sure the constructor is only as available as its superclass's
   // constructor.
   AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
@@ -2115,7 +2131,6 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
       if (objcAttr->hasName()) {
         auto *clonedAttr = objcAttr->clone(ctx);
-        // Set it to implicit to disable printing it for SIL.
         clonedAttr->setImplicit(true);
         ctor->getAttrs().add(clonedAttr);
       }

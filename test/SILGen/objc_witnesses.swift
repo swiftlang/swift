@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -sil-serialize-witness-tables -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -62,9 +62,9 @@ protocol Subscriptable {
   subscript(x: Int) -> Any { get }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T0So7NSArrayC14objc_witnesses13SubscriptableA2cDP9subscriptypSicfgTW : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @out Any {
-// CHECK:         function_ref @_T0So7NSArrayC9subscriptypSicfgTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any
-// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So7NSArrayC9subscriptypSicfgTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any {
+// CHECK-LABEL: sil private [transparent] [thunk] @_T0So7NSArrayC14objc_witnesses13SubscriptableA2cDPypSicigTW : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @out Any {
+// CHECK:         function_ref @_T0So7NSArrayCypSicigTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So7NSArrayCypSicigTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any {
 // CHECK:         class_method [volatile] {{%.*}} : $NSArray, #NSArray.subscript!getter.1.foreign
 extension NSArray: Subscriptable {}
 
@@ -78,11 +78,11 @@ class Electron : Orbital {
   dynamic var quantumNumber: Int = 0
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T014objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSifgTW
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T014objc_witnesses8ElectronC13quantumNumberSifgTD
+// CHECK-LABEL: sil private [transparent] [thunk] @_T014objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSivgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T014objc_witnesses8ElectronC13quantumNumberSivgTD
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T014objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSifsTW
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T014objc_witnesses8ElectronC13quantumNumberSifsTD
+// CHECK-LABEL: sil private [transparent] [thunk] @_T014objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSivsTW
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T014objc_witnesses8ElectronC13quantumNumberSivsTD
 
 // witness is a dynamic thunk and is public:
 
@@ -94,8 +94,8 @@ public class Positron : Lepton {
   public dynamic var spin: Float = 0.5
 }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T014objc_witnesses8PositronCAA6LeptonA2aDP4spinSffgTW
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T014objc_witnesses8PositronC4spinSffgTD
+// CHECK-LABEL: sil private [transparent] [thunk] @_T014objc_witnesses8PositronCAA6LeptonA2aDP4spinSfvgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T014objc_witnesses8PositronC4spinSfvgTD
 
 // Override of property defined in @objc extension
 
@@ -109,11 +109,11 @@ extension NSObject : Atom {
   var valence: Int { get { return 1 } set { } }
 }
 
-// CHECK-LABEL: sil private @_T0So8NSObjectC14objc_witnessesE7valenceSifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout NSObject, @thick NSObject.Type) -> () {
+// CHECK-LABEL: sil private @_T0So8NSObjectC14objc_witnessesE7valenceSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout NSObject, @thick NSObject.Type) -> () {
 // CHECK: class_method [volatile] %4 : $NSObject, #NSObject.valence!setter.1.foreign
 // CHECK: }
 
-// CHECK-LABEL: sil hidden @_T0So8NSObjectC14objc_witnessesE7valenceSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed NSObject) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden @_T0So8NSObjectC14objc_witnessesE7valenceSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed NSObject) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: class_method [volatile] %2 : $NSObject, #NSObject.valence!getter.1.foreign
 // CHECK: }
 

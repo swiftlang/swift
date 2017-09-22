@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -sil-serialize-witness-tables %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
 
 class RefAggregate {}
 struct ValueAggregate { let x = RefAggregate() }

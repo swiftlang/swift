@@ -12,8 +12,8 @@ extension Foo {
   // An unconstrained extension in the same module doesn't use the extension
   // mangling, since the implementation can be resiliently moved into the
   // definition.
-  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooV1aSifg
-  // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV1aSifg
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooV1aSivg
+  // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV1aSivg
   var a: Int { return 0 }
 
   // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV3zimyyF
@@ -26,18 +26,18 @@ extension Foo {
 
 extension Foo where T: Runcible {
   // A constrained extension always uses the extension mangling.
-  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVA2A8RuncibleRzlE1aSifg
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVA2A8RuncibleRzlE1aSivg
   var a: Int { return 0 }
 
-  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVA2A8RuncibleRzlE1bxfg
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVA2A8RuncibleRzlE1bxvg
   var b: T { get { } }
 }
 
 extension Foo where T: Runcible, T.Spoon: Runcible {
-  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVA2A8RuncibleRzAaD5SpoonRpzlE1aSifg
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVA2A8RuncibleRzAaD5SpoonRpzlE1aSivg
   var a: Int { return 0 }
 
-  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVA2A8RuncibleRzAaD5SpoonRpzlE1bxfg
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVA2A8RuncibleRzAaD5SpoonRpzlE1bxvg
   var b: T { get { } }
 }
 

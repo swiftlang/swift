@@ -2044,6 +2044,44 @@ public:
         }
       }
 
+      if (auto getter = ASD->getGetter()) {
+        if (getter->isMutating() != ASD->isGetterMutating()) {
+          Out << "AbstractStorageDecl::isGetterMutating is out of sync"
+                 " with whether the getter is actually mutating";
+          abort();
+        }
+      }
+      if (auto setter = ASD->getSetter()) {
+        if (setter->isMutating() != ASD->isSetterMutating()) {
+          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
+                 " with whether the setter is actually mutating";
+          abort();
+        }
+      }
+      if (auto materializeForSet = ASD->getMaterializeForSetFunc()) {
+        if (materializeForSet->isMutating() != ASD->isSetterMutating()) {
+          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
+                 " with whether materializeForSet is mutating";
+          abort();
+        }
+      }
+      if (ASD->hasAddressors()) {
+        if (auto addressor = ASD->getAddressor()) {
+          if (addressor->isMutating() != ASD->isGetterMutating()) {
+            Out << "AbstractStorageDecl::isGetterMutating is out of sync"
+                   " with whether immutable addressor is mutating";
+            abort();
+          }
+        }
+        if (auto addressor = ASD->getMutableAddressor()) {
+          if (addressor->isMutating() != ASD->isSetterMutating()) {
+            Out << "AbstractStorageDecl::isSetterMutating is out of sync"
+                   " with whether mutable addressor is mutating";
+            abort();
+          }
+        }
+      }
+
       // Make sure we consistently set accessor overrides.
       if (auto *baseASD = ASD->getOverriddenDecl()) {
         if (ASD->getGetter() && baseASD->getGetter())
@@ -2155,11 +2193,10 @@ public:
         if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
           paramType = var->getDeclContext()->mapTypeIntoContext(paramType);
           if (!paramType->isEqual(typeForAccessors)) {
-            Out << "property and setter param have mismatched types: '";
-            typeForAccessors.print(Out);
-            Out << "' vs. '";
-            paramType.print(Out);
-            Out << "'\n";
+            Out << "property and setter param have mismatched types:\n";
+            typeForAccessors.dump(Out, 2);
+            Out << "vs.\n";
+            paramType.dump(Out, 2);
             abort();
           }
         }
@@ -2262,7 +2299,7 @@ public:
 
       // If the conformance is lazily resolved, don't check it; that can cause
       // massive deserialization at a point where the compiler cannot handle it.
-      if (normal->isLazilyResolved()) return;
+      if (normal->isLazilyLoaded()) return;
 
       // Translate the owning declaration into a DeclContext.
       auto *nominal = dyn_cast<NominalTypeDecl>(decl);

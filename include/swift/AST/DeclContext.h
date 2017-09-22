@@ -275,12 +275,6 @@ public:
 
   /// Gets the type being declared by this context.
   ///
-  /// - Generic types returns an unbound generic type.
-  /// - Non-type contexts returns a null type.
-  Type getDeclaredTypeOfContext() const;
-
-  /// Gets the type being declared by this context.
-  ///
   /// - Generic types return a bound generic type using archetypes.
   /// - Non-type contexts return a null type.
   Type getDeclaredTypeInContext() const;

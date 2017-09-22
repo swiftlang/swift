@@ -309,56 +309,6 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   return false;
 }
 
-static Type getTypeAtIndex(const ParameterList *params, size_t index) {
-  if (params->size() == 0)
-    return nullptr;
-
-  if (index < params->size()) {
-    auto param = params->get(index);
-    if (param->isVariadic())
-      return param->getVarargBaseTy();
-  
-    return param->getInterfaceType();
-  }
-  
-  /// FIXME: This looks completely wrong for varargs within a parameter list.
-  if (params->size() != 0) {
-    auto lastParam = params->getArray().back();
-    if (lastParam->isVariadic())
-      return lastParam->getVarargBaseTy();
-  }
-  
-  return nullptr;
-}
-
-/// For two function declarations, determine if a parameter of the second is an
-/// empty existential composition ("Any"), and if it would otherwise be compared
-/// against a non-existential parameter at the same position of the first decl.
-/// This is used to disambiguate function overloads that would otherwise be
-/// identical after opening their parameter types.
-static bool hasEmptyExistentialParameterMismatch(ValueDecl *decl1,
-                                                 ValueDecl *decl2) {
-  auto func1 = dyn_cast<FuncDecl>(decl1);
-  auto func2 = dyn_cast<FuncDecl>(decl2);
-  if (!func1 || !func2) return false;
-    
-  auto pl1 = func1->getParameterLists();
-  auto pl2 = func2->getParameterLists();
-  
-  auto pc = std::min(pl1.size(), pl2.size());
-  
-  for (size_t i = 0; i < pc; i++) {
-    auto t1 = getTypeAtIndex(pl1[i], i);
-    auto t2 = getTypeAtIndex(pl2[i], i);
-    if (!t1 || !t2)
-      return false;
-    
-    if (t2->isAnyExistentialType() && !t1->isAnyExistentialType())
-      return t2->isAny();
-  }
-  return false;
-}
-
 /// Determine whether one protocol extension is at least as specialized as
 /// another.
 static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
@@ -945,19 +895,6 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       }
       
       if (isDeclMoreConstrainedThan(decl2, decl1)) {
-        foundRefinement2 = true;
-      }
-    }
-     
-    // If we still haven't found a refinement, check if there's a parameter-
-    // wise comparison between an empty existential collection and a non-
-    // existential type.
-    if (!(foundRefinement1 && foundRefinement2)) {
-      if (hasEmptyExistentialParameterMismatch(decl1, decl2)) {
-        foundRefinement1 = true;
-      }
-      
-      if (hasEmptyExistentialParameterMismatch(decl2, decl1)) {
         foundRefinement2 = true;
       }
     }

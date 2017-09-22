@@ -967,18 +967,17 @@ OwnedToGuaranteedFinalizeThunkFunction(SILBuilder &Builder, SILFunction *F) {
 
 static void createArgumentRelease(SILBuilder &Builder, ArgumentDescriptor &AD) {
   auto &F = Builder.getFunction();
-  if (AD.PInfo->getConvention() == ParameterConvention::Direct_Owned) {
-    Builder.createReleaseValue(RegularLocation(SourceLoc()),
-                               F.getArguments()[AD.Index],
-                               Builder.getDefaultAtomicity());
-    return;
-  }
-  if (AD.PInfo->getConvention() == ParameterConvention::Indirect_In) {
+  SILArgument *Arg = F.getArguments()[AD.Index];
+  if (Arg->getType().isAddress()) {
+    assert(AD.PInfo->getConvention() == ParameterConvention::Indirect_In
+           && F.getConventions().useLoweredAddresses());
     Builder.createDestroyAddr(RegularLocation(SourceLoc()),
                               F.getArguments()[AD.Index]);
     return;
   }
-  llvm_unreachable("Parameter convention is not supported");
+  Builder.createReleaseValue(RegularLocation(SourceLoc()),
+                             F.getArguments()[AD.Index],
+                             Builder.getDefaultAtomicity());
 }
 
 /// Set up epilogue work for the thunk arguments based in the given argument.

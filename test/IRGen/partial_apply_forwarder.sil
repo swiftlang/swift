@@ -195,9 +195,9 @@ sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q>
 // CHECK:   [[WBADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>, <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>* [[CONTEXT]], i32 0, i32 {{(2|3)}}
 // CHECK:   [[WB:%.*]] = load %T23partial_apply_forwarder7WeakBoxC*, %T23partial_apply_forwarder7WeakBoxC** [[WBADDR]]
 // CHECK:   [[WBREF:%.*]] = bitcast %T23partial_apply_forwarder7WeakBoxC* [[WB]] to %swift.refcounted*
-// CHECK:   call void @swift_rt_swift_retain(%swift.refcounted* [[WBREF]])
+// CHECK:   call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[WBREF]])
 // CHECK:   [[TYADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder7WeakBoxC, %T23partial_apply_forwarder7WeakBoxC* [[WB]], i32 0, i32 0, i32 0
-// CHECK:   [[TY:%.*]] = load %swift.type*, %swift.type** %7
+// CHECK:   [[TY:%.*]] = load %swift.type*, %swift.type** [[TYADDR]] 
 // CHECK:   %.asUnsubstituted = bitcast %T23partial_apply_forwarder7WeakBoxC* [[WB]] to %T23partial_apply_forwarder7WeakBoxC.1*
 // CHECK:   call void @swift_rt_swift_release(%swift.refcounted* %0)
 // CHECK:   [[GENPARAMSADDR:%.*]] = bitcast %swift.type* [[TY]] to %swift.type**

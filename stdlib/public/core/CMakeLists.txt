@@ -107,6 +107,7 @@ set(SWIFTLIB_ESSENTIAL
   REPL.swift
   Reverse.swift
   Runtime.swift.gyb
+  RuntimeFunctionCounters.swift
   SipHash.swift.gyb
   SentinelCollection.swift
   Sequence.swift
@@ -130,6 +131,7 @@ set(SWIFTLIB_ESSENTIAL
   StringInterpolation.swift
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
+  StringSwitch.swift
   StringIndexConversions.swift
   StringUnicodeScalarView.swift
   StringUTF16.swift

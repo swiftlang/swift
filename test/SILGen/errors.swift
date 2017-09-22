@@ -633,7 +633,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Pylon
 // CHECK-NEXT: [[BASE:%.*]] = load_borrow [[WRITE]] : $*Bridge
 // CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[GETTER:%.*]] = function_ref @_T06errors6BridgeV9subscriptAA5PylonVSScfg :
+// CHECK-NEXT: [[GETTER:%.*]] = function_ref @_T06errors6BridgeVAA5PylonVSScig :
 // CHECK-NEXT: [[T0:%.*]] = apply [[GETTER]]([[INDEX_COPY_1]], [[BASE]])
 // CHECK-NEXT: store [[T0]] to [init] [[TEMP]]
 // CHECK-NEXT: end_borrow [[BASE]] from [[WRITE]]
@@ -642,7 +642,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK:    [[BB_NORMAL]]
 // CHECK-NEXT: [[T0:%.*]] = load [take] [[TEMP]]
 // CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[SETTER:%.*]] = function_ref @_T06errors6BridgeV9subscriptAA5PylonVSScfs :
+// CHECK-NEXT: [[SETTER:%.*]] = function_ref @_T06errors6BridgeVAA5PylonVSScis :
 // CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX_COPY_2]], [[WRITE]])
 // CHECK-NEXT: end_access [[WRITE]]
 // CHECK-NEXT: dealloc_stack [[TEMP]]
@@ -657,7 +657,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: [[T0:%.*]] = load [copy] [[TEMP]]
 // CHECK-NEXT: [[INDEX_COPY_2_COPY:%.*]] = copy_value [[INDEX_COPY_2]]
 // CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[SETTER:%.*]] = function_ref @_T06errors6BridgeV9subscriptAA5PylonVSScfs :
+// CHECK-NEXT: [[SETTER:%.*]] = function_ref @_T06errors6BridgeVAA5PylonVSScis :
 // CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX_COPY_2_COPY]], [[WRITE]])
 // CHECK-NEXT: destroy_addr [[TEMP]]
 // CHECK-NEXT: dealloc_stack [[TEMP]]
@@ -686,7 +686,7 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK:      [[ARG2_COPY:%.*]] = copy_value [[BORROWED_ARG2]] : $String
 // CHECK:      [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*OwnedBridge
 // CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @_T06errors11OwnedBridgeV9subscriptAA5PylonVSScfaO :
+// CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @_T06errors11OwnedBridgeVAA5PylonVSSciaO :
 // CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[WRITE]])
 // CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
 // CHECK-NEXT: [[T1:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 0
@@ -730,7 +730,7 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 // CHECK:        [[ARG2_COPY:%.*]] = copy_value [[BORROWED_ARG2]] : $String
 // CHECK-NEXT:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG1]] : $*PinnedBridge
 // CHECK-NEXT:   // function_ref
-// CHECK-NEXT:   [[ADDRESSOR:%.*]] = function_ref @_T06errors12PinnedBridgeV9subscriptAA5PylonVSScfaP :
+// CHECK-NEXT:   [[ADDRESSOR:%.*]] = function_ref @_T06errors12PinnedBridgeVAA5PylonVSSciaP :
 // CHECK-NEXT:   [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[WRITE]])
 // CHECK-NEXT:   [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
 // CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 0

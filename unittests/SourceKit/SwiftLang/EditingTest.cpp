@@ -64,7 +64,7 @@ private:
                                  StringRef RuntimeName,
                                  StringRef SelectorName,
                                  ArrayRef<StringRef> InheritedTypes,
-                                 ArrayRef<UIdent> Attrs) override {
+                                 ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override {
     return false;
   }
 
@@ -192,17 +192,17 @@ static UIdent ParseDiagStage("source.diagnostic.stage.swift.parse");
 TEST_F(EditTest, DiagsAfterEdit) {
   const char *DocName = "/test.swift";
   const char *Contents =
-    "func foo\n"
+    "func foo {}\n"
     "let v = 0\n";
   const char *Args[] = { "-parse-as-library" };
 
   DiagConsumer Consumer;
   open(DocName, Contents, Args, Consumer);
-  ASSERT_TRUE(Consumer.Diags.size() == 1);
+  ASSERT_EQ(1u, Consumer.Diags.size());
   EXPECT_STREQ("expected '(' in argument list of function declaration", Consumer.Diags[0].Description.c_str());
 
   reset(Consumer);
-  replaceText(DocName, findOffset("func foo", Contents)+strlen("func foo"), 0, "(){}", Consumer);
+  replaceText(DocName, findOffset("func foo", Contents)+strlen("func foo"), 0, "()", Consumer);
   EXPECT_TRUE(Consumer.Diags.empty());
 
   bool expired = waitForDocUpdate();

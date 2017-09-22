@@ -20,10 +20,13 @@ import csv
 import json
 import os
 import platform
+import re
 import sys
 import time
 import urllib
 import urllib2
+from collections import namedtuple
+from operator import attrgetter
 from jobstats import load_stats_dir, merge_all_jobstats
 
 
@@ -34,7 +37,6 @@ from jobstats import load_stats_dir, merge_all_jobstats
 def load_paired_stats_dirs(args):
     assert(len(args.remainder) == 2)
     paired_stats = []
-    sel = args.select_module
     (old, new) = args.remainder
     for p in sorted(os.listdir(old)):
         full_old = os.path.join(old, p)
@@ -42,8 +44,8 @@ def load_paired_stats_dirs(args):
         if not (os.path.exists(full_old) and os.path.isdir(full_old) and
                 os.path.exists(full_new) and os.path.isdir(full_new)):
             continue
-        old_stats = load_stats_dir(full_old, select_module=sel)
-        new_stats = load_stats_dir(full_new, select_module=sel)
+        old_stats = load_stats_dir(full_old, **vars(args))
+        new_stats = load_stats_dir(full_new, **vars(args))
         if len(old_stats) == 0 or len(new_stats) == 0:
             continue
         paired_stats.append((p, (old_stats, new_stats)))
@@ -53,16 +55,14 @@ def load_paired_stats_dirs(args):
 def write_catapult_trace(args):
     allstats = []
     for path in args.remainder:
-        allstats += load_stats_dir(path)
+        allstats += load_stats_dir(path, **vars(args))
     json.dump([s.to_catapult_trace_obj() for s in allstats], args.output)
 
 
 def write_lnt_values(args):
     for d in args.remainder:
-        stats = load_stats_dir(d)
-        merged = merge_all_jobstats(stats,
-                                    select_module=args.select_module,
-                                    group_by_module=args.group_by_module)
+        stats = load_stats_dir(d, **vars(args))
+        merged = merge_all_jobstats(stats, **vars(args))
         j = merged.to_lnt_test_obj(args)
         if args.lnt_submit is None:
             json.dump(j, args.output, indent=4)
@@ -91,16 +91,11 @@ def show_paired_incrementality(args):
     out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
     out.writeheader()
 
-    sel = args.select_module
     for (name, (oldstats, newstats)) in load_paired_stats_dirs(args):
         olddriver = merge_all_jobstats((x for x in oldstats
-                                        if x.is_driver_job()),
-                                       select_module=sel,
-                                       group_by_module=args.group_by_module)
+                                        if x.is_driver_job()), **vars(args))
         newdriver = merge_all_jobstats((x for x in newstats
-                                        if x.is_driver_job()),
-                                       select_module=sel,
-                                       group_by_module=args.group_by_module)
+                                        if x.is_driver_job()), **vars(args))
         if olddriver is None or newdriver is None:
             continue
         oldpct = olddriver.incrementality_percentage()
@@ -121,7 +116,7 @@ def show_incrementality(args):
     out.writeheader()
 
     for path in args.remainder:
-        stats = load_stats_dir(path, select_module=args.select_module)
+        stats = load_stats_dir(path, **vars(args))
         for s in stats:
             if s.is_driver_job():
                 pct = s.incrementality_percentage()
@@ -160,15 +155,19 @@ def update_epoch_value(d, name, epoch, value):
     return (epoch, value, changed)
 
 
-def read_stats_dict_from_csv(f):
+def read_stats_dict_from_csv(f, select_stat=''):
     infieldnames = ["epoch", "name", "value"]
     c = csv.DictReader(f, infieldnames,
                        dialect='excel-tab',
                        quoting=csv.QUOTE_NONNUMERIC)
     d = {}
+    sre = re.compile('.*' if len(select_stat) == 0 else
+                     '|'.join(select_stat))
     for row in c:
         epoch = int(row["epoch"])
         name = row["name"]
+        if sre.search(name) is None:
+            continue
         value = int(row["value"])
         update_epoch_value(d, name, epoch, value)
     return d
@@ -195,7 +194,8 @@ def set_csv_baseline(args):
     existing = None
     if os.path.exists(args.set_csv_baseline):
         with open(args.set_csv_baseline, "r") as f:
-            existing = read_stats_dict_from_csv(f)
+            existing = read_stats_dict_from_csv(f,
+                                                select_stat=args.select_stat)
             print ("updating %d baseline entries in %s" %
                    (len(existing), args.set_csv_baseline))
     else:
@@ -204,11 +204,12 @@ def set_csv_baseline(args):
     with open(args.set_csv_baseline, "wb") as f:
         out = csv.DictWriter(f, fieldnames, dialect='excel-tab',
                              quoting=csv.QUOTE_NONNUMERIC)
-        sel = args.select_module
         m = merge_all_jobstats((s for d in args.remainder
-                                for s in load_stats_dir(d, select_module=sel)),
-                               select_module=sel,
-                               group_by_module=args.group_by_module)
+                                for s in load_stats_dir(d, **vars(args))),
+                               **vars(args))
+        if m is None:
+            print "no stats found"
+            return 1
         changed = 0
         newepoch = int(time.time())
         for name in sorted(m.stats.keys()):
@@ -228,43 +229,61 @@ def set_csv_baseline(args):
     return 0
 
 
+OutputRow = namedtuple("OutputRow",
+                       ["name", "old", "new",
+                        "delta", "delta_pct"])
+
+
 def compare_stats(args, old_stats, new_stats):
-    for stat_name in sorted(old_stats.keys()):
-        old = old_stats[stat_name]
-        new = new_stats.get(stat_name, 0)
+    for name in sorted(old_stats.keys()):
+        old = old_stats[name]
+        new = new_stats.get(name, 0)
         (delta, delta_pct) = diff_and_pct(old, new)
-        if (stat_name.startswith("time.") and
+        if ((name.startswith("time.") or '.time.' in name) and
            abs(delta) < args.delta_usec_thresh):
             continue
         if abs(delta_pct) < args.delta_pct_thresh:
             continue
-        yield (stat_name, old, new, delta, delta_pct)
+        yield OutputRow(name=name,
+                        old=int(old), new=int(new),
+                        delta=int(delta),
+                        delta_pct=delta_pct)
 
 
 def write_comparison(args, old_stats, new_stats):
     regressions = 0
-    outfieldnames = ["old", "new", "delta_pct", "name"]
-    out = csv.DictWriter(args.output, outfieldnames, dialect='excel-tab')
-    out.writeheader()
+    rows = list(compare_stats(args, old_stats, new_stats))
+    sort_key = (attrgetter('delta_pct')
+                if args.sort_by_delta_pct
+                else attrgetter('name'))
+    rows.sort(key=sort_key, reverse=args.sort_descending)
+    regressions = sum(1 for row in rows if row.delta > 0)
 
-    for (stat_name, old, new, delta, delta_pct) in compare_stats(args,
-                                                                 old_stats,
-                                                                 new_stats):
-        out.writerow(dict(name=stat_name,
-                          old=int(old), new=int(new),
-                          delta_pct=delta_pct))
-        if delta > 0:
-            regressions += 1
+    if args.markdown:
+        out = args.output
+        out.write(' | '.join(OutputRow._fields))
+        out.write('\n')
+        out.write(' | '.join('---:' for _ in OutputRow._fields))
+        out.write('\n')
+        for row in rows:
+            out.write(' | '.join(str(v) for v in row))
+            out.write('\n')
+    else:
+        out = csv.DictWriter(args.output, OutputRow._fields,
+                             dialect='excel-tab')
+        out.writeheader()
+        for row in rows:
+            out.writerow(row._asdict())
+
     return regressions
 
 
 def compare_to_csv_baseline(args):
-    old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline)
-    sel = args.select_module
+    old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline,
+                                         select_stat=args.select_stat)
     m = merge_all_jobstats((s for d in args.remainder
-                            for s in load_stats_dir(d, select_module=sel)),
-                           select_module=sel,
-                           group_by_module=args.group_by_module)
+                            for s in load_stats_dir(d, **vars(args))),
+                           **vars(args))
     old_stats = dict((k, v) for (k, (_, v)) in old_stats.items())
     new_stats = m.stats
 
@@ -277,14 +296,10 @@ def compare_stats_dirs(args):
         raise ValueError("Expected exactly 2 stats-dirs")
 
     (old, new) = args.remainder
-    old_stats = merge_all_jobstats(
-        load_stats_dir(old, select_module=args.select_module),
-        select_module=args.select_module,
-        group_by_module=args.group_by_module)
-    new_stats = merge_all_jobstats(
-        load_stats_dir(new, select_module=args.select_module),
-        select_module=args.select_module,
-        group_by_module=args.group_by_module)
+    old_stats = merge_all_jobstats(load_stats_dir(old, **vars(args)),
+                                   **vars(args))
+    new_stats = merge_all_jobstats(load_stats_dir(new, **vars(args)),
+                                   **vars(args))
 
     return write_comparison(args, old_stats.stats, new_stats.stats)
 
@@ -325,6 +340,30 @@ def main():
                         default=False,
                         action="store_true",
                         help="Group stats by module")
+    parser.add_argument("--select-stat",
+                        default=[],
+                        action="append",
+                        help="Select specific statistics")
+    parser.add_argument("--exclude-timers",
+                        default=False,
+                        action="store_true",
+                        help="only select counters, exclude timers")
+    parser.add_argument("--sort-by-delta-pct",
+                        default=False,
+                        action="store_true",
+                        help="Sort comparison results by delta-%%, not stat")
+    parser.add_argument("--sort-descending",
+                        default=False,
+                        action="store_true",
+                        help="Sort comparison results in descending order")
+    parser.add_argument("--merge-by",
+                        default="sum",
+                        type=str,
+                        help="Merge identical metrics by (sum|min|max)")
+    parser.add_argument("--markdown",
+                        default=False,
+                        action="store_true",
+                        help="Write output in markdown table format")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")

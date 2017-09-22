@@ -1025,7 +1025,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
 
   std::vector<NoteRegion> NoteRegions(Renamer.Ranges.size());
   std::transform(Ranges.begin(), Ranges.end(), NoteRegions.begin(),
-                 [&SM, BufferId](RenameRangeDetail &Detail) -> NoteRegion {
+                 [&SM](RenameRangeDetail &Detail) -> NoteRegion {
     auto Start = SM.getLineAndColumn(Detail.Range.getStart());
     auto End = SM.getLineAndColumn(Detail.Range.getEnd());
     return {Detail.RangeKind, Start.first, Start.second, End.first, End.second, Detail.Index};
@@ -1257,18 +1257,7 @@ struct SimilarExprCollector: public SourceEntityWalker {
 
   /// Find all tokens included by an expression.
   llvm::ArrayRef<Token> getExprSlice(Expr *E) {
-    auto TokenComp = [&](const Token &LHS, SourceLoc Loc) {
-      return SM.isBeforeInBuffer(LHS.getLoc(), Loc);
-    };
-    SourceLoc StartLoc = E->getStartLoc();
-    SourceLoc EndLoc = E->getEndLoc();
-    auto StartIt = std::lower_bound(AllTokens.begin(), AllTokens.end(),
-                                    StartLoc, TokenComp);
-    auto EndIt = std::lower_bound(AllTokens.begin(), AllTokens.end(),
-                                  EndLoc, TokenComp);
-    assert(StartIt->getLoc() == StartLoc);
-    assert(EndIt->getLoc() == EndLoc);
-    return AllTokens.slice(StartIt - AllTokens.begin(), EndIt - StartIt + 1);
+    return slice_token_array(AllTokens, E->getStartLoc(), E->getEndLoc());
   }
 
   SimilarExprCollector(SourceManager &SM, Expr* SelectedExpr,
@@ -1333,16 +1322,12 @@ bool RefactoringActionExtractExprBase::performChange() {
     Collector.walk(BS);
 
     if (ExtractRepeated) {
-      unsigned BufferId = *TheFile->getBufferID();
-
-      // Tokenize the brace statement; all expressions should have their tokens
-      // in this array.
-      std::vector<Token> AllToks(tokenize(Ctx.LangOpts, SM, BufferId,
-          /*start offset*/SM.getLocOffsetInBuffer(BS->getStartLoc(), BufferId),
-          /*end offset*/SM.getLocOffsetInBuffer(BS->getEndLoc(), BufferId)));
-
       // Collect all expressions we are going to extract.
-      SimilarExprCollector(SM, SelectedExpr, AllToks, AllExpressions).walk(BS);
+      SimilarExprCollector(SM, SelectedExpr,
+                           slice_token_array(TheFile->getAllTokens(),
+                                             BS->getStartLoc(),
+                                             BS->getEndLoc()),
+                           AllExpressions).walk(BS);
     } else {
       AllExpressions.insert(SelectedExpr);
     }
@@ -1461,6 +1446,223 @@ bool RefactoringActionExtractRepeatedExpr::performChange() {
   return RefactoringActionExtractExprBase(TheFile, RangeInfo,
                                           DiagEngine, true, PreferredName,
                                           EditConsumer).performChange();
+}
+
+struct CollapsibleNestedIfInfo {
+  IfStmt *OuterIf;
+  IfStmt *InnerIf;
+  bool FinishedOuterIf;
+  bool FoundNonCollapsibleItem;
+  CollapsibleNestedIfInfo():
+    OuterIf(nullptr), InnerIf(nullptr),
+    FinishedOuterIf(false), FoundNonCollapsibleItem(false) {}
+  bool isValid() {
+    return OuterIf && InnerIf && FinishedOuterIf && !FoundNonCollapsibleItem;
+  }
+};
+
+static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
+  if (CursorInfo.Kind != CursorInfoKind::StmtStart)
+    return CollapsibleNestedIfInfo();
+  struct IfStmtFinder: public SourceEntityWalker {
+    SourceLoc StartLoc;
+    CollapsibleNestedIfInfo IfInfo;
+    IfStmtFinder(SourceLoc StartLoc): StartLoc(StartLoc), IfInfo() {}
+    bool finishedInnerIfButNotFinishedOuterIf() {
+      return IfInfo.InnerIf && !IfInfo.FinishedOuterIf;
+    }
+    bool walkToStmtPre(Stmt *S) {
+      if (finishedInnerIfButNotFinishedOuterIf()) {
+        IfInfo.FoundNonCollapsibleItem = true;
+        return false;
+      }
+
+      bool StmtIsOuterIfBrace =
+        IfInfo.OuterIf && !IfInfo.InnerIf && S->getKind() == StmtKind::Brace;
+      if (StmtIsOuterIfBrace) {
+        return true;
+      }
+
+      auto *IFS = dyn_cast<IfStmt>(S);
+      if (!IFS) {
+        return false;
+      }
+      if (!IfInfo.OuterIf) {
+        IfInfo.OuterIf = IFS;
+        return true;
+      } else {
+        IfInfo.InnerIf = IFS;
+        return false;
+      }
+    }
+    bool walkToStmtPost(Stmt *S) {
+      assert(S != IfInfo.InnerIf && "Should not traverse inner if statement");
+      if (S == IfInfo.OuterIf) {
+        IfInfo.FinishedOuterIf = true;
+      }
+      return true;
+    }
+    bool walkToDeclPre(Decl *D, CharSourceRange Range) {
+      if (finishedInnerIfButNotFinishedOuterIf()) {
+        IfInfo.FoundNonCollapsibleItem = true;
+        return false;
+      }
+      return true;
+    }
+    bool walkToExprPre(Expr *E) {
+      if (finishedInnerIfButNotFinishedOuterIf()) {
+        IfInfo.FoundNonCollapsibleItem = true;
+        return false;
+      }
+      return true;
+    }
+
+  } Walker(CursorInfo.TrailingStmt->getStartLoc());
+  Walker.walk(CursorInfo.TrailingStmt);
+  return Walker.IfInfo;
+}
+
+bool RefactoringActionCollapseNestedIfExpr::isApplicable(ResolvedCursorInfo Tok) {
+  return findCollapseNestedIfTarget(Tok).isValid();
+}
+
+bool RefactoringActionCollapseNestedIfExpr::performChange() {
+  auto Target = findCollapseNestedIfTarget(CursorInfo);
+  if (!Target.isValid())
+    return true;
+  auto OuterIfConds = Target.OuterIf->getCond().vec();
+  auto InnerIfConds = Target.InnerIf->getCond().vec();
+
+  llvm::SmallString<64> DeclBuffer;
+  llvm::raw_svector_ostream OS(DeclBuffer);
+  OS << tok::kw_if << " ";
+  for (auto CI = OuterIfConds.begin(); CI != OuterIfConds.end(); ++CI) {
+    OS << (CI != OuterIfConds.begin() ? ", " : "");
+    OS << Lexer::getCharSourceRangeFromSourceRange(
+      SM, CI->getSourceRange()).str();
+  }
+  for (auto CI = InnerIfConds.begin(); CI != InnerIfConds.end(); ++CI) {
+    OS << ", " << Lexer::getCharSourceRangeFromSourceRange(
+      SM, CI->getSourceRange()).str();
+  }
+  auto ThenStatementText = Lexer::getCharSourceRangeFromSourceRange(
+    SM, Target.InnerIf->getThenStmt()->getSourceRange()).str();
+  OS << " " << ThenStatementText;
+
+  auto SourceRange = Lexer::getCharSourceRangeFromSourceRange(
+    SM, Target.OuterIf->getSourceRange());
+  EditConsumer.accept(SM, SourceRange, DeclBuffer.str());
+  return false;
+}
+
+static std::unique_ptr<llvm::SetVector<Expr*>>
+  findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
+  if (Info.Kind != RangeKind::SingleExpression
+      && Info.Kind != RangeKind::PartOfExpression)
+    return nullptr;
+  Expr *E = Info.ContainedNodes[0].get<Expr*>();
+
+  struct StringInterpolationExprFinder: public SourceEntityWalker {
+    std::unique_ptr<llvm::SetVector<Expr*>> Bucket = llvm::
+    make_unique<llvm::SetVector<Expr*>>();
+    ASTContext &Ctx;
+
+    bool IsValidInterpolation = true;
+    StringInterpolationExprFinder(ASTContext &Ctx): Ctx(Ctx) {}
+
+    bool isConcatenationExpr(DeclRefExpr* Expr) {
+      if (!Expr)
+        return false;
+      auto *FD = dyn_cast<FuncDecl>(Expr->getDecl());
+      if (FD == nullptr || (FD != Ctx.getPlusFunctionOnString() &&
+          FD != Ctx.getPlusFunctionOnRangeReplaceableCollection())) {
+        return false;
+      }
+      return true;
+    }
+
+    bool walkToExprPre(Expr *E) {
+      if (E->isImplicit())
+        return true;
+      auto ExprType = E->getType()->getNominalOrBoundGenericNominal();
+      //Only binary concatenation operators should exist in expression
+      if (E->getKind() == ExprKind::Binary) {
+        auto *BE = dyn_cast<BinaryExpr>(E);
+        auto *OperatorDeclRef = BE->getSemanticFn()->getMemberOperatorRef();
+        if (!(isConcatenationExpr(OperatorDeclRef)
+            && ExprType == Ctx.getStringDecl())) {
+          IsValidInterpolation = false;
+          return false;
+        }
+        return true;
+      }
+      // Everything that evaluates to string should be gathered.
+      if (ExprType == Ctx.getStringDecl()) {
+        Bucket->insert(E);
+        return false;
+      }
+      if (auto *DR = dyn_cast<DeclRefExpr>(E)) {
+        // Checks whether all function references in expression are concatenations.
+        auto *FD = dyn_cast<FuncDecl>(DR->getDecl());
+        auto IsConcatenation = isConcatenationExpr(DR);
+        if (FD && IsConcatenation) {
+          return false;
+        }
+      }
+      // There was non-expected expression, it's not valid interpolation then.
+      IsValidInterpolation = false;
+      return false;
+    }
+  } Walker(Ctx);
+  Walker.walk(E);
+
+  // There should be two or more expressions to convert.
+  if (!Walker.IsValidInterpolation || Walker.Bucket->size() < 2)
+    return nullptr;
+
+  return std::move(Walker.Bucket);
+}
+
+static void interpolatedExpressionForm(Expr *E, SourceManager &SM,
+                                              llvm::raw_ostream &OS) {
+  if (auto *Literal = dyn_cast<StringLiteralExpr>(E)) {
+    OS << Literal->getValue();
+    return;
+  }
+  auto ExpStr = Lexer::getCharSourceRangeFromSourceRange(SM,
+    E->getSourceRange()).str().str();
+  if (isa<InterpolatedStringLiteralExpr>(E)) {
+    ExpStr.erase(0, 1);
+    ExpStr.pop_back();
+    OS << ExpStr;
+    return;
+  }
+  OS << "\\(" << ExpStr << ")";
+}
+
+bool RefactoringActionConvertStringsConcatenationToInterpolation::
+isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  auto RangeContext = Info.RangeContext;
+  if (RangeContext) {
+    auto &Ctx = Info.RangeContext->getASTContext();
+    return findConcatenatedExpressions(Info, Ctx) != nullptr;
+  }
+  return false;
+}
+
+bool RefactoringActionConvertStringsConcatenationToInterpolation::performChange() {
+  auto Expressions = findConcatenatedExpressions(RangeInfo, Ctx);
+  if (!Expressions)
+    return true;
+  llvm::SmallString<64> Buffer;
+  llvm::raw_svector_ostream OS(Buffer);
+  OS << "\"";
+  for (auto It = Expressions->begin(); It != Expressions->end(); It++) {
+    interpolatedExpressionForm(*It, SM, OS);
+  }
+  OS << "\"";
+  EditConsumer.accept(SM, RangeInfo.ContentRange, Buffer);
+  return false;
 }
 
 /// The helper class analyzes a given nominal decl or an extension decl to
@@ -2135,10 +2337,8 @@ resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs, SourceFile &SF,
     });
   }
 
-  std::vector<Token> Tokens =
-      swift::tokenize(SF.getASTContext().LangOpts, SM, BufferID, 0, 0, true);
   NameMatcher Resolver(SF);
-  return Resolver.resolve(UnresolvedLocs, Tokens);
+  return Resolver.resolve(UnresolvedLocs, SF.getAllTokens());
 }
 
 int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,

@@ -449,8 +449,6 @@ NO_OPERAND_INST(StrongRetain)
 NO_OPERAND_INST(StrongRetainUnowned)
 NO_OPERAND_INST(UnownedRetain)
 NO_OPERAND_INST(Unreachable)
-// TODO: Some key path components will have operands
-NO_OPERAND_INST(KeyPath)
 #undef NO_OPERAND_INST
 
 /// Instructions whose arguments are always compatible with one convention.
@@ -1144,6 +1142,18 @@ OwnershipCompatibilityUseChecker::visitMarkDependenceInst(
   return {true, UseLifetimeConstraint::MustBeLive};
 }
 
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitKeyPathInst(KeyPathInst *I) {
+  // KeyPath moves the value in memory out of address operands, but the
+  // ownership checker doesn't reason about that yet.
+  if (isAddressOrTrivialType()) {
+    return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
+            UseLifetimeConstraint::MustBeLive};
+  }
+  return {compatibleWithOwnership(ValueOwnershipKind::Owned),
+          UseLifetimeConstraint::MustBeInvalidated};
+}
+
 //===----------------------------------------------------------------------===//
 //                            Builtin Use Checker
 //===----------------------------------------------------------------------===//
@@ -1186,6 +1196,9 @@ public:
     return {true, UseLifetimeConstraint::MustBeLive};
   }
 
+    // BUILTIN_TYPE_CHECKER_OPERATION does not live past the type checker.
+#define BUILTIN_TYPE_CHECKER_OPERATION(ID, NAME)
+
 #define BUILTIN(ID, NAME, ATTRS)                                               \
   OwnershipUseCheckerResult visit##ID(BuiltinInst *BI, StringRef Attr);
 #include "swift/AST/Builtins.def"
@@ -1215,6 +1228,10 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Alignof)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AllocRaw)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, And)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssertConf)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssignCopyArrayNoAlias)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssignCopyArrayFrontToBack)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssignCopyArrayBackToFront)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssignTakeArray)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssumeNonNegative)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AtomicLoad)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AtomicRMW)
@@ -1294,6 +1311,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Sizeof)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, StaticReport)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Strideof)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Sub)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, TakeArrayNoAlias)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, TakeArrayBackToFront)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, TakeArrayFrontToBack)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Trunc)

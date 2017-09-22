@@ -76,12 +76,13 @@ SILInstruction *SILGlobalVariable::getStaticInitializerValue() {
   return &StaticInitializerBlock.back();
 }
 
-bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I) {
+bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
+                                                     SILModule &M) {
   switch (I->getKind()) {
     case ValueKind::BuiltinInst: {
       auto *bi = cast<BuiltinInst>(I);
-      switch (bi->getBuiltinInfo().ID) {
-        case BuiltinValueKind::FPTrunc:
+      switch (M.getBuiltinInfo(bi->getName()).ID) {
+        case BuiltinValueKind::PtrToInt:
           if (isa<LiteralInst>(bi->getArguments()[0]))
             return true;
           break;

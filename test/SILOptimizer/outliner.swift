@@ -13,7 +13,7 @@ public class MyGizmo {
      gizmo = Gizmo()
    }
 	 // CHECK-LABEL: sil @_T08outliner7MyGizmoC11usePropertyyyF
-	 // CHECK: [[FUN:%.*]] = function_ref @_T0So5GizmoC14stringPropertySQySSGfgToTeab_
+	 // CHECK: [[FUN:%.*]] = function_ref @_T0So5GizmoC14stringPropertySQySSGvgToTeab_
 	 // CHECK: apply [[FUN]]({{.*}}) : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
 	 // CHECK-NOT: return
 	 // CHECK: apply [[FUN]]({{.*}}) : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
@@ -25,10 +25,10 @@ public class MyGizmo {
 }
 
 // CHECK-LABEL: sil @_T08outliner13testOutliningyyF
-// CHECK:  [[FUN:%.*]] = function_ref @_T0So5GizmoC14stringPropertySQySSGfgToTepb_
+// CHECK:  [[FUN:%.*]] = function_ref @_T0So5GizmoC14stringPropertySQySSGvgToTepb_
 // CHECK:  apply [[FUN]](%{{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
 // CHECK:  apply [[FUN]](%{{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
-// CHECK:  [[FUN:%.*]] = function_ref @_T0So5GizmoC14stringPropertySQySSGfsToTembnn_
+// CHECK:  [[FUN:%.*]] = function_ref @_T0So5GizmoC14stringPropertySQySSGvsToTembnn_
 // CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@owned String, Gizmo) -> ()
 // CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@owned String, Gizmo) -> ()
 // CHECK:  [[FUN:%.*]] = function_ref @_T0So5GizmoC12modifyStringSQySSGAD_Si10withNumberSQyypG0D6FoobartFToTembnnnb_
@@ -53,7 +53,7 @@ public func testOutlining() {
   gizmo.doSomething(arr)
 }
 
-// CHECK-LABEL: sil shared [serializable] [noinline] @_T0So5GizmoC14stringPropertySQySSGfgToTeab_ : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
+// CHECK-LABEL: sil shared [serializable] [noinline] @_T0So5GizmoC14stringPropertySQySSGvgToTeab_ : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
 // CHECK: bb0(%0 : $*Gizmo):
 // CHECK:   %1 = load %0 : $*Gizmo
 // CHECK:   %2 = class_method [volatile] %1 : $Gizmo, #Gizmo.stringProperty!getter.1.foreign : (Gizmo) -> () -> String!
@@ -71,7 +71,7 @@ public func testOutlining() {
 // CHECK: bb3(%13 : $Optional<String>):
 // CHECK:   return %13 : $Optional<String>
 
-// CHECK-LABEL: sil shared [serializable] [noinline] @_T0So5GizmoC14stringPropertySQySSGfgToTepb_ : $@convention(thin) (Gizmo) -> @owned Optional<String>
+// CHECK-LABEL: sil shared [serializable] [noinline] @_T0So5GizmoC14stringPropertySQySSGvgToTepb_ : $@convention(thin) (Gizmo) -> @owned Optional<String>
 // CHECK: bb0(%0 : $Gizmo):
 // CHECK:  %1 = class_method [volatile] %0 : $Gizmo, #Gizmo.stringProperty!getter.1.foreign : (Gizmo) -> () -> String!
 // CHECK:  %2 = apply %1(%0) : $@convention(objc_method) (Gizmo) -> @autoreleased Optional<NSString>
@@ -88,7 +88,7 @@ public func testOutlining() {
 // CHECK:bb3(%12 : $Optional<String>):
 // CHECK:  return %12 : $Optional<String>
 
-// CHECK-LABEL: sil shared [serializable] [noinline] @_T0So5GizmoC14stringPropertySQySSGfsToTembnn_ : $@convention(thin) (@owned String, Gizmo) -> () {
+// CHECK-LABEL: sil shared [serializable] [noinline] @_T0So5GizmoC14stringPropertySQySSGvsToTembnn_ : $@convention(thin) (@owned String, Gizmo) -> () {
 // CHECK: bb0(%0 : $String, %1 : $Gizmo):
 // CHECK:   %2 = class_method [volatile] %1 : $Gizmo, #Gizmo.stringProperty!setter.1.foreign : (Gizmo) -> (String!) -> ()
 // CHECK:   %3 = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString

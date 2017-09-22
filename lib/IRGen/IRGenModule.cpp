@@ -128,9 +128,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
                                             ModuleName)),
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
-      DataLayout(target->createDataLayout()),
-      Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
-      silConv(irgen.SIL), OutputFilename(OutputFilename),
+      DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
+      TargetMachine(std::move(target)), silConv(irgen.SIL),
+      OutputFilename(OutputFilename),
       TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
       ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
       Types(*new TypeConverter(*this)) {
@@ -428,6 +428,7 @@ namespace RuntimeConstants {
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
+  const auto FirstParamReturned = llvm::Attribute::Returned;
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -435,6 +436,11 @@ namespace RuntimeConstants {
 // associated with the return type not the function type.
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr) {
   return Attr == llvm::Attribute::ZExt;
+}
+// Similar to the 'return' attribute we assume that the 'returned' attributed is
+// associated with the first function parameter.
+static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr) {
+  return Attr == llvm::Attribute::Returned;
 }
 
 llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
@@ -471,15 +477,19 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
 
     llvm::AttrBuilder buildFnAttr;
     llvm::AttrBuilder buildRetAttr;
+    llvm::AttrBuilder buildFirstParamAttr;
 
     for (auto Attr : attrs) {
       if (isReturnAttribute(Attr))
         buildRetAttr.addAttribute(Attr);
+      else if (isReturnedAttribute(Attr))
+        buildFirstParamAttr.addAttribute(Attr);
       else
         buildFnAttr.addAttribute(Attr);
     }
     fn->addAttributes(llvm::AttributeList::FunctionIndex, buildFnAttr);
     fn->addAttributes(llvm::AttributeList::ReturnIndex, buildRetAttr);
+    fn->addParamAttrs(0, buildFirstParamAttr);
   }
 
   return cache;
@@ -543,10 +553,14 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
 
 
     auto fnPtr = Builder.CreateLoad(globalFnPtr, "load");
+
     auto call = Builder.CreateCall(fnPtr, args);
     call->setCallingConv(cc);
     call->setTailCall(true);
-
+    for (auto Attr : attrs)
+      if (isReturnedAttribute(Attr)) {
+        call->addParamAttr(0, llvm::Attribute::Returned);
+      }
     auto VoidTy = llvm::Type::getVoidTy(Module.getContext());
     if (retTypes.size() == 1 && *retTypes.begin() == VoidTy)
       Builder.CreateRetVoid();
@@ -1170,11 +1184,4 @@ IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
     return IGM;
 
   return getPrimaryIGM();
-}
-
-llvm::Triple IRGenerator::getEffectiveClangTriple() {
-  auto CI = static_cast<ClangImporter *>(
-      &*SIL.getASTContext().getClangModuleLoader());
-  assert(CI && "no clang module loader");
-  return llvm::Triple(CI->getTargetInfo().getTargetOpts().Triple);
 }

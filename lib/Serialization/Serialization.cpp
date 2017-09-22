@@ -37,7 +37,6 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializationOptions.h"
 
-#include "clang/Basic/Module.h"
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
 #include "clang/Frontend/CompilerInstance.h"
@@ -531,6 +530,16 @@ IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
   if (M == clangImporter->getImportedHeaderModule())
     return OBJC_HEADER_MODULE_ID;
 
+  // If we're referring to a member of a private module that will be
+  // re-exported via a public module, record the public module's name.
+  if (auto clangModuleUnit =
+        dyn_cast<ClangModuleUnit>(M->getFiles().front())) {
+    auto exportedModuleName =
+        M->getASTContext().getIdentifier(
+                                 clangModuleUnit->getExportedModuleName());
+    return addDeclBaseNameRef(exportedModuleName);
+  }
+
   assert(!M->getName().empty());
   return addDeclBaseNameRef(M->getName());
 }
@@ -1005,6 +1014,15 @@ static uint8_t getRawStableAddressorKind(swift::AddressorKind kind) {
   llvm_unreachable("bad addressor kind");
 }
 
+static uint8_t getRawStableResilienceExpansion(swift::ResilienceExpansion e) {
+  switch (e) {
+  case swift::ResilienceExpansion::Minimal:
+    return uint8_t(serialization::ResilienceExpansion::Minimal);
+  case swift::ResilienceExpansion::Maximal:
+    return uint8_t(serialization::ResilienceExpansion::Maximal);
+  }
+}
+
 void Serializer::writeParameterList(const ParameterList *PL) {
   using namespace decls_block;
 
@@ -1156,7 +1174,7 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
       unsigned alignment = 0;
       if (layout->isKnownSizeTrivial()) {
         size = layout->getTrivialSizeInBits();
-        alignment = layout->getAlignment();
+        alignment = layout->getAlignmentInBits();
       }
       LayoutRequirementKind rawKind = LayoutRequirementKind::UnknownLayout;
       switch (layout->getKind()) {
@@ -2894,6 +2912,8 @@ void Serializer::writeDecl(const Decl *D) {
                           var->isStatic(),
                           getRawStableVarDeclSpecifier(var->getSpecifier()),
                           var->hasNonPatternBindingInit(),
+                          var->isGetterMutating(),
+                          var->isSetterMutating(),
                           (unsigned) accessors.Kind,
                           addTypeRef(ty),
                           addDeclRef(accessors.Get),
@@ -2948,6 +2968,9 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
     uint8_t rawAddressorKind =
       getRawStableAddressorKind(fn->getAddressorKind());
+    uint8_t rawDefaultArgumentResilienceExpansion =
+      getRawStableResilienceExpansion(
+          fn->getDefaultArgumentResilienceExpansion());
     Type ty = fn->getInterfaceType();
 
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
@@ -2976,6 +2999,7 @@ void Serializer::writeDecl(const Decl *D) {
                            rawAddressorKind,
                            rawAccessLevel,
                            fn->needsNewVTableEntry(),
+                           rawDefaultArgumentResilienceExpansion,
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -3047,6 +3071,8 @@ void Serializer::writeDecl(const Decl *D) {
                                 contextID,
                                 subscript->isImplicit(),
                                 subscript->isObjC(),
+                                subscript->isGetterMutating(),
+                                subscript->isSetterMutating(),
                                 (unsigned) accessors.Kind,
                                 addGenericEnvironmentRef(
                                             subscript->getGenericEnvironment()),
@@ -3086,6 +3112,9 @@ void Serializer::writeDecl(const Decl *D) {
       nameComponentsAndDependencies.push_back(addTypeRef(dependency));
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(ctor->getFormalAccess());
+    uint8_t rawDefaultArgumentResilienceExpansion =
+        getRawStableResilienceExpansion(
+            ctor->getDefaultArgumentResilienceExpansion());
 
     bool firstTimeRequired = ctor->isRequired();
     if (auto *overridden = ctor->getOverriddenDecl())
@@ -3109,6 +3138,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
+                                  rawDefaultArgumentResilienceExpansion,
                                   firstTimeRequired,
                                   ctor->getFullName().getArgumentNames().size(),
                                   nameComponentsAndDependencies);

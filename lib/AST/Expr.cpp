@@ -301,7 +301,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
       if ((accessKind != AccessKind::Write &&
            memberDecl->isGetterMutating()) ||
           (accessKind != AccessKind::Read &&
-           !memberDecl->isSetterNonMutating())) {
+           memberDecl->isSetterMutating())) {
         return AccessKind::ReadWrite;
       }
 
@@ -1582,8 +1582,8 @@ DynamicSubscriptExpr::DynamicSubscriptExpr(Expr *base, Expr *index,
                                            bool hasTrailingClosure,
                                            ConcreteDeclRef member,
                                            bool implicit)
-    : DynamicLookupExpr(ExprKind::DynamicSubscript),
-      Base(base), Index(index), Member(member) {
+    : DynamicLookupExpr(ExprKind::DynamicSubscript, member, base),
+      Index(index) {
   DynamicSubscriptExprBits.NumArgLabels = argLabels.size();
   DynamicSubscriptExprBits.HasArgLabelLocs = !argLabelLocs.empty();
   DynamicSubscriptExprBits.HasTrailingClosure = hasTrailingClosure;
@@ -2131,14 +2131,15 @@ KeyPathExpr::resolveComponents(ASTContext &C,
 
 KeyPathExpr::Component
 KeyPathExpr::Component::forSubscript(ASTContext &ctx,
-                                     ConcreteDeclRef subscript,
-                                     SourceLoc lSquareLoc,
-                                     ArrayRef<Expr *> indexArgs,
-                                     ArrayRef<Identifier> indexArgLabels,
-                                     ArrayRef<SourceLoc> indexArgLabelLocs,
-                                     SourceLoc rSquareLoc,
-                                     Expr *trailingClosure,
-                                     Type elementType) {
+                             ConcreteDeclRef subscript,
+                             SourceLoc lSquareLoc,
+                             ArrayRef<Expr *> indexArgs,
+                             ArrayRef<Identifier> indexArgLabels,
+                             ArrayRef<SourceLoc> indexArgLabelLocs,
+                             SourceLoc rSquareLoc,
+                             Expr *trailingClosure,
+                             Type elementType,
+                             ArrayRef<ProtocolConformanceRef> indexHashables) {
   SmallVector<Identifier, 4> indexArgLabelsScratch;
   SmallVector<SourceLoc, 4> indexArgLabelLocsScratch;
   Expr *index = packSingleArgument(ctx, lSquareLoc, indexArgs, indexArgLabels,
@@ -2149,7 +2150,8 @@ KeyPathExpr::Component::forSubscript(ASTContext &ctx,
   return forSubscriptWithPrebuiltIndexExpr(subscript, index,
                                            indexArgLabels,
                                            elementType,
-                                           lSquareLoc);
+                                           lSquareLoc,
+                                           indexHashables);
 }
 
 KeyPathExpr::Component
@@ -2176,6 +2178,7 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
                      DeclNameOrRef decl,
                      Expr *indexExpr,
                      ArrayRef<Identifier> subscriptLabels,
+                     ArrayRef<ProtocolConformanceRef> indexHashables,
                      Kind kind,
                      Type type,
                      SourceLoc loc)
@@ -2183,13 +2186,35 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
       SubscriptLabels(subscriptLabels.empty()
                        ? subscriptLabels
                        : ctxForCopyingLabels->AllocateCopy(subscriptLabels)),
+      SubscriptHashableConformances(indexHashables),
       ComponentType(type), Loc(loc)
   {}
 
 KeyPathExpr::Component
 KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
        ConcreteDeclRef subscript, Expr *index, ArrayRef<Identifier> labels,
-       Type elementType, SourceLoc loc) {
+       Type elementType, SourceLoc loc,
+       ArrayRef<ProtocolConformanceRef> indexHashables) {
   return Component(&elementType->getASTContext(),
-                   subscript, index, {}, Kind::Subscript, elementType, loc);
+                   subscript, index, labels, indexHashables,
+                   Kind::Subscript, elementType, loc);
+}
+
+void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
+    ArrayRef<ProtocolConformanceRef> hashables) {
+  switch (getKind()) {
+  case Kind::Subscript:
+    SubscriptHashableConformances = getComponentType()->getASTContext()
+      .AllocateCopy(hashables);
+    return;
+    
+  case Kind::UnresolvedSubscript:
+  case Kind::Invalid:
+  case Kind::OptionalChain:
+  case Kind::OptionalWrap:
+  case Kind::OptionalForce:
+  case Kind::UnresolvedProperty:
+  case Kind::Property:
+    llvm_unreachable("no hashable conformances for this kind");
+  }
 }

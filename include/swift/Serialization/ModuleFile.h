@@ -44,7 +44,9 @@ class Pattern;
 class ProtocolConformance;
 
 /// A serialized module, along with the tools to access it.
-class ModuleFile : public LazyMemberLoader {
+class ModuleFile
+  : public LazyMemberLoader,
+    public LazyConformanceLoader {
   friend class SerializedASTFile;
   friend class SILDeserializer;
   using Status = serialization::Status;

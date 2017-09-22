@@ -84,6 +84,46 @@ Type TypeChecker::getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type element
   return ImplicitlyUnwrappedOptionalType::get(elementType);
 }
 
+static Type getPointerType(TypeChecker &tc, SourceLoc loc, Type pointeeType,
+                           PointerTypeKind kind) {
+  auto pointerDecl = [&] {
+    switch (kind) {
+    case PTK_UnsafeMutableRawPointer:
+    case PTK_UnsafeRawPointer:
+      llvm_unreachable("these pointer types don't take arguments");
+    case PTK_UnsafePointer:
+      return tc.Context.getUnsafePointerDecl();
+    case PTK_UnsafeMutablePointer:
+      return tc.Context.getUnsafeMutablePointerDecl();
+    case PTK_AutoreleasingUnsafeMutablePointer:
+      return tc.Context.getAutoreleasingUnsafeMutablePointerDecl();
+    }
+    llvm_unreachable("bad kind");
+  }();
+  if (!pointerDecl) {
+    tc.diagnose(loc, diag::pointer_type_not_found,
+                kind == PTK_UnsafePointer ? 0 :
+                kind == PTK_UnsafeMutablePointer ? 1 : 2);
+    return Type();
+  }
+
+  tc.validateDecl(pointerDecl);
+  if (pointerDecl->isInvalid())
+    return Type();
+
+  // TODO: validate generic signature?
+
+  return BoundGenericType::get(pointerDecl, nullptr, pointeeType);
+}
+
+Type TypeChecker::getUnsafePointerType(SourceLoc loc, Type pointeeType) {
+  return getPointerType(*this, loc, pointeeType, PTK_UnsafePointer);
+}
+
+Type TypeChecker::getUnsafeMutablePointerType(SourceLoc loc, Type pointeeType) {
+  return getPointerType(*this, loc, pointeeType, PTK_UnsafeMutablePointer);
+}
+
 static Type getStdlibType(TypeChecker &TC, Type &cached, DeclContext *dc,
                           StringRef name) {
   if (cached.isNull()) {
@@ -1547,10 +1587,6 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     // Raise error if we parse an IUO type in an illegal position.
     checkForIllegalIUOs(*this, Loc.getTypeRepr(), options);
 
-    // Special case: in computed property setter, newValue closure is escaping
-    if (isa<FuncDecl>(DC) && cast<FuncDecl>(DC)->isSetter())
-      options |= TR_ImmediateSetterNewValue;
-
     auto type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
                             unsatisfiedDependency);
     if (!type) {
@@ -1565,12 +1601,6 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
       Loc.setType(ErrorType::get(Context), true);
       return true;
     }
-
-    // Special case: in computed property setter, newValue closure is escaping
-    if (auto funcDecl = dyn_cast<FuncDecl>(DC))
-      if (funcDecl->isSetter())
-        if (auto funTy = type->getAs<AnyFunctionType>())
-          type = funTy->withExtInfo(funTy->getExtInfo().withNoEscape(false));
 
     Loc.setType(type, true);
     return Loc.isError();
@@ -1697,9 +1727,6 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
     options -= TR_TypeAliasUnderlyingType;
   }
 
-  bool isImmediateSetterNewValue = options.contains(TR_ImmediateSetterNewValue);
-  options -= TR_ImmediateSetterNewValue;
-
   if (Context.LangOpts.DisableAvailabilityChecking)
     options |= TR_AllowUnavailable;
 
@@ -1725,7 +1752,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
       // Default non-escaping for closure parameters
       auto result =
           resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
-      if (result && result->is<FunctionType>() && !isImmediateSetterNewValue)
+      if (result && result->is<FunctionType>())
         return applyNonEscapingFromContext(DC, result, options);
       return result;
     }

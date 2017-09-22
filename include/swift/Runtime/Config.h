@@ -54,7 +54,7 @@
 /// According to the Objective-C ABI, this is true only for 64-bit
 /// platforms.
 #ifndef SWIFT_HAS_ISA_MASKING
-#if SWIFT_OBJC_INTEROP && defined(__LP64__)
+#if SWIFT_OBJC_INTEROP && __POINTER_WIDTH__ == 64
 #define SWIFT_HAS_ISA_MASKING 1
 #else
 #define SWIFT_HAS_ISA_MASKING 0
@@ -188,6 +188,15 @@
 #define SWIFT_CC_RegisterPreservingCC SWIFT_CC_c
 #define SWIFT_CC_RegisterPreservingCC_IMPL SWIFT_CC_c
 
+#endif
+
+// The runtime implementation uses the preserve_most convention to save
+// registers spills on the hot path.
+#if __has_attribute(preserve_most) &&                                          \
+    (defined(__aarch64__) || defined(__x86_64__))
+#define SWIFT_CC_PreserveMost __attribute__((preserve_most))
+#else
+#define SWIFT_CC_PreserveMost
 #endif
 
 // Generates a name of the runtime entry's implementation by

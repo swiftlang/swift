@@ -391,7 +391,10 @@ extension String {
   /// slice of the `picnicGuest.utf8` view.
   ///
   /// - Parameter utf8: A UTF-8 code sequence.
-  @available(swift, deprecated: 3.2, obsoleted: 4.0)
+  @available(swift, deprecated: 3.2,
+    message: "Failable initializer was removed in Swift 4. When upgrading to Swift 4, please use non-failable String.init(_:UTF8View)")
+  @available(swift, obsoleted: 4.0,
+    message: "Please use non-failable String.init(_:UTF8View) instead")
   public init?(_ utf8: UTF8View) {
     if utf8.startIndex._transcodedOffset != 0
     || utf8.endIndex._transcodedOffset != 0 {
@@ -420,12 +423,13 @@ extension String {
   }
 
   /// Creates a string corresponding to the given sequence of UTF-8 code units.
-  @available(swift, introduced: 4.0)
+  @available(swift, introduced: 4.0, message:
+    "Please use failable String.init?(_:UTF8View) when in Swift 3.2 mode")
   public init(_ utf8: UTF8View) {
     self = String(utf8._core)
   }
 
-  /// The index type for subscripting a string's `utf8` view.
+  /// The index type for subscripting a string.
   public typealias UTF8Index = UTF8View.Index
 }
 

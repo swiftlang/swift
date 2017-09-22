@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module-path %t/Empty.framework/Modules/Empty.swiftmodule/%target-swiftmodule-name %S/../Inputs/empty.swift -module-name Empty
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -F %t -DIMPORT_EMPTY -O -disable-sil-perf-optzns -disable-llvm-optzns -emit-ir | %FileCheck %s
 
-// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64
 // XFAIL: linux
 
 #if IMPORT_EMPTY

@@ -250,12 +250,13 @@ mergeKnownSizeTrivialConstraints(LayoutConstraint LHS, LayoutConstraint RHS) {
   // Check alignments
 
   // Quick exit if at_most_size_layout does not care about the alignment.
-  if (!RHS->getAlignment())
+  if (!RHS->getAlignmentInBits())
     return LHS;
 
   // Check if fixed_size_layout.alignment is a multiple of
   // at_most_size_layout.alignment.
-  if (LHS->getAlignment() && LHS->getAlignment() % RHS->getAlignment() == 0)
+  if (LHS->getAlignmentInBits() &&
+      LHS->getAlignmentInBits() % RHS->getAlignmentInBits() == 0)
     return LHS;
 
   return LayoutConstraint::getUnknownLayout();

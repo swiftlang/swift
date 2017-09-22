@@ -2669,6 +2669,7 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFileName);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
+  Invocation.getLangOptions().KeepTokensInSourceFile = true;
 
   CompilerInstance CI;
 

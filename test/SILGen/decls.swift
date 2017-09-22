@@ -120,7 +120,7 @@ var global = 42
 // CHECK-LABEL: sil hidden @_T05decls16load_from_global{{[_0-9a-zA-Z]*}}F
 func load_from_global() -> Int {
   return global
-  // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_T05decls6globalSifau
+  // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_T05decls6globalSivau
   // CHECK: [[PTR:%[0-9]+]] = apply [[ACCESSOR]]()
   // CHECK: [[ADDR:%[0-9]+]] = pointer_to_address [[PTR]]
   // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*Int
@@ -134,7 +134,7 @@ func store_to_global(x: Int) {
   global = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PBX:%.*]] = project_box [[XADDR]]
-  // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_T05decls6globalSifau
+  // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_T05decls6globalSivau
   // CHECK: [[PTR:%[0-9]+]] = apply [[ACCESSOR]]()
   // CHECK: [[ADDR:%[0-9]+]] = pointer_to_address [[PTR]]
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PBX]] : $*Int

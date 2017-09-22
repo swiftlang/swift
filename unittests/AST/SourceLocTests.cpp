@@ -23,7 +23,8 @@ namespace swift {
   void PrintTo(SourceLoc loc, std::ostream *os) {
     *os << loc.getOpaquePointerValue();
     if (loc.isValid())
-      *os << " '" << *(char *)loc.getOpaquePointerValue() << "'";
+      *os << " '" << *static_cast<const char *>(loc.getOpaquePointerValue())
+          << "'";
   }
 
   void PrintTo(SourceRange range, std::ostream *os) {

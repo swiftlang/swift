@@ -22,8 +22,8 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/ClangImporter/ClangModule.h" // FIXME: SDK overlay semantics
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -1327,19 +1327,7 @@ static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
   if (!classDecl)
     return false;
 
-  // The class must be defined in Objective-C.
-  if (!classDecl->hasClangNode())
-    return false;
-
-  // Find the Clang module unit that stores the class.
-  auto classModuleUnit
-    = dyn_cast<ClangModuleUnit>(classDecl->getModuleScopeContext());
-  if (!classModuleUnit)
-    return false;
-
-  // Check whether the extension is in the overlay.
-  auto extModule = ext->getDeclContext()->getParentModule();
-  return extModule == classModuleUnit->getAdapterModule();
+  return isInOverlayModuleForImportedModule(ext, classDecl);
 }
 
 void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {

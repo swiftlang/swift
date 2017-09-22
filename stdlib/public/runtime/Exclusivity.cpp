@@ -69,7 +69,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
                                       ExclusivityFlags newFlags, void *newPC,
                                       void *pointer) {
   static std::atomic<long> reportedConflicts{0};
-  constexpr unsigned maxReportedConflicts = 100;
+  constexpr long maxReportedConflicts = 100;
   // Don't report more that 100 conflicts. Hopefully, this will improve
   // performance in case there are conflicts inside a tight loop.
   if (reportedConflicts.fetch_add(1, std::memory_order_relaxed) >=
@@ -81,9 +81,9 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   constexpr unsigned maxAccessDescriptionLength = 50;
   char message[maxMessageLength];
   snprintf(message, sizeof(message),
-           "Simultaneous accesses to 0x%lx, but modification requires "
+           "Simultaneous accesses to 0x%tx, but modification requires "
            "exclusive access",
-           (uintptr_t)pointer);
+           reinterpret_cast<uintptr_t>(pointer));
   fprintf(stderr, "%s.\n", message);
 
   char oldAccess[maxAccessDescriptionLength];
@@ -92,7 +92,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   fprintf(stderr, "%s ", oldAccess);
   if (oldPC) {
     dumpStackTraceEntry(0, oldPC, /*shortOutput=*/true);
-    fprintf(stderr, " (0x%lx).\n", (uintptr_t)oldPC);
+    fprintf(stderr, " (0x%tx).\n", reinterpret_cast<uintptr_t>(oldPC));
   } else {
     fprintf(stderr, "<unknown>.\n");
   }

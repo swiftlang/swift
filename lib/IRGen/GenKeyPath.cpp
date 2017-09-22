@@ -30,6 +30,7 @@
 #include "MetadataLayout.h"
 #include "ProtocolInfo.h"
 #include "StructLayout.h"
+#include "TypeInfo.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/IR/Module.h"
 #include "swift/SIL/SILInstruction.h"
@@ -47,15 +48,44 @@
 using namespace swift;
 using namespace irgen;
 
-enum GetterOrSetter {
+enum KeyPathAccessor {
   Getter,
   Setter,
+  Equals,
+  Hash,
 };
+
+static void
+bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
+                                     const KeyPathPatternComponent &component,
+                                     GenericEnvironment *genericEnv,
+                                     ArrayRef<GenericRequirement> requirements,
+                                     llvm::Value *args,
+                                     llvm::Value *size) {
+  if (!genericEnv)
+    return;
+  
+  // The generic environment is marshaled into the end of the component
+  // argument area inside the instance. Bind the generic information out of
+  // the buffer.
+  if (!component.getComputedPropertyIndices().empty()) {
+    auto genericArgsSize = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+      requirements.size() * IGF.IGM.getPointerSize().getValue());
+
+    auto genericArgsOffset = IGF.Builder.CreateSub(size, genericArgsSize);
+    args = IGF.Builder.CreateInBoundsGEP(args, genericArgsOffset);
+  }
+  bindFromGenericRequirementsBuffer(IGF, requirements,
+    Address(args, IGF.IGM.getPointerAlignment()),
+    [&](CanType t) {
+      return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
+    });
+}
 
 static llvm::Function *
 getAccessorForComputedComponent(IRGenModule &IGM,
                                 const KeyPathPatternComponent &component,
-                                GetterOrSetter whichAccessor,
+                                KeyPathAccessor whichAccessor,
                                 GenericEnvironment *genericEnv,
                                 ArrayRef<GenericRequirement> requirements) {
   SILFunction *accessor;
@@ -66,6 +96,12 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   case Setter:
     accessor = component.getComputedPropertySetter();
     break;
+  case Equals:
+    accessor = component.getComputedPropertyIndexEquals();
+    break;
+  case Hash:
+    accessor = component.getComputedPropertyIndexHash();
+    break;
   }
   
   auto accessorFn = IGM.getAddrOfSILFunction(accessor, NotForDefinition);
@@ -75,42 +111,82 @@ getAccessorForComputedComponent(IRGenModule &IGM,
     return accessorFn;
   }
 
-  auto accessorFnTy = accessorFn->getType()->getPointerElementType();
+  auto accessorFnTy = cast<llvm::FunctionType>(
+    accessorFn->getType()->getPointerElementType());;
   
   // Otherwise, we need a thunk to unmarshal the generic environment from the
   // argument area. It'd be nice to have a good way to represent this
   // directly in SIL, of course...
-  auto thunkType = llvm::FunctionType::get(
-      IGM.VoidTy,
-      { /*sret or newValue*/ accessorFnTy->getFunctionParamType(0),
-        /*base*/ accessorFnTy->getFunctionParamType(1),
-        /*arg*/ IGM.Int8PtrTy },
-      /*vararg*/ false);
   const char *thunkName;
-  unsigned numArgsToForward = 2;
+  unsigned numArgsToForward;
+
   switch (whichAccessor) {
   case Getter:
     thunkName = "keypath_get";
+    numArgsToForward = 2;
     break;
   case Setter:
     thunkName = "keypath_set";
+    numArgsToForward = 2;
+    break;
+  case Equals:
+    thunkName = "keypath_equals";
+    numArgsToForward = 2;
+    break;
+  case Hash:
+    thunkName = "keypath_hash";
+    numArgsToForward = 1;
     break;
   }
+
+  SmallVector<llvm::Type *, 4> thunkParams;
+  for (unsigned i = 0; i < numArgsToForward; ++i)
+    thunkParams.push_back(accessorFnTy->getParamType(i));
+  
+  switch (whichAccessor) {
+  case Getter:
+  case Setter:
+    thunkParams.push_back(IGM.Int8PtrTy);
+    break;
+  case Equals:
+  case Hash:
+    break;
+  }
+  thunkParams.push_back(IGM.SizeTy);
+
+  auto thunkType = llvm::FunctionType::get(accessorFnTy->getReturnType(),
+                                           thunkParams,
+                                           /*vararg*/ false);
   
   auto accessorThunk = llvm::Function::Create(thunkType,
     llvm::GlobalValue::PrivateLinkage, thunkName, IGM.getModule());
   accessorThunk->setAttributes(IGM.constructInitialAttributes());
-  // Original accessor's args should be @in or @out, meaning they won't be
-  // captured or aliased.
-  accessorThunk->addAttribute(1, llvm::Attribute::NoCapture);
-  accessorThunk->addAttribute(1, llvm::Attribute::NoAlias);
-  accessorThunk->addAttribute(2, llvm::Attribute::NoCapture);
-  accessorThunk->addAttribute(2, llvm::Attribute::NoAlias);
-  // Getter's output is sret.
-  if (whichAccessor == Getter)
-    accessorThunk->addAttribute(1, llvm::Attribute::StructRet);
   accessorThunk->setCallingConv(IGM.SwiftCC);
-  
+
+  switch (whichAccessor) {
+  case Getter:
+    // Original accessor's args should be @in or @out, meaning they won't be
+    // captured or aliased.
+    accessorThunk->addAttribute(1, llvm::Attribute::NoCapture);
+    accessorThunk->addAttribute(1, llvm::Attribute::NoAlias);
+    accessorThunk->addAttribute(2, llvm::Attribute::NoCapture);
+    accessorThunk->addAttribute(2, llvm::Attribute::NoAlias);
+    // Output is sret.
+    accessorThunk->addAttribute(1, llvm::Attribute::StructRet);
+    break;
+  case Setter:
+    // Original accessor's args should be @in or @out, meaning they won't be
+    // captured or aliased.
+    accessorThunk->addAttribute(1, llvm::Attribute::NoCapture);
+    accessorThunk->addAttribute(1, llvm::Attribute::NoAlias);
+    accessorThunk->addAttribute(2, llvm::Attribute::NoCapture);
+    accessorThunk->addAttribute(2, llvm::Attribute::NoAlias);
+    break;
+  case Equals:
+  case Hash:
+    break;
+  }
+
   {
     IRGenFunction IGF(IGM, accessorThunk);
     if (IGM.DebugInfo)
@@ -120,35 +196,46 @@ getAccessorForComputedComponent(IRGenModule &IGM,
     Explosion forwardedArgs;
     forwardedArgs.add(params.claim(numArgsToForward));
     
-    // The generic environment is marshaled into the beginning of the component
-    // argument area inside the instance. Bind the generic information out of
-    // the buffer, and advance past it.
-    auto componentArgsBuf = params.claimNext();
-    bindFromGenericRequirementsBuffer(IGF, requirements,
-      Address(componentArgsBuf, IGM.getPointerAlignment()),
-      [&](CanType t) {
-        if (!genericEnv)
-          return t;
-        return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-      });
-      
-    /* TODO: If the underlying accessor wants index arguments, advance the
-     * pointer past the generic requirements here to pass down. */
-     
+    llvm::Value *componentArgsBuf;
+    switch (whichAccessor) {
+    case Getter:
+    case Setter:
+      // The component arguments are passed alongside the base being projected.
+      componentArgsBuf = params.claimNext();
+      // Pass the argument pointer down to the underlying function.
+      if (!component.getComputedPropertyIndices().empty()) {
+        forwardedArgs.add(componentArgsBuf);
+      }
+      break;
+    case Equals:
+    case Hash:
+      // We're operating directly on the component argument buffer.
+      componentArgsBuf = forwardedArgs.getAll()[0];
+      break;
+    }
+    auto componentArgsBufSize = params.claimNext();
+    bindPolymorphicArgumentsFromComponentIndices(IGF, component,
+                                                 genericEnv, requirements,
+                                                 componentArgsBuf,
+                                                 componentArgsBufSize);
+    
     // Use the bound generic metadata to form a call to the original generic
     // accessor.
-    WitnessMetadata witnessMetadata;
+    WitnessMetadata ignoreWitnessMetadata;
     auto forwardingSubs = genericEnv->getGenericSignature()->getSubstitutionMap(
       genericEnv->getForwardingSubstitutions());
     emitPolymorphicArguments(IGF, accessor->getLoweredFunctionType(),
                              forwardingSubs,
-                             &witnessMetadata,
+                             &ignoreWitnessMetadata,
                              forwardedArgs);
     auto fnPtr = FunctionPointer::forDirect(IGM, accessorFn,
                                           accessor->getLoweredFunctionType());
-    IGF.Builder.CreateCall(fnPtr, forwardedArgs.claimAll());
+    auto call = IGF.Builder.CreateCall(fnPtr, forwardedArgs.claimAll());
     
-    IGF.Builder.CreateRetVoid();
+    if (call->getType()->isVoidTy())
+      IGF.Builder.CreateRetVoid();
+    else
+      IGF.Builder.CreateRet(call);
   }
   
   return accessorThunk;
@@ -171,19 +258,53 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
     
   {
     IRGenFunction IGF(IGM, layoutFn);
-    // TODO: We would need to unmarshal generic arguments to be able to
-    // compute the layout of dependent subscript indexes.
-    (void)IGF.collectParameters().claimNext();
+    // Unmarshal the generic environment from the argument buffer.
+    auto parameters = IGF.collectParameters();
+    auto args = parameters.claimNext();
     
-    // Base size is one pointer for each generic requirement; base alignment
-    // is pointer alignment.
-    llvm::Value *size = llvm::ConstantInt::get(IGM.SizeTy,
-      IGM.getPointerSize().getValue() * requirements.size());
-    llvm::Value *alignMask = llvm::ConstantInt::get(IGM.SizeTy,
-      IGM.getPointerAlignment().getValue() - 1);
+    if (genericEnv) {
+      bindFromGenericRequirementsBuffer(IGF, requirements,
+        Address(args, IGF.IGM.getPointerAlignment()),
+        [&](CanType t) {
+          return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
+        });
+    }
+    
+    // Run through the captured index types to determine the size and alignment
+    // needed. Start with pointer alignment for the generic environment.
+    llvm::Value *size = llvm::ConstantInt::get(IGM.SizeTy, 0);
+    llvm::Value *alignMask = llvm::ConstantInt::get(IGM.SizeTy, 0);
+
+    for (auto &index : component.getComputedPropertyIndices()) {
+      auto ty = genericEnv
+        ? genericEnv->mapTypeIntoContext(IGM.getSILModule(), index.LoweredType)
+        : index.LoweredType;
+      auto &ti = IGM.getTypeInfo(ty);
+      auto indexSize = ti.getSize(IGF, ty);
+      auto indexAlign = ti.getAlignmentMask(IGF, ty);
       
-    // TODO: Combine layout of captured index values
+      auto notIndexAlign = IGF.Builder.CreateNot(indexAlign);
+      
+      size = IGF.Builder.CreateAdd(size, indexAlign);
+      size = IGF.Builder.CreateAnd(size, notIndexAlign);
+      size = IGF.Builder.CreateAdd(size, indexSize);
+      
+      alignMask = IGF.Builder.CreateOr(alignMask, indexAlign);
+    }
     
+    // If there's generic environment to capture, then it's stored as a block
+    // of pointer-aligned words after the captured values.
+    
+    auto genericsSize = llvm::ConstantInt::get(IGM.SizeTy,
+      IGM.getPointerSize().getValue() * requirements.size());
+    auto genericsAlign = llvm::ConstantInt::get(IGM.SizeTy,
+      IGM.getPointerAlignment().getValue() - 1);
+    auto notGenericsAlign = llvm::ConstantExpr::getNot(genericsAlign);
+    size = IGF.Builder.CreateAdd(size, genericsAlign);
+    size = IGF.Builder.CreateAnd(size, notGenericsAlign);
+    size = IGF.Builder.CreateAdd(size, genericsSize);
+    alignMask = IGF.Builder.CreateOr(alignMask, genericsAlign);
+
     llvm::Value *retValue = IGF.Builder.CreateInsertValue(
       llvm::UndefValue::get(retTy), size, 0);
     retValue = IGF.Builder.CreateInsertValue(
@@ -202,27 +323,184 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
                                     ArrayRef<GenericRequirement> requirements) {
   // If the only thing we're capturing is generic environment, then we can
   // use a prefab witness table from the runtime.
-  // TODO: If there were subscript indexes, we'd need to generate something.
-  if (auto existing =
-        IGM.Module.getNamedGlobal("swift_keyPathGenericWitnessTable"))
-    return existing;
+  if (component.getComputedPropertyIndices().empty()) {
+    if (auto existing =
+          IGM.Module.getNamedGlobal("swift_keyPathGenericWitnessTable"))
+      return existing;
+    
+    auto linkInfo = LinkInfo::get(IGM, "swift_keyPathGenericWitnessTable",
+                                  SILLinkage::PublicExternal,
+                                  /*fragile*/ false,
+                                  /*sil only*/ false,
+                                  NotForDefinition,
+                                  /*weak imported*/ false);
+    
+    return createVariable(IGM, linkInfo,
+                          IGM.Int8PtrTy, IGM.getPointerAlignment());
+  }
   
-  auto linkInfo = LinkInfo::get(IGM, "swift_keyPathGenericWitnessTable",
-                                SILLinkage::PublicExternal,
-                                /*fragile*/ false,
-                                /*sil only*/ false,
-                                NotForDefinition,
-                                /*weak imported*/ false);
+  // Are the index values trivial?
+  bool isTrivial = true;
+  for (auto &component : component.getComputedPropertyIndices()) {
+    auto ty = genericEnv
+      ? genericEnv->mapTypeIntoContext(IGM.getSILModule(), component.LoweredType)
+      : component.LoweredType;
+    auto &ti = IGM.getTypeInfo(ty);
+    isTrivial &= ti.isPOD(ResilienceExpansion::Minimal);
+  }
   
-  return createVariable(IGM, linkInfo,
-                        IGM.Int8PtrTy, IGM.getPointerAlignment());
+  llvm::Constant *destroy;
+  llvm::Constant *copy;
+  if (isTrivial) {
+    // We can use prefab witnesses for handling trivial copying and destruction.
+    // A null destructor witness signals that the payload is trivial.
+    destroy = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    copy = IGM.getCopyKeyPathTrivialIndicesFn();
+  } else {
+    // Generate a destructor for this set of indices.
+    {
+      auto destroyType = llvm::FunctionType::get(IGM.VoidTy,
+                                                 {IGM.Int8PtrTy, IGM.SizeTy},
+                                                 /*vararg*/ false);
+      auto destroyFn = llvm::Function::Create(destroyType,
+        llvm::GlobalValue::PrivateLinkage, "keypath_destroy", IGM.getModule());
+      destroy = destroyFn;
+      
+      IRGenFunction IGF(IGM, destroyFn);
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, destroyFn);
+    
+      auto params = IGF.collectParameters();
+      auto componentArgsBuf = params.claimNext();
+      auto componentArgsBufSize = params.claimNext();
+      bindPolymorphicArgumentsFromComponentIndices(IGF, component,
+                                                   genericEnv, requirements,
+                                                   componentArgsBuf,
+                                                   componentArgsBufSize);
+      
+      llvm::Value *offset = nullptr;
+      for (auto &component : component.getComputedPropertyIndices()) {
+        auto ty = genericEnv
+          ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
+                                           component.LoweredType)
+          : component.LoweredType;
+        auto &ti = IGM.getTypeInfo(ty);
+        if (offset) {
+          auto align = ti.getAlignmentMask(IGF, ty);
+          auto notAlign = IGF.Builder.CreateNot(align);
+          offset = IGF.Builder.CreateAdd(offset, align);
+          offset = IGF.Builder.CreateAnd(offset, notAlign);
+        } else {
+          offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
+        }
+        auto elt = IGF.Builder.CreateInBoundsGEP(componentArgsBuf, offset);
+        auto eltAddr = ti.getAddressForPointer(
+          IGF.Builder.CreateBitCast(elt, ti.getStorageType()->getPointerTo()));
+        ti.destroy(IGF, eltAddr, ty);
+        auto size = ti.getSize(IGF, ty);
+        offset = IGF.Builder.CreateAdd(offset, size);
+      }
+      IGF.Builder.CreateRetVoid();
+    }
+    // Generate a copier for this set of indices.
+    {
+      auto copyType = llvm::FunctionType::get(IGM.VoidTy,
+                                              {IGM.Int8PtrTy, IGM.Int8PtrTy,
+                                               IGM.SizeTy},
+                                              /*vararg*/ false);
+      auto copyFn = llvm::Function::Create(copyType,
+        llvm::GlobalValue::PrivateLinkage, "keypath_copy", IGM.getModule());
+      copy = copyFn;
+      
+      IRGenFunction IGF(IGM, copyFn);
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, copyFn);
+    
+      auto params = IGF.collectParameters();
+      auto sourceArgsBuf = params.claimNext();
+      auto destArgsBuf = params.claimNext();
+      auto componentArgsBufSize = params.claimNext();
+      bindPolymorphicArgumentsFromComponentIndices(IGF, component,
+                                                   genericEnv, requirements,
+                                                   sourceArgsBuf,
+                                                   componentArgsBufSize);
+      
+      // Copy over the index values.
+      llvm::Value *offset = nullptr;
+      for (auto &component : component.getComputedPropertyIndices()) {
+        auto ty = genericEnv
+          ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
+                                           component.LoweredType)
+          : component.LoweredType;
+        auto &ti = IGM.getTypeInfo(ty);
+        if (offset) {
+          auto align = ti.getAlignmentMask(IGF, ty);
+          auto notAlign = IGF.Builder.CreateNot(align);
+          offset = IGF.Builder.CreateAdd(offset, align);
+          offset = IGF.Builder.CreateAnd(offset, notAlign);
+        } else {
+          offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
+        }
+        auto sourceElt = IGF.Builder.CreateInBoundsGEP(sourceArgsBuf, offset);
+        auto destElt = IGF.Builder.CreateInBoundsGEP(destArgsBuf, offset);
+        auto sourceEltAddr = ti.getAddressForPointer(
+          IGF.Builder.CreateBitCast(sourceElt,
+                                    ti.getStorageType()->getPointerTo()));
+        auto destEltAddr = ti.getAddressForPointer(
+          IGF.Builder.CreateBitCast(destElt,
+                                    ti.getStorageType()->getPointerTo()));
+        
+        ti.initializeWithCopy(IGF, destEltAddr, sourceEltAddr, ty);
+        auto size = ti.getSize(IGF, ty);
+        offset = IGF.Builder.CreateAdd(offset, size);
+      }
+      
+      // Copy over the generic environment.
+      if (genericEnv) {
+        auto envAlignMask = llvm::ConstantInt::get(IGM.SizeTy,
+          IGM.getPointerAlignment().getMaskValue());
+        auto notAlignMask = IGF.Builder.CreateNot(envAlignMask);
+        offset = IGF.Builder.CreateAdd(offset, envAlignMask);
+        offset = IGF.Builder.CreateAnd(offset, notAlignMask);
+        
+        auto sourceEnv = IGF.Builder.CreateInBoundsGEP(sourceArgsBuf, offset);
+        auto destEnv = IGF.Builder.CreateInBoundsGEP(destArgsBuf, offset);
+        
+        IGF.Builder.CreateMemCpy(destEnv, sourceEnv,
+          IGM.getPointerSize().getValue() * requirements.size(),
+          IGM.getPointerAlignment().getValue());
+      }
+      
+      IGF.Builder.CreateRetVoid();
+    }
+  }
+  
+  auto equals = getAccessorForComputedComponent(IGM, component, Equals,
+                                                genericEnv, requirements);
+  auto hash = getAccessorForComputedComponent(IGM, component, Hash,
+                                              genericEnv, requirements);
+  
+  auto witnesses = llvm::ConstantStruct::getAnon({destroy, copy, equals, hash});
+  return new llvm::GlobalVariable(IGM.Module, witnesses->getType(),
+                                  /*constant*/ true,
+                                  llvm::GlobalValue::PrivateLinkage,
+                                  witnesses,
+                                  "keypath_witnesses");
 }
+
+/// Information about each index operand for a key path pattern that is used
+/// to lay out and consume the argument packet.
+struct KeyPathIndexOperand {
+  SILType LoweredType;
+  const KeyPathPatternComponent *LastUser;
+};
 
 static llvm::Constant *
 getInitializerForComputedComponent(IRGenModule &IGM,
-                                   const KeyPathPatternComponent &component,
-                                   GenericEnvironment *genericEnv,
-                                   ArrayRef<GenericRequirement> requirements) {
+           const KeyPathPatternComponent &component,
+           ArrayRef<KeyPathIndexOperand> operands,
+           GenericEnvironment *genericEnv,
+           ArrayRef<GenericRequirement> requirements) {
   auto fnTy = llvm::FunctionType::get(IGM.VoidTy,
     { /*src*/ IGM.Int8PtrTy,
       /*dest*/ IGM.Int8PtrTy }, /*vararg*/ false);
@@ -233,16 +511,111 @@ getInitializerForComputedComponent(IRGenModule &IGM,
   {
     IRGenFunction IGF(IGM, initFn);
     auto params = IGF.collectParameters();
+    // Pointer to the argument packet passed into swift_getKeyPath
     auto src = params.claimNext();
+    // Pointer to the destination component's argument buffer
     auto dest = params.claimNext();
     
-    // Transfer all of the requirements into the destination instance.
-    IGF.Builder.CreateMemCpy(dest, src,
-                         IGM.getPointerSize().getValue() * requirements.size(),
-                         IGM.getPointerAlignment().getValue());
+    SmallVector<Address, 4> srcAddresses;
+    int lastOperandNeeded = -1;
+    for (auto &index : component.getComputedPropertyIndices()) {
+      lastOperandNeeded = std::max(lastOperandNeeded, (int)index.Operand);
+    }
     
-    // TODO: Copy over subscript index values.
+    llvm::Value *offset;
     
+    if (genericEnv) {
+      // We'll copy over the generic environment after we copy in the indexes.
+      offset = llvm::ConstantInt::get(IGM.SizeTy,
+        IGM.getPointerSize().getValue() * requirements.size());
+
+      // Bind the generic environment from the argument buffer.
+      bindFromGenericRequirementsBuffer(IGF, requirements,
+        Address(src, IGF.IGM.getPointerAlignment()),
+        [&](CanType t) {
+          return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
+        });
+
+    } else {
+      offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
+    }
+    
+    // Figure out the offsets of the operands in the source buffer.
+    for (int i = 0; i <= lastOperandNeeded; ++i) {
+      auto ty = genericEnv
+        ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
+                                         operands[i].LoweredType)
+        : operands[i].LoweredType;
+      
+      auto &ti = IGM.getTypeInfo(ty);
+
+      if (i != 0 || genericEnv) {
+        auto alignMask = ti.getAlignmentMask(IGF, ty);
+        auto notAlignMask = IGF.Builder.CreateNot(alignMask);
+        offset = IGF.Builder.CreateAdd(offset, alignMask);
+        offset = IGF.Builder.CreateAnd(offset, notAlignMask);
+      }
+      
+      auto ptr = IGF.Builder.CreateInBoundsGEP(src, offset);
+      auto addr = ti.getAddressForPointer(IGF.Builder.CreateBitCast(
+        ptr, ti.getStorageType()->getPointerTo()));
+      srcAddresses.push_back(addr);
+      
+      auto size = ti.getSize(IGF, ty);
+      offset = IGF.Builder.CreateAdd(offset, size);
+    }
+    
+    offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
+    
+    // Transfer the operands we want into the destination buffer.
+    for (unsigned i : indices(component.getComputedPropertyIndices())) {
+      auto &index = component.getComputedPropertyIndices()[i];
+      
+      auto ty = genericEnv
+        ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
+                                         index.LoweredType)
+        : index.LoweredType;
+      
+      auto &ti = IGM.getTypeInfo(ty);
+      
+      if (i != 0) {
+        auto alignMask = ti.getAlignmentMask(IGF, ty);
+        auto notAlignMask = IGF.Builder.CreateNot(alignMask);
+        offset = IGF.Builder.CreateAdd(offset, alignMask);
+        offset = IGF.Builder.CreateAnd(offset, notAlignMask);
+      }
+      
+      auto ptr = IGF.Builder.CreateInBoundsGEP(dest, offset);
+      auto destAddr = ti.getAddressForPointer(IGF.Builder.CreateBitCast(
+        ptr, ti.getStorageType()->getPointerTo()));
+      
+      // The last component using an operand can move the value out of the
+      // buffer.
+      if (&component == operands[index.Operand].LastUser) {
+        ti.initializeWithTake(IGF, destAddr, srcAddresses[index.Operand], ty);
+      } else {
+        ti.initializeWithCopy(IGF, destAddr, srcAddresses[index.Operand], ty);
+      }
+      auto size = ti.getSize(IGF, ty);
+      offset = IGF.Builder.CreateAdd(offset, size);
+    }
+    
+    // Transfer the generic environment.
+    if (genericEnv) {
+      auto destGenericEnv = dest;
+      if (!component.getComputedPropertyIndices().empty()) {
+        auto genericEnvAlignMask = llvm::ConstantInt::get(IGM.SizeTy,
+          IGM.getPointerAlignment().getMaskValue());
+        auto notGenericEnvAlignMask = IGF.Builder.CreateNot(genericEnvAlignMask);
+        offset = IGF.Builder.CreateAdd(offset, genericEnvAlignMask);
+        offset = IGF.Builder.CreateAnd(offset, notGenericEnvAlignMask);
+        destGenericEnv = IGF.Builder.CreateInBoundsGEP(dest, offset);
+      }
+      
+      IGF.Builder.CreateMemCpy(destGenericEnv, src,
+                           IGM.getPointerSize().getValue() * requirements.size(),
+                           IGM.getPointerAlignment().getValue());
+    }
     IGF.Builder.CreateRetVoid();
   }
   return initFn;
@@ -300,8 +673,6 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         bindFromGenericRequirementsBuffer(IGF, requirements,
           Address(bindingsBufPtr, getPointerAlignment()),
           [&](CanType t) {
-            if (!genericEnv)
-              return t;
             return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
           });
       
@@ -373,6 +744,28 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     assert(fields.getNextOffsetFromGlobal() % getPointerAlignment() == Size(0)
            && "must be pointer-aligned here");
   };
+  
+  // Collect the order and types of any captured index operands, which will
+  // determine the layout of the buffer that gets passed to the initializer
+  // for each component.
+  SmallVector<KeyPathIndexOperand, 4> operands;
+  operands.resize(pattern->getNumOperands());
+  for (auto &component : pattern->getComponents()) {
+    switch (component.getKind()) {
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty:
+      for (auto &index : component.getComputedPropertyIndices()) {
+        operands[index.Operand].LoweredType = index.LoweredType;
+        operands[index.Operand].LastUser = &component;
+      }
+      break;
+    case KeyPathPatternComponent::Kind::StoredProperty:
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalForce:
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+      break;
+    }
+  }
   
   for (unsigned i : indices(pattern->getComponents())) {
     assertPointerAlignment();
@@ -585,7 +978,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
           fields.add(getAddrOfSILFunction(component.getComputedPropertySetter(),
                                           NotForDefinition));
       } else {
-        // If there's generic context (TODO: or subscript indexes), embed as
+        // If there's generic context or subscript indexes, embed as
         // arguments in the component. Thunk the SIL-level accessors to give the
         // runtime implementation a polymorphically-callable interface.
         
@@ -611,7 +1004,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         
         // Add an initializer function that copies generic arguments out of the
         // pattern argument buffer into the instantiated object.
-        fields.add(getInitializerForComputedComponent(*this, component,
+        fields.add(getInitializerForComputedComponent(*this, component, operands,
                                                      genericEnv, requirements));
       }
       break;
@@ -657,4 +1050,3 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   KeyPathPatterns.insert({pattern, patternVar});
   return patternVar;
 }
-

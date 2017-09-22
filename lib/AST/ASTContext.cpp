@@ -129,6 +129,12 @@ struct ASTContext::Implementation {
   DECL_CLASS *NAME##Decl = nullptr;
 #include "swift/AST/KnownStdlibTypes.def"
 
+  /// The declaration of '+' function for two RangeReplaceableCollection.
+  FuncDecl *PlusFunctionOnRangeReplaceableCollection = nullptr;
+
+  /// The declaration of '+' function for two String.
+  FuncDecl *PlusFunctionOnString = nullptr;
+
   /// The declaration of Swift.Optional<T>.Some.
   EnumElementDecl *OptionalSomeDecl = nullptr;
 
@@ -549,6 +555,60 @@ static NominalTypeDecl *findStdlibType(const ASTContext &ctx, StringRef name,
     }
   }
   return nullptr;
+}
+
+FuncDecl *ASTContext::getPlusFunctionOnRangeReplaceableCollection() const {
+  if (Impl.PlusFunctionOnRangeReplaceableCollection) {
+    return Impl.PlusFunctionOnRangeReplaceableCollection;
+  }
+  // Find all of the declarations with this name in the Swift module.
+  SmallVector<ValueDecl *, 1> Results;
+  lookupInSwiftModule("+", Results);
+  for (auto Result : Results) {
+    if (auto *FD = dyn_cast<FuncDecl>(Result)) {
+      if (!FD->getOperatorDecl())
+        continue;
+      for (auto Req: FD->getGenericRequirements()) {
+        if (Req.getKind() == RequirementKind::Conformance &&
+              Req.getSecondType()->getNominalOrBoundGenericNominal() ==
+            getRangeReplaceableCollectionDecl()) {
+          Impl.PlusFunctionOnRangeReplaceableCollection = FD;
+        }
+      }
+    }
+  }
+  return Impl.PlusFunctionOnRangeReplaceableCollection;
+}
+
+FuncDecl *ASTContext::getPlusFunctionOnString() const {
+  if (Impl.PlusFunctionOnString) {
+    return Impl.PlusFunctionOnString;
+  }
+  // Find all of the declarations with this name in the Swift module.
+  SmallVector<ValueDecl *, 1> Results;
+  lookupInSwiftModule("+", Results);
+  for (auto Result : Results) {
+    if (auto *FD = dyn_cast<FuncDecl>(Result)) {
+      if (!FD->getOperatorDecl())
+        continue;
+      auto ResultType = FD->getResultInterfaceType();
+      if (ResultType->getNominalOrBoundGenericNominal() != getStringDecl())
+        continue;
+      auto ParamLists = FD->getParameterLists();
+      if (ParamLists.size() != 2 || ParamLists[1]->size() != 2)
+        continue;
+      auto CheckIfStringParam = [this](ParamDecl* Param) {
+        auto Type = Param->getInterfaceType()->getNominalOrBoundGenericNominal();
+        return Type == getStringDecl();
+      };
+      if (CheckIfStringParam(ParamLists[1]->get(0)) &&
+          CheckIfStringParam(ParamLists[1]->get(1))) {
+        Impl.PlusFunctionOnString = FD;
+        break;
+      }
+    }
+  }
+  return Impl.PlusFunctionOnString;
 }
 
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \

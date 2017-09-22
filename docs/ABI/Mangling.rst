@@ -117,6 +117,10 @@ types where the metadata itself has unknown layout.)
   global ::= global 'Tm'                 // merged function
   global ::= entity                      // some identifiable thing
   global ::= type type generic-signature? 'T' REABSTRACT-THUNK-TYPE   // reabstraction thunk helper function
+  global ::= entity generic-signature? type type* 'TK' // key path getter
+  global ::= entity generic-signature? type type* 'Tk' // key path setter
+  global ::= type generic-signature 'TH' // key path equality
+  global ::= type generic-signature 'Th' // key path hasher
 
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk helper function
   REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk
@@ -178,11 +182,12 @@ Entities
   entity-spec ::= 'Te' bridge-spec           // outlined objective c method call
 
   entity-spec ::= decl-name function-signature generic-signature? 'F'    // function
-  entity-spec ::= decl-name type 'i'                 // subscript ('i'ndex) itself (not the individual accessors)
-  entity-spec ::= decl-name type 'v'                 // variable
-  entity-spec ::= decl-name type 'f' ACCESSOR
+  entity-spec ::= storage-spec
   entity-spec ::= decl-name type 'fp'                // generic type parameter
   entity-spec ::= decl-name type 'fo'                // enum element (currently not used)
+
+  storage-spec ::= type file-discriminator? 'i' ACCESSOR
+  storage-spec ::= decl-name type 'v' ACCESSOR
 
   ACCESSOR ::= 'm'                           // materializeForSet
   ACCESSOR ::= 's'                           // setter
@@ -192,6 +197,7 @@ Entities
   ACCESSOR ::= 'W'                           // didSet
   ACCESSOR ::= 'a' ADDRESSOR-KIND            // mutable addressor
   ACCESSOR ::= 'l' ADDRESSOR-KIND            // non-mutable addressor
+  ACCESSOR ::= 'p'                           // pseudo accessor referring to the storage itself
                                          
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
   ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner)

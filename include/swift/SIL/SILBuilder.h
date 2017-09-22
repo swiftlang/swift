@@ -36,6 +36,10 @@ class SILBuilder {
   SILFunction *F;
   SILModule &Mod;
 
+  /// Allow the SIL module conventions to be overriden within the builder.
+  /// This supports passes that lower SIL to a new stage.
+  SILModuleConventions silConv = SILModuleConventions(Mod);
+
   /// If this is non-null, the instruction is inserted in the specified
   /// basic block, at the specified InsertPt.  If null, created instructions
   /// are not auto-inserted.
@@ -101,6 +105,13 @@ public:
       : F(BB->getParent()), Mod(BB->getParent()->getModule()),
         InsertedInstrs(InsertedInstrs) {
     setInsertionPoint(BB, InsertPt);
+  }
+
+  // Allow a pass to override the current SIL module conventions. This should
+  // only be done by a pass responsible for lowering SIL to a new stage
+  // (e.g. AddressLowering).
+  void setSILConventions(SILModuleConventions silConv) {
+    this->silConv = silConv;
   }
 
   SILFunction &getFunction() const {
@@ -333,10 +344,9 @@ public:
   ApplyInst *createApply(
       SILLocation Loc, SILValue Fn, SubstitutionList Subs,
       ArrayRef<SILValue> Args, bool isNonThrowing,
-      const GenericSpecializationInformation *SpecializationInfo = nullptr,
-      Optional<SILModuleConventions> ModuleConventions = None) {
+      const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn, Subs, Args,
-                                    isNonThrowing, ModuleConventions, *F,
+                                    isNonThrowing, silConv, *F,
                                     OpenedArchetypes, SpecializationInfo));
   }
 
@@ -525,9 +535,11 @@ public:
   KeyPathInst *createKeyPath(SILLocation Loc,
                              KeyPathPattern *Pattern,
                              SubstitutionList Subs,
+                             ArrayRef<SILValue> Args,
                              SILType Ty) {
     return insert(KeyPathInst::create(getSILDebugLocation(Loc),
-                                      Pattern, Subs, Ty, getFunction()));
+                                      Pattern, Subs, Args,
+                                      Ty, getFunction()));
   }
 
   /// Convenience function for calling emitLoad on the type lowering for

@@ -109,6 +109,7 @@ protected:
 
   /// Verify that demangling and remangling works.
   static void verify(StringRef mangledName);
+  static void verifyOld(StringRef mangledName);
 
   /// Appends a mangled identifier string.
   void appendIdentifier(StringRef ident);

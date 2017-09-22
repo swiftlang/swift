@@ -17,7 +17,7 @@ var gStruct = MyStruct()
 var gClass = MyClass()
 
 // CHECK-LABEL: sil hidden @_T020tsan_instrumentation17inoutGlobalStructyyF : $@convention(thin) () -> () {
-// CHECK:  [[GLOBAL_ADDR:%.*]] = global_addr @_T020tsan_instrumentation7gStructAA02MyC0Vv : $*MyStruct
+// CHECK:  [[GLOBAL_ADDR:%.*]] = global_addr @_T020tsan_instrumentation7gStructAA02MyC0Vvp : $*MyStruct
 // CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutyAA8MyStructVzF : $@convention(thin) (@inout MyStruct) -> ()
 // CHECK:  [[WRITE:%.*]] = begin_access [modify] [dynamic] [[GLOBAL_ADDR]] : $*MyStruct
 // CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[WRITE]] : $*MyStruct) : $()
@@ -28,7 +28,7 @@ func inoutGlobalStruct() {
 
 
 // CHECK-LABEL: sil hidden @_T020tsan_instrumentation31inoutGlobalStructStoredPropertyyyF : $@convention(thin) () -> () {
-// CHECK:  [[GLOBAL_ADDR:%.*]] = global_addr @_T020tsan_instrumentation7gStructAA02MyC0Vv : $*MyStruct
+// CHECK:  [[GLOBAL_ADDR:%.*]] = global_addr @_T020tsan_instrumentation7gStructAA02MyC0Vvp : $*MyStruct
 // CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutySizF : $@convention(thin) (@inout Int) -> ()
 // CHECK:  [[WRITE:%.*]] = begin_access [modify] [dynamic] [[GLOBAL_ADDR]] : $*MyStruct
 // CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[WRITE]] : $*MyStruct) : $()
@@ -42,7 +42,7 @@ func inoutGlobalStructStoredProperty() {
 }
 
 // CHECK-LABEL: sil hidden @_T020tsan_instrumentation30inoutGlobalClassStoredPropertyyyF : $@convention(thin) () -> () {
-// CHECK:  [[GLOBAL_ADDR:%.*]] = global_addr @_T020tsan_instrumentation6gClassAA02MyC0Cv : $*MyClass
+// CHECK:  [[GLOBAL_ADDR:%.*]] = global_addr @_T020tsan_instrumentation6gClassAA02MyC0Cvp : $*MyClass
 // CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutySizF : $@convention(thin) (@inout Int) -> ()
 // CHECK:  [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL_ADDR]] : $*MyClass
 // CHECK:  [[LOADED_CLASS:%.*]] = load [copy] [[READ]] : $*MyClass

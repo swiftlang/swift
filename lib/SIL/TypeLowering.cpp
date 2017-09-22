@@ -1116,7 +1116,7 @@ namespace {
   class OpaqueValueTypeLowering : public LeafLoadableTypeLowering {
   public:
     OpaqueValueTypeLowering(SILType type)
-      : LeafLoadableTypeLowering(type, IsAddressOnly, IsReferenceCounted) {}
+      : LeafLoadableTypeLowering(type, IsAddressOnly, IsNotReferenceCounted) {}
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,

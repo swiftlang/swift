@@ -3347,8 +3347,32 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
     }
 
     if (Indices) {
-      Indices = Indices->clone(P->Context, ParameterList::Implicit);
-      ValueArgElements.append(Indices->begin(), Indices->end());
+      // Create parameter declarations corresponding to each of the
+      // parameter declarations from the subscript declaration.
+      for (ParamDecl *storageParam : *Indices) {
+        // Clone the parameter.  Do not clone the parameter type;
+        // this will be filled in by the type-checker.
+        auto accessorParam =
+          new (P->Context) ParamDecl(storageParam->getSpecifier(),
+                                     storageParam->getSpecifierLoc(),
+                                     storageParam->getArgumentNameLoc(),
+                                     storageParam->getArgumentName(),
+                                     storageParam->getNameLoc(),
+                                     storageParam->getName(),
+                                     Type(),
+                                     P->CurDeclContext);
+        accessorParam->setVariadic(storageParam->isVariadic());
+
+        // The cloned parameter is implicit.
+        accessorParam->setImplicit();
+
+        // It has no default arguments; these will be always be taken
+        // from the subscript declaration.
+        accessorParam->setDefaultArgumentKind(DefaultArgumentKind::None);
+
+        ValueArgElements.push_back(accessorParam);
+      }
+
       if (StartLoc.isInvalid()) {
         StartLoc = Indices->getStartLoc();
         EndLoc = Indices->getEndLoc();
@@ -3370,81 +3394,8 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   // Add the "(value)" and subscript indices parameter clause.
   Params.push_back(ValueArg);
 
+  // The typechecker will always fill this in.
   TypeLoc ReturnType;
-
-  // Getters return the value type.
-  if (Kind == AccessorKind::IsGetter) {
-    ReturnType = ElementTy.clone(P->Context);
-
-  // Addressors return Unsafe{,Mutable}Pointer<T>, plus sometimes an
-  // owner or pinned owner.
-  } else if (Kind == AccessorKind::IsAddressor ||
-             Kind == AccessorKind::IsMutableAddressor) {
-
-    // If we don't have a declared type, we will diagnose later,
-    // so skip this to avoid crashing.
-    if (ElementTy.getTypeRepr()) {
-      // Construct "Unsafe{,Mutable}Pointer<T>".
-      
-      TypeRepr *args[] = { ElementTy.clone(P->Context).getTypeRepr() };
-
-      // FIXME: the fact that this could resolve in the local scope is dumb.
-      bool isMutable = (Kind == AccessorKind::IsMutableAddressor);
-      Identifier name = P->Context.getIdentifier(
-                      isMutable ? "UnsafeMutablePointer" : "UnsafePointer");
-
-      TypeRepr *resultType =
-        new (P->Context) GenericIdentTypeRepr(SourceLoc(), name,
-                                              P->Context.AllocateCopy(args),
-                                              SourceRange());
-
-      auto makeKnownType = [&](Type type) -> TypeRepr* {
-        return new (P->Context) FixedTypeRepr(type, SourceLoc());
-      };
-      auto makePairType = [&](TypeRepr *fst, TypeRepr *snd) -> TypeRepr* {
-        return TupleTypeRepr::create(P->Context, {fst, snd}, SourceRange());
-      };
-
-      switch (addressorKind) {
-      case AddressorKind::NotAddressor:
-        llvm_unreachable("not an addressor!");
-
-      // For unsafe addressors, that's all we've got.
-      case AddressorKind::Unsafe:
-        break;
-
-      // For non-native owning addressors, the return type is actually
-      //   (Unsafe{,Mutable}Pointer<T>, Builtin.UnknownObject)
-      case AddressorKind::Owning:
-        resultType = makePairType(resultType,
-                                  makeKnownType(P->Context.TheUnknownObjectType));
-        break;
-
-      // For native owning addressors, the return type is actually
-      //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
-      case AddressorKind::NativeOwning:
-        resultType = makePairType(resultType,
-                                  makeKnownType(P->Context.TheNativeObjectType));
-        break;
-
-      // For native pinning addressors, the return type is actually
-      //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
-      case AddressorKind::NativePinning: {
-        auto optNativePtr = new (P->Context) OptionalTypeRepr(
-            makeKnownType(P->Context.TheNativeObjectType),
-            SourceLoc());
-        resultType = makePairType(resultType, optNativePtr);
-        break;
-      }
-      }
-
-      ReturnType = resultType;
-    }
-
-  // Everything else returns ().
-  } else {
-    ReturnType = TypeLoc::withoutLoc(TupleType::getEmpty(P->Context));
-  }
 
   // Start the function.
   auto *D = FuncDecl::create(P->Context, StaticLoc, StaticSpellingKind::None,
@@ -3489,8 +3440,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
 
 static ParamDecl *
 createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
-                             TypeLoc elementTy, AccessorKind accessorKind,
-                             Parser &P) {
+                             AccessorKind accessorKind, Parser &P) {
   // Add the parameter. If no name was specified, the name defaults to
   // 'value'.
   bool isNameImplicit = name.empty();
@@ -3507,8 +3457,6 @@ createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
   if (isNameImplicit)
     result->setImplicit();
 
-  result->getTypeLoc() = elementTy.clone(P.Context);
-  
   // AST Walker shouldn't go into the type recursively.
   result->setIsTypeLocImplicit(true);
   return result;
@@ -3518,7 +3466,7 @@ createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
 /// parameter list to represent the spelled argument or return null if none is
 /// present.
 static ParameterList *
-parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
+parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
                               Parser &P, AccessorKind Kind) {
   // 'set' and 'willSet' have a (value) parameter, 'didSet' takes an (oldValue)
   // parameter and 'get' and always takes a () parameter.
@@ -3556,7 +3504,7 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
   }
 
   if (Name.empty()) NameLoc = SpecifierLoc;
-  auto param = createSetterAccessorArgument(NameLoc, Name, ElementTy, Kind, P);
+  auto param = createSetterAccessorArgument(NameLoc, Name, Kind, P);
   return ParameterList::create(P.Context, StartLoc, param, EndLoc);
 }
 
@@ -3779,7 +3727,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
         diagnose(Loc, diag::protocol_setter_name);
 
       auto *ValueNameParams
-        = parseOptionalAccessorArgument(Loc, ElementTy, *this, Kind);
+        = parseOptionalAccessorArgument(Loc, *this, Kind);
 
       // Set up a function declaration.
       TheDecl = createAccessorFunc(Loc, ValueNameParams,
@@ -3905,7 +3853,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     //
     //     set-name    ::= '(' identifier ')'
     auto *ValueNamePattern =
-      parseOptionalAccessorArgument(Loc, ElementTy, *this, Kind);
+      parseOptionalAccessorArgument(Loc, *this, Kind);
 
     SourceLoc LBLoc = isImplicitGet ? VarLBLoc : Tok.getLoc();
     // FIXME: Use outer '{' loc if isImplicitGet.
@@ -4033,6 +3981,54 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
   AFD->setBody(Body);
 }
 
+static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
+                                     AccessorKind kind) {
+  if (!accessor) return;
+
+  // Fill in the parameter types.
+  for (auto paramList : accessor->getParameterLists()) {
+    for (auto param : *paramList) {
+      if (param->getTypeLoc().isNull()) {
+        param->getTypeLoc().setType(P.Context.TheErrorType, true);
+      }
+    }
+  }
+
+  // Fill in the result type.
+  switch (kind) {
+  case AccessorKind::NotAccessor:
+  case AccessorKind::IsMaterializeForSet:
+    llvm_unreachable("should never be seen here");
+
+  // These have non-trivial returns, so fill in error.
+  case AccessorKind::IsGetter:
+  case AccessorKind::IsAddressor:
+  case AccessorKind::IsMutableAddressor:
+    accessor->getBodyResultTypeLoc().setType(P.Context.TheErrorType, true);
+    return;
+
+  // These return void.
+  case AccessorKind::IsSetter:
+  case AccessorKind::IsWillSet:
+  case AccessorKind::IsDidSet:
+    return;
+  }
+  llvm_unreachable("bad kind");
+}
+
+/// We weren't able to tie the given accessors to a storage declaration.
+/// Fill in various slots with type errors.
+static void fillInAccessorTypeErrors(Parser &P,
+                                     Parser::ParsedAccessors &accessors) {
+  fillInAccessorTypeErrors(P, accessors.Get, AccessorKind::IsGetter);
+  fillInAccessorTypeErrors(P, accessors.Set, AccessorKind::IsSetter);
+  fillInAccessorTypeErrors(P, accessors.Addressor, AccessorKind::IsAddressor);
+  fillInAccessorTypeErrors(P, accessors.MutableAddressor,
+                           AccessorKind::IsMutableAddressor);
+  fillInAccessorTypeErrors(P, accessors.WillSet, AccessorKind::IsWillSet);
+  fillInAccessorTypeErrors(P, accessors.DidSet, AccessorKind::IsDidSet);
+}
+
 /// \brief Parse the brace-enclosed getter and setter for a variable.
 VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
                                     ParseDeclOptions Flags,
@@ -4076,8 +4072,10 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
     Invalid = true;
 
   // If we have an invalid case, bail out now.
-  if (!PrimaryVar)
+  if (!PrimaryVar) {
+    fillInAccessorTypeErrors(*this, accessors);
     return nullptr;
+  }
 
   if (!TyLoc.hasLocation()) {
     if (accessors.Get || accessors.Set || accessors.Addressor ||
@@ -4258,7 +4256,7 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     auto argFunc = (WillSet ? WillSet : DidSet);
     auto argLoc = argFunc->getParameterLists().back()->getStartLoc();
 
-    auto argument = createSetterAccessorArgument(argLoc, Identifier(),elementTy,
+    auto argument = createSetterAccessorArgument(argLoc, Identifier(),
                                                  AccessorKind::IsSetter, P);
     auto argList = ParameterList::create(P.Context, argument);
     Set = createImplicitAccessor(AccessorKind::IsSetter,
@@ -4281,7 +4279,7 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     assert(Get && !Set);
     auto argument =
       createSetterAccessorArgument(MutableAddressor->getLoc(), Identifier(),
-                                   elementTy, AccessorKind::IsSetter, P);
+                                   AccessorKind::IsSetter, P);
     auto argList = ParameterList::create(P.Context, argument);
     Set = createImplicitAccessor(AccessorKind::IsSetter,
                                  AddressorKind::NotAddressor, argList);
@@ -4848,8 +4846,18 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
+  // Create the decl for the func and add it to the parent scope.
+  auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
+                              FuncLoc, FullName, NameLoc,
+                              /*Throws=*/throwsLoc.isValid(), throwsLoc,
+                              /*AccessorKeywordLoc=*/SourceLoc(),
+                              nullptr, BodyParams, FuncRetTy,
+                              CurDeclContext);
+
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
+    ContextChange CC(*this, FD);
+
     auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
     SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -4857,6 +4865,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
       return whereStatus;
     }
   }
+
+  FD->setGenericParams(GenericParams);
   
   // Protocol method arguments may not have default values.
   if (Flags.contains(PD_InProtocol) && DefaultArgs.HasDefaultArgument) {
@@ -4872,18 +4882,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
   // duplication.
-  FuncDecl *FD;
   {
     Scope S(this, ScopeKind::FunctionBody);
 
-    // Create the decl for the func and add it to the parent scope.
-    FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
-                          FuncLoc, FullName, NameLoc,
-                          /*Throws=*/throwsLoc.isValid(), throwsLoc,
-                          /*AccessorKeywordLoc=*/SourceLoc(),
-                          GenericParams, BodyParams, FuncRetTy,
-                          CurDeclContext);
-    
     diagnoseOperatorFixityAttributes(*this, Attributes, FD);
     
     // Add the attributes here so if we need them while parsing the body
@@ -5018,7 +5019,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   }
 
   EnumDecl *ED = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
-                                        { }, GenericParams, CurDeclContext);
+                                        { }, nullptr, CurDeclContext);
   setLocalDiscriminator(ED);
   ED->getAttrs() = Attributes;
 
@@ -5043,8 +5044,9 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
-    ED->setGenericParams(GenericParams);
   }
+
+  ED->setGenericParams(GenericParams);
 
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
@@ -5279,7 +5281,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   StructDecl *SD = new (Context) StructDecl(StructLoc, StructName,
                                             StructNameLoc,
                                             { },
-                                            GenericParams,
+                                            nullptr,
                                             CurDeclContext);
   setLocalDiscriminator(SD);
   SD->getAttrs() = Attributes;
@@ -5305,9 +5307,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
-    SD->setGenericParams(GenericParams);
   }
-  
+
+  SD->setGenericParams(GenericParams);
+
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
     LBLoc = PreviousLoc;
@@ -5365,7 +5368,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
 
   // Create the class.
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
-                                          { }, GenericParams, CurDeclContext);
+                                          { }, nullptr, CurDeclContext);
   setLocalDiscriminator(CD);
 
   // Attach attributes.
@@ -5392,8 +5395,9 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
-    CD->setGenericParams(GenericParams);
   }
+
+  CD->setGenericParams(GenericParams);
 
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
@@ -5565,8 +5569,20 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
+  // Build an AST for the subscript declaration.
+  DeclName name = DeclName(Context, DeclBaseName::createSubscript(),
+                           argumentNames);
+  auto *Subscript = new (Context) SubscriptDecl(name,
+                                                SubscriptLoc, Indices.get(),
+                                                ArrowLoc, ElementTy.get(),
+                                                CurDeclContext,
+                                                nullptr);
+  Subscript->getAttrs() = Attributes;
+
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
+    ContextChange CC(*this, Subscript);
+
     auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
     SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -5575,15 +5591,7 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
     }
   }
 
-  // Build an AST for the subscript declaration.
-  DeclName name = DeclName(Context, DeclBaseName::createSubscript(),
-                           argumentNames);
-  auto *Subscript = new (Context) SubscriptDecl(name,
-                                                SubscriptLoc, Indices.get(),
-                                                ArrowLoc, ElementTy.get(),
-                                                CurDeclContext,
-                                                GenericParams);
-  Subscript->getAttrs() = Attributes;
+  Subscript->setGenericParams(GenericParams);
 
   // Pass the function signature to code completion.
   if (SignatureHasCodeCompletion)
@@ -5692,8 +5700,19 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
+  auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
+  DeclName FullName(Context, Context.Id_init, namePieces);
+
+  auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
+                                           Failability, FailabilityLoc,
+                                           throwsLoc.isValid(), throwsLoc,
+                                           SelfDecl, Params.get(), nullptr,
+                                           CurDeclContext);
+
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
+    ContextChange(*this, CD);
+
     auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
     SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -5701,18 +5720,10 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       return whereStatus;
     }
   }
-  
-  auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
-  DeclName FullName(Context, Context.Id_init, namePieces);
+
+  CD->setGenericParams(GenericParams);
 
   Scope S2(this, ScopeKind::ConstructorBody);
-  auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
-                                           Failability, FailabilityLoc,
-                                           throwsLoc.isValid(), throwsLoc,
-                                           SelfDecl, Params.get(),
-                                           GenericParams,
-                                           CurDeclContext);
-  
   CtorInitializerKind initKind = CtorInitializerKind::Designated;
   if (Attributes.hasAttribute<ConvenienceAttr>())
     initKind = CtorInitializerKind::Convenience;

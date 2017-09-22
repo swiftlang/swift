@@ -11,7 +11,7 @@ func onDestruct() { }
 class SwiftGizmo : Gizmo {
   var x = X()
 
-  // CHECK-LABEL: sil hidden [transparent] @_T012objc_dealloc10SwiftGizmoC1xAA1XCvfi : $@convention(thin) () -> @owned X
+  // CHECK-LABEL: sil hidden [transparent] @_T012objc_dealloc10SwiftGizmoC1xAA1XCvpfi : $@convention(thin) () -> @owned X
   // CHECK:      [[FN:%.*]] = function_ref @_T012objc_dealloc1XCACycfC : $@convention(method) (@thick X.Type) -> @owned X
   // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick X.Type
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]([[METATYPE]]) : $@convention(method) (@thick X.Type) -> @owned X
@@ -68,7 +68,7 @@ class SwiftGizmo : Gizmo {
   // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : @owned $SwiftGizmo):
   // CHECK-NEXT:   debug_value [[SELF_PARAM]] : $SwiftGizmo, let, name "self"
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $SwiftGizmo
-  // CHECK:        [[XINIT:%[0-9]+]] = function_ref @_T012objc_dealloc10SwiftGizmoC1xAA1XCvfi
+  // CHECK:        [[XINIT:%[0-9]+]] = function_ref @_T012objc_dealloc10SwiftGizmoC1xAA1XCvpfi
   // CHECK-NEXT:   [[XOBJ:%[0-9]+]] = apply [[XINIT]]() : $@convention(thin) () -> @owned X
   // CHECK-NEXT:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
   // CHECK-NEXT:   [[X:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $SwiftGizmo, #SwiftGizmo.x

@@ -649,11 +649,10 @@ emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
 
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // Emit any default argument generators.
-  {
-    auto paramLists = AFD->getParameterLists();
-    if (AFD->getDeclContext()->isTypeContext())
-      paramLists = paramLists.slice(1);
-    emitDefaultArgGenerators(AFD, paramLists);
+  if (!isa<DestructorDecl>(AFD)) {
+    unsigned paramListIndex = AFD->getDeclContext()->isTypeContext() ? 1 : 0;
+    auto *paramList = AFD->getParameterLists()[paramListIndex];
+    emitDefaultArgGenerators(AFD, paramList);
   }
 
   // If this is a function at global scope, it may close over a global variable.
@@ -693,6 +692,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
     emitOrDelayFunction(*this, constant, [this,constant,fd](SILFunction *f){
       preEmitFunction(constant, fd, f, fd);
+      PrettyStackTraceSILFunction X("silgen emitFunction", f);
       if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
         SILGenFunction(*this, *f).emitMaterializeForSet(fd);
       else
@@ -1014,15 +1014,13 @@ void SILGenModule::emitGlobalGetter(VarDecl *global,
 }
 
 void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
-                                        ArrayRef<ParameterList*> paramLists) {
+                                            ParameterList *paramList) {
   unsigned index = 0;
-  for (auto paramList : paramLists) {
-    for (auto param : *paramList) {
-      if (auto defaultArg = param->getDefaultValue())
-        emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
-                                defaultArg, param->getDefaultArgumentKind());
-      ++index;
-    }
+  for (auto param : *paramList) {
+    if (auto defaultArg = param->getDefaultValue())
+      emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
+                              defaultArg, param->getDefaultArgumentKind());
+    ++index;
   }
 }
 

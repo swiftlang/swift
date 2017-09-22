@@ -1212,13 +1212,14 @@ public:
       ManagedValue superMV = std::move(super).getScalarValue();
 
       // Check if super is not the same as our base type. This means that we
-      // performed an upcast. Set SuperInitDelegationState to super.
+      // performed an upcast, and we must have consumed the special cleanup
+      // we installed.  Install a new special cleanup.
       if (superMV.getValue() != SGF.InitDelegationSelf.getValue()) {
-        SILValue underlyingSelf = SGF.InitDelegationSelf.forward(SGF);
+        SILValue underlyingSelf = SGF.InitDelegationSelf.getValue();
         SGF.InitDelegationSelf = ManagedValue::forUnmanaged(underlyingSelf);
         CleanupHandle newWriteback = SGF.enterDelegateInitSelfWritebackCleanup(
             SGF.InitDelegationLoc.getValue(), SGF.InitDelegationSelfBox,
-            superMV.getValue());
+            superMV.forward(SGF));
         SGF.SuperInitDelegationSelf =
             ManagedValue(superMV.getValue(), newWriteback);
         super = RValue(SGF, SGF.InitDelegationLoc.getValue(), superFormalType,
@@ -1275,10 +1276,7 @@ public:
         }
         auto loweredResultTy = SGF.getLoweredLoadableType(resultTy);
         if (loweredResultTy != selfValue.getType()) {
-          auto upcast = SGF.B.createUpcast(ice,
-                                           selfValue.getValue(),
-                                           loweredResultTy);
-          selfValue = ManagedValue(upcast, selfValue.getCleanup());
+          selfValue = SGF.B.createUpcast(ice, selfValue, loweredResultTy);
         }
 
         selfArg = ice->getSubExpr();

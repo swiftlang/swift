@@ -1057,14 +1057,15 @@ public:
   /// \arg isBaseGuaranteed This should /only/ be set to true if we know that
   /// the base value will stay alive as long as the returned RValue implying
   /// that it is safe to load/use values as +0.
-  RValue emitRValueForPropertyLoad(SILLocation loc,
-                                   ManagedValue base,
-                                   CanType baseFormalType,
-                                   bool isSuper, VarDecl *property,
-                                   SubstitutionList substitutions,
-                                   AccessSemantics semantics, Type propTy,
-                                   SGFContext C,
-                                   bool isBaseGuaranteed = false);
+  RValue emitRValueForStorageLoad(SILLocation loc,
+                                  ManagedValue base,
+                                  CanType baseFormalType,
+                                  bool isSuper, AbstractStorageDecl *storage,
+                                  RValue indexes,
+                                  SubstitutionList substitutions,
+                                  AccessSemantics semantics, Type propTy,
+                                  SGFContext C,
+                                  bool isBaseGuaranteed = false);
 
   void emitCaptures(SILLocation loc,
                     AnyFunctionRef TheClosure,

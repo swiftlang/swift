@@ -65,6 +65,23 @@ Functions:
 Tags:
   - Name: InnerInSwift4
     SwiftName: Outer.Inner
+Globals:
+  - Name: multiVersionedGlobal34Notes
+    SwiftName: multiVersionedGlobal34Notes_NEW
+  - Name: multiVersionedGlobal34Both
+    SwiftName: multiVersionedGlobal34Both_NEW
+  - Name: multiVersionedGlobal345Notes
+    SwiftName: multiVersionedGlobal345Notes_NEW
+  - Name: multiVersionedGlobal345Both
+    SwiftName: multiVersionedGlobal345Both_NEW
+  - Name: multiVersionedGlobal4Notes
+    SwiftName: multiVersionedGlobal4Notes_NEW
+  - Name: multiVersionedGlobal4Both
+    SwiftName: multiVersionedGlobal4Both_NEW
+  - Name: multiVersionedGlobal45Notes
+    SwiftName: multiVersionedGlobal45Notes_NEW
+  - Name: multiVersionedGlobal45Both
+    SwiftName: multiVersionedGlobal45Both_NEW
 SwiftVersions:
   - Version: 3.0
     Classes:
@@ -207,3 +224,72 @@ SwiftVersions:
         SwiftName: aliasRenamedSwift3
       - Name: OptionyEnumRenamed
         SwiftName: renamedSwift3
+    Globals:
+      - Name: multiVersionedGlobal34
+        SwiftName: multiVersionedGlobal34_3
+      - Name: multiVersionedGlobal34Header
+        SwiftName: multiVersionedGlobal34Header_3
+      - Name: multiVersionedGlobal34Notes
+        SwiftName: multiVersionedGlobal34Notes_3
+      - Name: multiVersionedGlobal34Both
+        SwiftName: multiVersionedGlobal34Both_3
+      - Name: multiVersionedGlobal345
+        SwiftName: multiVersionedGlobal345_3
+      - Name: multiVersionedGlobal345Header
+        SwiftName: multiVersionedGlobal345Header_3
+      - Name: multiVersionedGlobal345Notes
+        SwiftName: multiVersionedGlobal345Notes_3
+      - Name: multiVersionedGlobal345Both
+        SwiftName: multiVersionedGlobal345Both_3
+  - Version: 5
+    Globals:
+      - Name: multiVersionedGlobal345
+        SwiftName: multiVersionedGlobal345_5
+      - Name: multiVersionedGlobal345Header
+        SwiftName: multiVersionedGlobal345Header_5
+      - Name: multiVersionedGlobal345Notes
+        SwiftName: multiVersionedGlobal345Notes_5
+      - Name: multiVersionedGlobal345Both
+        SwiftName: multiVersionedGlobal345Both_5
+      - Name: multiVersionedGlobal45
+        SwiftName: multiVersionedGlobal45_5
+      - Name: multiVersionedGlobal45Header
+        SwiftName: multiVersionedGlobal45Header_5
+      - Name: multiVersionedGlobal45Notes
+        SwiftName: multiVersionedGlobal45Notes_5
+      - Name: multiVersionedGlobal45Both
+        SwiftName: multiVersionedGlobal45Both_5
+  - Version: 4 # Versions are deliberately ordered as "3, 5, 4" to catch bugs.
+    Globals:
+      - Name: multiVersionedGlobal34
+        SwiftName: multiVersionedGlobal34_4
+      - Name: multiVersionedGlobal34Header
+        SwiftName: multiVersionedGlobal34Header_4
+      - Name: multiVersionedGlobal34Notes
+        SwiftName: multiVersionedGlobal34Notes_4
+      - Name: multiVersionedGlobal34Both
+        SwiftName: multiVersionedGlobal34Both_4
+      - Name: multiVersionedGlobal345
+        SwiftName: multiVersionedGlobal345_4
+      - Name: multiVersionedGlobal345Header
+        SwiftName: multiVersionedGlobal345Header_4
+      - Name: multiVersionedGlobal345Notes
+        SwiftName: multiVersionedGlobal345Notes_4
+      - Name: multiVersionedGlobal345Both
+        SwiftName: multiVersionedGlobal345Both_4
+      - Name: multiVersionedGlobal4
+        SwiftName: multiVersionedGlobal4_4
+      - Name: multiVersionedGlobal4Header
+        SwiftName: multiVersionedGlobal4Header_4
+      - Name: multiVersionedGlobal4Notes
+        SwiftName: multiVersionedGlobal4Notes_4
+      - Name: multiVersionedGlobal4Both
+        SwiftName: multiVersionedGlobal4Both_4
+      - Name: multiVersionedGlobal45
+        SwiftName: multiVersionedGlobal45_4
+      - Name: multiVersionedGlobal45Header
+        SwiftName: multiVersionedGlobal45Header_4
+      - Name: multiVersionedGlobal45Notes
+        SwiftName: multiVersionedGlobal45Notes_4
+      - Name: multiVersionedGlobal45Both
+        SwiftName: multiVersionedGlobal45Both_4

@@ -1025,10 +1025,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *Extend
 }
 
 static NominalTypeDecl *getNominalParent(ValueDecl *D) {
-  Type Ty = D->getDeclContext()->getDeclaredTypeOfContext();
-  if (!Ty)
-    return nullptr;
-  return Ty->getAnyNominal();
+  return D->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
 }
 
 bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,

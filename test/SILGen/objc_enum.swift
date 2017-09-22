@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -enable-sil-ownership -sil-serialize-witness-tables > %t.out
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -enable-sil-ownership > %t.out
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize %s < %t.out
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.out
 
@@ -8,8 +8,8 @@ import gizmo
 
 
 // CHECK-DAG: sil shared [serializable] @_T0SC16NSRuncingOptionsO{{[_0-9a-zA-Z]*}}fC
-// CHECK-DAG: sil shared [serializable] @_T0SC16NSRuncingOptionsO8rawValueSifg
-// CHECK-DAG: sil shared [serializable] @_T0SC16NSRuncingOptionsO9hashValueSifg
+// CHECK-DAG: sil shared [serializable] @_T0SC16NSRuncingOptionsO8rawValueSivg
+// CHECK-DAG: sil shared [serializable] @_T0SC16NSRuncingOptionsO9hashValueSivg
 
 // Non-payload enum ctors don't need to be instantiated at all.
 // NEGATIVE-NOT: sil shared [transparent] @_T0SC16NSRuncingOptionsO5MinceAbBmF

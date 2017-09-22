@@ -170,7 +170,6 @@ public:
 };
 
 class SILLayout; // From SIL
-
 /// \brief Describes either a nominal type declaration or an extension
 /// declaration.
 typedef llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *>
@@ -437,6 +436,12 @@ public:
 #define FUNC_DECL(Name, Id) \
   FuncDecl *get##Name(LazyResolver *resolver) const;
 #include "swift/AST/KnownDecls.def"
+
+  /// Get the '+' function on two RangeReplaceableCollection.
+  FuncDecl *getPlusFunctionOnRangeReplaceableCollection() const;
+
+  /// Get the '+' function on two String.
+  FuncDecl *getPlusFunctionOnString() const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.

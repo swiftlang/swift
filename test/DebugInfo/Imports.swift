@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend -emit-ir -module-name Foo %s -I %t -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend -c -module-name Foo %s -I %t -g -o %t.o
-// RUN: %llvm-dwarfdump %t.o | %FileCheck --check-prefix=DWARF %s
+// RUN: %llvm-dwarfdump -a %t.o | %FileCheck --check-prefix=DWARF %s
 
 // CHECK-DAG: ![[FOOMODULE:[0-9]+]] = !DIModule({{.*}}, name: "Foo", includePath: "{{.*}}test{{.*}}DebugInfo{{.*}}"
 // CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[THISFILE:[0-9]+]], entity: ![[FOOMODULE]]
@@ -21,13 +21,13 @@ markUsed(basic.foo(1, 2))
 
 // DWARF: .debug_info
 // DWARF: DW_TAG_module
-// DWARF:   DW_AT_name {{.*}}"Foo"
+// DWARF:   DW_AT_name ("Foo")
 // DWARF:   DW_AT_LLVM_include_path
 // DWARF: DW_TAG_module
-// DWARF:   DW_AT_name {{.*}}"Swift"
+// DWARF:   DW_AT_name ("Swift")
 // DWARF:   DW_AT_LLVM_include_path
 // DWARF: DW_TAG_module
-// DWARF:   DW_AT_name {{.*}}"basic"
+// DWARF:   DW_AT_name ("basic")
 
 // DWARF-NOT: "Swift.Optional"
 
