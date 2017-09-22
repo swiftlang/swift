@@ -529,6 +529,41 @@ public:
   void accept(SourceManager &SM, Replacement Replacement) { accept(SM, RegionType::ActiveCode, {Replacement}); }
 };
 
+/// This helper stream inserts text into a SourceLoc by calling functions in
+/// SourceEditorConsumer when it is destroyed.
+class EditorConsumerInsertStream: public raw_ostream {
+  SourceEditConsumer &Consumer;
+  SourceManager &SM;
+  CharSourceRange Range;
+  llvm::SmallString<64> Buffer;
+  llvm::raw_svector_ostream OS;
+
+public:
+  explicit EditorConsumerInsertStream(SourceEditConsumer &Consumer,
+                                      SourceManager &SM,
+                                      CharSourceRange Range):
+    Consumer(Consumer), SM(SM), Range(Range), Buffer(), OS(Buffer) {}
+
+  explicit EditorConsumerInsertStream(SourceEditConsumer &Consumer,
+                                      SourceManager &SM,
+                                      SourceLoc Loc):
+    EditorConsumerInsertStream(Consumer, SM, CharSourceRange(Loc, 0)) {}
+
+  ~EditorConsumerInsertStream() {
+    Consumer.accept(SM, Range, OS.str());
+  }
+
+  void write_impl(const char *ptr, size_t size) override {
+    OS.write(ptr, size);
+  }
+  uint64_t current_pos() const override {
+    return OS.tell();
+  }
+  size_t preferred_buffer_size() const override {
+    return 0;
+  }
+};
+
 class SourceEditJsonConsumer : public SourceEditConsumer {
   struct Implementation;
   Implementation &Impl;
