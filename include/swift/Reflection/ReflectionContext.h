@@ -459,10 +459,6 @@ private:
       auto Base = cast<GenericArgumentMetadataSource>(MS)->getSource();
       return isMetadataSourceReady(Base, Builder);
     }
-    case MetadataSourceKind::Parent: {
-      auto Base = cast<ParentMetadataSource>(MS)->getChild();
-      return isMetadataSourceReady(Base, Builder);
-    }
     case MetadataSourceKind::Self:
     case MetadataSourceKind::SelfWitnessTable:
       return true;
@@ -547,7 +543,6 @@ private:
 
       return Arg;
     }
-    case MetadataSourceKind::Parent:
     case MetadataSourceKind::Self:
     case MetadataSourceKind::SelfWitnessTable:
       break;
