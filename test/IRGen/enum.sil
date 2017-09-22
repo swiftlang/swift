@@ -107,75 +107,81 @@ import Swift
 // CHECK: [[DYNAMICSINGLETON_FIELD_NAMES:@.*]] = private constant [7 x i8] c"value\00\00"
 // CHECK: [[DYNAMICSINGLETON_NAME:@.*]] = private constant [25 x i8] c"4enum16DynamicSingletonO\00"
 // CHECK: @_T04enum16DynamicSingletonOMn = hidden constant <{ {{.*}} i32 }> <{
-// CHECK:   [25 x i8]* [[DYNAMICSINGLETON_NAME]]
+// CHECK-SAME:   [25 x i8]* [[DYNAMICSINGLETON_NAME]]
 // --       One payload
-// CHECK:   i32 1,
+// CHECK-SAME:   i32 1,
 // --       No empty cases
-// CHECK:   i32 0,
+// CHECK-SAME:   i32 0,
 // --       Case names
-// CHECK:   [[DYNAMICSINGLETON_FIELD_NAMES]]
+// CHECK-SAME:   [[DYNAMICSINGLETON_FIELD_NAMES]]
 // --       Case type accessor
-// CHECK:   @get_field_types_DynamicSingleton
+// CHECK-SAME:   @get_field_types_DynamicSingleton
 // --       generic parameter vector offset
-// CHECK:   i32 3,
+// CHECK-SAME:   i32 3,
 // --       generic parameter vector length; witness table counts
-// CHECK:   i32 1, i32 0
-// CHECK: }>
+// CHECK-SAME:   i32 1, i32 1
+// --       nesting depth
+// CHECK-SAME:   i16 1
+// --       flags
+// CHECK-SAME:   i16 0
+// --       generic parameters at depth 0
+// CHECK-SAME:   i32 1
+// CHECK-SAME: }>
 
 // CHECK: @_T04enum16DynamicSingletonOMP = internal global <{ {{.*}}, [16 x i8*] }> <{
-// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSingleton
-// CHECK:   @_T04enum16DynamicSingletonOMn
-// CHECK:   i8* null
-// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum16DynamicSingletonOwxs to i8*)
-// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum16DynamicSingletonOwxg to i8*)
+// CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSingleton
+// CHECK-SAME:   @_T04enum16DynamicSingletonOMn
+// CHECK-SAME:   i8* null
+// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum16DynamicSingletonOwxs to i8*)
+// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum16DynamicSingletonOwxg to i8*)
 
 // -- No-payload enums have extra inhabitants in
 //    their value witness table.
 // CHECK: @_T04enum10NoPayloadsOWV = internal constant [16 x i8*] [
 // -- ...
 // -- size
-// CHECK:   i8* inttoptr ([[WORD:i32|i64]] 1 to i8*),
+// CHECK-SAME:   i8* inttoptr ([[WORD:i32|i64]] 1 to i8*),
 // -- flags                 0x24_0000 - alignment 1, has extra inhabitants and enum witnesses
-// CHECK:   i8* inttoptr ([[WORD]] 2359296 to i8*),
+// CHECK-SAME:   i8* inttoptr ([[WORD]] 2359296 to i8*),
 // -- stride
-// CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
+// CHECK-SAME:   i8* inttoptr ([[WORD]] 1 to i8*),
 // -- num extra inhabitants (256 - 3 valid states)
-// CHECK:   i8* inttoptr ([[WORD]] 253 to i8*)
+// CHECK-SAME:   i8* inttoptr ([[WORD]] 253 to i8*)
 // -- storeExtraInhabitant
-// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum10NoPayloadsOwxs to i8*)
+// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum10NoPayloadsOwxs to i8*)
 // -- getExtraInhabitantIndex
-// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum10NoPayloadsOwxg to i8*)
-// CHECK: ]
+// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum10NoPayloadsOwxg to i8*)
+// CHECK-SAME: ]
 
 // -- Single-payload enums take unused extra inhabitants from their payload
 //    as their own.
 // CHECK: @_T04enum19SinglePayloadNestedOWV = internal constant [16 x i8*] [
 // -- ...
 // -- size
-// CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
+// CHECK-SAME:   i8* inttoptr ([[WORD]] 1 to i8*),
 // -- flags                 0x4_0000 - alignment 1, has extra inhabitants
-// CHECK:   i8* inttoptr ([[WORD]] 2359296 to i8*),
+// CHECK-SAME:   i8* inttoptr ([[WORD]] 2359296 to i8*),
 // -- stride
-// CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
+// CHECK-SAME:   i8* inttoptr ([[WORD]] 1 to i8*),
 // -- num extra inhabitants (253 from payload - 3 empty cases)
-// CHECK:   i8* inttoptr ([[WORD]] 250 to i8*)
+// CHECK-SAME:   i8* inttoptr ([[WORD]] 250 to i8*)
 // -- storeExtraInhabitant
-// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum19SinglePayloadNestedOwxs to i8*)
+// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum19SinglePayloadNestedOwxs to i8*)
 // -- getExtraInhabitantIndex
-// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum19SinglePayloadNestedOwxg to i8*)
-// CHECK: ]
+// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum19SinglePayloadNestedOwxg to i8*)
+// CHECK-SAME: ]
 
 
 // CHECK: @_T04enum20DynamicSinglePayloadOMP = internal global <{ {{.*}}, [16 x i8*] }> <{
-// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSinglePayload
-// CHECK:   i8* null
-// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum20DynamicSinglePayloadOwxs to i8*)
-// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum20DynamicSinglePayloadOwxg to i8*)
+// CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSinglePayload
+// CHECK-SAME:   i8* null
+// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum20DynamicSinglePayloadOwxs to i8*)
+// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum20DynamicSinglePayloadOwxg to i8*)
 
 // CHECK: @_T04enum18MultiPayloadNestedOWV = internal constant [16 x i8*] [
-// CHECK:   i8* inttoptr ([[WORD]] 9 to i8*),
-// CHECK:   i8* inttoptr ([[WORD]] 16 to i8*)
-// CHECK: ]
+// CHECK-SAME:   i8* inttoptr ([[WORD]] 9 to i8*),
+// CHECK-SAME:   i8* inttoptr ([[WORD]] 16 to i8*)
+// CHECK-SAME: ]
 
 enum Empty {}
 

@@ -1102,6 +1102,13 @@ struct TargetHeapMetadata : TargetMetadata<Runtime> {
 };
 using HeapMetadata = TargetHeapMetadata<InProcess>;
 
+struct GenericContextDescriptor {
+  /// The number of primary type parameters. This is always less than or equal
+  /// to NumGenericRequirements; it counts only the type parameters
+  /// and not any required witness tables.
+  uint32_t NumPrimaryParams;
+};
+
 /// Header for a generic parameter descriptor. This is a variable-sized
 /// structure that describes how to find and parse a generic parameter vector
 /// within the type metadata for an instance of a nominal type.
@@ -1126,6 +1133,10 @@ struct GenericParameterDescriptor {
   /// and not any required witness tables.
   uint32_t NumPrimaryParams;
 
+  /// The number of types that this type is nested inside of, including itself
+  /// (so this value is at least 1).
+  uint16_t NestingDepth;
+
   /// Flags for this generic parameter descriptor.
   GenericParameterDescriptorFlags Flags;
 
@@ -1136,6 +1147,11 @@ struct GenericParameterDescriptor {
   /// True if the nominal type is generic in any way.
   bool isGeneric() const {
     return hasGenericRequirements() || Flags.hasGenericParent();
+  }
+
+  GenericContextDescriptor getContext(unsigned depth) const {
+    assert(depth < NestingDepth);
+    return ((const GenericContextDescriptor *)(this + 1))[depth];
   }
 
   // TODO: add meaningful descriptions of the generic requirements.
@@ -1316,12 +1332,13 @@ struct TargetNominalTypeDescriptor {
         !GenericParams.Flags.hasVTable())
       return nullptr;
 
-    auto asWords = reinterpret_cast<const void * const*>(this + 1);
+    auto asWords = reinterpret_cast<const uint32_t *>(this + 1);
 
     // TODO: Once we emit reflective descriptions of generic requirements,
     // skip the right number of words here.
 
-    return reinterpret_cast<const VTableDescriptor *>(asWords);
+    return reinterpret_cast<const VTableDescriptor *>(asWords
+        + GenericParams.NestingDepth);
   }
 
   /// The generic parameter descriptor header. This describes how to find and
