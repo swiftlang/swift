@@ -668,7 +668,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   }
 }
 
-void swift::finishTypeCheckingOfFile(SourceFile &SF) {
+void swift::finishTypeCheckingFile(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   TypeChecker TC(Ctx);
 
