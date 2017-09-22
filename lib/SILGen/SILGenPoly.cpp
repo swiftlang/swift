@@ -2695,7 +2695,7 @@ buildThunkSignature(SILGenFunction &SGF,
   builder.addRequirement(newRequirement, source, nullptr);
 
   GenericSignature *genericSig =
-    std::move(builder).computeGenericSignature(SourceLoc(),
+    std::move(builder).computeGenericSignature(*mod, SourceLoc(),
                                     /*allowConcreteGenericParams=*/true);
   genericEnv = genericSig->createGenericEnvironment(*mod);
 
