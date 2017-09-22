@@ -113,7 +113,7 @@ setObjectRuntimeFunctionCounters(HeapObject *object,
                                  RuntimeFunctionCountersState *state);
 
 /// Set the global runtime function counters update handler.
-extern "C" RuntimeFunctionCountersUpdateHandler
+SWIFT_RT_ENTRY_VISIBILITY RuntimeFunctionCountersUpdateHandler
 setGlobalRuntimeFunctionCountersUpdateHandler(
     RuntimeFunctionCountersUpdateHandler handler);
 
