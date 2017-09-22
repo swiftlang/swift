@@ -63,10 +63,25 @@ public typealias CFloat = Float
 public typealias CDouble = Double
 
 /// The C 'long double' type.
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+// On Darwin, long double is Float80 on x86, and Double otherwise.
 #if arch(x86_64) || arch(i386)
 public typealias CLongDouble = Float80
 #else
 public typealias CLongDouble = Double
+#endif
+#elseif os(Windows)
+// On Windows, long double is always Double.
+public typealias CLongDouble = Double
+#elseif os(Linux)
+// On Linux/x86, long double is Float80.
+// TODO: Fill in definitions for additional architectures as needed. IIRC
+// armv7 should map to Double, but arm64 and ppc64le should map to Float128,
+// which we don't yet have in Swift.
+#if arch(x86_64) || arch(i386)
+public typealias CLongDouble = Float80
+#endif
+// TODO: Fill in definitions for other OSes.
 #endif
 
 // FIXME: Is it actually UTF-32 on Darwin?
