@@ -170,7 +170,7 @@ extension Int : CVarArg {
 
 extension Bool : CVarArg {
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(self)
+    return _encodeBitsAsWords(Int32(self ? 1:0))
   }
 }
 
