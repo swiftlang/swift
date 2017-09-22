@@ -27,6 +27,7 @@ func test_indirect_by_val_alignment() {
 
 
 // We only want to test x86_64.
+// aarch64: define hidden swiftcc void  @_T011c_functions30test_indirect_by_val_alignmentyyF()
 // arm64: define hidden swiftcc void  @_T011c_functions30test_indirect_by_val_alignmentyyF()
 // armv7k: define hidden swiftcc void  @_T011c_functions30test_indirect_by_val_alignmentyyF()
 // armv7s: define hidden swiftcc void  @_T011c_functions30test_indirect_by_val_alignmentyyF()
