@@ -570,9 +570,6 @@ public:
                       bool allowConcreteGenericParams = false) &&;
 
 private:
-  /// \brief Build the generic signature.
-  GenericSignature *getGenericSignature();
-
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
   ///
