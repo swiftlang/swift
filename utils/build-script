@@ -470,6 +470,9 @@ class BuildScriptInvocation(object):
             impl_args += [
                 "--cross-compile-hosts", " ".join(args.cross_compile_hosts)]
 
+        if args.test_paths:
+            impl_args += ["--test-paths", " ".join(args.test_paths)]
+
         if toolchain.ninja:
             impl_args += ["--ninja-bin=%s" % toolchain.ninja]
         if args.distcc:

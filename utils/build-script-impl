@@ -152,6 +152,7 @@ KNOWN_SETTINGS=(
     skip-test-android-host      ""               "set to skip testing the host parts of the Android toolchain"
     validation-test             "0"              "set to run the validation test suite"
     long-test                   "0"              "set to run the long test suite"
+    test-paths                  ""               "run tests located in specific directories and/or files"
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
     skip-test-optimize-for-size ""               "set to skip testing the test suite in optimize for size mode"
@@ -2938,6 +2939,20 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- ${target} ---"
                 trap "tests_busted ${product} '(${target})'" ERR
 
+                test_target="$target"
+                test_paths=()
+
+                if [[ ${test_target} == check-swift* ]]; then
+                    if [[ "${TEST_PATHS}" ]]; then
+                        test_target="${test_target}-custom"
+                        for path in ${TEST_PATHS}; do
+                            test_paths+=(
+                                "${build_dir}/$(echo ${path} | sed -E "s/^(validation-test|test)/\1-${host}/")"
+                            )
+                        done
+                    fi
+                fi
+
                 # NOTE: In dry-run mode, build_dir might not exist yet. In that
                 #       case, -n query will fail. So, in dry-run mode,
                 #       we don't expand test script.
@@ -2950,12 +2965,17 @@ for host in "${ALL_HOSTS[@]}"; do
                     # shell to execute that.
                     # However, if we do this in a subshell in the ``sh -e -x -c`` line,
                     # errors in the command will not stop the script as they should.
-                    echo "Generating dry run test command from: ${build_cmd[@]} -n -v ${target}"
-                    dry_run_command_output="$(${build_cmd[@]} -n -v ${target} | sed -e 's/[^]]*] //')"
+                    echo "Generating dry run test command from: ${build_cmd[@]} -n -v ${test_target}"
+                    dry_run_command_output="$(${build_cmd[@]} -n -v ${test_target} | sed -e 's/[^]]*] //')"
                     echo "Test command: ${dry_run_command_output}"
-                    sh -e -x -c "${dry_run_command_output}"
+
+                    if [[ ! "${test_paths}" ]]; then
+                        sh -e -x -c "${dry_run_command_output}"
+                    else
+                        sh -e -x -c "${dry_run_command_output} $(echo ${test_paths[@]})"
+                    fi
                 else
-                    call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${target}
+                    call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${test_target}
                 fi
                 echo "-- ${target} finished --"
             fi
