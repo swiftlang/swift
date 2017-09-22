@@ -2065,25 +2065,6 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     return source;
   }
 
-  case Component::Kind::NominalParent: {
-    assert(sourceKey.Kind == LocalTypeDataKind::forTypeMetadata());
-    NominalTypeDecl *nominalDecl;
-    if (auto nominal = dyn_cast<NominalType>(sourceKey.Type)) {
-      nominalDecl = nominal->getDecl();
-      sourceKey.Type = nominal.getParent();
-    } else {
-      auto generic = cast<BoundGenericType>(sourceKey.Type);
-      nominalDecl = generic->getDecl();
-      sourceKey.Type = generic.getParent();
-    }
-
-    if (source) {
-      source = emitParentMetadataRef(IGF, nominalDecl, source);
-      setTypeMetadataName(IGF.IGM, source, sourceKey.Type);
-    }
-    return source;
-  }
-
   case Component::Kind::OutOfLineBaseProtocol: {
     auto conformance = sourceKey.Kind.getProtocolConformance();
     auto protocol = conformance.getRequirement();
@@ -2182,9 +2163,6 @@ void MetadataPath::print(llvm::raw_ostream &out) const {
     case Component::Kind::NominalTypeArgumentConformance:
       out << "nominal_type_argument_conformance["
           << component.getPrimaryIndex() << "]";
-      break;
-    case Component::Kind::NominalParent:
-      out << "nominal_parent";
       break;
     case Component::Kind::Impossible:
       out << "impossible";
