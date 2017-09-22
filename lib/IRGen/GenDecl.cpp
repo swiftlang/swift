@@ -1097,12 +1097,8 @@ void IRGenModule::emitTypeVerifier() {
     Builder.CreateCall(VerifierFunction, {});
   }
 
-  IRGenFunction VerifierIGF(*this, VerifierFunction);
-  if (DebugInfo)
-    DebugInfo->emitArtificialFunction(VerifierIGF, VerifierFunction);
-
-  emitTypeLayoutVerifier(VerifierIGF, TypesToVerify);
-  VerifierIGF.Builder.CreateRetVoid();
+  IRGenTypeVerifierFunction VerifierIGF(*this, VerifierFunction);
+  VerifierIGF.emit(TypesToVerify);
 }
 
 /// Get SIL-linkage for something that's not required to be visible
