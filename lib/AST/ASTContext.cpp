@@ -1421,6 +1421,18 @@ void ASTContext::getVisibleTopLevelClangModules(
     collectAllModules(Modules);
 }
 
+void ASTContext::registerGenericSignatureBuilder(
+                                       GenericSignature *sig,
+                                       ModuleDecl &module,
+                                       GenericSignatureBuilder &&builder) {
+  auto canSig = sig->getCanonicalSignature();
+  auto known = Impl.GenericSignatureBuilders.find({canSig, &module});
+  if (known != Impl.GenericSignatureBuilders.end()) return;
+
+  Impl.GenericSignatureBuilders[{canSig, &module}] =
+    llvm::make_unique<GenericSignatureBuilder>(std::move(builder));
+}
+
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
                                                       CanGenericSignature sig,
                                                       ModuleDecl *mod) {
@@ -4589,7 +4601,7 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   builder.addRequirement(requirement, source, nullptr);
 
-  CanGenericSignature genericSig(std::move(builder).computeGenericSignature(SourceLoc()));
+  CanGenericSignature genericSig(std::move(builder).computeGenericSignature(*mod, SourceLoc()));
 
   auto result = Impl.ExistentialSignatures.insert(
     std::make_pair(existential, genericSig));

@@ -3326,7 +3326,7 @@ void ProtocolDecl::computeRequirementSignature() {
 
   // Compute and record the signature.
   auto requirementSig =
-    std::move(builder).computeGenericSignature(SourceLoc());
+    std::move(builder).computeGenericSignature(*module, SourceLoc());
   RequirementSignature = requirementSig->getRequirements().data();
   assert(RequirementSignature != nullptr);
   NumRequirementsInSignature = requirementSig->getRequirements().size();
