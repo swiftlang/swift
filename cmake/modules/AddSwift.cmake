@@ -1,5 +1,6 @@
 include(SwiftList)
 include(SwiftXcodeSupport)
+include(SwiftWindowsSupport)
 
 # SWIFTLIB_DIR is the directory in the build tree where Swift resource files
 # should be placed.  Note that $CMAKE_CFG_INTDIR expands to "." for
@@ -354,6 +355,8 @@ function(_add_variant_link_flags)
       # options. This causes conflicts.
       list(APPEND result "-nostdlib")
     endif()
+    swift_windows_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
+    list(APPEND library_search_directories ${${LFLAGS_ARCH}_LIB})
   elseif("${LFLAGS_SDK}" STREQUAL "HAIKU")
     list(APPEND result "-lbsd" "-latomic" "-Wl,-Bsymbolic")
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
@@ -723,6 +726,10 @@ function(_add_swift_library_single target name)
   endif()
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
+    swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
+    foreach(directory ${SWIFTLIB_INCLUDE})
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-I${directory})
+    endforeach()
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;oldnames)
     # TODO(compnerd) handle /MT and /MTd
     if("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
@@ -831,6 +838,11 @@ function(_add_swift_library_single target name)
        NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
       target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}")
     endif()
+  endif()
+
+  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
+    swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
+    target_include_directories("${target}" SYSTEM PRIVATE ${SWIFTLIB_INCLUDE})
   endif()
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
