@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Timer.h"
 
 #define SWIFT_FUNC_STAT                                                 \
@@ -65,20 +66,54 @@ public:
 #undef FRONTEND_STATISTIC
   };
 
+  struct FrontendStatsTracer
+  {
+    UnifiedStatsReporter *Reporter;
+    llvm::TimeRecord SavedTime;
+    StringRef Name;
+    SourceRange Range;
+    FrontendStatsTracer(StringRef Name,
+                        SourceRange const &Range,
+                        UnifiedStatsReporter *Reporter);
+    FrontendStatsTracer();
+    FrontendStatsTracer(FrontendStatsTracer&& other);
+    FrontendStatsTracer& operator=(FrontendStatsTracer&&);
+    ~FrontendStatsTracer();
+    FrontendStatsTracer(const FrontendStatsTracer&) = delete;
+    FrontendStatsTracer& operator=(const FrontendStatsTracer&) = delete;
+  };
+
+  struct FrontendStatsEvent
+  {
+    uint64_t TimeUSec;
+    uint64_t LiveUSec;
+    bool IsEntry;
+    StringRef EventName;
+    StringRef CounterName;
+    size_t CounterDelta;
+    size_t CounterValue;
+    SourceRange SourceRange;
+  };
+
 private:
-  SmallString<128> Filename;
+  SmallString<128> StatsFilename;
+  SmallString<128> TraceFilename;
   llvm::TimeRecord StartedTime;
   std::unique_ptr<llvm::NamedRegionTimer> Timer;
-
+  SourceManager *SourceMgr;
   std::unique_ptr<AlwaysOnDriverCounters> DriverCounters;
   std::unique_ptr<AlwaysOnFrontendCounters> FrontendCounters;
+  std::unique_ptr<AlwaysOnFrontendCounters> LastTracedFrontendCounters;
+  std::vector<FrontendStatsEvent> FrontendStatsEvents;
 
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(llvm::raw_ostream &OS);
 
   UnifiedStatsReporter(StringRef ProgramName,
                        StringRef AuxName,
-                       StringRef Directory);
+                       StringRef Directory,
+                       SourceManager *SM,
+                       bool TraceEvents);
 public:
   UnifiedStatsReporter(StringRef ProgramName,
                        StringRef ModuleName,
@@ -86,11 +121,17 @@ public:
                        StringRef TripleName,
                        StringRef OutputType,
                        StringRef OptType,
-                       StringRef Directory);
+                       StringRef Directory,
+                       SourceManager *SM=nullptr,
+                       bool TraceEvents=false);
   ~UnifiedStatsReporter();
 
   AlwaysOnDriverCounters &getDriverCounters();
   AlwaysOnFrontendCounters &getFrontendCounters();
+  FrontendStatsTracer getStatsTracer(StringRef N,
+                                     SourceRange const &R);
+  void saveAnyFrontendStatsEvents(FrontendStatsTracer const& T,
+                                  bool IsEntry);
 };
 
 }
