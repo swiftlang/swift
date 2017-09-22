@@ -164,7 +164,6 @@ unsigned SourceManager::getByteDistance(SourceLoc Start, SourceLoc End) const {
   assert(End.isValid() && "end location should be valid");
 #ifndef NDEBUG
   unsigned BufferID = findBufferContainingLoc(Start);
-
   auto *Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID);
   assert(End.Value.getPointer() >= Buffer->getBuffer().begin() &&
          End.Value.getPointer() <= Buffer->getBuffer().end() &&
