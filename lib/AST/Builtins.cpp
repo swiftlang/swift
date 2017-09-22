@@ -491,7 +491,8 @@ namespace {
         Builder.addGenericParameter(gp);
       }
 
-      auto GenericSig = Builder.computeGenericSignature(SourceLoc());
+      auto GenericSig =
+        std::move(Builder).computeGenericSignature(SourceLoc());
       GenericEnv = GenericSig->createGenericEnvironment(*ctx.TheBuiltinModule);
     }
 
