@@ -67,10 +67,9 @@ namespace {
     llvm::SmallDenseMap<SILBasicBlock*, unsigned, 32> WorklistMap;
     // Keep track of loop headers - we don't want to jump-thread through them.
     SmallPtrSet<SILBasicBlock *, 32> LoopHeaders;
-    // The number of times jump threading was done through a switch_enum in
-    // a loop header. Used to limit that to prevent an infinite jump threading
-    // loop.
-    llvm::SmallDenseMap<SILBasicBlock*, unsigned, 8> JumpThreadedLoopHeaders;
+    // The number of times jump threading was done through a block.
+    // Used to prevent infinite jump threading loops.
+    llvm::SmallDenseMap<SILBasicBlock*, unsigned, 8> JumpThreadedBlocks;
 
     // Dominance and post-dominance info for the current function
     DominanceInfo *DT = nullptr;
@@ -1009,14 +1008,13 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   if (DestIsLoopHeader) {
     if (!isa<SwitchEnumInst>(DestBB->getTerminator()))
       return false;
-
-    // Limit the number we jump-thread through an switch_enum loop header.
-    // In case the CFG contains an infinite loop through such a header we
-    // otherwise may end up with jump-threading indefinitely.
-    unsigned &NumThreaded = JumpThreadedLoopHeaders[DestBB];
-    if (++NumThreaded > 8)
-      return false;
   }
+
+  // Limit the number we jump-thread through a block.
+  // Otherwise we may end up with jump-threading indefinitely.
+  unsigned &NumThreaded = JumpThreadedBlocks[DestBB];
+  if (++NumThreaded > 16)
+    return false;
 
   DEBUG(llvm::dbgs() << "jump thread from bb" << SrcBB->getDebugID() <<
         " to bb" << DestBB->getDebugID() << '\n');
