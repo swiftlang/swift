@@ -6288,25 +6288,18 @@ static void collectRequirements(GenericSignatureBuilder &builder,
   });
 }
 
-GenericSignature *GenericSignatureBuilder::getGenericSignature() {
-  assert(Impl->finalized && "Must finalize builder first");
-
-  // Collect the requirements placed on the generic parameter types.
-  SmallVector<Requirement, 4> requirements;
-  collectRequirements(*this, Impl->GenericParams, requirements);
-
-  auto sig = GenericSignature::get(Impl->GenericParams, requirements);
-  return sig;
-}
-
 GenericSignature *GenericSignatureBuilder::computeGenericSignature(
                                           SourceLoc loc,
                                           bool allowConcreteGenericParams) && {
   // Finalize the builder, producing any necessary diagnostics.
   finalize(loc, Impl->GenericParams, allowConcreteGenericParams);
 
-  // Determine the generic signature.
-  auto sig = getGenericSignature();
+  // Collect the requirements placed on the generic parameter types.
+  SmallVector<Requirement, 4> requirements;
+  collectRequirements(*this, Impl->GenericParams, requirements);
+
+  // Form the generic signature.
+  auto sig = GenericSignature::get(Impl->GenericParams, requirements);
 
   // Wipe out the internal state, ensuring that nobody uses this builder for
   // anything more.
