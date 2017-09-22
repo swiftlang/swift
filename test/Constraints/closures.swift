@@ -264,6 +264,10 @@ func someFunc(_ foo: ((String) -> String)?,
     let _: (String) -> String = foo ?? bar
 }
 
+func verify_NotAC_to_AC_failure(_ arg: () -> ()) {
+  func takesAC(_ arg: @autoclosure () -> ()) {}
+  takesAC(arg) // expected-error {{function produces expected type '()'; did you mean to call it with '()'?}}
+}
 
 // SR-1069 - Error diagnostic refers to wrong argument
 class SR1069_W<T> {
