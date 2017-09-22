@@ -132,6 +132,13 @@ private func addTo(
   testSuite[name] = function
 }
 
+@inline(__always)
+private func registerBenchmark(_ bench: BenchmarkInfo) {
+  registeredBenchmarks.append(bench)
+}
+
+registerBenchmark(ObjectAllocation)
+
 // The main test suite: precommit tests
 addTo(&precommitTests, "AngryPhonebook", run_AngryPhonebook)
 addTo(&precommitTests, "AnyHashableWithAClass", run_AnyHashableWithAClass)

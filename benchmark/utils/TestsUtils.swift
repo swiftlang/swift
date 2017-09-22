@@ -16,6 +16,60 @@ import Glibc
 import Darwin
 #endif
 
+public enum BenchmarkCategories {
+// Optimized benchmarks cover performance areas that have already been
+// investigated and optimized to some reasonable level. We expect these to be
+// "representative" of Swift perforance.
+case optimized
+
+// Most benchmarks are assumed to be "stable" and will be regularly tracked at
+// each commit. A handful may be marked unstable if continually tracking them is
+// counterproductive.
+case unstable
+
+// Validation "micro" benchmarks test a specific operation or critical path that
+// we know is important to measure.
+case validation
+// subsystems to validate and their subcategories.
+case api, Array, String, Dictionary, Codable
+case sdk
+case runtime, refcount, metadata
+// Other general areas of compiled code validation.
+case abstraction, safetychecks, exceptions, bridging, concurrency
+
+// Algorithms are "micro" that test some well-known algorithm in isolation:
+// sorting, searching, hashing, fibonaci, crypto, etc.
+case algorithm
+
+// Miniapplications are contrived to mimic some subset of application behavior
+// in a way that can be easily measured. They are larger than micro-benchmarks,
+// combining multiple APIs, data structures, or algorithms. This includes small
+// standardized benchmarks, pieces of real applications that have been extracted
+// into a benchmark, important functionality like JSON parsing, etc.
+case miniapplication
+
+// Regression benchmarks is a catch-all for less important "micro"
+// benchmarks. This could be a random piece of code that was attached to a bug
+// report. We want to make sure the optimizer as a whole continues to handle
+// this case, but don't know how applicable it is to general Swift performance
+// relative to the other micro-benchmarks. In particular, these aren't weighted
+// as highly as "validation" benchmarks and likely won't be the subject of future
+// investigation unless they significantly regress.
+case regression
+}
+
+public struct BenchmarkInfo {
+  public var name: String
+  public var runFunction: (Int) -> ()
+  public var tags: [BenchmarkCategories]
+
+  public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategories]) {
+    self.name = name
+    self.runFunction = runFunction
+    self.tags = tags
+  }
+}
+
 // Linear function shift register.
 //
 // This is just to drive benchmarks. I don't make any claim about its
