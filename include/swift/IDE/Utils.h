@@ -534,18 +534,23 @@ public:
 class EditorConsumerInsertStream: public raw_ostream {
   SourceEditConsumer &Consumer;
   SourceManager &SM;
-  SourceLoc Loc;
+  CharSourceRange Range;
   llvm::SmallString<64> Buffer;
   llvm::raw_svector_ostream OS;
 
 public:
   explicit EditorConsumerInsertStream(SourceEditConsumer &Consumer,
                                       SourceManager &SM,
+                                      CharSourceRange Range):
+    Consumer(Consumer), SM(SM), Range(Range), Buffer(), OS(Buffer) {}
+
+  explicit EditorConsumerInsertStream(SourceEditConsumer &Consumer,
+                                      SourceManager &SM,
                                       SourceLoc Loc):
-    Consumer(Consumer), SM(SM), Loc(Loc), Buffer(), OS(Buffer) {}
+    EditorConsumerInsertStream(Consumer, SM, CharSourceRange(Loc, 0)) {}
 
   ~EditorConsumerInsertStream() {
-    Consumer.accept(SM, Loc, OS.str());
+    Consumer.accept(SM, Range, OS.str());
   }
 
   void write_impl(const char *ptr, size_t size) override {
