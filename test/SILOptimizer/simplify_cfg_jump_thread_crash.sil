@@ -107,3 +107,51 @@ bb13:
   return %65 : $()
 }
 
+sil @some_function : $@convention(thin) (AA) -> Optional<AA>
+
+// Another test for checking that SimplifyCFG does not hang.
+// CHECK-LABEL: test_other_infinite_loop
+sil hidden @test_other_infinite_loop : $@convention(method) (@owned AA) -> () {
+bb0(%5 : $AA):
+  strong_retain %5 : $AA
+  %6 = enum $Optional<AA>, #Optional.some!enumelt.1, %5 : $AA
+  br bb1(%6 : $Optional<AA>)
+
+bb1(%8 : $Optional<AA>):
+  retain_value %8 : $Optional<AA>
+  switch_enum %8 : $Optional<AA>, case #Optional.some!enumelt.1: bb3, default bb2
+
+bb2:
+  release_value %8 : $Optional<AA>
+  br bb6
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  %85 = tuple ()
+  return %85 : $()
+
+bb5:
+  br bb6
+
+bb6:
+  switch_enum %8 : $Optional<AA>, case #Optional.none!enumelt: bb7, default bb8
+
+bb7:
+  br bb9(%8 : $Optional<AA>)
+
+bb8:
+  %23 = unchecked_enum_data %8 : $Optional<AA>, #Optional.some!enumelt.1
+  strong_retain %23 : $AA
+  %25 = function_ref @some_function : $@convention(thin) (AA) -> Optional<AA>
+  %26 = apply %25(%23) : $@convention(thin) (AA) -> Optional<AA>
+  strong_release %23 : $AA
+  br bb9(%26 : $Optional<AA>)
+
+bb9(%29 : $Optional<AA>):
+  release_value %8 : $Optional<AA>
+  br bb1(%29 : $Optional<AA>)
+
+}
+
