@@ -182,8 +182,11 @@ struct TestConfig {
     if onlyRegistered {
       allTests = registeredBenchmarks.map {
         bench -> (key: String, value: (Int)-> ()) in
-        (bench.name, bench.runFunction)
+        return (bench.name, bench.runFunction)
       }
+      // FIXME: for now unstable/extra benchmarks are not registered at all, but
+      // soon they will be handled with a default exclude list.
+      onlyPrecommit = false
     }
     else {
       allTests = [precommitTests, otherTests, stringTests]
