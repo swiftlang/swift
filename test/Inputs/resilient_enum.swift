@@ -1,22 +1,27 @@
 import resilient_struct
 
 // Fixed-layout enum with resilient members
-@_fixed_layout _exhaustive public enum SimpleShape {
+_exhaustive public enum SimpleShape {
   case KleinBottle
   case Triangle(Size)
 }
 
 // Fixed-layout enum with resilient members
-@_fixed_layout _exhaustive public enum Shape {
+_exhaustive public enum Shape {
   case Point
   case Rect(Size)
   case RoundedRect(Size, Size)
 }
 
 // Fixed-layout enum with indirect resilient members
-@_fixed_layout _exhaustive public enum FunnyShape {
+_exhaustive public enum FunnyShape {
   indirect case Parallelogram(Size)
   indirect case Trapezoid(Size)
+}
+
+_exhaustive public enum FullyFixedLayout {
+  case noPayload
+  case hasPayload(Int)
 }
 
 // The enum payload has fixed layout inside this module, but
@@ -33,7 +38,7 @@ public struct Color {
   }
 }
 
-@_fixed_layout _exhaustive public enum CustomColor {
+_exhaustive public enum CustomColor {
   case Black
   case White
   case Custom(Color)
