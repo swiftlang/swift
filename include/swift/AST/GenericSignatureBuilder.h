@@ -530,9 +530,6 @@ public:
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
 
-  /// \brief Build the generic signature.
-  GenericSignature *getGenericSignature();
-
   /// Infer requirements from the given type, recursively.
   ///
   /// This routine infers requirements from a type that occurs within the
@@ -566,10 +563,15 @@ public:
   /// \brief Finalize the set of requirements and compute the generic
   /// signature.
   ///
-  /// After this point, one cannot introduce new requirements.
+  /// After this point, one cannot introduce new requirements, and the
+  /// generic signature builder no longer has valid state.
   GenericSignature *computeGenericSignature(
                       SourceLoc loc,
-                      bool allowConcreteGenericParams = false);
+                      bool allowConcreteGenericParams = false) &&;
+
+private:
+  /// \brief Build the generic signature.
+  GenericSignature *getGenericSignature();
 
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
@@ -580,6 +582,7 @@ public:
                 ArrayRef<GenericTypeParamType *> genericParams,
                 bool allowConcreteGenericParams=false);
 
+public:
   /// Process any delayed requirements that can be handled now.
   void processDelayedRequirements();
 
