@@ -12,6 +12,7 @@
 
 #include "swift/IDE/Refactoring.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/Expr.h"
@@ -1923,30 +1924,26 @@ bool RefactoringActionLocalizeString::performChange() {
   return false;
 }
 
-static std::unique_ptr<CharSourceRange>
+static CharSourceRange
   findSourceRangeToWrapInCatch(ResolvedCursorInfo CursorInfo,
                                SourceFile *TheFile,
                                SourceManager &SM) {
   Expr *E = CursorInfo.TrailingExpr;
   if (!E)
-    return nullptr;
+    return CharSourceRange();
   auto Node = ASTNode(E);
-  auto NodeChecker = [](ASTNode N) {
-    return N.isStmt(StmtKind::Brace);
-  };
+  auto NodeChecker = [](ASTNode N) { return N.isStmt(StmtKind::Brace); };
   ContextFinder Finder(*TheFile, Node, NodeChecker);
   Finder.resolve();
   auto Contexts = Finder.getContexts();
   if (Contexts.size() == 0)
-    return nullptr;
+    return CharSourceRange();
   auto TargetNode = Contexts.back();
-  Stmt *S = TargetNode.dyn_cast<Stmt*>();
-  BraceStmt *BStmt = dyn_cast<BraceStmt>(S);
+  BraceStmt *BStmt = dyn_cast<BraceStmt>(TargetNode.dyn_cast<Stmt*>());
   auto ConvertToCharRange = [&SM](SourceRange SR) {
     return Lexer::getCharSourceRangeFromSourceRange(SM, SR);
   };
-  if (!BStmt)
-    return nullptr;
+  assert(BStmt);
   auto ExprRange = ConvertToCharRange(E->getSourceRange());
   // Check elements of the deepest BraceStmt, pick one that covers expression.
   for (auto Elem: BStmt->getElements()) {
@@ -1954,8 +1951,7 @@ static std::unique_ptr<CharSourceRange>
     if (ElemRange.contains(ExprRange))
       TargetNode = Elem;
   }
-  auto ResultRange = ConvertToCharRange(TargetNode.getSourceRange());
-  return llvm::make_unique<CharSourceRange>(ResultRange);
+  return ConvertToCharRange(TargetNode.getSourceRange());
 }
 
 bool RefactoringActionConvertToDoCatch::isApplicable(ResolvedCursorInfo Tok) {
@@ -1965,17 +1961,20 @@ bool RefactoringActionConvertToDoCatch::isApplicable(ResolvedCursorInfo Tok) {
 }
 
 bool RefactoringActionConvertToDoCatch::performChange() {
-  auto Range = findSourceRangeToWrapInCatch(CursorInfo, TheFile, SM);
-  if (!Range)
-    return true;
-  // Wrap given range in do catch block.
-  EditConsumer.accept(SM, Range->getStart(), "do {\n");
-  EditConsumer.accept(SM, Range->getEnd(), "\n} catch {\n<#code#>\n}");
-
-  // Delete ! from try! expression
   auto *TryExpr = dyn_cast<ForceTryExpr>(CursorInfo.TrailingExpr);
   if (!TryExpr)
     return true;
+  auto Range = findSourceRangeToWrapInCatch(CursorInfo, TheFile, SM);
+  if (!Range.isValid())
+    return true;
+  // Wrap given range in do catch block.
+  EditConsumer.accept(SM, Range.getStart(), "do {\n");
+  auto CatchReplacement = "\n} catch {\n" + getCodePlaceholder().str() + "\n}";
+  EditConsumer.accept(SM,
+                      Range.getEnd(),
+                      StringRef(CatchReplacement));
+
+  // Delete ! from try! expression
   auto ExclaimRange = CharSourceRange(TryExpr->getExclaimLoc(), 1);
   EditConsumer.accept(SM, ExclaimRange, "");
   return false;
