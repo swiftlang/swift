@@ -593,8 +593,10 @@ public:
   /// After this point, one cannot introduce new requirements, and the
   /// generic signature builder no longer has valid state.
   GenericSignature *computeGenericSignature(
+                      ModuleDecl &module,
                       SourceLoc loc,
-                      bool allowConcreteGenericParams = false) &&;
+                      bool allowConcreteGenericParams = false,
+                      bool allowBuilderToMove = true) &&;
 
   /// Compute the requirement signature for the given protocol.
   static GenericSignature *computeRequirementSignature(ProtocolDecl *proto);
@@ -1484,6 +1486,12 @@ private:
     while (auto parent = pa->getParent())
       pa = parent;
     return pa->parentOrBuilder.get<GenericSignatureBuilder *>();
+  }
+
+  // Replace the generic signature builder.
+  void replaceBuilder(GenericSignatureBuilder *builder) {
+    assert(parentOrBuilder.is<GenericSignatureBuilder *>());
+    parentOrBuilder = builder;
   }
 
   friend class GenericSignatureBuilder;
