@@ -188,9 +188,14 @@ bool CursorInfoResolver::walkToExprPre(Expr *E) {
         ContainerType = ME->getBase()->getType();
       }
     }
-
+    auto IsProperCursorLocation = E->getStartLoc() == LocToResolve;
+    // Handle cursor placement between try and ! in ForceTryExpr.
+    if (auto *FTE = dyn_cast<ForceTryExpr>(E)) {
+      IsProperCursorLocation = LocToResolve == FTE->getExclaimLoc() ||
+      IsProperCursorLocation;
+    }
     // Keep track of trailing expressions.
-    if (!E->isImplicit() && E->getStartLoc() == LocToResolve)
+    if (!E->isImplicit() && IsProperCursorLocation)
       TrailingExprStack.push_back(E);
   }
   return true;
