@@ -2580,21 +2580,9 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
       ParentType = cast<BoundGenericType>(type).getParent();
     }
 
-    // Ignore the existence of the parent type if it has no type parameters.
-    if (ParentType && !ParentType->hasTypeParameter())
-      ParentType = CanType();
-
-    SmallVector<SILParameterInfo, 1> params;
-    if (ParentType) {
-      auto parentMetatype =
-        CanMetatypeType::get(ParentType, MetatypeRepresentation::Thick);
-      params.push_back(SILParameterInfo(parentMetatype,
-                                        ParameterConvention::Direct_Unowned));
-    }
-
     return SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
                                 /*callee*/ ParameterConvention::Direct_Unowned,
-                                params, /*results*/ {}, /*error*/ None,
+                                /*params*/ {}, /*results*/ {}, /*error*/ None,
                                 IGM.Context);
   }();
 
