@@ -2023,15 +2023,14 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
   case Component::Kind::NominalTypeArgument:
   case Component::Kind::NominalTypeArgumentConformance: {
     assert(sourceKey.Kind == LocalTypeDataKind::forTypeMetadata());
-    auto generic = cast<BoundGenericType>(sourceKey.Type);
+    auto *nominal = sourceKey.Type.getAnyNominal();
     auto reqtIndex = component.getPrimaryIndex();
 
-    GenericTypeRequirements requirements(IGF.IGM, generic->getDecl());
+    GenericTypeRequirements requirements(IGF.IGM, nominal);
     auto &requirement = requirements.getRequirements()[reqtIndex];
 
     auto module = IGF.getSwiftModule();
-    auto subs = generic->getContextSubstitutionMap(module,
-                                                   generic->getDecl());
+    auto subs = sourceKey.Type->getContextSubstitutionMap(module, nominal);
     auto sub = requirement.TypeParameter.subst(subs)->getCanonicalType();
 
     // In either case, we need to change the type.
@@ -2041,7 +2040,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     if (component.getKind() == Component::Kind::NominalTypeArgument) {
       assert(!requirement.Protocol && "index mismatch!");
       if (source) {
-        source = emitArgumentMetadataRef(IGF, generic->getDecl(),
+        source = emitArgumentMetadataRef(IGF, nominal,
                                          requirements, reqtIndex, source);
         setTypeMetadataName(IGF.IGM, source, sourceKey.Type);
       }
@@ -2057,7 +2056,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
 
       if (source) {
         auto protocol = conformance.getRequirement();
-        source = emitArgumentWitnessTableRef(IGF, generic->getDecl(),
+        source = emitArgumentWitnessTableRef(IGF, nominal,
                                              requirements, reqtIndex, source);
         setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type, protocol);
       }
