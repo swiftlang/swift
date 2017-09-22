@@ -114,7 +114,7 @@ var genericNotHashableHash: Int = GenericNotHashable<String>(value: "a").hashVal
 struct StructConformsInExtension {
   let v: Int
 }
-extension StructConformsInExtension : Equatable {} // expected-error {{cannot be automatically synthesized in an extension yet}}
+extension StructConformsInExtension : Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
 
 // But explicit conformance in an extension should work.
 public struct StructConformsAndImplementsInExtension {
@@ -144,7 +144,7 @@ extension OtherFileNonconforming: Hashable {
   var hashValue: Int { return 0 }
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
-extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension yet}}
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'

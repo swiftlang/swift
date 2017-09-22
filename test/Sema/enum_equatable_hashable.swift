@@ -178,7 +178,7 @@ public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 2 {{non-
 
 // No explicit conformance; it could be derived, but we don't support extensions
 // yet.
-extension Complex : Hashable {}  // expected-error 2 {{cannot be automatically synthesized in an extension yet}}
+extension Complex : Hashable {}  // expected-error 2 {{cannot be automatically synthesized in an extension}}
 
 // No explicit conformance and it cannot be derived.
 enum NotExplicitlyHashableAndCannotDerive {
@@ -195,7 +195,7 @@ extension OtherFileNonconforming: Hashable {
   var hashValue: Int { return 0 }
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
-extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension yet}}
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
 
 // Verify that an indirect enum doesn't emit any errors as long as its "leaves"
 // are conformant.
