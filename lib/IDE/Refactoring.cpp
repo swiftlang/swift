@@ -1958,13 +1958,13 @@ static std::unique_ptr<CharSourceRange>
   return llvm::make_unique<CharSourceRange>(ResultRange);
 }
 
-bool RefactoringActionConvertToTryCatch::isApplicable(ResolvedCursorInfo Tok) {
+bool RefactoringActionConvertToDoCatch::isApplicable(ResolvedCursorInfo Tok) {
   if (!Tok.TrailingExpr)
     return false;
   return isa<ForceTryExpr>(Tok.TrailingExpr);
 }
 
-bool RefactoringActionConvertToTryCatch::performChange() {
+bool RefactoringActionConvertToDoCatch::performChange() {
   auto Range = findSourceRangeToWrapInCatch(CursorInfo, TheFile, SM);
   if (!Range)
     return true;

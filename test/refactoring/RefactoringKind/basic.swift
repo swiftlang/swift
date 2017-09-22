@@ -339,5 +339,5 @@ func testForceTry() {
 
 // CHECK-STRINGS-INTERPOLATION: Convert to String Interpolation
 
-// CHECK-TRY-CATCH: Convert To Try Catch
+// CHECK-TRY-CATCH: Convert To Do/Catch
 

@@ -5,5 +5,5 @@ for num in try! throwingFunc() {
     let _ = num
 }
 // RUN: rm -rf %t.result && mkdir -p %t.result
-// RUN: %refactor -convert-to-try-catch -source-filename %s -pos=4:14 > %t.result/L5.swift
+// RUN: %refactor -convert-to-do-catch -source-filename %s -pos=4:14 > %t.result/L5.swift
 // RUN: diff -u %S/Outputs/for_loop/L5.swift.expected %t.result/L5.swift

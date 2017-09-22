@@ -5,5 +5,5 @@ if let val = try! throwingFunc() {
     let _ = val
 }
 // RUN: rm -rf %t.result && mkdir -p %t.result
-// RUN: %refactor -convert-to-try-catch -source-filename %s -pos=4:16 > %t.result/L5.swift
+// RUN: %refactor -convert-to-do-catch -source-filename %s -pos=4:16 > %t.result/L5.swift
 // RUN: diff -u %S/Outputs/in_if_clause_with_let_binding/L5.swift.expected %t.result/L5.swift
