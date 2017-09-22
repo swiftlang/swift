@@ -1116,8 +1116,7 @@ struct GenericParameterDescriptor {
   /// The offset to the first generic argument from the start of
   /// metadata record.
   ///
-  /// This is meaningful if either NumGenericRequirements is nonzero or
-  /// (for classes) if Flags.hasParent() is true.
+  /// This is meaningful if NumGenericRequirements is nonzero.
   uint32_t Offset;
 
   /// The amount of generic requirement data in the metadata record, in
@@ -1146,7 +1145,7 @@ struct GenericParameterDescriptor {
 
   /// True if the nominal type is generic in any way.
   bool isGeneric() const {
-    return hasGenericRequirements() || Flags.hasGenericParent();
+    return hasGenericRequirements();
   }
 
   GenericContextDescriptor getContext(unsigned depth) const {
@@ -1584,17 +1583,6 @@ public:
     return getter(this);
   }
 
-  /// Return the parent type for a given level in the class hierarchy, or
-  /// null if that level does not have a parent type.
-  const TargetMetadata<Runtime> *
-  getParentType(const TargetNominalTypeDescriptor<Runtime> *theClass) const {
-    if (!theClass->GenericParams.Flags.hasParent())
-      return nullptr;
-
-    auto metadataAsWords = reinterpret_cast<const Metadata * const *>(this);
-    return metadataAsWords[theClass->GenericParams.Offset - 1];
-  }
-
   StoredPointer offsetToDescriptorOffset() const {
     return offsetof(TargetClassMetadata<Runtime>, Description);
   }
@@ -1762,21 +1750,14 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   TargetValueMetadata(MetadataKind Kind,
     ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
-                      description,
-    ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> parent)
+                      description)
     : TargetMetadata<Runtime>(Kind),
-      Description(description),
-      Parent(parent)
+      Description(description)
   {}
 
   /// An out-of-line description of the type.
   ConstTargetFarRelativeDirectPointer<Runtime, TargetNominalTypeDescriptor>
   Description;
-
-  /// The parent type of this member type, or null if this is not a
-  /// member type.  It's acceptable to make this a direct pointer because
-  /// parent types are relatively uncommon.
-  TargetPointer<Runtime, const TargetMetadata<Runtime>> Parent;
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Struct
@@ -1802,11 +1783,6 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
   StoredPointer offsetToDescriptorOffset() const {
     return offsetof(TargetValueMetadata<Runtime>, Description);
   }
-
-  StoredPointer offsetToParentOffset() const {
-    return offsetof(TargetValueMetadata<Runtime>, Parent);
-  }
-  
 };
 using ValueMetadata = TargetValueMetadata<InProcess>;
 

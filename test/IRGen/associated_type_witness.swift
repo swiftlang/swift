@@ -51,21 +51,21 @@ struct Fulfilled<T : P & Q> : Assocked {
 //   Associated type metadata access function for Fulfilled.Assoc.
 // CHECK-LABEL:  define internal %swift.type* @_T023associated_type_witness9FulfilledVyxGAA8AssockedA2A1PRzAA1QRzl5AssocWt(%swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Fulfilled<T>" to %swift.type**
-// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 3
+// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 2
 // CHECK-NEXT:    [[T2:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8, !invariant.load
 // CHECK-NEXT:    ret %swift.type* [[T2]]
 
 //   Associated type witness table access function for Fulfilled.Assoc : P.
 // CHECK-LABEL:  define internal i8** @_T023associated_type_witness9FulfilledVyxGAA8AssockedA2A1PRzAA1QRzl5AssocAaFPWT(%swift.type* %"Fulfilled<T>.Assoc", %swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Fulfilled<T>" to i8***
-// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 4
+// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 3
 // CHECK-NEXT:    [[T2:%.*]] = load i8**, i8*** [[T1]], align 8, !invariant.load
 // CHECK-NEXT:    ret i8** [[T2]]
 
 //   Associated type witness table access function for Fulfilled.Assoc : Q.
 // CHECK-LABEL:  define internal i8** @_T023associated_type_witness9FulfilledVyxGAA8AssockedA2A1PRzAA1QRzl5AssocAaGPWT(%swift.type* %"Fulfilled<T>.Assoc", %swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Fulfilled<T>" to i8***
-// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 5
+// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 4
 // CHECK-NEXT:    [[T2:%.*]] = load i8**, i8*** [[T1]], align 8, !invariant.load
 // CHECK-NEXT:    ret i8** [[T2]]
 
@@ -108,10 +108,10 @@ struct Computed<T, U> : Assocked {
 // CHECK-NEXT:     ret %swift.type* [[T0]]
 // CHECK:        fetch:
 // CHECK-NEXT:    [[T0:%.*]] = bitcast %swift.type* %"Computed<T, U>" to %swift.type**
-// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 3
+// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 2
 // CHECK-NEXT:    [[T:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8, !invariant.load
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Computed<T, U>" to %swift.type**
-// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 4
+// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 3
 // CHECK-NEXT:    [[U:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8, !invariant.load
 // CHECK-NEXT:    [[FETCH_RESULT]] = call %swift.type* @_T023associated_type_witness4PairVMa(%swift.type* [[T]], %swift.type* [[U]])
 // CHECK-NEXT:    store atomic %swift.type* [[FETCH_RESULT]], %swift.type** [[CACHE]] release, align 8
