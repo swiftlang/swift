@@ -303,6 +303,19 @@ foreach(SDK ${SWIFT_SDKS})
             DEPENDS ${dependencies}
             COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
             USES_TERMINAL)
+
+        add_custom_target("check-swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}-custom"
+            ${command_upload_stdlib}
+            ${command_upload_swift_reflection_test}
+            ${command_clean_test_results_dir}
+            COMMAND
+              ${PYTHON_EXECUTABLE} "${LIT}"
+              ${LIT_ARGS}
+              "--param" "swift_test_subset=${test_subset}"
+              "--param" "swift_test_mode=${test_mode}"
+            DEPENDS ${dependencies}
+            COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE} from custom test locations"
+            USES_TERMINAL)
       endforeach()
     endforeach()
   endforeach()
