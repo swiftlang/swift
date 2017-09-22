@@ -55,10 +55,8 @@ std::string CompilerInvocation::getPCHHash() const {
 
 void CompilerInstance::createSILModule() {
   assert(MainModule && "main module not created yet");
-  // Assume WMO if a -primary-file option was not provided.
-  bool WholeModule = !Invocation.getFrontendOptions().PrimaryInput.hasValue();
   TheSILModule = SILModule::createEmptyModule(
-    getMainModule(), Invocation.getSILOptions(), WholeModule);
+    getMainModule(), Invocation.getSILOptions(), isWholeModuleCompilation());
 }
 
 void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
@@ -436,7 +434,6 @@ void CompilerInstance::getImplicitlyImportedModules(
 
 void CompilerInstance::createREPLFile(
     const ImplicitImports &implicitImports) const {
-  SharedTimer timer("performSema-createREPLFile");
   auto *SingleInputFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind,
       Invocation.getLangOptions().KeepTokensInSourceFile);
@@ -456,8 +453,6 @@ CompilerInstance::computeDelayedParsingCallback() {
 
 void CompilerInstance::addMainFileToModule(
     const ImplicitImports &implicitImports) {
-  SharedTimer timer("performSema-addMainFileToModule");
-
   const InputFileKind Kind = Invocation.getInputKind();
   assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_SIL);
 
@@ -496,8 +491,10 @@ void CompilerInstance::parseAndCheckTypes(
 
   OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions();
 
-  // Parse main file last in order to make sure that it can use decls from other
-  // files in the module.
+    // Type-check main file after parsing all other files so that
+    // it can use declarations from other files.
+    // In addition, the main file has parsing and type-checking
+    // interwined.
   if (MainBufferID != NO_SUCH_BUFFER) {
     parseAndTypeCheckMainFile(PersistentState, DelayedCB.get(),
                               TypeCheckOptions);
@@ -657,7 +654,7 @@ void CompilerInstance::parseAndTypeCheckMainFile(
 
 static void
 forEachSourceFileIn(ModuleDecl *module,
-                    const llvm::function_ref<void(SourceFile &)> &fn) {
+                    llvm::function_ref<void(SourceFile &)> fn) {
   for (auto File : module->getFiles()) {
     if (auto SF = dyn_cast<SourceFile>(File))
       fn(*SF);
@@ -680,7 +677,7 @@ void CompilerInstance::finishTypeChecking(
       performWholeModuleTypeChecking(SF);
     });
   }
-  forEachFileToTypeCheck([&](SourceFile &SF) { finishTypeCheckingOfFile(SF); });
+  forEachFileToTypeCheck([&](SourceFile &SF) { finishTypeCheckingFile(SF); });
 }
 
 void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
