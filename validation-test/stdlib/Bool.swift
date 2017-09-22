@@ -8,7 +8,6 @@
 import Swift
 import StdlibUnittest
 import StdlibCollectionUnittest
-import Foundation
 import VariadicBool
 
 func countTrues(_ count: Int, _ bools: CVarArg...) -> Int {
