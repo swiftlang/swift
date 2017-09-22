@@ -223,6 +223,67 @@ internal struct OperatorPlusTest {
   }
 }
 
+public struct RemoveElementTest {
+    
+    public let collection: [Int]
+    public let elementToBeRemoved: Int
+    public let expected: [Int]
+    public let loc: SourceLoc
+    
+    internal init(
+        collection: [Int], elementToBeRemoved: Int,
+        expected: [Int],
+        file: String = #file, line: UInt = #line
+        ) {
+        self.collection = collection
+        self.elementToBeRemoved = elementToBeRemoved
+        self.expected = expected
+        self.loc = SourceLoc(file, line, comment: "removeElement(_ element:) test data")
+    }
+    
+}
+
+public struct RemoveElementInSubrangeTest {
+    
+    public let collection: [Int]
+    public let elementToBeRemoved:Int
+    public let rangeSelection: RangeSelection
+    public let expected: [Int]
+    public let loc: SourceLoc
+    
+    internal init(
+        collection: [Int], elementToBeRemoved:Int,rangeSelection: RangeSelection, expected: [Int],
+        file: String = #file, line: UInt = #line
+        ) {
+        self.collection = collection
+        self.elementToBeRemoved = elementToBeRemoved
+        self.rangeSelection = rangeSelection
+        self.expected = expected
+        self.loc = SourceLoc(file, line, comment: "removeElementInSubrange(_ element:Element,in range:Range<Index>) test data")
+    }
+    
+}
+
+public struct RemoveElementsTest {
+    
+    public let collection: [Int]
+    public let elementsToBeRemoved: [Int]
+    public let expected: [Int]
+    public let loc: SourceLoc
+    
+    internal init(
+        collection: [Int], elementsToBeRemoved: [Int],
+        expected: [Int], file: String = #file, line: UInt = #line
+        ) {
+        self.collection = collection
+        self.elementsToBeRemoved = elementsToBeRemoved
+        self.expected = expected
+        self.loc = SourceLoc(file, line, comment: "removeElements(_ fromSequence:Element...) test data")
+    }
+}
+
+
+
 let removeLastTests: [RemoveLastNTest] = [
   RemoveLastNTest(
     collection: [1010],
@@ -435,6 +496,156 @@ public let removeRangeTests: [RemoveSubrangeTest] = [
     rangeSelection: .middle,
     expected: [1010, 6060]),
 ]
+
+public let removeElementTests :[RemoveElementTest] = [
+
+    RemoveElementTest(
+        
+        collection: [],
+        elementToBeRemoved: 3030,
+        expected: []
+    ),
+  
+  RemoveElementTest(
+    
+    collection: [1010, 2020, 3030, 4040, 5050, 6060],
+    elementToBeRemoved: 3030,
+    expected: [1010, 2020, 4040, 5050, 6060]
+    ),
+  
+  RemoveElementTest(
+    
+    collection: [1010, 2020, 3030, 4040, 5050, 6060],
+    elementToBeRemoved: 7070,
+    expected: [1010, 2020, 3030, 4040, 5050, 6060]
+    ),
+  
+
+]
+
+public let removeElementInSubrangeTests: [RemoveElementInSubrangeTest] = [
+
+    RemoveElementInSubrangeTest(
+        
+        collection: [],
+        elementToBeRemoved:6060,
+        rangeSelection: .leftHalf,
+        expected: []
+    ),
+    
+    RemoveElementInSubrangeTest(
+        
+     collection: [1010, 2020, 3030, 2020, 5050, 6060],
+     elementToBeRemoved:2020,
+     rangeSelection: .emptyRange,
+     expected: [1010, 2020, 3030, 2020, 5050, 6060]
+    ),
+    
+    RemoveElementInSubrangeTest(
+        
+        collection: [1010, 2020, 3030, 2020, 5050, 6060],
+        elementToBeRemoved:7070,
+        rangeSelection: .leftHalf,
+        expected: [1010, 2020, 3030, 2020, 5050, 6060]
+    ),
+    
+    RemoveElementInSubrangeTest(
+        
+        collection: [1010, 2020, 3030, 2020],
+        elementToBeRemoved:2020,
+        rangeSelection: .leftHalf,
+        expected: [3030, 2020]
+    ),
+    
+    RemoveElementInSubrangeTest(
+        
+        collection: [6060, 2020, 3030, 2020],
+        elementToBeRemoved:2020,
+        rangeSelection: .middle,
+        expected: [6060, 2020]
+    ),
+    
+    RemoveElementInSubrangeTest(
+        
+        collection: [4040, 2020, 2020,3030],
+        elementToBeRemoved:2020,
+        rangeSelection: .rightHalf,
+        expected: [4040, 2020]
+    ),
+    
+    RemoveElementInSubrangeTest(
+        
+        collection: [1010, 2020, 1010, 3030, 5050],
+        elementToBeRemoved:2020,
+        rangeSelection: .middle,
+        expected: [1010, 5050]
+    ),
+    
+    RemoveElementInSubrangeTest(
+        
+        collection: [1010, 2020, 3030, 4040, 2020, 5050],
+        elementToBeRemoved:2020,
+        rangeSelection: .leftHalf,
+        expected: [4040, 2020, 5050]
+    ),
+    
+    RemoveElementInSubrangeTest(
+        
+        collection: [2020, 2020, 3030, 4040, 2020, 5050],
+        elementToBeRemoved:2020,
+        rangeSelection: .middle,
+        expected: [2020, 5050]
+    ),
+    
+    RemoveElementInSubrangeTest(
+        
+        collection: [1010, 2020, 3030, 4040, 2020, 5050],
+        elementToBeRemoved:2020,
+        rangeSelection: .rightHalf,
+        expected: [1010, 2020, 3030]
+    ),
+    
+]
+
+public let removeElementsTests: [RemoveElementsTest] = [
+
+    RemoveElementsTest(
+        collection: [],
+        elementsToBeRemoved: [],
+        expected: []
+    
+    ),
+    
+    RemoveElementsTest(
+        collection: [],
+        elementsToBeRemoved: [1010],
+        expected: []
+        
+    ),
+    
+    RemoveElementsTest(
+        collection: [1010,2020,3030,4040],
+        elementsToBeRemoved: [2020,5050,6060],
+        expected: [1010,3030,4040]
+        
+    ),
+    
+    RemoveElementsTest(
+        collection: [1010,2020,3030,4040,5050],
+        elementsToBeRemoved: [6060,7070,8080,9090],
+        expected: [1010,2020,3030,4040,5050]
+        
+    ),
+    
+    RemoveElementsTest(
+        collection: [1010,2020,3030,4040,5050],
+        elementsToBeRemoved: [1010,2020,3030,5050],
+        expected: [4040]
+        
+    ),
+]
+
+
 
 extension TestSuite {
   /// Adds a set of tests for `RangeReplaceableCollection`.
@@ -928,6 +1139,77 @@ self.test("\(testNamePrefix).removeAll()/semantics") {
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
+
+//===----------------------------------------------------------------------===//
+// removeElement(_ element:)
+//===----------------------------------------------------------------------===//
+        
+self.test("\(testNamePrefix).removeElement()/semantics") {
+    
+    let tests = removeElementTests
+    
+    for test in tests{
+        
+        var c = test.collection
+        c.removeElement(test.elementToBeRemoved)
+        expectEqualSequence(
+             test.expected,
+             c.map { $0 },
+             stackTrace: SourceLocStack().with(test.loc))
+        
+    }
+    
+}
+        
+        
+//===----------------------------------------------------------------------===//
+// removeElementInSubrange(in subrange:)
+//===----------------------------------------------------------------------===//
+        
+self.test("\(testNamePrefix).removeElementInSubrange()/semantics") {
+    
+    let tests = removeElementInSubrangeTests
+    
+    for test in tests{
+        
+        var c = test.collection
+        let rangeToBeConsidered = test.rangeSelection.range(in:c)
+        c.removeElementInSubrange(test.elementToBeRemoved,in:rangeToBeConsidered)
+        expectEqualSequence(
+            test.expected,
+            c.map { $0 },
+            stackTrace: SourceLocStack().with(test.loc))
+        
+    }
+    
+}
+        
+   
+//===----------------------------------------------------------------------===//
+// removeContentsOf()
+//===----------------------------------------------------------------------===//
+        
+self.test("\(testNamePrefix).removeContentsOf()/semantics") {
+            
+    let tests = removeElementsTests
+    
+    for test in tests{
+        
+        var c = test.collection
+        let elementsToRemove =
+            MinimalCollection(elements: test.elementsToBeRemoved)
+        c.removeContentsOf(elementsToRemove)
+        expectEqualSequence(
+            test.expected,
+            c.map { $0 },
+            stackTrace: SourceLocStack().with(test.loc))
+        
+    }
+            
+}
+        
+
+
 
 //===----------------------------------------------------------------------===//
 // reserveCapacity()
