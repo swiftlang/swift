@@ -1,0 +1,103 @@
+//===--- Statistics.def - Statistics Macro Metaprogramming Database -*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the database of always-available statistic counters.
+//
+// DRIVER_STATISTIC(Id)
+//   - Id is an identifier suitable for use in C++
+//
+// FRONTEND_STATISTIC(Subsystem, Id)
+//   - Subsystem is a token to be stringified as a name prefix
+//   - Id is an identifier suitable for use in C++
+//===----------------------------------------------------------------------===//
+
+/// Driver statistics are collected for driver processes
+#ifdef DRIVER_STATISTIC
+DRIVER_STATISTIC(NumDriverJobsRun)
+DRIVER_STATISTIC(NumDriverJobsSkipped)
+
+DRIVER_STATISTIC(DriverDepCascadingTopLevel)
+DRIVER_STATISTIC(DriverDepCascadingDynamic)
+DRIVER_STATISTIC(DriverDepCascadingNominal)
+DRIVER_STATISTIC(DriverDepCascadingMember)
+DRIVER_STATISTIC(DriverDepCascadingExternal)
+
+DRIVER_STATISTIC(DriverDepTopLevel)
+DRIVER_STATISTIC(DriverDepDynamic)
+DRIVER_STATISTIC(DriverDepNominal)
+DRIVER_STATISTIC(DriverDepMember)
+DRIVER_STATISTIC(DriverDepExternal)
+
+DRIVER_STATISTIC(ChildrenMaxRSS)
+#endif
+
+/// Driver statistics are collected for frontend processes
+#ifdef FRONTEND_STATISTIC
+FRONTEND_STATISTIC(AST, NumSourceBuffers)
+FRONTEND_STATISTIC(AST, NumSourceLines)
+FRONTEND_STATISTIC(AST, NumSourceLinesPerSecond)
+FRONTEND_STATISTIC(AST, NumLinkLibraries)
+FRONTEND_STATISTIC(AST, NumLoadedModules)
+FRONTEND_STATISTIC(AST, NumImportedExternalDefinitions)
+FRONTEND_STATISTIC(AST, NumTotalClangImportedEntities)
+FRONTEND_STATISTIC(AST, NumASTBytesAllocated)
+FRONTEND_STATISTIC(AST, NumDependencies)
+FRONTEND_STATISTIC(AST, NumReferencedTopLevelNames)
+FRONTEND_STATISTIC(AST, NumReferencedDynamicNames)
+FRONTEND_STATISTIC(AST, NumReferencedMemberNames)
+FRONTEND_STATISTIC(AST, NumDecls)
+FRONTEND_STATISTIC(AST, NumLocalTypeDecls)
+FRONTEND_STATISTIC(AST, NumObjCMethods)
+FRONTEND_STATISTIC(AST, NumInfixOperators)
+FRONTEND_STATISTIC(AST, NumPostfixOperators)
+FRONTEND_STATISTIC(AST, NumPrefixOperators)
+FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
+FRONTEND_STATISTIC(AST, NumUsedConformances)
+
+FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
+FRONTEND_STATISTIC(Sema, NumConstraintScopes)
+FRONTEND_STATISTIC(Sema, NumDeclsDeserialized)
+FRONTEND_STATISTIC(Sema, NumDeclsValidated)
+FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
+FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)
+FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironments)
+FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironmentsLoaded)
+FRONTEND_STATISTIC(Sema, NumLazyIterableDeclContexts)
+FRONTEND_STATISTIC(Sema, NominalTypeLookupDirectCount)
+FRONTEND_STATISTIC(Sema, NumTypesDeserialized)
+FRONTEND_STATISTIC(Sema, NumTypesValidated)
+FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
+
+FRONTEND_STATISTIC(SILModule, NumSILGenFunctions)
+FRONTEND_STATISTIC(SILModule, NumSILGenVtables)
+FRONTEND_STATISTIC(SILModule, NumSILGenWitnessTables)
+FRONTEND_STATISTIC(SILModule, NumSILGenDefaultWitnessTables)
+FRONTEND_STATISTIC(SILModule, NumSILGenGlobalVariables)
+
+FRONTEND_STATISTIC(SILModule, NumSILOptFunctions)
+FRONTEND_STATISTIC(SILModule, NumSILOptVtables)
+FRONTEND_STATISTIC(SILModule, NumSILOptWitnessTables)
+FRONTEND_STATISTIC(SILModule, NumSILOptDefaultWitnessTables)
+FRONTEND_STATISTIC(SILModule, NumSILOptGlobalVariables)
+
+FRONTEND_STATISTIC(IRModule, NumIRGlobals)
+FRONTEND_STATISTIC(IRModule, NumIRFunctions)
+FRONTEND_STATISTIC(IRModule, NumIRAliases)
+FRONTEND_STATISTIC(IRModule, NumIRIFuncs)
+FRONTEND_STATISTIC(IRModule, NumIRNamedMetaData)
+FRONTEND_STATISTIC(IRModule, NumIRValueSymbols)
+FRONTEND_STATISTIC(IRModule, NumIRComdatSymbols)
+FRONTEND_STATISTIC(IRModule, NumIRBasicBlocks)
+FRONTEND_STATISTIC(IRModule, NumIRInsts)
+
+FRONTEND_STATISTIC(LLVM, NumLLVMBytesOutput)
+#endif
