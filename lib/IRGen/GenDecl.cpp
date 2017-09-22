@@ -3664,7 +3664,8 @@ IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
 ///
 /// IRGen is primarily concerned with resilient handling of the following:
 /// - For structs, a struct's size might change
-/// - For enums, new cases can be added
+/// - For enums, new cases can be added that would change the representation.
+///   (Note that enums with known representation can still grow new cases.)
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {

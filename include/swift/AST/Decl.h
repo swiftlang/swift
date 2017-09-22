@@ -2818,6 +2818,8 @@ public:
   ///
   /// This is used for diagnostics, because we do not want a behavior
   /// change between builds with resilience enabled and disabled.
+  /// For enums, this means clients can assume the representation will not
+  /// change, although more cases may be added within that representation.
   bool isFormallyResilient() const;
 
   /// \brief Do we need to use resilient access patterns outside of this type's

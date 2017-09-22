@@ -1406,9 +1406,11 @@ namespace {
     EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
     assert(decl && "switch_enum operand is not an enum");
 
-    // FIXME: Get expansion from SILFunction
-    if (decl->isResilient(inst->getModule().getSwiftModule(),
-                          ResilienceExpansion::Maximal))
+    // FIXME: Test this?
+    const DeclContext *dc = inst->getFunction()->getDeclContext();
+    if (!dc && inst->getFunction()->isSerialized() == IsNotSerialized)
+      dc = inst->getModule().getAssociatedContext();
+    if (!decl->isExhaustive(dc))
       return nullptr;
 
     llvm::SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
