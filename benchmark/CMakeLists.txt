@@ -25,6 +25,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ArrayOfGenericRef
     single-source/ArrayOfPOD
     single-source/ArrayOfRef
+    single-source/ArraySetElement
     single-source/ArraySubscript
     single-source/BitCount
     single-source/ByteSwap
