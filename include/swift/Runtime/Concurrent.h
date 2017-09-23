@@ -17,7 +17,7 @@
 #include <stdint.h>
 #include "llvm/Support/Allocator.h"
 
-#if defined(__FreeBSD__) || defined(__CYGWIN__)
+#if defined(__FreeBSD__) || defined(__CYGWIN__) || defined(__HAIKU__)
 #include <stdio.h>
 #endif
 

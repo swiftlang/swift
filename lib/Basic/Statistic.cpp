@@ -32,7 +32,7 @@ using namespace llvm::sys;
 
 static size_t
 getChildrenMaxResidentSetSize() {
-#if defined(HAVE_GETRUSAGE)
+#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
   struct rusage RU;
   ::getrusage(RUSAGE_CHILDREN, &RU);
   return RU.ru_maxrss;

@@ -13,7 +13,7 @@
 import SwiftPrivate
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
 #elseif os(Windows)
 import ucrt
@@ -21,8 +21,8 @@ import ucrt
 
 #if !os(Windows)
 public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CInt {
-#if os(Android)
-  preconditionFailure("mkstemps doesn't work on Android")
+#if os(Android) || os(Haiku)
+  preconditionFailure("mkstemps doesn't work on your platform")
 #else
   var utf8CStr = template.utf8CString
   let (fd, fileName) = utf8CStr.withUnsafeMutableBufferPointer {

@@ -13,7 +13,7 @@
 import SwiftPrivate
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
 #endif
 
@@ -21,7 +21,8 @@ import Glibc
 #if !os(Windows)
 // posix_spawn is not available on Windows.
 // posix_spawn is not available on Android.
-#if !os(Android)
+// posix_spawn is not available on Haiku.
+#if !os(Android) && !os(Haiku)
 // swift_posix_spawn isn't available in the public watchOS SDK, we sneak by the
 // unavailable attribute declaration here of the APIs that we need.
 
@@ -83,7 +84,7 @@ public func spawnChild(_ args: [String])
   let childStdin = posixPipe()
   let childStderr = posixPipe()
 
-#if os(Android)
+#if os(Android) || os(Haiku)
   // posix_spawn isn't available on Android. Instead, we fork and exec.
   // To correctly communicate the exit status of the child process to this
   // (parent) process, we'll use this pipe.
@@ -222,7 +223,7 @@ public func spawnChild(_ args: [String])
   return (pid, childStdin.writeFD, childStdout.readFD, childStderr.readFD)
 }
 
-#if !os(Android)
+#if !os(Android) && !os(Haiku)
 #if os(Linux)
 internal func _make_posix_spawn_file_actions_t()
   -> swift_posix_spawn_file_actions_t {
@@ -306,6 +307,8 @@ internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?
 #elseif os(Android)
   return environ
 #elseif os(Cygwin)
+  return environ
+#elseif os(Haiku)
   return environ
 #else
   return __environ

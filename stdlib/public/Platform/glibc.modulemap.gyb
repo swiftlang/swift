@@ -26,13 +26,19 @@ module SwiftGlibc [system] {
   link "util"
 % end
 
-% if CMAKE_SDK != "FREEBSD":
+% if CMAKE_SDK != "FREEBSD" and CMAKE_SDK != "HAIKU":
   link "dl"
+% end
+
+% if CMAKE_SDK == "HAIKU":
+  link "network"
+  link "bsd"
+  link "execinfo"
 % end
 
   // C standard library
   module C {
-% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "HAIKU"]:
     module complex {
       header "${GLIBC_INCLUDE_PATH}/complex.h"
       export *
@@ -55,6 +61,12 @@ module SwiftGlibc [system] {
     }
     module utmp {
       header "${GLIBC_INCLUDE_PATH}/utmpx.h"
+      export *
+    }
+% end
+% if CMAKE_SDK == "HAIKU":
+    module pty {
+      header "${GLIBC_INCLUDE_PATH}/../bsd/pty.h"
       export *
     }
 % end
@@ -249,6 +261,48 @@ module SwiftGlibc [system] {
     }
 % end
 
+% if CMAKE_SDK == "HAIKU":
+    module ftw {
+      header "${GLIBC_INCLUDE_PATH}/ftw.h"
+      export *
+    }
+    module glob {
+      header "${GLIBC_INCLUDE_PATH}/glob.h"
+      export *
+    }
+    module iconv {
+      header "${GLIBC_INCLUDE_PATH}/../iconv.h"
+      export *
+    }
+    module langinfo {
+      header "${GLIBC_INCLUDE_PATH}/langinfo.h"
+      export *
+    }
+    module monetary {
+      header "${GLIBC_INCLUDE_PATH}/monetary.h"
+      export *
+    }
+    module netdb {
+      header "${GLIBC_INCLUDE_PATH}/netdb.h"
+      export *
+    }
+    module ifaddrs {
+      header "${GLIBC_INCLUDE_PATH}/../bsd/ifaddrs.h"
+      export *
+    }
+    module search {
+      header "${GLIBC_INCLUDE_PATH}/search.h"
+      export *
+    }
+    module syslog {
+      header "${GLIBC_INCLUDE_PATH}/syslog.h"
+      export *
+    }
+    module tar {
+      header "${GLIBC_INCLUDE_PATH}/tar.h"
+      export *
+    }
+% end
     module arpa {
       module inet {
         header "${GLIBC_INCLUDE_PATH}/arpa/inet.h"
@@ -334,7 +388,7 @@ module SwiftGlibc [system] {
     module sys {
       export *
 
-% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "HAIKU"]:
       module file {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/file.h"
         export *
@@ -343,10 +397,12 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/sem.h"
         export *
       }
+% if CMAKE_SDK != "HAIKU":
       module shm {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/shm.h"
         export *
       }
+% end
       module statvfs {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/statvfs.h"
         export *
@@ -373,7 +429,7 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/select.h"
         export *
       }
-% if CMAKE_SDK != "FREEBSD":
+% if CMAKE_SDK != "FREEBSD" and CMAKE_SDK != "HAIKU":
       module sendfile {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/sendfile.h"
         export *
