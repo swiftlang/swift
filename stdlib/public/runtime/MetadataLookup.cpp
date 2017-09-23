@@ -130,8 +130,11 @@ const Metadata *TypeMetadataRecord::getCanonicalTypeMetadata() const {
   switch (getTypeKind()) {
   case TypeMetadataRecordKind::UniqueDirectType:
     return getDirectType();
-  case TypeMetadataRecordKind::NonuniqueDirectType:
-    return swift_getForeignTypeMetadata((ForeignTypeMetadata *)getDirectType());
+  case TypeMetadataRecordKind::NonuniqueDirectType: {
+    const ForeignTypeMetadata *FMD =
+        static_cast<const ForeignTypeMetadata *>(getDirectType());
+    return swift_getForeignTypeMetadata(const_cast<ForeignTypeMetadata *>(FMD));
+  }
   case TypeMetadataRecordKind::UniqueDirectClass:
     if (auto *ClassMetadata =
           static_cast<const ::ClassMetadata *>(getDirectType()))

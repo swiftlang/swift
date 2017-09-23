@@ -269,7 +269,7 @@ private:
   llvm::MD5 Hash;
 
   void write_impl(const char *Ptr, size_t Size) override {
-    Hash.update(ArrayRef<uint8_t>((uint8_t *)Ptr, Size));
+    Hash.update(ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(Ptr), Size));
     Pos += Size;
   }
 
@@ -336,12 +336,16 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
     if (SectionName == HashSectionName) {
       StringRef SectionData;
       Section.getContents(SectionData);
-      ArrayRef<uint8_t> PrevHashData((uint8_t *)SectionData.data(),
-                                     SectionData.size());
+      ArrayRef<uint8_t> PrevHashData(
+          reinterpret_cast<const uint8_t *>(SectionData.data()),
+          SectionData.size());
       DEBUG(if (PrevHashData.size() == sizeof(MD5::MD5Result)) {
         if (DiagMutex) DiagMutex->lock();
         SmallString<32> HashStr;
-        MD5::stringifyResult(*(MD5::MD5Result *)PrevHashData.data(), HashStr);
+        MD5::stringifyResult(
+            *reinterpret_cast<MD5::MD5Result *>(
+                const_cast<unsigned char *>(PrevHashData.data())),
+            HashStr);
         llvm::dbgs() << OutputFilename << ": prev MD5=" << HashStr <<
           (HashData == PrevHashData ? " skipping\n" : " recompiling\n");
         if (DiagMutex) DiagMutex->unlock();
@@ -590,7 +594,8 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   if (Opts.EmbedMode == IRGenEmbedMode::EmbedBitcode)
     llvm::WriteBitcodeToFile(M, OS);
 
-  ArrayRef<uint8_t> ModuleData((uint8_t*)OS.str().data(), OS.str().size());
+  ArrayRef<uint8_t> ModuleData(
+      reinterpret_cast<const uint8_t *>(OS.str().data()), OS.str().size());
   llvm::Constant *ModuleConstant =
     llvm::ConstantDataArray::get(M->getContext(), ModuleData);
   llvm::GlobalVariable *GV = new llvm::GlobalVariable(*M,
@@ -610,8 +615,9 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   }
 
   // Embed command-line options.
-  ArrayRef<uint8_t> CmdData((uint8_t*)Opts.CmdArgs.data(),
-                            Opts.CmdArgs.size());
+  ArrayRef<uint8_t>
+      CmdData(reinterpret_cast<const uint8_t *>(Opts.CmdArgs.data()),
+              Opts.CmdArgs.size());
   llvm::Constant *CmdConstant =
     llvm::ConstantDataArray::get(M->getContext(), CmdData);
   GV = new llvm::GlobalVariable(*M, CmdConstant->getType(), true,

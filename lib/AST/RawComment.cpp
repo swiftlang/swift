@@ -258,7 +258,7 @@ CharSourceRange RawComment::getCharSourceRange() {
     return CharSourceRange();
   }
   auto End = this->Comments.back().Range.getEnd();
-  auto Length = (char *)End.getOpaquePointerValue() -
-                (char* )Start.getOpaquePointerValue();
+  auto Length = static_cast<const char *>(End.getOpaquePointerValue()) -
+                static_cast<const char *>(Start.getOpaquePointerValue());
   return CharSourceRange(Start, Length);
 }
