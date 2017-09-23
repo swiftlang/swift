@@ -800,7 +800,8 @@ getGenericEnvironmentAndSignatureWithRequirements(
   }
 
   auto NewGenSig =
-    Builder.computeGenericSignature(SourceLoc(),
+    std::move(Builder).computeGenericSignature(*M.getSwiftModule(),
+                                   SourceLoc(),
                                    /*allowConcreteGenericParams=*/true);
   auto NewGenEnv = NewGenSig->createGenericEnvironment(*M.getSwiftModule());
   return { NewGenEnv, NewGenSig };
@@ -1490,7 +1491,8 @@ FunctionSignaturePartialSpecializer::
 
   // Finalize the archetype builder.
   auto GenSig =
-      Builder.computeGenericSignature(SourceLoc(),
+      std::move(Builder).computeGenericSignature(*M.getSwiftModule(),
+                                      SourceLoc(),
                                       /*allowConcreteGenericParams=*/true);
   auto GenEnv = GenSig->createGenericEnvironment(*M.getSwiftModule());
   return { GenEnv, GenSig };

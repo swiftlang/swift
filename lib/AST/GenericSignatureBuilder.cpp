@@ -76,6 +76,10 @@ STATISTIC(NumArchetypeAnchorCacheHits,
           "# of hits in the archetype anchor cache");
 STATISTIC(NumArchetypeAnchorCacheMisses,
           "# of misses in the archetype anchor cache");
+STATISTIC(NumNestedTypeCacheHits,
+         "# of hits in the equivalence class nested type cache");
+STATISTIC(NumNestedTypeCacheMisses,
+         "# of misses in the equivalence class nested type cache");
 STATISTIC(NumProcessDelayedRequirements,
           "# of times we process delayed requirements");
 STATISTIC(NumProcessDelayedRequirementsUnchanged,
@@ -113,6 +117,12 @@ struct GenericSignatureBuilder::Implementation {
 
   /// Whether we are currently processing delayed requirements.
   bool ProcessingDelayedRequirements = false;
+
+  /// Whether there were any errors.
+  bool HadAnyError = false;
+
+  /// FIXME: Hack to work around a small number of minimization bugs.
+  bool HadAnyRedundantConstraints = false;
 
 #ifndef NDEBUG
   /// Whether we've already finalized the builder.
@@ -1554,6 +1564,159 @@ bool EquivalenceClass::isConformanceSatisfiedBySuperclass(
   return false;
 }
 
+/// Compare two associated types.
+static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
+                                  AssociatedTypeDecl *assocType2) {
+  // - by name.
+  if (int result = assocType1->getName().str().compare(
+                                              assocType2->getName().str()))
+    return result;
+
+  // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
+  auto proto1 = assocType1->getProtocol();
+  auto proto2 = assocType2->getProtocol();
+  if (int compareProtocols = ProtocolType::compareProtocols(&proto1, &proto2))
+    return compareProtocols;
+
+  // Error case: if we have two associated types with the same name in the
+  // same protocol, just tie-break based on address.
+  if (assocType1 != assocType2)
+    return assocType1 < assocType2 ? -1 : +1;
+
+  return 0;
+}
+
+TypeDecl *EquivalenceClass::lookupNestedType(
+                             Identifier name,
+                             SmallVectorImpl<TypeDecl *> *otherConcreteTypes) {
+  // Populates the result structures from the given cache entry.
+  auto populateResult = [&](const CachedNestedType &cache) -> TypeDecl * {
+    if (otherConcreteTypes)
+      otherConcreteTypes->clear();
+
+    // If there aren't any types in the cache, we're done.
+    if (cache.types.empty()) return nullptr;
+
+    // The first type in the cache is always the final result.
+    // Collect the rest in the concrete-declarations list, if needed.
+    if (otherConcreteTypes) {
+      for (auto type : ArrayRef<TypeDecl *>(cache.types).slice(1)) {
+        otherConcreteTypes->push_back(type);
+      }
+    }
+
+    return cache.types.front();
+  };
+
+  // If we have a cached value that is up-to-date, use that.
+  auto cached = nestedTypeNameCache.find(name);
+  if (cached != nestedTypeNameCache.end() &&
+      cached->second.numConformancesPresent == conformsTo.size() &&
+      (!superclass ||
+       cached->second.superclassPresent == superclass->getCanonicalType())) {
+    ++NumNestedTypeCacheHits;
+    return populateResult(cached->second);
+  }
+
+  // Cache miss; go compute the result.
+  ++NumNestedTypeCacheMisses;
+
+  // Look for types with the given name in protocols that we know about.
+  AssociatedTypeDecl *bestAssocType = nullptr;
+  SmallVector<TypeDecl *, 4> concreteDecls;
+  for (const auto &conforms : conformsTo) {
+    ProtocolDecl *proto = conforms.first;
+
+    // Look for an associated type and/or concrete type with this name.
+    for (auto member : proto->lookupDirect(name,
+                                           /*ignoreNewExtensions=*/true)) {
+      // If this is an associated type, record whether it is the best
+      // associated type we've seen thus far.
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        if (!bestAssocType ||
+             compareAssociatedTypes(assocType, bestAssocType) < 0)
+          bestAssocType = assocType;
+
+        continue;
+      }
+
+      // If this is another type declaration, determine whether we should
+      // record it.
+      if (auto type = dyn_cast<TypeDecl>(member)) {
+        // FIXME: Filter out type declarations that aren't in the same
+        // module as the protocol itself. This is an unprincipled hack, but
+        // provides consistent lookup semantics for the generic signature
+        // builder in all contents.
+        if (type->getDeclContext()->getParentModule()
+              != proto->getParentModule())
+          continue;
+
+        // Resolve the signature of this type.
+        if (!type->hasInterfaceType()) {
+          type->getASTContext().getLazyResolver()->resolveDeclSignature(type);
+          if (!type->hasInterfaceType())
+            continue;
+        }
+
+        concreteDecls.push_back(type);
+        continue;
+      }
+    }
+  }
+
+  // If we haven't found anything yet but have a superclass, look for a type
+  // in the superclass.
+  // FIXME: Shouldn't we always look in the superclass?
+  if (!bestAssocType && concreteDecls.empty() && superclass) {
+    if (auto classDecl = superclass->getClassOrBoundGenericClass()) {
+      SmallVector<ValueDecl *, 2> superclassMembers;
+      classDecl->getParentModule()->lookupQualified(
+          superclass, name,
+          NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers, nullptr,
+          superclassMembers);
+      for (auto member : superclassMembers) {
+        if (auto type = dyn_cast<TypeDecl>(member)) {
+          // Resolve the signature of this type.
+          if (!type->hasInterfaceType()) {
+            type->getASTContext().getLazyResolver()->resolveDeclSignature(type);
+            if (!type->hasInterfaceType())
+              continue;
+          }
+
+          concreteDecls.push_back(type);
+        }
+      }
+    }
+  }
+
+  // Form the new cache entry.
+  CachedNestedType entry;
+  entry.numConformancesPresent = conformsTo.size();
+  entry.superclassPresent =
+    superclass ? superclass->getCanonicalType() : CanType();
+  if (bestAssocType) {
+    entry.types.push_back(bestAssocType);
+    entry.types.insert(entry.types.end(),
+                       concreteDecls.begin(), concreteDecls.end());
+  } else if (!concreteDecls.empty()) {
+    // Find the best concrete type.
+    auto bestConcreteTypeIter =
+      std::min_element(concreteDecls.begin(), concreteDecls.end(),
+                       [](TypeDecl *type1, TypeDecl *type2) {
+                         return TypeDecl::compare(type1, type2) < 0;
+                       });
+
+    // Put the best concrete type first; the rest will follow.
+    entry.types.push_back(*bestConcreteTypeIter);
+    entry.types.insert(entry.types.end(),
+                       concreteDecls.begin(), bestConcreteTypeIter);
+    entry.types.insert(entry.types.end(),
+                       bestConcreteTypeIter + 1, concreteDecls.end());
+  }
+
+  return populateResult((nestedTypeNameCache[name] = std::move(entry)));
+}
+
 void EquivalenceClass::dump(llvm::raw_ostream &out) const {
   out << "Equivalence class represented by "
     << members.front()->getRepresentative()->getDebugName() << ":\n";
@@ -1733,11 +1896,14 @@ GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
                               ->castTo<ProtocolType>());
   if (!conformance) {
     if (!concrete->hasError() && concreteSource->getLoc().isValid()) {
+      Impl->HadAnyError = true;
+
       Diags.diagnose(concreteSource->getLoc(),
                      diag::requires_generic_param_same_type_does_not_conform,
                      concrete, proto->getName());
     }
 
+    Impl->HadAnyError = true;
     paEquivClass->invalidConcreteType = true;
     return nullptr;
   }
@@ -1959,28 +2125,6 @@ auto PotentialArchetype::getRepresentative() const -> PotentialArchetype * {
   }
 
   return result;
-}
-
-/// Compare two associated types.
-static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
-                                  AssociatedTypeDecl *assocType2) {
-  // - by name.
-  if (int result = assocType1->getName().str().compare(
-                                              assocType2->getName().str()))
-    return result;
-
-  // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
-  auto proto1 = assocType1->getProtocol();
-  auto proto2 = assocType2->getProtocol();
-  if (int compareProtocols = ProtocolType::compareProtocols(&proto1, &proto2))
-    return compareProtocols;
-
-  // Error case: if we have two associated types with the same name in the
-  // same protocol, just tie-break based on address.
-  if (assocType1 != assocType2)
-    return assocType1 < assocType2 ? -1 : +1;
-
-  return 0;
 }
 
 /// Whether there are any concrete type declarations in the potential archetype.
@@ -2210,16 +2354,9 @@ PotentialArchetype *PotentialArchetype::getNestedType(
 }
 
 PotentialArchetype *PotentialArchetype::getNestedType(
-                                            AssociatedTypeDecl *assocType,
+                                            TypeDecl *type,
                                             GenericSignatureBuilder &builder) {
-  return updateNestedTypeForConformance(assocType,
-                                        ArchetypeResolutionKind::WellFormed);
-}
-
-PotentialArchetype *PotentialArchetype::getNestedType(
-                                            TypeDecl *getConcreteTypeDecl,
-                                            GenericSignatureBuilder &builder) {
-  return updateNestedTypeForConformance(getConcreteTypeDecl,
+  return updateNestedTypeForConformance(type,
                                         ArchetypeResolutionKind::WellFormed);
 }
 
@@ -2227,94 +2364,21 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
                                            Identifier name,
                                            GenericSignatureBuilder &builder,
                                            ArchetypeResolutionKind kind) {
-  // Look for the best associated type or concrete type within the protocols
-  // we know about.
-  AssociatedTypeDecl *bestAssocType = nullptr;
-  TypeDecl *bestConcreteDecl = nullptr;
   SmallVector<TypeDecl *, 4> concreteDecls;
-  auto rep = getRepresentative();
-  for (auto proto : rep->getConformsTo()) {
-    // Look for an associated type and/or concrete type with this name.
-    AssociatedTypeDecl *assocType = nullptr;
-    TypeDecl *concreteDecl = nullptr;
-    for (auto member : proto->lookupDirect(name,
-                                           /*ignoreNewExtensions=*/true)) {
-      if (!assocType)
-        assocType = dyn_cast<AssociatedTypeDecl>(member);
+  auto bestType =
+    getOrCreateEquivalenceClass()->lookupNestedType(name, &concreteDecls);
 
-      // FIXME: Filter out type declarations that aren't in the protocol itself?
-      if (!concreteDecl && !isa<AssociatedTypeDecl>(member)) {
-        if (!member->hasInterfaceType())
-          builder.getLazyResolver()->resolveDeclSignature(member);
-        if (member->hasInterfaceType())
-          concreteDecl = dyn_cast<TypeDecl>(member);
-      }
-    }
+  // We didn't find any type with this name.
+  if (!bestType) return nullptr;
 
-    if (assocType &&
-        (!bestAssocType ||
-         compareAssociatedTypes(assocType, bestAssocType) < 0))
-      bestAssocType = assocType;
-
-    if (concreteDecl) {
-      // Record every concrete type.
-      concreteDecls.push_back(concreteDecl);
-
-      // Track the best concrete type.
-      if (!bestConcreteDecl ||
-          TypeDecl::compare(concreteDecl, bestConcreteDecl) < 0)
-        bestConcreteDecl = concreteDecl;
-    }
-  }
-
-  // If we found an associated type, use it.
-  PotentialArchetype *resultPA = nullptr;
-  if (bestAssocType) {
-    resultPA = updateNestedTypeForConformance(bestAssocType, kind);
-  }
-
-  // If we have an associated type, drop any concrete decls that aren't in
-  // the same module as the protocol.
-  // FIXME: This is an unprincipled hack for an unprincipled feature.
-  concreteDecls.erase(
-    std::remove_if(concreteDecls.begin(), concreteDecls.end(),
-                   [&](TypeDecl *concreteDecl) {
-      return concreteDecl->getDeclContext()->getParentModule() !=
-        concreteDecl->getDeclContext()
-          ->getAsNominalTypeOrNominalTypeExtensionContext()->getParentModule();
-    }),
-    concreteDecls.end());
-
-  // If we haven't found anything yet but have a superclass, look for a type
-  // in the superclass.
-  if (!resultPA && concreteDecls.empty()) {
-    if (auto superclass = getSuperclass()) {
-      if (auto classDecl = superclass->getClassOrBoundGenericClass()) {
-        SmallVector<ValueDecl *, 2> superclassMembers;
-        classDecl->getParentModule()->lookupQualified(superclass, name, NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers, nullptr,
-            superclassMembers);
-        for (auto member : superclassMembers) {
-          if (auto concreteDecl = dyn_cast<TypeDecl>(member)) {
-            // Track the best concrete type.
-            if (!bestConcreteDecl ||
-                TypeDecl::compare(concreteDecl, bestConcreteDecl) < 0)
-              bestConcreteDecl = concreteDecl;
-
-            concreteDecls.push_back(concreteDecl);
-          }
-        }
-      }
-    }
-  }
+  // Resolve the nested type.
+  auto resultPA = updateNestedTypeForConformance(bestType, kind);
 
   // Update for all of the concrete decls with this name, which will introduce
   // various same-type constraints.
   for (auto concreteDecl : concreteDecls) {
-    auto concreteDeclPA = updateNestedTypeForConformance(
-                                      concreteDecl,
-                                      ArchetypeResolutionKind::WellFormed);
-    if (!resultPA && concreteDecl == bestConcreteDecl)
-      resultPA = concreteDeclPA;
+    (void)updateNestedTypeForConformance(concreteDecl,
+                                         ArchetypeResolutionKind::WellFormed);
   }
 
   return resultPA;
@@ -2325,43 +2389,22 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
                                                  Identifier name,
                                                  ProtocolDecl *proto,
                                                  ArchetypeResolutionKind kind) {
-  /// Determine whether there is an associated type or concrete type with this
-  /// name in this protocol. If not, there's nothing to do.
-  AssociatedTypeDecl *assocType = nullptr;
-  TypeDecl *concreteDecl = nullptr;
-  for (auto member : proto->lookupDirect(name, /*ignoreNewExtensions=*/true)) {
-    if (!assocType)
-      assocType = dyn_cast<AssociatedTypeDecl>(member);
+  // Lookup the best type for this name.
+  auto bestType =
+    getOrCreateEquivalenceClass()->lookupNestedType(name, nullptr);
+  if (!bestType) return nullptr;
 
-    // FIXME: Filter out concrete types that aren't in the protocol itself?
-    if (!concreteDecl && !isa<AssociatedTypeDecl>(member)) {
-      if (!member->hasInterfaceType())
-        proto->getASTContext().getLazyResolver()->resolveDeclSignature(member);
-      if (member->hasInterfaceType())
-        concreteDecl = dyn_cast<TypeDecl>(member);
-    }
-  }
-
-  // There is no associated type or concrete type with this name in this
-  // protocol
-  if (!assocType && !concreteDecl)
-    return nullptr;
-
-  // If we had both an associated type and a concrete type, ignore the latter.
-  // This is for ill-formed code.
-  if (assocType)
-    return updateNestedTypeForConformance(assocType, kind);
-
-  return updateNestedTypeForConformance(concreteDecl, kind);
+  // Form the potential archetype.
+  return updateNestedTypeForConformance(bestType, kind);
 }
 
 PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
-                      PointerUnion<AssociatedTypeDecl *, TypeDecl *> type,
-                      ArchetypeResolutionKind kind) {
-  auto *assocType = type.dyn_cast<AssociatedTypeDecl *>();
-  auto *concreteDecl = type.dyn_cast<TypeDecl *>();
-  if (!assocType && !concreteDecl)
-    return nullptr;
+                                              TypeDecl *type,
+                                              ArchetypeResolutionKind kind) {
+  if (!type) return nullptr;
+
+  AssociatedTypeDecl *assocType = dyn_cast<AssociatedTypeDecl>(type);
+  TypeDecl *concreteDecl = assocType ? nullptr : type;
 
   // If we were asked for a complete, well-formed archetype, make sure we
   // process delayed requirements if anything changed.
@@ -2822,7 +2865,23 @@ GenericSignatureBuilder::GenericSignatureBuilder(
     Context.Stats->getFrontendCounters().NumGenericSignatureBuilders++;
 }
 
-GenericSignatureBuilder::GenericSignatureBuilder(GenericSignatureBuilder &&) = default;
+GenericSignatureBuilder::GenericSignatureBuilder(
+                                         GenericSignatureBuilder &&other)
+  : Context(other.Context), Diags(other.Diags), Impl(std::move(other.Impl))
+{
+  other.Impl.reset();
+
+  if (Impl) {
+    // Update the generic parameters to their canonical types.
+    for (auto &gp : Impl->GenericParams) {
+      gp = gp->getCanonicalType()->castTo<GenericTypeParamType>();
+    }
+
+    // Point each root potential archetype at this generic signature builder.
+    for (auto pa : Impl->PotentialArchetypes)
+      pa->replaceBuilder(this);
+  }
+}
 
 GenericSignatureBuilder::~GenericSignatureBuilder() {
   if (!Impl)
@@ -3372,6 +3431,8 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
     // If a layout requirement was explicitly written on a concrete type,
     // complain.
     if (source.isExplicit() && source.getLoc().isValid()) {
+      Impl->HadAnyError = true;
+
       Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
                      TypeLoc::withoutLoc(resolvedSubject->getType()));
       return ConstraintResult::Concrete;
@@ -3515,6 +3576,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         subjectType = subject.get<PotentialArchetype *>()
                         ->getDependentType(Impl->GenericParams);
 
+      Impl->HadAnyError = true;
       Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
                      TypeLoc::withoutLoc(subjectType),
                      TypeLoc::withoutLoc(constraintType));
@@ -3543,6 +3605,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     // One cannot explicitly write a constraint on a concrete type.
     if (source.isExplicit()) {
       if (source.getLoc().isValid()) {
+        Impl->HadAnyError = true;
         Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
                        TypeLoc::withoutLoc(resolvedSubject->getType()));
       }
@@ -3633,13 +3696,8 @@ void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
   auto parentRepPA = parentPA->getRepresentative();
   if (parentPA == parentRepPA) return;
 
-  PotentialArchetype *existingPA;
-  if (auto assocType = nestedPA->getResolvedAssociatedType()) {
-    existingPA = parentRepPA->getNestedType(assocType, *this);
-  } else {
-    existingPA = parentRepPA->getNestedType(nestedPA->getConcreteTypeDecl(),
-                                            *this);
-  }
+  PotentialArchetype *existingPA =
+    parentRepPA->getNestedType(nestedPA->getResolvedType(), *this);
 
   auto sameNamedSource =
     FloatingRequirementSource::forNestedTypeNameMatch(
@@ -3893,8 +3951,11 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
                                  UnresolvedHandlingKind unresolvedHandling) {
   return addSameTypeRequirement(paOrT1, paOrT2, source, unresolvedHandling,
                                 [&](Type type1, Type type2) {
-      Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
-                     type1, type2);
+      Impl->HadAnyError = true;
+      if (source.getLoc().isValid()) {
+        Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
+                       type1, type2);
+      }
     });
 }
 
@@ -4071,6 +4132,8 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
         !Req->getSecondType()->hasTypeParameter()) {
       if (!Req->getFirstType()->hasError() &&
           !Req->getSecondType()->hasError()) {
+        Impl->HadAnyError = true;
+
         Diags.diagnose(Req->getEqualLoc(),
                        diag::requires_no_same_type_archetype)
           .highlight(Req->getFirstTypeLoc().getSourceRange())
@@ -4170,9 +4233,11 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
         firstType, secondType, source,
         UnresolvedHandlingKind::GenerateConstraints,
         [&](Type type1, Type type2) {
-          if (source.getLoc().isValid())
+          Impl->HadAnyError = true;
+          if (source.getLoc().isValid()) {
             Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
                            type1, type2);
+          }
         });
   }
   }
@@ -4517,6 +4582,8 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
       if (isRecursiveConcreteType(archetype, /*isSuperclass=*/false)) {
         if (auto constraint =
               equivClass->findAnyConcreteConstraintAsWritten()) {
+          Impl->HadAnyError = true;
+
           Diags.diagnose(constraint->source->getLoc(),
                          diag::recursive_same_type_constraint,
                          archetype->getDependentType(genericParams),
@@ -4533,6 +4600,8 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
     if (equivClass->superclass) {
       if (isRecursiveConcreteType(archetype, /*isSuperclass=*/true)) {
         if (auto source = equivClass->findAnySuperclassConstraintAsWritten()) {
+          Impl->HadAnyError = true;
+
           Diags.diagnose(source->source->getLoc(),
                          diag::recursive_superclass_constraint,
                          source->archetype->getDependentType(genericParams),
@@ -4594,10 +4663,13 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
       // because then we don't actually have a parameter.
       auto equivClass = rep->getOrCreateEquivalenceClass();
       if (equivClass->concreteType) {
-        if (auto constraint = equivClass->findAnyConcreteConstraintAsWritten())
+        if (auto constraint = equivClass->findAnyConcreteConstraintAsWritten()){
+          Impl->HadAnyError = true;
+
           Diags.diagnose(constraint->source->getLoc(),
                          diag::requires_generic_param_made_equal_to_concrete,
                          rep->getDependentType(genericParams));
+        }
         continue;
       }
 
@@ -4627,6 +4699,8 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         }
 
         if (repConstraint && repConstraint->source->getLoc().isValid()) {
+          Impl->HadAnyError = true;
+
           Diags.diagnose(repConstraint->source->getLoc(),
                          diag::requires_generic_params_made_equal,
                          pa->getDependentType(genericParams),
@@ -4906,6 +4980,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       // The requirement conflicts. If this constraint has a location, complain
       // about it.
       if (constraint.source->getLoc().isValid()) {
+        Impl->HadAnyError = true;
+
         auto subject = getSubjectType(constraint.archetype);
         Diags.diagnose(constraint.source->getLoc(), *conflictingDiag,
                        subject.first, subject.second,
@@ -4920,6 +4996,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       // do so now.
       if (!diagnosedConflictingRepresentative &&
           representativeConstraint->source->getLoc().isValid()) {
+        Impl->HadAnyError = true;
+
         auto subject = getSubjectType(representativeConstraint->archetype);
         Diags.diagnose(representativeConstraint->source->getLoc(),
                        *conflictingDiag,
@@ -4936,6 +5014,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
     case ConstraintRelation::Redundant:
       // If this requirement is not derived or inferred (but has a useful
       // location) complain that it is redundant.
+      Impl->HadAnyRedundantConstraints = true;
       if (!constraint.source->isDerivedRequirement() &&
           !constraint.source->isInferredRequirement(
             /*includeQuietInferred=*/true) &&
@@ -5903,6 +5982,8 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
     if (!equivClass->superclass->isExactSuperclassOf(equivClass->concreteType)) {
       if (auto existing = equivClass->findAnyConcreteConstraintAsWritten(
                             representativeConstraint.archetype)) {
+        Impl->HadAnyError = true;
+
         Diags.diagnose(existing->source->getLoc(), diag::type_does_not_inherit,
                        existing->archetype->getDependentType(
                                                    genericParams),
@@ -5910,6 +5991,8 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
 
         // FIXME: Note the representative constraint.
       } else if (representativeConstraint.source->getLoc().isValid()) {
+        Impl->HadAnyError = true;
+
         Diags.diagnose(representativeConstraint.source->getLoc(),
                        diag::type_does_not_inherit,
                        representativeConstraint.archetype->getDependentType(
@@ -6293,21 +6376,53 @@ static void collectRequirements(GenericSignatureBuilder &builder,
   });
 }
 
-GenericSignature *GenericSignatureBuilder::getGenericSignature() {
-  assert(Impl->finalized && "Must finalize builder first");
+GenericSignature *GenericSignatureBuilder::computeGenericSignature(
+                                          ModuleDecl &module,
+                                          SourceLoc loc,
+                                          bool allowConcreteGenericParams) && {
+  // Finalize the builder, producing any necessary diagnostics.
+  finalize(loc, Impl->GenericParams, allowConcreteGenericParams);
 
   // Collect the requirements placed on the generic parameter types.
   SmallVector<Requirement, 4> requirements;
   collectRequirements(*this, Impl->GenericParams, requirements);
 
+  // Form the generic signature.
   auto sig = GenericSignature::get(Impl->GenericParams, requirements);
-  return sig;
-}
 
-GenericSignature *GenericSignatureBuilder::computeGenericSignature(
-                                          SourceLoc loc,
-                                          bool allowConcreteGenericParams) {
-  finalize(loc, Impl->GenericParams, allowConcreteGenericParams);
-  return getGenericSignature();
+  // Was this a requirement signature?
+  bool isRequirementSignature = false;
+  if (auto firstEquivClass =
+        Impl->PotentialArchetypes.front()->getEquivalenceClassIfPresent()) {
+    if (!firstEquivClass->conformsTo.empty() &&
+        firstEquivClass->conformsTo.front().second.front().source->getRoot()
+          ->kind == RequirementSource::RequirementSignatureSelf)
+      isRequirementSignature = true;
+  }
+
+  // When we can, move this generic signature builder to make it the canonical
+  // builder, rather than constructing a new generic signature builder that
+  // will produce the same thing.
+  //
+  // We cannot do this for requirement signatures (because they aren't
+  // fully-formed generic signatures) or when there were errors.
+  // FIXME: hadAnyError() is a big over-approximation here.
+  // FIXME: The HadAnyRedundantConstraints bit is a hack because we are
+  // over-minimizing.
+  if (!isRequirementSignature && !Impl->HadAnyError &&
+      !Impl->HadAnyRedundantConstraints) {
+    // Set the conformance lookup function to something that works canonically.
+    Impl->LookupConformance = LookUpConformanceInModule(&module);
+
+    // Register this generic signature builer as the canonical builder for the
+    // given signature.
+    Context.registerGenericSignatureBuilder(sig, module, std::move(*this));
+  }
+
+  // Wipe out the internal state, ensuring that nobody uses this builder for
+  // anything more.
+  Impl.reset();
+
+  return sig;
 }
 

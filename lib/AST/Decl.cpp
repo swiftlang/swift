@@ -3419,7 +3419,8 @@ void ProtocolDecl::computeRequirementSignature() {
          nullptr);
 
   // Compute and record the signature.
-  auto requirementSig = builder.computeGenericSignature(SourceLoc());
+  auto requirementSig =
+    std::move(builder).computeGenericSignature(*module, SourceLoc());
   RequirementSignature = requirementSig->getRequirements().data();
   assert(RequirementSignature != nullptr);
   NumRequirementsInSignature = requirementSig->getRequirements().size();
@@ -4217,10 +4218,11 @@ ParamDecl::ParamDecl(Specifier specifier,
 
 /// Clone constructor, allocates a new ParamDecl identical to the first.
 /// Intentionally not defined as a copy constructor to avoid accidental copies.
-ParamDecl::ParamDecl(ParamDecl *PD)
+ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
   : VarDecl(DeclKind::Param, /*IsStatic*/false, PD->getSpecifier(),
             /*IsCaptureList*/false, PD->getNameLoc(), PD->getName(),
-            PD->hasType() ? PD->getType() : Type(), PD->getDeclContext()),
+            PD->hasType() && withTypes? PD->getType() : Type(),
+            PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     SpecifierLoc(PD->getSpecifierLoc()),
@@ -4228,7 +4230,10 @@ ParamDecl::ParamDecl(ParamDecl *PD)
     IsTypeLocImplicit(PD->IsTypeLocImplicit),
     defaultArgumentKind(PD->defaultArgumentKind) {
   typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
-  if (PD->hasInterfaceType())
+  if (!withTypes && typeLoc.getTypeRepr())
+    typeLoc.setType(Type());
+
+  if (withTypes && PD->hasInterfaceType())
     setInterfaceType(PD->getInterfaceType());
 }
 
