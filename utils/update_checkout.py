@@ -182,14 +182,10 @@ def get_timestamp_to_match(args):
 def update_all_repositories(args, config, scheme_name, cross_repos_pr):
     scheme_map = None
     if scheme_name:
-        # This loop is only correct, since we know that each alias set has
-        # unique contents. This is checked by validate_config. Thus the first
-        # branch scheme data that has scheme_name as one of its aliases is
-        # the only possible correct answer.
-        for v in config['branch-schemes'].values():
-            if scheme_name in v['aliases']:
-                scheme_map = v['repos']
-                break
+        scheme = scheme_named(config, scheme_name)
+        if scheme is not None:
+            scheme_map = scheme['repos']
+
     pool_args = []
     timestamp = get_timestamp_to_match(args)
     for repo_name in config['repos'].keys():
@@ -266,11 +262,9 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
 
             repo_branch = None
             if scheme_name:
-                for v in config['branch-schemes'].values():
-                    if scheme_name not in v['aliases']:
-                        continue
-                    repo_branch = v['repos'][repo_name]
-                    break
+                scheme = scheme_named(config, scheme_name)
+                if scheme is not None:
+                    repo_branch = scheme['repos'][repo_name]
                 else:
                     repo_branch = scheme_name
 
@@ -309,7 +303,7 @@ def dump_hashes_config(args, config):
     for config_copy_key in config_copy_keys:
         new_config[config_copy_key] = config[config_copy_key]
     repos = {}
-    branch_scheme = {'aliases': [branch_scheme_name], 'repos': repos}
+    branch_scheme = {'aliases': [], 'repos': repos}
     new_config['branch-schemes'] = {args.dump_hashes_config: branch_scheme}
     for repo_name, repo_info in sorted(config['repos'].items(),
                                        key=lambda x: x[0]):
@@ -333,20 +327,18 @@ def validate_config(config):
     scheme_names = schemes.keys()
     ensure_unique(scheme_names, 'Configuration file has duplicate schemes?!')
 
-    # Ensure the branch-scheme name is also an alias
-    # This guarantees sensible behavior of update_repository_to_scheme when
-    # the branch-scheme is passed as the scheme name
-    for scheme_name, scheme in schemes.items():
-        if scheme_name not in scheme['aliases']:
-            raise RuntimeError('branch-scheme name: "{0}" must be an alias '
-                               'too.'.format(scheme_name))
-
     aliases = []
     for scheme in schemes.values():
         aliases.extend(scheme['aliases'])
 
     ensure_unique(aliases,
                   'Configuration file has schemes with duplicate aliases?!')
+
+
+def scheme_named(config, name):
+    for k, v in config['branch-schemes'].items():
+        if name == k or name in v['aliases']:
+            return v
 
 
 def abspath_of_relative_file(file):
