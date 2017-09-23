@@ -34,6 +34,13 @@ func typoAssoc3<T : P2, U : P2>(t: T, u: U)
 // expected-error@+1{{'T' does not have a member type named 'Assocp2'; did you mean 'AssocP2'?}}{{39-46=AssocP2}}
 func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 
+
+// CHECK-GENERIC-LABEL: .typoAssoc4@
+// CHECK-GENERIC-NEXT: Requirements:
+// CHECK-GENERIC-NEXT:   τ_0_0 : P2 [τ_0_0: Explicit @ {{.*}}:21]
+// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2 : P1 [τ_0_0: Explicit @ {{.*}}:21 -> Protocol requirement (via Self.AssocP2 in P2)
+// CHECK-GENERIC-NEXT: Potential archetypes
+
 // <rdar://problem/19620340>
 
 func typoFunc1<T : P1>(x: TypoType) { // expected-error{{use of undeclared type 'TypoType'}}

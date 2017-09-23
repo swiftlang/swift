@@ -88,12 +88,11 @@ ParameterList *ParameterList::clone(const ASTContext &C,
   SmallVector<ParamDecl*, 8> params(begin(), end());
 
   // Remap the ParamDecls inside of the ParameterList.
-  bool withTypes = !options.contains(ParameterList::WithoutTypes);
   for (auto &decl : params) {
     bool hadDefaultArgument =
         decl->getDefaultArgumentKind() == DefaultArgumentKind::Normal;
 
-    decl = new (C) ParamDecl(decl, withTypes);
+    decl = new (C) ParamDecl(decl);
     if (options & Implicit)
       decl->setImplicit();
 
