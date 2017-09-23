@@ -91,15 +91,18 @@ template<> void ProtocolConformanceRecord::dump() const {
 /// Take the type reference inside a protocol conformance record and fetch the
 /// canonical metadata pointer for the type it refers to.
 /// Returns nil for universal or generic type references.
-template<> const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata()
-const {
+template <>
+const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
   switch (getTypeKind()) {
   case TypeMetadataRecordKind::UniqueDirectType:
     // Already unique.
     return getDirectType();
-  case TypeMetadataRecordKind::NonuniqueDirectType:
+  case TypeMetadataRecordKind::NonuniqueDirectType: {
     // Ask the runtime for the unique metadata record we've canonized.
-    return swift_getForeignTypeMetadata((ForeignTypeMetadata*)getDirectType());
+    const ForeignTypeMetadata *FMD =
+        static_cast<const ForeignTypeMetadata *>(getDirectType());
+    return swift_getForeignTypeMetadata(const_cast<ForeignTypeMetadata *>(FMD));
+  }
   case TypeMetadataRecordKind::UniqueIndirectClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata. The class additionally may be weak-linked, so we have to check
