@@ -30,6 +30,7 @@ import ArrayOfGenericPOD
 import ArrayOfGenericRef
 import ArrayOfPOD
 import ArrayOfRef
+import ArraySetElement
 import ArraySubscript
 import BitCount
 import ByteSwap
@@ -137,6 +138,7 @@ private func registerBenchmark(_ bench: BenchmarkInfo) {
   registeredBenchmarks.append(bench)
 }
 
+registerBenchmark(ArraySetElement)
 registerBenchmark(ObjectAllocation)
 
 // The main test suite: precommit tests

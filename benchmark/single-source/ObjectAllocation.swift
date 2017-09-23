@@ -13,10 +13,13 @@
 import TestsUtils
 
 // This test checks the performance of allocations.
+// 53% _swift_release_dealloc
+// 30% _swift_alloc_object
+// 10% retain/release
 public var ObjectAllocation = BenchmarkInfo(
   name: "ObjectAllocation",
   runFunction: run_ObjectAllocation,
-  tags: [.runtime]
+  tags: [.runtime, .cpubench]
 )
 
 final class XX {
