@@ -780,7 +780,7 @@ bad (`exit 1`), or should be skipped (`exit 125`).
 How the test-script determines the presence of a regression is up to you: a
 typical approach is to measure against a baseline (eg. using
 `utils/process-stats-dir.py --compare-to-csv-baseline`, if your regression range
-covers compilers that all support `--output-stats-dir`). Alternatively, just
+covers compilers that all support `-stats-output-dir`). Alternatively, just
 measure raw time or instruction counts. An example script that uses the
 `perf`-based `count_instructions` shell function (see the section on `perf`) to
 judge whether a revision contains a bug looks something like this:
