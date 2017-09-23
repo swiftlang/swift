@@ -303,7 +303,7 @@ def dump_hashes_config(args, config):
     for config_copy_key in config_copy_keys:
         new_config[config_copy_key] = config[config_copy_key]
     repos = {}
-    branch_scheme = {'aliases': [], 'repos': repos}
+    branch_scheme = {'repos': repos}
     new_config['branch-schemes'] = {args.dump_hashes_config: branch_scheme}
     for repo_name, repo_info in sorted(config['repos'].items(),
                                        key=lambda x: x[0]):
@@ -329,7 +329,7 @@ def validate_config(config):
 
     aliases = []
     for scheme in schemes.values():
-        aliases.extend(scheme['aliases'])
+        aliases.extend(scheme.get('aliases', []))
 
     ensure_unique(aliases,
                   'Configuration file has schemes with duplicate aliases?!')
@@ -337,7 +337,7 @@ def validate_config(config):
 
 def scheme_named(config, name):
     for k, v in config['branch-schemes'].items():
-        if name == k or name in v['aliases']:
+        if name == k or name in v.get('aliases', []):
             return v
 
 
@@ -472,7 +472,7 @@ create any new checkouts).
 
     clone_results = None
     if clone or clone_with_ssh:
-        # If branch is None, default to using the default branch alias
+        # If branch is None, default to using the default branch name
         # specified by our configuration file.
         if scheme is None:
             scheme = config['default-branch-scheme']
