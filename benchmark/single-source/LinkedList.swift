@@ -14,6 +14,14 @@
 // utils/benchmark, with modifications for performance measuring.
 import TestsUtils
 
+// 47% _swift_retain
+// 43% _swift_release
+public var LinkedList = BenchmarkInfo(
+  name: "LinkedList",
+  runFunction: run_LinkedList,
+  tags: [.runtime, .cpubench, .refcount]
+)
+
 final class Node {
   var next: Node?
   var data: Int
