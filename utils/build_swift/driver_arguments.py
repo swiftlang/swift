@@ -153,6 +153,7 @@ def _apply_default_arguments(args):
         args.build_watchos = False
         args.build_android = False
         args.build_benchmarks = False
+        args.build_external_benchmarks = False
         args.build_lldb = False
         args.build_llbuild = False
         args.build_swiftpm = False
@@ -769,6 +770,12 @@ iterations with -O",
         "--skip-build-benchmarks",
         dest='build_benchmarks',
         action=arguments.action.optional_false,
+        help="skip building Swift Benchmark Suite")
+
+    run_build_group.add_argument(
+        "--build-external-benchmarks",
+        dest='build_external_benchmarks',
+        action=arguments.action.optional_true,
         help="skip building Swift Benchmark Suite")
 
     skip_test_group = parser.add_argument_group(
