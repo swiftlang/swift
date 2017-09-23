@@ -126,6 +126,7 @@ KNOWN_SETTINGS=(
     skip-build-libdispatch      ""               "set to skip building libdispatch"
     skip-build-libicu           ""               "set to skip building libicu"
     skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
+    skip-build-external-benchmarks "1"            "set to skip building the external Swift Benchmark Suite. (skipped by default)"
     skip-build-playgroundlogger ""               "set to skip building PlaygroundLogger"
     skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
     skip-test-cmark             ""               "set to skip testing CommonMark"
@@ -1324,6 +1325,7 @@ function calculate_targets_for_host() {
         local test_this_target=1
         local test_host_only=
         local build_benchmark_this_target=
+        local build_external_benchmark_this_target=
         local test_benchmark_this_target=
 
         case ${stdlib_deployment_target} in
@@ -1352,6 +1354,7 @@ function calculate_targets_for_host() {
                 build_for_this_target=$(not ${SKIP_BUILD_OSX})
                 test_this_target=$(not ${SKIP_TEST_OSX})
                 build_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
+                build_external_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
                 test_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
                 ;;
             iphoneos-*)
@@ -1363,10 +1366,12 @@ function calculate_targets_for_host() {
                     test_this_target=
                 fi
                 build_benchmark_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
+                build_external_benchmark_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
 
                 # Never build iOS armv7s benchmarks.
                 if [[ "${stdlib_deployment_target}" == "iphoneos-armv7s" ]]; then
                     build_benchmark_this_target=
+                    build_external_benchmark_this_target=
                 fi
                 ;;
             iphonesimulator-x86_64)
@@ -1391,6 +1396,7 @@ function calculate_targets_for_host() {
                     test_this_target=
                 fi
                 build_benchmark_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
+                build_external_benchmark_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
                 ;;
             appletvsimulator-*)
                 swift_sdk="TVOS_SIMULATOR"
@@ -1406,6 +1412,7 @@ function calculate_targets_for_host() {
                     test_this_target=
                 fi
                 build_benchmark_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
+                build_external_benchmark_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
                 ;;
             watchsimulator-*)
                 swift_sdk="WATCHOS_SIMULATOR"
@@ -1443,6 +1450,16 @@ function calculate_targets_for_host() {
               SWIFT_RUN_BENCHMARK_TARGETS+=("check-swift-benchmark-${stdlib_deployment_target}")
             fi
         fi
+
+        if [[ "$(true_false ${SKIP_BUILD_EXTERNAL_BENCHMARKS})" == "FALSE"  ]] &&
+           [[ "${build_external_benchmark_this_target}" ]] &&
+           [[ "${is_in_build_list}" ]] ; then
+            SWIFT_BENCHMARK_TARGETS+=("swift-benchmark-${stdlib_deployment_target}-external")
+            if [[ $(not ${SKIP_TEST_BENCHMARK}) ]] ; then
+                SWIFT_RUN_BENCHMARK_TARGETS+=("check-swift-benchmark-${stdlib_deployment_target}-external")
+            fi
+        fi
+
         if [[ "${test_this_target}" ]] && [[ "${is_in_build_list}" ]]; then
             test_target_suffix=""
             if [[ -n "${test_host_only}" ]] ; then
@@ -2098,13 +2115,16 @@ for host in "${ALL_HOSTS[@]}"; do
 
                     # Don't build benchmarks and tests when building cross compiler.
                     build_perf_testsuite_this_time=false
+                    build_external_perf_testsuite_this_time=false
                     build_tests_this_time=false
 
                     native_llvm_tools_path="$(build_directory "${LOCAL_HOST}" llvm)/bin"
                     native_clang_tools_path="$(build_directory "${LOCAL_HOST}" llvm)/bin"
                     native_swift_tools_path="$(build_directory "${LOCAL_HOST}" swift)/bin"
                 else
+                    # FIXME: Why is the next line not using false_true?
                     build_perf_testsuite_this_time=$(true_false "$(not ${SKIP_BUILD_BENCHMARKS})")
+                    build_external_perf_testsuite_this_time=$(false_true "${SKIP_BUILD_EXTERNAL_BENCHMARKS}")
                     build_tests_this_time=${SWIFT_INCLUDE_TESTS}
                 fi
 
@@ -2162,6 +2182,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_DYNAMIC_SDK_OVERLAY}")
                     -DSWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_STATIC_SDK_OVERLAY}")
                     -DSWIFT_BUILD_PERF_TESTSUITE:BOOL=$(true_false "${build_perf_testsuite_this_time}")
+                    -DSWIFT_BUILD_EXTERNAL_PERF_TESTSUITE:BOOL=$(true_false "${build_external_perf_testsuite_this_time}")
                     -DSWIFT_BUILD_EXAMPLES:BOOL=$(true_false "${BUILD_SWIFT_EXAMPLES}")
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
                     -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
