@@ -1969,10 +1969,8 @@ bool RefactoringActionConvertToDoCatch::performChange() {
     return true;
   // Wrap given range in do catch block.
   EditConsumer.accept(SM, Range.getStart(), "do {\n");
-  auto CatchReplacement = "\n} catch {\n" + getCodePlaceholder().str() + "\n}";
-  EditConsumer.accept(SM,
-                      Range.getEnd(),
-                      StringRef(CatchReplacement));
+  EditorConsumerInsertStream OS(EditConsumer, SM, Range.getEnd());
+  OS << "\n} catch {\n" << getCodePlaceholder() << "\n}";
 
   // Delete ! from try! expression
   auto ExclaimRange = CharSourceRange(TryExpr->getExclaimLoc(), 1);
