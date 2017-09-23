@@ -7653,8 +7653,7 @@ GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     (void) result;
   }
 
-  return std::move(builder).computeGenericSignature(*dc->getParentModule(),
-                                                    SourceLoc());
+  return builder.computeGenericSignature(SourceLoc());
 }
 
 // Calculate the generic environment from an imported generic param list.

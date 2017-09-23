@@ -128,15 +128,9 @@ public:
     Implicit = 0x01,
     /// The cloned pattern is for an inherited constructor; mark default
     /// arguments as inherited, and mark unnamed arguments as named.
-    Inherited = 0x02,
-    /// The cloned pattern will strip type information.
-    WithoutTypes = 0x04,
+    Inherited = 0x02
   };
-
-  friend OptionSet<CloneFlags> operator|(CloneFlags flag1, CloneFlags flag2) {
-    return OptionSet<CloneFlags>(flag1) | flag2;
-  }
-
+  
   /// Make a duplicate copy of this parameter list.  This allocates copies of
   /// the ParamDecls, so they can be reparented into a new DeclContext.
   ParameterList *clone(const ASTContext &C,
