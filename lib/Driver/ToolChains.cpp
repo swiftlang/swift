@@ -1514,7 +1514,7 @@ bool toolchains::GenericUnix::shouldProvideRPathToLinker() const {
 
 std::string toolchains::GenericUnix::getPreInputObjectPath(
     StringRef RuntimeLibraryPath) const {
-  // On Linux and FreeBSD (really, ELF binaries) we need to add objects
+  // On Linux and FreeBSD and Haiku (really, ELF binaries) we need to add objects
   // to provide markers and size for the metadata sections.
   SmallString<128> PreInputObjectPath = RuntimeLibraryPath;
   llvm::sys::path::append(PreInputObjectPath,
@@ -1559,7 +1559,13 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Linker = getDefaultLinker();
   }
   if (!Linker.empty()) {
+#if defined(__HAIKU__)
+    // For now, passing -fuse-ld on Haiku doesn't work as swiftc doesn't recognise
+    // it. Passing -use-ld= as the argument works fine.
+    Arguments.push_back(context.Args.MakeArgString("-use-ld=" + Linker));
+#else
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
+#endif
   }
 
   // Configure the toolchain.
