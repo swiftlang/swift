@@ -1156,7 +1156,10 @@ RequirementEnvironment::RequirementEnvironment(
   // Produce the generic signature and environment.
   // FIXME: Pass in a source location for the conformance, perhaps? It seems
   // like this could fail.
-  syntheticSignature = builder.computeGenericSignature(SourceLoc());
+  syntheticSignature =
+    std::move(builder).computeGenericSignature(
+                                           *conformanceDC->getParentModule(),
+                                           SourceLoc());
   syntheticEnvironment = syntheticSignature->createGenericEnvironment(
                                              *conformanceDC->getParentModule());
 }

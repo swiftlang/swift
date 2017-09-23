@@ -130,14 +130,14 @@ public:
 /// to check the signature of a generic declaration and resolve (for example)
 /// all dependent member refers to archetype members.
 class CompleteGenericTypeResolver : public GenericTypeResolver {
-  TypeChecker &TC;
-  GenericSignatureBuilder &Builder;
-  ArrayRef<GenericTypeParamType *> GenericParams;
+  TypeChecker &tc;
+  GenericSignature *genericSig;
+  ModuleDecl &module;
+  GenericSignatureBuilder &builder;
 
 public:
-  CompleteGenericTypeResolver(TypeChecker &tc, GenericSignatureBuilder &builder,
-                              ArrayRef<GenericTypeParamType *> genericParams)
-    : TC(tc), Builder(builder), GenericParams(genericParams) { }
+  CompleteGenericTypeResolver(TypeChecker &tc, GenericSignature *genericSig,
+                              ModuleDecl &module);
 
   virtual Type mapTypeIntoContext(Type type);
 
