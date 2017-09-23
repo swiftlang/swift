@@ -42,18 +42,32 @@ getChildrenMaxResidentSetSize() {
 }
 
 static std::string
-makeFileName(StringRef ProgramName,
-             StringRef AuxName) {
+makeFileName(StringRef Prefix,
+             StringRef ProgramName,
+             StringRef AuxName,
+             StringRef Suffix) {
   std::string tmp;
   raw_string_ostream stream(tmp);
   auto now = std::chrono::system_clock::now();
-  stream << "stats"
+  stream << Prefix
          << "-" << now.time_since_epoch().count()
          << "-" << ProgramName
          << "-" << AuxName
          << "-" << Process::GetRandomNumber()
-         << ".json";
+         << "." << Suffix;
   return stream.str();
+}
+
+static std::string
+makeStatsFileName(StringRef ProgramName,
+                  StringRef AuxName) {
+  return makeFileName("stats", ProgramName, AuxName, "json");
+}
+
+static std::string
+makeTraceFileName(StringRef ProgramName,
+                  StringRef AuxName) {
+  return makeFileName("trace", ProgramName, AuxName, "csv");
 }
 
 // LLVM's statistics-reporting machinery is sensitive to filenames containing
@@ -108,29 +122,39 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef TripleName,
                                            StringRef OutputType,
                                            StringRef OptType,
-                                           StringRef Directory)
+                                           StringRef Directory,
+                                           SourceManager *SM,
+                                           bool TraceEvents)
   : UnifiedStatsReporter(ProgramName,
                          auxName(ModuleName,
                                  InputName,
                                  TripleName,
                                  OutputType,
                                  OptType),
-                         Directory)
+                         Directory,
+                         SM, TraceEvents)
 {
 }
 
 UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef AuxName,
-                                           StringRef Directory)
-  : Filename(Directory),
+                                           StringRef Directory,
+                                           SourceManager *SM,
+                                           bool TraceEvents)
+  : StatsFilename(Directory),
+    TraceFilename(Directory),
     StartedTime(llvm::TimeRecord::getCurrentTime()),
     Timer(make_unique<NamedRegionTimer>(AuxName,
                                         "Building Target",
-                                        ProgramName, "Running Program"))
+                                        ProgramName, "Running Program")),
+    SourceMgr(SM)
 {
-  path::append(Filename, makeFileName(ProgramName, AuxName));
+  path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
+  path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
   EnableStatistics(/*PrintOnExit=*/false);
   SharedTimer::enableCompilationTimers();
+  if (TraceEvents)
+    LastTracedFrontendCounters = make_unique<AlwaysOnFrontendCounters>();
 }
 
 UnifiedStatsReporter::AlwaysOnDriverCounters &
@@ -149,101 +173,29 @@ UnifiedStatsReporter::getFrontendCounters()
   return *FrontendCounters;
 }
 
-#define PUBLISH_STAT(C,TY,NAME)                               \
-  do {                                                        \
-    static Statistic Stat = {TY, #NAME, #NAME, {0}, false};   \
-    Stat += (C).NAME;                                         \
-  } while (0)
-
 void
 UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
   if (FrontendCounters) {
     auto &C = getFrontendCounters();
-
-    PUBLISH_STAT(C, "AST", NumSourceBuffers);
-    PUBLISH_STAT(C, "AST", NumSourceLines);
-    PUBLISH_STAT(C, "AST", NumSourceLinesPerSecond);
-    PUBLISH_STAT(C, "AST", NumLinkLibraries);
-    PUBLISH_STAT(C, "AST", NumLoadedModules);
-    PUBLISH_STAT(C, "AST", NumImportedExternalDefinitions);
-    PUBLISH_STAT(C, "AST", NumTotalClangImportedEntities);
-    PUBLISH_STAT(C, "AST", NumASTBytesAllocated);
-    PUBLISH_STAT(C, "AST", NumDependencies);
-    PUBLISH_STAT(C, "AST", NumReferencedTopLevelNames);
-    PUBLISH_STAT(C, "AST", NumReferencedDynamicNames);
-    PUBLISH_STAT(C, "AST", NumReferencedMemberNames);
-    PUBLISH_STAT(C, "AST", NumDecls);
-    PUBLISH_STAT(C, "AST", NumLocalTypeDecls);
-    PUBLISH_STAT(C, "AST", NumObjCMethods);
-    PUBLISH_STAT(C, "AST", NumInfixOperators);
-    PUBLISH_STAT(C, "AST", NumPostfixOperators);
-    PUBLISH_STAT(C, "AST", NumPrefixOperators);
-    PUBLISH_STAT(C, "AST", NumPrecedenceGroups);
-    PUBLISH_STAT(C, "AST", NumUsedConformances);
-
-    PUBLISH_STAT(C, "Sema", NumConformancesDeserialized);
-    PUBLISH_STAT(C, "Sema", NumConstraintScopes);
-    PUBLISH_STAT(C, "Sema", NumDeclsDeserialized);
-    PUBLISH_STAT(C, "Sema", NumDeclsValidated);
-    PUBLISH_STAT(C, "Sema", NumFunctionsTypechecked);
-    PUBLISH_STAT(C, "Sema", NumGenericSignatureBuilders);
-    PUBLISH_STAT(C, "Sema", NumLazyGenericEnvironments);
-    PUBLISH_STAT(C, "Sema", NumLazyGenericEnvironmentsLoaded);
-    PUBLISH_STAT(C, "Sema", NumLazyIterableDeclContexts);
-    PUBLISH_STAT(C, "Sema", NominalTypeLookupDirectCount);
-    PUBLISH_STAT(C, "Sema", NumTypesDeserialized);
-    PUBLISH_STAT(C, "Sema", NumTypesValidated);
-    PUBLISH_STAT(C, "Sema", NumUnloadedLazyIterableDeclContexts);
-
-    PUBLISH_STAT(C, "SILModule", NumSILGenFunctions);
-    PUBLISH_STAT(C, "SILModule", NumSILGenVtables);
-    PUBLISH_STAT(C, "SILModule", NumSILGenWitnessTables);
-    PUBLISH_STAT(C, "SILModule", NumSILGenDefaultWitnessTables);
-    PUBLISH_STAT(C, "SILModule", NumSILGenGlobalVariables);
-
-    PUBLISH_STAT(C, "SILModule", NumSILOptFunctions);
-    PUBLISH_STAT(C, "SILModule", NumSILOptVtables);
-    PUBLISH_STAT(C, "SILModule", NumSILOptWitnessTables);
-    PUBLISH_STAT(C, "SILModule", NumSILOptDefaultWitnessTables);
-    PUBLISH_STAT(C, "SILModule", NumSILOptGlobalVariables);
-
-    PUBLISH_STAT(C, "IRModule", NumIRGlobals);
-    PUBLISH_STAT(C, "IRModule", NumIRFunctions);
-    PUBLISH_STAT(C, "IRModule", NumIRAliases);
-    PUBLISH_STAT(C, "IRModule", NumIRIFuncs);
-    PUBLISH_STAT(C, "IRModule", NumIRNamedMetaData);
-    PUBLISH_STAT(C, "IRModule", NumIRValueSymbols);
-    PUBLISH_STAT(C, "IRModule", NumIRComdatSymbols);
-    PUBLISH_STAT(C, "IRModule", NumIRBasicBlocks);
-    PUBLISH_STAT(C, "IRModule", NumIRInsts);
-
-    PUBLISH_STAT(C, "LLVM", NumLLVMBytesOutput);
+#define FRONTEND_STATISTIC(TY, NAME)                            \
+    do {                                                        \
+      static Statistic Stat = {#TY, #NAME, #NAME, {0}, false};  \
+      Stat += (C).NAME;                                         \
+    } while (0);
+#include "swift/Basic/Statistics.def"
+#undef FRONTEND_STATISTIC
   }
   if (DriverCounters) {
     auto &C = getDriverCounters();
-    PUBLISH_STAT(C, "Driver", NumDriverJobsRun);
-    PUBLISH_STAT(C, "Driver", NumDriverJobsSkipped);
-
-    PUBLISH_STAT(C, "Driver", DriverDepCascadingTopLevel);
-    PUBLISH_STAT(C, "Driver", DriverDepCascadingDynamic);
-    PUBLISH_STAT(C, "Driver", DriverDepCascadingNominal);
-    PUBLISH_STAT(C, "Driver", DriverDepCascadingMember);
-    PUBLISH_STAT(C, "Driver", DriverDepCascadingExternal);
-
-    PUBLISH_STAT(C, "Driver", DriverDepTopLevel);
-    PUBLISH_STAT(C, "Driver", DriverDepDynamic);
-    PUBLISH_STAT(C, "Driver", DriverDepNominal);
-    PUBLISH_STAT(C, "Driver", DriverDepMember);
-    PUBLISH_STAT(C, "Driver", DriverDepExternal);
-    PUBLISH_STAT(C, "Driver", ChildrenMaxRSS);
+#define DRIVER_STATISTIC(NAME)                                       \
+    do {                                                             \
+      static Statistic Stat = {"Driver", #NAME, #NAME, {0}, false};  \
+      Stat += (C).NAME;                                              \
+    } while (0);
+#include "swift/Basic/Statistics.def"
+#undef DRIVER_STATISTIC
   }
 }
-
-#define PRINT_STAT(OS,DELIM,C,TY,NAME)                   \
-  do {                                                   \
-    OS << DELIM << "\t\"" TY "." #NAME "\": " << C.NAME; \
-    delim = ",\n";                                       \
-  } while (0)
 
 void
 UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
@@ -252,88 +204,113 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
   const char *delim = "";
   if (FrontendCounters) {
     auto &C = getFrontendCounters();
-
-    PRINT_STAT(OS, delim, C, "AST", NumSourceBuffers);
-    PRINT_STAT(OS, delim, C, "AST", NumSourceLines);
-    PRINT_STAT(OS, delim, C, "AST", NumSourceLinesPerSecond);
-    PRINT_STAT(OS, delim, C, "AST", NumLinkLibraries);
-    PRINT_STAT(OS, delim, C, "AST", NumLoadedModules);
-    PRINT_STAT(OS, delim, C, "AST", NumImportedExternalDefinitions);
-    PRINT_STAT(OS, delim, C, "AST", NumTotalClangImportedEntities);
-    PRINT_STAT(OS, delim, C, "AST", NumASTBytesAllocated);
-    PRINT_STAT(OS, delim, C, "AST", NumDependencies);
-    PRINT_STAT(OS, delim, C, "AST", NumReferencedTopLevelNames);
-    PRINT_STAT(OS, delim, C, "AST", NumReferencedDynamicNames);
-    PRINT_STAT(OS, delim, C, "AST", NumReferencedMemberNames);
-    PRINT_STAT(OS, delim, C, "AST", NumDecls);
-    PRINT_STAT(OS, delim, C, "AST", NumLocalTypeDecls);
-    PRINT_STAT(OS, delim, C, "AST", NumObjCMethods);
-    PRINT_STAT(OS, delim, C, "AST", NumInfixOperators);
-    PRINT_STAT(OS, delim, C, "AST", NumPostfixOperators);
-    PRINT_STAT(OS, delim, C, "AST", NumPrefixOperators);
-    PRINT_STAT(OS, delim, C, "AST", NumPrecedenceGroups);
-    PRINT_STAT(OS, delim, C, "AST", NumUsedConformances);
-
-    PRINT_STAT(OS, delim, C, "Sema", NumConformancesDeserialized);
-    PRINT_STAT(OS, delim, C, "Sema", NumConstraintScopes);
-    PRINT_STAT(OS, delim, C, "Sema", NumDeclsDeserialized);
-    PRINT_STAT(OS, delim, C, "Sema", NumDeclsValidated);
-    PRINT_STAT(OS, delim, C, "Sema", NumFunctionsTypechecked);
-    PRINT_STAT(OS, delim, C, "Sema", NumGenericSignatureBuilders);
-    PRINT_STAT(OS, delim, C, "Sema", NumLazyGenericEnvironments);
-    PRINT_STAT(OS, delim, C, "Sema", NumLazyGenericEnvironmentsLoaded);
-    PRINT_STAT(OS, delim, C, "Sema", NumLazyIterableDeclContexts);
-    PRINT_STAT(OS, delim, C, "Sema", NominalTypeLookupDirectCount);
-    PRINT_STAT(OS, delim, C, "Sema", NumTypesDeserialized);
-    PRINT_STAT(OS, delim, C, "Sema", NumTypesValidated);
-    PRINT_STAT(OS, delim, C, "Sema", NumUnloadedLazyIterableDeclContexts);
-
-    PRINT_STAT(OS, delim, C, "SILModule", NumSILGenFunctions);
-    PRINT_STAT(OS, delim, C, "SILModule", NumSILGenVtables);
-    PRINT_STAT(OS, delim, C, "SILModule", NumSILGenWitnessTables);
-    PRINT_STAT(OS, delim, C, "SILModule", NumSILGenDefaultWitnessTables);
-    PRINT_STAT(OS, delim, C, "SILModule", NumSILGenGlobalVariables);
-
-    PRINT_STAT(OS, delim, C, "SILModule", NumSILOptFunctions);
-    PRINT_STAT(OS, delim, C, "SILModule", NumSILOptVtables);
-    PRINT_STAT(OS, delim, C, "SILModule", NumSILOptWitnessTables);
-    PRINT_STAT(OS, delim, C, "SILModule", NumSILOptDefaultWitnessTables);
-    PRINT_STAT(OS, delim, C, "SILModule", NumSILOptGlobalVariables);
-
-    PRINT_STAT(OS, delim, C, "IRModule", NumIRGlobals);
-    PRINT_STAT(OS, delim, C, "IRModule", NumIRFunctions);
-    PRINT_STAT(OS, delim, C, "IRModule", NumIRAliases);
-    PRINT_STAT(OS, delim, C, "IRModule", NumIRIFuncs);
-    PRINT_STAT(OS, delim, C, "IRModule", NumIRNamedMetaData);
-    PRINT_STAT(OS, delim, C, "IRModule", NumIRValueSymbols);
-    PRINT_STAT(OS, delim, C, "IRModule", NumIRComdatSymbols);
-    PRINT_STAT(OS, delim, C, "IRModule", NumIRBasicBlocks);
-    PRINT_STAT(OS, delim, C, "IRModule", NumIRInsts);
-
-    PRINT_STAT(OS, delim, C, "LLVM", NumLLVMBytesOutput);
+#define FRONTEND_STATISTIC(TY, NAME)                        \
+    do {                                                    \
+      OS << delim << "\t\"" #TY "." #NAME "\": " << C.NAME; \
+      delim = ",\n";                                        \
+    } while (0);
+#include "swift/Basic/Statistics.def"
+#undef FRONTEND_STATISTIC
   }
   if (DriverCounters) {
     auto &C = getDriverCounters();
-    PRINT_STAT(OS, delim, C, "Driver", NumDriverJobsRun);
-    PRINT_STAT(OS, delim, C, "Driver", NumDriverJobsSkipped);
-
-    PRINT_STAT(OS, delim, C, "Driver", DriverDepCascadingTopLevel);
-    PRINT_STAT(OS, delim, C, "Driver", DriverDepCascadingDynamic);
-    PRINT_STAT(OS, delim, C, "Driver", DriverDepCascadingNominal);
-    PRINT_STAT(OS, delim, C, "Driver", DriverDepCascadingMember);
-    PRINT_STAT(OS, delim, C, "Driver", DriverDepCascadingExternal);
-
-    PRINT_STAT(OS, delim, C, "Driver", DriverDepTopLevel);
-    PRINT_STAT(OS, delim, C, "Driver", DriverDepDynamic);
-    PRINT_STAT(OS, delim, C, "Driver", DriverDepNominal);
-    PRINT_STAT(OS, delim, C, "Driver", DriverDepMember);
-    PRINT_STAT(OS, delim, C, "Driver", DriverDepExternal);
-    PRINT_STAT(OS, delim, C, "Driver", ChildrenMaxRSS);
+#define DRIVER_STATISTIC(NAME)                              \
+    do {                                                    \
+      OS << delim << "\t\"Driver." #NAME "\": " << C.NAME;  \
+      delim = ",\n";                                        \
+    } while (0);
+#include "swift/Basic/Statistics.def"
+#undef DRIVER_STATISTIC
   }
   // Print timers.
   TimerGroup::printAllJSONValues(OS, delim);
   OS << "\n}\n";
   OS.flush();
+}
+
+UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer(
+    StringRef Name,
+    SourceRange const &Range,
+    UnifiedStatsReporter *Reporter)
+  : Reporter(Reporter),
+    SavedTime(llvm::TimeRecord::getCurrentTime()),
+    Name(Name),
+    Range(Range)
+{
+  if (Reporter)
+    Reporter->saveAnyFrontendStatsEvents(*this, true);
+}
+
+UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer()
+  : Reporter(nullptr)
+{
+}
+
+UnifiedStatsReporter::FrontendStatsTracer&
+UnifiedStatsReporter::FrontendStatsTracer::operator=(
+    FrontendStatsTracer&& other)
+{
+  Reporter = other.Reporter;
+  SavedTime = other.SavedTime;
+  Name = other.Name;
+  Range = other.Range;
+  other.Reporter = nullptr;
+  return *this;
+}
+
+UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer(
+    FrontendStatsTracer&& other)
+  : Reporter(other.Reporter),
+    SavedTime(other.SavedTime),
+    Name(other.Name),
+    Range(other.Range)
+{
+  other.Reporter = nullptr;
+}
+
+UnifiedStatsReporter::FrontendStatsTracer::~FrontendStatsTracer()
+{
+  if (Reporter)
+    Reporter->saveAnyFrontendStatsEvents(*this, false);
+}
+
+UnifiedStatsReporter::FrontendStatsTracer
+UnifiedStatsReporter::getStatsTracer(StringRef N,
+                                     SourceRange const &R)
+{
+  if (LastTracedFrontendCounters)
+    // Return live tracer object.
+    return FrontendStatsTracer(N, R, this);
+  else
+    // Return inert tracer object.
+    return FrontendStatsTracer();
+}
+
+void
+UnifiedStatsReporter::saveAnyFrontendStatsEvents(
+    FrontendStatsTracer const& T,
+    bool IsEntry)
+{
+  if (!LastTracedFrontendCounters)
+    return;
+  auto Now = llvm::TimeRecord::getCurrentTime();
+  auto StartUS = uint64_t(1000000.0 * T.SavedTime.getProcessTime());
+  auto NowUS = uint64_t(1000000.0 * Now.getProcessTime());
+  auto LiveUS = IsEntry ? 0 : NowUS - StartUS;
+  auto &C = getFrontendCounters();
+#define FRONTEND_STATISTIC(TY, NAME)                          \
+  do {                                                        \
+    auto delta = C.NAME - LastTracedFrontendCounters->NAME;   \
+    static char const *name = #TY "." #NAME;                  \
+    if (delta != 0) {                                         \
+      LastTracedFrontendCounters->NAME = C.NAME;              \
+      FrontendStatsEvents.emplace_back(FrontendStatsEvent {   \
+          NowUS, LiveUS, IsEntry, T.Name, name,               \
+            delta, C.NAME, T.Range});                         \
+    }                                                         \
+  } while (0);
+#include "swift/Basic/Statistics.def"
+#undef FRONTEND_STATISTIC
 }
 
 UnifiedStatsReporter::~UnifiedStatsReporter()
@@ -364,7 +341,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   }
 
   std::error_code EC;
-  raw_fd_ostream ostream(Filename, EC, fs::F_Append | fs::F_Text);
+  raw_fd_ostream ostream(StatsFilename, EC, fs::F_Append | fs::F_Text);
   if (EC)
     return;
 
@@ -387,6 +364,27 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 #else
   printAlwaysOnStatsAndTimers(ostream);
 #endif
+
+  if (LastTracedFrontendCounters && SourceMgr) {
+    std::error_code EC;
+    raw_fd_ostream tstream(TraceFilename, EC, fs::F_Append | fs::F_Text);
+    if (EC)
+      return;
+    tstream << "Time,Live,IsEntry,EventName,CounterName,"
+            << "CounterDelta,CounterValue,SourceRange\n";
+    for (auto const &E : FrontendStatsEvents) {
+      tstream << E.TimeUSec << ','
+              << E.LiveUSec << ','
+              << (E.IsEntry ? "\"entry\"," : "\"exit\",")
+              << '"' << E.EventName << '"' << ','
+              << '"' << E.CounterName << '"' << ','
+              << E.CounterDelta << ','
+              << E.CounterValue << ',';
+      tstream << '"';
+      E.SourceRange.print(tstream, *SourceMgr, false);
+      tstream << '"' << '\n';
+    }
+  }
 }
 
 } // namespace swift

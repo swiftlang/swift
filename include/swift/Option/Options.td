@@ -194,6 +194,9 @@ def driver_time_compilation : Flag<["-"], "driver-time-compilation">,
 def stats_output_dir: Separate<["-"], "stats-output-dir">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Directory to write unified compilation-statistics files to">;
+def trace_stats_events: Flag<["-"], "trace-stats-events">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Trace changes to stats in -stats-output-dir">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,

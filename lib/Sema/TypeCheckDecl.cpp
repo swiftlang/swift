@@ -3937,6 +3937,10 @@ public:
       : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
 
   void visit(Decl *decl) {
+    UnifiedStatsReporter::FrontendStatsTracer Tracer;
+    if (TC.Context.Stats)
+      Tracer = TC.Context.Stats->getStatsTracer("type-checking",
+                                                decl->getSourceRange());
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);
