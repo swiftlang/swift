@@ -129,6 +129,7 @@ private func registerBenchmark(_ bench: BenchmarkInfo) {
   registeredBenchmarks.append(bench)
 }
 
+registerBenchmark(AnyHashableWithAClass)
 registerBenchmark(ArraySetElement)
 registerBenchmark(ExclusivityGlobal)
 registerBenchmark(ExclusivityInMatSet)

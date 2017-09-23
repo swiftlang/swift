@@ -25,7 +25,7 @@ import Foundation
 public var SevenBoom = BenchmarkInfo(
   name: "SevenBoom",
   runFunction: run_SevenBoom,
-  tags: [.runtime, .exceptions, .cpubench]
+  tags: [.runtime, .exceptions, .bridging, .cpubench]
 )
 
 @inline(never)
