@@ -1,4 +1,4 @@
-# utils/update_checkout.py - Utility to update local checkouts --*- python -*-
+# utils/update_checkout.py - Create or update local checkouts --*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
@@ -361,9 +361,24 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""
-Update local checkout of Swift and related repositories.
+Create or update local checkouts of Swift and related repositories.
 
-By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
+This script can be used for two related tasks:
+
+    1. After a fresh checkout of the Swift repository, you can use this
+       with the '--clone' (or '--clone-with-ssh') argument to create
+       local checkouts of related repositories.
+
+    2. Subsequently, you can use this to update your local checkouts
+       with any changes made to the remote repositories.
+
+By default, when cloning, it will create checkouts of all repositories
+related to Swift development.
+
+By default, when updating, it will only update those local repositories
+that already exist as sibling directories (i.e., updating will not
+create any new checkouts).
+""")
     parser.add_argument(
         "--clone",
         help="Obtain Sources for Swift and Related Projects",
