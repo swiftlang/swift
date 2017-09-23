@@ -17,6 +17,36 @@
 
 import TestsUtils
 
+// At -Onone
+// 25% swift_beginAccess
+// 15% tlv_get_addr
+// 15% swift_endAccess
+public var ExclusivityGlobal = BenchmarkInfo(
+  name: "ExclusivityGlobal",
+  runFunction: run_accessGlobal,
+  tags: [.runtime, .cpubench]
+)
+// At -Onone
+// 23% swift_retain
+// 22% swift_release
+//  9% swift_beginAccess
+//  3% swift_endAccess
+public var ExclusivityInMatSet = BenchmarkInfo(
+  name: "ExclusivityInMatSet",
+  runFunction: run_accessInMatSet,
+  tags: [.runtime, .cpubench]
+)
+// At -Onone
+// 25% swift_release
+// 23% swift_retain
+// 16% swift_beginAccess
+//  8% swift_endAccess
+public var ExclusivityIndependent = BenchmarkInfo(
+  name: "ExclusivityIndependent",
+  runFunction: run_accessIndependent,
+  tags: [.runtime, .cpubench]
+)
+
 // Initially these benchmarks only measure access checks at -Onone. In
 // the future, access checks will also be emitted at -O.
 
