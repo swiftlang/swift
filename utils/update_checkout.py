@@ -381,11 +381,11 @@ create any new checkouts).
 """)
     parser.add_argument(
         "--clone",
-        help="Obtain Sources for Swift and Related Projects",
+        help="Obtain sources for Swift and related projects",
         action="store_true")
     parser.add_argument(
         "--clone-with-ssh",
-        help="Obtain Sources for Swift and Related Projects via SSH",
+        help="Obtain sources for Swift and related projects via SSH",
         action="store_true")
     parser.add_argument(
         "--skip-history",
@@ -400,18 +400,18 @@ create any new checkouts).
         action="append")
     parser.add_argument(
         "--scheme",
-        help='Use branches from the specified branch-scheme. A "branch-scheme"'
-        ' is a list of (repo, branch) pairs.',
-        metavar='BRANCH-SCHEME',
-        dest='scheme')
+        help='''Use branches from the specified branch-scheme
+        (a "branch-scheme" is a list of (repo, branch) pairs)''',
+        metavar="BRANCH-SCHEME",
+        dest="scheme")
     parser.add_argument(
-        '--reset-to-remote',
-        help='Reset each branch to the remote state.',
-        action='store_true')
+        "--reset-to-remote",
+        help="Reset each branch to the remote state",
+        action="store_true")
     parser.add_argument(
-        '--clean',
-        help='Clean unrelated files from each repository.',
-        action='store_true')
+        "--clean",
+        help="Clean unrelated files from each repository",
+        action="store_true")
     parser.add_argument(
         "--config",
         default=os.path.join(SCRIPT_DIR, "update-checkout-config.json"),
@@ -419,27 +419,27 @@ create any new checkouts).
     parser.add_argument(
         "--github-comment",
         help="""Check out related pull requests referenced in the given
-        free-form GitHub-style comment.""",
-        metavar='GITHUB-COMMENT',
-        dest='github_comment')
+        free-form GitHub-style comment""",
+        metavar="GITHUB-COMMENT",
+        dest="github_comment")
     parser.add_argument(
-        '--dump-hashes',
-        action='store_true',
-        help='Dump the git hashes of all repositories being tracked')
+        "--dump-hashes",
+        action="store_true",
+        help="Dump the git hashes of all repositories being tracked")
     parser.add_argument(
-        '--dump-hashes-config',
-        help='Dump the git hashes of all repositories packaged into '
-             'update-checkout-config.json',
-        metavar='BRANCH-SCHEME-NAME')
+        "--dump-hashes-config",
+        help="""Dump the git hashes of all repositories packaged into
+        update-checkout-config.json""",
+        metavar="BRANCH-SCHEME-NAME")
     parser.add_argument(
         "--tag",
-        help="""Check out each repository to the specified tag.""",
-        metavar='TAG-NAME')
+        help="Check out each repository to the specified tag",
+        metavar="TAG-NAME")
     parser.add_argument(
         "--match-timestamp",
-        help='Check out adjacent repositories to match timestamp of '
-        ' current swift checkout.',
-        action='store_true')
+        help="""Check out adjacent repositories to match timestamp of
+        current swift checkout""",
+        action="store_true")
     parser.add_argument(
         "-j", "--jobs",
         type=int,
