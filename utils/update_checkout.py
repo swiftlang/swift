@@ -341,19 +341,12 @@ def validate_config(config):
                                'too.'.format(scheme_name))
 
     # Then make sure the alias names used by our branches are unique.
-    #
-    # We do this by constructing a list consisting of len(names),
-    # set(names). Then we reduce over that list summing the counts and taking
-    # the union of the sets. We have uniqueness if the length of the union
-    # equals the length of the sum of the counts.
-    data = [(len(v['aliases']), set(v['aliases']))
-            for v in config['branch-schemes'].values()]
-    result = reduce(lambda acc, x: (acc[0] + x[0], acc[1] | x[1]), data,
-                    (0, set([])))
-    if result[0] == len(result[1]):
-        return
-    raise RuntimeError('Configuration file has schemes with duplicate '
-                       'aliases?!')
+    aliases = []
+    for scheme in config['branch-schemes'].values():
+        aliases.extend(scheme['aliases'])
+    if len(aliases) != len(set(aliases)):
+        raise RuntimeError('Configuration file has schemes with duplicate '
+                           'aliases?!')
 
 
 def main():
