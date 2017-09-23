@@ -133,6 +133,7 @@ registerBenchmark(ArraySetElement)
 registerBenchmark(ExclusivityGlobal)
 registerBenchmark(ExclusivityInMatSet)
 registerBenchmark(ExclusivityIndependent)
+registerBenchmark(LinkedList)
 registerBenchmark(ObjectAllocation)
 
 @inline(__always)
