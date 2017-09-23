@@ -327,26 +327,30 @@ def dump_hashes_config(args, config):
 
 
 def validate_config(config):
-    # Make sure that our branch-names are unique.
-    scheme_names = config['branch-schemes'].keys()
-    if len(scheme_names) != len(set(scheme_names)):
-        raise RuntimeError('Configuration file has duplicate schemes?!')
+
+    def ensure_unique(xs, msg):
+        if len(xs) != len(set(xs)):
+            raise RuntimeError(msg)
+
+    schemes = config['branch-schemes']
+
+    scheme_names = schemes.keys()
+    ensure_unique(scheme_names, 'Configuration file has duplicate schemes?!')
 
     # Ensure the branch-scheme name is also an alias
     # This guarantees sensible behavior of update_repository_to_scheme when
     # the branch-scheme is passed as the scheme name
-    for scheme_name in config['branch-schemes'].keys():
-        if scheme_name not in config['branch-schemes'][scheme_name]['aliases']:
+    for scheme_name, scheme in schemes.items():
+        if scheme_name not in scheme['aliases']:
             raise RuntimeError('branch-scheme name: "{0}" must be an alias '
                                'too.'.format(scheme_name))
 
-    # Then make sure the alias names used by our branches are unique.
     aliases = []
-    for scheme in config['branch-schemes'].values():
+    for scheme in schemes.values():
         aliases.extend(scheme['aliases'])
-    if len(aliases) != len(set(aliases)):
-        raise RuntimeError('Configuration file has schemes with duplicate '
-                           'aliases?!')
+
+    ensure_unique(aliases,
+                  'Configuration file has schemes with duplicate aliases?!')
 
 
 def main():
