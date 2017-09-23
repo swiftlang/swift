@@ -195,6 +195,8 @@ public:
     EmitObject, ///< Emit object file
   };
 
+  bool isCreatingSIL() { return RequestedAction >= EmitSILGen; }
+
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = NoneAction;
 
