@@ -1345,7 +1345,7 @@ func testForFixitWithNestedMemberRefExpr() {
 // Protocol Conformances
 
 protocol ProtocolWithRequirementMentioningUnavailable {
-      // expected-note@-1 4{{add @available attribute to enclosing protocol}}
+      // expected-note@-1 6{{add @available attribute to enclosing protocol}}
   func hasUnavailableParameter(_ p: ClassAvailableOn10_51) // expected-error * {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing instance method}}
       
