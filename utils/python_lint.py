@@ -33,7 +33,7 @@ You can install these using:
     python -m pip install flake8-import-order
 
 For more help, see http://flake8.pycqa.org.""")
-        return 0
+        return flake8_result
 
     utils_directory = os.path.dirname(os.path.abspath(__file__))
     parent_directory = os.path.dirname(utils_directory)
