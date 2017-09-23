@@ -270,14 +270,14 @@ int main(int argc, char **argv) {
     M->setTargetTriple(llvm::Triple::normalize(TargetTriple));
 
   // Figure out what stream we are supposed to write to...
-  std::unique_ptr<llvm::tool_output_file> Out;
+  std::unique_ptr<llvm::ToolOutputFile> Out;
   // Default to standard output.
   if (OutputFilename.empty())
     OutputFilename = "-";
 
   std::error_code EC;
   Out.reset(
-      new llvm::tool_output_file(OutputFilename, EC, llvm::sys::fs::F_None));
+      new llvm::ToolOutputFile(OutputFilename, EC, llvm::sys::fs::F_None));
   if (EC) {
     errs() << EC.message() << '\n';
     return 1;
