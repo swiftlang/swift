@@ -297,7 +297,6 @@ def dump_repo_hashes(config):
 
 
 def dump_hashes_config(args, config):
-    branch_scheme_name = args.dump_hashes_config
     new_config = {}
     config_copy_keys = ['ssh-clone-pattern', 'https-clone-pattern', 'repos']
     for config_copy_key in config_copy_keys:
