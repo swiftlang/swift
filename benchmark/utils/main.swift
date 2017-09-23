@@ -135,6 +135,7 @@ registerBenchmark(ExclusivityInMatSet)
 registerBenchmark(ExclusivityIndependent)
 registerBenchmark(LinkedList)
 registerBenchmark(ObjectAllocation)
+registerBenchmark(SevenBoom)
 
 @inline(__always)
 private func addTo(
