@@ -36,6 +36,7 @@ set(swift_runtime_sources
     Array.cpp
     Casting.cpp
     CygwinPort.cpp
+    HaikuPort.cpp
     Demangle.cpp
     Enum.cpp
     ErrorObjectConstants.cpp
