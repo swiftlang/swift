@@ -18,25 +18,26 @@
 #ifndef SWIFT_FRONTEND_H
 #define SWIFT_FRONTEND_H
 
-#include "swift/Basic/DiagnosticOptions.h"
-#include "swift/Basic/LangOptions.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SILOptions.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/Parser.h"
+#include "swift/AST/SearchPathOptions.h"
+#include "swift/Basic/DiagnosticOptions.h"
+#include "swift/Basic/LangOptions.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Migrator/MigratorOptions.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/Parser.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
-#include "swift/SIL/SILModule.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
@@ -304,6 +305,16 @@ public:
   /// identifying the conditions under which the module was built, for use
   /// in generating a cached PCH file for the bridging header.
   std::string getPCHHash() const;
+
+  SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() {
+    if (getInputKind() == InputFileKind::IFK_SIL) {
+      return SourceFile::ImplicitModuleImportKind::None;
+    }
+    if (getParseStdlib()) {
+      return SourceFile::ImplicitModuleImportKind::Builtin;
+    }
+    return SourceFile::ImplicitModuleImportKind::Stdlib;
+  }
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -341,11 +352,14 @@ class CompilerInstance {
 
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
   unsigned MainBufferID = NO_SUCH_BUFFER;
+
+  /// PrimaryBufferID corresponds to PrimaryInput.
   unsigned PrimaryBufferID = NO_SUCH_BUFFER;
+  bool isWholeModuleCompilation() { return PrimaryBufferID == NO_SUCH_BUFFER; }
 
   SourceFile *PrimarySourceFile = nullptr;
 
-  void createSILModule(bool WholeModule = false);
+  void createSILModule();
   void setPrimarySourceFile(SourceFile *SF);
 
 public:
@@ -433,6 +447,55 @@ public:
   /// Frees up the ASTContext and SILModule objects that this instance is
   /// holding on.
   void freeContextAndSIL();
+
+private:
+  /// Load stdlib & return true if should continue, i.e. no error
+  bool loadStdlib();
+  ModuleDecl *importUnderlyingModule();
+  ModuleDecl *importBridgingHeader();
+
+  void
+  getImplicitlyImportedModules(SmallVectorImpl<ModuleDecl *> &importModules);
+
+public: // for static functions in Frontend.cpp
+  struct ImplicitImports {
+    SourceFile::ImplicitModuleImportKind kind;
+    ModuleDecl *objCModuleUnderlyingMixedFramework;
+    ModuleDecl *headerModule;
+    SmallVector<ModuleDecl *, 4> modules;
+
+    explicit ImplicitImports(CompilerInstance &compiler);
+  };
+
+private:
+  void createREPLFile(const ImplicitImports &implicitImports) const;
+  std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
+
+  void addMainFileToModule(const ImplicitImports &implicitImports);
+
+  void parseAndCheckTypes(const ImplicitImports &implicitImports);
+
+  void parseLibraryFile(unsigned BufferID,
+                        const ImplicitImports &implicitImports,
+                        PersistentParserState &PersistentState,
+                        DelayedParsingCallbacks *DelayedParseCB);
+
+  /// Return true if had load error
+  bool
+  parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports,
+                                     PersistentParserState &PersistentState,
+                                     DelayedParsingCallbacks *DelayedParseCB);
+
+  OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
+
+  void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
+
+  void parseAndTypeCheckMainFile(PersistentParserState &PersistentState,
+                                 DelayedParsingCallbacks *DelayedParseCB,
+                                 OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void performTypeCheckingAndDelayedParsing();
+
+  void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 };
 
 } // namespace swift

@@ -545,10 +545,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // Make sure that name binding has been completed before doing any type
   // checking.
-  {
-    SharedTimer timer("Name binding");
     performNameBinding(SF, StartElem);
-  }
 
   {
     // NOTE: The type checker is scoped to be torn down before AST
@@ -671,7 +668,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   }
 }
 
-void swift::finishTypeChecking(SourceFile &SF) {
+void swift::finishTypeCheckingFile(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   TypeChecker TC(Ctx);
 
@@ -681,6 +678,7 @@ void swift::finishTypeChecking(SourceFile &SF) {
 }
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
+  SharedTimer("performWholeModuleTypeChecking");
   auto &Ctx = SF.getASTContext();
   Ctx.diagnoseAttrsRequiringFoundation(SF);
   Ctx.diagnoseObjCMethodConflicts(SF);
