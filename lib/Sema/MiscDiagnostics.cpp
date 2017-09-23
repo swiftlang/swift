@@ -2082,8 +2082,7 @@ class VarDeclUsageChecker : public ASTWalker {
     RK_Read        = 1,      ///< Whether it was ever read.
     RK_Written     = 2,      ///< Whether it was ever written or passed inout.
     
-    RK_CaptureList = 4,      ///< Var is an entry in a capture list.
-    RK_DoNotReport = 8       ///< Var is being tracked, but do not report.
+    RK_CaptureList = 4       ///< Var is an entry in a capture list.
   };
   
   /// These are all of the variables that we are tracking.  VarDecls get added
@@ -2094,7 +2093,11 @@ class VarDeclUsageChecker : public ASTWalker {
   /// This is a mapping from an OpaqueValue to the expression that initialized
   /// it.
   llvm::SmallDenseMap<OpaqueValueExpr*, Expr*> OpaqueValueMap;
-  
+
+  /// This is a mapping from a VarDecl property getter to the expression that
+  /// used it.
+  llvm::SmallDenseMap<VarDecl*, DeclRefExpr*> GetterDeclUsageMap;
+
   /// This is a mapping from VarDecls to the if/while/guard statement that they
   /// occur in, when they are in a pattern in a StmtCondition.
   llvm::SmallDenseMap<VarDecl*, LabeledConditionalStmt*> StmtConditionForVD;
@@ -2114,7 +2117,7 @@ public:
         if (auto getter = dyn_cast<VarDecl>(FD->getAccessorStorageDecl())) {
           auto arguments = FD->getParameterLists().back();
           VarDecls[arguments->get(0)] = 0;
-          VarDecls[getter] = RK_DoNotReport;
+          GetterDeclUsageMap[getter] = nullptr;
         }
       }
     }
@@ -2327,10 +2330,6 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     if (var->isInOut())
       continue;    
     
-    // Skip any VarDecl flagged with RK_DoNotReport
-    if (access & RK_DoNotReport)
-      continue;
-
     // If the setter parameter is not used, but the property is read, report
     // a warning. Otherwise, parameters should not generate usage warnings. It
     // is common to name a parameter and not use it (e.g. because you are an
@@ -2340,9 +2339,15 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       auto FD = dyn_cast<FuncDecl>(param->getDeclContext());
       if (FD && FD->getAccessorKind() == AccessorKind::IsSetter) {
         auto getter = dyn_cast<VarDecl>(FD->getAccessorStorageDecl());
-        if ((access & RK_Read) == 0 && (VarDecls[getter] & RK_Read) != 0) {
-          Diags.diagnose(var->getLoc(), diag::unused_setter_newvalue,
-                         var->getName());
+        auto getterUsage = GetterDeclUsageMap.find(getter);
+        if ((access & RK_Read) == 0 && getterUsage != GetterDeclUsageMap.end()) {
+          if (auto DRE = getterUsage->second) {
+            Diags.diagnose(DRE->getLoc(), diag::unused_setter_parameter,
+                           var->getName());
+            Diags.diagnose(DRE->getLoc(), diag::fixit_for_unused_setter_parameter,
+                           getter->getName(), var->getName())
+              .fixItReplace(DRE->getSourceRange(), var->getName().str());
+          }
         }
       }
       continue;
@@ -2628,9 +2633,16 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
 
   // If this is a DeclRefExpr found in a random place, it is a load of the
   // vardecl.
-  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     addMark(DRE->getDecl(), RK_Read);
 
+    // If the Decl is a read of a getter, track the first DRE for diagnostics
+    if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+      auto it = GetterDeclUsageMap.find(VD);
+      if (it != GetterDeclUsageMap.end() && it->second == nullptr)
+        GetterDeclUsageMap[VD] = DRE;
+    }
+  }
   // If this is an AssignExpr, see if we're mutating something that we know
   // about.
   if (auto *assign = dyn_cast<AssignExpr>(E)) {

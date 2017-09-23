@@ -283,14 +283,25 @@ func sr964() {
   }
   var suspiciousSetter: String {
     get { return "" }
-    set { print(suspiciousSetter) } // expected-warning {{setter argument 'newValue' was never used; did you mean to use it instead of accessing the property's current value?}}
+    set {
+      print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used; did you mean to use it instead of accessing the property's current value?}} expected-note {{do you want to replace 'suspiciousSetter' with 'newValue'?}}
+    }
   }
   var namedSuspiciousSetter: String {
     get { return "" }
-    set(parameter) { print(namedSuspiciousSetter) } // expected-warning {{setter argument 'parameter' was never used; did you mean to use it instead of accessing the property's current value?}}
+    set(parameter) {
+      print(namedSuspiciousSetter) // expected-warning {{setter argument 'parameter' was never used; did you mean to use it instead of accessing the property's current value?}} expected-note {{do you want to replace 'namedSuspiciousSetter' with 'parameter'?}}
+    }
   }
   var okSetter: String {
     get { return "" }
     set { print(newValue) } // No warning
+  }
+  var multiTriggerSetter: String {
+    get { return "" }
+    set {
+      print(multiTriggerSetter) // expected-warning {{setter argument 'newValue' was never used; did you mean to use it instead of accessing the property's current value?}} expected-note {{do you want to replace 'multiTriggerSetter' with 'newValue'?}}
+      print(multiTriggerSetter)
+    }
   }
 }
