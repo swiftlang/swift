@@ -56,12 +56,13 @@ struct Test {
   let index: Int
   let f: (Int) -> ()
   let run: Bool
+  let tags: [BenchmarkCategories]
 }
 
 // Legacy test dictionaries.
-public var precommitTests: [String : (Int) -> ()] = [:]
-public var otherTests: [String : (Int) -> ()] = [:]
-public var stringTests: [String : (Int) -> ()] = [:]
+public var precommitTests: [String : ((Int) -> (), [BenchmarkCategories])] = [:]
+public var otherTests: [String : ((Int) -> (), [BenchmarkCategories])] = [:]
+public var stringTests: [String : ((Int) -> (), [BenchmarkCategories])] = [:]
 
 // We should migrate to a collection of BenchmarkInfo.
 public var registeredBenchmarks = [TestsUtils.BenchmarkInfo]()
@@ -78,6 +79,9 @@ struct TestConfig {
 
   /// The filters applied to our test names.
   var filters = [String]()
+
+  /// The tag that we want to run
+  var tags = Set<BenchmarkCategories>()
 
   /// The scalar multiple of the amount of times a test should be run. This
   /// enables one to cause tests to run for N iterations longer than they
@@ -115,7 +119,7 @@ struct TestConfig {
     let validOptions = [
       "--iter-scale", "--num-samples", "--num-iters",
       "--verbose", "--delim", "--run-all", "--list", "--sleep",
-      "--registered"
+      "--registered", "--tags"
     ]
     let maybeBenchArgs: Arguments? = parseArgs(validOptions)
     if maybeBenchArgs == nil {
@@ -150,6 +154,73 @@ struct TestConfig {
       delim = x
     }
 
+    if let x = benchArgs.optionalArgsMap["--tags"] {
+      if x.isEmpty { return .Fail("--tags requires a value") }
+      if x.contains("cpubench") {
+        tags.insert(BenchmarkCategories.cpubench)
+      }
+      if x.contains("unstable") {
+        tags.insert(BenchmarkCategories.unstable)
+      }
+      if x.contains("validation") {
+        tags.insert(BenchmarkCategories.validation)
+      }
+      if x.contains("api") {
+        tags.insert(BenchmarkCategories.api)
+      }
+      if x.contains("Array") {
+        tags.insert(BenchmarkCategories.Array)
+      }
+      if x.contains("String") {
+        tags.insert(BenchmarkCategories.String)
+      }
+      if x.contains("Dictionary") {
+        tags.insert(BenchmarkCategories.Dictionary)
+      }
+      if x.contains("Codable") {
+        tags.insert(BenchmarkCategories.Codable)
+      }
+      if x.contains("Set") {
+        tags.insert(BenchmarkCategories.Set)
+      }
+      if x.contains("sdk") {
+        tags.insert(BenchmarkCategories.sdk)
+      }
+      if x.contains("runtime") {
+        tags.insert(BenchmarkCategories.runtime)
+      }
+      if x.contains("refcount") {
+        tags.insert(BenchmarkCategories.refcount)
+      }
+      if x.contains("metadata") {
+        tags.insert(BenchmarkCategories.metadata)
+      }
+      if x.contains("abstraction") {
+        tags.insert(BenchmarkCategories.abstraction)
+      }
+      if x.contains("safetychecks") {
+        tags.insert(BenchmarkCategories.safetychecks)
+      }
+      if x.contains("exceptions") {
+        tags.insert(BenchmarkCategories.exceptions)
+      }
+      if x.contains("bridging") {
+        tags.insert(BenchmarkCategories.bridging)
+      }
+      if x.contains("concurrency") {
+        tags.insert(BenchmarkCategories.concurrency)
+      }
+      if x.contains("algorithm") {
+        tags.insert(BenchmarkCategories.algorithm)
+      }
+      if x.contains("miniapplication") {
+        tags.insert(BenchmarkCategories.miniapplication)
+      }
+      if x.contains("regression") {
+        tags.insert(BenchmarkCategories.regression)
+      }
+    }
+
     if let _ = benchArgs.optionalArgsMap["--run-all"] {
       onlyPrecommit = false
     }
@@ -177,12 +248,12 @@ struct TestConfig {
   }
 
   mutating func findTestsToRun() {
-    var allTests: [(key: String, value: (Int)-> ())]
+    var allTests: [(key: String, value: ((Int) -> (), [BenchmarkCategories]))]
 
     if onlyRegistered {
       allTests = registeredBenchmarks.map {
-        bench -> (key: String, value: (Int)-> ()) in
-        return (bench.name, bench.runFunction)
+        bench -> (key: String, value: ((Int) -> (), [BenchmarkCategories])) in
+        (bench.name, (bench.runFunction, bench.tags))
       }
       // FIXME: for now unstable/extra benchmarks are not registered at all, but
       // soon they will be handled with a default exclude list.
@@ -190,22 +261,28 @@ struct TestConfig {
     }
     else {
       allTests = [precommitTests, otherTests, stringTests]
-        .map { dictionary -> [(key: String, value: (Int)-> ())] in
+        .map { dictionary -> [(key: String, value: ((Int) -> (), [BenchmarkCategories]))] in
           Array(dictionary).sorted { $0.key < $1.key } } // by name
         .flatMap { $0 }
+    }
+
+    let filteredTests = allTests.filter { pair in tags.isSubset(of: pair.value.1)}
+    if (filteredTests.isEmpty) {
+      return;
     }
 
     let included =
       !filters.isEmpty ? Set(filters)
       : onlyPrecommit ? Set(precommitTests.keys)
-      : Set(allTests.map { $0.key })
+      : Set(filteredTests.map { $0.key })
 
-    tests = zip(1...allTests.count, allTests).map {
+    tests = zip(1...filteredTests.count, filteredTests).map {
       t -> Test in
-      let (ordinal, (key: name, value: function)) = t
-      return Test(name: name, index: ordinal, f: function,
+      let (ordinal, (key: name, value: funcAndTags)) = t
+      return Test(name: name, index: ordinal, f: funcAndTags.0,
                   run: included.contains(name)
-                    || included.contains(String(ordinal)))
+                    || included.contains(String(ordinal)),
+                  tags: funcAndTags.1)
     }
   }
 }
@@ -426,9 +503,9 @@ public func main() {
       fatalError("\(msg)")
     case .ListTests:
       config.findTestsToRun()
-      print("Enabled Tests:")
+      print("Enabled Tests\(config.delim)Tags")
       for t in config.tests where t.run == true {
-        print("    \(t.name)")
+        print("\(t.name)\(config.delim)\(t.tags)")
       }
     case .Run:
       config.findTestsToRun()

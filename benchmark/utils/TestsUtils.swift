@@ -16,12 +16,12 @@ import Glibc
 import Darwin
 #endif
 
-public enum BenchmarkCategories {
+public enum BenchmarkCategories : CustomStringConvertible {
 // Validation "micro" benchmarks test a specific operation or critical path that
 // we know is important to measure.
 case validation
 // subsystems to validate and their subcategories.
-case api, Array, String, Dictionary, Codable
+case api, Array, String, Dictionary, Codable, Set
 case sdk
 case runtime, refcount, metadata
 // Other general areas of compiled code validation.
@@ -65,6 +65,32 @@ case unstable
 // reimplementing or call into code paths that have known opportunities for
 // significant optimization.
 case cpubench
+
+  public var description : String {
+    switch self {
+    case .cpubench: return "cpubench"
+    case .unstable: return "unstable"
+    case .validation: return "validation"
+    case .api: return "api"
+    case .Array: return "Array"
+    case .String: return "String"
+    case .Dictionary: return "Dictionary"
+    case .Codable: return "Codable"
+    case .Set: return "Set"
+    case .sdk: return "sdk"
+    case .runtime: return "runtime"
+    case .refcount: return "refcount"
+    case .metadata: return "metadata"
+    case .abstraction: return "abstraction"
+    case .safetychecks: return "safetychecks"
+    case .exceptions: return "exceptions"
+    case .bridging: return "bridging"
+    case .concurrency: return "concurrency"
+    case .algorithm: return "algorithm"
+    case .miniapplication: return "miniapplication"
+    case .regression: return "regression"
+    }
+  }
 }
 
 public struct BenchmarkInfo {
