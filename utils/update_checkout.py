@@ -25,10 +25,6 @@ from swift_build_support.swift_build_support.SwiftBuildSupport import \
     SWIFT_SOURCE_ROOT
 
 
-SCRIPT_FILE = os.path.abspath(__file__)
-SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
-
-
 def confirm_tag_in_repo(tag, repo_name):
     tag_exists = shell.capture(['git', 'ls-remote', '--tags',
                                 'origin', tag], echo=False)
@@ -353,6 +349,12 @@ def validate_config(config):
                   'Configuration file has schemes with duplicate aliases?!')
 
 
+def abspath_of_relative_file(file):
+    our_abspath = os.path.abspath(__file__)
+    our_absdir = os.path.dirname(our_abspath)
+    return os.path.join(our_absdir, file)
+
+
 def main():
     freeze_support()
     parser = argparse.ArgumentParser(
@@ -411,7 +413,7 @@ create any new checkouts).
         action="store_true")
     parser.add_argument(
         "--config",
-        default=os.path.join(SCRIPT_DIR, "update-checkout-config.json"),
+        default=abspath_of_relative_file("update-checkout-config.json"),
         help="Configuration file to use")
     parser.add_argument(
         "--github-comment",
