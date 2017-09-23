@@ -125,6 +125,21 @@ import Walsh
 import XorLoop
 
 @inline(__always)
+private func registerBenchmark(_ bench: BenchmarkInfo) {
+  registeredBenchmarks.append(bench)
+}
+
+registerBenchmark(AnyHashableWithAClass)
+registerBenchmark(ArraySetElement)
+registerBenchmark(ExclusivityGlobal)
+registerBenchmark(ExclusivityInMatSet)
+registerBenchmark(ExclusivityIndependent)
+registerBenchmark(LinkedList)
+registerBenchmark(ObjectAllocation)
+registerBenchmark(PolymorphicCalls)
+registerBenchmark(SevenBoom)
+
+@inline(__always)
 private func addTo(
   _ testSuite: inout [String : ((Int) -> (), [BenchmarkCategories])],
   _ name: String,
@@ -133,14 +148,6 @@ private func addTo(
   ) {
   testSuite[name] = (function, tags)
 }
-
-@inline(__always)
-private func registerBenchmark(_ bench: BenchmarkInfo) {
-  registeredBenchmarks.append(bench)
-}
-
-registerBenchmark(ArraySetElement)
-registerBenchmark(ObjectAllocation)
 
 // The main test suite: precommit tests
 addTo(&precommitTests, "AngryPhonebook", run_AngryPhonebook, [.validation, .api, .String])

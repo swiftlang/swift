@@ -14,7 +14,6 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/Dominance.h"
-#include "llvm/Support/GenericDomTree.h"
 #include "llvm/Support/GenericDomTreeConstruction.h"
 
 using namespace swift;
@@ -22,11 +21,13 @@ using namespace swift;
 template class llvm::DominatorTreeBase<SILBasicBlock, false>;
 template class llvm::DominatorTreeBase<SILBasicBlock, true>;
 template class llvm::DomTreeNodeBase<SILBasicBlock>;
-using SILDomTree = llvm::DomTreeBase<SILBasicBlock>;
-using SILPostDomTree = llvm::PostDomTreeBase<SILBasicBlock>;
-template void llvm::DomTreeBuilder::Calculate<SILDomTree>(SILDomTree &DT);
-template void
-llvm::DomTreeBuilder::Calculate<SILPostDomTree>(SILPostDomTree &DT);
+
+namespace llvm {
+namespace DomTreeBuilder {
+template void Calculate<SILDomTree>(SILDomTree &DT);
+template void Calculate<SILPostDomTree>(SILPostDomTree &DT);
+} // namespace DomTreeBuilder
+} // namespace llvm
 
 /// Compute the immediate-dominators map.
 DominanceInfo::DominanceInfo(SILFunction *F)

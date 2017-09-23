@@ -827,8 +827,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     prepareGenericParamList(genericParams, DC);
 
     parentEnv = checkGenericEnvironment(genericParams, DC, parentSig,
-                                        /*allowConcreteGenericParams=*/true,
-                                        /*ext=*/nullptr);
+                                        /*allowConcreteGenericParams=*/true);
     parentSig = parentEnv->getGenericSignature();
 
     // Compute the final set of archetypes.
@@ -3937,6 +3936,10 @@ public:
       : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
 
   void visit(Decl *decl) {
+    UnifiedStatsReporter::FrontendStatsTracer Tracer;
+    if (TC.Context.Stats)
+      Tracer = TC.Context.Stats->getStatsTracer("type-checking",
+                                                decl->getSourceRange());
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);
@@ -5230,18 +5233,10 @@ public:
       // Revert the types within the signature so it can be type-checked with
       // archetypes below.
       TC.revertGenericFuncSignature(FD);
-    } else if (auto genericSig =
-                 FD->getDeclContext()->getGenericSignatureOfContext()) {
-      if (!FD->getAccessorStorageDecl()) {
-        (void)TC.validateGenericFuncSignature(FD);
-
-        // Revert all of the types within the signature of the function.
-        TC.revertGenericFuncSignature(FD);
-      } else {
-        // We've inherited all of the type information already.
-        TC.configureInterfaceType(FD, genericSig);
-      }
-
+    } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
+      (void)TC.validateGenericFuncSignature(FD);
+      // Revert all of the types within the signature of the function.
+      TC.revertGenericFuncSignature(FD);
       FD->setGenericEnvironment(
           FD->getDeclContext()->getGenericEnvironmentOfContext());
     }
@@ -8044,7 +8039,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   auto *env = tc.checkGenericEnvironment(genericParams,
                                          ext->getDeclContext(), nullptr,
                                          /*allowConcreteGenericParams=*/true,
-                                         ext, inferExtendedTypeReqs);
+                                         inferExtendedTypeReqs);
 
   // Validate the generic parameters for the last time, to splat down
   // actual archetypes.

@@ -222,6 +222,9 @@ public:
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;
 
+  /// Trace changes to stats to files in StatsOutputDir.
+  bool TraceStats = false;
+
   /// Indicates whether function body parsing should be delayed
   /// until the end of all files.
   bool DelayedFunctionBodyParsing = false;

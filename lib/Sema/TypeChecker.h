@@ -1367,9 +1367,6 @@ public:
   /// context, if not available as part of the \c dc argument (used
   /// for SIL parsing).
   ///
-  /// \param ext The extension for which we're checking the generic
-  /// environment, or null if we're not checking an extension.
-  ///
   /// \param inferRequirements When non-empty, callback that will be invoked
   /// to perform any additional requirement inference that contributes to the
   /// generic environment..
@@ -1380,7 +1377,6 @@ public:
                         DeclContext *dc,
                         GenericSignature *outerSignature,
                         bool allowConcreteGenericParams,
-                        ExtensionDecl *ext,
                         llvm::function_ref<void(GenericSignatureBuilder &)>
                           inferRequirements);
 
@@ -1398,10 +1394,9 @@ public:
                         GenericParamList *genericParams,
                         DeclContext *dc,
                         GenericSignature *outerSignature,
-                        bool allowConcreteGenericParams,
-                        ExtensionDecl *ext) {
+                        bool allowConcreteGenericParams) {
     return checkGenericEnvironment(genericParams, dc, outerSignature,
-                                   allowConcreteGenericParams, ext,
+                                   allowConcreteGenericParams,
                                    [&](GenericSignatureBuilder &) { });
   }
 
