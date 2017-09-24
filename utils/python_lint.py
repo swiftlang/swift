@@ -23,8 +23,22 @@ def lint(arguments, verbose=True):
     )
     if flake8_result != 0:
         if verbose:
-            print("Missing modules flake8 or flake8-import-order. Please be"
-                  " sure to install these python packages before linting.")
+            print("""
+The flake8 and flake8-import-order Python packages are required for linting,
+but these were not found on your system.
+
+You can install these using:
+
+    python -m pip install flake8
+    python -m pip install flake8-import-order
+
+For more help, see http://flake8.pycqa.org.""")
+
+        # We should be returning `flake8_result` from here.  However,
+        # some Python files lint themselves using embedded doctests,
+        # which causes CI smoke tests to fail because the Linux nodes
+        # do not have these modules installed.
+
         return 0
 
     utils_directory = os.path.dirname(os.path.abspath(__file__))
