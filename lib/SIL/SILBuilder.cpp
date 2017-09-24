@@ -410,10 +410,13 @@ void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
   if (I && I->getNumTypeDependentOperands() > 0)
     return;
 
+  // Keep track of already visited instructions to avoid infinite loops.
+  SmallPtrSet<SILInstruction *, 8> Visited;
+
   while (I && I->getNumOperands() == 1 &&
          I->getNumTypeDependentOperands() == 0) {
     I = dyn_cast<SILInstruction>(I->getOperand(0));
-    if (!I)
+    if (!I || !Visited.insert(I).second)
       return;
     // If it is a definition of an opened archetype,
     // register it and exit.
