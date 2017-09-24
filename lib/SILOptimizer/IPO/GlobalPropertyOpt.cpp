@@ -73,7 +73,7 @@ class GlobalPropertyOpt {
       if (!entry.Value)
         return os << "unknown-address\n";
       if (auto *Inst = dyn_cast<SILInstruction>(entry.Value))
-        os << Inst->getFunction()->getName() << ": " << entry.Value;
+        return os << Inst->getFunction()->getName() << ": " << entry.Value;
       if (auto *Arg = dyn_cast<SILArgument>(entry.Value))
         return os << Arg->getFunction()->getName() << ": " << entry.Value;
       return os << entry.Value;
