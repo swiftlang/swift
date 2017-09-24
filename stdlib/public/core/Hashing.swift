@@ -175,3 +175,15 @@ func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
   return mixedHashValue & (upperBound &- 1)
 }
 
+/// Returns a new value that combines the two given hash values.
+///
+/// This function is used by synthesized implementations of `hashValue` to
+/// combine the hash values of individual `struct` fields and associated values
+/// of `enum`s. It is factored out into a standard library function so that the
+/// specific hashing logic can be refined without requiring major changes to the
+/// code that creates the synthesized AST nodes.
+@_transparent
+public // @testable
+func _mixForSynthesizedHashValue(_ oldValue: Int, _ nextValue: Int) -> Int {
+  return 31 &* oldValue &+ nextValue
+}
