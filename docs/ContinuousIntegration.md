@@ -8,7 +8,7 @@
     - [@swift-ci](#swift-ci)
     - [Smoke Testing](#smoke-testing)
     - [Validation Testing](#validation-testing)
-    - [Lint Testing](#lint-testing)
+    - [Linting](#linting)
     - [Specific Preset Testing](#specific-preset-testing)
 - [Cross Repository Testing](#cross-repository-testing)
 - [ci.swift.org bots](#ciswiftorg-bots)
@@ -28,7 +28,7 @@ Users with [commit access](https://swift.org/contributing/#commit-access) can tr
 1. Smoke Testing
 2. Validation Testing
 3. Benchmarking.
-4. Lint Testing
+4. Linting
 5. Source Compatibility Testing
 6. Specific Preset Testing
 
@@ -121,11 +121,11 @@ Platform        | Comment | Check Status
 macOS platform  | @swift-ci Please benchmark       | Swift Benchmark on OS X Platform (many runs - rigorous)
 macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on OS X Platform (few runs - sanity)
 
-### Lint Testing
+### Linting
 
-Language     | Comment | Check Status
------------- | ------- | ------------
-Python       | @swift-ci Please Python lint | Python lint
+Language     | Comment | What it Does | Corresponding Local Command
+------------ | ------- | ------------ | -------------
+Python       | @swift-ci Please Python lint | Lints Python sources | `./utils/python_lint.py`
 
 ### Source Compatibility Testing
 
