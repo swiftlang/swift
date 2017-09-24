@@ -178,9 +178,20 @@ public:
   }
 
   const NominalTypeRef *createNominalType(
+                                    const Optional<std::string> &mangledName) {
+    return NominalTypeRef::create(*this, *mangledName, nullptr);
+  }
+
+  const NominalTypeRef *createNominalType(
                                     const Optional<std::string> &mangledName,
                                     const TypeRef *parent) {
     return NominalTypeRef::create(*this, *mangledName, parent);
+  }
+
+  const BoundGenericTypeRef *
+  createBoundGenericType(const Optional<std::string> &mangledName,
+                         const std::vector<const TypeRef *> &args) {
+    return BoundGenericTypeRef::create(*this, *mangledName, args, nullptr);
   }
 
   const BoundGenericTypeRef *
