@@ -1,0 +1,10 @@
+func throwingFunc() throws -> Int? {
+    return nil
+}
+do {
+if let val = try throwingFunc() { 
+    let _ = val
+}
+} catch {
+<#code#>
+}
