@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift
-// REQUIRES: executable-test
+// REQUIRES: executable_test
 
 import StdlibUnittest
 
