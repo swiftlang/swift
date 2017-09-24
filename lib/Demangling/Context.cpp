@@ -36,7 +36,7 @@ void Context::clear() {
 }
 
 NodePointer Context::demangleSymbolAsNode(llvm::StringRef MangledName) {
-  if (isMangledName(MangledName.data())) {
+  if (isMangledName(MangledName)) {
     return D->demangleSymbol(MangledName);
   }
   return demangleOldSymbolAsNode(MangledName, *D);
