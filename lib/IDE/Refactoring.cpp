@@ -12,6 +12,7 @@
 
 #include "swift/IDE/Refactoring.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/Expr.h"
@@ -1920,6 +1921,60 @@ bool RefactoringActionLocalizeString::performChange() {
     return true;
   EditConsumer.accept(SM, Target->getStartLoc(), "NSLocalizedString(");
   EditConsumer.insertAfter(SM, Target->getEndLoc(), ", comment: \"\")");
+  return false;
+}
+
+static CharSourceRange
+  findSourceRangeToWrapInCatch(ResolvedCursorInfo CursorInfo,
+                               SourceFile *TheFile,
+                               SourceManager &SM) {
+  Expr *E = CursorInfo.TrailingExpr;
+  if (!E)
+    return CharSourceRange();
+  auto Node = ASTNode(E);
+  auto NodeChecker = [](ASTNode N) { return N.isStmt(StmtKind::Brace); };
+  ContextFinder Finder(*TheFile, Node, NodeChecker);
+  Finder.resolve();
+  auto Contexts = Finder.getContexts();
+  if (Contexts.size() == 0)
+    return CharSourceRange();
+  auto TargetNode = Contexts.back();
+  BraceStmt *BStmt = dyn_cast<BraceStmt>(TargetNode.dyn_cast<Stmt*>());
+  auto ConvertToCharRange = [&SM](SourceRange SR) {
+    return Lexer::getCharSourceRangeFromSourceRange(SM, SR);
+  };
+  assert(BStmt);
+  auto ExprRange = ConvertToCharRange(E->getSourceRange());
+  // Check elements of the deepest BraceStmt, pick one that covers expression.
+  for (auto Elem: BStmt->getElements()) {
+    auto ElemRange = ConvertToCharRange(Elem.getSourceRange());
+    if (ElemRange.contains(ExprRange))
+      TargetNode = Elem;
+  }
+  return ConvertToCharRange(TargetNode.getSourceRange());
+}
+
+bool RefactoringActionConvertToDoCatch::isApplicable(ResolvedCursorInfo Tok) {
+  if (!Tok.TrailingExpr)
+    return false;
+  return isa<ForceTryExpr>(Tok.TrailingExpr);
+}
+
+bool RefactoringActionConvertToDoCatch::performChange() {
+  auto *TryExpr = dyn_cast<ForceTryExpr>(CursorInfo.TrailingExpr);
+  if (!TryExpr)
+    return true;
+  auto Range = findSourceRangeToWrapInCatch(CursorInfo, TheFile, SM);
+  if (!Range.isValid())
+    return true;
+  // Wrap given range in do catch block.
+  EditConsumer.accept(SM, Range.getStart(), "do {\n");
+  EditorConsumerInsertStream OS(EditConsumer, SM, Range.getEnd());
+  OS << "\n} catch {\n" << getCodePlaceholder() << "\n}";
+
+  // Delete ! from try! expression
+  auto ExclaimRange = CharSourceRange(TryExpr->getExclaimLoc(), 1);
+  EditConsumer.accept(SM, ExclaimRange, "");
   return false;
 }
 
