@@ -745,8 +745,8 @@ static Expr* integerLiteralExpr(ASTContext &C, int64_t value) {
   return integerExpr;
 }
 
-/// Returns a new expression that mixes the hash value of an expression into a
-/// variable (as a mutating assignment).
+/// Returns a new assignment expression that mixes the hash value of an
+/// expression into a variable.
 /// \p C The AST context.
 /// \p resultVar The variable into which the hash value will be mixed.
 /// \p exprToHash The expression whose hash value should be mixed in.
@@ -754,42 +754,49 @@ static Expr* integerLiteralExpr(ASTContext &C, int64_t value) {
 static Expr* mixInHashExpr_hashValue(ASTContext &C,
                                      VarDecl* resultVar,
                                      Expr *exprToHash) {
-  auto intType = C.getIntDecl()->getDeclaredType();
-  auto xorFuncInputType =
-    TupleType::get({
-      TupleTypeElt(intType, Identifier(), ParameterTypeFlags().withInOut(true)),
-      TupleTypeElt(intType) }, C);
-
   // <exprToHash>.hashValue
   auto hashValueExpr = new (C) UnresolvedDotExpr(exprToHash, SourceLoc(),
                                                  C.Id_hashValue, DeclNameLoc(),
                                                  /*implicit*/ true);
 
-  // _mixInt(<exprToHash>.hashValue)
+  // _mixForSynthesizedHashValue(result, <exprToHash>.hashValue)
+  auto mixinFunc = C.getMixForSynthesizedHashValueDecl();
+  auto mixinFuncExpr = new (C) DeclRefExpr(mixinFunc, DeclNameLoc(),
+                                           /*implicit*/ true);
+  auto rhsResultExpr = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
+                                           /*implicit*/ true);
+  auto mixinResultExpr = CallExpr::createImplicit(
+      C, mixinFuncExpr, { rhsResultExpr, hashValueExpr }, {});
+
+  // result = _mixForSynthesizedHashValue(result, <exprToHash>.hashValue)
+  auto lhsResultExpr = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
+                                           /*implicit*/ true);
+  auto assignExpr = new (C) AssignExpr(lhsResultExpr, SourceLoc(),
+                                       mixinResultExpr, /*implicit*/ true);
+  return assignExpr;
+}
+
+/// Returns a new assignment expression that invokes _mixInt on a variable and
+/// assigns the result back to the same variable.
+/// \p C The AST context.
+/// \p resultVar The integer variable to be mixed.
+/// \return The expression that mixes the integer value.
+static Expr* mixIntAssignmentExpr(ASTContext &C, VarDecl* resultVar) {
   auto mixinFunc = C.getMixIntDecl();
   auto mixinFuncExpr = new (C) DeclRefExpr(mixinFunc, DeclNameLoc(),
                                            /*implicit*/ true);
-  auto mixinResultExpr = CallExpr::createImplicit(C, mixinFuncExpr,
-                                                  { hashValueExpr }, {});
+  auto rhsResultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
+                                          /*implicit*/ true);
+  // _mixInt(result)
+  auto mixedResultExpr = CallExpr::createImplicit(C, mixinFuncExpr,
+                                                  { rhsResultRef }, {});
 
-  // result ^= _mixInt(<exprToHash>.hashValue)
-  auto resultExpr = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
-                                        /*implicit*/ true);
-  auto resultInoutExpr = new (C) InOutExpr(SourceLoc(), resultExpr,
-                                           intType, /*implicit*/ true);
-
-  auto xorFunc = C.getMutatingXorIntDecl();
-  auto xorFuncExpr = new (C) DeclRefExpr(xorFunc, DeclNameLoc(),
-                                         /*implicit*/ true);
-
-  TupleExpr *xorArgTuple = TupleExpr::create(C, SourceLoc(),
-                                             { resultInoutExpr,
-                                               mixinResultExpr },
-                                             { }, { }, SourceLoc(),
-                                             /*HasTrailingClosure*/ false,
-                                             /*Implicit*/ true,
-                                             xorFuncInputType);
-  return new (C) BinaryExpr(xorFuncExpr, xorArgTuple, /*implicit*/ true);
+  // result = _mixInt(result)
+  auto lhsResultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
+                                          /*implicit*/ true);
+  auto assignExpr = new (C) AssignExpr(lhsResultRef, SourceLoc(),
+                                       mixedResultExpr, /*implicit*/ true);
+  return assignExpr;
 }
 
 static void
@@ -844,45 +851,39 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
     auto labelItem = CaseLabelItem(/*IsDefault*/ false, pat, SourceLoc(),
                                    nullptr);
 
-    auto hasBoundDecls = !payloadVars.empty();
+    // If the enum has no associated values, we use the ordinal alone as the
+    // hash value, because that is sufficient for a good distribution. If any
+    // case do have associated values, then the ordinal is used as the first
+    // term mixed into _mixForSynthesizedHashValue, and the final result after
+    // mixing in the payload is passed to _mixInt to improve the distribution.
 
-    // If the enum has no cases with associated values, we use the ordinal
-    // directly as the hash value. If any of the cases have associated values,
-    // then we mix the ordinal instead to better distribute it among the hash
-    // values of its payload.
-    if (hasNoAssociatedValues) {
-      // result = <ordinal>
+    // result = <ordinal>
+    {
       auto ordinalExpr = integerLiteralExpr(C, index++);
       auto resultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
                                            /*implicit*/ true);
       auto assignExpr = new (C) AssignExpr(resultRef, SourceLoc(),
                                            ordinalExpr, /*implicit*/ true);
       mixExpressions.emplace_back(ASTNode(assignExpr));
-    } else {
-      // result = _mixInt(<ordinal>)
-      auto mixinFunc = C.getMixIntDecl();
-      auto mixinFuncExpr = new (C) DeclRefExpr(mixinFunc, DeclNameLoc(),
-                                               /*implicit*/ true);
-      auto ordinalExpr = integerLiteralExpr(C, index++);
-      auto mixedOrdinalExpr = CallExpr::createImplicit(C, mixinFuncExpr,
-                                                       { ordinalExpr }, {});
-      auto resultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
-                                           /*implicit*/ true);
-      auto assignExpr = new (C) AssignExpr(resultRef, SourceLoc(),
-                                           mixedOrdinalExpr, /*implicit*/ true);
-      mixExpressions.emplace_back(ASTNode(assignExpr));
+    }
 
+    if (!hasNoAssociatedValues) {
       // Generate a sequence of expressions that mix the payload's hash values
       // into result.
       for (auto payloadVar : payloadVars) {
         auto payloadVarRef = new (C) DeclRefExpr(payloadVar, DeclNameLoc(),
                                                  /*implicit*/ true);
-        // result ^= <payloadVar>.hashValue
+        // result = _mixForSynthesizedHashValue(result, <payloadVar>.hashValue)
         auto mixExpr = mixInHashExpr_hashValue(C, resultVar, payloadVarRef);
         mixExpressions.emplace_back(ASTNode(mixExpr));
       }
+
+      // result = _mixInt(result)
+      auto assignExpr = mixIntAssignmentExpr(C, resultVar);
+      mixExpressions.emplace_back(ASTNode(assignExpr));
     }
 
+    auto hasBoundDecls = !payloadVars.empty();
     auto body = BraceStmt::create(C, SourceLoc(), mixExpressions, SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, hasBoundDecls,
                                      SourceLoc(), body));
@@ -961,13 +962,17 @@ deriveBodyHashable_struct_hashValue(AbstractFunctionDecl *hashValueDecl) {
                                        /*implicit*/ true);
     auto selfPropertyExpr = new (C) DotSyntaxCallExpr(propertyRef, SourceLoc(),
                                                       selfRef);
-    // result ^= <property>.hashValue
+    // result = _mixForSynthesizedHashValue(result, <property>.hashValue)
     auto mixExpr = mixInHashExpr_hashValue(C, resultVar, selfPropertyExpr);
     statements.emplace_back(ASTNode(mixExpr));
   }
 
-  // return result
   {
+    // result = _mixInt(result)
+    auto assignExpr = mixIntAssignmentExpr(C, resultVar);
+    statements.push_back(assignExpr);
+
+    // return result
     auto resultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
                                          /*implicit*/ true,
                                          AccessSemantics::Ordinary, intType);
@@ -987,16 +992,16 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   // enum SomeEnum {
   //   case A, B, C
   //   @derived var hashValue: Int {
-  //     var index: Int
+  //     var result: Int
   //     switch self {
   //     case A:
-  //       index = 0
+  //       result = 0
   //     case B:
-  //       index = 1
+  //       result = 1
   //     case C:
-  //       index = 2
+  //       result = 2
   //     }
-  //     return index.hashValue
+  //     return result
   //   }
   // }
   //
@@ -1006,15 +1011,16 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   //     var result: Int
   //     switch self {
   //     case A:
-  //       result = _mixInt(0)
+  //       result = 0
   //     case B(let a0):
-  //       result = _mixInt(1)
-  //       result ^= _mixInt(a0.hashValue)
+  //       result = _mixForSynthesizedHashValue(result, 1)
+  //       result = _mixForSynthesizedHashValue(result, a0.hashValue)
   //     case C(let a0, let a1):
-  //       result = _mixInt(2)
-  //       result ^= _mixInt(a0.hashValue)
-  //       result ^= _mixInt(a1.hashValue)
+  //       result = _mixForSynthesizedHashValue(result, 2)
+  //       result = _mixForSynthesizedHashValue(result, a0.hashValue)
+  //       result = _mixForSynthesizedHashValue(result, a1.hashValue)
   //     }
+  //     result = _mixInt(result)
   //     return result
   //   }
   // }
@@ -1024,8 +1030,9 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   //   var y: String
   //   @derived var hashValue: Int {
   //     var result: Int = 0
-  //     result ^= _mixInt(x.hashValue)
-  //     result ^= _mixInt(y.hashValue)
+  //     result = _mixForSynthesizedHashValue(result, x.hashValue)
+  //     result = _mixForSynthesizedHashValue(result, y.hashValue)
+  //     result = _mixInt(result)
   //     return result
   //   }
   // }

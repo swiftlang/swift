@@ -470,12 +470,13 @@ public:
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
 
-  /// Retrieve the declaration of Swift.^= (inout Int, Int) -> Void.
-  FuncDecl *getMutatingXorIntDecl() const;
+  /// Retrieve the declaration of
+  /// Swift._mixForSynthesizedHashValue (Int, Int) -> Int.
+  FuncDecl *getMixForSynthesizedHashValueDecl() const;
 
   /// Retrieve the declaration of Swift._mixInt(Int) -> Int.
   FuncDecl *getMixIntDecl() const;
-  
+
   /// Retrieve the declaration of Array.append(element:)
   FuncDecl *getArrayAppendElementDecl() const;
 

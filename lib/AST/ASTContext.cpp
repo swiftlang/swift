@@ -184,8 +184,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
-  /// func ^= (inout Int, Int) -> Void
-  FuncDecl *MutatingXorIntDecl = nullptr;
+  /// func _mixForSynthesizedHashValue(Int, Int) -> Int
+  FuncDecl *MixForSynthesizedHashValueDecl = nullptr;
 
   /// func _mixInt(Int) -> Int
   FuncDecl *MixIntDecl = nullptr;
@@ -1028,27 +1028,6 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
   return decl;
 }
 
-FuncDecl *ASTContext::getMutatingXorIntDecl() const {
-  if (Impl.MutatingXorIntDecl)
-    return Impl.MutatingXorIntDecl;
-
-  auto intType = getIntDecl()->getDeclaredType();
-  auto inoutIntType = InOutType::get(intType);
-  auto callback = [&](Type inputType, Type resultType) {
-    // Check for the signature: (inout Int, Int) -> Void
-    auto tupleType = dyn_cast<TupleType>(inputType.getPointer());
-    assert(tupleType);
-    return (tupleType->getNumElements() == 2 &&
-            tupleType->getElementType(0)->isEqual(inoutIntType) &&
-            tupleType->getElementType(1)->isEqual(intType) &&
-            resultType->isVoid());
-  };
-
-  auto decl = lookupOperatorFunc<16>(*this, "^=", intType, callback);
-  Impl.MutatingXorIntDecl = decl;
-  return decl;
-}
-
 FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   if (Impl.GetBoolDecl)
     return Impl.GetBoolDecl;
@@ -1061,6 +1040,29 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
 
   auto decl = lookupLibraryIntrinsicFunc(*this, "_getBool", resolver, callback);
   Impl.GetBoolDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getMixForSynthesizedHashValueDecl() const {
+  if (Impl.MixForSynthesizedHashValueDecl)
+    return Impl.MixForSynthesizedHashValueDecl;
+
+  auto resolver = getLazyResolver();
+  auto intType = getIntDecl()->getDeclaredType();
+
+  auto callback = [&](Type inputType, Type resultType) {
+    // Look for the signature (Int, Int) -> Int
+    auto tupleType = dyn_cast<TupleType>(inputType.getPointer());
+    assert(tupleType);
+    return tupleType->getNumElements() == 2 &&
+        tupleType->getElementType(0)->isEqual(intType) &&
+        tupleType->getElementType(1)->isEqual(intType) &&
+        resultType->isEqual(intType);
+  };
+
+  auto decl = lookupLibraryIntrinsicFunc(
+      *this, "_mixForSynthesizedHashValue", resolver, callback);
+  Impl.MixForSynthesizedHashValueDecl = decl;
   return decl;
 }
 
