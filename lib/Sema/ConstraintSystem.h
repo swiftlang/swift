@@ -2640,10 +2640,15 @@ private:
           auto &lastBinding = Bindings[*lastSupertypeIndex];
           auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
           auto bindingType = binding.BindingType->getWithoutSpecifierType();
-          if (auto join = Type::join(lastType, bindingType)) {
-            // Replace the last supertype binding with the join. We're done.
-            lastBinding.BindingType = join;
-            return;
+          auto join = Type::join(lastType, bindingType);
+          if (join) {
+            auto anyType = join->getASTContext().TheAnyType;
+            if (!join->isEqual(anyType) || lastType->isEqual(anyType) ||
+                bindingType->isEqual(anyType)) {
+              // Replace the last supertype binding with the join. We're done.
+              lastBinding.BindingType = join;
+              return;
+            }
           }
         }
 
