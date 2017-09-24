@@ -21,7 +21,7 @@ function(runcmd)
 endfunction(runcmd)
 
 function (add_swift_benchmark_library objfile_out sibfile_out)
-  cmake_parse_arguments(BENCHLIB "" "MODULE_PATH;SOURCE_DIR;OBJECT_DIR" "SOURCES;LIBRARY_FLAGS" ${ARGN})
+  cmake_parse_arguments(BENCHLIB "" "MODULE_PATH;SOURCE_DIR;OBJECT_DIR" "SOURCES;LIBRARY_FLAGS;DEPENDS" ${ARGN})
 
   precondition(BENCHLIB_MODULE_PATH)
   precondition(BENCHLIB_SOURCE_DIR)
@@ -40,7 +40,7 @@ function (add_swift_benchmark_library objfile_out sibfile_out)
   precondition(objfile_out)
   add_custom_command(
     OUTPUT "${objfile}"
-    DEPENDS ${stdlib_dependencies} ${sources}
+    DEPENDS ${stdlib_dependencies} ${sources} ${BENCHLIB_DEPENDS}
     COMMAND "${SWIFT_EXEC}"
       ${BENCHLIB_LIBRARY_FLAGS}
       "-force-single-frontend-invocation"
@@ -59,7 +59,7 @@ function (add_swift_benchmark_library objfile_out sibfile_out)
     add_custom_command(
       OUTPUT "${sibfile}"
       DEPENDS
-      ${stdlib_dependencies} ${sources}
+      ${stdlib_dependencies} ${sources} ${BENCHLIB_DEPENDS}
       COMMAND "${SWIFT_EXEC}"
         ${BENCHLIB_LIBRARY_FLAGS}
         "-force-single-frontend-invocation"
@@ -121,89 +121,47 @@ function (swift_benchmark_compile_archopts)
   set(bench_library_sibfiles)
   # Build libraries used by the driver and benchmarks.
   foreach(module_name_path ${BENCH_LIBRARY_MODULES})
-    get_filename_component(module_name "${module_name_path}" NAME)
+    set(sources "${srcdir}/${module_name_path}.swift")
 
-    set(objfile "${objdir}/${module_name}.o")
-    set(swiftmodule "${objdir}/${module_name}.swiftmodule")
-    set(source "${srcdir}/${module_name_path}.swift")
-    list(APPEND bench_library_objects "${objfile}")
-    add_custom_command(
-        OUTPUT "${objfile}"
-        DEPENDS
-          ${stdlib_dependencies} "${source}" ${extra_sources}
-        COMMAND "${SWIFT_EXEC}"
-        ${common_options}
-        "-force-single-frontend-invocation"
-        "-parse-as-library"
-        "-module-name" "${module_name}"
-        "-emit-module" "-emit-module-path" "${swiftmodule}"
-        "-o" "${objfile}"
-        "${source}" ${extra_sources})
+    add_swift_benchmark_library(objfile_out sibfile_out
+      MODULE_PATH "${module_name_path}"
+      SOURCE_DIR "${srcdir}"
+      OBJECT_DIR "${objdir}"
+      SOURCES ${sources}
+      LIBRARY_FLAGS ${common_options})
+    precondition(objfile_out)
+    list(APPEND bench_library_objects "${objfile_out}")
     if (SWIFT_BENCHMARK_EMIT_SIB)
-      set(sibfile "${objdir}/${module_name}.sib")
-      list(APPEND bench_library_sibfiles "${sibfile}")
-      add_custom_command(
-          OUTPUT "${sibfile}"
-          DEPENDS
-            ${stdlib_dependencies} "${srcdir}/${module_name_path}.swift"
-            ${extra_sources}
-          COMMAND "${SWIFT_EXEC}"
-          ${common_options}
-          "-force-single-frontend-invocation"
-          "-parse-as-library"
-          "-module-name" "${module_name}"
-          "-emit-sib"
-          "-o" "${sibfile}"
-          "${source}" ${extra_sources})
+      precondition(sibfile_out)
+      list(APPEND bench_library_sibfiles "${sibfile_out}")
     endif()
   endforeach()
+  precondition(bench_library_objects)
 
   set(bench_driver_objects)
   set(bench_driver_sibfiles)
   foreach(module_name_path ${BENCH_DRIVER_LIBRARY_MODULES})
-    get_filename_component(module_name "${module_name_path}" NAME)
+    set(sources "${srcdir}/${module_name_path}.swift")
 
+    get_filename_component(module_name "${module_name_path}" NAME)
     if("${module_name}" STREQUAL "DriverUtils")
-      set(extra_sources "${srcdir}/utils/ArgParse.swift")
+      list(APPEND sources "${srcdir}/utils/ArgParse.swift")
     endif()
 
-    set(objfile "${objdir}/${module_name}.o")
-    set(swiftmodule "${objdir}/${module_name}.swiftmodule")
-    list(APPEND bench_driver_objects "${objfile}")
-    set(source "${srcdir}/${module_name_path}.swift")
-    add_custom_command(
-        OUTPUT "${objfile}"
-        DEPENDS
-          ${stdlib_dependencies} ${bench_library_objects} ${source}
-          ${extra_sources}
-        COMMAND "${SWIFT_EXEC}"
-        ${common_options_driver}
-        ${BENCH_DRIVER_LIBRARY_FLAGS}
-        "-force-single-frontend-invocation"
-        "-parse-as-library"
-        "-module-name" "${module_name}"
-        "-emit-module" "-emit-module-path" "${swiftmodule}"
-        "-I" "${objdir}"
-        "-o" "${objfile}"
-        "${source}" ${extra_sources})
-    if(SWIFT_BENCHMARK_EMIT_SIB)
-      set(sibfile "${objdir}/${module_name}.sib")
-      list(APPEND bench_driver_sibfiles "${sibfile}")
-      add_custom_command(
-          OUTPUT "${sibfile}"
-          DEPENDS
-            ${stdlib_dependencies} ${bench_library_objects} ${source}
-            ${extra_sources}
-          COMMAND "${SWIFT_EXEC}"
-          ${common_options_driver}
-          ${BENCH_DRIVER_LIBRARY_FLAGS}
-          "-force-single-frontend-invocation"
-          "-parse-as-library"
-          "-module-name" "${module_name}"
-          "-emit-sib"
-          "-I" "${objdir}"
-          "-o" "${sibfile}"
-          "${source}" ${extra_sources})
+    set(objfile_out)
+    set(sibfile_out)
+    add_swift_benchmark_library(objfile_out sibfile_out
+      MODULE_PATH "${module_name_path}"
+      SOURCE_DIR "${srcdir}"
+      OBJECT_DIR "${objdir}"
+      SOURCES ${sources}
+      LIBRARY_FLAGS ${common_options_driver} ${BENCH_DRIVER_LIBRARY_FLAGS}
+      DEPENDS ${bench_library_objects})
+    precondition(objfile_out)
+    list(APPEND bench_driver_objects "${objfile_out}")
+    if (SWIFT_BENCHMARK_EMIT_SIB)
+      precondition(sibfile_out)
+      list(APPEND bench_driver_sibfiles "${sibfile_out}")
     endif()
   endforeach()
 
