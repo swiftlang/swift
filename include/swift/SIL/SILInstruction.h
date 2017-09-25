@@ -524,6 +524,8 @@ public:
   // Redeclare because lldb currently doesn't know about using-declarations
   void dump() const;
 
+  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
+
   ValueKind getValueKind() const {
     return ValueBase::getKind();
   }
