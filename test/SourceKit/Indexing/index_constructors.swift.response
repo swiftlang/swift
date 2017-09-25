@@ -65,6 +65,9 @@
           key.is_dynamic: 1,
           key.attributes: [
             {
+              key.attribute: source.decl.attribute.public
+            },
+            {
               key.attribute: source.decl.attribute.objc
             }
           ]

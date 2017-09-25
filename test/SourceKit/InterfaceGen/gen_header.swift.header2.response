@@ -144,6 +144,13 @@ public struct NUPixelSize {
     key.namelength: 11,
     key.bodyoffset: 28,
     key.bodylength: 117,
+    key.attributes: [
+      {
+        key.offset: 1,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ],
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -154,7 +161,14 @@ public struct NUPixelSize {
         key.length: 14,
         key.typename: "Int",
         key.nameoffset: 45,
-        key.namelength: 5
+        key.namelength: 5,
+        key.attributes: [
+          {
+            key.offset: 34,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ]
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -165,7 +179,14 @@ public struct NUPixelSize {
         key.length: 15,
         key.typename: "Int",
         key.nameoffset: 72,
-        key.namelength: 6
+        key.namelength: 6,
+        key.attributes: [
+          {
+            key.offset: 61,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ]
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -174,7 +195,14 @@ public struct NUPixelSize {
         key.offset: 96,
         key.length: 6,
         key.nameoffset: 96,
-        key.namelength: 6
+        key.namelength: 6,
+        key.attributes: [
+          {
+            key.offset: 89,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ]
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -184,6 +212,13 @@ public struct NUPixelSize {
         key.length: 29,
         key.nameoffset: 115,
         key.namelength: 29,
+        key.attributes: [
+          {
+            key.offset: 108,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ],
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.var.parameter,

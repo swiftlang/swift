@@ -180,6 +180,13 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.typename: "Int32",
     key.nameoffset: 79,
     key.namelength: 26,
+    key.attributes: [
+      {
+        key.offset: 67,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ],
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.var.parameter,
@@ -201,7 +208,14 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.length: 45,
     key.typename: "Int",
     key.nameoffset: 127,
-    key.namelength: 28
+    key.namelength: 28,
+    key.attributes: [
+      {
+        key.offset: 116,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ]
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -212,6 +226,13 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.length: 45,
     key.typename: "Int",
     key.nameoffset: 180,
-    key.namelength: 28
+    key.namelength: 28,
+    key.attributes: [
+      {
+        key.offset: 169,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ]
   }
 ]
