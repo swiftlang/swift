@@ -11,6 +11,11 @@ cmake_minimum_required(VERSION 2.8.12)
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+set(SWIFT_BENCHMARK_BUILT_STANDALONE FALSE)
+if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
+  set(SWIFT_BENCHMARK_BUILT_STANDALONE TRUE)
+endif()
+
 include(AddSwiftBenchmarkSuite)
 
 set(SWIFT_BENCH_MODULES
@@ -240,16 +245,12 @@ endforeach()
 
 set(executable_targets)
 
-if(SWIFT_SDKS)
-  set(IS_SWIFT_BUILD true)
-endif()
-
 set(srcdir "${CMAKE_CURRENT_SOURCE_DIR}")
 
-if(IS_SWIFT_BUILD)
-  get_filename_component(swift-bin-dir "${SWIFT_EXEC}" DIRECTORY)
-else()
+if(SWIFT_BENCHMARK_BUILT_STANDALONE)
   set(swift-bin-dir "${CMAKE_BINARY_DIR}/bin")
+else()
+  get_filename_component(swift-bin-dir "${SWIFT_EXEC}" DIRECTORY)
 endif()
 
 set(benchmark-bin-dir "${CMAKE_CURRENT_BINARY_DIR}/bin")
