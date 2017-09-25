@@ -19,6 +19,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
 
@@ -65,12 +66,18 @@ public:
     if (first == second)
       return first;
 
-    // Until we handle all the combinations of joins, we need to make
-    // sure we visit the optional side.
+    // Optionals broadly interact with all the other types since
+    //   T <: T? for any T.
+    // So we'll always attempt to dispatch Optional here rather than
+    // make every visitor check for it explicitly.
+
+    // If the second type is an Optional, dispatch to that visitor.
     OptionalTypeKind otk;
     if (second->getAnyOptionalObjectType(otk))
       return TypeJoin(first).visit(second);
 
+    // Otherwise the first type might be an optional (or not), so
+    // dispatch there.
     return TypeJoin(second).visit(first);
   }
 };
@@ -148,23 +155,48 @@ CanType TypeJoin::visitExistentialMetatypeType(CanType second) {
   return ExistentialMetatypeType::get(joinInstance)->getCanonicalType();
 }
 
+/// We'll define the subtype relationships of Optionals as follows:
+///   S  <: S?
+///   S? <: T? if S <: T (covariant)
+///   S! <: S
+///   S! <: T! if S <: T (covariant)
+static Optional<CanType> joinOptional(CanType first, CanType second) {
+  OptionalTypeKind firstKind, secondKind;
+  auto firstObject = first->getAnyOptionalObjectType(firstKind);
+  auto secondObject = second->getAnyOptionalObjectType(secondKind);
+
+  // If neither is any kind of Optional, we're done.
+  if (firstKind == OTK_None && secondKind == OTK_None)
+    return None;
+
+  CanType canFirst = (firstObject ? firstObject : first)->getCanonicalType();
+  CanType canSecond =
+      (secondObject ? secondObject : second)->getCanonicalType();
+
+  auto joined = TypeJoin::join(canFirst, canSecond);
+
+  // If either is a plain Optional, the result is a plain Optional.
+  if (firstKind == OTK_Optional || secondKind == OTK_Optional)
+    return OptionalType::get(joined)->getCanonicalType();
+
+  assert((firstKind == OTK_ImplicitlyUnwrappedOptional ||
+          secondKind == OTK_ImplicitlyUnwrappedOptional) &&
+         "Expected an implicitly unwrapped optional type!");
+
+  if (firstKind == OTK_ImplicitlyUnwrappedOptional &&
+      secondKind == OTK_ImplicitlyUnwrappedOptional)
+    return ImplicitlyUnwrappedOptionalType::get(joined)->getCanonicalType();
+
+  return joined;
+}
+
 CanType TypeJoin::visitBoundGenericEnumType(CanType second) {
+  // Deal with either First or second (or both) being optionals.
+  if (auto joined = joinOptional(First, second))
+    return joined.getValue();
+
   if (First->getKind() != second->getKind())
     return First->getASTContext().TheAnyType;
-
-  OptionalTypeKind otk1, otk2;
-  auto firstObject = First->getAnyOptionalObjectType(otk1);
-  auto secondObject = second->getAnyOptionalObjectType(otk2);
-  if (otk1 == OTK_Optional || otk2 == OTK_Optional) {
-    auto canFirst = firstObject->getCanonicalType();
-    auto canSecond = secondObject->getCanonicalType();
-
-    // Compute the join of the unwrapped type. If there is none, we're done.
-    auto unwrappedJoin =
-        join(canFirst ? canFirst : First, canSecond ? canSecond : second);
-
-    return OptionalType::get(unwrappedJoin)->getCanonicalType();
-  }
 
   // FIXME: More general joins of enums need to be handled.
   return First->getASTContext().TheAnyType;
