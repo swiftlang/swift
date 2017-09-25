@@ -140,6 +140,11 @@ module Redeclaration {
   export *
 }
 
+module SubclassExistentialsExtra {
+  header "SubclassExistentialsExtra.h"
+  export *
+}
+
 module SwiftPrivateAttr {
   header "SwiftPrivateAttr.h"
 }
