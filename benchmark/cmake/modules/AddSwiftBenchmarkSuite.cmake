@@ -73,6 +73,104 @@ function (add_swift_benchmark_library objfile_out sibfile_out)
   endif()
 endfunction()
 
+function(_construct_sources_for_multibench sources_out objfile_out)
+  cmake_parse_arguments(SOURCEJSONLIST "" "" "SOURCES" ${ARGN})
+
+  set(sources)
+  set(objfiles)
+
+  foreach(source ${SOURCEJSONLIST_SOURCES})
+    list(APPEND sources "${srcdir}/${source}")
+
+    get_filename_component(basename "${source}" NAME_WE)
+    set(objfile "${objdir}/${module_name}/${basename}.o")
+
+    string(CONCAT json "${json}"
+      "  \"${srcdir}/${source}\": { \"object\": \"${objfile}\" },\n")
+
+    list(APPEND objfiles "${objfile}")
+  endforeach()
+  string(CONCAT json "${json}" "}")
+  file(WRITE "${objdir}/${module_name}/outputmap.json" ${json})
+  set(${sources_out} ${sources} PARENT_SCOPE)
+  set(${objfile_out} ${objfiles} PARENT_SCOPE)
+endfunction()
+
+# Regular whole-module-compilation: only a single object file is
+# generated.
+function (add_swift_multisource_wmo_benchmark_library objfile_out)
+  cmake_parse_arguments(BENCHLIB "" "MODULE_PATH;SOURCE_DIR;OBJECT_DIR" "SOURCES;LIBRARY_FLAGS;DEPENDS" ${ARGN})
+
+  precondition(BENCHLIB_MODULE_PATH)
+  precondition(BENCHLIB_SOURCE_DIR)
+  precondition(BENCHLIB_OBJECT_DIR)
+  precondition(BENCHLIB_SOURCES)
+
+  set(module_name_path "${BENCHLIB_MODULE_PATH}")
+  get_filename_component(module_name "${module_name_path}" NAME)
+  set(srcdir "${BENCHLIB_SOURCE_DIR}")
+  set(objdir "${BENCHLIB_OBJECT_DIR}")
+
+  set(objfile "${objdir}/${module_name}.o")
+
+  set(sources)
+  foreach(source ${BENCHLIB_SOURCES})
+    list(APPEND sources "${srcdir}/${source}")
+  endforeach()
+
+  add_custom_command(
+    OUTPUT "${objfile}"
+    DEPENDS
+      ${sources} ${BENCHLIB_DEPENDS}
+    COMMAND "${SWIFT_EXEC}"
+      ${BENCHLIB_LIBRARY_FLAGS}
+      "-parse-as-library"
+      "-emit-module" "-module-name" "${module_name}"
+      "-I" "${objdir}"
+      "-o" "${objfile}"
+      ${sources})
+
+  set(${objfile_out} "${objfile}" PARENT_SCOPE)
+endfunction()
+
+function(add_swift_multisource_nonwmo_benchmark_library objfiles_out)
+  cmake_parse_arguments(BENCHLIB "" "MODULE_PATH;SOURCE_DIR;OBJECT_DIR" "SOURCES;LIBRARY_FLAGS;DEPENDS" ${ARGN})
+
+  precondition(BENCHLIB_MODULE_PATH)
+  precondition(BENCHLIB_SOURCE_DIR)
+  precondition(BENCHLIB_OBJECT_DIR)
+  precondition(BENCHLIB_SOURCES)
+
+  set(module_name_path "${BENCHLIB_MODULE_PATH}")
+  get_filename_component(module_name "${module_name_path}" NAME)
+  set(srcdir "${BENCHLIB_SOURCE_DIR}")
+  set(objdir "${BENCHLIB_OBJECT_DIR}")
+
+  set(objfile "${objdir}/${module_name}.o")
+
+  # No whole-module-compilation or multi-threaded compilation.
+  # There is an output object file for each input file. We have to write
+  # an output-map-file to specify the output object file names.
+  set(sources)
+  set(objfiles)
+  _construct_sources_for_multibench(sources objfiles
+    SOURCES ${BENCHLIB_SOURCES})
+
+  add_custom_command(
+    OUTPUT ${objfiles}
+    DEPENDS ${sources} ${BENCHLIB_DEPENDS}
+    COMMAND "${SWIFT_EXEC}"
+      ${BENCHLIB_LIBRARY_FLAGS}
+      "-parse-as-library"
+      "-emit-module-path" "${objdir}/${module_name}.swiftmodule"
+      "-module-name" "${module_name}"
+      "-I" "${objdir}"
+      "-output-file-map" "${objdir}/${module_name}/outputmap.json"
+      ${sources})
+
+  set(${objfiles_out} ${objfiles} PARENT_SCOPE)
+endfunction()
+
 function (swift_benchmark_compile_archopts)
   cmake_parse_arguments(BENCH_COMPILE_ARCHOPTS "" "PLATFORM;ARCH;OPT" "" ${ARGN})
   set(sdk ${${BENCH_COMPILE_ARCHOPTS_PLATFORM}_sdk})
@@ -228,66 +326,28 @@ function (swift_benchmark_compile_archopts)
   endforeach()
 
   foreach(module_name_path ${SWIFT_MULTISOURCE_BENCHES})
-    get_filename_component(module_name "${module_name_path}" NAME)
-
+    set(objfile_out)
     if ("${bench_flags}" MATCHES "-whole-module.*" AND
         NOT "${bench_flags}" MATCHES "-num-threads.*")
-      # Regular whole-module-compilation: only a single object file is
-      # generated.
-      set(objfile "${objdir}/${module_name}.o")
+      add_swift_multisource_wmo_benchmark_library(objfile_out
+        MODULE_PATH "${module_name_path}"
+        SOURCE_DIR "${srcdir}"
+        OBJECT_DIR "${objdir}"
+        SOURCES ${${module_name}_sources}
+        LIBRARY_FLAGS ${common_options} ${bench_flags}
+        DEPENDS ${bench_library_objects} ${stdlib_dependencies})
+      precondition(objfile_out)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
-      set(sources)
-      foreach(source ${${module_name}_sources})
-        list(APPEND sources "${srcdir}/${source}")
-      endforeach()
-      add_custom_command(
-          OUTPUT "${objfile}"
-          DEPENDS
-            ${stdlib_dependencies} ${bench_library_objects} ${sources}
-          COMMAND "${SWIFT_EXEC}"
-          ${common_options}
-          ${bench_flags}
-          "-parse-as-library"
-          "-emit-module" "-module-name" "${module_name}"
-          "-I" "${objdir}"
-          "-o" "${objfile}"
-          ${sources})
     else()
-
-      # No whole-module-compilation or multi-threaded compilation.
-      # There is an output object file for each input file. We have to write
-      # an output-map-file to specify the output object file names.
-      set(sources)
-      set(objfiles)
-      set(json "{\n")
-      foreach(source ${${module_name}_sources})
-          list(APPEND sources "${srcdir}/${source}")
-
-          get_filename_component(basename "${source}" NAME_WE)
-          set(objfile "${objdir}/${module_name}/${basename}.o")
-
-              string(CONCAT json "${json}"
-    "  \"${srcdir}/${source}\": { \"object\": \"${objfile}\" },\n")
-
-          list(APPEND objfiles "${objfile}")
-          list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
-      endforeach()
-      string(CONCAT json "${json}" "}")
-      file(WRITE "${objdir}/${module_name}/outputmap.json" ${json})
-
-      add_custom_command(
-          OUTPUT ${objfiles}
-          DEPENDS
-            ${stdlib_dependencies} ${bench_library_objects} ${sources}
-          COMMAND "${SWIFT_EXEC}"
-          ${common_options}
-          ${bench_flags}
-          "-parse-as-library"
-          "-emit-module-path" "${objdir}/${module_name}.swiftmodule"
-          "-module-name" "${module_name}"
-          "-I" "${objdir}"
-          "-output-file-map" "${objdir}/${module_name}/outputmap.json"
-          ${sources})
+      add_swift_multisource_nonwmo_benchmark_library(objfiles_out
+        MODULE_PATH "${module_name_path}"
+        SOURCE_DIR "${srcdir}"
+        OBJECT_DIR "${objdir}"
+        SOURCES ${${module_name}_sources}
+        LIBRARY_FLAGS ${common_options} ${bench_flags}
+        DEPENDS ${bench_library_objects} ${stdlib_dependencies})
+      precondition(objfiles_out)
+      list(APPEND SWIFT_BENCH_OBJFILES ${objfiles_out})
     endif()
   endforeach()
 
