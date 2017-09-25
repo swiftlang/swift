@@ -48,8 +48,7 @@ struct TypeJoin : TypeVisitor<TypeJoin, Type> {
   Type visitType(Type second) {
     // FIXME: Implement all the visitors.
     //    llvm_unreachable("Unimplemented type visitor!");
-    // return First->getASTContext().TheAnyType;
-    return nullptr;
+    return First->getASTContext().TheAnyType;
   }
 
 public:
@@ -90,9 +89,8 @@ Type TypeJoin::getSuperclassJoin(Type first, Type second) {
   if (!first || !second)
     return TypeJoin::join(first, second);
 
-  // FIXME: Return Any
   if (!first->mayHaveSuperclass() || !second->mayHaveSuperclass())
-    return nullptr;
+    return first->getASTContext().TheAnyType;
 
   /// Walk the superclasses of `first` looking for `second`. Record them
   /// for our second step.
@@ -102,7 +100,8 @@ Type TypeJoin::getSuperclassJoin(Type first, Type second) {
     CanType canSuper = super->getCanonicalType();
 
     // If we have found the second type, we're done.
-    if (canSuper == canSecond) return super;
+    if (canSuper == canSecond)
+      return super;
 
     superclassesOfFirst.insert(canSuper);
   }
@@ -113,12 +112,12 @@ Type TypeJoin::getSuperclassJoin(Type first, Type second) {
     CanType canSuper = super->getCanonicalType();
 
     // If we found the first type, we're done.
-    if (superclassesOfFirst.count(canSuper)) return super;
+    if (superclassesOfFirst.count(canSuper))
+      return super;
   }
 
-  // FIXME: Return Any
   // There is no common superclass; we're done.
-  return nullptr;
+  return first->getASTContext().TheAnyType;
 }
 
 Type TypeJoin::visitClassType(Type second) {
@@ -138,47 +137,38 @@ Type TypeJoin::visitDynamicSelfType(Type second) {
 }
 
 Type TypeJoin::visitMetatypeType(Type second) {
-  assert(!First->mayHaveSuperclass() && !second->mayHaveSuperclass());
-
-  // FIXME: Return Any
   if (First->getKind() != second->getKind())
-    return nullptr;
+    return First->getASTContext().TheAnyType;
 
   auto firstInstance = First->castTo<AnyMetatypeType>()->getInstanceType();
   auto secondInstance = second->castTo<AnyMetatypeType>()->getInstanceType();
 
   auto joinInstance = join(firstInstance, secondInstance);
 
-  // FIXME: Return Any
   if (!joinInstance)
-    return nullptr;
+    return First->getASTContext().TheAnyType;
 
   return MetatypeType::get(joinInstance);
 }
 
 Type TypeJoin::visitExistentialMetatypeType(Type second) {
-  assert(!First->mayHaveSuperclass() && !second->mayHaveSuperclass());
-
-  // FIXME: Return Any
   if (First->getKind() != second->getKind())
-    return nullptr;
+    return First->getASTContext().TheAnyType;
 
   auto firstInstance = First->castTo<AnyMetatypeType>()->getInstanceType();
   auto secondInstance = second->castTo<AnyMetatypeType>()->getInstanceType();
 
   auto joinInstance = join(firstInstance, secondInstance);
 
-  // FIXME: Return Any
   if (!joinInstance)
-    return nullptr;
+    return First->getASTContext().TheAnyType;
 
   return ExistentialMetatypeType::get(joinInstance);
 }
 
 Type TypeJoin::visitBoundGenericEnumType(Type second) {
-  // FIXME: Return Any
   if (First->getKind() != second->getKind())
-    return nullptr;
+    return First->getASTContext().TheAnyType;
 
   OptionalTypeKind otk1, otk2;
   Type objectType1 = First->getAnyOptionalObjectType(otk1);
@@ -188,15 +178,14 @@ Type TypeJoin::visitBoundGenericEnumType(Type second) {
     Type unwrappedJoin = join(objectType1 ? objectType1 : First,
                               objectType2 ? objectType2 : second);
     // FIXME: More general joins of enums need to be handled.
-    if (!unwrappedJoin) return nullptr;
+    if (!unwrappedJoin)
+      return First->getASTContext().TheAnyType;
 
     return OptionalType::get(unwrappedJoin);
   }
 
-  // FIXME: More general joins of enums need to be handled, and
-  //        then Any should be returned when there is no better
-  //        choice.
-  return nullptr;
+  // FIXME: More general joins of enums need to be handled.
+  return First->getASTContext().TheAnyType;
 }
 
 Type TypeJoin::visitOptionalType(Type second) {

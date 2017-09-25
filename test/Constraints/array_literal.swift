@@ -304,8 +304,6 @@ struct Beef : Pear {}
 
 let routerFruit = Company(
   routes: [
-    // FIXME: implement join() for existentials
-    // expected-error@+1 {{cannot convert value of type '() -> Tomato.Type' to expected element type '() -> _'}}
     { () -> Tomato.Type in
       _ = ()
       return Chicken.self
