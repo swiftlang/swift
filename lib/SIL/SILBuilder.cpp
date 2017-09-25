@@ -409,6 +409,12 @@ void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
   while (I && I->getNumOperands() == 1 &&
          I->getNumTypeDependentOperands() == 0) {
     I = dyn_cast<SILInstruction>(I->getOperand(0));
+    // Within SimplifyCFG this function may be called for an instruction
+    // within unreachable code. And within an unreachable block it can happen
+    // that defs do not dominate uses (because there is no dominance defined).
+    // To avoid the infinite loop when following the chain of instructions via
+    // their operands, bail if the operand is not an instruction or this
+    // instruction was seen already.
     if (!I || !Visited.insert(I).second)
       return;
     // If it is a definition of an opened archetype,
