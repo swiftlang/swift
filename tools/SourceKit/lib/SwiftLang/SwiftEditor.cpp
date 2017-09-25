@@ -1193,7 +1193,8 @@ public:
     UIdent AccessLevel;
     UIdent SetterAccessLevel;
     if (Node.Kind != SyntaxStructureKind::Parameter &&
-        Node.Kind != SyntaxStructureKind::LocalVariable) {
+        Node.Kind != SyntaxStructureKind::LocalVariable &&
+        Node.Kind != SyntaxStructureKind::GenericTypeParam) {
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
         AccessLevel = getAccessLevelUID(inferAccessLevel(VD));
       } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
