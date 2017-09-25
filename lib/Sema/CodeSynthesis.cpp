@@ -2118,6 +2118,12 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     ctor->getAttrs().add(clonedAttr);
   }
 
+  // Inherit the @_inlineable attribute.
+  if (superclassCtor->getAttrs().hasAttribute<InlineableAttr>()) {
+    auto *clonedAttr = new (ctx) InlineableAttr(/*implicit=*/true);
+    ctor->getAttrs().add(clonedAttr);
+  }
+
   // Make sure the constructor is only as available as its superclass's
   // constructor.
   AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
