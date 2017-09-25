@@ -136,20 +136,19 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
                                     DeclContext *DC,
                                     SourceRange baseRange,
                                     ComponentIdentTypeRepr *ref) {
-  // Resolve the base to a potential archetype.
-  auto basePA =
-    builder.resolveArchetype(baseTy,
-                             ArchetypeResolutionKind::CompleteWellFormed);
-  assert(basePA && "Missing potential archetype for base");
+  auto baseEquivClass =
+    builder.resolveEquivalenceClass(
+                                baseTy,
+                                ArchetypeResolutionKind::CompleteWellFormed);
+  assert(baseEquivClass && "Unknown base type?");
 
-  // Retrieve the potential archetype for the nested type.
-  auto nestedPA =
-    basePA->getNestedType(ref->getIdentifier(),
-                          ArchetypeResolutionKind::CompleteWellFormed,
-                          builder);
-
-  // If there was no such nested type, produce an error.
-  if (!nestedPA) {
+  // Look for a nested type with the given name.
+  if (auto nestedType =
+          baseEquivClass->lookupNestedType(ref->getIdentifier())) {
+    // Record the type we found.
+    ref->setValue(nestedType, nullptr);
+  } else {
+    // Resolve the base to a potential archetype.
     // Perform typo correction.
     LookupResult corrections;
     tc.performTypoCorrection(DC, DeclRefKind::Ordinary,
@@ -189,11 +188,6 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
     // Correct to the single type result.
     ref->overwriteIdentifier(singleType->getBaseName().getIdentifier());
     ref->setValue(singleType, nullptr);
-  } else if (auto assocType = nestedPA->getResolvedAssociatedType()) {
-    ref->setValue(assocType, nullptr);
-  } else {
-    assert(nestedPA->getConcreteTypeDecl());
-    ref->setValue(nestedPA->getConcreteTypeDecl(), nullptr);
   }
 
   // If the nested type has been resolved to an associated type, use it.
@@ -217,7 +211,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
       return concrete->getDeclaredInterfaceType().subst(subMap);
     }
 
-    if (auto superclass = basePA->getSuperclass()) {
+    if (auto superclass = baseEquivClass->superclass) {
       return superclass->getTypeOfMember(
                                        DC->getParentModule(), concrete,
                                        concrete->getDeclaredInterfaceType());

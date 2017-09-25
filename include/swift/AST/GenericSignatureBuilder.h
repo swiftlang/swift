@@ -226,8 +226,9 @@ public:
     ///
     /// \param otherConcreteTypes If non-null, will be filled in the all of the
     /// concrete types we found (other than the result) with the same name.
-    TypeDecl *lookupNestedType(Identifier name,
-                               SmallVectorImpl<TypeDecl *> *otherConcreteTypes);
+    TypeDecl *lookupNestedType(
+                   Identifier name,
+                   SmallVectorImpl<TypeDecl *> *otherConcreteTypes = nullptr);
 
     /// Dump a debugging representation of this equivalence class.
     void dump(llvm::raw_ostream &out) const;
