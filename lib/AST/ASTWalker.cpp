@@ -191,6 +191,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    if (TAD->getGenericParams() &&
+        Walker.shouldWalkIntoGenericParams()) {
+      // Visit generic params
+      for (auto GP : TAD->getGenericParams()->getParams()) {
+        if (doIt(GP))
+          return true;
+      }
+      // Visit param conformance
+      for (auto &Req : TAD->getGenericParams()->getRequirements()) {
+        if (doIt(Req))
+          return true;
+      }
+    }
+
     return doIt(TAD->getUnderlyingTypeLoc());
   }
 
