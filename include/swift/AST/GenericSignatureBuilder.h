@@ -230,6 +230,10 @@ public:
                    Identifier name,
                    SmallVectorImpl<TypeDecl *> *otherConcreteTypes = nullptr);
 
+    /// Retrieve the "anchor" type that canonically describes this equivalence
+    /// class, for use in the canonical type.
+    Type getAnchor(ArrayRef<GenericTypeParamType *> genericParams);
+
     /// Dump a debugging representation of this equivalence class.
     void dump(llvm::raw_ostream &out) const;
 

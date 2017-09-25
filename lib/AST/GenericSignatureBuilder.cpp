@@ -1743,6 +1743,13 @@ TypeDecl *EquivalenceClass::lookupNestedType(
   return populateResult((nestedTypeNameCache[name] = std::move(entry)));
 }
 
+Type EquivalenceClass::getAnchor(
+                            ArrayRef<GenericTypeParamType *> genericParams) {
+  auto anchorPA =
+    members.front()->getArchetypeAnchor(*members.front()->getBuilder());
+  return anchorPA->getDependentType(genericParams);
+}
+
 void EquivalenceClass::dump(llvm::raw_ostream &out) const {
   out << "Equivalence class represented by "
     << members.front()->getRepresentative()->getDebugName() << ":\n";
