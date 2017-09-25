@@ -2625,39 +2625,7 @@ private:
     /// \brief Add a potential binding to the list of bindings,
     /// coalescing supertype bounds when we are able to compute the meet.
     void addPotentialBinding(PotentialBinding binding,
-                             bool allowJoinMeet = true) {
-      assert(!binding.BindingType->is<ErrorType>());
-
-      // If this is a non-defaulted supertype binding,
-      // check whether we can combine it with another
-      // supertype binding by computing the 'join' of the types.
-      if (binding.Kind == AllowedBindingKind::Supertypes &&
-          !binding.BindingType->hasTypeVariable() &&
-          !binding.DefaultedProtocol && !binding.isDefaultableBinding() &&
-          allowJoinMeet) {
-        if (lastSupertypeIndex) {
-          // Can we compute a join?
-          auto &lastBinding = Bindings[*lastSupertypeIndex];
-          auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
-          auto bindingType = binding.BindingType->getWithoutSpecifierType();
-          auto join = Type::join(lastType, bindingType);
-          if (join) {
-            auto anyType = join->getASTContext().TheAnyType;
-            if (!join->isEqual(anyType) || lastType->isEqual(anyType) ||
-                bindingType->isEqual(anyType)) {
-              // Replace the last supertype binding with the join. We're done.
-              lastBinding.BindingType = join;
-              return;
-            }
-          }
-        }
-
-        // Record this as the most recent supertype index.
-        lastSupertypeIndex = Bindings.size();
-      }
-
-      Bindings.push_back(std::move(binding));
-    }
+                             bool allowJoinMeet = true);
 
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
