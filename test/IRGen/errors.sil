@@ -20,6 +20,7 @@ entry:
 // CHECK-LABEL-armv7s: define{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
 // CHECK-LABEL-armv7k: define{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
 // CHECK-LABEL-arm64:  define{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
+// CHECK-LABEL-aarch64:  define{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
 sil @does_throw : $@convention(thin) () -> @error Error {
   // CHECK: [[T0:%.*]] = call swiftcc %swift.error* @create_error()
   %0 = function_ref @create_error : $@convention(thin) () -> @owned Error
@@ -38,6 +39,7 @@ sil @does_throw : $@convention(thin) () -> @error Error {
 // CHECK-LABEL-armv7s: define{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
 // CHECK-LABEL-armv7k: define{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
 // CHECK-LABEL-arm64:  define{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
+// CHECK-LABEL-aarch64:  define{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
 sil @doesnt_throw : $@convention(thin) () -> @error Error {
   //   We don't have to do anything here because the caller always
   //   zeroes the error slot before a call.
@@ -59,6 +61,7 @@ entry(%0 : $AnyObject):
   // CHECK-armv7s:      [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
   // CHECK-armv7k:      [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
   // CHECK-arm64:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
+  // CHECK-aarch64:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
   // CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
 
   // CHECK-objc-NEXT: [[RESULT:%.*]] = call swiftcc %objc_object* @try_apply_helper(%objc_object* %0, %swift.refcounted* swiftself undef, %swift.error** nocapture [[SWIFTERROR]]{{( )?}}[[ERRORSLOT]])
