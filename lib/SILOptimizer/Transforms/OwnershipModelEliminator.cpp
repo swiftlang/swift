@@ -46,13 +46,12 @@ struct OwnershipModelEliminatorVisitor
     B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 
-  void beforeVisit(ValueBase *V) {
-    auto *I = cast<SILInstruction>(V);
+  void beforeVisit(SILInstruction *I) {
     B.setInsertionPoint(I);
     B.setCurrentDebugScope(I->getDebugScope());
   }
 
-  bool visitValueBase(ValueBase *V) { return false; }
+  bool visitSILInstruction(SILInstruction *I) { return false; }
   bool visitLoadInst(LoadInst *LI);
   bool visitStoreInst(StoreInst *SI);
   bool visitStoreBorrowInst(StoreBorrowInst *SI);
@@ -176,7 +175,6 @@ bool OwnershipModelEliminatorVisitor::visitUnmanagedRetainValueInst(
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
   B.emitCopyValueOperation(URVI->getLoc(), URVI->getOperand());
-  URVI->replaceAllUsesWith(URVI->getOperand());
   URVI->eraseFromParent();
   return true;
 }

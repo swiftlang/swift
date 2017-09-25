@@ -167,7 +167,7 @@ Here is an example of a ``.sil`` file::
     %2 = struct_extract %0 : $Point, #Point.x
     %3 = struct_extract %0 : $Point, #Point.y
     %4 = apply %1(%2, %3) : $(Double, Double) -> Double
-    %5 = return %4 : Double
+    return %4 : Double
   }
 
   // Define a SIL vtable. This matches dynamically-dispatched method
@@ -4625,7 +4625,7 @@ unconditional_checked_cast_addr
                        sil-type 'in' sil-operand 'to'
                        sil-type 'in' sil-operand
 
-  %1 = unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in $*@thick B
+  unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in $*@thick B
   // $A and $B must be both addresses
   // %1 will be of type $*B
   // $A is destroyed during the conversion. There is no implicit copy.

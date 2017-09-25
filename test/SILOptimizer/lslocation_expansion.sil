@@ -82,7 +82,7 @@ sil @stack_store : $@convention(thin) () -> () {
   store %9 to %1 : $*Builtin.Int64
   %4 = tuple()
   dealloc_stack %1 : $*Builtin.Int64        // id: %13
-  %5 = return %4 : $()
+  return %4 : $()
 }
 
 // CHECK-LABEL: @store_after_store
@@ -94,10 +94,10 @@ sil @store_after_store : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
-  %2 = store %0 to %1a : $*B
-  %3 = store %0 to %1a : $*B
+  store %0 to %1a : $*B
+  store %0 to %1a : $*B
   %4 = tuple()
-  %5 = return %4 : $()
+  return %4 : $()
 }
 
 // CHECK-LABEL: @store_after_store_struct
@@ -120,7 +120,7 @@ sil @store_after_store_struct : $@convention(thin) () -> () {
   store %10 to %11 : $*Int
   %4 = tuple()
   dealloc_stack %1 : $*S1        // id: %13
-  %5 = return %4 : $()
+  return %4 : $()
 }
 
 // Make sure all the structs get expanded correctly.

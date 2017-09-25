@@ -447,13 +447,12 @@ namespace {
   
 /// SILPrinter class - This holds the internal implementation details of
 /// printing SIL structures.
-class SILPrinter : public SILVisitor<SILPrinter> {
+class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   SILPrintContext &Ctx;
   struct {
     llvm::formatted_raw_ostream OS;
     PrintOptions ASTOptions;
   } PrintState;
-  SILValue subjectValue;
   unsigned LastBufferID;
 
   // Printers for the underlying stream.
@@ -644,7 +643,7 @@ public:
   //===--------------------------------------------------------------------===//
   // SILInstruction Printing Logic
 
-  bool printTypeDependentOperands(SILInstruction *I) {
+  bool printTypeDependentOperands(const SILInstruction *I) {
     ArrayRef<Operand> TypeDepOps = I->getTypeDependentOperands();
     if (TypeDepOps.empty())
       return false;
@@ -659,10 +658,27 @@ public:
 
   /// Print out the users of the SILValue \p V. Return true if we printed out
   /// either an id or a use list. Return false otherwise.
-  bool printUsersOfSILValue(SILValue V, bool printedSlashes) {
+  bool printUsersOfSILNode(const SILNode *node, bool printedSlashes) {
+    SILInstruction::ResultArrayRef values;
+    if (auto value = dyn_cast<ValueBase>(node)) {
+      // The base pointer of the ultimate ArrayRef here is just the
+      // ValueBase; we aren't forming a reference to a temporary array.
+      values = ArrayRef<ValueBase>(value, 1);
+    } else if (auto inst = dyn_cast<SILInstruction>(node)) {
+      values = inst->getResults();
+    }
 
-    if (V->hasValue() && V->use_empty())
-      return printedSlashes;
+    // If the set of values is empty, we need to print the ID of
+    // the instruction.  Otherwise, if none of the values has a use,
+    // we don't need to do anything.
+    if (!values.empty()) {
+      bool hasUse = false;
+      for (auto value : values) {
+        if (!value->use_empty()) hasUse = true;
+      }
+      if (!hasUse)
+        return printedSlashes;
+    }
 
     if (printedSlashes) {
       *this << "; ";
@@ -670,22 +686,20 @@ public:
       PrintState.OS.PadToColumn(50);
       *this << "// ";
     }
-    if (!V->hasValue()) {
-      *this << "id: " << Ctx.getID(V);
+    if (values.empty()) {
+      *this << "id: " << Ctx.getID(node);
       return true;
     }
 
-    if (V->use_empty())
-      return true;
+    llvm::SmallVector<ID, 32> UserIDs;
+    for (auto value : values)
+      for (auto *Op : value->getUses())
+        UserIDs.push_back(Ctx.getID(Op->getUser()));
 
     *this << "user";
-    if (std::next(V->use_begin()) != V->use_end())
+    if (UserIDs.size() != 1)
       *this << 's';
     *this << ": ";
-
-    llvm::SmallVector<ID, 32> UserIDs;
-    for (auto *Op : V->getUses())
-      UserIDs.push_back(Ctx.getID(Op->getUser()));
 
     // If we are asked to, display the user ids sorted to give a stable use
     // order in the printer's output. This makes diffing large sections of SIL
@@ -825,69 +839,114 @@ public:
     }
   }
 
-  void printInstOpCode(SILInstruction *I) {
-    *this << getSILValueName(I->getKind()) << " ";
+  void printInstOpCode(const SILInstruction *I) {
+    *this << getSILInstructionName(I->getKind()) << " ";
   }
 
-  void print(SILValue V) {
-    if (auto *FRI = dyn_cast<FunctionRefInst>(V))
+  void print(const SILInstruction *I) {
+    if (auto *FRI = dyn_cast<FunctionRefInst>(I))
       *this << "  // function_ref "
             << demangleSymbol(FRI->getReferencedFunction()->getName())
             << "\n";
 
     *this << "  ";
 
-    SILInstruction *I = dyn_cast<SILInstruction>(V);
-
-    // Print result.
-    if (V->hasValue()) {
-      if (I && I->isStaticInitializerInst() && I == &I->getParent()->back()) {
-        *this << "%initval = ";
-      } else {
-        ID Name = Ctx.getID(V);
-        *this << Name << " = ";
+    // Print results.
+    auto results = I->getResults();
+    if (results.size() == 1 &&
+        I->isStaticInitializerInst() &&
+        I == &I->getParent()->back()) {
+      *this << "%initval = ";
+    } else if (results.size() == 1) {
+      ID Name = Ctx.getID(results[0]);
+      *this << Name << " = ";
+    } else if (results.size() > 1) {
+      *this << '(';
+      bool first = true;
+      for (auto result : results) {
+        if (first) {
+          first = false;
+        } else {
+          *this << ", ";
+        }
+        ID Name = Ctx.getID(result);
+        *this << Name;
       }
+      *this << ") = ";
     }
 
-    // First if we have a SILInstruction, print the opcode.
-    if (auto *I = dyn_cast<SILInstruction>(V))
-      printInstOpCode(I);
+    // Print the opcode.
+    printInstOpCode(I);
 
-    // Then print the value.
-    visit(V);
+    // Use the visitor to print the rest of the instruction.
+    visit(const_cast<SILInstruction*>(I));
 
+    // Maybe print debugging information.
     bool printedSlashes = false;
-    if (I) {
-      if (Ctx.printDebugInfo() && !I->isStaticInitializerInst()) {
-        auto &SM = I->getModule().getASTContext().SourceMgr;
-        printDebugLocRef(I->getLoc(), SM);
-        printDebugScopeRef(I->getDebugScope(), SM);
-      }
-      printedSlashes = printTypeDependentOperands(I);
+    if (Ctx.printDebugInfo() && !I->isStaticInitializerInst()) {
+      auto &SM = I->getModule().getASTContext().SourceMgr;
+      printDebugLocRef(I->getLoc(), SM);
+      printDebugScopeRef(I->getDebugScope(), SM);
     }
+    printedSlashes = printTypeDependentOperands(I);
 
     // Print users, or id for valueless instructions.
-    printedSlashes = printUsersOfSILValue(V, printedSlashes);
+    printedSlashes = printUsersOfSILNode(I, printedSlashes);
 
     // Print SIL location.
     if (Ctx.printVerbose()) {
-      if (I) {
-        printSILLocation(I->getLoc(), I->getModule(), I->getDebugScope(),
-                         printedSlashes);
-      }
+      printSILLocation(I->getLoc(), I->getModule(), I->getDebugScope(),
+                       printedSlashes);
     }
     
     *this << '\n';
   }
-  
-  void printInContext(SILValue V) {
-    subjectValue = V;
 
-    auto sortByID = [&](SILValue a, SILValue b) {
+  void print(const SILNode *node) {
+    switch (node->getKind()) {
+#define INST(ID, PARENT) \
+    case SILNodeKind::ID:
+#include "swift/SIL/SILNodes.def"
+      print(cast<SingleValueInstruction>(node));
+      return;
+
+    // TODO: MultiValueInstruction
+
+#define ARGUMENT(ID, PARENT) \
+    case SILNodeKind::ID:
+#include "swift/SIL/SILNodes.def"
+      printSILArgument(cast<SILArgument>(node));
+      return;
+
+    case SILNodeKind::SILUndef:
+      printSILUndef(cast<SILUndef>(node));
+      return;
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  void printSILArgument(const SILArgument *arg) {
+    // This should really only happen during debugging.
+    *this << Ctx.getID(arg) << " = argument of "
+          << Ctx.getID(arg->getParent()) << " : " << arg->getType();
+
+    // Print users.
+    (void) printUsersOfSILNode(arg, false);
+
+    *this << '\n';
+  }
+
+  void printSILUndef(const SILUndef *undef) {
+    // This should really only happen during debugging.
+    *this << "undef<" << undef->getType() << ">\n";
+  }
+  
+  void printInContext(const SILNode *node) {
+    auto sortByID = [&](const SILNode *a, const SILNode *b) {
       return Ctx.getID(a).Number < Ctx.getID(b).Number;
     };
 
-    if (auto *I = dyn_cast<SILInstruction>(V)) {
+    if (auto *I = dyn_cast<SILInstruction>(node)) {
       auto operands = map<SmallVector<SILValue,4>>(I->getAllOperands(),
                                                    [](Operand const &o) {
                                                      return o.get();
@@ -900,28 +959,19 @@ public:
     }
     
     *this << "-> ";
-    print(V);
-    
-    auto users = map<SmallVector<SILValue,4>>(V->getUses(),
-                                              [](Operand *o) {
-                                                return o->getUser();
-                                              });
-    std::sort(users.begin(), users.end(), sortByID);
-    for (auto &user : users) {
-      *this << "   ";
-      print(user);
+    print(node);
+
+    if (auto V = dyn_cast<ValueBase>(node)) {    
+      auto users = map<SmallVector<const SILInstruction*,4>>(V->getUses(),
+                                                       [](Operand *o) {
+                                                         return o->getUser();
+                                                       });
+      std::sort(users.begin(), users.end(), sortByID);
+      for (auto &user : users) {
+        *this << "   ";
+        print(user);
+      }
     }
-  }
-
-  void visitSILArgument(SILArgument *A) {
-    // This should really only happen during debugging.
-    *this << "argument of " << Ctx.getID(A->getParent()) << " : "
-          << A->getType();
-  }
-
-  void visitSILUndef(SILUndef *A) {
-    // This should really only happen during debugging.
-    *this << "undef<" << A->getType() << ">";
   }
 
   void printDebugVar(SILDebugVariable Var) {
@@ -1657,6 +1707,11 @@ public:
       *this << "[nonatomic] ";
     *this << getIDAndType(I->getOperand(0));
   }
+  void visitStrongPinInst(StrongPinInst *I) {
+    if (I->isNonAtomic())
+      *this << "[nonatomic] ";
+    *this << getIDAndType(I->getOperand());
+  }
   void visitIsUniqueInst(IsUniqueInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
   }
@@ -1985,11 +2040,24 @@ void SILBasicBlock::printAsOperand(raw_ostream &OS, bool PrintType) {
 // Printing for SILInstruction, SILBasicBlock, SILFunction, and SILModule
 //===----------------------------------------------------------------------===//
 
-void ValueBase::dump() const {
+void SILNode::dump() const {
   print(llvm::errs());
 }
 
-void ValueBase::print(raw_ostream &OS) const {
+void SILNode::print(raw_ostream &OS) const {
+  SILPrintContext Ctx(OS);
+  SILPrinter(Ctx).print(this);
+}
+
+void SILInstruction::dump() const {
+  print(llvm::errs());
+}
+
+void SingleValueInstruction::dump() const {
+  SILInstruction::dump();
+}
+
+void SILInstruction::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
   SILPrinter(Ctx).print(this);
 }
@@ -2429,10 +2497,18 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   OS << "\n\n";
 }
 
-void ValueBase::dumpInContext() const {
+void SILNode::dumpInContext() const {
   printInContext(llvm::errs());
 }
-void ValueBase::printInContext(llvm::raw_ostream &OS) const {
+void SILNode::printInContext(llvm::raw_ostream &OS) const {
+  SILPrintContext Ctx(OS);
+  SILPrinter(Ctx).printInContext(this);
+}
+
+void SILInstruction::dumpInContext() const {
+  printInContext(llvm::errs());
+}
+void SILInstruction::printInContext(llvm::raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
   SILPrinter(Ctx).printInContext(this);
 }
@@ -2779,11 +2855,11 @@ ID SILPrintContext::getID(const SILBasicBlock *Block) {
   return R;
 }
 
-ID SILPrintContext::getID(SILValue V) {
-  if (isa<SILUndef>(V))
+ID SILPrintContext::getID(const SILNode *node) {
+  if (isa<SILUndef>(node))
     return {ID::SILUndef, 0};
   
-  SILBasicBlock *BB = V->getParentBlock();
+  SILBasicBlock *BB = node->getParentBlock();
   if (SILFunction *F = BB->getParent()) {
     setContext(F);
     // Lazily initialize the instruction -> ID mapping.
@@ -2795,10 +2871,26 @@ ID SILPrintContext::getID(SILValue V) {
     if (ValueToIDMap.empty()) {
       unsigned idx = 0;
       for (auto &I : *BB) {
-        ValueToIDMap[&I] = idx++;
+        // Give the instruction itself the next ID.
+        ValueToIDMap[&I] = idx;
+
+        // If there are no results, make sure we don't reuse that ID.
+        auto results = I.getResults();
+        if (results.empty()) {
+          idx++;
+
+        // Otherwise, assign all of the results an index.  Note that
+        // we'll assign the same ID to both the instruction and the
+        // first result.
+        } else {
+          for (auto result : results) {
+            ValueToIDMap[result] = idx++;
+          }
+        }
       }
     }
   }
-  ID R = {ID::SSAValue, ValueToIDMap[V]};
+
+  ID R = {ID::SSAValue, ValueToIDMap[node]};
   return R;
 }

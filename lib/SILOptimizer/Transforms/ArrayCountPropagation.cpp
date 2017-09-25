@@ -123,7 +123,9 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
   for (auto *Opd : Def->getUses()) {
     auto *User = Opd->getUser();
     // Ignore reference counting and debug instructions.
-    if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User))
+    if (isa<RefCountingInst>(User) ||
+        isa<StrongPinInst>(User) ||
+        isa<DebugValueInst>(User))
       continue;
 
     // Array value projection.
@@ -134,11 +136,13 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
     }
 
     // Check array semantic calls.
-    ArraySemanticsCall ArrayOp(User);
-    if (ArrayOp && ArrayOp.doesNotChangeArray()) {
-      if (ArrayOp.getKind() == ArrayCallKind::kGetCount)
-        CountCalls.insert(ArrayOp);
-      continue;
+    if (auto apply = dyn_cast<ApplyInst>(User)) {
+      ArraySemanticsCall ArrayOp(apply);
+      if (ArrayOp && ArrayOp.doesNotChangeArray()) {
+        if (ArrayOp.getKind() == ArrayCallKind::kGetCount)
+          CountCalls.insert(ArrayOp);
+        continue;
+      }
     }
 
     // An operation that escapes or modifies the array value.

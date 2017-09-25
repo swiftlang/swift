@@ -653,7 +653,7 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
     //
     // We can not move a release above the instruction that defines the
     // released value.
-    if (II == Ptr)
+    if (II == Ptr->getDefiningInstruction())
       return true;
     // Identical RC root blocks code motion, we will be able to move this release
     // further once we move the blocking release.

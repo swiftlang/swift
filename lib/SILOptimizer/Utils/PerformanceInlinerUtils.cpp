@@ -41,8 +41,7 @@ void ConstantTracker::trackInst(SILInstruction *inst) {
 SILValue ConstantTracker::scanProjections(SILValue addr,
                                           SmallVectorImpl<Projection> *Result) {
   for (;;) {
-    if (Projection::isAddressProjection(addr)) {
-      SILInstruction *I = cast<SILInstruction>(addr);
+    if (auto *I = Projection::isAddressProjection(addr)) {
       if (Result) {
         Result->push_back(Projection(I));
       }
@@ -110,11 +109,11 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
 
   // Track the value up the dominator tree.
   for (;;) {
-    if (auto *inst = dyn_cast<SILInstruction>(val)) {
-      if (Projection::isObjectProjection(inst)) {
+    if (auto *inst = dyn_cast<SingleValueInstruction>(val)) {
+      if (auto pi = Projection::isObjectProjection(val)) {
         // Extract a member from a struct/tuple/enum.
-        projStack.push_back(Projection(inst));
-        val = inst->getOperand(0);
+        projStack.push_back(Projection(pi));
+        val = pi->getOperand(0);
         continue;
       } else if (SILValue member = getMember(inst, projStack)) {
         // The opposite of a projection instruction: composing a struct/tuple.
@@ -125,8 +124,8 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
         // A value loaded from memory.
         val = loadedVal;
         continue;
-      } else if (isa<ThinToThickFunctionInst>(inst)) {
-        val = inst->getOperand(0);
+      } else if (auto ti = dyn_cast<ThinToThickFunctionInst>(inst)) {
+        val = ti->getOperand();
         continue;
       }
       return inst;

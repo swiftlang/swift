@@ -70,7 +70,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   %3 = begin_borrow %1 : $Builtin.NativeObject
   apply %2(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  %4 = end_borrow %3 from %1 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %3 from %1 : $Builtin.NativeObject, $Builtin.NativeObject
   destroy_value %1 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()

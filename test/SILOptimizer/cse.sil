@@ -112,17 +112,17 @@ sil @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
-  %2 = store %0 to %1a : $*B
+  store %0 to %1a : $*B
   %3 = load %1a : $*B
-  %4 = strong_retain %3 : $B
+  strong_retain %3 : $B
   %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject
-  %7 = strong_release %3 : $B
-  %8 = strong_release %1 : $<τ_0_0> { var τ_0_0 } <B>
+  strong_release %3 : $B
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <B>
   %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
   %10 = apply %9() : $@convention(thin) () -> Never
   %6 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B
   %11 = tuple()
-  %12 = return %11 : $()
+  return %11 : $()
 }
 
 // CHECK-LABEL: sil @removeTriviallyDeadCrossBasicBlocks
@@ -132,15 +132,15 @@ bb0(%0 : $B):
 sil @removeTriviallyDeadCrossBasicBlocks : $@convention(thin) (@owned B, Builtin.Int1) -> () {
 bb0(%0: $B, %1: $Builtin.Int1):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
-  %13 = cond_br %1, bb1, bb2
+  cond_br %1, bb1, bb2
 bb1:
-  %22 = br bb2
+  br bb2
 bb2:
   %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
   %10 = apply %9() : $@convention(thin) () -> Never
   %21 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B
   %32 = tuple ()
-  %33 = return %32 : $()
+  return %32 : $()
 }
 
 // CHECK-LABEL: sil @dead_use_of_alloc_stack
@@ -710,14 +710,14 @@ sil @cse_unchecked_ref_cast : $@convention(thin) (@owned B, Builtin.Int1) -> () 
 bb0(%0: $B, %1: $Builtin.Int1):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
   strong_release %5 : $Builtin.NativeObject
-  %13 = cond_br %1, bb1, bb2
+  cond_br %1, bb1, bb2
 bb1:
-  %22 = br bb2
+  br bb2
 bb2:
   %21 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
   strong_release %21 : $Builtin.NativeObject
   %32 = tuple ()
-  %33 = return %32 : $()
+  return %32 : $()
 }
 
 // CHECK-LABEL: sil @cse_raw_pointer_to_ref

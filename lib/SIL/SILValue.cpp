@@ -57,31 +57,57 @@ void ValueBase::replaceAllUsesWithUndef() {
   }
 }
 
-SILBasicBlock *ValueBase::getParentBlock() const {
-  auto *NonConstThis = const_cast<ValueBase *>(this);
+SILInstruction *ValueBase::getDefiningInstruction() {
+  if (auto inst = dyn_cast<SingleValueInstruction>(this))
+    return inst;
+  // TODO: MultiValueInstruction
+  return nullptr;
+}
+
+Optional<ValueBase::DefiningInstructionResult>
+ValueBase::getDefiningInstructionResult() {
+  if (auto inst = dyn_cast<SingleValueInstruction>(this))
+    return DefiningInstructionResult{ inst, 0 };
+  // TODO: MultiValueInstruction
+  return None;
+}
+
+SILBasicBlock *SILNode::getParentBlock() const {
+  auto *NonConstThis = const_cast<SILNode *>(this);
   if (auto *Inst = dyn_cast<SILInstruction>(NonConstThis))
     return Inst->getParent();
+  // TODO: MultiValueInstruction
   if (auto *Arg = dyn_cast<SILArgument>(NonConstThis))
     return Arg->getParent();
   return nullptr;
 }
 
-SILFunction *ValueBase::getFunction() const {
-  auto *NonConstThis = const_cast<ValueBase *>(this);
+SILFunction *SILNode::getFunction() const {
+  auto *NonConstThis = const_cast<SILNode *>(this);
   if (auto *Inst = dyn_cast<SILInstruction>(NonConstThis))
     return Inst->getFunction();
+  // TODO: MultiValueInstruction
   if (auto *Arg = dyn_cast<SILArgument>(NonConstThis))
     return Arg->getFunction();
   return nullptr;
 }
 
-SILModule *ValueBase::getModule() const {
-  auto *NonConstThis = const_cast<ValueBase *>(this);
+SILModule *SILNode::getModule() const {
+  auto *NonConstThis = const_cast<SILNode *>(this);
   if (auto *Inst = dyn_cast<SILInstruction>(NonConstThis))
     return &Inst->getModule();
+  // TODO: MultiValueInstruction
   if (auto *Arg = dyn_cast<SILArgument>(NonConstThis))
     return &Arg->getModule();
   return nullptr;
+}
+
+const SILNode *SILNode::getCanonicalSILNodeSlowPath() const {
+  assert(getStorageLoc() != SILNodeStorageLocation::Instruction &&
+         hasMultipleSILNodes(getKind()));
+  return &static_cast<const SILInstruction &>(
+            static_cast<const SingleValueInstruction &>(
+              static_cast<const ValueBase &>(*this)));
 }
 
 //===----------------------------------------------------------------------===//
@@ -183,9 +209,10 @@ ValueOwnershipKind SILValue::getOwnershipKind() const {
   return Classifier.visit(const_cast<ValueBase *>(Value));
 }
 
+#if 0
 /// Map a SILValue mnemonic name to its ValueKind.
 ValueKind swift::getSILValueKind(StringRef Name) {
-#define INST(Id, Parent, TextualName, MemoryBehavior, ReleasingBehavior)       \
+#define SINGLE_VALUE_INST(Id, TextualName, Parent, MemoryBehavior, ReleasingBehavior)       \
   if (Name == #TextualName)                                                    \
     return ValueKind::Id;
 
@@ -206,16 +233,15 @@ ValueKind swift::getSILValueKind(StringRef Name) {
 /// Map ValueKind to a corresponding mnemonic name.
 StringRef swift::getSILValueName(ValueKind Kind) {
   switch (Kind) {
-#define INST(Id, Parent, TextualName, MemoryBehavior, ReleasingBehavior)       \
+#define SINGLE_VALUE_INST(Id, TextualName, Parent, MemoryBehavior, ReleasingBehavior)       \
   case ValueKind::Id:                                                          \
-    return #TextualName;                                                       \
-    break;
+    return #TextualName;
 
 #define VALUE(Id, Parent)                                                      \
   case ValueKind::Id:                                                          \
-    return #Id;                                                                \
-    break;
+    return #Id;
 
 #include "swift/SIL/SILNodes.def"
   }
 }
+#endif

@@ -55,7 +55,7 @@ class DIMemoryObjectInfo {
 public:
   /// This is the instruction that represents the memory.  It is either an
   /// allocation (alloc_box, alloc_stack) or a mark_uninitialized.
-  SILInstruction *MemoryInst;
+  SingleValueInstruction *MemoryInst;
 
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
@@ -70,7 +70,7 @@ public:
   unsigned NumElements;
 
 public:
-  DIMemoryObjectInfo(SILInstruction *MemoryInst);
+  DIMemoryObjectInfo(SingleValueInstruction *MemoryInst);
 
   SILLocation getLoc() const { return MemoryInst->getLoc(); }
   SILFunction &getFunction() const { return *MemoryInst->getFunction(); }
@@ -80,7 +80,7 @@ public:
 
   CanType getType() const { return MemorySILType.getSwiftRValueType(); }
 
-  SILInstruction *getAddress() const {
+  SingleValueInstruction *getAddress() const {
     if (isa<MarkUninitializedInst>(MemoryInst) ||
         isa<AllocStackInst>(MemoryInst))
       return MemoryInst;

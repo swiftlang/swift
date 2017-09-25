@@ -31,7 +31,7 @@ namespace swift {
 /// TypeSubstCloner - a utility class for cloning code while remapping types.
 template<typename ImplClass>
 class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
-  friend class SILVisitor<ImplClass>;
+  friend class SILInstructionVisitor<ImplClass>;
   friend class SILCloner<ImplClass>;
 
   typedef SILClonerWithScopes<ImplClass> super;
@@ -185,7 +185,7 @@ protected:
   }
 
   void visitApplyInst(ApplyInst *Inst) {
-    ApplySiteCloningHelper Helper(ApplySite::isa(Inst), *this);
+    ApplySiteCloningHelper Helper(ApplySite(Inst), *this);
     ApplyInst *N =
         getBuilder().createApply(getOpLocation(Inst->getLoc()),
                                  Helper.getCallee(), Helper.getSubstitutions(),
@@ -196,7 +196,7 @@ protected:
   }
 
   void visitTryApplyInst(TryApplyInst *Inst) {
-    ApplySiteCloningHelper Helper(ApplySite::isa(Inst), *this);
+    ApplySiteCloningHelper Helper(ApplySite(Inst), *this);
     TryApplyInst *N = getBuilder().createTryApply(
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
         Helper.getSubstitutions(), Helper.getArguments(),
@@ -208,7 +208,7 @@ protected:
   }
 
   void visitPartialApplyInst(PartialApplyInst *Inst) {
-    ApplySiteCloningHelper Helper(ApplySite::isa(Inst), *this);
+    ApplySiteCloningHelper Helper(ApplySite(Inst), *this);
     auto ParamConvention =
         Inst->getType().getAs<SILFunctionType>()->getCalleeConvention();
     PartialApplyInst *N = getBuilder().createPartialApply(

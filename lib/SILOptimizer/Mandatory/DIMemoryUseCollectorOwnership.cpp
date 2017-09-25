@@ -90,7 +90,8 @@ computeMemorySILType(SILInstruction *MemoryInst) {
   return {MemorySILType, VDecl->isLet()};
 }
 
-DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) : MemoryInst(MI) {
+DIMemoryObjectInfo::DIMemoryObjectInfo(SingleValueInstruction *MI)
+    : MemoryInst(MI) {
   auto &Module = MI->getModule();
 
   std::tie(MemorySILType, IsLet) = computeMemorySILType(MemoryInst);
@@ -418,10 +419,12 @@ void DIElementUseInfo::trackFailableInitCall(
       if (!isa<SelectEnumInst>(User) && !isa<SelectEnumAddrInst>(User))
         continue;
 
-      if (!User->hasOneUse())
+      auto value = cast<SingleValueInstruction>(User);
+
+      if (!value->hasOneUse())
         continue;
 
-      User = User->use_begin()->getUser();
+      User = value->use_begin()->getUser();
       if (auto *CBI = dyn_cast<CondBranchInst>(User)) {
         trackFailureBlock(MemoryInfo, CBI, CBI->getTrueBB());
         return;
@@ -668,7 +671,7 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
       continue;
 
     if (auto *PBI = dyn_cast<ProjectBoxInst>(User)) {
-      collectUses(User, PBI->getFieldIndex());
+      collectUses(PBI, PBI->getFieldIndex());
       continue;
     }
 
@@ -736,7 +739,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     // Look through begin_access and begin_borrow
     if (isa<BeginAccessInst>(User) || isa<BeginBorrowInst>(User)) {
-      collectUses(User, BaseEltNo);
+      auto begin = cast<SingleValueInstruction>(User);
+      collectUses(begin, BaseEltNo);
       continue;
     }
 
@@ -917,14 +921,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // that is looking into the memory object (i.e., the memory object needs to
     // be explicitly initialized by a copy_addr or some other use of the
     // projected address).
-    if (isa<InitEnumDataAddrInst>(User)) {
+    if (auto init = dyn_cast<InitEnumDataAddrInst>(User)) {
       assert(!InStructSubElement &&
              "init_enum_data_addr shouldn't apply to struct subelements");
       // Keep track of the fact that we're inside of an enum.  This informs our
       // recursion that tuple stores are not scalarized outside, and that stores
       // should not be treated as partial stores.
       llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
-      collectUses(User, BaseEltNo);
+      collectUses(init, BaseEltNo);
       continue;
     }
 
@@ -974,7 +978,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   // Now that we've walked all of the immediate uses, scalarize any operations
   // working on tuples if we need to for canonicalization or analysis reasons.
   if (!UsesToScalarize.empty()) {
-    SILInstruction *PointerInst = cast<SILInstruction>(Pointer);
+    SILInstruction *PointerInst = Pointer->getDefiningInstruction();
     SmallVector<SILValue, 4> ElementAddrs;
     SILBuilderWithScope AddrBuilder(++SILBasicBlock::iterator(PointerInst),
                                     PointerInst);
@@ -1103,7 +1107,8 @@ void ElementUseCollector::collectClassSelfUses() {
 
     // Loads of the box produce self, so collect uses from them.
     if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
-      collectClassSelfUses(User, TheMemory.MemorySILType, EltNumbering);
+      auto load = cast<SingleValueInstruction>(User);
+      collectClassSelfUses(load, TheMemory.MemorySILType, EltNumbering);
       continue;
     }
 
@@ -1385,7 +1390,8 @@ void ElementUseCollector::checkClassSelfUpcastUsedBySuperInit(
     // Look through begin_borrow and unchecked_ref_cast.
     if (isa<BeginBorrowInst>(UCIOpUser) ||
         isa<UncheckedRefCastInst>(UCIOpUser)) {
-      copy(UCIOpUser->getUses(), std::back_inserter(Worklist));
+      auto I = cast<SingleValueInstruction>(UCIOpUser);
+      copy(I->getUses(), std::back_inserter(Worklist));
       continue;
     }
 
@@ -1474,14 +1480,15 @@ void ElementUseCollector::collectClassSelfUses(
       }
 
       // Otherwise, look through the upcast and continue.
-      std::copy(User->use_begin(), User->use_end(),
+      std::copy(UCI->use_begin(), UCI->use_end(),
                 std::back_inserter(Worklist));
       continue;
     }
 
     // Look through begin_borrow and copy_value.
     if (isa<BeginBorrowInst>(User) || isa<CopyValueInst>(User)) {
-      std::copy(User->use_begin(), User->use_end(),
+      auto value = cast<SingleValueInstruction>(User);
+      std::copy(value->use_begin(), value->use_end(),
                 std::back_inserter(Worklist));
       continue;
     }
@@ -1527,7 +1534,7 @@ public:
   // *NOTE* Even though this takes a SILInstruction it actually only accepts
   // load_borrow and load instructions. This is enforced via an assert.
   void collectDelegatingClassInitSelfLoadUses(MarkUninitializedInst *MUI,
-                                              SILInstruction *LI);
+                                              SingleValueInstruction *LI);
 };
 
 } // end anonymous namespace
@@ -1583,7 +1590,7 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
     // Stores *to* the allocation are writes.  If the value being stored is a
     // call to self.init()... then we have a self.init call.
     if (auto *AI = dyn_cast<AssignInst>(User)) {
-      if (auto *AssignSource = dyn_cast<SILInstruction>(AI->getOperand(0))) {
+      if (auto *AssignSource = AI->getOperand(0)->getDefiningInstruction()) {
         if (isSelfInitUse(AssignSource)) {
           UseInfo.trackUse(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
           continue;
@@ -1607,7 +1614,8 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
 
     // Loads of the box produce self, so collect uses from them.
     if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
-      collectDelegatingClassInitSelfLoadUses(MUI, User);
+      collectDelegatingClassInitSelfLoadUses(MUI,
+                                        cast<SingleValueInstruction>(User));
       continue;
     }
 
@@ -1667,7 +1675,7 @@ void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses() {
     // Stores *to* the allocation are writes.  If the value being stored is a
     // call to self.init()... then we have a self.init call.
     if (auto *AI = dyn_cast<AssignInst>(User)) {
-      if (auto *AssignSource = dyn_cast<SILInstruction>(AI->getOperand(0)))
+      if (auto *AssignSource = AI->getOperand(0)->getDefiningInstruction())
         if (isSelfInitUse(AssignSource))
           Kind = DIUseKind::SelfInit;
       if (auto *AssignSource = dyn_cast<SILArgument>(AI->getOperand(0))) {
@@ -1692,7 +1700,7 @@ void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses() {
 }
 
 void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
-    MarkUninitializedInst *MUI, SILInstruction *LI) {
+    MarkUninitializedInst *MUI, SingleValueInstruction *LI) {
   assert(isa<LoadBorrowInst>(LI) || isa<LoadInst>(LI));
 
   // If we have a load, then this is a use of the box.  Look at the uses of
@@ -1712,8 +1720,8 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
       continue;
 
     // Look through begin_borrow.
-    if (isa<BeginBorrowInst>(User)) {
-      std::copy(User->use_begin(), User->use_end(),
+    if (auto borrow = dyn_cast<BeginBorrowInst>(User)) {
+      std::copy(borrow->use_begin(), borrow->use_end(),
                 std::back_inserter(Worklist));
       continue;
     }

@@ -25,10 +25,10 @@ struct A {
 
 sil @test_weak_rr_class : $@convention(thin) (@sil_unowned C) -> () {
 bb0(%0 : $@sil_unowned C):
-  %1 = unowned_retain %0 : $@sil_unowned C
-  %2 = unowned_release %0 : $@sil_unowned C
+  unowned_retain %0 : $@sil_unowned C
+  unowned_release %0 : $@sil_unowned C
   %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 // CHECK:    define{{( protected)?}} swiftcc void @test_weak_rr_class([[C]]*) {{.*}} {
 // CHECK:      call [[C]]* bitcast ([[REF]]* ([[REF]]*)* @swift_rt_swift_unownedRetain to [[C]]* ([[C]]*)*)([[C]]* returned %0)
@@ -37,10 +37,10 @@ bb0(%0 : $@sil_unowned C):
 
 sil @test_weak_rr_proto : $@convention(thin) (@sil_unowned P) -> () {
 bb0(%0 : $@sil_unowned P):
-  %1 = unowned_retain %0 : $@sil_unowned P
-  %2 = unowned_release %0 : $@sil_unowned P
+  unowned_retain %0 : $@sil_unowned P
+  unowned_release %0 : $@sil_unowned P
   %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 // CHECK:    define{{( protected)?}} swiftcc void @test_weak_rr_proto(%swift.refcounted*, i8**) {{.*}} {
 // CHECK:      call %swift.refcounted* @swift_rt_swift_unownedRetain(%swift.refcounted* returned %0)

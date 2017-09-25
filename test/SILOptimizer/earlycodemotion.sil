@@ -88,11 +88,11 @@ bb0(%0 : $Builtin.Int1, %1 : $B):
   cond_br %0, bb1, bb2
 
 bb1:
-  %2 = strong_retain %1 : $B
+  strong_retain %1 : $B
   br bb3
 
 bb2:
-  %3 = strong_retain %1 : $B
+  strong_retain %1 : $B
   br bb3
 
 bb3:
@@ -133,12 +133,12 @@ bb0(%0 : $Builtin.Int1, %1 : $B):
   cond_br %0, bb1, bb2
 
 bb1:
-  %2 = strong_retain %1 : $B
+  strong_retain %1 : $B
   %3 = integer_literal $Builtin.Int32, 9
   br bb3(%3 : $Builtin.Int32)
 
 bb2:
-  %4 = strong_retain %1 : $B
+  strong_retain %1 : $B
   %5 = integer_literal $Builtin.Int32, 7
   br bb3(%5 : $Builtin.Int32)
 
@@ -160,12 +160,12 @@ bb0(%0 : $Builtin.Int1, %1 : $B):
   cond_br %0, bb1, bb2
 
 bb1:
-  %2 = strong_retain %1 : $B
+  strong_retain %1 : $B
   %3 = integer_literal $Builtin.Int32, 7
   br bb3(%3 : $Builtin.Int32)
 
 bb2:
-  %4 = strong_retain %1 : $B
+  strong_retain %1 : $B
   %5 = integer_literal $Builtin.Int32, 7
   br bb3(%5 : $Builtin.Int32)
 

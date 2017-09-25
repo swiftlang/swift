@@ -22,7 +22,7 @@ using namespace swift;
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//
 
-static SILInstruction *
+static ProjectBoxInst *
 getInitialProjectBox(MarkUninitializedInst *MUI,
                      ArrayRef<ProjectBoxInst *> Projections) {
   assert(!Projections.empty());
@@ -113,7 +113,7 @@ struct MarkUninitializedFixup : SILModuleTransform {
 
           // That means now our project box now has the alloc_box as its
           // operand. Grab that project_box.
-          SILInstruction *PBI = getInitialProjectBox(MUI, Projections);
+          auto *PBI = getInitialProjectBox(MUI, Projections);
 
           // Then create the new mark_uninitialized and force all uses of the
           // project_box to go through the new mark_uninitialized.

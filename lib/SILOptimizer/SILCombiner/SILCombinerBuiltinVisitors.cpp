@@ -287,12 +287,12 @@ matchSizeOfMultiplication(SILValue I, MetatypeInst *RequiredType,
 /// Given an index_raw_pointer Ptr, size_of(Metatype) * Distance create an
 /// address_to_pointer (index_addr ptr, Distance : $*Metatype) : $RawPointer
 /// instruction.
-static SILInstruction *createIndexAddrFrom(IndexRawPointerInst *I,
-                                           MetatypeInst *Metatype,
-                                           BuiltinInst *TruncOrBitCast,
-                                           SILValue Ptr, SILValue Distance,
-                                           SILType RawPointerTy,
-                                           SILBuilder &Builder) {
+static SILValue createIndexAddrFrom(IndexRawPointerInst *I,
+                                    MetatypeInst *Metatype,
+                                    BuiltinInst *TruncOrBitCast,
+                                    SILValue Ptr, SILValue Distance,
+                                    SILType RawPointerTy,
+                                    SILBuilder &Builder) {
   Builder.setCurrentDebugScope(I->getDebugScope());
   SILType InstanceType =
     Metatype->getType().getMetatypeInstanceType(I->getModule());
@@ -408,9 +408,11 @@ SILInstruction *optimizeBitOp(BuiltinInst *BI,
          getBitOpArgs(Prev, op, prevBits)) {
     combine(bits, prevBits);
   }
-  if (isNeutral(bits))
+  if (isNeutral(bits)) {
     // The bit operation has no effect, e.g. x | 0 -> x
-    return C->replaceInstUsesWith(*BI, op);
+    C->replaceInstUsesWith(*BI, op);
+    return BI;
+  }
 
   if (isZero(bits))
     // The bit operation yields to a constant, e.g. x & 0 -> 0

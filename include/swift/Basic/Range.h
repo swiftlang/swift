@@ -63,11 +63,47 @@ namespace swift {
     return result;
   }
 
-/// A range of integers.  This type behaves roughly like an ArrayRef.
-template <class T=unsigned> class IntRange {
-  static_assert(std::is_integral<T>::value, "T must be an integer type");
+template <class T, bool IsEnum = std::is_enum<T>::value>
+struct IntRangeTraits;
+
+template <class T>
+struct IntRangeTraits<T, /*is enum*/ false> {
+  static_assert(std::is_integral<T>::value,
+                "argument type of IntRange is either an integer nor an enum");
+  using int_type = T;
+  using difference_type = typename std::make_signed<int_type>::type;
+
+  static T addOffset(T value, difference_type quantity) {
+    return T(difference_type(value) + quantity);
+  }
+  static difference_type distance(T begin, T end) {
+    return difference_type(end) - difference_type(begin);
+  }
+};
+
+template <class T>
+struct IntRangeTraits<T, /*is enum*/ true> {
+  using int_type = typename std::underlying_type<T>::type;
+  using difference_type = typename std::make_signed<int_type>::type;
+
+  static T addOffset(T value, difference_type quantity) {
+    return T(difference_type(value) + quantity);
+  }
+  static difference_type distance(T begin, T end) {
+    return difference_type(end) - difference_type(begin);
+  }
+};
+
+/// A range of integers or enum values.  This type behaves roughly
+/// like an ArrayRef.
+template <class T = unsigned, class Traits = IntRangeTraits<T>>
+class IntRange {
   T Begin;
   T End;
+
+  using int_type = typename Traits::int_type;
+  using difference_type = typename Traits::difference_type;
+
 public:
   IntRange() : Begin(0), End(0) {}
   IntRange(T end) : Begin(0), End(end) {}
@@ -87,37 +123,48 @@ public:
     typedef std::random_access_iterator_tag iterator_category;
 
     T operator*() const { return Value; }
-    iterator &operator++() { Value++; return *this; }
-    iterator operator++(int) { return iterator(Value++); }
-    iterator &operator--() {
-      Value--;
-      return *this;
+    iterator &operator++() {
+      return *this += 1;
     }
-    iterator operator--(int) { return iterator(Value--); }
+    iterator operator++(int) {
+      auto copy = *this;
+      *this += 1;
+      return copy;
+    }
+    iterator &operator--() {
+      return *this -= 1;
+    }
+    iterator operator--(int) {
+      auto copy = *this;
+      *this -= 1;
+      return copy;
+    }
     bool operator==(iterator rhs) { return Value == rhs.Value; }
     bool operator!=(iterator rhs) { return Value != rhs.Value; }
 
     iterator &operator+=(difference_type i) {
-      Value += T(i);
+      Value = Traits::addOffset(Value, i);
       return *this;
     }
     iterator operator+(difference_type i) const {
-      return iterator(Value + T(i));
+      return iterator(Traits::adddOfset(Value, i));
     }
     friend iterator operator+(difference_type i, iterator base) {
-      return iterator(base.Value + T(i));
+      return iterator(Traits::addOffset(base.Value, i));
     }
     iterator &operator-=(difference_type i) {
-      Value -= T(i);
+      Value = Traits::addOffset(Value, -i);
       return *this;
     }
     iterator operator-(difference_type i) const {
-      return iterator(Value - T(i));
+      return iterator(Traits::addOffset(Value, -i));
     }
     difference_type operator-(iterator rhs) const {
-      return difference_type(Value - rhs.Value);
+      return Traits::distance(rhs.Value, Value);
     }
-    T operator[](difference_type i) const { return Value + T(i);       }
+    T operator[](difference_type i) const {
+      return Traits::addOffset(Value, i);
+    }
     bool operator<(iterator rhs) const {    return Value <  rhs.Value; }
     bool operator<=(iterator rhs) const {   return Value <= rhs.Value; }
     bool operator>(iterator rhs) const {    return Value >  rhs.Value; }
@@ -134,26 +181,27 @@ public:
   }
 
   bool empty() const { return Begin == End; }
-  size_t size() const { return End - Begin; }
+  size_t size() const { return size_t(Traits::distance(Begin, End)); }
   T operator[](size_t i) const {
     assert(i < size());
-    return Begin + i;
+    return Traits::addOffset(Begin, i);
   }
   T front() const { assert(!empty()); return Begin; }
-  T back() const { assert(!empty()); return End - 1; }
+  T back() const { assert(!empty()); return Traits::addOffset(End, -1); }
   IntRange drop_back(size_t length = 1) const {
     assert(length <= size());
-    return IntRange(Begin, End - length);
+    return IntRange(Begin, Traits::addOffset(End, -length));
   }
 
   IntRange slice(size_t start) const {
     assert(start <= size());
-    return IntRange(Begin + start, End);
+    return IntRange(Traits::addOffset(Begin, start), End);
   }
   IntRange slice(size_t start, size_t length) const {
     assert(start <= size());
-    return IntRange(Begin + start,
-                    Begin + start + std::min(length, End - (Begin + start)));
+    auto newBegin = Traits::addOffset(Begin, start);
+    auto newSize = std::min(length, size_t(Traits::distance(newBegin, End)));
+    return IntRange(newBegin, Traits::addOffset(newBegin, newSize));
   }
 
   bool operator==(IntRange other) const {

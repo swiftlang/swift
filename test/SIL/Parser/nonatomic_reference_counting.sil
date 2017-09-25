@@ -56,7 +56,7 @@ bb0:
   %2 = strong_pin [nonatomic] %1 : $Builtin.NativeObject
   strong_unpin [nonatomic] %2 : $Optional<Builtin.NativeObject>
   %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 
 // CHECK-LABEL: sil @test_unowned_nonatomic_rr
@@ -70,7 +70,7 @@ bb0:
   unowned_retain [nonatomic] %1 : $@sil_unowned C
   unowned_release [nonatomic] %1 : $@sil_unowned C
   %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 
 // CHECK-LABEL: sil @test_set_deallocating

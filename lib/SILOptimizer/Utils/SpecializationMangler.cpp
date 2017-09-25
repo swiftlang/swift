@@ -183,29 +183,29 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
   switch (LI->getKind()) {
   default:
     llvm_unreachable("unknown literal");
-  case ValueKind::FunctionRefInst: {
+  case SILInstructionKind::FunctionRefInst: {
     SILFunction *F = cast<FunctionRefInst>(LI)->getReferencedFunction();
     ArgOpBuffer << 'f';
     appendIdentifier(F->getName());
     break;
   }
-  case ValueKind::GlobalAddrInst: {
+  case SILInstructionKind::GlobalAddrInst: {
     SILGlobalVariable *G = cast<GlobalAddrInst>(LI)->getReferencedGlobal();
     ArgOpBuffer << 'g';
     appendIdentifier(G->getName());
     break;
   }
-  case ValueKind::IntegerLiteralInst: {
+  case SILInstructionKind::IntegerLiteralInst: {
     APInt apint = cast<IntegerLiteralInst>(LI)->getValue();
     ArgOpBuffer << 'i' << apint;
     break;
   }
-  case ValueKind::FloatLiteralInst: {
+  case SILInstructionKind::FloatLiteralInst: {
     APInt apint = cast<FloatLiteralInst>(LI)->getBits();
     ArgOpBuffer << 'd' << apint;
     break;
   }
-  case ValueKind::StringLiteralInst: {
+  case SILInstructionKind::StringLiteralInst: {
     StringLiteralInst *SLI = cast<StringLiteralInst>(LI);
     StringRef V = SLI->getValue();
     assert(V.size() <= 32 && "Cannot encode string of length > 32");

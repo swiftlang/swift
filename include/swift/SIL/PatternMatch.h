@@ -296,19 +296,24 @@ using m_One = match_integer<1>;
 //                             Unary Instructions
 //===----------------------------------------------------------------------===//
 
-template<typename OpMatchTy, ValueKind Kind>
+template<typename OpMatchTy, SILInstructionKind Kind>
 struct UnaryOp_match {
   OpMatchTy OpMatch;
 
   UnaryOp_match(const OpMatchTy &Op) : OpMatch(Op) { }
 
-  template<typename OpTy>
-  bool match(OpTy *V) {
-    if (V->getKind() != Kind)
+  bool match(SILNode *node) {
+    if (node->getKind() != SILNodeKind(Kind))
       return false;
 
-    auto *I = dyn_cast<SILInstruction>(V);
-    if (!I || I->getNumOperands() != 1)
+    return match(cast<SILInstruction>(node));
+  }
+
+  bool match(SILInstruction *I) {
+    if (I->getKind() != Kind)
+      return false;
+
+    if (I->getNumOperands() != 1)
       return false;
 
     return OpMatch.match(I->getOperand(0));
@@ -319,7 +324,7 @@ struct UnaryOp_match {
 // further matchers to the operands of the unary operation.
 #define UNARY_OP_MATCH_WITH_ARG_MATCHER(Class)        \
   template <typename Ty>                              \
-  UnaryOp_match<Ty, ValueKind::Class>                 \
+  UnaryOp_match<Ty, SILInstructionKind::Class>        \
   m_##Class(const Ty &T) {                            \
     return T;                                         \
   }
@@ -393,20 +398,25 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(ReturnInst)
 //                            Binary Instructions
 //===----------------------------------------------------------------------===//
 
-template<typename LHSTy, typename RHSTy, ValueKind Kind>
+template<typename LHSTy, typename RHSTy, SILInstructionKind Kind>
 struct BinaryOp_match {
   LHSTy L;
   RHSTy R;
 
   BinaryOp_match(const LHSTy &LHS, const RHSTy &RHS) : L(LHS), R(RHS) {}
 
-  template<typename OpTy>
-  bool match(OpTy *V) {
-    if (V->getKind() != Kind)
+  bool match(SILNode *node) {
+    if (node->getKind() != SILNodeKind(Kind))
       return false;
 
-    auto *I = dyn_cast<SILInstruction>(V);
-    if (!I || I->getNumOperands() != 2)
+    return match(cast<SILInstruction>(node));
+  }
+
+  bool match(SILInstruction *I) {
+    if (I->getKind() != Kind)
+      return false;
+
+    if (I->getNumOperands() != 2)
       return false;
 
     return L.match((ValueBase *)I->getOperand(0)) &&
@@ -415,7 +425,7 @@ struct BinaryOp_match {
 };
 
 template <typename LTy, typename RTy>
-BinaryOp_match<LTy, RTy, ValueKind::IndexRawPointerInst>
+BinaryOp_match<LTy, RTy, SILInstructionKind::IndexRawPointerInst>
 m_IndexRawPointerInst(const LTy &Left, const RTy &Right) {
   return {Left, Right};
 }

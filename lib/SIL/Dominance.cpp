@@ -61,7 +61,7 @@ bool DominanceInfo::properlyDominates(SILInstruction *a, SILInstruction *b) {
 
 /// Does value A properly dominate instruction B?
 bool DominanceInfo::properlyDominates(SILValue a, SILInstruction *b) {
-  if (auto *Inst = dyn_cast<SILInstruction>(a)) {
+  if (auto *Inst = a->getDefiningInstruction()) {
     return properlyDominates(Inst, b);
   }
   if (auto *Arg = dyn_cast<SILArgument>(a)) {
