@@ -67,6 +67,10 @@ class S : P2 {
 }
 
 // CHECK: superclassConformance1
+// CHECK: Requirements:
+// CHECK-NEXT: τ_0_0 : C [τ_0_0: Explicit @ {{.*}}:11]
+// CHECK-NEXT: τ_0_0 : _NativeClass [τ_0_0: Explicit @ {{.*}}:11 -> Derived]
+// CHECK-NEXT: τ_0_0 : P3 [τ_0_0: Explicit @ {{.*}}:11 -> Superclass (C: P3)]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
 func superclassConformance1<T>(t: T)
   where T : C, // expected-note{{conformance constraint 'T': 'P3' implied here}}
@@ -75,6 +79,10 @@ func superclassConformance1<T>(t: T)
 
 
 // CHECK: superclassConformance2
+// CHECK: Requirements:
+// CHECK-NEXT: τ_0_0 : C [τ_0_0: Explicit @ {{.*}}:11]
+// CHECK-NEXT: τ_0_0 : _NativeClass [τ_0_0: Explicit @ {{.*}}:11 -> Derived]
+// CHECK-NEXT: τ_0_0 : P3 [τ_0_0: Explicit @ {{.*}}:11 -> Superclass (C: P3)]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
 func superclassConformance2<T>(t: T)
   where T : C, // expected-note{{conformance constraint 'T': 'P3' implied here}}
@@ -85,6 +93,10 @@ protocol P4 { }
 class C2 : C, P4 { }
 
 // CHECK: superclassConformance3
+// CHECK: Requirements:
+// CHECK-NEXT: τ_0_0 : C2 [τ_0_0: Explicit @ {{.*}}:61]
+// CHECK-NEXT: τ_0_0 : _NativeClass [τ_0_0: Explicit @ {{.*}}:46 -> Derived]
+// CHECK-NEXT: τ_0_0 : P4 [τ_0_0: Explicit @ {{.*}}:61 -> Superclass (C2: P4)]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C2>
 func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
 // expected-warning@-1{{redundant superclass constraint 'T' : 'C'}}
