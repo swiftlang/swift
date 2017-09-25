@@ -94,7 +94,7 @@ if 1 != 2, 4 == 57 {}
 if 1 != 2, 4 == 57, let x = opt {} // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 
 // Test that these don't cause the parser to crash.
-if true { if a == 0; {} }   // expected-error {{expected '{' after 'if' condition}} expected-error 2{{}} expected-note 1{{}}
+if true { if a == 0; {} }   // expected-error {{use of unresolved identifier 'a'}} expected-error {{expected '{' after 'if' condition}}
 if a == 0, where b == 0 {}  // expected-error 3{{}} expected-note {{}} {{25-25=do }}
 
 
