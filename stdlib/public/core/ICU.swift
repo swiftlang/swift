@@ -14,5 +14,7 @@ import SwiftShims
 extension __swift_stdlib_UErrorCode {
   var isFailure: Bool { return rawValue > __swift_stdlib_U_ZERO_ERROR.rawValue }
   var isWarning: Bool { return rawValue < __swift_stdlib_U_ZERO_ERROR.rawValue }
+
+  public // TODO(String Comparison Prototype): internalize
   var isSuccess: Bool { return rawValue <= __swift_stdlib_U_ZERO_ERROR.rawValue }
 }

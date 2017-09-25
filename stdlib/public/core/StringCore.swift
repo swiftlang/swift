@@ -340,6 +340,7 @@ public struct _StringCore {
     }
   }
 
+  public // TODO(String Comparison Prototype): internalize
   var _unmanagedASCII : UnsafeBufferPointer<Unicode.ASCII.CodeUnit>? {
     @inline(__always)
     get {
@@ -354,6 +355,7 @@ public struct _StringCore {
     }
   }
   
+  public // TODO(String Comparison Prototype): internalize
   var _unmanagedUTF16 : UnsafeBufferPointer<UTF16.CodeUnit>? {
     @inline(__always)
     get {
