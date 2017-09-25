@@ -117,6 +117,9 @@ struct GenericSignatureBuilder::Implementation {
   /// The set of equivalence classes.
   llvm::iplist<EquivalenceClass> EquivalenceClasses;
 
+  /// Equivalence classes that are not currently being used.
+  std::vector<void *> FreeEquivalenceClasses;
+
   /// The generation number, which is incremented whenever we successfully
   /// introduce a new constraint.
   unsigned Generation = 0;
@@ -126,6 +129,9 @@ struct GenericSignatureBuilder::Implementation {
 
   /// Whether we are currently processing delayed requirements.
   bool ProcessingDelayedRequirements = false;
+
+  /// Tear down an implementation.
+  ~Implementation();
 
   /// Allocate a new equivalence class with the given representative.
   EquivalenceClass *allocateEquivalenceClass(
@@ -141,10 +147,25 @@ struct GenericSignatureBuilder::Implementation {
 };
 
 #pragma mark Memory management
+GenericSignatureBuilder::Implementation::~Implementation() {
+  for (auto pa : PotentialArchetypes)
+    pa->~PotentialArchetype();
+}
+
 EquivalenceClass *
 GenericSignatureBuilder::Implementation::allocateEquivalenceClass(
                                           PotentialArchetype *representative) {
-  auto equivClass = new EquivalenceClass(representative);
+  void *mem;
+  if (FreeEquivalenceClasses.empty()) {
+    // Allocate a new equivalence class.
+    mem = Allocator.Allocate<EquivalenceClass>();
+  } else {
+    // Take an equivalence class from the free list.
+    mem = FreeEquivalenceClasses.back();
+    FreeEquivalenceClasses.pop_back();
+  }
+
+  auto equivClass = new (mem) EquivalenceClass(representative);
   EquivalenceClasses.push_back(equivClass);
   return equivClass;
 }
@@ -152,6 +173,7 @@ GenericSignatureBuilder::Implementation::allocateEquivalenceClass(
 void GenericSignatureBuilder::Implementation::deallocateEquivalenceClass(
                                                EquivalenceClass *equivClass) {
   EquivalenceClasses.erase(equivClass);
+  FreeEquivalenceClasses.push_back(equivClass);
 }
 
 #pragma mark GraphViz visualization
@@ -1463,7 +1485,7 @@ GenericSignatureBuilder::PotentialArchetype::~PotentialArchetype() {
 
   for (const auto &nested : NestedTypes) {
     for (auto pa : nested.second) {
-      delete pa;
+      pa->~PotentialArchetype();
     }
   }
 }
