@@ -66,13 +66,6 @@ class S : P2 {
   typealias T = C
 }
 
-extension P2 where Self.T : C {
-  // CHECK: superclass_constraint.(file).P2.concreteTypeWitnessViaSuperclass1
-  // CHECK: Generic signature: <Self where Self : P2, Self.T : C>
-  // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P2, τ_0_0.T : C>
-  func concreteTypeWitnessViaSuperclass1(x: Self.T.T) {}
-}
-
 // CHECK: superclassConformance1
 // CHECK: Requirements:
 // CHECK-NEXT: τ_0_0 : C [τ_0_0: Explicit @ {{.*}}:11]
