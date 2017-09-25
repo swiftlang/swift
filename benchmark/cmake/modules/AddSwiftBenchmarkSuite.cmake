@@ -415,7 +415,7 @@ endfunction()
 function(swift_benchmark_compile)
   cmake_parse_arguments(SWIFT_BENCHMARK_COMPILE "" "PLATFORM" "" ${ARGN})
 
-  if(IS_SWIFT_BUILD)
+  if(NOT SWIFT_BENCHMARK_BUILT_STANDALONE)
     set(stdlib_dependencies "swift")
     foreach(stdlib_dependency ${UNIVERSAL_LIBRARY_NAMES_${SWIFT_BENCHMARK_COMPILE_PLATFORM}})
       string(FIND "${stdlib_dependency}" "Unittest" find_output)
@@ -441,7 +441,7 @@ function(swift_benchmark_compile)
     add_custom_target("${executable_target}"
         DEPENDS ${platform_executables})
 
-    if(IS_SWIFT_BUILD AND "${SWIFT_BENCHMARK_COMPILE_PLATFORM}" STREQUAL "macosx")
+    if(NOT SWIFT_BENCHMARK_BUILT_STANDALONE AND "${SWIFT_BENCHMARK_COMPILE_PLATFORM}" STREQUAL "macosx")
       add_custom_command(
           TARGET "${executable_target}"
           POST_BUILD
