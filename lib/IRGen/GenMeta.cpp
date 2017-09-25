@@ -142,8 +142,24 @@ namespace {
     static unsigned getNumGenericArguments(IRGenModule &IGM,
                                            NominalTypeDecl *nominal) {
       GenericTypeRequirements requirements(IGM, nominal);
-      return unsigned(requirements.hasParentType())
-               + requirements.getNumTypeRequirements();
+      unsigned count = requirements.hasParentType() ? 1 : 0;
+
+      for (auto &requirement : requirements.getRequirements()) {
+        if (!requirement.Protocol) {
+          // Type requirement
+          count++;
+          continue;
+        }
+        
+        if (Lowering::TypeConverter
+            ::protocolRequiresWitnessTable(requirement.Protocol)) {
+          // Witness table requirement
+          count++;
+          continue;
+        }
+      }
+      
+      return count;
     }
 
     void collectTypes(IRGenModule &IGM, NominalTypeDecl *nominal) {
