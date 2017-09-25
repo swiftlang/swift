@@ -236,10 +236,7 @@ extension Equatable {
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
-    return Bool(Builtin.cmp_eq_RawPointer(
-        Builtin.bridgeToRawPointer(Builtin.castToUnknownObject(l)),
-        Builtin.bridgeToRawPointer(Builtin.castToUnknownObject(r))
-      ))
+    return ObjectIdentifier(l) == ObjectIdentifier(r)
   case (nil, nil):
     return true
   default:
