@@ -229,7 +229,7 @@ var p3: Promise = getRandomPromise() // p3 has type Promise<Int, Error> due to t
 
 ### Generalized `class` constraints
 
-*This feature will come as a consequence of proposal [SE-0156](https://github.com/apple/swift-evolution/blob/master/proposals/0156-subclass-existentials.md) and was released with Swift 4.*
+*This feature is a consequence of proposal [SE-0156](https://github.com/apple/swift-evolution/blob/master/proposals/0156-subclass-existentials.md) and was released with Swift 4.*
 
 The `class` constraint can currently only be used for defining protocols. We could generalize it to associated type and type parameter declarations, e.g.,
 
