@@ -2914,23 +2914,11 @@ auto GenericSignatureBuilder::resolvePotentialArchetype(
 EquivalenceClass *GenericSignatureBuilder::resolveEquivalenceClass(
                                     Type type,
                                     ArchetypeResolutionKind resolutionKind) {
-  auto pa = resolveArchetype(type, resolutionKind);
+  auto pa = resolvePotentialArchetype(type, resolutionKind)
+              .dyn_cast<PotentialArchetype *>();
   if (!pa) return nullptr;
 
   return pa->getOrCreateEquivalenceClass();
-}
-
-PotentialArchetype *GenericSignatureBuilder::resolveArchetype(
-                                      Type type,
-                                      ArchetypeResolutionKind resolutionKind) {
-  if (!type->isTypeParameter())
-    return nullptr;
-
-  auto result = resolvePotentialArchetype(type, resolutionKind);
-  if (auto pa = result.dyn_cast<PotentialArchetype *>())
-    return pa;
-
-  return nullptr;
 }
 
 auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
@@ -5370,8 +5358,9 @@ static void collapseSameTypeComponentsThroughDelayedRequirements(
   /// associated, for a type that we haven't tried to resolve yet.
   auto getUnknownTypeVirtualComponent = [&](Type type) {
     if (auto pa =
-            builder.resolveArchetype(type,
-                                     ArchetypeResolutionKind::AlreadyKnown))
+            builder.resolvePotentialArchetype(type,
+                                     ArchetypeResolutionKind::AlreadyKnown)
+              .dyn_cast<PotentialArchetype *>())
       return getPotentialArchetypeVirtualComponent(pa);
 
     return getTypeVirtualComponent(type);
@@ -6314,5 +6303,33 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
   Impl.reset();
 
   return sig;
+}
+
+GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
+                                                     ProtocolDecl *proto) {
+  auto module = proto->getParentModule();
+  GenericSignatureBuilder builder(proto->getASTContext(),
+                                  LookUpConformanceInModule(module));
+
+  // Add the 'self' parameter.
+  auto selfType =
+    proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+  builder.addGenericParameter(selfType);
+  auto selfPA =
+    builder.resolvePotentialArchetype(selfType,
+                                      ArchetypeResolutionKind::WellFormed)
+      .get<PotentialArchetype *>();
+
+  // Add the conformance of 'self' to the protocol.
+  auto requirement =
+    Requirement(RequirementKind::Conformance, selfType,
+                proto->getDeclaredInterfaceType());
+
+  builder.addRequirement(
+                 requirement,
+                 RequirementSource::forRequirementSignature(selfPA, proto),
+                 nullptr);
+
+  return std::move(builder).computeGenericSignature(SourceLoc());
 }
 

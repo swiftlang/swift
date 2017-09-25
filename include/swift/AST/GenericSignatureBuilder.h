@@ -596,6 +596,9 @@ public:
                       SourceLoc loc,
                       bool allowConcreteGenericParams = false) &&;
 
+  /// Compute the requirement signature for the given protocol.
+  static GenericSignature *computeRequirementSignature(ProtocolDecl *proto);
+
 private:
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
@@ -707,6 +710,7 @@ private:
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
+public:
   /// \brief Resolve the given type to the potential archetype it names.
   ///
   /// The \c resolutionKind parameter describes how resolution should be
@@ -722,7 +726,6 @@ private:
   resolvePotentialArchetype(Type type,
                             ArchetypeResolutionKind resolutionKind);
 
-public:
   /// \brief Resolve the equivalence class for the given type parameter,
   /// which provides information about that type.
   ///
@@ -737,18 +740,6 @@ public:
   EquivalenceClass *resolveEquivalenceClass(
                       Type type,
                       ArchetypeResolutionKind resolutionKind);
-
-  /// \brief Resolve the given type to the potential archetype it names.
-  ///
-  /// The \c resolutionKind parameter describes how resolution should be
-  /// performed. If the potential archetype named by the given dependent type
-  /// already exists, it will be always returned. If it doesn't exist yet,
-  /// the \c resolutionKind dictates whether the potential archetype will
-  /// be created or whether null will be returned.
-  ///
-  /// For any type that cannot refer to an archetype, this routine returns null.
-  PotentialArchetype *resolveArchetype(Type type,
-                                       ArchetypeResolutionKind resolutionKind);
 
   /// \brief Resolve the given type as far as this Builder knows how.
   ///

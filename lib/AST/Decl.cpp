@@ -3399,28 +3399,9 @@ void ProtocolDecl::createGenericParamsIfMissing() {
 void ProtocolDecl::computeRequirementSignature() {
   assert(!RequirementSignature && "already computed requirement signature");
 
-  auto module = getParentModule();
-
-  auto selfType = getSelfInterfaceType()->castTo<GenericTypeParamType>();
-  auto requirement =
-    Requirement(RequirementKind::Conformance, selfType,
-                getDeclaredInterfaceType());
-
-  GenericSignatureBuilder builder(getASTContext(),
-                                  LookUpConformanceInModule(module));
-  builder.addGenericParameter(selfType);
-  auto selfPA =
-      builder.resolveArchetype(selfType, ArchetypeResolutionKind::WellFormed);
-
-  builder.addRequirement(
-         requirement,
-         GenericSignatureBuilder::RequirementSource
-           ::forRequirementSignature(selfPA, this),
-         nullptr);
-
   // Compute and record the signature.
   auto requirementSig =
-    std::move(builder).computeGenericSignature(SourceLoc());
+    GenericSignatureBuilder::computeRequirementSignature(this);
   RequirementSignature = requirementSig->getRequirements().data();
   assert(RequirementSignature != nullptr);
   NumRequirementsInSignature = requirementSig->getRequirements().size();
