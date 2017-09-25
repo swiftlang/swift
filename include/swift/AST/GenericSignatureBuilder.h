@@ -30,6 +30,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/MapVector.h"
@@ -117,7 +118,7 @@ public:
   typedef Constraint<Type> ConcreteConstraint;
 
   /// Describes an equivalence class of potential archetypes.
-  struct EquivalenceClass {
+  struct EquivalenceClass : llvm::ilist_node<EquivalenceClass> {
     /// The list of protocols to which this equivalence class conforms.
     ///
     /// The keys form the (semantic) list of protocols to which this type
@@ -196,6 +197,11 @@ public:
 
     /// Note that this equivalence class has been modified.
     void modified(GenericSignatureBuilder &builder);
+
+    EquivalenceClass(const EquivalenceClass &) = delete;
+    EquivalenceClass(EquivalenceClass &&) = delete;
+    EquivalenceClass &operator=(const EquivalenceClass &) = delete;
+    EquivalenceClass &operator=(EquivalenceClass &&) = delete;
 
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
