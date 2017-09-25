@@ -132,10 +132,6 @@ CanType TypeJoin::visitMetatypeType(CanType second) {
       second->castTo<AnyMetatypeType>()->getInstanceType()->getCanonicalType();
 
   auto joinInstance = join(firstInstance, secondInstance);
-
-  if (!joinInstance)
-    return First->getASTContext().TheAnyType;
-
   return MetatypeType::get(joinInstance)->getCanonicalType();
 }
 
@@ -149,10 +145,6 @@ CanType TypeJoin::visitExistentialMetatypeType(CanType second) {
       second->castTo<AnyMetatypeType>()->getInstanceType()->getCanonicalType();
 
   auto joinInstance = join(firstInstance, secondInstance);
-
-  if (!joinInstance)
-    return First->getASTContext().TheAnyType;
-
   return ExistentialMetatypeType::get(joinInstance)->getCanonicalType();
 }
 
@@ -170,9 +162,6 @@ CanType TypeJoin::visitBoundGenericEnumType(CanType second) {
     // Compute the join of the unwrapped type. If there is none, we're done.
     auto unwrappedJoin =
         join(canFirst ? canFirst : First, canSecond ? canSecond : second);
-    // FIXME: More general joins of enums need to be handled.
-    if (!unwrappedJoin)
-      return First->getASTContext().TheAnyType;
 
     return OptionalType::get(unwrappedJoin)->getCanonicalType();
   }
