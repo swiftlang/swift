@@ -72,6 +72,9 @@ func run(_ executable: URL, arguments: [String] = []) -> ProcessResult {
   process.terminationHandler = { process in
     stdoutPipe.fileHandleForReading.readabilityHandler = nil
     stderrPipe.fileHandleForReading.readabilityHandler = nil
+    
+    stdoutPipe.fileHandleForReading.closeFile()
+    stderrPipe.fileHandleForReading.closeFile()
   }
 
   process.launchPath = executable.path
