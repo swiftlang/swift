@@ -29,6 +29,7 @@ template <class Orig, class Projected, Projected (&Project)(const Orig &),
 class ArrayRefView {
   llvm::ArrayRef<Orig> Array;
 public:
+  ArrayRefView() {}
   ArrayRefView(llvm::ArrayRef<Orig> array) : Array(array) {}
 
   class iterator {
@@ -110,6 +111,41 @@ public:
     static_assert(AllowOrigAccess,
                   "original array access not enabled for this view");
     return Array;
+  }
+
+  friend bool operator==(ArrayRefView lhs, ArrayRefView rhs) {
+    if (lhs.size() != rhs.size())
+      return false;
+    for (auto i : indices(lhs))
+      if (lhs[i] != rhs[i])
+        return false;
+    return true;
+  }
+  friend bool operator==(llvm::ArrayRef<Projected> lhs, ArrayRefView rhs) {
+    if (lhs.size() != rhs.size())
+      return false;
+    for (auto i : indices(lhs))
+      if (lhs[i] != rhs[i])
+        return false;
+    return true;
+  }
+  friend bool operator==(ArrayRefView lhs, llvm::ArrayRef<Projected> rhs) {
+    if (lhs.size() != rhs.size())
+      return false;
+    for (auto i : indices(lhs))
+      if (lhs[i] != rhs[i])
+        return false;
+    return true;
+  }
+
+  friend bool operator!=(ArrayRefView lhs, ArrayRefView rhs) {
+    return !(lhs == rhs);
+  }
+  friend bool operator!=(llvm::ArrayRef<Projected> lhs, ArrayRefView rhs) {
+    return !(lhs == rhs);
+  }
+  friend bool operator!=(ArrayRefView lhs, llvm::ArrayRef<Projected> rhs) {
+    return !(lhs == rhs);
   }
 };
 

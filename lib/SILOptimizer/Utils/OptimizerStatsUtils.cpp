@@ -79,51 +79,79 @@ using namespace swift;
 namespace {
 
 /// The total number of different kinds of SILInstructions.
-constexpr unsigned SILInstructionsNum = int(ValueKind::Last_SILInstruction) + 1;
+constexpr unsigned NumSILInstructions =
+    unsigned(SILNodeKind::Last_SILInstruction)
+  - unsigned(SILNodeKind::First_SILInstruction)
+  + 1;
+
+static unsigned getIndexForKind(SILInstructionKind kind) {
+  return unsigned(kind) - unsigned(SILNodeKind::First_SILInstruction);
+}
 
 /// A set of counters, one per SILInstruction kind.
-using InstructionCounts = SmallVector<int, SILInstructionsNum>;
+class InstructionCounts {
+  unsigned Counts[NumSILInstructions] = {};
+
+public:
+  constexpr InstructionCounts() {}
+
+  unsigned &operator[](SILInstructionKind kind) {
+    return Counts[getIndexForKind(kind)];
+  }
+
+  void addAll(const InstructionCounts &other) {
+    for (unsigned i = 0; i != NumSILInstructions; ++i) {
+      Counts[i] += other.Counts[i];
+    }
+  }
+
+  void subAll(const InstructionCounts &other) {
+    for (unsigned i = 0; i != NumSILInstructions; ++i) {
+      Counts[i] -= other.Counts[i];
+    }
+  }
+};
 
 /// A helper type to parse a comma separated list of SIL instruction names
 /// provided as argument of the -sil-stats-only-instructions options.
 class StatsOnlyInstructionsOpt {
-  /// If ComputeInstCounts[i] is non-zero, this kind of SILInstruction should be
-  /// tracked.
-  InstructionCounts ComputeInstCounts;
+  bool ShouldComputeInstCounts[NumSILInstructions] = {};
+
   /// The number of different kinds of SILInstructions to be tracked.
-  int InstCountsNum = 0;
+  unsigned NumInstCounts = 0;
 
 public:
-  StatsOnlyInstructionsOpt() : ComputeInstCounts(SILInstructionsNum) {}
+  constexpr StatsOnlyInstructionsOpt() {}
 
-  void operator=(const std::string &Val) {
-    if (Val.empty())
+  void operator=(StringRef val) {
+    if (val.empty())
       return;
-    if (Val == "all") {
-      for (auto &Inst : ComputeInstCounts) {
-        Inst = 1;
+    if (val == "all") {
+      for (auto &inst : ShouldComputeInstCounts) {
+        inst = true;
       }
-      InstCountsNum = ComputeInstCounts.size();
+      NumInstCounts = NumSILInstructions;
       return;
     }
     SmallVector<StringRef, 8> statsInstNames;
-    StringRef(Val).split(statsInstNames, ',', -1, false);
+    val.split(statsInstNames, ',', -1, false);
     for (auto instName : statsInstNames) {
       // Check if it is a known instruction.
-      auto Kind = getSILInstructionKind(instName);
-      if (!ComputeInstCounts[int(Kind)] ){
-          ComputeInstCounts[int(Kind)] = 1;
-          InstCountsNum++;
+      auto kind = getSILInstructionKind(instName);
+      unsigned index = getIndexForKind(kind);
+      if (!ShouldComputeInstCounts[index]) {
+        ShouldComputeInstCounts[index] = true;
+        NumInstCounts++;
       }
     }
   }
 
-  bool shouldComputeInstCount(SILInstructionKind Kind) const {
-    return ComputeInstCounts[int(Kind)] != 0;
+  bool shouldComputeInstCount(SILInstructionKind kind) const {
+    return ShouldComputeInstCounts[getIndexForKind(kind)];
   }
 
   int getInstCountsNum() const {
-    return InstCountsNum;
+    return NumInstCounts;
   }
 };
 
@@ -245,7 +273,7 @@ struct FunctionStat {
   InstructionCounts InstCounts;
 
   FunctionStat(SILFunction *F);
-  FunctionStat() : InstCounts(SILInstructionsNum) {}
+  FunctionStat() {}
 
   void print(llvm::raw_ostream &stream) const {
     stream << "FunctionStat("
@@ -280,7 +308,7 @@ struct ModuleStat {
   /// Instruction counts per SILInstruction kind.
   InstructionCounts InstCounts;
 
-  ModuleStat() : InstCounts(SILInstructionsNum) {}
+  ModuleStat() {}
 
   /// Add the stats for a given function to the total module stats.
   void addFunctionStat(FunctionStat &Stat) {
@@ -289,9 +317,7 @@ struct ModuleStat {
     ++FunctionCount;
     if (!StatsOnlyInstructionsOptLoc.getInstCountsNum())
       return;
-    for (unsigned i : indices(InstCounts)) {
-      InstCounts[i] += Stat.InstCounts[i];
-    }
+    InstCounts.addAll(Stat.InstCounts);
   }
 
   /// Subtract the stats for a given function from total module stats.
@@ -301,9 +327,7 @@ struct ModuleStat {
     --FunctionCount;
     if (!StatsOnlyInstructionsOptLoc.getInstCountsNum())
       return;
-    for (unsigned i : indices(InstCounts)) {
-      InstCounts[i] -= Stat.InstCounts[i];
-    }
+    InstCounts.subAll(Stat.InstCounts);
   }
 
   /// Add the stats about current memory usage.
@@ -338,7 +362,7 @@ struct ModuleStat {
 
 // A helper type to collect the stats about the number of instructions and basic
 // blocks.
-struct InstCountVisitor : SILVisitor<InstCountVisitor> {
+struct InstCountVisitor : SILInstructionVisitor<InstCountVisitor> {
   int BlockCount = 0;
   int InstCount = 0;
   InstructionCounts &InstCounts;
@@ -355,21 +379,13 @@ struct InstCountVisitor : SILVisitor<InstCountVisitor> {
 
   void visitSILBasicBlock(SILBasicBlock *BB) {
     ++BlockCount;
-    SILVisitor<InstCountVisitor>::visitSILBasicBlock(BB);
+    SILInstructionVisitor<InstCountVisitor>::visitSILBasicBlock(BB);
   }
 
-  void visitSILFunction(SILFunction *F) {
-    SILVisitor<InstCountVisitor>::visitSILFunction(F);
+  void visit(SILInstruction *I) {
+    ++InstCount;
+    ++InstCounts[I->getKind()];
   }
-
-  void visitValueBase(ValueBase *V) {}
-
-#define INST(Id, Parent, TextualName, MemBehavior, ReleasingBehavior)          \
-  void visit##Id(Id *I) {                                                      \
-    ++InstCount;                                                               \
-    ++InstCounts[int(I->getKind())];                                           \
-  }
-#include "swift/SIL/SILNodes.def"
 };
 
 /// A helper type to store different parameters related to the current transform.
@@ -673,15 +689,14 @@ void processFuncStatHistory(SILFunction *F, FunctionStat &Stat,
   if (!StatsOnlyInstructionsOptLoc.getInstCountsNum())
     return;
 
-  for (int i = 0, e = SILInstructionsNum; i < e; ++i) {
-    if (!Stat.InstCounts[i])
+  for (auto kind : allSILInstructionKinds()) {
+    if (!Stat.InstCounts[kind])
       continue;
-    SILInstructionKind Kind = SILInstructionKind(i);
-    if (!StatsOnlyInstructionsOptLoc.shouldComputeInstCount(Kind))
+    if (!StatsOnlyInstructionsOptLoc.shouldComputeInstCount(kind))
       continue;
     std::string CounterName = "inst_";
-    CounterName += getSILInstructionName(Kind);
-    printCounterValue("function_history", CounterName, Stat.InstCounts[i],
+    CounterName += getSILInstructionName(kind);
+    printCounterValue("function_history", CounterName, Stat.InstCounts[kind],
                       F->getName(), Ctx);
   }
 }
@@ -822,19 +837,18 @@ void processModuleStatsChanges(ModuleStat &OldStat, ModuleStat &NewStat,
   if (!StatsOnlyInstructionsOptLoc.getInstCountsNum())
     return;
 
-  for (int i = 0, e = SILInstructionsNum; i < e; ++i) {
+  for (auto kind : allSILInstructionKinds()) {
     // Do not print anything, if there is no change.
-    if (OldStat.InstCounts[i] == NewStat.InstCounts[i])
+    if (OldStat.InstCounts[kind] == NewStat.InstCounts[kind])
       continue;
-    SILInstructionKind Kind = SILInstructionKind(i);
-    if (!StatsOnlyInstructionsOptLoc.shouldComputeInstCount(Kind))
+    if (!StatsOnlyInstructionsOptLoc.shouldComputeInstCount(kind))
       continue;
     SmallString<64> CounterName("inst_");
-    CounterName += getSILInstructionName(Kind);
+    CounterName += getSILInstructionName(kind);
     auto DeltaCounterKindCount =
-        computeDelta(OldStat.InstCounts[i], NewStat.InstCounts[i]);
+        computeDelta(OldStat.InstCounts[kind], NewStat.InstCounts[kind]);
     printCounterChange("module", CounterName, DeltaCounterKindCount,
-                       OldStat.InstCounts[i], NewStat.InstCounts[i], Ctx);
+                       OldStat.InstCounts[kind], NewStat.InstCounts[kind], Ctx);
   }
 }
 
@@ -925,7 +939,7 @@ void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
   ModStat = NewModStat;
 }
 
-FunctionStat::FunctionStat(SILFunction *F) : InstCounts(SILInstructionsNum) {
+FunctionStat::FunctionStat(SILFunction *F) {
   InstCountVisitor V(InstCounts);
   V.visitSILFunction(F);
   BlockCount = V.getBlockCount();

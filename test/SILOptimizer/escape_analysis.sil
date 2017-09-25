@@ -376,8 +376,8 @@ sil @call_copy_addr_content : $@convention(thin) () -> () {
   %2 = function_ref @copy_addr_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32
   %3 = apply %2(%0, %1) : $@convention(thin) (@in_guaranteed Int32) -> @out Int32
   %4 = tuple()
-  %6 = dealloc_stack %1 : $*Int32
-  %5 = dealloc_stack %0 : $*Int32
+  dealloc_stack %1 : $*Int32
+  dealloc_stack %0 : $*Int32
   return %4 : $()
 }
 
@@ -808,7 +808,7 @@ bb0:
   %f = function_ref @unknown_set_y : $@convention(thin) () -> @out Y
   %a = apply %f(%0) : $@convention(thin) () -> @out Y
   %r = load %0 : $*Y
-  %5 = dealloc_stack %0 : $*Y
+  dealloc_stack %0 : $*Y
   return %r : $Y
 }
 

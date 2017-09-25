@@ -37,7 +37,7 @@ bb0(%0 : $Int):
 // CHECK-LABEL: } // end sil function 'condCastOpaque'
 sil @condCastOpaque : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  %c = checked_cast_value_br %0 : $Int to $Int, bb2, bb1
+  checked_cast_value_br %0 : $Int to $Int, bb2, bb1
 
 bb1:
   br bb3
@@ -58,7 +58,7 @@ bb3:
 sil @initDeinitExistentialValue : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $T):
   %i = init_existential_value %0 : $T, $T, $Any
-  %d = deinit_existential_value %i : $Any
+  deinit_existential_value %i : $Any
   %t = tuple ()
   return %t : $()
 }

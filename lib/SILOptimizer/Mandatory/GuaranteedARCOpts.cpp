@@ -24,7 +24,7 @@ namespace {
 
 struct GuaranteedARCOptsVisitor
     : SILInstructionVisitor<GuaranteedARCOptsVisitor, bool> {
-  bool visitValueBase(ValueBase *V) { return false; }
+  bool visitSILInstruction(SILInstruction *I) { return false; }
   bool visitDestroyAddrInst(DestroyAddrInst *DAI);
   bool visitStrongReleaseInst(StrongReleaseInst *SRI);
   bool visitDestroyValueInst(DestroyValueInst *DVI);

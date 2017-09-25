@@ -53,20 +53,18 @@ static bool isLocalObject(SILValue Obj) {
     Processed.insert(V);
     // It should be a local object.
     V = getUnderlyingObject(V);
-    if (auto I = dyn_cast<SILInstruction>(V)) {
-      if (isa<AllocationInst>(V))
-        continue;
-      if (isa<StrongPinInst>(I)) {
-        WorkList.push_back(I->getOperand(0));
-        continue;
+    if (isa<AllocationInst>(V))
+      continue;
+    if (auto I = dyn_cast<StrongPinInst>(V)) {
+      WorkList.push_back(I->getOperand());
+      continue;
+    }
+    if (isa<StructInst>(V) || isa<TupleInst>(V) || isa<EnumInst>(V)) {
+      // A compound value is local, if all of its components are local.
+      for (auto &Op : cast<SingleValueInstruction>(V)->getAllOperands()) {
+        WorkList.push_back(Op.get());
       }
-      if (isa<StructInst>(I) || isa<TupleInst>(I) || isa<EnumInst>(I)) {
-        // A compound value is local, if all of its components are local.
-        for (auto &Op : I->getAllOperands()) {
-          WorkList.push_back(Op.get());
-        }
-        continue;
-      }
+      continue;
     }
 
     if (auto *Arg = dyn_cast<SILPHIArgument>(V)) {
@@ -108,7 +106,7 @@ IsZeroKind swift::isZeroValue(SILValue Value) {
     case ValueKind::UncheckedTrivialBitCastInst:
     // Extracting from a zero class returns a zero.
     case ValueKind::StructExtractInst:
-      return isZeroValue(cast<SILInstruction>(Value)->getOperand(0));
+      return isZeroValue(cast<SingleValueInstruction>(Value)->getOperand(0));
     default:
       break;
   }
@@ -180,7 +178,7 @@ Optional<bool> swift::computeSignBit(SILValue V) {
     switch (Def->getKind()) {
     // Bitcast of non-negative is non-negative
     case ValueKind::UncheckedTrivialBitCastInst:
-      Value = cast<SILInstruction>(Def)->getOperand(0);
+      Value = cast<UncheckedTrivialBitCastInst>(Def)->getOperand();
       continue;
     default:
       break;

@@ -37,7 +37,7 @@ namespace {
 class LoopCloner : public SILCloner<LoopCloner> {
   SILLoop *Loop;
 
-  friend class SILVisitor<LoopCloner>;
+  friend class SILInstructionVisitor<LoopCloner>;
   friend class SILCloner<LoopCloner>;
 
 public:
@@ -51,9 +51,6 @@ public:
   MapVector<SILBasicBlock *, SILBasicBlock *> &getBBMap() { return BBMap; }
 
   DenseMap<SILValue, SILValue> &getValueMap() { return ValueMap; }
-  DenseMap<SILInstruction *, SILInstruction *> &getInstMap() {
-    return InstructionMap;
-  }
 
 protected:
   SILValue remapValue(SILValue V) {
@@ -293,8 +290,7 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
 /// value to live out value in the cloned loop.
 static void collectLoopLiveOutValues(
     DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues,
-    SILLoop *Loop, DenseMap<SILValue, SILValue> &ClonedValues,
-    DenseMap<SILInstruction *, SILInstruction *> &ClonedInstructions) {
+    SILLoop *Loop, DenseMap<SILValue, SILValue> &ClonedValues) {
   for (auto *Block : Loop->getBlocks()) {
     // Look at block arguments.
     for (auto *Arg : Block->getArguments()) {
@@ -312,15 +308,17 @@ static void collectLoopLiveOutValues(
     }
     // And the instructions.
     for (auto &Inst : *Block) {
-      for (auto *Op : Inst.getUses()) {
-        // Is this use outside the loop.
-        if (!Loop->contains(Op->getUser())) {
+      for (SILValue result : Inst.getResults()) {
+        for (auto *Op : result->getUses()) {
+          // Ignore uses inside the loop.
+          if (Loop->contains(Op->getUser()))
+            continue;
+
           auto UsedValue = Op->get();
-          assert(UsedValue == &Inst && "Instructions must match");
-          assert(ClonedInstructions.count(&Inst) && "Unmapped instruction!");
+          assert(UsedValue == result && "Instructions must match");
 
           if (!LoopLiveOutValues.count(UsedValue))
-            LoopLiveOutValues[UsedValue].push_back(ClonedInstructions[&Inst]);
+            LoopLiveOutValues[UsedValue].push_back(ClonedValues[result]);
         }
       }
     }
@@ -405,18 +403,11 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
     // subsequent iterations we only need to update this map with the values
     // from the new iteration's clone.
     if (Cnt == 1)
-      collectLoopLiveOutValues(LoopLiveOutValues, Loop, Cloner.getValueMap(),
-                               Cloner.getInstMap());
+      collectLoopLiveOutValues(LoopLiveOutValues, Loop, Cloner.getValueMap());
     else {
       for (auto &MapEntry : LoopLiveOutValues) {
-        // If this is an argument look up the value in the value map.
-        SILValue MappedValue;
-        if (isa<SILArgument>(MapEntry.first))
-          MappedValue = Cloner.getValueMap()[MapEntry.first];
-        // Otherwise, consult the instruction map.
-        else
-          MappedValue = Cloner
-                  .getInstMap()[cast<SILInstruction>(MapEntry.first)];
+        // Look it up in the value map.
+        SILValue MappedValue = Cloner.getValueMap()[MapEntry.first];
         MapEntry.second.push_back(MappedValue);
         assert(MapEntry.second.size() == Cnt);
       }

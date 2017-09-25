@@ -187,7 +187,7 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
     return false;
   
   // Recursively search for other (non-)loads in the instruction's uses.
-  for (auto UI : I->getUses()) {
+  for (auto UI : cast<SingleValueInstruction>(I)->getUses()) {
     SILInstruction *II = UI->getUser();
     if (II->getParent() != singleBlock)
       singleBlock = nullptr;
@@ -290,7 +290,7 @@ static bool isLoadFromStack(SILInstruction *I, AllocStackInst *ASI) {
     if (!isa<StructElementAddrInst>(op) && !isa<TupleElementAddrInst>(op))
       return false;
     
-    op = cast<SILInstruction>(op)->getOperand(0);
+    op = cast<SingleValueInstruction>(op)->getOperand(0);
   }
   return true;
 }
@@ -305,7 +305,7 @@ static void collectLoads(SILInstruction *I, SmallVectorImpl<LoadInst *> &Loads) 
     return;
   
   // Recursively search for other loads in the instruction's uses.
-  for (auto UI : I->getUses()) {
+  for (auto UI : cast<SingleValueInstruction>(I)->getUses()) {
     collectLoads(UI->getUser(), Loads);
   }
 }
@@ -316,7 +316,7 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   SILValue op = LI->getOperand();
   while (op != ASI) {
     assert(isa<StructElementAddrInst>(op) || isa<TupleElementAddrInst>(op));
-    SILInstruction *Inst = cast<SILInstruction>(op);
+    auto *Inst = cast<SingleValueInstruction>(op);
     projections.push_back(Projection(Inst));
     op = Inst->getOperand(0);
   }
@@ -330,7 +330,7 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   LI->eraseFromParent();
   while (op != ASI && op->use_empty()) {
     assert(isa<StructElementAddrInst>(op) || isa<TupleElementAddrInst>(op));
-    SILInstruction *Inst = cast<SILInstruction>(op);
+    auto *Inst = cast<SingleValueInstruction>(op);
     SILValue next = Inst->getOperand(0);
     Inst->eraseFromParent();
     op = next;
@@ -370,18 +370,19 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
     ++BBI;
 
     if (isLoadFromStack(Inst, ASI)) {
+      auto Load = cast<LoadInst>(Inst);
       if (RunningVal) {
         // If we are loading from the AllocStackInst and we already know the
         // content of the Alloca then use it.
-        DEBUG(llvm::dbgs() << "*** Promoting load: " << *Inst);
+        DEBUG(llvm::dbgs() << "*** Promoting load: " << *Load);
         
-        replaceLoad(cast<LoadInst>(Inst), RunningVal, ASI);
+        replaceLoad(Load, RunningVal, ASI);
         NumInstRemoved++;
-      } else if (Inst->getOperand(0) == ASI) {
+      } else if (Load->getOperand() == ASI) {
         // If we don't know the content of the AllocStack then the loaded
         // value *is* the new value;
-        DEBUG(llvm::dbgs() << "*** First load: " << *Inst);
-        RunningVal = Inst;
+        DEBUG(llvm::dbgs() << "*** First load: " << *Load);
+        RunningVal = Load;
       }
       continue;
     }
@@ -509,13 +510,13 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       }
     }
 
-    SILValue InstVal = Inst;
-    
     // Remove dead address instructions that may be uses of the allocation.
-    while (InstVal->use_empty() && (isa<StructElementAddrInst>(InstVal) ||
-                                    isa<TupleElementAddrInst>(InstVal))) {
-      SILInstruction *I = cast<SILInstruction>(InstVal);
-      InstVal = I->getOperand(0);
+    SILNode *Node = Inst;
+    while (isa<StructElementAddrInst>(Node) ||
+           isa<TupleElementAddrInst>(Node)) {
+      auto *I = cast<SingleValueInstruction>(Node);
+      if (!I->use_empty()) break;
+      Node = I->getOperand(0);
       I->eraseFromParent();
       NumInstRemoved++;
     }

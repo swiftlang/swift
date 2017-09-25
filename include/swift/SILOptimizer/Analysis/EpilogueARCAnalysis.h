@@ -224,7 +224,7 @@ class EpilogueARCFunctionInfo {
   llvm::DenseMap<SILValue, ARCInstructions> EpilogueReleaseInstCache;
 
 public:
-  void handleDeleteNotification(ValueBase *V) {
+  void handleDeleteNotification(SILNode *node) {
     // Being conservative and clear everything for now.
     EpilogueRetainInstCache.clear();
     EpilogueReleaseInstCache.clear();
@@ -277,17 +277,17 @@ public:
   EpilogueARCAnalysis(const EpilogueARCAnalysis &) = delete;
   EpilogueARCAnalysis &operator=(const EpilogueARCAnalysis &) = delete;
 
-  virtual void handleDeleteNotification(ValueBase *V) override {
+  virtual void handleDeleteNotification(SILNode *node) override {
     // If the parent function of this instruction was just turned into an
     // external declaration, bail. This happens during SILFunction destruction.
-    SILFunction *F = V->getFunction();
+    SILFunction *F = node->getFunction();
     if (F->isExternalDeclaration()) {
       return;
     }
 
     // If we do have an analysis, tell it to handle its delete notifications.
     if (auto A = maybeGet(F)) {
-      A.get()->handleDeleteNotification(V);
+      A.get()->handleDeleteNotification(node);
     }
   }
 

@@ -248,7 +248,7 @@ public:
 
   /// Send the invalidation message that \p V is being deleted to all
   /// registered handlers. The order of handlers is deterministic but arbitrary.
-  void notifyDeleteHandlers(ValueBase *V);
+  void notifyDeleteHandlers(SILNode *node);
 
   /// \brief This converts Swift types to SILTypes.
   mutable Lowering::TypeConverter Types;

@@ -35,7 +35,7 @@ entry(%e : $TreeA<T>):
 sil @indirect_enum_case_addr_only : $@convention(thin) <T> (@in TreeB<T>) -> () {
 entry(%e : $*TreeB<T>):
   %a = unchecked_take_enum_data_addr %e : $*TreeB<T>, #TreeB.Leaf!enumelt.1
-  %b = destroy_addr %a : $*T
+  destroy_addr %a : $*T
 
   %c = unchecked_take_enum_data_addr %e : $*TreeB<T>, #TreeB.Branch!enumelt.1
   %d = load [take] %c : $*<τ_0_0> { var τ_0_0 } <(left: TreeB<T>, right: TreeB<T>)>

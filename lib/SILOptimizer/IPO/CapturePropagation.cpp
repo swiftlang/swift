@@ -94,7 +94,7 @@ namespace {
 class CapturePropagationCloner
   : public TypeSubstCloner<CapturePropagationCloner> {
   using SuperTy = TypeSubstCloner<CapturePropagationCloner>;
-  friend class SILVisitor<CapturePropagationCloner>;
+  friend class SILInstructionVisitor<CapturePropagationCloner>;
   friend class SILCloner<CapturePropagationCloner>;
 
   SILFunction *OrigF;
@@ -141,12 +141,12 @@ protected:
 void CapturePropagationCloner::cloneConstValue(SILValue Val) {
   assert(IsCloningConstant && "incorrect mode");
 
-  auto Inst = dyn_cast<SILInstruction>(Val);
-  if (!Inst)
+  if (ValueMap.find(Val) != ValueMap.end())
     return;
 
-  auto II = InstructionMap.find(Inst);
-  if (II != InstructionMap.end())
+  // TODO: MultiValueInstruction?
+  auto Inst = dyn_cast<SingleValueInstruction>(Val);
+  if (!Inst)
     return;
 
   if (Inst->getNumOperands() > 0) {
@@ -387,7 +387,7 @@ static SILFunction *getSpecializedWithDeadParams(
         return nullptr;
       }
       assert(isa<ApplyInst>(&I) && "unknown FullApplySite instruction");
-      RetValue = &I;
+      RetValue = cast<ApplyInst>(&I);
       continue;
     }
     if (auto *RI = dyn_cast<ReturnInst>(&I)) {

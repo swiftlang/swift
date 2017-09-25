@@ -73,7 +73,7 @@ struct ControllingInfo {
 class DCE : public SILFunctionTransform {
   typedef llvm::DomTreeNodeBase<SILBasicBlock> PostDomTreeNode;
 
-  llvm::SmallPtrSet<ValueBase *, 16> LiveValues;
+  llvm::SmallPtrSet<SILNode *, 16> LiveValues;
   llvm::SmallPtrSet<SILBasicBlock *, 16> LiveBlocks;
   llvm::SmallVector<SILInstruction *, 64> Worklist;
   PostDominanceInfo *PDT;
@@ -160,7 +160,7 @@ class DCE : public SILFunctionTransform {
   unsigned computeMinPredecessorLevels(PostDomTreeNode *Node);
   void insertControllingInfo(SILBasicBlock *Block, unsigned Level);
 
-  void markValueLive(ValueBase *V);
+  void markValueLive(SILNode *V);
   void markTerminatorArgsLive(SILBasicBlock *Pred, SILBasicBlock *Succ,
                               size_t ArgIndex);
   void markControllingTerminatorsLive(SILBasicBlock *Block);
@@ -178,7 +178,8 @@ class DCE : public SILFunctionTransform {
 
 // Keep track of the fact that V is live and add it to our worklist
 // so that we can process the values it depends on.
-void DCE::markValueLive(ValueBase *V) {
+void DCE::markValueLive(SILNode *V) {
+  V = V->getCanonicalSILNodeInObject();
   if (LiveValues.count(V) || isa<SILUndef>(V))
     return;
 
@@ -192,6 +193,8 @@ void DCE::markValueLive(ValueBase *V) {
     Worklist.push_back(Def);
     return;
   }
+
+  // TODO: MultiValueInstruction
 
   assert(isa<SILArgument>(V) &&
          "Only expected instructions and arguments!");
@@ -239,7 +242,7 @@ void DCE::markLive(SILFunction &F) {
         // A fix_lifetime (with a non-address type) is only alive if it's
         // definition is alive.
         SILValue Op = FLI->getOperand();
-        auto *OpInst = dyn_cast<SILInstruction>(Op);
+        auto *OpInst = Op->getDefiningInstruction();
         if (OpInst && !Op->getType().isAddress()) {
           addReverseDependency(OpInst, FLI);
         } else {
@@ -363,8 +366,9 @@ void DCE::propagateLiveness(SILInstruction *I) {
     // Conceptually, the dependency from a debug instruction to its definition
     // is in reverse direction: Only if its definition is alive, also the
     // debug_value instruction is alive.
-    for (Operand *DU : getDebugUses(I))
-      markValueLive(DU->getUser());
+    for (auto result : I->getResults())
+      for (Operand *DU : getDebugUses(result))
+        markValueLive(DU->getUser());
 
     // Handle all other reverse-dependency instructions, like cond_fail and
     // fix_lifetime. Only if the definition is alive, the user itself is alive.
@@ -374,7 +378,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
     return;
   }
 
-  switch (ValueKindAsTermKind(I->getKind())) {
+  switch (cast<TermInst>(I)->getTermKind()) {
   case TermKind::BranchInst:
   case TermKind::UnreachableInst:
     return;
@@ -459,10 +463,7 @@ bool DCE::removeDead(SILFunction &F) {
       DEBUG(llvm::dbgs() << "Removing dead argument:\n");
       DEBUG(Inst->dump());
 
-      if (Inst->hasValue()) {
-        auto *Undef = SILUndef::get(Inst->getType(), Inst->getModule());
-        Inst->replaceAllUsesWith(Undef);
-      }
+      Inst->replaceAllUsesWithUndef();
 
       Changed = true;
     }
@@ -489,11 +490,7 @@ bool DCE::removeDead(SILFunction &F) {
       DEBUG(llvm::dbgs() << "Removing dead instruction:\n");
       DEBUG(Inst->dump());
 
-      if (Inst->hasValue()) {
-        auto *Undef = SILUndef::get(Inst->getType(), Inst->getModule());
-        Inst->replaceAllUsesWith(Undef);
-      }
-
+      Inst->replaceAllUsesOfAllResultsWithUndef();
 
       if (isa<ApplyInst>(Inst))
         CallsChanged = true;

@@ -139,15 +139,25 @@ bool SILFunction::hasForeignBody() const {
   return SILDeclRef::isClangGenerated(getClangNode());
 }
 
-void SILFunction::numberValues(llvm::DenseMap<const ValueBase*,
-                               unsigned> &ValueToNumberMap) const {
+void SILFunction::numberValues(llvm::DenseMap<const SILNode*, unsigned> &
+                                 ValueToNumberMap) const {
   unsigned idx = 0;
   for (auto &BB : *this) {
     for (auto I = BB.args_begin(), E = BB.args_end(); I != E; ++I)
       ValueToNumberMap[*I] = idx++;
     
-    for (auto &I : BB)
-      ValueToNumberMap[&I] = idx++;
+    for (auto &I : BB) {
+      auto results = I.getResults();
+      if (results.empty()) {
+        ValueToNumberMap[&I] = idx++;
+      } else {
+        // Assign the instruction node the first result ID.
+        ValueToNumberMap[&I] = idx;
+        for (auto result : results) {
+          ValueToNumberMap[result] = idx++;
+        }
+      }
+    }
   }
 }
 

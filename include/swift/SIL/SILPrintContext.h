@@ -50,7 +50,7 @@ protected:
   //
   const void *ContextFunctionOrBlock = nullptr;
   llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
-  llvm::DenseMap<const ValueBase *, unsigned> ValueToIDMap;
+  llvm::DenseMap<const SILNode *, unsigned> ValueToIDMap;
 
   llvm::raw_ostream &OutStream;
 
@@ -96,7 +96,7 @@ public:
 
   SILPrintContext::ID getID(const SILBasicBlock *Block);
 
-  SILPrintContext::ID getID(SILValue V);
+  SILPrintContext::ID getID(const SILNode *node);
 
   /// Returns true if the \p Scope has and ID assigned.
   bool hasScopeID(const SILDebugScope *Scope) const {

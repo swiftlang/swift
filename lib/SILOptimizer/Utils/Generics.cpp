@@ -2300,7 +2300,7 @@ void swift::trySpecializeApplyOfGeneric(
         continue;
 
       auto FAS = FullApplySite::isa(User);
-      if (FAS && FAS.getCallee() == Apply.getInstruction())
+      if (FAS && FAS.getCallee() == PAI)
         continue;
 
       auto *PAIUser = dyn_cast<PartialApplyInst>(User);

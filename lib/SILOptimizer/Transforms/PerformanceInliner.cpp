@@ -253,7 +253,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
         // Check if inlining the callee would allow for further
         // optimizations like devirtualization or generic specialization. 
         if (!def)
-          def = dyn_cast_or_null<SILInstruction>(FAI.getCallee());
+          def = dyn_cast_or_null<SingleValueInstruction>(FAI.getCallee());
 
         if (!def)
           continue;

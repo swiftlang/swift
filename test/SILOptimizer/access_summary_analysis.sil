@@ -81,10 +81,10 @@ sil private @accessSeparateStoredPropertiesOfSameCapture : $@convention(thin) (@
 bb0(%0 : $*StructWithStoredProperties):
   %1 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
   %2 = struct_element_addr %1 : $*StructWithStoredProperties, #StructWithStoredProperties.f
-  %3 = end_access %1 : $*StructWithStoredProperties
+  end_access %1 : $*StructWithStoredProperties
   %4 = begin_access [read] [unknown] %0: $*StructWithStoredProperties
   %5 = struct_element_addr %4 : $*StructWithStoredProperties, #StructWithStoredProperties.g
-  %6 = end_access %4 : $*StructWithStoredProperties
+  end_access %4 : $*StructWithStoredProperties
   %7 = tuple ()
   return %7 : $()
 }
@@ -95,10 +95,10 @@ sil private @accessSeparateElementsOfSameCapture : $@convention(thin) (@inout_al
 bb0(%0 : $*(Int, Int)):
   %1 = begin_access [modify] [unknown] %0: $*(Int, Int)
   %2 = tuple_element_addr %1 : $*(Int, Int), 0
-  %3 = end_access %1 : $*(Int, Int)
+  end_access %1 : $*(Int, Int)
   %4 = begin_access [read] [unknown] %0: $*(Int, Int)
   %5 = tuple_element_addr %4 : $*(Int, Int), 1
-  %6 = end_access %4 : $*(Int, Int)
+  end_access %4 : $*(Int, Int)
   %7 = tuple ()
   return %7 : $()
 }
@@ -110,11 +110,11 @@ bb0(%0 : $*StructWithStructWithStoredProperties):
   %1 = begin_access [modify] [unknown] %0: $*StructWithStructWithStoredProperties
   %2 = struct_element_addr %1 : $*StructWithStructWithStoredProperties, #StructWithStructWithStoredProperties.a
   %3 = struct_element_addr %2 : $*StructWithStoredProperties, #StructWithStoredProperties.f
-  %4 = end_access %1 : $*StructWithStructWithStoredProperties
+  end_access %1 : $*StructWithStructWithStoredProperties
   %5 = begin_access [modify] [unknown] %0: $*StructWithStructWithStoredProperties
   %6 = struct_element_addr %5 : $*StructWithStructWithStoredProperties, #StructWithStructWithStoredProperties.b
   %7 = struct_element_addr %6 : $*StructWithStoredProperties, #StructWithStoredProperties.g
-  %8 = end_access %5 : $*StructWithStructWithStoredProperties
+  end_access %5 : $*StructWithStructWithStoredProperties
   %9 = tuple ()
   return %9 : $()
 }
@@ -126,10 +126,10 @@ sil private @accessSeparateStoredPropertiesOfSameCaptureOppositeOfDeclarationOrd
 bb0(%0 : $*StructWithStoredProperties):
   %1 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
   %2 = struct_element_addr %1 : $*StructWithStoredProperties, #StructWithStoredProperties.g
-  %3 = end_access %1 : $*StructWithStoredProperties
+  end_access %1 : $*StructWithStoredProperties
   %4 = begin_access [read] [unknown] %0: $*StructWithStoredProperties
   %5 = struct_element_addr %4 : $*StructWithStoredProperties, #StructWithStoredProperties.f
-  %6 = end_access %4 : $*StructWithStoredProperties
+  end_access %4 : $*StructWithStoredProperties
   %7 = tuple ()
   return %7 : $()
 }
@@ -139,10 +139,10 @@ bb0(%0 : $*StructWithStoredProperties):
 sil private @accessAggregateDoesNotSubsumeAccessStoredProp : $@convention(thin) (@inout_aliasable StructWithStoredProperties) -> () {
 bb0(%0 : $*StructWithStoredProperties):
   %1 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
-  %3 = end_access %1 : $*StructWithStoredProperties
+  end_access %1 : $*StructWithStoredProperties
   %4 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
   %5 = struct_element_addr %4 : $*StructWithStoredProperties, #StructWithStoredProperties.g
-  %6 = end_access %4 : $*StructWithStoredProperties
+  end_access %4 : $*StructWithStoredProperties
   %7 = tuple ()
   return %7 : $()
 }
@@ -153,9 +153,9 @@ sil private @accessAggregateDoesNotSubsumeAccessStoredPropWithAggregateSecond : 
 bb0(%0 : $*StructWithStoredProperties):
   %1 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
   %2 = struct_element_addr %1 : $*StructWithStoredProperties, #StructWithStoredProperties.f
-  %3 = end_access %1 : $*StructWithStoredProperties
+  end_access %1 : $*StructWithStoredProperties
   %4 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
-  %6 = end_access %4 : $*StructWithStoredProperties
+  end_access %4 : $*StructWithStoredProperties
   %7 = tuple ()
   return %7 : $()
 }
@@ -166,10 +166,10 @@ sil private @accessSameStoredPropertyOfSameCapture : $@convention(thin) (@inout_
 bb0(%0 : $*StructWithStoredProperties):
   %1 = begin_access [read] [unknown] %0: $*StructWithStoredProperties
   %2 = struct_element_addr %1 : $*StructWithStoredProperties, #StructWithStoredProperties.f
-  %3 = end_access %1 : $*StructWithStoredProperties
+  end_access %1 : $*StructWithStoredProperties
   %4 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
   %5 = struct_element_addr %4 : $*StructWithStoredProperties, #StructWithStoredProperties.f
-  %6 = end_access %4 : $*StructWithStoredProperties
+  end_access %4 : $*StructWithStoredProperties
   %7 = tuple ()
   return %7 : $()
 }
@@ -241,7 +241,7 @@ bb0(%0 : $*Int):
 sil private @callThrowingClosureThatModifiesCapture : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %1 = function_ref @throwingClosureThatModifesCapture : $@convention(thin) (@inout_aliasable Int) -> @error Error
-  %2 = try_apply %1(%0) : $@convention(thin) (@inout_aliasable Int) -> @error Error, normal bb1, error bb2
+  try_apply %1(%0) : $@convention(thin) (@inout_aliasable Int) -> @error Error, normal bb1, error bb2
 bb1(%3 : $()):
   %4 = tuple ()
   return %4 : $()

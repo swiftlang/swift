@@ -30,9 +30,9 @@ bb0:
   store %1 to %2 : $*SomeClass                    // id: %3
   inject_enum_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt.1 // id: %4
   %5 = load %0 : $*Optional<SomeClass>          // users: %6, %8, %9, %14
-  %6 = retain_value %5 : $Optional<SomeClass>
+  retain_value %5 : $Optional<SomeClass>
   %7 = alloc_stack $Optional<SomeClass>           // users: %9, %10, %11, %13
-  %8 = retain_value %5 : $Optional<SomeClass>
+  retain_value %5 : $Optional<SomeClass>
   store %5 to %7 : $*Optional<SomeClass>        // id: %9
   switch_enum_addr %7 : $*Optional<SomeClass>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2 // id: %10
 
@@ -65,9 +65,9 @@ bb0:
   store %1 to %2 : $*SomeClass
   inject_enum_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt.1
   %5 = load %0 : $*Optional<SomeClass>
-  %6 = retain_value %5 : $Optional<SomeClass>
+  retain_value %5 : $Optional<SomeClass>
   %7 = alloc_stack $Optional<SomeClass>
-  %8 = retain_value %5 : $Optional<SomeClass>
+  retain_value %5 : $Optional<SomeClass>
   store %5 to %7 : $*Optional<SomeClass>
   %t = integer_literal $Builtin.Int1, -1
   %f = integer_literal $Builtin.Int1, 0

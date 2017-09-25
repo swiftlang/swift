@@ -59,7 +59,7 @@ bb0(%0 : $*Int, %1 : $*_Stdout):
   unconditional_checked_cast_addr Int in %5 : $*Int to CustomStringConvertible in %4 : $*CustomStringConvertible
   inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt.1
   dealloc_stack %5 : $*Int
-  %13 = switch_enum_addr %3 : $*Optional<CustomStringConvertible>, case #Optional.some!enumelt.1: bb3, case #Optional.none!enumelt: bb2
+  switch_enum_addr %3 : $*Optional<CustomStringConvertible>, case #Optional.some!enumelt.1: bb3, case #Optional.none!enumelt: bb2
 
 bb1:
   %15 = tuple ()

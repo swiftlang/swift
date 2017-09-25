@@ -37,7 +37,7 @@ InlineCost instructionInlineCost(SILInstruction &I);
 
 class SILInliner : public TypeSubstCloner<SILInliner> {
 public:
-  friend class SILVisitor<SILInliner>;
+  friend class SILInstructionVisitor<SILInliner>;
   friend class SILCloner<SILInliner>;
   
   enum class InlineKind {

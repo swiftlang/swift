@@ -719,7 +719,7 @@ namespace {
     std::vector<Node> Nodes;
 
     /// The SILValue IDs which are printed as edge source labels.
-    llvm::DenseMap<const ValueBase *, unsigned> InstToIDMap;
+    llvm::DenseMap<const SILNode *, unsigned> InstToIDMap;
 
     typedef std::vector<Node>::iterator iterator;
   };
