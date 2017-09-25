@@ -104,6 +104,11 @@
           ]
         }
       ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.private
+        }
+      ],
       key.is_test_candidate: 1
     },
     {
@@ -177,7 +182,12 @@
           key.usr: "s:23index_is_test_candidate7MyClassC0C57_startsWithTest_takesNoParams_andReturnsVoid_butIsPrivate33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B9LLyyF",
           key.line: 24,
           key.column: 16,
-          key.is_dynamic: 1
+          key.is_dynamic: 1,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -214,6 +224,11 @@
               key.attribute: source.decl.attribute.override
             }
           ]
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
         }
       ],
       key.is_test_candidate: 1
