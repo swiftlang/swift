@@ -590,7 +590,14 @@
       key.length: 28,
       key.typename: "Int",
       key.nameoffset: 953,
-      key.namelength: 14
+      key.namelength: 14,
+      key.attributes: [
+        {
+          key.offset: 936,
+          key.length: 12,
+          key.attribute: source.decl.attribute.setter_access.private
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.var.global,
@@ -605,6 +612,11 @@
       key.bodyoffset: 1026,
       key.bodylength: 31,
       key.attributes: [
+        {
+          key.offset: 987,
+          key.length: 12,
+          key.attribute: source.decl.attribute.setter_access.private
+        },
         {
           key.offset: 980,
           key.length: 6,
@@ -626,6 +638,11 @@
       key.bodylength: 31,
       key.attributes: [
         {
+          key.offset: 1066,
+          key.length: 16,
+          key.attribute: source.decl.attribute.setter_access.fileprivate
+        },
+        {
           key.offset: 1059,
           key.length: 6,
           key.attribute: source.decl.attribute.public
@@ -645,6 +662,11 @@
       key.bodyoffset: 1186,
       key.bodylength: 31,
       key.attributes: [
+        {
+          key.offset: 1147,
+          key.length: 13,
+          key.attribute: source.decl.attribute.setter_access.internal
+        },
         {
           key.offset: 1140,
           key.length: 6,

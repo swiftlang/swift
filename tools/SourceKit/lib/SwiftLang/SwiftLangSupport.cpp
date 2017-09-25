@@ -643,9 +643,28 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
           return Attr_Open;
       }
     }
+    case DAK_SetterAccess: {
+      static UIdent Attr_Private("source.decl.attribute.setter_access.private");
+      static UIdent Attr_FilePrivate("source.decl.attribute.setter_access.fileprivate");
+      static UIdent Attr_Internal("source.decl.attribute.setter_access.internal");
+      static UIdent Attr_Public("source.decl.attribute.setter_access.public");
+      static UIdent Attr_Open("source.decl.attribute.setter_access.open");
+
+      switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
+        case AccessLevel::Private:
+          return Attr_Private;
+        case AccessLevel::FilePrivate:
+          return Attr_FilePrivate;
+        case AccessLevel::Internal:
+          return Attr_Internal;
+        case AccessLevel::Public:
+          return Attr_Public;
+        case AccessLevel::Open:
+          return Attr_Open;
+      }
+    }
 
     // Ignore these.
-    case DAK_SetterAccess:
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
     case DAK_DowngradeExhaustivityCheck:
