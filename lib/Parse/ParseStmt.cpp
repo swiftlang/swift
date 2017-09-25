@@ -579,7 +579,12 @@ ParserResult<Stmt> Parser::parseStmt() {
 ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   if (Tok.isNot(tok::l_brace)) {
     diagnose(Tok, ID);
-    return nullptr;
+
+    // Attempt to recover by looking for a left brace on the same line
+    while (Tok.isNot(tok::eof, tok::l_brace) && !Tok.isAtStartOfLine())
+      skipSingle();
+    if (Tok.isNot(tok::l_brace))
+      return nullptr;
   }
   SourceLoc LBLoc = consumeToken(tok::l_brace);
 
