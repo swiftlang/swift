@@ -1750,6 +1750,125 @@ Type EquivalenceClass::getAnchor(
   return anchorPA->getDependentType(genericParams);
 }
 
+Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
+                                        GenericEnvironment *genericEnv) {
+  ArrayRef<GenericTypeParamType *> genericParams =
+    genericEnv->getGenericParams();
+
+  // The anchor descr
+  Type anchor = getAnchor(genericParams);
+
+  // If this equivalence class is mapped to a concrete type, produce that
+  // type.
+  if (concreteType) {
+    if (recursiveConcreteType)
+      return ErrorType::get(anchor);
+
+    return genericEnv->mapTypeIntoContext(concreteType,
+                                          builder.getLookupConformanceFn());
+  }
+
+  // Local function to check whether we have a generic parameter that has
+  // already been recorded
+  auto getAlreadyRecoveredGenericParam = [&]() -> Type {
+    auto genericParam = anchor->getAs<GenericTypeParamType>();
+    if (!genericParam) return Type();
+
+    auto type = genericEnv->getMappingIfPresent(genericParam);
+    if (!type) return Type();
+
+    // We already have a mapping for this generic parameter in the generic
+    // environment. Return it.
+    return *type;
+  };
+
+  AssociatedTypeDecl *assocType = nullptr;
+  ArchetypeType *parentArchetype = nullptr;
+  if (auto depMemTy = anchor->getAs<DependentMemberType>()) {
+    // Resolve the equivalence class of the parent.
+    auto parentEquivClass =
+      builder.resolveEquivalenceClass(
+                          depMemTy->getBase(),
+                          ArchetypeResolutionKind::CompleteWellFormed);
+    if (!parentEquivClass)
+      return ErrorType::get(anchor);
+
+    // Map the parent type into this context.
+    Type parentType = parentEquivClass->getTypeInContext(builder, genericEnv);
+
+    // If the parent is concrete, handle the
+    parentArchetype = parentType->getAs<ArchetypeType>();
+    if (!parentArchetype) {
+      // Resolve the member type.
+      Type memberType =
+        depMemTy->substBaseType(parentType, builder.getLookupConformanceFn());
+
+      return genericEnv->mapTypeIntoContext(memberType,
+                                            builder.getLookupConformanceFn());
+    }
+
+    // If we already have a nested type with this name, return it.
+    assocType = depMemTy->getAssocType();
+    if (auto nested =
+          parentArchetype->getNestedTypeIfKnown(assocType->getName())) {
+      return *nested;
+    }
+
+    // We will build the archetype below.
+  } else if (auto result = getAlreadyRecoveredGenericParam()) {
+    // Return already-contextualized generic type parameter.
+    return result;
+  }
+
+  // Substitute into the superclass.
+  Type superclass = this->recursiveSuperclassType ? Type() : this->superclass;
+  if (superclass && superclass->hasTypeParameter()) {
+    superclass = genericEnv->mapTypeIntoContext(
+                                            superclass,
+                                            builder.getLookupConformanceFn());
+    if (superclass->is<ErrorType>())
+      superclass = Type();
+
+    // We might have recursively recorded the archetype; if so, return early.
+    // FIXME: This should be detectable before we end up building archetypes.
+    if (auto result = getAlreadyRecoveredGenericParam())
+      return result;
+  }
+
+  // Build a new archetype.
+
+  // Collect the protocol conformances for the archetype.
+  SmallVector<ProtocolDecl *, 4> protos;
+  for (const auto &conforms : conformsTo) {
+    auto proto = conforms.first;
+
+    if (!isConformanceSatisfiedBySuperclass(proto))
+      protos.push_back(proto);
+  }
+
+  ArchetypeType *archetype;
+  ASTContext &ctx = builder.getASTContext();
+  if (parentArchetype) {
+    // Create a nested archetype.
+    archetype = ArchetypeType::getNew(ctx, parentArchetype, assocType, protos,
+                                      superclass, layout);
+
+    // Register this archetype with its parent.
+    parentArchetype->registerNestedType(assocType->getName(), archetype);
+  } else {
+    // Create a top-level archetype.
+    auto genericParam = anchor->castTo<GenericTypeParamType>();
+    Identifier name = genericParam->getName();
+    archetype = ArchetypeType::getNew(ctx, genericEnv, name, protos,
+                                      superclass, layout);
+
+    // Register the archetype with the generic environment.
+    genericEnv->addMapping(genericParam, archetype);
+  }
+
+  return archetype;
+}
+
 void EquivalenceClass::dump(llvm::raw_ostream &out) const {
   out << "Equivalence class represented by "
     << members.front()->getRepresentative()->getDebugName() << ":\n";
@@ -2563,167 +2682,6 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   return resultPA;
 }
 
-Type GenericSignatureBuilder::PotentialArchetype::getTypeInContext(
-                                               GenericSignatureBuilder &builder,
-                                               GenericEnvironment *genericEnv) {
-  ArrayRef<GenericTypeParamType *> genericParams =
-    genericEnv->getGenericParams();
-
-  // Retrieve the archetype from the archetype anchor in this equivalence class.
-  // The anchor must not have any concrete parents (otherwise we would just
-  // use the representative).
-  auto archetypeAnchor = getArchetypeAnchor(builder);
-  if (archetypeAnchor != this)
-    return archetypeAnchor->getTypeInContext(builder, genericEnv);
-
-  auto representative = getRepresentative();
-  auto equivClass = representative->getOrCreateEquivalenceClass();
-  ASTContext &ctx = genericEnv->getGenericSignature()->getASTContext();
-
-  // Return a concrete type or archetype we've already resolved.
-  if (Type concreteType = representative->getConcreteType()) {
-    // Otherwise, substitute in the archetypes in the environment.
-    // If this has a recursive type, return an error type.
-    auto equivClass = representative->getEquivalenceClassIfPresent();
-    if (equivClass->recursiveConcreteType) {
-      return ErrorType::get(getDependentType(genericParams));
-    }
-
-    return genericEnv->mapTypeIntoContext(concreteType,
-                                          builder.getLookupConformanceFn());
-  }
-
-  // Local function to check whether we have a generic parameter that has
-  // already been recorded
-  auto getAlreadyRecoveredGenericParam = [&]() -> Type {
-    if (!isGenericParam()) return Type();
-
-    auto type = genericEnv->getMappingIfPresent(getGenericParamKey());
-    if (!type) return Type();
-
-    // We already have a mapping for this generic parameter in the generic
-    // environment. Return it.
-    return *type;
-  };
-
-  AssociatedTypeDecl *assocType = nullptr;
-  ArchetypeType *ParentArchetype = nullptr;
-  if (auto parent = getParent()) {
-    // For nested types, first substitute into the parent so we can form the
-    // proper nested type.
-    auto parentTy = parent->getTypeInContext(builder, genericEnv);
-    if (!parentTy)
-      return ErrorType::get(getDependentType(genericParams));
-
-    ParentArchetype = parentTy->getAs<ArchetypeType>();
-    if (!ParentArchetype) {
-      LazyResolver *resolver = ctx.getLazyResolver();
-      assert(resolver && "need a lazy resolver");
-      (void) resolver;
-
-      // Resolve the member type.
-      auto type = getDependentType(genericParams);
-      if (type->hasError())
-        return type;
-
-      auto depMemberType = type->castTo<DependentMemberType>();
-      Type memberType =
-        depMemberType->substBaseType(parentTy,
-                                     builder.getLookupConformanceFn());
-
-      // If the member type maps to an archetype, resolve that archetype.
-      if (auto memberPA =
-            builder.resolveArchetype(
-                               memberType,
-                               ArchetypeResolutionKind::CompleteWellFormed)) {
-        if (memberPA->getRepresentative() != representative) {
-          return memberPA->getTypeInContext(builder, genericEnv);
-        }
-
-        llvm_unreachable("we have no parent archetype");
-      }
-
-
-      // Otherwise, it's a concrete type.
-      return genericEnv->mapTypeIntoContext(memberType,
-                                            builder.getLookupConformanceFn());
-    }
-
-    // Check whether the parent already has a nested type with this name. If
-    // so, return it directly.
-    if (auto nested = ParentArchetype->getNestedTypeIfKnown(getNestedName()))
-      return *nested;
-
-    // We will build the archetype below.
-    assocType = getResolvedAssociatedType();
-  } else if (auto result = getAlreadyRecoveredGenericParam()) {
-    return result;
-  }
-
-  // Determine the superclass for the archetype. If it exists and involves
-  // type parameters, substitute them.
-  Type superclass = representative->getSuperclass();
-  if (superclass && superclass->hasTypeParameter()) {
-    if (equivClass->recursiveSuperclassType) {
-      superclass = Type();
-    } else {
-      superclass = genericEnv->mapTypeIntoContext(
-                                              superclass,
-                                              builder.getLookupConformanceFn());
-      if (superclass->is<ErrorType>())
-        superclass = Type();
-
-      // We might have recursively recorded the archetype; if so, return early.
-      // FIXME: This should be detectable before we end up building archetypes.
-      if (auto result = getAlreadyRecoveredGenericParam())
-        return result;
-    }
-  }
-
-  LayoutConstraint layout = representative->getLayout();
-
-  // Build a new archetype.
-
-  // Collect the protocol conformances for the archetype.
-  SmallVector<ProtocolDecl *, 4> Protos;
-  for (auto proto : representative->getConformsTo()) {
-    if (!equivClass || !equivClass->isConformanceSatisfiedBySuperclass(proto))
-      Protos.push_back(proto);
-  }
-
-  // Create the archetype.
-  //
-  // Note that we delay the computation of the superclass until after we
-  // create the archetype, in case the superclass references the archetype
-  // itself.
-  ArchetypeType *arch;
-  if (ParentArchetype) {
-    // If we were unable to resolve this as an associated type, produce an
-    // error type.
-    if (!assocType) {
-      return ErrorType::get(getDependentType(genericParams));
-    }
-
-    // Create a nested archetype.
-    arch = ArchetypeType::getNew(ctx, ParentArchetype, assocType, Protos,
-                                 superclass, layout);
-
-    // Register this archetype with its parent.
-    ParentArchetype->registerNestedType(getNestedName(), arch);
-  } else {
-    // Create a top-level archetype.
-    Identifier name =
-      genericParams[getGenericParamKey().findIndexIn(genericParams)]->getName();
-    arch = ArchetypeType::getNew(ctx, genericEnv, name, Protos,
-                                 superclass, layout);
-
-    // Register the archetype with the generic environment.
-    genericEnv->addMapping(getGenericParamKey(), arch);
-  }
-
-  return arch;
-}
-
 void ArchetypeType::resolveNestedType(
                                     std::pair<Identifier, Type> &nested) const {
   auto genericEnv = getGenericEnvironment();
@@ -2731,14 +2689,13 @@ void ArchetypeType::resolveNestedType(
 
   Type interfaceType =
     genericEnv->mapTypeOutOfContext(const_cast<ArchetypeType *>(this));
-  auto parentPA =
-    builder.resolveArchetype(interfaceType,
-                             ArchetypeResolutionKind::CompleteWellFormed);
-  auto memberPA = parentPA->getNestedType(
-                                    nested.first,
-                                    ArchetypeResolutionKind::CompleteWellFormed,
-                                    builder);
-  auto result = memberPA->getTypeInContext(builder, genericEnv);
+  Type memberInterfaceType =
+    DependentMemberType::get(interfaceType, nested.first);
+  auto equivClass =
+    builder.resolveEquivalenceClass(
+                                  memberInterfaceType,
+                                  ArchetypeResolutionKind::CompleteWellFormed);
+  auto result = equivClass->getTypeInContext(builder, genericEnv);
   assert(!nested.second ||
          nested.second->isEqual(result) ||
          (nested.second->hasError() && result->hasError()));
