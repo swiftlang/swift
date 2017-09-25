@@ -4341,9 +4341,10 @@ namespace {
       SmallVector<TypeLoc, 4> inheritedTypes;
       Type superclassType;
       if (decl->getSuperClass()) {
-        auto clangSuperclassType =
-          Impl.getClangASTContext().getObjCObjectPointerType(
-              clang::QualType(decl->getSuperClassType(), 0));
+        clang::QualType clangSuperclassType =
+          decl->getSuperClassType()->stripObjCKindOfTypeAndQuals(clangCtx);
+        clangSuperclassType =
+          clangCtx.getObjCObjectPointerType(clangSuperclassType);
         superclassType = Impl.importType(clangSuperclassType,
                                          ImportTypeKind::Abstract,
                                          isInSystemModule(dc),
