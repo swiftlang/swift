@@ -356,11 +356,11 @@ public:
   /// join of D and A (or D and B, or D and C) because there is no common
   /// superclass. One would have to jump to an existential (e.g., \c AnyObject)
   /// to find a common type.
-  /// 
-  /// \returns the join of the two types, if there is a concrete type that can
-  /// express the join, or a null type if the only join would be a more-general
-  /// existential type (e.g., \c Any).
-  static Type join(Type type1, Type type2);
+  ///
+  /// \returns the join of the two types, if there is a concrete type
+  /// that can express the join, or Any if the only join would be a
+  /// more-general existential type
+  static Type join(Type first, Type second);
 
 private:
   // Direct comparison is disabled for types, because they may not be canonical.

@@ -15,9 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
@@ -26,43 +26,33 @@ using namespace swift;
 // used for optimizing away extra exploratory work in the constraint
 // solver. It should eventually encompass all of the subtyping rules
 // of the language.
-struct TypeJoin : TypeVisitor<TypeJoin, Type> {
-  Type First;
+struct TypeJoin : CanTypeVisitor<TypeJoin, CanType> {
+  CanType First;
 
-  TypeJoin(Type First) : First(First) {
+  TypeJoin(CanType First) : First(First) {
     assert(First && "Unexpected null type!");
   }
 
-  static Type getSuperclassJoin(Type first, Type second);
+  static CanType getSuperclassJoin(CanType first, CanType second);
 
-  Type visitClassType(Type second);
-  Type visitBoundGenericClassType(Type second);
-  Type visitArchetypeType(Type second);
-  Type visitDynamicSelfType(Type second);
-  Type visitMetatypeType(Type second);
-  Type visitExistentialMetatypeType(Type second);
-  Type visitBoundGenericEnumType(Type second);
+  CanType visitClassType(CanType second);
+  CanType visitBoundGenericClassType(CanType second);
+  CanType visitArchetypeType(CanType second);
+  CanType visitDynamicSelfType(CanType second);
+  CanType visitMetatypeType(CanType second);
+  CanType visitExistentialMetatypeType(CanType second);
+  CanType visitBoundGenericEnumType(CanType second);
 
-  Type visitOptionalType(Type second);
+  CanType visitOptionalType(CanType second);
 
-  Type visitType(Type second) {
+  CanType visitType(CanType second) {
     // FIXME: Implement all the visitors.
     //    llvm_unreachable("Unimplemented type visitor!");
     return First->getASTContext().TheAnyType;
   }
 
 public:
-  static Type join(Type first, Type second) {
-    if (!first || !second) {
-      if (first)
-        return ErrorType::get(first->getASTContext());
-
-      if (second)
-        return ErrorType::get(second->getASTContext());
-
-      return Type();
-    }
-
+  static CanType join(CanType first, CanType second) {
     assert(!first->hasTypeVariable() && !second->hasTypeVariable() &&
            "Cannot compute join of types involving type variables");
 
@@ -72,7 +62,7 @@ public:
            "Expected simple type!");
 
     // If the types are equivalent, the join is obvious.
-    if (first->isEqual(second))
+    if (first == second)
       return first;
 
     // Until we handle all the combinations of joins, we need to make
@@ -85,23 +75,19 @@ public:
   }
 };
 
-Type TypeJoin::getSuperclassJoin(Type first, Type second) {
-  if (!first || !second)
-    return TypeJoin::join(first, second);
-
+CanType TypeJoin::getSuperclassJoin(CanType first, CanType second) {
   if (!first->mayHaveSuperclass() || !second->mayHaveSuperclass())
     return first->getASTContext().TheAnyType;
 
   /// Walk the superclasses of `first` looking for `second`. Record them
   /// for our second step.
   llvm::SmallPtrSet<CanType, 8> superclassesOfFirst;
-  CanType canSecond = second->getCanonicalType();
   for (Type super = first; super; super = super->getSuperclass()) {
-    CanType canSuper = super->getCanonicalType();
+    auto canSuper = super->getCanonicalType();
 
     // If we have found the second type, we're done.
-    if (canSuper == canSecond)
-      return super;
+    if (canSuper == second)
+      return canSuper;
 
     superclassesOfFirst.insert(canSuper);
   }
@@ -109,94 +95,104 @@ Type TypeJoin::getSuperclassJoin(Type first, Type second) {
   // Look through the superclasses of second to determine if any were also
   // superclasses of first.
   for (Type super = second; super; super = super->getSuperclass()) {
-    CanType canSuper = super->getCanonicalType();
+    auto canSuper = super->getCanonicalType();
 
     // If we found the first type, we're done.
     if (superclassesOfFirst.count(canSuper))
-      return super;
+      return canSuper;
   }
 
   // There is no common superclass; we're done.
   return first->getASTContext().TheAnyType;
 }
 
-Type TypeJoin::visitClassType(Type second) {
+CanType TypeJoin::visitClassType(CanType second) {
   return getSuperclassJoin(First, second);
 }
 
-Type TypeJoin::visitBoundGenericClassType(Type second) {
+CanType TypeJoin::visitBoundGenericClassType(CanType second) {
   return getSuperclassJoin(First, second);
 }
 
-Type TypeJoin::visitArchetypeType(Type second) {
+CanType TypeJoin::visitArchetypeType(CanType second) {
   return getSuperclassJoin(First, second);
 }
 
-Type TypeJoin::visitDynamicSelfType(Type second) {
+CanType TypeJoin::visitDynamicSelfType(CanType second) {
   return getSuperclassJoin(First, second);
 }
 
-Type TypeJoin::visitMetatypeType(Type second) {
+CanType TypeJoin::visitMetatypeType(CanType second) {
   if (First->getKind() != second->getKind())
     return First->getASTContext().TheAnyType;
 
-  auto firstInstance = First->castTo<AnyMetatypeType>()->getInstanceType();
-  auto secondInstance = second->castTo<AnyMetatypeType>()->getInstanceType();
+  auto firstInstance =
+      First->castTo<AnyMetatypeType>()->getInstanceType()->getCanonicalType();
+  auto secondInstance =
+      second->castTo<AnyMetatypeType>()->getInstanceType()->getCanonicalType();
 
   auto joinInstance = join(firstInstance, secondInstance);
 
   if (!joinInstance)
     return First->getASTContext().TheAnyType;
 
-  return MetatypeType::get(joinInstance);
+  return MetatypeType::get(joinInstance)->getCanonicalType();
 }
 
-Type TypeJoin::visitExistentialMetatypeType(Type second) {
+CanType TypeJoin::visitExistentialMetatypeType(CanType second) {
   if (First->getKind() != second->getKind())
     return First->getASTContext().TheAnyType;
 
-  auto firstInstance = First->castTo<AnyMetatypeType>()->getInstanceType();
-  auto secondInstance = second->castTo<AnyMetatypeType>()->getInstanceType();
+  auto firstInstance =
+      First->castTo<AnyMetatypeType>()->getInstanceType()->getCanonicalType();
+  auto secondInstance =
+      second->castTo<AnyMetatypeType>()->getInstanceType()->getCanonicalType();
 
   auto joinInstance = join(firstInstance, secondInstance);
 
   if (!joinInstance)
     return First->getASTContext().TheAnyType;
 
-  return ExistentialMetatypeType::get(joinInstance);
+  return ExistentialMetatypeType::get(joinInstance)->getCanonicalType();
 }
 
-Type TypeJoin::visitBoundGenericEnumType(Type second) {
+CanType TypeJoin::visitBoundGenericEnumType(CanType second) {
   if (First->getKind() != second->getKind())
     return First->getASTContext().TheAnyType;
 
   OptionalTypeKind otk1, otk2;
-  Type objectType1 = First->getAnyOptionalObjectType(otk1);
-  Type objectType2 = second->getAnyOptionalObjectType(otk2);
+  auto firstObject = First->getAnyOptionalObjectType(otk1);
+  auto secondObject = second->getAnyOptionalObjectType(otk2);
   if (otk1 == OTK_Optional || otk2 == OTK_Optional) {
+    auto canFirst = firstObject->getCanonicalType();
+    auto canSecond = secondObject->getCanonicalType();
+
     // Compute the join of the unwrapped type. If there is none, we're done.
-    Type unwrappedJoin = join(objectType1 ? objectType1 : First,
-                              objectType2 ? objectType2 : second);
+    auto unwrappedJoin =
+        join(canFirst ? canFirst : First, canSecond ? canSecond : second);
     // FIXME: More general joins of enums need to be handled.
     if (!unwrappedJoin)
       return First->getASTContext().TheAnyType;
 
-    return OptionalType::get(unwrappedJoin);
+    return OptionalType::get(unwrappedJoin)->getCanonicalType();
   }
 
   // FIXME: More general joins of enums need to be handled.
   return First->getASTContext().TheAnyType;
 }
 
-Type TypeJoin::visitOptionalType(Type second) {
-  auto canFirst = First->getCanonicalType();
-  auto canSecond = second->getCanonicalType();
+Type Type::join(Type first, Type second) {
+  assert(first && second && "Unexpected null type!");
 
-  return TypeJoin::join(canFirst, canSecond);
-}
+  if (!first || !second) {
+    if (first)
+      return Type(ErrorType::get(first->getASTContext()));
 
-Type Type::join(Type type1, Type type2) {
-  assert(type1 && type2 && "Unexpected null type!");
+    if (second)
+      return Type(ErrorType::get(second->getASTContext()));
 
-  return TypeJoin::join(type1, type2);
+    return Type();
+  }
+
+  return TypeJoin::join(first->getCanonicalType(), second->getCanonicalType());
 }

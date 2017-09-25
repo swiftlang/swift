@@ -231,6 +231,7 @@ endforeach()
 
 message("--")
 message("-- Swift Benchmark Suite:")
+message("--   SWIFT_BENCHMARK_BUILT_STANDALONE = ${SWIFT_BENCHMARK_BUILT_STANDALONE}")
 message("--   SWIFT_EXEC = ${SWIFT_EXEC}")
 message("--   SWIFT_LIBRARY_PATH = ${SWIFT_LIBRARY_PATH}")
 message("--   CLANG_EXEC = ${CLANG_EXEC}")

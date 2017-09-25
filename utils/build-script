@@ -127,7 +127,11 @@ class HostSpecificConfiguration(object):
             test = (
                 deployment_platform not in invocation.platforms_to_skip_test)
             test_host_only = None
-            build_benchmark = build and deployment_target.supports_benchmark
+            dt_supports_benchmark = deployment_target.supports_benchmark
+            build_benchmarks = build and dt_supports_benchmark
+            build_external_benchmarks = all([build, dt_supports_benchmark,
+                                             args.build_external_benchmarks])
+
             # FIXME: Note, `build-script-impl` computed a property here
             # w.r.t. testing, but it was actually unused.
 
@@ -161,13 +165,20 @@ class HostSpecificConfiguration(object):
                 else:
                     self.swift_stdlib_build_targets.append(
                         "swift-test-stdlib-" + name)
-            if build_benchmark:
+            if build_benchmarks:
                 self.swift_benchmark_build_targets.append(
                     "swift-benchmark-" + name)
                 # FIXME: This probably should respect `args.benchmark`, but
                 # a typo in build-script-impl meant we always would do this.
                 self.swift_benchmark_run_targets.append(
                     "check-swift-benchmark-" + name)
+
+            if build_external_benchmarks:
+                # Add support for the external benchmarks.
+                self.swift_benchmark_build_targets.append(
+                    "swift-benchmark-{}-external".format(name))
+                self.swift_benchmark_run_targets.append(
+                    "check-swift-benchmark-{}-external".format(name))
             if test:
                 if test_host_only:
                     suffix = "-non-executable"
@@ -506,6 +517,9 @@ class BuildScriptInvocation(object):
                           "--skip-build-swift"]
         if not args.build_benchmarks:
             impl_args += ["--skip-build-benchmarks"]
+        # Currently we do not build external benchmarks by default.
+        if args.build_external_benchmarks:
+            impl_args += ["--skip-build-external-benchmarks=0"]
         if not args.build_foundation:
             impl_args += ["--skip-build-foundation"]
         if not args.build_xctest:
