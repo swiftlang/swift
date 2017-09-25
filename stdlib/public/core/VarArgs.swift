@@ -168,6 +168,12 @@ extension Int : CVarArg {
   }
 }
 
+extension Bool : CVarArg {
+  public var _cVarArgEncoding: [Int] {
+    return _encodeBitsAsWords(Int32(self ? 1:0))
+  }
+}
+
 extension Int64 : CVarArg, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
