@@ -4431,48 +4431,44 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   Impl->finalized = true;
 #endif
 
-  // Local function (+ cache) describing the set of potential archetypes
+  // Local function (+ cache) describing the set of equivalence classes
   // directly referenced by the concrete same-type constraint of the given
-  // potential archetype. Both the inputs and results are the representatives
-  // of their equivalence classes.
-  llvm::DenseMap<PotentialArchetype *,
-                 SmallPtrSet<PotentialArchetype *, 4>> concretePAs;
-  auto getConcreteReferencedPAs
-      = [&](PotentialArchetype *pa) -> SmallPtrSet<PotentialArchetype *, 4> {
-    assert(pa == pa->getRepresentative() && "Only use with representatives");
-    auto known = concretePAs.find(pa);
-    if (known != concretePAs.end())
+  // equivalence class.
+  llvm::DenseMap<EquivalenceClass *,
+                 SmallPtrSet<EquivalenceClass *, 4>> concreteEquivClasses;
+  auto getConcreteReferencedEquivClasses
+      = [&](EquivalenceClass *equivClass)
+          -> SmallPtrSet<EquivalenceClass *, 4> {
+    auto known = concreteEquivClasses.find(equivClass);
+    if (known != concreteEquivClasses.end())
       return known->second;
 
-    SmallPtrSet<PotentialArchetype *, 4> referencedPAs;
-    if (!pa->isConcreteType() || !pa->getConcreteType()->hasTypeParameter())
-      return referencedPAs;
+    SmallPtrSet<EquivalenceClass *, 4> referencedEquivClasses;
+    if (!equivClass->concreteType ||
+        !equivClass->concreteType->hasTypeParameter())
+      return referencedEquivClasses;
 
-    if (auto concreteType = pa->getConcreteType()) {
-      if (concreteType->hasTypeParameter()) {
-        concreteType.visit([&](Type type) {
-          if (type->isTypeParameter()) {
-            if (auto referencedPA =
-                  resolveArchetype(type,
-                                   ArchetypeResolutionKind::AlreadyKnown)) {
-              referencedPAs.insert(referencedPA->getRepresentative());
-            }
-          }
-        });
+    equivClass->concreteType.visit([&](Type type) {
+      if (type->isTypeParameter()) {
+        if (auto referencedEquivClass =
+              resolveEquivalenceClass(type,
+                                      ArchetypeResolutionKind::AlreadyKnown)) {
+          referencedEquivClasses.insert(referencedEquivClass);
+        }
       }
-    }
+    });
 
-    concretePAs[pa] = referencedPAs;
-    return referencedPAs;
+    concreteEquivClasses[equivClass] = referencedEquivClasses;
+    return referencedEquivClasses;
   };
 
   /// Check whether the given type references the archetype.
-  auto isRecursiveConcreteType = [&](PotentialArchetype *archetype,
+  auto isRecursiveConcreteType = [&](EquivalenceClass *equivClass,
                                      bool isSuperclass) {
-    SmallPtrSet<PotentialArchetype *, 4> visited;
-    SmallVector<PotentialArchetype *, 4> stack;
-    stack.push_back(archetype);
-    visited.insert(archetype);
+    SmallPtrSet<EquivalenceClass *, 4> visited;
+    SmallVector<EquivalenceClass *, 4> stack;
+    stack.push_back(equivClass);
+    visited.insert(equivClass);
 
     // Check whether the specific type introduces recursion.
     auto checkTypeRecursion = [&](Type type) {
@@ -4480,13 +4476,14 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
       return type.findIf([&](Type type) {
         if (type->isTypeParameter()) {
-          if (auto referencedPA =
-                resolveArchetype(type, ArchetypeResolutionKind::AlreadyKnown)) {
-            referencedPA = referencedPA->getRepresentative();
-            if (referencedPA == archetype) return true;
+          if (auto referencedEquivClass =
+                resolveEquivalenceClass(
+                                    type,
+                                    ArchetypeResolutionKind::AlreadyKnown)) {
+            if (referencedEquivClass == equivClass) return true;
 
-            if (visited.insert(referencedPA).second)
-              stack.push_back(referencedPA);
+            if (visited.insert(referencedEquivClass).second)
+              stack.push_back(referencedEquivClass);
           }
         }
 
@@ -4495,24 +4492,24 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
     };
 
     while (!stack.empty()) {
-      auto pa = stack.back();
+      auto currentEquivClass = stack.back();
       stack.pop_back();
 
       // If we're checking superclasses, do so now.
-      if (isSuperclass) {
-        if (auto superclass = pa->getSuperclass()) {
-          if (checkTypeRecursion(superclass)) return true;
-        }
+      if (isSuperclass && currentEquivClass->superclass &&
+          checkTypeRecursion(currentEquivClass->superclass)) {
+        return true;
       }
 
-      // Otherwise, look for the potential archetypes referenced by
+      // Otherwise, look for the equivalence classes referenced by
       // same-type constraints.
-      for (auto referencedPA : getConcreteReferencedPAs(pa)) {
+      for (auto referencedEquivClass :
+             getConcreteReferencedEquivClasses(currentEquivClass)) {
         // If we found a reference to the original archetype, it's recursive.
-        if (referencedPA == archetype) return true;
+        if (referencedEquivClass == equivClass) return true;
 
-        if (visited.insert(referencedPA).second)
-          stack.push_back(referencedPA);
+        if (visited.insert(referencedEquivClass).second)
+          stack.push_back(referencedEquivClass);
       }
     }
 
@@ -4526,7 +4523,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
     if (equivClass.concreteType) {
       // Check for recursive same-type bindings.
-      if (isRecursiveConcreteType(archetype, /*isSuperclass=*/false)) {
+      if (isRecursiveConcreteType(&equivClass, /*isSuperclass=*/false)) {
         if (auto constraint =
               equivClass.findAnyConcreteConstraintAsWritten()) {
           Diags.diagnose(constraint->source->getLoc(),
@@ -4543,7 +4540,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
     // Check for recursive superclass bindings.
     if (equivClass.superclass) {
-      if (isRecursiveConcreteType(archetype, /*isSuperclass=*/true)) {
+      if (isRecursiveConcreteType(&equivClass, /*isSuperclass=*/true)) {
         if (auto source = equivClass.findAnySuperclassConstraintAsWritten()) {
           Diags.diagnose(source->source->getLoc(),
                          diag::recursive_superclass_constraint,
