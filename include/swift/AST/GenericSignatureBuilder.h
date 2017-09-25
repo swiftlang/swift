@@ -234,6 +234,11 @@ public:
     /// class, for use in the canonical type.
     Type getAnchor(ArrayRef<GenericTypeParamType *> genericParams);
 
+    /// \brief Retrieve (or build) the contextual type corresponding to
+    /// this equivalence class within the given generic environment.
+    Type getTypeInContext(GenericSignatureBuilder &builder,
+                          GenericEnvironment *genericEnv);
+
     /// Dump a debugging representation of this equivalence class.
     void dump(llvm::raw_ostream &out) const;
 
@@ -1687,11 +1692,6 @@ public:
                         Identifier name,
                         ProtocolDecl *protocol,
                         ArchetypeResolutionKind kind);
-
-  /// \brief Retrieve (or build) the type corresponding to the potential
-  /// archetype within the given generic environment.
-  Type getTypeInContext(GenericSignatureBuilder &builder,
-                        GenericEnvironment *genericEnv);
 
   /// Retrieve the dependent type that describes this potential
   /// archetype.
