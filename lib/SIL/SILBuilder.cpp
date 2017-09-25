@@ -416,6 +416,12 @@ void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
          I->getNumTypeDependentOperands() == 0) {
     // All the open instructions are single-value instructions.
     auto SVI = dyn_cast<SingleValueInstruction>(I->getOperand(0));
+    // Within SimplifyCFG this function may be called for an instruction
+    // within unreachable code. And within an unreachable block it can happen
+    // that defs do not dominate uses (because there is no dominance defined).
+    // To avoid the infinite loop when following the chain of instructions via
+    // their operands, bail if the operand is not an instruction or this
+    // instruction was seen already.
     if (!SVI || !Visited.insert(SVI).second)
       return;
     // If it is a definition of an opened archetype,
