@@ -104,6 +104,9 @@ struct GenericSignatureBuilder::Implementation {
   /// The set of requirements that have been delayed for some reason.
   SmallVector<DelayedRequirement, 4> DelayedRequirements;
 
+  /// The set of equivalence classes.
+  llvm::iplist<EquivalenceClass> EquivalenceClasses;
+
   /// The generation number, which is incremented whenever we successfully
   /// introduce a new constraint.
   unsigned Generation = 0;
@@ -114,11 +117,32 @@ struct GenericSignatureBuilder::Implementation {
   /// Whether we are currently processing delayed requirements.
   bool ProcessingDelayedRequirements = false;
 
+  /// Allocate a new equivalence class with the given representative.
+  EquivalenceClass *allocateEquivalenceClass(
+                                       PotentialArchetype *representative);
+
+  /// Deallocate the given equivalence class, returning it to the free list.
+  void deallocateEquivalenceClass(EquivalenceClass *equivClass);
+
 #ifndef NDEBUG
   /// Whether we've already finalized the builder.
   bool finalized = false;
 #endif
 };
+
+#pragma mark Memory management
+EquivalenceClass *
+GenericSignatureBuilder::Implementation::allocateEquivalenceClass(
+                                          PotentialArchetype *representative) {
+  auto equivClass = new EquivalenceClass(representative);
+  EquivalenceClasses.push_back(equivClass);
+  return equivClass;
+}
+
+void GenericSignatureBuilder::Implementation::deallocateEquivalenceClass(
+                                               EquivalenceClass *equivClass) {
+  EquivalenceClasses.erase(equivClass);
+}
 
 #pragma mark GraphViz visualization
 static int compareDependentTypes(PotentialArchetype * const* pa,
@@ -1428,12 +1452,9 @@ GenericSignatureBuilder::PotentialArchetype::~PotentialArchetype() {
 
   for (const auto &nested : NestedTypes) {
     for (auto pa : nested.second) {
-      if (pa != this)
-        delete pa;
+      delete pa;
     }
   }
-
-  delete representativeOrEquivClass.dyn_cast<EquivalenceClass *>();
 }
 
 std::string GenericSignatureBuilder::PotentialArchetype::getDebugName() const {
@@ -1911,7 +1932,8 @@ auto PotentialArchetype::getOrCreateEquivalenceClass() const -> EquivalenceClass
 
   // Create a new equivalence class.
   auto equivClass =
-    new EquivalenceClass(const_cast<PotentialArchetype *>(this));
+    getBuilder()->Impl->allocateEquivalenceClass(
+      const_cast<PotentialArchetype *>(this));
   representativeOrEquivClass = equivClass;
   return equivClass;
 }
@@ -3666,7 +3688,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   // Grab the old equivalence class, if present. We'll delete it at the end.
   auto equivClass2 = T2->getEquivalenceClassIfPresent();
   SWIFT_DEFER {
-    delete equivClass2;
+    Impl->deallocateEquivalenceClass(equivClass2);
   };
 
   // Consider the second equivalence class to be modified.
@@ -4481,38 +4503,37 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
   // Check for recursive or conflicting same-type bindings and superclass
   // constraints.
-  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
-    if (archetype != archetype->getRepresentative()) return;
+  for (auto &equivClass : Impl->EquivalenceClasses) {
+    auto archetype = equivClass.members.front()->getRepresentative();
 
-    auto equivClass = archetype->getOrCreateEquivalenceClass();
-    if (equivClass->concreteType) {
+    if (equivClass.concreteType) {
       // Check for recursive same-type bindings.
       if (isRecursiveConcreteType(archetype, /*isSuperclass=*/false)) {
         if (auto constraint =
-              equivClass->findAnyConcreteConstraintAsWritten()) {
+              equivClass.findAnyConcreteConstraintAsWritten()) {
           Diags.diagnose(constraint->source->getLoc(),
                          diag::recursive_same_type_constraint,
                          archetype->getDependentType(genericParams),
                          constraint->value);
         }
 
-        equivClass->recursiveConcreteType = true;
+        equivClass.recursiveConcreteType = true;
       } else {
         checkConcreteTypeConstraints(genericParams, archetype);
       }
     }
 
     // Check for recursive superclass bindings.
-    if (equivClass->superclass) {
+    if (equivClass.superclass) {
       if (isRecursiveConcreteType(archetype, /*isSuperclass=*/true)) {
-        if (auto source = equivClass->findAnySuperclassConstraintAsWritten()) {
+        if (auto source = equivClass.findAnySuperclassConstraintAsWritten()) {
           Diags.diagnose(source->source->getLoc(),
                          diag::recursive_superclass_constraint,
                          source->archetype->getDependentType(genericParams),
-                         equivClass->superclass);
+                         equivClass.superclass);
         }
 
-        equivClass->recursiveSuperclassType = true;
+        equivClass.recursiveSuperclassType = true;
       } else {
         checkSuperclassConstraints(genericParams, archetype);
       }
@@ -4520,7 +4541,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
     checkConformanceConstraints(genericParams, archetype);
     checkLayoutConstraints(genericParams, archetype);
-  });
+  };
 
   // FIXME: Expand all conformance requirements. This is expensive :(
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
@@ -4538,12 +4559,10 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   });
 
   // Check same-type constraints.
-  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
-    if (archetype != archetype->getRepresentative()) return;
-
-    if (archetype->getEquivalenceClassIfPresent())
-      checkSameTypeConstraints(genericParams, archetype);
-  });
+  for (const auto &equivClass : Impl->EquivalenceClasses) {
+    checkSameTypeConstraints(genericParams,
+                             equivClass.members[0]->getRepresentative());
+  };
 
   // Check for generic parameters which have been made concrete or equated
   // with each other.
