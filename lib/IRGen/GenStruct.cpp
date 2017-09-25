@@ -266,64 +266,95 @@ namespace {
     void verify(IRGenTypeVerifierFunction &IGF,
                 llvm::Value *metadata,
                 SILType structType) const override {
-      // Check that constant field offsets we know match
+      // Check that field offsets in the field offset vector match the code we
+      // generate for projecting struct addresses.
+      
       for (auto &field : asImpl().getFields()) {
+        Size FieldOffsetVectorOffset = Size::invalid();
+        // We know the offset at compile time. See whether there's also an
+        // entry for this field in the field offset vector.
+        class FindOffsetOfFieldOffsetVector
+          : public StructMetadataScanner<FindOffsetOfFieldOffsetVector> {
+        public:
+          VarDecl *FieldToFind;
+          Size &FieldOffset;
+
+          using super = StructMetadataScanner<FindOffsetOfFieldOffsetVector>;
+
+          FindOffsetOfFieldOffsetVector(IRGenModule &IGM,
+                                        VarDecl *Field,
+                                        Size &FieldOffset)
+            : super(IGM, cast<StructDecl>(Field->getDeclContext())),
+              FieldToFind(Field),
+              FieldOffset(FieldOffset)
+          {}
+            
+          void addFieldOffset(VarDecl *Field) {
+            if (Field == FieldToFind) {
+              FieldOffset = this->NextOffset;
+            }
+            super::addFieldOffset(Field);
+          }
+        };
+
+        FindOffsetOfFieldOffsetVector(IGF.IGM, field.Field,
+                                      FieldOffsetVectorOffset)
+          .layout();
+        
+        // If the offset isn't in the field offset vector, we don't have
+        // anything to compare to.
+        if (FieldOffsetVectorOffset == Size::invalid())
+          continue;
+        
+        auto metadataBytes =
+          IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy);
+        auto fieldOffsetPtr =
+          IGF.Builder.CreateInBoundsGEP(metadataBytes,
+                                    IGF.IGM.getSize(FieldOffsetVectorOffset));
+        fieldOffsetPtr =
+          IGF.Builder.CreateBitCast(fieldOffsetPtr,
+                                    IGF.IGM.SizeTy->getPointerTo());
+        auto fieldOffset =
+          IGF.Builder.CreateLoad(fieldOffsetPtr,
+                                 IGF.IGM.getPointerAlignment());
+      
         switch (field.getKind()) {
         case ElementLayout::Kind::Fixed: {
-          // We know the offset at compile time. See whether there's also an
-          // entry for this field in the field offset vector.
-          class FindOffsetOfFieldOffsetVector
-            : public StructMetadataScanner<FindOffsetOfFieldOffsetVector> {
-          public:
-            VarDecl *FieldToFind;
-            Size FieldOffset = Size::invalid();
-
-            using super = StructMetadataScanner<FindOffsetOfFieldOffsetVector>;
-
-            FindOffsetOfFieldOffsetVector(IRGenModule &IGM,
-                                          VarDecl *Field)
-              : super(IGM, cast<StructDecl>(Field->getDeclContext())),
-                FieldToFind(Field)
-            {}
-              
-            void addFieldOffset(VarDecl *Field) {
-              if (Field == FieldToFind) {
-                FieldOffset = this->NextOffset;
-              }
-              super::addFieldOffset(Field);
-            }
-          };
-          
-          FindOffsetOfFieldOffsetVector scanner(IGF.IGM, field.Field);
-          scanner.layout();
-          
-          if (scanner.FieldOffset == Size::invalid())
-            continue;
-          
           // Load the offset from the field offset vector and ensure it matches
           // the compiler's idea of the offset.
-          auto metadataBytes =
-            IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy);
-          auto fieldOffsetPtr =
-            IGF.Builder.CreateInBoundsGEP(metadataBytes,
-                                          IGF.IGM.getSize(scanner.FieldOffset));
-          fieldOffsetPtr =
-            IGF.Builder.CreateBitCast(fieldOffsetPtr,
-                                      IGF.IGM.SizeTy->getPointerTo());
-          auto fieldOffset =
-            IGF.Builder.CreateLoad(fieldOffsetPtr,
-                                   IGF.IGM.getPointerAlignment());
-          
           IGF.verifyValues(metadata, fieldOffset,
-                       IGF.IGM.getSize(field.getFixedByteOffset()),
-                       Twine("offset of struct field ") + field.getFieldName());
+             IGF.IGM.getSize(field.getFixedByteOffset()),
+             Twine("metadata offset of struct field ") + field.getFieldName());
           break;
         }
         case ElementLayout::Kind::Empty:
         case ElementLayout::Kind::InitialNonFixedSize:
         case ElementLayout::Kind::NonFixed:
-          continue;
+          break;
         }
+        
+        // See that, when the compiler generates code to project the field,
+        // it gets the same offset we loaded from the field offset vector.
+        // Use a fake base that's well-aligned for any useful alignment and
+        // also unlikely to signed-overflow on an inbounds gep
+        uint64_t pointerBase =
+          (uint64_t)1 << (uint64_t)(IGF.IGM.SizeTy->getBitWidth() - 2);
+        llvm::Constant *fakeBaseInt = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                                          pointerBase);
+        auto fakeBasePtr = IGF.Builder.CreateIntToPtr(fakeBaseInt,
+                                        this->getStorageType()->getPointerTo());
+        
+        auto fakeBaseAddr = this->getAddressForPointer(fakeBasePtr);
+        
+        auto offsets = asImpl().getNonFixedOffsets(IGF, structType);
+        auto fakeField = field.projectAddress(IGF, fakeBaseAddr, offsets);
+        
+        auto fakeFieldInt = IGF.Builder.CreatePtrToInt(fakeField.getAddress(),
+                                                       IGF.IGM.SizeTy);
+        auto projectedOffset = IGF.Builder.CreateSub(fakeFieldInt, fakeBaseInt);
+        
+        IGF.verifyValues(metadata, projectedOffset, fieldOffset,
+             Twine("projected offset of struct field ") + field.getFieldName());
       }
     }
   };
