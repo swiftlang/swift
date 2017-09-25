@@ -3289,17 +3289,41 @@ namespace {
           patternElt.first->setType(patternElt.second);
       
       for (auto paramDeclElt : ParamDeclTypes)
-        if (!paramDeclElt.first->hasType())
-          paramDeclElt.first->setType(paramDeclElt.second);
+        if (!paramDeclElt.first->hasType()) {
+          paramDeclElt.first->setType(getParamBaseType(paramDeclElt));
+        }
 
       for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes)
-        if (!paramDeclIfaceElt.first->hasInterfaceType())
-          paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second);
+        if (!paramDeclIfaceElt.first->hasInterfaceType()) {
+          paramDeclIfaceElt.first->setInterfaceType(
+              getParamBaseType(paramDeclIfaceElt));
+        }
 
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
           if (D->hasInterfaceType())
             D->setInvalid(D->getInterfaceType()->hasError());
+    }
+
+  private:
+    static Type getParamBaseType(std::pair<ParamDecl *, Type> &storedParam) {
+      ParamDecl *param;
+      Type storedType;
+
+      std::tie(param, storedType) = storedParam;
+
+      // FIXME: We are currently in process of removing `InOutType`
+      //        so `VarDecl::get{Interface}Type` is going to wrap base
+      //        type into `InOutType` if its flag indicates that it's
+      //        an `inout` parameter declaration. But such type can't
+      //        be restored directly using `VarDecl::set{Interface}Type`
+      //        caller needs additional logic to extract base type.
+      if (auto *IOT = storedType->getAs<InOutType>()) {
+        assert(param->isInOut());
+        return IOT->getObjectType();
+      }
+
+      return storedType;
     }
   };
 } // end anonymous namespace
