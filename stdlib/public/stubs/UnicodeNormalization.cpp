@@ -151,9 +151,9 @@ swift::_swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
   // as wchar_t which size is 2. It seems that the underlying binary
   // representation is same with swift utf16 representation.
   // On Clang 4.0 under a recent Linux, ICU uses the built-in char16_t type.
-  return ucol_strcoll(GetRootCollator(),
-                      reinterpret_cast<const UChar *>(LeftString), LeftLength,
-                      reinterpret_cast<const UChar *>(RightString), RightLength);
+  return ucol_strcoll(
+      GetRootCollator(), reinterpret_cast<const UChar *>(LeftString),
+      LeftLength, reinterpret_cast<const UChar *>(RightString), RightLength);
 }
 
 /// Compares the strings via the Unicode Collation Algorithm on the root locale.
@@ -170,14 +170,16 @@ swift::_swift_stdlib_unicode_compare_utf8_utf16(const unsigned char *LeftString,
   UCharIterator RightIterator;
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
-  uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString), LeftLength);
+  uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString),
+                LeftLength);
   uiter_setString(&RightIterator, reinterpret_cast<const UChar *>(RightString),
                   RightLength);
 
   uint32_t Diff = ucol_strcollIter(GetRootCollator(),
     &LeftIterator, &RightIterator, &ErrorCode);
   if (U_FAILURE(ErrorCode)) {
-    swift::crash("ucol_strcollIter: Unexpected error doing utf8<->utf16 string comparison.");
+    swift::crash("ucol_strcollIter: Unexpected error doing utf8<->utf16 string "
+                 "comparison.");
   }
   return Diff;
 }
@@ -196,13 +198,16 @@ swift::_swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *LeftString,
   UCharIterator RightIterator;
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
-  uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString), LeftLength);
-  uiter_setUTF8(&RightIterator, reinterpret_cast<const char *>(RightString), RightLength);
+  uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString),
+                LeftLength);
+  uiter_setUTF8(&RightIterator, reinterpret_cast<const char *>(RightString),
+                RightLength);
 
   uint32_t Diff = ucol_strcollIter(GetRootCollator(),
     &LeftIterator, &RightIterator, &ErrorCode);
   if (U_FAILURE(ErrorCode)) {
-    swift::crash("ucol_strcollIter: Unexpected error doing utf8<->utf8 string comparison.");
+    swift::crash("ucol_strcollIter: Unexpected error doing utf8<->utf8 string "
+                 "comparison.");
   }
   return Diff;
 }
@@ -214,7 +219,8 @@ void *swift::_swift_stdlib_unicodeCollationIterator_create(
       ucol_openElements(GetRootCollator(), reinterpret_cast<const UChar *>(Str),
                         Length, &ErrorCode);
   if (U_FAILURE(ErrorCode)) {
-    swift::crash("_swift_stdlib_unicodeCollationIterator_create: ucol_openElements() failed.");
+    swift::crash("_swift_stdlib_unicodeCollationIterator_create: "
+                 "ucol_openElements() failed.");
   }
   return CollationIterator;
 }
@@ -225,7 +231,8 @@ __swift_int32_t swift::_swift_stdlib_unicodeCollationIterator_next(
   auto Result = ucol_next(
       static_cast<UCollationElements *>(CollationIterator), &ErrorCode);
   if (U_FAILURE(ErrorCode)) {
-    swift::crash("_swift_stdlib_unicodeCollationIterator_next: ucol_next() failed.");
+    swift::crash(
+        "_swift_stdlib_unicodeCollationIterator_next: ucol_next() failed.");
   }
   *HitEnd = (Result == UCOL_NULLORDER);
   return Result;
@@ -299,9 +306,11 @@ void swift::__swift_stdlib_ubrk_close(
   ubrk_close(ptr_cast<UBreakIterator>(bi));
 }
 
-swift::__swift_stdlib_UBreakIterator *swift::__swift_stdlib_ubrk_open(
-    swift::__swift_stdlib_UBreakIteratorType type, const char *locale,
-    const uint16_t *text, int32_t textLength, __swift_stdlib_UErrorCode *status) {
+swift::__swift_stdlib_UBreakIterator *
+swift::__swift_stdlib_ubrk_open(swift::__swift_stdlib_UBreakIteratorType type,
+                                const char *locale, const uint16_t *text,
+                                int32_t textLength,
+                                __swift_stdlib_UErrorCode *status) {
   return ptr_cast<swift::__swift_stdlib_UBreakIterator>(
       ubrk_open(static_cast<UBreakIteratorType>(type), locale,
                 reinterpret_cast<const UChar *>(text), textLength,
