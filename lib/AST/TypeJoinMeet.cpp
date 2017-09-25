@@ -86,9 +86,6 @@ public:
 };
 
 Type TypeJoin::getSuperclassJoin(Type first, Type second) {
-  if (!first || !second)
-    return TypeJoin::join(first, second);
-
   if (!first->mayHaveSuperclass() || !second->mayHaveSuperclass())
     return first->getASTContext().TheAnyType;
 
@@ -192,7 +189,7 @@ Type TypeJoin::visitOptionalType(Type second) {
   auto canFirst = First->getCanonicalType();
   auto canSecond = second->getCanonicalType();
 
-  return TypeJoin::join(canFirst, canSecond);
+  return join(canFirst, canSecond);
 }
 
 Type Type::join(Type type1, Type type2) {
