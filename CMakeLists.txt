@@ -66,7 +66,11 @@ else()
 endif()
 
 option(SWIFT_BUILD_PERF_TESTSUITE
-    "Create targets for swift performance benchmarks."
+    "Create in-tree targets for building swift performance benchmarks."
+    FALSE)
+
+option(SWIFT_BUILD_EXTERNAL_PERF_TESTSUITE
+    "Create out-of-tree targets for building swift performance benchmarks."
     FALSE)
 
 option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." TRUE)
@@ -882,9 +886,16 @@ if(SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_INCLUDE_TESTS)
   add_subdirectory(tools/swift-reflection-test)
 endif()
 
-if(SWIFT_BUILD_PERF_TESTSUITE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-  add_subdirectory(benchmark)
+if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  if(SWIFT_BUILD_PERF_TESTSUITE)
+    add_subdirectory(benchmark)
+  endif()
+  if(SWIFT_BUILD_EXTERNAL_PERF_TESTSUITE)
+    include(SwiftExternalBenchmarkBuild)
+    add_external_benchmark_suite()
+  endif()
 endif()
+
 if(SWIFT_INCLUDE_TESTS)
   add_subdirectory(test)
   add_subdirectory(unittests)
