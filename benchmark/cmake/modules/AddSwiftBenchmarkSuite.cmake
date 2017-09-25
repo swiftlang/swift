@@ -193,7 +193,6 @@ function (swift_benchmark_compile_archopts)
   set(bench_flags "${${benchvar}}")
 
   set(common_options
-      "-swift-version" "3" # FIXME: Force Swift 3 version compatibility.
       "-c"
       "-sdk" "${sdk}"
       "-target" "${target}"
@@ -201,6 +200,8 @@ function (swift_benchmark_compile_archopts)
       "-${BENCH_COMPILE_ARCHOPTS_OPT}"
       "-no-link-objc-runtime"
       "-I" "${srcdir}/utils/ObjectiveCTests")
+  set(common_swift3_options ${common_options} "-swift-version" "3")
+  set(common_swift4_options ${common_options} "-swift-version" "4")
 
   # Always optimize the driver modules.
   # Note that we compile the driver for Ounchecked also with -Ounchecked
@@ -226,7 +227,7 @@ function (swift_benchmark_compile_archopts)
       SOURCE_DIR "${srcdir}"
       OBJECT_DIR "${objdir}"
       SOURCES ${sources}
-      LIBRARY_FLAGS ${common_options})
+      LIBRARY_FLAGS ${common_swift3_options})
     precondition(objfile_out)
     list(APPEND bench_library_objects "${objfile_out}")
     if (SWIFT_BENCHMARK_EMIT_SIB)
@@ -295,7 +296,7 @@ function (swift_benchmark_compile_archopts)
             ${stdlib_dependencies} ${bench_library_objects}
             "${srcdir}/${module_name_path}.swift"
           COMMAND "${SWIFT_EXEC}"
-          ${common_options}
+          ${common_swift3_options}
           ${extra_options}
           "-parse-as-library"
           ${bench_flags}
@@ -313,7 +314,7 @@ function (swift_benchmark_compile_archopts)
               ${stdlib_dependencies} ${bench_library_sibfiles}
               "${srcdir}/${module_name_path}.swift"
             COMMAND "${SWIFT_EXEC}"
-            ${common_options}
+            ${common_swift3_options}
             "-parse-as-library"
             ${bench_flags}
             "-module-name" "${module_name}"
@@ -325,7 +326,7 @@ function (swift_benchmark_compile_archopts)
     endif()
   endforeach()
 
-  foreach(module_name_path ${SWIFT_MULTISOURCE_BENCHES})
+  foreach(module_name_path ${SWIFT_MULTISOURCE_SWIFT3_BENCHES})
     set(objfile_out)
     if ("${bench_flags}" MATCHES "-whole-module.*" AND
         NOT "${bench_flags}" MATCHES "-num-threads.*")
@@ -334,7 +335,7 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift3_options} ${bench_flags}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfile_out)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
@@ -344,7 +345,33 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift3_options} ${bench_flags}
+        DEPENDS ${bench_library_objects} ${stdlib_dependencies})
+      precondition(objfiles_out)
+      list(APPEND SWIFT_BENCH_OBJFILES ${objfiles_out})
+    endif()
+  endforeach()
+
+  foreach(module_name_path ${SWIFT_MULTISOURCE_SWIFT4_BENCHES})
+    set(objfile_out)
+    if ("${bench_flags}" MATCHES "-whole-module.*" AND
+        NOT "${bench_flags}" MATCHES "-num-threads.*")
+      add_swift_multisource_wmo_benchmark_library(objfile_out
+        MODULE_PATH "${module_name_path}"
+        SOURCE_DIR "${srcdir}"
+        OBJECT_DIR "${objdir}"
+        SOURCES ${${module_name}_sources}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags}
+        DEPENDS ${bench_library_objects} ${stdlib_dependencies})
+      precondition(objfile_out)
+      list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
+    else()
+      add_swift_multisource_nonwmo_benchmark_library(objfiles_out
+        MODULE_PATH "${module_name_path}"
+        SOURCE_DIR "${srcdir}"
+        OBJECT_DIR "${objdir}"
+        SOURCES ${${module_name}_sources}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfiles_out)
       list(APPEND SWIFT_BENCH_OBJFILES ${objfiles_out})
@@ -361,7 +388,7 @@ function (swift_benchmark_compile_archopts)
         ${bench_library_sibfiles} ${bench_driver_sibfiles}
         ${SWIFT_BENCH_SIBFILES} "${source}"
       COMMAND "${SWIFT_EXEC}"
-      ${common_options}
+      ${common_swift3_options}
       "-force-single-frontend-invocation"
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"
