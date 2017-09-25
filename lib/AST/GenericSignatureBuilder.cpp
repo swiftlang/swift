@@ -62,6 +62,13 @@ namespace {
 
 } // end anonymous namespace
 
+namespace llvm {
+  // Equivalence classes are bump-ptr-allocated.
+  template <> struct ilist_alloc_traits<EquivalenceClass> {
+    static void deleteNode(EquivalenceClass *ptr) { ptr->~EquivalenceClass(); }
+  };
+}
+
 #define DEBUG_TYPE "Generic signature builder"
 STATISTIC(NumPotentialArchetypes, "# of potential archetypes");
 STATISTIC(NumConformances, "# of conformances tracked");
@@ -88,6 +95,9 @@ STATISTIC(NumDelayedRequirementUnresolved,
           "Delayed requirements left unresolved");
 
 struct GenericSignatureBuilder::Implementation {
+  /// Allocator.
+  llvm::BumpPtrAllocator Allocator;
+
   /// Function used to look up conformances.
   std::function<GenericFunction> LookupConformance;
 
@@ -107,6 +117,9 @@ struct GenericSignatureBuilder::Implementation {
   /// The set of equivalence classes.
   llvm::iplist<EquivalenceClass> EquivalenceClasses;
 
+  /// Equivalence classes that are not currently being used.
+  std::vector<void *> FreeEquivalenceClasses;
+
   /// The generation number, which is incremented whenever we successfully
   /// introduce a new constraint.
   unsigned Generation = 0;
@@ -116,6 +129,9 @@ struct GenericSignatureBuilder::Implementation {
 
   /// Whether we are currently processing delayed requirements.
   bool ProcessingDelayedRequirements = false;
+
+  /// Tear down an implementation.
+  ~Implementation();
 
   /// Allocate a new equivalence class with the given representative.
   EquivalenceClass *allocateEquivalenceClass(
@@ -131,10 +147,25 @@ struct GenericSignatureBuilder::Implementation {
 };
 
 #pragma mark Memory management
+GenericSignatureBuilder::Implementation::~Implementation() {
+  for (auto pa : PotentialArchetypes)
+    pa->~PotentialArchetype();
+}
+
 EquivalenceClass *
 GenericSignatureBuilder::Implementation::allocateEquivalenceClass(
                                           PotentialArchetype *representative) {
-  auto equivClass = new EquivalenceClass(representative);
+  void *mem;
+  if (FreeEquivalenceClasses.empty()) {
+    // Allocate a new equivalence class.
+    mem = Allocator.Allocate<EquivalenceClass>();
+  } else {
+    // Take an equivalence class from the free list.
+    mem = FreeEquivalenceClasses.back();
+    FreeEquivalenceClasses.pop_back();
+  }
+
+  auto equivClass = new (mem) EquivalenceClass(representative);
   EquivalenceClasses.push_back(equivClass);
   return equivClass;
 }
@@ -142,6 +173,7 @@ GenericSignatureBuilder::Implementation::allocateEquivalenceClass(
 void GenericSignatureBuilder::Implementation::deallocateEquivalenceClass(
                                                EquivalenceClass *equivClass) {
   EquivalenceClasses.erase(equivClass);
+  FreeEquivalenceClasses.push_back(equivClass);
 }
 
 #pragma mark GraphViz visualization
@@ -770,7 +802,8 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
     totalSizeToAlloc<ProtocolDecl *, WrittenRequirementLoc>(               \
                                            NumProtocolDecls,               \
                                            WrittenReq.isNull()? 0 : 1);    \
-  void *mem = ::operator new(size);                                        \
+  void *mem =                                                              \
+    builder.Impl->Allocator.Allocate(size, alignof(RequirementSource));    \
   auto result = new (mem) RequirementSource ConstructorArgs;               \
   builder.Impl->RequirementSources.InsertNode(result, insertPos);          \
   return result
@@ -1452,7 +1485,7 @@ GenericSignatureBuilder::PotentialArchetype::~PotentialArchetype() {
 
   for (const auto &nested : NestedTypes) {
     for (auto pa : nested.second) {
-      delete pa;
+      pa->~PotentialArchetype();
     }
   }
 }
@@ -2408,10 +2441,11 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
       // modification.
       getOrCreateEquivalenceClass()->modified(builder);
 
+      void *mem = builder.Impl->Allocator.Allocate<PotentialArchetype>();
       if (assocType)
-        resultPA = new PotentialArchetype(this, assocType);
+        resultPA = new (mem) PotentialArchetype(this, assocType);
       else
-        resultPA = new PotentialArchetype(this, concreteDecl);
+        resultPA = new (mem) PotentialArchetype(this, concreteDecl);
 
       NestedTypes[name].push_back(resultPA);
       builder.addedNestedType(resultPA);
@@ -2824,20 +2858,7 @@ GenericSignatureBuilder::GenericSignatureBuilder(
 
 GenericSignatureBuilder::GenericSignatureBuilder(GenericSignatureBuilder &&) = default;
 
-GenericSignatureBuilder::~GenericSignatureBuilder() {
-  if (!Impl)
-    return;
-
-  SmallVector<RequirementSource *, 4> requirementSources;
-  for (auto &reqSource : Impl->RequirementSources)
-    requirementSources.push_back(&reqSource);
-  Impl->RequirementSources.clear();
-  for (auto reqSource : requirementSources)
-    delete reqSource;
-
-  for (auto PA : Impl->PotentialArchetypes)
-    delete PA;
-}
+GenericSignatureBuilder::~GenericSignatureBuilder() = default;
 
 std::function<GenericFunction>
 GenericSignatureBuilder::getLookupConformanceFn() const {
@@ -2964,7 +2985,8 @@ void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericP
            Key.Index == 0)));
 
   // Create a potential archetype for this type parameter.
-  auto PA = new PotentialArchetype(this, GenericParam);
+  void *mem = Impl->Allocator.Allocate<PotentialArchetype>();
+  auto PA = new (mem) PotentialArchetype(this, GenericParam);
   Impl->GenericParams.push_back(GenericParam);
   Impl->PotentialArchetypes.push_back(PA);
 }
@@ -3685,7 +3707,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   for (auto equiv : equivClass2Members)
     equivClass->members.push_back(equiv);
 
-  // Grab the old equivalence class, if present. We'll delete it at the end.
+  // Grab the old equivalence class, if present. We'll deallocate it at the end.
   auto equivClass2 = T2->getEquivalenceClassIfPresent();
   SWIFT_DEFER {
     Impl->deallocateEquivalenceClass(equivClass2);
