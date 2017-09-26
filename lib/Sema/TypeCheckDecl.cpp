@@ -7117,8 +7117,11 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    if (DD->isInvalid()) {
+    auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext());
+    if (DD->isInvalid() ||
+        enclosingClass == nullptr) {
       DD->setInterfaceType(ErrorType::get(TC.Context));
+      DD->setInvalid();
       return;
     }
 
@@ -7140,8 +7143,11 @@ public:
 
     TC.checkDeclAttributesEarly(DD);
     if (!DD->hasAccess()) {
-      auto enclosingClass = cast<ClassDecl>(DD->getParent());
       DD->setAccess(enclosingClass->getFormalAccess());
+    }
+
+    if (enclosingClass->getAttrs().hasAttribute<VersionedAttr>()) {
+      DD->getAttrs().add(new (TC.Context) VersionedAttr(/*implicit=*/true));
     }
 
     configureImplicitSelf(TC, DD);
@@ -7664,25 +7670,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     break;
   }
-      
-  case DeclKind::Func: {
-    typeCheckDecl(D, true);
-    break;
-  }
 
+  case DeclKind::Func:
   case DeclKind::Subscript:
   case DeclKind::Constructor:
-    typeCheckDecl(D, true);
-    break;
-
   case DeclKind::Destructor:
   case DeclKind::EnumElement: {
-    if (auto container = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
-      validateDecl(container);
-      typeCheckDecl(D, true);
-    } else {
-      D->setInterfaceType(ErrorType::get(Context));
-    }
+    typeCheckDecl(D, true);
     break;
   }
   }

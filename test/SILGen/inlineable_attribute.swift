@@ -74,3 +74,20 @@ public class Horse {
 @_inlineable public func talkAboutAHorse(h: Horse) {
   _ = h.gallop
 }
+
+@_versioned class Base {
+  @_versioned
+  @_inlineable
+  init(horse: Horse) {}
+}
+
+// CHECK-LABEL: sil [serialized] @_T020inlineable_attribute7DerivedCfd : $@convention(method) (@guaranteed Derived) -> @owned Builtin.NativeObject
+// CHECK-LABEL: sil [serialized] @_T020inlineable_attribute7DerivedCfD : $@convention(method) (@owned Derived) -> ()
+
+// Make sure the synthesized delegating initializer is inlineable also
+
+// CHECK-LABEL: sil [serialized] @_T020inlineable_attribute7DerivedCAcA5HorseC5horse_tcfc : $@convention(method) (@owned Horse, @owned Derived) -> @owned Derived
+@_versioned class Derived : Base {
+  // Allow @_inlineable deinits
+  @_inlineable deinit {}
+}

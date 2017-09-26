@@ -259,8 +259,8 @@ DECL_ATTR(_cdecl, CDecl,
 // FIXME: Replace with improved @available attribute.
 SIMPLE_DECL_ATTR(_versioned, Versioned,
                  OnFunc | OnVar | OnSubscript | OnConstructor |
-                 OnStruct | OnEnum | OnClass | OnProtocol |
-                 LongAttribute | UserInaccessible,
+                 OnDestructor | OnStruct | OnEnum | OnClass |
+                 OnProtocol | LongAttribute | UserInaccessible,
                  64)
 
 SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
