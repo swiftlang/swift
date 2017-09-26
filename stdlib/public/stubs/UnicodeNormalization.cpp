@@ -330,7 +330,5 @@ void swift::__swift_stdlib_ubrk_setText(
 // Force an autolink with ICU
 #if defined(__MACH__)
 asm(".linker_option \"-licucore\"\n");
-#elif defined(_WIN32)
-#pragma comment(lib, "icucore.lib")
 #endif // defined(__MACH__)
 
