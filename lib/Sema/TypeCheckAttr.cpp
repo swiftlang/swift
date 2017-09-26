@@ -1851,8 +1851,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     Builder.addRequirement(&req, DC->getParentModule());
 
   // Check the result.
-  (void)std::move(Builder).computeGenericSignature(
-                                        attr->getLocation(),
+  (void)Builder.computeGenericSignature(attr->getLocation(),
                                         /*allowConcreteGenericParams=*/true);
 }
 
