@@ -189,10 +189,15 @@ bool CursorInfoResolver::walkToExprPre(Expr *E) {
       }
     }
     auto IsProperCursorLocation = E->getStartLoc() == LocToResolve;
-    // Handle cursor placement between try and ! in ForceTryExpr.
+    // Handle cursor placement after `try` in ForceTry and OptionalTry Expr.
+    auto CheckLocation = [&IsProperCursorLocation, this](SourceLoc Loc) {
+      IsProperCursorLocation = Loc == LocToResolve || IsProperCursorLocation;
+    };
     if (auto *FTE = dyn_cast<ForceTryExpr>(E)) {
-      IsProperCursorLocation = LocToResolve == FTE->getExclaimLoc() ||
-      IsProperCursorLocation;
+      CheckLocation(FTE->getExclaimLoc());
+    }
+    if (auto *OTE = dyn_cast<OptionalTryExpr>(E)) {
+      CheckLocation(OTE->getQuestionLoc());
     }
     // Keep track of trailing expressions.
     if (!E->isImplicit() && IsProperCursorLocation)
