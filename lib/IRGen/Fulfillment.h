@@ -66,17 +66,10 @@ public:
     virtual GenericSignature::ConformsToArray
       getInterestingConformances(CanType type) const = 0;
 
-    virtual ~InterestingKeysCallback() = default;
-  };
+    /// Return the limited interesting conformances for an interesting type.
+    virtual CanType getSuperclassBound(CanType type) const = 0;
 
-  /// An implementation of InterestingKeysCallback that returns everything
-  /// fulfillable.
-  struct Everything : InterestingKeysCallback {
-    bool isInterestingType(CanType type) const override;
-    bool hasInterestingType(CanType type) const override;
-    bool hasLimitedInterestingConformances(CanType type) const override;
-    GenericSignature::ConformsToArray
-      getInterestingConformances(CanType type) const override;
+    virtual ~InterestingKeysCallback() = default;
   };
 
   FulfillmentMap() = default;
