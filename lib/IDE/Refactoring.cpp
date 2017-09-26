@@ -619,21 +619,17 @@ RefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
 class TokenBasedRefactoringAction : public RefactoringAction {
 protected:
   ResolvedCursorInfo CursorInfo;
-  bool CanProceed;
 public:
   TokenBasedRefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
                               SourceEditConsumer &EditConsumer,
                               DiagnosticConsumer &DiagConsumer) :
   RefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {
     // We can only proceed with valid location and source file.
-    CanProceed = StartLoc.isValid() && TheFile;
-    if (!CanProceed)
-      return;
-
-    // Resolve the sema token and save it for later use.
-    CursorInfoResolver Resolver(*TheFile);
-    CursorInfo = Resolver.resolve(StartLoc);
-    CanProceed = CursorInfo.isValid();
+    if (StartLoc.isValid() && TheFile) {
+      // Resolve the sema token and save it for later use.
+      CursorInfoResolver Resolver(*TheFile);
+      CursorInfo = Resolver.resolve(StartLoc);
+    }
   }
 };
 
@@ -644,8 +640,11 @@ class RefactoringAction##KIND: public TokenBasedRefactoringAction {           \
                           SourceEditConsumer &EditConsumer,                   \
                           DiagnosticConsumer &DiagConsumer) :                 \
     TokenBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {}      \
-  static bool isApplicable(ResolvedCursorInfo Tok);                           \
   bool performChange() override;                                              \
+  static bool isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag);   \
+  bool isApplicable() {                                                       \
+    return RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine) ;    \
+  }                                                                           \
 };
 #include "swift/IDE/RefactoringKinds.def"
 
@@ -671,10 +670,14 @@ class RefactoringAction##KIND: public RangeBasedRefactoringAction {           \
     RangeBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {}      \
   bool performChange() override;                                              \
   static bool isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag);   \
+  bool isApplicable() {                                                       \
+    return RefactoringAction##KIND::isApplicable(RangeInfo, DiagEngine) ;     \
+  }                                                                           \
 };
 #include "swift/IDE/RefactoringKinds.def"
 
-bool RefactoringActionLocalRename::isApplicable(ResolvedCursorInfo CursorInfo) {
+bool RefactoringActionLocalRename::
+isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
   if (CursorInfo.Kind != CursorInfoKind::ValueRef)
     return false;
   auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD);
@@ -1036,8 +1039,6 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
 }
 
 bool RefactoringActionExtractFunction::performChange() {
-  if (!isApplicable(RangeInfo, DiagEngine))
-    return true;
   // Check if the new name is ok.
   if (!Lexer::isIdentifier(PreferredName)) {
     DiagEngine.diagnose(SourceLoc(), diag::invalid_name, PreferredName);
@@ -1420,8 +1421,6 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
 }
 
 bool RefactoringActionExtractExpr::performChange() {
-  if (!isApplicable(RangeInfo, DiagEngine))
-    return true;
   return RefactoringActionExtractExprBase(TheFile, RangeInfo,
                                           DiagEngine, false, PreferredName,
                                           EditConsumer).performChange();
@@ -1442,8 +1441,6 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
   }
 }
 bool RefactoringActionExtractRepeatedExpr::performChange() {
-  if (!isApplicable(RangeInfo, DiagEngine))
-    return true;
   return RefactoringActionExtractExprBase(TheFile, RangeInfo,
                                           DiagEngine, true, PreferredName,
                                           EditConsumer).performChange();
@@ -1523,7 +1520,8 @@ static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo Cur
   return Walker.IfInfo;
 }
 
-bool RefactoringActionCollapseNestedIfExpr::isApplicable(ResolvedCursorInfo Tok) {
+bool RefactoringActionCollapseNestedIfExpr::
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   return findCollapseNestedIfTarget(Tok).isValid();
 }
 
@@ -1752,22 +1750,17 @@ getUnsatisfiedRequirements(const DeclContext *DC) {
   return NonWitnessedReqs;
 }
 
-bool RefactoringActionFillProtocolStub::isApplicable(ResolvedCursorInfo Tok) {
+bool RefactoringActionFillProtocolStub::
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   return FillProtocolStubContext::getContextFromCursorInfo(Tok).canProceed();
 };
 
 bool RefactoringActionFillProtocolStub::performChange() {
-  // If the base class says no proceeding, respect it.
-  if (!CanProceed)
-    return true;
-
   // Get the filling protocol context from the input token.
   FillProtocolStubContext Context = FillProtocolStubContext::
-  getContextFromCursorInfo(CursorInfo);
+    getContextFromCursorInfo(CursorInfo);
 
-  // If the filling context disallows continue, abort.
-  if (!Context.canProceed())
-    return true;
+  assert(Context.canProceed());
   assert(!Context.getFillingContents().empty());
   assert(Context.getFillingContext());
   llvm::SmallString<128> Text;
@@ -1807,21 +1800,22 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
   return collectAvailableRefactorings(SF, Tok, Scratch, /*Exclude rename*/false);
 }
 
-bool RefactoringActionExpandDefault::isApplicable(ResolvedCursorInfo CursorInfo) {
+bool RefactoringActionExpandDefault::
+isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
+  auto Exit = [&](bool Applicable) {
+    if (!Applicable)
+      Diag.diagnose(SourceLoc(), diag::invalid_default_location);
+    return Applicable;
+  };
   if (CursorInfo.Kind != CursorInfoKind::StmtStart)
-    return false;
+    return Exit(false);
   if (auto *CS = dyn_cast<CaseStmt>(CursorInfo.TrailingStmt)) {
-    return CS->isDefault();
+    return Exit(CS->isDefault());
   }
-  return false;
+  return Exit(false);
 }
 
 bool RefactoringActionExpandDefault::performChange() {
-  if (!isApplicable(CursorInfo)) {
-    DiagEngine.diagnose(SourceLoc(), diag::invalid_default_location);
-    return true;
-  }
-
   // Try to find the switch statement enclosing the default statement.
   auto *CS = static_cast<CaseStmt*>(CursorInfo.TrailingStmt);
   auto IsSwitch = [](ASTNode Node) {
@@ -1911,7 +1905,8 @@ static Expr *findLocalizeTarget(ResolvedCursorInfo CursorInfo) {
   return Walker.Target;
 }
 
-bool RefactoringActionLocalizeString::isApplicable(ResolvedCursorInfo Tok) {
+bool RefactoringActionLocalizeString::
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   return findLocalizeTarget(Tok);
 }
 
@@ -1954,7 +1949,8 @@ static CharSourceRange
   return ConvertToCharRange(TargetNode.getSourceRange());
 }
 
-bool RefactoringActionConvertToDoCatch::isApplicable(ResolvedCursorInfo Tok) {
+bool RefactoringActionConvertToDoCatch::
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   if (!Tok.TrailingExpr)
     return false;
   return isa<ForceTryExpr>(Tok.TrailingExpr);
@@ -1962,8 +1958,7 @@ bool RefactoringActionConvertToDoCatch::isApplicable(ResolvedCursorInfo Tok) {
 
 bool RefactoringActionConvertToDoCatch::performChange() {
   auto *TryExpr = dyn_cast<ForceTryExpr>(CursorInfo.TrailingExpr);
-  if (!TryExpr)
-    return true;
+  assert(TryExpr);
   auto Range = findSourceRangeToWrapInCatch(CursorInfo, TheFile, SM);
   if (!Range.isValid())
     return true;
@@ -2042,7 +2037,7 @@ static void insertUnderscoreInDigits(StringRef Digits,
 }
 
 bool RefactoringActionSimplifyNumberLiteral::
-isApplicable(ResolvedCursorInfo Tok) {
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   if (auto *Literal = getTrailingNumberLiteral(Tok)) {
     llvm::SmallString<64> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
@@ -2257,8 +2252,9 @@ collectAvailableRefactorings(SourceFile *SF,
       AllKinds.push_back(RenameOp.getValue());
     }
   }
+  DiagnosticEngine DiagEngine(SF->getASTContext().SourceMgr);
 #define CURSOR_REFACTORING(KIND, NAME, ID)                                     \
-  if (RefactoringAction##KIND::isApplicable(CursorInfo))                       \
+  if (RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine))           \
     AllKinds.push_back(RefactoringKind::KIND);
 #include "swift/IDE/RefactoringKinds.def"
 
@@ -2323,8 +2319,13 @@ refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
 
   switch (Opts.Kind) {
 #define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
-    case RefactoringKind::KIND: return RefactoringAction##KIND(M, Opts,        \
-      EditConsumer, DiagConsumer).performChange();
+case RefactoringKind::KIND: {                                                  \
+      RefactoringAction##KIND Action(M, Opts, EditConsumer, DiagConsumer);     \
+      if (RefactoringKind::KIND == RefactoringKind::LocalRename ||             \
+          Action.isApplicable())                                               \
+        return Action.performChange();                                         \
+      return true;                                                             \
+  }
 #include "swift/IDE/RefactoringKinds.def"
     case RefactoringKind::GlobalRename:
     case RefactoringKind::FindGlobalRenameRanges:
