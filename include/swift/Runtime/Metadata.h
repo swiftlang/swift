@@ -1102,6 +1102,13 @@ struct TargetHeapMetadata : TargetMetadata<Runtime> {
 };
 using HeapMetadata = TargetHeapMetadata<InProcess>;
 
+struct GenericContextDescriptor {
+  /// The number of primary type parameters. This is always less than or equal
+  /// to NumGenericRequirements; it counts only the type parameters
+  /// and not any required witness tables.
+  uint32_t NumPrimaryParams;
+};
+
 /// Header for a generic parameter descriptor. This is a variable-sized
 /// structure that describes how to find and parse a generic parameter vector
 /// within the type metadata for an instance of a nominal type.
@@ -1109,8 +1116,7 @@ struct GenericParameterDescriptor {
   /// The offset to the first generic argument from the start of
   /// metadata record.
   ///
-  /// This is meaningful if either NumGenericRequirements is nonzero or
-  /// (for classes) if Flags.hasParent() is true.
+  /// This is meaningful if NumGenericRequirements is nonzero.
   uint32_t Offset;
 
   /// The amount of generic requirement data in the metadata record, in
@@ -1126,6 +1132,10 @@ struct GenericParameterDescriptor {
   /// and not any required witness tables.
   uint32_t NumPrimaryParams;
 
+  /// The number of types that this type is nested inside of, including itself
+  /// (so this value is at least 1).
+  uint16_t NestingDepth;
+
   /// Flags for this generic parameter descriptor.
   GenericParameterDescriptorFlags Flags;
 
@@ -1135,7 +1145,12 @@ struct GenericParameterDescriptor {
 
   /// True if the nominal type is generic in any way.
   bool isGeneric() const {
-    return hasGenericRequirements() || Flags.hasGenericParent();
+    return hasGenericRequirements();
+  }
+
+  GenericContextDescriptor getContext(unsigned depth) const {
+    assert(depth < NestingDepth);
+    return ((const GenericContextDescriptor *)(this + 1))[depth];
   }
 
   // TODO: add meaningful descriptions of the generic requirements.
@@ -1316,12 +1331,13 @@ struct TargetNominalTypeDescriptor {
         !GenericParams.Flags.hasVTable())
       return nullptr;
 
-    auto asWords = reinterpret_cast<const void * const*>(this + 1);
+    auto asWords = reinterpret_cast<const uint32_t *>(this + 1);
 
     // TODO: Once we emit reflective descriptions of generic requirements,
     // skip the right number of words here.
 
-    return reinterpret_cast<const VTableDescriptor *>(asWords);
+    return reinterpret_cast<const VTableDescriptor *>(asWords
+        + GenericParams.NestingDepth);
   }
 
   /// The generic parameter descriptor header. This describes how to find and
@@ -1567,17 +1583,6 @@ public:
     return getter(this);
   }
 
-  /// Return the parent type for a given level in the class hierarchy, or
-  /// null if that level does not have a parent type.
-  const TargetMetadata<Runtime> *
-  getParentType(const TargetNominalTypeDescriptor<Runtime> *theClass) const {
-    if (!theClass->GenericParams.Flags.hasParent())
-      return nullptr;
-
-    auto metadataAsWords = reinterpret_cast<const Metadata * const *>(this);
-    return metadataAsWords[theClass->GenericParams.Offset - 1];
-  }
-
   StoredPointer offsetToDescriptorOffset() const {
     return offsetof(TargetClassMetadata<Runtime>, Description);
   }
@@ -1745,21 +1750,14 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   TargetValueMetadata(MetadataKind Kind,
     ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
-                      description,
-    ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> parent)
+                      description)
     : TargetMetadata<Runtime>(Kind),
-      Description(description),
-      Parent(parent)
+      Description(description)
   {}
 
   /// An out-of-line description of the type.
   ConstTargetFarRelativeDirectPointer<Runtime, TargetNominalTypeDescriptor>
   Description;
-
-  /// The parent type of this member type, or null if this is not a
-  /// member type.  It's acceptable to make this a direct pointer because
-  /// parent types are relatively uncommon.
-  TargetPointer<Runtime, const TargetMetadata<Runtime>> Parent;
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Struct
@@ -1785,11 +1783,6 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
   StoredPointer offsetToDescriptorOffset() const {
     return offsetof(TargetValueMetadata<Runtime>, Description);
   }
-
-  StoredPointer offsetToParentOffset() const {
-    return offsetof(TargetValueMetadata<Runtime>, Parent);
-  }
-  
 };
 using ValueMetadata = TargetValueMetadata<InProcess>;
 

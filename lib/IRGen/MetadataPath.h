@@ -61,9 +61,6 @@ class MetadataPath {
 
       // Everything past this point has no index.
 
-      /// The parent metadata of a nominal type.
-      NominalParent,
-
       /// An impossible path.
       Impossible,
     };
@@ -102,7 +99,6 @@ class MetadataPath {
       case Kind::OutOfLineBaseProtocol:
       case Kind::NominalTypeArgumentConformance:
       case Kind::NominalTypeArgument:
-      case Kind::NominalParent:
         return OperationCost::Load;
 
       case Kind::AssociatedConformance:
@@ -142,11 +138,6 @@ public:
   /// it's followed.
   void addImpossibleComponent() {
     Path.push_back(Component(Component::Kind::Impossible));
-  }
-
-  /// Add a step to this path which gets the parent metadata.
-  void addNominalParentComponent() {
-    Path.push_back(Component(Component::Kind::NominalParent));
   }
 
   /// Add a step to this path which gets the type metadata stored at
@@ -208,9 +199,6 @@ public:
 
     for (auto C : Path) {
       switch (C.getKind()) {
-      case Component::Kind::NominalParent:
-        Root = A.createParent(Root);
-        continue;
       case Component::Kind::NominalTypeArgument:
         Root = A.createGenericArgument(C.getPrimaryIndex(), Root);
         continue;

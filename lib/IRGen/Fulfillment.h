@@ -140,18 +140,9 @@ public:
   }
 
 private:
-  bool searchParentTypeMetadata(IRGenModule &IGM, NominalTypeDecl *typeDecl,
-                                CanType parent,
-                                unsigned source, MetadataPath &&path,
-                                const InterestingKeysCallback &keys);
-
-  bool searchNominalTypeMetadata(IRGenModule &IGM, CanNominalType type,
+  bool searchNominalTypeMetadata(IRGenModule &IGM, CanType type,
                                  unsigned source, MetadataPath &&path,
                                  const InterestingKeysCallback &keys);
-
-  bool searchBoundGenericTypeMetadata(IRGenModule &IGM, CanBoundGenericType type,
-                                      unsigned source, MetadataPath &&path,
-                                      const InterestingKeysCallback &keys);
 
   /// Search the given witness table for useful fulfillments.
   ///
@@ -168,5 +159,3 @@ private:
 }
 
 #endif
-
-

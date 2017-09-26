@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Mangler.h"
@@ -133,6 +134,14 @@ public:
 
   NominalTypeDecl *createNominalTypeDecl(const Demangle::NodePointer &node);
 
+  Type createNominalType(NominalTypeDecl *decl) {
+    // If the declaration is generic, fail.
+    if (decl->isGenericContext())
+      return Type();
+
+    return decl->getDeclaredType();
+  }
+
   Type createNominalType(NominalTypeDecl *decl, Type parent) {
     // If the declaration is generic, fail.
     if (decl->getGenericParams())
@@ -143,6 +152,36 @@ public:
       return Type();
 
     return NominalType::get(decl, parent, Ctx);
+  }
+
+  Type createBoundGenericType(NominalTypeDecl *decl, ArrayRef<Type> args) {
+    // If the declaration isn't generic, fail.
+    if (!decl->isGenericContext())
+      return Type();
+
+    // Build a SubstitutionMap.
+    auto *genericSig = decl->getGenericSignature();
+    auto genericParams = genericSig->getSubstitutableParams();
+    if (genericParams.size() != args.size())
+      return Type();
+
+    auto subMap = genericSig->getSubstitutionMap(
+        [&](SubstitutableType *t) -> Type {
+          for (unsigned i = 0, e = genericParams.size(); i < e; ++i) {
+            if (t->isEqual(genericParams[i]))
+              return args[i];
+          }
+          return Type();
+        },
+        // FIXME: Wrong module
+        LookUpConformanceInModule(decl->getParentModule()));
+
+    auto origType = decl->getDeclaredInterfaceType();
+
+    // FIXME: We're not checking that the type satisfies the generic
+    // requirements of the signature here.
+    auto substType = origType.subst(subMap);
+    return substType;
   }
 
   Type createBoundGenericType(NominalTypeDecl *decl, ArrayRef<Type> args,
