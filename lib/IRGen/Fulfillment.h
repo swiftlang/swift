@@ -66,6 +66,9 @@ public:
     virtual GenericSignature::ConformsToArray
       getInterestingConformances(CanType type) const = 0;
 
+    /// Return the limited interesting conformances for an interesting type.
+    virtual CanType getSuperclassBound(CanType type) const = 0;
+
     virtual ~InterestingKeysCallback() = default;
   };
 
