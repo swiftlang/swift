@@ -109,7 +109,7 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 void _swift_stdlib_destroyTLS(void *);
 
 static void
-#if defined(_M_X86)
+#if defined(_M_IX86)
 __stdcall
 #endif
 _swift_stdlib_destroyTLS_CCAdjustmentThunk(void *ptr) {
