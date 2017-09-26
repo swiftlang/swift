@@ -6,6 +6,9 @@
 import SwiftShims
 import Darwin
 
+print("[String Normalization]")
+defer { print("[done]") }
+
 //
 // Print debugging helpers
 //
@@ -74,9 +77,6 @@ where Base == UnsafeMutableBufferPointer<UInt16> {
     return UnsafeMutableBufferPointer(rebasing: self)
   }
 }
-
-print("[String Normalization]")
-defer { print("[done]") }
 
 internal let _leadingSurrogateBias: UInt16 = 0xd800
 internal let _trailingSurrogateBias: UInt16 = 0xdc00
@@ -567,16 +567,25 @@ internal func _findNormalizationSegment(
 }
 
 // For testing purposes only. Not to be used for anything performance sensitive
-internal func _naiveNormalize(_ string: String) -> String {
-  let cus = Array(string.utf16)
-  return cus.withUnsafeBufferPointer { (cuBuffer) -> String in
-    return String(decoding: _slowNormalize(cuBuffer), as: UTF16.self)
-  }
-}
 internal func _naiveNormalize(_ codeUnits: Array<UInt16>) -> Array<UInt16> {
+  if codeUnits.withUnsafeBufferPointer({ bufPtr -> Bool in
+    return _Normalization._prenormalQuickCheckYes(bufPtr)
+  }) {
+    return codeUnits
+  }
   return codeUnits.withUnsafeBufferPointer { (cuBuffer) -> Array<UInt16> in
     return _slowNormalize(cuBuffer)
   }
+}
+internal func _naiveNormalize(_ string: String) -> Array<UInt16> {
+  if (string._core.isASCII) {
+    return Array(string.utf16)
+  }
+  if (string._core._unmanagedUTF16 != nil) {
+    return _slowNormalize(string._unsafeUTF16)
+  }
+
+  return _naiveNormalize(Array(string.utf16))
 }
 
 // Wether the segment identified by `idx` is prenormal.
@@ -918,12 +927,9 @@ extension String {
   // A super slow reference implementation for correctness checking purposes
   // only
   func _compareStringsReference(_ other: String) -> _Ordering {
-    let selfCodeUnits = Array(self.utf16)
-    let otherCodeUnits = Array(other.utf16)
     return _lexicographicalCompare(
-      _naiveNormalize(selfCodeUnits), _naiveNormalize(otherCodeUnits))
+      _naiveNormalize(self), _naiveNormalize(other))
   }
-
 }
 
 extension String {
@@ -1018,8 +1024,8 @@ enum Tests {
         print("FAIL: expected \(order) for \(lhs) compared to \(rhs)")
         print("""
           Details:
-            lhs: \(lhs.utf16.hex), normalized: \(_naiveNormalize(lhs).utf16.hex)
-            rhs: \(rhs.utf16.hex), normalized: \(_naiveNormalize(rhs).utf16.hex)
+            lhs: \(lhs.utf16.hex), normalized: \(_naiveNormalize(lhs).hex)
+            rhs: \(rhs.utf16.hex), normalized: \(_naiveNormalize(rhs).hex)
           """)
         passed = false
       }
@@ -1109,8 +1115,6 @@ enum Tests {
     )
   }
 }
-
-Tests.test()
 
 ///
 /// Benchmarks
@@ -1293,25 +1297,28 @@ struct Workload {
   )
   // static let pathological = """
   //   """.lines()
-  // static let zalgo = """
-  //   """.lines()
-    // ṭ̴̵̶̷̸̢̧̨̡̛̤̥̦̩̪̫̬̭̮̯̰̖̗̘̙̜̝̞̟̠̱̲̳̹̺̻̼͇͈͉͍͎̀́̂̃̄̅̆̇̈̉ͣͤ̊̋̌̍̎̏̐̑̒̓̔̽̾̿̀́͂̓̈́͆͊͋͌̕̚͜͟͢͝͞͠͡ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡
-    // h̀́̂̃
-    // è͇͈͉͍͎́̂̃̄̅̆̇̈̉͊͋͌͏̡̢̧̨̛͓͔͕͖͙͚̖̗̘̙̜̝̞̟̠̣̤̥̦̩̪̫̬̭͇͈͉͍͎͐͑͒͗͛̊̋̌̍̎̏̐̑̒̓̔̀́͂̓̈́͆͊͋͌͘̕̚͜͟͝͞͠ͅ͏͓͔͕͖͐͑͒
-    // q̴̵̶̷̸̡̢̧̨̛̖̗̘̙̜̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̱̲̳̹̺̻̼͇̀́̂̃̄̅̆̇̈̉̊̋̌̍̎̏̐̑̒̓̔̽̾̿̀́͂̓̈́͆̕̚ͅ
-    // ư̴̵̶̷̸̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡
-    // ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘
-    // c̴̵̶̷̸̡̢̧̨̛̖̗̘̙̜̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̱̲̳̹̺̻̼̀́̂̃̄̔̽̾̿̀́͂̓̈́͆ͣͤͥͦͧͨͩͪͫͬͭͮ̕̚͢͡ͅ
-    // k̴̵̶̷̸̡̢̧̨̛̖̗̘̙̜̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̱̲̳̹̺̻̼͇͈͉͍͎̀́̂̃̄̅̆̇̈̉̊̋̌̍̎̏̐̑̒̓̔̽̾̿̀́͂̓̈́͆͊͋͌̕̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡
-    // b̴̵̶̷̸̡̢̛̗̘̙̜̝̞̟̠̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡
-    // ŗ̴̵̶̷̸̨̛̩̪̫̯̰̱̲̳̹̺̻̼̬̭̮͇̗̘̙̜̝̞̟̤̥̦͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏̡̢͓͔͕͖͙͚̠̣͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡
-    // o
-    // w̗̘͇͈͉͍͎̓̈́͆͊͋͌ͅ͏̛͓͔͕͖͙͚̙̜̹̺̻̼͐͑͒͗͛ͣͤͥͦ̽̾̿̀́͂ͧͨͩͪͫͬͭͮ͘̚͜͟͢͝͞͠͡
-    // n͇͈͉͍͎͊͋͌ͧͨͩͪͫͬͭͮ͏̛͓͔͕͖͙͚̗̘̙̜̹̺̻̼͐͑͒͗͛ͣͤͥͦ̽̾̿̀́͂̓̈́͆ͧͨͩͪͫͬͭͮ͘̚͜͟͢͝͞͠͡ͅ
-    // f̛̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦ͘͜͟͢͝͞͠͡
-    // ơ̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͥͦͧͨͩͪͫͬͭͮ͘
-    // xͣͤͥͦͧͨͩͪͫͬͭͮ
-    // """.lines()
+  static let zalgo = Workload(
+    name: "Zalgo",
+    payload: """
+    ṭ̴̵̶̷̸̢̧̨̡̛̤̥̦̩̪̫̬̭̮̯̰̖̗̘̙̜̝̞̟̠̱̲̳̹̺̻̼͇͈͉͍͎̀́̂̃̄̅̆̇̈̉ͣͤ̊̋̌̍̎̏̐̑̒̓̔̽̾̿̀́͂̓̈́͆͊͋͌̕̚͜͟͢͝͞͠͡ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡
+    h̀́̂̃
+    è͇͈͉͍͎́̂̃̄̅̆̇̈̉͊͋͌͏̡̢̧̨̛͓͔͕͖͙͚̖̗̘̙̜̝̞̟̠̣̤̥̦̩̪̫̬̭͇͈͉͍͎͐͑͒͗͛̊̋̌̍̎̏̐̑̒̓̔̀́͂̓̈́͆͊͋͌͘̕̚͜͟͝͞͠ͅ͏͓͔͕͖͐͑͒
+    q̴̵̶̷̸̡̢̧̨̛̖̗̘̙̜̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̱̲̳̹̺̻̼͇̀́̂̃̄̅̆̇̈̉̊̋̌̍̎̏̐̑̒̓̔̽̾̿̀́͂̓̈́͆̕̚ͅ
+    ư̴̵̶̷̸̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡
+    ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘
+    c̴̵̶̷̸̡̢̧̨̛̖̗̘̙̜̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̱̲̳̹̺̻̼̀́̂̃̄̔̽̾̿̀́͂̓̈́͆ͣͤͥͦͧͨͩͪͫͬͭͮ̕̚͢͡ͅ
+    k̴̵̶̷̸̡̢̧̨̛̖̗̘̙̜̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̱̲̳̹̺̻̼͇͈͉͍͎̀́̂̃̄̅̆̇̈̉̊̋̌̍̎̏̐̑̒̓̔̽̾̿̀́͂̓̈́͆͊͋͌̕̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡
+    b̴̵̶̷̸̡̢̛̗̘̙̜̝̞̟̠̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡
+    ŗ̴̵̶̷̸̨̛̩̪̫̯̰̱̲̳̹̺̻̼̬̭̮͇̗̘̙̜̝̞̟̤̥̦͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏̡̢͓͔͕͖͙͚̠̣͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡
+    o
+    w̗̘͇͈͉͍͎̓̈́͆͊͋͌ͅ͏̛͓͔͕͖͙͚̙̜̹̺̻̼͐͑͒͗͛ͣͤͥͦ̽̾̿̀́͂ͧͨͩͪͫͬͭͮ͘̚͜͟͢͝͞͠͡
+    n͇͈͉͍͎͊͋͌ͧͨͩͪͫͬͭͮ͏̛͓͔͕͖͙͚̗̘̙̜̹̺̻̼͐͑͒͗͛ͣͤͥͦ̽̾̿̀́͂̓̈́͆ͧͨͩͪͫͬͭͮ͘̚͜͟͢͝͞͠͡ͅ
+    f̛̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦ͘͜͟͢͝͞͠͡
+    ơ̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͥͦͧͨͩͪͫͬͭͮ͘
+    xͣͤͥͦͧͨͩͪͫͬͭͮ
+    """.lines(),
+    scaleMultiplier: 0.25
+  )
 
   static let allScalars: Workload = {
     let maxScalarValue = 0x0010_FFFF
@@ -1323,12 +1330,20 @@ struct Workload {
     )
   }()
 
-  static var all: [Workload] = {
+  static var allNoZalgo: [Workload] = {
     return [
       .ascii, .latin1, .fastPrenormal, .slowerPrenormal,
       .nonBMPSlowestPrenormal, .emoji, .abnormal
     ]
   }()
+
+  static var all: [Workload] = {
+    return [
+      .ascii, .latin1, .fastPrenormal, .slowerPrenormal,
+      .nonBMPSlowestPrenormal, .emoji, .abnormal, .zalgo,
+    ]
+  }()
+
 
   static func concat(_ workloads: [Workload]) -> Workload {
     return Workload(
@@ -1366,6 +1381,20 @@ struct Workload {
   }()
   static var allCrossProductConcat: Workload = { concat(allCrossProduct) }()
 
+  static var allNoZalgoCrossProduct: [Workload] = {
+    var result: [Workload] = []
+    for prefix in allNoZalgo {
+      for suffix in allNoZalgo {
+        if prefix.name == suffix.name {
+          continue
+        }
+        result.append(crossProduct(prefix, suffix))
+      }
+    }
+    return result
+  }()
+  static var allNoZalgoCrossProductConcat: Workload = { concat(allNoZalgoCrossProduct) }()
+
   static var allCrossProductCrossProduct: [Workload] = {
     var result: [Workload] = []
     for prefix in allCrossProduct {
@@ -1378,7 +1407,32 @@ struct Workload {
     }
     return result
   }()
+
+  // Perform some tests using a reference comparison function
+  //
+  // NOTE: This is very slow, it's about a 10_000 X 10_000 cross compare
+  static func slowTest() {
+    print("[testing workloads]")
+    defer { print("[done]") }
+    let tests = concat([allConcat, zalgo] + allNoZalgoCrossProduct)
+    var i = 0
+    // print(tests.payload.count)
+    for testLHS in tests.payload {
+      // print(i, terminator: " ")
+      i += 1
+      for testRHS in tests.payload {
+        guard testLHS._compare(
+          testRHS
+        ) == testLHS._compareStringsReference(
+          testRHS
+        ) else {
+          fatalError("Impl differs from reference impl")
+        }
+      }
+    }
+  }
 }
+
 
 import Dispatch
 enum Benchmarks {
@@ -1448,20 +1502,17 @@ enum Benchmarks {
     print("[benchmarking (N=\(Workload.N))]")
     defer { print( "[done]") }
     var passed = true
-    for workload in [Workload.allConcat] {
-      var workload = workload
-      workload.scaleMultiplier *= 100.0
-      // guard workload.name == "Emoji_X_Latin1" else { continue }
-      // passed = passed && benchmark(workload)
-    }
     for workload in Workload.all {
       var workload = workload
       workload.scaleMultiplier *= 100.0
-      // guard workload.name == "Emoji_X_Latin1" else { continue }
+      passed = passed && benchmark(workload)
+    }
+    for workload in [Workload.allConcat] {
+      var workload = workload
+      workload.scaleMultiplier *= 100.0
       passed = passed && benchmark(workload)
     }
     for workload in Workload.allCrossProduct {
-      // guard workload.name == "Emoji_X_Latin1" else { continue }
       passed = passed && benchmark(workload)
     }
 
@@ -1613,11 +1664,6 @@ enum Benchmarks {
   }
 }
 
-// NOTE: Since this gets ran as part of LIT testing, don't benchmark by default.
-// Uncomment to compare performance.
-//
-// Benchmarks.run()
-// Benchmarks.adHoc()
 
 
 @inline(never)
@@ -1642,3 +1688,10 @@ func benchmark_findTheOnes() -> Set<UInt32> {
 //   return benchmark_findTheOnes()
 // }
 
+Tests.test()
+// Workload.slowTest()
+
+// NOTE: Since this gets ran as part of LIT testing, don't benchmark by default.
+// Uncomment to compare performance.
+// Benchmarks.run()
+// Benchmarks.adHoc()
