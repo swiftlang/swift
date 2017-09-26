@@ -333,7 +333,7 @@ ERROR(cannot_convert_default_arg_value,none,
 ERROR(cannot_convert_default_arg_value_protocol,none,
       "default argument value of type %0 does not conform to %1", (Type,Type))
 ERROR(cannot_convert_default_arg_value_nil,none,
-      "nil default argument value of cannot be converted to type %0", (Type))
+      "nil default argument value cannot be converted to type %0", (Type))
 
 ERROR(cannot_convert_argument_value,none,
       "cannot convert value of type %0 to expected argument type %1",
