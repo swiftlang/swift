@@ -90,6 +90,7 @@ import PopFrontGeneric
 import Prefix
 import PrefixWhile
 import Prims
+import PrimsSplit
 import ProtocolDispatch
 import ProtocolDispatch2
 import RC4
@@ -402,6 +403,7 @@ addTo(&precommitTests, "PrefixWhileCountableRangeLazy", run_PrefixWhileCountable
 addTo(&precommitTests, "PrefixWhileSequence", run_PrefixWhileSequence, [.validation, .api, .abstraction])
 addTo(&precommitTests, "PrefixWhileSequenceLazy", run_PrefixWhileSequenceLazy, [.validation, .api, .abstraction])
 addTo(&precommitTests, "Prims", run_Prims, [.validation, .algorithm])
+addTo(&precommitTests, "PrimsSplit", run_PrimsSplit, [.validation, .algorithm])
 addTo(&precommitTests, "ProtocolDispatch", run_ProtocolDispatch, [.validation, .abstraction])
 addTo(&precommitTests, "ProtocolDispatch2", run_ProtocolDispatch2, [.validation, .abstraction])
 addTo(&precommitTests, "RC4", run_RC4, [.validation, .algorithm])
