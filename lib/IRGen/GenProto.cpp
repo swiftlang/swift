@@ -2023,15 +2023,14 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
   case Component::Kind::NominalTypeArgument:
   case Component::Kind::NominalTypeArgumentConformance: {
     assert(sourceKey.Kind == LocalTypeDataKind::forTypeMetadata());
-    auto generic = cast<BoundGenericType>(sourceKey.Type);
+    auto *nominal = sourceKey.Type.getAnyNominal();
     auto reqtIndex = component.getPrimaryIndex();
 
-    GenericTypeRequirements requirements(IGF.IGM, generic->getDecl());
+    GenericTypeRequirements requirements(IGF.IGM, nominal);
     auto &requirement = requirements.getRequirements()[reqtIndex];
 
     auto module = IGF.getSwiftModule();
-    auto subs = generic->getContextSubstitutionMap(module,
-                                                   generic->getDecl());
+    auto subs = sourceKey.Type->getContextSubstitutionMap(module, nominal);
     auto sub = requirement.TypeParameter.subst(subs)->getCanonicalType();
 
     // In either case, we need to change the type.
@@ -2041,7 +2040,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     if (component.getKind() == Component::Kind::NominalTypeArgument) {
       assert(!requirement.Protocol && "index mismatch!");
       if (source) {
-        source = emitArgumentMetadataRef(IGF, generic->getDecl(),
+        source = emitArgumentMetadataRef(IGF, nominal,
                                          requirements, reqtIndex, source);
         setTypeMetadataName(IGF.IGM, source, sourceKey.Type);
       }
@@ -2057,31 +2056,12 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
 
       if (source) {
         auto protocol = conformance.getRequirement();
-        source = emitArgumentWitnessTableRef(IGF, generic->getDecl(),
+        source = emitArgumentWitnessTableRef(IGF, nominal,
                                              requirements, reqtIndex, source);
         setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type, protocol);
       }
     }
 
-    return source;
-  }
-
-  case Component::Kind::NominalParent: {
-    assert(sourceKey.Kind == LocalTypeDataKind::forTypeMetadata());
-    NominalTypeDecl *nominalDecl;
-    if (auto nominal = dyn_cast<NominalType>(sourceKey.Type)) {
-      nominalDecl = nominal->getDecl();
-      sourceKey.Type = nominal.getParent();
-    } else {
-      auto generic = cast<BoundGenericType>(sourceKey.Type);
-      nominalDecl = generic->getDecl();
-      sourceKey.Type = generic.getParent();
-    }
-
-    if (source) {
-      source = emitParentMetadataRef(IGF, nominalDecl, source);
-      setTypeMetadataName(IGF.IGM, source, sourceKey.Type);
-    }
     return source;
   }
 
@@ -2183,9 +2163,6 @@ void MetadataPath::print(llvm::raw_ostream &out) const {
     case Component::Kind::NominalTypeArgumentConformance:
       out << "nominal_type_argument_conformance["
           << component.getPrimaryIndex() << "]";
-      break;
-    case Component::Kind::NominalParent:
-      out << "nominal_parent";
       break;
     case Component::Kind::Impossible:
       out << "impossible";
@@ -2573,28 +2550,9 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // Construct a representative function type.
   auto generics = ncGenerics->getCanonicalSignature();
   CanSILFunctionType fnType = [&]() -> CanSILFunctionType {
-    CanType type = typeDecl->getDeclaredInterfaceType()->getCanonicalType();
-    if (auto nominal = dyn_cast<NominalType>(type)) {
-      ParentType = nominal.getParent();
-    } else {
-      ParentType = cast<BoundGenericType>(type).getParent();
-    }
-
-    // Ignore the existence of the parent type if it has no type parameters.
-    if (ParentType && !ParentType->hasTypeParameter())
-      ParentType = CanType();
-
-    SmallVector<SILParameterInfo, 1> params;
-    if (ParentType) {
-      auto parentMetatype =
-        CanMetatypeType::get(ParentType, MetatypeRepresentation::Thick);
-      params.push_back(SILParameterInfo(parentMetatype,
-                                        ParameterConvention::Direct_Unowned));
-    }
-
     return SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
                                 /*callee*/ ParameterConvention::Direct_Unowned,
-                                params, /*results*/ {}, /*error*/ None,
+                                /*params*/ {}, /*results*/ {}, /*error*/ None,
                                 IGM.Context);
   }();
 

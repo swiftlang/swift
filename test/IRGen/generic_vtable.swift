@@ -21,8 +21,12 @@ public class Concrete : Derived<Int> {
 //// Nominal type descriptor for 'Base' does not have any method descriptors.
 
 // CHECK-LABEL: @_T014generic_vtable4BaseCMn = {{(protected )?}}constant
+// -- nesting depth
+// CHECK-SAME: i16 1,
 // -- flags: has vtable
-// CHECK-SAME: i32 4,
+// CHECK-SAME: i16 4,
+// -- generic parameters at depth 0
+// CHECK-SAME: i32 0,
 // -- vtable offset
 // CHECK-SAME: i32 10,
 // -- vtable size
@@ -46,8 +50,12 @@ public class Concrete : Derived<Int> {
 //// Nominal type descriptor for 'Derived' has method descriptors.
 
 // CHECK-LABEL: @_T014generic_vtable7DerivedCMn = {{(protected )?}}constant
+// -- nesting depth
+// CHECK-SAME: i16 1,
 // -- flags: has vtable
-// CHECK-SAME: i32 4,
+// CHECK-SAME: i16 4,
+// -- generic parameters at depth 0
+// CHECK-SAME: i32 1,
 // -- vtable offset
 // CHECK-SAME: i32 14,
 // -- vtable size
@@ -76,8 +84,12 @@ public class Concrete : Derived<Int> {
 //// Nominal type descriptor for 'Concrete' has method descriptors.
 
 // CHECK-LABEL: @_T014generic_vtable8ConcreteCMn = {{(protected )?}}constant
+// -- nesting depth
+// CHECK-SAME: i16 1,
 // -- flags: has vtable
-// CHECK-SAME: i32 4,
+// CHECK-SAME: i16 4,
+// -- generic parameters at depth 0
+// CHECK-SAME: i32 0,
 // -- vtable offset
 // CHECK-SAME: i32 15,
 // -- vtable size

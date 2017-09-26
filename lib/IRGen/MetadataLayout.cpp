@@ -126,12 +126,6 @@ void MetadataLayout::destroy() const {
 
 /******************************* NOMINAL TYPES ********************************/
 
-Offset NominalMetadataLayout::getParentOffset(IRGenFunction &IGF) const {
-  assert(Parent.isValid());
-  assert(Parent.isStatic() && "resilient metadata layout unsupported!");
-  return Offset(Parent.getStaticOffset());
-}
-
 Size
 NominalMetadataLayout::getStaticGenericRequirementsOffset() const {
   assert(GenericRequirements.isValid());
@@ -144,24 +138,6 @@ NominalMetadataLayout::getGenericRequirementsOffset(IRGenFunction &IGF) const {
   assert(GenericRequirements.isValid());
   assert(GenericRequirements.isStatic() && "resilient metadata layout unsupported!");
   return Offset(GenericRequirements.getStaticOffset());
-}
-
-/// Given a reference to some metadata, derive a reference to the
-/// type's parent type.
-llvm::Value *irgen::emitParentMetadataRef(IRGenFunction &IGF,
-                                          NominalTypeDecl *decl,
-                                          llvm::Value *metadata) {
-  auto slot = emitAddressOfParentMetadataSlot(IGF, metadata, decl);
-  return IGF.emitInvariantLoad(slot);
-}
-
-Address irgen::emitAddressOfParentMetadataSlot(IRGenFunction &IGF,
-                                               llvm::Value *metadata,
-                                               NominalTypeDecl *decl) {
-  auto offset = IGF.IGM.getMetadataLayout(decl).getParentOffset(IGF);
-  return IGF.emitAddressAtOffset(metadata, offset,
-                                 IGF.IGM.TypeMetadataPtrTy,
-                                 IGF.IGM.getPointerAlignment());
 }
 
 static llvm::Value *emitLoadOfGenericRequirement(IRGenFunction &IGF,
@@ -244,12 +220,6 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     void addInstanceAlignMask() {
       Layout.InstanceAlignMask = getNextOffset();
       super::addInstanceAlignMask();
-    }
-
-    void addParentMetadataRef(ClassDecl *forClass, Type classType) {
-      if (forClass == Target)
-        Layout.Parent = getNextOffset();
-      super::addParentMetadataRef(forClass, classType);
     }
 
     void noteStartOfGenericRequirements(ClassDecl *forClass) {
@@ -404,11 +374,6 @@ EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
       super::addPayloadSize();
     }
 
-    void addParentMetadataRef() {
-      Layout.Parent = getNextOffset();
-      super::addParentMetadataRef();
-    }
-
     void noteStartOfGenericRequirements() {
       Layout.GenericRequirements = getNextOffset();
       super::noteStartOfGenericRequirements();
@@ -440,11 +405,6 @@ StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
     StructMetadataLayout &Layout;
     Scanner(IRGenModule &IGM, StructDecl *decl, StructMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
-
-    void addParentMetadataRef() {
-      Layout.Parent = getNextOffset();
-      super::addParentMetadataRef();
-    }
 
     void noteStartOfGenericRequirements() {
       Layout.GenericRequirements = getNextOffset();

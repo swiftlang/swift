@@ -47,7 +47,6 @@ public:
 
     // StructMetadata header.
     asImpl().addNominalTypeDescriptor();
-    asImpl().addParentMetadataRef();
 
     // If changing this layout, you must update the magic number in
     // emitParentMetadataRef.
@@ -80,7 +79,6 @@ public:
   void addMetadataFlags() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
-  void addParentMetadataRef() { addPointer(); }
   void addFieldOffset(VarDecl*) { addPointer(); }
   void addGenericArgument(CanType argument) { addPointer(); }
   void addGenericWitnessTable(CanType argument, ProtocolConformanceRef conf) {

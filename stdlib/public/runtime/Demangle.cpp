@@ -30,13 +30,107 @@ Demangle::NodePointer
 swift::_swift_buildDemanglingForMetadata(const Metadata *type,
                                          Demangle::Demangler &Dem);
 
+static Demangle::NodePointer
+_applyGenericArguments(const Metadata * const *genericArgs,
+                       const NominalTypeDescriptor *description,
+                       Demangle::NodePointer node, unsigned depth,
+                       Demangle::Demangler &Dem) {
+  assert(depth > 0);
+
+  auto typeNode = node;
+  if (typeNode->getKind() == Node::Kind::Type)
+    typeNode = typeNode->getChild(0);
+
+  auto parentNode = typeNode->getChild(0);
+
+  // It might be more accurate to keep this sugar, but the old version
+  // of this function dropped it, and I want to keep things compatible.
+  if (parentNode->getKind() == Node::Kind::Extension) {
+    parentNode = parentNode->getChild(1);
+  }
+
+  switch (parentNode->getKind()) {
+  case Node::Kind::Class:
+  case Node::Kind::Structure:
+  case Node::Kind::Enum: {
+    // The parent type is a nominal type which may have its own generic
+    // arguments.
+    auto newParentNode = _applyGenericArguments(genericArgs, description,
+                                                parentNode, depth - 1,
+                                                Dem);
+    if (newParentNode == nullptr)
+      return nullptr;
+
+    auto newTypeNode = Dem.createNode(typeNode->getKind());
+    newTypeNode->addChild(newParentNode, Dem);
+    newTypeNode->addChild(typeNode->getChild(1), Dem);
+
+    typeNode = newTypeNode;
+    break;
+  }
+  default:
+    // Parent is a local context or module. Leave it as-is, and just apply
+    // generic arguments below.
+    break;
+  }
+
+  // See if we have any generic arguments at this depth.
+  unsigned numArgumentsAtDepth =
+      description->GenericParams.getContext(depth - 1).NumPrimaryParams;
+  if (numArgumentsAtDepth == 0) {
+    // No arguments here, just return the original node (except we may have
+    // replaced its parent type above).
+    return typeNode;
+  }
+
+  // Ok, we have generic arguments. Figure out where the arguments for this
+  // depth begin in the generic type metadata.
+  unsigned firstArgumentAtDepth = 0;
+  for (unsigned i = 0; i < depth - 1; i++) {
+    firstArgumentAtDepth +=
+        description->GenericParams.getContext(i).NumPrimaryParams;
+  }
+
+  // Demangle them.
+  auto typeParams = Dem.createNode(Node::Kind::TypeList);
+  for (unsigned i = firstArgumentAtDepth,
+                e = firstArgumentAtDepth + numArgumentsAtDepth;
+                i < e; ++i) {
+    auto demangling = _swift_buildDemanglingForMetadata(genericArgs[i], Dem);
+    if (demangling == nullptr)
+      return nullptr;
+    typeParams->addChild(demangling, Dem);
+  }
+
+  Node::Kind boundGenericKind;
+  switch (typeNode->getKind()) {
+  case Node::Kind::Class:
+    boundGenericKind = Node::Kind::BoundGenericClass;
+    break;
+  case Node::Kind::Structure:
+    boundGenericKind = Node::Kind::BoundGenericStructure;
+    break;
+  case Node::Kind::Enum:
+    boundGenericKind = Node::Kind::BoundGenericEnum;
+    break;
+  default:
+    return nullptr;
+  }
+
+  auto newNode = Dem.createNode(Node::Kind::Type);
+  newNode->addChild(typeNode, Dem);
+
+  auto genericNode = Dem.createNode(boundGenericKind);
+  genericNode->addChild(newNode, Dem);
+  genericNode->addChild(typeParams, Dem);
+  return genericNode;
+}
+
 // Build a demangled type tree for a nominal type.
 static Demangle::NodePointer
 _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   using namespace Demangle;
 
-  const Metadata *parent;
-  Node::Kind boundGenericKind;
   const NominalTypeDescriptor *description;
 
   // Demangle the parent type, if any.
@@ -48,23 +142,17 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
     while (classType->isTypeMetadata() && classType->isArtificialSubclass())
       classType = classType->SuperClass;
 #endif
-    parent = classType->getParentType(classType->getDescription());
-    boundGenericKind = Node::Kind::BoundGenericClass;
     description = classType->getDescription();
     break;
   }
   case MetadataKind::Enum:
   case MetadataKind::Optional: {
     auto enumType = static_cast<const EnumMetadata *>(type);
-    parent = enumType->Parent;
-    boundGenericKind = Node::Kind::BoundGenericEnum;
     description = enumType->Description;
     break;
   }
   case MetadataKind::Struct: {
     auto structType = static_cast<const StructMetadata *>(type);
-    parent = structType->Parent;
-    boundGenericKind = Node::Kind::BoundGenericStructure;
     description = structType->Description;
     break;
   }
@@ -76,42 +164,13 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   auto node = Dem.demangleType(StringRef(description->Name));
   assert(node->getKind() == Node::Kind::Type);
 
-  // Demangle the parent.
-  if (parent) {
-    auto parentNode = _swift_buildDemanglingForMetadata(parent, Dem);
-    if (parentNode->getKind() == Node::Kind::Type)
-      parentNode = parentNode->getChild(0);
+  auto typeBytes = reinterpret_cast<const char *>(type);
+  auto genericArgs = reinterpret_cast<const Metadata * const *>(
+               typeBytes + sizeof(void*) * description->GenericParams.Offset);
 
-    auto typeNode = node->getChild(0);
-    auto newTypeNode = Dem.createNode(typeNode->getKind());
-    newTypeNode->addChild(parentNode, Dem);
-    newTypeNode->addChild(typeNode->getChild(1), Dem);
-
-    auto newNode = Dem.createNode(Node::Kind::Type);
-    newNode->addChild(newTypeNode, Dem);
-    node = newNode;
-  }
-
-  // If generic, demangle the type parameters.
-  if (description->GenericParams.NumPrimaryParams > 0) {
-    auto typeParams = Dem.createNode(Node::Kind::TypeList);
-    auto typeBytes = reinterpret_cast<const char *>(type);
-    auto genericParam = reinterpret_cast<const Metadata * const *>(
-                 typeBytes + sizeof(void*) * description->GenericParams.Offset);
-    for (unsigned i = 0, e = description->GenericParams.NumPrimaryParams;
-         i < e; ++i, ++genericParam) {
-      auto demangling = _swift_buildDemanglingForMetadata(*genericParam, Dem);
-      if (demangling == nullptr)
-        return nullptr;
-      typeParams->addChild(demangling, Dem);
-    }
-
-    auto genericNode = Dem.createNode(boundGenericKind);
-    genericNode->addChild(node, Dem);
-    genericNode->addChild(typeParams, Dem);
-    return genericNode;
-  }
-  return node;
+  return _applyGenericArguments(genericArgs, description, node,
+                                description->GenericParams.NestingDepth,
+                                Dem);
 }
 
 // Build a demangled type tree for a type.

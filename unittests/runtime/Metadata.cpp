@@ -191,8 +191,7 @@ GenericMetadataTest<StructMetadata> MetadataTest1 = {
   // Fields
   {
     MetadataKind::Struct,
-    reinterpret_cast<const NominalTypeDescriptor*>(&Global1),
-    nullptr
+    reinterpret_cast<const NominalTypeDescriptor*>(&Global1)
   }
 };
 

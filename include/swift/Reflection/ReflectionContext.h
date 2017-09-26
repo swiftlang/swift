@@ -50,7 +50,6 @@ public:
   using super::getBuilder;
   using super::readIsaMask;
   using super::readTypeFromMetadata;
-  using super::readParentFromMetadata;
   using super::readGenericArgFromMetadata;
   using super::readMetadataFromInstance;
   using typename super::StoredPointer;
@@ -460,10 +459,6 @@ private:
       auto Base = cast<GenericArgumentMetadataSource>(MS)->getSource();
       return isMetadataSourceReady(Base, Builder);
     }
-    case MetadataSourceKind::Parent: {
-      auto Base = cast<ParentMetadataSource>(MS)->getChild();
-      return isMetadataSourceReady(Base, Builder);
-    }
     case MetadataSourceKind::Self:
     case MetadataSourceKind::SelfWitnessTable:
       return true;
@@ -547,19 +542,6 @@ private:
         break;
 
       return Arg;
-    }
-    case MetadataSourceKind::Parent: {
-      auto Base = readMetadataSource(Context,
-          cast<ParentMetadataSource>(MS)->getChild(),
-          Builder);
-      if (!Base.first)
-        break;
-
-      auto Parent = readParentFromMetadata(Base.second);
-      if (!Parent.first)
-        break;
-
-      return Parent;
     }
     case MetadataSourceKind::Self:
     case MetadataSourceKind::SelfWitnessTable:

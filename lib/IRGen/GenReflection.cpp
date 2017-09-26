@@ -71,12 +71,6 @@ public:
     OS << '_';
   }
 
-  void visitParentMetadataSource(const ParentMetadataSource *P) {
-    OS << 'P';
-    visit(P->getChild());
-    OS << '_';
-  }
-
   void visitSelfMetadataSource(const SelfMetadataSource *S) {
     OS << 'S';
   }
@@ -154,13 +148,6 @@ public:
     printHeader("generic-argument");
     printField("index", GA->getIndex());
     printRec(GA->getSource());
-    closeForm();
-  }
-
-  void
-  visitParentMetadataSource(const ParentMetadataSource *P) {
-    printHeader("parent-of");
-    printRec(P->getChild());
     closeForm();
   }
 
