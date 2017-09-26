@@ -126,7 +126,12 @@ set(SWIFT_BENCH_MODULES
 )
 
 set(SWIFT_MULTISOURCE_SWIFT3_BENCHES
+  multi-source/PrimsSplit
 )
+
+set(PrimsSplit_sources
+    multi-source/PrimsSplit/Prims.swift
+    multi-source/PrimsSplit/main.swift)
 
 set(SWIFT_MULTISOURCE_SWIFT4_BENCHES
 )
