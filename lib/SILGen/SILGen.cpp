@@ -441,7 +441,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
 
   return M.createFunction(SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION,
                           topLevelType, nullptr, Loc, IsBare, IsNotTransparent,
-                          IsNotSerialized, None, IsNotThunk,
+                          IsNotSerialized, ProfileCounter(), IsNotThunk,
                           SubclassScope::NotApplicable);
 }
 
@@ -501,7 +501,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   if (auto emitted = getEmittedFunction(constant, forDefinition))
     return emitted;
 
-  Optional<uint64_t> count = None;
+  ProfileCounter count = ProfileCounter();
   if (constant.hasDecl()) {
     if (auto *fd = constant.getFuncDecl()) {
       count = loadProfilerCount(fd->getBody());

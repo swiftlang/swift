@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -66,10 +67,10 @@ public:
 
   /// Load the profiled execution count corresponding to \p N, if one is
   /// available.
-  Optional<uint64_t> loadProfilerCount(ASTNode N) {
+  ProfileCounter loadProfilerCount(ASTNode N) {
     if (PGOReader && Profiler && Profiler->hasRegionCounters())
       return Profiler->getExecutionCount(N);
-    return None;
+    return ProfileCounter();
   }
 
   /// Get the PGO's node parent

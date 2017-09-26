@@ -1179,8 +1179,8 @@ void swift::emitIndirectConditionalCastWithScalar(
     SILBuilder &B, ModuleDecl *M, SILLocation loc,
     CastConsumptionKind consumption, SILValue src, CanType sourceType,
     SILValue dest, CanType targetType, SILBasicBlock *indirectSuccBB,
-    SILBasicBlock *indirectFailBB, Optional<uint64_t> TrueCount,
-    Optional<uint64_t> FalseCount) {
+    SILBasicBlock *indirectFailBB, ProfileCounter TrueCount,
+    ProfileCounter FalseCount) {
   assert(canUseScalarCheckedCastInstructions(B.getModule(),
                                              sourceType, targetType));
 

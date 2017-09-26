@@ -2080,7 +2080,7 @@ protected:
 SILFunction *ReabstractionThunkGenerator::createThunk() {
   SILFunction *Thunk = M.getOrCreateSharedFunction(
       Loc, ThunkName, ReInfo.getSubstitutedType(), IsBare, IsTransparent,
-      Serialized, None, IsThunk);
+      Serialized, ProfileCounter(), IsThunk);
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;

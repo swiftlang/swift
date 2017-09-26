@@ -11,26 +11,27 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "patternmatch-silgen"
-#include "SILGen.h"
-#include "Scope.h"
 #include "Cleanup.h"
 #include "ExitableFullExpr.h"
 #include "Initialization.h"
 #include "RValue.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/FormattedStream.h"
+#include "SILGen.h"
+#include "Scope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/FormattedStream.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -316,7 +317,7 @@ struct RowToSpecialize {
   bool Irrefutable;
 
   /// Profile Count of hte row we intend to specialize.
-  Optional<uint64_t> Count;
+  ProfileCounter Count;
 };
 
 /// Changes that we wish to apply to a row which we have specialized.
@@ -474,7 +475,7 @@ private:
                                ConsumableManagedValue src,
                                const SpecializationHandler &handleSpec,
                                const FailureHandler &failure,
-                               Optional<uint64_t> defaultCaseCount);
+                               ProfileCounter defaultCaseCount);
   void emitBoolDispatch(ArrayRef<RowToSpecialize> rows,
                         ConsumableManagedValue src,
                         const SpecializationHandler &handleSpec,
@@ -1329,14 +1330,14 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
     assert(getSpecializingPattern(clauses[rowIndex][column]) == pattern);
     bool irrefutable = clauses[rowIndex].isIrrefutableAfterSpecializing(column);
     auto caseBlock = clauses[rowIndex].getClientData<CaseStmt>();
-    Optional<uint64_t> count = None;
+    ProfileCounter count = ProfileCounter();
     if (caseBlock) {
       count = SGF.SGM.loadProfilerCount(caseBlock);
     }
     rowsToSpecialize.push_back({pattern, rowIndex, irrefutable, count});
   };
 
-  Optional<uint64_t> defaultCaseCount = None;
+  ProfileCounter defaultCaseCount = ProfileCounter();
   Pattern *firstSpecializer = getSpecializingPattern(clauses[firstRow][column]);
   assert(firstSpecializer && "specializing unspecializable row?");
   addRowToSpecialize(firstSpecializer, firstRow);
@@ -1896,7 +1897,7 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
 void PatternMatchEmission::emitEnumElementDispatch(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     const SpecializationHandler &handleCase, const FailureHandler &outerFailure,
-    Optional<uint64_t> defaultCaseCount) {
+    ProfileCounter defaultCaseCount) {
   // If sil ownership is enabled and we have that our source type is an object,
   // use the dispatch code path.
   if (SGF.getOptions().EnableSILOwnership && src.getType().isObject()) {
@@ -1921,7 +1922,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
   // instructions want only the first information, so we split them up.
   SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 4> caseBBs;
   SmallVector<CaseInfo, 4> caseInfos;
-  SmallVector<Optional<uint64_t>, 4> caseCounts;
+  SmallVector<ProfileCounter, 4> caseCounts;
   SILBasicBlock *defaultBB = nullptr;
 
   caseBBs.reserve(rows.size());
@@ -2038,7 +2039,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
   SILLocation loc = PatternMatchStmt;
   loc.setDebugLoc(rows[0].Pattern);
-  ArrayRef<Optional<uint64_t>> caseCountsArrayRef = caseCounts;
+  ArrayRef<ProfileCounter> caseCountsArrayRef = caseCounts;
   if (addressOnlyEnum) {
     SGF.B.createSwitchEnumAddr(loc, srcValue, defaultBB, caseBBs,
                                caseCountsArrayRef, defaultCaseCount);

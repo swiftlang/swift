@@ -26,6 +26,7 @@
 #include "JumpDest.h"
 #include "ManagedValue.h"
 #include "RValue.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILBuilder.h"
 
 namespace swift {
@@ -258,8 +259,8 @@ public:
                                ManagedValue operand, SILType type,
                                SILBasicBlock *trueBlock,
                                SILBasicBlock *falseBlock,
-                               Optional<uint64_t> Target1Count,
-                               Optional<uint64_t> Target2Count);
+                               ProfileCounter Target1Count,
+                               ProfileCounter Target2Count);
 
   using SILBuilder::createCheckedCastValueBranch;
   void createCheckedCastValueBranch(SILLocation loc, ManagedValue operand,
@@ -336,11 +337,11 @@ private:
     SILBasicBlock *block;
     NullablePtr<SILBasicBlock> contBlock;
     NormalCaseHandler handler;
-    Optional<uint64_t> count;
+    ProfileCounter count;
 
     NormalCaseData(EnumElementDecl *decl, SILBasicBlock *block,
                    NullablePtr<SILBasicBlock> contBlock,
-                   NormalCaseHandler handler, Optional<uint64_t> count)
+                   NormalCaseHandler handler, ProfileCounter count)
         : decl(decl), block(block), contBlock(contBlock), handler(handler),
           count(count) {}
     ~NormalCaseData() = default;
@@ -351,11 +352,11 @@ private:
     NullablePtr<SILBasicBlock> contBlock;
     DefaultCaseHandler handler;
     DefaultDispatchTime dispatchTime;
-    Optional<uint64_t> count;
+    ProfileCounter count;
 
     DefaultCaseData(SILBasicBlock *block, NullablePtr<SILBasicBlock> contBlock,
                     DefaultCaseHandler handler,
-                    DefaultDispatchTime dispatchTime, Optional<uint64_t> count)
+                    DefaultDispatchTime dispatchTime, ProfileCounter count)
         : block(block), contBlock(contBlock), handler(handler),
           dispatchTime(dispatchTime), count(count) {}
     ~DefaultCaseData() = default;
@@ -376,14 +377,14 @@ public:
       SILBasicBlock *defaultBlock, NullablePtr<SILBasicBlock> contBlock,
       DefaultCaseHandler handle,
       DefaultDispatchTime dispatchTime = DefaultDispatchTime::AfterNormalCases,
-      Optional<uint64_t> count = None) {
+      ProfileCounter count = ProfileCounter()) {
     defaultBlockData.emplace(defaultBlock, contBlock, handle, dispatchTime,
                              count);
   }
 
   void addCase(EnumElementDecl *decl, SILBasicBlock *caseBlock,
                NullablePtr<SILBasicBlock> contBlock, NormalCaseHandler handle,
-               Optional<uint64_t> count = None) {
+               ProfileCounter count = ProfileCounter()) {
     caseDataArray.emplace_back(decl, caseBlock, contBlock, handle, count);
   }
 
