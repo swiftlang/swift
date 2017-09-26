@@ -189,24 +189,15 @@ bool CursorInfoResolver::walkToExprPre(Expr *E) {
       }
     }
     auto IsProperCursorLocation = E->getStartLoc() == LocToResolve;
-    // Handle cursor placement after Try, ForceTry and OptionalTry Expr.
-    if (auto *ATE = dyn_cast<AnyTryExpr>(E)) {
-      auto CheckLocation = [&IsProperCursorLocation, this](SourceLoc Loc) {
-        IsProperCursorLocation = Loc == LocToResolve || IsProperCursorLocation;
-      };
-      auto TryLoc = ATE->getTryLoc();
-      auto TryEndLoc = TryLoc.getAdvancedLocOrInvalid(getKeywordLen(tok::kw_try));
-      CheckLocation(TryEndLoc);
-      if (auto *FTE = dyn_cast<ForceTryExpr>(E)) {
-        auto ExclaimLoc = FTE->getExclaimLoc();
-        auto ExclaimLen = getKeywordLen(tok::exclaim_postfix);
-        CheckLocation(ExclaimLoc.getAdvancedLocOrInvalid(ExclaimLen));
-      }
-      if (auto *OTE = dyn_cast<OptionalTryExpr>(E)) {
-        auto QuestionLoc = OTE->getQuestionLoc();
-        auto QuestionLen = getKeywordLen(tok::question_postfix);
-        CheckLocation(QuestionLoc.getAdvancedLocOrInvalid(QuestionLen));
-      }
+    // Handle cursor placement after `try` in ForceTry and OptionalTry Expr.
+    auto CheckLocation = [&IsProperCursorLocation, this](SourceLoc Loc) {
+      IsProperCursorLocation = Loc == LocToResolve || IsProperCursorLocation;
+    };
+    if (auto *FTE = dyn_cast<ForceTryExpr>(E)) {
+      CheckLocation(FTE->getExclaimLoc());
+    }
+    if (auto *OTE = dyn_cast<OptionalTryExpr>(E)) {
+      CheckLocation(OTE->getQuestionLoc());
     }
     // Keep track of trailing expressions.
     if (!E->isImplicit() && IsProperCursorLocation)
