@@ -47,11 +47,9 @@ namespace swift {
   };
 
   /// A SharedTimer for recursive routines.
-  /// Declare as a static, and use as below:
   /// void example() {
-  ///     static RecursiveSharedTimer timer("lookupDirect");
-  ///     auto guard = RecursiveSharedTimer::Guard(timer);
-  ///     (void)guard;
+  /// ASTContext &ctx = getASTContext();
+  ///   auto guard = RecursiveSharedTimer::Guard(ctx.Stats ? ctx.Stats->getFrontendRecursiveSharedTimers().NominalTypeDecl__lookupDirect : nullptr); (void)guard;
   ///   ...
   /// }
 
@@ -74,14 +72,16 @@ namespace swift {
 
   public:
     RecursiveSharedTimer(StringRef name) : name(name) {}
+    
+    // IMPLICIT TO OPTIONAL??
 
     struct Guard {
-      RecursiveSharedTimer &recursiveTimer;
+      RecursiveSharedTimer *recursiveTimerOrNull;
       Guard &operator=(Guard &) = delete;
-      Guard(RecursiveSharedTimer &rst) : recursiveTimer(rst) {
-        recursiveTimer.enterRecursiveFunction();
+      Guard(RecursiveSharedTimer *rst) : recursiveTimerOrNull(rst) {
+        if (recursiveTimerOrNull) recursiveTimerOrNull->enterRecursiveFunction();
       }
-      ~Guard() { recursiveTimer.exitRecursiveFunction(); }
+      ~Guard() {  if (recursiveTimerOrNull) recursiveTimerOrNull->exitRecursiveFunction(); }
     };
   };
 } // end namespace swift
