@@ -95,6 +95,12 @@ protected:
     return Generics->getConformsTo(t, M);
   }
 
+  CanType getSuperclassBound(Type t) {
+    if (auto superclassTy = Generics->getSuperclassBound(t, M))
+      return superclassTy->getCanonicalType();
+    return CanType();
+  }
+
 public:
   PolymorphicConvention(IRGenModule &IGM, CanSILFunctionType fnType);
 
@@ -291,6 +297,9 @@ bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact,
     getInterestingConformances(CanType type) const override {
       return Self.getConformsTo(type);
     }
+    CanType getSuperclassBound(CanType type) const override {
+      return Self.getSuperclassBound(type);
+    }
   } callbacks(*this);
   return Fulfillments.searchTypeMetadata(IGM, type, isExact, sourceIndex,
                                          std::move(path), callbacks);
@@ -365,6 +374,15 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
         considerNewTypeSource(MetadataSource::Kind::ClassPointer,
                               paramIndex, type, IsInexact);
         return;
+      }
+
+      if (isa<GenericTypeParamType>(type)) {
+        if (auto superclassTy = getSuperclassBound(type)) {
+          considerNewTypeSource(MetadataSource::Kind::ClassPointer,
+                                paramIndex, superclassTy, IsInexact);
+          return;
+
+        }
       }
 
       // Thick metatypes are sources of metadata.
@@ -1284,6 +1302,11 @@ public:
           getInterestingConformances(CanType type) const override {
             llvm_unreachable("no limits");
           }
+          CanType getSuperclassBound(CanType type) const override {
+            if (auto superclassTy = cast<ArchetypeType>(type)->getSuperclass())
+              return superclassTy->getCanonicalType();
+            return CanType();
+          }
         } callback;
         Fulfillments->searchTypeMetadata(IGM, ConcreteType, IsExact,
                                          /*sourceIndex*/ 0, MetadataPath(),
@@ -2023,7 +2046,10 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
   case Component::Kind::NominalTypeArgument:
   case Component::Kind::NominalTypeArgumentConformance: {
     assert(sourceKey.Kind == LocalTypeDataKind::forTypeMetadata());
-    auto *nominal = sourceKey.Type.getAnyNominal();
+    auto type = sourceKey.Type;
+    if (auto archetypeTy = dyn_cast<ArchetypeType>(type))
+      type = archetypeTy->getSuperclass()->getCanonicalType();
+    auto *nominal = type.getAnyNominal();
     auto reqtIndex = component.getPrimaryIndex();
 
     GenericTypeRequirements requirements(IGF.IGM, nominal);

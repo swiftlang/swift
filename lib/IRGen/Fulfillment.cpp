@@ -125,6 +125,13 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
     return hadFulfillment;
   }
 
+  if (keys.isInterestingType(type)) {
+    if (auto superclassTy = keys.getSuperclassBound(type)) {
+      return searchNominalTypeMetadata(IGM, superclassTy, source,
+                                       std::move(path), keys);
+    }
+  }
+
   // Inexact metadata will be a problem if we ever try to use this
   // to remember that we already have the metadata for something.
   if (isa<NominalType>(type) || isa<BoundGenericType>(type)) {

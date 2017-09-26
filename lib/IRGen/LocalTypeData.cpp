@@ -268,6 +268,12 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
     getInterestingConformances(CanType type) const override {
       llvm_unreachable("no limits");
     }
+    CanType getSuperclassBound(CanType type) const override {
+      if (auto arch = dyn_cast<ArchetypeType>(type))
+        if (auto superclassTy = arch->getSuperclass())
+          return superclassTy->getCanonicalType();
+      return CanType();
+    }
   } callbacks;
 
   // Look for anything at all that's fulfilled by this.  If we don't find
