@@ -182,7 +182,7 @@ GenericMetadataTest<StructMetadata> MetadataTest1 = {
       metadataWords[2] = argsWords[0];
       return metadata;
     },
-    3 * sizeof(void*), // metadata size
+    2 * sizeof(void*), // metadata size
     1, // num arguments
     0, // address point
     {} // private data
