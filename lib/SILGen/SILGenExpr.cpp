@@ -2170,8 +2170,8 @@ RValue RValueEmitter::visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
 RValue RValueEmitter::
 visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                 SGFContext C) {
-  Optional<uint64_t> trueCount = None;
-  Optional<uint64_t> falseCount = None;
+  ProfileCounter trueCount = ProfileCounter();
+  ProfileCounter falseCount = ProfileCounter();
   auto parent = SGF.SGM.getPGOParent(E);
   if (parent) {
     auto &Node = parent.getValue();
@@ -3042,8 +3042,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
     .mangleKeyPathGetterThunkHelper(property, genericSig, baseType,
                                     interfaceSubs);
   auto thunk = SGF.SGM.M.getOrCreateSharedFunction(
-      loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized, None,
-      IsThunk);
+      loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
+      ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;
   
@@ -3164,8 +3164,8 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
                                                                 baseType,
                                                                 interfaceSubs);
   auto thunk = SGF.SGM.M.getOrCreateSharedFunction(
-      loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized, None,
-      IsThunk);
+      loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
+      ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;
   
@@ -3324,7 +3324,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
                                                                genericSig);
     equals = SGM.M.getOrCreateSharedFunction(loc, name, signature, IsBare,
                                              IsNotTransparent, IsNotSerialized,
-                                             None, IsThunk);
+                                             ProfileCounter(), IsThunk);
     if (!equals->empty()) {
       return;
     }
@@ -3489,7 +3489,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
                                                              genericSig);
     hash = SGM.M.getOrCreateSharedFunction(loc, name, signature, IsBare,
                                            IsNotTransparent, IsNotSerialized,
-                                           None, IsThunk);
+                                           ProfileCounter(), IsThunk);
     if (!hash->empty()) {
       return;
     }

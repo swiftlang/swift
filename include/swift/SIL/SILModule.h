@@ -20,21 +20,22 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/SILOptions.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
-#include "swift/SIL/Notifications.h"
+#include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/Optional.h"
@@ -488,7 +489,7 @@ public:
                                          IsBare_t isBareSILFunction,
                                          IsTransparent_t isTransparent,
                                          IsSerialized_t isSerialized,
-                                         Optional<uint64_t> entryCount,
+                                         ProfileCounter entryCount,
                                          IsThunk_t isThunk);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
@@ -497,14 +498,16 @@ public:
       SILLocation loc, StringRef name, SILLinkage linkage,
       CanSILFunctionType type, IsBare_t isBareSILFunction,
       IsTransparent_t isTransparent, IsSerialized_t isSerialized,
-      Optional<uint64_t> entryCount = None, IsThunk_t isThunk = IsNotThunk,
+      ProfileCounter entryCount = ProfileCounter(),
+      IsThunk_t isThunk = IsNotThunk,
       SubclassScope subclassScope = SubclassScope::NotApplicable);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
   /// exist.
-  SILFunction *getOrCreateFunction(SILLocation loc, SILDeclRef constant,
-                                   ForDefinition_t forDefinition,
-                                   Optional<uint64_t> entryCount = None);
+  SILFunction *
+  getOrCreateFunction(SILLocation loc, SILDeclRef constant,
+                      ForDefinition_t forDefinition,
+                      ProfileCounter entryCount = ProfileCounter());
 
   /// \brief Create a function declaration.
   ///
@@ -516,7 +519,7 @@ public:
                  CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
                  Optional<SILLocation> loc, IsBare_t isBareSILFunction,
                  IsTransparent_t isTrans, IsSerialized_t isSerialized,
-                 Optional<uint64_t> entryCount = None,
+                 ProfileCounter entryCount = ProfileCounter(),
                  IsThunk_t isThunk = IsNotThunk,
                  SubclassScope subclassScope = SubclassScope::NotApplicable,
                  Inline_t inlineStrategy = InlineDefault,

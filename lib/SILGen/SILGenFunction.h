@@ -21,6 +21,7 @@
 #include "SILGen.h"
 #include "SILGenBuilder.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -599,14 +600,14 @@ public:
   Condition emitCondition(Expr *E, bool hasFalseCode = true,
                           bool invertValue = false,
                           ArrayRef<SILType> contArgs = {},
-                          Optional<uint64_t> NumTrueTaken = None,
-                          Optional<uint64_t> NumFalseTaken = None);
+                          ProfileCounter NumTrueTaken = ProfileCounter(),
+                          ProfileCounter NumFalseTaken = ProfileCounter());
 
   Condition emitCondition(SILValue V, SILLocation Loc, bool hasFalseCode = true,
                           bool invertValue = false,
                           ArrayRef<SILType> contArgs = {},
-                          Optional<uint64_t> NumTrueTaken = None,
-                          Optional<uint64_t> NumFalseTaken = None);
+                          ProfileCounter NumTrueTaken = ProfileCounter(),
+                          ProfileCounter NumFalseTaken = ProfileCounter());
 
   /// Create a new basic block.
   ///
@@ -932,8 +933,8 @@ public:
 
   SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range);
   void emitStmtCondition(StmtCondition Cond, JumpDest FailDest, SILLocation loc,
-                         Optional<uint64_t> NumTrueTaken = None,
-                         Optional<uint64_t> NumFalseTaken = None);
+                         ProfileCounter NumTrueTaken = ProfileCounter(),
+                         ProfileCounter NumFalseTaken = ProfileCounter());
 
   void emitConditionalPBD(PatternBindingDecl *PBD, SILBasicBlock *FailBB);
 
@@ -1454,8 +1455,8 @@ public:
                         Type sourceType, CanType targetType, SGFContext C,
                         std::function<void(ManagedValue)> handleTrue,
                         std::function<void(Optional<ManagedValue>)> handleFalse,
-                        Optional<uint64_t> TrueCount = None,
-                        Optional<uint64_t> FalseCount = None);
+                        ProfileCounter TrueCount = ProfileCounter(),
+                        ProfileCounter FalseCount = ProfileCounter());
 
   /// A form of checked cast branch that uses the old non-ownership preserving
   /// semantics.
@@ -1467,8 +1468,8 @@ public:
                                 SGFContext ctx,
                                 std::function<void(ManagedValue)> handleTrue,
                                 std::function<void()> handleFalse,
-                                Optional<uint64_t> TrueCount = None,
-                                Optional<uint64_t> FalseCount = None);
+                                ProfileCounter TrueCount = ProfileCounter(),
+                                ProfileCounter FalseCount = ProfileCounter());
 
   /// \brief Emit a conditional checked cast branch, starting from an
   /// expression.  Terminates the current BB.
@@ -1487,8 +1488,8 @@ public:
                         SGFContext C,
                         std::function<void(ManagedValue)> handleTrue,
                         std::function<void(Optional<ManagedValue>)> handleFalse,
-                        Optional<uint64_t> TrueCount = None,
-                        Optional<uint64_t> FalseCount = None);
+                        ProfileCounter TrueCount = ProfileCounter(),
+                        ProfileCounter FalseCount = ProfileCounter());
 
   /// A form of checked cast branch that uses the old non-ownership preserving
   /// semantics.
@@ -1501,8 +1502,8 @@ public:
                                 SGFContext ctx,
                                 std::function<void(ManagedValue)> handleTrue,
                                 std::function<void()> handleFalse,
-                                Optional<uint64_t> TrueCount = None,
-                                Optional<uint64_t> FalseCount = None);
+                                ProfileCounter TrueCount = ProfileCounter(),
+                                ProfileCounter FalseCount = ProfileCounter());
 
   /// Emit the control flow for an optional 'bind' operation, branching to the
   /// active failure destination if the optional value addressed by optionalAddr

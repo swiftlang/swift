@@ -559,8 +559,8 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                                             ManagedValue operand, SILType type,
                                             SILBasicBlock *trueBlock,
                                             SILBasicBlock *falseBlock,
-                                            Optional<uint64_t> Target1Count,
-                                            Optional<uint64_t> Target2Count) {
+                                            ProfileCounter Target1Count,
+                                            ProfileCounter Target2Count) {
   SILBuilder::createCheckedCastBranch(loc, isExact, operand.forward(SGF), type,
                                       trueBlock, falseBlock, Target1Count,
                                       Target2Count);
@@ -716,7 +716,7 @@ void SwitchEnumBuilder::emit() && {
   {
     // TODO: We could store the data in CaseBB form and not have to do this.
     llvm::SmallVector<DeclBlockPair, 8> caseBlocks;
-    llvm::SmallVector<Optional<uint64_t>, 8> caseBlockCounts;
+    llvm::SmallVector<ProfileCounter, 8> caseBlockCounts;
     std::transform(caseDataArray.begin(), caseDataArray.end(),
                    std::back_inserter(caseBlocks),
                    [](NormalCaseData &caseData) -> DeclBlockPair {
@@ -724,14 +724,14 @@ void SwitchEnumBuilder::emit() && {
                    });
     std::transform(caseDataArray.begin(), caseDataArray.end(),
                    std::back_inserter(caseBlockCounts),
-                   [](NormalCaseData &caseData) -> Optional<uint64_t> {
+                   [](NormalCaseData &caseData) -> ProfileCounter {
                      return caseData.count;
                    });
     SILBasicBlock *defaultBlock =
         defaultBlockData ? defaultBlockData->block : nullptr;
-    Optional<uint64_t> defaultBlockCount =
-        defaultBlockData ? defaultBlockData->count : None;
-    ArrayRef<Optional<uint64_t>> caseBlockCountsRef = caseBlockCounts;
+    ProfileCounter defaultBlockCount =
+        defaultBlockData ? defaultBlockData->count : ProfileCounter();
+    ArrayRef<ProfileCounter> caseBlockCountsRef = caseBlockCounts;
     if (isAddressOnly) {
       builder.createSwitchEnumAddr(loc, optional.getValue(), defaultBlock,
                                    caseBlocks, caseBlockCountsRef,

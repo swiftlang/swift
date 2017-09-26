@@ -13,11 +13,12 @@
 #ifndef SWIFT_SILGEN_PROFILING_H
 #define SWIFT_SILGEN_PROFILING_H
 
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ProfileData/InstrProf.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/FormalLinkage.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ProfileData/InstrProf.h"
 
 namespace swift {
 
@@ -44,7 +45,7 @@ private:
   uint64_t FunctionHash;
   std::string PGOFuncName;
   llvm::DenseMap<ASTNode, unsigned> RegionCounterMap;
-  llvm::DenseMap<ASTNode, Optional<uint64_t>> PGORegionLoadedCounterMap;
+  llvm::DenseMap<ASTNode, ProfileCounter> PGORegionLoadedCounterMap;
   llvm::DenseMap<ASTNode, ASTNode> PGORegionCondToParentMap;
 
   std::vector<std::tuple<std::string, uint64_t, std::string>> CoverageData;
@@ -61,7 +62,7 @@ public:
 
   /// Get previously Loaded the execution count corresponding to \p Node
   /// from a profile, if one is available.
-  Optional<uint64_t> getExecutionCount(ASTNode Node);
+  ProfileCounter getExecutionCount(ASTNode Node);
 
   /// Get PGORegion's parent ASTNode
   /// used to get a condition's parent IfStmt or IfCond

@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
 #include "Initialization.h"
 #include "RValue.h"
+#include "SILGen.h"
 #include "SILGenDynamicCast.h"
 #include "Scope.h"
 #include "SwitchCaseFullExpr.h"
@@ -21,6 +21,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -909,10 +910,11 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
   // indicates whether we succeeded.
   auto destType = OptionalType::get(pattern->getCastTypeLoc().getType());
 
-  value = emitConditionalCheckedCast(SGF, loc, value, pattern->getType(),
-                                     destType, pattern->getCastKind(),
-                                     SGFContext(), None, None)
-              .getAsSingleValue(SGF, loc);
+  value =
+      emitConditionalCheckedCast(SGF, loc, value, pattern->getType(), destType,
+                                 pattern->getCastKind(), SGFContext(),
+                                 ProfileCounter(), ProfileCounter())
+          .getAsSingleValue(SGF, loc);
 
   // Now that we have our result as an optional, we can use an enum projection
   // to do all the work.
@@ -1184,10 +1186,10 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 /// specified JumpDest.  The insertion point is left in the block where the
 /// condition has matched and any bound variables are in scope.
 ///
-void SILGenFunction::emitStmtCondition(StmtCondition Cond,
-                                       JumpDest FailDest, SILLocation loc,
-                                       Optional<uint64_t> NumTrueTaken,
-                                       Optional<uint64_t> NumFalseTaken) {
+void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FailDest,
+                                       SILLocation loc,
+                                       ProfileCounter NumTrueTaken,
+                                       ProfileCounter NumFalseTaken) {
 
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");

@@ -233,8 +233,7 @@ SILFunction *SILModule::getOrCreateFunction(
     SILLocation loc, StringRef name, SILLinkage linkage,
     CanSILFunctionType type, IsBare_t isBareSILFunction,
     IsTransparent_t isTransparent, IsSerialized_t isSerialized,
-    Optional<uint64_t> entryCount, IsThunk_t isThunk,
-    SubclassScope subclassScope) {
+    ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope) {
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
     assert(fn->getLinkage() == linkage ||
@@ -280,7 +279,7 @@ static bool verifySILSelfParameterType(SILDeclRef DeclRef,
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             SILDeclRef constant,
                                             ForDefinition_t forDefinition,
-                                            Optional<uint64_t> entryCount) {
+                                            ProfileCounter entryCount) {
 
   auto name = constant.mangle();
   auto constantType = Types.getConstantType(constant).castTo<SILFunctionType>();
@@ -364,8 +363,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
 SILFunction *SILModule::getOrCreateSharedFunction(
     SILLocation loc, StringRef name, CanSILFunctionType type,
     IsBare_t isBareSILFunction, IsTransparent_t isTransparent,
-    IsSerialized_t isSerialized, Optional<uint64_t> entryCount,
-    IsThunk_t isThunk) {
+    IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk) {
   return getOrCreateFunction(loc, name, SILLinkage::Shared, type,
                              isBareSILFunction, isTransparent, isSerialized,
                              entryCount, isThunk, SubclassScope::NotApplicable);
@@ -375,10 +373,9 @@ SILFunction *SILModule::createFunction(
     SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
     GenericEnvironment *genericEnv, Optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-    IsSerialized_t isSerialized, Optional<uint64_t> entryCount,
-    IsThunk_t isThunk, SubclassScope subclassScope, Inline_t inlineStrategy,
-    EffectsKind EK, SILFunction *InsertBefore,
-    const SILDebugScope *DebugScope) {
+    IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk,
+    SubclassScope subclassScope, Inline_t inlineStrategy, EffectsKind EK,
+    SILFunction *InsertBefore, const SILDebugScope *DebugScope) {
   return SILFunction::create(*this, linkage, name, loweredType, genericEnv, loc,
                              isBareSILFunction, isTrans, isSerialized,
                              entryCount, isThunk, subclassScope, inlineStrategy,

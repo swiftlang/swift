@@ -278,12 +278,12 @@ struct PGOMapping : public ASTWalker {
   unsigned NextCounter;
 
   /// The map of statements to counters.
-  llvm::DenseMap<ASTNode, Optional<uint64_t>> &LoadedCounterMap;
+  llvm::DenseMap<ASTNode, ProfileCounter> &LoadedCounterMap;
   llvm::Expected<llvm::InstrProfRecord> &LoadedCounts;
   llvm::DenseMap<ASTNode, ASTNode> &CondToParentMap;
   llvm::DenseMap<ASTNode, unsigned> CounterMap;
 
-  PGOMapping(llvm::DenseMap<ASTNode, Optional<uint64_t>> &LoadedCounterMap,
+  PGOMapping(llvm::DenseMap<ASTNode, ProfileCounter> &LoadedCounterMap,
              llvm::Expected<llvm::InstrProfRecord> &LoadedCounts,
              llvm::DenseMap<ASTNode, ASTNode> &PGORegionCondToParentMap)
       : NextCounter(0), LoadedCounterMap(LoadedCounterMap),
@@ -305,8 +305,8 @@ struct PGOMapping : public ASTWalker {
     return 0;
   }
 
-  Optional<uint64_t> subtract(Optional<uint64_t> L, Optional<uint64_t> R) {
-    if (!L || !R) {
+  ProfileCounter subtract(ProfileCounter L, ProfileCounter R) {
+    if (!L.hasValue() || !R.hasValue()) {
       return L;
     }
     uint64_t LV = L.getValue();
@@ -317,9 +317,9 @@ struct PGOMapping : public ASTWalker {
 
   /// Load the execution count corresponding to \p Node from a profile, if one
   /// is available.
-  Optional<uint64_t> loadExecutionCount(ASTNode Node) {
+  ProfileCounter loadExecutionCount(ASTNode Node) {
     if (!Node)
-      return None;
+      return ProfileCounter();
 
     auto CounterIt = CounterMap.find(Node);
     assert(CounterIt != CounterMap.end() &&
@@ -925,13 +925,13 @@ void SILGenProfiling::assignRegionCounters(Decl *Root) {
   }
 }
 
-Optional<uint64_t> SILGenProfiling::getExecutionCount(ASTNode Node) {
+ProfileCounter SILGenProfiling::getExecutionCount(ASTNode Node) {
   if (!Node) {
-    return None;
+    return ProfileCounter();
   }
   auto it = PGORegionLoadedCounterMap.find(Node);
   if (it == PGORegionLoadedCounterMap.end()) {
-    return None;
+    return ProfileCounter();
   }
   return it->getSecond();
 }

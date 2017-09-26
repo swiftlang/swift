@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_SILBUILDER_H
 #define SWIFT_SIL_SILBUILDER_H
 
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
@@ -1088,8 +1089,8 @@ public:
   createSelectEnum(SILLocation Loc, SILValue Operand, SILType Ty,
                    SILValue DefaultValue,
                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-                   Optional<ArrayRef<Optional<uint64_t>>> CaseCounts = None,
-                   Optional<uint64_t> DefaultCount = None) {
+                   Optional<ArrayRef<ProfileCounter>> CaseCounts = None,
+                   ProfileCounter DefaultCount = ProfileCounter()) {
     return insert(SelectEnumInst::create(
         getSILDebugLocation(Loc), Operand, Ty, DefaultValue, CaseValues,
         getFunction(), CaseCounts, DefaultCount));
@@ -1098,8 +1099,8 @@ public:
   SelectEnumAddrInst *createSelectEnumAddr(
       SILLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
       ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-      Optional<ArrayRef<Optional<uint64_t>>> CaseCounts = None,
-      Optional<uint64_t> DefaultCount = None) {
+      Optional<ArrayRef<ProfileCounter>> CaseCounts = None,
+      ProfileCounter DefaultCount = ProfileCounter()) {
     return insert(SelectEnumAddrInst::create(
         getSILDebugLocation(Loc), Operand, Ty, DefaultValue, CaseValues,
         getFunction(), CaseCounts, DefaultCount));
@@ -1595,35 +1596,33 @@ public:
         new (getModule()) ThrowInst(getSILDebugLocation(Loc), errorValue));
   }
 
-  CondBranchInst *createCondBranch(SILLocation Loc, SILValue Cond,
-                                   SILBasicBlock *Target1,
-                                   SILBasicBlock *Target2,
-                                   Optional<uint64_t> Target1Count = None,
-                                   Optional<uint64_t> Target2Count = None) {
+  CondBranchInst *
+  createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,
+                   SILBasicBlock *Target2,
+                   ProfileCounter Target1Count = ProfileCounter(),
+                   ProfileCounter Target2Count = ProfileCounter()) {
     return insertTerminator(
         CondBranchInst::create(getSILDebugLocation(Loc), Cond, Target1, Target2,
                                Target1Count, Target2Count, getFunction()));
   }
 
-  CondBranchInst *createCondBranch(SILLocation Loc, SILValue Cond,
-                                   SILBasicBlock *Target1,
-                                   ArrayRef<SILValue> Args1,
-                                   SILBasicBlock *Target2,
-                                   ArrayRef<SILValue> Args2,
-                                   Optional<uint64_t> Target1Count = None,
-                                   Optional<uint64_t> Target2Count = None) {
+  CondBranchInst *
+  createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,
+                   ArrayRef<SILValue> Args1, SILBasicBlock *Target2,
+                   ArrayRef<SILValue> Args2,
+                   ProfileCounter Target1Count = ProfileCounter(),
+                   ProfileCounter Target2Count = ProfileCounter()) {
     return insertTerminator(
         CondBranchInst::create(getSILDebugLocation(Loc), Cond, Target1, Args1,
                                Target2, Args2, Target1Count, Target2Count, getFunction()));
   }
 
-  CondBranchInst *createCondBranch(SILLocation Loc, SILValue Cond,
-                                   SILBasicBlock *Target1,
-                                   OperandValueArrayRef Args1,
-                                   SILBasicBlock *Target2,
-                                   OperandValueArrayRef Args2,
-                                   Optional<uint64_t> Target1Count = None,
-                                   Optional<uint64_t> Target2Count = None) {
+  CondBranchInst *
+  createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,
+                   OperandValueArrayRef Args1, SILBasicBlock *Target2,
+                   OperandValueArrayRef Args2,
+                   ProfileCounter Target1Count = ProfileCounter(),
+                   ProfileCounter Target2Count = ProfileCounter()) {
     SmallVector<SILValue, 6> ArgsCopy1;
     SmallVector<SILValue, 6> ArgsCopy2;
 
@@ -1665,8 +1664,8 @@ public:
   SwitchEnumInst *createSwitchEnum(
       SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      Optional<ArrayRef<Optional<uint64_t>>> CaseCounts = None,
-      Optional<uint64_t> DefaultCount = None) {
+      Optional<ArrayRef<ProfileCounter>> CaseCounts = None,
+      ProfileCounter DefaultCount = ProfileCounter()) {
     return insertTerminator(SwitchEnumInst::create(
         getSILDebugLocation(Loc), Operand, DefaultBB, CaseBBs, getFunction(),
         CaseCounts, DefaultCount));
@@ -1675,8 +1674,8 @@ public:
   SwitchEnumAddrInst *createSwitchEnumAddr(
       SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      Optional<ArrayRef<Optional<uint64_t>>> CaseCounts = None,
-      Optional<uint64_t> DefaultCount = None) {
+      Optional<ArrayRef<ProfileCounter>> CaseCounts = None,
+      ProfileCounter DefaultCount = ProfileCounter()) {
     return insertTerminator(SwitchEnumAddrInst::create(
         getSILDebugLocation(Loc), Operand, DefaultBB, CaseBBs, getFunction(),
         CaseCounts, DefaultCount));
@@ -1695,8 +1694,8 @@ public:
   createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op,
                           SILType destTy, SILBasicBlock *successBB,
                           SILBasicBlock *failureBB,
-                          Optional<uint64_t> Target1Count = None,
-                          Optional<uint64_t> Target2Count = None) {
+                          ProfileCounter Target1Count = ProfileCounter(),
+                          ProfileCounter Target2Count = ProfileCounter()) {
     return insertTerminator(CheckedCastBranchInst::create(
         getSILDebugLocation(Loc), isExact, op, destTy, successBB, failureBB,
         getFunction(), OpenedArchetypes, Target1Count, Target2Count));
@@ -1716,8 +1715,8 @@ public:
                               SILValue src, CanType sourceType, SILValue dest,
                               CanType targetType, SILBasicBlock *successBB,
                               SILBasicBlock *failureBB,
-                              Optional<uint64_t> Target1Count = None,
-                              Optional<uint64_t> Target2Count = None) {
+                              ProfileCounter Target1Count = ProfileCounter(),
+                              ProfileCounter Target2Count = ProfileCounter()) {
     return insertTerminator(new (getModule()) CheckedCastAddrBranchInst(
         getSILDebugLocation(Loc), consumption, src, sourceType, dest,
         targetType, successBB, failureBB, Target1Count, Target2Count));

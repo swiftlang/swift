@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
 #include "Condition.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "SILGen.h"
 #include "Scope.h"
 #include "SwitchCaseFullExpr.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -138,11 +139,11 @@ static void emitOrDeleteBlock(SILGenFunction &SGF, JumpDest &dest,
     SGF.B.emitBlock(BB, BranchLoc);
 }
 
-Condition SILGenFunction::emitCondition(Expr *E,
-                                        bool hasFalseCode, bool invertValue,
+Condition SILGenFunction::emitCondition(Expr *E, bool hasFalseCode,
+                                        bool invertValue,
                                         ArrayRef<SILType> contArgs,
-                                        Optional<uint64_t> NumTrueTaken,
-                                        Optional<uint64_t> NumFalseTaken) {
+                                        ProfileCounter NumTrueTaken,
+                                        ProfileCounter NumFalseTaken) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
 
@@ -161,8 +162,8 @@ Condition SILGenFunction::emitCondition(Expr *E,
 Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
                                         bool hasFalseCode, bool invertValue,
                                         ArrayRef<SILType> contArgs,
-                                        Optional<uint64_t> NumTrueTaken,
-                                        Optional<uint64_t> NumFalseTaken) {
+                                        ProfileCounter NumTrueTaken,
+                                        ProfileCounter NumFalseTaken) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
 

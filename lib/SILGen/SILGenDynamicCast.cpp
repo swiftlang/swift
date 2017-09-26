@@ -118,8 +118,8 @@ namespace {
         ManagedValue operand, CastConsumptionKind consumption, SGFContext ctx,
         const std::function<void(ManagedValue)> &handleTrue,
         const std::function<void(Optional<ManagedValue>)> &handleFalse,
-        Optional<uint64_t> TrueCount = None,
-        Optional<uint64_t> FalseCount = None) {
+        ProfileCounter TrueCount = ProfileCounter(),
+        ProfileCounter FalseCount = ProfileCounter()) {
       // The cast instructions don't know how to work with anything
       // but the most general possible abstraction level.
       AbstractionPattern abstraction =
@@ -288,7 +288,7 @@ void SILGenFunction::emitCheckedCastBranch(
     SILLocation loc, Expr *source, Type targetType, SGFContext ctx,
     std::function<void(ManagedValue)> handleTrue,
     std::function<void(Optional<ManagedValue>)> handleFalse,
-    Optional<uint64_t> TrueCount, Optional<uint64_t> FalseCount) {
+    ProfileCounter TrueCount, ProfileCounter FalseCount) {
   CheckedCastEmitter emitter(*this, loc, source->getType(), targetType);
   ManagedValue operand = emitter.emitOperand(source);
   emitter.emitConditional(operand, CastConsumptionKind::TakeAlways, ctx,
@@ -300,7 +300,7 @@ void SILGenFunction::emitCheckedCastBranch(
     CanType targetType, SGFContext ctx,
     std::function<void(ManagedValue)> handleTrue,
     std::function<void(Optional<ManagedValue>)> handleFalse,
-    Optional<uint64_t> TrueCount, Optional<uint64_t> FalseCount) {
+    ProfileCounter TrueCount, ProfileCounter FalseCount) {
   CheckedCastEmitter emitter(*this, loc, sourceType, targetType);
   emitter.emitConditional(src.getFinalManagedValue(), src.getFinalConsumption(),
                           ctx, handleTrue, handleFalse, TrueCount, FalseCount);
@@ -399,8 +399,8 @@ namespace {
                          SGFContext ctx,
                          const std::function<void(ManagedValue)> &handleTrue,
                          const std::function<void()> &handleFalse,
-                         Optional<uint64_t> TrueCount = None,
-                         Optional<uint64_t> FalseCount = None) {
+                         ProfileCounter TrueCount = ProfileCounter(),
+                         ProfileCounter FalseCount = ProfileCounter()) {
       // The cast instructions don't know how to work with anything
       // but the most general possible abstraction level.
       AbstractionPattern abstraction = SGF.SGM.Types.getMostGeneralAbstraction();
@@ -545,8 +545,8 @@ namespace {
 void SILGenFunction::emitCheckedCastBranchOld(
     SILLocation loc, Expr *source, Type targetType, SGFContext ctx,
     std::function<void(ManagedValue)> handleTrue,
-    std::function<void()> handleFalse, Optional<uint64_t> TrueCount,
-    Optional<uint64_t> FalseCount) {
+    std::function<void()> handleFalse, ProfileCounter TrueCount,
+    ProfileCounter FalseCount) {
   CheckedCastEmitterOld emitter(*this, loc, source->getType(), targetType);
   ManagedValue operand = emitter.emitOperand(source);
   emitter.emitConditional(operand, CastConsumptionKind::TakeAlways, ctx,
@@ -557,8 +557,8 @@ void SILGenFunction::emitCheckedCastBranchOld(
     SILLocation loc, ConsumableManagedValue src, Type sourceType,
     CanType targetType, SGFContext ctx,
     std::function<void(ManagedValue)> handleTrue,
-    std::function<void()> handleFalse, Optional<uint64_t> TrueCount,
-    Optional<uint64_t> FalseCount) {
+    std::function<void()> handleFalse, ProfileCounter TrueCount,
+    ProfileCounter FalseCount) {
   CheckedCastEmitterOld emitter(*this, loc, sourceType, targetType);
   emitter.emitConditional(src.getFinalManagedValue(), src.getFinalConsumption(),
                           ctx, handleTrue, handleFalse, TrueCount, FalseCount);
@@ -673,7 +673,7 @@ RValue Lowering::emitUnconditionalCheckedCast(SILGenFunction &SGF,
 RValue Lowering::emitConditionalCheckedCast(
     SILGenFunction &SGF, SILLocation loc, ManagedValue operand,
     Type operandType, Type optTargetType, CheckedCastKind castKind,
-    SGFContext C, Optional<uint64_t> TrueCount, Optional<uint64_t> FalseCount) {
+    SGFContext C, ProfileCounter TrueCount, ProfileCounter FalseCount) {
   // Drill into the result type.
   CanType resultObjectType =
     optTargetType->getCanonicalType().getAnyOptionalObjectType();

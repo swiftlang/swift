@@ -23,11 +23,12 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
-#include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/SILValue.h"
@@ -4441,16 +4442,16 @@ protected:
   SelectEnumInstBase(SILInstructionKind kind, SILDebugLocation debugLoc,
                      SILType type, SILValue enumValue, SILValue defaultValue,
                      ArrayRef<std::pair<EnumElementDecl *, SILValue>> cases,
-      Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
-      Optional<uint64_t> DefaultCount);
+                     Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                     ProfileCounter DefaultCount);
   template <typename SELECT_ENUM_INST>
   static SELECT_ENUM_INST *
   createSelectEnum(SILDebugLocation DebugLoc, SILValue Enum, SILType Type,
                    SILValue DefaultValue,
                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
                    SILFunction &F,
-                   Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
-                   Optional<uint64_t> DefaultCount);
+                   Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                   ProfileCounter DefaultCount);
 
 public:
   SILValue getEnumOperand() const { return getOperand(); }
@@ -4502,15 +4503,16 @@ private:
   SelectEnumInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                  SILValue DefaultValue,
                  ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-                 Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
-                 Optional<uint64_t> DefaultCount)
-      : InstructionBase(DebugLoc, Type, Operand, DefaultValue, CaseValues, CaseCounts, DefaultCount) {}
+                 Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                 ProfileCounter DefaultCount)
+      : InstructionBase(DebugLoc, Type, Operand, DefaultValue, CaseValues,
+                        CaseCounts, DefaultCount) {}
   static SelectEnumInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-         SILFunction &F, Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
-         Optional<uint64_t> DefaultCount);
+         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         ProfileCounter DefaultCount);
 };
 
 /// Select one of a set of values based on the case of an enum.
@@ -4523,17 +4525,17 @@ class SelectEnumAddrInst
   SelectEnumAddrInst(
       SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
       SILValue DefaultValue,
-                     ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-                     Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
-                     Optional<uint64_t> DefaultCount)
-                               : InstructionBase(DebugLoc, Type, Operand, DefaultValue, CaseValues,CaseCounts,
-                                                 DefaultCount) {}
+      ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+      Optional<ArrayRef<ProfileCounter>> CaseCounts,
+      ProfileCounter DefaultCount)
+      : InstructionBase(DebugLoc, Type, Operand, DefaultValue, CaseValues,
+                        CaseCounts, DefaultCount) {}
   static SelectEnumAddrInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-         SILFunction &F, Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
-         Optional<uint64_t> DefaultCount);
+         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         ProfileCounter DefaultCount);
 };
 
 /// Select on a value of a builtin integer type.
@@ -5959,28 +5961,23 @@ private:
   CondBranchInst(SILDebugLocation DebugLoc, SILValue Condition,
                  SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
                  ArrayRef<SILValue> Args, unsigned NumTrue, unsigned NumFalse,
-                 Optional<uint64_t> TrueBBCount,
-                 Optional<uint64_t> FalseBBCount);
+                 ProfileCounter TrueBBCount, ProfileCounter FalseBBCount);
 
   /// Construct a CondBranchInst that will branch to TrueBB or FalseBB based on
   /// the Condition value. Both blocks must not take any arguments.
   static CondBranchInst *create(SILDebugLocation DebugLoc, SILValue Condition,
                                 SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
-                                Optional<uint64_t> TrueBBCount,
-                                Optional<uint64_t> FalseBBCount,
-                                SILFunction &F);
+                                ProfileCounter TrueBBCount,
+                                ProfileCounter FalseBBCount, SILFunction &F);
 
   /// Construct a CondBranchInst that will either branch to TrueBB and pass
   /// TrueArgs or branch to FalseBB and pass FalseArgs based on the Condition
   /// value.
-  static CondBranchInst *create(SILDebugLocation DebugLoc, SILValue Condition,
-                                SILBasicBlock *TrueBB,
-                                ArrayRef<SILValue> TrueArgs,
-                                SILBasicBlock *FalseBB,
-                                ArrayRef<SILValue> FalseArgs, 
-                                Optional<uint64_t> TrueBBCount,
-                                Optional<uint64_t> FalseBBCount,
-                                SILFunction &F);
+  static CondBranchInst *
+  create(SILDebugLocation DebugLoc, SILValue Condition, SILBasicBlock *TrueBB,
+         ArrayRef<SILValue> TrueArgs, SILBasicBlock *FalseBB,
+         ArrayRef<SILValue> FalseArgs, ProfileCounter TrueBBCount,
+         ProfileCounter FalseBBCount, SILFunction &F);
 
 public:
   SILValue getCondition() const { return Operands[ConditionIdx].get(); }
@@ -5998,9 +5995,9 @@ public:
   const SILBasicBlock *getFalseBB() const { return DestBBs[1]; }
 
   /// The number of times the True branch was executed.
-  Optional<uint64_t> getTrueBBCount() const { return DestBBs[0].getCount(); }
+  ProfileCounter getTrueBBCount() const { return DestBBs[0].getCount(); }
   /// The number of times the False branch was executed.
-  Optional<uint64_t> getFalseBBCount() const { return DestBBs[1].getCount(); }
+  ProfileCounter getFalseBBCount() const { return DestBBs[1].getCount(); }
 
   /// Get the arguments to the true BB.
   OperandValueArrayRef getTrueArgs() const;
@@ -6164,15 +6161,14 @@ protected:
       SILInstructionKind Kind, SILDebugLocation DebugLoc, SILValue Operand,
       SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      Optional<ArrayRef<Optional<uint64_t>>> Counts,
-      Optional<uint64_t> DefaultCount);
+      Optional<ArrayRef<ProfileCounter>> Counts, ProfileCounter DefaultCount);
 
   template <typename SWITCH_ENUM_INST>
   static SWITCH_ENUM_INST *createSwitchEnum(
       SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      SILFunction &F, Optional<ArrayRef<Optional<uint64_t>>> Counts,
-      Optional<uint64_t> DefaultCount);
+      SILFunction &F, Optional<ArrayRef<ProfileCounter>> Counts,
+      ProfileCounter DefaultCount);
 
 public:
   /// Clean up tail-allocated successor records for the switch cases.
@@ -6194,7 +6190,7 @@ public:
     assert(i < NumCases && "case out of bounds");
     return {getCaseBuf()[i], getSuccessorBuf()[i].getBB()};
   }
-  Optional<uint64_t> getCaseCount(unsigned i) const {
+  ProfileCounter getCaseCount(unsigned i) const {
     assert(i < NumCases && "case out of bounds");
     return getSuccessorBuf()[i].getCount();
   }
@@ -6226,7 +6222,7 @@ public:
     assert(HasDefault && "doesn't have a default");
     return getSuccessorBuf()[NumCases];
   }
-  Optional<uint64_t> getDefaultCount() const {
+  ProfileCounter getDefaultCount() const {
     assert(HasDefault && "doesn't have a default");
     return getSuccessorBuf()[NumCases].getCount();
   }
@@ -6249,15 +6245,16 @@ private:
 
   SwitchEnumInst(
       SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
-                 ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-                 Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
-                 Optional<uint64_t> DefaultCount)
-      : InstructionBase(DebugLoc, Operand, DefaultBB, CaseBBs, CaseCounts, DefaultCount) {}
+      ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
+      Optional<ArrayRef<ProfileCounter>> CaseCounts,
+      ProfileCounter DefaultCount)
+      : InstructionBase(DebugLoc, Operand, DefaultBB, CaseBBs, CaseCounts,
+                        DefaultCount) {}
   static SwitchEnumInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
          ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-         SILFunction &F, Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
-         Optional<uint64_t> DefaultCount);
+         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         ProfileCounter DefaultCount);
 };
 
 /// A switch on an enum's discriminator in memory.
@@ -6271,15 +6268,16 @@ private:
 
   SwitchEnumAddrInst(
       SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
-                     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-                     Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
-                     Optional<uint64_t> DefaultCount)
-      : InstructionBase(DebugLoc, Operand, DefaultBB, CaseBBs, CaseCounts, DefaultCount) {}
+      ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
+      Optional<ArrayRef<ProfileCounter>> CaseCounts,
+      ProfileCounter DefaultCount)
+      : InstructionBase(DebugLoc, Operand, DefaultBB, CaseBBs, CaseCounts,
+                        DefaultCount) {}
   static SwitchEnumAddrInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
          ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-         SILFunction &F, Optional<ArrayRef<Optional<uint64_t>>> CaseCounts,
-         Optional<uint64_t> DefaultCount);
+         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         ProfileCounter DefaultCount);
 };
 
 /// Branch on the existence of an Objective-C method in the dynamic type of
@@ -6347,9 +6345,8 @@ class CheckedCastBranchInst final:
                         SILValue Operand,
                         ArrayRef<SILValue> TypeDependentOperands,
                         SILType DestTy, SILBasicBlock *SuccessBB,
-                        SILBasicBlock *FailureBB,
-                        Optional<uint64_t> Target1Count,
-                        Optional<uint64_t> Target2Count)
+                        SILBasicBlock *FailureBB, ProfileCounter Target1Count,
+                        ProfileCounter Target2Count)
       : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
                                                       TypeDependentOperands),
         DestTy(DestTy),
@@ -6360,7 +6357,7 @@ class CheckedCastBranchInst final:
   create(SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
          SILType DestTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
-         Optional<uint64_t> Target1Count, Optional<uint64_t> Target2Count);
+         ProfileCounter Target1Count, ProfileCounter Target2Count);
 
 public:
   bool isExact() const { return IsExact; }
@@ -6389,9 +6386,9 @@ public:
   const SILBasicBlock *getFailureBB() const { return DestBBs[1]; }
 
   /// The number of times the True branch was executed
-  Optional<uint64_t> getTrueBBCount() const { return DestBBs[0].getCount(); }
+  ProfileCounter getTrueBBCount() const { return DestBBs[0].getCount(); }
   /// The number of times the False branch was executed
-  Optional<uint64_t> getFalseBBCount() const { return DestBBs[1].getCount(); }
+  ProfileCounter getFalseBBCount() const { return DestBBs[1].getCount(); }
 };
 
 /// Perform a checked cast operation and branch on whether the cast succeeds.
@@ -6469,12 +6466,11 @@ class CheckedCastAddrBranchInst
                             CastConsumptionKind consumptionKind, SILValue src,
                             CanType srcType, SILValue dest, CanType targetType,
                             SILBasicBlock *successBB, SILBasicBlock *failureBB,
-                            Optional<uint64_t> Target1Count,
-                            Optional<uint64_t> Target2Count)
-      : InstructionBase(DebugLoc),
-        ConsumptionKind(consumptionKind), Operands{this, src, dest},
-        DestBBs{{this, successBB, Target1Count},
-                {this, failureBB, Target2Count}},
+                            ProfileCounter Target1Count,
+                            ProfileCounter Target2Count)
+      : InstructionBase(DebugLoc), ConsumptionKind(consumptionKind),
+        Operands{this, src, dest}, DestBBs{{this, successBB, Target1Count},
+                                           {this, failureBB, Target2Count}},
         SourceType(srcType), TargetType(targetType) {}
 
 public:
@@ -6502,9 +6498,9 @@ public:
   const SILBasicBlock *getFailureBB() const { return DestBBs[1]; }
 
   /// The number of times the True branch was executed.
-  Optional<uint64_t> getTrueBBCount() const { return DestBBs[0].getCount(); }
+  ProfileCounter getTrueBBCount() const { return DestBBs[0].getCount(); }
   /// The number of times the False branch was executed.
-  Optional<uint64_t> getFalseBBCount() const { return DestBBs[1].getCount(); }
+  ProfileCounter getFalseBBCount() const { return DestBBs[1].getCount(); }
 };
 
 /// A private abstract class to store the destinations of a TryApplyInst.
