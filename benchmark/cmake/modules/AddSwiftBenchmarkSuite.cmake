@@ -327,9 +327,11 @@ function (swift_benchmark_compile_archopts)
   endforeach()
 
   foreach(module_name_path ${SWIFT_MULTISOURCE_SWIFT3_BENCHES})
-    set(objfile_out)
+    get_filename_component(module_name "${module_name_path}" NAME)
+
     if ("${bench_flags}" MATCHES "-whole-module.*" AND
         NOT "${bench_flags}" MATCHES "-num-threads.*")
+      set(objfile_out)
       add_swift_multisource_wmo_benchmark_library(objfile_out
         MODULE_PATH "${module_name_path}"
         SOURCE_DIR "${srcdir}"
@@ -338,8 +340,9 @@ function (swift_benchmark_compile_archopts)
         LIBRARY_FLAGS ${common_swift3_options} ${bench_flags}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfile_out)
-      list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
+      list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
     else()
+      set(objfiles_out)
       add_swift_multisource_nonwmo_benchmark_library(objfiles_out
         MODULE_PATH "${module_name_path}"
         SOURCE_DIR "${srcdir}"
@@ -353,9 +356,11 @@ function (swift_benchmark_compile_archopts)
   endforeach()
 
   foreach(module_name_path ${SWIFT_MULTISOURCE_SWIFT4_BENCHES})
-    set(objfile_out)
+    get_filename_component(module_name "${module_name_path}" NAME)
+
     if ("${bench_flags}" MATCHES "-whole-module.*" AND
         NOT "${bench_flags}" MATCHES "-num-threads.*")
+      set(objfile_out)
       add_swift_multisource_wmo_benchmark_library(objfile_out
         MODULE_PATH "${module_name_path}"
         SOURCE_DIR "${srcdir}"
@@ -364,8 +369,9 @@ function (swift_benchmark_compile_archopts)
         LIBRARY_FLAGS ${common_swift4_options} ${bench_flags}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfile_out)
-      list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
+      list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
     else()
+      set(objfiles_out)
       add_swift_multisource_nonwmo_benchmark_library(objfiles_out
         MODULE_PATH "${module_name_path}"
         SOURCE_DIR "${srcdir}"
