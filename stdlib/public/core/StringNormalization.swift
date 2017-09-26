@@ -19,11 +19,90 @@ import SwiftShims
 //
 public // String Comparison Prototype
 enum _Normalization {
+  // ICU's NFC unorm2 instance
+  public // String Comparison Prototype
+  static var _nfcNormalizer: OpaquePointer = {
+    var err = __swift_stdlib_U_ZERO_ERROR
+    let normalizer = __swift_stdlib_unorm2_getNFCInstance(&err)
+    guard err.isSuccess else {
+      // This shouldn't be possible unless some deep (unrecoverable) system
+      // invariants are violated
+      fatalError("Unable to talk to ICU")
+    }
+    return normalizer
+  }()
 
-	// When normalized in NFC, some segments may expand in size. This expansion is
-	// capped by the maximum expansion factor of the normal form. For NFC, that is
-	// 3x.
-	public // String Comparison Prototype
+  // Whether this buffer of code units satisfies the quickCheck=YES property for
+  // normality checking under NFC.
+  //
+  // ICU provides a quickCheck, which may yield "YES", "NO", or "MAYBE". YES
+  // means that the string was determined to definitely be normal under NFC. In
+  // practice, the majority of Strings have this property. Checking for YES is
+  // considerably faster than trying to distinguish between NO and MAYBE.
+  public // String Comparison Prototype
+  static func _prenormalQuickCheckYes(
+    _ buffer: UnsafeBufferPointer<UInt16>
+  ) -> Bool {
+    var err = __swift_stdlib_U_ZERO_ERROR
+    let length = __swift_stdlib_unorm2_spanQuickCheckYes(
+      _Normalization._nfcNormalizer,
+      buffer.baseAddress._unsafelyUnwrappedUnchecked,
+      Int32(buffer.count),
+      &err)
+
+    guard err.isSuccess else {
+      // This shouldn't be possible unless some deep (unrecoverable) system
+      // invariants are violated
+      fatalError("Unable to talk to ICU")
+    }
+    return length == buffer.count
+  }}
+
+extension UnicodeScalar {
+  // Normalization boundary - a place in a string where everything left of the
+  // boundary can be normalized independently from everything right of the
+  // boundary. The concatenation of each result is the same as if the entire
+  // string had been normalized as a whole.
+  //
+  // Normalization segment - a sequence of code units between two normalization
+  // boundaries (without any boundaries in the middle). Note that normalization
+  // segments can, as a process of normalization, expand, contract, and even
+  // produce new sub-segments.
+
+  // Whether this scalar value always has a normalization boundary before it.
+  public // String Comparison Prototype
+  var _hasNormalizationBoundaryBefore: Bool {
+    _sanityCheck(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
+    let value = Int32(bitPattern: self.value)
+    return 0 != __swift_stdlib_unorm2_hasBoundaryBefore(
+      _Normalization._nfcNormalizer, value)
+  }
+
+  // Whether the supported version of Unicode has assigned a code point to this
+  // value.
+  public // String Comparison Prototype
+  var _isDefined: Bool {
+    return __swift_stdlib_u_isdefined(Int32(self.value)) != 0
+  }
+
+  // A property tracked in ICU regarding the scalar's potential non-normality;
+  // this is equivalent to whether quickCheck=NO. A subset of such scalars may
+  // expand under NFC normalization, and a subset of those may expand into
+  // multiple segments.
+  public // String Comparison Prototype
+  var _hasFullCompExclusion: Bool {
+    _sanityCheck(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
+    let value = Int32(bitPattern: self.value)
+    let prop = __swift_stdlib_UCHAR_FULL_COMPOSITION_EXCLUSION
+    return __swift_stdlib_u_hasBinaryProperty(value, prop) != 0
+  }
+}
+
+extension _Normalization {
+  // When normalized in NFC, some segments may expand in size (e.g. some non-BMP
+  // musical notes). This expansion is capped by the maximum expansion factor of
+  // the normal form. For NFC, that is 3x.
+  public // String Comparison Prototype
   static let _maxNFCExpansionFactor = 3
 
   // A small output buffer to use for normalizing a single normalization
@@ -38,60 +117,4 @@ enum _Normalization {
   // Expanders" below)
   public // String Comparison Prototype
   typealias _ChunkOutputBuffer = _FixedArray64<UInt16>
-
-  public // String Comparison Prototype
-  static var _nfcNormalizer: OpaquePointer = {
-    var err = __swift_stdlib_U_ZERO_ERROR
-    let normalizer = __swift_stdlib_unorm2_getNFCInstance(&err)
-    guard err.isSuccess else {
-      // This shouldn't be possible unless some deep (unrecoverable) system
-      // invariants are violated
-      fatalError("Unable to talk to ICU")
-    }
-    return normalizer
-  }()
-
-  public // String Comparison Prototype
-  static func _prenormalQuickCheckYes(
-    _ buffer: UnsafeBufferPointer<UInt16>
-  ) -> Bool {
-	  var err = __swift_stdlib_U_ZERO_ERROR
-	  let length = __swift_stdlib_unorm2_spanQuickCheckYes(
-	    _Normalization._nfcNormalizer,
-	    buffer.baseAddress._unsafelyUnwrappedUnchecked,
-	    Int32(buffer.count),
-	    &err)
-
-    guard err.isSuccess else {
-      // This shouldn't be possible unless some deep (unrecoverable) system
-      // invariants are violated
-      fatalError("Unable to talk to ICU")
-    }
-	  return length == buffer.count
-	}
 }
-
-extension UnicodeScalar {
-  public // String Comparison Prototype
-	var _hasNormalizationBoundaryBefore: Bool {
-	  _sanityCheck(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
-	  let value = Int32(bitPattern: self.value)
-	  return 0 != __swift_stdlib_unorm2_hasBoundaryBefore(
-	  	_Normalization._nfcNormalizer, value)
-	}
-
-  public // String Comparison Prototype
-  var _isDefined: Bool {
-    return __swift_stdlib_u_isdefined(Int32(self.value)) != 0
-  }
-
-  public // String Comparison Prototype
-  var _hasFullCompExclusion: Bool {
-	  _sanityCheck(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
-	  let value = Int32(bitPattern: self.value)
-	  let prop = __swift_stdlib_UCHAR_FULL_COMPOSITION_EXCLUSION
-	  return __swift_stdlib_u_hasBinaryProperty(value, prop) != 0
-  }
-}
-
-

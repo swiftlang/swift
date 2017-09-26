@@ -1599,7 +1599,10 @@ enum Benchmarks {
   }
 }
 
-Benchmarks.run()
+// NOTE: Since this gets ran as part of LIT testing, don't benchmark by default.
+// Uncomment to compare performance.
+//
+// Benchmarks.run()
 // Benchmarks.adHoc()
 
 
@@ -1619,8 +1622,9 @@ func benchmark_findTheOnes() -> Set<UInt32> {
   return result
 }
 
-let theOnes_2 = Benchmarks.time(
-  "finding the segment expanders N=\(Workload.N)") {
-  () -> Set<UInt32> in
-  return benchmark_findTheOnes()
-}
+// let theOnes_2 = Benchmarks.time(
+//   "finding the segment expanders N=\(Workload.N)") {
+//   () -> Set<UInt32> in
+//   return benchmark_findTheOnes()
+// }
+
