@@ -216,6 +216,15 @@ func testForceTry() {
   func throwingFunc() throws -> Int { return 3 }
   let _ = try! throwingFunc()
 }
+
+func testTryToForceTry() {
+  func throwingFunc() throws -> Int { return 3 }
+  do {
+    let _ = try throwingFunc()
+  } catch {
+    let _ = error
+  }
+}
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -301,6 +310,10 @@ func testForceTry() {
 // RUN: %refactor -source-filename %s -pos=217:13 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
 // RUN: %refactor -source-filename %s -pos=217:14 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
 
+// RUN: %refactor -source-filename %s -pos=223:13 | %FileCheck %s -check-prefix=CHECK-FORCE-TRY
+// RUN: %refactor -source-filename %s -pos=223:14 | %FileCheck %s -check-prefix=CHECK-FORCE-TRY
+// RUN: %refactor -source-filename %s -pos=223:15 | %FileCheck %s -check-prefix=CHECK-FORCE-TRY
+
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
 // CHECK1-NEXT: Action ends
@@ -341,4 +354,6 @@ func testForceTry() {
 // CHECK-STRINGS-INTERPOLATION: Convert to String Interpolation
 
 // CHECK-TRY-CATCH: Convert To Do/Catch
+
+// CHECK-FORCE-TRY: Convert To Force Try
 

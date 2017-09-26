@@ -42,6 +42,8 @@ CURSOR_REFACTORING(CollapseNestedIfExpr, "Collapse Nested If Expression", collap
 
 CURSOR_REFACTORING(ConvertToDoCatch, "Convert To Do/Catch", convert.do.catch)
 
+CURSOR_REFACTORING(ConvertToForceTry, "Convert To Force Try", convert.force.try)
+
 RANGE_REFACTORING(ExtractExpr, "Extract Expression", extract.expr)
 
 RANGE_REFACTORING(ExtractFunction, "Extract Method", extract.function)
