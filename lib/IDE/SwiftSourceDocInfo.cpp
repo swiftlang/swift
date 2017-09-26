@@ -195,15 +195,17 @@ bool CursorInfoResolver::walkToExprPre(Expr *E) {
         IsProperCursorLocation = Loc == LocToResolve || IsProperCursorLocation;
       };
       auto TryLoc = ATE->getTryLoc();
-      auto TryEndLoc = TryLoc.getAdvancedLocOrInvalid(3);
+      auto TryEndLoc = TryLoc.getAdvancedLocOrInvalid(getKeywordLen(tok::kw_try));
       CheckLocation(TryEndLoc);
       if (auto *FTE = dyn_cast<ForceTryExpr>(E)) {
         auto ExclaimLoc = FTE->getExclaimLoc();
-        CheckLocation(ExclaimLoc.getAdvancedLocOrInvalid(1));
+        auto ExclaimLen = getKeywordLen(tok::exclaim_postfix);
+        CheckLocation(ExclaimLoc.getAdvancedLocOrInvalid(ExclaimLen));
       }
       if (auto *OTE = dyn_cast<OptionalTryExpr>(E)) {
         auto QuestionLoc = OTE->getQuestionLoc();
-        CheckLocation(QuestionLoc.getAdvancedLocOrInvalid(1));
+        auto QuestionLen = getKeywordLen(tok::question_postfix);
+        CheckLocation(QuestionLoc.getAdvancedLocOrInvalid(QuestionLen));
       }
     }
     // Keep track of trailing expressions.

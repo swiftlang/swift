@@ -1968,7 +1968,8 @@ bool RefactoringActionConvertToDoCatch::performChange() {
   OS << "\n} catch {\n" << getCodePlaceholder() << "\n}";
 
   // Delete ! from try! expression
-  auto ExclaimRange = CharSourceRange(TryExpr->getExclaimLoc(), 1);
+  auto ExclaimLen = getKeywordLen(tok::exclaim_postfix);
+  auto ExclaimRange = CharSourceRange(TryExpr->getExclaimLoc(), ExclaimLen);
   EditConsumer.accept(SM, ExclaimRange, "");
   return false;
 }
