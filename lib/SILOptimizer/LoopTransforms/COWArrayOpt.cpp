@@ -2213,6 +2213,24 @@ static void replaceArrayPropsCall(SILBuilder &B, ArraySemanticsCall C) {
   C.removeCall();
 }
 
+/// Collects all loop dominated blocks outside the loop that are immediately
+/// dominated by the loop.
+static void
+collectImmediateLoopDominatedBlocks(const SILLoop *Lp, DominanceInfoNode *Node,
+                                    SmallVectorImpl<SILBasicBlock *> &Blocks) {
+  SILBasicBlock *BB = Node->getBlock();
+
+  // Base case: First loop dominated block outside of loop.
+  if (!Lp->contains(BB)) {
+    Blocks.push_back(BB);
+    return;
+  }
+
+  // Loop contains the basic block. Look at immediately dominated nodes.
+  for (auto *Child : *Node)
+    collectImmediateLoopDominatedBlocks(Lp, Child, Blocks);
+}
+
 void ArrayPropertiesSpecializer::specializeLoopNest() {
   auto *Lp = getLoop();
   assert(Lp);
@@ -2225,21 +2243,18 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
   auto *CheckBlock = splitBasicBlockAndBranch(B,
       HoistableLoopPreheader->getTerminator(), DomTree, nullptr);
 
-  // Get the exit blocks of the original loop.
   auto *Header = CheckBlock->getSingleSuccessorBlock();
   assert(Header);
 
-  // Our loop info is not really completely valid anymore since the cloner does
-  // not update it. However, exit blocks of the original loop are still valid.
+  // Collect all loop dominated blocks (e.g exit blocks could be among them). We
+  // need to update their dominator.
+  SmallVector<SILBasicBlock *, 16> LoopDominatedBlocks;
+  collectImmediateLoopDominatedBlocks(Lp, DomTree->getNode(Header),
+                                      LoopDominatedBlocks);
+
+  // Collect all exit blocks.
   SmallVector<SILBasicBlock *, 16> ExitBlocks;
   Lp->getExitBlocks(ExitBlocks);
-
-  // Collect the exit blocks dominated by the loop - they will be dominated by
-  // the check block.
-  SmallVector<SILBasicBlock *, 16> ExitBlocksDominatedByPreheader;
-  for (auto *ExitBlock: ExitBlocks)
-    if (DomTree->dominates(CheckBlock, ExitBlock))
-      ExitBlocksDominatedByPreheader.push_back(ExitBlock);
 
   // Split the preheader before the first instruction.
   SILBasicBlock *NewPreheader =
@@ -2269,8 +2284,8 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
                      IsFastNativeArray, ClonedPreheader, NewPreheader);
   CheckBlock->getTerminator()->eraseFromParent();
 
-  // Fixup the exit blocks. They are now dominated by the check block.
-  for (auto *BB : ExitBlocksDominatedByPreheader)
+  // Fixup the loop dominated blocks. They are now dominated by the check block.
+  for (auto *BB : LoopDominatedBlocks)
     DomTree->changeImmediateDominator(DomTree->getNode(BB),
                                       DomTree->getNode(CheckBlock));
 
