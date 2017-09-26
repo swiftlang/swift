@@ -575,11 +575,17 @@ internal func _naiveNormalize(_ codeUnits: Array<UInt16>) -> Array<UInt16> {
   }
 }
 
+// Wether the segment identified by `idx` is prenormal.
 //
-// TODO: drop the @inline(never), useful for now to inspect code quality
+// Scalar values below 0x300 are special: normalization segments containing only
+// one such scalar are trivially prenormal under NFC. Most Latin-derived scripts
+// can be represented entirely by <0x300 scalar values, meaning that many user
+// strings satisfy this prenormal check.
 //
+// The check is effectively:
+//   1) Whether the current scalar <0x300, AND
+//   2) Whether the current scalar comprises the entire segment
 //
-// @inline(never)
 internal func _isLatinyPrenormal(
   _ buffer: UnsafeBufferPointer<UInt16>, idx: Int
 ) -> Bool {
@@ -832,6 +838,12 @@ private func _compareStringsSuffix(
   // long strings that differ in the middle. We might want this one day... but
   // not today.
   //
+  // TODO: An additional (or even repeated) reapplying of the algorithm,
+  // including the binary diff scan, could greatly benefit strings that only
+  // sparsely differ in normality (penalizing strings that densely differ in
+  // normality). This would add complexity, but with compelling data could be an
+  // alternative to chunking.
+  //
   return _compareStringsPathological(
     selfUTF16: selfUTF16[selfSegmentEndIdx...].rebased,
     otherUTF16: otherUTF16[otherSegmentEndIdx...].rebased)
@@ -903,16 +915,6 @@ extension String {
 }
 
 extension String {
-  @inline(__always)
-  func _spanPrenormalLatiny(
-    _ codeUnits: UnsafeBufferPointer<UInt16>
-  ) -> Int {
-    for i in 0..<codeUnits.count {
-      guard codeUnits[i] < 0x300 else { return i }
-    }
-    return codeUnits.count
-  }
-
   var _unsafeASCII : UnsafeBufferPointer<UInt8> {
     _sanityCheck(_core.isASCII && _core._unmanagedASCII != nil)
     return UnsafeBufferPointer(
@@ -931,7 +933,7 @@ extension String {
   }
 
   @inline(__always)
-  func _comparePreLoop(_ other: String) -> _Ordering {
+  func _compare(_ other: String) -> _Ordering {
     guard self._core._baseAddress != nil
       && other._core._baseAddress != nil
     else {
@@ -999,7 +1001,7 @@ enum Tests {
     print("[testing]")
     defer { print("[done]") }
     func expect(_ lhs: String, _ rhs: String, _ order: _Ordering) {
-      if lhs._comparePreLoop(rhs) != order {
+      if lhs._compare(rhs) != order {
         _sanityCheck(lhs._compareStringsReference(rhs) == order, "bad test")
         print("FAIL: expected \(order) for \(lhs) compared to \(rhs)")
         print("""
@@ -1392,7 +1394,7 @@ enum Benchmarks {
       for _ in 0..<tripCount {
         for s1 in payload {
           for s2 in payload {
-            let cmp = s1._comparePreLoop(s2)
+            let cmp = s1._compare(s2)
             count += cmp == .less ? 1 : 0
           }
         }
