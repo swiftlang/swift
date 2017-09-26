@@ -215,43 +215,43 @@ def _apply_default_arguments(args):
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
     if not args.test_ios:
-        args.test_ios_device = False
+        args.test_ios_host = False
         args.test_ios_simulator = False
     # --skip-test-tvos is merely a shorthand for host and simulator tests.
     if not args.test_tvos:
-        args.test_tvos_device = False
+        args.test_tvos_host = False
         args.test_tvos_simulator = False
     # --skip-test-watchos is merely a shorthand for host and simulator
     # --tests.
     if not args.test_watchos:
-        args.test_watchos_device = False
+        args.test_watchos_host = False
         args.test_watchos_simulator = False
 
     # --skip-build-{ios,tvos,watchos}-{device,simulator} implies
     # --skip-test-{ios,tvos,watchos}-{host,simulator}
     if not args.build_ios_device:
-        args.test_ios_device = False
+        args.test_ios_host = False
     if not args.build_ios_simulator:
         args.test_ios_simulator = False
 
     if not args.build_tvos_device:
-        args.test_tvos_device = False
+        args.test_tvos_host = False
     if not args.build_tvos_simulator:
         args.test_tvos_simulator = False
 
     if not args.build_watchos_device:
-        args.test_watchos_device = False
+        args.test_watchos_host = False
     if not args.build_watchos_simulator:
         args.test_watchos_simulator = False
 
     if not args.build_android:
-        args.test_android_device = False
+        args.test_android_host = False
 
     if not args.host_test:
-        args.test_ios_device = False
-        args.test_tvos_device = False
-        args.test_watchos_device = False
-        args.test_android_device = False
+        args.test_ios_host = False
+        args.test_tvos_host = False
+        args.test_watchos_host = False
+        args.test_android_host = False
 
     if args.build_subdir is None:
         args.build_subdir = \
@@ -798,7 +798,7 @@ iterations with -O",
         help="skip testing iOS 32 bit simulator targets")
     skip_test_group.add_argument(
         "--skip-test-ios-host",
-        dest='test_ios_device',
+        dest='test_ios_host',
         action=arguments.action.optional_false,
         help="skip testing iOS device targets on the host machine (the phone "
              "itself)")
@@ -815,7 +815,7 @@ iterations with -O",
         help="skip testing tvOS simulator targets")
     skip_test_group.add_argument(
         "--skip-test-tvos-host",
-        dest='test_tvos_device',
+        dest='test_tvos_host',
         action=arguments.action.optional_false,
         help="skip testing tvOS device targets on the host machine (the TV "
              "itself)")
@@ -832,13 +832,13 @@ iterations with -O",
         help="skip testing watchOS simulator targets")
     skip_test_group.add_argument(
         "--skip-test-watchos-host",
-        dest='test_watchos_device',
+        dest='test_watchos_host',
         action=arguments.action.optional_false,
         help="skip testing watchOS device targets on the host machine (the "
              "watch itself)")
     skip_test_group.add_argument(
         "--skip-test-android-host",
-        dest='test_android_device',
+        dest='test_android_host',
         action=arguments.action.optional_false,
         help="skip testing Android device targets on the host machine (the "
              "phone itself)")
