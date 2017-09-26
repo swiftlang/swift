@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
@@ -9,7 +9,7 @@ protocol ClassBound : class {
 protocol ClassBound2 : class {
   func classBoundMethod2()
 }
-protocol ClassBoundBinary : class, ClassBound {
+protocol ClassBoundBinary : ClassBound {
   func classBoundBinaryMethod(_ x: Self)
 }
 @objc protocol ObjCClassBound {
@@ -214,7 +214,7 @@ func objc_class_bounded_protocol_conversion_4
 }
 
 // CHECK-LABEL: define hidden swiftcc { i64, %objc_object*, i64 } @_T022class_bounded_generics0A28_generic_field_struct_fields{{[_0-9a-zA-Z]*}}F(i64, %objc_object*, i64, %swift.type* %T, i8** %T.ClassBound)
-func class_generic_field_struct_fields<T : ClassBound>
+func class_generic_field_struct_fields<T>
 (_ x:ClassGenericFieldStruct<T>) -> (Int, T, Int) {
   return (x.x, x.y, x.z)
 }
@@ -226,7 +226,7 @@ func class_protocol_field_struct_fields
 }
 
 // CHECK-LABEL: define hidden swiftcc { i64, %objc_object*, i64 } @_T022class_bounded_generics0a15_generic_field_A7_fields{{[_0-9a-zA-Z]*}}F(%T22class_bounded_generics017ClassGenericFieldD0C*)
-func class_generic_field_class_fields<T : ClassBound>
+func class_generic_field_class_fields<T>
 (_ x:ClassGenericFieldClass<T>) -> (Int, T, Int) {
   return (x.x, x.y, x.z)
   // CHECK: getelementptr inbounds %T22class_bounded_generics017ClassGenericFieldD0C, %T22class_bounded_generics017ClassGenericFieldD0C* %0, i32 0, i32 1
@@ -272,4 +272,37 @@ class M<T, S: A<T>> {
     // Don't crash generating the reference to 's'.
     s = S.init()
   }
+}
+
+// CHECK-LABEL: define hidden swiftcc void @_T022class_bounded_generics14takes_metatypeyxmlF(%swift.type*, %swift.type* %T)
+func takes_metatype<T>(_: T.Type) {}
+
+// CHECK-LABEL: define hidden swiftcc void @_T022class_bounded_generics023archetype_with_generic_A11_constraintyx1t_tAA1ACyq_GRbzr0_lF(%T22class_bounded_generics1AC.2*, %swift.type* %T)
+// CHECK:      [[ISA_ADDR:%.*]] = bitcast %T22class_bounded_generics1AC.2* %0 to %swift.type**
+// CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
+// CHECK-NEXT: call swiftcc void @_T022class_bounded_generics14takes_metatypeyxmlF(%swift.type* %T, %swift.type* %T)
+// CHECK-NEXT: [[ISA_PTR:%.*]] = bitcast %swift.type* [[ISA]] to %swift.type**
+// CHECK-NEXT: [[U_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[ISA_PTR]], i64 10
+// CHECK-NEXT: [[U:%.*]] = load %swift.type*, %swift.type** [[U_ADDR]]
+// CHECK-NEXT: call swiftcc void @_T022class_bounded_generics14takes_metatypeyxmlF(%swift.type* %U, %swift.type* %U)
+// CHECK:      ret void
+
+func archetype_with_generic_class_constraint<T, U>(t: T) where T : A<U> {
+  takes_metatype(T.self)
+  takes_metatype(U.self)
+}
+
+// CHECK-LABEL: define hidden swiftcc void @_T022class_bounded_generics029calls_archetype_with_generic_A11_constraintyAA1ACyxG1a_tlF(%T22class_bounded_generics1AC*) #0 {
+// CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T22class_bounded_generics1AC, %T22class_bounded_generics1AC* %0, i32 0, i32 0, i32 0
+// CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
+// CHECK:      [[SELF:%.*]] = bitcast %T22class_bounded_generics1AC* %0 to %T22class_bounded_generics1AC.2*
+// CHECK-NEXT: [[ISA_PTR:%.*]] = bitcast %swift.type* [[ISA]] to %swift.type**
+// CHECK-NEXT: [[T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[ISA_PTR]], i64 10
+// CHECK-NEXT: [[T:%.*]] = load %swift.type*, %swift.type** [[T_ADDR]]
+// CHECK-NEXT: [[A_OF_T:%.*]] = call %swift.type* @_T022class_bounded_generics1ACMa(%swift.type* [[T]])
+// CHECK-NEXT: call swiftcc void @_T022class_bounded_generics023archetype_with_generic_A11_constraintyx1t_tAA1ACyq_GRbzr0_lF(%T22class_bounded_generics1AC.2* [[SELF]], %swift.type* [[A_OF_T]])
+// CHECK:      ret void
+
+func calls_archetype_with_generic_class_constraint<T>(a: A<T>) {
+  archetype_with_generic_class_constraint(t: a)
 }

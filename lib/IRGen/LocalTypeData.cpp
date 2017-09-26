@@ -254,12 +254,34 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
                                                     CanType type,
                                                     IsExact_t isExact,
                                                     llvm::Value *metadata) {
+  struct Callback : FulfillmentMap::InterestingKeysCallback {
+    bool isInterestingType(CanType type) const override {
+      return true;
+    }
+    bool hasInterestingType(CanType type) const override {
+      return true;
+    }
+    bool hasLimitedInterestingConformances(CanType type) const override {
+      return false;
+    }
+    GenericSignature::ConformsToArray
+    getInterestingConformances(CanType type) const override {
+      llvm_unreachable("no limits");
+    }
+    CanType getSuperclassBound(CanType type) const override {
+      if (auto arch = dyn_cast<ArchetypeType>(type))
+        if (auto superclassTy = arch->getSuperclass())
+          return superclassTy->getCanonicalType();
+      return CanType();
+    }
+  } callbacks;
+
   // Look for anything at all that's fulfilled by this.  If we don't find
   // anything, stop.
   FulfillmentMap fulfillments;
   if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
                                        /*source*/ 0, MetadataPath(),
-                                       FulfillmentMap::Everything())) {
+                                       callbacks)) {
     return;
   }
 

@@ -70,12 +70,12 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::Tuple:
     return cast<TupleType>(type)->getNumElements() == 0;
 
-  // Nominal types might have parents.
+  // Nominal types might have generic parents.
   case TypeKind::Class:
   case TypeKind::Enum:
   case TypeKind::Protocol:
   case TypeKind::Struct:
-    return !cast<NominalType>(type)->getParent();
+    return !cast<NominalType>(type)->getDecl()->isGenericContext();
 
   // Bound generic types have type arguments.
   case TypeKind::BoundGenericClass:
@@ -123,6 +123,13 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
     // Add the fulfillment.
     hadFulfillment |= addFulfillment({type, nullptr}, source, std::move(path));
     return hadFulfillment;
+  }
+
+  if (keys.isInterestingType(type)) {
+    if (auto superclassTy = keys.getSuperclassBound(type)) {
+      return searchNominalTypeMetadata(IGM, superclassTy, source,
+                                       std::move(path), keys);
+    }
   }
 
   // Inexact metadata will be a problem if we ever try to use this
@@ -287,21 +294,6 @@ bool FulfillmentMap::addFulfillment(FulfillmentKey key,
     Fulfillments.insert({ key, Fulfillment(source, std::move(path)) });
     return true;
   }
-}
-
-bool FulfillmentMap::Everything::isInterestingType(CanType type) const {
-  return true;
-}
-bool FulfillmentMap::Everything::hasInterestingType(CanType type) const {
-  return true;
-}
-bool FulfillmentMap::Everything
-                   ::hasLimitedInterestingConformances(CanType type) const {
-  return false;
-}
-GenericSignature::ConformsToArray
-FulfillmentMap::Everything::getInterestingConformances(CanType type) const{
-  return {};
 }
 
 void FulfillmentMap::dump() const {
