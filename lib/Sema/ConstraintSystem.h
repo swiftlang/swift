@@ -2551,8 +2551,8 @@ private:
   };
 
   struct PotentialBindings {
-    typedef std::tuple<bool, bool, bool, bool, bool,
-                       unsigned char, unsigned int> BindingScore;
+    typedef std::tuple<bool, bool, bool, bool, unsigned char, unsigned int>
+        BindingScore;
 
     TypeVariableType *TypeVar;
 
@@ -2574,9 +2574,6 @@ private:
     /// The number of defaultable bindings.
     unsigned NumDefaultableBindings = 0;
 
-    /// Is this type variable on the RHS of a BindParam constraint?
-    bool IsRHSOfBindParam = false;
-
     /// Tracks the position of the last known supertype in the group.
     Optional<unsigned> lastSupertypeIndex;
 
@@ -2593,7 +2590,6 @@ private:
     static BindingScore formBindingScore(const PotentialBindings &b) {
       return std::make_tuple(!b.hasNonDefaultableBindings(),
                              b.FullyBound,
-                             b.IsRHSOfBindParam,
                              b.SubtypeOfExistentialType,
                              b.InvolvesTypeVariables,
                              static_cast<unsigned char>(b.LiteralBinding),

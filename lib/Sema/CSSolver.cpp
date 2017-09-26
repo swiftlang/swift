@@ -75,6 +75,17 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
   if (count(referencedTypeVars, typeVar))
     return None;
 
+  // If type variable is not allowed to bind to `lvalue`,
+  // let's check if type of potential binding has any
+  // type variables, which are allowed to bind to `lvalue`,
+  // and postpone such type from consideration.
+  if (!typeVar->getImpl().canBindToLValue()) {
+    for (auto *typeVar : referencedTypeVars) {
+      if (typeVar->getImpl().canBindToLValue())
+        return None;
+    }
+  }
+
   // If the type is a type variable itself, don't permit the binding.
   if (auto bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>()) {
     if (isNilLiteral) {
