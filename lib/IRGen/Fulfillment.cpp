@@ -70,12 +70,12 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::Tuple:
     return cast<TupleType>(type)->getNumElements() == 0;
 
-  // Nominal types might have parents.
+  // Nominal types might have generic parents.
   case TypeKind::Class:
   case TypeKind::Enum:
   case TypeKind::Protocol:
   case TypeKind::Struct:
-    return !cast<NominalType>(type)->getParent();
+    return !cast<NominalType>(type)->getDecl()->isGenericContext();
 
   // Bound generic types have type arguments.
   case TypeKind::BoundGenericClass:
