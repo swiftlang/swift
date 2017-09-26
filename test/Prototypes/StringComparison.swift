@@ -28,7 +28,7 @@ func _sanityCheck(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
-  _debugPrecondition(condition, message, file: file, line: line)  
+  _debugPrecondition(condition, message, file: file, line: line)
 }
 
 //
@@ -284,8 +284,8 @@ internal func _lexicographicalCompare(
   _ leftHS: Array<UInt16>,
   _ rightHS: Array<UInt16>
 ) -> _Ordering {
-  return leftHS.withUnsafeBufferPointer { leftPtr in 
-    return rightHS.withUnsafeBufferPointer { rightPtr in 
+  return leftHS.withUnsafeBufferPointer { leftPtr in
+    return rightHS.withUnsafeBufferPointer { rightPtr in
       return _lexicographicalCompare(leftPtr, rightPtr)
     }
   }
@@ -443,8 +443,12 @@ extension UnicodeScalar {
       var i = 0
       while i < buffer.count {
         let (value, nextI) = _parseRawScalar(buffer, startingFrom: i)
-        if i != 0 
-        && UnicodeScalar(_unchecked: value)._hasNormalizationBoundaryBefore {
+        let scalar = UnicodeScalar(_unchecked: value)
+        if i != 0 && scalar._hasNormalizationBoundaryBefore {
+          guard scalar._hasNormalizationBoundaryBefore else {
+            fatalError(
+              "Unicode invariant violated: non-starter multi-segment expander")
+          }
           return true
         }
         i = nextI
@@ -593,9 +597,10 @@ internal func _isLatinyPrenormal(
   let ptr = buffer.baseAddress._unsafelyUnwrappedUnchecked
 
   let cu = ptr[idx]
-  guard cu < 0x300 else { return false }
-
-  if idx+1 == buffer.count {
+  if _slowPath(cu >= 0x300) {
+    return false
+  }
+  if _slowPath(idx+1 == buffer.count) {
     return true
   }
 
@@ -742,9 +747,9 @@ private func _compareStringsSuffix(
   // identified the segment, we can normalize and continue comparision.
   //
   // NOTE: We need to back-track for both self and other. Even though prefixes
-  // are binary equal, the point of difference might be at the start of a new 
-  // segment for one and in the middle of the prior segment for the other. In 
-  // which case, we will want to effectively compare the two consecutive 
+  // are binary equal, the point of difference might be at the start of a new
+  // segment for one and in the middle of the prior segment for the other. In
+  // which case, we will want to effectively compare the two consecutive
   // segments together.
   //
   let (selfSegmentStartIdx, selfSegmentEndIdx) = _findNormalizationSegment(
@@ -769,6 +774,13 @@ private func _compareStringsSuffix(
   //
   // Pathological case: multi-segment expanders ruin segment-by-segment
   // processing.
+  //
+  // NOTE: Multi-segment expanders are (at least up til Unicode 10) always the
+  // beginning of a normalization segment (i.e. they are starters). This is very
+  // unlikely to change in the future, as new non-starter scalars that normalize
+  // to pre-existing scalars would have to produce a starter. We validate this
+  // fact on constructing our MultiSegmentExpander set, so we can rely on it
+  // here.
   //
   if _slowPath(
      UnicodeScalar(
@@ -871,7 +883,7 @@ private func _compareStringsPathological(
     }
   }
   return _slowNormalize(selfUTF16).withUnsafeBufferPointer {
-    (selfBufPtr) -> _Ordering in 
+    (selfBufPtr) -> _Ordering in
     return _compareStringsPathological(
       normalizedSelfUTF16: selfBufPtr, otherUTF16: otherUTF16)
   }
