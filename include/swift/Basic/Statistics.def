@@ -101,3 +101,9 @@ FRONTEND_STATISTIC(IRModule, NumIRInsts)
 
 FRONTEND_STATISTIC(LLVM, NumLLVMBytesOutput)
 #endif
+
+/// Frontend timers for recursive routines
+#ifdef FRONTEND_RECURSIVE_SHARED_TIMER
+FRONTEND_RECURSIVE_SHARED_TIMER(NominalTypeDecl__lookupDirect)
+FRONTEND_RECURSIVE_SHARED_TIMER(ClangImporter__Implementation__loadAllMembers)
+#endif
