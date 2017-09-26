@@ -183,10 +183,9 @@ import Swift
 // CHECK-32-SAME:   i8* inttoptr ([[WORD]] 5 to i8*),
 // CHECK-64-SAME:   i8* inttoptr ([[WORD]] 9 to i8*),
 // -- flags                 0x250003 - alignment 4
-// CHECK-32-SAME:   i8* inttoptr ([[WORD]] 2424835 to i8*)
+// CHECK-32-SAME:   i8* inttoptr ([[WORD]] {{2424835|2097155}} to i8*)
 // -- flags                 0x200007 - alignment 8
 // CHECK-64-SAME:   i8* inttoptr ([[WORD]] 2097159 to i8*)
-// CHECK-SAME:   i8* inttoptr ([[WORD]] 16 to i8*)
 // CHECK-SAME: ]
 
 enum Empty {}
