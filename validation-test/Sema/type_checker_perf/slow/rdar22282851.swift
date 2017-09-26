@@ -7,5 +7,6 @@ struct S {
 
 func rdar22282851(_ a: [S]) -> [S] {
   let result = a.sorted{ $0.s < $1.s || ($0.s == $1.s && $0.s < $1.s) }
+  // expected-error@-1 {{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
   return result
 }
