@@ -45,6 +45,7 @@ EXPECTED_DEFAULTS = {
     'build_args': [],
     'build_benchmarks': True,
     'build_cygwin': True,
+    'build_external_benchmarks': False,
     'build_foundation': False,
     'build_freebsd': True,
     'build_ios': True,
@@ -349,6 +350,8 @@ EXPECTED_OPTIONS = [
     Option('-x', dest='cmake_generator', value='Xcode'),
 
     ToggleOption('--android', dest='android'),
+    ToggleOption('--build-external-benchmarks',
+                 dest='build_external_benchmarks'),
     ToggleOption('--build-ninja', dest='build_ninja'),
     ToggleOption('--build-runtime-with-host-compiler',
                  dest='build_runtime_with_host_compiler'),
