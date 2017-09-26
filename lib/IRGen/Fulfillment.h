@@ -69,16 +69,6 @@ public:
     virtual ~InterestingKeysCallback() = default;
   };
 
-  /// An implementation of InterestingKeysCallback that returns everything
-  /// fulfillable.
-  struct Everything : InterestingKeysCallback {
-    bool isInterestingType(CanType type) const override;
-    bool hasInterestingType(CanType type) const override;
-    bool hasLimitedInterestingConformances(CanType type) const override;
-    GenericSignature::ConformsToArray
-      getInterestingConformances(CanType type) const override;
-  };
-
   FulfillmentMap() = default;
 
   using iterator = decltype(Fulfillments)::iterator;
