@@ -16,7 +16,7 @@ function(handle_swift_sources
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
       "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE"
-      "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT"
+      "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;MODULE_DIR"
       "DEPENDS;API_NOTES;COMPILE_FLAGS;MODULE_NAME"
       ${ARGN})
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
@@ -78,6 +78,17 @@ function(handle_swift_sources
       list(APPEND swift_compile_flags "-Xcc" "-D__SWIFT_CURRENT_DYLIB=swiftCore")
     endif()
 
+    precondition(NOT SWIFTSOURCES_IS_STDLIB OR NOT SWIFTSOURCES_MODULE_DIR,
+      "Cannot provide MODULE_DIR if IS_STDLIB is set")
+
+    if(SWIFTSOURCES_IS_STDLIB)
+      set(SWIFTSOURCES_MODULE_DIR
+          "${SWIFTLIB_DIR}/${SWIFTSOURCES_LIBRARY_SUBDIR}")
+    endif()
+
+    precondition(SWIFTSOURCES_MODULE_DIR,
+      "Must provide MODULE_DIR or set IS_STDLIB")
+
     _compile_swift_files(
         dependency_target
         module_dependency_target
@@ -92,6 +103,7 @@ function(handle_swift_sources
         ARCHITECTURE ${SWIFTSOURCES_ARCHITECTURE}
         API_NOTES ${SWIFTSOURCES_API_NOTES}
         MODULE_NAME ${SWIFTSOURCES_MODULE_NAME}
+        MODULE_DIR ${SWIFTSOURCES_MODULE_DIR}
         ${IS_MAIN_arg}
         ${IS_STDLIB_arg}
         ${IS_STDLIB_CORE_arg}
@@ -298,19 +310,12 @@ function(_compile_swift_files
   set(module_file)
   set(module_doc_file)
 
-  if(NOT SWIFTFILE_IS_MAIN)
-    # Determine the directory where the module file should be placed.
-    if(SWIFTFILE_MODULE_DIR)
-      set(module_dir "${SWIFTFILE_MODULE_DIR}")
-    elseif(SWIFTFILE_IS_STDLIB)
-      set(module_dir "${SWIFTLIB_DIR}/${library_subdir}")
-    else()
-      message(FATAL_ERROR "Don't know where to put the module files")
-    endif()
+  precondition(SWIFTFILE_MODULE_DIR "Must provide a MODULE_DIR")
 
+  if(NOT SWIFTFILE_IS_MAIN)
     list(APPEND swift_flags "-parse-as-library")
 
-    set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
+    set(module_base "${SWIFTFILE_MODULE_DIR}/${SWIFTFILE_MODULE_NAME}")
     set(module_file "${module_base}.swiftmodule")
     set(sib_file "${module_base}.Onone.sib")
     set(sibopt_file "${module_base}.O.sib")
@@ -318,7 +323,7 @@ function(_compile_swift_files
     set(module_doc_file "${module_base}.swiftdoc")
 
     list(APPEND command_create_dirs
-        COMMAND "${CMAKE_COMMAND}" -E make_directory "${module_dir}")
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${SWIFTFILE_MODULE_DIR}")
 
     # If we have extra regexp flags, check if we match any of the regexps. If so
     # add the relevant flags to our swift_flags.
