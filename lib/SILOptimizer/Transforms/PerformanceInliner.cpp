@@ -128,6 +128,15 @@ class SILPerformanceInliner {
     return SPA;
   }
 
+  bool profileBasedDecision(
+      const FullApplySite &AI, int Benefit, SILFunction *Callee, int CalleeCost,
+      int &NumCallerBlocks,
+      const llvm::DenseMapIterator<
+          swift::SILBasicBlock *, uint64_t,
+          llvm::DenseMapInfo<swift::SILBasicBlock *>,
+          llvm::detail::DenseMapPair<swift::SILBasicBlock *, uint64_t>, true>
+          &bbIt);
+
   bool isProfitableToInline(
       FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
       int &NumCallerBlocks,
@@ -163,6 +172,59 @@ public:
 static bool canSpecializeGeneric(ApplySite AI, SILFunction *F,
                                  SubstitutionList Subs) {
   return ReabstractionInfo::canBeSpecialized(AI, F, Subs);
+}
+
+bool SILPerformanceInliner::profileBasedDecision(
+    const FullApplySite &AI, int Benefit, SILFunction *Callee, int CalleeCost,
+    int &NumCallerBlocks,
+    const llvm::DenseMapIterator<
+        swift::SILBasicBlock *, uint64_t,
+        llvm::DenseMapInfo<swift::SILBasicBlock *>,
+        llvm::detail::DenseMapPair<swift::SILBasicBlock *, uint64_t>, true>
+        &bbIt) {
+  if (CalleeCost < TrivialFunctionThreshold) {
+    // We do not increase code size below this threshold
+    return true;
+  }
+  auto callerCount = bbIt->getSecond();
+  if (callerCount < 1) {
+    // Never called - do not inline
+    DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs()
+                                        << "profiled decision: NO"
+                                        << ", reason= Never Called." << '\n';);
+    return false;
+  }
+  auto calleeCount = Callee->getEntryCount();
+  if (calleeCount) {
+    // If we have Callee count - use SI heuristic:
+    auto calleCountVal = calleeCount.getValue();
+    auto percent = (long double)callerCount / (long double)calleCountVal;
+    if (percent < 0.8) {
+      DEBUG(dumpCaller(AI.getFunction());
+            llvm::dbgs() << "profiled decision: NO"
+                         << ", reason=SI " << std::to_string(percent) << "%"
+                         << '\n';);
+      return false;
+    }
+    DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs() << "profiled decision: YES"
+                                                     << ", reason=SI "
+                                                     << std::to_string(percent)
+                                                     << "%" << '\n';);
+  } else {
+    // No callee count - use a "modified" aggressive IHF for now
+    if (CalleeCost > Benefit && callerCount < 100) {
+      DEBUG(dumpCaller(AI.getFunction());
+            llvm::dbgs() << "profiled decision: NO"
+                         << ", reason=IHF " << callerCount << '\n';);
+      return false;
+    }
+    DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs() << "profiled decision: YES"
+                                                     << ", reason=IHF "
+                                                     << callerCount << '\n';);
+  }
+  // We're gonna inline!
+  NumCallerBlocks += Callee->size();
+  return true;
 }
 
 bool SILPerformanceInliner::isProfitableToInline(
@@ -366,49 +428,8 @@ bool SILPerformanceInliner::isProfitableToInline(
   auto *bb = AI.getInstruction()->getParent();
   auto bbIt = BBToWeightMap.find(bb);
   if (bbIt != BBToWeightMap.end()) {
-    if (CalleeCost < TrivialFunctionThreshold) {
-      // We do not increase code size below this threshold
-      return true;
-    }
-    auto callerCount = bbIt->getSecond();
-    if (callerCount < 1) {
-      // Never called - do not inline
-      DEBUG(dumpCaller(AI.getFunction());
-            llvm::dbgs() << "profiled decision: NO"
-                         << ", reason= Never Called." << '\n';);
-      return false;
-    }
-    auto calleeCount = Callee->getEntryCount();
-    if (calleeCount) {
-      // If we have Callee count - use SI heuristic:
-      auto calleCountVal = calleeCount.getValue();
-      auto percent = (long double)callerCount / (long double)calleCountVal;
-      if (percent < 0.8) {
-        DEBUG(dumpCaller(AI.getFunction());
-              llvm::dbgs() << "profiled decision: NO"
-                           << ", reason=SI " << std::to_string(percent) << "%"
-                           << '\n';);
-        return false;
-      }
-      DEBUG(dumpCaller(AI.getFunction());
-            llvm::dbgs() << "profiled decision: YES"
-                         << ", reason=SI " << std::to_string(percent) << "%"
-                         << '\n';);
-    } else {
-      // No callee count - use a "modified" aggressive IHF for now
-      if (CalleeCost > Benefit && callerCount < 100) {
-        DEBUG(dumpCaller(AI.getFunction());
-              llvm::dbgs() << "profiled decision: NO"
-                           << ", reason=IHF " << callerCount << '\n';);
-        return false;
-      }
-      DEBUG(dumpCaller(AI.getFunction());
-            llvm::dbgs() << "profiled decision: YES"
-                         << ", reason=IHF " << callerCount << '\n';);
-    }
-    // We're gonna inline!
-    NumCallerBlocks += Callee->size();
-    return true;
+    return profileBasedDecision(AI, Benefit, Callee, CalleeCost,
+                                NumCallerBlocks, bbIt);
   }
 
   // This is the final inlining decision.
@@ -565,7 +586,7 @@ static bool containsWeight(TermInst *inst) {
 
 static void
 addToBBCounts(llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap,
-              unsigned long long numToAdd, swift::TermInst *termInst) {
+              uint64_t numToAdd, swift::TermInst *termInst) {
   for (auto &succ : termInst->getSuccessors()) {
     auto *currBB = succ.getBB();
     assert(BBToWeightMap.find(currBB) != BBToWeightMap.end() &&
