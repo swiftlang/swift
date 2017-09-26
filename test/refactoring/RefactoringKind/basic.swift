@@ -300,6 +300,7 @@ func testForceTry() {
 // RUN: %refactor -source-filename %s -pos=217:12 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
 // RUN: %refactor -source-filename %s -pos=217:13 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
 // RUN: %refactor -source-filename %s -pos=217:14 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
+// RUN: %refactor -source-filename %s -pos=217:15 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
 
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method

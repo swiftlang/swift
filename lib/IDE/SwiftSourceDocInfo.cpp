@@ -189,10 +189,22 @@ bool CursorInfoResolver::walkToExprPre(Expr *E) {
       }
     }
     auto IsProperCursorLocation = E->getStartLoc() == LocToResolve;
-    // Handle cursor placement between try and ! in ForceTryExpr.
-    if (auto *FTE = dyn_cast<ForceTryExpr>(E)) {
-      IsProperCursorLocation = LocToResolve == FTE->getExclaimLoc() ||
-      IsProperCursorLocation;
+    // Handle cursor placement after Try, ForceTry and OptionalTry Expr.
+    if (auto *ATE = dyn_cast<AnyTryExpr>(E)) {
+      auto CheckLocation = [&IsProperCursorLocation, this](SourceLoc Loc) {
+        IsProperCursorLocation = Loc == LocToResolve || IsProperCursorLocation;
+      };
+      auto TryLoc = ATE->getTryLoc();
+      auto TryEndLoc = TryLoc.getAdvancedLocOrInvalid(3);
+      CheckLocation(TryEndLoc);
+      if (auto *FTE = dyn_cast<ForceTryExpr>(E)) {
+        auto ExclaimLoc = FTE->getExclaimLoc();
+        CheckLocation(ExclaimLoc.getAdvancedLocOrInvalid(1));
+      }
+      if (auto *OTE = dyn_cast<OptionalTryExpr>(E)) {
+        auto QuestionLoc = OTE->getQuestionLoc();
+        CheckLocation(QuestionLoc.getAdvancedLocOrInvalid(1));
+      }
     }
     // Keep track of trailing expressions.
     if (!E->isImplicit() && IsProperCursorLocation)
