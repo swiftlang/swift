@@ -56,7 +56,6 @@ extension BenchResults : CustomStringConvertible {
 struct Test {
   let benchInfo: BenchmarkInfo
   let index: Int
-  let run: Bool
 
   var name: String {
     return benchInfo.name
@@ -219,15 +218,7 @@ struct TestConfig {
       }
     }
 
-    let t = tags
-    var filteredTests = allTests.filter { benchInfo in t.isSubset(of: benchInfo.tags) }
-                                .map { $0 }
-                                .sorted()
-    if (filteredTests.isEmpty) {
-      return
-    }
-
-    let includedBenchmarks: Set<String> = {
+    let benchmarkNameFilter: Set<String>? = {
       if !filters.isEmpty {
         return Set(filters)
       }
@@ -236,15 +227,37 @@ struct TestConfig {
         return Set(precommitTests.map { $0.name })
       }
 
-      return Set(filteredTests.map { $0.name })
+      return nil
     }()
+
+    // t is needed so we don't capture an ivar of a mutable inout self.
+    let t = tags
+    var filteredTests = allTests.filter {
+      benchInfo in
+      if !t.isSubset(of: benchInfo.tags) {
+        return false
+      }
+
+      // If the user did not specified a benchmark name filter and our tags are
+      // a subset of the specified tags by the user, return true. We want to run
+      // this test.
+      guard let benchFilter = benchmarkNameFilter else {
+        return true
+      }
+
+      // Otherwise, we need to check if our benchInfo's name is in the benchmark
+      // name filter list. If it isn't, then we shouldn't process it.
+      return benchFilter.contains(benchInfo.name)
+    }.map { $0 }.sorted()
+
+    if (filteredTests.isEmpty) {
+      return
+    }
 
     tests = zip(1...filteredTests.count, filteredTests).map {
       t -> Test in
       let (ordinal, benchInfo) = t
-      return Test(benchInfo: benchInfo, index: ordinal,
-                  run: includedBenchmarks.contains(benchInfo.name)
-                  || includedBenchmarks.contains(String(ordinal)))
+      return Test(benchInfo: benchInfo, index: ordinal)
     }
   }
 }
@@ -415,9 +428,7 @@ func printRunInfo(_ c: TestConfig) {
     print("Tests Filter: \(c.filters)")
     print("Tests to run: ", terminator: "")
     for t in c.tests {
-      if t.run {
-        print("\(t.name), ", terminator: "")
-      }
+      print("\(t.name), ", terminator: "")
     }
     print("")
     print("")
@@ -432,10 +443,6 @@ func runBenchmarks(_ c: TestConfig) {
   sumBenchResults.sampleCount = 0
 
   for t in c.tests {
-    if !t.run {
-      continue
-    }
-
     let benchIndex = t.index
     let benchName = t.name
     let results = runBench(benchName, t.runFunction, c)
@@ -466,7 +473,7 @@ public func main() {
     case .listTests:
       config.findTestsToRun()
       print("Enabled Tests\(config.delim)Tags")
-      for t in config.tests where t.run == true {
+      for t in config.tests {
         print("\(t.name)\(config.delim)\(t.tags)")
       }
     case .run:
