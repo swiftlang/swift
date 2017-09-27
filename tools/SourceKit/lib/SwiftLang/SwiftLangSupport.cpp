@@ -421,6 +421,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindExprDictionary;
     case SyntaxStructureKind::ObjectLiteralExpression:
       return KindExprObjectLiteral;
+    case SyntaxStructureKind::TupleExpression:
+      return KindExprTuple;
     case SyntaxStructureKind::Argument:
       return KindExprArg;
   }
