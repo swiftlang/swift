@@ -494,6 +494,13 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
   return nullptr;
 }
 
+static bool hasSILBody(FuncDecl *fd) {
+  if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
+    return !isa<ProtocolDecl>(fd->getDeclContext());
+
+  return fd->getBody(/*canSynthesize=*/false);
+}
+
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                        ForDefinition_t forDefinition) {
   // If we already emitted the function, return it (potentially preparing it
@@ -504,7 +511,9 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   ProfileCounter count = ProfileCounter();
   if (constant.hasDecl()) {
     if (auto *fd = constant.getFuncDecl()) {
-      count = loadProfilerCount(fd->getBody());
+      if (hasSILBody(fd)) {
+        count = loadProfilerCount(fd->getBody(/*canSynthesize=*/false));
+      }
     }
   }
   // Note: Do not provide any SILLocation. You can set it afterwards.
@@ -688,13 +697,6 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
     if (!hasFunction(thunk))
       emitNativeToForeignThunk(thunk);
   }
-}
-
-static bool hasSILBody(FuncDecl *fd) {
-  if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
-    return !isa<ProtocolDecl>(fd->getDeclContext());
-
-  return fd->getBody(/*canSynthesize=*/false);
 }
 
 void SILGenModule::emitFunction(FuncDecl *fd) {
