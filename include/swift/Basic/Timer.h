@@ -76,13 +76,14 @@ namespace swift {
     RecursiveSharedTimer(StringRef name) : name(name) {}    
 
     struct Guard {
-      // FIXME OPTIONAL??
       RecursiveSharedTimer *recursiveTimerOrNull;
  
-      // All this stuff is to do an RAII object that be moved.
       Guard(RecursiveSharedTimer *rst) : recursiveTimerOrNull(rst) {
         if (recursiveTimerOrNull) recursiveTimerOrNull->enterRecursiveFunction();
       }
+      ~Guard() {  if (recursiveTimerOrNull) recursiveTimerOrNull->exitRecursiveFunction(); }
+
+      // All this stuff is to do an RAII object that be moved.
       Guard() : recursiveTimerOrNull(nullptr) {}
       Guard(Guard &&other) { recursiveTimerOrNull = other.recursiveTimerOrNull; other.recursiveTimerOrNull = nullptr; }
       Guard& operator=(Guard&& other) {
@@ -90,7 +91,6 @@ namespace swift {
         other.recursiveTimerOrNull = nullptr;
         return *this;
       }
-      ~Guard() {  if (recursiveTimerOrNull) recursiveTimerOrNull->exitRecursiveFunction(); }
       Guard(const Guard&) = delete;
       Guard& operator=(const Guard&) = delete;
     };
