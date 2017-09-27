@@ -447,8 +447,8 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied")
-  .xfail(.iOSAny("<rdar://problem/33926468>"))
-  .xfail(.tvOSAny("<rdar://problem/33926468>"))
+  .skip(.iOSAny("<rdar://problem/33926468>"))
+  .skip(.tvOSAny("<rdar://problem/33926468>"))
   .code {
   let nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
 
