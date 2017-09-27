@@ -2094,9 +2094,11 @@ class VarDeclUsageChecker : public ASTWalker {
   /// it.
   llvm::SmallDenseMap<OpaqueValueExpr*, Expr*> OpaqueValueMap;
 
-  /// This is a mapping from a VarDecl property getter to the expression that
-  /// used it.
-  llvm::SmallDenseMap<VarDecl*, DeclRefExpr*> GetterDeclUsageMap;
+  /// The getter associated with a setter function declaration.
+  const VarDecl *AssociatedGetter = nullptr;
+
+  /// The first reference to the associated getter.
+  const DeclRefExpr *AssociatedGetterDeclRef = nullptr;
 
   /// This is a mapping from VarDecls to the if/while/guard statement that they
   /// occur in, when they are in a pattern in a StmtCondition.
@@ -2117,7 +2119,7 @@ public:
         if (auto getter = dyn_cast<VarDecl>(FD->getAccessorStorageDecl())) {
           auto arguments = FD->getParameterLists().back();
           VarDecls[arguments->get(0)] = 0;
-          GetterDeclUsageMap[getter] = nullptr;
+          AssociatedGetter = getter;
         }
       }
     }
@@ -2339,9 +2341,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       auto FD = dyn_cast<FuncDecl>(param->getDeclContext());
       if (FD && FD->getAccessorKind() == AccessorKind::IsSetter) {
         auto getter = dyn_cast<VarDecl>(FD->getAccessorStorageDecl());
-        auto getterUsage = GetterDeclUsageMap.find(getter);
-        if ((access & RK_Read) == 0 && getterUsage != GetterDeclUsageMap.end()) {
-          if (auto DRE = getterUsage->second) {
+        if ((access & RK_Read) == 0 && AssociatedGetter == getter) {
+          if (auto DRE = AssociatedGetterDeclRef) {
             Diags.diagnose(DRE->getLoc(), diag::unused_setter_parameter,
                            var->getName());
             Diags.diagnose(DRE->getLoc(), diag::fixit_for_unused_setter_parameter,
@@ -2638,9 +2639,8 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
 
     // If the Decl is a read of a getter, track the first DRE for diagnostics
     if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-      auto it = GetterDeclUsageMap.find(VD);
-      if (it != GetterDeclUsageMap.end() && it->second == nullptr)
-        GetterDeclUsageMap[VD] = DRE;
+      if (AssociatedGetter == VD && AssociatedGetterDeclRef == nullptr)
+        AssociatedGetterDeclRef = DRE;
     }
   }
   // If this is an AssignExpr, see if we're mutating something that we know
