@@ -100,7 +100,7 @@ add_swift_library(swiftAST STATIC
 # intrinsics_gen is the LLVM tablegen target that generates the include files
 # where intrinsics and attributes are declared. swiftAST depends on these
 # headers.
-add_dependencies(swiftAST intrinsics_gen clang-tabelgen-targets)
+add_dependencies(swiftAST intrinsics_gen clang-tablegen-targets)
 
 set(swift_ast_verifier_flag)
 if(SWIFT_AST_VERIFIER)
