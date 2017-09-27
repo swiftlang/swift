@@ -2131,7 +2131,7 @@ public:
     // Track a specific VarDecl
     VarDecls[VD] = 0;
   }
-    
+
   void suppressDiagnostics() {
     sawError = true; // set this flag so that no diagnostics will be emitted on delete.
   }
@@ -2346,7 +2346,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
             Diags.diagnose(DRE->getLoc(), diag::unused_setter_parameter,
                            var->getName());
             Diags.diagnose(DRE->getLoc(), diag::fixit_for_unused_setter_parameter,
-                           getter->getName(), var->getName())
+                           var->getName())
               .fixItReplace(DRE->getSourceRange(), var->getName().str());
           }
         }

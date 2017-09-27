@@ -3722,11 +3722,10 @@ WARNING(pbd_never_used_stmtcond, none,
         "with boolean test",
         (Identifier))
 WARNING(unused_setter_parameter, none,
-        "setter argument %0 was never used; did you mean to use it "
-        "instead of accessing the property's current value?",
+        "setter argument %0 was never used, but the property was accessed",
         (Identifier))
 NOTE(fixit_for_unused_setter_parameter, none,
-     "do you want to replace %0 with %1?", (Identifier, Identifier))
+     "did you mean to use %0 instead of accessing the property's current value?", (Identifier))
 
 WARNING(pbd_never_used, none,
         "initialization of %select{variable|immutable value}1 %0 was never used"
