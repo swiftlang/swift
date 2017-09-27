@@ -2128,8 +2128,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
 
-  if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumDeclsDeserialized++;
+  if (auto s = ctx.Stats)
+    s->getFrontendCounters().NumDeclsDeserialized++;
 
   // Read the attributes (if any).
   // This isn't just using DeclAttributes because that would result in the
@@ -3816,8 +3816,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   StringRef blobData;
   unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
 
-  if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumTypesDeserialized++;
+  if (auto s = ctx.Stats)
+    s->getFrontendCounters().NumTypesDeserialized++;
 
   switch (recordID) {
   case decls_block::NAME_ALIAS_TYPE: {

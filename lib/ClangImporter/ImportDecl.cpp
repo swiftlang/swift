@@ -7978,9 +7978,11 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
-  static RecursiveSharedTimer timer("ClangImporterLoadAllMembers");
-  auto guard = RecursiveSharedTimer::Guard(timer);
-  (void)guard;
+  RecursiveSharedTimer::Guard guard;
+  if (auto s = D->getASTContext().Stats) {
+    guard = s->getFrontendRecursiveSharedTimers()
+                .ClangImporter__Implementation__loadAllMembers.getGuard();
+  }
 
   assert(D);
 

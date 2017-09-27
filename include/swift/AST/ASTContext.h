@@ -176,6 +176,17 @@ typedef llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *>
   TypeOrExtensionDecl;
 
 /// ASTContext - This object creates and owns the AST objects.
+/// However, this class does more than just maintain context within an AST.
+/// It is the closest thing to thread-local or compile-local storage in this
+/// code base. Why? SourceKit uses this code with multiple threads per Unix
+/// process. Each thread processes a different source file. Each thread has its
+/// own instance of ASTContext, and that instance persists for the duration of
+/// the thread, throughout all phases of the compilation. (The name "ASTContext"
+/// is a bit of a misnomer here.) Why not use thread-local storage? This code
+/// may use DispatchQueues and pthread-style TLS won't work with code that uses
+/// DispatchQueues. Summary: if you think you need a global or static variable,
+/// you probably need to put it here instead.
+
 class ASTContext {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;

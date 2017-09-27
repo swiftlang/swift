@@ -66,6 +66,15 @@ public:
 #undef FRONTEND_STATISTIC
   };
 
+  struct AlwaysOnFrontendRecursiveSharedTimers {
+    AlwaysOnFrontendRecursiveSharedTimers();
+#define FRONTEND_RECURSIVE_SHARED_TIMER(ID) RecursiveSharedTimer ID;
+#include "Statistics.def"
+#undef FRONTEND_RECURSIVE_SHARED_TIMER
+
+    int dummyInstanceVariableToGetConstructorToParse;
+  };
+
   struct FrontendStatsTracer
   {
     UnifiedStatsReporter *Reporter;
@@ -105,6 +114,8 @@ private:
   std::unique_ptr<AlwaysOnFrontendCounters> FrontendCounters;
   std::unique_ptr<AlwaysOnFrontendCounters> LastTracedFrontendCounters;
   std::vector<FrontendStatsEvent> FrontendStatsEvents;
+  std::unique_ptr<AlwaysOnFrontendRecursiveSharedTimers>
+      FrontendRecursiveSharedTimers;
 
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(llvm::raw_ostream &OS);
@@ -128,6 +139,7 @@ public:
 
   AlwaysOnDriverCounters &getDriverCounters();
   AlwaysOnFrontendCounters &getFrontendCounters();
+  AlwaysOnFrontendRecursiveSharedTimers &getFrontendRecursiveSharedTimers();
   FrontendStatsTracer getStatsTracer(StringRef N,
                                      SourceRange const &R);
   void saveAnyFrontendStatsEvents(FrontendStatsTracer const& T,
