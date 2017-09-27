@@ -144,7 +144,7 @@ internal func _destroyTLS(_ ptr: UnsafeMutableRawPointer?) {
 ```
 
 ```C++
-__attribute__((swiftcall)) extern "C" void _swift_stdlib_destroyTLS(void *);
+__attribute__((__swiftcall__)) extern "C" void _swift_stdlib_destroyTLS(void *);
 
 // ... C code can now call _swift_stdlib_destroyTLS on a void * ...
 ```
