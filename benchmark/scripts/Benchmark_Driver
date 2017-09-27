@@ -118,12 +118,20 @@ def instrument_test(driver_path, test, num_samples):
     return avg_test_output
 
 
+BENCHMARK_OUTPUT_RE = re.compile('([^,]+),')
+
+
 def get_tests(driver_path, args):
     """Return a list of available performance tests"""
     driver = ([driver_path, '--list'])
     if args.benchmarks or args.filters:
         driver.append('--run-all')
-    tests = subprocess.check_output(driver).split()[2:]
+    tests = []
+    for l in subprocess.check_output(driver).split("\n")[1:]:
+        m = BENCHMARK_OUTPUT_RE.match(l)
+        if m is None:
+            continue
+        tests.append(m.group(1))
     if args.filters:
         regexes = [re.compile(pattern) for pattern in args.filters]
         return sorted(list(set([name for pattern in regexes
