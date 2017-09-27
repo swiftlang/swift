@@ -207,6 +207,9 @@ public class _SwiftNativeNSString {
   @_versioned // FIXME(sil-serialize-all)
   @objc
   internal init() {}
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 }
 
 @objc
@@ -240,6 +243,10 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   init(coder aDecoder: AnyObject) {
     _sanityCheckFailure("init(coder:) not implemented for _NSContiguousString")
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)

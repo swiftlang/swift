@@ -136,6 +136,7 @@ extension ${Self}: BinaryFloatingPoint {
   ///     // Prints "127"
   ///     print(Float.leastNormalMagnitude.exponent)
   ///     // Prints "-126"
+  @_inlineable // FIXME(sil-serialize-all)
   public static var exponentBitCount: Int {
     return ${ExponentBitCount}
   }
@@ -156,6 +157,7 @@ extension ${Self}: BinaryFloatingPoint {
   /// instance. Unlike other floating-point types, the `Float80` type
   /// explicitly stores the leading integral significand bit.
 %end
+  @_inlineable // FIXME(sil-serialize-all)
   public static var significandBitCount: Int {
     return ${SignificandBitCount}
   }

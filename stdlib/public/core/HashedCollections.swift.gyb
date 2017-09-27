@@ -297,6 +297,7 @@ internal struct _UnmanagedAnyObjectArray {
     self.init(unwrapped)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal subscript(i: Int) -> AnyObject {
     get {

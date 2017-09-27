@@ -45,6 +45,14 @@ internal func _isValidArraySubscript(_ index: Int, count: Int) -> Bool {
 internal class _SwiftNativeNSArrayWithContiguousStorage
   : _SwiftNativeNSArray { // Provides NSArray inheritance and native refcounting
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init() {}
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
+
   // Operate on our contiguous storage
   @_inlineable
   @_versioned
@@ -196,6 +204,8 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   deinit {
     _destroyBridgedStorage(_heapBufferBridged)
   }
@@ -342,6 +352,8 @@ internal class _ContiguousArrayStorageBase
       "Concrete subclasses must implement staticElementType")
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   deinit {
     _sanityCheck(
       self !== _emptyArrayStorage, "Deallocating empty array storage?!")

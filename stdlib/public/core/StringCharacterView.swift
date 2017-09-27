@@ -19,8 +19,12 @@
 // to allow performance optimizations of linear traversals.
 
 /// CR and LF are common special cases in grapheme breaking logic
-@_versioned internal var _CR: UInt8 { return 0x0d }
-@_versioned internal var _LF: UInt8 { return 0x0a }
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned
+internal var _CR: UInt8 { return 0x0d }
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned
+internal var _LF: UInt8 { return 0x0a }
 
 import SwiftShims
 
@@ -184,6 +188,7 @@ extension String.CharacterView : _SwiftStringView {
 /// `String.CharacterView` is a collection of `Character`.
 extension String.CharacterView : BidirectionalCollection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core, coreOffset: _coreOffset)

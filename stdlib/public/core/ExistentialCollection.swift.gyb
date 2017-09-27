@@ -132,6 +132,13 @@ internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
 @_fixed_layout
 @_versioned
 internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init() {}
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
@@ -151,6 +158,9 @@ internal final class _IteratorBox<
   @_inlineable
   @_versioned
   internal init(_ base: Base) { self._base = base }
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
   @_inlineable
   @_versioned
   internal override func next() -> Base.Element? { return _base.next() }
@@ -552,6 +562,10 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
       }
   }
 %   end
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 
 %   if Kind == 'Sequence':
   @_versioned
