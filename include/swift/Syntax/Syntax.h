@@ -127,6 +127,8 @@ public:
   /// if it has one, otherwise 0.
   CursorIndex getIndexInParent() const;
 
+  bool isToken() const;
+
   /// Returns true if this syntax node represents a statement.
   bool isStmt() const;
 

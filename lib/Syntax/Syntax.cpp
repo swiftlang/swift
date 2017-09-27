@@ -52,6 +52,10 @@ bool Syntax::isExpr() const {
   return Data->isExpr();
 }
 
+bool Syntax::isToken() const {
+  return getRaw()->isToken();
+}
+
 bool Syntax::isPattern() const {
   return Data->isPattern();
 }

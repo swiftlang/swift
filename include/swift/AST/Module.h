@@ -28,6 +28,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Parse/Token.h"
+#include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
@@ -1088,9 +1089,23 @@ public:
     return (bool)AllCorrectedTokens;
   }
 
+  ArrayRef<syntax::RawTokenInfo> getSyntaxTokens() const {
+    return AllRawTokenSyntax;
+  }
+
+  ArrayRef<syntax::Syntax> getSyntaxNodes() const {
+    return SyntaxNodes;
+  }
+
 private:
+  friend class syntax::EnabledSyntaxParsingContext;
+
   /// If not None, the underlying vector should contain tokens of this source file.
   Optional<std::vector<Token>> AllCorrectedTokens;
+
+  std::vector<syntax::RawTokenInfo> AllRawTokenSyntax;
+
+  std::vector<syntax::Syntax> SyntaxNodes;
 };
 
 
