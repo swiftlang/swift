@@ -48,8 +48,11 @@ namespace swift {
 
   /// A SharedTimer for recursive routines.
   /// void example() {
-  /// ASTContext &ctx = getASTContext();
-  ///   auto guard = RecursiveSharedTimer::Guard(ctx.Stats ? ctx.Stats->getFrontendRecursiveSharedTimers().NominalTypeDecl__lookupDirect : nullptr); (void)guard;
+  ///  RecursiveSharedTimer::Guard guard; // MUST BE AT TOP SCOPE of function to work right!
+  ///  ASTContext &ctx = getASTContext();
+  ///  if (ctx.Stats) {
+  ///    guard = ctx.Stats->getFrontendRecursiveSharedTimers().NominalTypeDecl__lookupDirect.getGuard();
+//  }
   ///   ...
   /// }
 
@@ -71,18 +74,29 @@ namespace swift {
     }
 
   public:
-    RecursiveSharedTimer(StringRef name) : name(name) {}
-    
-    // IMPLICIT TO OPTIONAL??
+    RecursiveSharedTimer(StringRef name) : name(name) {}    
 
     struct Guard {
+      // FIXME OPTIONAL??
       RecursiveSharedTimer *recursiveTimerOrNull;
-      Guard &operator=(Guard &) = delete;
+ 
+      // All this stuff is to do an RAII object that be moved.
       Guard(RecursiveSharedTimer *rst) : recursiveTimerOrNull(rst) {
         if (recursiveTimerOrNull) recursiveTimerOrNull->enterRecursiveFunction();
       }
+      Guard() : recursiveTimerOrNull(nullptr) {}
+      Guard(Guard &&other) { recursiveTimerOrNull = other.recursiveTimerOrNull; other.recursiveTimerOrNull = nullptr; }
+      Guard& operator=(Guard&& other) {
+        recursiveTimerOrNull = other.recursiveTimerOrNull;
+        other.recursiveTimerOrNull = nullptr;
+        return *this;
+      }
       ~Guard() {  if (recursiveTimerOrNull) recursiveTimerOrNull->exitRecursiveFunction(); }
+      Guard(const Guard&) = delete;
+      Guard& operator=(const Guard&) = delete;
     };
+    
+    Guard getGuard() { return Guard(this); }
   };
 } // end namespace swift
 
