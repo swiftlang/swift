@@ -2718,6 +2718,14 @@ public extension DecodingError {
 @_fixed_layout
 @_versioned
 internal class _KeyedEncodingContainerBase<Key : CodingKey> {
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    internal init(){}
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    deinit {}
+
     // These must all be given a concrete implementation in _*Box.
     @_inlineable
     @_versioned
@@ -3182,6 +3190,14 @@ internal final class _KeyedEncodingContainerBox<Concrete : KeyedEncodingContaine
 @_fixed_layout
 @_versioned
 internal class _KeyedDecodingContainerBase<Key : CodingKey> {
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    internal init(){}
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    deinit {}
+
     @_inlineable
     @_versioned
     internal var codingPath: [CodingKey] {
