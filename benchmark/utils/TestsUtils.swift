@@ -86,6 +86,21 @@ public struct BenchmarkInfo {
   }
 }
 
+extension BenchmarkInfo : Comparable {
+  public static func < (lhs: BenchmarkInfo, rhs: BenchmarkInfo) -> Bool {
+    return lhs.name < rhs.name
+  }
+  public static func == (lhs: BenchmarkInfo, rhs: BenchmarkInfo) -> Bool {
+    return lhs.name == rhs.name
+  }
+}
+
+extension BenchmarkInfo : Hashable {
+  public var hashValue: Int {
+    return name.hashValue
+  }
+}
+
 // Linear function shift register.
 //
 // This is just to drive benchmarks. I don't make any claim about its
