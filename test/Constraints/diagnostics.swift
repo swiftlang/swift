@@ -1080,3 +1080,12 @@ fun_31849281(a: { !$0 }, c: [nil, 42], b: { "\($0)" })
 
 func f_31849281(x: Int, y: Int, z: Int) {}
 f_31849281(42, y: 10, x: 20) // expected-error {{argument 'x' must precede unnamed argument #1}} {{12-12=x: 20, }} {{21-28=}}
+
+// https://bugs.swift.org/browse/SR-5934 - failure to emit diagnostic for bad
+// generic constraints
+func elephant<T, U>(_: T) where T : Collection, T.Element == U, T.Element : Hashable {}
+// expected-note@-1 {{in call to function 'elephant'}}
+
+func platypus<T>(a: [T]) {
+    _ = elephant(a) // expected-error {{generic parameter 'U' could not be inferred}}
+}
