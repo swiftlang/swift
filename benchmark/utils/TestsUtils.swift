@@ -94,8 +94,15 @@ public enum BenchmarkCategories : CustomStringConvertible {
 }
 
 public struct BenchmarkInfo {
+  /// The name of the benchmark that should be displayed by the harness.
   public var name: String
+
+  /// A function that invokes the specific benchmark routine.
   public var runFunction: (Int) -> ()
+
+  /// A set of category tags that describe this benchmark. This is used by the
+  /// harness to allow for easy slicing of the set of benchmarks along tag
+  /// boundaries, e.x.: run all string benchmarks or ref count benchmarks, etc.
   public var tags: [BenchmarkCategories]
 
   public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategories]) {
