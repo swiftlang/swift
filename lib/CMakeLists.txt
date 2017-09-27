@@ -1,3 +1,9 @@
+# TODO: Fix the fine grained tabegen dependencies
+# In the absence of fine grained tablegen dependencies we need to ensure that
+# Swift's libraries all build after the LLVM & Clang tablegen-generated headers
+# are generated.
+list(APPEND LLVM_COMMON_DEPENDS intrinsics_gen clang-tablegen-targets)
+
 add_subdirectory(AST)
 add_subdirectory(ASTSectionImporter)
 add_subdirectory(Basic)
