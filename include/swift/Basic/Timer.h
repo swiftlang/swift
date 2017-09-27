@@ -48,10 +48,11 @@ namespace swift {
 
   /// A SharedTimer for recursive routines.
   /// void example() {
-  ///  RecursiveSharedTimer::Guard guard; // MUST BE AT TOP SCOPE of function to work right!
-  ///  if (auto s = getASTContext().Stats) {
-  ///    guard = ctx.Stats->getFrontendRecursiveSharedTimers().NominalTypeDecl__lookupDirect.getGuard();
-//  }
+  ///  RecursiveSharedTimer::Guard guard; // MUST BE AT TOP SCOPE of function to
+  ///  work right! if (auto s = getASTContext().Stats) {
+  ///    guard =
+  ///    ctx.Stats->getFrontendRecursiveSharedTimers().NominalTypeDecl__lookupDirect.getGuard();
+  //  }
   ///   ...
   /// }
 
@@ -73,28 +74,35 @@ namespace swift {
     }
 
   public:
-    RecursiveSharedTimer(StringRef name) : name(name) {}    
+    RecursiveSharedTimer(StringRef name) : name(name) {}
 
     struct Guard {
       RecursiveSharedTimer *recursiveTimerOrNull;
- 
+
       Guard(RecursiveSharedTimer *rst) : recursiveTimerOrNull(rst) {
-        if (recursiveTimerOrNull) recursiveTimerOrNull->enterRecursiveFunction();
+        if (recursiveTimerOrNull)
+          recursiveTimerOrNull->enterRecursiveFunction();
       }
-      ~Guard() {  if (recursiveTimerOrNull) recursiveTimerOrNull->exitRecursiveFunction(); }
+      ~Guard() {
+        if (recursiveTimerOrNull)
+          recursiveTimerOrNull->exitRecursiveFunction();
+      }
 
       // All this stuff is to do an RAII object that be moved.
       Guard() : recursiveTimerOrNull(nullptr) {}
-      Guard(Guard &&other) { recursiveTimerOrNull = other.recursiveTimerOrNull; other.recursiveTimerOrNull = nullptr; }
-      Guard& operator=(Guard&& other) {
+      Guard(Guard &&other) {
+        recursiveTimerOrNull = other.recursiveTimerOrNull;
+        other.recursiveTimerOrNull = nullptr;
+      }
+      Guard &operator=(Guard &&other) {
         recursiveTimerOrNull = other.recursiveTimerOrNull;
         other.recursiveTimerOrNull = nullptr;
         return *this;
       }
-      Guard(const Guard&) = delete;
-      Guard& operator=(const Guard&) = delete;
+      Guard(const Guard &) = delete;
+      Guard &operator=(const Guard &) = delete;
     };
-    
+
     Guard getGuard() { return Guard(this); }
   };
 } // end namespace swift

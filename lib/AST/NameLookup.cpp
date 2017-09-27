@@ -1195,11 +1195,12 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
   RecursiveSharedTimer::Guard guard;
-    if (auto s = getASTContext().Stats) {
-      ++s->getFrontendCounters().NominalTypeLookupDirectCount;
-      guard = s->getFrontendRecursiveSharedTimers().NominalTypeDecl__lookupDirect.getGuard();
-    }
-  
+  if (auto s = getASTContext().Stats) {
+    ++s->getFrontendCounters().NominalTypeLookupDirectCount;
+    guard = s->getFrontendRecursiveSharedTimers()
+                .NominalTypeDecl__lookupDirect.getGuard();
+  }
+
   (void)getMembers();
 
   // Make sure we have the complete list of members (in this nominal and in all

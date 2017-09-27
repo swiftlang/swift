@@ -172,12 +172,12 @@ UnifiedStatsReporter::getFrontendCounters()
     FrontendCounters = make_unique<AlwaysOnFrontendCounters>();
   return *FrontendCounters;
 }
-  
+
 UnifiedStatsReporter::AlwaysOnFrontendRecursiveSharedTimers &
-UnifiedStatsReporter::getFrontendRecursiveSharedTimers()
-{
+UnifiedStatsReporter::getFrontendRecursiveSharedTimers() {
   if (!FrontendRecursiveSharedTimers)
-    FrontendRecursiveSharedTimers = make_unique<AlwaysOnFrontendRecursiveSharedTimers>();
+    FrontendRecursiveSharedTimers =
+        make_unique<AlwaysOnFrontendRecursiveSharedTimers>();
   return *FrontendRecursiveSharedTimers;
 }
 
@@ -320,13 +320,15 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
 #include "swift/Basic/Statistics.def"
 #undef FRONTEND_STATISTIC
 }
-  
-UnifiedStatsReporter::AlwaysOnFrontendRecursiveSharedTimers::AlwaysOnFrontendRecursiveSharedTimers() :
+
+UnifiedStatsReporter::AlwaysOnFrontendRecursiveSharedTimers::
+    AlwaysOnFrontendRecursiveSharedTimers()
+    :
 #define FRONTEND_RECURSIVE_SHARED_TIMER(ID) ID(#ID),
 #include "swift/Basic/Statistics.def"
 #undef FRONTEND_RECURSIVE_SHARED_TIMER
-  dummyInstanceVariableToGetConstructorToParse(0)
-{}
+      dummyInstanceVariableToGetConstructorToParse(0) {
+}
 
 UnifiedStatsReporter::~UnifiedStatsReporter()
 {
