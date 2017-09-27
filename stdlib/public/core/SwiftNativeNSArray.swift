@@ -47,7 +47,7 @@ internal class _SwiftNativeNSArrayWithContiguousStorage
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init() {}
+  internal override init() {}
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)

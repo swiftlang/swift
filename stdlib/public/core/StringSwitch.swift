@@ -44,8 +44,20 @@ internal typealias _StringSwitchCache = Dictionary<String, Int>
 
 @_versioned // FIXME(sil-serialize-all)
 internal struct _StringSwitchContext {
-  let cases: [StaticString]
-  let cachePtr: UnsafeMutablePointer<_StringSwitchCache>
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(
+    cases: [StaticString],
+    cachePtr: UnsafeMutablePointer<_StringSwitchCache>
+  ){
+    self.cases = cases
+    self.cachePtr = cachePtr
+  }
+
+  @_versioned // FIXME(sil-serialize-all)
+  internal let cases: [StaticString]
+  @_versioned // FIXME(sil-serialize-all)
+  internal let cachePtr: UnsafeMutablePointer<_StringSwitchCache>
 }
 
 /// The compiler intrinsic which is called to lookup a string in a table

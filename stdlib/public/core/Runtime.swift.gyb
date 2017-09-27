@@ -295,7 +295,6 @@ public final class _stdlib_AtomicInt {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   deinit {}
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -593,7 +592,6 @@ open class _SwiftNativeNSData {
   @_inlineable // FIXME(sil-serialize-all)
   @objc public init() {}
   @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   deinit {}
 }
 

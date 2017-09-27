@@ -121,7 +121,6 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   deinit {}
   
   // internal-with-availability
@@ -250,7 +249,6 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   }
   
   @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   deinit {
     withBuffer { $0.destroy() }
   }
