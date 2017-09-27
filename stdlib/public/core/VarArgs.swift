@@ -359,6 +359,10 @@ final internal class _VaListBuilder {
 
   @_versioned
   internal struct Header {
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    internal init() {}
+
     @_versioned // FIXME(sil-serialize-all)
     internal var gp_offset = CUnsignedInt(0)
     @_versioned // FIXME(sil-serialize-all)
@@ -376,6 +380,10 @@ final internal class _VaListBuilder {
     // prepare the register save area
     storage = ContiguousArray(repeating: 0, count: _x86_64RegisterSaveWords)
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -438,6 +446,10 @@ final internal class _VaListBuilder {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal init() {}
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)

@@ -295,6 +295,10 @@ public final class _stdlib_AtomicInt {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
+
+  @_inlineable // FIXME(sil-serialize-all)
   public func store(_ desired: Int) {
     return _swift_stdlib_atomicStoreInt(object: _valuePtr, desired: desired)
   }
@@ -542,6 +546,9 @@ internal class _SwiftNativeNSArray {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal init() {}
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 }
 
 @_versioned // FIXME(sil-serialize-all)
@@ -551,6 +558,9 @@ internal class _SwiftNativeNSDictionary {
   @_versioned // FIXME(sil-serialize-all)
   @objc
   internal init() {}
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 }
 
 @_versioned // FIXME(sil-serialize-all)
@@ -560,6 +570,9 @@ internal class _SwiftNativeNSSet {
   @_versioned // FIXME(sil-serialize-all)
   @objc
   internal init() {}
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 }
 
 @_versioned // FIXME(sil-serialize-all)
@@ -569,12 +582,19 @@ internal class _SwiftNativeNSEnumerator {
   @_versioned // FIXME(sil-serialize-all)
   @objc
   internal init() {}
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 }
 
 // FIXME(ABI)#60 : move into the Foundation overlay and remove 'open'
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSDataBase)
 open class _SwiftNativeNSData {
+  @_inlineable // FIXME(sil-serialize-all)
   @objc public init() {}
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 }
 
 //===----------------------------------------------------------------------===//
@@ -588,6 +608,9 @@ internal class _stdlib_ReturnAutoreleasedDummy {
   @_versioned // FIXME(sil-serialize-all)
   @objc
   internal init() {}
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
   // Use 'dynamic' to force Objective-C dispatch, which uses the
   // return-autoreleased call sequence.
   @_inlineable // FIXME(sil-serialize-all)
@@ -634,18 +657,27 @@ internal class _SwiftNativeNSArray {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal init() {}
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 }
 @_versioned // FIXME(sil-serialize-all)
 internal class _SwiftNativeNSDictionary {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal init() {}
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 }
 @_versioned // FIXME(sil-serialize-all)
 internal class _SwiftNativeNSSet {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal init() {}
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 }
 
 #endif

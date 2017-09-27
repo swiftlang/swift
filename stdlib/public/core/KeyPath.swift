@@ -119,6 +119,10 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   internal init() {
     _sanityCheckFailure("use _create(...)")
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
   
   // internal-with-availability
   @_inlineable // FIXME(sil-serialize-all)
@@ -245,6 +249,8 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
     }
   }
   
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   deinit {
     withBuffer { $0.destroy() }
   }
@@ -627,6 +633,9 @@ internal final class ClassHolder {
     self.previous = previous
     self.instance = instance
   }
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 }
 
 // A class that triggers writeback to a pointer when destroyed.
@@ -645,6 +654,8 @@ internal final class MutatingWritebackBuffer<CurValue, NewValue> {
   @_versioned // FIXME(sil-serialize-all)
   internal var value: NewValue
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   deinit {
     set(value, &base.pointee, argument, argumentSize)
   }
@@ -683,6 +694,8 @@ internal final class NonmutatingWritebackBuffer<CurValue, NewValue> {
   @_versioned // FIXME(sil-serialize-all)
   internal var value: NewValue
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   deinit {
     set(value, base, argument, argumentSize)
   }

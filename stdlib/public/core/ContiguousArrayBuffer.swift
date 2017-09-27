@@ -83,6 +83,8 @@ internal final class _ContiguousArrayStorage<
   Element
 > : _ContiguousArrayStorageBase {
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   deinit {
     _elementPointer.deinitialize(count: countAndCapacity.count)
     _fixLifetime(self)

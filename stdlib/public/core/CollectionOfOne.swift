@@ -14,6 +14,7 @@
 public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
   /// Construct an instance that generates `_element!`, or an empty
   /// sequence if `_element == nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   init(_elements: Element?) {
     self._elements = _elements
