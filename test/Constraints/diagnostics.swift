@@ -1102,3 +1102,12 @@ func rdar17170728() {
     // expected-error@-1 {{type of expression is ambiguous without more context}}
   }
 }
+
+// https://bugs.swift.org/browse/SR-5934 - failure to emit diagnostic for bad
+// generic constraints
+func elephant<T, U>(_: T) where T : Collection, T.Element == U, T.Element : Hashable {}
+// expected-note@-1 {{in call to function 'elephant'}}
+
+func platypus<T>(a: [T]) {
+    _ = elephant(a) // expected-error {{generic parameter 'U' could not be inferred}}
+}
