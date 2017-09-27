@@ -28,7 +28,11 @@ private:
 
 public:
   explicit ProfileCounter() : count(UINT64_MAX) {}
-  ProfileCounter(uint64_t count) : count(count) {}
+  ProfileCounter(uint64_t Count) : count(Count) {
+    if (Count == UINT64_MAX) {
+      count = UINT64_MAX - 1;
+    }
+  }
 
   bool hasValue() const { return count != UINT64_MAX; }
   uint64_t getValue() const {
