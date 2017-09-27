@@ -912,8 +912,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
     // We are at an explicit or inferred requirement.
     assert(source->kind == RequirementSource::Explicit ||
-           source->kind == RequirementSource::Inferred ||
-           source->kind == RequirementSource::QuietlyInferred);
+           source->kind == RequirementSource::Inferred);
 
     // Skip trivial path elements. These occur when querying a requirement
     // signature.

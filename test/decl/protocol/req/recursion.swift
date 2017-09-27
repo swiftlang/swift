@@ -97,12 +97,7 @@ struct SI<A: PI> : I where A : I, A.T == SI<A> {
 struct S4<A: PI> : I where A : I {
 }
 
-struct S5<A: PI> : I where A : I, A.T == S4<A> {
-// expected-warning@-1{{redundant conformance constraint 'A': 'I'}}
-// expected-warning@-2{{redundant conformance constraint 'A': 'PI'}}
-// expected-note@-3{{conformance constraint 'A': 'PI' inferred from type here}}
-// expected-note@-4{{conformance constraint 'A': 'I' inferred from type here}}
-}
+struct S5<A: PI> : I where A : I, A.T == S4<A> { }
 
 // Used to hit ArchetypeBuilder assertions
 struct SU<A: P> where A.T == SU {
