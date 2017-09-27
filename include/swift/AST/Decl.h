@@ -562,8 +562,10 @@ class alignas(1 << DeclAlignInBits) Decl {
   class AssociatedTypeDeclBitfields {
     friend class AssociatedTypeDecl;
     unsigned : NumTypeDeclBits;
+    unsigned ComputedOverridden : 1;
+    unsigned HasOverridden : 1;
   };
-  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits };
+  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits + 2 };
   static_assert(NumAssociatedTypeDeclBits <= 32, "fits in an unsigned");
 
   class ImportDeclBitfields {
@@ -2661,6 +2663,24 @@ public:
   /// computeType - Compute the type (and declared type) of this associated
   /// type; can only be called after the alias type has been resolved.
   void computeType();
+
+  /// Retrieve the (first) overridden associated type declaration, if any.
+  AssociatedTypeDecl *getOverriddenDecl() const;
+
+  /// Retrieve the set of associated types overridden by this associated
+  /// type.
+  ArrayRef<AssociatedTypeDecl *> getOverriddenDecls() const;
+
+  /// Whether the overridden declarations have already been computed.
+  bool overriddenDeclsComputed() const {
+    return AssociatedTypeDeclBits.ComputedOverridden;
+  }
+
+  /// Record the set of overridden declarations.
+  ///
+  /// \returns the array recorded in the AST.
+  ArrayRef<AssociatedTypeDecl *> setOverriddenDecls(
+                                   ArrayRef<AssociatedTypeDecl *> overridden);
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;

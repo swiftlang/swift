@@ -278,6 +278,10 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// The existential signature <T : P> for each P.
   llvm::DenseMap<CanType, CanGenericSignature> ExistentialSignatures;
 
+  /// Overridden associated type declarations.
+  llvm::DenseMap<const AssociatedTypeDecl *, ArrayRef<AssociatedTypeDecl *>>
+    AssociatedTypeOverrides;
+
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -1539,6 +1543,125 @@ GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
   auto env = sig->createGenericEnvironment(module);
   Impl.CanonicalGenericEnvironments[builder] = env;
   return env;
+}
+
+/// Minimize the set of overridden associated types, eliminating any
+/// associated types that are overridden by other associated types.
+static void minimizeOverriddenAssociatedTypes(
+                           SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) {
+  // Mark associated types that are "worse" than some other associated type,
+  // because they come from an inherited protocol.
+  bool anyWorse = false;
+  std::vector<bool> worseThanAny(assocTypes.size(), false);
+  for (unsigned i : indices(assocTypes)) {
+    auto proto1 = assocTypes[i]->getProtocol();
+    for (unsigned j : range(i + 1, assocTypes.size())) {
+      auto proto2 = assocTypes[j]->getProtocol();
+      if (proto1->inheritsFrom(proto2)) {
+        anyWorse = true;
+        worseThanAny[j] = true;
+      } else if (proto2->inheritsFrom(proto1)) {
+        anyWorse = true;
+        worseThanAny[i] = true;
+        break;
+      }
+    }
+  }
+
+  // If we didn't find any associated types that were "worse", we're done.
+  if (!anyWorse) return;
+
+  // Copy in the associated types that aren't worse than any other associated
+  // type.
+  unsigned nextIndex = 0;
+  for (unsigned i : indices(assocTypes)) {
+    if (worseThanAny[i]) continue;
+    assocTypes[nextIndex++] = assocTypes[i];
+  }
+
+  assocTypes.erase(assocTypes.begin() + nextIndex, assocTypes.end());
+}
+
+/// Sort associated types just based on the protocol.
+static int compareSimilarAssociatedTypes(AssociatedTypeDecl *const *lhs,
+                                         AssociatedTypeDecl *const *rhs) {
+  auto lhsProto = (*lhs)->getProtocol();
+  auto rhsProto = (*rhs)->getProtocol();
+  return ProtocolType::compareProtocols(&lhsProto, &rhsProto);
+}
+
+ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::getOverriddenDecls() const {
+  // If we already computed the set of overridden associated types, return it.
+  if (AssociatedTypeDeclBits.ComputedOverridden) {
+    // We didn't override any associated types, so return the empty set.
+    if (!AssociatedTypeDeclBits.HasOverridden)
+      return { };
+
+    // Look up the overrides.
+    auto known = getASTContext().Impl.AssociatedTypeOverrides.find(this);
+    assert(known != getASTContext().Impl.AssociatedTypeOverrides.end());
+    return known->second;
+  }
+
+  // Find associated types with the given name in all of the inherited
+  // protocols.
+  SmallVector<AssociatedTypeDecl *, 4> inheritedAssociatedTypes;
+  auto proto = getProtocol();
+  proto->walkInheritedProtocols([&](ProtocolDecl *inheritedProto) {
+    if (proto == inheritedProto) return TypeWalker::Action::Continue;
+
+    // Objective-C protocols
+    if (inheritedProto->isObjC()) return TypeWalker::Action::Continue;
+
+    // Look for associated types with the same name.
+    bool foundAny = false;
+    for (auto member : inheritedProto->lookupDirect(
+                                              getFullName(),
+                                              /*ignoreNewExtensions=*/true)) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        inheritedAssociatedTypes.push_back(assocType);
+        foundAny = true;
+      }
+    }
+
+    return foundAny ? TypeWalker::Action::SkipChildren
+                    : TypeWalker::Action::Continue;
+  });
+
+  // Minimize the set of inherited associated types, eliminating any that
+  // themselves are overridden.
+  minimizeOverriddenAssociatedTypes(inheritedAssociatedTypes);
+
+  // Sort the set of inherited associated types.
+  llvm::array_pod_sort(inheritedAssociatedTypes.begin(),
+                       inheritedAssociatedTypes.end(),
+                       compareSimilarAssociatedTypes);
+
+  return const_cast<AssociatedTypeDecl *>(this)
+    ->setOverriddenDecls(inheritedAssociatedTypes);
+}
+
+ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::setOverriddenDecls(
+                                  ArrayRef<AssociatedTypeDecl *> overridden) {
+  assert(!AssociatedTypeDeclBits.ComputedOverridden &&
+         "Overridden decls already computed");
+  AssociatedTypeDeclBits.ComputedOverridden = true;
+
+  // If the set of overridden declarations is empty, note that.
+  if (overridden.empty()) {
+    AssociatedTypeDeclBits.HasOverridden = false;
+    return { };
+  }
+
+  // Record the overrides in the context.
+  auto &ctx = getASTContext();
+  AssociatedTypeDeclBits.HasOverridden = true;
+  auto overriddenCopy = ctx.AllocateCopy(overridden);
+  auto inserted =
+    ctx.Impl.AssociatedTypeOverrides.insert({this, overriddenCopy}).second;
+  (void)inserted;
+  assert(inserted && "Already recorded associated type overrides");
+  return overriddenCopy;
 }
 
 bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {

@@ -1593,6 +1593,8 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
     return sdd->getOverriddenDecl();
   if (auto cd = dyn_cast<ConstructorDecl>(this))
     return cd->getOverriddenDecl();
+  if (auto at = dyn_cast<AssociatedTypeDecl>(this))
+    return at->getOverriddenDecl();
   return nullptr;
 }
 
@@ -2580,7 +2582,11 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        TrailingWhereClause *trailingWhere)
     : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
       KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
-      TrailingWhere(trailingWhere) {}
+      TrailingWhere(trailingWhere) {
+
+  AssociatedTypeDeclBits.ComputedOverridden = false;
+  AssociatedTypeDeclBits.HasOverridden = false;
+}
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
@@ -2591,6 +2597,8 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
       KeywordLoc(keywordLoc), TrailingWhere(trailingWhere),
       Resolver(definitionResolver), ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
+  AssociatedTypeDeclBits.ComputedOverridden = false;
+  AssociatedTypeDeclBits.HasOverridden = false;
 }
 
 void AssociatedTypeDecl::computeType() {
@@ -2615,6 +2623,11 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
     endLoc = getInherited().back().getSourceRange().End;
   }
   return SourceRange(KeywordLoc, endLoc);
+}
+
+AssociatedTypeDecl *AssociatedTypeDecl::getOverriddenDecl() const {
+  auto overridden = getOverriddenDecls();
+  return overridden.empty() ? nullptr : overridden.front();
 }
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
