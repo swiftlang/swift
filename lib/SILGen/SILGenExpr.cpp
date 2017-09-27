@@ -2170,9 +2170,23 @@ RValue RValueEmitter::visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
 RValue RValueEmitter::
 visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                 SGFContext C) {
+  ProfileCounter trueCount = ProfileCounter();
+  ProfileCounter falseCount = ProfileCounter();
+  auto parent = SGF.SGM.getPGOParent(E);
+  if (parent) {
+    auto &Node = parent.getValue();
+    auto *NodeS = Node.get<Stmt *>();
+    if (auto *IS = dyn_cast<IfStmt>(NodeS)) {
+      trueCount = SGF.SGM.loadProfilerCount(IS->getThenStmt());
+      if (auto *ElseStmt = IS->getElseStmt()) {
+        falseCount = SGF.SGM.loadProfilerCount(ElseStmt);
+      }
+    }
+  }
   ManagedValue operand = SGF.emitRValueAsSingleValue(E->getSubExpr());
   return emitConditionalCheckedCast(SGF, E, operand, E->getSubExpr()->getType(),
-                                    E->getType(), E->getCastKind(), C);
+                                    E->getType(), E->getCastKind(), C,
+                                    trueCount, falseCount);
 }
 
 RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
@@ -3027,12 +3041,9 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   auto name = Mangle::ASTMangler()
     .mangleKeyPathGetterThunkHelper(property, genericSig, baseType,
                                     interfaceSubs);
-  auto thunk = SGF.SGM.M.getOrCreateSharedFunction(loc, name,
-                                                   signature,
-                                                   IsBare,
-                                                   IsNotTransparent,
-                                                   IsNotSerialized,
-                                                   IsThunk);
+  auto thunk = SGF.SGM.M.getOrCreateSharedFunction(
+      loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
+      ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;
   
@@ -3152,12 +3163,9 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
                                                                 genericSig,
                                                                 baseType,
                                                                 interfaceSubs);
-  auto thunk = SGF.SGM.M.getOrCreateSharedFunction(loc, name,
-                                                   signature,
-                                                   IsBare,
-                                                   IsNotTransparent,
-                                                   IsNotSerialized,
-                                                   IsThunk);
+  auto thunk = SGF.SGM.M.getOrCreateSharedFunction(
+      loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
+      ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;
   
@@ -3314,12 +3322,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
     
     auto name = Mangle::ASTMangler().mangleKeyPathEqualsHelper(indexTypes,
                                                                genericSig);
-    equals = SGM.M.getOrCreateSharedFunction(loc, name,
-                                             signature,
-                                             IsBare,
-                                             IsNotTransparent,
-                                             IsNotSerialized,
-                                             IsThunk);
+    equals = SGM.M.getOrCreateSharedFunction(loc, name, signature, IsBare,
+                                             IsNotTransparent, IsNotSerialized,
+                                             ProfileCounter(), IsThunk);
     if (!equals->empty()) {
       return;
     }
@@ -3482,12 +3487,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
     
     auto name = Mangle::ASTMangler().mangleKeyPathHashHelper(indexTypes,
                                                              genericSig);
-    hash = SGM.M.getOrCreateSharedFunction(loc, name,
-                                           signature,
-                                           IsBare,
-                                           IsNotTransparent,
-                                           IsNotSerialized,
-                                           IsThunk);
+    hash = SGM.M.getOrCreateSharedFunction(loc, name, signature, IsBare,
+                                           IsNotTransparent, IsNotSerialized,
+                                           ProfileCounter(), IsThunk);
     if (!hash->empty()) {
       return;
     }
@@ -4421,6 +4423,9 @@ RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
 RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
   auto &lowering = SGF.getTypeLowering(E->getType());
 
+  auto NumTrueTaken = SGF.SGM.loadProfilerCount(E->getThenExpr());
+  auto NumFalseTaken = SGF.SGM.loadProfilerCount(E->getElseExpr());
+
   if (lowering.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     // If the result is loadable, emit each branch and forward its result
     // into the destination block argument.
@@ -4429,7 +4434,8 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     Condition cond = SGF.emitCondition(E->getCondExpr(),
                                        /*hasFalse*/ true,
                                        /*invertCondition*/ false,
-                                       SGF.getLoweredType(E->getType()));
+                                       SGF.getLoweredType(E->getType()),
+                                       NumTrueTaken, NumFalseTaken);
     
     cond.enterTrue(SGF);
     SGF.emitProfilerIncrement(E->getThenExpr());
@@ -4464,7 +4470,9 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     
     Condition cond = SGF.emitCondition(E->getCondExpr(),
                                        /*hasFalse*/ true,
-                                       /*invertCondition*/ false);
+                                       /*invertCondition*/ false,
+                                       /*contArgs*/ {},
+                                       NumTrueTaken, NumFalseTaken);
     cond.enterTrue(SGF);
     SGF.emitProfilerIncrement(E->getThenExpr());
     {

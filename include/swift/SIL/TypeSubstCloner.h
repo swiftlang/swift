@@ -232,14 +232,15 @@ protected:
     SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
     B.setCurrentDebugScope(super::getOpScope(inst->getDebugScope()));
 
+    auto TrueCount = inst->getTrueBBCount();
+    auto FalseCount = inst->getFalseBBCount();
+
     // Try to use the scalar cast instruction.
     if (canUseScalarCheckedCastInstructions(B.getModule(),
                                             sourceType, targetType)) {
-      emitIndirectConditionalCastWithScalar(B, SwiftMod, loc,
-                                            inst->getConsumptionKind(),
-                                            src, sourceType,
-                                            dest, targetType,
-                                            succBB, failBB);
+      emitIndirectConditionalCastWithScalar(
+          B, SwiftMod, loc, inst->getConsumptionKind(), src, sourceType, dest,
+          targetType, succBB, failBB, TrueCount, FalseCount);
       return;
     }
 

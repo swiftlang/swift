@@ -162,6 +162,18 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
                    "-warnings-as-errors", "-suppress-warnings");
   }
 
+  // Check for conflicting profiling flags
+  const Arg *ProfileGenerate = Args.getLastArg(options::OPT_profile_generate);
+  const Arg *ProfileUse = Args.getLastArg(options::OPT_profile_use);
+  if (ProfileGenerate && ProfileUse)
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-profile-generate", "-profile-use");
+
+  // Check if the profdata is missing
+  if (ProfileUse && !llvm::sys::fs::exists(ProfileUse->getValue()))
+    diags.diagnose(SourceLoc(), diag::error_profile_missing,
+                  ProfileUse->getValue());
+
   // Check for missing debug option when verifying debug info.
   if (Args.hasArg(options::OPT_verify_debug_info)) {
     bool hasDebugOption = true;

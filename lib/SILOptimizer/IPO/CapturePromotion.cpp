@@ -428,8 +428,9 @@ ClosureCloner::initCloned(SILFunction *Orig, IsSerialized_t Serialized,
   auto *Fn = M.createFunction(
       Orig->getLinkage(), ClonedName, ClonedTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
-      Orig->isThunk(), Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
-      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
+      Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
+      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
+      Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs())
     Fn->addSemanticsAttr(Attr);
   if (Orig->hasUnqualifiedOwnership()) {

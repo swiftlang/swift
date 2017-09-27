@@ -649,11 +649,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     NewFGenericEnv = nullptr;
   }
 
-  NewF = M.createFunction(
-      linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isSerialized(), F->isThunk(),
-      F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
-      nullptr, F->getDebugScope());
+  NewF = M.createFunction(linkage, Name, NewFTy, NewFGenericEnv,
+                          F->getLocation(), F->isBare(), F->isTransparent(),
+                          F->isSerialized(), F->getEntryCount(), F->isThunk(),
+                          F->getClassSubclassScope(), F->getInlineStrategy(),
+                          F->getEffectsKind(), nullptr, F->getDebugScope());
   if (F->hasUnqualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }

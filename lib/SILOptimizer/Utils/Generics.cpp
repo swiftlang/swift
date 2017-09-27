@@ -2078,9 +2078,9 @@ protected:
 } // anonymous namespace
 
 SILFunction *ReabstractionThunkGenerator::createThunk() {
-  SILFunction *Thunk =
-      M.getOrCreateSharedFunction(Loc, ThunkName, ReInfo.getSubstitutedType(),
-                                  IsBare, IsTransparent, Serialized, IsThunk);
+  SILFunction *Thunk = M.getOrCreateSharedFunction(
+      Loc, ThunkName, ReInfo.getSubstitutedType(), IsBare, IsTransparent,
+      Serialized, ProfileCounter(), IsThunk);
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;

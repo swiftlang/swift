@@ -463,6 +463,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   }
   SIMPLE_PRINTER(char)
   SIMPLE_PRINTER(unsigned)
+  SIMPLE_PRINTER(uint64_t)
   SIMPLE_PRINTER(StringRef)
   SIMPLE_PRINTER(Identifier)
   SIMPLE_PRINTER(ID)
@@ -1329,6 +1330,10 @@ public:
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getCastType()
           << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
+    if (CI->getTrueBBCount())
+      *this << " !true_count(" << CI->getTrueBBCount().getValue() << ")";
+    if (CI->getFalseBBCount())
+      *this << " !false_count(" << CI->getFalseBBCount().getValue() << ")";
   }
 
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CI) {
@@ -1355,6 +1360,10 @@ public:
           << getIDAndType(CI->getDest()) << ", "
           << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
+    if (CI->getTrueBBCount())
+      *this << " !true_count(" << CI->getTrueBBCount().getValue() << ")";
+    if (CI->getFalseBBCount())
+      *this << " !false_count(" << CI->getFalseBBCount().getValue() << ")";
   }
 
   void printUncheckedConversionInst(ConversionInst *CI, SILValue operand) {
@@ -1820,9 +1829,16 @@ public:
       std::tie(elt, dest) = SOI->getCase(i);
       *this << ", case " << SILDeclRef(elt, SILDeclRef::Kind::EnumElement)
             << ": " << Ctx.getID(dest);
+      if (SOI->getCaseCount(i)) {
+        *this << " !case_count(" << SOI->getCaseCount(i).getValue() << ")";
+      }
     }
-    if (SOI->hasDefault())
+    if (SOI->hasDefault()) {
       *this << ", default " << Ctx.getID(SOI->getDefaultBB());
+      if (SOI->getDefaultCount()) {
+        *this << " !default_count(" << SOI->getDefaultCount().getValue() << ")";
+      }
+    }
   }
   
   void visitSwitchEnumInst(SwitchEnumInst *SOI) {
@@ -1897,6 +1913,10 @@ public:
     printBranchArgs(CBI->getTrueArgs());
     *this << ", " << Ctx.getID(CBI->getFalseBB());
     printBranchArgs(CBI->getFalseArgs());
+    if (CBI->getTrueBBCount())
+      *this << " !true_count(" << CBI->getTrueBBCount().getValue() << ")";
+    if (CBI->getFalseBBCount())
+      *this << " !false_count(" << CBI->getFalseBBCount().getValue() << ")";
   }
   
   void visitKeyPathInst(KeyPathInst *KPI) {
@@ -2235,6 +2255,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
   
   if (!isExternalDeclaration()) {
+    if (auto eCount = getEntryCount()) {
+      OS << " !function_entry_count(" << eCount.getValue() << ")";
+    }
     OS << " {\n";
 
     SILPrinter(PrintCtx, (Aliases.empty() ? nullptr : &Aliases))

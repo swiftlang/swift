@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
 #include "Condition.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "SILGen.h"
 #include "Scope.h"
 #include "SwitchCaseFullExpr.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -138,9 +139,11 @@ static void emitOrDeleteBlock(SILGenFunction &SGF, JumpDest &dest,
     SGF.B.emitBlock(BB, BranchLoc);
 }
 
-Condition SILGenFunction::emitCondition(Expr *E,
-                                        bool hasFalseCode, bool invertValue,
-                                        ArrayRef<SILType> contArgs) {
+Condition SILGenFunction::emitCondition(Expr *E, bool hasFalseCode,
+                                        bool invertValue,
+                                        ArrayRef<SILType> contArgs,
+                                        ProfileCounter NumTrueTaken,
+                                        ProfileCounter NumFalseTaken) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
 
@@ -152,14 +155,15 @@ Condition SILGenFunction::emitCondition(Expr *E,
   }
   assert(V->getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
 
-  return emitCondition(V, E, hasFalseCode, invertValue, contArgs);
+  return emitCondition(V, E, hasFalseCode, invertValue, contArgs, NumTrueTaken,
+                       NumFalseTaken);
 }
-
-
 
 Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
                                         bool hasFalseCode, bool invertValue,
-                                        ArrayRef<SILType> contArgs) {
+                                        ArrayRef<SILType> contArgs,
+                                        ProfileCounter NumTrueTaken,
+                                        ProfileCounter NumFalseTaken) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
 
@@ -180,10 +184,12 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   SILBasicBlock *TrueBB = createBasicBlock();
 
   if (invertValue)
-    B.createCondBranch(Loc, V, FalseDestBB, TrueBB);
+    B.createCondBranch(Loc, V, FalseDestBB, TrueBB, NumFalseTaken,
+                       NumTrueTaken);
   else
-    B.createCondBranch(Loc, V, TrueBB, FalseDestBB);
-  
+    B.createCondBranch(Loc, V, TrueBB, FalseDestBB, NumTrueTaken,
+                       NumFalseTaken);
+
   return Condition(TrueBB, FalseBB, ContBB, Loc);
 }
 
@@ -484,7 +490,7 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
   JumpDest falseDest = contDest;
   if (S->getElseStmt())
     falseDest = createJumpDest(S);
-  
+
   // Emit the condition, along with the "then" part of the if properly guarded
   // by the condition and a jump to ContBB.  If the condition fails, jump to
   // the CondFalseBB.
@@ -492,8 +498,12 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
     // Enter a scope for any bound pattern variables.
     LexicalScope trueScope(SGF, S);
 
-    SGF.emitStmtCondition(S->getCond(), falseDest, S);
-    
+    auto NumTrueTaken = SGF.SGM.loadProfilerCount(S->getThenStmt());
+    auto NumFalseTaken = SGF.SGM.loadProfilerCount(S->getElseStmt());
+
+    SGF.emitStmtCondition(S->getCond(), falseDest, S, NumTrueTaken,
+                          NumFalseTaken);
+
     // In the success path, emit the 'then' part if the if.
     SGF.emitProfilerIncrement(S->getThenStmt());
     SGF.emitStmt(S->getThenStmt());
@@ -553,7 +563,9 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
 
   // Emit the condition bindings, branching to the bodyBB if they fail.  Since
   // we didn't push a scope, the bound variables are live after this statement.
-  SGF.emitStmtCondition(S->getCond(), bodyBB, S);
+  auto NumFalseTaken = SGF.SGM.loadProfilerCount(S->getBody());
+  auto NumNonTaken = SGF.SGM.loadProfilerCount(S);
+  SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken);
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {
@@ -576,8 +588,10 @@ void StmtEmitter::visitWhileStmt(WhileStmt *S) {
   {
     // Enter a scope for any bound pattern variables.
     Scope conditionScope(SGF.Cleanups, S);
-    
-    SGF.emitStmtCondition(S->getCond(), breakDest, S);
+
+    auto NumTrueTaken = SGF.SGM.loadProfilerCount(S->getBody());
+    auto NumFalseTaken = SGF.SGM.loadProfilerCount(S);
+    SGF.emitStmtCondition(S->getCond(), breakDest, S, NumTrueTaken, NumFalseTaken);
     
     // In the success path, emit the body of the while.
     SGF.emitProfilerIncrement(S->getBody());
@@ -729,8 +743,12 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   if (SGF.B.hasValidInsertionPoint()) {
     // Evaluate the condition with the false edge leading directly
     // to the continuation block.
-    Condition Cond = SGF.emitCondition(S->getCond(), /*hasFalseCode*/ false);
-    
+    auto NumTrueTaken = SGF.SGM.loadProfilerCount(S->getBody());
+    auto NumFalseTaken = SGF.SGM.loadProfilerCount(S);
+    Condition Cond = SGF.emitCondition(S->getCond(), /*hasFalseCode*/ false,
+                                       /*invertValue*/ false, /*contArgs*/ {},
+                                       NumTrueTaken, NumFalseTaken);
+
     Cond.enterTrue(SGF);
     if (SGF.B.hasValidInsertionPoint()) {
       SGF.B.createBranch(S->getCond(), loopBB);
@@ -866,7 +884,8 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
         RegularLocation L(S->getBody());
         L.pointToEnd();
         scope.exitAndBranch(L);
-      });
+      },
+      SGF.SGM.loadProfilerCount(S->getBody()));
 
   // We add loop fail block, just to be defensive about intermediate
   // transformations performing cleanups at scope.exit(). We still jump to the
@@ -877,7 +896,8 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
       [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
         assert(!inputValue && "None should not be passed an argument!");
         scope.exitAndBranch(S);
-      });
+      },
+      SGF.SGM.loadProfilerCount(S));
 
   std::move(switchEnumBuilder).emit();
 

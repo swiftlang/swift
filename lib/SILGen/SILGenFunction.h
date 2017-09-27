@@ -21,6 +21,7 @@
 #include "SILGen.h"
 #include "SILGenBuilder.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -370,10 +371,11 @@ public:
 
   /// Emit code to increment a counter for profiling.
   void emitProfilerIncrement(ASTNode N) {
-    if (SGM.Profiler && SGM.Profiler->hasRegionCounters())
+    if (SGM.Profiler && SGM.Profiler->hasRegionCounters() &&
+        SGM.M.getOptions().UseProfile.empty())
       SGM.Profiler->emitCounterIncrement(B, N);
   }
-  
+
   SILGenFunction(SILGenModule &SGM, SILFunction &F);
   ~SILGenFunction();
   
@@ -592,13 +594,20 @@ public:
   /// \param contArgs - the types of the arguments to the continuation BB.
   ///        Matching argument values must be passed to exitTrue and exitFalse
   ///        of the resulting Condition object.
-  Condition emitCondition(Expr *E,
-                          bool hasFalseCode = true, bool invertValue = false,
-                          ArrayRef<SILType> contArgs = {});
+  /// \param NumTrueTaken - The number of times the condition evaluates to true.
+  /// \param NumFalseTaken - The number of times the condition evaluates to
+  /// false.
+  Condition emitCondition(Expr *E, bool hasFalseCode = true,
+                          bool invertValue = false,
+                          ArrayRef<SILType> contArgs = {},
+                          ProfileCounter NumTrueTaken = ProfileCounter(),
+                          ProfileCounter NumFalseTaken = ProfileCounter());
 
-  Condition emitCondition(SILValue V, SILLocation Loc,
-                          bool hasFalseCode = true, bool invertValue = false,
-                          ArrayRef<SILType> contArgs = {});
+  Condition emitCondition(SILValue V, SILLocation Loc, bool hasFalseCode = true,
+                          bool invertValue = false,
+                          ArrayRef<SILType> contArgs = {},
+                          ProfileCounter NumTrueTaken = ProfileCounter(),
+                          ProfileCounter NumFalseTaken = ProfileCounter());
 
   /// Create a new basic block.
   ///
@@ -923,8 +932,9 @@ public:
   //===--------------------------------------------------------------------===//
 
   SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range);
-  void emitStmtCondition(StmtCondition Cond, JumpDest FailDest,
-                         SILLocation loc);
+  void emitStmtCondition(StmtCondition Cond, JumpDest FailDest, SILLocation loc,
+                         ProfileCounter NumTrueTaken = ProfileCounter(),
+                         ProfileCounter NumFalseTaken = ProfileCounter());
 
   void emitConditionalPBD(PatternBindingDecl *PBD, SILBasicBlock *FailBB);
 
@@ -1440,11 +1450,13 @@ public:
   ///                     terminated.
   /// \param handleFalse  A callback to invoke in the failure path.  The
   ///                     current BB should be terminated.
-  void emitCheckedCastBranch(
-      SILLocation loc, ConsumableManagedValue src, Type sourceType,
-      CanType targetType, SGFContext C,
-      std::function<void(ManagedValue)> handleTrue,
-      std::function<void(Optional<ManagedValue>)> handleFalse);
+  void
+  emitCheckedCastBranch(SILLocation loc, ConsumableManagedValue src,
+                        Type sourceType, CanType targetType, SGFContext C,
+                        std::function<void(ManagedValue)> handleTrue,
+                        std::function<void(Optional<ManagedValue>)> handleFalse,
+                        ProfileCounter TrueCount = ProfileCounter(),
+                        ProfileCounter FalseCount = ProfileCounter());
 
   /// A form of checked cast branch that uses the old non-ownership preserving
   /// semantics.
@@ -1455,7 +1467,9 @@ public:
   void emitCheckedCastBranchOld(SILLocation loc, Expr *source, Type targetType,
                                 SGFContext ctx,
                                 std::function<void(ManagedValue)> handleTrue,
-                                std::function<void()> handleFalse);
+                                std::function<void()> handleFalse,
+                                ProfileCounter TrueCount = ProfileCounter(),
+                                ProfileCounter FalseCount = ProfileCounter());
 
   /// \brief Emit a conditional checked cast branch, starting from an
   /// expression.  Terminates the current BB.
@@ -1469,10 +1483,13 @@ public:
   ///                     terminated.
   /// \param handleFalse  A callback to invoke in the failure path.  The
   ///                     current BB should be terminated.
-  void emitCheckedCastBranch(
-      SILLocation loc, Expr *src, Type targetType, SGFContext C,
-      std::function<void(ManagedValue)> handleTrue,
-      std::function<void(Optional<ManagedValue>)> handleFalse);
+  void
+  emitCheckedCastBranch(SILLocation loc, Expr *src, Type targetType,
+                        SGFContext C,
+                        std::function<void(ManagedValue)> handleTrue,
+                        std::function<void(Optional<ManagedValue>)> handleFalse,
+                        ProfileCounter TrueCount = ProfileCounter(),
+                        ProfileCounter FalseCount = ProfileCounter());
 
   /// A form of checked cast branch that uses the old non-ownership preserving
   /// semantics.
@@ -1484,7 +1501,9 @@ public:
                                 Type sourceType, CanType targetType,
                                 SGFContext ctx,
                                 std::function<void(ManagedValue)> handleTrue,
-                                std::function<void()> handleFalse);
+                                std::function<void()> handleFalse,
+                                ProfileCounter TrueCount = ProfileCounter(),
+                                ProfileCounter FalseCount = ProfileCounter());
 
   /// Emit the control flow for an optional 'bind' operation, branching to the
   /// active failure destination if the optional value addressed by optionalAddr
