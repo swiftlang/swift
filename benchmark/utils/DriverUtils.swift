@@ -158,69 +158,10 @@ struct TestConfig {
 
     if let x = benchArgs.optionalArgsMap["--tags"] {
       if x.isEmpty { return .fail("--tags requires a value") }
-      if x.contains("cpubench") {
-        tags.insert(.cpubench)
+      guard let cat = BenchmarkCategories(rawValue: x) else {
+        return .fail("Unknown benchmark category: '\(x)'")
       }
-      if x.contains("unstable") {
-        tags.insert(.unstable)
-      }
-      if x.contains("validation") {
-        tags.insert(.validation)
-      }
-      if x.contains("api") {
-        tags.insert(.api)
-      }
-      if x.contains("Array") {
-        tags.insert(.Array)
-      }
-      if x.contains("String") {
-        tags.insert(.String)
-      }
-      if x.contains("Dictionary") {
-        tags.insert(.Dictionary)
-      }
-      if x.contains("Codable") {
-        tags.insert(.Codable)
-      }
-      if x.contains("Set") {
-        tags.insert(.Set)
-      }
-      if x.contains("sdk") {
-        tags.insert(.sdk)
-      }
-      if x.contains("runtime") {
-        tags.insert(.runtime)
-      }
-      if x.contains("refcount") {
-        tags.insert(.refcount)
-      }
-      if x.contains("metadata") {
-        tags.insert(.metadata)
-      }
-      if x.contains("abstraction") {
-        tags.insert(.abstraction)
-      }
-      if x.contains("safetychecks") {
-        tags.insert(.safetychecks)
-      }
-      if x.contains("exceptions") {
-        tags.insert(.exceptions)
-      }
-      if x.contains("bridging") {
-        tags.insert(.bridging)
-      }
-      if x.contains("concurrency") {
-        tags.insert(.concurrency)
-      }
-      if x.contains("algorithm") {
-        tags.insert(.algorithm)
-      }
-      if x.contains("miniapplication") {
-        tags.insert(.miniapplication)
-      }
-      if x.contains("regression") {
-        tags.insert(.regression)
-      }
+      tags.insert(cat)
     }
 
     if let _ = benchArgs.optionalArgsMap["--run-all"] {
