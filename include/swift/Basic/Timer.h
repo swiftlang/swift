@@ -49,8 +49,7 @@ namespace swift {
   /// A SharedTimer for recursive routines.
   /// void example() {
   ///  RecursiveSharedTimer::Guard guard; // MUST BE AT TOP SCOPE of function to work right!
-  ///  ASTContext &ctx = getASTContext();
-  ///  if (ctx.Stats) {
+  ///  if (auto s = getASTContext().Stats) {
   ///    guard = ctx.Stats->getFrontendRecursiveSharedTimers().NominalTypeDecl__lookupDirect.getGuard();
 //  }
   ///   ...
