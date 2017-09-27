@@ -340,7 +340,6 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
   switch (kind) {
   case Explicit:
   case Inferred:
-  case QuietlyInferred:
   case RequirementSignatureSelf:
   case NestedTypeNameMatch:
   case ConcreteTypeBinding:
@@ -449,16 +448,13 @@ const void *RequirementSource::getOpaqueStorage3() const {
   return nullptr;
 }
 
-bool RequirementSource::isInferredRequirement(bool includeQuietInferred) const {
+bool RequirementSource::isInferredRequirement() const {
   for (auto source = this; source; source = source->parent) {
     switch (source->kind) {
     case Inferred:
     case InferredProtocolRequirement:
-      return true;
-
-    case QuietlyInferred:
     case NestedTypeNameMatch:
-      return includeQuietInferred;
+      return true;
 
     case ConcreteTypeBinding:
     case EquivalentType:
@@ -479,7 +475,7 @@ bool RequirementSource::isInferredRequirement(bool includeQuietInferred) const {
 }
 
 unsigned RequirementSource::classifyDiagKind() const {
-  if (isInferredRequirement(/*includeQuietInferred=*/false)) return 2;
+  if (isInferredRequirement()) return 2;
   if (isDerivedRequirement()) return 1;
   return 0;
 }
@@ -488,7 +484,6 @@ bool RequirementSource::isDerivedRequirement() const {
   switch (kind) {
   case Explicit:
   case Inferred:
-  case QuietlyInferred:
     return false;
 
   case NestedTypeNameMatch:
@@ -691,7 +686,6 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
 
     case Explicit:
     case Inferred:
-    case QuietlyInferred:
     case NestedTypeNameMatch:
     case ConcreteTypeBinding:
       rootPA = parentPA;
@@ -779,14 +773,13 @@ const RequirementSource *RequirementSource::forExplicit(
 
 const RequirementSource *RequirementSource::forInferred(
                                               PotentialArchetype *root,
-                                              const TypeRepr *typeRepr,
-                                              bool quietly) {
+                                              const TypeRepr *typeRepr) {
   WrittenRequirementLoc writtenLoc = typeRepr;
   auto &builder = *root->getBuilder();
   REQUIREMENT_SOURCE_FACTORY_BODY(
-      (nodeID, quietly ? QuietlyInferred : Inferred, nullptr, root,
+      (nodeID, Inferred, nullptr, root,
        writtenLoc.getOpaqueValue(), nullptr),
-       (quietly ? QuietlyInferred : Inferred, root, nullptr, writtenLoc),
+       (Inferred, root, nullptr, writtenLoc),
        0, writtenLoc);
 }
 
@@ -916,7 +909,6 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
   switch (kind) {
   case Explicit:
   case Inferred:
-  case QuietlyInferred:
   case RequirementSignatureSelf:
   case NestedTypeNameMatch:
   case ConcreteTypeBinding:
@@ -999,7 +991,6 @@ RequirementSource::visitPotentialArchetypesAlongPath(
   case RequirementSource::ConcreteTypeBinding:
   case RequirementSource::Explicit:
   case RequirementSource::Inferred:
-  case RequirementSource::QuietlyInferred:
   case RequirementSource::RequirementSignatureSelf: {
     auto rootPA = getRootPotentialArchetype();
     if (visitor(rootPA, this)) return nullptr;
@@ -1175,10 +1166,6 @@ void RequirementSource::print(llvm::raw_ostream &out,
     out << "Inferred";
     break;
 
-  case QuietlyInferred:
-    out << "Quietly inferred";
-    break;
-
   case NestedTypeNameMatch:
     out << "Nested type match";
     break;
@@ -1292,12 +1279,7 @@ const RequirementSource *FloatingRequirementSource::getSource(
     return RequirementSource::forAbstract(pa);
 
   case Inferred:
-    return RequirementSource::forInferred(pa, storage.get<const TypeRepr *>(),
-                                          /*quietly=*/false);
-
-  case QuietlyInferred:
-    return RequirementSource::forInferred(pa, storage.get<const TypeRepr *>(),
-                                          /*quietly=*/true);
+    return RequirementSource::forInferred(pa, storage.get<const TypeRepr *>());
 
   case AbstractProtocol: {
     // Derive the dependent type on which this requirement was written. It is
@@ -1350,7 +1332,6 @@ bool FloatingRequirementSource::isExplicit() const {
     return true;
 
   case Inferred:
-  case QuietlyInferred:
   case NestedTypeNameMatch:
     return false;
 
@@ -1366,7 +1347,6 @@ bool FloatingRequirementSource::isExplicit() const {
     case RequirementSource::Concrete:
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
-    case RequirementSource::QuietlyInferred:
     case RequirementSource::NestedTypeNameMatch:
     case RequirementSource::ConcreteTypeBinding:
     case RequirementSource::Parent:
@@ -1388,7 +1368,6 @@ bool FloatingRequirementSource::isExplicit() const {
         == RequirementSource::RequirementSignatureSelf;
 
     case RequirementSource::Inferred:
-    case RequirementSource::QuietlyInferred:
     case RequirementSource::InferredProtocolRequirement:
     case RequirementSource::RequirementSignatureSelf:
     case RequirementSource::Concrete:
@@ -1408,10 +1387,9 @@ FloatingRequirementSource FloatingRequirementSource::asInferred(
                                                   const TypeRepr *typeRepr) const {
   switch (kind) {
   case Explicit:
-    return forInferred(typeRepr, /*quietly=*/false);
+    return forInferred(typeRepr);
 
   case Inferred:
-  case QuietlyInferred:
   case Resolved:
   case NestedTypeNameMatch:
     return *this;
@@ -3619,10 +3597,10 @@ void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
   assert(allNested.back() == nestedPA);
   if (allNested.size() > 1) {
     auto firstPA = allNested.front();
-    auto quietlyInferredSource =
-      FloatingRequirementSource::forInferred(nullptr, /*quietly=*/true);
+    auto inferredSource =
+      FloatingRequirementSource::forInferred(nullptr);
 
-    addSameTypeRequirement(firstPA, nestedPA, quietlyInferredSource,
+    addSameTypeRequirement(firstPA, nestedPA, inferredSource,
                            UnresolvedHandlingKind::GenerateConstraints);
     return;
   }
@@ -3977,8 +3955,7 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
 
     // We are inferring requirements.
     if (forInferred) {
-      return FloatingRequirementSource::forInferred(typeRepr,
-                                                    /*quietly=*/false);
+      return FloatingRequirementSource::forInferred(typeRepr);
     }
 
     // Explicit requirement.
@@ -4126,10 +4103,10 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
     if (inferForModule) {
       inferRequirements(*inferForModule, TypeLoc::withoutLoc(firstType),
                         FloatingRequirementSource::forInferred(
-                            nullptr, /*quietly=*/false));
+                            nullptr));
       inferRequirements(*inferForModule, TypeLoc::withoutLoc(secondType),
                         FloatingRequirementSource::forInferred(
-                            nullptr, /*quietly=*/false));
+                            nullptr));
     }
 
     return addTypeRequirement(firstType, secondType, source,
@@ -4143,8 +4120,7 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
 
     if (inferForModule) {
       inferRequirements(*inferForModule, TypeLoc::withoutLoc(firstType),
-                        FloatingRequirementSource::forInferred(
-                            nullptr, /*quietly=*/false));
+                        FloatingRequirementSource::forInferred(nullptr));
     }
 
     return addLayoutRequirement(firstType, req.getLayoutConstraint(), source,
@@ -4160,10 +4136,10 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
     if (inferForModule) {
       inferRequirements(*inferForModule, TypeLoc::withoutLoc(firstType),
                         FloatingRequirementSource::forInferred(
-                            nullptr, /*quietly=*/false));
+                            nullptr));
       inferRequirements(*inferForModule, TypeLoc::withoutLoc(secondType),
                         FloatingRequirementSource::forInferred(
-                            nullptr, /*quietly=*/false));
+                            nullptr));
     }
 
     return addSameTypeRequirement(
@@ -4237,7 +4213,7 @@ void GenericSignatureBuilder::inferRequirements(
   for (auto P : *params) {
     inferRequirements(module, P->getTypeLoc(),
                       FloatingRequirementSource::forInferred(
-                          P->getTypeLoc().getTypeRepr(), /*quietly=*/false));
+                          P->getTypeLoc().getTypeRepr()));
   }
 }
 
@@ -4292,26 +4268,23 @@ namespace {
         continue;
       }
 
-      // We prefer constraints rooted at inferred requirements to ones rooted
-      // on explicit requirements, because the former won't be diagnosed
-      // directly.
-      bool thisIsInferred = constraint.source->isInferredRequirement(
-                              /*includeQuietInferred=*/false);
-      bool representativeIsInferred =
-          representativeConstraint->source->isInferredRequirement(
-            /*includeQuietInferred=*/false);
-      if (thisIsInferred != representativeIsInferred) {
-        if (thisIsInferred)
-          representativeConstraint = constraint;
-        continue;
-      }
-
       // We prefer derived constraints to non-derived constraints.
       bool thisIsDerived = constraint.source->isDerivedRequirement();
       bool representativeIsDerived =
         representativeConstraint->source->isDerivedRequirement();
       if (thisIsDerived != representativeIsDerived) {
         if (thisIsDerived)
+          representativeConstraint = constraint;
+
+        continue;
+      }
+
+      // We prefer constraints that are explicit to inferred constraints.
+      bool thisIsInferred = constraint.source->isInferredRequirement();
+      bool representativeIsInferred =
+        representativeConstraint->source->isInferredRequirement();
+      if (thisIsInferred != representativeIsInferred) {
+        if (thisIsInferred)
           representativeConstraint = constraint;
 
         continue;
@@ -4873,7 +4846,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
   bool diagnosedConflictingRepresentative = false;
   for (const auto &constraint : constraints) {
     // Leave the representative alone.
-    if (constraint == *representativeConstraint) continue;
+    if (representativeConstraint && constraint == *representativeConstraint)
+      continue;
 
     switch (checkConstraint(constraint)) {
     case ConstraintRelation::Unrelated:
@@ -4937,9 +4911,9 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       // If this requirement is not derived or inferred (but has a useful
       // location) complain that it is redundant.
       if (!constraint.source->isDerivedRequirement() &&
-          !constraint.source->isInferredRequirement(
-            /*includeQuietInferred=*/true) &&
-          constraint.source->getLoc().isValid()) {
+          !constraint.source->isInferredRequirement() &&
+          constraint.source->getLoc().isValid() &&
+          !representativeConstraint->source->isInferredRequirement()) {
         Diags.diagnose(constraint.source->getLoc(),
                        redundancyDiag,
                        constraint.archetype->getDependentType(genericParams),
@@ -5191,12 +5165,8 @@ namespace {
         return lhs.target < rhs.target;
 
       // Prefer non-inferred requirement sources.
-      bool lhsIsInferred =
-      lhs.constraint.source->isInferredRequirement(
-                                            /*includeQuietInferred=*/false);
-      bool rhsIsInferred =
-      rhs.constraint.source->isInferredRequirement(
-                                            /*includeQuietInferred=*/false);
+      bool lhsIsInferred = lhs.constraint.source->isInferredRequirement();
+      bool rhsIsInferred = rhs.constraint.source->isInferredRequirement();
       if (lhsIsInferred != rhsIsInferred)
         return rhsIsInferred;;
 
@@ -5615,8 +5585,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       // If the source/destination are identical, complain.
       if (constraint.archetype == constraint.value) {
         if (!constraint.source->isDerivedRequirement() &&
-            !constraint.source->isInferredRequirement(
-               /*includeQuietInferred=*/true) &&
+            !constraint.source->isInferredRequirement() &&
             constraint.source->getLoc().isValid()) {
           Diags.diagnose(constraint.source->getLoc(),
                          diag::redundant_same_type_constraint,
@@ -5734,8 +5703,8 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
           return true;
 
         // If the constraint source is inferred, don't diagnose it.
-        if (lhs.constraint.source->isInferredRequirement(
-              /*includeQuietInferred=*/true))
+        if (lhs.constraint.source->isInferredRequirement() ||
+            rhs.constraint.source->isInferredRequirement())
           return true;
 
         Diags.diagnose(lhs.constraint.source->getLoc(),
@@ -5765,9 +5734,9 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       // not part of the spanning tree.
       if (connected[edge.source] && connected[edge.target]) {
         if (edge.constraint.source->getLoc().isValid() &&
-            !edge.constraint.source->isInferredRequirement(
-              /*includeQuietInferred=*/true) &&
-            firstEdge.constraint.source->getLoc().isValid()) {
+            !edge.constraint.source->isInferredRequirement() &&
+            firstEdge.constraint.source->getLoc().isValid() &&
+            !firstEdge.constraint.source->isInferredRequirement()) {
           Diags.diagnose(edge.constraint.source->getLoc(),
                          diag::redundant_same_type_constraint,
                          edge.constraint.archetype->getDependentType(
@@ -5926,11 +5895,13 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
 
       if (auto existing = equivClass->findAnyConcreteConstraintAsWritten(
                             representativeConstraint.archetype)) {
-        Diags.diagnose(existing->source->getLoc(),
-                       diag::same_type_redundancy_here,
-                       existing->source->classifyDiagKind(),
-                       existing->archetype->getDependentType(genericParams),
-                       existing->value);
+        if (!existing->source->isInferredRequirement()) {
+          Diags.diagnose(existing->source->getLoc(),
+                         diag::same_type_redundancy_here,
+                         existing->source->classifyDiagKind(),
+                         existing->archetype->getDependentType(genericParams),
+                         existing->value);
+        }
       }
     }
   }
