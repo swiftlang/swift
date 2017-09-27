@@ -142,24 +142,6 @@ internal func _castOutputBuffer(
       ptr, _Normalization._SegmentOutputBuffer._arraySize)
   return bufPtr[..<endIdx].rebased
 }
-internal func _castOutputBuffer(
-  _ ptr: UnsafeMutablePointer<_Normalization._ChunkOutputBuffer>,
-  endingAt endIdx: Int = _Normalization._ChunkOutputBuffer._arraySize
-) -> UnsafeMutableBufferPointer<UInt16> {
-  let bufPtr: UnsafeMutableBufferPointer<UInt16> =
-    _unsafeMutableBufferPointerCast(
-      ptr, _Normalization._ChunkOutputBuffer._arraySize)
-  return bufPtr[..<endIdx].rebased
-}
-internal func _castOutputBuffer(
-  _ ptr: UnsafePointer<_Normalization._ChunkOutputBuffer>,
-  endingAt endIdx: Int = _Normalization._ChunkOutputBuffer._arraySize
-) -> UnsafeBufferPointer<UInt16> {
-  let bufPtr: UnsafeBufferPointer<UInt16> =
-    _unsafeBufferPointerCast(
-      ptr, _Normalization._ChunkOutputBuffer._arraySize)
-  return bufPtr[..<endIdx].rebased
-}
 
 extension _FixedArray16 {
   mutating func fill(_ other: UnsafeBufferPointer<T>) {
@@ -349,12 +331,6 @@ internal func _reverseParseRawScalar(
 internal func _tryNormalize(
   _ input: UnsafeBufferPointer<UInt16>,
   into outputBuffer: UnsafeMutablePointer<_Normalization._SegmentOutputBuffer>
-) -> Int? {
-  return _tryNormalize(input, into: _castOutputBuffer(outputBuffer))
-}
-internal func _tryNormalize(
-  _ input: UnsafeBufferPointer<UInt16>,
-  into outputBuffer: UnsafeMutablePointer<_Normalization._ChunkOutputBuffer>
 ) -> Int? {
   return _tryNormalize(input, into: _castOutputBuffer(outputBuffer))
 }
@@ -883,8 +859,8 @@ private func _compareStringsPathological(
   // Normalize self, then proceed. Attempt to do so with a stack buffer first,
   // otherwise use an Array.
   //
-  if selfUTF16.count < _Normalization._ChunkOutputBuffer._arraySize {
-    var selfBuffer = _Normalization._ChunkOutputBuffer(allZeros:())
+  if selfUTF16.count < _Normalization._SegmentOutputBuffer._arraySize {
+    var selfBuffer = _Normalization._SegmentOutputBuffer(allZeros:())
     if let length = _tryNormalize(selfUTF16, into: &selfBuffer) {
       return _compareStringsPathological(
         normalizedSelfUTF16: _castOutputBuffer(&selfBuffer, endingAt: length),
@@ -910,8 +886,8 @@ private func _compareStringsPathological(
   // Normalize other, then proceed. Attempt to do so with a stack buffer first,
   // otherwise use an Array.
   //
-  if otherUTF16.count < _Normalization._ChunkOutputBuffer._arraySize {
-    var otherBuffer = _Normalization._ChunkOutputBuffer(allZeros:())
+  if otherUTF16.count < _Normalization._SegmentOutputBuffer._arraySize {
+    var otherBuffer = _Normalization._SegmentOutputBuffer(allZeros:())
     if let length = _tryNormalize(otherUTF16, into: &otherBuffer) {
       return _lexicographicalCompare(
         normalizedSelfUTF16, _castOutputBuffer(&otherBuffer, endingAt: length))

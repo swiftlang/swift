@@ -111,10 +111,10 @@ extension _Normalization {
   public // String Comparison Prototype
   typealias _SegmentOutputBuffer = _FixedArray16<UInt16>
 
-  // A large output buffer to use for normalizing large portions of a String. It
-  // should be used extremely carefully, as chunking is inherently tricky in
-  // Unicode, even when aligned on a normalization boundary (see "Multi-Segment
-  // Expanders" below)
-  public // String Comparison Prototype
-  typealias _ChunkOutputBuffer = _FixedArray64<UInt16>
+  // // A large output buffer to use for normalizing large portions of a String. It
+  // // should be used extremely carefully, as chunking is inherently tricky in
+  // // Unicode, even when aligned on a normalization boundary (see "Multi-Segment
+  // // Expanders" below)
+  // public // String Comparison Prototype
+  // typealias _ChunkOutputBuffer = _FixedArray64<UInt16>
 }
