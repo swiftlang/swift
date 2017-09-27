@@ -214,17 +214,24 @@ struct TestConfig {
       return;
     }
 
-    let included =
-      !filters.isEmpty ? Set(filters)
-      : onlyPrecommit ? Set(precommitTests.keys)
-      : Set(filteredTests.map { $0.key })
+    let includedBenchmarks: Set<String> = {
+      if !filters.isEmpty {
+        return Set(filters)
+      }
+
+      if onlyPrecommit {
+        return Set(precommitTests.keys)
+      }
+
+      return Set(filteredTests.map { $0.key })
+    }()
 
     tests = zip(1...filteredTests.count, filteredTests).map {
       t -> Test in
       let (ordinal, (key: name, value: funcAndTags)) = t
       return Test(name: name, index: ordinal, f: funcAndTags.0,
-                  run: included.contains(name)
-                    || included.contains(String(ordinal)),
+                  run: includedBenchmarks.contains(name)
+                    || includedBenchmarks.contains(String(ordinal)),
                   tags: funcAndTags.1)
     }
   }
