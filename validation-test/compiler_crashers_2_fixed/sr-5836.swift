@@ -1,5 +1,4 @@
-// RUN: not --crash %target-typecheck-verify-swift
-// REQUIRES: asserts
+// RUN: not %target-typecheck-verify-swift
 
 extension Dictionary {
   func doSomething<T>() -> [T : Value] {
