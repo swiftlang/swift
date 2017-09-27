@@ -397,9 +397,7 @@ TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
       assert(FalseArgs.size() == Dest->getNumArguments());
     }
 
-    return Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
-                                    CBI->getTrueBB(), TrueArgs,
-                                    CBI->getFalseBB(), FalseArgs);
+    return Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(), CBI->getTrueBB(), TrueArgs, CBI->getFalseBB(), FalseArgs, CBI->getTrueBBCount(), CBI->getFalseBBCount());
   }
 
   if (auto *BI = dyn_cast<BranchInst>(Branch)) {
@@ -2294,8 +2292,9 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
                 Inst->getTargetType())) {
           SILBuilderWithScope B(Inst);
           auto NewI = B.createCheckedCastBranch(
-              Loc, false /*isExact*/, MI,
-              Dest->getType().getObjectType(), SuccessBB, FailureBB);
+              Loc, false /*isExact*/, MI, Dest->getType().getObjectType(),
+              SuccessBB, FailureBB, Inst->getTrueBBCount(),
+              Inst->getFalseBBCount());
           SuccessBB->createPHIArgument(Dest->getType().getObjectType(),
                                        ValueOwnershipKind::Owned);
           B.setInsertionPoint(SuccessBB->begin());
@@ -2341,10 +2340,9 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(Op)) {
     if (auto *MI = dyn_cast<MetatypeInst>(IEMI->getOperand())) {
       SILBuilderWithScope B(Inst);
-      auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
-                                LoweredTargetType,
-                                SuccessBB,
-                                FailureBB);
+      auto *NewI = B.createCheckedCastBranch(
+          Loc, /* isExact */ false, MI, LoweredTargetType, SuccessBB, FailureBB,
+          Inst->getTrueBBCount(), Inst->getFalseBBCount());
       EraseInstAction(Inst);
       return NewI;
     }
@@ -2410,10 +2408,9 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
             FoundIEI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIEI->getLoc(), SILMetaTy);
 
-        auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
-                                  LoweredTargetType,
-                                  SuccessBB,
-                                  FailureBB);
+        auto *NewI = B.createCheckedCastBranch(
+            Loc, /* isExact */ false, MI, LoweredTargetType, SuccessBB,
+            FailureBB, Inst->getTrueBBCount(), Inst->getFalseBBCount());
         EraseInstAction(Inst);
         return NewI;
       }
@@ -2470,10 +2467,9 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
             FoundIERI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
 
-        auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
-                                  LoweredTargetType,
-                                  SuccessBB,
-                                  FailureBB);
+        auto *NewI = B.createCheckedCastBranch(
+            Loc, /* isExact */ false, MI, LoweredTargetType, SuccessBB,
+            FailureBB, Inst->getTrueBBCount(), Inst->getFalseBBCount());
         EraseInstAction(Inst);
         return NewI;
       }

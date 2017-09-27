@@ -117,7 +117,9 @@ namespace {
     void emitConditional(
         ManagedValue operand, CastConsumptionKind consumption, SGFContext ctx,
         const std::function<void(ManagedValue)> &handleTrue,
-        const std::function<void(Optional<ManagedValue>)> &handleFalse) {
+        const std::function<void(Optional<ManagedValue>)> &handleFalse,
+        ProfileCounter TrueCount = ProfileCounter(),
+        ProfileCounter FalseCount = ProfileCounter()) {
       // The cast instructions don't know how to work with anything
       // but the most general possible abstraction level.
       AbstractionPattern abstraction =
@@ -140,7 +142,7 @@ namespace {
             createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
         SGF.B.createCheckedCastAddrBranch(
             Loc, consumption, operand.forward(SGF), SourceType, resultBuffer,
-            TargetType, trueBB, falseBB);
+            TargetType, trueBB, falseBB, TrueCount, FalseCount);
       } else if (Strategy == CastStrategy::Address) {
         // Opaque value mode
         operandValue = std::move(operand);
@@ -155,7 +157,7 @@ namespace {
         }
         SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, operandValue,
                                       origTargetTL.getLoweredType(), trueBB,
-                                      falseBB);
+                                      falseBB, TrueCount, FalseCount);
       }
 
       // Emit the success block.
@@ -285,22 +287,23 @@ namespace {
 void SILGenFunction::emitCheckedCastBranch(
     SILLocation loc, Expr *source, Type targetType, SGFContext ctx,
     std::function<void(ManagedValue)> handleTrue,
-    std::function<void(Optional<ManagedValue>)> handleFalse) {
+    std::function<void(Optional<ManagedValue>)> handleFalse,
+    ProfileCounter TrueCount, ProfileCounter FalseCount) {
   CheckedCastEmitter emitter(*this, loc, source->getType(), targetType);
   ManagedValue operand = emitter.emitOperand(source);
   emitter.emitConditional(operand, CastConsumptionKind::TakeAlways, ctx,
-                          handleTrue, handleFalse);
+                          handleTrue, handleFalse, TrueCount, FalseCount);
 }
 
 void SILGenFunction::emitCheckedCastBranch(
     SILLocation loc, ConsumableManagedValue src, Type sourceType,
     CanType targetType, SGFContext ctx,
     std::function<void(ManagedValue)> handleTrue,
-    std::function<void(Optional<ManagedValue>)> handleFalse) {
+    std::function<void(Optional<ManagedValue>)> handleFalse,
+    ProfileCounter TrueCount, ProfileCounter FalseCount) {
   CheckedCastEmitter emitter(*this, loc, sourceType, targetType);
-  emitter.emitConditional(src.getFinalManagedValue(),
-                          src.getFinalConsumption(), ctx, handleTrue,
-                          handleFalse);
+  emitter.emitConditional(src.getFinalManagedValue(), src.getFinalConsumption(),
+                          ctx, handleTrue, handleFalse, TrueCount, FalseCount);
 }
 
 namespace {
@@ -395,7 +398,9 @@ namespace {
     void emitConditional(ManagedValue operand, CastConsumptionKind consumption,
                          SGFContext ctx,
                          const std::function<void(ManagedValue)> &handleTrue,
-                         const std::function<void()> &handleFalse) {
+                         const std::function<void()> &handleFalse,
+                         ProfileCounter TrueCount = ProfileCounter(),
+                         ProfileCounter FalseCount = ProfileCounter()) {
       // The cast instructions don't know how to work with anything
       // but the most general possible abstraction level.
       AbstractionPattern abstraction = SGF.SGM.Types.getMostGeneralAbstraction();
@@ -414,10 +419,9 @@ namespace {
         assert(operand.getType().isAddress());
         resultBuffer =
           createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
-        SGF.B.createCheckedCastAddrBranch(Loc, consumption,
-                                          operand.forward(SGF), SourceType,
-                                          resultBuffer, TargetType,
-                                          trueBB, falseBB);
+        SGF.B.createCheckedCastAddrBranch(
+            Loc, consumption, operand.forward(SGF), SourceType, resultBuffer,
+            TargetType, trueBB, falseBB, TrueCount, FalseCount);
       } else {
         // Tolerate being passed an address here.  It comes up during switch
         //emission.
@@ -427,8 +431,8 @@ namespace {
               Loc, scalarOperandValue, LoadOwnershipQualifier::Take);
         }
         SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, scalarOperandValue,
-                                      origTargetTL.getLoweredType(),
-                                      trueBB, falseBB);
+                                      origTargetTL.getLoweredType(), trueBB,
+                                      falseBB, TrueCount, FalseCount);
       }
 
       // Emit the success block.
@@ -541,21 +545,23 @@ namespace {
 void SILGenFunction::emitCheckedCastBranchOld(
     SILLocation loc, Expr *source, Type targetType, SGFContext ctx,
     std::function<void(ManagedValue)> handleTrue,
-    std::function<void()> handleFalse) {
+    std::function<void()> handleFalse, ProfileCounter TrueCount,
+    ProfileCounter FalseCount) {
   CheckedCastEmitterOld emitter(*this, loc, source->getType(), targetType);
   ManagedValue operand = emitter.emitOperand(source);
   emitter.emitConditional(operand, CastConsumptionKind::TakeAlways, ctx,
-                          handleTrue, handleFalse);
+                          handleTrue, handleFalse, TrueCount, FalseCount);
 }
 
 void SILGenFunction::emitCheckedCastBranchOld(
     SILLocation loc, ConsumableManagedValue src, Type sourceType,
     CanType targetType, SGFContext ctx,
     std::function<void(ManagedValue)> handleTrue,
-    std::function<void()> handleFalse) {
+    std::function<void()> handleFalse, ProfileCounter TrueCount,
+    ProfileCounter FalseCount) {
   CheckedCastEmitterOld emitter(*this, loc, sourceType, targetType);
   emitter.emitConditional(src.getFinalManagedValue(), src.getFinalConsumption(),
-                          ctx, handleTrue, handleFalse);
+                          ctx, handleTrue, handleFalse, TrueCount, FalseCount);
 }
 
 /// Emit a collection downcast expression.
@@ -664,13 +670,10 @@ RValue Lowering::emitUnconditionalCheckedCast(SILGenFunction &SGF,
   return emitter.emitUnconditionalCast(operandValue, C);
 }
 
-RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
-                                            SILLocation loc,
-                                            ManagedValue operand,
-                                            Type operandType,
-                                            Type optTargetType,
-                                            CheckedCastKind castKind,
-                                            SGFContext C) {
+RValue Lowering::emitConditionalCheckedCast(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue operand,
+    Type operandType, Type optTargetType, CheckedCastKind castKind,
+    SGFContext C, ProfileCounter TrueCount, ProfileCounter FalseCount) {
   // Drill into the result type.
   CanType resultObjectType =
     optTargetType->getCanonicalType().getAnyOptionalObjectType();
@@ -755,7 +758,8 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
           SGF.B.createInjectEnumAddr(loc, resultBuffer, noneDecl);
           SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc);
         }
-      });
+      },
+      TrueCount, FalseCount);
 
   // Enter the continuation block.
   SILBasicBlock *contBlock = scope.exit();
