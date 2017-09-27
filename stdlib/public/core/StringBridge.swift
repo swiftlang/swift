@@ -208,7 +208,6 @@ public class _SwiftNativeNSString {
   @objc
   internal init() {}
   @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   deinit {}
 }
 
@@ -245,7 +244,6 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   deinit {}
 
   @_inlineable // FIXME(sil-serialize-all)
