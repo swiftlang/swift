@@ -54,11 +54,21 @@ extension BenchResults : CustomStringConvertible {
 }
 
 struct Test {
-  let name: String
+  let benchInfo: BenchmarkInfo
   let index: Int
-  let f: (Int) -> ()
   let run: Bool
-  let tags: [BenchmarkCategory]
+
+  var name: String {
+    return benchInfo.name
+  }
+
+  var runFunction: (Int) -> () {
+    return benchInfo.runFunction
+  }
+
+  var tags: [BenchmarkCategory] {
+    return benchInfo.tags
+  }
 }
 
 // Legacy test dictionaries.
@@ -232,10 +242,9 @@ struct TestConfig {
     tests = zip(1...filteredTests.count, filteredTests).map {
       t -> Test in
       let (ordinal, benchInfo) = t
-      return Test(name: benchInfo.name, index: ordinal, f: benchInfo.runFunction,
+      return Test(benchInfo: benchInfo, index: ordinal,
                   run: includedBenchmarks.contains(benchInfo.name)
-                    || includedBenchmarks.contains(String(ordinal)),
-                  tags: benchInfo.tags)
+                  || includedBenchmarks.contains(String(ordinal)))
     }
   }
 }
@@ -426,10 +435,10 @@ func runBenchmarks(_ c: TestConfig) {
     if !t.run {
       continue
     }
+
     let benchIndex = t.index
     let benchName = t.name
-    let benchFunc = t.f
-    let results = runBench(benchName, benchFunc, c)
+    let results = runBench(benchName, t.runFunction, c)
     print("\(benchIndex)\(c.delim)\(benchName)\(c.delim)\(results.description)")
     fflush(stdout)
 
