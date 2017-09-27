@@ -6197,22 +6197,8 @@ void GenericSignatureBuilder::addGenericSignature(GenericSignature *sig) {
   for (auto param : sig->getGenericParams())
     addGenericParameter(param);
 
-  // Add the requirements, queuing up same-type requirements until the end.
-  // FIXME: Queuing up same-type requirements is a hack that works around
-  // problems when referencing associated types. These issues primarily
-  // occur when building canonical generic environments
-  SmallVector<Requirement, 4> sameTypeRequirements;
-  for (auto &reqt : sig->getRequirements()) {
-    if (reqt.getKind() == RequirementKind::SameType)
-      sameTypeRequirements.push_back(reqt);
-    else
-      addRequirement(reqt, FloatingRequirementSource::forAbstract(), nullptr);
-  }
-
-  // Handle same-type requirements.
-  for (auto &reqt : sameTypeRequirements) {
+  for (auto &reqt : sig->getRequirements())
     addRequirement(reqt, FloatingRequirementSource::forAbstract(), nullptr);
-  }
 }
 
 /// Collect the set of requirements placed on the given generic parameters and
