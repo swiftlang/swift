@@ -241,6 +241,9 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D_CRT_USE_BUILTIN_OFFSETOF")
     # TODO(compnerd) permit building for different families
     list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
+    if("${CFLAGS_ARCH}" MATCHES arm)
+      list(APPEND result "-D_ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE")
+    endif()
     # TODO(compnerd) handle /MT
     list(APPEND result "-D_DLL")
     # NOTE: We assume that we are using VS 2015 U2+
@@ -730,6 +733,9 @@ function(_add_swift_library_single target name)
     foreach(directory ${SWIFTLIB_INCLUDE})
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-I${directory})
     endforeach()
+    if("${SWIFTLIB_SINGLE_ARCHITECTURE}" MATCHES arm)
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-D_ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE)
+    endif()
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;oldnames)
     # TODO(compnerd) handle /MT and /MTd
     if("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
