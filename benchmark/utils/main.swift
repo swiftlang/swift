@@ -142,10 +142,10 @@ registerBenchmark(SevenBoom)
 
 @inline(__always)
 private func addTo(
-  _ testSuite: inout [String : ((Int) -> (), [BenchmarkCategories])],
+  _ testSuite: inout [String : ((Int) -> (), [BenchmarkCategory])],
   _ name: String,
   _ function: @escaping (Int) -> (),
-  _ tags: [BenchmarkCategories] = []
+  _ tags: [BenchmarkCategory] = []
   ) {
   testSuite[name] = (function, tags)
 }

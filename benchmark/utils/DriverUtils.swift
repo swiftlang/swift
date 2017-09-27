@@ -58,13 +58,13 @@ struct Test {
   let index: Int
   let f: (Int) -> ()
   let run: Bool
-  let tags: [BenchmarkCategories]
+  let tags: [BenchmarkCategory]
 }
 
 // Legacy test dictionaries.
-public var precommitTests: [String : ((Int) -> (), [BenchmarkCategories])] = [:]
-public var otherTests: [String : ((Int) -> (), [BenchmarkCategories])] = [:]
-public var stringTests: [String : ((Int) -> (), [BenchmarkCategories])] = [:]
+public var precommitTests: [String : ((Int) -> (), [BenchmarkCategory])] = [:]
+public var otherTests: [String : ((Int) -> (), [BenchmarkCategory])] = [:]
+public var stringTests: [String : ((Int) -> (), [BenchmarkCategory])] = [:]
 
 // We should migrate to a collection of BenchmarkInfo.
 public var registeredBenchmarks = [TestsUtils.BenchmarkInfo]()
@@ -83,7 +83,7 @@ struct TestConfig {
   var filters = [String]()
 
   /// The tag that we want to run
-  var tags = Set<BenchmarkCategories>()
+  var tags = Set<BenchmarkCategory>()
 
   /// The scalar multiple of the amount of times a test should be run. This
   /// enables one to cause tests to run for N iterations longer than they
@@ -158,7 +158,7 @@ struct TestConfig {
 
     if let x = benchArgs.optionalArgsMap["--tags"] {
       if x.isEmpty { return .fail("--tags requires a value") }
-      guard let cat = BenchmarkCategories(rawValue: x) else {
+      guard let cat = BenchmarkCategory(rawValue: x) else {
         return .fail("Unknown benchmark category: '\(x)'")
       }
       tags.insert(cat)
@@ -191,11 +191,11 @@ struct TestConfig {
   }
 
   mutating func findTestsToRun() {
-    var allTests: [(key: String, value: ((Int) -> (), [BenchmarkCategories]))]
+    var allTests: [(key: String, value: ((Int) -> (), [BenchmarkCategory]))]
 
     if onlyRegistered {
       allTests = registeredBenchmarks.map {
-        bench -> (key: String, value: ((Int) -> (), [BenchmarkCategories])) in
+        bench -> (key: String, value: ((Int) -> (), [BenchmarkCategory])) in
         (bench.name, (bench.runFunction, bench.tags))
       }
       // FIXME: for now unstable/extra benchmarks are not registered at all, but
@@ -204,7 +204,7 @@ struct TestConfig {
     }
     else {
       allTests = [precommitTests, otherTests, stringTests]
-        .map { dictionary -> [(key: String, value: ((Int) -> (), [BenchmarkCategories]))] in
+        .map { dictionary -> [(key: String, value: ((Int) -> (), [BenchmarkCategory]))] in
           Array(dictionary).sorted { $0.key < $1.key } } // by name
         .flatMap { $0 }
     }

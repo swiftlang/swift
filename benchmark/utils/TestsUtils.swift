@@ -16,7 +16,7 @@ import Glibc
 import Darwin
 #endif
 
-public enum BenchmarkCategories : String {
+public enum BenchmarkCategory : String {
   // Validation "micro" benchmarks test a specific operation or critical path that
   // we know is important to measure.
   case validation
@@ -77,9 +77,9 @@ public struct BenchmarkInfo {
   /// A set of category tags that describe this benchmark. This is used by the
   /// harness to allow for easy slicing of the set of benchmarks along tag
   /// boundaries, e.x.: run all string benchmarks or ref count benchmarks, etc.
-  public var tags: [BenchmarkCategories]
+  public var tags: [BenchmarkCategory]
 
-  public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategories]) {
+  public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory]) {
     self.name = name
     self.runFunction = runFunction
     self.tags = tags
