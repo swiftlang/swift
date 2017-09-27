@@ -253,13 +253,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
 %   end
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal init() {}
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  deinit {}
 
 %   override = 'override' if Kind != 'Sequence' else ''
   @_versioned
@@ -397,6 +390,10 @@ internal class _AnyRandomAccessCollectionBox<Element>
     self._startIndex = _startIndex
     self._endIndex = endIndex
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
 
   @_versioned
   internal let _startIndex: _AnyIndexBox
