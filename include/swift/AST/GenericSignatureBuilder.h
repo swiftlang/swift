@@ -1314,6 +1314,7 @@ public:
                                      bool inferred) {
     FloatingRequirementSource result{ AbstractProtocol, base };
     result.protocolReq.protocol = inProtocol;
+    result.protocolReq.written = WrittenRequirementLoc();
     result.protocolReq.inferred = inferred;
     return result;
   }
