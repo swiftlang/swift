@@ -107,6 +107,8 @@ ProtocolConformanceRef::subst(Type origType,
   if (auto result = conformances(origType->getCanonicalType(),
                                  substType,
                                  proto->getDeclaredType())) {
+    assert(result->getConditionalRequirements().empty() &&
+           "unhandled conditional requirements");
     return *result;
   }
 

@@ -1268,6 +1268,8 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         // pass it on up.
         return status;
       case RequirementCheckResult::Success:
+        assert(result.getConformance().getConditionalRequirements().empty() &&
+               "unhandled conditional requirements");
         // Report the conformance.
         if (listener && valid) {
           listener->satisfiedConformance(rawReq.getFirstType(), firstType,
