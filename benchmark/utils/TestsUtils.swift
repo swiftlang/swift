@@ -79,10 +79,30 @@ public struct BenchmarkInfo {
   /// boundaries, e.x.: run all string benchmarks or ref count benchmarks, etc.
   public var tags: [BenchmarkCategory]
 
+  /// An optional function that if non-null is run before benchmark samples
+  /// are timed.
+  public var setUpFunction: (() -> ())?
+
+  /// An optional function that if non-null is run immediately after a sample is
+  /// taken.
+  public var tearDownFunction: (() -> ())?
+
   public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory]) {
     self.name = name
     self.runFunction = runFunction
     self.tags = tags
+    self.setUpFunction = nil
+    self.tearDownFunction = nil
+  }
+
+  public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory],
+              setUpFunction: (() -> ())?,
+              tearDownFunction: (() -> ())?) {
+    self.name = name
+    self.runFunction = runFunction
+    self.tags = tags
+    self.setUpFunction = setUpFunction
+    self.tearDownFunction = tearDownFunction
   }
 }
 

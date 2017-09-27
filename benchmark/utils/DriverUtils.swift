@@ -57,16 +57,32 @@ struct Test {
   let benchInfo: BenchmarkInfo
   let index: Int
 
+  /// The name of the benchmark.
   var name: String {
     return benchInfo.name
   }
 
+  /// The "main routine" of the benchmark.
   var runFunction: (Int) -> () {
     return benchInfo.runFunction
   }
 
+  /// The benchmark categories that this test belongs to. Used for filtering.
   var tags: [BenchmarkCategory] {
     return benchInfo.tags
+  }
+
+  /// An optional initialization function for a benchmark that is run before
+  /// measuring begins. Intended to be used to initialize global data used in
+  /// a benchmark.
+  var setUpFunction: (() -> ())? {
+    return benchInfo.setUpFunction
+  }
+
+  /// An optional deinitialization function that if non-null is run /after/ a
+  /// measurement has been taken.
+  var tearDownFunction: (() -> ())? {
+    return benchInfo.tearDownFunction
   }
 }
 
@@ -363,12 +379,11 @@ class SampleRunner {
 }
 
 /// Invoke the benchmark entry point and return the run time in milliseconds.
-func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResults {
-
+func runBench(_ test: Test, _ c: TestConfig) -> BenchResults {
   var samples = [UInt64](repeating: 0, count: c.numSamples)
 
   if c.verbose {
-    print("Running \(name) for \(c.numSamples) samples.")
+    print("Running \(test.name) for \(c.numSamples) samples.")
   }
 
   let sampler = SampleRunner()
@@ -378,7 +393,10 @@ func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResu
     var scale : UInt
     var elapsed_time : UInt64 = 0
     if c.fixedNumIters == 0 {
-      elapsed_time = sampler.run(name, fn: fn, num_iters: 1)
+      test.setUpFunction?()
+      elapsed_time = sampler.run(test.name, fn: test.runFunction, num_iters: 1)
+      test.tearDownFunction?()
+
       if elapsed_time > 0 {
         scale = UInt(time_per_sample / elapsed_time)
       } else {
@@ -397,7 +415,9 @@ func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResu
       if c.verbose {
         print("    Measuring with scale \(scale).")
       }
-      elapsed_time = sampler.run(name, fn: fn, num_iters: scale)
+      test.setUpFunction?()
+      elapsed_time = sampler.run(test.name, fn: test.runFunction, num_iters: scale)
+      test.tearDownFunction?()
     } else {
       scale = 1
     }
@@ -443,10 +463,8 @@ func runBenchmarks(_ c: TestConfig) {
   sumBenchResults.sampleCount = 0
 
   for t in c.tests {
-    let benchIndex = t.index
-    let benchName = t.name
-    let results = runBench(benchName, t.runFunction, c)
-    print("\(benchIndex)\(c.delim)\(benchName)\(c.delim)\(results.description)")
+    let results = runBench(t, c)
+    print("\(t.index)\(c.delim)\(t.name)\(c.delim)\(results.description)")
     fflush(stdout)
 
     sumBenchResults.min += results.min
