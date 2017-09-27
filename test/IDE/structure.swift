@@ -232,3 +232,21 @@ protocol FooProtocol {
 
 a.b(c: d?.e?.f, g: h)
 // CHECK: <call><name>a.b</name>(<arg><name>c</name>: d?.e?.f</arg>, <arg><name>g</name>: h</arg>)</call>
+
+struct Tuples {
+  var foo: (Int, String) {
+    return (1, "test")
+    // CHECK: <tuple>(<elem-expr>1</elem-expr>, <elem-expr>"test"</elem-expr>)</tuple>
+  }
+  
+  func foo2() {
+    foo3(x: (1, 20))
+    // CHECK: <call><name>foo3</name>(<arg><name>x</name>: <tuple>(<elem-expr>1</elem-expr>, <elem-expr>20</elem-expr>)</tuple></arg>)</call>
+    let y = (x, foo4(a: 0))
+    // CHECK: <lvar>let <name>y</name> = <tuple>(<elem-expr>x</elem-expr>, <elem-expr><call><name>foo4</name>(<arg><name>a</name>: 0</arg>)</call></elem-expr>)</tuple></lvar>
+    
+    let z = (name1: 1, name2: 2)
+    // CHECK: <lvar>let <name>z</name> = <tuple>(name1: <elem-expr>1</elem-expr>, name2: <elem-expr>2</elem-expr>)</tuple></lvar>
+  }
+}
+
