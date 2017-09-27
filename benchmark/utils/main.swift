@@ -142,12 +142,12 @@ registerBenchmark(SevenBoom)
 
 @inline(__always)
 private func addTo(
-  _ testSuite: inout [String : ((Int) -> (), [BenchmarkCategory])],
+  _ testSuite: inout [BenchmarkInfo],
   _ name: String,
   _ function: @escaping (Int) -> (),
   _ tags: [BenchmarkCategory] = []
   ) {
-  testSuite[name] = (function, tags)
+  testSuite.append(BenchmarkInfo(name: name, runFunction: function, tags: tags))
 }
 
 // The main test suite: precommit tests

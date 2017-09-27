@@ -62,12 +62,12 @@ struct Test {
 }
 
 // Legacy test dictionaries.
-public var precommitTests: [String : ((Int) -> (), [BenchmarkCategory])] = [:]
-public var otherTests: [String : ((Int) -> (), [BenchmarkCategory])] = [:]
-public var stringTests: [String : ((Int) -> (), [BenchmarkCategory])] = [:]
+public var precommitTests: [BenchmarkInfo] = []
+public var otherTests: [BenchmarkInfo] = []
+public var stringTests: [BenchmarkInfo] = []
 
 // We should migrate to a collection of BenchmarkInfo.
-public var registeredBenchmarks = [TestsUtils.BenchmarkInfo]()
+public var registeredBenchmarks: [BenchmarkInfo] = []
 
 enum TestAction {
   case run
@@ -191,27 +191,30 @@ struct TestConfig {
   }
 
   mutating func findTestsToRun() {
-    var allTests: [(key: String, value: ((Int) -> (), [BenchmarkCategory]))]
+    // Begin by creating a set of our non-legacy registeredBenchmarks
+    var allTests = Set<BenchmarkInfo>(registeredBenchmarks)
 
+    // If we are supposed to only run registered tests there isn't anything
+    // further to do (in the future anyways).
     if onlyRegistered {
-      allTests = registeredBenchmarks.map {
-        bench -> (key: String, value: ((Int) -> (), [BenchmarkCategory])) in
-        (bench.name, (bench.runFunction, bench.tags))
-      }
       // FIXME: for now unstable/extra benchmarks are not registered at all, but
       // soon they will be handled with a default exclude list.
       onlyPrecommit = false
-    }
-    else {
-      allTests = [precommitTests, otherTests, stringTests]
-        .map { dictionary -> [(key: String, value: ((Int) -> (), [BenchmarkCategory]))] in
-          Array(dictionary).sorted { $0.key < $1.key } } // by name
-        .flatMap { $0 }
+    } else {
+      // Merge legacy benchmark info into allTests. If we already have a
+      // registered benchmark info, formUnion leaves this alone. This allows for
+      // us to perform incremental work.
+      for testList in [precommitTests, otherTests, stringTests] {
+        allTests.formUnion(testList)
+      }
     }
 
-    let filteredTests = allTests.filter { pair in tags.isSubset(of: pair.value.1)}
+    let t = tags
+    var filteredTests = allTests.filter { benchInfo in t.isSubset(of: benchInfo.tags) }
+                                .map { $0 }
+                                .sorted()
     if (filteredTests.isEmpty) {
-      return;
+      return
     }
 
     let includedBenchmarks: Set<String> = {
@@ -220,19 +223,19 @@ struct TestConfig {
       }
 
       if onlyPrecommit {
-        return Set(precommitTests.keys)
+        return Set(precommitTests.map { $0.name })
       }
 
-      return Set(filteredTests.map { $0.key })
+      return Set(filteredTests.map { $0.name })
     }()
 
     tests = zip(1...filteredTests.count, filteredTests).map {
       t -> Test in
-      let (ordinal, (key: name, value: funcAndTags)) = t
-      return Test(name: name, index: ordinal, f: funcAndTags.0,
-                  run: includedBenchmarks.contains(name)
+      let (ordinal, benchInfo) = t
+      return Test(name: benchInfo.name, index: ordinal, f: benchInfo.runFunction,
+                  run: includedBenchmarks.contains(benchInfo.name)
                     || includedBenchmarks.contains(String(ordinal)),
-                  tags: funcAndTags.1)
+                  tags: benchInfo.tags)
     }
   }
 }
