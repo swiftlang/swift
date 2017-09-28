@@ -7,6 +7,9 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 import argparse
+import multiprocessing
+
+from build_swift import defaults
 
 
 __all__ = [
@@ -54,7 +57,7 @@ EXPECTED_DEFAULTS = {
     'build_ios': True,
     'build_ios_device': False,
     'build_ios_simulator': False,
-    'build_jobs': 4,
+    'build_jobs': multiprocessing.cpu_count(),
     'build_libdispatch': False,
     'build_libicu': False,
     'build_linux': True,
@@ -83,20 +86,25 @@ EXPECTED_DEFAULTS = {
     'build_xctest': False,
     'clang_compiler_version': None,
     'clang_profile_instr_use': None,
-    'clang_user_visible_version': '5.0.0',
+    'clang_user_visible_version': defaults.CLANG_USER_VISIBLE_VERSION,
     'clean': False,
     'cmake': None,
     'cmake_generator': 'Ninja',
     'cmark_assertions': True,
     'cmark_build_variant': 'Debug',
-    'compiler_vendor': 'none',
+    'compiler_vendor': defaults.COMPILER_VENDOR,
     'coverage_db': None,
     'cross_compile_hosts': [],
-    'darwin_deployment_version_ios': '7.0',
-    'darwin_deployment_version_osx': '10.9',
-    'darwin_deployment_version_tvos': '9.0',
-    'darwin_deployment_version_watchos': '2.0',
-    'darwin_xcrun_toolchain': 'default',
+    'darwin_deployment_version_ios':
+        defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
+    'darwin_deployment_version_osx':
+        defaults.DARWIN_DEPLOYMENT_VERSION_OSX,
+    'darwin_deployment_version_tvos':
+        defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
+    'darwin_deployment_version_watchos':
+        defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
+    'darwin_xcrun_toolchain':
+        defaults.DARWIN_XCRUN_TOOLCHAIN,
     'distcc': False,
     'dry_run': False,
     'enable_asan': False,
@@ -114,8 +122,10 @@ EXPECTED_DEFAULTS = {
     'host_cxx': None,
     'host_libtool': None,
     'host_lipo': None,
+    # FIXME: determine actual default value rather than hardcode
     'host_target': 'macosx-x86_64',
     'host_test': False,
+    # FIXME: determine actual default value rather than hardcode
     'install_prefix': '/Applications/Xcode.app/Contents/Developer/Toolchains/'
                       'XcodeDefault.xctoolchain/usr',
     'install_symroot': None,
@@ -147,14 +157,14 @@ EXPECTED_DEFAULTS = {
         'appletvos-arm64',
         'watchos-armv7k'
     ],
-    'swift_analyze_code_coverage': 'false',
+    'swift_analyze_code_coverage': defaults.SWIFT_ANALYZE_CODE_COVERAGE,
     'swift_assertions': True,
     'swift_build_variant': 'Debug',
     'swift_compiler_version': None,
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
     'swift_tools_max_parallel_lto_link_jobs': 0,
-    'swift_user_visible_version': '4.1',
+    'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
     'symbols_package': None,
     'test': None,
     'test_android_host': False,
