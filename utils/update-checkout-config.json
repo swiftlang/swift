@@ -116,8 +116,8 @@
             "repos": {
                 "llvm": "swift-4.1-branch",
                 "clang": "swift-4.1-branch",
-                "swift": "swift-4.1-branch",
-                "lldb": "upstream-with-swift",
+                "swift": "master",
+                "lldb": "swift-4.1-branch",
                 "cmark": "master",
                 "llbuild": "master",
                 "swiftpm": "master",
