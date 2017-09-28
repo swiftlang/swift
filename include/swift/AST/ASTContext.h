@@ -857,6 +857,16 @@ public:
   /// not necessarily loaded.
   void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
 
+private:
+  /// Register the given generic signature builder to be used as the canonical
+  /// generic signature builder for the given signature, if we don't already
+  /// have one.
+  void registerGenericSignatureBuilder(GenericSignature *sig,
+                                       ModuleDecl &module,
+                                       GenericSignatureBuilder &&builder);
+  friend class GenericSignatureBuilder;
+
+public:
   /// Retrieve or create the stored generic signature builder for the given
   /// canonical generic signature and module.
   GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(CanGenericSignature sig,

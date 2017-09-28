@@ -144,6 +144,12 @@ struct GenericSignatureBuilder::Implementation {
   /// Deallocate the given equivalence class, returning it to the free list.
   void deallocateEquivalenceClass(EquivalenceClass *equivClass);
 
+  /// Whether there were any errors.
+  bool HadAnyError = false;
+
+  /// FIXME: Hack to work around a small number of minimization bugs.
+  bool HadAnyRedundantConstraints = false;
+
 #ifndef NDEBUG
   /// Whether we've already finalized the builder.
   bool finalized = false;
@@ -2048,11 +2054,14 @@ GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
                               ->castTo<ProtocolType>());
   if (!conformance) {
     if (!concrete->hasError() && concreteSource->getLoc().isValid()) {
+      Impl->HadAnyError = true;
+
       Diags.diagnose(concreteSource->getLoc(),
                      diag::requires_generic_param_same_type_does_not_conform,
                      concrete, proto->getName());
     }
 
+    Impl->HadAnyError = true;
     paEquivClass->invalidConcreteType = true;
     return nullptr;
   }
@@ -2854,7 +2863,23 @@ GenericSignatureBuilder::GenericSignatureBuilder(
     Context.Stats->getFrontendCounters().NumGenericSignatureBuilders++;
 }
 
-GenericSignatureBuilder::GenericSignatureBuilder(GenericSignatureBuilder &&) = default;
+GenericSignatureBuilder::GenericSignatureBuilder(
+                                         GenericSignatureBuilder &&other)
+  : Context(other.Context), Diags(other.Diags), Impl(std::move(other.Impl))
+{
+  other.Impl.reset();
+
+  if (Impl) {
+    // Update the generic parameters to their canonical types.
+    for (auto &gp : Impl->GenericParams) {
+      gp = gp->getCanonicalType()->castTo<GenericTypeParamType>();
+    }
+
+    // Point each root potential archetype at this generic signature builder.
+    for (auto pa : Impl->PotentialArchetypes)
+      pa->replaceBuilder(this);
+  }
+}
 
 GenericSignatureBuilder::~GenericSignatureBuilder() = default;
 
@@ -3380,6 +3405,8 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
     // If a layout requirement was explicitly written on a concrete type,
     // complain.
     if (source.isExplicit() && source.getLoc().isValid()) {
+      Impl->HadAnyError = true;
+
       Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
                      TypeLoc::withoutLoc(resolvedSubject->getType()));
       return ConstraintResult::Concrete;
@@ -3523,6 +3550,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         subjectType = subject.get<PotentialArchetype *>()
                         ->getDependentType(Impl->GenericParams);
 
+      Impl->HadAnyError = true;
       Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
                      TypeLoc::withoutLoc(subjectType),
                      TypeLoc::withoutLoc(constraintType));
@@ -3551,6 +3579,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     // One cannot explicitly write a constraint on a concrete type.
     if (source.isExplicit()) {
       if (source.getLoc().isValid()) {
+        Impl->HadAnyError = true;
         Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
                        TypeLoc::withoutLoc(resolvedSubject->getType()));
       }
@@ -3896,6 +3925,7 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
                                  UnresolvedHandlingKind unresolvedHandling) {
   return addSameTypeRequirement(paOrT1, paOrT2, source, unresolvedHandling,
                                 [&](Type type1, Type type2) {
+      Impl->HadAnyError = true;
       if (source.getLoc().isValid()) {
         Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
                        type1, type2);
@@ -4075,6 +4105,8 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
         !Req->getSecondType()->hasTypeParameter()) {
       if (!Req->getFirstType()->hasError() &&
           !Req->getSecondType()->hasError()) {
+        Impl->HadAnyError = true;
+
         Diags.diagnose(Req->getEqualLoc(),
                        diag::requires_no_same_type_archetype)
           .highlight(Req->getFirstTypeLoc().getSourceRange())
@@ -4173,6 +4205,7 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
         firstType, secondType, source,
         UnresolvedHandlingKind::GenerateConstraints,
         [&](Type type1, Type type2) {
+          Impl->HadAnyError = true;
           if (source.getLoc().isValid()) {
             Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
                            type1, type2);
@@ -4514,6 +4547,8 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
       if (isRecursiveConcreteType(&equivClass, /*isSuperclass=*/false)) {
         if (auto constraint =
               equivClass.findAnyConcreteConstraintAsWritten()) {
+          Impl->HadAnyError = true;
+
           Diags.diagnose(constraint->source->getLoc(),
                          diag::recursive_same_type_constraint,
                          archetype->getDependentType(genericParams),
@@ -4530,6 +4565,8 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
     if (equivClass.superclass) {
       if (isRecursiveConcreteType(&equivClass, /*isSuperclass=*/true)) {
         if (auto source = equivClass.findAnySuperclassConstraintAsWritten()) {
+          Impl->HadAnyError = true;
+
           Diags.diagnose(source->source->getLoc(),
                          diag::recursive_superclass_constraint,
                          source->archetype->getDependentType(genericParams),
@@ -4589,10 +4626,13 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
       // because then we don't actually have a parameter.
       auto equivClass = rep->getOrCreateEquivalenceClass();
       if (equivClass->concreteType) {
-        if (auto constraint = equivClass->findAnyConcreteConstraintAsWritten())
+        if (auto constraint = equivClass->findAnyConcreteConstraintAsWritten()){
+          Impl->HadAnyError = true;
+
           Diags.diagnose(constraint->source->getLoc(),
                          diag::requires_generic_param_made_equal_to_concrete,
                          rep->getDependentType(genericParams));
+        }
         continue;
       }
 
@@ -4622,6 +4662,8 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         }
 
         if (repConstraint && repConstraint->source->getLoc().isValid()) {
+          Impl->HadAnyError = true;
+
           Diags.diagnose(repConstraint->source->getLoc(),
                          diag::requires_generic_params_made_equal,
                          pa->getDependentType(genericParams),
@@ -4902,6 +4944,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       // The requirement conflicts. If this constraint has a location, complain
       // about it.
       if (constraint.source->getLoc().isValid()) {
+        Impl->HadAnyError = true;
+
         auto subject = getSubjectType(constraint.archetype);
         Diags.diagnose(constraint.source->getLoc(), *conflictingDiag,
                        subject.first, subject.second,
@@ -4916,6 +4960,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       // do so now.
       if (!diagnosedConflictingRepresentative &&
           representativeConstraint->source->getLoc().isValid()) {
+        Impl->HadAnyError = true;
+
         auto subject = getSubjectType(representativeConstraint->archetype);
         Diags.diagnose(representativeConstraint->source->getLoc(),
                        *conflictingDiag,
@@ -4932,6 +4978,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
     case ConstraintRelation::Redundant:
       // If this requirement is not derived or inferred (but has a useful
       // location) complain that it is redundant.
+      Impl->HadAnyRedundantConstraints = true;
       if (!constraint.source->isDerivedRequirement() &&
           !constraint.source->isInferredRequirement() &&
           constraint.source->getLoc().isValid() &&
@@ -5907,6 +5954,8 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
     if (!equivClass->superclass->isExactSuperclassOf(equivClass->concreteType)) {
       if (auto existing = equivClass->findAnyConcreteConstraintAsWritten(
                             representativeConstraint.archetype)) {
+        Impl->HadAnyError = true;
+
         Diags.diagnose(existing->source->getLoc(), diag::type_does_not_inherit,
                        existing->archetype->getDependentType(
                                                    genericParams),
@@ -5914,6 +5963,8 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
 
         // FIXME: Note the representative constraint.
       } else if (representativeConstraint.source->getLoc().isValid()) {
+        Impl->HadAnyError = true;
+
         Diags.diagnose(representativeConstraint.source->getLoc(),
                        diag::type_does_not_inherit,
                        representativeConstraint.archetype->getDependentType(
@@ -6286,8 +6337,10 @@ static void collectRequirements(GenericSignatureBuilder &builder,
 }
 
 GenericSignature *GenericSignatureBuilder::computeGenericSignature(
+                                          ModuleDecl &module,
                                           SourceLoc loc,
-                                          bool allowConcreteGenericParams) && {
+                                          bool allowConcreteGenericParams,
+                                          bool allowBuilderToMove) && {
   // Finalize the builder, producing any necessary diagnostics.
   finalize(loc, Impl->GenericParams, allowConcreteGenericParams);
 
@@ -6297,6 +6350,23 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
 
   // Form the generic signature.
   auto sig = GenericSignature::get(Impl->GenericParams, requirements);
+
+  // When we can, move this generic signature builder to make it the canonical
+  // builder, rather than constructing a new generic signature builder that
+  // will produce the same thing.
+  //
+  // We cannot do this when there were errors.
+  // FIXME: The HadAnyRedundantConstraints bit is a hack because we are
+  // over-minimizing.
+  if (allowBuilderToMove && !Impl->HadAnyError &&
+      !Impl->HadAnyRedundantConstraints) {
+    // Set the conformance lookup function to something that works canonically.
+    Impl->LookupConformance = LookUpConformanceInModule(&module);
+
+    // Register this generic signature builer as the canonical builder for the
+    // given signature.
+    Context.registerGenericSignatureBuilder(sig, module, std::move(*this));
+  }
 
   // Wipe out the internal state, ensuring that nobody uses this builder for
   // anything more.
@@ -6330,6 +6400,9 @@ GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
                  RequirementSource::forRequirementSignature(selfPA, proto),
                  nullptr);
 
-  return std::move(builder).computeGenericSignature(SourceLoc());
+  return std::move(builder).computeGenericSignature(
+           *module, SourceLoc(),
+           /*allowConcreteGenericPArams=*/false,
+           /*allowBuilderToMove=*/false);
 }
 
