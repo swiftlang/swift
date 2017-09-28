@@ -839,6 +839,11 @@ insertAfter(SourceManager &SM, SourceLoc Loc, StringRef Text,
   accept(SM, Lexer::getLocForEndOfToken(SM, Loc), Text, SubRegions);
 }
 
+void swift::ide::SourceEditConsumer::
+remove(SourceManager &SM, CharSourceRange Range) {
+  accept(SM, Range, "");
+}
+
 struct swift::ide::SourceEditJsonConsumer::Implementation {
   llvm::raw_ostream &OS;
   std::vector<SingleEdit> AllEdits;
