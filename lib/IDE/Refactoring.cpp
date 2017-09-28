@@ -1974,6 +1974,89 @@ bool RefactoringActionConvertToDoCatch::performChange() {
   return false;
 }
 
+struct TryExpressionConversionInfo {
+  TryExpr &TE;
+  DoCatchStmt *Stmt;
+  unsigned int NumberOfTriesInDoCatch;
+  TryExpressionConversionInfo(TryExpr &TE, DoCatchStmt *Stmt,
+                              unsigned int NumberOfTriesInDoCatch):
+                              TE(TE),
+                              Stmt(Stmt),
+                              NumberOfTriesInDoCatch(NumberOfTriesInDoCatch) {}
+  TryExpressionConversionInfo(TryExpr &TE): TE(TE), Stmt(nullptr),
+                              NumberOfTriesInDoCatch(0) {}
+};
+
+static TryExpressionConversionInfo findTryConversion(ResolvedCursorInfo Info,
+                                                     SourceFile *TheFile,
+                                                     SourceManager &SM) {
+  auto *TE = dyn_cast<TryExpr>(Info.TrailingExpr);
+  assert(TE);
+  auto Node = ASTNode(TE);
+  auto NodeChecker = [](ASTNode N) {
+    return N.isStmt(StmtKind::DoCatch);
+  };
+  ContextFinder Finder(*TheFile, Node, NodeChecker);
+  Finder.resolve();
+  auto Contexts = Finder.getContexts();
+  if (Contexts.size() == 0) {
+    return TryExpressionConversionInfo(*TE);
+  }
+  auto StmtNode = Contexts.back();
+  DoCatchStmt *DCStmt = dyn_cast<DoCatchStmt>(StmtNode.dyn_cast<Stmt*>());
+
+  struct TryExprCounter: public SourceEntityWalker {
+    unsigned int Count = 0;
+    bool walkToExprPre(Expr *E) {
+      if (auto *FE = dyn_cast<TryExpr>(E)) {
+        Count += 1;
+      }
+      return true;
+    }
+  } Counter;
+  Counter.walk(DCStmt);
+
+  return TryExpressionConversionInfo(*TE, DCStmt, Counter.Count);
+}
+
+bool RefactoringActionConvertToForceTry::
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+  if (!Tok.TrailingExpr)
+    return false;
+  return isa<TryExpr>(Tok.TrailingExpr);
+}
+
+bool RefactoringActionConvertToForceTry::performChange() {
+  auto ConversionInfo = findTryConversion(CursorInfo, TheFile, SM);
+  auto *DCStmt = ConversionInfo.Stmt;
+  // Add exclamation to the call.
+  auto TryLoc = ConversionInfo.TE.getTryLoc();
+  auto TryEndLoc = TryLoc.getAdvancedLocOrInvalid(getKeywordLen(tok::kw_try));
+  EditConsumer.accept(SM, TryEndLoc, "!");
+
+  if (DCStmt && ConversionInfo.NumberOfTriesInDoCatch == 1) {
+    //It's the only try in do catch block, remove the block.
+    auto *BodyStmt = DCStmt->getBody();
+    auto *BCStmt = dyn_cast<BraceStmt>(BodyStmt);
+    auto FirstNodeStartLoc = BCStmt->getElements().front().getStartLoc();
+    auto BeforeBodyRange = CharSourceRange(
+                                      SM,
+                                      DCStmt->getStartLoc(),
+                                      FirstNodeStartLoc);
+    EditConsumer.accept(SM, BeforeBodyRange, "");
+    auto LastNodePastEndLoc = BCStmt->getElements()
+      .back().getEndLoc().getAdvancedLocOrInvalid(1);
+    auto CatchRBraceLoc = DCStmt->getEndLoc()
+      .getAdvancedLocOrInvalid(getKeywordLen(tok::r_paren));
+    auto AfterBodyRange = CharSourceRange(
+                                    SM,
+                                    LastNodePastEndLoc,
+                                    CatchRBraceLoc);
+    EditConsumer.accept(SM, AfterBodyRange, "");
+  }
+  return false;
+}
+
 /// Given a cursor position, this function tries to collect a number literal
 /// expression immediately following the cursor.
 static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfo Tok) {

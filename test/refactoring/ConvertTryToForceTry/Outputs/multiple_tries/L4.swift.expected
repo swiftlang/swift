@@ -1,0 +1,9 @@
+func testTryToForceTry() {
+  func throwingFunc() throws -> Int { return 3 }
+  do {
+    let _ = try! throwingFunc()
+    let _ = try throwingFunc()
+  } catch {
+    let _ = error
+  }
+}
