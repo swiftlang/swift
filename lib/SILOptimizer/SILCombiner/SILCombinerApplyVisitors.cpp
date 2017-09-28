@@ -417,6 +417,12 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   if (SubstCalleeTy->hasArchetype() || ConvertCalleeTy->hasArchetype())
     return nullptr;
 
+  // Bail if the result type of the converted callee is different from the callee's
+  // result type of the apply instruction.
+  if (SubstCalleeTy->getAllResultsType() != ConvertCalleeTy->getAllResultsType()) {
+    return nullptr;
+  }
+
   // Ok, we can now perform our transformation. Grab AI's operands and the
   // relevant types from the ConvertFunction function type and AI.
   Builder.setCurrentDebugScope(AI.getDebugScope());
@@ -461,9 +467,13 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
     NAI = Builder.createTryApply(AI.getLoc(), FRI, 
                                  SubstitutionList(), Args,
                                  TAI->getNormalBB(), TAI->getErrorBB());
-  else
+  else {
     NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionList(), Args,
                               cast<ApplyInst>(AI)->isNonThrowing());
+    assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsType() ==
+           AI.getSubstCalleeType()->getAllResultsType() &&
+           "Function types should be the same");
+  }
   return NAI;
 }
 
