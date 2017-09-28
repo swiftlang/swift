@@ -2604,6 +2604,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                 ConformanceCheckFlags::InExpression)) {
       CheckedConformances.push_back({getConstraintLocator(locator),
                                      *conformance});
+
+      // This conformance may be conditional, in which case we need to consider
+      // those requirements as constraints too.
+      //
+      // FIXME: this doesn't seem to be right; the requirements are sometimes
+      // phrased in terms of the type's generic parameters, not type variables
+      // in this context.
+      for (auto req : conformance->getConditionalRequirements()) {
+        addConstraint(req, locator);
+      }
       return SolutionKind::Solved;
     }
     break;
