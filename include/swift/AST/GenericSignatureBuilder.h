@@ -221,6 +221,15 @@ public:
     /// a superclass requirement.
     bool isConformanceSatisfiedBySuperclass(ProtocolDecl *proto) const;
 
+    /// Lookup a nested type with the given name within this equivalence
+    /// class.
+    ///
+    /// \param otherConcreteTypes If non-null, will be filled in the all of the
+    /// concrete types we found (other than the result) with the same name.
+    TypeDecl *lookupNestedType(
+                   Identifier name,
+                   SmallVectorImpl<TypeDecl *> *otherConcreteTypes = nullptr);
+
     /// Dump a debugging representation of this equivalence class.
     void dump(llvm::raw_ostream &out) const;
 
@@ -238,6 +247,17 @@ public:
       /// anchor was cached.
       unsigned numMembers;
     } archetypeAnchorCache;
+
+    /// Describes a cached nested type.
+    struct CachedNestedType {
+      unsigned numConformancesPresent;
+      CanType superclassPresent;
+      llvm::TinyPtrVector<TypeDecl *> types;
+    };
+
+    /// Cached nested-type information, which contains the best declaration
+    /// for a given name.
+    llvm::SmallDenseMap<Identifier, CachedNestedType> nestedTypeNameCache;
   };
 
   friend class RequirementSource;
@@ -528,9 +548,6 @@ public:
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
 
-  /// \brief Build the generic signature.
-  GenericSignature *getGenericSignature();
-
   /// Infer requirements from the given type, recursively.
   ///
   /// This routine infers requirements from a type that occurs within the
@@ -564,11 +581,13 @@ public:
   /// \brief Finalize the set of requirements and compute the generic
   /// signature.
   ///
-  /// After this point, one cannot introduce new requirements.
+  /// After this point, one cannot introduce new requirements, and the
+  /// generic signature builder no longer has valid state.
   GenericSignature *computeGenericSignature(
                       SourceLoc loc,
-                      bool allowConcreteGenericParams = false);
+                      bool allowConcreteGenericParams = false) &&;
 
+private:
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
   ///
@@ -578,6 +597,7 @@ public:
                 ArrayRef<GenericTypeParamType *> genericParams,
                 bool allowConcreteGenericParams=false);
 
+public:
   /// Process any delayed requirements that can be handled now.
   void processDelayedRequirements();
 
@@ -1481,6 +1501,12 @@ public:
     return parentOrBuilder.dyn_cast<PotentialArchetype *>();
   }
 
+  /// Retrieve the type declaration to which this nested type was resolved.
+  TypeDecl *getResolvedType() const {
+    assert(getParent() && "Not an associated type");
+    return identifier.assocTypeOrConcrete;
+  }
+
   /// Retrieve the associated type to which this potential archetype
   /// has been resolved.
   AssociatedTypeDecl *getResolvedAssociatedType() const {
@@ -1623,13 +1649,8 @@ public:
                                     ArchetypeResolutionKind kind,
                                     GenericSignatureBuilder &builder);
 
-  /// \brief Retrieve (or create) a nested type with a known associated type.
-  PotentialArchetype *getNestedType(AssociatedTypeDecl *assocType,
-                                    GenericSignatureBuilder &builder);
-
-  /// \brief Retrieve (or create) a nested type with a known concrete type
-  /// declaration.
-  PotentialArchetype *getNestedType(TypeDecl *concreteDecl,
+  /// \brief Retrieve (or create) a nested type with a known type.
+  PotentialArchetype *getNestedType(TypeDecl *type,
                                     GenericSignatureBuilder &builder);
 
   /// \brief Retrieve (or create) a nested type that is the current best
@@ -1649,8 +1670,8 @@ public:
   /// type or typealias of the given protocol, unless the \c kind implies that
   /// a potential archetype should not be created if it's missing.
   PotentialArchetype *updateNestedTypeForConformance(
-                      PointerUnion<AssociatedTypeDecl *, TypeDecl *> type,
-                      ArchetypeResolutionKind kind);
+                        TypeDecl *type,
+                        ArchetypeResolutionKind kind);
 
   /// Update the named nested type when we know this type conforms to the given
   /// protocol.
