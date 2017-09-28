@@ -27,7 +27,8 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
     1. Resilience, ABI stability, `@_inlineable`, `@_versioned`, etc
     1. Strings and ICU
     1. Lifetimes
-        1. withExtendedLifetime, withUnsafe..., 
+        1. withExtendedLifetime, withUnsafe...,
+    1. Shims and stubs
 1. Coding Standards
     1. High level concerns
     1. Best practices
@@ -35,7 +36,6 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
 1. Internals
     1. `@inline(__always)` and `@inline(never)`
     1. `@semantics(...)`
-    1. `@_silgen_name`
     1. Builtins
         1. Builtin.addressof, _isUnique, _isUniqueOrPinned, etc
 1. Dirty hacks
@@ -124,6 +124,35 @@ Use of this attribute imposes limitations on what can be in the body. For more d
 #### `@unsafe_no_objc_tagged_pointer`
 
 This is currently used in the standard library as an additional annotation applied to @objc protocols signifying that any objects which conform to this protocol are not tagged. This means that (on Darwin platforms) such references, unlike AnyObject, have spare bits available from things like restricted memory spaces or alignment.
+
+#### `@_silgen_name`
+
+This attribute specifies the name that a declaration will have at link time. It is used for two purposes, the second of which is currently considered bad practice and should be replaced with shims:
+
+1. To specify the symbol name of a Swift function so that it can be called from Swift-aware C. Such functions have bodies.
+2. To provide a Swift declaration which really represents a C declaration. Such functions do not have bodies.
+
+##### Using `@_silgen_name` to call Swift from Swift-aware C
+
+Rather than hard-code Swift mangling into C code, `@_silgen_name` is used to provide a stable and known symbol name for linking. Note that C code still must understand and use the Swift calling convention (available in swift-clang) for such Swift functions (if they use Swift's CC). Example:
+
+```swift
+@_silgen_name("_swift_stdlib_destroyTLS")
+internal func _destroyTLS(_ ptr: UnsafeMutableRawPointer?) {
+  // ... implementation ...
+}
+```
+
+```C++
+__attribute__((__swiftcall__)) extern "C" void _swift_stdlib_destroyTLS(void *);
+
+// ... C code can now call _swift_stdlib_destroyTLS on a void * ...
+```
+
+##### Using `@_silgen_name` to call C from Swift
+
+The standard library cannot import the Darwin module (much less an ICU module), yet it needs access to these C functions that it otherwise wouldn't have a decl for. For that, we use shims. But, `@_silgen_name` can also be used on a body-less Swift function declaration to denote that it's an external C function whose symbol will be available at link time, even if not available at compile time. This usage is discouraged.
+
 
 ### Internal structures
 
