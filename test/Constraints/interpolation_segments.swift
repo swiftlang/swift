@@ -16,30 +16,30 @@
 // CHECK-NEXT:  9:
 
 // CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByStringLiteral) String)
+// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByStringLiteral) String})
 
 // CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
+// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByIntegerLiteral) Int})
 
 // CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByStringLiteral) String)
+// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByStringLiteral) String})
 
 // CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
+// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByIntegerLiteral) Int})
 
 // CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByStringLiteral) String)
+// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByStringLiteral) String})
 
 // CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
+// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByIntegerLiteral) Int})
 
 // CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByStringLiteral) String)
+// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByStringLiteral) String})
 
 // CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
+// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByIntegerLiteral) Int})
 
 // CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByStringLiteral) String)
+// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByStringLiteral) String})
 
 _ = "\(1), \(2), \(3), \(4)"
