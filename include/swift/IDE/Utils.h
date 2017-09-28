@@ -527,6 +527,7 @@ public:
   void accept(SourceManager &SM, SourceLoc Loc, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
   void insertAfter(SourceManager &SM, SourceLoc Loc, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
   void accept(SourceManager &SM, Replacement Replacement) { accept(SM, RegionType::ActiveCode, {Replacement}); }
+  void remove(SourceManager &SM, CharSourceRange Range);
 };
 
 /// This helper stream inserts text into a SourceLoc by calling functions in

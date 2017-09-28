@@ -1970,7 +1970,7 @@ bool RefactoringActionConvertToDoCatch::performChange() {
   // Delete ! from try! expression
   auto ExclaimLen = getKeywordLen(tok::exclaim_postfix);
   auto ExclaimRange = CharSourceRange(TryExpr->getExclaimLoc(), ExclaimLen);
-  EditConsumer.accept(SM, ExclaimRange, "");
+  EditConsumer.remove(SM, ExclaimRange);
   return false;
 }
 
