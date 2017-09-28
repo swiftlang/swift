@@ -1260,6 +1260,52 @@ bb0(%0 : $*B, %1 : $B, %2 : $Builtin.Int1):
   return %6 : $()
 }
 
+// Check that convert_function simplifications are not applied in certain cases.
+@objc class MyNSObj { }
+
+class AnotherClass : MyNSObj { }
+
+sil @MyNSObj_self : $@convention(method) (@guaranteed MyNSObj) -> @owned MyNSObj
+
+sil shared [transparent] [serializable] [reabstraction_thunk] @reabstraction_thunk1 : $@convention(thin) (@in (), @owned @callee_owned () -> @owned AnotherClass) -> @out AnotherClass {
+bb0(%0 : $*AnotherClass, %1 : $*(), %2 : $@callee_owned () -> @owned AnotherClass):
+  %3 = apply %2() : $@callee_owned () -> @owned AnotherClass
+  store %3 to %0 : $*AnotherClass
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// @nonobjc curry thunk of MyNSObj.self()
+sil shared [serializable] [thunk] @curry_thunk_for_MyNSObj_self : $@convention(thin) (@owned MyNSObj) -> @owned @callee_owned () -> @owned MyNSObj {
+bb0(%0 : $MyNSObj):
+  // function_ref @nonobjc MyNSObj.self()
+  %1 = function_ref @MyNSObj_self : $@convention(method) (@guaranteed MyNSObj) -> @owned MyNSObj
+  %2 = partial_apply %1(%0) : $@convention(method) (@guaranteed MyNSObj) -> @owned MyNSObj
+  return %2 : $@callee_owned () -> @owned MyNSObj
+}
+
+// Check that convert_function is not eliminated if the result type of the converted function is different from the apply result type.
+// CHECK-LABEL: sil {{.*}} @do_not_peephole_convert_function : $@convention(thin) (@in AnotherClass) -> @out @callee_owned (@in ()) -> @out AnotherClass {
+// CHECK: [[CF:%[0-9]+]] = convert_function
+// CHECK: [[APPLY:%[0-9]+]] = apply
+// CHECK: [[FUN:%[0-9]+]] = function_ref
+// CHECK: [[CF:%[0-9]+]] = partial_apply [[FUN]]([[APPLY]])
+// CHECK: // end sil function 'do_not_peephole_convert_function'
+sil shared [transparent] [reabstraction_thunk] @do_not_peephole_convert_function : $@convention(thin) (@in AnotherClass) -> @out @callee_owned (@in ()) -> @out AnotherClass {
+bb0(%0 : $*@callee_owned (@in ()) -> @out AnotherClass, %1 : $*AnotherClass):
+  // function_ref @nonobjc curry thunk of MyNSObj.self()
+  %2 = function_ref @curry_thunk_for_MyNSObj_self : $@convention(thin) (@owned MyNSObj) -> @owned @callee_owned () -> @owned MyNSObj
+  %3 = convert_function %2 : $@convention(thin) (@owned MyNSObj) -> @owned @callee_owned () -> @owned MyNSObj to $@convention(thin) (@owned AnotherClass) -> @owned @callee_owned () -> @owned AnotherClass
+  %5 = load %1 : $*AnotherClass
+  %6 = apply %3(%5) : $@convention(thin) (@owned AnotherClass) -> @owned @callee_owned () -> @owned AnotherClass
+  // function_ref thunk for @callee_owned () -> (@owned AnotherClass)
+  %7 = function_ref @reabstraction_thunk1 : $@convention(thin) (@in (), @owned @callee_owned () -> @owned AnotherClass) -> @out AnotherClass
+  %8 = partial_apply %7(%6) : $@convention(thin) (@in (), @owned @callee_owned () -> @owned AnotherClass) -> @out AnotherClass
+  store %8 to %0 : $*@callee_owned (@in ()) -> @out AnotherClass
+  %10 = tuple ()
+  return %10 : $()
+} // end sil function 'do_not_peephole_convert_function'
+
 // CHECK-LABEL: sil @upcast_formation : $@convention(thin) (@inout E, E, @inout B) -> B {
 // CHECK: bb0
 // CHECK-NEXT: upcast
