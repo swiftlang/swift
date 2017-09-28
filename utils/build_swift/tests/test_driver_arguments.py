@@ -440,6 +440,29 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.fail('non-exhaustive expected options, missing: {}'
                       .format(diff))
 
+    def test_expected_options_have_default_values(self):
+        """Test that all the options in EXPECTED_OPTIONS have an associated
+        default value.
+        """
+
+        skip_option_classes = [
+            eo.HelpOption,
+            eo.IgnoreOption,
+            eo.UnsupportedOption,
+        ]
+
+        missing_defaults = set()
+        for option in eo.EXPECTED_OPTIONS:
+            if option.__class__ in skip_option_classes:
+                continue
+
+            if option.dest not in eo.EXPECTED_DEFAULTS:
+                missing_defaults.add(option.dest)
+
+        if len(missing_defaults) > 0:
+            self.fail('non-exhaustive default values for options, missing: {}'
+                      .format(missing_defaults))
+
     # -------------------------------------------------------------------------
     # Manual option tests
 
