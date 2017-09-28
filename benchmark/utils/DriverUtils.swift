@@ -183,10 +183,19 @@ struct TestConfig {
 
     if let x = benchArgs.optionalArgsMap["--tags"] {
       if x.isEmpty { return .fail("--tags requires a value") }
-      guard let cat = BenchmarkCategory(rawValue: x) else {
-        return .fail("Unknown benchmark category: '\(x)'")
+
+      // We support specifying multiple tags by splitting on comma, i.e.:
+      //
+      //  --tags=array,set
+      //
+      // FIXME: If we used Error instead of .fail, then we could have a cleaner
+      // impl here using map on x and tags.formUnion.
+      for t in x.split(separator: ",") {
+        guard let cat = BenchmarkCategory(rawValue: String(t)) else {
+          return .fail("Unknown benchmark category: '\(t)'")
+        }
+        tags.insert(cat)
       }
-      tags.insert(cat)
     }
 
     if let _ = benchArgs.optionalArgsMap["--run-all"] {
