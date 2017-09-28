@@ -6034,11 +6034,15 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
 
   auto result = TC.checkGenericArguments(
       dc, callExpr->getLoc(), fnExpr->getLoc(), AFD->getInterfaceType(),
-      env->getGenericSignature(), QueryTypeSubstitutionMap{substitutions},
+      env->getGenericSignature(), substitutionFn,
       LookUpConformanceInModule{dc->getParentModule()}, nullptr,
       ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
 
-  return result != RequirementCheckResult::Success;
+  assert(result != RequirementCheckResult::UnsatisfiedDependency);
+
+  // Note: If result is RequirementCheckResult::SubstitutionFailure, we did
+  // not emit a diagnostic, so we must return false in that case.
+  return result == RequirementCheckResult::Failure;
 }
 
 /// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,
