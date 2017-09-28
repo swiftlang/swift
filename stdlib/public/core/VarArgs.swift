@@ -326,7 +326,69 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
   }
 }
 
-#if !arch(x86_64)
+#if arch(x86_64)
+
+/// An object that can manage the lifetime of storage backing a
+/// `CVaListPointer`.
+final internal class _VaListBuilder {
+
+  @_versioned
+  struct Header {
+    var gp_offset = CUnsignedInt(0)
+    var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * MemoryLayout<Int>.stride)
+    var overflow_arg_area: UnsafeMutablePointer<Int>?
+    var reg_save_area: UnsafeMutablePointer<Int>?
+  }
+
+  init() {
+    // prepare the register save area
+    storage = ContiguousArray(repeating: 0, count: _x86_64RegisterSaveWords)
+  }
+
+  func append(_ arg: CVarArg) {
+    var encoded = arg._cVarArgEncoding
+
+    if arg is _CVarArgPassedAsDouble
+      && sseRegistersUsed < _x86_64CountSSERegisters {
+      var startIndex = _x86_64CountGPRegisters
+           + (sseRegistersUsed * _x86_64SSERegisterWords)
+      for w in encoded {
+        storage[startIndex] = w
+        startIndex += 1
+      }
+      sseRegistersUsed += 1
+    }
+    else if encoded.count == 1
+      && !(arg is _CVarArgPassedAsDouble)
+      && gpRegistersUsed < _x86_64CountGPRegisters {
+      storage[gpRegistersUsed] = encoded[0]
+      gpRegistersUsed += 1
+    }
+    else {
+      for w in encoded {
+        storage.append(w)
+      }
+    }
+  }
+
+  func va_list() -> CVaListPointer {
+    header.reg_save_area = storage._baseAddress
+    header.overflow_arg_area
+      = storage._baseAddress + _x86_64RegisterSaveWords
+    return CVaListPointer(
+             _fromUnsafeMutablePointer: UnsafeMutableRawPointer(
+               Builtin.addressof(&self.header)))
+  }
+
+  var gpRegistersUsed = 0
+  var sseRegistersUsed = 0
+
+  final  // Property must be final since it is used by Builtin.addressof.
+  var header = Header()
+  var storage: ContiguousArray<Int>
+}
+
+#else
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
@@ -422,68 +484,6 @@ final internal class _VaListBuilder {
   var storage: UnsafeMutablePointer<Int>?
 
   static var alignedStorageForEmptyVaLists: Double = 0
-}
-
-#else
-
-/// An object that can manage the lifetime of storage backing a
-/// `CVaListPointer`.
-final internal class _VaListBuilder {
-
-  @_versioned
-  struct Header {
-    var gp_offset = CUnsignedInt(0)
-    var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * MemoryLayout<Int>.stride)
-    var overflow_arg_area: UnsafeMutablePointer<Int>?
-    var reg_save_area: UnsafeMutablePointer<Int>?
-  }
-
-  init() {
-    // prepare the register save area
-    storage = ContiguousArray(repeating: 0, count: _x86_64RegisterSaveWords)
-  }
-
-  func append(_ arg: CVarArg) {
-    var encoded = arg._cVarArgEncoding
-
-    if arg is _CVarArgPassedAsDouble
-      && sseRegistersUsed < _x86_64CountSSERegisters {
-      var startIndex = _x86_64CountGPRegisters
-           + (sseRegistersUsed * _x86_64SSERegisterWords)
-      for w in encoded {
-        storage[startIndex] = w
-        startIndex += 1
-      }
-      sseRegistersUsed += 1
-    }
-    else if encoded.count == 1
-      && !(arg is _CVarArgPassedAsDouble)
-      && gpRegistersUsed < _x86_64CountGPRegisters {
-      storage[gpRegistersUsed] = encoded[0]
-      gpRegistersUsed += 1
-    }
-    else {
-      for w in encoded {
-        storage.append(w)
-      }
-    }
-  }
-
-  func va_list() -> CVaListPointer {
-    header.reg_save_area = storage._baseAddress
-    header.overflow_arg_area
-      = storage._baseAddress + _x86_64RegisterSaveWords
-    return CVaListPointer(
-             _fromUnsafeMutablePointer: UnsafeMutableRawPointer(
-               Builtin.addressof(&self.header)))
-  }
-
-  var gpRegistersUsed = 0
-  var sseRegistersUsed = 0
-
-  final  // Property must be final since it is used by Builtin.addressof.
-  var header = Header()
-  var storage: ContiguousArray<Int>
 }
 
 #endif
