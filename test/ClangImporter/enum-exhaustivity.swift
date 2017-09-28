@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules -verify -warnings-as-errors -enable-nonfrozen-enum-exhaustivity-diagnostics
 
-// RUN: %target-swift-ide-test -source-filename %s -print-module -module-to-print EnumExhaustivity -I %S/Inputs/custom-modules | %FileCheck -check-prefix=CHECK %s
+// RUN: %target-swift-ide-test -source-filename %s -print-module -module-to-print EnumExhaustivity -I %S/Inputs/custom-modules | %FileCheck %s
 
 // CHECK-LABEL: {{^}}enum RegularEnum : {{.+}} {
 // CHECK:      case A
@@ -13,6 +13,7 @@
 // CHECK-NEXT: case B
 // CHECK-NEXT: {{^}$}}
 
+
 import EnumExhaustivity
 
 func test(_ value: RegularEnum, _ exhaustiveValue: ExhaustiveEnum) {
@@ -24,5 +25,33 @@ func test(_ value: RegularEnum, _ exhaustiveValue: ExhaustiveEnum) {
   switch exhaustiveValue { // always okay
   case .A: break
   case .B: break
+  }
+}
+
+func testAttributes(
+  _ rete: RegularEnumTurnedExhaustive,
+  _ arete: AnotherRegularEnumTurnedExhaustive,
+  _ retetb: RegularEnumTurnedExhaustiveThenBackViaAPINotes,
+  _ fdte: ForwardDeclaredTurnedExhaustive,
+  _ fdo: ForwardDeclaredOnly
+) {
+  switch rete {
+  case .A, .B: break
+  }
+
+  switch arete {
+  case .A, .B: break
+  }
+
+  switch retetb { // expected-error {{switch must be exhaustive}} expected-note {{do you want to add a default clause?}}
+  case .A, .B: break
+  }
+
+  switch fdte {
+  case .A, .B: break
+  }
+
+  switch fdo {
+  case .A, .B: break
   }
 }

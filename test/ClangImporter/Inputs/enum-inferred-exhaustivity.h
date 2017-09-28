@@ -8,3 +8,9 @@
 typedef CF_ENUM(EnumWithDefaultExhaustivity) {
   EnumWithDefaultExhaustivityLoneCase
 };
+
+// This name is also specially recognized by Swift.
+#define __CF_ENUM_ATTRIBUTES __attribute__((enum_extensibility(open)))
+typedef CF_ENUM(EnumWithSpecialAttributes) {
+  EnumWithSpecialAttributesLoneCase
+} __CF_ENUM_ATTRIBUTES;

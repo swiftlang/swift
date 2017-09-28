@@ -10,3 +10,10 @@ func test(_ value: EnumWithDefaultExhaustivity) {
   case .loneCase: break
   }
 }
+
+func test(_ value: EnumWithSpecialAttributes) {
+  // Same, but with the attributes macro shipped in the Xcode 9 SDKs.
+  switch value { // expected-error {{switch must be exhaustive}} expected-note {{do you want to add a default clause?}}
+  case .loneCase: break
+  }
+}
