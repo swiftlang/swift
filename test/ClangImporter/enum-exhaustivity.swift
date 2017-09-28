@@ -12,3 +12,9 @@
 // CHECK:      case A
 // CHECK-NEXT: case B
 // CHECK-NEXT: {{^}$}}
+
+// CHECK-5-LABEL: {{^}}_exhaustive enum RegularEnumTurnedExhaustive
+// CHECK-5-LABEL: {{^}}_exhaustive enum AnotherRegularEnumTurnedExhaustive
+// CHECK-4-LABEL: {{^}}_nonexhaustive enum RegularEnumTurnedExhaustiveThenBackViaAPINotes
+// CHECK-5-LABEL: {{^}}_exhaustive enum ForwardDeclaredTurnedExhaustive
+// CHECK-5-LABEL: {{^}}_exhaustive enum ForwardDeclaredOnly
