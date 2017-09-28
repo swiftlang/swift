@@ -4678,6 +4678,13 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   }
 }
 
+bool ModuleFile::loadNamedMembers(const Decl *D, DeclName N,
+                                  uint64_t contextData,
+                                  TinyPtrVector<ValueDecl *> &Members) {
+  // Not presently supported.
+  return true;
+}
+
 void
 ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
                           SmallVectorImpl<ProtocolConformance*> &conformances) {

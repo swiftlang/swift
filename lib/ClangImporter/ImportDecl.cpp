@@ -7994,6 +7994,13 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   loadAllMembersIntoExtension(D, extra);
 }
 
+bool ClangImporter::Implementation::loadNamedMembers(
+    const Decl *D, DeclName N, uint64_t contextData,
+    TinyPtrVector<ValueDecl *> &Members) {
+  // Not presently supported.
+  return true;
+}
+
 void ClangImporter::Implementation::loadAllMembersIntoExtension(
     Decl *D, uint64_t extra) {
   // We have extension.
