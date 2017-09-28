@@ -668,13 +668,14 @@ bool GenericSignature::isCanonicalTypeInContext(Type type,
   return !type.findIf([&](Type component) -> bool {
     if (!component->isTypeParameter()) return false;
 
-    auto pa =
-      builder.resolveArchetype(component,
+    auto equivClass =
+      builder.resolveEquivalenceClass(
+                               Type(component),
                                ArchetypeResolutionKind::CompleteWellFormed);
-    if (!pa) return false;
+    if (!equivClass) return false;
 
-    auto rep = pa->getArchetypeAnchor(builder);
-    return (rep->isConcreteType() || pa != rep);
+    return (equivClass->concreteType ||
+            !component->isEqual(equivClass->getAnchor(getGenericParams())));
   });
 }
 
@@ -693,19 +694,18 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type,
         !isa<DependentMemberType>(component))
       return None;
 
-    // Resolve the potential archetype.  This can be null in nested generic
-    // types, which we can't immediately canonicalize.
-    auto pa =
-      builder.resolveArchetype(Type(component),
+    // Find the equivalence class for this dependent member type.
+    auto equivClass =
+      builder.resolveEquivalenceClass(
+                               Type(component),
                                ArchetypeResolutionKind::CompleteWellFormed);
-    if (!pa) return None;
+    if (!equivClass) return None;
 
-    auto rep = pa->getArchetypeAnchor(builder);
-    if (rep->isConcreteType()) {
-      return getCanonicalTypeInContext(rep->getConcreteType(), builder);
+    if (equivClass->concreteType) {
+      return getCanonicalTypeInContext(equivClass->concreteType, builder);
     }
 
-    return rep->getDependentType(getGenericParams());
+    return equivClass->getAnchor(getGenericParams());
   });
   
   auto result = type->getCanonicalType();

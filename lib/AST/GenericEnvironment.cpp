@@ -190,15 +190,14 @@ Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
     Type contextType = self->getContextTypes()[index];
     if (!contextType) {
       assert(self->Builder && "Missing generic signature builder for lazy query");
-      auto potentialArchetype =
-        self->Builder->resolveArchetype(
+      auto equivClass =
+        self->Builder->resolveEquivalenceClass(
                                   type,
                                   ArchetypeResolutionKind::CompleteWellFormed);
 
       auto mutableSelf = const_cast<GenericEnvironment *>(self);
-      contextType =
-        potentialArchetype->getTypeInContext(*mutableSelf->Builder,
-                                             mutableSelf);
+      contextType = equivClass->getTypeInContext(*mutableSelf->Builder,
+                                                 mutableSelf);
 
       // FIXME: Redundant mapping from key -> index.
       if (self->getContextTypes()[index].isNull())

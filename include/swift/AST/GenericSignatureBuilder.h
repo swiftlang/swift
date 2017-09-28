@@ -230,6 +230,15 @@ public:
                    Identifier name,
                    SmallVectorImpl<TypeDecl *> *otherConcreteTypes = nullptr);
 
+    /// Retrieve the "anchor" type that canonically describes this equivalence
+    /// class, for use in the canonical type.
+    Type getAnchor(ArrayRef<GenericTypeParamType *> genericParams);
+
+    /// \brief Retrieve (or build) the contextual type corresponding to
+    /// this equivalence class within the given generic environment.
+    Type getTypeInContext(GenericSignatureBuilder &builder,
+                          GenericEnvironment *genericEnv);
+
     /// Dump a debugging representation of this equivalence class.
     void dump(llvm::raw_ostream &out) const;
 
@@ -587,6 +596,9 @@ public:
                       SourceLoc loc,
                       bool allowConcreteGenericParams = false) &&;
 
+  /// Compute the requirement signature for the given protocol.
+  static GenericSignature *computeRequirementSignature(ProtocolDecl *proto);
+
 private:
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
@@ -698,6 +710,7 @@ private:
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
+public:
   /// \brief Resolve the given type to the potential archetype it names.
   ///
   /// The \c resolutionKind parameter describes how resolution should be
@@ -713,7 +726,6 @@ private:
   resolvePotentialArchetype(Type type,
                             ArchetypeResolutionKind resolutionKind);
 
-public:
   /// \brief Resolve the equivalence class for the given type parameter,
   /// which provides information about that type.
   ///
@@ -728,18 +740,6 @@ public:
   EquivalenceClass *resolveEquivalenceClass(
                       Type type,
                       ArchetypeResolutionKind resolutionKind);
-
-  /// \brief Resolve the given type to the potential archetype it names.
-  ///
-  /// The \c resolutionKind parameter describes how resolution should be
-  /// performed. If the potential archetype named by the given dependent type
-  /// already exists, it will be always returned. If it doesn't exist yet,
-  /// the \c resolutionKind dictates whether the potential archetype will
-  /// be created or whether null will be returned.
-  ///
-  /// For any type that cannot refer to an archetype, this routine returns null.
-  PotentialArchetype *resolveArchetype(Type type,
-                                       ArchetypeResolutionKind resolutionKind);
 
   /// \brief Resolve the given type as far as this Builder knows how.
   ///
@@ -1683,11 +1683,6 @@ public:
                         Identifier name,
                         ProtocolDecl *protocol,
                         ArchetypeResolutionKind kind);
-
-  /// \brief Retrieve (or build) the type corresponding to the potential
-  /// archetype within the given generic environment.
-  Type getTypeInContext(GenericSignatureBuilder &builder,
-                        GenericEnvironment *genericEnv);
 
   /// Retrieve the dependent type that describes this potential
   /// archetype.
