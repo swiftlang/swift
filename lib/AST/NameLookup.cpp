@@ -29,6 +29,10 @@
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
+
+#define DEBUG_TYPE "namelookup"
 
 using namespace swift;
 
@@ -1201,6 +1205,11 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     guard = s->getFrontendRecursiveSharedTimers()
                 .NominalTypeDecl__lookupDirect.getGuard();
   }
+
+  DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
+        << ", lookupTable.getInt()=" << LookupTable.getInt()
+        << ", hasLazyMembers()=" << hasLazyMembers()
+        << "\n");
 
   if (ctx.LangOpts.NamedLazyMemberLoading &&
       !LookupTable.getInt() &&
