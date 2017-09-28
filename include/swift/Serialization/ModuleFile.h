@@ -700,6 +700,11 @@ public:
   virtual void loadAllMembers(Decl *D,
                               uint64_t contextData) override;
 
+  virtual bool
+  loadNamedMembers(const Decl *D, DeclName N,
+                   uint64_t contextData,
+                   TinyPtrVector<ValueDecl *> &Members) override;
+
   virtual void
   loadAllConformances(const Decl *D, uint64_t contextData,
                     SmallVectorImpl<ProtocolConformance*> &Conforms) override;
