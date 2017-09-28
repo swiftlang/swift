@@ -54,20 +54,45 @@ extension BenchResults : CustomStringConvertible {
 }
 
 struct Test {
-  let name: String
+  let benchInfo: BenchmarkInfo
   let index: Int
-  let f: (Int) -> ()
-  let run: Bool
-  let tags: [BenchmarkCategory]
+
+  /// The name of the benchmark.
+  var name: String {
+    return benchInfo.name
+  }
+
+  /// The "main routine" of the benchmark.
+  var runFunction: (Int) -> () {
+    return benchInfo.runFunction
+  }
+
+  /// The benchmark categories that this test belongs to. Used for filtering.
+  var tags: [BenchmarkCategory] {
+    return benchInfo.tags
+  }
+
+  /// An optional initialization function for a benchmark that is run before
+  /// measuring begins. Intended to be used to initialize global data used in
+  /// a benchmark.
+  var setUpFunction: (() -> ())? {
+    return benchInfo.setUpFunction
+  }
+
+  /// An optional deinitialization function that if non-null is run /after/ a
+  /// measurement has been taken.
+  var tearDownFunction: (() -> ())? {
+    return benchInfo.tearDownFunction
+  }
 }
 
 // Legacy test dictionaries.
-public var precommitTests: [String : ((Int) -> (), [BenchmarkCategory])] = [:]
-public var otherTests: [String : ((Int) -> (), [BenchmarkCategory])] = [:]
-public var stringTests: [String : ((Int) -> (), [BenchmarkCategory])] = [:]
+public var precommitTests: [BenchmarkInfo] = []
+public var otherTests: [BenchmarkInfo] = []
+public var stringTests: [BenchmarkInfo] = []
 
 // We should migrate to a collection of BenchmarkInfo.
-public var registeredBenchmarks = [TestsUtils.BenchmarkInfo]()
+public var registeredBenchmarks: [BenchmarkInfo] = []
 
 enum TestAction {
   case run
@@ -200,41 +225,64 @@ struct TestConfig {
   }
 
   mutating func findTestsToRun() {
-    var allTests: [(key: String, value: ((Int) -> (), [BenchmarkCategory]))]
+    // Begin by creating a set of our non-legacy registeredBenchmarks
+    var allTests = Set<BenchmarkInfo>(registeredBenchmarks)
 
+    // If we are supposed to only run registered tests there isn't anything
+    // further to do (in the future anyways).
     if onlyRegistered {
-      allTests = registeredBenchmarks.map {
-        bench -> (key: String, value: ((Int) -> (), [BenchmarkCategory])) in
-        (bench.name, (bench.runFunction, bench.tags))
-      }
       // FIXME: for now unstable/extra benchmarks are not registered at all, but
       // soon they will be handled with a default exclude list.
       onlyPrecommit = false
-    }
-    else {
-      allTests = [precommitTests, otherTests, stringTests]
-        .map { dictionary -> [(key: String, value: ((Int) -> (), [BenchmarkCategory]))] in
-          Array(dictionary).sorted { $0.key < $1.key } } // by name
-        .flatMap { $0 }
+    } else {
+      // Merge legacy benchmark info into allTests. If we already have a
+      // registered benchmark info, formUnion leaves this alone. This allows for
+      // us to perform incremental work.
+      for testList in [precommitTests, otherTests, stringTests] {
+        allTests.formUnion(testList)
+      }
     }
 
-    let filteredTests = allTests.filter { pair in tags.isSubset(of: pair.value.1)}
+    let benchmarkNameFilter: Set<String>? = {
+      if !filters.isEmpty {
+        return Set(filters)
+      }
+
+      if onlyPrecommit {
+        return Set(precommitTests.map { $0.name })
+      }
+
+      return nil
+    }()
+
+    // t is needed so we don't capture an ivar of a mutable inout self.
+    let t = tags
+    var filteredTests = allTests.filter {
+      benchInfo in
+      if !t.isSubset(of: benchInfo.tags) {
+        return false
+      }
+
+      // If the user did not specified a benchmark name filter and our tags are
+      // a subset of the specified tags by the user, return true. We want to run
+      // this test.
+      guard let benchFilter = benchmarkNameFilter else {
+        return true
+      }
+
+      // Otherwise, we need to check if our benchInfo's name is in the benchmark
+      // name filter list. If it isn't, then we shouldn't process it.
+      return benchFilter.contains(benchInfo.name)
+    }.map { $0 }.sorted()
+
     if (filteredTests.isEmpty) {
-      return;
+      return
     }
-
-    let included =
-      !filters.isEmpty ? Set(filters)
-      : onlyPrecommit ? Set(precommitTests.keys)
-      : Set(filteredTests.map { $0.key })
 
     tests = zip(1...filteredTests.count, filteredTests).map {
       t -> Test in
-      let (ordinal, (key: name, value: funcAndTags)) = t
-      return Test(name: name, index: ordinal, f: funcAndTags.0,
-                  run: included.contains(name)
-                    || included.contains(String(ordinal)),
-                  tags: funcAndTags.1)
+      let (ordinal, benchInfo) = t
+      return Test(benchInfo: benchInfo, index: ordinal)
     }
   }
 }
@@ -340,12 +388,11 @@ class SampleRunner {
 }
 
 /// Invoke the benchmark entry point and return the run time in milliseconds.
-func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResults {
-
+func runBench(_ test: Test, _ c: TestConfig) -> BenchResults {
   var samples = [UInt64](repeating: 0, count: c.numSamples)
 
   if c.verbose {
-    print("Running \(name) for \(c.numSamples) samples.")
+    print("Running \(test.name) for \(c.numSamples) samples.")
   }
 
   let sampler = SampleRunner()
@@ -355,7 +402,10 @@ func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResu
     var scale : UInt
     var elapsed_time : UInt64 = 0
     if c.fixedNumIters == 0 {
-      elapsed_time = sampler.run(name, fn: fn, num_iters: 1)
+      test.setUpFunction?()
+      elapsed_time = sampler.run(test.name, fn: test.runFunction, num_iters: 1)
+      test.tearDownFunction?()
+
       if elapsed_time > 0 {
         scale = UInt(time_per_sample / elapsed_time)
       } else {
@@ -374,7 +424,9 @@ func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResu
       if c.verbose {
         print("    Measuring with scale \(scale).")
       }
-      elapsed_time = sampler.run(name, fn: fn, num_iters: scale)
+      test.setUpFunction?()
+      elapsed_time = sampler.run(test.name, fn: test.runFunction, num_iters: scale)
+      test.tearDownFunction?()
     } else {
       scale = 1
     }
@@ -405,9 +457,7 @@ func printRunInfo(_ c: TestConfig) {
     print("Tests Filter: \(c.filters)")
     print("Tests to run: ", terminator: "")
     for t in c.tests {
-      if t.run {
-        print("\(t.name), ", terminator: "")
-      }
+      print("\(t.name), ", terminator: "")
     }
     print("")
     print("")
@@ -422,14 +472,8 @@ func runBenchmarks(_ c: TestConfig) {
   sumBenchResults.sampleCount = 0
 
   for t in c.tests {
-    if !t.run {
-      continue
-    }
-    let benchIndex = t.index
-    let benchName = t.name
-    let benchFunc = t.f
-    let results = runBench(benchName, benchFunc, c)
-    print("\(benchIndex)\(c.delim)\(benchName)\(c.delim)\(results.description)")
+    let results = runBench(t, c)
+    print("\(t.index)\(c.delim)\(t.name)\(c.delim)\(results.description)")
     fflush(stdout)
 
     sumBenchResults.min += results.min
@@ -456,7 +500,7 @@ public func main() {
     case .listTests:
       config.findTestsToRun()
       print("Enabled Tests\(config.delim)Tags")
-      for t in config.tests where t.run == true {
+      for t in config.tests {
         print("\(t.name)\(config.delim)\(t.tags)")
       }
     case .run:
