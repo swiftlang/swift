@@ -1195,10 +1195,35 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
   RecursiveSharedTimer::Guard guard;
-  if (auto s = getASTContext().Stats) {
+  ASTContext &ctx = getASTContext();
+  if (auto s = ctx.Stats) {
     ++s->getFrontendCounters().NominalTypeLookupDirectCount;
     guard = s->getFrontendRecursiveSharedTimers()
                 .NominalTypeDecl__lookupDirect.getGuard();
+  }
+
+  if (ctx.LangOpts.NamedLazyMemberLoading &&
+      !LookupTable.getInt() &&
+      hasLazyMembers()) {
+    // The lookup table (containing all loaded members) has not yet been built;
+    // we *might* be able to avoid loading all members, just focus on the ones
+    // matching the name we were asked for.
+    TinyPtrVector<ValueDecl *> results;
+    auto contextInfo =
+        ctx.getOrCreateLazyIterableContextData(this,
+                                               /*lazyLoader=*/nullptr);
+    if (contextInfo->loader->loadNamedMembers(this, name,
+                                              contextInfo->memberData,
+                                              results)) {
+      if (auto s = ctx.Stats) {
+        ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
+      }
+    } else {
+      if (auto s = ctx.Stats) {
+        ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
+      }
+      return results;
+    }
   }
 
   (void)getMembers();
