@@ -169,3 +169,6 @@ class SR_5245 {
 
 SR_5245(s: SR_5245.S(f: [.e1, .e2]))
 // expected-error@-1 {{incorrect argument label in call (have 'f:', expected 'e:')}} {{22-23=e}}
+
+// rdar://problem/34670592 - Compiler crash on heterogeneous collection literal
+_ = Array([1, "hello"]) // Ok
