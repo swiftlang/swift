@@ -286,6 +286,8 @@ internal struct _SliceBuffer<Element>
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
+  @_inlineable
+  @_versioned
   internal subscript(position: Int) -> Element {
     get {
       return getElement(position)

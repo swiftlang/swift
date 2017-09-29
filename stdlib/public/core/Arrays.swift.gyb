@@ -453,6 +453,31 @@ if True:
     raise ValueError('Unhandled case: ' + Self)
 }%
 
+
+@_fixed_layout
+public struct ${Self}Iterator<Element>: IteratorProtocol, Sequence {
+  @_versioned
+  var _buffer: ${Self}<Element>._Buffer
+  @_versioned
+  var _position: Int
+  @_versioned
+  var _end: Int
+  @_inlineable
+  @_versioned
+  init(_elements: ${Self}<Element>) {
+    self._buffer = _elements._buffer
+    _position = _elements.startIndex
+    _end = _elements.endIndex
+  }
+  @_inlineable
+  mutating public func next() -> Element? {
+    guard _position != _end else { return nil }
+    defer { _position += 1 }
+    return _buffer[_position]
+  }
+}
+
+
 ${SelfDocComment}
 @_fixed_layout
 public struct ${Self}<Element>
@@ -462,7 +487,7 @@ public struct ${Self}<Element>
 {
 
   public typealias Index = Int
-  public typealias Iterator = IndexingIterator<${Self}>
+  public typealias Iterator = ${Self}Iterator<Element>
 
 %if Self == 'ArraySlice':
   /// The position of the first element in a nonempty array.
@@ -537,6 +562,10 @@ public struct ${Self}<Element>
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
     return i - 1
+  }
+  
+  public func makeIterator() -> ${Self}Iterator<Element> {
+    return ${Self}Iterator(_elements: self)
   }
 
   @_inlineable
@@ -1794,7 +1823,7 @@ extension ${Self} {
       }
     }
 
-    var it = IndexingIterator(_elements: self)
+    var it = Iterator(_elements: self)
     it._position = endIndex
     return (it,buffer.index(buffer.startIndex, offsetBy: self.count))
   }
