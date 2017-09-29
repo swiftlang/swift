@@ -221,7 +221,7 @@ ERROR(missing_never_call,none,
       "call to another never-returning function on all paths",
       (Type, unsigned))
 ERROR(guard_body_must_not_fallthrough,none,
-      "'guard' body may not fall through, consider using a 'return' or 'throw'"
+      "'guard' body must not fall through, consider using a 'return' or 'throw'"
       " to exit the scope", ())
 WARNING(unreachable_code,none, "will never be executed", ())
 NOTE(unreachable_code_branch,none,
