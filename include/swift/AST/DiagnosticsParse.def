@@ -316,7 +316,7 @@ ERROR(expected_type_in_typealias,PointsToFirstBadToken,
 ERROR(expected_type_in_associatedtype,PointsToFirstBadToken,
       "expected type in associated type declaration", ())
 ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
-      "associated types may not have a generic parameter list", ())
+      "associated types must not have a generic parameter list", ())
 
 
 // Func
