@@ -1415,6 +1415,14 @@ public:
                            TypeResolutionOptions options = None,
                            GenericTypeResolver *resolver = nullptr);
 
+  /// Validate the given requirements.
+  void validateRequirements(SourceLoc whereLoc,
+                            MutableArrayRef<RequirementRepr> requirements,
+                            DeclContext *dc,
+                            TypeResolutionOptions options,
+                            GenericTypeResolver *resolver,
+                            GenericSignatureBuilder *builder = nullptr);
+
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
   ///
