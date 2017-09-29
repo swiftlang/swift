@@ -2309,7 +2309,7 @@ ERROR(lazy_requires_single_var,none,
 ERROR(lazy_must_be_property,none,
       "lazy is only valid for members of a struct or class", ())
 ERROR(lazy_not_observable,none,
-      "lazy properties may not have observers", ())
+      "lazy properties must not have observers", ())
 
 // Debugger function attribute.
 ERROR(attr_for_debugger_support_only,none,
