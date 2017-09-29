@@ -205,7 +205,7 @@ ERROR(immutable_value_passed_inout,none,
       "immutable value '%0' must not be passed inout",
       (StringRef))
 ERROR(assignment_to_immutable_value,none,
-      "immutable value '%0' may not be assigned to",
+      "immutable value '%0' must not be assigned to",
       (StringRef))
 ERROR(mutating_protocol_witness_method_on_let_constant,none,
       "cannot perform mutating operation: '%0' is a 'let' constant",
