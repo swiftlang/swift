@@ -3310,6 +3310,10 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
   ProtocolDeclBits.ExistentialTypeSupportedValid = true;
   ProtocolDeclBits.ExistentialTypeSupported = true;
 
+  // ObjC protocols can always be existential.
+  if (isObjC())
+    return true;
+
   // Resolve the protocol's type.
   if (resolver && !hasInterfaceType())
     resolver->resolveDeclSignature(this);
