@@ -269,7 +269,7 @@ ERROR(expected_accessor_kw,none,
 ERROR(var_set_without_get,none,
       "variable with a setter must also have a getter", ())
 ERROR(observingproperty_with_getset,none,
-      "%select{willSet|didSet}0 variable may not also have a "
+      "%select{willSet|didSet}0 variable must not also have a "
       "%select{get|set}1 specifier", (unsigned, unsigned))
 ERROR(observingproperty_without_mutableaddress,none,
       "%select{willSet|didSet}0 variable with addressor must provide a "
