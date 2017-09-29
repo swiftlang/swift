@@ -2274,6 +2274,12 @@ void swift::trySpecializeApplyOfGeneric(
   if (F->isSerialized() && RefF->isSerialized())
     Serialized = IsSerializable;
 
+  // If it is OnoneSupport consider all specializations as serialized.
+  // It is important to set this flag here, because it affects the
+  // mangling of the specialization's name.
+  if (Apply.getModule().isOptimizedOnoneSupportModule())
+    Serialized = IsSerialized;
+
   ReabstractionInfo ReInfo(Apply, RefF, Apply.getSubstitutions());
   if (!ReInfo.canBeSpecialized())
     return;
@@ -2440,8 +2446,7 @@ static bool linkSpecialization(SILModule &M, SILFunction *F) {
   // Do not remove functions that are known prespecializations.
   // Keep them around. Change their linkage to public, so that other
   // applications can refer to them.
-  if (M.getOptions().Optimization >= SILOptions::SILOptMode::Optimize &&
-      F->getModule().getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT) {
+  if (M.isOptimizedOnoneSupportModule()) {
     if (isKnownPrespecialization(F->getName())) {
       keepSpecializationAsPublic(F);
       return true;

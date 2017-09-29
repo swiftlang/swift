@@ -581,7 +581,7 @@ bb0(%0 : $*T):
 
 // Check that a public specialization for Int64 was produced.
 // specialized exportSpecializations<A> (A) -> ()
-// CHECK-DEADFUNCELIM-LABEL: sil @_T016eager_specialize21exportSpecializationsyxlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> ()
+// CHECK-DEADFUNCELIM-LABEL: sil [serialized] @_T016eager_specialize21exportSpecializationsyxlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> ()
 
 ////////////////////////////////////////////////////////////////////
 // Check the ability to produce explicit partial specializations.
