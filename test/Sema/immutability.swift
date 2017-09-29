@@ -488,11 +488,11 @@ struct F { // expected-note 1 {{in declaration of 'F'}}
   mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{expected declaration}}
   }
   
-  mutating nonmutating func g() {}  // expected-error {{method may not be declared both mutating and nonmutating}}
-  __consuming nonmutating func h() {}  // expected-error {{method may not be declared both __consuming and nonmutating}}
-  __consuming mutating func i() {}  // expected-error {{method may not be declared both __consuming and mutating}}
-  nonmutating mutating func j() {}  // expected-error {{method may not be declared both nonmutating and mutating}}
-  __consuming nonmutating mutating func k() {}  // expected-error {{method may not be declared both __consuming and mutating}} expected-error {{method may not be declared both nonmutating and mutating}}
+  mutating nonmutating func g() {}  // expected-error {{method must not be declared both mutating and nonmutating}}
+  __consuming nonmutating func h() {}  // expected-error {{method must not be declared both __consuming and nonmutating}}
+  __consuming mutating func i() {}  // expected-error {{method must not be declared both __consuming and mutating}}
+  nonmutating mutating func j() {}  // expected-error {{method must not be declared both nonmutating and mutating}}
+  __consuming nonmutating mutating func k() {}  // expected-error {{method must not be declared both __consuming and mutating}} expected-error {{method must not be declared both nonmutating and mutating}}
 }
 
 protocol SingleIntProperty {
