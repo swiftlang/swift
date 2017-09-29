@@ -96,6 +96,7 @@ import ProtocolDispatch2
 import RC4
 import RGBHistogram
 import RangeAssignment
+import RangeIteration
 import RecursiveOwnedParameter
 import ReduceInto
 import ReversedCollections
@@ -214,6 +215,7 @@ registerBenchmark(ProtocolDispatch2)
 registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
 registerBenchmark(RangeAssignment)
+registerBenchmark(RangeIteration)
 registerBenchmark(RecursiveOwnedParameter)
 registerBenchmark(ReduceInto)
 registerBenchmark(ReversedCollections)
