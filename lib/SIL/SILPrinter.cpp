@@ -908,7 +908,7 @@ public:
 #define INST(ID, PARENT) \
     case SILNodeKind::ID:
 #include "swift/SIL/SILNodes.def"
-      print(cast<SingleValueInstruction>(node));
+      print(cast<SILInstruction>(node));
       return;
 
     // TODO: MultiValueInstruction
