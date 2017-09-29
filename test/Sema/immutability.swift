@@ -119,7 +119,7 @@ struct SomeStruct {
   
   static let type_let = 5  // expected-note {{change 'let' to 'var' to make it mutable}} {{10-13=var}}
 
-  mutating static func f() {  // expected-error {{static functions may not be declared mutating}} {{3-12=}}
+  mutating static func f() {  // expected-error {{static functions must not be declared mutating}} {{3-12=}}
   }
   
   mutating func g() {
