@@ -1017,7 +1017,7 @@ ERROR(mutating_invalid_classes,none,
       "classes or class-bound protocols", (bool))
 
 ERROR(functions_mutating_and_not,none,
-      "method may not be declared both "
+      "method must not be declared both "
       "%select{nonmutating|mutating|__consuming}0 and "
       "%select{nonmutating|mutating|__consuming}1",
       (unsigned, unsigned))
