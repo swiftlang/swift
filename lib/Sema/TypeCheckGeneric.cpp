@@ -411,20 +411,24 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   }
 
   // Revert the requirements of the generic parameter list.
-  for (auto &req : genericParams->getRequirements()) {
+  revertGenericRequirements(genericParams->getRequirements());
+}
+
+void TypeChecker::revertGenericRequirements(
+                                MutableArrayRef<RequirementRepr> requirements) {
+  for (auto &req : requirements) {
     if (req.isInvalid())
       continue;
 
     switch (req.getKind()) {
-    case RequirementReprKind::TypeConstraint: {
-      revertDependentTypeLoc(req.getSubjectLoc());
+    case RequirementReprKind::TypeConstraint:
       revertDependentTypeLoc(req.getConstraintLoc());
-      break;
-    }
-    case RequirementReprKind::LayoutConstraint: {
+      LLVM_FALLTHROUGH;
+
+    case RequirementReprKind::LayoutConstraint:
       revertDependentTypeLoc(req.getSubjectLoc());
       break;
-    }
+
     case RequirementReprKind::SameType:
       revertDependentTypeLoc(req.getFirstTypeLoc());
       revertDependentTypeLoc(req.getSecondTypeLoc());

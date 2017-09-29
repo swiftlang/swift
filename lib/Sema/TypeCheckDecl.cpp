@@ -244,22 +244,24 @@ void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
   ITC.satisfy(requestTypeCheckRawType(enumDecl));
 }
 
-void TypeChecker::validateWhereClauses(ProtocolDecl *protocol) {
-  ProtocolRequirementTypeResolver resolver;
+void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
+                                       GenericTypeResolver *resolver) {
   TypeResolutionOptions options;
 
   if (auto whereClause = protocol->getTrailingWhereClause()) {
+    revertGenericRequirements(whereClause->getRequirements());
     validateRequirements(whereClause->getWhereLoc(),
                          whereClause->getRequirements(), protocol,
-                         options, &resolver);
+                         options, resolver);
   }
 
   for (auto member : protocol->getMembers()) {
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       if (auto whereClause = assocType->getTrailingWhereClause()) {
+        revertGenericRequirements(whereClause->getRequirements());
         validateRequirements(whereClause->getWhereLoc(),
                              whereClause->getRequirements(),
-                             protocol, options, &resolver);
+                             protocol, options, resolver);
       }
     }
   }
@@ -269,7 +271,8 @@ void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {
   IterativeTypeChecker ITC(*this);
   ITC.satisfy(requestInheritedProtocols(protocol));
 
-  validateWhereClauses(protocol);
+  ProtocolRequirementTypeResolver resolver;
+  validateWhereClauses(protocol, &resolver);
 }
 
 void TypeChecker::resolveInheritanceClause(
@@ -4724,7 +4727,6 @@ public:
 
     if (!IsSecondPass) {
       checkUnsupportedNestedType(PD);
-      TC.validateWhereClauses(PD);
     }
 
     if (IsSecondPass) {
@@ -4734,6 +4736,9 @@ public:
         checkAccessControl(TC, member);
       }
       TC.checkInheritanceClause(PD);
+
+      GenericTypeToArchetypeResolver resolver(PD);
+      TC.validateWhereClauses(PD, &resolver);
       return;
     }
 
