@@ -470,7 +470,7 @@ public protocol _BitwiseOperations {
   ///
   /// [identity element]:http://en.wikipedia.org/wiki/Identity_element
   /// [fixed point]:http://en.wikipedia.org/wiki/Fixed_point_(mathematics)
-  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0 or init() of a type conforming to FixedWidthInteger")
+  @available(swift, deprecated: 3.1, obsoleted: 4.1, message: "Use 0 or init() of a type conforming to FixedWidthInteger")
   static var allZeros: Self { get }
 }
 
