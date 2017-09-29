@@ -1452,6 +1452,11 @@ ERROR(witness_requires_dynamic_self,none,
       "method %0 in non-final class %1 must return `Self` to conform to "
       "protocol %2",
       (DeclName, Type, Type))
+ERROR(witness_requires_class_implementation,none,
+      "method %0 in non-final class %1 cannot be implemented in a "
+      "protocol extension because it returns `Self` and has associated type "
+      "requirements",
+      (DeclName, Type))
 ERROR(witness_not_accessible_proto,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be declared "
