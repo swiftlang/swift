@@ -363,9 +363,9 @@ ERROR(expected_rbrace_protocol,none,
 ERROR(protocol_setter_name,none,
       "setter in a protocol cannot have a name", ())
 ERROR(protocol_method_with_body,none,
-      "protocol methods may not have bodies", ())
+      "protocol methods must not have bodies", ())
 ERROR(protocol_init_with_body,none,
-      "protocol initializers may not have bodies", ())
+      "protocol initializers must not have bodies", ())
 
 // Subscripting
 ERROR(subscript_decl_wrong_scope,none,
