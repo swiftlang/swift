@@ -2,10 +2,10 @@
 
 lazy func lazy_func() {} // expected-error {{'lazy' may only be used on 'var' declarations}} {{1-6=}}
 
-lazy var b = 42  // expected-error {{'lazy' may not be used on an already-lazy global}} {{1-6=}}
+lazy var b = 42  // expected-error {{'lazy' must not be used on an already-lazy global}} {{1-6=}}
 
 struct S {
-  lazy static var lazy_global = 42 // expected-error {{'lazy' may not be used on an already-lazy global}} {{3-8=}}
+  lazy static var lazy_global = 42 // expected-error {{'lazy' must not be used on an already-lazy global}} {{3-8=}}
 }
 
 protocol SomeProtocol {

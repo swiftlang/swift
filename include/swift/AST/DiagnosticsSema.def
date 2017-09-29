@@ -2297,7 +2297,7 @@ ERROR(lazy_not_on_computed,none,
       "'lazy' must not be used on a computed property", ())
 
 ERROR(lazy_on_already_lazy_global,none,
-      "'lazy' may not be used on an already-lazy global", ())
+      "'lazy' must not be used on an already-lazy global", ())
 ERROR(lazy_not_in_protocol,none,
       "'lazy' isn't allowed on a protocol requirement", ())
 ERROR(lazy_requires_initializer,none,
