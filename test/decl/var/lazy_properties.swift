@@ -21,7 +21,7 @@ class TestClass {
 
   lazy let b = 42  // expected-error {{'lazy' cannot be used on a let}} {{3-8=}}
 
-  lazy var c : Int { return 42 } // expected-error {{'lazy' may not be used on a computed property}} {{3-8=}}
+  lazy var c : Int { return 42 } // expected-error {{'lazy' must not be used on a computed property}} {{3-8=}}
 
   lazy var d : Int  // expected-error {{lazy properties must have an initializer}} {{3-8=}}
 
