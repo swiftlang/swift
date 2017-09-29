@@ -3150,13 +3150,12 @@ namespace {
         B.addNullPointer(IGM.FunctionPtrTy);
       }
     }
-    
+
     void addNominalTypeDescriptor() {
-      auto descriptor =
-        ClassNominalTypeDescriptorBuilder(IGM, Target).emit();
-      B.addFarRelativeAddress(descriptor);
+      auto descriptor = ClassNominalTypeDescriptorBuilder(IGM, Target).emit();
+      B.add(descriptor);
     }
-    
+
     void addIVarDestroyer() {
       auto dtorFunc = IGM.getAddrOfIVarInitDestroy(Target,
                                                    /*isDestroyer=*/ true,
@@ -4416,9 +4415,8 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      llvm::Constant *descriptor =
-        StructNominalTypeDescriptorBuilder(IGM, Target).emit();
-      B.addFarRelativeAddress(descriptor);
+      auto *descriptor = StructNominalTypeDescriptorBuilder(IGM, Target).emit();
+      B.add(descriptor);
     }
 
     void addFieldOffset(VarDecl *var) {
@@ -4596,12 +4594,10 @@ public:
                   : MetadataKind::Enum;
     B.addInt(IGM.MetadataKindTy, unsigned(kind));
   }
-  
+
   void addNominalTypeDescriptor() {
-    auto descriptor =
-      EnumNominalTypeDescriptorBuilder(IGM, Target).emit();
-    
-    B.addFarRelativeAddress(descriptor);
+    auto descriptor = EnumNominalTypeDescriptorBuilder(IGM, Target).emit();
+    B.add(descriptor);
   }
 
   void addGenericArgument(CanType type) {

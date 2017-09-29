@@ -1182,23 +1182,19 @@ private:
     return MetadataRef(address, metadata);
   }
 
-  StoredPointer readAddressOfNominalTypeDescriptor(MetadataRef &metadata,
-                                        bool skipArtificialSubclasses = false) {
+  StoredPointer
+  readAddressOfNominalTypeDescriptor(MetadataRef &metadata,
+                                     bool skipArtificialSubclasses = false) {
     switch (metadata->getKind()) {
     case MetadataKind::Class: {
       auto classMeta = cast<TargetClassMetadata<Runtime>>(metadata);
       while (true) {
-        auto descriptorAddress =
-          resolveNullableRelativeOffset<StoredPointer>(metadata.getAddress() +
-                                         classMeta->offsetToDescriptorOffset());
-
-        // Propagate errors reading the offset.
-        if (!descriptorAddress) return 0;
+        auto descriptorAddress = classMeta->getDescription();
 
         // If this class has a null descriptor, it's artificial,
         // and we need to skip it upon request.  Otherwise, we're done.
-        if (*descriptorAddress || !skipArtificialSubclasses)
-          return *descriptorAddress;
+        if (descriptorAddress || !skipArtificialSubclasses)
+          return static_cast<uintptr_t>(descriptorAddress);
 
         auto superclassMetadataAddress = classMeta->SuperClass;
         if (!superclassMetadataAddress)
@@ -1207,8 +1203,8 @@ private:
         auto superMeta = readMetadata(superclassMetadataAddress);
         if (!superMeta)
           return 0;
-        auto superclassMeta =
-          dyn_cast<TargetClassMetadata<Runtime>>(superMeta);
+
+        auto superclassMeta = dyn_cast<TargetClassMetadata<Runtime>>(superMeta);
         if (!superclassMeta)
           return 0;
 
@@ -1221,8 +1217,7 @@ private:
     case MetadataKind::Optional:
     case MetadataKind::Enum: {
       auto valueMeta = cast<TargetValueMetadata<Runtime>>(metadata);
-      return resolveRelativeOffset<StoredPointer>(metadata.getAddress() +
-                                       valueMeta->offsetToDescriptorOffset());
+      return reinterpret_cast<uintptr_t>(valueMeta->getDescription());
     }
 
     default:

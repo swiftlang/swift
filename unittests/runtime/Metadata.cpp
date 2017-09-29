@@ -300,8 +300,8 @@ TEST(MetadataTest, getGenericMetadata) {
       auto fields = reinterpret_cast<void * const *>(inst);
 
       EXPECT_EQ(MetadataKind::Struct, inst->getKind());
-      EXPECT_EQ((const NominalTypeDescriptor*)&Global1,
-                inst->Description.get());
+      EXPECT_EQ(reinterpret_cast<const NominalTypeDescriptor *>(&Global1),
+                inst->Description);
 
       EXPECT_EQ(&Global2, fields[2]);
 
@@ -318,8 +318,8 @@ TEST(MetadataTest, getGenericMetadata) {
 
       auto fields = reinterpret_cast<void * const *>(inst);
       EXPECT_EQ(MetadataKind::Struct, inst->getKind());
-      EXPECT_EQ((const NominalTypeDescriptor*)&Global1,
-                inst->Description.get());
+      EXPECT_EQ(reinterpret_cast<const NominalTypeDescriptor *>(&Global1),
+                inst->Description);
 
       EXPECT_EQ(&Global3, fields[2]);
 

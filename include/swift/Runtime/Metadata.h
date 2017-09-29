@@ -966,9 +966,7 @@ public:
 
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
-  const ConstTargetFarRelativeDirectPointer<Runtime,
-                                            TargetNominalTypeDescriptor,
-                                            /*nullable*/ true> &
+  ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
   getNominalTypeDescriptor() const {
     switch (getKind()) {
     case MetadataKind::Class: {
@@ -982,7 +980,8 @@ public:
     case MetadataKind::Struct:
     case MetadataKind::Enum:
     case MetadataKind::Optional:
-      return static_cast<const TargetStructMetadata<Runtime> *>(this)->Description;
+      return static_cast<const TargetStructMetadata<Runtime> *>(this)
+          ->Description;
     case MetadataKind::ForeignClass:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
@@ -999,7 +998,7 @@ public:
 
     swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
-  
+
   /// Get the generic metadata pattern from which this generic type instance was
   /// instantiated, or null if the type is not generic.
   const TargetGenericMetadata<Runtime> *getGenericPattern() const;
@@ -1380,20 +1379,16 @@ struct TargetClassMetadata : public TargetHeapMetadata<Runtime> {
       Description(nullptr), IVarDestroyer(ivarDestroyer) {}
 
   // Description's copy ctor is deleted so we have to do this the hard way.
-  TargetClassMetadata(const TargetClassMetadata& other)
-    : TargetHeapMetadata<Runtime>(other),
-      SuperClass(other.SuperClass),
-      CacheData{other.CacheData[0], other.CacheData[1]},
-      Data(other.Data),
-      Flags(other.Flags),
-      InstanceAddressPoint(other.InstanceAddressPoint),
-      InstanceSize(other.InstanceSize),
-      InstanceAlignMask(other.InstanceAlignMask),
-      Reserved(other.Reserved),
-      ClassSize(other.ClassSize),
-      ClassAddressPoint(other.ClassAddressPoint),
-      Description(other.Description.get()),
-      IVarDestroyer(other.IVarDestroyer) {}
+  TargetClassMetadata(const TargetClassMetadata &other)
+      : TargetHeapMetadata<Runtime>(other),
+        SuperClass(other.SuperClass),
+        CacheData{other.CacheData[0], other.CacheData[1]},
+        Data(other.Data), Flags(other.Flags),
+        InstanceAddressPoint(other.InstanceAddressPoint),
+        InstanceSize(other.InstanceSize),
+        InstanceAlignMask(other.InstanceAlignMask), Reserved(other.Reserved),
+        ClassSize(other.ClassSize), ClassAddressPoint(other.ClassAddressPoint),
+        Description(other.Description), IVarDestroyer(other.IVarDestroyer) {}
 
   /// The metadata for the superclass.  This is null for the root class.
   ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> SuperClass;
@@ -1455,8 +1450,7 @@ private:
   /// if this is an artificial subclass.  We currently provide no
   /// supported mechanism for making a non-artificial subclass
   /// dynamically.
-  ConstTargetFarRelativeDirectPointer<Runtime, TargetNominalTypeDescriptor,
-                                      /*nullable*/ true> Description;
+  ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor> Description;
 
   /// A function for destroying instance variables, used to clean up
   /// after an early return from a constructor.
@@ -1470,15 +1464,12 @@ private:
   //   - "tabulated" virtual methods
 
 public:
-  const ConstTargetFarRelativeDirectPointer<Runtime,
-                                            TargetNominalTypeDescriptor,
-                                            /*nullable*/ true> &
+  ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
   getDescription() const {
     assert(isTypeMetadata());
-    assert(!isArtificialSubclass());
     return Description;
   }
-  
+
   void setDescription(const TargetNominalTypeDescriptor<Runtime> *
                       description) {
     Description = description;
@@ -1581,10 +1572,6 @@ public:
       return nullptr;
     
     return getter(this);
-  }
-
-  StoredPointer offsetToDescriptorOffset() const {
-    return offsetof(TargetClassMetadata<Runtime>, Description);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1749,15 +1736,11 @@ template <typename Runtime>
 struct TargetValueMetadata : public TargetMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   TargetValueMetadata(MetadataKind Kind,
-    ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
-                      description)
-    : TargetMetadata<Runtime>(Kind),
-      Description(description)
-  {}
+                      const TargetNominalTypeDescriptor<Runtime> *description)
+      : TargetMetadata<Runtime>(Kind), Description(description) {}
 
   /// An out-of-line description of the type.
-  ConstTargetFarRelativeDirectPointer<Runtime, TargetNominalTypeDescriptor>
-  Description;
+  const TargetNominalTypeDescriptor<Runtime> *Description;
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Struct
@@ -1777,11 +1760,7 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
   }
 
   const TargetNominalTypeDescriptor<Runtime> *getDescription() const {
-    return Description.get();
-  }
-
-  StoredPointer offsetToDescriptorOffset() const {
-    return offsetof(TargetValueMetadata<Runtime>, Description);
+    return Description;
   }
 };
 using ValueMetadata = TargetValueMetadata<InProcess>;

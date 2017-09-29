@@ -220,7 +220,7 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
     reinterpret_cast<const char*>(pattern->getMetadataTemplate()) +
     pattern->AddressPoint;
   auto patternMetadata = reinterpret_cast<const ValueMetadata*>(patternBytes);
-  metadata->Description = patternMetadata->Description.get();
+  metadata->Description = patternMetadata->Description;
 
   return metadata;
 }
@@ -1300,7 +1300,7 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
   // Copy the class's immediate methods from the nominal type descriptor
   // to the class metadata.
   {
-    auto &description = theClass->getDescription();
+    const auto *description = theClass->getDescription();
     auto &genericParams = description->GenericParams;
 
     auto *classWords = reinterpret_cast<void **>(theClass);
@@ -1325,7 +1325,7 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
   auto *classWords = reinterpret_cast<uintptr_t *>(theClass);
   auto *superWords = reinterpret_cast<const uintptr_t *>(theSuperclass);
   while (ancestor && ancestor->isTypeMetadata()) {
-    auto &description = ancestor->getDescription();
+    const auto *description = ancestor->getDescription();
     auto &genericParams = description->GenericParams;
 
     // Copy the generic requirements.
@@ -2422,10 +2422,9 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
 
 template<> const GenericMetadata *
 Metadata::getGenericPattern() const {
-  auto &ntd = getNominalTypeDescriptor();
-  if (!ntd)
-    return nullptr;
-  return ntd->getGenericMetadataPattern();
+  if (const auto *ntd = getNominalTypeDescriptor())
+    return ntd->getGenericMetadataPattern();
+  return nullptr;
 }
 
 template<> const ClassMetadata *
