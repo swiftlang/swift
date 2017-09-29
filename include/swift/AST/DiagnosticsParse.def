@@ -844,7 +844,7 @@ ERROR(inout_as_attr_disallowed,none,
       "%0 before a parameter name is not allowed, place it before the parameter type instead",
       (StringRef))
 ERROR(parameter_specifier_repeated,none,
-      "parameter may not have multiple '__owned', 'inout', '__shared',"
+      "parameter must not have multiple '__owned', 'inout', '__shared',"
       " 'var', or 'let' specifiers", ())
 ERROR(parameter_let_var_as_attr,none,
       "'%0' as a parameter attribute is not allowed",
