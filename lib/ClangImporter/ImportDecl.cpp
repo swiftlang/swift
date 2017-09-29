@@ -6716,7 +6716,7 @@ void SwiftDeclConverter::importInheritedConstructors(
 
   auto curObjCClass = cast<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
 
-  auto inheritConstructors = [&](DeclRange members,
+  auto inheritConstructors = [&](ArrayRef<ValueDecl *> members,
                                  Optional<CtorInitializerKind> kind) {
     const auto &languageVersion =
         Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
@@ -6816,10 +6816,8 @@ void SwiftDeclConverter::importInheritedConstructors(
   // If we have a superclass, import from it.
   if (auto superclassClangDecl = superclass->getClangDecl()) {
     if (isa<clang::ObjCInterfaceDecl>(superclassClangDecl)) {
-      inheritConstructors(superclass->getMembers(), kind);
-
-      for (auto ext : superclass->getExtensions())
-        inheritConstructors(ext->getMembers(), kind);
+      inheritConstructors(superclass->lookupDirect(Impl.SwiftContext.Id_init),
+                          kind);
     }
   }
 }
