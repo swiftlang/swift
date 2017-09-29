@@ -2192,7 +2192,7 @@ ERROR(attr_only_on_parameters,none,
 ERROR(attr_not_on_variadic_parameters,none,
       "%0 must not be used on variadic parameters", (StringRef))
 ERROR(attr_not_on_subscript_parameters,none,
-      "%0 may not be used on subscript parameters", (StringRef))
+      "%0 must not be used on subscript parameters", (StringRef))
 
 ERROR(override_final,none,
       "%0 overrides a 'final' %1", (DescriptiveDeclKind, DescriptiveDeclKind))
