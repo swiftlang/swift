@@ -1111,3 +1111,11 @@ func elephant<T, U>(_: T) where T : Collection, T.Element == U, T.Element : Hash
 func platypus<T>(a: [T]) {
     _ = elephant(a) // expected-error {{generic parameter 'U' could not be inferred}}
 }
+
+// Another case of the above.
+func badTypes() {
+  let sequence:AnySequence<[Int]> = AnySequence() { AnyIterator() { [3] }}
+  let array = [Int](sequence)
+  // expected-error@-1 {{type of expression is ambiguous without more context}}
+  // FIXME: terrible diagnostic
+}
