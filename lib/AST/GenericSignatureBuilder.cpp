@@ -2946,20 +2946,64 @@ EquivalenceClass *GenericSignatureBuilder::resolveEquivalenceClass(
   return pa->getOrCreateEquivalenceClass();
 }
 
+/// Resolve any unresolved dependent member types using the given builder.
+static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
+                                        Type type,
+                                        ArchetypeResolutionKind kind) {
+  if (!type->hasTypeParameter()) return type;
+
+  return type.transformRec([&builder,kind](TypeBase *type) -> Optional<Type> {
+    if (auto depTy = dyn_cast<DependentMemberType>(type)) {
+      if (depTy->getAssocType()) return None;
+
+      Type newBase =
+        resolveDependentMemberTypes(builder, depTy->getBase(), kind);
+      if (newBase->is<ErrorType>())
+        return ErrorType::get(depTy);
+
+      auto parentEquivClass = builder.resolveEquivalenceClass(newBase, kind);
+      if (!parentEquivClass)
+        return ErrorType::get(depTy);
+
+      auto memberType = parentEquivClass->lookupNestedType(depTy->getName());
+      if (!memberType)
+        return ErrorType::get(depTy);
+
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(memberType))
+        return Type(DependentMemberType::get(newBase, assocType));
+
+      // FIXME: Need to substitute here.
+      return Type(type);
+    }
+
+    return None;
+  });
+}
 auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
                                       FloatingRequirementSource source)
     -> ResolveResult {
   auto pa = paOrT.dyn_cast<PotentialArchetype *>();
   if (auto type = paOrT.dyn_cast<Type>()) {
-    // If it's not a type parameter,
-    if (!type->isTypeParameter())
-      return ResolvedType::forConcreteType(type);
-
     // Determine what kind of resolution we want.
     ArchetypeResolutionKind resolutionKind =
       ArchetypeResolutionKind::WellFormed;
     if (!source.isExplicit() && source.isRecursive(type, *this))
       resolutionKind = ArchetypeResolutionKind::AlreadyKnown;
+
+    // If it's not a type parameter, it won't directly resolve to one.
+    if (!type->isTypeParameter()) {
+      // If there is a type parameter somewhere in this type, resolve it.
+      if (type->hasTypeParameter()) {
+        Type resolved =
+          resolveDependentMemberTypes(*this, type, resolutionKind);
+        if (resolved->hasError() && !type->hasError())
+          return static_cast<EquivalenceClass *>(nullptr);
+
+        type = resolved;
+      }
+
+      return ResolvedType::forConcreteType(type);
+    }
 
     // Attempt to resolve the type parameter to a potential archetype. If this
     // fails, it's because we weren't allowed to resolve anything now.
@@ -5836,39 +5880,6 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
                              nestedTypeNameMatchEdges);
 }
 
-/// Resolve any unresolved dependent member types using the given builder.
-static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
-                                        Type type) {
-  if (!type->hasTypeParameter()) return type;
-
-  return type.transformRec([&builder](TypeBase *type) -> Optional<Type> {
-    if (auto depTy = dyn_cast<DependentMemberType>(type)) {
-      if (depTy->getAssocType()) return None;
-
-      Type newBase = resolveDependentMemberTypes(builder, depTy->getBase());
-
-      auto parentEquivClass =
-        builder.resolveEquivalenceClass(
-                              newBase,
-                              ArchetypeResolutionKind::CompleteWellFormed);
-      if (!parentEquivClass)
-        return ErrorType::get(depTy);
-
-      auto memberType = parentEquivClass->lookupNestedType(depTy->getName());
-      if (!memberType)
-        return ErrorType::get(depTy);
-
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(memberType))
-        return Type(DependentMemberType::get(newBase, assocType));
-
-      // FIXME: This is a weird case, because the type is concrete.
-      return Type(type);
-    }
-
-    return None;
-  });
-}
-
 void GenericSignatureBuilder::checkConcreteTypeConstraints(
                                  ArrayRef<GenericTypeParamType *> genericParams,
                                  PotentialArchetype *representative) {
@@ -5902,7 +5913,8 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
 
   // Resolve any this-far-unresolved dependent types.
   equivClass->concreteType =
-    resolveDependentMemberTypes(*this, equivClass->concreteType);
+    resolveDependentMemberTypes(*this, equivClass->concreteType,
+                                ArchetypeResolutionKind::CompleteWellFormed);
 }
 
 void GenericSignatureBuilder::checkSuperclassConstraints(
@@ -5945,7 +5957,8 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
 
   // Resolve any this-far-unresolved dependent types.
   equivClass->superclass =
-    resolveDependentMemberTypes(*this, equivClass->superclass);
+    resolveDependentMemberTypes(*this, equivClass->superclass,
+                                ArchetypeResolutionKind::CompleteWellFormed);
 
   // If we have a concrete type, check it.
   // FIXME: Substitute into the concrete type.
