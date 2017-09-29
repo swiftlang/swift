@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Frontend/DiagnosticRenderer.h"
+#include "clang/Frontend/FrontendDiagnostic.h"
 #include "clang/Lex/LexDiagnostic.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -36,17 +37,37 @@ namespace {
          callback(fn) {}
 
   private:
+    /// Is this a diagnostic that doesn't do the user any good to show if it
+    /// is located in one of Swift's synthetic buffers? If so, returns true to
+    /// suppress it.
+    static bool shouldSuppressDiagInSwiftBuffers(clang::DiagOrStoredDiag info) {
+      if (info.isNull())
+        return false;
+
+      unsigned ID;
+      if (auto *activeDiag = info.dyn_cast<const clang::Diagnostic *>())
+        ID = activeDiag->getID();
+      else
+        ID = info.get<const clang::StoredDiagnostic *>()->getID();
+      return ID == clang::diag::note_module_import_here ||
+             ID == clang::diag::err_module_not_built;
+    }
+
+    /// Returns true if \p loc is inside one of Swift's synthetic buffers.
+    static bool isInSwiftBuffers(clang::FullSourceLoc loc) {
+      StringRef bufName = StringRef(loc.getManager().getBufferName(loc));
+      return bufName == ClangImporter::Implementation::moduleImportBufferName ||
+             bufName == ClangImporter::Implementation::bridgingHeaderBufferName;
+    }
+
     void emitDiagnosticMessage(clang::FullSourceLoc Loc,
                                clang::PresumedLoc PLoc,
                                clang::DiagnosticsEngine::Level Level,
                                StringRef Message,
                                ArrayRef<clang::CharSourceRange> Ranges,
                                clang::DiagOrStoredDiag Info) override {
-      StringRef bufName = StringRef(Loc.getManager().getBufferName(Loc));
-      if (bufName == ClangImporter::Implementation::moduleImportBufferName ||
-          bufName == ClangImporter::Implementation::bridgingHeaderBufferName) {
+      if (shouldSuppressDiagInSwiftBuffers(Info) && isInSwiftBuffers(Loc))
         return;
-      }
       callback(Loc, Level, Message);
     }
 
@@ -61,8 +82,9 @@ namespace {
 
     void emitNote(clang::FullSourceLoc Loc, StringRef Message) override {
       // We get invalid note locations when trying to describe where a module
-      // is imported and the actual location is in Swift.
-      if (Loc.isInvalid())
+      // is imported and the actual location is in Swift. We also want to ignore
+      // things like "in module X imported from <swift-imported-modules>".
+      if (Loc.isInvalid() || isInSwiftBuffers(Loc))
         return;
       emitDiagnosticMessage(Loc, {}, clang::DiagnosticsEngine::Note, Message,
                             {}, {});
@@ -227,6 +249,7 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
     clang::FullSourceLoc clangDiagLoc(clangDiag.getLocation(),
                                       clangDiag.getSourceManager());
     renderer.emitDiagnostic(clangDiagLoc, clangDiagLevel, message,
-                            clangDiag.getRanges(), clangDiag.getFixItHints());
+                            clangDiag.getRanges(), clangDiag.getFixItHints(),
+                            &clangDiag);
   }
 }
