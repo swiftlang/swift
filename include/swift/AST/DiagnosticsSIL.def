@@ -202,7 +202,7 @@ ERROR(mutating_method_called_on_immutable_value,none,
       " be used on immutable value '%2'",
       (DeclBaseName, unsigned, StringRef))
 ERROR(immutable_value_passed_inout,none,
-      "immutable value '%0' may not be passed inout",
+      "immutable value '%0' must not be passed inout",
       (StringRef))
 ERROR(assignment_to_immutable_value,none,
       "immutable value '%0' may not be assigned to",

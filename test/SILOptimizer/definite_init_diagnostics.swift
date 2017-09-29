@@ -85,8 +85,8 @@ func test2() {
   
   let b5: Any
   b5 = "x"   
-  { takes_inout_any(&b5) }()   // expected-error {{immutable value 'b5' may not be passed inout}}
-  ({ takes_inout_any(&b5) })()   // expected-error {{immutable value 'b5' may not be passed inout}}
+  { takes_inout_any(&b5) }()   // expected-error {{immutable value 'b5' must not be passed inout}}
+  ({ takes_inout_any(&b5) })()   // expected-error {{immutable value 'b5' must not be passed inout}}
 
   // Structs
   var s1 : SomeStruct
@@ -874,7 +874,7 @@ struct LetProperties {
     u = 1; v = 13; w = (1,2); y = 1 ; z = u
 
     var variable = 42
-    swap(&u, &variable)  // expected-error {{immutable value 'self.u' may not be passed inout}}
+    swap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
     
     u.inspect()  // ok, non mutating.
     u.mutate()  // expected-error {{mutating method 'mutate' may not be used on immutable value 'self.u'}}
@@ -945,7 +945,7 @@ func testAddressOnlyProperty<T>(_ b : T) -> T {
   x = b   // expected-error {{immutable value 'x' may only be initialized once}}
 
   var tmp = b
-  swap(&x, &tmp)   // expected-error {{immutable value 'x' may not be passed inout}}
+  swap(&x, &tmp)   // expected-error {{immutable value 'x' must not be passed inout}}
   return y
 }
 
@@ -996,7 +996,7 @@ struct StructMutatingMethodTest {
     x += 1     // expected-error {{mutating operator '+=' may not be used on immutable value 'self.x'}}
 
     y = 12
-    myTransparentFunction(&y)  // expected-error {{immutable value 'self.y' may not be passed inout}}
+    myTransparentFunction(&y)  // expected-error {{immutable value 'self.y' must not be passed inout}}
   }
 }
 
@@ -1135,7 +1135,7 @@ func bug22436880(_ x: UnsafeMutablePointer<Int>) {}
 func test22436880() {
   let x: Int
   x = 1
-  bug22436880(&x) // expected-error {{immutable value 'x' may not be passed inout}}
+  bug22436880(&x) // expected-error {{immutable value 'x' must not be passed inout}}
 }
 
 // sr-184
