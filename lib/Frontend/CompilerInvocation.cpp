@@ -1376,6 +1376,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.SILSerializeAll |= Args.hasArg(OPT_sil_serialize_all);
   Opts.SILSerializeWitnessTables |=
     Args.hasArg(OPT_sil_serialize_witness_tables);
+  Opts.SILSerializeVTables |=
+    Args.hasArg(OPT_sil_serialize_vtables);
 
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.

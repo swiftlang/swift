@@ -2262,7 +2262,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   const DeclContext *assocDC = SILMod->getAssociatedContext();
   assert(assocDC && "cannot serialize SIL without an associated DeclContext");
   for (const SILVTable &vt : SILMod->getVTables()) {
-    if (ShouldSerializeAll &&
+    if ((ShouldSerializeAll || SILMod->getOptions().SILSerializeVTables) &&
         vt.getClass()->isChildContextOf(assocDC))
       writeSILVTable(vt);
   }
