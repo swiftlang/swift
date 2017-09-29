@@ -2294,7 +2294,7 @@ NOTE(attr_ApplicationMain_script_here,none,
 ERROR(lazy_not_on_let,none,
       "'lazy' cannot be used on a let", ())
 ERROR(lazy_not_on_computed,none,
-      "'lazy' may not be used on a computed property", ())
+      "'lazy' must not be used on a computed property", ())
 
 ERROR(lazy_on_already_lazy_global,none,
       "'lazy' may not be used on an already-lazy global", ())
