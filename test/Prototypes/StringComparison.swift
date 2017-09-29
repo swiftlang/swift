@@ -208,6 +208,18 @@ internal func _findDiffIdx(
   }
   return count
 }
+@inline(never)
+internal func _findDiffIdx(
+  _ leftCore: _StringCore, _ rightCore: _StringCore
+) -> Int {
+  let count = Swift.min(leftCore.count, rightCore.count)
+  for idx in 0..<count {
+    guard leftCore[idx] == rightCore[idx] else {
+      return idx
+    }
+  }
+  return count
+}
 
 @inline(__always)
 internal func _lexicographicalCompare(_ lhs: Int, _ rhs: Int) -> _Ordering {
@@ -273,6 +285,12 @@ internal func _lexicographicalCompare(
   }
 }
 
+internal func _parseRawScalar(
+  _ buf: UnsafeMutablePointer<_Normalization._SegmentOutputBuffer>,
+  startingFrom idx: Int = 0
+) -> (UInt32, scalarEndIndex: Int) {
+  return _parseRawScalar(_castOutputBuffer(buf), startingFrom: idx)
+}
 internal func _parseRawScalar(
   _ buf: UnsafeBufferPointer<UInt16>,
   startingFrom idx: Int = 0
@@ -378,94 +396,126 @@ internal func _slowNormalize(
 
 
 extension UnicodeScalar {
-  internal var _isSegmentExpander: Bool {
-    // Fast path: skip unassigned code points
-    guard self._isDefined else { return false }
-
-    // Fast path: skip unless QC_FCD=no
-    guard self._hasFullCompExclusion else { return false }
-
-    // Try to expand this scalar and see if it now contains multiple segments
-    typealias InputBuffer = _FixedArray2<UInt16>
-    typealias OutputBuffer = _FixedArray8<UInt16>
-    var outBuffer = OutputBuffer(allZeros:())
-
-    var inBuffer = InputBuffer(allZeros:())
-    var inLength = 0
-    for cu in self.utf16 {
-      inBuffer[inLength] = cu
-      inLength += 1
-    }
-
-    func normalize(
-      _ input: UnsafeMutablePointer<InputBuffer>,
+  internal func _normalize(
+    into outputBuffer: UnsafeMutablePointer<_Normalization._SegmentOutputBuffer>
+  ) -> Int {
+    // Implementation: Perform the normalization on an input buffer and output
+    // buffer.
+    func impl(
+      _ input: UnsafeMutablePointer<_FixedArray2<UInt16>>,
       count: Int,
-      into output: UnsafeMutablePointer<OutputBuffer>,
-      capacity: Int
+      into output: UnsafeMutablePointer<_Normalization._SegmentOutputBuffer>
     ) -> Int {
       let inputBuffer = _unsafeBufferPointerCast(
         input, count, to: UInt16.self
       )
       let outputBuffer = _unsafeMutableBufferPointerCast(
-        output, capacity, to: UInt16.self
+        output, _FixedArray8<UInt16>._arraySize, to: UInt16.self
       )
       return _tryNormalize(
         inputBuffer, into: outputBuffer
       )._unsafelyUnwrappedUnchecked
     }
 
-    func impl(_ buffer: UnsafePointer<OutputBuffer>, count: Int) -> Bool {
-      let buffer = _unsafeBufferPointerCast(buffer, count, to: UInt16.self)
+    var inBuffer = _FixedArray2<UInt16>(allZeros:())
+    var inLength = 0
+    for cu in self.utf16 {
+      inBuffer[inLength] = cu
+      inLength += 1
+    }
+
+    return impl(&inBuffer, count: inLength, into: outputBuffer)
+  }
+
+  static internal let maxValue = 0x0010_FFFF
+}
+
+private struct _UnicodeScalarExceptions {
+  fileprivate let _multiSegmentExpanders: Set<UInt32>
+  fileprivate let _normalizedASCIIStarter: Array<UInt32>
+
+  @inline(__always)
+  init() {
+    var msExpanders = Set<UInt32>()
+    msExpanders.reserveCapacity(16)
+    var normalizedASCIIStarter = Array<UInt32>()
+    normalizedASCIIStarter.reserveCapacity(8)
+
+    for rawValue in 0..<UnicodeScalar.maxValue {
+      guard let scalar = UnicodeScalar(rawValue) else { continue }
+
+      // Fast path: skip unassigned code points
+      guard scalar._isDefined else { continue }
+
+      // Fast path: skip unless QC_FCD=no
+      if _fastPath(!scalar._hasFullCompExclusion) {
+        continue
+      }
+
+      var outBuffer = _Normalization._SegmentOutputBuffer(allZeros:())
+      let length = scalar._normalize(into: &outBuffer)
+
+      // See if this normalized to have an ASCII starter
+      if _slowPath(outBuffer[0] <= 0x7F) {
+        normalizedASCIIStarter.append(scalar.value)
+      }
+
+      // See if this normalizes to multiple segments
       var i = 0
-      while i < buffer.count {
-        let (value, nextI) = _parseRawScalar(buffer, startingFrom: i)
-        let scalar = UnicodeScalar(_unchecked: value)
-        if i != 0 && scalar._hasNormalizationBoundaryBefore {
-          guard scalar._hasNormalizationBoundaryBefore else {
+      while i < length {
+        let (value, nextI) = _parseRawScalar(&outBuffer, startingFrom: i)
+        let innerScalar = UnicodeScalar(_unchecked: value)
+        if _slowPath(i != 0 && innerScalar._hasNormalizationBoundaryBefore) {
+          guard innerScalar._hasNormalizationBoundaryBefore else {
             fatalError(
               "Unicode invariant violated: non-starter multi-segment expander")
           }
-          return true
+          msExpanders.insert(scalar.value)
+          break
         }
         i = nextI
       }
-      return false
     }
 
-    let length = normalize(
-      &inBuffer, count: inLength, into: &outBuffer, capacity: outBuffer.count)
-
-    return impl(&outBuffer, count: length)
+    self._multiSegmentExpanders = msExpanders
+    self._normalizedASCIIStarter = normalizedASCIIStarter
   }
 }
-
-// Multi-Segment Expanders - Unicode defines "expanding canonical
-// decompositions", where even in NFC a single scalar expands to multiple
-// scalars. A small subset (currently 12 scalars circa Unicode 10) of these will
-// expand into multiple normalization segments, breaking any kind of segment-by-
-// segment logic or processing even under NFC. These are a subset of what is
-// identified by the UCD as "composition exclusion" scalars. Since we don't have
-// access to a UCD (available only at runtime), we go through ICU which lumps
-// those and even more as "Full Composition Exclusions". Of the many full
-// composition exclusions, this set (created once at runtime as this can change
-// with Unicode version) tracks just those that can expand into multiple
-// normalization segments.
-private let _multiSegmentExpanders: Set<UInt32> = {
-  var result = Set<UInt32>()
-  result.reserveCapacity(16)
-  let maxScalarValue = 0x0010_FFFF
-  for i in 0..<maxScalarValue {
-    guard let value = UnicodeScalar(i) else { continue }
-    if _slowPath(value._isSegmentExpander) {
-      result.insert(value.value)
-    }
-  }
-  return result
+private let _unicodeScalarExceptions: _UnicodeScalarExceptions = {
+  return _UnicodeScalarExceptions()
 }()
 
 extension UnicodeScalar {
-  var _isMultiSegmentExpander: Bool {
-    return _multiSegmentExpanders.contains(self.value)
+  // Multi-Segment Expanders - Unicode defines "expanding canonical
+  // decompositions", where even in NFC a single scalar expands to multiple
+  // scalars. A small subset (currently 12 scalars circa Unicode 10) of these
+  // will expand into multiple normalization segments, breaking any kind of
+  // segment-by- segment logic or processing even under NFC. These are a subset
+  // of what is identified by the UCD as "composition exclusion" scalars. Since
+  // we don't have access to a UCD (available only at runtime), we go through
+  // ICU which lumps those and even more as "Full Composition Exclusions". Of
+  // the many full composition exclusions, this set (created once at runtime as
+  // this can change with Unicode version) tracks just those that can expand
+  // into multiple normalization segments.
+  internal var _isMultiSegmentExpander: Bool {
+    return _unicodeScalarExceptions._multiSegmentExpanders.contains(self.value)
+  }
+
+  // Whether, post-normalization, this scalar definitely compares greater than
+  // any ASCII scalar. This is true for all super-ASCII scalars that are not
+  // ASCII Normalized Starters.
+  //
+  // ASCII Normalized Starters - A handful of scalars normalize to have ASCII
+  // starters, e.g. Greek question mark ";". As of Unicode 10 there are 3 (all
+  // from Unicode 1.1 originally) and more are unlikely. But, there could be
+  // more in future versions, so determine at runtime.
+  internal var _isNormalizedSuperASCII: Bool {
+    if _slowPath(
+      _unicodeScalarExceptions._normalizedASCIIStarter.contains(self.value)
+    ) {
+      return false
+    }
+    return self.value > 0x7F
   }
 }
 
@@ -569,7 +619,8 @@ internal func _naiveNormalize(_ string: String) -> Array<UInt16> {
 // Scalar values below 0x300 are special: normalization segments containing only
 // one such scalar are trivially prenormal under NFC. Most Latin-derived scripts
 // can be represented entirely by <0x300 scalar values, meaning that many user
-// strings satisfy this prenormal check.
+// strings satisfy this prenormal check. We call sub-0x300 scalars "Latiny" (not
+// official terminology).
 //
 // The check is effectively:
 //   1) Whether the current scalar <0x300, AND
@@ -616,31 +667,33 @@ private func _compareStringsPreLoop(
   let otherCU = otherUTF16Ptr[idx]
 
   //
-  // Fast path: if other is non-ASCII, we must be less because:
-  //   1) If other hasBoundaryBefore, it is a new super-ASCII segment
-  //   2) Otherwise, it might modify prior value, but even then prior value must
-  //      be a super-ASCII segment.
+  // Fast path: if other is super-ASCII post-normalization, we must be less. If
+  // other is ASCII and a single-scalar segment, we have our answer.
   //
   if otherCU > 0x7F {
-    return .less
-  }
-
-  //
-  // Fast path: If otherCU is entire segment, we're done.
-  //
-  let selfASCIIChar = UInt16(selfASCIIPtr[idx])
-  _sanityCheck(selfASCIIChar != otherCU, "should be different")
-  if idx+1 == otherUTF16.count {
-    return _lexicographicalCompare(selfASCIIChar, otherCU)
-  }
-  let otherNextCU = otherUTF16Ptr[idx+1]
-  if _normalizationBoundary(beforeCodeUnit: otherNextCU) {
-    return _lexicographicalCompare(selfASCIIChar, otherCU)
+    if _fastPath(
+      UnicodeScalar(_unchecked:
+        _parseRawScalar(otherUTF16, startingFrom: idx).0
+      )._isNormalizedSuperASCII
+    ) {
+     return .less
+    }
+  } else {
+    let selfASCIIChar = UInt16(selfASCIIPtr[idx])
+    _sanityCheck(selfASCIIChar != otherCU, "should be different")
+    if idx+1 == otherUTF16.count {
+      return _lexicographicalCompare(selfASCIIChar, otherCU)
+    }
+    let otherNextCU = otherUTF16Ptr[idx+1]
+    if _fastPath(_normalizationBoundary(beforeCodeUnit: otherNextCU)) {
+      return _lexicographicalCompare(selfASCIIChar, otherCU)
+    }
   }
 
   //
   // Otherwise, need to normalize the segment and then compare
   //
+  let selfASCIIChar = UInt16(selfASCIIPtr[idx])
   return _compareStringsPostSuffix(
     selfASCIIChar: selfASCIIChar, otherUTF16: otherUTF16[idx...].rebased)
 }
@@ -928,10 +981,10 @@ extension String {
 
   @inline(__always)
   func _compare(_ other: String) -> _Ordering {
-    guard self._core._baseAddress != nil
-      && other._core._baseAddress != nil
-    else {
-      fatalError("TODO: non-contig strings. mostly ascii in practice...")
+    if _slowPath(
+      self._core._baseAddress == nil || other._core._baseAddress == nil
+    ) {
+      return self._compareOpaque(other)
     }
 
     // Referential equality means String equality
@@ -960,6 +1013,55 @@ extension String {
         otherUTF16: other._unsafeUTF16)
       // return _compareFast(other)
     }
+  }
+
+  @inline(never)
+  func _compareOpaque(_ other: String) -> _Ordering {
+    //
+    // Do a fast Latiny comparison loop; bail if that proves insufficient.
+    //
+    // The vast majority of the time, seemingly-non-contiguous Strings are
+    // really ASCII strings that were bridged improperly. E.g., unknown nul-
+    // termination of an all-ASCII file loaded by String.init(contentsOfFile:).
+    //
+    let selfCount = self._core.count
+    let otherCount = other._core.count
+    let count = Swift.min(selfCount, otherCount)
+    let idx = _findDiffIdx(self._core, other._core)
+    if idx == count {
+      return _lexicographicalCompare(self._core.count, other._core.count)
+    }
+
+    let selfCU = self._core[idx]
+    let otherCU = other._core[idx]
+
+    //
+    // Fast path (ASCII-always-less): if one is ASCII and the other not, the
+    // ASCII one must be less. See "ASCII-always-less" in assumption checker.
+    //
+    if _fastPath(selfCU <= 0x7F || otherCU <= 0x7F) {
+      return _lexicographicalCompare(selfCU, otherCU)
+    }
+
+    // TODO: Consider a Latiny fast path, but how common are non-ASCII non-
+    // contiguous Latiny strings?
+
+    return self._compareOpaquePathological(
+      other, startingFrom: Swift.min(0, idx-1))
+  }
+
+  @inline(never)
+  func _compareOpaquePathological(
+    _ other: String, startingFrom: Int
+  ) -> _Ordering {
+    //
+    // Eagerly pull in the seemingly-non-contiguous String, then compare
+    // normally
+    //
+    // switch (self._baseAddress != nil, other._baseAddress != nil) {
+    //   case true, true:
+
+    fatalError("unimplemented")
   }
 }
 
@@ -1089,6 +1191,14 @@ enum Tests {
       "🧀", // D83E DDC0 -- aka a really big scalar
       "\u{FFEE}" // half width CJK dot
     )
+  }
+
+  // Dynamically check some of our assumptions
+  internal static func validateAssumptions() {
+    // Validate per-scalar assumptions
+    for _ in 0..<UnicodeScalar.maxValue {
+      // TODO: validate
+    }
   }
 }
 
@@ -1598,27 +1708,6 @@ enum Benchmarks {
   }
 
   @inline(never)
-  static func time_isSegmentExpander(
-    _ workload: Workload
-  ) -> Int {
-    let name = workload.name + " (one of those)"
-    let payload = workload.payload
-    return time(name) {
-      var count = 0
-      for str in payload {
-        for _ in 0..<Workload.N {
-          for scalar in str.unicodeScalars {
-            if scalar._isSegmentExpander {
-              count += 1
-            }
-          }
-        }
-      }
-      return count
-    }
-  }
-
-  @inline(never)
   public static func benchmarkAdHoc(_ workload: Workload) -> Int {
     var count = 0
     count += Benchmarks.timeFastLatiny(workload)
@@ -1626,7 +1715,6 @@ enum Benchmarks {
     count += Benchmarks.timeSegmentWalk(workload)
     count += Benchmarks.timeSegmentWalk_2(workload)
     count += Benchmarks.timeCompExclusion(workload)
-    count += Benchmarks.time_isSegmentExpander(workload)
     return count
   }
 
@@ -1640,34 +1728,27 @@ enum Benchmarks {
   }
 }
 
-
-
-@inline(never)
-func benchmark_findTheOnes() -> Set<UInt32> {
-  var result = Set<UInt32>()
-  result.reserveCapacity(16)
-  let maxScalarValue = 0x0010_FFFF
-  for _ in 0..<Workload.N {
-    for i in 0..<maxScalarValue {
-      guard let value = UnicodeScalar(i) else { continue }
-      if _slowPath(value._isSegmentExpander) {
-        result.insert(value.value)
-      }
-    }
-  }
-  return result
-}
-
-// let theOnes_2 = Benchmarks.time(
-//   "finding the segment expanders N=\(Workload.N)") {
-//   () -> Set<UInt32> in
-//   return benchmark_findTheOnes()
-// }
-
 Tests.test()
+Tests.validateAssumptions()
 // Workload.slowTest()
 
 // NOTE: Since this gets ran as part of LIT testing, don't benchmark by default.
 // Uncomment to compare performance.
 // Benchmarks.run()
 // Benchmarks.adHoc()
+
+@inline(never)
+public func benchmark_UnicodeScalarExceptions(_ N: Int) -> Int {
+  var result = 0
+  for _ in 0..<N {
+    let ex = _UnicodeScalarExceptions()
+    result += ex._multiSegmentExpanders.count + ex._normalizedASCIIStarter.count
+  }
+  return result
+}
+
+// let count = Benchmarks.time("Unicode scalar exceptions: N=\(Workload.N)") {
+//   return benchmark_UnicodeScalarExceptions(Workload.N)
+// }
+// print(count)
+
