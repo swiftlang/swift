@@ -325,6 +325,12 @@ public:
   /// Returns true if everything in this SILModule is being serialized.
   bool isWholeModuleSerialized() const { return Options.SILSerializeAll; }
 
+  /// Returns true if it is the OnoneSupport module.
+  bool isOnoneSupportModule() const;
+
+  /// Returns true if it is the optimized OnoneSupport module.
+  bool isOptimizedOnoneSupportModule() const;
+
   SILOptions &getOptions() const { return Options; }
 
   using iterator = FunctionListType::iterator;

@@ -18,6 +18,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Strings.h"
 #include "Linker.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILValue.h"
@@ -749,4 +750,15 @@ bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
   case BuiltinValueKind::ErrorInMain:
     return true;
   }
+}
+
+/// Returns true if it is the OnoneSupport module.
+bool SILModule::isOnoneSupportModule() const {
+  return getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT;
+}
+
+/// Returns true if it is the optimized OnoneSupport module.
+bool SILModule::isOptimizedOnoneSupportModule() const {
+  return getOptions().Optimization >= SILOptions::SILOptMode::Optimize &&
+         isOnoneSupportModule();
 }
