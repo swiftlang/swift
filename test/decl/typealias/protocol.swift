@@ -3,7 +3,7 @@
 // Tests for typealias inside protocols
 
 protocol Bad {
-  associatedtype X<T>  // expected-error {{associated types may not have a generic parameter list}}
+  associatedtype X<T>  // expected-error {{associated types must not have a generic parameter list}}
   typealias Y<T>       // expected-error {{expected '=' in type alias declaration}}
 }
 
