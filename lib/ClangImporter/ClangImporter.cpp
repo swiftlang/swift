@@ -1064,9 +1064,21 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
     return true;
 
   auto &headerSearchInfo = Impl.getClangPreprocessor().getHeaderSearchInfo();
-  headerSearchInfo.AddSearchPath({entry, isSystem ?
-                                           clang::SrcMgr::C_System :
-                                           clang::SrcMgr::C_User, isFramework},
+  auto exists = std::any_of(headerSearchInfo.search_dir_begin(),
+                            headerSearchInfo.search_dir_end(),
+                            [&](const clang::DirectoryLookup &lookup) -> bool {
+    if (isFramework)
+      return lookup.getFrameworkDir() == entry;
+    return lookup.getDir() == entry;
+  });
+  if (exists) {
+    // Don't bother adding a search path that's already there. Clang would have
+    // removed it via deduplication at the time the search path info gets built.
+    return false;
+  }
+
+  auto kind = isSystem ? clang::SrcMgr::C_System : clang::SrcMgr::C_User;
+  headerSearchInfo.AddSearchPath({entry, kind, isFramework},
                                  /*isAngled=*/true);
 
   // In addition to changing the current preprocessor directly, we still need
