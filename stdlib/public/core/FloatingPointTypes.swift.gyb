@@ -1725,13 +1725,15 @@ extension ${Self} {
 % end # for bits in all_floating_point_types
 
 @_transparent
-@available(*, unavailable, message: "Use truncatingRemainder instead")
+@available(*, unavailable,
+  message: "For floating point numbers use truncatingRemainder instead")
 public func % <T : BinaryFloatingPoint>(lhs: T, rhs: T) -> T {
   fatalError("% is not available.")
 }
 
 @_transparent
-@available(*, unavailable, message: "Use formTruncatingRemainder instead")
+@available(*, unavailable,
+  message: "For floating point numbers use formTruncatingRemainder instead")
 public func %= <T : BinaryFloatingPoint> (lhs: inout T, rhs: T) {
   fatalError("%= is not available.")
 }
