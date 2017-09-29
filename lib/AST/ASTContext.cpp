@@ -43,6 +43,7 @@
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Allocator.h"
@@ -51,6 +52,12 @@
 #include <memory>
 
 using namespace swift;
+
+#define DEBUG_TYPE "ASTContext"
+STATISTIC(NumRegisteredGenericSignatureBuilders,
+          "# of generic signature builders successfully registered");
+STATISTIC(NumRegisteredGenericSignatureBuildersAlready,
+          "# of generic signature builders already registered");
 
 /// Define this to 1 to enable expensive assertions of the
 /// GenericSignatureBuilder.
@@ -1421,6 +1428,22 @@ void ASTContext::getVisibleTopLevelClangModules(
     SmallVectorImpl<clang::Module*> &Modules) const {
   getClangModuleLoader()->getClangPreprocessor().getHeaderSearchInfo().
     collectAllModules(Modules);
+}
+
+void ASTContext::registerGenericSignatureBuilder(
+                                       GenericSignature *sig,
+                                       ModuleDecl &module,
+                                       GenericSignatureBuilder &&builder) {
+  auto canSig = sig->getCanonicalSignature();
+  auto known = Impl.GenericSignatureBuilders.find({canSig, &module});
+  if (known != Impl.GenericSignatureBuilders.end()) {
+    ++NumRegisteredGenericSignatureBuildersAlready;
+    return;
+  }
+
+  ++NumRegisteredGenericSignatureBuilders;
+  Impl.GenericSignatureBuilders[{canSig, &module}] =
+    llvm::make_unique<GenericSignatureBuilder>(std::move(builder));
 }
 
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
@@ -4591,7 +4614,7 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   builder.addRequirement(requirement, source, nullptr);
 
-  CanGenericSignature genericSig(std::move(builder).computeGenericSignature(SourceLoc()));
+  CanGenericSignature genericSig(std::move(builder).computeGenericSignature(*mod, SourceLoc()));
 
   auto result = Impl.ExistentialSignatures.insert(
     std::make_pair(existential, genericSig));
