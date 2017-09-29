@@ -961,7 +961,7 @@ NOTE(unbound_generic_parameter_explicit_fix,none,
 
 
 ERROR(string_index_not_integer,none,
-      "String may not be indexed with %0, it has variable size elements",
+      "String must not be indexed with %0, it has variable size elements",
       (Type))
 NOTE(string_index_not_integer_note,none,
      "consider using an existing high level algorithm, "
