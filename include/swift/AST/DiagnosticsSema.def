@@ -1022,7 +1022,7 @@ ERROR(functions_mutating_and_not,none,
       "%select{nonmutating|mutating|__consuming}1",
       (unsigned, unsigned))
 ERROR(static_functions_not_mutating,none,
-      "static functions may not be declared mutating", ())
+      "static functions must not be declared mutating", ())
 
 ERROR(transparent_stored_property,none,
       "@_transparent cannot be applied to stored properties", ())
