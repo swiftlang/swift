@@ -641,7 +641,7 @@ NOTE(unspaced_binary_operators_candidate,none,
      "could be %select{binary|postfix}2 %0 and %select{prefix|binary}2 %1",
      (Identifier, Identifier, bool))
 ERROR(unspaced_unary_operator,none,
-      "unary operators may not be juxtaposed; parenthesize inner expression",
+      "unary operators must not be juxtaposed; parenthesize inner expression",
       ())
 
 
