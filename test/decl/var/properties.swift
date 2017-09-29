@@ -712,7 +712,7 @@ struct WillSetDidSetProperties {
     didSet {
       markUsed("woot")
     }
-    get { // expected-error {{didSet variable may not also have a get specifier}}
+    get { // expected-error {{didSet variable must not also have a get specifier}}
       return 4
     }
   }
@@ -721,7 +721,7 @@ struct WillSetDidSetProperties {
     willSet {
       markUsed("woot")
     }
-    set { // expected-error {{willSet variable may not also have a set specifier}}
+    set { // expected-error {{willSet variable must not also have a set specifier}}
       return 4
     }
   }
