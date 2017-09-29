@@ -3206,7 +3206,7 @@ ERROR(objc_in_generic_extension,none,
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
-      "@objc protocols may not have operator requirements", ())
+      "@objc protocols must not have operator requirements", ())
 WARNING(objc_inference_swift3_dynamic,none,
         "inference of '@objc' for 'dynamic' members is deprecated", ())
 WARNING(objc_inference_swift3_objc_derived,none,
