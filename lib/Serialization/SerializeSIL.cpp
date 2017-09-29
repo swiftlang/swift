@@ -258,7 +258,8 @@ namespace {
 void SILSerializer::addMandatorySILFunction(const SILFunction *F,
                                             bool emitDeclarationsForOnoneSupport) {
   // If this function is not fragile, don't do anything.
-  if (!shouldEmitFunctionBody(F, /* isReference */ false))
+  if (!emitDeclarationsForOnoneSupport &&
+      !shouldEmitFunctionBody(F, /* isReference */ false))
     return;
 
   auto iter = FuncsToEmit.find(F);
@@ -273,7 +274,10 @@ void SILSerializer::addMandatorySILFunction(const SILFunction *F,
   // We haven't seen this function before. Record that we want to
   // emit its body, and add it to the worklist.
   FuncsToEmit[F] = emitDeclarationsForOnoneSupport;
-  if (!emitDeclarationsForOnoneSupport)
+
+  // Function body should be serialized unless it is a KeepAsPublic function
+  // (which is typically a pre-specialization).
+  if (!emitDeclarationsForOnoneSupport && !F->isKeepAsPublic())
     Worklist.push_back(F);
 }
 
