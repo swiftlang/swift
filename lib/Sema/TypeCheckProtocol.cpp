@@ -3093,7 +3093,8 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
 
     // If the function has a dynamic Self, it's okay.
     if (auto func = dyn_cast<FuncDecl>(witness)) {
-      if (!func->hasDynamicSelf()) {
+      if (func->getDeclContext()->getAsClassOrClassExtensionContext() &&
+          !func->hasDynamicSelf()) {
         diagnoseOrDefer(requirement, false,
           [witness, requirement](NormalProtocolConformance *conformance) {
             auto proto = conformance->getProtocol();
@@ -3147,6 +3148,31 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   // A non-final class can model a protocol requirement with a
   // contravariant Self, because here the witness will always have
   // a more general type than the requirement.
+
+  // If the witness is in a protocol extension, there's an additional
+  // constraint that either the requirement not produce 'Self' in a
+  // covariant position, or the type of the requirement does not involve
+  // associated types.
+  if (auto func = dyn_cast<FuncDecl>(witness)) {
+    if (func->getDeclContext()->getAsProtocolExtensionContext()) {
+      auto selfKindWithAssocTypes = Proto->findProtocolSelfReferences(
+          requirement,
+          /*allowCovariantParameters=*/false,
+          /*skipAssocTypes=*/false);
+      if (selfKindWithAssocTypes.other &&
+          selfKindWithAssocTypes.result) {
+        diagnoseOrDefer(requirement, false,
+          [witness, requirement](NormalProtocolConformance *conformance) {
+            auto proto = conformance->getProtocol();
+            auto &diags = proto->getASTContext().Diags;
+            diags.diagnose(witness->getLoc(),
+                           diag::witness_requires_class_implementation,
+                           requirement->getFullName(),
+                           conformance->getType());
+          });
+      }
+    }
+  }
 }
 
 ResolveWitnessResult
