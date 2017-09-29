@@ -1322,6 +1322,9 @@ public:
   /// Revert the dependent types within the given generic parameter list.
   void revertGenericParamList(GenericParamList *genericParams);
 
+  /// Revert the dependent types within a set of requirements.
+  void revertGenericRequirements(MutableArrayRef<RequirementRepr> requirements);
+
   /// Configure the interface type of a function declaration.
   void configureInterfaceType(AbstractFunctionDecl *func,
                               GenericSignature *sig);
@@ -1415,6 +1418,14 @@ public:
                            TypeResolutionOptions options = None,
                            GenericTypeResolver *resolver = nullptr);
 
+  /// Validate the given requirements.
+  void validateRequirements(SourceLoc whereLoc,
+                            MutableArrayRef<RequirementRepr> requirements,
+                            DeclContext *dc,
+                            TypeResolutionOptions options,
+                            GenericTypeResolver *resolver,
+                            GenericSignatureBuilder *builder = nullptr);
+
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
   ///
@@ -1450,7 +1461,8 @@ public:
 
   /// Validate a protocol's where clause, along with the where clauses of
   /// its associated types.
-  void validateWhereClauses(ProtocolDecl *protocol);
+  void validateWhereClauses(ProtocolDecl *protocol,
+                            GenericTypeResolver *resolver);
 
   /// Resolve the types in the inheritance clause of the given
   /// declaration context, which will be a nominal type declaration or

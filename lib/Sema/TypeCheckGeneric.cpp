@@ -284,19 +284,11 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
       builder->addGenericParameterRequirements(param);
   }
 
-  // Visit each of the requirements, adding them to the builder.
   // Add the requirements clause to the builder, validating the types in
   // the requirements clause along the way.
-  for (auto &req : genericParams->getRequirements()) {
-    if (validateRequirement(genericParams->getWhereLoc(), req, lookupDC,
-                            options, resolver))
-      continue;
-
-    if (builder &&
-        isErrorResult(builder->addRequirement(&req,
-                                              lookupDC->getParentModule())))
-      req.setInvalid();
-  }
+  validateRequirements(genericParams->getWhereLoc(),
+                       genericParams->getRequirements(), lookupDC,
+                       options, resolver, builder);
 }
 
 bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
@@ -346,6 +338,23 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
   }
 
   llvm_unreachable("Unhandled RequirementKind in switch.");
+}
+
+void TypeChecker::validateRequirements(
+                                 SourceLoc whereLoc,
+                                 MutableArrayRef<RequirementRepr> requirements,
+                                 DeclContext *dc,
+                                 TypeResolutionOptions options,
+                                 GenericTypeResolver *resolver,
+                                 GenericSignatureBuilder *builder) {
+  for (auto &req : requirements) {
+    if (validateRequirement(whereLoc, req, dc, options, resolver))
+      continue;
+
+    if (builder &&
+        isErrorResult(builder->addRequirement(&req, dc->getParentModule())))
+      req.setInvalid();
+  }
 }
 
 void
@@ -402,20 +411,24 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   }
 
   // Revert the requirements of the generic parameter list.
-  for (auto &req : genericParams->getRequirements()) {
+  revertGenericRequirements(genericParams->getRequirements());
+}
+
+void TypeChecker::revertGenericRequirements(
+                                MutableArrayRef<RequirementRepr> requirements) {
+  for (auto &req : requirements) {
     if (req.isInvalid())
       continue;
 
     switch (req.getKind()) {
-    case RequirementReprKind::TypeConstraint: {
-      revertDependentTypeLoc(req.getSubjectLoc());
+    case RequirementReprKind::TypeConstraint:
       revertDependentTypeLoc(req.getConstraintLoc());
-      break;
-    }
-    case RequirementReprKind::LayoutConstraint: {
+      LLVM_FALLTHROUGH;
+
+    case RequirementReprKind::LayoutConstraint:
       revertDependentTypeLoc(req.getSubjectLoc());
       break;
-    }
+
     case RequirementReprKind::SameType:
       revertDependentTypeLoc(req.getFirstTypeLoc());
       revertDependentTypeLoc(req.getSecondTypeLoc());
