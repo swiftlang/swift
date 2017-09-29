@@ -245,7 +245,7 @@ namespace {
       }
 
 
-      if (auto CE = dyn_cast<ClosureExpr>(expr)) {
+      if (isa<ClosureExpr>(expr)) {
         return { true, expr };
       }
 
