@@ -603,7 +603,7 @@ NOTE(serialization_compatibility_version_mismatch,none,
      (StringRef, StringRef, StringRef))
 
 ERROR(reserved_member_name,none,
-      "type member may not be named %0, since it would conflict with the"
+      "type member must not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))
 
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))

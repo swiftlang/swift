@@ -295,11 +295,11 @@ enum EnumWithMutating {
 // <rdar://problem/21783216> Ban members named Type and Protocol without backticks
 // https://twitter.com/jadengeller/status/619989059046240256
 protocol r21783216a {
-  // expected-error @+2 {{type member may not be named 'Type', since it would conflict with the 'foo.Type' expression}}
+  // expected-error @+2 {{type member must not be named 'Type', since it would conflict with the 'foo.Type' expression}}
   // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}} {{18-22=`Type`}}
   associatedtype Type
   
-  // expected-error @+2 {{type member may not be named 'Protocol', since it would conflict with the 'foo.Protocol' expression}}
+  // expected-error @+2 {{type member must not be named 'Protocol', since it would conflict with the 'foo.Protocol' expression}}
   // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}} {{18-26=`Protocol`}}
   associatedtype Protocol
 }
