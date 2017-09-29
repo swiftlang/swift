@@ -1347,7 +1347,7 @@ ERROR(extension_specialization,none,
       "constrained extension must be declared on the unspecialized generic "
       "type %0 with constraints specified by a 'where' clause", (Identifier))
 ERROR(extension_stored_property,none,
-      "extensions may not contain stored properties", ())
+      "extensions must not contain stored properties", ())
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0", (Type))
 ERROR(extension_constrained_inheritance,none,
@@ -1993,7 +1993,7 @@ WARNING(enum_case_access_warn,none,
         "uses %select{a private|a fileprivate|an internal|%error|%error}1 type",
         (AccessLevel, AccessLevel))
 ERROR(enum_stored_property,none,
-      "enums may not contain stored properties", ())
+      "enums must not contain stored properties", ())
 
 // Enum raw types
 ERROR(multiple_enum_raw_types,none,
