@@ -249,25 +249,17 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol) {
   TypeResolutionOptions options;
 
   if (auto whereClause = protocol->getTrailingWhereClause()) {
-    DeclContext *lookupDC = protocol;
-    for (auto &req : whereClause->getRequirements()) {
-      // FIXME: handle error?
-      (void)validateRequirement(whereClause->getWhereLoc(), req,
-                                lookupDC, options, &resolver);
-    }
+    validateRequirements(whereClause->getWhereLoc(),
+                         whereClause->getRequirements(), protocol,
+                         options, &resolver);
   }
 
   for (auto member : protocol->getMembers()) {
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       if (auto whereClause = assocType->getTrailingWhereClause()) {
-        DeclContext *lookupDC = assocType->getDeclContext();
-
-        for (auto &req : whereClause->getRequirements()) {
-          if (!validateRequirement(whereClause->getWhereLoc(), req,
-                                   lookupDC, options, &resolver))
-            // FIXME handle error?
-            continue;
-        }
+        validateRequirements(whereClause->getWhereLoc(),
+                             whereClause->getRequirements(),
+                             protocol, options, &resolver);
       }
     }
   }
