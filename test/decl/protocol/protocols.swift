@@ -466,7 +466,7 @@ protocol ShouldntCrash {
 
 // rdar://problem/18168866
 protocol FirstProtocol {
-    weak var delegate : SecondProtocol? { get } // expected-error{{'weak' may not be applied to non-class-bound 'SecondProtocol'; consider adding a protocol conformance that has a class bound}}
+    weak var delegate : SecondProtocol? { get } // expected-error{{'weak' must not be applied to non-class-bound 'SecondProtocol'; consider adding a protocol conformance that has a class bound}}
 }
 
 protocol SecondProtocol {

@@ -3108,7 +3108,7 @@ ERROR(invalid_ownership_type,none,
       "class and class-bound protocol types, not %1",
       (/*Ownership*/unsigned, Type))
 ERROR(invalid_ownership_protocol_type,none,
-      "'%select{strong|weak|unowned|unowned}0' may not be applied to "
+      "'%select{strong|weak|unowned|unowned}0' must not be applied to "
       "non-class-bound %1; consider adding a protocol conformance that has a class bound",
       (/*Ownership*/unsigned, Type))
 ERROR(invalid_weak_ownership_not_optional,none,
