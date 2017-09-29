@@ -3749,7 +3749,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       // Evaluate the index arguments.
       SmallVector<RValue, 2> indexValues;
       auto indexResult = visit(component.getIndexExpr(), SGFContext());
-      if (auto tup = indexResult.getType()->getAs<TupleType>()) {
+      if (isa<TupleType>(indexResult.getType())) {
         std::move(indexResult).extractElements(indexValues);
       } else {
         indexValues.push_back(std::move(indexResult));
