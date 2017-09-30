@@ -309,7 +309,11 @@ public struct _StringCore {
     return UTF16.CodeUnit(p.pointee)
       + UTF16.CodeUnit((p + 1).pointee) * _highByteMultiplier
 #else
-    return _highByteMultiplier == 0 ? UTF16.CodeUnit(p.pointee) : UTF16.CodeUnit((p + 1).pointee) + UTF16.CodeUnit(p.pointee) * _highByteMultiplier
+    if _highByteMultiplier == 0 {
+      return UTF16.CodeUnit(p.pointee)
+    }
+    return UTF16.CodeUnit((p + 1).pointee)
+      + UTF16.CodeUnit(p.pointee) * _highByteMultiplier
 #endif
   }
 
@@ -336,6 +340,7 @@ public struct _StringCore {
     }
   }
 
+  public // TODO(String Comparison Prototype): internalize
   var _unmanagedASCII : UnsafeBufferPointer<Unicode.ASCII.CodeUnit>? {
     @inline(__always)
     get {
@@ -350,6 +355,7 @@ public struct _StringCore {
     }
   }
   
+  public // TODO(String Comparison Prototype): internalize
   var _unmanagedUTF16 : UnsafeBufferPointer<UTF16.CodeUnit>? {
     @inline(__always)
     get {

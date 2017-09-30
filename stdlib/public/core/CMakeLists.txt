@@ -133,6 +133,7 @@ set(SWIFTLIB_ESSENTIAL
   StringRangeReplaceableCollection.swift.gyb
   StringSwitch.swift
   StringIndexConversions.swift
+  StringNormalization.swift
   StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift

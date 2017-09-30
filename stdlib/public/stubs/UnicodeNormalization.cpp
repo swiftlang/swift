@@ -22,17 +22,34 @@
 
 // Declare a few external functions to avoid a dependency on ICU headers.
 extern "C" {
+
+// Types
 typedef struct UBreakIterator UBreakIterator;
+typedef struct UBreakIterator UNormalizer2;
 typedef enum UBreakIteratorType {} UBreakIteratorType;
 typedef enum UErrorCode {} UErrorCode;
 typedef uint16_t UChar;
+typedef int32_t UChar32;
+typedef int8_t UBool;
+typedef swift::__swift_stdlib_UProperty UProperty;
 
+// Grapheme breaking APIs
 void ubrk_close(UBreakIterator *);
 UBreakIterator *ubrk_open(UBreakIteratorType, const char *, const UChar *,
                           int32_t, UErrorCode *);
 int32_t ubrk_preceding(UBreakIterator *, int32_t);
 int32_t ubrk_following(UBreakIterator *, int32_t);
 void ubrk_setText(UBreakIterator *, const UChar *, int32_t, UErrorCode *);
+
+// Comparison, normalization, and character property APIs
+int32_t unorm2_spanQuickCheckYes(const UNormalizer2 *, const UChar *, int32_t,
+                                 UErrorCode *);
+int32_t unorm2_normalize(const UNormalizer2 *, const UChar *, int32_t, UChar *,
+                         int32_t, UErrorCode *);
+const UNormalizer2 *unorm2_getNFCInstance(UErrorCode *);
+UBool unorm2_hasBoundaryBefore(const UNormalizer2 *norm2, UChar32 c);
+UBool u_hasBinaryProperty(UChar32, UProperty);
+UBool u_isdefined(UChar32);
 }
 
 #else
@@ -151,9 +168,9 @@ swift::_swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
   // as wchar_t which size is 2. It seems that the underlying binary
   // representation is same with swift utf16 representation.
   // On Clang 4.0 under a recent Linux, ICU uses the built-in char16_t type.
-  return ucol_strcoll(GetRootCollator(),
-                      reinterpret_cast<const UChar *>(LeftString), LeftLength,
-                      reinterpret_cast<const UChar *>(RightString), RightLength);
+  return ucol_strcoll(
+      GetRootCollator(), reinterpret_cast<const UChar *>(LeftString),
+      LeftLength, reinterpret_cast<const UChar *>(RightString), RightLength);
 }
 
 /// Compares the strings via the Unicode Collation Algorithm on the root locale.
@@ -170,14 +187,16 @@ swift::_swift_stdlib_unicode_compare_utf8_utf16(const unsigned char *LeftString,
   UCharIterator RightIterator;
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
-  uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString), LeftLength);
+  uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString),
+                LeftLength);
   uiter_setString(&RightIterator, reinterpret_cast<const UChar *>(RightString),
                   RightLength);
 
   uint32_t Diff = ucol_strcollIter(GetRootCollator(),
     &LeftIterator, &RightIterator, &ErrorCode);
   if (U_FAILURE(ErrorCode)) {
-    swift::crash("ucol_strcollIter: Unexpected error doing utf8<->utf16 string comparison.");
+    swift::crash("ucol_strcollIter: Unexpected error doing utf8<->utf16 string "
+                 "comparison.");
   }
   return Diff;
 }
@@ -196,13 +215,16 @@ swift::_swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *LeftString,
   UCharIterator RightIterator;
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
-  uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString), LeftLength);
-  uiter_setUTF8(&RightIterator, reinterpret_cast<const char *>(RightString), RightLength);
+  uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString),
+                LeftLength);
+  uiter_setUTF8(&RightIterator, reinterpret_cast<const char *>(RightString),
+                RightLength);
 
   uint32_t Diff = ucol_strcollIter(GetRootCollator(),
     &LeftIterator, &RightIterator, &ErrorCode);
   if (U_FAILURE(ErrorCode)) {
-    swift::crash("ucol_strcollIter: Unexpected error doing utf8<->utf8 string comparison.");
+    swift::crash("ucol_strcollIter: Unexpected error doing utf8<->utf8 string "
+                 "comparison.");
   }
   return Diff;
 }
@@ -214,7 +236,8 @@ void *swift::_swift_stdlib_unicodeCollationIterator_create(
       ucol_openElements(GetRootCollator(), reinterpret_cast<const UChar *>(Str),
                         Length, &ErrorCode);
   if (U_FAILURE(ErrorCode)) {
-    swift::crash("_swift_stdlib_unicodeCollationIterator_create: ucol_openElements() failed.");
+    swift::crash("_swift_stdlib_unicodeCollationIterator_create: "
+                 "ucol_openElements() failed.");
   }
   return CollationIterator;
 }
@@ -225,7 +248,8 @@ __swift_int32_t swift::_swift_stdlib_unicodeCollationIterator_next(
   auto Result = ucol_next(
       static_cast<UCollationElements *>(CollationIterator), &ErrorCode);
   if (U_FAILURE(ErrorCode)) {
-    swift::crash("_swift_stdlib_unicodeCollationIterator_next: ucol_next() failed.");
+    swift::crash(
+        "_swift_stdlib_unicodeCollationIterator_next: ucol_next() failed.");
   }
   *HitEnd = (Result == UCOL_NULLORDER);
   return Result;
@@ -299,9 +323,11 @@ void swift::__swift_stdlib_ubrk_close(
   ubrk_close(ptr_cast<UBreakIterator>(bi));
 }
 
-swift::__swift_stdlib_UBreakIterator *swift::__swift_stdlib_ubrk_open(
-    swift::__swift_stdlib_UBreakIteratorType type, const char *locale,
-    const uint16_t *text, int32_t textLength, __swift_stdlib_UErrorCode *status) {
+swift::__swift_stdlib_UBreakIterator *
+swift::__swift_stdlib_ubrk_open(swift::__swift_stdlib_UBreakIteratorType type,
+                                const char *locale, const uint16_t *text,
+                                int32_t textLength,
+                                __swift_stdlib_UErrorCode *status) {
   return ptr_cast<swift::__swift_stdlib_UBreakIterator>(
       ubrk_open(static_cast<UBreakIteratorType>(type), locale,
                 reinterpret_cast<const UChar *>(text), textLength,
@@ -326,6 +352,44 @@ void swift::__swift_stdlib_ubrk_setText(
   return ubrk_setText(ptr_cast<UBreakIterator>(bi), ptr_cast<UChar>(text),
                       textLength, ptr_cast<UErrorCode>(status));
 }
+
+swift::__swift_stdlib_UBool swift::__swift_stdlib_unorm2_hasBoundaryBefore(
+    const __swift_stdlib_UNormalizer2 *ptr, __swift_stdlib_UChar32 char32) {
+  return unorm2_hasBoundaryBefore(ptr_cast<UNormalizer2>(ptr), char32);
+}
+const swift::__swift_stdlib_UNormalizer2 *
+swift::__swift_stdlib_unorm2_getNFCInstance(__swift_stdlib_UErrorCode *err) {
+  return ptr_cast<__swift_stdlib_UNormalizer2>(
+      unorm2_getNFCInstance(ptr_cast<UErrorCode>(err)));
+}
+
+int32_t swift::__swift_stdlib_unorm2_normalize(
+    const __swift_stdlib_UNormalizer2 *norm, const __swift_stdlib_UChar *src,
+    __swift_int32_t len, __swift_stdlib_UChar *dst, __swift_int32_t capacity,
+    __swift_stdlib_UErrorCode *err) {
+  return unorm2_normalize(ptr_cast<UNormalizer2>(norm), src, len, dst, capacity,
+                          ptr_cast<UErrorCode>(err));
+}
+
+__swift_int32_t swift::__swift_stdlib_unorm2_spanQuickCheckYes(
+    const __swift_stdlib_UNormalizer2 *norm, const __swift_stdlib_UChar *ptr,
+    __swift_int32_t len, __swift_stdlib_UErrorCode *err) {
+  return unorm2_spanQuickCheckYes(ptr_cast<UNormalizer2>(norm),
+                                  ptr_cast<UChar>(ptr), len,
+                                  ptr_cast<UErrorCode>(err));
+}
+
+swift::__swift_stdlib_UBool
+swift::__swift_stdlib_u_hasBinaryProperty(__swift_stdlib_UChar32 c,
+                                          __swift_stdlib_UProperty p) {
+  return u_hasBinaryProperty(c, p);
+}
+
+swift::__swift_stdlib_UBool
+swift::__swift_stdlib_u_isdefined(UChar32 c) {
+  return u_isdefined(c);
+}
+
 
 // Force an autolink with ICU
 #if defined(__MACH__)
