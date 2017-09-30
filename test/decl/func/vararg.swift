@@ -19,7 +19,7 @@ f3({ print($0) })
 func f4(_ a: Int..., b: Int) { }
 
 // rdar://16008564
-func inoutVariadic(_ i: inout Int...) {  // expected-error {{'inout' may not be used on variadic parameters}}
+func inoutVariadic(_ i: inout Int...) {  // expected-error {{'inout' must not be used on variadic parameters}}
 }
 
 // rdar://19722429

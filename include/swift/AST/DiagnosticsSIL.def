@@ -202,10 +202,10 @@ ERROR(mutating_method_called_on_immutable_value,none,
       " be used on immutable value '%2'",
       (DeclBaseName, unsigned, StringRef))
 ERROR(immutable_value_passed_inout,none,
-      "immutable value '%0' may not be passed inout",
+      "immutable value '%0' must not be passed inout",
       (StringRef))
 ERROR(assignment_to_immutable_value,none,
-      "immutable value '%0' may not be assigned to",
+      "immutable value '%0' must not be assigned to",
       (StringRef))
 ERROR(mutating_protocol_witness_method_on_let_constant,none,
       "cannot perform mutating operation: '%0' is a 'let' constant",
@@ -221,7 +221,7 @@ ERROR(missing_never_call,none,
       "call to another never-returning function on all paths",
       (Type, unsigned))
 ERROR(guard_body_must_not_fallthrough,none,
-      "'guard' body may not fall through, consider using a 'return' or 'throw'"
+      "'guard' body must not fall through, consider using a 'return' or 'throw'"
       " to exit the scope", ())
 WARNING(unreachable_code,none, "will never be executed", ())
 NOTE(unreachable_code_branch,none,

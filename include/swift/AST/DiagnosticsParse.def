@@ -269,7 +269,7 @@ ERROR(expected_accessor_kw,none,
 ERROR(var_set_without_get,none,
       "variable with a setter must also have a getter", ())
 ERROR(observingproperty_with_getset,none,
-      "%select{willSet|didSet}0 variable may not also have a "
+      "%select{willSet|didSet}0 variable must not also have a "
       "%select{get|set}1 specifier", (unsigned, unsigned))
 ERROR(observingproperty_without_mutableaddress,none,
       "%select{willSet|didSet}0 variable with addressor must provide a "
@@ -316,7 +316,7 @@ ERROR(expected_type_in_typealias,PointsToFirstBadToken,
 ERROR(expected_type_in_associatedtype,PointsToFirstBadToken,
       "expected type in associated type declaration", ())
 ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
-      "associated types may not have a generic parameter list", ())
+      "associated types must not have a generic parameter list", ())
 
 
 // Func
@@ -363,9 +363,9 @@ ERROR(expected_rbrace_protocol,none,
 ERROR(protocol_setter_name,none,
       "setter in a protocol cannot have a name", ())
 ERROR(protocol_method_with_body,none,
-      "protocol methods may not have bodies", ())
+      "protocol methods must not have bodies", ())
 ERROR(protocol_init_with_body,none,
-      "protocol initializers may not have bodies", ())
+      "protocol initializers must not have bodies", ())
 
 // Subscripting
 ERROR(subscript_decl_wrong_scope,none,
@@ -844,7 +844,7 @@ ERROR(inout_as_attr_disallowed,none,
       "%0 before a parameter name is not allowed, place it before the parameter type instead",
       (StringRef))
 ERROR(parameter_specifier_repeated,none,
-      "parameter may not have multiple '__owned', 'inout', '__shared',"
+      "parameter must not have multiple '__owned', 'inout', '__shared',"
       " 'var', or 'let' specifiers", ())
 ERROR(parameter_let_var_as_attr,none,
       "'%0' as a parameter attribute is not allowed",

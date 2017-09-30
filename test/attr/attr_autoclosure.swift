@@ -155,7 +155,7 @@ func callAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
   takesAutoclosure(fn()) // ok
 }
 
-// expected-error @+1 {{@autoclosure may not be used on variadic parameters}}
+// expected-error @+1 {{@autoclosure must not be used on variadic parameters}}
 func variadicAutoclosure(_ fn: @autoclosure () -> ()...) {
   for _ in fn {}
 }

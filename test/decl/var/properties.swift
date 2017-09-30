@@ -441,7 +441,7 @@ struct StructWithExtension1 {
   static var fooStatic = 4
 }
 extension StructWithExtension1 {
-  var fooExt: Int // expected-error {{extensions may not contain stored properties}}
+  var fooExt: Int // expected-error {{extensions must not contain stored properties}}
   static var fooExtStatic = 4
 }
 
@@ -450,16 +450,16 @@ class ClassWithExtension1 {
   class var fooStatic = 4 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
 }
 extension ClassWithExtension1 {
-  var fooExt: Int // expected-error {{extensions may not contain stored properties}}
+  var fooExt: Int // expected-error {{extensions must not contain stored properties}}
   class var fooExtStatic = 4 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
 }
 
 enum EnumWithExtension1 {
-  var foo: Int // expected-error {{enums may not contain stored properties}}
+  var foo: Int // expected-error {{enums must not contain stored properties}}
   static var fooStatic  = 4
 }
 extension EnumWithExtension1 {
-  var fooExt: Int // expected-error {{extensions may not contain stored properties}}
+  var fooExt: Int // expected-error {{extensions must not contain stored properties}}
   static var fooExtStatic = 4
 }
 
@@ -468,7 +468,7 @@ protocol ProtocolWithExtension1 {
   static var fooStatic : Int { get }
 }
 extension ProtocolWithExtension1 {
-  var fooExt: Int // expected-error{{extensions may not contain stored properties}}
+  var fooExt: Int // expected-error{{extensions must not contain stored properties}}
   static var fooExtStatic = 4 // expected-error{{static stored properties not supported in protocol extensions}}
 }
 
@@ -712,7 +712,7 @@ struct WillSetDidSetProperties {
     didSet {
       markUsed("woot")
     }
-    get { // expected-error {{didSet variable may not also have a get specifier}}
+    get { // expected-error {{didSet variable must not also have a get specifier}}
       return 4
     }
   }
@@ -721,7 +721,7 @@ struct WillSetDidSetProperties {
     willSet {
       markUsed("woot")
     }
-    set { // expected-error {{willSet variable may not also have a set specifier}}
+    set { // expected-error {{willSet variable must not also have a set specifier}}
       return 4
     }
   }
@@ -1113,8 +1113,8 @@ class rdar17391625 {
 }
 
 extension rdar17391625 {
-  var someStoredVar: Int       // expected-error {{extensions may not contain stored properties}}
-  var someObservedVar: Int {   // expected-error {{extensions may not contain stored properties}}
+  var someStoredVar: Int       // expected-error {{extensions must not contain stored properties}}
+  var someObservedVar: Int {   // expected-error {{extensions must not contain stored properties}}
   didSet {
   }
   }
@@ -1135,7 +1135,7 @@ extension rdar17391625derived {
 public protocol rdar27671033P {}
 struct rdar27671033S<Key, Value> {}
 extension rdar27671033S : rdar27671033P where Key == String { // expected-error {{extension of type 'rdar27671033S' with constraints cannot have an inheritance clause}}
-  let d = rdar27671033S<Int, Int>() // expected-error {{extensions may not contain stored properties}}
+  let d = rdar27671033S<Int, Int>() // expected-error {{extensions must not contain stored properties}}
 }
 
 // <rdar://problem/19874152> struct memberwise initializer violates new sanctity of previously set `let` property
