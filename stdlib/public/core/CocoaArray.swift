@@ -31,19 +31,19 @@ internal struct _CocoaArrayWrapper : RandomAccessCollection {
   typealias Indices = CountableRange<Int>
   @_inlineable
   @_versioned
-  var startIndex: Int {
+  internal var startIndex: Int {
     return 0
   }
 
   @_inlineable
   @_versioned
-  var endIndex: Int {
+  internal var endIndex: Int {
     return buffer.count
   }
 
   @_inlineable
   @_versioned
-  subscript(i: Int) -> AnyObject {
+  internal subscript(i: Int) -> AnyObject {
     return buffer.objectAt(i)
   }
 
@@ -59,7 +59,7 @@ internal struct _CocoaArrayWrapper : RandomAccessCollection {
   /// implementation of countByEnumerating.
   @_inlineable
   @_versioned
-  func contiguousStorage(
+  internal func contiguousStorage(
     _ subRange: Range<Int>
   ) -> UnsafeMutablePointer<AnyObject>?
   {
@@ -81,13 +81,14 @@ internal struct _CocoaArrayWrapper : RandomAccessCollection {
       : nil
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @_transparent
-  init(_ buffer: _NSArrayCore) {
+  internal init(_ buffer: _NSArrayCore) {
     self.buffer = buffer
   }
 
   @_versioned
-  var buffer: _NSArrayCore
+  internal var buffer: _NSArrayCore
 }
 #endif

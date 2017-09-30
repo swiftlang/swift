@@ -61,6 +61,7 @@ public struct StaticString
   /// The static string must store a pointer to either ASCII or UTF-8 code
   /// units. Accessing this property when `hasPointerRepresentation` is
   /// `false` triggers a runtime error.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public var utf8Start: UnsafePointer<UInt8> {
     _precondition(
@@ -74,6 +75,7 @@ public struct StaticString
   /// The static string must store a single Unicode scalar value. Accessing
   /// this property when `hasPointerRepresentation` is `true` triggers a
   /// runtime error.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public var unicodeScalar: Unicode.Scalar {
     _precondition(
@@ -86,6 +88,7 @@ public struct StaticString
   ///
   /// - Warning: If the static string stores a single Unicode scalar value, the
   ///   value of `utf8CodeUnitCount` is unspecified.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public var utf8CodeUnitCount: Int {
     _precondition(
@@ -96,6 +99,7 @@ public struct StaticString
 
   /// A Boolean value indicating whether the static string stores a pointer to
   /// ASCII or UTF-8 code units.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public var hasPointerRepresentation: Bool {
     return (UInt8(_flags) & 0x1) == 0
@@ -110,6 +114,7 @@ public struct StaticString
   ///
   /// - Warning: If the static string stores a single Unicode scalar value, the
   ///   value of `isASCII` is unspecified.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public var isASCII: Bool {
     return (UInt8(_flags) & 0x2) != 0
@@ -130,6 +135,7 @@ public struct StaticString
   ///   `withUTF8Buffer(invoke:)` method. The pointer argument is valid only
   ///   for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure.
+  @_inlineable // FIXME(sil-serialize-all)
   public func withUTF8Buffer<R>(
     _ body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
@@ -154,11 +160,13 @@ public struct StaticString
   }
 
   /// Creates an empty static string.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init() {
     self = ""
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @_transparent
   internal init(
@@ -176,6 +184,7 @@ public struct StaticString
       : (0x0 as UInt8)._value
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @_transparent
   internal init(
@@ -188,6 +197,7 @@ public struct StaticString
       : (0x1 as UInt8)._value
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @effects(readonly)
   @_transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
@@ -198,12 +208,14 @@ public struct StaticString
   ///
   /// Do not call this initializer directly. It may be used by the compiler
   /// when you initialize a static string with a Unicode scalar.
+  @_inlineable // FIXME(sil-serialize-all)
   @effects(readonly)
   @_transparent
   public init(unicodeScalarLiteral value: StaticString) {
     self = value
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @effects(readonly)
   @_transparent
   public init(
@@ -223,12 +235,14 @@ public struct StaticString
   ///
   /// Do not call this initializer directly. It may be used by the compiler
   /// when you initialize a static string using an extended grapheme cluster.
+  @_inlineable // FIXME(sil-serialize-all)
   @effects(readonly)
   @_transparent
   public init(extendedGraphemeClusterLiteral value: StaticString) {
     self = value
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @effects(readonly)
   @_transparent
   public init(
@@ -246,6 +260,7 @@ public struct StaticString
   ///
   /// Do not call this initializer directly. It may be used by the compiler
   /// when you initialize a static string using a string literal.
+  @_inlineable // FIXME(sil-serialize-all)
   @effects(readonly)
   @_transparent
   public init(stringLiteral value: StaticString) {
@@ -253,6 +268,7 @@ public struct StaticString
   }
 
   /// A string representation of the static string.
+  @_inlineable // FIXME(sil-serialize-all)
   public var description: String {
     return withUTF8Buffer {
       (buffer) in
@@ -261,12 +277,14 @@ public struct StaticString
   }
 
   /// A textual representation of the static string, suitable for debugging.
+  @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return self.description.debugDescription
   }
 }
 
 extension StaticString {
+  @_inlineable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(reflecting: description)
   }

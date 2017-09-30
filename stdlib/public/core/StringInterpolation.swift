@@ -66,6 +66,7 @@ extension String : _ExpressibleByStringInterpolation {
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
+  @_inlineable // FIXME(sil-serialize-all)
   public init<T: TextOutputStreamable & CustomStringConvertible> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyStreamable(expr)
   }

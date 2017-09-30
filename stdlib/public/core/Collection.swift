@@ -1000,6 +1000,7 @@ extension _Indexable {
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
+  @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public func formIndex(after i: inout Index) {
     i = index(after: i)
@@ -1221,8 +1222,7 @@ extension _Indexable {
   @_inlineable
   @_versioned
   @inline(__always)
-  internal
-  func _advanceForward(
+  internal func _advanceForward(
     _ i: Index, by n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     _precondition(n >= 0,
@@ -1244,6 +1244,7 @@ extension _Indexable {
 /// `IndexingIterator<Self>`.
 extension Collection where Iterator == IndexingIterator<Self> {
   /// Returns an iterator over the elements of the collection.
+  @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public func makeIterator() -> IndexingIterator<Self> {
     return IndexingIterator(_elements: self)

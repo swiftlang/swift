@@ -34,6 +34,7 @@ public protocol LazyCollectionProtocol
 /// property is provided.
 extension LazyCollectionProtocol where Elements == Self {
   /// Identical to `self`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var elements: Self { return self }
 }
 

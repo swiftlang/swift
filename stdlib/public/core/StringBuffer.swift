@@ -12,12 +12,16 @@
 
 @_versioned
 struct _StringBufferIVars {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(_elementWidth: Int) {
     _sanityCheck(_elementWidth == 1 || _elementWidth == 2)
     usedEnd = nil
     capacityAndElementShift = _elementWidth - 1
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(
     _usedEnd: UnsafeMutableRawPointer,
     byteCapacity: Int,
@@ -31,12 +35,18 @@ struct _StringBufferIVars {
 
   // This stored property should be stored at offset zero.  We perform atomic
   // operations on it using _HeapBuffer's pointer.
+  @_versioned // FIXME(sil-serialize-all)
   var usedEnd: UnsafeMutableRawPointer?
 
+  @_versioned // FIXME(sil-serialize-all)
   var capacityAndElementShift: Int
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var byteCapacity: Int {
     return capacityAndElementShift & ~0x1
   }
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var elementShift: Int {
     return capacityAndElementShift & 0x1
   }
@@ -54,10 +64,13 @@ public struct _StringBuffer {
   typealias HeapBufferStorage
     = _HeapBufferStorage<_StringBufferIVars, UTF16.CodeUnit>
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   init(_ storage: _Storage) {
     _storage = storage
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public init(capacity: Int, initialSize: Int, elementWidth: Int) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
     _sanityCheck(initialSize <= capacity)
@@ -91,6 +104,8 @@ public struct _StringBuffer {
       = ((_storage.capacity - capacityBump) &<< 1) + elementShift
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   static func fromCodeUnits<Input : Sequence, Encoding : _UnicodeEncoding>(
     _ input: Input, encoding: Encoding.Type, repairIllFormedSequences: Bool,
     minimumCapacity: Int = 0
@@ -141,12 +156,15 @@ public struct _StringBuffer {
   }
 
   /// A pointer to the start of this buffer's data area.
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   var start: UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(_storage.baseAddress)
   }
 
   /// A past-the-end pointer for this buffer's stored data.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var usedEnd: UnsafeMutableRawPointer {
     get {
       return _storage.value.usedEnd!
@@ -156,26 +174,35 @@ public struct _StringBuffer {
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var usedCount: Int {
     return (usedEnd - start) &>> elementShift
   }
 
   /// A past-the-end pointer for this buffer's available storage.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var capacityEnd: UnsafeMutableRawPointer {
     return start + _storage.value.byteCapacity
   }
 
   /// The number of elements that can be stored in this buffer.
+  @_inlineable // FIXME(sil-serialize-all)
   public var capacity: Int {
     return _storage.value.byteCapacity &>> elementShift
   }
 
   /// 1 if the buffer stores UTF-16; 0 otherwise.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var elementShift: Int {
     return _storage.value.elementShift
   }
 
   /// The number of bytes per element.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var elementWidth: Int {
     return elementShift + 1
   }
@@ -185,6 +212,8 @@ public struct _StringBuffer {
   // reserveCapacity on String and subsequently use that capacity, in
   // two separate phases.  Operations with one-phase growth should use
   // "grow()," below.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   func hasCapacity(
     _ cap: Int, forSubRange r: Range<UnsafeRawPointer>
   ) -> Bool {
@@ -194,9 +223,12 @@ public struct _StringBuffer {
     return cap + offset <= capacity
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var _anyObject: AnyObject? {
     return _storage.storage
   }
 
+  @_versioned // FIXME(sil-serialize-all)
   var _storage: _Storage
 }

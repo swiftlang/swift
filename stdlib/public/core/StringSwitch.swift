@@ -16,6 +16,7 @@
 
 /// The compiler intrinsic which is called to lookup a string in a table
 /// of static string case values.
+@_inlineable // FIXME(sil-serialize-all)
 @_semantics("stdlib_binary_only")
 @_semantics("findStringSwitchCase")
 public // COMPILER_INTRINSIC
@@ -41,9 +42,22 @@ struct _OpaqueStringSwitchCache {
 
 internal typealias _StringSwitchCache = Dictionary<String, Int>
 
+@_versioned // FIXME(sil-serialize-all)
 internal struct _StringSwitchContext {
-  let cases: [StaticString]
-  let cachePtr: UnsafeMutablePointer<_StringSwitchCache>
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(
+    cases: [StaticString],
+    cachePtr: UnsafeMutablePointer<_StringSwitchCache>
+  ){
+    self.cases = cases
+    self.cachePtr = cachePtr
+  }
+
+  @_versioned // FIXME(sil-serialize-all)
+  internal let cases: [StaticString]
+  @_versioned // FIXME(sil-serialize-all)
+  internal let cachePtr: UnsafeMutablePointer<_StringSwitchCache>
 }
 
 /// The compiler intrinsic which is called to lookup a string in a table
@@ -53,6 +67,7 @@ internal struct _StringSwitchContext {
 /// in \p cache. Consecutive calls use the cache for faster lookup.
 /// The \p cases array must not change between subsequent calls with the
 /// same \p cache.
+@_inlineable // FIXME(sil-serialize-all)
 @_semantics("stdlib_binary_only")
 @_semantics("findStringSwitchCaseWithCache")
 public // COMPILER_INTRINSIC
@@ -81,6 +96,8 @@ func _findStringSwitchCaseWithCache(
 }
 
 /// Builds the string switch case.
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 internal func _createStringTableCache(_ cacheRawPtr: Builtin.RawPointer) {
   let context = UnsafePointer<_StringSwitchContext>(cacheRawPtr).pointee
   var cache = _StringSwitchCache()

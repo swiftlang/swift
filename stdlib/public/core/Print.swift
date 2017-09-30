@@ -49,6 +49,7 @@
 ///     space (`" "`).
 ///   - terminator: The string to print after all items have been printed. The
 ///     default is a newline (`"\n"`).
+@_inlineable // FIXME(sil-serialize-all)
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func print(
@@ -109,6 +110,7 @@ public func print(
 ///     space (`" "`).
 ///   - terminator: The string to print after all items have been printed. The
 ///     default is a newline (`"\n"`).
+@_inlineable // FIXME(sil-serialize-all)
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func debugPrint(
@@ -165,6 +167,7 @@ public func debugPrint(
 ///     default is a newline (`"\n"`).
 ///   - output: An output stream to receive the text representation of each
 ///     item.
+@_inlineable // FIXME(sil-serialize-all)
 @inline(__always)
 public func print<Target : TextOutputStream>(
   _ items: Any...,
@@ -213,6 +216,7 @@ public func print<Target : TextOutputStream>(
 ///     default is a newline (`"\n"`).
 ///   - output: An output stream to receive the text representation of each
 ///     item.
+@_inlineable // FIXME(sil-serialize-all)
 @inline(__always)
 public func debugPrint<Target : TextOutputStream>(
   _ items: Any...,
@@ -224,6 +228,7 @@ public func debugPrint<Target : TextOutputStream>(
     items, separator: separator, terminator: terminator, to: &output)
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 @_versioned
 @inline(never)
 @_semantics("stdlib_binary_only")
@@ -244,6 +249,7 @@ internal func _print<Target : TextOutputStream>(
   output.write(terminator)
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 @_versioned
 @inline(never)
 @_semantics("stdlib_binary_only")

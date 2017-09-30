@@ -376,6 +376,7 @@ extension MutableCollection {
 }
 
 extension MutableCollection where Self: BidirectionalCollection {
+  @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> MutableBidirectionalSlice<Self> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
@@ -388,6 +389,7 @@ extension MutableCollection where Self: BidirectionalCollection {
 }
 
 extension MutableCollection where Self: RandomAccessCollection {
+  @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> MutableRandomAccessSlice<Self> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)

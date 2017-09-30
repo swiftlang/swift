@@ -28,6 +28,7 @@ from gyb_stdlib_support import (
 public struct LazyPrefixWhileIterator<Base : IteratorProtocol> :
   IteratorProtocol, Sequence {
 
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func next() -> Base.Element? {
     // Return elements from the base iterator until one fails the predicate.
     if !_predicateHasFailed, let nextElement = _base.next() {
@@ -40,13 +41,18 @@ public struct LazyPrefixWhileIterator<Base : IteratorProtocol> :
     return nil
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(_base: Base, predicate: @escaping (Base.Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
   }
 
+  @_versioned // FIXME(sil-serialize-all)
   internal var _predicateHasFailed = false
+  @_versioned // FIXME(sil-serialize-all)
   internal var _base: Base
+  @_versioned // FIXME(sil-serialize-all)
   internal let _predicate: (Base.Element) -> Bool
 }
 
@@ -56,17 +62,22 @@ public struct LazyPrefixWhileSequence<Base : Sequence> : LazySequenceProtocol {
 
   public typealias Elements = LazyPrefixWhileSequence
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func makeIterator() -> LazyPrefixWhileIterator<Base.Iterator> {
     return LazyPrefixWhileIterator(
       _base: _base.makeIterator(), predicate: _predicate)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(_base: Base, predicate: @escaping (Base.Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
   }
 
+  @_versioned // FIXME(sil-serialize-all)
   internal var _base: Base
+  @_versioned // FIXME(sil-serialize-all)
   internal let _predicate: (Base.Element) -> Bool
 }
 
@@ -78,6 +89,7 @@ extension LazySequenceProtocol {
   ///   its argument and returns `true` if the element should be included or
   ///   `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
+  @_inlineable // FIXME(sil-serialize-all)
   public func prefix(
     while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyPrefixWhileSequence<Self.Elements> {
@@ -98,9 +110,12 @@ public enum _LazyPrefixWhileIndexRepresentation<Base : Collection> {
 /// `LazyPrefixWhileBidirectionalCollection` instance.
 public struct LazyPrefixWhileIndex<Base : Collection> : Comparable {
   /// The position corresponding to `self` in the underlying collection.
+  @_versioned // FIXME(sil-serialize-all)
   internal let _value: _LazyPrefixWhileIndexRepresentation<Base>
 
   /// Creates a new index wrapper for `i`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(_ i: Base.Index) {
     self._value = .index(i)
   }
@@ -108,10 +123,13 @@ public struct LazyPrefixWhileIndex<Base : Collection> : Comparable {
   /// Creates a new index that can represent the `endIndex` of a
   /// `LazyPrefixWhileCollection<Base>`. This is not the same as a wrapper
   /// around `Base.endIndex`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(endOf: Base) {
     self._value = .pastEnd
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static func == (
     lhs: LazyPrefixWhileIndex, rhs: LazyPrefixWhileIndex
   ) -> Bool {
@@ -125,6 +143,7 @@ public struct LazyPrefixWhileIndex<Base : Collection> : Comparable {
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static func < (
     lhs: LazyPrefixWhileIndex, rhs: LazyPrefixWhileIndex
   ) -> Bool {
@@ -158,10 +177,12 @@ public struct ${Self}<
 
   public typealias Index = LazyPrefixWhileIndex<Base>
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var startIndex: Index {
     return LazyPrefixWhileIndex(_base.startIndex)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var endIndex: Index {
     // If the first element of `_base` satisfies the predicate, there is at
     // least one element in the lazy collection: Use the explicit `.pastEnd` index.
@@ -174,6 +195,7 @@ public struct ${Self}<
     return startIndex
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
     _precondition(i != endIndex, "Can't advance past endIndex")
     guard case .index(let i) = i._value else {
@@ -188,6 +210,7 @@ public struct ${Self}<
 
 %   if Traversal == 'Bidirectional':
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     switch i._value {
     case .index(let i):
@@ -216,6 +239,7 @@ public struct ${Self}<
 
 %   end
 
+  @_inlineable // FIXME(sil-serialize-all)
   public subscript(position: Index) -> Base.Element {
     switch position._value {
     case .index(let i):
@@ -225,17 +249,22 @@ public struct ${Self}<
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func makeIterator() -> LazyPrefixWhileIterator<Base.Iterator> {
     return LazyPrefixWhileIterator(
       _base: _base.makeIterator(), predicate: _predicate)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(_base: Base, predicate: @escaping (Base.Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
   }
 
+  @_versioned // FIXME(sil-serialize-all)
   internal var _base: Base
+  @_versioned // FIXME(sil-serialize-all)
   internal let _predicate: (Base.Element) -> Bool
 }
 
@@ -253,6 +282,7 @@ extension LazyCollectionProtocol
   ///   as its argument and returns `true` if the element should be included
   ///   or `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
+  @_inlineable // FIXME(sil-serialize-all)
   public func prefix(
     while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyPrefixWhile${Collection}<Self.Elements> {

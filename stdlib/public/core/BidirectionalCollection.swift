@@ -158,11 +158,13 @@ public protocol BidirectionalCollection : _BidirectionalIndexable, Collection
 /// Default implementation for bidirectional collections.
 extension _BidirectionalIndexable {
 
+  @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public func formIndex(before i: inout Index) {
     i = index(before: i)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
@@ -174,6 +176,7 @@ extension _BidirectionalIndexable {
     return i
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -190,6 +193,7 @@ extension _BidirectionalIndexable {
     return i
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     var start = start
     var count: IndexDistance = 0
@@ -215,6 +219,7 @@ extension _BidirectionalIndexable {
 /// models that accept the default associated `SubSequence`,
 /// `BidirectionalSlice<Self>`.
 extension BidirectionalCollection where SubSequence == BidirectionalSlice<Self> {
+  @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> BidirectionalSlice<Self> {
     _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
     return BidirectionalSlice(base: self, bounds: bounds)
@@ -232,6 +237,7 @@ extension BidirectionalCollection where SubSequence == Self {
   ///   or more elements; otherwise, `nil`.
   ///
   /// - Complexity: O(1).
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
     let element = last!
@@ -247,6 +253,7 @@ extension BidirectionalCollection where SubSequence == Self {
   /// - Returns: The last element of the collection.
   ///
   /// - Complexity: O(1)
+  @_inlineable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func removeLast() -> Element {
     let element = last!
@@ -263,6 +270,7 @@ extension BidirectionalCollection where SubSequence == Self {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
@@ -290,6 +298,7 @@ extension BidirectionalCollection {
   /// - Returns: A subsequence that leaves off `n` elements from the end.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements to drop.
+  @_inlineable // FIXME(sil-serialize-all)
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
@@ -318,6 +327,7 @@ extension BidirectionalCollection {
   ///   most `maxLength` elements.
   ///
   /// - Complexity: O(*n*), where *n* is equal to `maxLength`.
+  @_inlineable // FIXME(sil-serialize-all)
   public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,

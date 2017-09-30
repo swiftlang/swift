@@ -480,6 +480,7 @@ public protocol _BitwiseOperations {
 /// - Parameters:
 ///   - lhs: A value to update with the union of bits set in the two arguments.
 ///   - rhs: Another value.
+@_inlineable // FIXME(sil-serialize-all)
 public func |= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
   lhs = lhs | rhs
 }
@@ -491,6 +492,7 @@ public func |= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
 ///   - lhs: A value to update with the intersections of bits set in the two
 ///     arguments.
 ///   - rhs: Another value.
+@_inlineable // FIXME(sil-serialize-all)
 public func &= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
   lhs = lhs & rhs
 }
@@ -502,6 +504,7 @@ public func &= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
 ///   - lhs: A value to update with the bits that are set in exactly one of the
 ///     two arguments.
 ///   - rhs: Another value.
+@_inlineable // FIXME(sil-serialize-all)
 public func ^= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
   lhs = lhs ^ rhs
 }
@@ -537,6 +540,7 @@ public func ^= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
 /// - Parameters:
 ///   - lhs: A value to compare.
 ///   - rhs: Another value to compare.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func ~= <T : Equatable>(a: T, b: T) -> Bool {
   return a == b
