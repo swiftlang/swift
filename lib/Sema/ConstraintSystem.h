@@ -33,6 +33,7 @@
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -2577,6 +2578,9 @@ private:
     /// Tracks the position of the last known supertype in the group.
     Optional<unsigned> lastSupertypeIndex;
 
+    /// A set of all constraints which contribute to pontential bindings.
+    llvm::SmallPtrSet<Constraint *, 8> Sources;
+
     PotentialBindings(TypeVariableType *typeVar) : TypeVar(typeVar) {}
 
     /// Determine whether the set of bindings is non-empty.
@@ -2600,7 +2604,29 @@ private:
     /// \c x is a better set of bindings that \c y.
     friend bool operator<(const PotentialBindings &x,
                           const PotentialBindings &y) {
-      return formBindingScore(x) < formBindingScore(y);
+      if (formBindingScore(x) < formBindingScore(y))
+        return true;
+
+      if (!x.hasNonDefaultableBindings())
+        return false;
+
+      llvm::SmallPtrSet<Constraint *, 8> intersection(x.Sources);
+      llvm::set_intersect(intersection, y.Sources);
+
+      // Some relational constraints dictate certain
+      // ordering when it comes to attempting binding
+      // of type variables, where left-hand side is
+      // always more preferrable than right-hand side.
+      for (const auto *constraint : intersection) {
+        if (constraint->getKind() != ConstraintKind::Subtype)
+          continue;
+
+        auto lhs = constraint->getFirstType();
+        if (auto *typeVar = lhs->getAs<TypeVariableType>())
+          return x.TypeVar == typeVar;
+      }
+
+      return false;
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
