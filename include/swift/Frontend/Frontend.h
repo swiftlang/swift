@@ -75,10 +75,15 @@ class CompilerInvocation {
   unsigned CodeCompletionOffset = ~0U;
 
   CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
+  
+  /// \brief Used for holding the Swift code passed into the command line via
+  /// the "-e" flag.
+  // SR-5860 WIP: commented out for now because it produces a compiler error
+//  std::unique_ptr<llvm::MemoryBuffer> ImmediateExecutionBuffer;
 
 public:
   CompilerInvocation();
-
+  
   /// Initializes the compiler invocation for the list of arguments.
   ///
   /// All parsing should be additive, i.e. options should not be reset to their

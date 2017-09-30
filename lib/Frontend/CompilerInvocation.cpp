@@ -446,13 +446,12 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   if (Opts.RequestedAction == FrontendOptions::Immediate) {
     if (Args.hasArg(OPT_e)) {
+      llvm::SmallString<64> CodeBuffer;
       for (const Arg *A : Args.filtered(OPT_e)) {
-        if (A->getNumValues() > 0) {
-          auto sourceBuffer =
-            llvm::MemoryBuffer::getMemBufferCopy(A->getValue(), "immediate");
-          Opts.InputBuffers.push_back(std::move(sourceBuffer.get()));
-        }
+        CodeBuffer.append(A->getValue());
+        CodeBuffer.append("\n");
       }
+      // SR-5860 WIP TODO: copy CodeBuffer into ImmediateExecutionBuffer
     } else {
       assert(!Opts.InputFilenames.empty());
       Opts.ImmediateArgv.push_back(Opts.InputFilenames[0]); // argv[0]
