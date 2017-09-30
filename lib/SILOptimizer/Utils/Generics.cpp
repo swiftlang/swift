@@ -2274,11 +2274,12 @@ void swift::trySpecializeApplyOfGeneric(
   if (F->isSerialized() && RefF->isSerialized())
     Serialized = IsSerializable;
 
-  // If it is OnoneSupport consider all specializations as serialized.
+  // If it is OnoneSupport consider all specializations as non-serialized
+  // as we do not SIL serialize their bodies.
   // It is important to set this flag here, because it affects the
   // mangling of the specialization's name.
   if (Apply.getModule().isOptimizedOnoneSupportModule())
-    Serialized = IsSerialized;
+    Serialized = IsNotSerialized;
 
   ReabstractionInfo ReInfo(Apply, RefF, Apply.getSubstitutions());
   if (!ReInfo.canBeSpecialized())

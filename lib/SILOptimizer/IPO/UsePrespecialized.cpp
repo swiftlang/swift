@@ -99,9 +99,10 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (SpecType->hasArchetype())
       continue;
 
-    // Create a name of the specialization.
+    // Create a name of the specialization. All external pre-specializations
+    // are serialized without bodies. Thus use IsNotSerialized here.
     Mangle::GenericSpecializationMangler NewGenericMangler(ReferencedF,
-                                              Subs, ReferencedF->isSerialized(),
+                                              Subs, IsNotSerialized,
                                               /*isReAbstracted*/ true);
     std::string ClonedName = NewGenericMangler.mangle();
       
