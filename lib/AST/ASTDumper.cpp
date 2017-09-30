@@ -2343,7 +2343,7 @@ public:
     printCommon(E, "enum_is_case_expr") << ' ' <<
       E->getEnumElement()->getName() << "\n";
     printRec(E->getSubExpr());
-    
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
     printCommon(E, "unresolved_pattern_expr") << '\n';
