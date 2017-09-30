@@ -2,7 +2,7 @@
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
-  init() {} // expected-error {{protocol initializers may not have bodies}}
+  init() {} // expected-error {{protocol initializers must not have bodies}}
   deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 
@@ -466,7 +466,7 @@ protocol ShouldntCrash {
 
 // rdar://problem/18168866
 protocol FirstProtocol {
-    weak var delegate : SecondProtocol? { get } // expected-error{{'weak' may not be applied to non-class-bound 'SecondProtocol'; consider adding a protocol conformance that has a class bound}}
+    weak var delegate : SecondProtocol? { get } // expected-error{{'weak' must not be applied to non-class-bound 'SecondProtocol'; consider adding a protocol conformance that has a class bound}}
 }
 
 protocol SecondProtocol {

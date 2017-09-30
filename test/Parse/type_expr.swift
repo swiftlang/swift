@@ -22,12 +22,12 @@ protocol Zim {
 
   init()
   // TODO class var prop: Int { get }
-  static func meth() {} // expected-error{{protocol methods may not have bodies}}
-  func instMeth() {} // expected-error{{protocol methods may not have bodies}}
+  static func meth() {} // expected-error{{protocol methods must not have bodies}}
+  func instMeth() {} // expected-error{{protocol methods must not have bodies}}
 }
 
 protocol Bad {
-  init() {} // expected-error{{protocol initializers may not have bodies}}
+  init() {} // expected-error{{protocol initializers must not have bodies}}
 }
 
 struct Gen<T> {
