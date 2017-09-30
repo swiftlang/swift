@@ -226,12 +226,12 @@ where Index : Strideable,
     return i.advanced(by: 1)
   }
 
-  @_inlineable
   /// Returns the position immediately after the given index.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
+  @_inlineable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     let result = i.advanced(by: -1)
     // FIXME: swift-3-indexing-model: tests for the trap.

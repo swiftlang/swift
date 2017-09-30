@@ -127,7 +127,7 @@ public struct Unsafe${Mutable}RawBufferPointer
 
     @_versioned
     @_inlineable
-    init(_position: UnsafeRawPointer?, _end: UnsafeRawPointer?) {
+    internal init(_position: UnsafeRawPointer?, _end: UnsafeRawPointer?) {
       self._position = _position
       self._end = _end
     }
@@ -566,11 +566,12 @@ public struct Unsafe${Mutable}RawBufferPointer
   %  end # mutable
 
   @_versioned
-  let _position, _end: Unsafe${Mutable}RawPointer?
+  internal let _position, _end: Unsafe${Mutable}RawPointer?
 }
 
 extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
+  @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "${Self}"
       + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
@@ -578,6 +579,7 @@ extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
 }
 
 extension ${Self} {
+  @_inlineable // FIXME(sil-serialize-all)
   @available(*, unavailable, message:
     "use 'Unsafe${Mutable}RawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
   public subscript(bounds: Range<Int>) -> ${Self} {

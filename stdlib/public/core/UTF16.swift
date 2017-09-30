@@ -19,14 +19,17 @@ extension Unicode.UTF16 : Unicode.Encoding {
   public typealias CodeUnit = UInt16
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt16>
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static var encodedReplacementCharacter : EncodedScalar {
     return EncodedScalar(_storage: 0xFFFD, _bitCount: 16)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static func _isScalar(_ x: CodeUnit) -> Bool  {
     return x & 0xf800 != 0xd800
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
     let bits = source._storage
     if _fastPath(source._bitCount == 16) {
@@ -37,6 +40,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
     return Unicode.Scalar(_unchecked: value)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static func encode(
     _ source: Unicode.Scalar
   ) -> EncodedScalar? {
@@ -51,6 +55,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
     return EncodedScalar(_storage: r, _bitCount: 32)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public static func transcode<FromEncoding : Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
@@ -96,12 +101,14 @@ extension Unicode.UTF16 : Unicode.Encoding {
   
   public struct ForwardParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt16>
+    @_inlineable // FIXME(sil-serialize-all)
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }
   
   public struct ReverseParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt16>
+    @_inlineable // FIXME(sil-serialize-all)
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }
@@ -110,6 +117,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
 extension UTF16.ReverseParser : Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF16
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(  // this case handled elsewhere
       !Encoding._isScalar(UInt16(truncatingIfNeeded: _buffer._storage)))
@@ -119,6 +127,7 @@ extension UTF16.ReverseParser : Unicode.Parser, _UTFParser {
     return (false, 1*16)
   }
   
+  @_inlineable // FIXME(sil-serialize-all)
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     return Encoding.EncodedScalar(
       _storage:
@@ -131,6 +140,7 @@ extension UTF16.ReverseParser : Unicode.Parser, _UTFParser {
 extension Unicode.UTF16.ForwardParser : Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF16
   
+  @_inlineable // FIXME(sil-serialize-all)
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(  // this case handled elsewhere
       !Encoding._isScalar(UInt16(truncatingIfNeeded: _buffer._storage)))
@@ -140,6 +150,7 @@ extension Unicode.UTF16.ForwardParser : Unicode.Parser, _UTFParser {
     return (false, 1*16)
   }
   
+  @_inlineable // FIXME(sil-serialize-all)
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     var r = _buffer
     r._bitCount = bitCount

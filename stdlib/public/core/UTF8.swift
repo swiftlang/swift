@@ -20,6 +20,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
   public typealias CodeUnit = UInt8
   public typealias EncodedScalar = _ValidUTF8Buffer<UInt32>
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static var encodedReplacementCharacter : EncodedScalar {
     return EncodedScalar.encodedReplacementCharacter
   }
@@ -87,6 +88,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
       _biasedBits: (o | c ) &+ 0b0__1000_0001__1000_0001__1000_0001__1111_0001)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public static func transcode<FromEncoding : _UnicodeEncoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
@@ -175,8 +177,9 @@ extension UTF8.ReverseParser : Unicode.Parser, _UTFParser {
   /// Returns the length of the invalid sequence that ends with the LSB of
   /// buffer.
   @inline(never)
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  func _invalidLength() -> UInt8 {
+  internal func _invalidLength() -> UInt8 {
     if _buffer._storage                 & 0b0__1111_0000__1100_0000
                                        == 0b0__1110_0000__1000_0000 {
       // 2-byte prefix of 3-byte sequence. The top 5 bits of the decoded result
@@ -252,8 +255,9 @@ extension Unicode.UTF8.ForwardParser : Unicode.Parser, _UTFParser {
   /// Returns the length of the invalid sequence that starts with the LSB of
   /// buffer.
   @inline(never)
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  func _invalidLength() -> UInt8 {
+  internal func _invalidLength() -> UInt8 {
     if _buffer._storage               & 0b0__1100_0000__1111_0000
                                      == 0b0__1000_0000__1110_0000 {
       // 2-byte prefix of 3-byte sequence. The top 5 bits of the decoded result
@@ -275,6 +279,7 @@ extension Unicode.UTF8.ForwardParser : Unicode.Parser, _UTFParser {
     return 1
   }
   
+  @_inlineable // FIXME(sil-serialize-all)
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     let x = UInt32(_buffer._storage) &+ 0x01010101
     return _ValidUTF8Buffer(_biasedBits: x & ._lowBits(bitCount))

@@ -27,11 +27,13 @@ import SwiftShims
 ///   * an unspecified value less than zero if `lhs < rhs`,
 ///   * zero if `lhs == rhs`,
 ///   * an unspecified value greater than zero if `lhs > rhs`.
+@_inlineable // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollation")
 public func _stdlib_compareNSStringDeterministicUnicodeCollation(
   _ lhs: AnyObject, _ rhs: AnyObject
 ) -> Int32
 
+@_inlineable // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr")
 public func _stdlib_compareNSStringDeterministicUnicodeCollationPointer(
   _ lhs: OpaquePointer, _ rhs: OpaquePointer
@@ -51,6 +53,7 @@ extension String {
   ///   0027  ; [*02F8.0020.0002] # APOSTROPHE
   ///
   /// - Precondition: Both `self` and `rhs` are ASCII strings.
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   func _compareASCII(_ rhs: String) -> Int {
     var compare: Int
@@ -74,6 +77,7 @@ extension String {
 #endif
 
   /// Compares two strings with the Unicode Collation Algorithm.
+  @_inlineable // FIXME(sil-serialize-all)
   @inline(never)
   @_semantics("stdlib_binary_only") // Hide the CF/ICU dependency
   public  // @testable
@@ -113,6 +117,7 @@ extension String {
 #endif
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public  // @testable
   func _compareString(_ rhs: String) -> Int {
 #if _runtime(_ObjC)
@@ -128,6 +133,7 @@ extension String {
 }
 
 extension String : Equatable {
+  @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public static func == (lhs: String, rhs: String) -> Bool {
 #if _runtime(_ObjC)
@@ -151,6 +157,7 @@ extension String : Equatable {
 }
 
 extension String : Comparable {
+  @_inlineable // FIXME(sil-serialize-all)
   public static func < (lhs: String, rhs: String) -> Bool {
     return lhs._compareString(rhs) < 0
   }

@@ -498,6 +498,7 @@ public struct ${Self}<Element>
   ///     // Prints "[30, 40, 50]"
   ///
   /// If the array is empty, `endIndex` is equal to `startIndex`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var endIndex: Int {
 %if Self == 'ArraySlice':
     return _buffer.endIndex
@@ -1808,7 +1809,7 @@ internal struct _InitializeMemoryFromCollection<
 > : _PointerFunction {
   @_inlineable
   @_versioned
-  func call(_ rawMemory: UnsafeMutablePointer<C.Element>, count: Int) {
+  internal func call(_ rawMemory: UnsafeMutablePointer<C.Element>, count: Int) {
     var p = rawMemory
     var q = newValues.startIndex
     for _ in 0..<count {
@@ -1821,12 +1822,12 @@ internal struct _InitializeMemoryFromCollection<
 
   @_inlineable
   @_versioned
-  init(_ newValues: C) {
+  internal init(_ newValues: C) {
     self.newValues = newValues
   }
 
   @_versioned
-  var newValues: C
+  internal var newValues: C
 }
 
 extension _ArrayBufferProtocol {
@@ -2097,7 +2098,7 @@ internal struct _IgnorePointer<T> : _PointerFunction {
 
   @_versioned
   @_inlineable
-  init() {
+  internal init() {
   }
 }
 

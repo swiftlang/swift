@@ -35,7 +35,7 @@ else:
 
 @_inlineable
 @_versioned
-func _insertionSort<C>(
+internal func _insertionSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
   ${", by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool" if p else ""}
@@ -178,7 +178,7 @@ func _sort3<C>(
 ///   `elements.distance(from: range.lowerBound, to: range.upperBound) >= 3`
 @_inlineable
 @_versioned
-func _partition<C>(
+internal func _partition<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
   ${", by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool" if p else ""}
@@ -255,7 +255,7 @@ func _introSort<C>(
 
 @_inlineable
 @_versioned
-func _introSortImpl<C>(
+internal func _introSortImpl<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
   ${", by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool" if p else ""},
@@ -302,7 +302,7 @@ func _introSortImpl<C>(
 
 @_inlineable
 @_versioned
-func _siftDown<C>(
+internal func _siftDown<C>(
   _ elements: inout C,
   index: C.Index,
   subRange range: Range<C.Index>
@@ -345,7 +345,7 @@ func _siftDown<C>(
 
 @_inlineable
 @_versioned
-func _heapify<C>(
+internal func _heapify<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
   ${", by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool" if p else ""}
@@ -377,7 +377,7 @@ func _heapify<C>(
 
 @_inlineable
 @_versioned
-func _heapSort<C>(
+internal func _heapSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
   ${", by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool" if p else ""}
