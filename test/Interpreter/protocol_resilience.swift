@@ -5,14 +5,14 @@
 
 // RUN: %target-build-swift %s -lresilient_protocol -I %t -L %t -o %t/main -Xlinker -rpath -Xlinker %t
 
-// RUN: %target-run %t/main
+// RUN: %target-run %t/main %t/libresilient_protocol.%target-dylib-extension
 
 // RUN: %target-build-swift-dylib(%t/libresilient_protocol.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_protocol.swift -emit-module -emit-module-path %t/resilient_protocol.swiftmodule -module-name resilient_protocol -whole-module-optimization
 // RUN: %target-codesign %t/libresilient_protocol.%target-dylib-extension
 
 // RUN: %target-build-swift %s -lresilient_protocol -I %t -L %t -o %t/main -Xlinker -rpath -Xlinker %t
 
-// RUN: %target-run %t/main
+// RUN: %target-run %t/main %t/libresilient_protocol.%target-dylib-extension
 
 // REQUIRES: executable_test
 
