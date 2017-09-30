@@ -288,26 +288,26 @@ internal func _lexicographicalCompare(
 internal func _parseRawScalar(
   _ buf: UnsafeMutablePointer<_Normalization._SegmentOutputBuffer>,
   startingFrom idx: Int = 0
-) -> (UInt32, scalarEndIndex: Int) {
+) -> (UnicodeScalar, scalarEndIndex: Int) {
   return _parseRawScalar(_castOutputBuffer(buf), startingFrom: idx)
 }
 internal func _parseRawScalar(
   _ buf: UnsafeBufferPointer<UInt16>,
   startingFrom idx: Int = 0
-) -> (UInt32, scalarEndIndex: Int) {
+) -> (UnicodeScalar, scalarEndIndex: Int) {
   let ptr = buf.baseAddress._unsafelyUnwrappedUnchecked
   _sanityCheck(idx >= 0 && idx < buf.count, "out of bounds index")
   let cu: UInt16 = ptr[idx]
   if _slowPath(idx+1 == buf.count) {
-    return (UInt32(cu), idx+1)
+    return (UnicodeScalar(_unchecked: UInt32(cu)), idx+1)
   }
   guard _isLeadingSurrogate(cu) else {
-    return (UInt32(cu), idx+1)
+    return (UnicodeScalar(_unchecked: UInt32(cu)), idx+1)
   }
   let nextCu: UInt16 = ptr[idx+1]
   guard _isTrailingSurrogate(nextCu) else {
     // Invalid surrogate pair: just return the invalid value
-    return (UInt32(cu), idx+1)
+    return (UnicodeScalar(_unchecked: UInt32(cu)), idx+1)
   }
 
   // print("""
@@ -317,33 +317,33 @@ internal func _parseRawScalar(
   // Decode
   let value: UInt32 = _decodeSurrogatePair(leading: cu, trailing: nextCu)
   _sanityCheck(Int32(exactly: value) != nil, "top bit shouldn't be set")
-  return (value, idx+2)
+  return (UnicodeScalar(_unchecked: value), idx+2)
 }
 internal func _reverseParseRawScalar(
   _ buf: UnsafeBufferPointer<UInt16>,
   endingAt idx: Int // one-past-the-end
-) -> (UInt32, scalarStartIndex: Int) {
+) -> (UnicodeScalar, scalarStartIndex: Int) {
   _sanityCheck(idx > 0 && idx <= buf.count, "out of bounds end index")
   let ptr = buf.baseAddress._unsafelyUnwrappedUnchecked
 
   // Corner case: leading un-paired surrogate
   if _slowPath(idx == 1) {
-    return (UInt32(ptr[0]), 0)
+    return (UnicodeScalar(_unchecked: UInt32(ptr[0])), 0)
   }
 
   let cu: UInt16 = ptr[idx-1]
   guard _isTrailingSurrogate(cu) else {
-    return (UInt32(cu), idx-1)
+    return (UnicodeScalar(_unchecked: UInt32(cu)), idx-1)
   }
   let priorCU: UInt16 = ptr[idx-2]
   guard _isLeadingSurrogate(priorCU) else {
-    return (UInt32(cu), idx-1)
+    return (UnicodeScalar(_unchecked: UInt32(cu)), idx-1)
   }
 
   // Decode
   let value: UInt32 = _decodeSurrogatePair(leading: priorCU, trailing: cu)
   _sanityCheck(Int32(exactly: value) != nil, "top bit shouldn't be set")
-  return (value, idx-2)
+  return (UnicodeScalar(_unchecked: value), idx-2)
 }
 
 internal func _tryNormalize(
@@ -463,8 +463,7 @@ private struct _UnicodeScalarExceptions {
       // See if this normalizes to multiple segments
       var i = 0
       while i < length {
-        let (value, nextI) = _parseRawScalar(&outBuffer, startingFrom: i)
-        let innerScalar = UnicodeScalar(_unchecked: value)
+        let (innerScalar, nextI) = _parseRawScalar(&outBuffer, startingFrom: i)
         if _slowPath(i != 0 && innerScalar._hasNormalizationBoundaryBefore) {
           guard innerScalar._hasNormalizationBoundaryBefore else {
             fatalError(
@@ -535,7 +534,7 @@ internal func _findNormalizationSegmentEnd(
   while segmentEndIdx < count {
     let (scalar, nextIdx) = _parseRawScalar(buf, startingFrom: segmentEndIdx)
     segmentEndIdx = nextIdx
-    if UnicodeScalar(_unchecked: scalar)._hasNormalizationBoundaryBefore {
+    if scalar._hasNormalizationBoundaryBefore {
       break
     }
   }
@@ -552,7 +551,7 @@ internal func _findNormalizationSegmentStart(
   while idx > 0 {
     let (scalar, priorIdx) = _reverseParseRawScalar(buf, endingAt: idx)
     idx = priorIdx
-    if UnicodeScalar(_unchecked: scalar)._hasNormalizationBoundaryBefore {
+    if scalar._hasNormalizationBoundaryBefore {
       break
     }
   }
@@ -580,9 +579,7 @@ internal func _findNormalizationSegment(
   }
 
   // Check current scalar
-  if UnicodeScalar(
-    _unchecked: _parseRawScalar(buf, startingFrom: idx).0
-  )._hasNormalizationBoundaryBefore {
+  if _parseRawScalar(buf, startingFrom: idx).0._hasNormalizationBoundaryBefore {
     return (idx, segmentEnd)
   }
 
@@ -672,9 +669,7 @@ private func _compareStringsPreLoop(
   //
   if otherCU > 0x7F {
     if _fastPath(
-      UnicodeScalar(_unchecked:
-        _parseRawScalar(otherUTF16, startingFrom: idx).0
-      )._isNormalizedSuperASCII
+      _parseRawScalar(otherUTF16, startingFrom: idx).0._isNormalizedSuperASCII
     ) {
      return .less
     }
@@ -821,10 +816,8 @@ private func _compareStringsSuffix(
   // here.
   //
   if _slowPath(
-     UnicodeScalar(
-      _unchecked: _parseRawScalar(selfSegment).0)._isMultiSegmentExpander
-  || UnicodeScalar(
-    _unchecked: _parseRawScalar(otherSegment).0)._isMultiSegmentExpander
+     _parseRawScalar(selfSegment).0._isMultiSegmentExpander
+  || _parseRawScalar(otherSegment).0._isMultiSegmentExpander
   ) {
     return _compareStringsPathological(
       selfUTF16: selfUTF16[comparisonStartIdx...].rebased,
