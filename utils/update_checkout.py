@@ -485,6 +485,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     fail_count += shell.check_parallel_results(update_results, "UPDATE")
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
+    else:
+        print("update-checkout succeeded")
     sys.exit(fail_count)
 
 
