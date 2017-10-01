@@ -41,12 +41,15 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
 
-#define DEBUG_TYPE "protocol-conformance-checking"
+#define DEBUG_TYPE "Protocol conformance checking"
 #include "llvm/Support/Debug.h"
+
+STATISTIC(NumRequirementEnvironments, "# of requirement environments");
 
 using namespace swift;
 
@@ -1065,26 +1068,19 @@ RequirementEnvironment::RequirementEnvironment(
   auto selfType = cast<GenericTypeParamType>(
                             proto->getSelfInterfaceType()->getCanonicalType());
 
-  // Construct a generic signature builder by collecting the constraints
-  // from the requirement and the context of the conformance together,
-  // because both define the capabilities of the requirement.
-  GenericSignatureBuilder builder(
-           ctx,
-           TypeChecker::LookUpConformance(tc, conformanceDC));
-
   SmallVector<GenericTypeParamType*, 4> allGenericParams;
 
   // Add the generic signature of the context of the conformance. This includes
   // the generic parameters from the conforming type as well as any additional
   // constraints that might occur on the extension that declares the
   // conformance (i.e., if the conformance is conditional).
+  GenericSignature *conformanceSig;
   unsigned depth = 0;
-  if (auto *conformanceSig = conformanceDC->getGenericSignatureOfContext()) {
+  if ((conformanceSig = conformanceDC->getGenericSignatureOfContext())) {
     // Use the canonical signature here.
     conformanceSig = conformanceSig->getCanonicalSignature();
     allGenericParams.append(conformanceSig->getGenericParams().begin(),
                             conformanceSig->getGenericParams().end());
-    builder.addGenericSignature(conformanceSig);
     depth = allGenericParams.back()->getDepth() + 1;
   }
 
@@ -1138,11 +1134,28 @@ RequirementEnvironment::RequirementEnvironment(
       GenericTypeParamType::get(depth, genericParam->getIndex(), ctx);
 
     allGenericParams.push_back(substGenericParam);
-    builder.addGenericParameter(substGenericParam);
   }
 
   // If there were no generic parameters, we're done.
   if (allGenericParams.empty()) return;
+
+  // Construct a generic signature builder by collecting the constraints
+  // from the requirement and the context of the conformance together,
+  // because both define the capabilities of the requirement.
+  GenericSignatureBuilder builder(
+           ctx,
+           TypeChecker::LookUpConformance(tc, conformanceDC));
+
+  unsigned firstGenericParamToAdd = 0;
+  if (conformanceSig) {
+    builder.addGenericSignature(conformanceSig);
+    firstGenericParamToAdd = conformanceSig->getGenericParams().size();
+  }
+
+  for (unsigned gp : range(firstGenericParamToAdd, allGenericParams.size()))
+    builder.addGenericParameter(allGenericParams[gp]);
+
+  ++NumRequirementEnvironments;
 
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
