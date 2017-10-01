@@ -70,7 +70,7 @@ which can be installed via a package manager:
 
     sudo port install cmake ninja
 
-Instructions for installing CMake and Ninja directly can be found [below](#build-dependencies)
+Instructions for installing CMake and Ninja directly can be found [below](#build-dependencies).
 
 #### Linux
 
@@ -81,7 +81,7 @@ For Ubuntu, you'll need the following development dependencies:
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
 
-Build instructions for Ubuntu 14.04 LTS can be found [here](docs/Ubuntu14.md)
+Build instructions for Ubuntu 14.04 LTS can be found [here](docs/Ubuntu14.md).
 
 ### Getting Sources for Swift and Related Projects
 
