@@ -181,12 +181,12 @@ To open the Swift project in Xcode, open `${SWIFT_BUILD_DIR}/Swift.xcodeproj`.
 It will auto-create a *lot* of schemes for all of the available targets. A
 common debug flow would involve:
 
- - Select the 'swift' scheme
- - Pull up the scheme editor (⌘⇧<)
- - Select the 'Arguments' tab and click the '+'
- - Add the command line options
- - Close the scheme editor
- - Build and run
+ - Select the 'swift' scheme.
+ - Pull up the scheme editor (⌘⇧<).
+ - Select the 'Arguments' tab and click the '+'.
+ - Add the command line options.
+ - Close the scheme editor.
+ - Build and run.
 
 Another option is to change the scheme to "Wait for executable to be launched",
 then run the build product in Terminal.
