@@ -1068,8 +1068,6 @@ RequirementEnvironment::RequirementEnvironment(
   auto selfType = cast<GenericTypeParamType>(
                             proto->getSelfInterfaceType()->getCanonicalType());
 
-  SmallVector<GenericTypeParamType*, 4> allGenericParams;
-
   // Add the generic signature of the context of the conformance. This includes
   // the generic parameters from the conforming type as well as any additional
   // constraints that might occur on the extension that declares the
@@ -1079,9 +1077,7 @@ RequirementEnvironment::RequirementEnvironment(
   if ((conformanceSig = conformanceDC->getGenericSignatureOfContext())) {
     // Use the canonical signature here.
     conformanceSig = conformanceSig->getCanonicalSignature();
-    allGenericParams.append(conformanceSig->getGenericParams().begin(),
-                            conformanceSig->getGenericParams().end());
-    depth = allGenericParams.back()->getDepth() + 1;
+    depth = conformanceSig->getGenericParams().back()->getDepth() + 1;
   }
 
   // Add the generic signature of the requirement, substituting our concrete
@@ -1121,6 +1117,32 @@ RequirementEnvironment::RequirementEnvironment(
       return ProtocolConformanceRef(proto);
     });
 
+  // If the requirement itself is non-generic, the synthetic signature
+  // is that of the conformance context.
+  if (reqSig->getGenericParams().size() == 1 &&
+      reqSig->getRequirements().size() == 1) {
+    syntheticSignature = conformanceDC->getGenericSignatureOfContext();
+    if (syntheticSignature) {
+      syntheticSignature = syntheticSignature->getCanonicalSignature();
+      syntheticEnvironment =
+        syntheticSignature->createGenericEnvironment(
+                                     *conformanceDC->getParentModule());
+    }
+
+    return;
+  }
+
+  // Construct a generic signature builder by collecting the constraints
+  // from the requirement and the context of the conformance together,
+  // because both define the capabilities of the requirement.
+  GenericSignatureBuilder builder(
+           ctx,
+           TypeChecker::LookUpConformance(tc, conformanceDC));
+
+  if (conformanceSig) {
+    builder.addGenericSignature(conformanceSig);
+  }
+
   // First, add the generic parameters from the requirement.
   for (auto genericParam : reqSig->getGenericParams().slice(1)) {
     // The only depth that makes sense is depth == 1, the generic parameters
@@ -1133,27 +1155,8 @@ RequirementEnvironment::RequirementEnvironment(
     auto substGenericParam =
       GenericTypeParamType::get(depth, genericParam->getIndex(), ctx);
 
-    allGenericParams.push_back(substGenericParam);
+    builder.addGenericParameter(substGenericParam);
   }
-
-  // If there were no generic parameters, we're done.
-  if (allGenericParams.empty()) return;
-
-  // Construct a generic signature builder by collecting the constraints
-  // from the requirement and the context of the conformance together,
-  // because both define the capabilities of the requirement.
-  GenericSignatureBuilder builder(
-           ctx,
-           TypeChecker::LookUpConformance(tc, conformanceDC));
-
-  unsigned firstGenericParamToAdd = 0;
-  if (conformanceSig) {
-    builder.addGenericSignature(conformanceSig);
-    firstGenericParamToAdd = conformanceSig->getGenericParams().size();
-  }
-
-  for (unsigned gp : range(firstGenericParamToAdd, allGenericParams.size()))
-    builder.addGenericParameter(allGenericParams[gp]);
 
   ++NumRequirementEnvironments;
 
