@@ -224,6 +224,9 @@ func missingControllingExprInForEach() {
       let key = "\(name)"
     }
   }
+
+  for // expected-error {{expected pattern}} expected-error {{Sequence expression for for-each loop}}
+  ; // expected-error {{expected '{' to start the body of for-each loop}}
 }
 
 func missingControllingExprInSwitch() {
