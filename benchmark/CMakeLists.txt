@@ -11,9 +11,17 @@ cmake_minimum_required(VERSION 2.8.12)
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+# Load utility modules.
+include(SwiftBenchmarkUtils)
+
 set(SWIFT_BENCHMARK_BUILT_STANDALONE FALSE)
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
   set(SWIFT_BENCHMARK_BUILT_STANDALONE TRUE)
+endif()
+
+if(SWIFT_BENCHMARK_SUBCMAKE_BUILD)
+  precondition(SWIFT_BENCHMARK_BUILD_STANDALONE
+    MESSAGE "If we are a subcmake build, we must be built standalone")
 endif()
 
 include(AddSwiftBenchmarkSuite)
