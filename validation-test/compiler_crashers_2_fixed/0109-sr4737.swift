@@ -1,6 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -typecheck
-
-// REQUIRES: long_test
+// RUN: not %target-swift-frontend %s -typecheck
 
 //===----------------------------------------------------------------------===//
 extension UnicodeScalar {
