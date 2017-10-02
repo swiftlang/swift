@@ -821,14 +821,23 @@ message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
 message(STATUS "  LTO:        ${SWIFT_TOOLS_ENABLE_LTO}")
 message(STATUS "")
 
-message(STATUS "Building Swift standard library and SDK overlays for SDKs: ${SWIFT_SDKS}")
-message(STATUS "  Build type: ${SWIFT_STDLIB_BUILD_TYPE}")
-message(STATUS "  Assertions: ${SWIFT_STDLIB_ASSERTIONS}")
-message(STATUS "")
+if (SWIFT_BULID_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
 
-message(STATUS "Building Swift runtime with:")
-message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
-message(STATUS "")
+  message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
+  message(STATUS "  Build type: ${SWIFT_STDLIB_BUILD_TYPE}")
+  message(STATUS "  Assertions: ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "")
+
+  message(STATUS "Building Swift runtime with:")
+  message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
+  message(STATUS "")
+
+else()
+
+  message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
+  message(STATUS "")
+
+endif()
 
 #
 # Find required dependencies.
