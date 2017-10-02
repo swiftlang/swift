@@ -85,6 +85,13 @@ option(SWIFT_INCLUDE_DOCS
 # TODO: Please categorize these!
 #
 
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE "Debug" CACHE STRING
+      "Build type for Swift [Debug, RelWithDebInfo, Release, MinSizeRel]"
+      FORCE)
+  message(STATUS "No build type was specified, will default to ${CMAKE_BUILD_TYPE}")
+endif()
+
 set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
     "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
 set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
