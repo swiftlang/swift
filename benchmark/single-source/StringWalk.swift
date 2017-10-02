@@ -34,13 +34,11 @@ var count: Int = 0
     count += 1
   }
 }
-
 @inline(never) func count_characters(_ s: String) {
   for _ in s {
     count += 1
   }
 }
-
 @inline(never) func count_unicodeScalars_rev(
   _ s: ReversedCollection<String.UnicodeScalarView>
 ) {
@@ -48,7 +46,6 @@ var count: Int = 0
     count += 1
   }
 }
-
 @inline(never) func count_characters_rev(
   _ s: ReversedCollection<String>
 ) {
