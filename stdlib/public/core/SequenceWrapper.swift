@@ -19,7 +19,7 @@
 @_show_in_interface
 public // @testable
 protocol _SequenceWrapper : Sequence {
-  associatedtype Base : Sequence
+  associatedtype Base : Sequence where Base.Element == Element
   associatedtype Iterator = Base.Iterator
   associatedtype SubSequence = Base.SubSequence
   
@@ -55,7 +55,7 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
   }
 }
 
-extension _SequenceWrapper where Element == Base.Element {
+extension _SequenceWrapper {
   @_inlineable // FIXME(sil-serialize-all)
   public func map<T>(
     _ transform: (Element) throws -> T
@@ -106,10 +106,6 @@ extension _SequenceWrapper where SubSequence == Base.SubSequence {
   public func suffix(_ maxLength: Int) -> SubSequence {
     return _base.suffix(maxLength)
   }
-}
-
-extension _SequenceWrapper
-  where SubSequence == Base.SubSequence, Element == Base.Element {
 
   @_inlineable // FIXME(sil-serialize-all)
   public func drop(
@@ -125,11 +121,6 @@ extension _SequenceWrapper
     return try _base.prefix(while: predicate)
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  public func suffix(_ maxLength: Int) -> SubSequence {
-    return _base.suffix(maxLength)
-  }
-
   @_inlineable // FIXME(sil-serialize-all)
   public func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,

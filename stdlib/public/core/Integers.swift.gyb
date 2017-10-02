@@ -989,11 +989,9 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   /// - Parameter source: A value to convert to this type.
   init?<T : BinaryInteger>(exactly source: T)
 
-  // FIXME(ABI)#44 (Recursive Protocol Constraints): should be just
-  // Numeric, Comparable
   /// A type that can represent the absolute value of any possible value of the
   /// conforming type.
-  associatedtype Magnitude : Comparable, ExpressibleByIntegerLiteral
+  associatedtype Magnitude : Comparable, Numeric
 
   /// The magnitude of this value.
   ///

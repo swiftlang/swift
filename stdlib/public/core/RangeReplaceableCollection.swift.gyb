@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME: swift-3-indexing-model: synchronize _Indexable with the actual
-// protocol.
 /// A type that supports replacement of an arbitrary subrange of elements with
 /// the elements of another collection.
 ///
@@ -23,176 +21,7 @@
 /// `RangeReplaceableCollection` protocol instead, because it has a more
 /// complete interface.
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
-public typealias RangeReplaceableIndexable = _RangeReplaceableIndexable
-public protocol _RangeReplaceableIndexable : _Indexable {
-  // FIXME(ABI)#58 (Recursive Protocol Constraints): there is no reason for this protocol
-  // to exist apart from missing compiler features that we emulate with it.
-  // rdar://problem/20531108
-  //
-  // This protocol is almost an implementation detail of the standard
-  // library.
-
-  /// Creates an empty instance.
-  init()
-
-  /// Creates a new collection containing the specified number of a single,
-  /// repeated value.
-  ///
-  /// Here's an example of creating an array initialized with five strings
-  /// containing the letter *Z*.
-  ///
-  ///     let fiveZs = Array(repeating: "Z", count: 5)
-  ///     print(fiveZs)
-  ///     // Prints "["Z", "Z", "Z", "Z", "Z"]"
-  ///
-  /// - Parameters:
-  ///   - repeatedValue: The element to repeat.
-  ///   - count: The number of times to repeat the value passed in the
-  ///     `repeating` parameter. `count` must be zero or greater.
-  init(repeating repeatedValue: Element, count: Int)
-
-  /// Creates a new instance of a collection containing the elements of a
-  /// sequence.
-  ///
-  /// - Parameter elements: The sequence of elements for the new collection.
-  ///   `elements` must be finite.
-  init<S : Sequence>(_ elements: S) where S.Element == Element
-
-  /// Replaces the specified subrange of elements with the given collection.
-  ///
-  /// This method has the effect of removing the specified range of elements
-  /// from the collection and inserting the new elements at the same location.
-  /// The number of new elements need not match the number of elements being
-  /// removed.
-  ///
-  /// In this example, three elements in the middle of an array of integers are
-  /// replaced by the five elements of a `Repeated<Int>` instance.
-  ///
-  ///      var nums = [10, 20, 30, 40, 50]
-  ///      nums.replaceSubrange(1...3, with: repeatElement(1, count: 5))
-  ///      print(nums)
-  ///      // Prints "[10, 1, 1, 1, 1, 1, 50]"
-  ///
-  /// If you pass a zero-length range as the `subrange` parameter, this method
-  /// inserts the elements of `newElements` at `subrange.startIndex`. Calling
-  /// the `insert(contentsOf:at:)` method instead is preferred.
-  ///
-  /// Likewise, if you pass a zero-length collection as the `newElements`
-  /// parameter, this method removes the elements in the given subrange
-  /// without replacement. Calling the `removeSubrange(_:)` method instead is
-  /// preferred.
-  ///
-  /// Calling this method may invalidate any existing indices for use with this
-  /// collection.
-  ///
-  /// - Parameters:
-  ///   - subrange: The subrange of the collection to replace. The bounds of
-  ///     the range must be valid indices of the collection.
-  ///   - newElements: The new elements to add to the collection.
-  ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the collection
-  ///   and `newElements`. If the call to `replaceSubrange` simply appends the
-  ///   contents of `newElements` to the collection, the complexity is O(*n*),
-  ///   where *n* is the length of `newElements`.
-  mutating func replaceSubrange<C>(
-    _ subrange: Range<Index>,
-    with newElements: C
-  ) where C : Collection, C.Element == Element
-
-  /// Inserts a new element into the collection at the specified position.
-  ///
-  /// The new element is inserted before the element currently at the specified
-  /// index. If you pass the collection's `endIndex` property as the `index`
-  /// parameter, the new element is appended to the collection.
-  ///
-  ///     var numbers = [1, 2, 3, 4, 5]
-  ///     numbers.insert(100, at: 3)
-  ///     numbers.insert(200, at: numbers.endIndex)
-  ///
-  ///     print(numbers)
-  ///     // Prints "[1, 2, 3, 100, 4, 5, 200]"
-  ///
-  /// Calling this method may invalidate any existing indices for use with this
-  /// collection.
-  ///
-  /// - Parameters:
-  ///   - newElement: The new element to insert into the collection.
-  ///   - i: The position at which to insert the new element. `index` must be a
-  ///     valid index into the collection.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func insert(_ newElement: Element, at i: Index)
-
-  /// Inserts the elements of a sequence into the collection at the specified
-  /// position.
-  ///
-  /// The new elements are inserted before the element currently at the
-  /// specified index. If you pass the collection's `endIndex` property as the
-  /// `index` parameter, the new elements are appended to the collection.
-  ///
-  /// Here's an example of inserting a range of integers into an array of the
-  /// same type:
-  ///
-  ///     var numbers = [1, 2, 3, 4, 5]
-  ///     numbers.insert(contentsOf: 100...103, at: 3)
-  ///     print(numbers)
-  ///     // Prints "[1, 2, 3, 100, 101, 102, 103, 4, 5]"
-  ///
-  /// Calling this method may invalidate any existing indices for use with this
-  /// collection.
-  ///
-  /// - Parameters:
-  ///   - newElements: The new elements to insert into the collection.
-  ///   - i: The position at which to insert the new elements. `index` must be
-  ///     a valid index of the collection.
-  ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the collection
-  ///   and `newElements`. If `i` is equal to the collection's `endIndex`
-  ///   property, the complexity is O(*n*), where *n* is the length of
-  ///   `newElements`.
-  mutating func insert<S : Collection>(
-    contentsOf newElements: S, at i: Index
-  ) where S.Element == Element
-
-  /// Removes and returns the element at the specified position.
-  ///
-  /// All the elements following the specified position are moved to close the
-  /// gap. This example removes the middle element from an array of
-  /// measurements.
-  ///
-  ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.6]
-  ///     let removed = measurements.remove(at: 2)
-  ///     print(measurements)
-  ///     // Prints "[1.2, 1.5, 1.2, 1.6]"
-  ///
-  /// Calling this method may invalidate any existing indices for use with this
-  /// collection.
-  ///
-  /// - Parameter i: The position of the element to remove. `index` must be
-  ///   a valid index of the collection that is not equal to the collection's
-  ///   end index.
-  /// - Returns: The removed element.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @discardableResult
-  mutating func remove(at i: Index) -> Element
-
-  /// Removes the specified subrange of elements from the collection.
-  ///
-  ///     var bugs = ["Aphid", "Bumblebee", "Cicada", "Damselfly", "Earwig"]
-  ///     bugs.removeSubrange(1...3)
-  ///     print(bugs)
-  ///     // Prints "["Aphid", "Earwig"]"
-  ///
-  /// Calling this method may invalidate any existing indices for use with this
-  /// collection.
-  ///
-  /// - Parameter bounds: The subrange of the collection to remove. The bounds
-  ///   of the range must be valid indices of the collection.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func removeSubrange(_ bounds: Range<Index>)
-}
+public typealias RangeReplaceableIndexable = RangeReplaceableCollection
 
 /// A collection that supports replacement of an arbitrary subrange of elements
 /// with the elements of another collection.
@@ -241,11 +70,9 @@ public protocol _RangeReplaceableIndexable : _Indexable {
 /// `replaceSubrange(_:with:)` with an empty collection for the `newElements` 
 /// parameter. You can override any of the protocol's required methods to 
 /// provide your own custom implementation.
-public protocol RangeReplaceableCollection
-  : _RangeReplaceableIndexable, Collection
+public protocol RangeReplaceableCollection : Collection
 {
-  // FIXME(ABI)#165 (Recursive Protocol Constraints): should require `RangeReplaceableCollection`.
-  associatedtype SubSequence : _RangeReplaceableIndexable /*: RangeReplaceableCollection*/
+  associatedtype SubSequence : RangeReplaceableCollection
     = RangeReplaceableSlice<Self>
 
   //===--- Fundamental Requirements ---------------------------------------===//
@@ -449,6 +276,22 @@ public protocol RangeReplaceableCollection
   @discardableResult
   mutating func remove(at i: Index) -> Element
 
+  /// Removes the specified subrange of elements from the collection.
+  ///
+  ///     var bugs = ["Aphid", "Bumblebee", "Cicada", "Damselfly", "Earwig"]
+  ///     bugs.removeSubrange(1...3)
+  ///     print(bugs)
+  ///     // Prints "["Aphid", "Earwig"]"
+  ///
+  /// Calling this method may invalidate any existing indices for use with this
+  /// collection.
+  ///
+  /// - Parameter bounds: The subrange of the collection to remove. The bounds
+  ///   of the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  mutating func removeSubrange(_ bounds: Range<Index>)
+
   /// Customization point for `removeLast()`.  Implement this function if you
   /// want to replace the default implementation.
   ///
@@ -509,6 +352,9 @@ public protocol RangeReplaceableCollection
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func removeAll(keepingCapacity keepCapacity: Bool /*= false*/)
+
+  // FIXME(ABI): Associated type inference requires this.
+  subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 
 //===----------------------------------------------------------------------===//
@@ -813,7 +659,6 @@ extension RangeReplaceableCollection {
 % for capability in ['', 'Bidirectional', 'RandomAccess']:
 %   if capability:
 extension RangeReplaceableCollection where
-    Self: ${capability}Collection,
     Self.SubSequence == RangeReplaceable${capability}Slice<Self> {
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>)
@@ -824,10 +669,6 @@ extension RangeReplaceableCollection where
 %   end
 
 extension RangeReplaceableCollection where
-  Self: MutableCollection,
-%   if capability:
-  Self: ${capability}Collection,
-%   end
   Self.SubSequence == MutableRangeReplaceable${capability}Slice<Self>
 {
   @_inlineable // FIXME(sil-serialize-all)

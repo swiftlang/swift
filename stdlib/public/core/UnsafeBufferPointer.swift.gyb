@@ -59,7 +59,7 @@ public struct UnsafeBufferPointerIterator<Element>
 /// referenced memory and into the new collection.
 @_fixed_layout
 public struct Unsafe${Mutable}BufferPointer<Element>
-  : _${Mutable}Indexable, ${Mutable}Collection, RandomAccessCollection {
+  : ${Mutable}Collection, RandomAccessCollection {
   // FIXME: rdar://18157434 - until this is fixed, this has to be fixed layout
   // to avoid a hang in Foundation, which has the following setup:
   // struct A { struct B { let x: UnsafeMutableBufferPointer<...> } let b: B }

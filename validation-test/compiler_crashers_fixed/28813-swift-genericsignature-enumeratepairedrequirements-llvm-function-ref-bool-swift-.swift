@@ -5,6 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-class a<a{{{}}func b{extension{class a<a{{}class a:RangeReplaceableCollection
+// RUN: not %target-swift-frontend %s -emit-ir
+protocol A:Collection}extension CountableRange{protocol P{protocol P{struct a:A{}typealias a:A}{}typealias e:P

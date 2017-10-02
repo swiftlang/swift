@@ -21,7 +21,7 @@ public protocol StringProtocol
   TextOutputStream, TextOutputStreamable,
   LosslessStringConvertible, ExpressibleByStringLiteral,
   Hashable, Comparable
-  where Iterator.Element == Character {
+  where Iterator.Element == Character, SubSequence : StringProtocol {
 
   associatedtype UTF8View : /*Bidirectional*/Collection
   where UTF8View.Element == UInt8 // Unicode.UTF8.CodeUnit
