@@ -3126,9 +3126,7 @@ public:
     require(AI->getType()
               .getSwiftRValueType()->isBridgeableObjectType()
             || AI->getType().getSwiftRValueType()->isEqual(
-                             AI->getType().getASTContext().TheNativeObjectType)
-            || AI->getType().getSwiftRValueType()->isEqual(
-                            AI->getType().getASTContext().TheUnknownObjectType),
+                             AI->getType().getASTContext().TheNativeObjectType),
         "raw-pointer-to-ref result must be a class reference or NativeObject");
     require(AI->getOperand()->getType().getSwiftRValueType()->isEqual(
                             AI->getType().getASTContext().TheRawPointerType),

@@ -100,6 +100,7 @@ public typealias UnfoldFirstSequence<T> = UnfoldSequence<T, (T?, Bool)>
 ///
 /// Instances of `UnfoldSequence` are created with the functions
 /// `sequence(first:next:)` and `sequence(state:next:)`.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct UnfoldSequence<Element, State> : Sequence, IteratorProtocol {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func next() -> Element? {

@@ -20,6 +20,7 @@ internal protocol _HeapBufferHeader_ {
   var value: Value { get set }
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
 internal struct _HeapBufferHeader<T> : _HeapBufferHeader_ {
   internal typealias Value = T

@@ -199,12 +199,6 @@ BUILTIN_SIL_OPERATION(Assign, "assign", Special)
 /// Init has type (T, Builtin.RawPointer) -> ()
 BUILTIN_SIL_OPERATION(Init, "initialize", Special)
 
-/// CastToUnknownObject has type (T) -> Builtin.UnknownObject.
-BUILTIN_SIL_OPERATION(CastToUnknownObject, "castToUnknownObject", Special)
-
-/// CastFromUnknownObject has type (Builtin.UnknownObject) -> T.
-BUILTIN_SIL_OPERATION(CastFromUnknownObject, "castFromUnknownObject", Special)
-
 /// CastToNativeObject has type (T) -> Builtin.NativeObject.
 ///
 /// This builtin asserts if the underlying type /could/ be objc.
@@ -306,7 +300,7 @@ BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
 ///
 /// - Objective-C object types require an additional check that the
 ///   dynamic object type uses native swift reference counting:
-///   (Builtin.UnknownObject, unknown class reference, class existential)
+///   (AnyObject, unknown class reference, class existential)
 ///
 /// - Bridged object types allow the dynamic object type check to be
 ///   passed based on their pointer encoding:
@@ -331,8 +325,7 @@ BUILTIN_SIL_OPERATION(IsUniqueOrPinned, "isUniqueOrPinned", Special)
 ///
 /// These variants of isUnique implicitly cast to a non-null NativeObject before
 /// checking uniqueness. This allows an object reference statically typed as
-/// BridgeObject or UnknownObject to be treated as a native object by the
-/// runtime.
+/// BridgeObject to be treated as a native object by the runtime.
 BUILTIN_SIL_OPERATION(IsUnique_native, "isUnique_native", Special)
 BUILTIN_SIL_OPERATION(IsUniqueOrPinned_native, "isUniqueOrPinned_native",
                       Special)

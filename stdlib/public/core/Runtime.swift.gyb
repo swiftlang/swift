@@ -278,6 +278,7 @@ public func _swift_stdlib_atomicFetch${operation}Int(
 }
 % end
 
+@_fixed_layout // FIXME(sil-serialize-all)
 public final class _stdlib_AtomicInt {
   @_versioned // FIXME(sil-serialize-all)
   internal var _value: Int
@@ -539,6 +540,7 @@ internal func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
 // allows us to subclass an Objective-C class and still use the fast Swift
 // memory allocator.
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSArrayBase)
 internal class _SwiftNativeNSArray {
@@ -550,6 +552,7 @@ internal class _SwiftNativeNSArray {
   deinit {}
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSDictionaryBase)
 internal class _SwiftNativeNSDictionary {
@@ -562,6 +565,7 @@ internal class _SwiftNativeNSDictionary {
   deinit {}
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSSetBase)
 internal class _SwiftNativeNSSet {
@@ -574,6 +578,7 @@ internal class _SwiftNativeNSSet {
   deinit {}
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSEnumeratorBase)
 internal class _SwiftNativeNSEnumerator {
@@ -587,6 +592,7 @@ internal class _SwiftNativeNSEnumerator {
 }
 
 // FIXME(ABI)#60 : move into the Foundation overlay and remove 'open'
+@_fixed_layout // FIXME(sil-serialize-all)
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSDataBase)
 open class _SwiftNativeNSData {
   @_inlineable // FIXME(sil-serialize-all)
@@ -599,6 +605,7 @@ open class _SwiftNativeNSData {
 // Support for reliable testing of the return-autoreleased optimization
 //===----------------------------------------------------------------------===//
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 @objc
 internal class _stdlib_ReturnAutoreleasedDummy {
@@ -650,6 +657,7 @@ public func _stdlib_initializeReturnAutoreleased() {
 }
 #else
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal class _SwiftNativeNSArray {
   @_inlineable // FIXME(sil-serialize-all)
@@ -659,6 +667,7 @@ internal class _SwiftNativeNSArray {
   @_versioned // FIXME(sil-serialize-all)
   deinit {}
 }
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal class _SwiftNativeNSDictionary {
   @_inlineable // FIXME(sil-serialize-all)
@@ -668,6 +677,7 @@ internal class _SwiftNativeNSDictionary {
   @_versioned // FIXME(sil-serialize-all)
   deinit {}
 }
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal class _SwiftNativeNSSet {
   @_inlineable // FIXME(sil-serialize-all)

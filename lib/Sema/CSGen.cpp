@@ -1926,9 +1926,13 @@ namespace {
 
     /// Give each parameter in a ClosureExpr a fresh type variable if parameter
     /// types were not specified, and return the eventual function type.
-    Type getTypeForParameterList(ParameterList *params,
-                                 ConstraintLocatorBuilder locator) {
-      for (auto param : *params) {
+    Type getTypeForParameterList(ClosureExpr *closureExpr) {
+      auto *params = closureExpr->getParameters();
+      for (auto i : indices(params->getArray())) {
+        auto *param = params->get(i);
+        auto *locator = CS.getConstraintLocator(
+            closureExpr, LocatorPathElt::getTupleElement(i));
+
         // If a type was explicitly specified, use its opened type.
         if (auto type = param->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
@@ -1940,9 +1944,8 @@ namespace {
         }
 
         // Otherwise, create a fresh type variable.
-        Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                        TVO_CanBindToInOut);
-        
+        Type ty = CS.createTypeVariable(locator, TVO_CanBindToInOut);
+
         param->setType(ty);
         param->setInterfaceType(ty);
       }
@@ -2286,12 +2289,7 @@ namespace {
 
       // Give each parameter in a ClosureExpr a fresh type variable if parameter
       // types were not specified, and return the eventual function type.
-      auto paramTy = getTypeForParameterList(
-                       expr->getParameters(),
-                       CS.getConstraintLocator(
-                         expr,
-                         LocatorPathElt::getTupleElement(0)));
-
+      auto paramTy = getTypeForParameterList(expr);
       auto extInfo = FunctionType::ExtInfo();
       
       if (closureCanThrow(expr))

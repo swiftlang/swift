@@ -111,6 +111,7 @@ ${get_slice_doc_comment(Self)}
 ///   subsequence type that takes your index invalidation requirements into
 ///   account.
 %     end
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct ${Self}<Base : ${BaseRequirements}>
   : ${SelfProtocols} {
 

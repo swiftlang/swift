@@ -3182,6 +3182,7 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 
   // FIXME should be RandomAccessCollection
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct Words : BidirectionalCollection {
     public typealias Indices = CountableRange<Int>
     public typealias SubSequence = BidirectionalSlice<${Self}.Words>

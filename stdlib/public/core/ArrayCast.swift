@@ -52,6 +52,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
   return source.map { $0 as! TargetElement }
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct _UnwrappingFailed : Error {
   @_inlineable // FIXME(sil-serialize-all)

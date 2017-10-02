@@ -67,7 +67,7 @@ static CanType getDynamicMethodSelfType(SILGenFunction &SGF,
                                         const ArgumentSource &proto,
                                         ValueDecl *member) {
   if (member->isInstanceMember()) {
-    return member->getASTContext().TheUnknownObjectType;
+    return SGF.getASTContext().getAnyObjectType();
   } else {
     return proto.getSILSubstType(SGF).getSwiftRValueType();
   }
@@ -1515,7 +1515,7 @@ public:
                                    SGF.emitRValue(dynamicMemberRef->getBase()));
 
       // Determine the type of the method we referenced, by replacing the
-      // class type of the 'Self' parameter with Builtin.UnknownObject.
+      // class type of the 'Self' parameter with AnyObject.
       auto member = SILDeclRef(fd).asForeign();
 
       auto substFormalType =

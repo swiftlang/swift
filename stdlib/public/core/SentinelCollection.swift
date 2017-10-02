@@ -18,6 +18,7 @@ protocol _Function {
 
 protocol _Predicate : _Function where Output == Bool { }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct _SentinelIterator<
   Base: IteratorProtocol, 
@@ -51,6 +52,7 @@ where IsSentinel.Input == Base.Element {
   }
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct _SentinelCollection<
   Base: Collection, 
@@ -70,6 +72,7 @@ where IsSentinel.Input == Base.Iterator.Element {
     return _SentinelIterator(_base.makeIterator(), until: _isSentinel)
   }
   
+  @_fixed_layout // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal struct Index : Comparable {
     @_inlineable // FIXME(sil-serialize-all)
@@ -141,6 +144,7 @@ where IsSentinel.Input == Base.Iterator.Element {
   }
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct _IsZero<T : BinaryInteger> : _Predicate {
   @_inlineable // FIXME(sil-serialize-all)

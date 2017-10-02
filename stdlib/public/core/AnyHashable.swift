@@ -53,6 +53,7 @@ internal protocol _AnyHashableBox {
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
   @_versioned // FIXME(sil-serialize-all)
@@ -141,6 +142,7 @@ internal func _getBridgedCustomAnyHashable<T>(_ value: T) -> AnyHashable? {
 ///     print(descriptions[AnyHashable(43)])       // prints "nil"
 ///     print(descriptions[AnyHashable(Int8(43))]!) // prints "an Int8"
 ///     print(descriptions[AnyHashable(Set(["a", "b"]))]!) // prints "a set of strings"
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct AnyHashable {
   @_versioned // FIXME(sil-serialize-all)
   internal var _box: _AnyHashableBox

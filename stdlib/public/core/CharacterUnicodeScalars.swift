@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 extension Character {
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct UnicodeScalarView {
     @_versioned // FIXME(sil-serialize-all)
     internal let _base: Character
@@ -28,6 +29,7 @@ extension Character {
 }
 
 extension Character.UnicodeScalarView {
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct Iterator {
     @_versioned // FIXME(sil-serialize-all)
     internal var _base: IndexingIterator<Character.UnicodeScalarView>
