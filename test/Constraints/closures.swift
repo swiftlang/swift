@@ -645,3 +645,14 @@ func rdar33429010_3() {
  let arr = [C_33429010()]
  let _ = arr.map({ ($0.name, $0 as P_33429010) }) // Ok
 }
+
+// rdar://problem/34772225 - failure to disambiguate the type of an overloaded closure argument on a method
+do {
+  struct Foo {
+    func bar(_: (Int) -> ()) {}
+    func bar(_: (Int) -> Bool) {}
+  }
+
+  let foo = Foo()
+  foo.bar { _ in } // Ok
+}

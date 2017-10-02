@@ -2275,9 +2275,10 @@ namespace {
         // variable for it.
         funcTy = CS.createTypeVariable(locator, TVO_CanBindToInOut);
 
-        // Allow it to default to () if there are no return statements.
+        // Allow result to be bound only to () if there are
+        // no return statements, covers only empty and multi-statement closures.
         if (closureHasNoResult(expr)) {
-          CS.addConstraint(ConstraintKind::Defaultable,
+          CS.addConstraint(ConstraintKind::Equal,
                            funcTy,
                            TupleType::getEmpty(CS.getASTContext()),
                            locator);
