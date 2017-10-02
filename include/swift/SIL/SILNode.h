@@ -285,7 +285,7 @@ struct cast_convert_val<To, const swift::SILNode, From>;
 /// ValueBase * is always at least eight-byte aligned; make the three tag bits
 /// available through PointerLikeTypeTraits.
 template<>
-class PointerLikeTypeTraits<swift::SILNode *> {
+struct PointerLikeTypeTraits<swift::SILNode *> {
 public:
   static inline void *getAsVoidPointer(swift::SILNode *I) {
     return (void*)I;
