@@ -43,6 +43,9 @@ private:
   std::vector<std::string> InputFilenames;
 
 public:
+  bool hasUniqueInputFilename() const { return InputFilenames.size() == 1; }
+  const std::string &getFilenameOfFirstInput() const { return InputFilenames[0]; }
+  
   void setMainExecutablePath(const std::string &Path) {
     MainExecutablePath = Path;
   }
@@ -126,13 +129,13 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
     return 1;
   }
 
-  if (Invocation.getInputFilenames().size() != 1) {
+  if (!Invocation.hasUniqueInputFilename()) {
     Instance.getDiags().diagnose(SourceLoc(),
                                  diag::error_mode_requires_one_input_file);
     return 1;
   }
 
-  StringRef Filename = Invocation.getInputFilenames()[0];
+  StringRef Filename = Invocation.getFilenameOfFirstInput();
   auto ErrOrBuf = llvm::MemoryBuffer::getFile(Filename);
   if (!ErrOrBuf) {
     Instance.getDiags().diagnose(

@@ -135,7 +135,7 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
     out << escape(targetName) << " :";
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!
-    for (auto const &path : reversePathSortedFilenames(opts.InputFilenames))
+    for (auto const &path : reversePathSortedFilenames(opts.Inputs.getInputFilenames()))
       out << ' ' << escape(path);
     // Then print dependencies we've picked up during compilation.
     for (auto const &path :
@@ -527,14 +527,14 @@ static bool performCompile(CompilerInstance &Instance,
     auto &ImporterOpts = Invocation.getClangImporterOptions();
     auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
     if (!PCHOutDir.empty()) {
-      ImporterOpts.BridgingHeader = Invocation.getInputFilenames()[0];
+      ImporterOpts.BridgingHeader = Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput();
       // Create or validate a persistent PCH.
       auto SwiftPCHHash = Invocation.getPCHHash();
       auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
       return !PCH.hasValue();
     }
     return clangImporter->emitBridgingPCH(
-      Invocation.getInputFilenames()[0],
+      Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
       opts.getSingleOutputFilename());
   }
 
@@ -545,14 +545,14 @@ static bool performCompile(CompilerInstance &Instance,
     auto &LLVMContext = getGlobalLLVMContext();
 
     // Load in bitcode file.
-    assert(Invocation.getInputFilenames().size() == 1 &&
+    assert(Invocation.getFrontendOptions().Inputs.hasUniqueInputFilename() &&
            "We expect a single input for bitcode input!");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(Invocation.getInputFilenames()[0]);
+      llvm::MemoryBuffer::getFileOrSTDIN(Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput());
     if (!FileBufOrErr) {
       Instance.getASTContext().Diags.diagnose(SourceLoc(),
                                               diag::error_open_input_file,
-                                              Invocation.getInputFilenames()[0],
+                                              Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
                                               FileBufOrErr.getError().message());
       return true;
     }
@@ -567,7 +567,7 @@ static bool performCompile(CompilerInstance &Instance,
       // if available.
       Instance.getASTContext().Diags.diagnose(SourceLoc(),
                                               diag::error_parse_input_file,
-                                              Invocation.getInputFilenames()[0],
+                                              Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
                                               Err.getMessage());
       return true;
     }
@@ -770,10 +770,10 @@ static bool performCompile(CompilerInstance &Instance,
       auto SASTF = dyn_cast<SerializedASTFile>(File);
       return SASTF && SASTF->isSIB();
     };
-    if (opts.PrimaryInput.hasValue() && opts.PrimaryInput.getValue().isFilename()) {
+    if (opts.Inputs.haveAPrimaryInputFile()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
-        auto Index = opts.PrimaryInput.getValue().Index;
+        auto Index = opts.Inputs.getPrimaryInput().getValue().Index;
         PrimaryFile = Instance.getMainModule()->getFiles()[Index];
       }
       astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
@@ -1349,13 +1349,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     auto &FEOpts = Invocation.getFrontendOptions();
     auto &LangOpts = Invocation.getLangOptions();
     auto &SILOpts = Invocation.getSILOptions();
-    StringRef InputName;
-    std::string TargetName = FEOpts.ModuleName;
-    if (FEOpts.PrimaryInput.hasValue() &&
-        FEOpts.PrimaryInput.getValue().isFilename()) {
-      auto Index = FEOpts.PrimaryInput.getValue().Index;
-      InputName = FEOpts.InputFilenames[Index];
-    }
+    StringRef InputName = FEOpts.Inputs.primaryInputFilenameIfAny();
     StringRef OptType = silOptModeArgStr(SILOpts.Optimization);
     StringRef OutFile = FEOpts.getSingleOutputFilename();
     StringRef OutputType = llvm::sys::path::extension(OutFile);

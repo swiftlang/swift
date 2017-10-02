@@ -243,27 +243,23 @@ public:
   }
 
   void addInputFilename(StringRef Filename) {
-    FrontendOpts.InputFilenames.push_back(Filename);
+    FrontendOpts.Inputs.addInputFilename(Filename);
   }
 
   /// Does not take ownership of \p Buf.
   void addInputBuffer(llvm::MemoryBuffer *Buf) {
-    FrontendOpts.InputBuffers.push_back(Buf);
+    FrontendOpts.Inputs.addInputBuffer(Buf);
+  }
+    
+  void setPrimaryInput(SelectedInput pi) {
+    FrontendOpts.Inputs.setPrimaryInput(pi);
   }
 
   void clearInputs() {
-    FrontendOpts.InputFilenames.clear();
-    FrontendOpts.InputBuffers.clear();
+    FrontendOpts.Inputs.clearInputs();
   }
 
-  ArrayRef<std::string> getInputFilenames() const {
-    return FrontendOpts.InputFilenames;
-  }
-  ArrayRef<llvm::MemoryBuffer*> getInputBuffers() const {
-    return FrontendOpts.InputBuffers;
-  }
-
-  StringRef getOutputFilename() const {
+   StringRef getOutputFilename() const {
     return FrontendOpts.getSingleOutputFilename();
   }
 
@@ -339,7 +335,7 @@ class CompilerInstance {
   SerializedModuleLoader *SML = nullptr;
 
   /// Contains buffer IDs for input source code files.
-  std::vector<unsigned> BufferIDs;
+  std::vector<unsigned> InputSourceCodeBufferIDs;
 
   struct PartialModuleInputs {
     std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
@@ -361,6 +357,8 @@ class CompilerInstance {
 
   void createSILModule();
   void setPrimarySourceFile(SourceFile *SF);
+  
+  bool setupForFileAt(unsigned i);
 
 public:
   SourceManager &getSourceMgr() { return SourceMgr; }
@@ -418,7 +416,7 @@ public:
 
   SerializedModuleLoader *getSerializedModuleLoader() const { return SML; }
 
-  ArrayRef<unsigned> getInputBufferIDs() const { return BufferIDs; }
+  ArrayRef<unsigned> getInputBufferIDs() const { return InputSourceCodeBufferIDs; }
 
   ArrayRef<LinkLibrary> getLinkLibraries() const {
     return Invocation.getLinkLibraries();
