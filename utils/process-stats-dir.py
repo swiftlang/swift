@@ -295,11 +295,18 @@ def compare_stats_dirs(args):
     if len(args.remainder) != 2:
         raise ValueError("Expected exactly 2 stats-dirs")
 
+    vargs = vars(args)
+    if args.select_stats_from_csv_baseline is not None:
+        b = read_stats_dict_from_csv(args.select_stats_from_csv_baseline)
+        if args.group_by_module:
+            pat = re.compile('^\w+\.')
+            vargs['select_stat'] = set(re.sub(pat, '', k) for k in b.keys())
+        else:
+            vargs['select_stat'] = b.keys()
+
     (old, new) = args.remainder
-    old_stats = merge_all_jobstats(load_stats_dir(old, **vars(args)),
-                                   **vars(args))
-    new_stats = merge_all_jobstats(load_stats_dir(new, **vars(args)),
-                                   **vars(args))
+    old_stats = merge_all_jobstats(load_stats_dir(old, **vargs), **vargs)
+    new_stats = merge_all_jobstats(load_stats_dir(new, **vargs), **vargs)
 
     return write_comparison(args, old_stats.stats, new_stats.stats)
 
@@ -344,6 +351,9 @@ def main():
                         default=[],
                         action="append",
                         help="Select specific statistics")
+    parser.add_argument("--select-stats-from-csv-baseline",
+                        type=argparse.FileType('rb', 0), default=None,
+                        help="Select statistics present in a CSV baseline")
     parser.add_argument("--exclude-timers",
                         default=False,
                         action="store_true",
