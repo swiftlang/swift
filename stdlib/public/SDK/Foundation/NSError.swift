@@ -469,16 +469,6 @@ public protocol _BridgedStoredNSError :
   init(_nsError error: NSError)
 }
 
-/// TODO: Better way to do this?
-internal func _stringDictToAnyHashableDict(_ input: [String : Any])
-    -> [AnyHashable : Any] {
-  var result = [AnyHashable : Any](minimumCapacity: input.count)
-  for (k, v) in input {
-    result[k] = v
-  }
-  return result
-}
-
 /// Various helper implementations for _BridgedStoredNSError
 public extension _BridgedStoredNSError
     where Code: RawRepresentable, Code.RawValue: SignedInteger {
@@ -492,7 +482,7 @@ public extension _BridgedStoredNSError
   public init(_ code: Code, userInfo: [String : Any] = [:]) {
     self.init(_nsError: NSError(domain: Self._nsErrorDomain,
                                 code: numericCast(code.rawValue),
-                                userInfo: _stringDictToAnyHashableDict(userInfo)))
+                                userInfo: userInfo))
   }
 
   /// The user-info dictionary for an error that was bridged from
@@ -513,7 +503,7 @@ public extension _BridgedStoredNSError
   public init(_ code: Code, userInfo: [String : Any] = [:]) {
     self.init(_nsError: NSError(domain: Self._nsErrorDomain,
                                 code: numericCast(code.rawValue),
-                                userInfo: _stringDictToAnyHashableDict(userInfo)))
+                                userInfo: userInfo))
   }
 }
 
