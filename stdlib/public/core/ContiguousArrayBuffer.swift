@@ -78,6 +78,7 @@ internal var _emptyArrayStorage : _EmptyArrayStorage {
 }
 
 // The class that implements the storage for a ContiguousArray<Element>
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
 internal final class _ContiguousArrayStorage<
   Element

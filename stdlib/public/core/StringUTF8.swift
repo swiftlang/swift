@@ -91,6 +91,7 @@ extension String {
   ///     // Prints "-17"
   ///     print(String(s1.utf8.prefix(15)))
   ///     // Prints "They call me 'B"
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct UTF8View
     : BidirectionalCollection,
       CustomStringConvertible, 
@@ -458,6 +459,7 @@ extension String.UTF8View : _SwiftStringView {
 }
 
 extension String.UTF8View {
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct Iterator {
     internal typealias _OutputBuffer = UInt64
     @_versioned // FIXME(sil-serialize-all)

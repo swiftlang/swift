@@ -418,6 +418,7 @@ public protocol KeyedEncodingContainerProtocol {
 
 /// A concrete container that provides a view into an encoder's storage, making
 /// the encoded properties of an encodable type accessible by keys.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct KeyedEncodingContainer<K : CodingKey> : KeyedEncodingContainerProtocol {
     public typealias Key = K
 
@@ -1167,6 +1168,7 @@ public protocol KeyedDecodingContainerProtocol {
 
 /// A concrete container that provides a view into an decoder's storage, making
 /// the encoded properties of an decodable type accessible by keys.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProtocol {
     public typealias Key = K
 
@@ -2441,6 +2443,7 @@ public protocol SingleValueDecodingContainer {
 //===----------------------------------------------------------------------===//
 
 /// A user-defined key for providing context during encoding and decoding.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
     public typealias RawValue = String
 
@@ -2478,6 +2481,7 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
 /// An error that occurs during the encoding of a value.
 public enum EncodingError : Error {
     /// The context in which the error occurred.
+    @_fixed_layout // FIXME(sil-serialize-all)
     public struct Context {
         /// The path of coding keys taken to get to the point of the failing encode call.
         public let codingPath: [CodingKey]
@@ -2551,6 +2555,7 @@ public enum EncodingError : Error {
 /// An error that occurs during the decoding of a value.
 public enum DecodingError : Error {
     /// The context in which the error occurred.
+    @_fixed_layout // FIXME(sil-serialize-all)
     public struct Context {
         /// The path of coding keys taken to get to the point of the failing decode call.
         public let codingPath: [CodingKey]

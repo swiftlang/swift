@@ -49,6 +49,7 @@ public func zip<Sequence1, Sequence2>(
 }
 
 /// An iterator for `Zip2Sequence`.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct Zip2Iterator<
   Iterator1 : IteratorProtocol, Iterator2 : IteratorProtocol
 > : IteratorProtocol {
@@ -114,6 +115,7 @@ public struct Zip2Iterator<
 ///     // Prints "two: 2
 ///     // Prints "three: 3"
 ///     // Prints "four: 4"
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence>
   : Sequence {
 

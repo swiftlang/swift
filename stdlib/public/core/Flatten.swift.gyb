@@ -26,6 +26,7 @@ from gyb_stdlib_support import (
 ///
 /// - Note: This is the `IteratorProtocol` used by `FlattenSequence`,
 ///   `FlattenCollection`, and `BidirectionalFlattenCollection`.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct FlattenIterator<Base : IteratorProtocol> : IteratorProtocol, Sequence
   where Base.Element : Sequence {
 
@@ -82,6 +83,7 @@ public struct FlattenIterator<Base : IteratorProtocol> : IteratorProtocol, Seque
 /// * `s.lazy.joined().map(f)` maps lazily and returns a `LazyMapSequence`
 ///
 /// - See also: `FlattenCollection`
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct FlattenSequence<Base : Sequence> : Sequence
   where Base.Element : Sequence {
 
@@ -157,6 +159,7 @@ extension LazySequenceProtocol where Element : Sequence {
 %   Index = Collection + 'Index'
 %   Slice = sliceTypeName(traversal=traversal, mutable=False, rangeReplaceable=False)
 /// A position in a `${Collection}`.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct ${Index}<BaseElements>
   where
   BaseElements : ${collectionForTraversal(traversal)},
@@ -239,6 +242,7 @@ extension ${Index} : Comparable {
 ///   documented complexity.
 ///
 /// - See also: `FlattenSequence`
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
   where
   Base : ${collectionForTraversal(traversal)},

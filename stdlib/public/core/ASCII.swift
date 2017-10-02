@@ -64,6 +64,7 @@ extension Unicode.ASCII : Unicode.Encoding {
     return encode(FromEncoding.decode(content))
   }
 
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct Parser {
     @_inlineable // FIXME(sil-serialize-all)
     public init() { }

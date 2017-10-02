@@ -201,6 +201,7 @@ extension String {
 // The @_swift_native_objc_runtime_base attribute
 // This allows us to subclass an Objective-C class and use the fast Swift
 // memory allocator.
+@_fixed_layout // FIXME(sil-serialize-all)
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSStringBase)
 public class _SwiftNativeNSString {
   @_inlineable // FIXME(sil-serialize-all)
@@ -226,6 +227,7 @@ public protocol _NSStringCore :
 }
 
 /// An `NSString` built around a slice of contiguous Swift `String` storage.
+@_fixed_layout // FIXME(sil-serialize-all)
 public final class _NSContiguousString : _SwiftNativeNSString {
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ _core: _StringCore) {

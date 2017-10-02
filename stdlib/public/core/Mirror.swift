@@ -21,6 +21,7 @@
 /// property that suggests how this structure might be rendered.
 ///
 /// Mirrors are used by playgrounds and the debugger.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct Mirror {
   /// Representation of descendant classes that don't override
   /// `customMirror`.
@@ -136,6 +137,7 @@ public struct Mirror {
   /// Playgrounds and the debugger will show a representation similar
   /// to the one used for instances of the kind indicated by the
   /// `DisplayStyle` case name when the `Mirror` is used for display.
+  @_fixed_layout // FIXME(sil-serialize-all)
   public enum DisplayStyle {
     case `struct`, `class`, `enum`, tuple, optional, collection
     case dictionary, `set`
@@ -388,6 +390,7 @@ extension Int : MirrorPath {}
 extension String : MirrorPath {}
 
 extension Mirror {
+  @_fixed_layout // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal struct _Dummy : CustomReflectable {
     @_inlineable // FIXME(sil-serialize-all)
@@ -524,6 +527,7 @@ internal extension Mirror {
   /// appropriate for random access!  To avoid this pitfall, convert
   /// mirrors to use the new style, which only present forward
   /// traversal in general.
+  @_fixed_layout // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal struct LegacyChildren : RandomAccessCollection {
     internal typealias Indices = CountableRange<Int>
@@ -622,6 +626,7 @@ internal extension Mirror {
 //===--- QuickLooks -------------------------------------------------------===//
 
 /// The sum of types that can be used as a Quick Look representation.
+@_fixed_layout // FIXME(sil-serialize-all)
 public enum PlaygroundQuickLook {
   /// Plain text.
   case text(String)
@@ -812,6 +817,7 @@ public protocol _DefaultCustomPlaygroundQuickLookable {
 ///     let pairs = IntPairs([1: 2, 1: 1, 3: 4, 2: 1])
 ///     print(pairs.elements)
 ///     // Prints "[(1, 2), (1, 1), (3, 4), (2, 1)]"
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct DictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
   /// Creates a new `DictionaryLiteral` instance from the given dictionary
   /// literal.
