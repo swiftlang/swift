@@ -260,13 +260,29 @@ def write_comparison(args, old_stats, new_stats):
     regressions = sum(1 for row in rows if row.delta > 0)
 
     if args.markdown:
+
+        def format_field(field, row, args):
+            if field == 'name' and args.group_by_module:
+                return re.sub(r'^(\w+)\.', r'\1<br/>', row.name)
+            elif field == 'delta_pct' and args.github_emoji:
+                if row.delta_pct > 0:
+                    return str(row.delta_pct) + " :no_entry:"
+                else:
+                    return str(row.delta_pct) + " :white_check_mark:"
+            else:
+                return str(vars(row)[field])
+
         out = args.output
         out.write(' | '.join(OutputRow._fields))
         out.write('\n')
         out.write(' | '.join('---:' for _ in OutputRow._fields))
         out.write('\n')
         for row in rows:
-            out.write(' | '.join(str(v) for v in row))
+            name = row.name
+            if args.group_by_module:
+                name
+            out.write(' | '.join(format_field(f, row, args)
+                                 for f in OutputRow._fields))
             out.write('\n')
     else:
         out = csv.DictWriter(args.output, OutputRow._fields,
@@ -374,6 +390,10 @@ def main():
                         default=False,
                         action="store_true",
                         help="Write output in markdown table format")
+    parser.add_argument("--github-emoji",
+                        default=False,
+                        action="store_true",
+                        help="Add github-emoji indicators to markdown")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")
