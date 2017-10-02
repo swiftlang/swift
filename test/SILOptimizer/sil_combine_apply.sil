@@ -309,3 +309,37 @@ bb0(%0 : $*SwiftP):
   %9999 = tuple()
   return %9999 : $()
 }
+
+protocol MutatingProto {
+    mutating func mutatingMethod()
+}
+
+struct MStruct : MutatingProto { 
+
+    var somevar: Builtin.Int32
+
+    mutating func mutatingMethod()
+}
+
+// CHECK-LABEL: sil @dont_replace_copied_self_in_mutating_method_call
+sil @dont_replace_copied_self_in_mutating_method_call : $@convention(thin) (MStruct) -> (@out MutatingProto) {
+bb0(%0 : $*MutatingProto, %1 : $MStruct):
+  %2 = alloc_stack $MutatingProto
+  %4 = init_existential_addr %2 : $*MutatingProto, $MStruct
+  store %1 to %4 : $*MStruct
+  %9 = alloc_stack $MutatingProto
+  copy_addr %2 to [initialization] %9 : $*MutatingProto
+  // CHECK: [[E:%[0-9]+]] = open_existential_addr
+  %11 = open_existential_addr mutable_access %9 : $*MutatingProto to $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto
+  // CHECK: [[M:%[0-9]+]] = witness_method $MStruct,
+  %12 = witness_method $@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto, #MutatingProto.mutatingMethod!1 : <Self where Self : MutatingProto> (inout Self) -> () -> (), %11 : $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto : $@convention(witness_method) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
+  // CHECK: apply [[M]]<@opened("{{.*}}") MutatingProto>([[E]]) :
+  %13 = apply %12<@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto>(%11) : $@convention(witness_method) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
+  copy_addr [take] %9 to [initialization] %0 : $*MutatingProto
+  dealloc_stack %9 : $*MutatingProto
+  destroy_addr %2 : $*MutatingProto
+  dealloc_stack %2 : $*MutatingProto
+  %27 = tuple ()
+  return %27 : $()
+}
+
