@@ -168,7 +168,6 @@ func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3
 // CHECK-LABEL: RangeReplaceableCollection
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RangeReplaceableCollection, τ_0_0.SubSequence == MutableRangeReplaceableSlice<τ_0_0>>
 extension RangeReplaceableCollection where
-  Self: MutableCollection,
   Self.SubSequence == MutableRangeReplaceableSlice<Self>
 {
 	func f() { }
@@ -177,7 +176,7 @@ extension RangeReplaceableCollection where
 // CHECK-LABEL: X14.recursiveConcreteSameType
 // CHECK: Generic signature: <T, V where T == CountableRange<Int>>
 // CHECK-NEXT: Canonical generic signature: <τ_0_0, τ_1_0 where τ_0_0 == CountableRange<Int>>
-struct X14<T: Collection> where T.Iterator == IndexingIterator<T> {
+struct X14<T> where T.Iterator == IndexingIterator<T> {
 	func recursiveConcreteSameType<V>(_: V) where T == CountableRange<Int> { }
 }
 

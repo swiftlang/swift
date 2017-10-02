@@ -380,6 +380,9 @@ public struct ReversedRandomAccessCollection<
 
   public typealias IndexDistance = Base.IndexDistance
 
+  public typealias Indices =
+    DefaultRandomAccessIndices<ReversedRandomAccessCollection<Base>>
+
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
   public typealias Iterator = IndexingIterator<

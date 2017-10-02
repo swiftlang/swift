@@ -60,7 +60,7 @@ public protocol RangeExpression {
   ///   is *not* guaranteed to be inside the bounds of `collection`. Callers
   ///   should apply the same preconditions to the return value as they would
   ///   to a range provided directly by the user.
-  func relative<C: _Indexable>(
+  func relative<C: Collection>(
     to collection: C
   ) -> Range<Bound> where C.Index == Bound
   
@@ -590,7 +590,7 @@ extension ${Self} {
 
 extension ${Self}: RangeExpression {
   @_inlineable // FIXME(sil-serialize-all)
-  public func relative<C: _Indexable>(to collection: C) -> Range<Bound>
+  public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     %   if 'Closed' in Self:
     return Range(
@@ -821,7 +821,7 @@ public struct PartialRangeUpTo<Bound: Comparable>: RangeExpression {
   
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public func relative<C: _Indexable>(to collection: C) -> Range<Bound>
+  public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return collection.startIndex..<self.upperBound
   }
@@ -863,7 +863,7 @@ public struct PartialRangeThrough<Bound: Comparable>: RangeExpression {
   
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public func relative<C: _Indexable>(to collection: C) -> Range<Bound>
+  public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return collection.startIndex..<collection.index(after: self.upperBound)
   }
@@ -904,7 +904,7 @@ public struct PartialRangeFrom<Bound: Comparable>: RangeExpression {
   
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public func relative<C: _Indexable>(to collection: C) -> Range<Bound>
+  public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return self.lowerBound..<collection.endIndex
   }
@@ -1005,7 +1005,7 @@ public struct CountablePartialRangeFrom<
   public let lowerBound: Bound
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public func relative<C: _Indexable>(
+  public func relative<C: Collection>(
     to collection: C
   ) -> Range<Bound> where C.Index == Bound {
     return self.lowerBound..<collection.endIndex
@@ -1214,7 +1214,7 @@ public enum UnboundedRange_ {
 }
 public typealias UnboundedRange = (UnboundedRange_)->()
 
-extension _Indexable {
+extension Collection {
   @_inlineable
   public subscript<R: RangeExpression>(r: R)
   -> SubSequence where R.Bound == Index {
@@ -1226,7 +1226,7 @@ extension _Indexable {
     return self[startIndex...]
   }
 }
-extension _MutableIndexable {
+extension MutableCollection {
   @_inlineable
   public subscript<R: RangeExpression>(r: R) -> SubSequence
   where R.Bound == Index {

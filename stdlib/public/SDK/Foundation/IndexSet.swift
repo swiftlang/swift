@@ -371,7 +371,7 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     public func intersects(integersIn range: CountableClosedRange<Element>) -> Bool { return self.intersects(integersIn: Range(range)) }
 
     // MARK: -
-    // Indexable
+    // Collection
     
     public func index(after i: Index) -> Index {
         if i.value + 1 == i.extent.upperBound {

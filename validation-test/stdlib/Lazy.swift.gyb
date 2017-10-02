@@ -874,8 +874,7 @@ tests.test("LazyMapCollection/AssociatedTypes") {
   expectCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
-    // FIXME(ABI)#77 (Associated Types with where clauses): SubSequence should be `LazyMapCollection<Base.Slice>`.
-    subSequenceType: Slice<Subject>.self,
+    subSequenceType: LazyMapCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
     indexDistanceType: Base.IndexDistance.self,
     indicesType: Base.Indices.self)
@@ -887,8 +886,7 @@ tests.test("LazyMapBidirectionalCollection/AssociatedTypes") {
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
-    // FIXME(ABI)#78 (Associated Types with where clauses): SubSequence should be `LazyMapBidirectionalCollection<Base.Slice>`.
-    subSequenceType: BidirectionalSlice<Subject>.self,
+    subSequenceType: LazyMapBidirectionalCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
     indexDistanceType: Base.IndexDistance.self,
     indicesType: Base.Indices.self)
@@ -900,8 +898,7 @@ tests.test("LazyMapRandomAccessCollection/AssociatedTypes") {
   expectRandomAccessCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
-    // FIXME(ABI)#79 (Associated Types with where clauses): SubSequence should be `LazyMapRandomAccessCollection<Base.Slice>`.
-    subSequenceType: RandomAccessSlice<Subject>.self,
+    subSequenceType: LazyMapRandomAccessCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
     indexDistanceType: Base.IndexDistance.self,
     indicesType: Base.Indices.self)
@@ -1167,8 +1164,7 @@ tests.test("LazyFilterCollection/AssociatedTypes") {
   expectCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyFilterIterator<Base.Iterator>.self,
-    // FIXME(ABI)#80 (Associated Types with where clauses): SubSequence should be `LazyFilterCollection<Base.Slice>`.
-    subSequenceType: Slice<Subject>.self,
+    subSequenceType: LazyFilterCollection<Base.SubSequence>.self,
     indexType: LazyFilterIndex<Base>.self,
     indexDistanceType: Base.IndexDistance.self,
     indicesType: DefaultIndices<Subject>.self)
@@ -1180,8 +1176,7 @@ tests.test("LazyFilterBidirectionalCollection/AssociatedTypes") {
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyFilterIterator<Base.Iterator>.self,
-    // FIXME(ABI)#81 (Associated Types with where clauses): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
-    subSequenceType: BidirectionalSlice<Subject>.self,
+    subSequenceType: LazyFilterBidirectionalCollection<Base.SubSequence>.self,
     indexType: LazyFilterIndex<Base>.self,
     indexDistanceType: Base.IndexDistance.self,
     indicesType: DefaultBidirectionalIndices<Subject>.self)

@@ -16,15 +16,7 @@
 /// `RandomAccessCollection` protocol instead, because it has a more complete
 /// interface.
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
-public typealias RandomAccessIndexable = _RandomAccessIndexable
-public protocol _RandomAccessIndexable : _BidirectionalIndexable {
-  // FIXME(ABI)#54 (Recursive Protocol Constraints): there is no reason for this protocol
-  // to exist apart from missing compiler features that we emulate with it.
-  // rdar://problem/20531108
-  //
-  // This protocol is almost an implementation detail of the standard
-  // library.
-}
+public typealias RandomAccessIndexable = RandomAccessCollection
 
 /// A collection that supports efficient random-access index traversal.
 ///
@@ -46,24 +38,23 @@ public protocol _RandomAccessIndexable : _BidirectionalIndexable {
 /// collection, either the index for your custom type must conform to the
 /// `Strideable` protocol or you must implement the `index(_:offsetBy:)` and
 /// `distance(from:to:)` methods with O(1) efficiency.
-public protocol RandomAccessCollection :
-  _RandomAccessIndexable, BidirectionalCollection
-// FIXME(ABI) (Revert Where Clauses): Restore this:
-// where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
+public protocol RandomAccessCollection : BidirectionalCollection
 {
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype Element
+
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype Index
+
   /// A collection that represents a contiguous subrange of the collection's
   /// elements.
-  associatedtype SubSequence
-  // FIXME(ABI) (Revert Where Clauses): Remove these two constraints:
-   : _RandomAccessIndexable, BidirectionalCollection
-   = RandomAccessSlice<Self>
+  associatedtype SubSequence : RandomAccessCollection
+    = RandomAccessSlice<Self>
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices 
-  // FIXME(ABI) (Revert Where Clauses): Remove these two constraints:
-  : _RandomAccessIndexable, BidirectionalCollection
-  = DefaultRandomAccessIndices<Self>
+  associatedtype Indices : RandomAccessCollection
+    = DefaultRandomAccessIndices<Self>
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
@@ -106,6 +97,15 @@ public protocol RandomAccessCollection :
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
   subscript(bounds: Range<Index>) -> SubSequence { get }
+
+  // FIXME(ABI): Associated type inference requires this.
+  subscript(position: Index) -> Element { get }
+
+  // FIXME(ABI): Associated type inference requires this.
+  var startIndex: Index { get }
+
+  // FIXME(ABI): Associated type inference requires this.
+  var endIndex: Index { get }
 }
 
 /// Supply the default "slicing" `subscript` for `RandomAccessCollection`
@@ -149,7 +149,7 @@ extension RandomAccessCollection where SubSequence == RandomAccessSlice<Self> {
 // wrong complexity.
 
 /// Default implementation for random access collections.
-extension _RandomAccessIndexable {
+extension RandomAccessCollection {
   /// Returns an index that is the specified distance from the given index,
   /// unless that distance is beyond a given limiting index.
   ///
