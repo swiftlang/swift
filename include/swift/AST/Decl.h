@@ -3783,7 +3783,7 @@ enum class AddressorKind : unsigned char {
   NotAddressor,
   /// \brief This is an unsafe addressor; it simply returns an address.
   Unsafe,
-  /// \brief This is an owning addressor; it returns a Builtin.UnknownObject
+  /// \brief This is an owning addressor; it returns an AnyObject
   /// which should be released when the caller is done with the object.
   Owning,
   /// \brief This is an owning addressor; it returns a Builtin.NativeObject

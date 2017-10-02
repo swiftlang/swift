@@ -5404,11 +5404,11 @@ public:
       return pointerType;
 
     // For non-native owning addressors, the return type is actually
-    //   (Unsafe{,Mutable}Pointer<T>, Builtin.UnknownObject)
+    //   (Unsafe{,Mutable}Pointer<T>, AnyObject)
     case AddressorKind::Owning: {
       TupleTypeElt elts[] = {
         pointerType,
-        TC.Context.TheUnknownObjectType
+        TC.Context.getAnyObjectType()
       };
       return TupleType::get(elts, TC.Context);
     }
