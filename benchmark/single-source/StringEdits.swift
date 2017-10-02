@@ -38,28 +38,28 @@ func edits(_ word: String) -> Set<String> {
   
   // though it should be, CharacterView isn't hashable
   // so using an array for now, ignore that aspect...
-  var result: Set<Substring> = []
+  var result: Array<Substring> = []
   
   for (left, right) in splits {
     // drop a character
-    result.insert(left + right.dropFirst())
+    result.append(left + right.dropFirst())
     
     // transpose two characters
     if let fst = right.first {
       let drop1 = right.dropFirst()
       if let snd = drop1.first {
-        result.insert(left + [snd,fst] + drop1.dropFirst())
+        result.append(left + [snd,fst] + drop1.dropFirst())
       }
     }
     
     // replace each character with another
     for letter in alphabet {
-      result.insert(left + [letter] + right.dropFirst())
+      result.append(left + [letter] + right.dropFirst())
     }
     
     // insert rogue characters
     for letter in alphabet {
-      result.insert(left + [letter] + right)
+      result.append(left + [letter] + right)
     }
   }
   
