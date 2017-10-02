@@ -123,19 +123,21 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   this->SML = SML.get();
   Context->addModuleLoader(std::move(SML));
 
-  // Wire up the Clang importer. If the user has specified an SDK, use it.
-  // Otherwise, we just keep it around as our interface to Clang's ABI
-  // knowledge.
-  auto clangImporter =
-    ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                          Invocation.getPCHHash(),
-                          DepTracker);
-  if (!clangImporter) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
-    return true;
-  }
+  if (!Invocation.getSearchPathOptions().RuntimeResourcePath.empty()) {
+    // Wire up the Clang importer. If the user has specified an SDK, use it.
+    // Otherwise, we just keep it around as our interface to Clang's ABI
+    // knowledge.
+    auto clangImporter =
+      ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
+                            Invocation.getPCHHash(),
+                            DepTracker);
+    if (!clangImporter) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
+      return true;
+    }
 
-  Context->addModuleLoader(std::move(clangImporter), /*isClang*/true);
+    Context->addModuleLoader(std::move(clangImporter), /*isClang*/true);
+  }
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
