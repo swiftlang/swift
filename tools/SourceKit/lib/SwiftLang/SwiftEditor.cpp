@@ -1590,20 +1590,10 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
     if (Length != 0 || Buf->getBufferSize() != 0) {
       updateSemaInfo();
 
-      if (auto Invok = Impl.SemanticInfo->getInvocation()) {
-        // Update semantic info for open editor documents of the same module.
-        // FIXME: Detect edits that don't affect other files, e.g. whitespace,
-        // comments, inside a function body, etc.
-        CompilerInvocation CI;
-        Invok->applyTo(CI);
-        auto &EditorDocs = Impl.LangSupport.getEditorDocuments();
-        for (auto &Input : CI.getInputFilenames()) {
-          if (auto EditorDoc = EditorDocs.findByPath(Input)) {
-            if (EditorDoc.get() != this)
-              EditorDoc->updateSemaInfo();
-          }
-        }
-      }
+      // FIXME: we should also update any "interesting" ASTs that depend on this
+      // document here, e.g. any ASTs for files visible in an editor. However,
+      // because our API conflates this with any file with unsaved changes we do
+      // not update all open documents, since there could be too many of them.
     }
   }
 
