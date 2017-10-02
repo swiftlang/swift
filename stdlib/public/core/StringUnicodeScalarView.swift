@@ -57,6 +57,7 @@ extension String {
   ///         print(asciiPrefix)
   ///     }
   ///     // Prints "My favorite emoji is "
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct UnicodeScalarView :
     BidirectionalCollection,
     CustomStringConvertible,
@@ -69,6 +70,7 @@ extension String {
       self._coreOffset = coreOffset
     }
 
+    @_fixed_layout // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
     internal struct _ScratchIterator : IteratorProtocol {
       @_versioned
@@ -189,6 +191,7 @@ extension String {
 
     /// An iterator over the Unicode scalars that make up a `UnicodeScalarView`
     /// collection.
+    @_fixed_layout // FIXME(sil-serialize-all)
     public struct Iterator : IteratorProtocol {
       @_inlineable // FIXME(sil-serialize-all)
       @_versioned // FIXME(sil-serialize-all)

@@ -42,6 +42,7 @@ struct _OpaqueStringSwitchCache {
 
 internal typealias _StringSwitchCache = Dictionary<String, Int>
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct _StringSwitchContext {
   @_inlineable // FIXME(sil-serialize-all)

@@ -30,6 +30,7 @@ internal func _abstract(
 // MARK: Type-erased abstract base classes
 
 /// A type-erased key path, from any root type to any resulting value type.
+@_fixed_layout // FIXME(sil-serialize-all)
 public class AnyKeyPath: Hashable, _AppendKeyPath {
   /// The root type for this key path.
   @_inlineable
@@ -158,6 +159,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
 
 /// A partially type-erased key path, from a concrete root type to any
 /// resulting value type.
+@_fixed_layout // FIXME(sil-serialize-all)
 public class PartialKeyPath<Root>: AnyKeyPath { }
 
 // MARK: Concrete implementations
@@ -165,6 +167,7 @@ public class PartialKeyPath<Root>: AnyKeyPath { }
 internal enum KeyPathKind { case readOnly, value, reference }
 
 /// A key path from a specific root type to a specific resulting value type.
+@_fixed_layout // FIXME(sil-serialize-all)
 public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   public typealias _Root = Root
   public typealias _Value = Value
@@ -255,6 +258,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
 }
 
 /// A key path that supports reading from and writing to the resulting value.
+@_fixed_layout // FIXME(sil-serialize-all)
 public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
   // MARK: Implementation detail
   
@@ -310,6 +314,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
 
 /// A key path that supports reading from and writing to the resulting value
 /// with reference semantics.
+@_fixed_layout // FIXME(sil-serialize-all)
 public class ReferenceWritableKeyPath<
   Root, Value
 > : WritableKeyPath<Root, Value> {
@@ -414,6 +419,7 @@ internal enum KeyPathComponentKind {
   case optionalWrap
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct ComputedPropertyID: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
@@ -480,6 +486,7 @@ internal struct ComputedArgumentWitnesses {
 
 @_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathComponent: Hashable {
+  @_fixed_layout // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal struct ArgumentRef {
     @_inlineable // FIXME(sil-serialize-all)
@@ -618,6 +625,7 @@ internal enum KeyPathComponent: Hashable {
 
 // A class that maintains ownership of another object while a mutable projection
 // into it is underway.
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal final class ClassHolder {
   @_versioned // FIXME(sil-serialize-all)
@@ -637,6 +645,7 @@ internal final class ClassHolder {
 }
 
 // A class that triggers writeback to a pointer when destroyed.
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal final class MutatingWritebackBuffer<CurValue, NewValue> {
   @_versioned // FIXME(sil-serialize-all)
@@ -677,6 +686,7 @@ internal final class MutatingWritebackBuffer<CurValue, NewValue> {
 }
 
 // A class that triggers writeback to a non-mutated value when destroyed.
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal final class NonmutatingWritebackBuffer<CurValue, NewValue> {
   @_versioned // FIXME(sil-serialize-all)
@@ -716,6 +726,7 @@ internal final class NonmutatingWritebackBuffer<CurValue, NewValue> {
   }
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct RawKeyPathComponent {
   @_inlineable // FIXME(sil-serialize-all)
@@ -1366,6 +1377,7 @@ internal struct RawKeyPathComponent {
   }
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct KeyPathBuffer {
   @_versioned // FIXME(sil-serialize-all)
@@ -1381,6 +1393,7 @@ internal struct KeyPathBuffer {
     return UnsafeMutableRawBufferPointer(mutating: data)
   }
 
+  @_fixed_layout // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal struct Header {
     @_versioned // FIXME(sil-serialize-all)

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// An iterator that produces one or fewer instances of `Element`.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
   /// Construct an instance that generates `_element!`, or an empty
   /// sequence if `_element == nil`.
@@ -39,6 +40,7 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
 }
 
 /// A collection containing a single element of type `Element`.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct CollectionOfOne<Element>
   : MutableCollection, RandomAccessCollection {
 

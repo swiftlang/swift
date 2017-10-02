@@ -32,6 +32,7 @@ internal func _swift_bufferAllocate(
 /// any live elements in the `deinit` of a subclass.
 /// - Note: Subclasses must not have any stored properties; any storage
 ///   needed should be included in `Header`.
+@_fixed_layout // FIXME(sil-serialize-all)
 open class ManagedBuffer<Header, Element> {
 
   /// Create a new instance of the most-derived class, calling

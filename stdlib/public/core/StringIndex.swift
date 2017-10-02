@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 extension String {
   /// A position of a character or code unit in a string.
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct Index {
     @_versioned // FIXME(sil-serialize-all)
     internal var _compoundOffset : UInt64

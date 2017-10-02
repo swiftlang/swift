@@ -98,6 +98,7 @@ extension String {
   ///         print(snowy[range])
   ///     }
   ///     // Prints "Let it snow!"
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct UTF16View
     : BidirectionalCollection,
     CustomStringConvertible,
@@ -122,6 +123,7 @@ extension String {
       return Index(encodedOffset: _offset + _length)
     }
 
+    @_fixed_layout // FIXME(sil-serialize-all)
     public struct Indices {
       @_inlineable // FIXME(sil-serialize-all)
       @_versioned // FIXME(sil-serialize-all)

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 extension Unicode {
+  @_fixed_layout // FIXME(sil-serialize-all)
   public enum UTF16 {
   case _swift3Buffer(Unicode.UTF16.ForwardParser)
   }
@@ -99,6 +100,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
     return encode(FromEncoding.decode(content))
   }
   
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct ForwardParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt16>
     @_inlineable // FIXME(sil-serialize-all)
@@ -106,6 +108,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
     public var _buffer: _Buffer
   }
   
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct ReverseParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt16>
     @_inlineable // FIXME(sil-serialize-all)

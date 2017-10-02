@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 extension Unicode {
+  @_fixed_layout // FIXME(sil-serialize-all)
   public enum UTF32 {
   case _swift3Codec
   }
@@ -44,6 +45,7 @@ extension Unicode.UTF32 : Unicode.Encoding {
     return EncodedScalar(source.value)
   }
   
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct Parser {
     @_inlineable // FIXME(sil-serialize-all)
     public init() { }

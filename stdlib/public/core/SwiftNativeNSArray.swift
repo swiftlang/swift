@@ -41,6 +41,7 @@ internal func _isValidArraySubscript(_ index: Int, count: Int) -> Bool {
 
 /// An `NSArray` with Swift-native reference counting and contiguous
 /// storage.
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
 internal class _SwiftNativeNSArrayWithContiguousStorage
   : _SwiftNativeNSArray { // Provides NSArray inheritance and native refcounting
@@ -149,6 +150,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 ///
 /// Ideally instances of this class would be allocated in-line in the
 /// buffers used for Array storage.
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
 @objc internal final class _SwiftDeferredNSArray
   : _SwiftNativeNSArrayWithContiguousStorage {

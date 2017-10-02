@@ -61,6 +61,7 @@ extension String {
   ///         print(firstName)
   ///     }
   ///     // Prints "Marie"
+  @_fixed_layout // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
   public struct CharacterView {

@@ -354,9 +354,11 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 final internal class _VaListBuilder {
 
+  @_fixed_layout // FIXME(sil-serialize-all)
   @_versioned
   internal struct Header {
     @_inlineable // FIXME(sil-serialize-all)
@@ -440,6 +442,7 @@ final internal class _VaListBuilder {
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 final internal class _VaListBuilder {
 

@@ -25,6 +25,7 @@ from gyb_stdlib_support import (
 /// This is the associated iterator for the `LazyPrefixWhileSequence`,
 /// `LazyPrefixWhileCollection`, and `LazyPrefixWhileBidirectionalCollection`
 /// types.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct LazyPrefixWhileIterator<Base : IteratorProtocol> :
   IteratorProtocol, Sequence {
 
@@ -58,6 +59,7 @@ public struct LazyPrefixWhileIterator<Base : IteratorProtocol> :
 
 /// A sequence whose elements consist of the initial consecutive elements of
 /// some base sequence that satisfy a given predicate.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct LazyPrefixWhileSequence<Base : Sequence> : LazySequenceProtocol {
 
   public typealias Elements = LazyPrefixWhileSequence
@@ -108,6 +110,7 @@ public enum _LazyPrefixWhileIndexRepresentation<Base : Collection> {
 
 /// A position in a `LazyPrefixWhileCollection` or
 /// `LazyPrefixWhileBidirectionalCollection` instance.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct LazyPrefixWhileIndex<Base : Collection> : Comparable {
   /// The position corresponding to `self` in the underlying collection.
   @_versioned // FIXME(sil-serialize-all)
@@ -171,6 +174,7 @@ public struct LazyPrefixWhileIndex<Base : Collection> : Comparable {
 ///   the usual performance given by the `Collection` protocol. Be aware,
 ///   therefore, that general operations on `${Self}` instances may not have
 ///   the documented complexity.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct ${Self}<
   Base : ${Collection}
 > : LazyCollectionProtocol, ${Collection} {
