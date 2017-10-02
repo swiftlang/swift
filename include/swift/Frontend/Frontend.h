@@ -243,24 +243,28 @@ public:
   }
 
   void addInputFilename(StringRef Filename) {
-    FrontendOpts.InputFilenames.push_back(Filename);
+    FrontendOpts.Inputs.addInputFilename(Filename);
   }
 
   /// Does not take ownership of \p Buf.
   void addInputBuffer(llvm::MemoryBuffer *Buf) {
-    FrontendOpts.InputBuffers.push_back(Buf);
+    FrontendOpts.Inputs.addInputBuffer(Buf);
+  }
+    
+  void setPrimaryInput(SelectedInput pi) {
+    FrontendOpts.Inputs.setPrimaryInput(pi);
   }
 
   void clearInputs() {
-    FrontendOpts.InputFilenames.clear();
-    FrontendOpts.InputBuffers.clear();
+    FrontendOpts.Inputs.clearInputs();
   }
 
   ArrayRef<std::string> getInputFilenames() const {
-    return FrontendOpts.InputFilenames;
+    return FrontendOpts.Inputs.getInputFilenames();
   }
+  
   ArrayRef<llvm::MemoryBuffer*> getInputBuffers() const {
-    return FrontendOpts.InputBuffers;
+    return FrontendOpts.Inputs.getInputBuffers();
   }
 
   StringRef getOutputFilename() const {

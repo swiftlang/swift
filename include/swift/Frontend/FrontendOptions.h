@@ -21,6 +21,10 @@
 
 namespace llvm {
   class MemoryBuffer;
+  namespace opt {
+    class ArgList;
+    class Arg;
+  }
 }
 
 namespace swift {
@@ -62,19 +66,74 @@ enum class InputFileKind {
   IFK_LLVM_IR
 };
 
-/// Options for controlling the behavior of the frontend.
-class FrontendOptions {
-public:
+/// Information about all the inputs to the frontend.
+class FrontendInputs {
+private:
+  // FIXME: (dmu) create a class for the inputs
+  
   /// The names of input files to the frontend.
   std::vector<std::string> InputFilenames;
-
+  
   /// Input buffers which may override the file contents of input files.
   std::vector<llvm::MemoryBuffer *> InputBuffers;
-
+  
   /// The input for which output should be generated. If not set, output will
   /// be generated for the whole module.
   Optional<SelectedInput> PrimaryInput;
+  
+public:
+  ArrayRef<std::string> getInputFilenames() const {
+    return InputFilenames;
+  }
+  ArrayRef<llvm::MemoryBuffer*> getInputBuffers() const {
+    return InputBuffers;
+  }
+  Optional<SelectedInput> getPrimaryInput() const {
+    return PrimaryInput;
+  }
+  void addInputFilename(StringRef Filename) {
+    InputFilenames.push_back(Filename);
+  }
+  void addInputBuffer(llvm::MemoryBuffer *Buf) {
+    InputBuffers.push_back(Buf);
+  }
+  void clearInputs() {
+    InputFilenames.clear();
+    InputBuffers.clear();
+  }
+  void setPrimaryInput(SelectedInput si) {
+    PrimaryInput = si;
+  }
+  
+  bool shouldTreatAsSIL() const;
+  
+  // If we have exactly one input filename, and its extension is "bc" or "ll",
+  // treat the input as LLVM_IR.
+  bool shouldTreatAsLLVM() const;
+  
+  void setInputFilenamesAndPrimaryInput(DiagnosticEngine &Diags, llvm::opt::ArgList &Args);
+  
+  /// Return true for error
+  bool verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool isREPLRequested, bool isNoneRequested) const;
+  
+  bool isReadingFromStdin() {
+    return getInputFilenames().size() == 1  &&  getInputFilenames()[0] == "-";
+  }
+  
+  StringRef baseNameOfOutput(bool UserSpecifiedModuleName, StringRef ModuleName) const;
+  
+  bool isWholeModule() { return !getPrimaryInput().hasValue(); }
+  
+  void readInputFileList(DiagnosticEngine &diags,
+                         llvm::opt::ArgList &Args,
+                         const llvm::opt::Arg *filelistPath);
+};
 
+/// Options for controlling the behavior of the frontend.
+class FrontendOptions {
+public:
+  FrontendInputs Inputs;
+  
   /// The kind of input on which the frontend should operate.
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 

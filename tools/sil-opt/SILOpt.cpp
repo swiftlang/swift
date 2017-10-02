@@ -351,11 +351,11 @@ int main(int argc, char **argv) {
   if (!PerformWMO) {
     auto &FrontendOpts = Invocation.getFrontendOptions();
     if (!InputFilename.empty() && InputFilename != "-") {
-      FrontendOpts.PrimaryInput = SelectedInput(
-          FrontendOpts.InputFilenames.size());
+      Invocation.setPrimaryInput( SelectedInput(
+          FrontendOpts.InputFilenames.size()));
     } else {
-      FrontendOpts.PrimaryInput = SelectedInput(
-          FrontendOpts.InputBuffers.size(), SelectedInput::InputKind::Buffer);
+      Invocation.setPrimaryInput( SelectedInput(
+          FrontendOpts.InputBuffers.size(), SelectedInput::InputKind::Buffer));
     }
   }
 

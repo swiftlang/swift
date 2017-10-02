@@ -56,9 +56,8 @@ std::string CompilerInvocation::getPCHHash() const {
 void CompilerInstance::createSILModule() {
   assert(MainModule && "main module not created yet");
   // Assume WMO if a -primary-file option was not provided.
-  bool WholeModule = !Invocation.getFrontendOptions().PrimaryInput.hasValue();
   TheSILModule = SILModule::createEmptyModule(
-    getMainModule(), Invocation.getSILOptions(), WholeModule);
+    getMainModule(), Invocation.getSILOptions(), Invocation.getFrontendOptions().Inputs.isWholeModule());
 }
 
 void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
@@ -157,7 +156,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().EnableAccessControl = false;
 
   const Optional<SelectedInput> &PrimaryInput =
-    Invocation.getFrontendOptions().PrimaryInput;
+    Invocation.getFrontendOptions().Inputs.getPrimaryInput();
 
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
