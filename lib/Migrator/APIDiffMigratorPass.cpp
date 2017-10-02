@@ -690,6 +690,10 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           StringRef NewArg = View.args()[Index++];
           auto ArgLoc = PD->getArgumentNameLoc();
 
+          // Represent empty label with underscore.
+          if (NewArg.empty())
+            NewArg = "_";
+
           // If the argument name is not specified, add the argument name before
           // the parameter name.
           if (ArgLoc.isInvalid())
@@ -697,7 +701,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
                                 (llvm::Twine(NewArg) + " ").str());
           else {
             // Otherwise, replace the argument name directly.
-            Editor.replaceToken(ArgLoc, NewArg.empty() ? "_" : NewArg);
+            Editor.replaceToken(ArgLoc, NewArg);
           }
         }
       }
