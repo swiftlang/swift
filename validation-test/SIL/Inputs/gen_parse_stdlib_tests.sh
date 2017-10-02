@@ -18,6 +18,9 @@ for id in $(seq 0 $process_id_max); do
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false %t.sil -ast-verifier-process-count=$process_count -ast-verifier-process-id=$id > /dev/null
 // REQUIRES: long_test
 // REQUIRES: nonexecutable_test
+
+// FIXME: Re-enable on Linux when we're no long running out of memory.
+// REQUIRES: OS=macosx
 __EOF__
 
 done
