@@ -319,6 +319,15 @@ internal func _parseRawScalar(
   _sanityCheck(Int32(exactly: value) != nil, "top bit shouldn't be set")
   return (UnicodeScalar(_unchecked: value), idx+2)
 }
+internal func _parseRawScalar(
+  _ core: _StringCore,
+  startingFrom idx: Int = 0
+) -> (UnicodeScalar, scalarEndIndex: Int) {
+  // TODO: Just put next two code units (checking for last code units, etc) into
+  // a _FixedArray2, and call other _parseRawScalar.
+  fatalError("unimplemented")
+}
+
 internal func _reverseParseRawScalar(
   _ buf: UnsafeBufferPointer<UInt16>,
   endingAt idx: Int // one-past-the-end
@@ -1029,11 +1038,17 @@ extension String {
     let otherCU = other._core[idx]
 
     //
-    // Fast path (ASCII-always-less): if one is ASCII and the other not, the
-    // ASCII one must be less. See "ASCII-always-less" in assumption checker.
+    // Fast path: if one is ASCII, we can often compare the code units directly.
     //
     if _fastPath(selfCU <= 0x7F || otherCU <= 0x7F) {
-      return _lexicographicalCompare(selfCU, otherCU)
+      _sanityCheck(idx < selfCount && idx < otherCount,
+        "Should be caught by check against min-count")
+
+      // TODO: Check if next CU is <0x300, or if we're in a
+      // "_isNormalizedSuperASCII" case. 99.9% of the time, we're here because
+      // the non-contig string is ASCII. We never want to hit the pathological
+      // path for those.
+      fatalError("unimplemented")
     }
 
     // TODO: Consider a Latiny fast path, but how common are non-ASCII non-
@@ -1050,9 +1065,6 @@ extension String {
     //
     // Eagerly pull in the seemingly-non-contiguous String, then compare
     // normally
-    //
-    // switch (self._baseAddress != nil, other._baseAddress != nil) {
-    //   case true, true:
 
     fatalError("unimplemented")
   }
