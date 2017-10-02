@@ -155,7 +155,7 @@ public:
   FoundResult visitInOutTypeRepr(InOutTypeRepr *T) {
     return visit(T->getBase());
   }
-  
+
   FoundResult visitSharedTypeRepr(SharedTypeRepr *T) {
     return visit(T->getBase());
   }
@@ -695,9 +695,10 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           if (ArgLoc.isInvalid())
             Editor.insertBefore(PD->getNameLoc(),
                                 (llvm::Twine(NewArg) + " ").str());
-          else
+          else {
             // Otherwise, replace the argument name directly.
-            Editor.replaceToken(ArgLoc, NewArg);
+            Editor.replaceToken(ArgLoc, NewArg.empty() ? "_" : NewArg);
+          }
         }
       }
     }
