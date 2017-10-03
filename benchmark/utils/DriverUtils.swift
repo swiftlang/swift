@@ -111,7 +111,7 @@ struct TestConfig {
   var tags = Set<BenchmarkCategory>()
 
   /// Tests tagged with any of these will not be executed
-  var skipTags: Set<BenchmarkCategory> = [.unstable, .String]
+  var skipTags: Set<BenchmarkCategory> = [.unstable, .skip]
 
   /// The scalar multiple of the amount of times a test should be run. This
   /// enables one to cause tests to run for N iterations longer than they
@@ -194,7 +194,9 @@ struct TestConfig {
     }
 
     if let x = benchArgs.optionalArgsMap["--skip-tags"] {
-      if x.isEmpty { return .fail("--skip-tags requires a value") }
+      // if the --skip-tags parameter is specified, we need to ignore the
+      // default and start from a clean slate.
+      skipTags = []
 
       // We support specifying multiple tags by splitting on comma, i.e.:
       //
