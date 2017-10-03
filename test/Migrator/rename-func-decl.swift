@@ -8,4 +8,5 @@ import Cities
 
 class MyCities : MoreCities {
   func setZooLocation(x ix: Int, y iy: Int, z iz: Int) {}
+  func addZooAt(_ x: Int, y: Int, z: Int) {}
 }

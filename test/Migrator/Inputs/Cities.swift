@@ -22,6 +22,7 @@ public protocol ExtraCities {
 
 public protocol MoreCities {
   func setZooLocation(x: Int, y: Int, z: Int)
+  func addZooAt(_ x: Int, y: Int, z: Int)
 }
 
 public func setCityProperty1(_ c : Cities, _ p : Int) {}
