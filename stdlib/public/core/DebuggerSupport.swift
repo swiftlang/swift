@@ -305,10 +305,8 @@ public enum _DebuggerSupport {
   }
 
   // LLDB uses this function in expressions, and if it is inlined the resulting
-  // LLVM IR is enormous.  As a result, to improve LLDB performance we have made
-  // this stdlib_binary_only, which prevents inlining.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_semantics("stdlib_binary_only")
+  // LLVM IR is enormous.  As a result, to improve LLDB performance we are not
+  // making it @_inlineable.
   public static func stringForPrintObject(_ value: Any) -> String {
     var maxItemCounter = Int.max
     var refs = Set<ObjectIdentifier>()

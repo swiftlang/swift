@@ -82,10 +82,8 @@ func _fatalErrorFlags() -> UInt32 {
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
+@_versioned // FIXME(sil-serialize-all)
 @inline(never)
-@_semantics("stdlib_binary_only")
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: StaticString,
   file: StaticString, line: UInt,
@@ -114,10 +112,8 @@ internal func _assertionFailure(
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
+@_versioned // FIXME(sil-serialize-all)
 @inline(never)
-@_semantics("stdlib_binary_only")
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
   file: StaticString, line: UInt,
@@ -146,10 +142,8 @@ internal func _assertionFailure(
 ///
 /// This function should not be inlined because it is cold and it inlining just
 /// bloats code.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
+@_versioned // FIXME(sil-serialize-all)
 @inline(never)
-@_semantics("stdlib_binary_only")
 @_semantics("arc.programtermination_point")
 internal func _fatalErrorMessage(
   _ prefix: StaticString, _ message: StaticString,
