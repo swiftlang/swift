@@ -10,17 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI)#69 (Overload Resolution): Remove `_Strideable`.
-// WORKAROUND rdar://25214598 - should be:
-// protocol Strideable : Comparable {...}
-
-% for Self in ['_Strideable', 'Strideable']:
-
-%{
-    Conformance = (
-      'Equatable' if Self == '_Strideable' else '_Strideable, Comparable'
-    )
-}%
 /// Conforming types are notionally continuous, one-dimensional
 /// values that can be offset and measured.
 ///
@@ -29,11 +18,9 @@
 ///   `Stride` type's implementations. If a type conforming to `Strideable`
 ///   is its own `Stride` type, it must provide concrete implementations of
 ///   the two operators to avoid infinite recursion.
-public protocol ${Self} : ${Conformance} {
-%   if Self == '_Strideable':
+public protocol Strideable : Comparable {
   /// A type that represents the distance between two values of `Self`.
   associatedtype Stride : SignedNumeric, Comparable
-%   end
 
   /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.
@@ -57,26 +44,6 @@ public protocol ${Self} : ${Conformance} {
   ) -> (index: Int?, value: Self)
 
   associatedtype _DisabledRangeIndex = _DisabledRangeIndex_
-}
-
-% end
-
-extension Strideable where Stride == Self {
-  @available(*, deprecated, message: "Strideable conformance where 'Stride == Self' requires user-defined implementation of the '<' operator")
-  public static func < (x: Self, y: Self) -> Bool {
-    fatalError("""
-      Strideable conformance where 'Stride == Self' requires user-defined \
-      implementation of the '<' operator
-      """)
-  }
-
-  @available(*, deprecated, message: "Strideable conformance where 'Stride == Self' requires user-defined implementation of the '==' operator")
-  public static func == (x: Self, y: Self) -> Bool {
-    fatalError("""
-      Strideable conformance where 'Stride == Self' requires user-defined \
-      implementation of the '==' operator
-      """)
-  }
 }
 
 extension Strideable {
