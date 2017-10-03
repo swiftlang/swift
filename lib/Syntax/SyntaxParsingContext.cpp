@@ -47,6 +47,8 @@ struct SyntaxParsingContext::Implementation {
   std::vector<Syntax> PendingSyntax;
 
   Implementation(SourceFile &File, bool Enabled): File(File), Enabled(Enabled) {}
+
+  // Pop back from PendingSyntax if the back is a token of the given Kind.
   Optional<TokenSyntax> checkBackToken(tok Kind) {
     if (PendingSyntax.empty())
       return None;
@@ -63,6 +65,7 @@ struct SyntaxParsingContext::Implementation {
                  [](const Syntax &S) { return make<Syntax>(S.getRaw()); });
   }
 
+  // Pop back from PendingSyntax.
   Syntax popPendingSyntax() {
     assert(!PendingSyntax.empty());
     auto Result = PendingSyntax.back();
@@ -104,8 +107,13 @@ SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
     } else if (S.isExpr()) {
       AllStmts.push_back(SyntaxFactory::makeExpressionStmt(
         S.getAs<ExprSyntax>().getValue(), None));
-    } else {
+    } else if (S.isStmt()) {
       AllStmts.push_back(S.getAs<StmtSyntax>().getValue());
+    } else {
+      // If this is a standalone token, we create an unknown expression wrapper
+      // for it.
+      AllStmts.push_back(SyntaxFactory::makeExpressionStmt(
+        getUnknownExpr({ *S.getAs<TokenSyntax>() }), None));
     }
     AllTopLevel.push_back(SyntaxFactory::makeTopLevelCodeDecl(
       SyntaxFactory::makeStmtList(AllStmts)));
@@ -126,7 +134,10 @@ void SyntaxParsingContext::addTokenSyntax(SourceLoc Loc) {
 }
 
 SyntaxParsingContextChild::~SyntaxParsingContextChild() {
+  // Prent should take care of the created syntax.
   Parent->Impl.addPendingSyntax(Impl.PendingSyntax);
+
+  // Reset the context holder to be Parent.
   ContextHolder = Parent;
 }
 
@@ -134,6 +145,7 @@ void SyntaxParsingContextExpr::makeNode(SyntaxKind Kind) {
   if (!Impl.Enabled)
     return;
 
+  // Create syntax nodes according to the given kind.
   switch (Kind) {
   case SyntaxKind::IntegerLiteralExpr: {
     auto Digit = *Impl.popPendingSyntax().getAs<TokenSyntax>();
@@ -154,6 +166,8 @@ void SyntaxParsingContextExpr::makeNode(SyntaxKind Kind) {
 }
 
 SyntaxParsingContextExpr::~SyntaxParsingContextExpr() {
+  // If we've created more than one expression syntax, we should enclose them
+  // under a unknown expression.
   if (Impl.PendingSyntax.size() > 1) {
     auto Result = getUnknownExpr(Impl.PendingSyntax);
     Impl.PendingSyntax.clear();

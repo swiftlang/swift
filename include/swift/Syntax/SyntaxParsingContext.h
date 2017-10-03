@@ -36,6 +36,8 @@ enum class SyntaxParsingContextKind: uint8_t {
   Expr,
 };
 
+/// The base class of different kinds of Syntax context that Parser should use to
+/// create syntax nodes.
 class SyntaxParsingContext {
 protected:
   SyntaxParsingContext(SourceFile &File, bool Enabled);
@@ -43,13 +45,26 @@ protected:
 public:
   struct Implementation;
   Implementation &Impl;
+
+  // Add a token syntax at the given source location to the context; this
+  // token node can be used to build more complex syntax nodes in later call
+  // back.
   void addTokenSyntax(SourceLoc Loc);
+
+  // Get the context kind.
   virtual SyntaxParsingContextKind getKind() = 0;
+
+  // Create a syntax node of the given kind.
   virtual void makeNode(SyntaxKind Kind) = 0;
   virtual ~SyntaxParsingContext();
+
+  // Disable the building of syntax tree in the current context.
   void disable();
 };
 
+// The start point of syntax tree parsing. This context is the root
+// of all other entity-specific contexts. This is the context Parser
+// has when the parser instance is firstly created.
 class SyntaxParsingContextRoot: public SyntaxParsingContext {
 public:
   SyntaxParsingContextRoot(SourceFile &SF, unsigned BufferID);
@@ -60,6 +75,10 @@ public:
   };
 };
 
+// The base class for contexts that are created from a parent context.
+// The stack instance will set the context holder when the context
+// is firstly created and reset the context holder to the parent when
+// it's destructed.
 class SyntaxParsingContextChild: public SyntaxParsingContext {
   SyntaxParsingContext *Parent;
   SyntaxParsingContext *&ContextHolder;
@@ -72,6 +91,9 @@ protected:
   ~SyntaxParsingContextChild();
 };
 
+// The context for creating expression syntax. By the destruction
+// of this context, we should expect one expression syntax is
+// created.
 class SyntaxParsingContextExpr: public SyntaxParsingContextChild {
 public:
   SyntaxParsingContextExpr(SyntaxParsingContext *&ContextHolder):
