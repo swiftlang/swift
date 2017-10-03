@@ -1121,7 +1121,7 @@ public:
 };
 
 /// Workaround to disable thumb-mode until debugger support is there.
-bool shouldRemoveTargetFeature(const std::string &);
+bool shouldRemoveTargetFeature(StringRef);
 
 } // end namespace irgen
 } // end namespace swift

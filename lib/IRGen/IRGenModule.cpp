@@ -804,7 +804,7 @@ llvm::AttributeList IRGenModule::getAllocAttrs() {
 }
 
 /// Disable thumb-mode until debugger support is there.
-bool swift::irgen::shouldRemoveTargetFeature(const std::string &feature) {
+bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
   return feature == "+thumb-mode";
 }
 
