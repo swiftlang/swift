@@ -226,7 +226,7 @@ struct TestConfig {
 
   mutating func findTestsToRun() {
     // Begin by creating a set of our non-legacy registeredBenchmarks
-    var allTests = Set<BenchmarkInfo>(registeredBenchmarks)
+    var allTests = Set(registeredBenchmarks)
 
     // If we are supposed to only run registered tests there isn't anything
     // further to do (in the future anyways).
@@ -243,22 +243,17 @@ struct TestConfig {
       }
     }
 
-    let benchmarkNameFilter: Set<String>? = {
-      if !filters.isEmpty {
-        return Set(filters)
-      }
-
+    let benchmarkNameFilter: Set<String> = {
       if onlyPrecommit {
         return Set(precommitTests.map { $0.name })
       }
 
-      return nil
+      return Set(filters)
     }()
 
     // t is needed so we don't capture an ivar of a mutable inout self.
     let t = tags
-    var filteredTests = allTests.filter {
-      benchInfo in
+    let filteredTests = Array(allTests.filter { benchInfo in
       if !t.isSubset(of: benchInfo.tags) {
         return false
       }
@@ -266,23 +261,21 @@ struct TestConfig {
       // If the user did not specified a benchmark name filter and our tags are
       // a subset of the specified tags by the user, return true. We want to run
       // this test.
-      guard let benchFilter = benchmarkNameFilter else {
+      if benchmarkNameFilter.isEmpty {
         return true
       }
 
       // Otherwise, we need to check if our benchInfo's name is in the benchmark
       // name filter list. If it isn't, then we shouldn't process it.
-      return benchFilter.contains(benchInfo.name)
-    }.map { $0 }.sorted()
+      return benchmarkNameFilter.contains(benchInfo.name)
+    }).sorted()
 
     if (filteredTests.isEmpty) {
       return
     }
 
-    tests = zip(1...filteredTests.count, filteredTests).map {
-      t -> Test in
-      let (ordinal, benchInfo) = t
-      return Test(benchInfo: benchInfo, index: ordinal)
+    tests = filteredTests.enumerated().map {
+      Test(benchInfo: $0.element, index: $0.offset + 1)
     }
   }
 }
