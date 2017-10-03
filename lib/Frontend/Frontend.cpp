@@ -258,8 +258,6 @@ ModuleDecl *CompilerInstance::getMainModule() {
 
     if (Invocation.getFrontendOptions().EnableResilience)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
-    else if (Invocation.getSILOptions().SILSerializeAll)
-      MainModule->setResilienceStrategy(ResilienceStrategy::Fragile);
   }
   return MainModule;
 }

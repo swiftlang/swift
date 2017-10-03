@@ -376,7 +376,8 @@ public:
 
     // Serialize the witness table if we're serializing everything with
     // -sil-serialize-all....
-    if (SGM.isMakeModuleFragile())
+    if (SGM.isMakeModuleFragile() ||
+        SGM.M.getOptions().SILSerializeWitnessTables)
       Serialized = IsSerialized;
 
     // ... or if the conformance itself thinks it should be.

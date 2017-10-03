@@ -925,8 +925,6 @@ static bool performCompile(CompilerInstance &Instance,
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
       serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-      serializationOpts.SerializeAllSIL =
-          Invocation.getSILOptions().SILSerializeAll;
       if (opts.SerializeBridgingHeader)
         serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
       serializationOpts.ModuleLinkName = opts.ModuleLinkName;

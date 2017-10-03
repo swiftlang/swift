@@ -126,7 +126,7 @@ public:
   
   /// If true, all functions and globals are made fragile. Currently only used
   /// for compiling the stdlib.
-  bool isMakeModuleFragile() const { return M.getOptions().SILSerializeAll; }
+  bool isMakeModuleFragile() const { return false; }
   
   Optional<SILDeclRef> StringToNSStringFn;
   Optional<SILDeclRef> NSStringToStringFn;
