@@ -613,6 +613,8 @@ NON_VALUE_INST(AllocGlobalInst, alloc_global,
 NON_VALUE_INST(CondFailInst, cond_fail,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
+NODE_RANGE(NonValueInstruction, UnreachableInst, CondFailInst)
+
 NODE_RANGE(SILInstruction, AllocStackInst, CondFailInst)
 NODE_RANGE(SILNode, SILPHIArgument, CondFailInst)
 
