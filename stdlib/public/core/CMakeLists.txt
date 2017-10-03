@@ -72,7 +72,6 @@ set(SWIFTLIB_ESSENTIAL
   HeapBuffer.swift
   ICU.swift
   ImplicitlyUnwrappedOptional.swift
-  Index.swift
   Indices.swift.gyb
   InputStream.swift
   IntegerParsing.swift
