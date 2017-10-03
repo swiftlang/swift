@@ -1090,22 +1090,21 @@ public:
     return (bool)AllCorrectedTokens;
   }
 
-  ArrayRef<syntax::RawTokenInfo> getSyntaxTokens() const {
-    return AllRawTokenSyntax;
-  }
-
   syntax::SourceFileSyntax getSyntaxRoot() const {
     return *SyntaxRoot;
   }
 
 private:
+  friend class syntax::SyntaxParsingContext;
   friend class syntax::SyntaxParsingContextRoot;
 
   /// If not None, the underlying vector should contain tokens of this source file.
   Optional<std::vector<Token>> AllCorrectedTokens;
 
+  /// All of the raw token syntax nodes in the underlying source.
   std::vector<syntax::RawTokenInfo> AllRawTokenSyntax;
 
+  /// The root of the syntax tree representing the source file.
   Optional<syntax::SourceFileSyntax> SyntaxRoot;
 };
 

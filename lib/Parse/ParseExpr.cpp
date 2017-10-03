@@ -39,6 +39,7 @@ using namespace swift::syntax;
 ///
 /// \param isExprBasic Whether we're only parsing an expr-basic.
 ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
+  // Start a context for creating expression syntax.
   SyntaxParsingContextExpr ExprParsingContext(SyntaxContext);
 
   // If we are parsing a refutable pattern, check to see if this is the start
@@ -1800,9 +1801,12 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   Token EntireTok = Tok;
 
+  // Create a syntax node for string literal.
   SyntaxContext->addTokenSyntax(Tok.getLoc());
   SyntaxContext->makeNode(SyntaxKind::StringLiteralExpr);
   SyntaxParsingContextExpr LocalContext(SyntaxContext);
+
+  // FIXME: Avoid creating syntax nodes for string interpolation.
   LocalContext.disable();
 
   // The start location of the entire string literal.

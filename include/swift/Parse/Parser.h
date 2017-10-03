@@ -327,6 +327,7 @@ public:
   /// This vector is managed by \c StructureMarkerRAII objects.
   llvm::SmallVector<StructureMarker, 16> StructureMarkers;
 
+  /// Current syntax parsing context where call backs should be directed to.
   syntax::SyntaxParsingContext *SyntaxContext;
 
 public:

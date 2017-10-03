@@ -129,12 +129,12 @@ SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
 void SyntaxParsingContext::addTokenSyntax(SourceLoc Loc) {
   if (!Impl.Enabled)
     return;
-  Impl.PendingSyntax.emplace_back(getTokenAtLocation(Impl.File.getSyntaxTokens(),
+  Impl.PendingSyntax.emplace_back(getTokenAtLocation(Impl.File.AllRawTokenSyntax,
                                                      Loc));
 }
 
 SyntaxParsingContextChild::~SyntaxParsingContextChild() {
-  // Prent should take care of the created syntax.
+  // Parent should take care of the created syntax.
   Parent->Impl.addPendingSyntax(Impl.PendingSyntax);
 
   // Reset the context holder to be Parent.
