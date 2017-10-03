@@ -1120,6 +1120,9 @@ public:
   IRGenModule *operator->() const { return IGM; }
 };
 
+/// Workaround to disable thumb-mode until debugger support is there.
+bool shouldRemoveTargetFeature(const std::string &);
+
 } // end namespace irgen
 } // end namespace swift
 
