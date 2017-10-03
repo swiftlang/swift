@@ -1221,13 +1221,13 @@ entry(%x : $Class1, %w : $Builtin.Word):
   return undef : $()
 }
 
-// CHECK-LABEL: sil {{.*}} [reabstraction_thunk] @a_reabstraction_thunk : $@convention(thin) () -> ()
+// CHECK-LABEL: sil {{.*}}[reabstraction_thunk] @a_reabstraction_thunk : $@convention(thin) () -> ()
 sil [reabstraction_thunk] @a_reabstraction_thunk : $@convention(thin) () -> () {
   %1 = tuple()
   return %1 : $()
 }
-// CHECK-LABEL: sil {{.*}} [thunk] @a_regular_thunk : $@convention(thin) () -> () {
-sil [thunk] @a_regular_thunk : $@convention(thin) () -> () {
+// CHECK-LABEL: sil {{.*}}[thunk] @a_regular_thunk : $@convention(thin) () -> () {
+sil [serialized] [thunk] @a_regular_thunk : $@convention(thin) () -> () {
   %1 = tuple()
   return %1 : $()
 }

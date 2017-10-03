@@ -369,7 +369,7 @@ libraries that require a single frontend invocation" )
 
 (defconst swift-project-stdlib-aux-swiftc-args
   (append swift-project-single-frontend-swiftc-args
-          (list "-Xfrontend" "-sil-serialize-all" "-parse-stdlib"))
+          (list "-Xfrontend" "-sil-serialize-witness-tables" "-sil-serialize-vtables" "-parse-stdlib"))
   "swiftc arguments for library components that are compiled as
   though they are part of the standard library even though
   they're not strictly in that binary."  )
