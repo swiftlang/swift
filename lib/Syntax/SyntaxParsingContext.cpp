@@ -121,8 +121,8 @@ SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
 void SyntaxParsingContext::addTokenSyntax(SourceLoc Loc) {
   if (!Impl.Enabled)
     return;
-  PendingSyntax.emplace_back(getTokenAtLocation(Impl.File.getSyntaxTokens(),
-                                                Loc));
+  Impl.PendingSyntax.emplace_back(getTokenAtLocation(Impl.File.getSyntaxTokens(),
+                                                     Loc));
 }
 
 SyntaxParsingContextChild::~SyntaxParsingContextChild() {
@@ -136,13 +136,13 @@ void SyntaxParsingContextExpr::makeNode(SyntaxKind Kind) {
 
   switch (Kind) {
   case SyntaxKind::IntegerLiteralExpr: {
-    auto Digit = Impl.popPendingSyntax();
+    auto Digit = *Impl.popPendingSyntax().getAs<TokenSyntax>();
     Impl.PendingSyntax.push_back(SyntaxFactory::makeIntegerLiteralExpr(
-      checkBackToken(tok::oper_prefix), Digit));
+      Impl.checkBackToken(tok::oper_prefix), Digit));
     break;
   }
   case SyntaxKind::StringLiteralExpr: {
-    auto StringToken = Impl.popPendingSyntax();
+    auto StringToken = *Impl.popPendingSyntax().getAs<TokenSyntax>();
     Impl.PendingSyntax.push_back(SyntaxFactory::
       makeStringLiteralExpr(StringToken));
     break;
@@ -154,7 +154,7 @@ void SyntaxParsingContextExpr::makeNode(SyntaxKind Kind) {
 }
 
 SyntaxParsingContextExpr::~SyntaxParsingContextExpr() {
-  if (PendingSyntax.size() > 1) {
+  if (Impl.PendingSyntax.size() > 1) {
     auto Result = getUnknownExpr(Impl.PendingSyntax);
     Impl.PendingSyntax.clear();
     Impl.PendingSyntax.push_back(Result);
