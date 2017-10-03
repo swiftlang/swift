@@ -30,22 +30,35 @@ static TokenSyntax getTokenAtLocation(ArrayRef<RawTokenInfo> Tokens,
   assert(It->Loc == Loc);
   return make<TokenSyntax>(It->Token);
 }
+
+static ExprSyntax getUnknownExpr(ArrayRef<Syntax> SubExpr) {
+  RawSyntax::LayoutList Layout;
+  std::transform(SubExpr.begin(), SubExpr.end(), std::back_inserter(Layout),
+                 [](const Syntax &S) { return S.getRaw(); });
+  return make<ExprSyntax>(RawSyntax::make(SyntaxKind::UnknownExpr,
+                                          Layout,
+                                          SourcePresence::Present));
 }
 
-EnabledSyntaxParsingContext::
-EnabledSyntaxParsingContext(SourceFile &File, unsigned BufferID): File(File) {
+static void addSyntaxNodes(std::vector<Syntax> &V, ArrayRef<Syntax> Pending) {
+  std::transform(Pending.begin(), Pending.end(), std::back_inserter(V),
+                 [](const Syntax &S) { return make<Syntax>(S.getRaw()); });
+}
+} // End of anonymous namespace
+
+SyntaxParsingContextRoot::
+SyntaxParsingContextRoot(SourceFile &File, unsigned BufferID):
+    SyntaxParsingContext(File, File.shouldKeepTokens()) {
   populateTokenSyntaxMap(File.getASTContext().LangOpts,
                          File.getASTContext().SourceMgr,
                          BufferID, File.AllRawTokenSyntax);
 }
 
-EnabledSyntaxParsingContext::~EnabledSyntaxParsingContext() {
-  std::transform(PendingSyntax.begin(), PendingSyntax.end(),
-                 std::back_inserter(File.SyntaxNodes),
-                 [](Syntax &S) { return make<Syntax>(S.getRaw()); });
+SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
+  addSyntaxNodes(File.SyntaxNodes, PendingSyntax);
 }
 
-Optional<TokenSyntax> EnabledSyntaxParsingContext::checkBackToken(tok Kind) {
+Optional<TokenSyntax> SyntaxParsingContext::checkBackToken(tok Kind) {
   if (PendingSyntax.empty())
     return None;
   auto Back = PendingSyntax.back().getAs<TokenSyntax>();
@@ -56,14 +69,44 @@ Optional<TokenSyntax> EnabledSyntaxParsingContext::checkBackToken(tok Kind) {
   return None;
 }
 
-void EnabledSyntaxParsingContext::addTokenSyntax(SourceLoc Loc) {
-  PendingSyntax.emplace_back(getTokenAtLocation(File.getSyntaxTokens(), Loc));
+void SyntaxParsingContext::addPendingSyntax(ArrayRef<Syntax> More) {
+  addSyntaxNodes(PendingSyntax, More);
 }
 
-void EnabledSyntaxParsingContext::makeIntegerLiteralExp() {
-  auto Digit = *PendingSyntax.back().getAs<TokenSyntax>();
-  PendingSyntax.pop_back();
-  PendingSyntax.push_back(SyntaxFactory::makeIntegerLiteralExpr(
-    checkBackToken(tok::oper_prefix), Digit));
+void SyntaxParsingContext::addTokenSyntax(SourceLoc Loc) {
+  if (!Enabled)
+    return;
+  PendingSyntax.emplace_back(getTokenAtLocation(File.getSyntaxTokens(),
+                                                Loc));
 }
 
+void SyntaxParsingContextExpr::makeNode(SyntaxKind Kind) {
+  if (!Enabled)
+    return;
+
+  switch (Kind) {
+  case SyntaxKind::IntegerLiteralExpr: {
+    auto Digit = *PendingSyntax.back().getAs<TokenSyntax>();
+    PendingSyntax.pop_back();
+    PendingSyntax.push_back(SyntaxFactory::makeIntegerLiteralExpr(
+      checkBackToken(tok::oper_prefix), Digit));
+    break;
+  }
+  case SyntaxKind::StringLiteralExpr: {
+    PendingSyntax.push_back(SyntaxFactory::makeStringLiteralExpr(*PendingSyntax.
+      back().getAs<TokenSyntax>()));
+    break;
+  }
+
+  default:
+    break;
+  }
+}
+
+SyntaxParsingContextExpr::~SyntaxParsingContextExpr() {
+  if (PendingSyntax.size() > 1) {
+    auto Result = getUnknownExpr(PendingSyntax);
+    PendingSyntax.clear();
+    PendingSyntax.push_back(Result);
+  }
+}

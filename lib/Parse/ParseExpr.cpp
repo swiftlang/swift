@@ -1386,7 +1386,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
     SyntaxContext->addTokenSyntax(Loc);
-    SyntaxContext->makeIntegerLiteralExp();
+    SyntaxContext->makeNode(SyntaxKind::IntegerLiteralExpr);
     Result = makeParserResult(new (Context) IntegerLiteralExpr(Text, Loc,
                                                            /*Implicit=*/false));
     break;
@@ -1792,14 +1792,16 @@ createStringLiteralExprFromSegment(ASTContext &Ctx,
 ///   expr-literal:
 ///     string_literal
 ParserResult<Expr> Parser::parseExprStringLiteral() {
-  std::unique_ptr<syntax::SyntaxParsingContext>
-    VoidInstance(new syntax::SyntaxParsingContext());
-  llvm::SaveAndRestore<syntax::SyntaxParsingContext*>
-    SkipInterpolation(SyntaxContext, VoidInstance.get());
+
   SmallVector<Lexer::StringSegment, 1> Segments;
   L->getStringLiteralSegments(Tok, Segments);
 
   Token EntireTok = Tok;
+
+  SyntaxContext->addTokenSyntax(Tok.getLoc());
+  SyntaxContext->makeNode(SyntaxKind::StringLiteralExpr);
+  SyntaxParsingContextExpr LocalContext(SyntaxContext);
+  LocalContext.disable();
 
   // The start location of the entire string literal.
   SourceLoc Loc = Tok.getLoc();

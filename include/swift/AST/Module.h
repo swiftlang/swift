@@ -1098,7 +1098,7 @@ public:
   }
 
 private:
-  friend class syntax::EnabledSyntaxParsingContext;
+  friend class syntax::SyntaxParsingContextRoot;
 
   /// If not None, the underlying vector should contain tokens of this source file.
   Optional<std::vector<Token>> AllCorrectedTokens;
