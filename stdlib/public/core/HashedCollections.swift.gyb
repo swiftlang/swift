@@ -2537,7 +2537,9 @@ extension Dictionary {
 
   /// A view of a dictionary's keys.
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Keys : Collection, Equatable {
+  public struct Keys
+    : Collection, Equatable,
+      CustomStringConvertible, CustomDebugStringConvertible {
     public typealias Element = Key
 
     @_versioned // FIXME(sil-serialize-all)
@@ -2621,11 +2623,22 @@ extension Dictionary {
 
       return true
     }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    public var description: String {
+      return _makeCollectionDescription(for: self, withTypeName: nil)
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    public var debugDescription: String {
+      return _makeCollectionDescription(for: self, withTypeName: "Dictionary.Keys")
+    }
   }
 
   /// A view of a dictionary's values.
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Values : MutableCollection {
+  public struct Values
+    : MutableCollection, CustomStringConvertible, CustomDebugStringConvertible {
     public typealias Element = Value
 
     @_versioned // FIXME(sil-serialize-all)
@@ -2681,6 +2694,16 @@ extension Dictionary {
     @_inlineable // FIXME(sil-serialize-all)
     public var isEmpty: Bool {
       return count == 0
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    public var description: String {
+      return _makeCollectionDescription(for: self, withTypeName: nil)
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    public var debugDescription: String {
+      return _makeCollectionDescription(for: self, withTypeName: "Dictionary.Values")
     }
   }
 }
