@@ -504,27 +504,3 @@ func rdar27700622<E: Comparable>(_ input: [E]) -> [E] {
 
   return rdar27700622(lhs) + [pivot] + rdar27700622(rhs) // Ok
 }
-
-// rdar://problem/22898292 - Type inference failure with constrained subclass
-protocol P_22898292 {}
-
-do {
-  func construct_generic<T: P_22898292>(_ construct: () -> T) -> T { return construct() }
-
-  class A {}
-  class B : A, P_22898292 {}
-
-  func foo() -> B { return B() }
-  func bar(_ value: A) {}
-  func baz<T: A>(_ value: T) {}
-
-  func rdar_22898292_1() {
-    let x = construct_generic { foo() } // returns A
-    bar(x) // Ok
-    bar(construct_generic { foo() }) // Ok
-  }
-
-  func rdar22898292_2<T: B>(_ d: T) {
-    _ = { baz($0) }(construct_generic { d }) // Ok
-  }
-}
