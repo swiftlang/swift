@@ -3127,17 +3127,21 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     configureGenericEnvironment(proto, genericEnvID);
 
-    SmallVector<Requirement, 4> requirements;
-    readGenericRequirements(requirements, DeclTypeCursor);
-
     if (isImplicit)
       proto->setImplicit();
     proto->computeType();
 
-    proto->setRequirementSignature(requirements);
+    proto->setCircularityCheck(CircularityCheck::Checked);
+
+    // Establish the requirement signature.
+    {
+      SmallVector<Requirement, 4> requirements;
+      readGenericRequirements(requirements, DeclTypeCursor);
+      proto->setRequirementSignature(requirements);
+    }
 
     proto->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
-    proto->setCircularityCheck(CircularityCheck::Checked);
+
     break;
   }
 
