@@ -1742,10 +1742,10 @@ bool FrontendInputs::shouldTreatAsSIL() const {
     StringRef Input(getInputFilenames()[0]);
     return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
   }
-  if (auto Index = primaryInputFileIndex()) {
+  StringRef Input = primaryInputFilenameIfAny();
+  if (!Input.empty()) {
     // If we have a primary input and it's a filename with extension "sil",
     // treat the input as SIL.
-    StringRef Input(getInputFilenames()[*Index]);
     return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
   }
   return false;
@@ -1815,8 +1815,9 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
 }
 
 StringRef FrontendInputs::baseNameOfOutput(bool UserSpecifiedModuleName, StringRef ModuleName) const {
-  if (auto Index = primaryInputFileIndex()) {
-    return llvm::sys::path::stem(getInputFilenames()[*Index]);
+  StringRef pifn = primaryInputFilenameIfAny();
+  if (!pifn.empty()) {
+    return llvm::sys::path::stem(pifn);
   }
   if (!UserSpecifiedModuleName &&  getInputFilenames().size() == 1) {
     return llvm::sys::path::stem(getInputFilenames()[0]);
