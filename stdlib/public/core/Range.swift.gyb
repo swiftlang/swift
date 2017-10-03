@@ -149,10 +149,7 @@ public enum _DisabledRangeIndex_ {}
 @_fixed_layout
 public struct CountableRange<Bound> : RandomAccessCollection
   where
-  // FIXME(ABI)#176 (Type checker)
-  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : _Strideable & Comparable,
-  Bound.Stride : SignedInteger {
+  Bound : Strideable, Bound.Stride : SignedInteger {
 
   /// The range's lower bound.
   ///
@@ -479,7 +476,7 @@ extension ${Self}
 %   if ('Countable' in OtherSelf or 'Closed' in OtherSelf or 'Closed' in Self) \
 %   and not 'Countable' in Self:
   where
-  Bound : _Strideable, Bound.Stride : SignedInteger
+  Bound : Strideable, Bound.Stride : SignedInteger
 %   end
 {
   /// Creates an instance equivalent to the given range.
@@ -506,7 +503,7 @@ ${get_init_warning(Self, OtherSelf)}
 extension ${Self}
 %   if 'Countable' in OtherSelf and not 'Countable' in Self:
   where
-  Bound : _Strideable, Bound.Stride : SignedInteger
+  Bound : Strideable, Bound.Stride : SignedInteger
 %   end
 {
   /// Returns a Boolean value indicating whether this range and the given range
@@ -718,10 +715,7 @@ extension ${Self} : Equatable {
 ///
 /// Unfortunately, we can't forward the full collection API, so we are
 /// forwarding a few select APIs.
-extension ${Self} where Bound : _Strideable, Bound.Stride : SignedInteger {
-  // FIXME(ABI)#176 (Type checker)
-  // WORKAROUND rdar://25214598 - should be Bound : Strideable
-
+extension ${Self} where Bound : Strideable, Bound.Stride : SignedInteger {
   /// The number of values contained in the range.
   @_inlineable
   public var count: Bound.Stride {
@@ -734,62 +728,6 @@ extension ${Self} where Bound : _Strideable, Bound.Stride : SignedInteger {
   }
 }
 % end
-
-/// Returns a half-open range that contains its lower bound but not its upper
-/// bound.
-///
-/// Use the half-open range operator (`..<`) to create a range of any type that
-/// conforms to the `Comparable` protocol. This example creates a
-/// `Range<Double>` from zero up to, but not including, 5.0.
-///
-///     let lessThanFive = 0.0..<5.0
-///     print(lessThanFive.contains(3.14))  // Prints "true"
-///     print(lessThanFive.contains(5.0))   // Prints "false"
-///
-/// - Parameters:
-///   - minimum: The lower bound for the range.
-///   - maximum: The upper bound for the range.
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public func ..< <Bound>(minimum: Bound, maximum: Bound)
-  -> Range<Bound> {
-  _precondition(minimum <= maximum,
-    "Can't form Range with upperBound < lowerBound")
-  return Range(uncheckedBounds: (lower: minimum, upper: maximum))
-}
-
-/// Returns a countable half-open range that contains its lower bound but not
-/// its upper bound.
-///
-/// Use the half-open range operator (`..<`) to create a range of any type that
-/// conforms to the `Strideable` protocol with an associated integer `Stride`
-/// type, such as any of the standard library's integer types. This example
-/// creates a `CountableRange<Int>` from zero up to, but not including, 5.
-///
-///     let upToFive = 0..<5
-///     print(upToFive.contains(3))         // Prints "true"
-///     print(upToFive.contains(5))         // Prints "false"
-///
-/// You can use sequence or collection methods on the `upToFive` countable
-/// range.
-///
-///     print(upToFive.count)               // Prints "5"
-///     print(upToFive.last)                // Prints "4"
-///
-/// - Parameters:
-///   - minimum: The lower bound for the range.
-///   - maximum: The upper bound for the range.
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public func ..< <Bound>(
-  minimum: Bound, maximum: Bound
-) -> CountableRange<Bound> {
-
-  // FIXME: swift-3-indexing-model: tests for traps.
-  _precondition(minimum <= maximum,
-    "Can't form Range with upperBound < lowerBound")
-  return CountableRange(uncheckedBounds: (lower: minimum, upper: maximum))
-}
 
 /// A partial half-open interval up to, but not including, an upper bound.
 ///
@@ -1036,6 +974,28 @@ extension CountablePartialRangeFrom: Sequence {
 }
 
 extension Comparable {
+  /// Returns a half-open range that contains its lower bound but not its upper
+  /// bound.
+  ///
+  /// Use the half-open range operator (`..<`) to create a range of any type that
+  /// conforms to the `Comparable` protocol. This example creates a
+  /// `Range<Double>` from zero up to, but not including, 5.0.
+  ///
+  ///     let lessThanFive = 0.0..<5.0
+  ///     print(lessThanFive.contains(3.14))  // Prints "true"
+  ///     print(lessThanFive.contains(5.0))   // Prints "false"
+  ///
+  /// - Parameters:
+  ///   - minimum: The lower bound for the range.
+  ///   - maximum: The upper bound for the range.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public func ..< (minimum: Self, maximum: Self) -> Range<Self> {
+    _precondition(minimum <= maximum,
+      "Can't form Range with upperBound < lowerBound")
+    return Range(uncheckedBounds: (lower: minimum, upper: maximum))
+  }
+
   /// Returns a partial range up to, but not including, its upper bound.
   ///
   /// Use the prefix half-open range operator (prefix `..<`) to create a
@@ -1060,7 +1020,7 @@ extension Comparable {
   /// - Parameter maximum: The upper bound for the range.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public static prefix func ..<(maximum: Self) -> PartialRangeUpTo<Self> {
+  public static prefix func ..< (maximum: Self) -> PartialRangeUpTo<Self> {
     return PartialRangeUpTo(maximum)
   }
 
@@ -1088,7 +1048,7 @@ extension Comparable {
   /// - Parameter maximum: The upper bound for the range.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public static prefix func ...(maximum: Self) -> PartialRangeThrough<Self> {
+  public static prefix func ... (maximum: Self) -> PartialRangeThrough<Self> {
     return PartialRangeThrough(maximum)
   }
 
@@ -1116,12 +1076,42 @@ extension Comparable {
   /// - Parameter minimum: The lower bound for the range.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public static postfix func ...(minimum: Self) -> PartialRangeFrom<Self> {
+  public static postfix func ... (minimum: Self) -> PartialRangeFrom<Self> {
     return PartialRangeFrom(minimum)
   }
 }
 
 extension Strideable where Stride: SignedInteger {
+  /// Returns a countable half-open range that contains its lower bound but not
+  /// its upper bound.
+  ///
+  /// Use the half-open range operator (`..<`) to create a range of any type that
+  /// conforms to the `Strideable` protocol with an associated integer `Stride`
+  /// type, such as any of the standard library's integer types. This example
+  /// creates a `CountableRange<Int>` from zero up to, but not including, 5.
+  ///
+  ///     let upToFive = 0..<5
+  ///     print(upToFive.contains(3))         // Prints "true"
+  ///     print(upToFive.contains(5))         // Prints "false"
+  ///
+  /// You can use sequence or collection methods on the `upToFive` countable
+  /// range.
+  ///
+  ///     print(upToFive.count)               // Prints "5"
+  ///     print(upToFive.last)                // Prints "4"
+  ///
+  /// - Parameters:
+  ///   - minimum: The lower bound for the range.
+  ///   - maximum: The upper bound for the range.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public func ..< (minimum: Self, maximum: Self) -> CountableRange<Self> {
+    // FIXME: swift-3-indexing-model: tests for traps.
+    _precondition(minimum <= maximum,
+      "Can't form Range with upperBound < lowerBound")
+    return CountableRange(uncheckedBounds: (lower: minimum, upper: maximum))
+  }
+
   /// Returns a countable partial range extending upward from a lower bound.
   ///
   /// Use the postfix range operator (postfix `...`) to create a partial range
@@ -1198,7 +1188,7 @@ extension Strideable where Stride: SignedInteger {
   /// - Parameter minimum: The lower bound for the range.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public static postfix func ...(minimum: Self)
+  public static postfix func ... (minimum: Self)
   -> CountablePartialRangeFrom<Self> {
     return CountablePartialRangeFrom(minimum)
   }
