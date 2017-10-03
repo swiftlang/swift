@@ -28,6 +28,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Parse/Token.h"
+#include "swift/Syntax/SyntaxNodes.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
@@ -1093,8 +1094,8 @@ public:
     return AllRawTokenSyntax;
   }
 
-  ArrayRef<syntax::Syntax> getSyntaxNodes() const {
-    return SyntaxNodes;
+  syntax::SourceFileSyntax getSyntaxRoot() const {
+    return *SyntaxRoot;
   }
 
 private:
@@ -1105,7 +1106,7 @@ private:
 
   std::vector<syntax::RawTokenInfo> AllRawTokenSyntax;
 
-  std::vector<syntax::Syntax> SyntaxNodes;
+  Optional<syntax::SourceFileSyntax> SyntaxRoot;
 };
 
 

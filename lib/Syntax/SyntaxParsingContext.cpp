@@ -55,7 +55,32 @@ SyntaxParsingContextRoot(SourceFile &File, unsigned BufferID):
 }
 
 SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
-  addSyntaxNodes(File.SyntaxNodes, PendingSyntax);
+  std::vector<DeclSyntax> AllTopLevel;
+  if (File.SyntaxRoot.hasValue()) {
+    for (auto It: File.getSyntaxRoot().getTopLevelDecls()) {
+      AllTopLevel.push_back(It);
+    }
+  }
+  for (auto S: PendingSyntax) {
+    std::vector<StmtSyntax> AllStmts;
+    if (S.isDecl()) {
+      AllStmts.push_back(SyntaxFactory::makeDeclarationStmt(
+        S.getAs<DeclSyntax>().getValue(), None));
+    } else if (S.isExpr()) {
+      AllStmts.push_back(SyntaxFactory::makeExpressionStmt(
+        S.getAs<ExprSyntax>().getValue(), None));
+    } else {
+      AllStmts.push_back(S.getAs<StmtSyntax>().getValue());
+    }
+    AllTopLevel.push_back(SyntaxFactory::makeTopLevelCodeDecl(
+      SyntaxFactory::makeStmtList(AllStmts)));
+  }
+
+  Trivia Leading, Trailing;
+  File.SyntaxRoot.emplace(
+    SyntaxFactory::makeSourceFile(SyntaxFactory::makeDeclList(AllTopLevel),
+      SyntaxFactory::makeToken(tok::eof, "\n", SourcePresence::Present,
+                               Leading, Trailing)));
 }
 
 Optional<TokenSyntax> SyntaxParsingContext::checkBackToken(tok Kind) {
@@ -93,8 +118,9 @@ void SyntaxParsingContextExpr::makeNode(SyntaxKind Kind) {
     break;
   }
   case SyntaxKind::StringLiteralExpr: {
-    PendingSyntax.push_back(SyntaxFactory::makeStringLiteralExpr(*PendingSyntax.
-      back().getAs<TokenSyntax>()));
+    auto StringToken = *PendingSyntax.back().getAs<TokenSyntax>();
+    PendingSyntax.pop_back();
+    PendingSyntax.push_back(SyntaxFactory::makeStringLiteralExpr(StringToken));
     break;
   }
 

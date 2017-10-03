@@ -277,9 +277,7 @@ int dumpParserGen(const char *MainExecutablePath,
                   const StringRef InputFileName) {
   CompilerInstance Instance;
   SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
-  assert(SF->getSyntaxNodes().size() == 1);
-  syntax::Syntax Root = SF->getSyntaxNodes().front();
-  Root.print(llvm::outs());
+  SF->getSyntaxRoot().print(llvm::outs());
   return 0;
 }
 
