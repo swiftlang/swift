@@ -361,10 +361,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
                ConstraintClassification::Relational &&
            "only relational constraints handled here");
 
-    // Record constraint which contributes to the
-    // finding of pontential bindings.
-    result.Sources.insert(constraint);
-
     auto first = simplifyType(constraint->getFirstType());
     auto second = simplifyType(constraint->getSecondType());
 
