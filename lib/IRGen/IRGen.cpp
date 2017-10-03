@@ -532,7 +532,9 @@ swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
   if (!targetFeaturesArray.empty()) {
     llvm::SubtargetFeatures features;
     for (const std::string &feature : targetFeaturesArray)
-      features.AddFeature(feature);
+      if (!shouldRemoveTargetFeature(feature)) {
+        features.AddFeature(feature);
+      }
     targetFeatures = features.getString();
   }
 
