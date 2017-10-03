@@ -135,7 +135,7 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
     out << escape(targetName) << " :";
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!
-    for (auto const &path : reversePathSortedFilenames(opts.InputFilenames))
+    for (auto const &path : reversePathSortedFilenames(opts.Inputs.getInputFilenames()))
       out << ' ' << escape(path);
     // Then print dependencies we've picked up during compilation.
     for (auto const &path :
@@ -770,10 +770,10 @@ static bool performCompile(CompilerInstance &Instance,
       auto SASTF = dyn_cast<SerializedASTFile>(File);
       return SASTF && SASTF->isSIB();
     };
-    if (opts.PrimaryInput.hasValue() && opts.PrimaryInput.getValue().isFilename()) {
+    if (opts.Inputs.haveAPrimaryInputFile()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
-        auto Index = opts.PrimaryInput.getValue().Index;
+        auto Index = opts.Inputs.getPrimaryInput().getValue().Index;
         PrimaryFile = Instance.getMainModule()->getFiles()[Index];
       }
       astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
@@ -1349,13 +1349,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     auto &FEOpts = Invocation.getFrontendOptions();
     auto &LangOpts = Invocation.getLangOptions();
     auto &SILOpts = Invocation.getSILOptions();
-    StringRef InputName;
-    std::string TargetName = FEOpts.ModuleName;
-    if (FEOpts.PrimaryInput.hasValue() &&
-        FEOpts.PrimaryInput.getValue().isFilename()) {
-      auto Index = FEOpts.PrimaryInput.getValue().Index;
-      InputName = FEOpts.InputFilenames[Index];
-    }
+    StringRef InputName = FEOpts.Inputs.primaryInputFilenameIfAny();
     StringRef OptType = silOptModeArgStr(SILOpts.Optimization);
     StringRef OutFile = FEOpts.getSingleOutputFilename();
     StringRef OutputType = llvm::sys::path::extension(OutFile);

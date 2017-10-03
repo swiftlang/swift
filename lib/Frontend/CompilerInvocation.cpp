@@ -570,21 +570,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     if (!output.empty())
       return;
 
-    StringRef OriginalPath;
-    if (!Opts.OutputFilenames.empty() && Opts.getSingleOutputFilename() != "-")
-      // Put the serialized diagnostics file next to the output file.
-      OriginalPath = Opts.getSingleOutputFilename();
-    else if (Opts.Inputs.getPrimaryInput().hasValue() && Opts.Inputs.getPrimaryInput()->isFilename())
-      // We have a primary input, so use that as the basis for the name of the
-      // serialized diagnostics file.
-      OriginalPath = llvm::sys::path::filename(
-        Opts.Inputs.getInputFilenames()[Opts.Inputs.getPrimaryInput()->Index]);
-    else
-      // We don't have any better indication of name, so fall back on the
-      // module name.
-      OriginalPath = Opts.ModuleName;
-
-    llvm::SmallString<128> Path(OriginalPath);
+    llvm::SmallString<128> Path(Opts.originalPath());
     llvm::sys::path::replace_extension(Path, extension);
     output = Path.str();
   };
@@ -1756,10 +1742,10 @@ bool FrontendInputs::shouldTreatAsSIL() const {
     StringRef Input(getInputFilenames()[0]);
     return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
   }
-  if (getPrimaryInput().hasValue() && getPrimaryInput()->isFilename()) {
+  if (auto Index = primaryInputFileIndex()) {
     // If we have a primary input and it's a filename with extension "sil",
     // treat the input as SIL.
-    StringRef Input(getInputFilenames()[getPrimaryInput()->Index]);
+    StringRef Input(getInputFilenames()[*Index]);
     return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
   }
   return false;
@@ -1825,12 +1811,12 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
       return true;
     }
   }
+  return false;
 }
 
 StringRef FrontendInputs::baseNameOfOutput(bool UserSpecifiedModuleName, StringRef ModuleName) const {
-  if (getPrimaryInput().hasValue()  &&  getPrimaryInput()->isFilename()) {
-    unsigned Index = getPrimaryInput()->Index;
-    return llvm::sys::path::stem(getInputFilenames()[Index]);
+  if (auto Index = primaryInputFileIndex()) {
+    return llvm::sys::path::stem(getInputFilenames()[*Index]);
   }
   if (!UserSpecifiedModuleName &&  getInputFilenames().size() == 1) {
     return llvm::sys::path::stem(getInputFilenames()[0]);
@@ -1877,4 +1863,16 @@ void FrontendInputs::readInputFileList(DiagnosticEngine &diags,
   if (primaryFileArg)
     setPrimaryInput(SelectedInput(primaryFileIndex));
   assert(!Args.hasArg(options::OPT_INPUT) && "mixing -filelist with inputs");
+}
+
+StringRef FrontendOptions::originalPath() const {
+  if (!OutputFilenames.empty() && getSingleOutputFilename() != "-")
+    // Put the serialized diagnostics file next to the output file.
+    return getSingleOutputFilename();
+  
+  StringRef fn = Inputs.primaryInputFilenameIfAny();
+  // If we have a primary input, so use that as the basis for the name of the
+  // serialized diagnostics file, otherwise fall back on the
+  // module name.
+  return !fn.empty() ? llvm::sys::path::filename(fn) : StringRef(ModuleName);
 }

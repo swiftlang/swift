@@ -127,6 +127,21 @@ public:
   void readInputFileList(DiagnosticEngine &diags,
                          llvm::opt::ArgList &Args,
                          const llvm::opt::Arg *filelistPath);
+  
+  bool haveAPrimaryInputFile() const {
+    return getPrimaryInput().hasValue() && getPrimaryInput()->isFilename();
+  }
+  
+  Optional<unsigned> primaryInputFileIndex() const {
+    return haveAPrimaryInputFile() ? Optional<unsigned>(getPrimaryInput()->Index) : None;
+  }
+  
+  StringRef primaryInputFilenameIfAny() const {
+    if (auto Index = primaryInputFileIndex()) {
+      return getInputFilenames()[*Index];
+    }
+    return StringRef();
+  }
 };
 
 /// Options for controlling the behavior of the frontend.
@@ -405,6 +420,8 @@ public:
   llvm::hash_code getPCHHashComponents() const {
     return llvm::hash_value(0);
   }
+  
+  StringRef originalPath() const;
 };
 
 }
