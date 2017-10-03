@@ -38,23 +38,16 @@ enum class SyntaxParsingContextKind: uint8_t {
 
 class SyntaxParsingContext {
 protected:
-  SourceFile &File;
-  bool Enabled;
-
-  std::vector<Syntax> PendingSyntax;
-  Optional<TokenSyntax> checkBackToken(tok Kind);
-
-  SyntaxParsingContext(SourceFile &File, bool Enabled):
-    File(File), Enabled(Enabled) {}
-  SyntaxParsingContext(SyntaxParsingContext &Another):
-    SyntaxParsingContext(Another.File, Another.Enabled) {}
+  SyntaxParsingContext(SourceFile &File, bool Enabled);
+  SyntaxParsingContext(SyntaxParsingContext &Another);
 public:
+  struct Implementation;
+  Implementation &Impl;
   void addTokenSyntax(SourceLoc Loc);
-  void addPendingSyntax(ArrayRef<Syntax> Pending);
   virtual SyntaxParsingContextKind getKind() = 0;
   virtual void makeNode(SyntaxKind Kind) = 0;
-  virtual ~SyntaxParsingContext() = default;
-  void disable() { Enabled = false; }
+  virtual ~SyntaxParsingContext();
+  void disable();
 };
 
 class SyntaxParsingContextRoot: public SyntaxParsingContext {
@@ -76,10 +69,7 @@ protected:
     ContextHolder(ContextHolder) {
       ContextHolder = this;
   }
-  ~SyntaxParsingContextChild() {
-    Parent->addPendingSyntax(PendingSyntax);
-    ContextHolder = Parent;
-  }
+  ~SyntaxParsingContextChild();
 };
 
 class SyntaxParsingContextExpr: public SyntaxParsingContextChild {
