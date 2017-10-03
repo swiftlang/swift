@@ -1,5 +1,7 @@
-// RUN: not %target-swift-frontend -swift-version 3 -typecheck %s 2>&1 | %FileCheck -check-prefix=CHECK-3 -check-prefix=CHECK-%target-runtime-3 %s
-// RUN: not %target-swift-frontend -swift-version 4 -typecheck %s 2>&1 | %FileCheck -check-prefix=CHECK-4 -check-prefix=CHECK-%target-runtime-4 %s
+// RUN: not %target-swift-frontend -swift-version 3 -typecheck %s 2> %t.3.txt
+// RUN: %FileCheck -check-prefix=CHECK-3 -check-prefix=CHECK-%target-runtime-3 %s < %t.3.txt
+// RUN: not %target-swift-frontend -swift-version 4 -typecheck %s 2> %t.4.txt
+// RUN: %FileCheck -check-prefix=CHECK-4 -check-prefix=CHECK-%target-runtime-4 %s < %t.4.txt
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   import Darwin
