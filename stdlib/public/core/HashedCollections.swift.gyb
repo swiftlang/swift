@@ -1322,33 +1322,16 @@ extension Set {
 }
 
 extension Set : CustomStringConvertible, CustomDebugStringConvertible {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func makeDescription(isDebug: Bool) -> String {
-    var result = isDebug ? "Set([" : "["
-    var first = true
-    for member in self {
-      if first {
-        first = false
-      } else {
-        result += ", "
-      }
-      debugPrint(member, terminator: "", to: &result)
-    }
-    result += isDebug ? "])" : "]"
-    return result
-  }
-
   /// A string that represents the contents of the set.
   @_inlineable // FIXME(sil-serialize-all)
   public var description: String {
-    return makeDescription(isDebug: false)
+    return _makeCollectionDescription(for: self, withTypeName: nil)
   }
 
   /// A string that represents the contents of the set, suitable for debugging.
   @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
-    return makeDescription(isDebug: true)
+    return _makeCollectionDescription(for: self, withTypeName: "Set")
   }
 }
 
