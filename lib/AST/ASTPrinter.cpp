@@ -2161,6 +2161,12 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
   if (flags.isShared())
     printer << "__shared ";
 }
+static bool isVariadicParam(VarDecl *decl) {
+  if (auto PV = dyn_cast<ParamDecl>(decl)) {
+    return PV->isVariadic();
+  }
+  return false;
+}
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
@@ -2200,7 +2206,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   if (decl->hasInterfaceType()) {
     Printer << ": ";
     auto tyLoc = decl->getTypeLoc();
-    if (!tyLoc.getTypeRepr())
+    if (!tyLoc.getTypeRepr() || isVariadicParam(decl))
       tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
     printTypeLoc(tyLoc);
   }
