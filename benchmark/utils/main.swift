@@ -147,7 +147,8 @@ private func addTo(
   _ function: @escaping (Int) -> (),
   _ tags: [BenchmarkCategory] = []
   ) {
-  testSuite.append(BenchmarkInfo(name: name, runFunction: function, tags: tags))
+  registerBenchmark(
+    BenchmarkInfo(name: name, runFunction: function, tags: tags))
 }
 
 // The main test suite: precommit tests
