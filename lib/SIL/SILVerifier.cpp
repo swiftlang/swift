@@ -2194,26 +2194,6 @@ public:
     return SILType::getPrimitiveObjectType(fnTy);
   }
   
-  void checkDynamicMethodInst(DynamicMethodInst *EMI) {
-    requireObjectType(SILFunctionType, EMI, "result of dynamic_method");
-    SILType operandType = EMI->getOperand()->getType();
-
-    require(EMI->getMember().getDecl()->isObjC(), "method must be @objc");
-    if (!EMI->getMember().getDecl()->isInstanceMember()) {
-      require(operandType.is<MetatypeType>(),
-              "operand must have metatype type");
-      require(operandType.castTo<MetatypeType>()
-                ->getInstanceType()->mayHaveSuperclass(),
-              "operand must have metatype of class or class-bounded type");
-    }
-    
-    require(getDynamicMethodType(operandType, EMI->getMember())
-              .getSwiftRValueType()
-              ->isBindableTo(EMI->getType().getSwiftRValueType()),
-            "result must be of the method's type");
-    verifyOpenedArchetype(EMI, EMI->getType().getSwiftRValueType());
-  }
-
   void checkClassMethodInst(ClassMethodInst *CMI) {
     auto member = CMI->getMember();
     auto overrideTy = TC.getConstantOverrideType(member);

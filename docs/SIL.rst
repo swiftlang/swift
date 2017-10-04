@@ -1034,8 +1034,7 @@ VTables
   sil-vtable-entry ::= sil-decl-ref ':' sil-linkage? sil-function-name
 
 SIL represents dynamic dispatch for class methods using the `class_method`_,
-`super_method`_, `objc_method`_, `objc_super_method`_ and `dynamic_method`_
-instructions.
+`super_method`_, `objc_method`_, and `objc_super_method`_ instructions.
 
 The potential destinations for `class_method`_ and `super_method`_ are
 tracked in ``sil_vtable`` declarations for every class type. The declaration
@@ -2945,10 +2944,9 @@ These instructions perform dynamic lookup of class and generic methods.
 The ``class_method`` and ``super_method`` instructions must reference
 Swift native methods and always use vtable dispatch.
 
-The ``objc_method``, ``objc_super_method`` and ``dynamic_method``
-instructions must reference Objective-C methods (indicated by the
-``foreign`` marker on a method reference, as in
-``#NSObject.description!1.foreign``).
+The ``objc_method`` and ``objc_super_method`` instructions must reference
+Objective-C methods (indicated by the ``foreign`` marker on a method
+reference, as in ``#NSObject.description!1.foreign``).
 
 Note that ``objc_msgSend`` invocations can only be used as the callee
 of an ``apply`` instruction or ``partial_apply`` instruction. They cannot
@@ -3045,40 +3043,6 @@ constrained by that protocol. The result will be generic on the ``Self``
 archetype of the original protocol and have the ``witness_method`` calling
 convention. If the referenced protocol is an ``@objc`` protocol, the
 resulting type has the ``objc`` calling convention.
-
-dynamic_method
-``````````````
-::
-
-  sil-instruction ::= 'dynamic_method' sil-method-attributes?
-                      sil-operand ',' sil-decl-ref ':' sil-type
-
-  %1 = dynamic_method %0 : $P, #X.method!1 : $@convention(thin) U -> V
-  // %0 must be of a protocol or protocol composition type $P,
-  // where $P contains the Swift.DynamicLookup protocol
-  // #X.method!1 must be a reference to an @objc method of any class
-  // or protocol type
-  //
-  // The "self" argument of the method type $@convention(thin) U -> V must be
-  //   AnyObject
-
-Looks up the implementation of an Objective-C method with the same
-selector as the named method for the dynamic type of the
-value inside an existential container. The "self" operand of the result
-function value is represented using an opaque type, the value for which must
-be projected out as a value of type ``AnyObject``.
-
-It is undefined behavior if the dynamic type of the operand does not
-have an implementation for the Objective-C method with the selector to
-which the ``dynamic_method`` instruction refers, or if that
-implementation has parameter or result types that are incompatible
-with the method referenced by ``dynamic_method``.
-This instruction should only be used in cases where its result will be
-immediately consumed by an operation that performs the selector check
-itself (e.g., an ``apply`` that lowers to ``objc_msgSend``).
-To query whether the operand has an implementation for the given
-method and safely handle the case where it does not, use
-`dynamic_method_br`_.
 
 Function Application
 ~~~~~~~~~~~~~~~~~~~~

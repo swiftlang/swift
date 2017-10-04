@@ -4983,30 +4983,6 @@ public:
   }
 };
 
-/// Given the address of a value of AnyObject protocol type and a method
-/// constant referring to some Objective-C method, performs dynamic method
-/// lookup to extract the implementation of that method. This method lookup
-/// can fail at run-time
-class DynamicMethodInst final
-  : public UnaryInstructionWithTypeDependentOperandsBase<
-                                   SILInstructionKind::DynamicMethodInst,
-                                   DynamicMethodInst,
-                                   MethodInst>
-{
-  friend SILBuilder;
-
-  DynamicMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                    ArrayRef<SILValue> TypeDependentOperands,
-                    SILDeclRef Member, SILType Ty)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                               TypeDependentOperands, Ty, Member) {}
-
-  static DynamicMethodInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand,
-         SILDeclRef Member, SILType Ty, SILFunction *F,
-         SILOpenedArchetypesState &OpenedArchetypes);
-};
-
 /// Access allowed to the opened value by the open_existential_addr instruction.
 /// Allowing mutable access to the opened existential requires a boxed
 /// existential value's box to be unique.

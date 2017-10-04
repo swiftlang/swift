@@ -642,7 +642,7 @@ public:
       Scope S(SGF, Loc);
       ManagedValue self =
           SelfValue.getValue().borrow(SGF).getAsSingleValue(SGF);
-      SILValue fn = SGF.B.createDynamicMethod(
+      SILValue fn = SGF.B.createObjCMethod(
           Loc, self.getValue(), *constant,
           SILType::getPrimitiveObjectType(closureType));
       return ManagedValue::forUnmanaged(fn);

@@ -895,7 +895,6 @@ public:
   void visitObjCMethodInst(ObjCMethodInst *i);
   void visitObjCSuperMethodInst(ObjCSuperMethodInst *i);
   void visitWitnessMethodInst(WitnessMethodInst *i);
-  void visitDynamicMethodInst(DynamicMethodInst *i);
 
   void visitAllocValueBufferInst(AllocValueBufferInst *i);
   void visitProjectValueBufferInst(ProjectValueBufferInst *i);
@@ -4999,12 +4998,6 @@ IRGenSILFunction::visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i) {
                                                 i->getType().getSwiftRValueType());
     setLoweredAddress(i, caddr.getAddress());
   }
-}
-
-void IRGenSILFunction::visitDynamicMethodInst(DynamicMethodInst *i) {
-  assert(i->getMember().isForeign && "dynamic_method requires [objc] method");
-  setLoweredObjCMethod(i, i->getMember());
-  return;
 }
 
 void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {

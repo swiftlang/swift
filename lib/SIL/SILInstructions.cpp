@@ -1615,23 +1615,6 @@ WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
                                           Ty, TypeDependentOperands, Volatile);
 }
 
-DynamicMethodInst *
-DynamicMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
-                          SILDeclRef Member, SILType Ty, SILFunction *F,
-                          SILOpenedArchetypesState &OpenedArchetypes) {
-  SILModule &Mod = F->getModule();
-  SmallVector<SILValue, 8> TypeDependentOperands;
-  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
-                               Ty.getSwiftRValueType());
-
-  unsigned size =
-      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
-  void *Buffer = Mod.allocateInst(size, alignof(DynamicMethodInst));
-  return ::new (Buffer) DynamicMethodInst(DebugLoc, Operand,
-                                          TypeDependentOperands,
-                                          Member, Ty);
-}
-
 ObjCMethodInst *
 ObjCMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                        SILDeclRef Member, SILType Ty, SILFunction *F,

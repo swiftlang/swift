@@ -1218,13 +1218,6 @@ public:
         &getFunction(), OpenedArchetypes, Volatile));
   }
 
-  DynamicMethodInst *createDynamicMethod(SILLocation Loc, SILValue Operand,
-                                         SILDeclRef Member, SILType MethodTy) {
-    return insert(DynamicMethodInst::create(
-        getSILDebugLocation(Loc), Operand, Member, MethodTy,
-        &getFunction(), OpenedArchetypes));
-  }
-
   OpenExistentialAddrInst *
   createOpenExistentialAddr(SILLocation Loc, SILValue Operand, SILType SelfTy,
                             OpenedExistentialAccess ForAccess) {

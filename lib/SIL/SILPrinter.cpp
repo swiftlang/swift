@@ -1631,12 +1631,6 @@ public:
     }
     *this << " : " << WMI->getType();
   }
-  void visitDynamicMethodInst(DynamicMethodInst *DMI) {
-    printMethodInst(DMI, DMI->getOperand());
-    *this << " : " << DMI->getMember().getDecl()->getInterfaceType();
-    *this << ", ";
-    *this << DMI->getType();
-  }
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *OI) {
     if (OI->getAccessKind() == OpenedExistentialAccess::Immutable)
       *this << "immutable_access ";

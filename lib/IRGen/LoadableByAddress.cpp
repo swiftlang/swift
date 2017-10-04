@@ -478,7 +478,6 @@ void LargeValueVisitor::mapValueStorage() {
       case SILInstructionKind::SuperMethodInst:
       case SILInstructionKind::ObjCMethodInst:
       case SILInstructionKind::ObjCSuperMethodInst:
-      case SILInstructionKind::DynamicMethodInst:
       case SILInstructionKind::WitnessMethodInst: {
         // TODO Any more instructions to add here?
         auto *MI = dyn_cast<MethodInst>(currIns);
@@ -2035,14 +2034,6 @@ static void rewriteFunction(StructLoweringState &pass,
       SILValue selfValue = instr->getOperand(0);
       newInstr = methodBuilder.createSuperMethod(loc, selfValue, member,
                                                  newSILType);
-      break;
-    }
-    case SILInstructionKind::DynamicMethodInst: {
-      auto *DMI = dyn_cast<DynamicMethodInst>(instr);
-      assert(DMI && "ValueKind is Witness Method but dyn_cast failed");
-      SILValue selfValue = instr->getOperand(0);
-      newInstr = methodBuilder.createDynamicMethod(loc, selfValue, member,
-                                                   newSILType);
       break;
     }
     case SILInstructionKind::WitnessMethodInst: {

@@ -1603,17 +1603,6 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitDynamicMethodInst(DynamicMethodInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createDynamicMethod(getOpLocation(Inst->getLoc()),
-                                     getOpValue(Inst->getOperand()),
-                                     Inst->getMember(),
-                                     getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst) {
   // Create a new archetype for this opened existential type.
   auto archetypeTy
