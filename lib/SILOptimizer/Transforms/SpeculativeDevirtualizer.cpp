@@ -326,11 +326,6 @@ static bool tryToSpeculateTarget(FullApplySite AI,
                                  ClassHierarchyAnalysis *CHA) {
   ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
 
-  // We cannot devirtualize in cases where dynamic calls are
-  // semantically required.
-  if (CMI->isVolatile())
-    return false;
-
   // Don't devirtualize withUnsafeGuaranteed 'self' as this would prevent
   // retain/release removal.
   //   unmanged._withUnsafeGuaranteedRef { $0.method() }

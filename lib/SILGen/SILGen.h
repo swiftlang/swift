@@ -188,7 +188,7 @@ public:
   
   /// Get the dynamic dispatch thunk for a SILDeclRef.
   SILFunction *getDynamicThunk(SILDeclRef constant,
-                               SILConstantInfo constantInfo);
+                               CanSILFunctionType constantTy);
   
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,

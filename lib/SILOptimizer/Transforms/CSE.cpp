@@ -201,6 +201,12 @@ public:
                               X->getOperand());
   }
 
+  hash_code visitSuperMethodInst(SuperMethodInst *X) {
+    return llvm::hash_combine(X->getKind(),
+                              X->getType(),
+                              X->getOperand());
+  }
+
   hash_code visitTupleInst(TupleInst *X) {
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(X->getKind(), X->getTupleType(),
@@ -862,9 +868,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
       return false;
     return !BI->mayReadOrWriteMemory();
   }
-  if (auto *CMI = dyn_cast<ClassMethodInst>(Inst)) {
-    return !CMI->isVolatile();
-  }
   if (auto *WMI = dyn_cast<WitnessMethodInst>(Inst)) {
     return !WMI->isVolatile();
   }
@@ -872,6 +875,8 @@ bool CSE::canHandle(SILInstruction *Inst) {
     return !EMI->getOperand()->getType().isAddress();
   }
   switch (Inst->getKind()) {
+  case SILInstructionKind::ClassMethodInst:
+  case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::FunctionRefInst:
   case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::IntegerLiteralInst:

@@ -22,7 +22,7 @@ class Hoozit : Gizmo {
 
 // CHECK-LABEL: sil hidden @_T012vtables_objc10callHoozityAA0D0CF : $@convention(thin) (@owned Hoozit) -> ()
 func callHoozit(_ h: Hoozit) {
-  // CHECK: class_method [volatile] {{.*}} : $Hoozit, #Hoozit.frob!1.foreign
+  // CHECK: objc_method {{.*}} : $Hoozit, #Hoozit.frob!1.foreign
   h.frob()
   // CHECK: function_ref @_T012vtables_objc6HoozitC3fooyyF
   h.foo()
@@ -44,7 +44,7 @@ class Wotsit : Hoozit {
 
 // CHECK-LABEL: sil hidden @_T012vtables_objc10callWotsityAA0D0CF : $@convention(thin) (@owned Wotsit) -> ()
 func callWotsit(_ w: Wotsit) {
-  // CHECK: class_method [volatile] {{.*}} : $Wotsit, #Wotsit.funge!1.foreign
+  // CHECK: objc_method {{.*}} : $Wotsit, #Wotsit.funge!1.foreign
   w.funge()
   // CHECK: class_method {{.*}} : $Wotsit, #Wotsit.incorrige!1
   w.incorrige()

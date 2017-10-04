@@ -16,11 +16,11 @@ extension Foo {
 func extensionReferences(_ x: Foo) {
   // dynamic extension methods are still dynamically dispatched.
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: class_method [volatile] [[BORROWED_ARG]] : $Foo, #Foo.kay!1.foreign
+  // CHECK: objc_method [[BORROWED_ARG]] : $Foo, #Foo.kay!1.foreign
   x.kay()
 
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: class_method [volatile] [[BORROWED_ARG]] : $Foo, #Foo.cox!getter.1.foreign
+  // CHECK: objc_method [[BORROWED_ARG]] : $Foo, #Foo.cox!getter.1.foreign
   _ = x.cox
 
 }
@@ -34,4 +34,4 @@ func extensionMethodCurrying(_ x: Foo) {
 // CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T015extensions_objc3FooC3kayyyFTD
 // CHECK:         bb0([[SELF:%.*]] : @guaranteed $Foo):
 // CHECK:           [[SELF_COPY:%.*]] = copy_value [[SELF]]
-// CHECK:           class_method [volatile] [[SELF_COPY]] : $Foo, #Foo.kay!1.foreign
+// CHECK:           objc_method [[SELF_COPY]] : $Foo, #Foo.kay!1.foreign

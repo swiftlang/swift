@@ -1483,12 +1483,10 @@ getThunkedForeignFunctionRef(SILGenFunction &SGF,
   // Produce a class_method when thunking imported ObjC methods.
   } else if (foreignCI.SILFnType->getRepresentation()
         == SILFunctionTypeRepresentation::ObjCMethod) {
-//    assert(subs.empty());
     SILValue thisArg = args.back().getValue();
 
-    return SGF.B.createClassMethod(loc, thisArg, foreign,
-                         SILType::getPrimitiveObjectType(foreignCI.SILFnType),
-                                   /*volatile*/ true);
+    return SGF.B.createObjCMethod(loc, thisArg, foreign,
+                         SILType::getPrimitiveObjectType(foreignCI.SILFnType));
   }
   // Otherwise, emit a function_ref.
   return SGF.emitGlobalFunctionRef(loc, foreign);

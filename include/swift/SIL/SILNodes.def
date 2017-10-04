@@ -249,6 +249,10 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       MethodInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(SuperMethodInst, super_method,
                       MethodInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ObjCMethodInst, objc_method,
+                      MethodInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ObjCSuperMethodInst, objc_super_method,
+                      MethodInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(WitnessMethodInst, witness_method,
                       MethodInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(DynamicMethodInst, dynamic_method,

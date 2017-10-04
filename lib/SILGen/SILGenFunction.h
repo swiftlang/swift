@@ -1042,7 +1042,7 @@ public:
   /// Returns a reference to a function value that dynamically dispatches
   /// the function in a runtime-modifiable way.
   SILValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
-                                SILConstantInfo constantInfo);  
+                                CanSILFunctionType constantTy);
 
   /// Emit the specified VarDecl as an LValue if possible, otherwise return
   /// null.
