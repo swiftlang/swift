@@ -16,6 +16,8 @@
 
 /// The compiler intrinsic which is called to lookup a string in a table
 /// of static string case values.
+@_inlineable // FIXME(sil-serialize-all)
+@_semantics("stdlib_binary_only")
 @_semantics("findStringSwitchCase")
 public // COMPILER_INTRINSIC
 func _findStringSwitchCase(
@@ -66,6 +68,8 @@ internal struct _StringSwitchContext {
 /// in \p cache. Consecutive calls use the cache for faster lookup.
 /// The \p cases array must not change between subsequent calls with the
 /// same \p cache.
+@_inlineable // FIXME(sil-serialize-all)
+@_semantics("stdlib_binary_only")
 @_semantics("findStringSwitchCaseWithCache")
 public // COMPILER_INTRINSIC
 func _findStringSwitchCaseWithCache(
