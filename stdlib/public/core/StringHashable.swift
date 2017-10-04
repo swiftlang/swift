@@ -82,8 +82,10 @@ extension Unicode {
   }
 }
 
+// FIXME: cannot be marked @_inlineable. See <rdar://problem/34438258>
+// @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
-@inline(never) // Hide the CF dependency
+@inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _hashString(_ string: String) -> Int {
   let core = string._core
 #if _runtime(_ObjC)
