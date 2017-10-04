@@ -999,10 +999,6 @@ public:
     swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
 
-  /// Get the generic metadata pattern from which this generic type instance was
-  /// instantiated, or null if the type is not generic.
-  const TargetGenericMetadata<Runtime> *getGenericPattern() const;
-  
   /// Get the class object for this type if it has one, or return null if the
   /// type is not a class (or not a class with a class object).
   const TargetClassMetadata<Runtime> *getClassObject() const;

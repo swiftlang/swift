@@ -2420,13 +2420,6 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
 /*** Other metadata routines ***********************************************/
 /***************************************************************************/
 
-template<> const GenericMetadata *
-Metadata::getGenericPattern() const {
-  if (const auto *ntd = getNominalTypeDescriptor())
-    return ntd->getGenericMetadataPattern();
-  return nullptr;
-}
-
 template<> const ClassMetadata *
 Metadata::getClassObject() const {
   switch (getKind()) {
