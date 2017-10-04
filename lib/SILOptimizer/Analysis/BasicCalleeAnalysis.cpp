@@ -221,7 +221,6 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
     return getCalleeList(cast<ClassMethodInst>(Callee));
 
   case ValueKind::SuperMethodInst:
-  case ValueKind::DynamicMethodInst:
   case ValueKind::ObjCMethodInst:
   case ValueKind::ObjCSuperMethodInst:
     return CalleeList();

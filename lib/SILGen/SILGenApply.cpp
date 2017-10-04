@@ -250,19 +250,17 @@ public:
     /// Enum case constructor call.
     EnumElement,
 
-    VirtualMethod_First,
-      /// A method call using class method dispatch.
-      ClassMethod = VirtualMethod_First,
-      /// A method call using super method dispatch.
-      SuperMethod,
-    VirtualMethod_Last = SuperMethod,
+    /// A method call using class method dispatch.
+    ClassMethod,
 
-    GenericMethod_First,
-      /// A method call using archetype dispatch.
-      WitnessMethod = GenericMethod_First,
-      /// A method call using dynamic lookup.
-      DynamicMethod,
-    GenericMethod_Last = DynamicMethod
+    /// A method call using super method dispatch.
+    SuperMethod,
+
+    /// A method call using protocol witness table dispatch.
+    WitnessMethod,
+
+    /// A method call using dynamic lookup.
+    DynamicMethod,
   };
 
   const Kind kind;
@@ -391,14 +389,11 @@ public:
     return Callee(Kind::SuperMethod, SGF, std::move(selfValue), c,
                   ci.FormalPattern, ci.FormalType, subs, l);
   }
-  static Callee forArchetype(SILGenFunction &SGF,
-                             CanType protocolSelfType,
-                             SILDeclRef c,
-                             SubstitutionList subs,
-                             SILLocation l) {
-    auto *protocol = cast<ProtocolDecl>(c.getDecl()->getDeclContext());
-    c = c.asForeign(protocol->isObjC());
-
+  static Callee forWitnessMethod(SILGenFunction &SGF,
+                                 CanType protocolSelfType,
+                                 SILDeclRef c,
+                                 SubstitutionList subs,
+                                 SILLocation l) {
     auto &ci = SGF.getConstantInfo(c);
     return Callee(Kind::WitnessMethod, SGF, None, c, ci.FormalPattern,
                   ci.FormalType, subs, l);
@@ -642,7 +637,7 @@ public:
       Scope S(SGF, Loc);
       ManagedValue self =
           SelfValue.getValue().borrow(SGF).getAsSingleValue(SGF);
-      SILValue fn = SGF.B.createDynamicMethod(
+      SILValue fn = SGF.B.createObjCMethod(
           Loc, self.getValue(), *constant,
           SILType::getPrimitiveObjectType(closureType));
       return ManagedValue::forUnmanaged(fn);
@@ -958,11 +953,13 @@ public:
       }
     }
 
-    SILDeclRef constant = SILDeclRef(afd, kind);
+    SILDeclRef constant(afd, kind);
+    constant = constant.asForeign(afd->isObjC());
 
     // Prepare the callee.  This can modify both selfValue and subs.
-    Callee theCallee = Callee::forArchetype(SGF, selfValue.getSubstRValueType(),
-                                            constant, subs, e);
+    Callee theCallee = Callee::forWitnessMethod(
+        SGF, selfValue.getSubstRValueType(),
+        constant, subs, e);
     assumedPlusZeroSelf =
         selfValue.isRValue() &&
         selfValue.forceAndPeekRValue(SGF).peekIsPlusZeroRValueOrTrivial();
@@ -1403,47 +1400,35 @@ public:
     auto subs = ctorRef->getDeclRef().getSubstitutions();
     ArgumentSource selfArgSource(arg, RValue(SGF, expr, selfFormalType, self));
 
+    SILDeclRef constant(ctorRef->getDecl(),
+                        useAllocatingCtor
+                         ? SILDeclRef::Kind::Allocator
+                         : SILDeclRef::Kind::Initializer);
+
+    constant = constant.asForeign(requiresForeignEntryPoint(ctorRef->getDecl()));
+
     // Determine the callee. For structs and enums, this is the allocating
     // constructor (because there is no initializing constructor). For protocol
     // default implementations, we also use the allocating constructor, because
     // that's the only thing that's witnessed. For classes,
     // this is the initializing constructor, to which we will dynamically
     // dispatch.
-    if (selfArgSource.getSubstRValueType()
-            ->getRValueInstanceType()
-            ->is<ArchetypeType>() &&
-        isa<ProtocolDecl>(ctorRef->getDecl()->getDeclContext())) {
+    if (isa<ProtocolDecl>(ctorRef->getDecl()->getDeclContext())) {
       // Look up the witness for the constructor.
-      auto constant = SILDeclRef(ctorRef->getDecl(),
-                             useAllocatingCtor
-                               ? SILDeclRef::Kind::Allocator
-                               : SILDeclRef::Kind::Initializer);
-      setCallee(Callee::forArchetype(SGF,
-                                     self.getType().getSwiftRValueType(),
-                                     constant, subs, expr));
+      setCallee(Callee::forWitnessMethod(
+          SGF, self.getType().getSwiftRValueType(),
+          constant, subs, expr));
     } else if (getMethodDispatch(ctorRef->getDecl())
                  == MethodDispatch::Class) {
       // Dynamic dispatch to the initializer.
       Scope S(SGF, expr);
       setCallee(Callee::forClassMethod(
           SGF, selfArgSource.delayedBorrow(SGF),
-          SILDeclRef(ctorRef->getDecl(),
-                     useAllocatingCtor ? SILDeclRef::Kind::Allocator
-                                       : SILDeclRef::Kind::Initializer)
-              .asForeign(requiresForeignEntryPoint(ctorRef->getDecl())),
-          subs, fn));
+          constant, subs, fn));
     } else {
       // Directly call the peer constructor.
       setCallee(
-        Callee::forDirect(
-          SGF,
-          SILDeclRef(ctorRef->getDecl(),
-                     useAllocatingCtor
-                       ? SILDeclRef::Kind::Allocator
-                     : SILDeclRef::Kind::Initializer)
-            .asForeign(requiresForeignEntryPoint(ctorRef->getDecl())),
-          subs,
-          fn));
+        Callee::forDirect(SGF, constant, subs, fn));
     }
 
     setSelfParam(std::move(selfArgSource), expr);
@@ -4797,9 +4782,9 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   // Form the callee.
   Optional<Callee> callee;
   if (isa<ProtocolDecl>(ctor->getDeclContext())) {
-    callee.emplace(Callee::forArchetype(SGF,
-                                        selfMetaVal.getType().getSwiftRValueType(),
-                                        initRef, subs, loc));
+    callee.emplace(Callee::forWitnessMethod(
+        SGF, selfMetaVal.getType().getSwiftRValueType(),
+        initRef, subs, loc));
   } else {
     callee.emplace(Callee::forDirect(SGF, initRef, subs, loc));
   }
@@ -5021,9 +5006,9 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
     assert(!isDirectUse && "direct use of protocol accessor?");
     assert(!isSuper && "super call to protocol method?");
 
-    return Callee::forArchetype(SGF,
-                                selfValue.getSubstRValueType(),
-                                constant, subs, loc);
+    return Callee::forWitnessMethod(
+        SGF, selfValue.getSubstRValueType(),
+        constant, subs, loc);
   }
 
   bool isClassDispatch = false;
@@ -5278,6 +5263,10 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
 
 static bool shouldReferenceForeignAccessor(AbstractStorageDecl *storage,
                                            bool isDirectUse) {
+  // Members of Objective-C protocols should be dynamically dispatched.
+  if (auto *protoDecl = dyn_cast<ProtocolDecl>(storage->getDeclContext()))
+    return protoDecl->isObjC();
+
   // C functions imported as members should be referenced as C functions.
   if (storage->getGetter()->isImportAsMember())
     return true;

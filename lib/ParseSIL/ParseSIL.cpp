@@ -3784,8 +3784,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::ObjCMethodInst:
-  case SILInstructionKind::ObjCSuperMethodInst:
-  case SILInstructionKind::DynamicMethodInst: {
+  case SILInstructionKind::ObjCSuperMethodInst: {
     SILDeclRef Member;
     SILType MethodTy;
     SourceLoc TyLoc;
@@ -3815,9 +3814,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       break;
     case SILInstructionKind::ObjCSuperMethodInst:
       ResultVal = B.createObjCSuperMethod(InstLoc, Val, Member, MethodTy);
-      break;
-    case SILInstructionKind::DynamicMethodInst:
-      ResultVal = B.createDynamicMethod(InstLoc, Val, Member, MethodTy);
       break;
     }
     break;

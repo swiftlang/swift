@@ -384,7 +384,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::UnmanagedAutoreleaseValueInst:
   case SILInstructionKind::DynamicMethodBranchInst:
-  case SILInstructionKind::DynamicMethodInst:
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::IndexAddrInst:
   case SILInstructionKind::TailAddrInst:

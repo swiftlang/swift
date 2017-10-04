@@ -1198,8 +1198,9 @@ public:
 
   ObjCMethodInst *createObjCMethod(SILLocation Loc, SILValue Operand,
                                    SILDeclRef Member, SILType MethodTy) {
-    return insert(new (getModule()) ObjCMethodInst(
-        getSILDebugLocation(Loc), Operand, Member, MethodTy));
+    return insert(ObjCMethodInst::create(
+        getSILDebugLocation(Loc), Operand, Member, MethodTy,
+        &getFunction(), OpenedArchetypes));
   }
 
   ObjCSuperMethodInst *createObjCSuperMethod(SILLocation Loc, SILValue Operand,
@@ -1215,13 +1216,6 @@ public:
     return insert(WitnessMethodInst::create(
         getSILDebugLocation(Loc), LookupTy, Conformance, Member, MethodTy,
         &getFunction(), OpenedArchetypes, Volatile));
-  }
-
-  DynamicMethodInst *createDynamicMethod(SILLocation Loc, SILValue Operand,
-                                         SILDeclRef Member, SILType MethodTy) {
-    return insert(DynamicMethodInst::create(
-        getSILDebugLocation(Loc), Operand, Member, MethodTy,
-        &getFunction(), OpenedArchetypes));
   }
 
   OpenExistentialAddrInst *

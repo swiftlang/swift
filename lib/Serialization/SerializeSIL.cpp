@@ -1755,21 +1755,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)Ty.getCategory(), ListOfValues);
     break;
   }
-  case SILInstructionKind::DynamicMethodInst: {
-    // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
-    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel),
-    // and an operand.
-    const DynamicMethodInst *DMI = cast<DynamicMethodInst>(&SI);
-    SILType Ty = DMI->getType();
-    SmallVector<ValueID, 9> ListOfValues;
-    handleMethodInst(DMI, DMI->getOperand(), ListOfValues);
-
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-        S.addTypeRef(Ty.getSwiftRValueType()),
-        (unsigned)Ty.getCategory(), ListOfValues);
-    break;
-  }
   case SILInstructionKind::DynamicMethodBranchInst: {
     // Format: a typed value, a SILDeclRef, a BasicBlock ID for method,
     // a BasicBlock ID for no method. Use SILOneTypeValuesLayout.
