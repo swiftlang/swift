@@ -612,7 +612,7 @@ Type TypeChecker::applyUnboundGenericArguments(
                                 LookUpConformance(*this, dc),
                                 SubstFlags::UseErrorType);
 
-  if (isa<NominalTypeDecl>(decl)) {
+  if (isa<NominalTypeDecl>(decl) && resultType) {
     if (useObjectiveCBridgeableConformancesOfArgs(
           dc, resultType->castTo<BoundGenericType>(),
           unsatisfiedDependency))
