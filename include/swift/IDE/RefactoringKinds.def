@@ -34,6 +34,8 @@ CURSOR_REFACTORING(FillProtocolStub, "Add Missing Protocol Requirements", fillst
 
 CURSOR_REFACTORING(ExpandDefault, "Expand Default", expand.default)
 
+CURSOR_REFACTORING(ExpandSwitchCases, "Expand Switch Cases", expand.switch.cases)
+
 CURSOR_REFACTORING(LocalizeString, "Localize String", localize.string)
 
 CURSOR_REFACTORING(SimplifyNumberLiteral, "Simplify Long Number Literal", simplify.long.number.literal)

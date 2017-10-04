@@ -633,6 +633,15 @@ public:
   }
 };
 
+struct ApplicabilityContext {
+  DiagnosticEngine &DiagEngine;
+  SourceFile *SF;
+  ApplicabilityContext(DiagnosticEngine &DiagEngine,
+                       SourceFile *SF):
+  DiagEngine(DiagEngine),
+  SF(SF) {}
+};
+
 #define CURSOR_REFACTORING(KIND, NAME, ID)                                    \
 class RefactoringAction##KIND: public TokenBasedRefactoringAction {           \
   public:                                                                     \
@@ -641,9 +650,10 @@ class RefactoringAction##KIND: public TokenBasedRefactoringAction {           \
                           DiagnosticConsumer &DiagConsumer) :                 \
     TokenBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {}      \
   bool performChange() override;                                              \
-  static bool isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag);   \
+  static bool isApplicable(ResolvedCursorInfo Tok, ApplicabilityContext &ACtx);\
   bool isApplicable() {                                                       \
-    return RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine) ;    \
+    auto Context = ApplicabilityContext(DiagEngine, TheFile);                 \
+    return RefactoringAction##KIND::isApplicable(CursorInfo, Context) ;       \
   }                                                                           \
 };
 #include "swift/IDE/RefactoringKinds.def"
@@ -669,15 +679,16 @@ class RefactoringAction##KIND: public RangeBasedRefactoringAction {           \
                           DiagnosticConsumer &DiagConsumer) :                 \
     RangeBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {}      \
   bool performChange() override;                                              \
-  static bool isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag);   \
+  static bool isApplicable(ResolvedRangeInfo Info, ApplicabilityContext &ACtx);\
   bool isApplicable() {                                                       \
-    return RefactoringAction##KIND::isApplicable(RangeInfo, DiagEngine) ;     \
+    auto Context = ApplicabilityContext(DiagEngine, TheFile);                 \
+    return RefactoringAction##KIND::isApplicable(RangeInfo, Context) ;        \
   }                                                                           \
 };
 #include "swift/IDE/RefactoringKinds.def"
 
 bool RefactoringActionLocalRename::
-isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
+isApplicable(ResolvedCursorInfo CursorInfo, ApplicabilityContext &ACtx) {
   if (CursorInfo.Kind != CursorInfoKind::ValueRef)
     return false;
   auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD);
@@ -876,7 +887,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
 }
 
 bool RefactoringActionExtractFunction::
-isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(ResolvedRangeInfo Info, ApplicabilityContext &ACtx) {
   switch (Info.Kind) {
   case RangeKind::PartOfExpression:
   case RangeKind::SingleDecl:
@@ -885,7 +896,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
   case RangeKind::SingleExpression:
   case RangeKind::SingleStatement:
   case RangeKind::MultiStatement: {
-    return checkExtractConditions(Info, Diag).
+    return checkExtractConditions(Info, ACtx.DiagEngine).
       success({CannotExtractReason::VoidType});
   }
   }
@@ -1403,14 +1414,14 @@ bool RefactoringActionExtractExprBase::performChange() {
 }
 
 bool RefactoringActionExtractExpr::
-isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(ResolvedRangeInfo Info, ApplicabilityContext &ACtx) {
   switch (Info.Kind) {
     case RangeKind::SingleExpression:
       // We disallow extract literal expression for two reasons:
       // (1) since we print the type for extracted expression, the type of a
       // literal may print as "int2048" where it is not typically users' choice;
       // (2) Extracting one literal provides little value for users.
-      return checkExtractConditions(Info, Diag).success();
+      return checkExtractConditions(Info, ACtx.DiagEngine).success();
     case RangeKind::PartOfExpression:
     case RangeKind::SingleDecl:
     case RangeKind::SingleStatement:
@@ -1427,10 +1438,10 @@ bool RefactoringActionExtractExpr::performChange() {
 }
 
 bool RefactoringActionExtractRepeatedExpr::
-isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(ResolvedRangeInfo Info, ApplicabilityContext &ACtx) {
   switch (Info.Kind) {
     case RangeKind::SingleExpression:
-      return checkExtractConditions(Info, Diag).
+      return checkExtractConditions(Info, ACtx.DiagEngine).
         success({CannotExtractReason::Literal});
     case RangeKind::PartOfExpression:
     case RangeKind::SingleDecl:
@@ -1521,7 +1532,7 @@ static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo Cur
 }
 
 bool RefactoringActionCollapseNestedIfExpr::
-isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+isApplicable(ResolvedCursorInfo Tok, ApplicabilityContext &ACtx) {
   return findCollapseNestedIfTarget(Tok).isValid();
 }
 
@@ -1638,7 +1649,7 @@ static void interpolatedExpressionForm(Expr *E, SourceManager &SM,
 }
 
 bool RefactoringActionConvertStringsConcatenationToInterpolation::
-isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(ResolvedRangeInfo Info, ApplicabilityContext &ACtx) {
   auto RangeContext = Info.RangeContext;
   if (RangeContext) {
     auto &Ctx = Info.RangeContext->getASTContext();
@@ -1751,7 +1762,7 @@ getUnsatisfiedRequirements(const DeclContext *DC) {
 }
 
 bool RefactoringActionFillProtocolStub::
-isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+isApplicable(ResolvedCursorInfo Tok, ApplicabilityContext &ACtx) {
   return FillProtocolStubContext::getContextFromCursorInfo(Tok).canProceed();
 };
 
@@ -1800,57 +1811,25 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
   return collectAvailableRefactorings(SF, Tok, Scratch, /*Exclude rename*/false);
 }
 
-bool RefactoringActionExpandDefault::
-isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
-  auto Exit = [&](bool Applicable) {
-    if (!Applicable)
-      Diag.diagnose(SourceLoc(), diag::invalid_default_location);
-    return Applicable;
-  };
-  if (CursorInfo.Kind != CursorInfoKind::StmtStart)
-    return Exit(false);
-  if (auto *CS = dyn_cast<CaseStmt>(CursorInfo.TrailingStmt)) {
-    return Exit(CS->isDefault());
+static EnumDecl* getEnumDeclFromSwitchStmt(SwitchStmt *SwitchS) {
+  if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
+    return SubjectTy->getAnyNominal()->getAsEnumOrEnumExtensionContext();
   }
-  return Exit(false);
+  return nullptr;
 }
 
-bool RefactoringActionExpandDefault::performChange() {
-  // Try to find the switch statement enclosing the default statement.
-  auto *CS = static_cast<CaseStmt*>(CursorInfo.TrailingStmt);
-  auto IsSwitch = [](ASTNode Node) {
-    return Node.is<Stmt*>() &&
-      Node.get<Stmt*>()->getKind() == StmtKind::Switch;
-  };
-  ContextFinder Finder(*TheFile, CS, IsSwitch);
-  Finder.resolve();
-
-  // If failed to find the switch statement, issue error.
-  if (Finder.getContexts().empty()) {
-    DiagEngine.diagnose(CS->getStartLoc(), diag::no_parent_switch);
-    return true;
-  }
-  auto *SwitchS = static_cast<SwitchStmt*>(Finder.getContexts().back().
-    get<Stmt*>());
-
-  // To find the subject enum decl for this switch statement; if failing,
-  // issue errors.
-  EnumDecl *SubjectED = nullptr;
-  if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
-    SubjectED = SubjectTy->getAnyNominal()->getAsEnumOrEnumExtensionContext();
-  }
-  if (!SubjectED) {
-    DiagEngine.diagnose(CS->getStartLoc(), diag::no_subject_enum);
-    return true;
-  }
-
+static bool performCasesExpansionInSwitchStmt(SwitchStmt *SwitchS,
+                                              DiagnosticEngine &DiagEngine,
+                                              SourceLoc ExpandedStmtLoc,
+                                              EditorConsumerInsertStream &OS
+                                              ) {
   // Assume enum elements are not handled in the switch statement.
+  auto EnumDecl = getEnumDeclFromSwitchStmt(SwitchS);
+  assert(EnumDecl);
   llvm::DenseSet<EnumElementDecl*> UnhandledElements;
-  SubjectED->getAllElements(UnhandledElements);
-  bool FoundDefault = false;
+  EnumDecl->getAllElements(UnhandledElements);
   for (auto Current : SwitchS->getCases()) {
-    if (Current == CS) {
-      FoundDefault = true;
+    if (Current->isDefault()) {
       continue;
     }
     // For each handled enum element, remove it from the bucket.
@@ -1861,25 +1840,118 @@ bool RefactoringActionExpandDefault::performChange() {
     }
   }
 
-  // If we've not seen the default statement inside the switch statement, issue
-  // error.
-  if (!FoundDefault) {
-    DiagEngine.diagnose(CS->getStartLoc(), diag::no_parent_switch);
-    return true;
-  }
-
   // If all enum elements are handled in the switch statement, issue error.
   if (UnhandledElements.empty()) {
-    DiagEngine.diagnose(CS->getStartLoc(), diag::no_remaining_cases);
+    DiagEngine.diagnose(ExpandedStmtLoc, diag::no_remaining_cases);
     return true;
   }
 
-  // Good to go, change the code!
+  printEnumElementsAsCases(UnhandledElements, OS);
+  return false;
+}
+
+// Finds SwitchStmt that contains given CaseStmt.
+static SwitchStmt* findEnclosingSwitchStmt(CaseStmt *CS,
+                                           SourceFile *SF,
+                                           DiagnosticEngine &DiagEngine) {
+  auto IsSwitch = [](ASTNode Node) {
+    return Node.is<Stmt*>() &&
+    Node.get<Stmt*>()->getKind() == StmtKind::Switch;
+  };
+  ContextFinder Finder(*SF, CS, IsSwitch);
+  Finder.resolve();
+
+  // If failed to find the switch statement, issue error.
+  if (Finder.getContexts().empty()) {
+    DiagEngine.diagnose(CS->getStartLoc(), diag::no_parent_switch);
+    return nullptr;
+  }
+  auto *SwitchS = static_cast<SwitchStmt*>(Finder.getContexts().back().
+                                           get<Stmt*>());
+  // Make sure that CaseStmt is included in switch that was found.
+  auto Cases = SwitchS->getCases();
+  auto Default = std::find(Cases.begin(), Cases.end(), CS);
+  if (Default == Cases.end()) {
+    DiagEngine.diagnose(CS->getStartLoc(), diag::no_parent_switch);
+    return nullptr;
+  }
+  return SwitchS;
+}
+
+bool RefactoringActionExpandDefault::
+isApplicable(ResolvedCursorInfo CursorInfo, ApplicabilityContext &ACtx) {
+  auto &Diag = ACtx.DiagEngine;
+  auto Exit = [&](bool Applicable) {
+    if (!Applicable)
+      Diag.diagnose(SourceLoc(), diag::invalid_default_location);
+    return Applicable;
+  };
+  if (CursorInfo.Kind != CursorInfoKind::StmtStart)
+    return Exit(false);
+  if (auto *CS = dyn_cast<CaseStmt>(CursorInfo.TrailingStmt)) {
+    auto EnclosingSwitchStmt = findEnclosingSwitchStmt(CS,
+                                                       ACtx.SF,
+                                                       ACtx.DiagEngine);
+    if (!EnclosingSwitchStmt)
+      return false;
+    auto EnumD = getEnumDeclFromSwitchStmt(EnclosingSwitchStmt);
+    auto IsApplicable = CS->isDefault() && EnumD != nullptr;
+    return IsApplicable;
+  }
+  return Exit(false);
+}
+
+bool RefactoringActionExpandDefault::performChange() {
+  // If we've not seen the default statement inside the switch statement, issue
+  // error.
+  auto *CS = static_cast<CaseStmt*>(CursorInfo.TrailingStmt);
+  auto *SwitchS = findEnclosingSwitchStmt(CS, TheFile, DiagEngine);
+  assert(SwitchS);
   EditorConsumerInsertStream OS(EditConsumer, SM,
                                 Lexer::getCharSourceRangeFromSourceRange(SM,
                                   CS->getLabelItemsRange()));
-  printEnumElementsAsCases(UnhandledElements, OS);
+  return performCasesExpansionInSwitchStmt(SwitchS,
+                                           DiagEngine,
+                                           CS->getStartLoc(),
+                                           OS);
+}
+
+bool RefactoringActionExpandSwitchCases::
+isApplicable(ResolvedCursorInfo CursorInfo, ApplicabilityContext &ACtx) {
+  if (!CursorInfo.TrailingStmt)
+    return false;
+  if (auto *Switch = dyn_cast<SwitchStmt>(CursorInfo.TrailingStmt)) {
+    return getEnumDeclFromSwitchStmt(Switch);
+  }
   return false;
+}
+
+bool RefactoringActionExpandSwitchCases::performChange() {
+  auto *SwitchS = dyn_cast<SwitchStmt>(CursorInfo.TrailingStmt);
+  assert(SwitchS);
+
+  auto InsertRange = CharSourceRange();
+  auto Cases = SwitchS->getCases();
+  auto Default = std::find_if(Cases.begin(), Cases.end(), [](CaseStmt *Stmt) {
+    return Stmt->isDefault();
+  });
+  if (Default != Cases.end()) {
+    auto DefaultRange = (*Default)->getLabelItemsRange();
+    InsertRange = Lexer::getCharSourceRangeFromSourceRange(SM, DefaultRange);
+  } else {
+    auto RBraceLoc = SwitchS->getRBraceLoc();
+    InsertRange = CharSourceRange(SM, RBraceLoc, RBraceLoc);
+  }
+  EditorConsumerInsertStream OS(EditConsumer, SM, InsertRange);
+  auto Result = performCasesExpansionInSwitchStmt(SwitchS,
+                                           DiagEngine,
+                                           SwitchS->getStartLoc(),
+                                           OS);
+  if (SM.getLineNumber(SwitchS->getLBraceLoc()) ==
+      SM.getLineNumber(SwitchS->getRBraceLoc())) {
+    EditConsumer.insertAfter(SM, SwitchS->getLBraceLoc(), "\n");
+  }
+  return Result;
 }
 
 static Expr *findLocalizeTarget(ResolvedCursorInfo CursorInfo) {
@@ -1906,7 +1978,7 @@ static Expr *findLocalizeTarget(ResolvedCursorInfo CursorInfo) {
 }
 
 bool RefactoringActionLocalizeString::
-isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+isApplicable(ResolvedCursorInfo Tok, ApplicabilityContext &ACtx) {
   return findLocalizeTarget(Tok);
 }
 
@@ -1950,7 +2022,7 @@ static CharSourceRange
 }
 
 bool RefactoringActionConvertToDoCatch::
-isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+isApplicable(ResolvedCursorInfo Tok, ApplicabilityContext &ACtx) {
   if (!Tok.TrailingExpr)
     return false;
   return isa<ForceTryExpr>(Tok.TrailingExpr);
@@ -2038,7 +2110,7 @@ static void insertUnderscoreInDigits(StringRef Digits,
 }
 
 bool RefactoringActionSimplifyNumberLiteral::
-isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+isApplicable(ResolvedCursorInfo Tok, ApplicabilityContext &ACtx) {
   if (auto *Literal = getTrailingNumberLiteral(Tok)) {
     llvm::SmallString<64> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
@@ -2254,8 +2326,9 @@ collectAvailableRefactorings(SourceFile *SF,
     }
   }
   DiagnosticEngine DiagEngine(SF->getASTContext().SourceMgr);
+  auto Context = ApplicabilityContext(DiagEngine, SF);
 #define CURSOR_REFACTORING(KIND, NAME, ID)                                     \
-  if (RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine))           \
+  if (RefactoringAction##KIND::isApplicable(CursorInfo, Context))           \
     AllKinds.push_back(RefactoringKind::KIND);
 #include "swift/IDE/RefactoringKinds.def"
 
@@ -2291,6 +2364,7 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
   ASTContext &Ctx = SF->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
   DiagnosticEngine DiagEngine(SM);
+  auto Context = ApplicabilityContext(DiagEngine, SF);
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
     [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
 
@@ -2299,7 +2373,7 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
   ResolvedRangeInfo Result = Resolver.resolve();
 
 #define RANGE_REFACTORING(KIND, NAME, ID)                                     \
-  if (RefactoringAction##KIND::isApplicable(Result, DiagEngine))              \
+  if (RefactoringAction##KIND::isApplicable(Result, Context))              \
     Scratch.push_back(RefactoringKind::KIND);
 #include "swift/IDE/RefactoringKinds.def"
 
