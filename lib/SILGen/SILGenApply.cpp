@@ -559,14 +559,16 @@ public:
         return ManagedValue::forUnmanaged(ref);
       }
 
+      auto methodTy = SGF.SGM.Types.getConstantOverrideType(*constant);
+
       // Otherwise, do the dynamic dispatch inline.
       Scope S(SGF, Loc);
       ManagedValue borrowedSelf =
           SelfValue.getValue().borrow(SGF).getAsSingleValue(SGF);
       SILValue methodVal =
           SGF.B.createClassMethod(Loc, borrowedSelf.getValue(), *constant,
-                                  /*volatile*/
-                                  constant->isForeign);
+                                  SILType::getPrimitiveObjectType(methodTy),
+                                  /*volatile*/ constant->isForeign);
       return ManagedValue::forUnmanaged(methodVal);
     }
     case Kind::SuperMethod: {

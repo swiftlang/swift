@@ -3258,20 +3258,20 @@ getWitnessFunctionType(SILGenModule &SGM,
 static SILValue
 getWitnessFunctionRef(SILGenFunction &SGF,
                       SILDeclRef witness,
+                      CanSILFunctionType witnessFTy,
                       WitnessDispatchKind witnessKind,
                       SmallVectorImpl<ManagedValue> &witnessParams,
                       SILLocation loc) {
-  SILGenModule &SGM = SGF.SGM;
-
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
-    return SGF.emitDynamicMethodRef(loc, witness,
-                                    SGM.Types.getConstantInfo(witness));
-  case WitnessDispatchKind::Class:
+    return SGF.emitDynamicMethodRef(loc, witness, witnessFTy);
+  case WitnessDispatchKind::Class: {
     SILValue selfPtr = witnessParams.back().getValue();
-    return SGF.B.createClassMethod(loc, selfPtr, witness);
+    return SGF.B.createClassMethod(loc, selfPtr, witness,
+                                   SILType::getPrimitiveObjectType(witnessFTy));
+  }
   }
 
   llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
@@ -3335,9 +3335,10 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
 
   // Translate the argument values from the requirement abstraction level to
   // the substituted signature of the witness.
-  auto witnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
+  auto origWitnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
+  auto witnessFTy = origWitnessFTy;
   if (!witnessSubs.empty())
-    witnessFTy = witnessFTy->substGenericArgs(SGM.M, witnessSubs);
+    witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs);
 
   SmallVector<ManagedValue, 8> witnessParams;
 
@@ -3374,7 +3375,9 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
                witnessOrigTy.getFunctionInputType(),
                witnessSubstTy.getInput());
 
-  SILValue witnessFnRef = getWitnessFunctionRef(*this, witness, witnessKind,
+  SILValue witnessFnRef = getWitnessFunctionRef(*this, witness,
+                                                origWitnessFTy,
+                                                witnessKind,
                                                 witnessParams, loc);
 
   // Collect the arguments.
