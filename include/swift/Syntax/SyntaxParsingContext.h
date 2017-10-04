@@ -40,16 +40,16 @@ enum class SyntaxParsingContextKind: uint8_t {
 /// create syntax nodes.
 class SyntaxParsingContext {
 protected:
-  SyntaxParsingContext(SourceFile &File, bool Enabled);
+  SyntaxParsingContext(bool Enabled);
   SyntaxParsingContext(SyntaxParsingContext &Another);
 public:
-  struct Implementation;
-  Implementation &Impl;
+  struct ContextInfo;
+  ContextInfo &ContextData;
 
   // Add a token syntax at the given source location to the context; this
   // token node can be used to build more complex syntax nodes in later call
   // back.
-  void addTokenSyntax(SourceLoc Loc);
+  virtual void addTokenSyntax(SourceLoc Loc) = 0;
 
   // Get the context kind.
   virtual SyntaxParsingContextKind getKind() = 0;
@@ -67,8 +67,13 @@ public:
 // has when the parser instance is firstly created.
 class SyntaxParsingContextRoot: public SyntaxParsingContext {
 public:
+  struct GlobalInfo;
+
+  // Contains global information of the source file under parsing.
+  GlobalInfo &GlobalData;
   SyntaxParsingContextRoot(SourceFile &SF, unsigned BufferID);
   ~SyntaxParsingContextRoot();
+  void addTokenSyntax(SourceLoc Loc) override {};
   void makeNode(SyntaxKind Kind) override {};
   SyntaxParsingContextKind getKind() override {
     return SyntaxParsingContextKind::Root;
@@ -89,6 +94,10 @@ protected:
       ContextHolder = this;
   }
   ~SyntaxParsingContextChild();
+public:
+  void addTokenSyntax(SourceLoc Loc) override;
+  SyntaxParsingContext* getParent() { return Parent; }
+  SyntaxParsingContextRoot &getRoot();
 };
 
 // The context for creating expression syntax. By the destruction

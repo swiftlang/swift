@@ -21,16 +21,6 @@ using namespace swift;
 using namespace swift::syntax;
 
 namespace {
-static TokenSyntax getTokenAtLocation(ArrayRef<RawTokenInfo> Tokens,
-                                      SourceLoc Loc) {
-  auto It = std::lower_bound(Tokens.begin(), Tokens.end(), Loc,
-   [](const RawTokenInfo &Info, SourceLoc Loc) {
-     return Info.Loc.getOpaquePointerValue() < Loc.getOpaquePointerValue();
-   });
-  assert(It->Loc == Loc);
-  return make<TokenSyntax>(It->Token);
-}
-
 static ExprSyntax getUnknownExpr(ArrayRef<Syntax> SubExpr) {
   RawSyntax::LayoutList Layout;
   std::transform(SubExpr.begin(), SubExpr.end(), std::back_inserter(Layout),
@@ -41,12 +31,11 @@ static ExprSyntax getUnknownExpr(ArrayRef<Syntax> SubExpr) {
 }
 } // End of anonymous namespace
 
-struct SyntaxParsingContext::Implementation {
-  SourceFile &File;
+struct SyntaxParsingContext::ContextInfo {
   bool Enabled;
   std::vector<Syntax> PendingSyntax;
 
-  Implementation(SourceFile &File, bool Enabled): File(File), Enabled(Enabled) {}
+  ContextInfo(bool Enabled): Enabled(Enabled) {}
 
   // Pop back from PendingSyntax if the back is a token of the given Kind.
   Optional<TokenSyntax> checkBackToken(tok Kind) {
@@ -74,32 +63,59 @@ struct SyntaxParsingContext::Implementation {
   }
 };
 
-SyntaxParsingContext::SyntaxParsingContext(SourceFile& File, bool Enabled):
-  Impl(*new Implementation(File, Enabled)) {}
+SyntaxParsingContext::SyntaxParsingContext(bool Enabled):
+  ContextData(*new ContextInfo(Enabled)) {}
 
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext &Another):
-    SyntaxParsingContext(Another.Impl.File, Another.Impl.Enabled) {}
+    SyntaxParsingContext(Another.ContextData.Enabled) {}
 
-SyntaxParsingContext::~SyntaxParsingContext() { delete &Impl; }
+SyntaxParsingContext::~SyntaxParsingContext() { delete &ContextData; }
 
-void SyntaxParsingContext::disable() { Impl.Enabled = false; }
+void SyntaxParsingContext::disable() { ContextData.Enabled = false; }
+
+struct SyntaxParsingContextRoot::GlobalInfo {
+  // The source file under parsing.
+  SourceFile &File;
+
+  // All tokens in the source file. This list will shrink from the start when
+  // we start to build syntax nodes.
+  ArrayRef<RawTokenInfo> Tokens;
+
+  GlobalInfo(SourceFile &File) : File(File) {}
+  TokenSyntax retrieveTokenSyntax(SourceLoc Loc) {
+    auto TargetLoc = Loc.getOpaquePointerValue();
+    for (unsigned I = 0, N = Tokens.size(); I < N; I ++) {
+      auto Info = Tokens[I];
+      auto InfoLoc = Info.Loc.getOpaquePointerValue();
+      if (InfoLoc < TargetLoc)
+        continue;
+      assert(InfoLoc == TargetLoc);
+      Tokens = Tokens.slice(I + 1);
+      return make<TokenSyntax>(Info.Token);
+    }
+    llvm_unreachable("can not find token at Loc");
+  }
+};
 
 SyntaxParsingContextRoot::
 SyntaxParsingContextRoot(SourceFile &File, unsigned BufferID):
-    SyntaxParsingContext(File, File.shouldKeepTokens()) {
+    SyntaxParsingContext(File.shouldKeepTokens()),
+    GlobalData(*new GlobalInfo(File)) {
   populateTokenSyntaxMap(File.getASTContext().LangOpts,
                          File.getASTContext().SourceMgr,
                          BufferID, File.AllRawTokenSyntax);
+  // Keep track of the raw tokens.
+  GlobalData.Tokens = llvm::makeArrayRef(File.AllRawTokenSyntax);
 }
 
 SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
   std::vector<DeclSyntax> AllTopLevel;
-  if (Impl.File.SyntaxRoot.hasValue()) {
-    for (auto It: Impl.File.getSyntaxRoot().getTopLevelDecls()) {
+  if (GlobalData.File.SyntaxRoot.hasValue()) {
+    for (auto It: GlobalData.File.getSyntaxRoot().getTopLevelDecls()) {
       AllTopLevel.push_back(It);
     }
   }
-  for (auto S: Impl.PendingSyntax) {
+  for (auto S: ContextData.PendingSyntax) {
     std::vector<StmtSyntax> AllStmts;
     if (S.isDecl()) {
       AllStmts.push_back(SyntaxFactory::makeDeclarationStmt(
@@ -120,42 +136,51 @@ SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
   }
 
   Trivia Leading, Trailing;
-  Impl.File.SyntaxRoot.emplace(
+  GlobalData.File.SyntaxRoot.emplace(
     SyntaxFactory::makeSourceFile(SyntaxFactory::makeDeclList(AllTopLevel),
       SyntaxFactory::makeToken(tok::eof, "\n", SourcePresence::Present,
                                Leading, Trailing)));
+  delete &GlobalData;
 }
 
-void SyntaxParsingContext::addTokenSyntax(SourceLoc Loc) {
-  if (!Impl.Enabled)
-    return;
-  Impl.PendingSyntax.emplace_back(getTokenAtLocation(Impl.File.AllRawTokenSyntax,
-                                                     Loc));
+SyntaxParsingContextRoot &SyntaxParsingContextChild::getRoot() {
+  for (SyntaxParsingContext *Root = getParent(); ;
+       Root = static_cast<SyntaxParsingContextChild*>(Root)->getParent()){
+    if (Root->getKind() == SyntaxParsingContextKind::Root)
+      return *static_cast<SyntaxParsingContextRoot*>(Root);
+  }
+  llvm_unreachable("can not find root");
+}
+
+void SyntaxParsingContextChild::addTokenSyntax(SourceLoc Loc) {
+  if (ContextData.Enabled)
+    ContextData.PendingSyntax.push_back(getRoot().GlobalData.
+      retrieveTokenSyntax(Loc));
 }
 
 SyntaxParsingContextChild::~SyntaxParsingContextChild() {
   // Parent should take care of the created syntax.
-  Parent->Impl.addPendingSyntax(Impl.PendingSyntax);
+  Parent->ContextData.addPendingSyntax(ContextData.PendingSyntax);
 
   // Reset the context holder to be Parent.
   ContextHolder = Parent;
 }
 
 void SyntaxParsingContextExpr::makeNode(SyntaxKind Kind) {
-  if (!Impl.Enabled)
+  if (!ContextData.Enabled)
     return;
 
   // Create syntax nodes according to the given kind.
   switch (Kind) {
   case SyntaxKind::IntegerLiteralExpr: {
-    auto Digit = *Impl.popPendingSyntax().getAs<TokenSyntax>();
-    Impl.PendingSyntax.push_back(SyntaxFactory::makeIntegerLiteralExpr(
-      Impl.checkBackToken(tok::oper_prefix), Digit));
+    auto Digit = *ContextData.popPendingSyntax().getAs<TokenSyntax>();
+    ContextData.PendingSyntax.push_back(SyntaxFactory::makeIntegerLiteralExpr(
+      ContextData.checkBackToken(tok::oper_prefix), Digit));
     break;
   }
   case SyntaxKind::StringLiteralExpr: {
-    auto StringToken = *Impl.popPendingSyntax().getAs<TokenSyntax>();
-    Impl.PendingSyntax.push_back(SyntaxFactory::
+    auto StringToken = *ContextData.popPendingSyntax().getAs<TokenSyntax>();
+    ContextData.PendingSyntax.push_back(SyntaxFactory::
       makeStringLiteralExpr(StringToken));
     break;
   }
@@ -168,9 +193,9 @@ void SyntaxParsingContextExpr::makeNode(SyntaxKind Kind) {
 SyntaxParsingContextExpr::~SyntaxParsingContextExpr() {
   // If we've created more than one expression syntax, we should enclose them
   // under a unknown expression.
-  if (Impl.PendingSyntax.size() > 1) {
-    auto Result = getUnknownExpr(Impl.PendingSyntax);
-    Impl.PendingSyntax.clear();
-    Impl.PendingSyntax.push_back(Result);
+  if (ContextData.PendingSyntax.size() > 1) {
+    auto Result = getUnknownExpr(ContextData.PendingSyntax);
+    ContextData.PendingSyntax.clear();
+    ContextData.PendingSyntax.push_back(Result);
   }
 }
