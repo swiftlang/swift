@@ -12,6 +12,7 @@ set(sources
   SwiftStdbool.h
   SwiftStddef.h
   SwiftStdint.h
+  System.h
   UnicodeShims.h
   Visibility.h
 
