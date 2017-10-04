@@ -116,8 +116,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
   : ${SelfProtocols} {
 
   public typealias Index = Base.Index
-  public typealias IndexDistance = Base.IndexDistance
-  public typealias Indices = ${Indices}<${Self}<Base>>
+  public typealias IndexDistance = Base.IndexDistance  
 
   public var _startIndex: Index
   public var _endIndex: Index
@@ -164,13 +163,10 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
-  // FIXME(ABI)#67 (Associated Types with where clauses):
-  //
-  //   public typealias Indices = Base.Indices
-  //   public var indices: Indices { ... }
-  //
-  // We can't do it right now because we don't have enough
-  // constraints on the Base.Indices type in this context.
+  public typealias Indices = Base.Indices
+  public var indices: Indices { 
+    return _base.indices[_startIndex..<_endIndex]
+  }
 
   @_inlineable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
