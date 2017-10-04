@@ -4202,7 +4202,9 @@ ParamDecl::ParamDecl(Specifier specifier,
 ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
   : VarDecl(DeclKind::Param, /*IsStatic*/false, PD->getSpecifier(),
             /*IsCaptureList*/false, PD->getNameLoc(), PD->getName(),
-            PD->hasType() && withTypes? PD->getType() : Type(),
+            PD->hasType() && withTypes
+              ? PD->getType()->getInOutObjectType()
+              : Type(),
             PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
@@ -4215,7 +4217,7 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
     typeLoc.setType(Type());
 
   if (withTypes && PD->hasInterfaceType())
-    setInterfaceType(PD->getInterfaceType());
+    setInterfaceType(PD->getInterfaceType()->getInOutObjectType());
 }
 
 
