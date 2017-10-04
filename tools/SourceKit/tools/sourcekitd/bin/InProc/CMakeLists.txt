@@ -42,10 +42,6 @@ if (SOURCEKITD_BUILD_STATIC_INPROC)
   )
 endif()
 
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-  target_link_libraries(sourcekitdInProc PUBLIC BlocksRuntime)
-endif()
-
 if (SOURCEKIT_BUILT_STANDALONE)
   # Create the symlinks necessary to find the swift runtime.
   add_custom_command(TARGET sourcekitdInProc PRE_BUILD

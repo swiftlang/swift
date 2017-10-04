@@ -9,7 +9,7 @@ else()
 endif()
 
 if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
-  set(SOURCEKITD_TEST_LINK_LIBS ${SOURCEKITD_TEST_LINK_LIBS} dispatch swiftCore)
+  set(SOURCEKITD_TEST_LINK_LIBS ${SOURCEKITD_TEST_LINK_LIBS} dispatch)
 endif()
 
 add_sourcekit_executable(sourcekitd-test
