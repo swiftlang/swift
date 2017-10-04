@@ -118,7 +118,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     include_directories(AFTER
                           ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime
                           ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
-    add_dependencies(libdispatch-configure
+    add_dependencies(libdispatch
                        swift
                        swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
                        swiftSwiftOnoneSupport-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
