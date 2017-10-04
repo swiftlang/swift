@@ -1589,9 +1589,6 @@ public:
   }
 
   void printMethodInst(MethodInst *I, SILValue Operand) {
-    if (I->isVolatile())
-      *this << "[volatile] ";
-    
     *this << getIDAndType(Operand) << ", " << I->getMember();
   }
   
@@ -1602,6 +1599,18 @@ public:
     *this << AMI->getType();
   }
   void visitSuperMethodInst(SuperMethodInst *AMI) {
+    printMethodInst(AMI, AMI->getOperand());
+    *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
+    *this << ", ";
+    *this << AMI->getType();
+  }
+  void visitObjCMethodInst(ObjCMethodInst *AMI) {
+    printMethodInst(AMI, AMI->getOperand());
+    *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
+    *this << ", ";
+    *this << AMI->getType();
+  }
+  void visitObjCSuperMethodInst(ObjCSuperMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
     *this << ", ";

@@ -1535,8 +1535,7 @@ SILCloner<ImplClass>::visitClassMethodInst(ClassMethodInst *Inst) {
     getBuilder().createClassMethod(getOpLocation(Inst->getLoc()),
                                    getOpValue(Inst->getOperand()),
                                    Inst->getMember(),
-                                   Inst->getType(),
-                                   Inst->isVolatile()));
+                                   Inst->getType()));
 }
 
 template<typename ImplClass>
@@ -1547,8 +1546,29 @@ SILCloner<ImplClass>::visitSuperMethodInst(SuperMethodInst *Inst) {
     getBuilder().createSuperMethod(getOpLocation(Inst->getLoc()),
                                    getOpValue(Inst->getOperand()),
                                    Inst->getMember(),
-                                   Inst->getType(),
-                                   Inst->isVolatile()));
+                                   Inst->getType()));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitObjCMethodInst(ObjCMethodInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createObjCMethod(getOpLocation(Inst->getLoc()),
+                                  getOpValue(Inst->getOperand()),
+                                  Inst->getMember(),
+                                  Inst->getType()));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitObjCSuperMethodInst(ObjCSuperMethodInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createObjCSuperMethod(getOpLocation(Inst->getLoc()),
+                                       getOpValue(Inst->getOperand()),
+                                       Inst->getMember(),
+                                       Inst->getType()));
 }
 
 template<typename ImplClass>
@@ -1589,8 +1609,7 @@ SILCloner<ImplClass>::visitDynamicMethodInst(DynamicMethodInst *Inst) {
     getBuilder().createDynamicMethod(getOpLocation(Inst->getLoc()),
                                      getOpValue(Inst->getOperand()),
                                      Inst->getMember(),
-                                     getOpType(Inst->getType()),
-                                     Inst->isVolatile()));
+                                     getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>

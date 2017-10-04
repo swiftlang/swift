@@ -4829,17 +4829,13 @@ public:
 /// method lookup.
 class MethodInst : public SingleValueInstruction {
   SILDeclRef Member;
-  bool Volatile;
 public:
   MethodInst(SILInstructionKind Kind, SILDebugLocation DebugLoc, SILType Ty,
-             SILDeclRef Member, bool Volatile = false)
-      : SingleValueInstruction(Kind, DebugLoc, Ty), Member(Member), Volatile(Volatile) {
+             SILDeclRef Member)
+      : SingleValueInstruction(Kind, DebugLoc, Ty), Member(Member) {
   }
 
   SILDeclRef getMember() const { return Member; }
-
-  /// True if this dynamic dispatch is semantically required.
-  bool isVolatile() const { return Volatile; }
 
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(MethodInst)
 };
@@ -4854,8 +4850,8 @@ class ClassMethodInst
   friend SILBuilder;
 
   ClassMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                  SILDeclRef Member, SILType Ty, bool Volatile = false)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member, Volatile) {}
+                  SILDeclRef Member, SILType Ty)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
 };
 
 /// SuperMethodInst - Given the address of a value of class type and a method
@@ -4867,8 +4863,35 @@ class SuperMethodInst
   friend SILBuilder;
 
   SuperMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                  SILDeclRef Member, SILType Ty, bool Volatile = false)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member, Volatile) {}      
+                  SILDeclRef Member, SILType Ty)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
+};
+
+/// ObjCMethodInst - Given the address of a value of class type and a method
+/// constant, extracts the implementation of that method for the dynamic
+/// instance type of the class.
+class ObjCMethodInst
+    : public UnaryInstructionBase<SILInstructionKind::ObjCMethodInst,
+                                  MethodInst>
+{
+  friend SILBuilder;
+
+  ObjCMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
+                 SILDeclRef Member, SILType Ty)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
+};
+
+/// ObjCSuperMethodInst - Given the address of a value of class type and a method
+/// constant, extracts the implementation of that method for the superclass of
+/// the static type of the class.
+class ObjCSuperMethodInst
+  : public UnaryInstructionBase<SILInstructionKind::ObjCSuperMethodInst, MethodInst>
+{
+  friend SILBuilder;
+
+  ObjCSuperMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
+                      SILDeclRef Member, SILType Ty)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
 };
 
 /// WitnessMethodInst - Given a type, a protocol conformance,
@@ -4884,14 +4907,16 @@ class WitnessMethodInst final
   CanType LookupType;
   ProtocolConformanceRef Conformance;
   unsigned NumOperands;
+  bool Volatile;
 
   WitnessMethodInst(SILDebugLocation DebugLoc, CanType LookupType,
                     ProtocolConformanceRef Conformance, SILDeclRef Member,
                     SILType Ty, ArrayRef<SILValue> TypeDependentOperands,
                     bool Volatile = false)
-      : InstructionBase(DebugLoc, Ty, Member, Volatile),
+      : InstructionBase(DebugLoc, Ty, Member),
         LookupType(LookupType), Conformance(Conformance),
-        NumOperands(TypeDependentOperands.size()) {
+        NumOperands(TypeDependentOperands.size()),
+        Volatile(Volatile) {
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                            TypeDependentOperands);
   }
@@ -4915,6 +4940,8 @@ public:
     return getMember().getDecl()->getDeclContext()
              ->getAsProtocolOrProtocolExtensionContext();
   }
+
+  bool isVolatile() const { return Volatile; }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
 
@@ -4949,13 +4976,13 @@ class DynamicMethodInst final
 
   DynamicMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
                     ArrayRef<SILValue> TypeDependentOperands,
-                    SILDeclRef Member, SILType Ty, bool Volatile)
+                    SILDeclRef Member, SILType Ty)
       : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                               TypeDependentOperands, Ty, Member, Volatile) {}
+                               TypeDependentOperands, Ty, Member) {}
 
   static DynamicMethodInst *
   create(SILDebugLocation DebugLoc, SILValue Operand,
-         SILDeclRef Member, SILType Ty, bool Volatile, SILFunction *F,
+         SILDeclRef Member, SILType Ty, SILFunction *F,
          SILOpenedArchetypesState &OpenedArchetypes);
 };
 

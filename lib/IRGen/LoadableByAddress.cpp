@@ -476,6 +476,8 @@ void LargeValueVisitor::mapValueStorage() {
       }
       case SILInstructionKind::ClassMethodInst:
       case SILInstructionKind::SuperMethodInst:
+      case SILInstructionKind::ObjCMethodInst:
+      case SILInstructionKind::ObjCSuperMethodInst:
       case SILInstructionKind::DynamicMethodInst:
       case SILInstructionKind::WitnessMethodInst: {
         // TODO Any more instructions to add here?
@@ -2019,7 +2021,6 @@ static void rewriteFunction(StructLoweringState &pass,
         getNewSILFunctionType(genEnvForMethod, currSILFunctionType, pass.Mod);
     auto member = instr->getMember();
     auto loc = instr->getLoc();
-    bool isVolatile = instr->isVolatile();
     SILBuilder methodBuilder(instr);
     MethodInst *newInstr = nullptr;
 
@@ -2027,13 +2028,13 @@ static void rewriteFunction(StructLoweringState &pass,
     case SILInstructionKind::ClassMethodInst: {
       SILValue selfValue = instr->getOperand(0);
       newInstr = methodBuilder.createClassMethod(loc, selfValue, member,
-                                                 newSILType, isVolatile);
+                                                 newSILType);
       break;
     }
     case SILInstructionKind::SuperMethodInst: {
       SILValue selfValue = instr->getOperand(0);
       newInstr = methodBuilder.createSuperMethod(loc, selfValue, member,
-                                                 newSILType, isVolatile);
+                                                 newSILType);
       break;
     }
     case SILInstructionKind::DynamicMethodInst: {
@@ -2041,15 +2042,15 @@ static void rewriteFunction(StructLoweringState &pass,
       assert(DMI && "ValueKind is Witness Method but dyn_cast failed");
       SILValue selfValue = instr->getOperand(0);
       newInstr = methodBuilder.createDynamicMethod(loc, selfValue, member,
-                                                   newSILType, isVolatile);
+                                                   newSILType);
       break;
     }
     case SILInstructionKind::WitnessMethodInst: {
       auto *WMI = dyn_cast<WitnessMethodInst>(instr);
+      assert(!WMI->isVolatile());
       assert(WMI && "ValueKind is Witness Method but dyn_cast failed");
       newInstr = methodBuilder.createWitnessMethod(
-          loc, WMI->getLookupType(), WMI->getConformance(), member, newSILType,
-          isVolatile);
+          loc, WMI->getLookupType(), WMI->getConformance(), member, newSILType);
       break;
     }
     default:

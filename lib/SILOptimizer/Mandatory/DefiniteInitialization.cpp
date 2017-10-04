@@ -1368,7 +1368,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // be removed.
     //
     // TODO: Implement the SILGen fixes so this can be removed.
-    ClassMethodInst *CMI = nullptr;
+    MethodInst *MI = nullptr;
     ApplyInst *AI = nullptr;
     SILInstruction *Release = nullptr;
     for (auto UI : UCI->getUses()) {
@@ -1379,9 +1379,16 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
           continue;
         }
       }
-      if (auto *TCMI = dyn_cast<ClassMethodInst>(User)) {
-        if (!CMI) {
-          CMI = TCMI;
+      if (auto *CMI = dyn_cast<ClassMethodInst>(User)) {
+        if (!MI) {
+          MI = CMI;
+          continue;
+        }
+      }
+
+      if (auto *OMI = dyn_cast<ObjCMethodInst>(User)) {
+        if (!MI) {
+          MI = OMI;
           continue;
         }
       }
@@ -1395,7 +1402,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
 
       // Not a pattern we recognize, conservatively generate a generic
       // diagnostic.
-      CMI = nullptr;
+      MI = nullptr;
       break;
     }
 
@@ -1405,11 +1412,11 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // That is the only case where we support pattern matching a release.
     if (Release && AI &&
         !AI->getSubstCalleeType()->getExtInfo().hasGuaranteedSelfParam())
-      CMI = nullptr;
+      MI = nullptr;
 
-    if (AI && CMI) {
+    if (AI && MI) {
       // TODO: Could handle many other members more specifically.
-      Method = dyn_cast<FuncDecl>(CMI->getMember().getDecl());
+      Method = dyn_cast<FuncDecl>(MI->getMember().getDecl());
     }
   }
 
@@ -1419,6 +1426,9 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // If this is a method application, produce a nice, specific, error.
     if (auto *CMI = dyn_cast<ClassMethodInst>(Inst->getOperand(0)))
       Method = dyn_cast<FuncDecl>(CMI->getMember().getDecl());
+
+    if (auto *OMI = dyn_cast<ObjCMethodInst>(Inst->getOperand(0)))
+      Method = dyn_cast<FuncDecl>(OMI->getMember().getDecl());
 
     // If this is a direct/devirt method application, check the location info.
     if (auto *Fn = cast<ApplyInst>(Inst)->getReferencedFunction()) {

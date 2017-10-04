@@ -34,14 +34,14 @@ using namespace swift;
 using namespace Lowering;
 
 SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
-                                           SILConstantInfo constantInfo) {
+                                           CanSILFunctionType constantTy) {
   assert(constant.kind != SILDeclRef::Kind::Allocator &&
          "allocating entry point for constructor is never dynamic");
   // Mangle the constant with a _TTD header.
   auto name = constant.mangle(SILDeclRef::ManglingKind::DynamicThunk);
 
   auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
-                                 constantInfo.SILFnType, IsBare, IsTransparent,
+                                 constantTy, IsBare, IsTransparent,
                                  IsSerializable, ProfileCounter(), IsThunk);
 
   if (F->empty()) {
@@ -58,7 +58,7 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
 
 SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
                                               SILDeclRef constant,
-                                              SILConstantInfo constantInfo) {
+                                              CanSILFunctionType constantTy) {
   // If the method is foreign, its foreign thunk will handle the dynamic
   // dispatch for us.
   if (constant.isForeignToNativeThunk()) {
@@ -68,7 +68,7 @@ SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
   }
 
   // Otherwise, we need a dynamic dispatch thunk.
-  SILFunction *F = SGM.getDynamicThunk(constant, constantInfo);
+  SILFunction *F = SGM.getDynamicThunk(constant, constantTy);
 
   return B.createFunctionRef(loc, F);
 }
@@ -99,11 +99,15 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &SGF,
     if (getMethodDispatch(func) == MethodDispatch::Class) {
       // Use the dynamic thunk if dynamic.
       if (vd->isDynamic()) {
-        auto dynamicThunk = SGF.SGM.getDynamicThunk(next, constantInfo);
+        auto dynamicThunk = SGF.SGM.getDynamicThunk(next,
+                                                    constantInfo.SILFnType);
         return SGF.B.createFunctionRef(loc, dynamicThunk);
       }
 
-      return SGF.B.createClassMethod(loc, selfArg, next);
+      auto methodTy = SGF.SGM.Types.getConstantOverrideType(next);
+      assert(!next.isForeign);
+      return SGF.B.createClassMethod(loc, selfArg, next,
+                                     SILType::getPrimitiveObjectType(methodTy));
     }
 
     // If the fully-uncurried reference is to a generic method, look up the

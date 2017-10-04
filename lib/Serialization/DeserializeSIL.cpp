@@ -1896,11 +1896,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::SuperMethodInst:
+  case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::ObjCSuperMethodInst:
   case SILInstructionKind::DynamicMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
-    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),
-    // and an operand.
-    unsigned NextValueIndex = 1;
+    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel), and an operand.
+    unsigned NextValueIndex = 0;
     SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, NextValueIndex);
     SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     assert(ListOfValues.size() >= NextValueIndex + 2 &&
@@ -1908,24 +1909,33 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType operandTy = getSILType(MF->getType(ListOfValues[NextValueIndex]),
                                    (SILValueCategory)ListOfValues[NextValueIndex+1]);
     NextValueIndex += 2;
-    bool IsVolatile = ListOfValues[0] > 0;
 
     switch (OpCode) {
     default: llvm_unreachable("Out of sync with parent switch");
     case SILInstructionKind::ClassMethodInst:
       ResultVal = Builder.createClassMethod(Loc,
                     getLocalValue(ListOfValues[NextValueIndex], operandTy),
-                    DRef, Ty, IsVolatile);
+                    DRef, Ty);
       break;
     case SILInstructionKind::SuperMethodInst:
       ResultVal = Builder.createSuperMethod(Loc,
                     getLocalValue(ListOfValues[NextValueIndex], operandTy),
-                    DRef, Ty, IsVolatile);
+                    DRef, Ty);
+      break;
+    case SILInstructionKind::ObjCMethodInst:
+      ResultVal = Builder.createObjCMethod(Loc,
+                    getLocalValue(ListOfValues[NextValueIndex], operandTy),
+                    DRef, Ty);
+      break;
+    case SILInstructionKind::ObjCSuperMethodInst:
+      ResultVal = Builder.createObjCSuperMethod(Loc,
+                    getLocalValue(ListOfValues[NextValueIndex], operandTy),
+                    DRef, Ty);
       break;
     case SILInstructionKind::DynamicMethodInst:
       ResultVal = Builder.createDynamicMethod(Loc,
                     getLocalValue(ListOfValues[NextValueIndex], operandTy),
-                    DRef, Ty, IsVolatile);
+                    DRef, Ty);
       break;
     }
     break;

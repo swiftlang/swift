@@ -291,7 +291,7 @@ bb0(%0 : $FooClass):
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb3, bb4 // id: %1
 
 bb1(%2 : $Int32):                                   // Preds: bb3 bb4
-  %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : (Bar) -> () -> (), $@convention(objc_method) (Bar) -> ()
+  %101 = objc_method %100 : $Bar, #Bar.foo!1.foreign : (Bar) -> () -> (), $@convention(objc_method) (Bar) -> ()
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb5, bb6 // id: %3
 
 bb2(%4 : $Int32):                                   // Preds: bb5 bb6

@@ -80,7 +80,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // hook point.
   if (derivedDecl->isDynamic()
       && derived.kind != SILDeclRef::Kind::Allocator) {
-    implFn = getDynamicThunk(derived, Types.getConstantInfo(derived));
+    implFn = getDynamicThunk(derived, Types.getConstantInfo(derived).SILFnType);
     implLinkage = SILLinkage::Public;
   } else {
     implFn = getFunction(derived, NotForDefinition);

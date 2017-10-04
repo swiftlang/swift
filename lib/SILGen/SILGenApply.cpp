@@ -559,14 +559,23 @@ public:
         return ManagedValue::forUnmanaged(ref);
       }
 
+      auto methodTy = SGF.SGM.Types.getConstantOverrideType(*constant);
+
       // Otherwise, do the dynamic dispatch inline.
       Scope S(SGF, Loc);
       ManagedValue borrowedSelf =
           SelfValue.getValue().borrow(SGF).getAsSingleValue(SGF);
-      SILValue methodVal =
-          SGF.B.createClassMethod(Loc, borrowedSelf.getValue(), *constant,
-                                  /*volatile*/
-                                  constant->isForeign);
+
+      SILValue methodVal;
+      if (!constant->isForeign) {
+        methodVal = SGF.B.createClassMethod(
+            Loc, borrowedSelf.getValue(), *constant,
+            SILType::getPrimitiveObjectType(methodTy));
+      } else {
+        methodVal = SGF.B.createObjCMethod(
+            Loc, borrowedSelf.getValue(), *constant,
+            SILType::getPrimitiveObjectType(methodTy));
+      }
       return ManagedValue::forUnmanaged(methodVal);
     }
     case Kind::SuperMethod: {
@@ -580,10 +589,14 @@ public:
       auto base = SGF.SGM.Types.getOverriddenVTableEntry(*constant);
       auto constantInfo =
           SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
-      return SGF.B.createSuperMethod(Loc, castValue, *constant,
-                                     constantInfo.getSILType(),
-                                     /*volatile*/
-                                     constant->isForeign);
+
+      if (!constant->isForeign) {
+        return SGF.B.createSuperMethod(Loc, castValue, *constant,
+                                       constantInfo.getSILType());
+      } else {
+        return SGF.B.createObjCSuperMethod(Loc, castValue, *constant,
+                                           constantInfo.getSILType());
+      }
     }
     case Kind::WitnessMethod: {
       auto constantInfo = SGF.getConstantInfo(*constant);
@@ -610,6 +623,7 @@ public:
     }
     case Kind::DynamicMethod: {
       assert(!constant->isCurried);
+      assert(constant->isForeign);
 
       // Lower the substituted type from the AST, which should have any generic
       // parameters in the original signature erased to their upper bounds.
@@ -630,8 +644,7 @@ public:
           SelfValue.getValue().borrow(SGF).getAsSingleValue(SGF);
       SILValue fn = SGF.B.createDynamicMethod(
           Loc, self.getValue(), *constant,
-          SILType::getPrimitiveObjectType(closureType),
-          /*volatile*/ Constant.isForeign);
+          SILType::getPrimitiveObjectType(closureType));
       return ManagedValue::forUnmanaged(fn);
     }
     }
@@ -4381,9 +4394,13 @@ CallEmission::applyPartiallyAppliedSuperMethod(unsigned uncurryLevel,
     Scope S(SGF, loc);
     ManagedValue castValue =
         borrowedCastToOriginalSelfType(SGF, loc, upcastedSelf);
-    superMethod = SGF.B.createSuperMethod(loc, castValue, constant, functionTy,
-                                          /*volatile*/
-                                          constant.isForeign);
+    if (!constant.isForeign) {
+      superMethod = SGF.B.createSuperMethod(loc, castValue, constant,
+                                            functionTy);
+    } else {
+      superMethod = SGF.B.createObjCSuperMethod(loc, castValue, constant,
+                                                functionTy);
+    }
   }
   auto closureTy = SILGenBuilder::getPartialApplyResultType(
       constantInfo.getSILType(), 1, SGF.B.getModule(), subs,

@@ -176,6 +176,9 @@ CalleeList CalleeCache::getCalleeList(SILDeclRef Decl) const {
 
 // Return a callee list for the given witness method.
 CalleeList CalleeCache::getCalleeList(WitnessMethodInst *WMI) const {
+  if (WMI->isVolatile())
+    return CalleeList();
+
   // First attempt to see if we can narrow it down to a single
   // function based on the conformance.
   if (auto *CalleeFn = getSingleCalleeForWitnessMethod(WMI))
@@ -219,6 +222,8 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
 
   case ValueKind::SuperMethodInst:
   case ValueKind::DynamicMethodInst:
+  case ValueKind::ObjCMethodInst:
+  case ValueKind::ObjCSuperMethodInst:
     return CalleeList();
   }
 }

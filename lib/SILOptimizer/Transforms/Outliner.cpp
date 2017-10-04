@@ -187,7 +187,7 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
 ///    %30 = unchecked_take_enum_data_addr %19 : $*Optional<UITextField>, #Optional.some!enumelt.1
 ///    %31 = load %30 : $*UITextField
 ///    strong_retain %31 : $UITextField
-///    %33 = class_method [volatile] %31 : $UITextField, #UITextField.text!getter.1.foreign : (UITextField) -> () -> String?, $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
+///    %33 = objc_method %31 : $UITextField, #UITextField.text!getter.1.foreign : (UITextField) -> () -> String?, $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
 ///    %34 = apply %33(%31) : $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
 ///    switch_enum %34 : $Optional<NSString>, case #Optional.some!enumelt.1: bb8, case #Optional.none!enumelt: bb9
 ///
@@ -212,7 +212,7 @@ class BridgedProperty : public OutlinePattern {
   SILBasicBlock *SomeBB;
   SILBasicBlock *NoneBB;
   BranchInst *Br;
-  ClassMethodInst *ClassMethod;
+  ObjCMethodInst *ObjCMethod;;
   StrongReleaseInst *Release;
   ApplyInst *PropApply;
 
@@ -246,7 +246,7 @@ void BridgedProperty::clearState() {
     SomeBB = nullptr;
     NoneBB = nullptr;
     Br = nullptr;
-    ClassMethod = nullptr;
+    ObjCMethod = nullptr;
     Release = nullptr;
     PropApply = nullptr;
     OutlinedName.clear();
@@ -254,7 +254,7 @@ void BridgedProperty::clearState() {
 
 std::string BridgedProperty::getOutlinedFunctionName() {
   if (OutlinedName.empty()) {
-    OutlinerMangler Mangler(ClassMethod->getMember(), isa<LoadInst>(FirstInst));
+    OutlinerMangler Mangler(ObjCMethod->getMember(), isa<LoadInst>(FirstInst));
     OutlinedName = Mangler.mangle();
   }
   return OutlinedName;
@@ -267,7 +267,7 @@ std::string BridgedProperty::getOutlinedFunctionName() {
 ///
 /// load %30 : *UITextField:
 ///   (@in_guaranteed InstanceType) -> (@owned Optional<BridgedInstanceType>)
-/// class_method [volatile] %31 : UITextField
+/// objc_method %31 : UITextField
 ///   (@unowned InstanceType) -> (@owned Optional<BridgedInstanceType>)
 ///
 CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
@@ -277,7 +277,7 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
       SILParameterInfo(Load->getType().getSwiftRValueType(),
                        ParameterConvention::Indirect_In_Guaranteed));
   else
-    Parameters.push_back(SILParameterInfo(cast<ClassMethodInst>(FirstInst)
+    Parameters.push_back(SILParameterInfo(cast<ObjCMethodInst>(FirstInst)
                                               ->getOperand()
                                               ->getType()
                                               .getSwiftRValueType(),
@@ -301,7 +301,7 @@ BridgedProperty::outline(SILModule &M) {
 
   std::string name = getOutlinedFunctionName();
 
-  auto *Fun = M.getOrCreateFunction(ClassMethod->getLoc(), name,
+  auto *Fun = M.getOrCreateFunction(ObjCMethod->getLoc(), name,
                                     SILLinkage::Shared, FunctionType, IsNotBare,
                                     IsNotTransparent, IsSerializable);
   bool NeedsDefinition = Fun->empty();
@@ -389,7 +389,7 @@ BridgedProperty::outline(SILModule &M) {
     PropApply->setArgument(0, Arg);
   }
   Builder.setInsertionPoint(OldMergeBB);
-  Builder.createReturn(ClassMethod->getLoc(), OldMergeBB->getArgument(0));
+  Builder.createReturn(ObjCMethod->getLoc(), OldMergeBB->getArgument(0));
   return std::make_pair(Fun, std::prev(StartBB->end()));
 }
 
@@ -401,7 +401,7 @@ BridgedProperty::outline(SILModule &M) {
 
 bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It) {
   // Matches:
-  //    %33 = class_method [volatile] %31 : $UITextField, #UITextField.text!getter.1.foreign : (UITextField) -> () -> String?, $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
+  //    %33 = objc_method %31 : $UITextField, #UITextField.text!getter.1.foreign : (UITextField) -> () -> String?, $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
   //    %34 = apply %33(%31) : $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
   //    switch_enum %34 : $Optional<NSString>, case #Optional.some!enumelt.1: bb8, case #Optional.none!enumelt: bb9
   //
@@ -420,22 +420,22 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It) {
   //  bb10(%45 : $Optional<String>):
   //
 
-  // %33 = class_method [volatile] %31 : $UITextField, #UITextField.text!getter.1.foreign
-  ClassMethod = dyn_cast<ClassMethodInst>(It);
+  // %33 = objc_method %31 : $UITextField, #UITextField.text!getter.1.foreign
+  ObjCMethod = dyn_cast<ObjCMethodInst>(It);
   SILValue Instance =
-      FirstInst != ClassMethod ? FirstInst : ClassMethod->getOperand();
-  if (!ClassMethod || !ClassMethod->isVolatile() || !ClassMethod->hasOneUse() ||
-      ClassMethod->getOperand() != Instance)
+      FirstInst != ObjCMethod ? FirstInst : ObjCMethod->getOperand();
+  if (!ObjCMethod || !ObjCMethod->hasOneUse() ||
+      ObjCMethod->getOperand() != Instance)
     return false;
 
   // Don't outline in the outlined function.
-  if (ClassMethod->getFunction()->getName().equals(getOutlinedFunctionName()))
+  if (ObjCMethod->getFunction()->getName().equals(getOutlinedFunctionName()))
     return false;
 
   // %34 = apply %33(%31) : $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
   ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
   PropApply = dyn_cast<ApplyInst>(It);
-  if (!PropApply || PropApply->getCallee() != ClassMethod ||
+  if (!PropApply || PropApply->getCallee() != ObjCMethod ||
       PropApply->getNumArguments() != 1 ||
       PropApply->getArgument(0) != Instance || !PropApply->hasOneUse())
     return false;
@@ -539,7 +539,7 @@ bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
   //    %31 = load %30 : $*UITextField
   //    strong_retain %31 : $UITextField
   // ]
-  //    %33 = class_method [volatile] %31 : $UITextField, #UITextField.text!getter.1.foreign : (UITextField) -> () -> String?, $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
+  //    %33 = objc_method %31 : $UITextField, #UITextField.text!getter.1.foreign : (UITextField) -> () -> String?, $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
   //    %34 = apply %33(%31) : $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
   //    switch_enum %34 : $Optional<NSString>, case #Optional.some!enumelt.1: bb8, case #Optional.none!enumelt: bb9
   //
@@ -565,7 +565,7 @@ bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
   // Otherwise, trying matching from the method call.
   if (!Load) {
     // Try to match without the load/strong_retain prefix.
-    auto *CMI = dyn_cast<ClassMethodInst>(It);
+    auto *CMI = dyn_cast<ObjCMethodInst>(It);
     if (!CMI)
       return false;
     FirstInst = CMI;
@@ -950,8 +950,8 @@ bool BridgedReturn::match(ApplyInst *BridgedCall) {
 }
 
 namespace {
-class ObjcMethodCall : public OutlinePattern {
-  ClassMethodInst *ClassMethod;
+class ObjCMethodCall : public OutlinePattern {
+  ObjCMethodInst *ObjCMethod;
   ApplyInst *BridgedCall;
   SmallVector<BridgedArgument, 4> BridgedArguments;
   std::string OutlinedName;
@@ -963,7 +963,7 @@ public:
   std::pair<SILFunction *, SILBasicBlock::iterator>
   outline(SILModule &M) override;
 
-  ~ObjcMethodCall();
+  ~ObjCMethodCall();
 
 private:
   void clearState();
@@ -972,24 +972,24 @@ private:
 };
 }
 
-ObjcMethodCall::~ObjcMethodCall() {
+ObjCMethodCall::~ObjCMethodCall() {
   clearState();
 }
 
-void ObjcMethodCall::clearState() {
-  ClassMethod = nullptr;
+void ObjCMethodCall::clearState() {
+  ObjCMethod = nullptr;
   BridgedCall = nullptr;
   BridgedArguments.clear();
   OutlinedName.clear();
 }
 
 std::pair<SILFunction *, SILBasicBlock::iterator>
-ObjcMethodCall::outline(SILModule &M) {
+ObjCMethodCall::outline(SILModule &M) {
 
   auto FunctionType = getOutlinedFunctionType(M);
   std::string name = getOutlinedFunctionName();
 
-  auto *Fun = M.getOrCreateFunction(ClassMethod->getLoc(), name,
+  auto *Fun = M.getOrCreateFunction(ObjCMethod->getLoc(), name,
                                     SILLinkage::Shared, FunctionType, IsNotBare,
                                     IsNotTransparent, IsSerializable);
   bool NeedsDefinition = Fun->empty();
@@ -1027,7 +1027,7 @@ ObjcMethodCall::outline(SILModule &M) {
 		if (BridgedReturn)
       BridgedReturn.outline(nullptr, OutlinedCall);
     BridgedCall->eraseFromParent();
-    ClassMethod->eraseFromParent();
+    ObjCMethod->eraseFromParent();
     // Remove bridged argument code.
     for (auto Arg : BridgedArguments)
       Arg.eraseFromParent();
@@ -1035,7 +1035,7 @@ ObjcMethodCall::outline(SILModule &M) {
     return std::make_pair(Fun, I);
   }
 
-  if (ClassMethod->getFunction()->hasUnqualifiedOwnership())
+  if (ObjCMethod->getFunction()->hasUnqualifiedOwnership())
     Fun->setUnqualifiedOwnership();
 
   Fun->setInlineStrategy(NoInline);
@@ -1044,7 +1044,7 @@ ObjcMethodCall::outline(SILModule &M) {
   auto *EntryBB = Fun->createBasicBlock();
 
   // Move the bridged call.
-  EntryBB->moveTo(EntryBB->end(), ClassMethod);
+  EntryBB->moveTo(EntryBB->end(), ObjCMethod);
   EntryBB->moveTo(EntryBB->end(), BridgedCall);
 
   // Create the arguments.
@@ -1068,7 +1068,7 @@ ObjcMethodCall::outline(SILModule &M) {
   }
 
   // Set the method lookup's target.
-  ClassMethod->setOperand(LastArg);
+  ObjCMethod->setOperand(LastArg);
 
   // Create the return and optionally move the bridging code.
   if (!BridgedReturn) {
@@ -1082,28 +1082,28 @@ ObjcMethodCall::outline(SILModule &M) {
   return std::make_pair(Fun, I);
 }
 
-std::string ObjcMethodCall::getOutlinedFunctionName() {
+std::string ObjCMethodCall::getOutlinedFunctionName() {
   if (OutlinedName.empty()) {
-    OutlinerMangler Mangler(ClassMethod->getMember(), &IsBridgedArgument,
+    OutlinerMangler Mangler(ObjCMethod->getMember(), &IsBridgedArgument,
                             BridgedReturn);
     OutlinedName = Mangler.mangle();
   }
   return OutlinedName;
 }
 
-bool ObjcMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
+bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
   clearState();
 
-  ClassMethod = dyn_cast<ClassMethodInst>(I);
-  if (!ClassMethod || !ClassMethod->isVolatile())
+  ObjCMethod = dyn_cast<ObjCMethodInst>(I);
+  if (!ObjCMethod)
     return false;
-  auto *Use = ClassMethod->getSingleUse();
+  auto *Use = ObjCMethod->getSingleUse();
   if (!Use)
     return false;
   BridgedCall = dyn_cast<ApplyInst>(Use->getUser());
   if (!BridgedCall ||
       (!BridgedCall->hasOneUse() && !BridgedCall->use_empty()) ||
-      ClassMethod->getParent() != BridgedCall->getParent())
+      ObjCMethod->getParent() != BridgedCall->getParent())
     return false;
 
   // Collect bridged parameters.
@@ -1136,7 +1136,7 @@ bool ObjcMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
 
   // Don't outline inside the outlined function.
   auto OutlinedName = getOutlinedFunctionName();
-  auto CurrentName = ClassMethod->getFunction()->getName();
+  auto CurrentName = ObjCMethod->getFunction()->getName();
   if (CurrentName.equals(OutlinedName))
     return false;
 
@@ -1151,7 +1151,7 @@ bool ObjcMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
   return !BridgedArguments.empty();
 }
 
-CanSILFunctionType ObjcMethodCall::getOutlinedFunctionType(SILModule &M) {
+CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
   auto FunTy = BridgedCall->getSubstCalleeType();
   SmallVector<SILParameterInfo, 4> Parameters;
   unsigned OrigSigIdx = 0;
@@ -1203,7 +1203,7 @@ namespace {
 /// A collection of outlineable patterns.
 class OutlinePatterns {
   BridgedProperty BridgedPropertyPattern;
-  ObjcMethodCall ObjcMethodCallPattern;
+  ObjCMethodCall ObjCMethodCallPattern;
   llvm::DenseMap<CanType, SILDeclRef> BridgeToObjectiveCCache;
   llvm::DenseMap<CanType, SILDeclRef> BridgeFromObjectiveCache;
 
@@ -1213,8 +1213,8 @@ public:
     if (BridgedPropertyPattern.matchInstSequence(CurInst))
       return &BridgedPropertyPattern;
 
-    if (ObjcMethodCallPattern.matchInstSequence(CurInst))
-      return &ObjcMethodCallPattern;
+    if (ObjCMethodCallPattern.matchInstSequence(CurInst))
+      return &ObjCMethodCallPattern;
 
     return nullptr;
   }
