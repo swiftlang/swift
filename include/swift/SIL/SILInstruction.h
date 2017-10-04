@@ -4870,15 +4870,24 @@ class SuperMethodInst
 /// ObjCMethodInst - Given the address of a value of class type and a method
 /// constant, extracts the implementation of that method for the dynamic
 /// instance type of the class.
-class ObjCMethodInst
-    : public UnaryInstructionBase<SILInstructionKind::ObjCMethodInst,
-                                  MethodInst>
+class ObjCMethodInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::ObjCMethodInst,
+          ObjCMethodInst,
+          MethodInst>
 {
   friend SILBuilder;
 
   ObjCMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
+                 ArrayRef<SILValue> TypeDependentOperands,
                  SILDeclRef Member, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                               TypeDependentOperands, Ty, Member) {}
+
+  static ObjCMethodInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand,
+         SILDeclRef Member, SILType Ty, SILFunction *F,
+         SILOpenedArchetypesState &OpenedArchetypes);
 };
 
 /// ObjCSuperMethodInst - Given the address of a value of class type and a method

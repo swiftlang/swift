@@ -1198,8 +1198,9 @@ public:
 
   ObjCMethodInst *createObjCMethod(SILLocation Loc, SILValue Operand,
                                    SILDeclRef Member, SILType MethodTy) {
-    return insert(new (getModule()) ObjCMethodInst(
-        getSILDebugLocation(Loc), Operand, Member, MethodTy));
+    return insert(ObjCMethodInst::create(
+        getSILDebugLocation(Loc), Operand, Member, MethodTy,
+        &getFunction(), OpenedArchetypes));
   }
 
   ObjCSuperMethodInst *createObjCSuperMethod(SILLocation Loc, SILValue Operand,

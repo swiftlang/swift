@@ -1557,7 +1557,7 @@ SILCloner<ImplClass>::visitObjCMethodInst(ObjCMethodInst *Inst) {
     getBuilder().createObjCMethod(getOpLocation(Inst->getLoc()),
                                   getOpValue(Inst->getOperand()),
                                   Inst->getMember(),
-                                  Inst->getType()));
+                                  getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>

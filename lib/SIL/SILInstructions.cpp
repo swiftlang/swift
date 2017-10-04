@@ -1644,6 +1644,23 @@ DynamicMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                                           Member, Ty);
 }
 
+ObjCMethodInst *
+ObjCMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                       SILDeclRef Member, SILType Ty, SILFunction *F,
+                       SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F->getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
+                               Ty.getSwiftRValueType());
+
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(ObjCMethodInst));
+  return ::new (Buffer) ObjCMethodInst(DebugLoc, Operand,
+                                       TypeDependentOperands,
+                                       Member, Ty);
+}
+
 InitExistentialAddrInst *InitExistentialAddrInst::create(
     SILDebugLocation Loc, SILValue Existential, CanType ConcreteType,
     SILType ConcreteLoweredType, ArrayRef<ProtocolConformanceRef> Conformances,
