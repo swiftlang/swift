@@ -23,6 +23,65 @@ let prefixCount = 1024
 let dropCount = sequenceCount - prefixCount
 let sumCount = prefixCount * (prefixCount - 1) / 2
 
+public let DropLast = [
+  BenchmarkInfo(
+    name: "DropLastCountableRange",
+    runFunction: run_DropLastCountableRange,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastSequence",
+    runFunction: run_DropLastSequence,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnySequence",
+    runFunction: run_DropLastAnySequence,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnySeqCntRange",
+    runFunction: run_DropLastAnySeqCntRange,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnySeqCRangeIter",
+    runFunction: run_DropLastAnySeqCRangeIter,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnyCollection",
+    runFunction: run_DropLastAnyCollection,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastArray",
+    runFunction: run_DropLastArray,
+    tags: [.validation, .api, .Array]),
+  BenchmarkInfo(
+    name: "DropLastCountableRangeLazy",
+    runFunction: run_DropLastCountableRangeLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastSequenceLazy",
+    runFunction: run_DropLastSequenceLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnySequenceLazy",
+    runFunction: run_DropLastAnySequenceLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnySeqCntRangeLazy",
+    runFunction: run_DropLastAnySeqCntRangeLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnySeqCRangeIterLazy",
+    runFunction: run_DropLastAnySeqCRangeIterLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnyCollectionLazy",
+    runFunction: run_DropLastAnyCollectionLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastArrayLazy",
+    runFunction: run_DropLastArrayLazy,
+    tags: [.validation, .api]),
+]
+
 @inline(never)
 public func run_DropLastCountableRange(_ N: Int) {
   let s = 0..<sequenceCount

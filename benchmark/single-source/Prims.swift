@@ -22,6 +22,11 @@
 // update the heap fast when we add a new node to the tree.
 import TestsUtils
 
+public let Prims = BenchmarkInfo(
+  name: "Prims",
+  runFunction: run_Prims,
+  tags: [.validation, .algorithm])
+
 class PriorityQueue {
   final var heap: Array<EdgeCost>
   final var graphIndexToHeapIndexMap: Array<Int?>

@@ -12,6 +12,22 @@
 
 import TestsUtils
 
+public let SubstringTest = [
+  BenchmarkInfo(name: "EqualStringSubstring", runFunction: run_EqualStringSubstring, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "EqualSubstringString", runFunction: run_EqualSubstringString, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "EqualSubstringSubstring", runFunction: run_EqualSubstringSubstring, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "EqualSubstringSubstringGenericEquatable", runFunction: run_EqualSubstringSubstringGenericEquatable, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "LessSubstringSubstring", runFunction: run_LessSubstringSubstring, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "LessSubstringSubstringGenericComparable", runFunction: run_LessSubstringSubstringGenericComparable, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "StringFromLongWholeSubstring", runFunction: run_StringFromLongWholeSubstring, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "StringFromLongWholeSubstringGeneric", runFunction: run_StringFromLongWholeSubstringGeneric, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringComparable", runFunction: run_SubstringComparable, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringEqualString", runFunction: run_SubstringEqualString, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringEquatable", runFunction: run_SubstringEquatable, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringFromLongString", runFunction: run_SubstringFromLongString, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringFromLongStringGeneric", runFunction: run_SubstringFromLongStringGeneric, tags: [.validation, .api, .String]),
+]
+
 // A string that doesn't fit in small string storage and doesn't fit in Latin-1
 let longWide = "fὢasὢodὢijὢadὢolὢsjὢalὢsdὢjlὢasὢdfὢijὢliὢsdὢjøὢslὢdiὢalὢiὢ"
 

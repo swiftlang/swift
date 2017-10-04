@@ -19,6 +19,11 @@
 // Thus, e = N / Nempty.
 import TestsUtils
 
+public let MonteCarloE = BenchmarkInfo(
+  name: "MonteCarloE",
+  runFunction: run_MonteCarloE,
+  tags: [.validation, .algorithm])
+
 public func run_MonteCarloE(scale: Int) {
   let N = 200000*scale
   var intervals = [Bool](repeating: false, count: N)

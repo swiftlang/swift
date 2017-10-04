@@ -14,6 +14,11 @@
 // Given an array and a number C, find elements A and B such that A+B = C
 import TestsUtils
 
+public let TwoSum = BenchmarkInfo(
+  name: "TwoSum",
+  runFunction: run_TwoSum,
+  tags: [.validation, .api, .Dictionary, .Array, .algorithm])
+
 let array = [
   959,  81, 670, 727, 416, 171, 401, 398, 707, 596, 200,   9, 414,  98,  43,
   352, 752, 158, 593, 418, 240, 912, 542, 445, 429, 456, 993, 618,  52, 649,

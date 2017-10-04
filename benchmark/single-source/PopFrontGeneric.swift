@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let PopFrontArrayGeneric = BenchmarkInfo(
+  name: "PopFrontArrayGeneric",
+  runFunction: run_PopFrontArrayGeneric,
+  tags: [.validation, .api, .Array])
+
 let reps = 1
 let arrayCount = 1024
 

@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let UTF8Decode = BenchmarkInfo(
+  name: "UTF8Decode",
+  runFunction: run_UTF8Decode,
+  tags: [.validation, .api, .String])
+
 @inline(never)
 public func run_UTF8Decode(_ N: Int) {
   // 1-byte sequences

@@ -89,8 +89,44 @@ let baseMultiplier = 10_000
 let unicodeScalarsMultiplier = baseMultiplier
 let charactersMultiplier = baseMultiplier / 5
 
-% for Name in ["ascii", "utf16", "tweet", "japanese", "chinese", "korean", "russian", "punctuated", "punctuatedJapanese"]:
-%   for Kind in ["unicodeScalars", "characters"]:
+% Names = ["ascii", "utf16", "tweet", "japanese", "chinese", "korean", "russian", "punctuated", "punctuatedJapanese"]
+% Kinds = ["unicodeScalars", "characters"]
+% Directions = ["", "_Backwards"]
+
+// An extended benchmark suite exercising finer-granularity behavior of our
+// Strings.
+public var StringWalk = [
+  BenchmarkInfo(
+    name: "StringWalk",
+    runFunction: run_StringWalk,
+    tags: [.validation, .api, .String]),
+
+% for Name in Names:
+%   for Direction in Directions:
+%     for Kind in Kinds:
+
+  BenchmarkInfo(
+    name: "StringWalk_${Name}_${Kind}${Direction}",
+    runFunction: run_StringWalk_${Name}_${Kind}${Direction},
+    tags: [.api, .String, .skip]),
+
+%     end # Kinds
+
+  BenchmarkInfo(
+    name: "CharIteration_${Name}_unicodeScalars${Direction}",
+    runFunction: run_CharIteration_${Name}_unicodeScalars${Direction},
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_${Name}_unicodeScalars${Direction}",
+    runFunction: run_CharIndexing_${Name}_unicodeScalars${Direction},
+    tags: [.validation, .api, .String]),
+%   end # Directions
+% end # Names
+]
+
+% for Name in Names:
+%   for Kind in Kinds:
 
 @inline(never)
 public func run_StringWalk_${Name}_${Kind}(_ N: Int) {
@@ -105,8 +141,6 @@ public func run_StringWalk_${Name}_${Kind}_Backwards(_ N: Int) {
     count_${Kind}_rev(${Name}.${Kind}.reversed())
   }
 }
-
-
 
 %   end
 

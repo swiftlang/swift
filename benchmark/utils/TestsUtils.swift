@@ -65,6 +65,9 @@ public enum BenchmarkCategory : String {
   // reimplementing or call into code paths that have known opportunities for
   // significant optimization.
   case cpubench
+
+  // Explicit skip marker
+  case skip
 }
 
 public struct BenchmarkInfo {

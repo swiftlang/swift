@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let DictionaryGroup = [
+  BenchmarkInfo(name: "DictionaryGroup", runFunction: run_DictionaryGroup, tags: [.validation, .api, .Dictionary]),
+  BenchmarkInfo(name: "DictionaryGroupOfObjects", runFunction: run_DictionaryGroupOfObjects, tags: [.validation, .api, .Dictionary]),
+]
+
 let count = 10_000
 let result = count / 10
 
