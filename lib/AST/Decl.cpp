@@ -1459,7 +1459,6 @@ bool AbstractStorageDecl::hasFixedLayout() const {
   switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Resilient:
     return false;
-  case ResilienceStrategy::Fragile:
   case ResilienceStrategy::Default:
     return true;
   }
@@ -2217,7 +2216,6 @@ bool NominalTypeDecl::hasFixedLayout() const {
   switch (getParentModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Resilient:
     return false;
-  case ResilienceStrategy::Fragile:
   case ResilienceStrategy::Default:
     return true;
   }

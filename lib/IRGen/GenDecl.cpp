@@ -1338,8 +1338,8 @@ bool LinkEntity::isFragile(ForDefinition_t isDefinition) const {
     auto conformance = getProtocolConformance();
 
     auto conformanceModule = conformance->getDeclContext()->getParentModule();
-    auto isCompletelySerialized = conformanceModule->getResilienceStrategy() ==
-                                  ResilienceStrategy::Fragile;
+    auto isCompletelySerialized =
+        conformanceModule->getOptions().SILSerializeWitnessTables;
 
     // The conformance is fragile if it is in a -sil-serialize-all module.
     return isCompletelySerialized;
