@@ -121,13 +121,9 @@ public:
   NormalProtocolConformance *lastEmittedConformance = nullptr;
 
   SILFunction *emitTopLevelFunction(SILLocation Loc);
-  
+
   size_t anonymousSymbolCounter = 0;
-  
-  /// If true, all functions and globals are made fragile. Currently only used
-  /// for compiling the stdlib.
-  bool isMakeModuleFragile() const { return false; }
-  
+
   Optional<SILDeclRef> StringToNSStringFn;
   Optional<SILDeclRef> NSStringToStringFn;
   Optional<SILDeclRef> ArrayToNSArrayFn;

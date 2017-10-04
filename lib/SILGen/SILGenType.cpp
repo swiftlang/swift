@@ -375,9 +375,8 @@ public:
     Serialized = IsNotSerialized;
 
     // Serialize the witness table if we're serializing everything with
-    // -sil-serialize-all....
-    if (SGM.isMakeModuleFragile() ||
-        SGM.M.getOptions().SILSerializeWitnessTables)
+    // -sil-serialize-witness-tables....
+    if (SGM.M.getOptions().SILSerializeWitnessTables)
       Serialized = IsSerialized;
 
     // ... or if the conformance itself thinks it should be.
@@ -483,9 +482,7 @@ public:
     if (witnessSerialized &&
         fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
       witnessLinkage = SILLinkage::Public;
-      witnessSerialized = (SGM.isMakeModuleFragile()
-                           ? IsSerialized
-                           : IsNotSerialized);
+      witnessSerialized = IsNotSerialized;
     } else {
       // This is the "real" rule; the above case should go away once we
       // figure out what's going on.
