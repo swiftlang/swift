@@ -2814,7 +2814,7 @@ WARNING(expression_unused_result_call,none,
 WARNING(expression_unused_result_operator,none,
         "result of operator %0 is unused", (DeclName))
 WARNING(expression_unused_result_unknown, none,
-        "result of call is unused, but produces %0", (Type))
+        "result of call to function returning %0 is unused", (Type))
 WARNING(expression_unused_result, none,
         "expression of type %0 is unused", (Type))
 WARNING(expression_unused_init_result,none,
