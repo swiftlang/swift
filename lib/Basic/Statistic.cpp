@@ -87,6 +87,8 @@ auxName(StringRef ModuleName,
   if (InputName.empty()) {
     InputName = "all";
   }
+  // Dispose of path prefix, which might make composite name too long.
+  InputName = path::filename(InputName);
   if (OptType.empty()) {
     OptType = "Onone";
   }
