@@ -1158,12 +1158,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       break;
 
-    // BEGIN APPLE-ONLY OUTPUT ACTIONS
     case options::OPT_index_file:
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       OI.CompilerOutputType = types::TY_IndexData;
       break;
-    // END APPLE-ONLY OUTPUT ACTIONS
 
     case options::OPT_update_code:
       OI.CompilerOutputType = types::TY_Remapping;
