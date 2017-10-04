@@ -167,6 +167,8 @@ public:
                                     const OutputInfo &OI) const;
 
   /// Return the default language type to use for the given extension.
+  /// If the extension is empty or is otherwise not recognized, return
+  /// the invalid type \c TY_INVALID.
   virtual types::ID lookupTypeForExtension(StringRef Ext) const;
 
   /// Check whether a clang library with a given name exists.
