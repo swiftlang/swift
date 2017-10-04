@@ -27,12 +27,35 @@ using namespace Lowering;
 STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 
 //===----------------------------------------------------------------------===//
+//                                  Utility
+//===----------------------------------------------------------------------===//
+
+/// \return True if the function \p F should be imported into the current
+/// module.
+static bool shouldImportFunction(SILFunction *F) {
+  // Skip functions that are marked with the 'no import' tag. These
+  // are functions that we don't want to copy from the module.
+  if (F->hasSemanticsAttr("stdlib_binary_only")) {
+    // If we are importing a function declaration mark it as external since we
+    // are not importing the body.
+    if (F->isExternalDeclaration())
+      F->setLinkage(SILLinkage::PublicExternal);
+    return false;
+  }
+
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 //                               Linker Helpers
 //===----------------------------------------------------------------------===//
 
 /// Process F, recursively deserializing any thing F may reference.
 bool SILLinkerVisitor::processFunction(SILFunction *F) {
   if (Mode == LinkingMode::LinkNone)
+    return false;
+
+  if (!shouldImportFunction(F))
     return false;
 
   // If F is a declaration, first deserialize it.
@@ -311,6 +334,9 @@ bool SILLinkerVisitor::process() {
   while (!Worklist.empty()) {
     auto *Fn = Worklist.pop_back_val();
 
+    if (!shouldImportFunction(Fn))
+      continue;
+
     DEBUG(llvm::dbgs() << "Process imports in function: "
                        << Fn->getName() << "\n");
 
@@ -319,6 +345,9 @@ bool SILLinkerVisitor::process() {
         // Should we try linking?
         if (visit(&I)) {
           for (auto *F : FunctionDeserializationWorklist) {
+
+            if (!shouldImportFunction(F))
+              continue;
 
             DEBUG(llvm::dbgs() << "Imported function: "
                                << F->getName() << "\n");

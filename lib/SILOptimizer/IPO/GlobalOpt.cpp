@@ -1353,9 +1353,11 @@ void SILGlobalOpt::replaceFindStringCall(ApplyInst *FindStringCall) {
   if (!FD)
     return;
 
-  SILDeclRef declRef(FD, SILDeclRef::Kind::Func);
-  SILFunction *replacementFunc = Module->getOrCreateFunction(
-      FindStringCall->getLoc(), declRef, NotForDefinition);
+  std::string Mangled = SILDeclRef(FD, SILDeclRef::Kind::Func).mangle();
+  SILFunction *replacementFunc = Module->findFunction(Mangled,
+                                                    SILLinkage::PublicExternal);
+  if (!replacementFunc)
+    return;
 
   SILFunctionType *FTy = replacementFunc->getLoweredFunctionType();
   if (FTy->getNumParameters() != 3)
@@ -1365,7 +1367,6 @@ void SILGlobalOpt::replaceFindStringCall(ApplyInst *FindStringCall) {
   NominalTypeDecl *cacheDecl = cacheType.getNominalOrBoundGenericNominal();
   if (!cacheDecl)
     return;
-
   SILType wordTy = cacheType.getFieldType(
                             cacheDecl->getStoredProperties().front(), *Module);
 

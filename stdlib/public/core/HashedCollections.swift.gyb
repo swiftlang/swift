@@ -2862,7 +2862,9 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 ///
 /// - Precondition: `SwiftKey` and `SwiftValue` are bridged to Objective-C,
 ///   and at least one of them requires non-trivial bridging.
+@_inlineable // FIXME(sil-serialize-all)
 @inline(never)
+@_semantics("stdlib_binary_only")
 public func _dictionaryBridgeToObjectiveC<
   SwiftKey, SwiftValue, ObjCKey, ObjCValue
 >(
