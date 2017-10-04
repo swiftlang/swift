@@ -1283,9 +1283,7 @@ struct TargetNominalTypeDescriptor {
     } Enum;
   };
   
-  RelativeDirectPointerIntPair<TargetGenericMetadata<Runtime>,
-                               NominalTypeKind, /*Nullable*/ true>
-    SadnessAndKind;
+  NominalTypeKind Kind;
 
   using NonGenericMetadataAccessFunction = const Metadata *();
 
@@ -1305,7 +1303,7 @@ struct TargetNominalTypeDescriptor {
   }
 
   NominalTypeKind getKind() const {
-    return SadnessAndKind.getInt();
+    return Kind;
   }
 
   int32_t offsetToNameOffset() const {
