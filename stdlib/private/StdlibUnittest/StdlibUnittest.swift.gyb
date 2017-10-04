@@ -627,7 +627,7 @@ func _stdlib_installTrapInterceptor()
 #endif
 
 // Avoid serializing references to objc_setUncaughtExceptionHandler in SIL.
-@inline(never) @_semantics("stdlib_binary_only")
+@inline(never)
 func _childProcess() {
   _stdlib_installTrapInterceptor()
 
