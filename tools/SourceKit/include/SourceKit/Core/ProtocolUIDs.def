@@ -107,6 +107,7 @@ KEY(NameKind, "key.namekind")
 KEY(LocalizationKey, "key.localization_key")
 KEY(IsZeroArgSelector, "key.is_zero_arg_selector")
 KEY(SwiftVersion, "key.swift_version")
+KEY(Value, "key.value")
 
 KEY(EnableDiagnostics, "key.enablediagnostics")
 KEY(GroupName, "key.groupname")
@@ -181,6 +182,7 @@ REQUEST(BuildSettingsRegister, "source.request.buildsettings.register")
 REQUEST(ModuleGroups, "source.request.module.groups")
 REQUEST(NameTranslation, "source.request.name.translation")
 REQUEST(MarkupToXML, "source.request.convert.markup.xml")
+REQUEST(Statistics, "source.request.statistics")
 
 REQUEST(SyntacticRename, "source.request.syntacticrename")
 REQUEST(FindRenameRanges, "source.request.find-syntactic-rename-ranges")
@@ -339,6 +341,9 @@ KIND(Definition, "source.syntacticrename.definition")
 KIND(Reference, "source.syntacticrename.reference")
 KIND(Call, "source.syntacticrename.call")
 KIND(Unknown, "source.syntacticrename.unknown")
+
+KIND(StatNumRequests, "source.statistic.num-requests")
+KIND(StatNumSemaRequests, "source.statistic.num-semantic-requests")
 
 #undef KIND
 #undef REQUEST

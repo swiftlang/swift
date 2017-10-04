@@ -158,13 +158,15 @@ void InvocationOptions::profile(llvm::FoldingSetNodeID &ID) const {
 namespace SourceKit {
   struct ASTUnit::Implementation {
     const uint64_t Generation;
+    SwiftStatistics &Stats;
     SmallVector<ImmutableTextSnapshotRef, 4> Snapshots;
     EditorDiagConsumer CollectDiagConsumer;
     CompilerInstance CompInst;
     OwnedResolver TypeResolver{ nullptr, nullptr };
     WorkQueue Queue{ WorkQueue::Dequeuing::Serial, "sourcekit.swift.ConsumeAST" };
 
-    Implementation(uint64_t Generation) : Generation(Generation) {}
+    Implementation(uint64_t Generation, SwiftStatistics &Statistics)
+        : Generation(Generation), Stats(Statistics) {}
 
     void consumeAsync(SwiftASTConsumerRef ASTConsumer, ASTUnitRef ASTRef);
   };
@@ -185,10 +187,14 @@ namespace SourceKit {
     });
   }
 
-  ASTUnit::ASTUnit(uint64_t Generation) : Impl(*new Implementation(Generation)) {
+  ASTUnit::ASTUnit(uint64_t Generation, SwiftStatistics &Stats)
+      : Impl(*new Implementation(Generation, Stats)) {
+    auto numASTs = ++Stats.numASTsInMem;
+    Stats.maxASTsInMem.updateMax(numASTs);
   }
 
   ASTUnit::~ASTUnit() {
+    --Impl.Stats.numASTsInMem;
     delete &Impl;
   }
 
@@ -307,10 +313,12 @@ struct CacheKeyHashInfo<ASTKey> {
 
 struct SwiftASTManager::Implementation {
   explicit Implementation(SwiftLangSupport &LangSupport)
-    : EditorDocs(LangSupport.getEditorDocuments()),
-      RuntimeResourcePath(LangSupport.getRuntimeResourcePath()) { }
+      : EditorDocs(LangSupport.getEditorDocuments()),
+        Stats(LangSupport.getStatistics()),
+        RuntimeResourcePath(LangSupport.getRuntimeResourcePath()) {}
 
   SwiftEditorDocumentFileMap &EditorDocs;
+  SwiftStatistics &Stats;
   std::string RuntimeResourcePath;
   SourceManager SourceMgr;
   Cache<ASTKey, ASTProducerRef> ASTCache{ "sourcekit.swift.ASTCache" };
@@ -488,6 +496,7 @@ void SwiftASTManager::processASTAsync(SwiftInvocationRef InvokRef,
 
   if (ASTUnitRef Unit = Producer->getExistingAST()) {
     if (ASTConsumer->canUseASTWithSnapshots(Unit->getSnapshots())) {
+      ++Impl.Stats.numASTsUsedWithSnaphots;
       Unit->Impl.consumeAsync(std::move(ASTConsumer), Unit);
       return;
     }
@@ -616,6 +625,8 @@ ASTUnitRef ASTProducer::getASTUnitImpl(SwiftASTManager::Implementation &MgrImpl,
       ASTProducerRef ThisProducer = this;
       MgrImpl.ASTCache.set(InvokRef->Impl.Key, ThisProducer);
     }
+  } else {
+    ++MgrImpl.Stats.numASTCacheHits;
   }
 
   return AST;
@@ -732,6 +743,8 @@ static std::atomic<uint64_t> ASTUnitGeneration{ 0 };
 ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
                                       ArrayRef<ImmutableTextSnapshotRef> Snapshots,
                                       std::string &Error) {
+  ++MgrImpl.Stats.numASTBuilds;
+
   Stamps.clear();
   DependencyStamps.clear();
 
@@ -770,7 +783,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     TraceInfo.Args.Args = Opts.Args;
   }
 
-  ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration);
+  ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration, MgrImpl.Stats);
   for (auto &Content : Contents) {
     if (Content.Snapshot)
       ASTRef->Impl.Snapshots.push_back(Content.Snapshot);
