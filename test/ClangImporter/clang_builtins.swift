@@ -27,6 +27,7 @@ func test() {
   // CHECK-4: [[@LINE-2]]:16: error: cannot convert value of type '({{.+}}) -> Int'{{( [(]aka .+[)])?}} to specified type 'Int'
 }
 
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 // These functions aren't consistently available across platforms, so only
 // test for them on Apple platforms.
 func testApple() {
@@ -44,3 +45,4 @@ func testApple() {
   // CHECK-objc-3: [[@LINE-1]]:16: error: cannot convert value of type '({{.+}}) -> Int'{{( [(]aka .+[)])?}} to specified type 'Int'
   // CHECK-objc-4: [[@LINE-2]]:16: error: cannot convert value of type '({{.+}}) -> Int'{{( [(]aka .+[)])?}} to specified type 'Int'
 }
+#endif
