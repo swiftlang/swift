@@ -16,6 +16,11 @@
 import Foundation
 import TestsUtils
 
+public let BitCount = BenchmarkInfo(
+  name: "BitCount",
+  runFunction: run_BitCount,
+  tags: [.validation, .algorithm])
+
 func countBitSet(_ num: Int) -> Int {
   let bits = MemoryLayout<Int>.size * 8
   var cnt: Int = 0

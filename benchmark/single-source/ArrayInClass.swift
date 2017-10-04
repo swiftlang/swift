@@ -10,6 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+import TestsUtils
+public let ArrayInClass = BenchmarkInfo(
+  name: "ArrayInClass",
+  runFunction: run_ArrayInClass,
+  tags: [.validation, .api, .Array])
+
 class ArrayContainer {
   final var arr : [Int]
 

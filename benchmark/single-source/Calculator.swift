@@ -13,6 +13,11 @@
 import TestsUtils
 import Foundation
 
+public let Calculator = BenchmarkInfo(
+  name: "Calculator",
+  runFunction: run_Calculator,
+  tags: [.validation])
+
 @inline(never)
 func my_atoi_impl(_ input : String) -> Int {
   switch input {

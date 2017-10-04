@@ -17,6 +17,11 @@ import Glibc
 import Darwin
 #endif
 
+public let Walsh = BenchmarkInfo(
+  name: "Walsh",
+  runFunction: run_Walsh,
+  tags: [.validation, .algorithm])
+
 func IsPowerOfTwo(_ x: Int) -> Bool { return (x & (x - 1)) == 0 }
 
 // Fast Walsh Hadamard Transform

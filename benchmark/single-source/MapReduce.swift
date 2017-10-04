@@ -13,6 +13,21 @@
 import TestsUtils
 import Foundation
 
+public let MapReduce = [
+  BenchmarkInfo(name: "MapReduce", runFunction: run_MapReduce, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "MapReduceAnyCollection", runFunction: run_MapReduceAnyCollection, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "MapReduceAnyCollectionShort", runFunction: run_MapReduceAnyCollectionShort, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "MapReduceClass", runFunction: run_MapReduceClass, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "MapReduceClassShort", runFunction: run_MapReduceClassShort, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "MapReduceLazyCollection", runFunction: run_MapReduceLazyCollection, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "MapReduceLazyCollectionShort", runFunction: run_MapReduceLazyCollectionShort, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "MapReduceLazySequence", runFunction: run_MapReduceLazySequence, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "MapReduceSequence", runFunction: run_MapReduceSequence, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "MapReduceShort", runFunction: run_MapReduceShort, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "MapReduceShortString", runFunction: run_MapReduceShortString, tags: [.validation, .algorithm, .String]),
+  BenchmarkInfo(name: "MapReduceString", runFunction: run_MapReduceString, tags: [.validation, .algorithm, .String]),
+]
+
 @inline(never)
 public func run_MapReduce(_ N: Int) {
   var numbers = [Int](0..<1000)
