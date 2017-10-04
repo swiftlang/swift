@@ -1185,17 +1185,27 @@ public:
   }
 
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
-                                     SILDeclRef Member, SILType MethodTy,
-                                     bool Volatile = false) {
+                                     SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) ClassMethodInst(
-        getSILDebugLocation(Loc), Operand, Member, MethodTy, Volatile));
+        getSILDebugLocation(Loc), Operand, Member, MethodTy));
   }
 
   SuperMethodInst *createSuperMethod(SILLocation Loc, SILValue Operand,
-                                     SILDeclRef Member, SILType MethodTy,
-                                     bool Volatile = false) {
+                                     SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) SuperMethodInst(
-        getSILDebugLocation(Loc), Operand, Member, MethodTy, Volatile));
+        getSILDebugLocation(Loc), Operand, Member, MethodTy));
+  }
+
+  ObjCMethodInst *createObjCMethod(SILLocation Loc, SILValue Operand,
+                                   SILDeclRef Member, SILType MethodTy) {
+    return insert(new (getModule()) ObjCMethodInst(
+        getSILDebugLocation(Loc), Operand, Member, MethodTy));
+  }
+
+  ObjCSuperMethodInst *createObjCSuperMethod(SILLocation Loc, SILValue Operand,
+                                             SILDeclRef Member, SILType MethodTy) {
+    return insert(new (getModule()) ObjCSuperMethodInst(
+        getSILDebugLocation(Loc), Operand, Member, MethodTy));
   }
 
   WitnessMethodInst *createWitnessMethod(SILLocation Loc, CanType LookupTy,
@@ -1208,10 +1218,9 @@ public:
   }
 
   DynamicMethodInst *createDynamicMethod(SILLocation Loc, SILValue Operand,
-                                         SILDeclRef Member, SILType MethodTy,
-                                         bool Volatile = false) {
+                                         SILDeclRef Member, SILType MethodTy) {
     return insert(DynamicMethodInst::create(
-        getSILDebugLocation(Loc), Operand, Member, MethodTy, Volatile,
+        getSILDebugLocation(Loc), Operand, Member, MethodTy,
         &getFunction(), OpenedArchetypes));
   }
 

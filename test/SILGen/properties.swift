@@ -992,7 +992,7 @@ class ClassWithLetProperty {
   // This property is marked dynamic, so go through the getter, always.
   func ReturnDynamicConstant() -> Int { return q }
 // CHECK-LABEL: sil hidden @_T010properties20ClassWithLetPropertyC21ReturnDynamicConstant{{[_0-9a-zA-Z]*}}F
-// CHECK: class_method [volatile] %0 : $ClassWithLetProperty, #ClassWithLetProperty.q!getter.1.foreign
+// CHECK: objc_method %0 : $ClassWithLetProperty, #ClassWithLetProperty.q!getter.1.foreign
 }
 
 

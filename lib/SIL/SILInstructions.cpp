@@ -1629,8 +1629,7 @@ WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
 
 DynamicMethodInst *
 DynamicMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
-                          SILDeclRef Member, SILType Ty, bool Volatile,
-                          SILFunction *F,
+                          SILDeclRef Member, SILType Ty, SILFunction *F,
                           SILOpenedArchetypesState &OpenedArchetypes) {
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
@@ -1642,7 +1641,7 @@ DynamicMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   void *Buffer = Mod.allocateInst(size, alignof(DynamicMethodInst));
   return ::new (Buffer) DynamicMethodInst(DebugLoc, Operand,
                                           TypeDependentOperands,
-                                          Member, Ty, Volatile);
+                                          Member, Ty);
 }
 
 InitExistentialAddrInst *InitExistentialAddrInst::create(

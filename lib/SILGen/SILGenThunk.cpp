@@ -105,6 +105,7 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &SGF,
       }
 
       auto methodTy = SGF.SGM.Types.getConstantOverrideType(next);
+      assert(!next.isForeign);
       return SGF.B.createClassMethod(loc, selfArg, next,
                                      SILType::getPrimitiveObjectType(methodTy));
     }

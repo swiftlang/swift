@@ -32,7 +32,7 @@ extension Sub {
     // CHECK: [[SELF_COPY_CAST:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
     // CHECK: [[BORROWED_SELF_COPY_CAST:%.*]] = begin_borrow [[SELF_COPY_CAST]]
     // CHECK: [[CAST_BACK:%.*]] = unchecked_ref_cast [[BORROWED_SELF_COPY_CAST]] : $Base to $Sub
-    // CHECK: [[SUPER_METHOD:%.*]] = super_method [volatile] [[CAST_BACK]] : $Sub, #Base.prop!getter.1.foreign
+    // CHECK: [[SUPER_METHOD:%.*]] = objc_super_method [[CAST_BACK]] : $Sub, #Base.prop!getter.1.foreign
     // CHECK: end_borrow [[BORROWED_SELF_COPY_CAST]]
     // CHECK: [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[SELF_COPY_CAST]])
     // CHECK: bb3(
@@ -66,7 +66,7 @@ extension Sub {
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
     // CHECK:   [[BORROWED_UPCAST_SELF_COPY:%.*]] = begin_borrow [[UPCAST_SELF_COPY]]
     // CHECK:   [[CAST_BACK:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF_COPY]] : $Base to $Sub
-    // CHECK:   [[GET_SUPER_METHOD:%.*]] = super_method [volatile] [[CAST_BACK]] : $Sub, #Base.prop!getter.1.foreign : (Base) -> () -> String!, $@convention(objc_method) (Base) -> @autoreleased Optional<NSString>
+    // CHECK:   [[GET_SUPER_METHOD:%.*]] = objc_super_method [[CAST_BACK]] : $Sub, #Base.prop!getter.1.foreign : (Base) -> () -> String!, $@convention(objc_method) (Base) -> @autoreleased Optional<NSString>
     // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY]] from [[UPCAST_SELF_COPY]]
     // CHECK:   [[OLD_NSSTRING:%.*]] = apply [[GET_SUPER_METHOD]]([[UPCAST_SELF_COPY]])
 
@@ -77,7 +77,7 @@ extension Sub {
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
     // CHECK:   [[BORROWED_UPCAST_SELF:%.*]] = begin_borrow [[UPCAST_SELF_COPY]] : $Base
     // CHECK:   [[SUPERREF_DOWNCAST:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF]] : $Base to $Sub
-    // CHECK:   [[SET_SUPER_METHOD:%.*]] = super_method [volatile] [[SUPERREF_DOWNCAST]] : $Sub, #Base.prop!setter.1.foreign : (Base) -> (String!) -> (), $@convention(objc_method) (Optional<NSString>, Base) -> ()
+    // CHECK:   [[SET_SUPER_METHOD:%.*]] = objc_super_method [[SUPERREF_DOWNCAST]] : $Sub, #Base.prop!setter.1.foreign : (Base) -> (String!) -> (), $@convention(objc_method) (Optional<NSString>, Base) -> ()
     // CHECK:    end_borrow [[BORROWED_UPCAST_SELF]]
     // CHECK:   [[BORROWED_NEW_VALUE:%.*]] = begin_borrow [[NEW_VALUE]]
     // CHECK:   [[NEW_VALUE_COPY:%.*]] = copy_value [[BORROWED_NEW_VALUE]]
@@ -111,7 +111,7 @@ extension Sub {
 func testOverrideProperty(_ obj: Sub) {
   // CHECK: bb0([[ARG:%.*]] : $Sub):
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: = class_method [volatile] [[BORROWED_ARG]] : $Sub, #Sub.prop!setter.1.foreign : (Sub) -> (String!) -> ()
+  // CHECK: = objc_method [[BORROWED_ARG]] : $Sub, #Sub.prop!setter.1.foreign : (Sub) -> (String!) -> ()
   obj.prop = "abc"
 } // CHECK: } // end sil function '_T015objc_extensions20testOverridePropertyyAA3SubCF'
 
@@ -123,7 +123,7 @@ testOverrideProperty(Sub())
 // CHECK:       sil shared [transparent] [serializable] [thunk] @_T015objc_extensions3SubC3fooyyFTD
 // CHECK:       bb0([[SELF:%.*]] : $Sub):
 // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
-// CHECK:         class_method [volatile] [[SELF_COPY]] : $Sub, #Sub.foo!1.foreign
+// CHECK:         objc_method [[SELF_COPY]] : $Sub, #Sub.foo!1.foreign
 // CHECK: } // end sil function '_T015objc_extensions3SubC3fooyyFTD'
 func testCurry(_ x: Sub) {
   _ = x.foo
@@ -143,7 +143,7 @@ class SubSub : Sub {
   // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $SubSub to $Sub
   // CHECK:   [[BORROWED_UPCAST_SELF_COPY:%.*]] = begin_borrow [[UPCAST_SELF_COPY]]
   // CHECK:   [[DOWNCAST:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF_COPY]] : $Sub to $SubSub
-  // CHECK:   super_method [volatile] [[DOWNCAST]] : $SubSub, #Sub.objCBaseMethod!1.foreign : (Sub) -> () -> (), $@convention(objc_method) (Sub) -> ()
+  // CHECK:   objc_super_method [[DOWNCAST]] : $SubSub, #Sub.objCBaseMethod!1.foreign : (Sub) -> () -> (), $@convention(objc_method) (Sub) -> ()
   // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY]] from [[UPCAST_SELF_COPY]]
   // CHECK: } // end sil function '_T015objc_extensions03SubC0C14objCBaseMethodyyF'
   override func objCBaseMethod() {
@@ -158,14 +158,14 @@ extension SubSub {
   // CHECK:   [[UPCAST_SELF_COPY_1:%.*]] = upcast [[SELF_COPY_1]] : $SubSub to $Sub
   // CHECK:   [[BORROWED_UPCAST_SELF_COPY_1:%.*]] = begin_borrow [[UPCAST_SELF_COPY_1]]
   // CHECK:   [[DOWNCAST_BORROWED_UPCAST_SELF_COPY_1:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF_COPY_1]] : $Sub to $SubSub
-  // CHECK:   = super_method [volatile] [[DOWNCAST_BORROWED_UPCAST_SELF_COPY_1]] : $SubSub, #Sub.otherProp!getter.1.foreign
+  // CHECK:   = objc_super_method [[DOWNCAST_BORROWED_UPCAST_SELF_COPY_1]] : $SubSub, #Sub.otherProp!getter.1.foreign
   // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY_1]] from [[UPCAST_SELF_COPY_1]]
 
   // CHECK:   [[SELF_COPY_2:%.*]] = copy_value [[SELF]]
   // CHECK:   [[UPCAST_SELF_COPY_2:%.*]] = upcast [[SELF_COPY_2]] : $SubSub to $Sub
   // CHECK:   [[BORROWED_UPCAST_SELF_COPY_2:%.*]] = begin_borrow [[UPCAST_SELF_COPY_2]]
   // CHECK:   [[DOWNCAST_BORROWED_UPCAST_SELF_COPY_2:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF_COPY_2]] : $Sub to $SubSub
-  // CHECK:   = super_method [volatile] [[DOWNCAST_BORROWED_UPCAST_SELF_COPY_2]] : $SubSub, #Sub.otherProp!setter.1.foreign
+  // CHECK:   = objc_super_method [[DOWNCAST_BORROWED_UPCAST_SELF_COPY_2]] : $SubSub, #Sub.otherProp!setter.1.foreign
   // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY_2]] from [[UPCAST_SELF_COPY_2]]
   // CHECK: } // end sil function '_T015objc_extensions03SubC0C9otherPropSSvs'
   override var otherProp: String {

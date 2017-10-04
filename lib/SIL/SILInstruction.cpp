@@ -754,6 +754,27 @@ namespace {
              X->getType()    == RHS->getType();
     }
 
+    bool visitSuperMethodInst(SuperMethodInst *RHS) {
+      auto *X = cast<SuperMethodInst>(LHS);
+      return X->getMember()  == RHS->getMember() &&
+             X->getOperand() == RHS->getOperand() &&
+             X->getType()    == RHS->getType();
+    }
+
+    bool visitObjCMethodInst(ObjCMethodInst *RHS) {
+      auto *X = cast<ObjCMethodInst>(LHS);
+      return X->getMember()  == RHS->getMember() &&
+             X->getOperand() == RHS->getOperand() &&
+             X->getType()    == RHS->getType();
+    }
+
+    bool visitObjCSuperMethodInst(ObjCSuperMethodInst *RHS) {
+      auto *X = cast<ObjCSuperMethodInst>(LHS);
+      return X->getMember()  == RHS->getMember() &&
+             X->getOperand() == RHS->getOperand() &&
+             X->getType()    == RHS->getType();
+    }
+
     bool visitWitnessMethodInst(const WitnessMethodInst *RHS) {
       auto *X = cast<WitnessMethodInst>(LHS);
       if (X->isVolatile() != RHS->isVolatile())

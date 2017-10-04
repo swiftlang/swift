@@ -15,13 +15,13 @@ class A {
 
 // CHECK-LABEL: sil hidden @_T014objc_subscript16testSubscriptGet{{[_0-9a-zA-Z]*}}F
 func testSubscriptGet(a: A, i: Int) -> ObjCClass {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.subscript!getter.1.foreign : (A) -> (Int) -> ObjCClass, $@convention(objc_method) (Int, A) -> @autoreleased ObjCClass
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.subscript!getter.1.foreign : (A) -> (Int) -> ObjCClass, $@convention(objc_method) (Int, A) -> @autoreleased ObjCClass
   return a[i]
 }
 
 // CHECK-LABEL: sil hidden @_T014objc_subscript16testSubscriptSet{{[_0-9a-zA-Z]*}}F
 func testSubscriptSet(a: A, i: Int, v: ObjCClass) {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.subscript!setter.1.foreign : (A) -> (ObjCClass, Int) -> (), $@convention(objc_method) (ObjCClass, Int, A) -> ()
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.subscript!setter.1.foreign : (A) -> (ObjCClass, Int) -> (), $@convention(objc_method) (ObjCClass, Int, A) -> ()
   a[i] = v
 }
 
@@ -30,12 +30,12 @@ class B : A {
   @objc override subscript (i: Int) -> ObjCClass {
     // CHECK-LABEL: sil hidden @_T014objc_subscript1BCAA9ObjCClassCSicig : $@convention(method) (Int, @guaranteed B) -> @owned ObjCClass
     get {
-      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.subscript!getter.1.foreign : (A) -> (Int) -> ObjCClass, $@convention(objc_method) (Int, A) -> @autoreleased ObjCClass
+      // CHECK: objc_super_method [[SELF:%[0-9]+]] : $B, #A.subscript!getter.1.foreign : (A) -> (Int) -> ObjCClass, $@convention(objc_method) (Int, A) -> @autoreleased ObjCClass
       return super[i]
     }
     // CHECK-LABEL: sil hidden @_T014objc_subscript1BCAA9ObjCClassCSicis : $@convention(method) (@owned ObjCClass, Int, @guaranteed B) -> ()
     set(value) {
-      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.subscript!setter.1.foreign : (A) -> (ObjCClass, Int) -> (), $@convention(objc_method) (ObjCClass, Int, A) -> ()
+      // CHECK: objc_super_method [[SELF:%[0-9]+]] : $B, #A.subscript!setter.1.foreign : (A) -> (ObjCClass, Int) -> (), $@convention(objc_method) (ObjCClass, Int, A) -> ()
       super[i] = value
     }
   }

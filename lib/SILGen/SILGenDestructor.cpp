@@ -239,7 +239,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
                                    SILDeclRef::Kind::Deallocator)
     .asForeign();
   auto superclassDtorType = SGM.getConstantType(superclassDtor);
-  SILValue superclassDtorValue = B.createSuperMethod(
+  SILValue superclassDtorValue = B.createObjCSuperMethod(
                                    cleanupLoc, selfValue, superclassDtor,
                                    superclassDtorType);
 

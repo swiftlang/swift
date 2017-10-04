@@ -593,6 +593,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(IsNonnull)
     return {compatible, UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};       \
   }
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ClassMethod)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ObjCMethod)
 #undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE
 
 // Trivial if trivial typed, otherwise must accept owned?
@@ -605,6 +606,7 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ClassMethod)
     return {compatible, UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};       \
   }
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, SuperMethod)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ObjCSuperMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, BridgeObjectToWord)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, DynamicMethod)

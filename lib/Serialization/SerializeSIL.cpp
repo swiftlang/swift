@@ -211,7 +211,7 @@ namespace {
     void processSILFunctionWorklist();
 
     /// Helper function to update ListOfValues for MethodInst. Format:
-    /// Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC), and an operand.
+    /// Attr, SILDeclRef (DeclID, Kind, uncurryLevel), and an operand.
     void handleMethodInst(const MethodInst *MI, SILValue operand,
                           SmallVectorImpl<ValueID> &ListOfValues);
 
@@ -493,11 +493,10 @@ IdentifierID SILSerializer::addSILFunctionRef(SILFunction *F) {
 }
 
 /// Helper function to update ListOfValues for MethodInst. Format:
-/// Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC), and an operand.
+/// Attr, SILDeclRef (DeclID, Kind, uncurryLevel), and an operand.
 void SILSerializer::handleMethodInst(const MethodInst *MI,
                                      SILValue operand,
                                      SmallVectorImpl<ValueID> &ListOfValues) {
-  ListOfValues.push_back(MI->isVolatile());
   handleSILDeclRef(S, MI->getMember(), ListOfValues);
   ListOfValues.push_back(
       S.addTypeRef(operand->getType().getSwiftRValueType()));
@@ -1673,12 +1672,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::WitnessMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC), and a type.
-    const WitnessMethodInst *AMI = cast<WitnessMethodInst>(&SI);
-    CanType Ty = AMI->getLookupType();
-    SILType Ty2 = AMI->getType();
+    const WitnessMethodInst *WMI = cast<WitnessMethodInst>(&SI);
+    CanType Ty = WMI->getLookupType();
+    SILType Ty2 = WMI->getType();
 
     SmallVector<ValueID, 8> ListOfValues;
-    handleSILDeclRef(S, AMI->getMember(), ListOfValues);
+    handleSILDeclRef(S, WMI->getMember(), ListOfValues);
 
     // Add an optional operand.
     TypeID OperandTy = TypeID();
@@ -1688,17 +1687,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     SILInstWitnessMethodLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstWitnessMethodLayout::Code],
-        S.addTypeRef(Ty), 0, AMI->isVolatile(),
+        S.addTypeRef(Ty), 0, WMI->isVolatile(),
         S.addTypeRef(Ty2.getSwiftRValueType()), (unsigned)Ty2.getCategory(),
         OperandTy, OperandTyCategory, OperandValueId, ListOfValues);
 
-    S.writeConformance(AMI->getConformance(), SILAbbrCodes);
+    S.writeConformance(WMI->getConformance(), SILAbbrCodes);
 
     break;
   }
   case SILInstructionKind::ClassMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
-    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),
+    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel),
     // and an operand.
     const ClassMethodInst *CMI = cast<ClassMethodInst>(&SI);
     SILType Ty = CMI->getType();
@@ -1713,7 +1712,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::SuperMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
-    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),
+    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel),
     // and an operand.
     const SuperMethodInst *SMI = cast<SuperMethodInst>(&SI);
     SILType Ty = SMI->getType();
@@ -1726,9 +1725,39 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)Ty.getCategory(), ListOfValues);
     break;
   }
+  case SILInstructionKind::ObjCMethodInst: {
+    // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
+    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel),
+    // and an operand.
+    const ObjCMethodInst *OMI = cast<ObjCMethodInst>(&SI);
+    SILType Ty = OMI->getType();
+    SmallVector<ValueID, 9> ListOfValues;
+    handleMethodInst(OMI, OMI->getOperand(), ListOfValues);
+
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+        S.addTypeRef(Ty.getSwiftRValueType()),
+        (unsigned)Ty.getCategory(), ListOfValues);
+    break;
+  }
+  case SILInstructionKind::ObjCSuperMethodInst: {
+    // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
+    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel),
+    // and an operand.
+    const ObjCSuperMethodInst *SMI = cast<ObjCSuperMethodInst>(&SI);
+    SILType Ty = SMI->getType();
+    SmallVector<ValueID, 9> ListOfValues;
+    handleMethodInst(SMI, SMI->getOperand(), ListOfValues);
+
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+        S.addTypeRef(Ty.getSwiftRValueType()),
+        (unsigned)Ty.getCategory(), ListOfValues);
+    break;
+  }
   case SILInstructionKind::DynamicMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
-    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),
+    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel),
     // and an operand.
     const DynamicMethodInst *DMI = cast<DynamicMethodInst>(&SI);
     SILType Ty = DMI->getType();

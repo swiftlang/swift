@@ -691,10 +691,18 @@ ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
 ManagedValue SILGenBuilder::createSuperMethod(SILLocation loc,
                                               ManagedValue operand,
                                               SILDeclRef member,
-                                              SILType methodTy,
-                                              bool isVolatile) {
+                                              SILType methodTy) {
   SILValue v = SILBuilder::createSuperMethod(loc, operand.getValue(), member,
-                                             methodTy, isVolatile);
+                                             methodTy);
+  return ManagedValue::forUnmanaged(v);
+}
+
+ManagedValue SILGenBuilder::createObjCSuperMethod(SILLocation loc,
+                                                  ManagedValue operand,
+                                                  SILDeclRef member,
+                                                  SILType methodTy) {
+  SILValue v = SILBuilder::createObjCSuperMethod(loc, operand.getValue(), member,
+                                                 methodTy);
   return ManagedValue::forUnmanaged(v);
 }
 
