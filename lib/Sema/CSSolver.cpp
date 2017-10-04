@@ -352,6 +352,14 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
         failedConstraint = constraint;
       }
 
+      if (TC.getLangOpts().DebugConstraintSolver) {
+        auto &log = getASTContext().TypeCheckerDebug->getStream();
+        log.indent(solverState ? solverState->depth * 2 : 0)
+            << "(failed constraint ";
+        constraint->print(log, &getASTContext().SourceMgr);
+        log << ")\n";
+      }
+
       if (solverState)
         solverState->retireConstraint(constraint);
 
