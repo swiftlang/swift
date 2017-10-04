@@ -2270,24 +2270,31 @@ public:
 
   void checkObjCMethodInst(ObjCMethodInst *OMI) {
     auto member = OMI->getMember();
-    auto overrideTy = TC.getConstantOverrideType(member);
-    if (OMI->getModule().getStage() != SILStage::Lowered) {
-      requireSameType(
-          OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
-          "result type of objc_method must match abstracted type of method");
-    }
+    require(member.isForeign,
+            "native method cannot be dispatched via objc");
+
     auto methodType = requireObjectType(SILFunctionType, OMI,
                                         "result of objc_method");
     require(!methodType->getExtInfo().hasContext(),
             "result method must be of a context-free function type");
-    SILType operandType = OMI->getOperand()->getType();
-    require(operandType.isClassOrClassMetatype(),
-            "operand must be of a class type");
-    require(getMethodSelfType(methodType).isClassOrClassMetatype(),
-            "result must be a method of a class");
-    
-    require(member.isForeign,
-            "native method cannot be dispatched via objc");
+
+    auto methodSelfType = getMethodSelfType(methodType);
+    auto operandType = OMI->getOperand()->getType();
+
+    if (methodSelfType.isClassOrClassMetatype()) {
+      auto overrideTy = TC.getConstantOverrideType(member);
+      requireSameType(
+          OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
+          "result type of objc_method must match abstracted type of method");
+      require(operandType.isClassOrClassMetatype(),
+              "operand must be of a class type");
+    } else {
+      require(getDynamicMethodType(operandType, OMI->getMember())
+                .getSwiftRValueType()
+                ->isBindableTo(OMI->getType().getSwiftRValueType()),
+              "result must be of the method's type");
+      verifyOpenedArchetype(OMI, OMI->getType().getSwiftRValueType());
+    }
 
     // TODO: We should enforce that ObjC methods are dispatched on ObjC
     // metatypes, but IRGen appears not to care right now.
