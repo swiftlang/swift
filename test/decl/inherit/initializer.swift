@@ -150,3 +150,34 @@ func testClassInGenericFunc<T>(t: T) {
 
   _ = B(t: t)
 }
+
+// rdar://problem/34789779
+public class Node {
+  var data : Data
+
+  public struct Data {
+    var index: Int32 = 0// for helpers
+  }
+
+ init(data: inout Data/*, context: Context*/) {
+   self.data = data
+ }
+
+ public required init(node: Node) {
+   data = node.data
+ }
+}
+
+final class SubNode : Node {
+  var a: Int
+
+  required init(node: Node) {
+    a = 1
+    super.init(node: node)
+  }
+
+  init(data: inout Data, additionalParam: Int) {
+    a = additionalParam
+    super.init(data: &data)
+  }
+}
