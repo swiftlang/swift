@@ -66,7 +66,7 @@ public enum BenchmarkCategory : String {
   // significant optimization.
   case cpubench
 
-  // Explict skip marker
+  // Explicit skip marker
   case skip
 }
 
