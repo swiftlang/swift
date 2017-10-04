@@ -2188,8 +2188,8 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
     return _succeed(destination, source, sourceType, flags);
 
   // The two types have to be instantiations of the same type.
-  auto descriptor = sourceType->Description.get();
-  auto targetDescriptor = targetType->Description.get();
+  const auto descriptor = sourceType->Description;
+  const auto targetDescriptor = targetType->Description;
   if (descriptor != targetDescriptor) {
     if (descriptor == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable)) {
       return _dynamicCastFromAnyHashable(destination, source,
