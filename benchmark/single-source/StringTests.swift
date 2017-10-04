@@ -11,6 +11,14 @@
 //===----------------------------------------------------------------------===//
 import TestsUtils
 
+public let StringTests = [
+  BenchmarkInfo(name: "StringEqualPointerComparison", runFunction: run_StringEqualPointerComparison, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "StringHasPrefix", runFunction: run_StringHasPrefix, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "StringHasPrefixUnicode", runFunction: run_StringHasPrefixUnicode, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "StringHasSuffix", runFunction: run_StringHasSuffix, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "StringHasSuffixUnicode", runFunction: run_StringHasSuffixUnicode, tags: [.validation, .api, .String]),
+]
+
 // FIXME(string)
 public func run_StringHasPrefix(_ N: Int) {
 #if _runtime(_ObjC)

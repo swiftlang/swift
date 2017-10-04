@@ -17,6 +17,11 @@ import Glibc
 import Darwin
 #endif
 
+public let StringEdits = BenchmarkInfo(
+  name: "StringEdits",
+  runFunction: run_StringEdits,
+  tags: [.validation, .api, .String])
+
 var editWords: [String] = [
   "woodshed",
   "lakism",

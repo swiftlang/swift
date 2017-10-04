@@ -13,6 +13,15 @@
 import TestsUtils
 import Foundation
 
+public let ReduceInto = [
+  BenchmarkInfo(name: "FilterEvenUsingReduce", runFunction: run_FilterEvenUsingReduce, tags: [.validation, .api]),
+  BenchmarkInfo(name: "FilterEvenUsingReduceInto", runFunction: run_FilterEvenUsingReduceInto, tags: [.validation, .api]),
+  BenchmarkInfo(name: "FrequenciesUsingReduce", runFunction: run_FrequenciesUsingReduce, tags: [.validation, .api]),
+  BenchmarkInfo(name: "FrequenciesUsingReduceInto", runFunction: run_FrequenciesUsingReduceInto, tags: [.validation, .api]),
+  BenchmarkInfo(name: "SumUsingReduce", runFunction: run_SumUsingReduce, tags: [.validation, .api]),
+  BenchmarkInfo(name: "SumUsingReduceInto", runFunction: run_SumUsingReduceInto, tags: [.validation, .api]),
+]
+
 // Sum
 
 @inline(never)

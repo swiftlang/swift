@@ -14,6 +14,11 @@
 // rdar://problem/19804127
 import TestsUtils
 
+public let DictionarySwap = [
+  BenchmarkInfo(name: "DictionarySwap", runFunction: run_DictionarySwap, tags: [.validation, .api, .Dictionary]),
+  BenchmarkInfo(name: "DictionarySwapOfObjects", runFunction: run_DictionarySwapOfObjects, tags: [.validation, .api, .Dictionary]),
+]
+
 @inline(never)
 public func run_DictionarySwap(_ N: Int) {
     let size = 100

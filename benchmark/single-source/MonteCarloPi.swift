@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let MonteCarloPi = BenchmarkInfo(
+  name: "MonteCarloPi",
+  runFunction: run_MonteCarloPi,
+  tags: [.validation, .algorithm])
+
 public func run_MonteCarloPi(scale: Int) {
   var pointsInside = 0
   let r = 10000

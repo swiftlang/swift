@@ -13,6 +13,11 @@
 // This test tests the performance of ASCII Character comparison.
 import TestsUtils
 
+public let SuperChars = BenchmarkInfo(
+  name: "SuperChars",
+  runFunction: run_SuperChars,
+  tags: [.validation, .api, .String])
+
 @inline(never)
 public func run_SuperChars(_ N: Int) {
   // Permute some characters.

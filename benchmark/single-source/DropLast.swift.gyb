@@ -42,6 +42,15 @@ def lazy ((Name, Expr)) : return (Name + 'Lazy', '(' + Expr + ').lazy')
 Sequences = Sequences + map(lazy, Sequences)
 }%
 
+public let DropLast = [
+% for (Name, Expr) in Sequences:
+  BenchmarkInfo(
+    name: "DropLast${Name}",
+    runFunction: run_DropLast${Name},
+    tags: [.validation, .api${', .Array' if Name == 'Array' else ''}]),
+% end
+]
+
 % for (Name, Expr) in Sequences:
 @inline(never)
 public func run_DropLast${Name}(_ N: Int) {

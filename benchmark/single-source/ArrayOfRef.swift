@@ -16,6 +16,13 @@
 //
 // For comparison, we always create four arrays of 10,000 words.
 
+import TestsUtils
+
+public let ArrayOfRef = BenchmarkInfo(
+  name: "ArrayOfRef",
+  runFunction: run_ArrayOfRef,
+  tags: [.validation, .api, .Array])
+
 protocol Constructible {
   associatedtype Element
   init(e:Element)

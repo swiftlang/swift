@@ -9,8 +9,14 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+import TestsUtils
 
 // Sort an array of strings using an explicit sort predicate.
+public let SortStrings = [
+  BenchmarkInfo(name: "SortSortedStrings", runFunction: run_SortSortedStrings, tags: [.validation, .api, .algorithm, .String]),
+  BenchmarkInfo(name: "SortStrings", runFunction: run_SortStrings, tags: [.validation, .api, .algorithm, .String]),
+  BenchmarkInfo(name: "SortStringsUnicode", runFunction: run_SortStringsUnicode, tags: [.validation, .api, .algorithm, .String]),
+]
 
 var stringBenchmarkWords: [String] = [
   "woodshed",

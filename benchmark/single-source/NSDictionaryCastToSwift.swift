@@ -18,6 +18,11 @@
 import Foundation
 import TestsUtils
 
+public let NSDictionaryCastToSwift = BenchmarkInfo(
+  name: "NSDictionaryCastToSwift",
+  runFunction: run_NSDictionaryCastToSwift,
+  tags: [.validation, .api, .Dictionary, .bridging])
+
 @inline(never)
 public func run_NSDictionaryCastToSwift(_ N: Int) {
 #if _runtime(_ObjC)

@@ -13,6 +13,11 @@
 // <rdar://problem/17838787>
 import TestsUtils
 
+public let NopDeinit = BenchmarkInfo(
+  name: "NopDeinit",
+  runFunction: run_NopDeinit,
+  tags: [.regression])
+
 class X<T : Comparable> {
   let deinitIters = 10000
   var elem: T

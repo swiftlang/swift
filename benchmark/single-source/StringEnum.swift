@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let StringEnum = BenchmarkInfo(
+  name: "StringEnumRawValueInitialization",
+  runFunction: run_StringEnumRawValueInitialization,
+  tags: [.validation, .api, .String])
+
 enum TestEnum : String {
   case c1 = "Swift"
   case c2 = "is"

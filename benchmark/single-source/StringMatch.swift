@@ -17,6 +17,11 @@ import Glibc
 import Darwin
 #endif
 
+public let StringMatch = BenchmarkInfo(
+  name: "StringMatch",
+  runFunction: run_StringMatch,
+  tags: [.validation, .api, .String])
+
 extension String {
   @inline(__always)
   func dropFirst(_ n: Int = 1) -> String {

@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let ProtocolDispatch = BenchmarkInfo(
+  name: "ProtocolDispatch",
+  runFunction: run_ProtocolDispatch,
+  tags: [.validation, .abstraction])
+
 @inline(never)
 public func run_ProtocolDispatch(_ N: Int) {
 

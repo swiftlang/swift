@@ -89,6 +89,413 @@ let unicodeScalarsMultiplier = baseMultiplier
 let charactersMultiplier = baseMultiplier / 5
 
 
+// An extended benchmark suite exercising finer-granularity behavior of our
+// Strings.
+public var StringWalk = [
+  BenchmarkInfo(
+    name: "StringWalk",
+    runFunction: run_StringWalk,
+    tags: [.validation, .api, .String]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_ascii_unicodeScalars",
+    runFunction: run_StringWalk_ascii_unicodeScalars,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_ascii_characters",
+    runFunction: run_StringWalk_ascii_characters,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_ascii_unicodeScalars",
+    runFunction: run_CharIteration_ascii_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_ascii_unicodeScalars",
+    runFunction: run_CharIndexing_ascii_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_ascii_unicodeScalars_Backwards",
+    runFunction: run_StringWalk_ascii_unicodeScalars_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_ascii_characters_Backwards",
+    runFunction: run_StringWalk_ascii_characters_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_ascii_unicodeScalars_Backwards",
+    runFunction: run_CharIteration_ascii_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_ascii_unicodeScalars_Backwards",
+    runFunction: run_CharIndexing_ascii_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_utf16_unicodeScalars",
+    runFunction: run_StringWalk_utf16_unicodeScalars,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_utf16_characters",
+    runFunction: run_StringWalk_utf16_characters,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_utf16_unicodeScalars",
+    runFunction: run_CharIteration_utf16_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_utf16_unicodeScalars",
+    runFunction: run_CharIndexing_utf16_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_utf16_unicodeScalars_Backwards",
+    runFunction: run_StringWalk_utf16_unicodeScalars_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_utf16_characters_Backwards",
+    runFunction: run_StringWalk_utf16_characters_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_utf16_unicodeScalars_Backwards",
+    runFunction: run_CharIteration_utf16_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_utf16_unicodeScalars_Backwards",
+    runFunction: run_CharIndexing_utf16_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_tweet_unicodeScalars",
+    runFunction: run_StringWalk_tweet_unicodeScalars,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_tweet_characters",
+    runFunction: run_StringWalk_tweet_characters,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_tweet_unicodeScalars",
+    runFunction: run_CharIteration_tweet_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_tweet_unicodeScalars",
+    runFunction: run_CharIndexing_tweet_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_tweet_unicodeScalars_Backwards",
+    runFunction: run_StringWalk_tweet_unicodeScalars_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_tweet_characters_Backwards",
+    runFunction: run_StringWalk_tweet_characters_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_tweet_unicodeScalars_Backwards",
+    runFunction: run_CharIteration_tweet_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_tweet_unicodeScalars_Backwards",
+    runFunction: run_CharIndexing_tweet_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_japanese_unicodeScalars",
+    runFunction: run_StringWalk_japanese_unicodeScalars,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_japanese_characters",
+    runFunction: run_StringWalk_japanese_characters,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_japanese_unicodeScalars",
+    runFunction: run_CharIteration_japanese_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_japanese_unicodeScalars",
+    runFunction: run_CharIndexing_japanese_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_japanese_unicodeScalars_Backwards",
+    runFunction: run_StringWalk_japanese_unicodeScalars_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_japanese_characters_Backwards",
+    runFunction: run_StringWalk_japanese_characters_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_japanese_unicodeScalars_Backwards",
+    runFunction: run_CharIteration_japanese_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_japanese_unicodeScalars_Backwards",
+    runFunction: run_CharIndexing_japanese_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_chinese_unicodeScalars",
+    runFunction: run_StringWalk_chinese_unicodeScalars,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_chinese_characters",
+    runFunction: run_StringWalk_chinese_characters,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_chinese_unicodeScalars",
+    runFunction: run_CharIteration_chinese_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_chinese_unicodeScalars",
+    runFunction: run_CharIndexing_chinese_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_chinese_unicodeScalars_Backwards",
+    runFunction: run_StringWalk_chinese_unicodeScalars_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_chinese_characters_Backwards",
+    runFunction: run_StringWalk_chinese_characters_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_chinese_unicodeScalars_Backwards",
+    runFunction: run_CharIteration_chinese_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_chinese_unicodeScalars_Backwards",
+    runFunction: run_CharIndexing_chinese_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_korean_unicodeScalars",
+    runFunction: run_StringWalk_korean_unicodeScalars,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_korean_characters",
+    runFunction: run_StringWalk_korean_characters,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_korean_unicodeScalars",
+    runFunction: run_CharIteration_korean_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_korean_unicodeScalars",
+    runFunction: run_CharIndexing_korean_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_korean_unicodeScalars_Backwards",
+    runFunction: run_StringWalk_korean_unicodeScalars_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_korean_characters_Backwards",
+    runFunction: run_StringWalk_korean_characters_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_korean_unicodeScalars_Backwards",
+    runFunction: run_CharIteration_korean_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_korean_unicodeScalars_Backwards",
+    runFunction: run_CharIndexing_korean_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_russian_unicodeScalars",
+    runFunction: run_StringWalk_russian_unicodeScalars,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_russian_characters",
+    runFunction: run_StringWalk_russian_characters,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_russian_unicodeScalars",
+    runFunction: run_CharIteration_russian_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_russian_unicodeScalars",
+    runFunction: run_CharIndexing_russian_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_russian_unicodeScalars_Backwards",
+    runFunction: run_StringWalk_russian_unicodeScalars_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_russian_characters_Backwards",
+    runFunction: run_StringWalk_russian_characters_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_russian_unicodeScalars_Backwards",
+    runFunction: run_CharIteration_russian_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_russian_unicodeScalars_Backwards",
+    runFunction: run_CharIndexing_russian_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_punctuated_unicodeScalars",
+    runFunction: run_StringWalk_punctuated_unicodeScalars,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_punctuated_characters",
+    runFunction: run_StringWalk_punctuated_characters,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_punctuated_unicodeScalars",
+    runFunction: run_CharIteration_punctuated_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_punctuated_unicodeScalars",
+    runFunction: run_CharIndexing_punctuated_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_punctuated_unicodeScalars_Backwards",
+    runFunction: run_StringWalk_punctuated_unicodeScalars_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_punctuated_characters_Backwards",
+    runFunction: run_StringWalk_punctuated_characters_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_punctuated_unicodeScalars_Backwards",
+    runFunction: run_CharIteration_punctuated_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_punctuated_unicodeScalars_Backwards",
+    runFunction: run_CharIndexing_punctuated_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_punctuatedJapanese_unicodeScalars",
+    runFunction: run_StringWalk_punctuatedJapanese_unicodeScalars,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_punctuatedJapanese_characters",
+    runFunction: run_StringWalk_punctuatedJapanese_characters,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_punctuatedJapanese_unicodeScalars",
+    runFunction: run_CharIteration_punctuatedJapanese_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_punctuatedJapanese_unicodeScalars",
+    runFunction: run_CharIndexing_punctuatedJapanese_unicodeScalars,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "StringWalk_punctuatedJapanese_unicodeScalars_Backwards",
+    runFunction: run_StringWalk_punctuatedJapanese_unicodeScalars_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "StringWalk_punctuatedJapanese_characters_Backwards",
+    runFunction: run_StringWalk_punctuatedJapanese_characters_Backwards,
+    tags: [.api, .String, .skip]),
+
+
+  BenchmarkInfo(
+    name: "CharIteration_punctuatedJapanese_unicodeScalars_Backwards",
+    runFunction: run_CharIteration_punctuatedJapanese_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_punctuatedJapanese_unicodeScalars_Backwards",
+    runFunction: run_CharIndexing_punctuatedJapanese_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String]),
+]
+
+
 @inline(never)
 public func run_StringWalk_ascii_unicodeScalars(_ N: Int) {
   for _ in 1...unicodeScalarsMultiplier*N {
@@ -104,8 +511,6 @@ public func run_StringWalk_ascii_unicodeScalars_Backwards(_ N: Int) {
 }
 
 
-
-
 @inline(never)
 public func run_StringWalk_ascii_characters(_ N: Int) {
   for _ in 1...charactersMultiplier*N {
@@ -119,8 +524,6 @@ public func run_StringWalk_ascii_characters_Backwards(_ N: Int) {
     count_characters_rev(ascii.characters.reversed())
   }
 }
-
-
 
 
 let asciiCharacters = Array(ascii)
@@ -189,8 +592,6 @@ public func run_StringWalk_utf16_unicodeScalars_Backwards(_ N: Int) {
 }
 
 
-
-
 @inline(never)
 public func run_StringWalk_utf16_characters(_ N: Int) {
   for _ in 1...charactersMultiplier*N {
@@ -204,8 +605,6 @@ public func run_StringWalk_utf16_characters_Backwards(_ N: Int) {
     count_characters_rev(utf16.characters.reversed())
   }
 }
-
-
 
 
 let utf16Characters = Array(utf16)
@@ -274,8 +673,6 @@ public func run_StringWalk_tweet_unicodeScalars_Backwards(_ N: Int) {
 }
 
 
-
-
 @inline(never)
 public func run_StringWalk_tweet_characters(_ N: Int) {
   for _ in 1...charactersMultiplier*N {
@@ -289,8 +686,6 @@ public func run_StringWalk_tweet_characters_Backwards(_ N: Int) {
     count_characters_rev(tweet.characters.reversed())
   }
 }
-
-
 
 
 let tweetCharacters = Array(tweet)
@@ -359,8 +754,6 @@ public func run_StringWalk_japanese_unicodeScalars_Backwards(_ N: Int) {
 }
 
 
-
-
 @inline(never)
 public func run_StringWalk_japanese_characters(_ N: Int) {
   for _ in 1...charactersMultiplier*N {
@@ -374,8 +767,6 @@ public func run_StringWalk_japanese_characters_Backwards(_ N: Int) {
     count_characters_rev(japanese.characters.reversed())
   }
 }
-
-
 
 
 let japaneseCharacters = Array(japanese)
@@ -444,8 +835,6 @@ public func run_StringWalk_chinese_unicodeScalars_Backwards(_ N: Int) {
 }
 
 
-
-
 @inline(never)
 public func run_StringWalk_chinese_characters(_ N: Int) {
   for _ in 1...charactersMultiplier*N {
@@ -459,8 +848,6 @@ public func run_StringWalk_chinese_characters_Backwards(_ N: Int) {
     count_characters_rev(chinese.characters.reversed())
   }
 }
-
-
 
 
 let chineseCharacters = Array(chinese)
@@ -529,8 +916,6 @@ public func run_StringWalk_korean_unicodeScalars_Backwards(_ N: Int) {
 }
 
 
-
-
 @inline(never)
 public func run_StringWalk_korean_characters(_ N: Int) {
   for _ in 1...charactersMultiplier*N {
@@ -544,8 +929,6 @@ public func run_StringWalk_korean_characters_Backwards(_ N: Int) {
     count_characters_rev(korean.characters.reversed())
   }
 }
-
-
 
 
 let koreanCharacters = Array(korean)
@@ -614,8 +997,6 @@ public func run_StringWalk_russian_unicodeScalars_Backwards(_ N: Int) {
 }
 
 
-
-
 @inline(never)
 public func run_StringWalk_russian_characters(_ N: Int) {
   for _ in 1...charactersMultiplier*N {
@@ -629,8 +1010,6 @@ public func run_StringWalk_russian_characters_Backwards(_ N: Int) {
     count_characters_rev(russian.characters.reversed())
   }
 }
-
-
 
 
 let russianCharacters = Array(russian)
@@ -699,8 +1078,6 @@ public func run_StringWalk_punctuated_unicodeScalars_Backwards(_ N: Int) {
 }
 
 
-
-
 @inline(never)
 public func run_StringWalk_punctuated_characters(_ N: Int) {
   for _ in 1...charactersMultiplier*N {
@@ -714,8 +1091,6 @@ public func run_StringWalk_punctuated_characters_Backwards(_ N: Int) {
     count_characters_rev(punctuated.characters.reversed())
   }
 }
-
-
 
 
 let punctuatedCharacters = Array(punctuated)
@@ -784,8 +1159,6 @@ public func run_StringWalk_punctuatedJapanese_unicodeScalars_Backwards(_ N: Int)
 }
 
 
-
-
 @inline(never)
 public func run_StringWalk_punctuatedJapanese_characters(_ N: Int) {
   for _ in 1...charactersMultiplier*N {
@@ -799,8 +1172,6 @@ public func run_StringWalk_punctuatedJapanese_characters_Backwards(_ N: Int) {
     count_characters_rev(punctuatedJapanese.characters.reversed())
   }
 }
-
-
 
 
 let punctuatedJapaneseCharacters = Array(punctuatedJapanese)
