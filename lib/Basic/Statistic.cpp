@@ -101,7 +101,7 @@ auxName(StringRef ModuleName,
     InputName = "all";
   }
   if (OptType.empty()) {
-    InputName = "Onone";
+    OptType = "Onone";
   }
   if (!OutputType.empty() && OutputType.front() == '.') {
     OutputType = OutputType.substr(1);
