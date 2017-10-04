@@ -1592,18 +1592,6 @@ DynamicMethodBranchInst::create(SILDebugLocation Loc, SILValue Operand,
       DynamicMethodBranchInst(Loc, Operand, Member, HasMethodBB, NoMethodBB);
 }
 
-/// Create a witness method call of a protocol requirement, passing in a lookup
-/// type and conformance.
-///
-/// At runtime, the witness is looked up in the conformance of the lookup type
-/// to the protocol.
-///
-/// The lookup type is usually an archetype, but it will be concrete if the
-/// witness_method instruction is inside a function body that was specialized.
-///
-/// The conformance must exactly match the requirement; the caller must handle
-/// the case where the requirement is defined in a base protocol that is
-/// refined by the conforming protocol.
 WitnessMethodInst *
 WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
                           ProtocolConformanceRef Conformance, SILDeclRef Member,
@@ -1627,10 +1615,10 @@ WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
                                           Ty, TypeDependentOperands, Volatile);
 }
 
-DynamicMethodInst *
-DynamicMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
-                          SILDeclRef Member, SILType Ty, SILFunction *F,
-                          SILOpenedArchetypesState &OpenedArchetypes) {
+ObjCMethodInst *
+ObjCMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                       SILDeclRef Member, SILType Ty, SILFunction *F,
+                       SILOpenedArchetypesState &OpenedArchetypes) {
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
@@ -1638,10 +1626,10 @@ DynamicMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
 
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
-  void *Buffer = Mod.allocateInst(size, alignof(DynamicMethodInst));
-  return ::new (Buffer) DynamicMethodInst(DebugLoc, Operand,
-                                          TypeDependentOperands,
-                                          Member, Ty);
+  void *Buffer = Mod.allocateInst(size, alignof(ObjCMethodInst));
+  return ::new (Buffer) ObjCMethodInst(DebugLoc, Operand,
+                                       TypeDependentOperands,
+                                       Member, Ty);
 }
 
 InitExistentialAddrInst *InitExistentialAddrInst::create(

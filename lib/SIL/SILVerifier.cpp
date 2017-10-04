@@ -2194,26 +2194,6 @@ public:
     return SILType::getPrimitiveObjectType(fnTy);
   }
   
-  void checkDynamicMethodInst(DynamicMethodInst *EMI) {
-    requireObjectType(SILFunctionType, EMI, "result of dynamic_method");
-    SILType operandType = EMI->getOperand()->getType();
-
-    require(EMI->getMember().getDecl()->isObjC(), "method must be @objc");
-    if (!EMI->getMember().getDecl()->isInstanceMember()) {
-      require(operandType.is<MetatypeType>(),
-              "operand must have metatype type");
-      require(operandType.castTo<MetatypeType>()
-                ->getInstanceType()->mayHaveSuperclass(),
-              "operand must have metatype of class or class-bounded type");
-    }
-    
-    require(getDynamicMethodType(operandType, EMI->getMember())
-              .getSwiftRValueType()
-              ->isBindableTo(EMI->getType().getSwiftRValueType()),
-            "result must be of the method's type");
-    verifyOpenedArchetype(EMI, EMI->getType().getSwiftRValueType());
-  }
-
   void checkClassMethodInst(ClassMethodInst *CMI) {
     auto member = CMI->getMember();
     auto overrideTy = TC.getConstantOverrideType(member);
@@ -2270,24 +2250,31 @@ public:
 
   void checkObjCMethodInst(ObjCMethodInst *OMI) {
     auto member = OMI->getMember();
-    auto overrideTy = TC.getConstantOverrideType(member);
-    if (OMI->getModule().getStage() != SILStage::Lowered) {
-      requireSameType(
-          OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
-          "result type of objc_method must match abstracted type of method");
-    }
+    require(member.isForeign,
+            "native method cannot be dispatched via objc");
+
     auto methodType = requireObjectType(SILFunctionType, OMI,
                                         "result of objc_method");
     require(!methodType->getExtInfo().hasContext(),
             "result method must be of a context-free function type");
-    SILType operandType = OMI->getOperand()->getType();
-    require(operandType.isClassOrClassMetatype(),
-            "operand must be of a class type");
-    require(getMethodSelfType(methodType).isClassOrClassMetatype(),
-            "result must be a method of a class");
-    
-    require(member.isForeign,
-            "native method cannot be dispatched via objc");
+
+    auto methodSelfType = getMethodSelfType(methodType);
+    auto operandType = OMI->getOperand()->getType();
+
+    if (methodSelfType.isClassOrClassMetatype()) {
+      auto overrideTy = TC.getConstantOverrideType(member);
+      requireSameType(
+          OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
+          "result type of objc_method must match abstracted type of method");
+      require(operandType.isClassOrClassMetatype(),
+              "operand must be of a class type");
+    } else {
+      require(getDynamicMethodType(operandType, OMI->getMember())
+                .getSwiftRValueType()
+                ->isBindableTo(OMI->getType().getSwiftRValueType()),
+              "result must be of the method's type");
+      verifyOpenedArchetype(OMI, OMI->getType().getSwiftRValueType());
+    }
 
     // TODO: We should enforce that ObjC methods are dispatched on ObjC
     // metatypes, but IRGen appears not to care right now.

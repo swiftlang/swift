@@ -70,7 +70,6 @@ static bool isNonWritableMemoryAddress(SILNode *V) {
   case SILNodeKind::SuperMethodInst:
   case SILNodeKind::ObjCMethodInst:
   case SILNodeKind::ObjCSuperMethodInst:
-  case SILNodeKind::DynamicMethodInst:
   case SILNodeKind::StringLiteralInst:
   case SILNodeKind::ThinToThickFunctionInst:
   case SILNodeKind::ThinFunctionToPointerInst:

@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
+// REQUIRES: sdk_overlay
 
 import Foundation
 import StdlibUnittest

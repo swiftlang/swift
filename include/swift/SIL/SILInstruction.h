@@ -4870,15 +4870,24 @@ class SuperMethodInst
 /// ObjCMethodInst - Given the address of a value of class type and a method
 /// constant, extracts the implementation of that method for the dynamic
 /// instance type of the class.
-class ObjCMethodInst
-    : public UnaryInstructionBase<SILInstructionKind::ObjCMethodInst,
-                                  MethodInst>
+class ObjCMethodInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::ObjCMethodInst,
+          ObjCMethodInst,
+          MethodInst>
 {
   friend SILBuilder;
 
   ObjCMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
+                 ArrayRef<SILValue> TypeDependentOperands,
                  SILDeclRef Member, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                               TypeDependentOperands, Ty, Member) {}
+
+  static ObjCMethodInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand,
+         SILDeclRef Member, SILType Ty, SILFunction *F,
+         SILOpenedArchetypesState &OpenedArchetypes);
 };
 
 /// ObjCSuperMethodInst - Given the address of a value of class type and a method
@@ -4921,6 +4930,18 @@ class WitnessMethodInst final
                                            TypeDependentOperands);
   }
 
+  /// Create a witness method call of a protocol requirement, passing in a lookup
+  /// type and conformance.
+  ///
+  /// At runtime, the witness is looked up in the conformance of the lookup type
+  /// to the protocol.
+  ///
+  /// The lookup type is usually an archetype, but it will be concrete if the
+  /// witness_method instruction is inside a function body that was specialized.
+  ///
+  /// The conformance must exactly match the requirement; the caller must handle
+  /// the case where the requirement is defined in a base protocol that is
+  /// refined by the conforming protocol.
   static WitnessMethodInst *
   create(SILDebugLocation DebugLoc, CanType LookupType,
          ProtocolConformanceRef Conformance, SILDeclRef Member, SILType Ty,
@@ -4960,30 +4981,6 @@ public:
   MutableArrayRef<Operand> getTypeDependentOperands() {
     return { getTrailingObjects<Operand>(), NumOperands };
   }
-};
-
-/// Given the address of a value of AnyObject protocol type and a method
-/// constant referring to some Objective-C method, performs dynamic method
-/// lookup to extract the implementation of that method. This method lookup
-/// can fail at run-time
-class DynamicMethodInst final
-  : public UnaryInstructionWithTypeDependentOperandsBase<
-                                   SILInstructionKind::DynamicMethodInst,
-                                   DynamicMethodInst,
-                                   MethodInst>
-{
-  friend SILBuilder;
-
-  DynamicMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                    ArrayRef<SILValue> TypeDependentOperands,
-                    SILDeclRef Member, SILType Ty)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                               TypeDependentOperands, Ty, Member) {}
-
-  static DynamicMethodInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand,
-         SILDeclRef Member, SILType Ty, SILFunction *F,
-         SILOpenedArchetypesState &OpenedArchetypes);
 };
 
 /// Access allowed to the opened value by the open_existential_addr instruction.
