@@ -1285,7 +1285,7 @@ struct TargetNominalTypeDescriptor {
   
   RelativeDirectPointerIntPair<TargetGenericMetadata<Runtime>,
                                NominalTypeKind, /*Nullable*/ true>
-    GenericMetadataPatternAndKind;
+    SadnessAndKind;
 
   using NonGenericMetadataAccessFunction = const Metadata *();
 
@@ -1300,19 +1300,12 @@ struct TargetNominalTypeDescriptor {
   TargetRelativeDirectPointer<Runtime, NonGenericMetadataAccessFunction,
                               /*Nullable*/ true> AccessFunction;
 
-  /// A pointer to the generic metadata pattern that is used to instantiate
-  /// instances of this type. Zero if the type is not generic.
-  TargetGenericMetadata<Runtime> *getGenericMetadataPattern() const {
-    return const_cast<TargetGenericMetadata<Runtime>*>(
-                                    GenericMetadataPatternAndKind.getPointer());
-  }
-
   NonGenericMetadataAccessFunction *getAccessFunction() const {
     return AccessFunction.get();
   }
 
   NominalTypeKind getKind() const {
-    return GenericMetadataPatternAndKind.getInt();
+    return SadnessAndKind.getInt();
   }
 
   int32_t offsetToNameOffset() const {

@@ -1471,11 +1471,6 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
   // even if Swift doesn't, because of SwiftObject.)
   rodata->InstanceStart = size;
 
-  auto genericPattern = self->getDescription()->getGenericMetadataPattern();
-  auto &allocator =
-    genericPattern ? unsafeGetInitializedCache(genericPattern).getAllocator()
-                   : getResilientMetadataAllocator();
-
   // Always clone the ivar descriptors.
   if (numFields) {
     const ClassIvarList *dependentIvars = rodata->IvarList;
@@ -1484,8 +1479,8 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 
     auto ivarListSize = sizeof(ClassIvarList) +
                         numFields * sizeof(ClassIvarEntry);
-    auto ivars = (ClassIvarList*) allocator.Allocate(ivarListSize,
-                                                     alignof(ClassIvarList));
+    auto ivars = (ClassIvarList*) getResilientMetadataAllocator()
+      .Allocate(ivarListSize, alignof(ClassIvarList));
     memcpy(ivars, dependentIvars, ivarListSize);
     rodata->IvarList = ivars;
 
