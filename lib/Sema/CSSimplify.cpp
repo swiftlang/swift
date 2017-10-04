@@ -1037,20 +1037,10 @@ ConstraintSystem::matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1
   // Match up the call arguments to the parameters.
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 4> parameterBindings;
-  if (constraints::matchCallArguments(type2, type1, defaultMap,
-                                      hasTrailingClosure,
-                                      /*allowFixes=*/false,
-                                      listener,
-                                      parameterBindings)) {
-    // FIXME: Sometimes we get asked to bind type variables to parameters.
-    // We should not be asked to bind type variables to parameters.
-    if (type2.size() == 1 && type2[0].getType()->isTypeVariableOrMember()) {
-      return matchTypes(argType, type2[0].getType(),
-                        ConstraintKind::BindParam,
-                        subflags, locator);
-    }
+  if (constraints::matchCallArguments(
+          type2, type1, defaultMap, hasTrailingClosure,
+          /*allowFixes=*/false, listener, parameterBindings))
     return SolutionKind::Error;
-  }
   
   // Compare each of the bound arguments for this parameter.
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
