@@ -482,7 +482,9 @@ public:
     if (witnessSerialized &&
         fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
       witnessLinkage = SILLinkage::Public;
-      witnessSerialized = IsNotSerialized;
+      witnessSerialized = (SGM.M.getOptions().SILSerializeWitnessTables
+                           ? IsSerialized
+                           : IsNotSerialized);
     } else {
       // This is the "real" rule; the above case should go away once we
       // figure out what's going on.
