@@ -638,6 +638,34 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
               unbound->getDecl()->getName());
 }
 
+// Produce a diagnostic if the type we referenced was an
+// associated type but the type itself was erroneous. We'll produce a
+// diagnostic here if the diagnostic for the bad type witness would show up in
+// a different context.
+static void maybeDiagnoseBadConformanceRef(TypeChecker &tc,
+                                           DeclContext *dc,
+                                           Type parentTy,
+                                           SourceLoc loc,
+                                           AssociatedTypeDecl *assocType) {
+  // If we weren't given a conformance, go look it up.
+  ProtocolConformance *conformance = nullptr;
+  if (auto conformanceRef =
+        tc.conformsToProtocol(
+          parentTy, assocType->getProtocol(), dc,
+          (ConformanceCheckFlags::InExpression|
+           ConformanceCheckFlags::SuppressDependencyTracking))) {
+    if (conformanceRef->isConcrete())
+      conformance = conformanceRef->getConcrete();
+  }
+
+  // If any errors have occurred, don't bother diagnosing this cross-file
+  // issue.
+  if (tc.Context.Diags.hadAnyError())
+    return;
+
+  tc.diagnose(loc, diag::broken_associated_type_witness,
+              assocType->getFullName(), parentTy);
+};
 /// \brief Returns a valid type or ErrorType in case of an error.
 static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *foundDC,
@@ -678,6 +706,12 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
       !options.contains(TR_ResolveStructure)) {
     diagnoseUnboundGenericType(TC, type, loc);
     return ErrorType::get(TC.Context);
+  }
+
+  if (type->hasError() && isa<AssociatedTypeDecl>(typeDecl)) {
+    maybeDiagnoseBadConformanceRef(TC, fromDC,
+                                   foundDC->getDeclaredInterfaceType(),
+                                   loc, cast<AssociatedTypeDecl>(typeDecl));
   }
 
   if (generic && !options.contains(TR_ResolveStructure)) {
@@ -1174,42 +1208,6 @@ static Type resolveNestedIdentTypeComponent(
               bool diagnoseErrors,
               GenericTypeResolver *resolver,
               UnsatisfiedDependency *unsatisfiedDependency) {
-  // Local function to produce a diagnostic if the type we referenced was an
-  // associated type but the type itself was erroneous. We'll produce a
-  // diagnostic here if the diagnostic for the bad type witness would show up in
-  // a different context.
-  auto maybeDiagnoseBadConformanceRef = [&](AssociatedTypeDecl *assocType) {
-    // If we aren't emitting any diagnostics, we're done.
-    if (!diagnoseErrors)
-      return;
-
-    // If we weren't given a conformance, go look it up.
-    ProtocolConformance *conformance = nullptr;
-    if (auto conformanceRef =
-        TC.conformsToProtocol(
-          parentTy, assocType->getProtocol(), DC,
-            (ConformanceCheckFlags::InExpression|
-             ConformanceCheckFlags::SuppressDependencyTracking))) {
-      if (conformanceRef->isConcrete())
-        conformance = conformanceRef->getConcrete();
-    }
-
-    // If there is a conformance and it comes from the same source file as type
-    // resolution, don't diagnose.
-    if (conformance &&
-        conformance->getDeclContext()->getParentSourceFile() ==
-          DC->getParentSourceFile())
-      return;
-
-    // If any errors have occurred, don't bother diagnosing this cross-file
-    // issue.
-    if (TC.Context.Diags.hadAnyError())
-      return;
-
-    TC.diagnose(comp->getLoc(), diag::broken_associated_type_witness,
-                assocType->getFullName(), parentTy);
-  };
-
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType) {
     // Diagnose invalid cases.
     if (TC.isUnsupportedMemberTypeAccess(parentTy, member)) {
@@ -1247,10 +1245,11 @@ static Type resolveNestedIdentTypeComponent(
       return ErrorType::get(TC.Context);
 
     // Diagnose a bad conformance reference if we need to.
-    if (isa<AssociatedTypeDecl>(member) &&
-        memberType &&
-        memberType->hasError())
-      maybeDiagnoseBadConformanceRef(cast<AssociatedTypeDecl>(member));
+    if (isa<AssociatedTypeDecl>(member) && diagnoseErrors &&
+        memberType && memberType->hasError()) {
+      maybeDiagnoseBadConformanceRef(TC, DC, parentTy, comp->getLoc(),
+                                     cast<AssociatedTypeDecl>(member));
+    }
 
     // At this point, we need to have resolved the type of the member.
     if (!memberType || memberType->hasError()) return memberType;
