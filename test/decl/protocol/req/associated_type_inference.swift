@@ -380,3 +380,13 @@ protocol Vector {
 struct Int8Vector : Vector {
   func process(elements: [Int8]) { }
 }
+
+// SR-4486
+protocol P13 {
+  associatedtype Arg // expected-note{{protocol requires nested type 'Arg'; do you want to add it?}}
+  func foo(arg: Arg)
+}
+
+struct S13 : P13 { // expected-error{{type 'S13' does not conform to protocol 'P13'}}
+  func foo(arg: inout Int) {}
+}
