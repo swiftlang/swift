@@ -168,7 +168,7 @@ public class Node {
  }
 }
 
-final class SubNode : Node {
+class SubNode : Node {
   var a: Int
 
   required init(node: Node) {
@@ -179,5 +179,30 @@ final class SubNode : Node {
   init(data: inout Data, additionalParam: Int) {
     a = additionalParam
     super.init(data: &data)
+  }
+}
+
+class GenericSubNode<T> : SubNode {
+  required init(node: Node) {
+    super.init(node: node)
+  }
+
+  init(data: inout Data, value: T) {
+    super.init(data: &data, additionalParam: 1)
+  }
+}
+
+protocol HasValue {
+  associatedtype Value
+  func getValue() -> Value
+}
+
+class GenericWrapperNode<T : HasValue> : GenericSubNode<T.Value> {
+  required init(node: Node) {
+    super.init(node: node)
+  }
+
+  init(data: inout Data, otherValue: T) {
+    super.init(data: &data, value: otherValue.getValue())
   }
 }
