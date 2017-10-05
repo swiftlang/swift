@@ -104,6 +104,9 @@ public:
   void setPrimaryInput(SelectedInput si) {
     PrimaryInput = si;
   }
+  void clearPrimaryInput() {
+    PrimaryInput = 0;
+  }
   
   bool shouldTreatAsSIL() const;
   
