@@ -21,8 +21,8 @@ import Swift
 // CHECK-SAME:   i32 15,
 // --       field names
 // CHECK-SAME:   [7 x i8]* [[ROOTGENERIC_FIELDS]]
-// --       generic metadata pattern
-// CHECK-SAME:   @_T015generic_classes11RootGenericCMP
+// --       kind 0 (class)
+// CHECK-SAME:   i32 0,
 // --       generic parameter vector offset
 // CHECK-SAME:   i32 10,
 // --       generic parameter count, primary count
