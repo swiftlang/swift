@@ -1314,44 +1314,11 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   llvm_unreachable("bad link entity kind");
 }
 
-bool LinkEntity::isFragile(ForDefinition_t isDefinition) const {
-  switch (getKind()) {
-    case Kind::SILFunction:
-      return getSILFunction()->isSerialized();
-      
-    case Kind::SILGlobalVariable:
-      return getSILGlobalVariable()->isSerialized();
-      
-    case Kind::ReflectionAssociatedTypeDescriptor:
-    case Kind::ReflectionSuperclassDescriptor:
-    case Kind::AssociatedTypeMetadataAccessFunction:
-    case Kind::AssociatedTypeWitnessTableAccessFunction:
-    case Kind::GenericProtocolWitnessTableCache:
-    case Kind::GenericProtocolWitnessTableInstantiationFunction:
-    case Kind::ObjCClassRef:
-      return false;
-
-    default:
-      break;
-  }
-  if (isProtocolConformanceKind(getKind())) {
-    auto conformance = getProtocolConformance();
-
-    auto conformanceModule = conformance->getDeclContext()->getParentModule();
-    auto isCompletelySerialized =
-        conformanceModule->getASTContext().LangOpts.SILSerializeWitnessTables;
-
-    // The conformance is fragile if it is in a -sil-serialize-all module.
-    return isCompletelySerialized;
-  }
-  return false;
-}
-
 static std::tuple<llvm::GlobalValue::LinkageTypes,
                   llvm::GlobalValue::VisibilityTypes,
                   llvm::GlobalValue::DLLStorageClassTypes>
 getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
-             bool isFragile, bool isSILOnly, ForDefinition_t isDefinition,
+             bool isSILOnly, ForDefinition_t isDefinition,
              bool isWeakImported) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
   std::make_tuple(llvm::GlobalValue::LINKAGE##Linkage,                         \
@@ -1371,29 +1338,6 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
   llvm::GlobalValue::DLLStorageClassTypes ImportedStorage =
       info.UseDLLStorage ? llvm::GlobalValue::DLLImportStorageClass
                          : llvm::GlobalValue::DefaultStorageClass;
-
-  if (isFragile) {
-    // Fragile functions/globals must be visible from outside, regardless of
-    // their access level. If a caller is also fragile and inlined into another
-    // module it must be able to access this (not-inlined) function/global.
-    switch (linkage) {
-    case SILLinkage::Hidden:
-    case SILLinkage::Private:
-      linkage = SILLinkage::Public;
-      break;
-
-    case SILLinkage::HiddenExternal:
-    case SILLinkage::PrivateExternal:
-      linkage = SILLinkage::PublicExternal;
-      break;
-
-    case SILLinkage::Public:
-    case SILLinkage::Shared:
-    case SILLinkage::PublicExternal:
-    case SILLinkage::SharedExternal:
-      break;
-    }
-  }
 
   switch (linkage) {
   case SILLinkage::Public:
@@ -1453,8 +1397,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
     return std::make_tuple(isDefinition
                                ? llvm::GlobalValue::AvailableExternallyLinkage
                                : llvm::GlobalValue::ExternalLinkage,
-                           isFragile ? llvm::GlobalValue::DefaultVisibility
-                                     : llvm::GlobalValue::HiddenVisibility,
+                           llvm::GlobalValue::HiddenVisibility,
                            ImportedStorage);
 
   }
@@ -1472,7 +1415,7 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
   UniversalLinkageInfo linkInfo(IGM);
   auto linkage =
       getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
-                   entity.isFragile(ForDefinition), entity.isSILOnly(),
+                   entity.isSILOnly(),
                    ForDefinition, entity.isWeakImported(IGM.getSwiftModule()));
   global->setLinkage(std::get<0>(linkage));
   global->setVisibility(std::get<1>(linkage));
@@ -1504,7 +1447,7 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
 
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
       getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
-                   entity.isFragile(isDefinition), entity.isSILOnly(),
+                   entity.isSILOnly(),
                    isDefinition, entity.isWeakImported(swiftModule));
 
   result.ForDefinition = isDefinition;
@@ -1515,20 +1458,19 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
 LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
                        StringRef name,
                        SILLinkage linkage,
-                       bool isFragile,
                        bool isSILOnly,
                        ForDefinition_t isDefinition,
                        bool isWeakImported) {
   LinkInfo result;
-  
+
   result.Name += name;
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-    getIRLinkage(linkInfo, linkage, isFragile, isSILOnly,
+    getIRLinkage(linkInfo, linkage, isSILOnly,
                  isDefinition, isWeakImported);
   result.ForDefinition = isDefinition;
   return result;
 }
-                       
+
 static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
   return cast<llvm::PointerType>(ptrTy)->getElementType() == objTy;
 }
