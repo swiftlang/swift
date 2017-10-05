@@ -73,7 +73,7 @@ public func NSApplicationMain(
 extension NSApplication {
   @available(swift 4)
   public static func loadApplication() {
-    NSApplicationLoad()
+    __NSApplicationLoad()
   }
 }
 
@@ -90,7 +90,7 @@ public typealias _ColorLiteralType = NSColor
 
 extension NSImage : _ExpressibleByImageLiteral {
   private convenience init!(failableImageLiteral name: String) {
-    self.init(named: name)
+    self.init(named: .init(name))
   }
 
   @nonobjc
