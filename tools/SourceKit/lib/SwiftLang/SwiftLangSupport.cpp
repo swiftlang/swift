@@ -715,6 +715,14 @@ std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
 #endif
 }
 
+void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {
+  std::vector<Statistic *> stats = {
+#define SWIFT_STATISTIC(VAR, UID, DESC) &Stats.VAR,
+#include "SwiftStatistics.def"
+  };
+  receiver(stats);
+}
+
 CloseClangModuleFiles::~CloseClangModuleFiles() {
   clang::Preprocessor &PP = loader.getClangPreprocessor();
   clang::ModuleMap &ModMap = PP.getHeaderSearchInfo().getModuleMap();

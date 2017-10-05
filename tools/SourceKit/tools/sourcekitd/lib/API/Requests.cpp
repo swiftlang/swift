@@ -21,6 +21,7 @@
 #include "SourceKit/Core/NotificationCenter.h"
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/Logging.h"
+#include "SourceKit/Support/Statistic.h"
 #include "SourceKit/Support/UIdent.h"
 #include "SourceKit/SwiftLang/Factory.h"
 
@@ -294,6 +295,11 @@ handleSemanticRequest(RequestDict Req,
                       ArrayRef<const char *> Args);
 
 void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
+  // NOTE: if we had a connection context, these stats should move into it.
+  static Statistic numRequests(UIdentFromSKDUID(KindStatNumRequests), "# of requests (total)");
+  static Statistic numSemaRequests(UIdentFromSKDUID(KindStatNumSemaRequests), "# of semantic requests");
+  ++numRequests;
+
   RequestDict Req(ReqObj);
   sourcekitd_uid_t ReqUID = Req.getUID(KeyRequest);
   if (!ReqUID)
@@ -660,6 +666,27 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     return Rec(ResponseBuilder().createResponse());
   }
 
+  if (ReqUID == RequestStatistics) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Lang.getStatistics([Rec](ArrayRef<Statistic *> stats) {
+      ResponseBuilder builder;
+      auto results = builder.getDictionary().setArray(KeyResults);
+      auto addStat = [&results](Statistic *stat) {
+        auto dict = results.appendDictionary();
+        dict.set(KeyKind, stat->name);
+        dict.set(KeyDescription, stat->description);
+        dict.set(KeyValue, stat->value);
+      };
+
+      addStat(&numRequests);
+      addStat(&numSemaRequests);
+      std::for_each(stats.begin(), stats.end(), addStat);
+
+      Rec(builder.createResponse());
+    });
+    return;
+  }
+
   if (!SourceFile.hasValue() && !SourceText.hasValue() &&
       ReqUID != RequestCodeCompleteUpdate)
     return Rec(createErrorRequestInvalid(
@@ -673,6 +700,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
   static WorkQueue SemaQueue{ WorkQueue::Dequeuing::Concurrent,
                               "sourcekit.request.semantic" };
   sourcekitd_request_retain(ReqObj);
+  ++numSemaRequests;
   SemaQueue.dispatch(
     [ReqObj, Rec, ReqUID, SourceFile, SourceText, Args] {
       RequestDict Req(ReqObj);
