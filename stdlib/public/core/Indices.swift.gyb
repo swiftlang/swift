@@ -34,8 +34,8 @@ public struct ${Self}<
   Elements : ${collectionForTraversal(Traversal)}
 > : ${collectionForTraversal(Traversal)} {
 
-  // FIXME(compiler limitation): this typealias should be inferred.
   public typealias Index = Elements.Index
+  public typealias Indices = ${Self}<Elements>
 
   @_inlineable
   @_versioned
@@ -50,12 +50,12 @@ public struct ${Self}<
   }
 
   @_inlineable
-  public var startIndex: Elements.Index {
+  public var startIndex: Index {
     return _startIndex
   }
 
   @_inlineable
-  public var endIndex: Elements.Index {
+  public var endIndex: Index {
     return _endIndex
   }
 
@@ -65,7 +65,6 @@ public struct ${Self}<
     return i
   }
 
-  // FIXME(compiler limitation): this typealias should be inferred.
   public typealias SubSequence = ${Self}<Elements>
 
   @_inlineable
@@ -103,9 +102,6 @@ public struct ${Self}<
   }
 %     end
 
-  // FIXME(compiler limitation): this typealias should be inferred.
-  public typealias Indices = ${Self}<Elements>
-
   @_inlineable
   public var indices: Indices {
     return self
@@ -120,10 +116,7 @@ public struct ${Self}<
 }
 
 extension ${collectionForTraversal(Traversal)}
-%     if Traversal != 'RandomAccess':
-  where Indices == ${Self}<Self>
-%     end
-{
+where Indices == ${Self}<Self> {
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
   ///
