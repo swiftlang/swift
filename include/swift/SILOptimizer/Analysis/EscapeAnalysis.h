@@ -490,7 +490,7 @@ public:
       if (Node->getEscapeState() >= EscapeState::Global)
         return -1;
 
-      User = User->getCanonicalSILNodeInObject();
+      User = User->getRepresentativeSILNodeInObject();
       int Idx = (int)UsePoints.size();
       assert(UsePoints.count(User) == 0 && "value is already a use-point");
       UsePoints[User] = Idx;

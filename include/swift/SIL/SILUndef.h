@@ -23,9 +23,12 @@ class SILModule;
 
 class SILUndef : public ValueBase {
   void operator=(const SILArgument &) = delete;
-  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
 
-  SILUndef(SILType Ty) : ValueBase(ValueKind::SILUndef, Ty) {}
+  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED;
+
+  SILUndef(SILType Ty)
+      : ValueBase(ValueKind::SILUndef, Ty, IsRepresentative::Yes) {}
+
 public:
 
   static SILUndef *get(SILType Ty, SILModule *M);

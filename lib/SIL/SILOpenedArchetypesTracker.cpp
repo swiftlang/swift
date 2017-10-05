@@ -187,9 +187,13 @@ SILValue SILOpenedArchetypesState::getOpenedArchetypeDef(
   // First perform a quick check.
   for (auto &Op : OpenedArchetypeOperands) {
     auto Def = Op.get();
-    if (auto SVI = dyn_cast<SingleValueInstruction>(Def))
+    if (auto *SVI = dyn_cast<SingleValueInstruction>(Def))
       if (getOpenedArchetypeOf(SVI) == archetypeTy)
         return Def;
+    if (auto *MVIR = dyn_cast<MultipleValueInstructionResult>(Def)) {
+      if (getOpenedArchetypeOf(MVIR->getParent()) == archetypeTy)
+        return Def;
+    }
   }
   // Then use a regular lookup.
   if (OpenedArchetypesTracker)

@@ -87,7 +87,7 @@ private:
   }
 
   DFSInfo &addDFSInfo(SILNode *node) {
-    assert(node->isCanonicalSILNodeInObject());
+    assert(node->isRepresentativeSILNodeInObject());
 
     auto entry = std::make_pair(node, new DFSInfo(node, CurrentNum++));
     auto insertion = ValueInfoMap.insert(entry);
@@ -96,7 +96,7 @@ private:
   }
 
   DFSInfo &getDFSInfo(SILNode *node) {
-    assert(node->isCanonicalSILNodeInObject());
+    assert(node->isRepresentativeSILNodeInObject());
     auto it = ValueInfoMap.find(node);
     assert(it != ValueInfoMap.end() &&
            "Expected to find value in DFS info map!");
@@ -169,7 +169,8 @@ private:
   /// and returning the DFSInfo for the node.
   /// But if we've already visited the node, just return null.
   DFSInfo *maybeDFSCanonicalNode(SILNode *node) {
-    assert(node->isCanonicalSILNodeInObject() && "should already be canonical");
+    assert(node->isRepresentativeSILNodeInObject() &&
+           "should already be canonical");
 
     if (!Visited.insert(node).second)
       return nullptr;
@@ -184,7 +185,7 @@ private:
     // Visit each unvisited operand, updating the lowest DFS number we've seen
     // reachable in User's SCC.
     for (SILValue operandValue : operands) {
-      SILNode *operandNode = operandValue->getCanonicalSILNodeInObject();
+      SILNode *operandNode = operandValue->getRepresentativeSILNodeInObject();
       if (auto operandNodeInfo = maybeDFSCanonicalNode(operandNode)) {
         nodeInfo.LowNum = std::min(nodeInfo.LowNum, operandNodeInfo->LowNum);
       } else if (DFSStack.count(operandNode)) {
