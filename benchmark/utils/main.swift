@@ -10,13 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-////////////////////////////////////////////////////////////////////////////////
-// WARNING: This file is manually generated from .gyb template and should not
-// be directly modified. Instead, make changes to main.swift.gyb and run
-// scripts/generate_harness/generate_harness.py to regenerate this file.
-////////////////////////////////////////////////////////////////////////////////
-
 // This is just a driver for performance overview tests.
+
 import TestsUtils
 import DriverUtils
 import Ackermann
@@ -96,6 +91,7 @@ import ProtocolDispatch2
 import RC4
 import RGBHistogram
 import RangeAssignment
+import RangeIteration
 import RecursiveOwnedParameter
 import ReduceInto
 import ReversedCollections
@@ -214,6 +210,7 @@ registerBenchmark(ProtocolDispatch2)
 registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
 registerBenchmark(RangeAssignment)
+registerBenchmark(RangeIteration)
 registerBenchmark(RecursiveOwnedParameter)
 registerBenchmark(ReduceInto)
 registerBenchmark(ReversedCollections)

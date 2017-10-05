@@ -103,6 +103,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RC4
     single-source/RGBHistogram
     single-source/RangeAssignment
+    single-source/RangeIteration
     single-source/RecursiveOwnedParameter
     single-source/ReduceInto
     single-source/ReversedCollections
