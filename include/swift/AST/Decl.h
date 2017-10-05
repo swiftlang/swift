@@ -3552,6 +3552,11 @@ public:
   /// Retrieve the set of protocols inherited from this protocol.
   llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
 
+  /// Retrieve the set of AssociatedTypeDecl members of this protocol; this
+  /// saves loading the set of members in cases where there's no possibility of
+  /// a protocol having nested types (ObjC protocols).
+  llvm::TinyPtrVector<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
+
   /// Walk all of the protocols inherited by this protocol, transitively,
   /// invoking the callback function for each protocol.
   ///

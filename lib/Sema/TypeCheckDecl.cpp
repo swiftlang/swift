@@ -255,14 +255,12 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
                          options, resolver);
   }
 
-  for (auto member : protocol->getMembers()) {
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      if (auto whereClause = assocType->getTrailingWhereClause()) {
-        revertGenericRequirements(whereClause->getRequirements());
-        validateRequirements(whereClause->getWhereLoc(),
-                             whereClause->getRequirements(),
-                             protocol, options, resolver);
-      }
+  for (auto assocType : protocol->getAssociatedTypeMembers()) {
+    if (auto whereClause = assocType->getTrailingWhereClause()) {
+      revertGenericRequirements(whereClause->getRequirements());
+      validateRequirements(whereClause->getWhereLoc(),
+                           whereClause->getRequirements(),
+                           protocol, options, resolver);
     }
   }
 }
@@ -3251,10 +3249,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // First, satisfy any associated type requirements.
   Substitution valueSub;
   AssociatedTypeDecl *valueReqt = nullptr;
-  for (auto requirementDecl : behaviorProto->getMembers()) {
-    auto assocTy = dyn_cast<AssociatedTypeDecl>(requirementDecl);
-    if (!assocTy)
-      continue;
+  for (auto assocTy : behaviorProto->getAssociatedTypeMembers()) {
   
     // Match a Value associated type requirement to the property type.
     if (assocTy->getName() != TC.Context.Id_Value) {
@@ -7711,10 +7706,8 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
 
-    for (auto member : proto->getMembers()) {
-      if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
-        validateDeclForNameLookup(ATD);
-      }
+    for (auto ATD : proto->getAssociatedTypeMembers()) {
+      validateDeclForNameLookup(ATD);
     }
 
     // Make sure the protocol is fully validated by the end of Sema.

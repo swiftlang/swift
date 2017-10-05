@@ -2371,12 +2371,10 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   // Form a string describing the associated type deductions.
   // FIXME: Determine which associated types matter, and only print those.
   llvm::SmallString<128> withAssocTypes;
-  for (auto member : conformance->getProtocol()->getMembers()) {
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      if (conformance->usesDefaultDefinition(assocType)) {
-        Type witness = conformance->getTypeWitness(assocType, nullptr);
-        addAssocTypeDeductionString(withAssocTypes, assocType, witness);
-      }
+  for (auto assocType : conformance->getProtocol()->getAssociatedTypeMembers()) {
+    if (conformance->usesDefaultDefinition(assocType)) {
+      Type witness = conformance->getTypeWitness(assocType, nullptr);
+      addAssocTypeDeductionString(withAssocTypes, assocType, witness);
     }
   }
   if (!withAssocTypes.empty())
@@ -4277,10 +4275,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   Conformance->setState(ProtocolConformanceState::CheckingTypeWitnesses);
   SWIFT_DEFER { Conformance->setState(initialState); };
 
-  for (auto member : Proto->getMembers()) {
-    auto assocType = dyn_cast<AssociatedTypeDecl>(member);
-    if (!assocType)
-      continue;
+  for (auto assocType : Proto->getAssociatedTypeMembers()) {
 
     // If we already have a type witness, do nothing.
     if (Conformance->hasTypeWitness(assocType))
@@ -4350,23 +4345,21 @@ void ConformanceChecker::resolveTypeWitnesses() {
     TypeSubstitutionMap substitutions;
     substitutions[Proto->mapTypeIntoContext(selfType)
         ->castTo<ArchetypeType>()] = Adoptee;
-    for (auto member : Proto->getMembers()) {
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        auto archetype = Proto->mapTypeIntoContext(
-            assocType->getDeclaredInterfaceType())
-                ->getAs<ArchetypeType>();
-        if (!archetype)
-          continue;
-        if (Conformance->hasTypeWitness(assocType)) {
-          substitutions[archetype] =
-            Conformance->getTypeWitness(assocType, nullptr);
-        } else {
-          auto known = typeWitnesses.begin(assocType);
-          if (known != typeWitnesses.end())
-            substitutions[archetype] = known->first;
-          else
-            substitutions[archetype] = ErrorType::get(archetype);
-        }
+    for (auto assocType : Proto->getAssociatedTypeMembers()) {
+      auto archetype = Proto->mapTypeIntoContext(
+        assocType->getDeclaredInterfaceType())
+        ->getAs<ArchetypeType>();
+      if (!archetype)
+        continue;
+      if (Conformance->hasTypeWitness(assocType)) {
+        substitutions[archetype] =
+          Conformance->getTypeWitness(assocType, nullptr);
+      } else {
+        auto known = typeWitnesses.begin(assocType);
+        if (known != typeWitnesses.end())
+          substitutions[archetype] = known->first;
+        else
+          substitutions[archetype] = ErrorType::get(archetype);
       }
     }
 
@@ -4493,25 +4486,23 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // substitution of type witness bindings into other type witness bindings.
   auto checkCurrentTypeWitnesses = [&]() -> bool {
     // Fold the dependent member types within this type.
-    for (auto member : Proto->getMembers()) {
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        if (Conformance->hasTypeWitness(assocType))
-          continue;
+    for (auto assocType : Proto->getAssociatedTypeMembers()) {
+      if (Conformance->hasTypeWitness(assocType))
+        continue;
 
-        // If the type binding does not have a type parameter, there's nothing
-        // to do.
-        auto known = typeWitnesses.begin(assocType);
-        assert(known != typeWitnesses.end());
-        if (!known->first->hasTypeParameter() &&
-            !known->first->hasDependentMember())
-          continue;
+      // If the type binding does not have a type parameter, there's nothing
+      // to do.
+      auto known = typeWitnesses.begin(assocType);
+      assert(known != typeWitnesses.end());
+      if (!known->first->hasTypeParameter() &&
+          !known->first->hasDependentMember())
+        continue;
 
-        Type replaced = known->first.transform(foldDependentMemberTypes);
-        if (replaced.isNull())
-          return true;
-        
-        known->first = replaced;
-      }
+      Type replaced = known->first.transform(foldDependentMemberTypes);
+      if (replaced.isNull())
+        return true;
+
+      known->first = replaced;
     }
 
     // Check any same-type requirements in the protocol's requirement signature.
