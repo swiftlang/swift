@@ -65,6 +65,8 @@ const char *irgen::getValueWitnessName(ValueWitness witness) {
   CASE(Flags)
   CASE(Stride)
   CASE(ExtraInhabitantFlags)
+  CASE(GetEnumTagSinglePayload)
+  CASE(StoreEnumTagSinglePayload)
 #undef CASE
   }
   llvm_unreachable("bad value witness kind");
@@ -621,6 +623,39 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     return;
   }
 
+  case ValueWitness::GetEnumTagSinglePayload: {
+    llvm::Value *value = getArg(argv, "value");
+    auto enumTy = type.getStorageType()->getPointerTo();
+    value = IGF.Builder.CreateBitCast(value, enumTy);
+
+    llvm::Value *numEmptyCases = getArg(argv, "numEmptyCases");
+
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
+    llvm::Value *idx = type.getEnumTagSinglePayload(
+        IGF, numEmptyCases, Address(value, type.getBestKnownAlignment()),
+        concreteType);
+    IGF.Builder.CreateRet(idx);
+    return;
+  }
+
+  case ValueWitness::StoreEnumTagSinglePayload: {
+    llvm::Value *value = getArg(argv, "value");
+    auto enumTy = type.getStorageType()->getPointerTo();
+    value = IGF.Builder.CreateBitCast(value, enumTy);
+
+    llvm::Value *whichCase = getArg(argv, "whichCase");
+    llvm::Value *numEmptyCases = getArg(argv, "numEmptyCases");
+
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
+    type.storeEnumTagSinglePayload(IGF, whichCase, numEmptyCases,
+                                   Address(value, type.getBestKnownAlignment()),
+                                   concreteType);
+    IGF.Builder.CreateRetVoid();
+    return;
+  }
+
   case ValueWitness::Size:
   case ValueWitness::Flags:
   case ValueWitness::Stride:
@@ -934,6 +969,11 @@ static void addValueWitness(IRGenModule &IGM,
     // Otherwise, just fill in null here if the type can't be statically
     // queried for extra inhabitants.
     return B.add(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+  }
+
+  case ValueWitness::GetEnumTagSinglePayload:
+  case ValueWitness::StoreEnumTagSinglePayload: {
+    goto standard;
   }
 
   case ValueWitness::GetEnumTag:

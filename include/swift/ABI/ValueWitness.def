@@ -74,6 +74,7 @@
 ///     TYPE_TYPE - a pointer to type metadata
 ///     SIZE_TYPE - size_t
 ///     INT_TYPE - int
+///     UINT_TYPE - unsigned int
 ///     VOID_TYPE - void
 ///   Defaults to VALUE_WITNESS.
 ///   FIXME: The 'copy' witnesses should be using immutable types but aren't.
@@ -179,8 +180,26 @@ FUNCTION_VALUE_WITNESS(initializeBufferWithTakeOfBuffer,
                        MUTABLE_VALUE_TYPE,
                        (MUTABLE_BUFFER_TYPE, MUTABLE_BUFFER_TYPE, TYPE_TYPE))
 
+/// int (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases)
+/// Given an instance of valid single payload enum with a payload of this
+/// witness table's type (e.g Optional<ThisType>) , get the tag of the enum.
+FUNCTION_VALUE_WITNESS(getEnumTagSinglePayload,
+                       GetEnumTagSinglePayload,
+                       INT_TYPE,
+                       (IMMUTABLE_VALUE_TYPE, UINT_TYPE, TYPE_TYPE))
+
+/// void (*storeEnumTagSinglePayload)(T* enum, INT_TYPE whichCase,
+///                                   UINT_TYPE emptyCases)
+/// Given uninitialized memory for an instance of a single payload enum with a
+/// payload of this witness table's type (e.g Optional<ThisType>), store the
+/// tag.
+FUNCTION_VALUE_WITNESS(storeEnumTagSinglePayload,
+                       StoreEnumTagSinglePayload,
+                       VOID_TYPE,
+                       (MUTABLE_VALUE_TYPE, INT_TYPE, UINT_TYPE, TYPE_TYPE))
+
 END_VALUE_WITNESS_RANGE(RequiredValueWitnessFunction,
-                        InitializeBufferWithTakeOfBuffer)
+                        StoreEnumTagSinglePayload)
 
 ///   size_t size;
 ///

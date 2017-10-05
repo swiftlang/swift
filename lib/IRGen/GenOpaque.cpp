@@ -141,6 +141,30 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(voidTy, args, /*isVarArg*/ false);
   }
 
+  /// int (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases,
+  ///                                M *self)
+  case ValueWitness::GetEnumTagSinglePayload: {
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *indexTy = IGM.Int32Ty;
+    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
+
+    llvm::Type *args[] = { ptrTy, indexTy, metaTy };
+    return llvm::FunctionType::get(indexTy, args, false);
+  }
+
+  /// void (*storeEnumTagSinglePayload)(T* enum, INT_TYPE whichCase,
+  ///                                   UINT_TYPE emptyCases,
+  ///                                   M *self)
+  case ValueWitness::StoreEnumTagSinglePayload: {
+    llvm::Type *voidTy = IGM.VoidTy;
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *indexTy = IGM.Int32Ty;
+    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
+
+    llvm::Type *args[] = { ptrTy, indexTy, indexTy, metaTy };
+    return llvm::FunctionType::get(voidTy, args, false);
+  }
+
   case ValueWitness::Size:
   case ValueWitness::Flags:
   case ValueWitness::Stride:
@@ -148,6 +172,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     // Non-function witnesses all have type size_t.
     return IGM.SizeTy;
   }
+
   llvm_unreachable("bad value witness!");
 }
 
@@ -173,6 +198,8 @@ static llvm::AttributeList getValueWitnessAttrs(IRGenModule &IGM,
   case ValueWitness::GetEnumTag:
   case ValueWitness::GetExtraInhabitantIndex:
   case ValueWitness::StoreExtraInhabitant:
+  case ValueWitness::GetEnumTagSinglePayload:
+  case ValueWitness::StoreEnumTagSinglePayload:
     return attrs.addAttribute(ctx, 1, llvm::Attribute::NoAlias);
 
   // These have two arguments and they don't alias each other.
@@ -245,6 +272,10 @@ static StringRef getValueWitnessLabel(ValueWitness index) {
     return "destructiveProjectEnumData";
   case ValueWitness::DestructiveInjectEnumTag:
     return "destructiveInjectEnumTag";
+  case ValueWitness::GetEnumTagSinglePayload:
+    return "getEnumTagSinglePayload";
+  case ValueWitness::StoreEnumTagSinglePayload:
+    return "storeEnumTagSinglePayload";
   }
   llvm_unreachable("bad value witness index");
 }
@@ -632,6 +663,29 @@ llvm::Value *irgen::emitStoreExtraInhabitantCall(IRGenFunction &IGF,
                                           ValueWitness::StoreExtraInhabitant);
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {destObject.getAddress(), index, metadata});
+  return call;
+}
+
+llvm::Value *irgen::emitGetEnumTagSinglePayloadCall(IRGenFunction &IGF,
+                                                    SILType T,
+                                                    llvm::Value *numEmptyCases,
+                                                    Address destObject) {
+  llvm::Value *metadata;
+  auto fn = IGF.emitValueWitnessFunctionRef(
+      T, metadata, ValueWitness::GetEnumTagSinglePayload);
+  llvm::CallInst *call = IGF.Builder.CreateCall(
+      fn, {destObject.getAddress(), numEmptyCases, metadata});
+  return call;
+}
+
+llvm::Value *irgen::emitStoreEnumTagSinglePayloadCall(
+    IRGenFunction &IGF, SILType T, llvm::Value *whichCase,
+    llvm::Value *numEmptyCases, Address destObject) {
+  llvm::Value *metadata;
+  auto fn = IGF.emitValueWitnessFunctionRef(
+      T, metadata, ValueWitness::StoreEnumTagSinglePayload);
+  llvm::CallInst *call = IGF.Builder.CreateCall(
+      fn, {destObject.getAddress(), whichCase, numEmptyCases, metadata});
   return call;
 }
 

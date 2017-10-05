@@ -390,6 +390,20 @@ public:
                                   llvm::Value *metadata,
                                   llvm::Value *vwtable,
                                   SILType T) const = 0;
+
+  /// Get the tag of a single payload enum with a payload of this type (\p T) e.g
+  /// Optional<T>.
+  virtual llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                               llvm::Value *numEmptyCases,
+                                               Address enumAddr,
+                                               SILType T) const = 0;
+
+  /// Store the tag of a single payload enum with a payload of this type.
+  virtual void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *whichCase,
+                                         llvm::Value *numEmptyCases,
+                                         Address enumAddr,
+                                         SILType T) const = 0;
   
   /// Compute the packing of values of this type into a fixed-size buffer.
   FixedPacking getFixedPacking(IRGenModule &IGM) const;

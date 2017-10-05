@@ -30,6 +30,16 @@
 namespace swift {
 namespace irgen {
 
+/// Emits the generic implementation for getEnumTagSinglePayload.
+llvm::Value *emitGetEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address enumAddr, SILType T);
+
+/// Emits the generic implementation for storeEnumTagSinglePayload.
+void emitStoreEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
+                                   llvm::Value *numEmptyCases, Address enumAddr,
+                                   SILType T);
+
 /// An abstract CRTP class designed for types whose storage size,
 /// alignment, and stride need to be fetched from the value witness
 /// table for the type.
@@ -130,8 +140,20 @@ public:
   llvm::Constant *getStaticStride(IRGenModule &IGM) const override {
     return nullptr;
   }
-};
 
+  llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                       llvm::Value *numEmptyCases,
+                                       Address enumAddr,
+                                       SILType T) const override {
+    return emitGetEnumTagSinglePayload(IGF, numEmptyCases, enumAddr, T);
+  }
+
+  void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
+                                 llvm::Value *numEmptyCases, Address enumAddr,
+                                 SILType T) const override {
+    emitStoreEnumTagSinglePayload(IGF, whichCase, numEmptyCases, enumAddr, T);
+  }
+};
 }
 }
 

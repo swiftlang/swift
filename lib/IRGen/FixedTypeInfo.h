@@ -227,7 +227,16 @@ public:
                           llvm::Value *metadata,
                           llvm::Value *vwtable,
                           SILType T) const override {}
-  
+
+  llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                       llvm::Value *numEmptyCases,
+                                       Address enumAddr,
+                                       SILType T) const override;
+
+  void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
+                                 llvm::Value *numEmptyCases, Address enumAddr,
+                                 SILType T) const override;
+
   static bool classof(const FixedTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isFixedSize(); }
 };
