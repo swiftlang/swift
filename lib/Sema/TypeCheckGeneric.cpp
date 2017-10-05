@@ -873,8 +873,11 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
 
     // 'throws' only applies to the innermost function.
     AnyFunctionType::ExtInfo info;
-    if (i == 0 && func->hasThrows())
-      info = info.withThrows();
+    if (i == 0) {
+      info = info.withThrows(func->hasThrows());
+      if (auto fd = dyn_cast<FuncDecl>(func))
+        info = info.withNoEscape(fd->isDeferBody());
+    }
     
     assert(std::all_of(argTy.begin(), argTy.end(), [](const AnyFunctionType::Param &aty){
       return !aty.getType()->hasArchetype();
