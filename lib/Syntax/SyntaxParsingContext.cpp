@@ -135,10 +135,10 @@ SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
       SyntaxFactory::makeStmtList(AllStmts)));
   }
 
-  Trivia Leading, Trailing;
+  Trivia Leading = Trivia::newlines(1), Trailing;
   GlobalData.File.SyntaxRoot.emplace(
     SyntaxFactory::makeSourceFile(SyntaxFactory::makeDeclList(AllTopLevel),
-      SyntaxFactory::makeToken(tok::eof, "\n", SourcePresence::Present,
+      SyntaxFactory::makeToken(tok::eof, "", SourcePresence::Present,
                                Leading, Trailing)));
   delete &GlobalData;
 }

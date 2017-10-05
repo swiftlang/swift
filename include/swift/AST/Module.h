@@ -1091,6 +1091,7 @@ public:
   }
 
   syntax::SourceFileSyntax getSyntaxRoot() const {
+    assert(SyntaxRoot && "no syntax root is set.");
     return *SyntaxRoot;
   }
 
