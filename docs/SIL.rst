@@ -784,8 +784,11 @@ Basic Blocks
   sil-label ::= sil-identifier ('(' sil-argument (',' sil-argument)* ')')? ':'
   sil-argument ::= sil-value-name ':' sil-type
 
-  sil-instruction-def ::= (sil-value-name '=')? sil-instruction
-                          (',' sil-loc)? (',' sil-scope-ref)?
+  sil-instruction-result ::= sil-value-name
+  sil-instruction-result ::= '(' (sil-value-name (',' sil-value-name)*)? ')'
+  sil-instruction-source-info ::= (',' sil-scope-ref)? (',' sil-loc)?
+  sil-instruction-def ::=
+    (sil-instruction-result '=')? sil-instruction sil-instruction-source-info
 
 A function body consists of one or more basic blocks that correspond
 to the nodes of the function's control flow graph. Each basic block
@@ -3506,6 +3509,19 @@ tuple_element_addr
 Given the address of a tuple in memory, derives the
 address of an element within that value.
 
+destructure_tuple
+`````````````````
+
+::
+
+   sil-instruction ::= 'destructure_tuple' sil-operand
+
+   (%elt1, ..., %eltn) = destructure_tuple %0 : $(Elt1Ty, ..., EltNTy)
+   // %0 must be a tuple of type $(Elt1Ty, ..., EltNTy)
+   // %eltN must have the type $EltNTy
+
+Given a tuple value, split the value into its constituent elements.
+
 struct
 ``````
 ::
@@ -3546,6 +3562,19 @@ struct_element_addr
 
 Given the address of a struct value in memory, derives the address of a
 physical field within the value.
+
+destructure_struct
+``````````````````
+
+::
+
+   sil-instruction ::= 'destructure_struct' sil-operand
+
+   (%elt1, ..., %eltn) = destructure_struct %0 : $S
+   // %0 must be a struct of type $S
+   // %eltN must have the same type as the Nth field of $S
+
+Given a struct, split the struct into its constituant fields.
 
 object
 ``````

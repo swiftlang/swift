@@ -214,7 +214,10 @@ ABSTRACT_VALUE(SILArgument, ValueBase)
   ARGUMENT(SILFunctionArgument, SILArgument)
   VALUE_RANGE(SILArgument, SILPHIArgument, SILFunctionArgument)
 
-ABSTRACT_VALUE(MultipleValueResult, ValueBase)
+ABSTRACT_VALUE(MultipleValueInstructionResult, ValueBase)
+  MULTIPLE_VALUE_INST_RESULT(DestructureStructResult, MultipleValueInstructionResult)
+  MULTIPLE_VALUE_INST_RESULT(DestructureTupleResult, MultipleValueInstructionResult)
+  VALUE_RANGE(MultipleValueInstructionResult, DestructureStructResult, DestructureTupleResult)
 
 VALUE(SILUndef, ValueBase)
 
@@ -633,8 +636,15 @@ NON_VALUE_INST(CondFailInst, cond_fail,
 
 NODE_RANGE(NonValueInstruction, UnreachableInst, CondFailInst)
 
-NODE_RANGE(SILInstruction, AllocStackInst, CondFailInst)
-NODE_RANGE(SILNode, SILPHIArgument, CondFailInst)
+ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
+MULTIPLE_VALUE_INST(DestructureStructInst, destructure_struct,
+                    SILInstruction, None, DoesNotRelease)
+MULTIPLE_VALUE_INST(DestructureTupleInst, destructure_tuple,
+                    SILInstruction, None, DoesNotRelease)
+INST_RANGE(MultipleValueInstruction, DestructureStructInst, DestructureTupleInst)
+
+NODE_RANGE(SILInstruction, AllocStackInst, DestructureTupleInst)
+NODE_RANGE(SILNode, SILPHIArgument, DestructureTupleInst)
 
 #undef SINGLE_VALUE_INST_RANGE
 #undef INST_RANGE

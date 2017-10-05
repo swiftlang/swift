@@ -22,3 +22,37 @@ bb0(%0 : $Builtin.NativeObject):
   end_lifetime %0 : $Builtin.NativeObject
   return undef : $()
 }
+
+class TestArrayStorage {
+  @sil_stored var count: Int32
+  init()
+}
+
+struct TestArray2 {
+  var storage : TestArrayStorage
+  var someValue : Int32
+  var storage2 : TestArrayStorage
+}
+
+struct Int32 {
+  var x: Builtin.Int32
+}
+
+sil @test_destructure_struct_tuple : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage) {
+bb0(%0 : $(Builtin.NativeObject, Builtin.Int32), %1 : $TestArray2):
+  (%2, %3) = destructure_tuple %0 : $(Builtin.NativeObject, Builtin.Int32)
+  (%4, %5, %6) = destructure_struct %1 : $TestArray2
+  %7 = tuple(%2 : $Builtin.NativeObject, %3 : $Builtin.Int32, %4 : $TestArrayStorage, %5 : $Int32, %6 : $TestArrayStorage)
+  return %7 : $(Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage)
+}
+
+struct EmptyStruct {}
+
+sil @test_empty_destructure : $@convention(thin) () -> () {
+bb0:
+  %0 = struct $EmptyStruct()
+  () = destructure_struct %0 : $EmptyStruct
+  %1 = tuple()
+  () = destructure_tuple %1 : $()
+  return %1 : $()
+}

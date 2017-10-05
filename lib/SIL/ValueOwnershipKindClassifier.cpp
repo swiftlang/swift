@@ -252,9 +252,13 @@ ValueOwnershipKindClassifier::visitSILPHIArgument(SILPHIArgument *Arg) {
   return Arg->getOwnershipKind();
 }
 
-ValueOwnershipKind
-ValueOwnershipKindClassifier::visitMultipleValueInstructionResult(
-    MultipleValueInstructionResult *Result) {
+ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureStructResult(
+    DestructureStructResult *Result) {
+  return Result->getOwnershipKind();
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureTupleResult(
+    DestructureTupleResult *Result) {
   return Result->getOwnershipKind();
 }
 

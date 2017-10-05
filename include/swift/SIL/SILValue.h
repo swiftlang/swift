@@ -138,6 +138,13 @@ struct ValueOwnershipKind {
   bool isTrivialOr(ValueOwnershipKind Kind) const {
     return Value == Trivial || Value == Kind;
   }
+
+  /// Given that there is an aggregate value (like a struct or enum) with this
+  /// ownership kind, and a subobject of type Proj is being projected from the
+  /// aggregate, return Trivial if Proj has trivial type and the aggregate's
+  /// ownership kind otherwise.
+  ValueOwnershipKind getProjectedOwnershipKind(SILModule &M,
+                                               SILType Proj) const;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, ValueOwnershipKind Kind);

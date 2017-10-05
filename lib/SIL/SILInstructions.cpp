@@ -14,15 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILInstruction.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/type_traits.h"
-#include "swift/Basic/Unicode.h"
 #include "swift/Basic/AssertImplements.h"
+#include "swift/Basic/Unicode.h"
+#include "swift/Basic/type_traits.h"
 #include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/APInt.h"
@@ -2325,4 +2326,70 @@ GenericSpecializationInformation::create(SILInstruction *Inst, SILBuilder &B) {
     return F->getSpecializationInfo();
 
   return nullptr;
+}
+
+static void computeAggregateFirstLevelSubtypeInfo(
+    SILModule &M, SILValue Operand, llvm::SmallVectorImpl<SILType> &Types,
+    llvm::SmallVectorImpl<ValueOwnershipKind> &OwnershipKinds) {
+  SILType OpType = Operand->getType();
+
+  // TODO: Create an iterator for accessing first level projections to eliminate
+  // this SmallVector.
+  llvm::SmallVector<Projection, 8> Projections;
+  Projection::getFirstLevelProjections(OpType, M, Projections);
+
+  auto OpOwnershipKind = Operand.getOwnershipKind();
+  for (auto &P : Projections) {
+    SILType ProjType = P.getType(OpType, M);
+    Types.emplace_back(ProjType);
+    OwnershipKinds.emplace_back(
+        OpOwnershipKind.getProjectedOwnershipKind(M, ProjType));
+  }
+}
+
+DestructureStructInst *DestructureStructInst::create(SILModule &M,
+                                                     SILDebugLocation Loc,
+                                                     SILValue Operand) {
+  assert(Operand->getType().getStructOrBoundGenericStruct() &&
+         "Expected a struct typed operand?!");
+
+  llvm::SmallVector<SILType, 8> Types;
+  llvm::SmallVector<ValueOwnershipKind, 8> OwnershipKinds;
+  computeAggregateFirstLevelSubtypeInfo(M, Operand, Types, OwnershipKinds);
+  assert(Types.size() == OwnershipKinds.size() &&
+         "Expected same number of Types and OwnerKinds");
+
+  unsigned NumElts = Types.size();
+  unsigned Size =
+      totalSizeToAlloc<MultipleValueInstruction *, DestructureStructResult>(
+          1, NumElts);
+
+  void *Buffer = M.allocateInst(Size, alignof(DestructureStructInst));
+
+  return ::new (Buffer)
+      DestructureStructInst(M, Loc, Operand, Types, OwnershipKinds);
+}
+
+DestructureTupleInst *DestructureTupleInst::create(SILModule &M,
+                                                   SILDebugLocation Loc,
+                                                   SILValue Operand) {
+  assert(Operand->getType().getSwiftRValueType()->is<TupleType>() &&
+         "Expected a tuple typed operand?!");
+
+  llvm::SmallVector<SILType, 8> Types;
+  llvm::SmallVector<ValueOwnershipKind, 8> OwnershipKinds;
+  computeAggregateFirstLevelSubtypeInfo(M, Operand, Types, OwnershipKinds);
+  assert(Types.size() == OwnershipKinds.size() &&
+         "Expected same number of Types and OwnerKinds");
+
+  // We add 1 since we store an offset to our
+  unsigned NumElts = Types.size();
+  unsigned Size =
+      totalSizeToAlloc<MultipleValueInstruction *, DestructureTupleResult>(
+          1, NumElts);
+
+  void *Buffer = M.allocateInst(Size, alignof(DestructureTupleInst));
+
+  return ::new (Buffer)
+      DestructureTupleInst(M, Loc, Operand, Types, OwnershipKinds);
 }

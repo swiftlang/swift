@@ -788,7 +788,9 @@ public:
   static bool classof(const SILNode *node) {
     // This is an abstract class without anything implementing it right now, so
     // just return false. This will be fixed in a subsequent commit.
-    return false;
+    SILNodeKind kind = node->getKind();
+    return kind >= SILNodeKind::First_MultipleValueInstructionResult &&
+           kind <= SILNodeKind::Last_MultipleValueInstructionResult;
   }
 
 protected:
@@ -830,9 +832,9 @@ public:
   unsigned getNumResults() const { return getResults().size(); }
 
   static bool classof(const SILNode *node) {
-    // This is an abstract class without anything implementing it right now, so
-    // just return false. This will be fixed in a subsequent commit.
-    return false;
+    SILNodeKind kind = node->getKind();
+    return kind >= SILNodeKind::First_MultipleValueInstruction &&
+           kind <= SILNodeKind::Last_MultipleValueInstruction;
   }
 };
 
@@ -7265,14 +7267,81 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
   }
 }
 
-inline SILNode *MultipleValueInstructionResult::getCanonicalSILNodeInObject() {
-  return getParent();
-}
+/// A result for the destructure_struct instruction. See documentation for
+/// destructure_struct for more information.
+class DestructureStructResult final : public MultipleValueInstructionResult {
+public:
+  DestructureStructResult(unsigned Index, SILType Type,
+                          ValueOwnershipKind OwnershipKind)
+      : MultipleValueInstructionResult(ValueKind::DestructureStructResult,
+                                       Index, Type, OwnershipKind) {}
 
-inline const SILNode *
-MultipleValueInstructionResult::getCanonicalSILNodeInObject() const {
-  return getParent();
-}
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::DestructureStructResult;
+  }
+};
+
+/// Instruction that takes in a struct value and splits the struct into the
+/// struct's fields.
+class DestructureStructInst final
+    : public UnaryInstructionBase<SILInstructionKind::DestructureStructInst,
+                                  MultipleValueInstruction>,
+      public MultipleValueInstructionTrailingObjects<
+          SILInstructionKind::DestructureStructInst, DestructureStructInst,
+          DestructureStructResult> {
+  friend TrailingObjects;
+
+  DestructureStructInst(SILModule &M, SILDebugLocation Loc, SILValue Operand,
+                        ArrayRef<SILType> Types,
+                        ArrayRef<ValueOwnershipKind> OwnershipKinds)
+      : UnaryInstructionBase(Loc, Operand),
+        MultipleValueInstructionTrailingObjects(this, Types, OwnershipKinds) {}
+
+public:
+  static DestructureStructInst *create(SILModule &M, SILDebugLocation Loc,
+                                       SILValue Operand);
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::DestructureStructInst;
+  }
+};
+
+/// A result for the destructure_tuple instruction. See documentation for
+/// destructure_tuple for more information.
+class DestructureTupleResult final : public MultipleValueInstructionResult {
+public:
+  DestructureTupleResult(unsigned Index, SILType Type,
+                         ValueOwnershipKind OwnershipKind)
+      : MultipleValueInstructionResult(ValueKind::DestructureTupleResult, Index,
+                                       Type, OwnershipKind) {}
+
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::DestructureTupleResult;
+  }
+};
+
+/// Instruction that takes in a tuple value and splits the tuple into the
+/// tuples's elements.
+class DestructureTupleInst final
+    : public UnaryInstructionBase<SILInstructionKind::DestructureTupleInst,
+                                  MultipleValueInstruction>,
+      public MultipleValueInstructionTrailingObjects<
+          SILInstructionKind::DestructureTupleInst, DestructureTupleInst,
+          DestructureTupleResult> {
+  friend TrailingObjects;
+
+  DestructureTupleInst(SILModule &M, SILDebugLocation Loc, SILValue Operand,
+                       ArrayRef<SILType> Types,
+                       ArrayRef<ValueOwnershipKind> OwnershipKinds)
+      : UnaryInstructionBase(Loc, Operand),
+        MultipleValueInstructionTrailingObjects(this, Types, OwnershipKinds) {}
+
+public:
+  static DestructureTupleInst *create(SILModule &M, SILDebugLocation Loc,
+                                      SILValue Operand);
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::DestructureTupleInst;
+  }
+};
 
 } // end swift namespace
 

@@ -92,6 +92,8 @@ class RefWithInt {
   init()
 }
 
+struct EmptyStruct {}
+
 ////////////////
 // Test Cases //
 ////////////////
@@ -917,6 +919,34 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @guaranteed $RefWithInt):
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil @test_destructure_struct_tuple : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned NonTrivialStructWithTrivialField) -> @owned (Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject, Builtin.Int32) {
+bb0(%0 : @owned $(Builtin.NativeObject, Builtin.Int32), %1 : @owned $NonTrivialStructWithTrivialField):
+  // First test guaranteed
+  %2 = begin_borrow %0 : $(Builtin.NativeObject, Builtin.Int32)
+  (%3, %4) = destructure_tuple %2 : $(Builtin.NativeObject, Builtin.Int32)
+  end_borrow %2 from %0 : $(Builtin.NativeObject, Builtin.Int32), $(Builtin.NativeObject, Builtin.Int32)
+
+  %5 = begin_borrow %1 : $NonTrivialStructWithTrivialField
+  (%6, %7) = destructure_struct %5 : $NonTrivialStructWithTrivialField
+  end_borrow %5 from %1 : $NonTrivialStructWithTrivialField, $NonTrivialStructWithTrivialField
+
+  // Then test destructive.
+  (%8, %9) = destructure_tuple %0 : $(Builtin.NativeObject, Builtin.Int32)
+  (%10, %11) = destructure_struct %1 : $NonTrivialStructWithTrivialField
+  %12 = tuple(%8 : $Builtin.NativeObject, %9 : $Builtin.Int32, %10 : $Builtin.NativeObject, %11 : $Builtin.Int32)
+  return %12 : $(Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject, Builtin.Int32)
+}
+
+sil @test_empty_destructure : $@convention(thin) () -> () {
+bb0:
+  %0 = struct $EmptyStruct()
+  () = destructure_struct %0 : $EmptyStruct
+  %1 = tuple()
+  () = destructure_tuple %1 : $()
+  return %1 : $()
+}
+
 
 //////////////////////////
 // Dependent Type Tests //
