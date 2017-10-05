@@ -1232,7 +1232,7 @@ sil [serialized] [thunk] @a_regular_thunk : $@convention(thin) () -> () {
   return %1 : $()
 }
 
-class Foo {
+public class Foo {
   subscript (x: Int, y: Int) -> Int32 { get set }
   var x: Int
   var y: Int

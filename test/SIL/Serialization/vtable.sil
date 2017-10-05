@@ -1,44 +1,44 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-sil -emit-sib -parse-as-library -parse-stdlib -module-name vtable -o %t/vtable.sib %s
+// RUN: %target-swift-frontend -parse-sil -emit-sib -parse-as-library -sil-serialize-vtables -parse-stdlib -module-name vtable -o %t/vtable.sib %s
 // RUN: %target-sil-opt %t/vtable.sib -o - -emit-sorted-sil | %FileCheck %s
 
 sil_stage canonical
 
 import Builtin
 
-class Base {
+public class Base {
   func m1()
   func m2()
 }
 
-class Derived : Base {
+public class Derived : Base {
   override func m2()
   func m3()
 }
 
-sil hidden_external @_T01x4BaseC2m1yyF : $@convention(method) (@guaranteed Base) -> ()
+sil hidden_external [serialized] @_T01x4BaseC2m1yyF : $@convention(method) (@guaranteed Base) -> ()
 
-sil hidden_external @_T01x4BaseC2m2yyF : $@convention(method) (@guaranteed Base) -> ()
+sil hidden_external [serialized] @_T01x4BaseC2m2yyF : $@convention(method) (@guaranteed Base) -> ()
 
-sil hidden_external @_T01x4BaseCfd : $@convention(method) (@guaranteed Base) -> @owned Builtin.NativeObject
+sil hidden_external [serialized] @_T01x4BaseCfd : $@convention(method) (@guaranteed Base) -> @owned Builtin.NativeObject
 
-sil hidden_external @_T01x4BaseCfD : $@convention(method) (@owned Base) -> ()
+sil hidden_external [serialized] @_T01x4BaseCfD : $@convention(method) (@owned Base) -> ()
 
-sil hidden_external @_T01x4BaseCACycfC : $@convention(method) (@thick Base.Type) -> @owned Base
+sil hidden_external [serialized] @_T01x4BaseCACycfC : $@convention(method) (@thick Base.Type) -> @owned Base
 
-sil hidden_external @_T01x4BaseCACycfc : $@convention(method) (@owned Base) -> @owned Base
+sil hidden_external [serialized] @_T01x4BaseCACycfc : $@convention(method) (@owned Base) -> @owned Base
 
-sil hidden_external @_T01x7DerivedC2m2yyF : $@convention(method) (@guaranteed Derived) -> ()
+sil hidden_external [serialized] @_T01x7DerivedC2m2yyF : $@convention(method) (@guaranteed Derived) -> ()
 
-sil hidden_external @_T01x7DerivedC2m3yyF : $@convention(method) (@guaranteed Derived) -> ()
+sil hidden_external [serialized] @_T01x7DerivedC2m3yyF : $@convention(method) (@guaranteed Derived) -> ()
 
-sil hidden_external @_T01x7DerivedCfd : $@convention(method) (@guaranteed Derived) -> @owned Builtin.NativeObject
+sil hidden_external [serialized] @_T01x7DerivedCfd : $@convention(method) (@guaranteed Derived) -> @owned Builtin.NativeObject
 
-sil hidden_external @_T01x7DerivedCfD : $@convention(method) (@owned Derived) -> ()
+sil hidden_external [serialized] @_T01x7DerivedCfD : $@convention(method) (@owned Derived) -> ()
 
-sil hidden_external @_T01x7DerivedCACycfC : $@convention(method) (@thick Derived.Type) -> @owned Derived
+sil hidden_external [serialized] @_T01x7DerivedCACycfC : $@convention(method) (@thick Derived.Type) -> @owned Derived
 
-sil hidden_external @_T01x7DerivedCACycfc : $@convention(method) (@owned Derived) -> @owned Derived
+sil hidden_external [serialized] @_T01x7DerivedCACycfc : $@convention(method) (@owned Derived) -> @owned Derived
 
 sil_vtable Base {
   #Base.m1!1: (Base) -> () -> () : _T01x4BaseC2m1yyF
