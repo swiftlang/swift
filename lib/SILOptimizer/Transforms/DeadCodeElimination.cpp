@@ -179,7 +179,7 @@ class DCE : public SILFunctionTransform {
 // Keep track of the fact that V is live and add it to our worklist
 // so that we can process the values it depends on.
 void DCE::markValueLive(SILNode *V) {
-  V = V->getCanonicalSILNodeInObject();
+  V = V->getRepresentativeSILNodeInObject();
   if (LiveValues.count(V) || isa<SILUndef>(V))
     return;
 

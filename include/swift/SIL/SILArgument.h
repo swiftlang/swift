@@ -124,7 +124,8 @@ protected:
   explicit SILArgument(ValueKind SubClassKind, SILType Ty,
                        ValueOwnershipKind OwnershipKind,
                        const ValueDecl *D = nullptr)
-      : ValueBase(SubClassKind, Ty), ParentBB(nullptr), Decl(D), OwnershipKind(OwnershipKind) {}
+      : ValueBase(SubClassKind, Ty, IsRepresentative::Yes), ParentBB(nullptr),
+        Decl(D), OwnershipKind(OwnershipKind) {}
   void setParent(SILBasicBlock *P) { ParentBB = P; }
 
   friend SILBasicBlock;

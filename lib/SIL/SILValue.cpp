@@ -22,6 +22,21 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
+//                       Check SILNode Type Properties
+//===----------------------------------------------------------------------===//
+
+/// These are just for performance and verification. If one needs to make
+/// changes that cause the asserts the fire, please update them. The purpose is
+/// to prevent these predicates from changing values by mistake.
+
+// SILNode uses its padding bits to delegate space to its subclasses. That being
+// said, we do not want to by mistake increase the size as our usage of the
+// padding bits changes over time. So we assert that our value is still exactly
+// 8 bytes in size.
+static_assert((sizeof(SILNode) * 8) == SILNode::NumTotalSILNodeBits,
+              "Expected SILNode to be exactly 8 bytes in size");
+
+//===----------------------------------------------------------------------===//
 //                       Check SILValue Type Properties
 //===----------------------------------------------------------------------===//
 
@@ -58,56 +73,67 @@ void ValueBase::replaceAllUsesWithUndef() {
 }
 
 SILInstruction *ValueBase::getDefiningInstruction() {
-  if (auto inst = dyn_cast<SingleValueInstruction>(this))
+  if (auto *inst = dyn_cast<SingleValueInstruction>(this))
     return inst;
-  // TODO: MultiValueInstruction
+  if (auto *result = dyn_cast<MultipleValueInstructionResult>(this))
+    return result->getParent();
   return nullptr;
 }
 
 Optional<ValueBase::DefiningInstructionResult>
 ValueBase::getDefiningInstructionResult() {
-  if (auto inst = dyn_cast<SingleValueInstruction>(this))
-    return DefiningInstructionResult{ inst, 0 };
-  // TODO: MultiValueInstruction
+  if (auto *inst = dyn_cast<SingleValueInstruction>(this))
+    return DefiningInstructionResult{inst, 0};
+  if (auto *result = dyn_cast<MultipleValueInstructionResult>(this))
+    return DefiningInstructionResult{result->getParent(), result->getIndex()};
   return None;
 }
 
 SILBasicBlock *SILNode::getParentBlock() const {
-  auto *NonConstThis = const_cast<SILNode *>(this);
-  if (auto *Inst = dyn_cast<SILInstruction>(NonConstThis))
+  auto *CanonicalNode =
+      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
+  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
     return Inst->getParent();
-  // TODO: MultiValueInstruction
-  if (auto *Arg = dyn_cast<SILArgument>(NonConstThis))
+  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
     return Arg->getParent();
   return nullptr;
 }
 
 SILFunction *SILNode::getFunction() const {
-  auto *NonConstThis = const_cast<SILNode *>(this);
-  if (auto *Inst = dyn_cast<SILInstruction>(NonConstThis))
+  auto *CanonicalNode =
+      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
+  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
     return Inst->getFunction();
-  // TODO: MultiValueInstruction
-  if (auto *Arg = dyn_cast<SILArgument>(NonConstThis))
+  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
     return Arg->getFunction();
   return nullptr;
 }
 
 SILModule *SILNode::getModule() const {
-  auto *NonConstThis = const_cast<SILNode *>(this);
-  if (auto *Inst = dyn_cast<SILInstruction>(NonConstThis))
+  auto *CanonicalNode =
+      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
+  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
     return &Inst->getModule();
-  // TODO: MultiValueInstruction
-  if (auto *Arg = dyn_cast<SILArgument>(NonConstThis))
+  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
     return &Arg->getModule();
   return nullptr;
 }
 
-const SILNode *SILNode::getCanonicalSILNodeSlowPath() const {
-  assert(getStorageLoc() != SILNodeStorageLocation::Instruction &&
-         hasMultipleSILNodes(getKind()));
-  return &static_cast<const SILInstruction &>(
-            static_cast<const SingleValueInstruction &>(
-              static_cast<const ValueBase &>(*this)));
+const SILNode *SILNode::getRepresentativeSILNodeSlowPath() const {
+  assert(getStorageLoc() != SILNodeStorageLocation::Instruction);
+
+  if (isa<SingleValueInstruction>(this)) {
+    assert(hasMultipleSILNodeBases(getKind()));
+    return &static_cast<const SILInstruction &>(
+        static_cast<const SingleValueInstruction &>(
+            static_cast<const ValueBase &>(*this)));
+  }
+
+  if (auto *MVR = dyn_cast<MultipleValueInstructionResult>(this)) {
+    return MVR->getParent();
+  }
+
+  llvm_unreachable("Invalid value for slow path");
 }
 
 /// Get a location for this value.
