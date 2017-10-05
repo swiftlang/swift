@@ -1613,40 +1613,20 @@ extension ${Self} : CustomReflectable {
 }
 
 extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
-  internal func _makeDescription(isDebug: Bool) -> String {
-%   if Self != 'Array':
-    var result = isDebug ? "${Self}([" : "["
-%   else:
-    // Always show sugared representation for Arrays.
-    var result = "["
-%   end
-    var first = true
-    for item in self {
-      if first {
-        first = false
-      } else {
-        result += ", "
-      }
-      debugPrint(item, terminator: "", to: &result)
-    }
-%   if Self != 'Array':
-    result += isDebug ? "])" : "]"
-%   else:
-    // Always show sugared representation for Arrays.
-    result += "]"
-%   end
-    return result
-  }
-
   /// A textual representation of the array and its elements.
   public var description: String {
-    return _makeDescription(isDebug: false)
+    return _makeCollectionDescription(for: self, withTypeName: nil)
   }
 
   /// A textual representation of the array and its elements, suitable for
   /// debugging.
   public var debugDescription: String {
-    return _makeDescription(isDebug: true)
+%   if Self != 'Array':
+    return _makeCollectionDescription(for: self, withTypeName: "${Self}")
+%   else:
+    // Always show sugared representation for Arrays.
+    return _makeCollectionDescription(for: self, withTypeName: nil)
+%   end
   }
 }
 
@@ -1811,6 +1791,32 @@ extension ${Self} {
   }
 }
 %end
+
+// Utility method for collections that wish to implement CustomStringConvertible
+// and CustomDebugStringConvertible using a bracketed list of elements,
+// like an array.
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _makeCollectionDescription<C : Collection>
+  (for items: C, withTypeName type: String?) -> String {
+  var result = ""
+  if let type = type {
+    result += "\(type)(["
+  } else {
+    result += "["
+  }
+  var first = true
+  for item in items {
+    if first {
+      first = false
+    } else {
+      result += ", "
+    }
+    debugPrint(item, terminator: "", to: &result)
+  }
+  result += type != nil ? "])" : "]"
+  return result
+}
 
 @_versioned
 @_fixed_layout
