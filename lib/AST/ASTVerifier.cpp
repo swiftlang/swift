@@ -924,6 +924,8 @@ public:
       verifyCheckedBase(S);
     }
     void verifyChecked(DeferStmt *S) {
+      auto FT = S->getTempDecl()->getInterfaceType()->castTo<AnyFunctionType>();
+      assert(FT->isNoEscape() && "Defer statements must not escape");
       verifyCheckedBase(S);
     }
 
