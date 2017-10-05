@@ -2073,6 +2073,8 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
       LOG_WARN_FUNC("Document already exists in editorOpen(..): " << Name);
       Snapshot = nullptr;
     }
+    auto numOpen = ++Stats.numOpenDocs;
+    Stats.maxOpenDocs.updateMax(numOpen);
   }
 
   if (!Snapshot) {
@@ -2095,8 +2097,12 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 
 void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
   auto Removed = EditorDocuments.remove(Name);
-  if (!Removed)
+  if (Removed) {
+    --Stats.numOpenDocs;
+  } else {
     IFaceGenContexts.remove(Name);
+  }
+
   if (Removed && RemoveCache)
     Removed->removeCachedAST();
   // FIXME: Report error if Name did not apply to anything ?

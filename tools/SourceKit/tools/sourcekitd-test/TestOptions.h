@@ -45,6 +45,7 @@ enum class SourceKitRequest {
   FindUSR,
   FindInterfaceDoc,
   Open,
+  Close,
   Edit,
   PrintAnnotations,
   PrintDiags,
@@ -55,6 +56,7 @@ enum class SourceKitRequest {
   FindLocalRenameRanges,
   NameTranslation,
   MarkupToXML,
+  Statistics,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
 #include "swift/IDE/RefactoringKinds.def"
 };
