@@ -1178,6 +1178,18 @@ public:
                                                       Ref, ResultTy));
   }
 
+  DestructureStructInst *createDestructureStruct(SILLocation Loc,
+                                                 SILValue Operand) {
+    return insert(DestructureStructInst::create(
+        getModule(), getSILDebugLocation(Loc), Operand));
+  }
+
+  DestructureTupleInst *createDestructureTuple(SILLocation Loc,
+                                               SILValue Operand) {
+    return insert(DestructureTupleInst::create(
+        getModule(), getSILDebugLocation(Loc), Operand));
+  }
+
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
                                      SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) ClassMethodInst(

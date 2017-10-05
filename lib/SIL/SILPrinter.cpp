@@ -660,7 +660,7 @@ public:
   /// Print out the users of the SILValue \p V. Return true if we printed out
   /// either an id or a use list. Return false otherwise.
   bool printUsersOfSILNode(const SILNode *node, bool printedSlashes) {
-    SmallVector<SILValue, 8> values;
+    llvm::SmallVector<SILValue, 8> values;
     if (auto *value = dyn_cast<ValueBase>(node)) {
       values.push_back(value);
     } else if (auto *inst = dyn_cast<SILInstruction>(node)) {
@@ -1598,6 +1598,7 @@ public:
   void visitTupleExtractInst(TupleExtractInst *EI) {
     *this << getIDAndType(EI->getOperand()) << ", " << EI->getFieldNo();
   }
+
   void visitTupleElementAddrInst(TupleElementAddrInst *EI) {
     *this << getIDAndType(EI->getOperand()) << ", " << EI->getFieldNo();
   }
@@ -1619,6 +1620,14 @@ public:
 
   void visitRefTailAddrInst(RefTailAddrInst *RTAI) {
     *this << getIDAndType(RTAI->getOperand()) << ", " << RTAI->getTailType();
+  }
+
+  void visitDestructureStructInst(DestructureStructInst *DSI) {
+    *this << getIDAndType(DSI->getOperand());
+  }
+
+  void visitDestructureTupleInst(DestructureTupleInst *DTI) {
+    *this << getIDAndType(DTI->getOperand());
   }
 
   void printMethodInst(MethodInst *I, SILValue Operand) {

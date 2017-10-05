@@ -265,6 +265,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::StructInst:
   case SILInstructionKind::StructExtractInst:
   case SILInstructionKind::TupleExtractInst:
+  case SILInstructionKind::DestructureStructInst:
+  case SILInstructionKind::DestructureTupleInst:
     return InlineCost::Free;
 
   // Unchecked casts are free.

@@ -208,6 +208,8 @@ static bool isOwnershipForwardingValueKind(SILNodeKind K) {
   case SILNodeKind::SelectEnumInst:
   case SILNodeKind::SwitchEnumInst:
   case SILNodeKind::CheckedCastBranchInst:
+  case SILNodeKind::DestructureStructInst:
+  case SILNodeKind::DestructureTupleInst:
     return true;
   default:
     return false;
@@ -686,6 +688,8 @@ FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
+FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
+FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
