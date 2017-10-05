@@ -61,7 +61,7 @@ function (add_external_benchmark_suite)
   set(stamp_dir ${SWIFT_BINARY_DIR}/external-benchmark/stamps)
   set(prefix_dir ${SWIFT_BINARY_DIR}/external-benchmark/prefix)
 
-  set(bench_targets Benchmark_O Benchmark_Onone Benchmark_Ounchecked)
+  set(bench_targets Benchmark_O Benchmark_Onone Benchmark_Osize)
   set(library_targets swift-benchmark-macosx-x86_64-external)
 
   set(all_stdlib_dependencies)

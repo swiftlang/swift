@@ -204,7 +204,7 @@ function (swift_benchmark_compile_archopts)
   set(common_swift4_options ${common_options} "-swift-version" "4")
 
   # Always optimize the driver modules.
-  # Note that we compile the driver for Ounchecked also with -Ounchecked
+  # Note that we compile the driver for Osize also with -Osize
   # (and not with -O), because of <rdar://problem/19614516>.
   string(REPLACE "Onone" "O" driver_opt "${optflag}")
 
