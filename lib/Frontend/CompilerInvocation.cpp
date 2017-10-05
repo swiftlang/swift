@@ -338,7 +338,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   }
 
   if (Opts.RequestedAction == FrontendOptions::Immediate &&
-      Opts.Inputs.getPrimaryInput().hasValue()) {
+      Opts.Inputs.hasPrimaryInput()) {
     Diags.diagnose(SourceLoc(), diag::error_immediate_mode_primary_file);
     return true;
   }
@@ -1784,20 +1784,18 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
       Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return true;
     }
-  } else if (TreatAsSIL && getPrimaryInput().hasValue()) {
+  } else if (TreatAsSIL && hasPrimaryInput()) {
     // If we have the SIL as our primary input, we can waive the one file
     // requirement as long as all the other inputs are SIBs.
-    if (getPrimaryInput().hasValue()) {
-      for (unsigned i = 0, e = getInputFilenames().size(); i != e; ++i) {
-        if (i == getPrimaryInput()->Index)
-          continue;
-        
-        StringRef File(getInputFilenames()[i]);
-        if (!llvm::sys::path::extension(File).endswith(SIB_EXTENSION)) {
-          Diags.diagnose(SourceLoc(),
-                         diag::error_mode_requires_one_sil_multi_sib);
-          return true;
-        }
+    for (unsigned i = 0, e = getInputFilenames().size(); i != e; ++i) {
+      if (i == getPrimaryInput()->Index)
+        continue;
+      
+      StringRef File(getInputFilenames()[i]);
+      if (!llvm::sys::path::extension(File).endswith(SIB_EXTENSION)) {
+        Diags.diagnose(SourceLoc(),
+                       diag::error_mode_requires_one_sil_multi_sib);
+        return true;
       }
     }
   } else if (TreatAsSIL) {
@@ -1823,6 +1821,15 @@ StringRef FrontendInputs::baseNameOfOutput(bool UserSpecifiedModuleName, StringR
     return llvm::sys::path::stem(getInputFilenames()[0]);
   }
   return ModuleName;
+}
+
+
+// FIXME: The frontend should be dealing with symlinks, maybe similar to
+// clang's FileManager ?
+void FrontendInputs::resolvePathSymlinksInPlace() {
+  for (auto &InputFile : InputFilenames {
+    InputFile = SwiftLangSupport::resolvePathSymlinks(InputFile);
+  }
 }
 
 /// Try to read an input file list file.

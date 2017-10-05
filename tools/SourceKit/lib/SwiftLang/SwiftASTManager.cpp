@@ -82,7 +82,7 @@ struct InvocationOptions {
     // Assert invocation with a primary file. We want to avoid full typechecking
     // for all files.
     assert(!this->PrimaryFile.empty());
-    assert(this->Invok.getFrontendOptions().PrimaryInput.hasValue());
+    assert(this->Invok.getFrontendOptions().Inputs.hasPrimaryInput());
   }
 
   void applyTo(CompilerInvocation &CompInvok) const;
@@ -399,9 +399,7 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   // clang's FileManager ?
   std::string PrimaryFile =
     SwiftLangSupport::resolvePathSymlinks(UnresolvedPrimaryFile);
-  for (auto &InputFile : Invocation.getFrontendOptions().InputFilenames) {
-    InputFile = SwiftLangSupport::resolvePathSymlinks(InputFile);
-  }
+  Invocation.getFrontendOptions().Inputs.resolvePathSymlinksInPlace();
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;
@@ -426,8 +424,8 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
 
   if (!PrimaryFile.empty()) {
     Optional<unsigned> PrimaryIndex;
-    for (auto i : indices(Invocation.getFrontendOptions().InputFilenames)) {
-      auto &CurFile = Invocation.getFrontendOptions().InputFilenames[i];
+    for (auto i : indices(Invocation.getFrontendOptions().Inputs.getInputFilenames())) {
+      auto &CurFile = Invocation.getFrontendOptions().Inputs.getInputFilenames()[i];
       if (PrimaryFile == CurFile) {
         PrimaryIndex = i;
         break;
@@ -440,7 +438,7 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
       Error = OS.str();
       return true;
     }
-    Invocation.getFrontendOptions().PrimaryInput = SelectedInput(*PrimaryIndex);
+    Invocation.getFrontendOptions().Inputs.setPrimaryInput(SelectedInput(*PrimaryIndex));
   }
 
   return Err;

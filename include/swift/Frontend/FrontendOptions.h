@@ -107,6 +107,9 @@ public:
   void clearPrimaryInput() {
     PrimaryInput = 0;
   }
+  bool hasPrimaryInput() const {
+    return getPrimaryInput().hasValue();
+  }
   
   bool shouldTreatAsSIL() const;
   
@@ -125,14 +128,14 @@ public:
   
   StringRef baseNameOfOutput(bool UserSpecifiedModuleName, StringRef ModuleName) const;
   
-  bool isWholeModule() { return !getPrimaryInput().hasValue(); }
+  bool isWholeModule() { return !hasPrimaryInput(); }
   
   void readInputFileList(DiagnosticEngine &diags,
                          llvm::opt::ArgList &Args,
                          const llvm::opt::Arg *filelistPath);
   
   bool haveAPrimaryInputFile() const {
-    return getPrimaryInput().hasValue() && getPrimaryInput()->isFilename();
+    return hasPrimaryInput() && getPrimaryInput()->isFilename();
   }
   
   Optional<unsigned> primaryInputFileIndex() const {
@@ -145,6 +148,8 @@ public:
     }
     return StringRef();
   }
+  
+  void resolvePathSymlinksInPlace();
 };
 
 /// Options for controlling the behavior of the frontend.
