@@ -243,6 +243,14 @@ ValueOwnershipKind::ValueOwnershipKind(StringRef S) {
   Value = Result.getValue();
 }
 
+ValueOwnershipKind
+ValueOwnershipKind::getProjectedOwnershipKind(SILModule &M,
+                                              SILType Proj) const {
+  if (Proj.isTrivial(M))
+    return ValueOwnershipKind::Trivial;
+  return *this;
+}
+
 ValueOwnershipKind SILValue::getOwnershipKind() const {
   // Once we have multiple return values, this must be changed.
   sil::ValueOwnershipKindClassifier Classifier;
