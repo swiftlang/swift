@@ -2075,7 +2075,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
         classDecl->getGenericEnvironment());
 
     for (auto *decl : *bodyParams) {
-      auto paramTy = decl->getInterfaceType();
+      auto paramTy = decl->getInterfaceType()->getInOutObjectType();
 
       // Apply the superclass substitutions to produce a contextual
       // type in terms of the derived class archetypes.
@@ -2089,7 +2089,9 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   } else {
     for (auto *decl : *bodyParams) {
       if (!decl->hasType())
-        decl->setType(classDecl->mapTypeIntoContext(decl->getInterfaceType()));
+        decl->setType(
+          classDecl->mapTypeIntoContext(
+            decl->getInterfaceType()->getInOutObjectType()));
     }
   }
 
