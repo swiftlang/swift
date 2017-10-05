@@ -1178,9 +1178,9 @@ RequirementEnvironment::RequirementEnvironment(
   }
 
   if (conformanceSig) {
-    for (auto &reqt : conformanceSig->getRequirements()) {
-      builder.addRequirement(reqt, source, nullptr,
-                             &conformanceToSyntheticEnvMap);
+    for (auto &rawReq : conformanceSig->getRequirements()) {
+      if (auto req = rawReq.subst(conformanceToSyntheticEnvMap))
+        builder.addRequirement(*req, source, nullptr);
     }
   }
 
@@ -1203,16 +1203,16 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
-  for (auto &req : reqSig->getRequirements()) {
+  for (auto &rawReq : reqSig->getRequirements()) {
     // FIXME: This should not be necessary, since the constraint is redundant,
     // but we need it to work around some crashes for now.
-    if (req.getKind() == RequirementKind::Conformance &&
-        req.getFirstType()->isEqual(selfType) &&
-        req.getSecondType()->isEqual(proto->getDeclaredType()))
+    if (rawReq.getKind() == RequirementKind::Conformance &&
+        rawReq.getFirstType()->isEqual(selfType) &&
+        rawReq.getSecondType()->isEqual(proto->getDeclaredType()))
       continue;
 
-    builder.addRequirement(req, source, /*inferModule=*/nullptr,
-                           &reqToSyntheticEnvMap);
+    if (auto req = rawReq.subst(reqToSyntheticEnvMap))
+      builder.addRequirement(*req, source, conformanceDC->getParentModule());
   }
 
   // Produce the generic signature and environment.

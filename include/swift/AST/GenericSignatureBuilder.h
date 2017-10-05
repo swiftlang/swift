@@ -574,8 +574,7 @@ public:
   /// inconsistent, in which case a diagnostic will have been issued.
   ConstraintResult addRequirement(const Requirement &req,
                                   FloatingRequirementSource source,
-                                  ModuleDecl *inferForModule,
-                                  const SubstitutionMap *subMap = nullptr);
+                                  ModuleDecl *inferForModule);
 
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
