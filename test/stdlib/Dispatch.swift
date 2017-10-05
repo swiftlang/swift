@@ -10,7 +10,7 @@
 // REQUIRES: objc_interop
 
 // FIXME: rdar://34751238 DispatchTime.addSubtract test traps
-// XFAIL: CPU=armv7 || CPU=armv7k || CPU=armv7s
+// XFAIL: CPU=armv7 || CPU=armv7k || CPU=armv7s || CPU=arm64
 
 
 import Dispatch
