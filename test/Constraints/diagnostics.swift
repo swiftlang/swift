@@ -337,7 +337,7 @@ f7(1)(b: 1.0)    // expected-error{{extraneous argument label 'b:' in call}}
 
 let f8 = f7(2)
 _ = f8(1)
-f8(10)          // expected-warning {{result of call is unused, but produces 'Int'}}
+f8(10)          // expected-warning {{result of call to closure returning 'Int' is unused}}
 f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 f8(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
 

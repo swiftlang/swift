@@ -671,7 +671,7 @@ func lvalue_processing() {
 
   var n = 42
   fn(n, 12)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{6-6=&}}
-  fn(&n, 12) // expected-warning {{result of call is unused, but produces 'Int'}}
+  fn(&n, 12) // expected-warning {{result of call to closure returning 'Int' is unused}}
 
   n +-+= 12
 

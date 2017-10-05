@@ -214,7 +214,7 @@ func testProtocolMethods(_ b: B, p2m: P2.Type) {
 
 func testId(_ x: AnyObject) {
   x.perform!("foo:", with: x) // expected-warning{{no method declared with Objective-C selector 'foo:'}}
-  // expected-warning @-1 {{result of call is unused, but produces 'Unmanaged<AnyObject>!'}}
+  // expected-warning @-1 {{result of call to closure returning 'Unmanaged<AnyObject>!' is unused}}
 
   _ = x.performAdd(1, withValue: 2, withValue: 3, withValue2: 4)
   _ = x.performAdd!(1, withValue: 2, withValue: 3, withValue2: 4)
