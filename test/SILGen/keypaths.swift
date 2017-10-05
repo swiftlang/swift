@@ -267,6 +267,13 @@ func iuoKeyPaths() {
   _ = \IUOProperty.iuo!.x
 }
 
+class Bass: Hashable {
+  static func ==(_: Bass, _: Bass) -> Bool { return false }
+  var hashValue: Int { return 0 }
+}
+
+class Treble: Bass { }
+
 struct Subscripts<T> {
   subscript() -> T {
     get { fatalError() }
@@ -291,6 +298,10 @@ struct Subscripts<T> {
   subscript(mutable x: T) -> T {
     get { fatalError() }
     set { fatalError() }
+  }
+  subscript(bass: Bass) -> Bass {
+    get { return bass }
+    set { }
   }
 }
 
@@ -321,4 +332,7 @@ func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
   _ = \Subscripts<String>.[subGeneric: y]
 
   _ = \Subscripts<T>.[s, s].count
+
+  _ = \Subscripts<T>.[Bass()]
+  _ = \Subscripts<T>.[Treble()]
 }
