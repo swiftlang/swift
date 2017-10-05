@@ -361,8 +361,11 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 
   std::error_code EC;
   raw_fd_ostream ostream(StatsFilename, EC, fs::F_Append | fs::F_Text);
-  if (EC)
+  if (EC) {
+    llvm::errs() << "Error opening -stats-output-dir file '"
+                 << TraceFilename << "' for writing\n";
     return;
+  }
 
   // We change behavior here depending on whether -DLLVM_ENABLE_STATS and/or
   // assertions were on in this build; this is somewhat subtle, but turning on
@@ -387,8 +390,11 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   if (LastTracedFrontendCounters && SourceMgr) {
     std::error_code EC;
     raw_fd_ostream tstream(TraceFilename, EC, fs::F_Append | fs::F_Text);
-    if (EC)
+    if (EC) {
+      llvm::errs() << "Error opening -trace-stats-events file '"
+                   << TraceFilename << "' for writing\n";
       return;
+    }
     tstream << "Time,Live,IsEntry,EventName,CounterName,"
             << "CounterDelta,CounterValue,SourceRange\n";
     for (auto const &E : FrontendStatsEvents) {
