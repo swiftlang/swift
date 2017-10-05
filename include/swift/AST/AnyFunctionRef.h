@@ -116,18 +116,9 @@ public:
   /// known not to escape from that function.  In this case, captures can be
   /// more efficient.
   bool isKnownNoEscape() const {
-    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      // As a hack, assume defer bodies are noescape.
-      if (auto fd = dyn_cast<FuncDecl>(afd))
-        return fd->isDeferBody();
-      return false;
-    }
-
-
-    auto *CE = TheFunction.get<AbstractClosureExpr *>();
-    if (!CE->getType() || CE->getType()->hasError())
-      return false;
-    return CE->getType()->castTo<FunctionType>()->isNoEscape();
+    if (hasType() && !getType()->hasError())
+      return getType()->castTo<AnyFunctionType>()->isNoEscape();
+    return false;
   }
 
   bool isObjC() const {
