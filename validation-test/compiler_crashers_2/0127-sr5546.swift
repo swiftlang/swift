@@ -1,4 +1,6 @@
 // RUN: not --crash %target-swift-frontend %s -typecheck
+// REQUIRES: asserts
+
 public struct Foo<A, B, C> {}
 
 public protocol P {
