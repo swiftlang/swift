@@ -31,14 +31,11 @@ var editWords: [String] = [
 let alphabet = "abcdefghijklmnopqrstuvwxyz"
 /// All edits that are one edit away from `word`
 func edits(_ word: String) -> Set<String> {
-  // create right/left splits as CharacterViews instead
   let splits = word.indices.map {
-    (word[..<$0], word[$0...])
+    (String(word[..<$0]), String(word[$0...]))
   }
   
-  // though it should be, CharacterView isn't hashable
-  // so using an array for now, ignore that aspect...
-  var result: Array<Substring> = []
+  var result: Array<String> = []
   
   for (left, right) in splits {
     // drop a character
@@ -64,7 +61,7 @@ func edits(_ word: String) -> Set<String> {
   }
   
   // have to map back to strings right at the end
-  return Set(result.lazy.map(String.init))
+  return Set(result)
 }
 
 @inline(never)
