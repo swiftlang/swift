@@ -2116,7 +2116,7 @@ namespace {
     void layout() {
       asImpl().addName();
       asImpl().addKindDependentFields();
-      asImpl().addGenericMetadataPatternAndKind();
+      asImpl().addKind();
       asImpl().addAccessFunction();
       asImpl().addGenericParams();
     }
@@ -2130,19 +2130,9 @@ namespace {
                                  /*willBeRelativelyAddressed*/ true));
     }
     
-    void addGenericMetadataPatternAndKind() {
-      NominalTypeDecl *ntd = asImpl().getTarget();
+    void addKind() {
       auto kind = asImpl().getKind();
-      if (!ntd->isGenericContext()) {
-        // There's no pattern to link.
-        B.addInt32(kind);
-        return;
-      }
-
-      B.addTaggedRelativeOffset(
-        IGM.RelativeAddressTy,
-        IGM.getAddrOfTypeMetadata(getAbstractType(), /*pattern*/ true),
-        kind);
+      B.addInt32(kind);
     }
 
     void addAccessFunction() {
