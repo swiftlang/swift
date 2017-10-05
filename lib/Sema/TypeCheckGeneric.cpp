@@ -875,6 +875,7 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
     AnyFunctionType::ExtInfo info;
     if (i == 0) {
       info = info.withThrows(func->hasThrows());
+      // Defer bodies must not escape.
       if (auto fd = dyn_cast<FuncDecl>(func))
         info = info.withNoEscape(fd->isDeferBody());
     }
