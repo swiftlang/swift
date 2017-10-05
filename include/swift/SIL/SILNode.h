@@ -32,7 +32,7 @@ class SingleValueInstruction;
 class ValueBase;
 
 /// An enumeration which contains values for all the nodes in SILNodes.def.
-/// Other enumerators, like ValueKind and SILInstructionind, ultimately
+/// Other enumerators, like ValueKind and SILInstructionKind, ultimately
 /// take their values from this enumerator.
 enum class SILNodeKind {
 #define NODE(ID, PARENT) \
@@ -92,36 +92,59 @@ static_assert(unsigned(SILNodeKind::Last_SILNode) < (1 << NumSILNodeKindBits),
 ///   ValueBase subobject, the cast will yield a corrupted value.
 ///   Always use the LLVM casts (cast<>, dyn_cast<>, etc.) instead.
 class alignas(8) SILNode {
+public:
+  /// The assumed number of bits that a SILNode+padding will take up. Public for
+  /// static assertion purposes.
+  static constexpr unsigned NumTotalSILNodeBits = 64;
+
 protected:
-  enum class SILNodeStorageLocation {
-    Value,
-    Instruction
+  static constexpr unsigned NumKindBits = NumSILNodeKindBits;
+  static constexpr unsigned NumStorageLocBits = 1;
+  static constexpr unsigned NumIsRepresentativeBits = 1;
+  static constexpr unsigned NumSubclassDataBits =
+      NumTotalSILNodeBits - NumKindBits - NumStorageLocBits -
+      NumIsRepresentativeBits;
+
+  enum class SILNodeStorageLocation : uint8_t { Value, Instruction };
+
+  enum class IsRepresentative : uint8_t {
+    No = 0,
+    Yes = 1,
   };
 
 private:
-  const unsigned Kind : NumSILNodeKindBits;
-  const unsigned StorageLoc : 1;
-  const unsigned IsCanonical : 1;
-
-  // TODO: Pack other things in here.
+  const unsigned Kind : NumKindBits;
+  const unsigned StorageLoc : NumStorageLocBits;
+  const unsigned IsRepresentativeNode : NumIsRepresentativeBits;
+  uint64_t SubclassData : NumSubclassDataBits;
 
   SILNodeStorageLocation getStorageLoc() const {
     return SILNodeStorageLocation(StorageLoc);
   }
 
-  const SILNode *getCanonicalSILNodeSlowPath() const;
+  const SILNode *getRepresentativeSILNodeSlowPath() const;
 
 protected:
-  SILNode(SILNodeKind kind, SILNodeStorageLocation storageLoc)
-    : Kind(unsigned(kind)),
-      StorageLoc(unsigned(storageLoc)),
-      IsCanonical(storageLoc == SILNodeStorageLocation::Instruction ||
-                  !hasMultipleSILNodes(kind)) {}
+  SILNode(SILNodeKind kind, SILNodeStorageLocation storageLoc,
+          IsRepresentative isRepresentative)
+      : Kind(unsigned(kind)), StorageLoc(unsigned(storageLoc)),
+        IsRepresentativeNode(unsigned(isRepresentative)), SubclassData(0) {}
+
+  uint64_t getSubclassData() const { return SubclassData; }
+
+  void setSubclassData(uint64_t NewData) {
+    assert(!(NewData & ~((uint64_t(1) << NumSubclassDataBits) - 1)) &&
+           "New subclass data is too large to fit in SubclassData");
+    SubclassData = NewData;
+  }
 
 public:
-
-  /// Does the given kind of node have multiple SILNode bases?
-  static bool hasMultipleSILNodes(SILNodeKind kind) {
+  /// Does the given kind of node inherit from multiple multiple SILNode base
+  /// classes.
+  ///
+  /// This enables one to know if their is a diamond in the inheritence
+  /// hierarchy for this SILNode.
+  static bool hasMultipleSILNodeBases(SILNodeKind kind) {
     // Currently only SingleValueInstructions.  Note that multi-result
     // instructions shouldn't return true for this.
     return kind >= SILNodeKind::First_SingleValueInstruction &&
@@ -129,23 +152,31 @@ public:
   }
 
   /// Is this SILNode the canonical SILNode subobject in this object?
-  bool isCanonicalSILNodeInObject() const {
-    return IsCanonical;
-  }
+  bool isRepresentativeSILNodeInObject() const { return IsRepresentativeNode; }
 
   /// Return a pointer to the canonical SILNode subobject in this object.
-  SILNode *getCanonicalSILNodeInObject() {
-    if (IsCanonical) return this;
-    return const_cast<SILNode*>(getCanonicalSILNodeSlowPath());
+  SILNode *getRepresentativeSILNodeInObject() {
+    if (isRepresentativeSILNodeInObject())
+      return this;
+    return const_cast<SILNode *>(getRepresentativeSILNodeSlowPath());
   }
-  const SILNode *getCanonicalSILNodeInObject() const {
-    if (IsCanonical) return this;
-    return getCanonicalSILNodeSlowPath();
+
+  const SILNode *getRepresentativeSILNodeInObject() const {
+    if (isRepresentativeSILNodeInObject())
+      return this;
+    return getRepresentativeSILNodeSlowPath();
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   SILNodeKind getKind() const {
     return SILNodeKind(Kind);
+  }
+
+  /// Return the SILNodeKind of this node's canonical SILNode.
+  ///
+  /// TODO: Find a better name for this.
+  SILNodeKind getKindOfRepresentativeSILNodeInObject() const {
+    return getRepresentativeSILNodeInObject()->getKind();
   }
 
   /// If this is a SILArgument or a SILInstruction get its parent basic block,
@@ -246,7 +277,7 @@ struct cast_sil_node<To, /*single value*/ false, /*unambiguous*/ false> {
   static To *doit(SILNode *node) {
     // If the node isn't dynamically a SingleValueInstruction, then this
     // is indeed the SILNode subobject that's statically observable in To.
-    if (!SILNode::hasMultipleSILNodes(node->getKind())) {
+    if (!SILNode::hasMultipleSILNodeBases(node->getKind())) {
       return &static_cast<To&>(*node);
     }
 

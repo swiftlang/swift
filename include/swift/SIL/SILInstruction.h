@@ -44,6 +44,9 @@ class DeclRefExpr;
 class FloatLiteralExpr;
 class FuncDecl;
 class IntegerLiteralExpr;
+class SingleValueInstruction;
+class MultipleValueInstruction;
+class MultipleValueInstructionResult;
 class NonValueInstruction;
 class SILBasicBlock;
 class SILBuilder;
@@ -51,9 +54,11 @@ class SILDebugLocation;
 class SILDebugScope;
 class SILFunction;
 class SILGlobalVariable;
+class SILInstructionResultArray;
 class SILOpenedArchetypesState;
 class SILType;
 class SILArgument;
+class SILUndef;
 class Stmt;
 class StringLiteralExpr;
 class Substitution;
@@ -96,13 +101,37 @@ StringRef getSILInstructionName(SILInstructionKind Kind);
 ///
 /// *NOTE* Most of this defined out of line further down in the file to work
 /// around forward declaration issues.
+///
+/// *NOTE* The reason why this does not store the size of the stored element is
+/// that just from the number of elements we can infer the size of each element
+/// due to the restricted problem space. Specificially:
+///
+/// 1. Size == 0 implies nothing is stored and thus element size is irrelevent.
+/// 2. Size == 1 implies we either had a single value instruction or a multiple
+/// value instruction, but no matter what instruction we had, we are going to
+/// store the results at the same starting location so element size is
+/// irrelevent.
+/// 3. Size > 1 implies we must be storing multiple value instruction results
+/// implying that the size of each stored element must be
+/// sizeof(MultipleValueInstructionResult).
+///
+/// If we ever allow for subclasses of MultipleValueInstructionResult of
+/// different sizes, we will need to store a stride into
+/// SILInstructionResultArray. We always assume all results are the same
+/// subclass of MultipleValueInstructionResult.
 class SILInstructionResultArray {
+  friend class MultipleValueInstruction;
+
+  /// Byte pointer to our data. nullptr for empty arrays.
   const uint8_t *Pointer;
+
+  /// The number of stored elements.
   unsigned Size;
 
 public:
   SILInstructionResultArray() : Pointer(nullptr), Size(0) {}
   SILInstructionResultArray(const SingleValueInstruction *SVI);
+  SILInstructionResultArray(ArrayRef<MultipleValueInstructionResult> MVResults);
 
   SILInstructionResultArray(const SILInstructionResultArray &Other) = default;
   SILInstructionResultArray &
@@ -141,6 +170,18 @@ public:
   bool hasSameTypes(const SILInstructionResultArray &rhs);
 
 private:
+  /// Return the first element of the array. Asserts if the array is empty.
+  ///
+  /// Please do not use this outside of this class. It is only meant to speedup
+  /// MultipleValueInstruction::getIndexOfResult(SILValue).
+  const ValueBase *front() const;
+
+  /// Return the last element of the array. Asserts if the array is empty.
+  ///
+  /// Please do not use this outside of this class. It is only meant to speedup
+  /// MultipleValueInstruction::getIndexOfResult(SILValue).
+  const ValueBase *back() const;
+
   /// Return the offset 1 past the end of the array or None if we are not
   /// actually storing anything.
   Optional<unsigned> getStartOffset() const {
@@ -185,6 +226,17 @@ public:
   iterator operator++(int) {
     iterator copy = *this;
     ++Index.getValue();
+    return copy;
+  }
+
+  iterator &operator--() {
+    --Index.getValue();
+    return *this;
+  }
+
+  iterator operator--(int) {
+    iterator copy = *this;
+    --Index.getValue();
     return copy;
   }
 
@@ -256,7 +308,8 @@ class SILInstruction
 
 protected:
   SILInstruction(SILInstructionKind kind, SILDebugLocation DebugLoc)
-      : SILNode(SILNodeKind(kind), SILNodeStorageLocation::Instruction),
+      : SILNode(SILNodeKind(kind), SILNodeStorageLocation::Instruction,
+                IsRepresentative::Yes),
         ParentBB(nullptr), Location(DebugLoc) {
     NumCreatedInstructions++;
   }
@@ -303,12 +356,12 @@ public:
   }
 
   SILNode *getCanonicalSILNodeInObject() {
-    assert(isCanonicalSILNodeInObject() &&
+    assert(isRepresentativeSILNodeInObject() &&
            "the SILInstruction subobject is always canonical");
     return this;
   }
   const SILNode *getCanonicalSILNodeInObject() const {
-    assert(isCanonicalSILNodeInObject() &&
+    assert(isRepresentativeSILNodeInObject() &&
            "the SILInstruction subobject is always canonical");
     return this;
   }
@@ -614,9 +667,8 @@ class SingleValueInstruction : public SILInstruction, public ValueBase {
 public:
   SingleValueInstruction(SILInstructionKind kind, SILDebugLocation loc,
                          SILType type)
-    : SILInstruction(kind, loc),
-      ValueBase(ValueKind(kind), type) {
-  }
+      : SILInstruction(kind, loc),
+        ValueBase(ValueKind(kind), type, IsRepresentative::No) {}
 
   using SILInstruction::getFunction;
   using SILInstruction::getModule;
@@ -636,12 +688,12 @@ public:
   }
 
   SILNode *getCanonicalSILNodeInObject() {
-    assert(SILInstruction::isCanonicalSILNodeInObject() &&
+    assert(SILInstruction::isRepresentativeSILNodeInObject() &&
            "the SILInstruction subobject is always canonical");
     return static_cast<SILInstruction*>(this);
   }
   const SILNode *getCanonicalSILNodeInObject() const {
-    assert(SILInstruction::isCanonicalSILNodeInObject() &&
+    assert(SILInstruction::isRepresentativeSILNodeInObject() &&
            "the SILInstruction subobject is always canonical");
     return static_cast<const SILInstruction*>(this);
   }
@@ -692,6 +744,182 @@ inline SingleValueInstruction *SILNode::castToSingleValueInstruction() {
     return inst->getKind() >= SILInstructionKind::First_##ID && \
            inst->getKind() <= SILInstructionKind::Last_##ID;    \
   }
+
+/// A value base result of a multiple value instruction.
+///
+/// *NOTE* We want this to be a pure abstract class that does not add /any/ size
+/// to subclasses.
+class MultipleValueInstructionResult : public ValueBase {
+public:
+  /// Create a new multiple value instruction result.
+  ///
+  /// \arg subclassDeltaOffset This is the delta offset in our parent object's
+  /// layout in between the end of the MultipleValueInstruction object and the
+  /// end of the specific subclass object.
+  ///
+  /// *NOTE* subclassDeltaOffset must be use only 5 bits. This gives us to
+  /// support subclasses up to 32 bytes in size. We can scavange up to 6 more
+  /// bits from ValueBase if this is not large enough.
+  MultipleValueInstructionResult(ValueKind valueKind, unsigned index,
+                                 SILType type,
+                                 ValueOwnershipKind ownershipKind);
+
+  /// Return the parent instruction of this result.
+  MultipleValueInstruction *getParent();
+
+  const MultipleValueInstruction *getParent() const {
+    return const_cast<MultipleValueInstructionResult *>(this)->getParent();
+  }
+
+  unsigned getIndex() const;
+
+  /// Get the ownership kind assigned to this result by its parent.
+  ///
+  /// This is stored in the bottom 3 bits of ValueBase's subclass data.
+  ValueOwnershipKind getOwnershipKind() const;
+
+  SILNode *getCanonicalSILNodeInObject();
+  const SILNode *getCanonicalSILNodeInObject() const;
+
+  static bool classof(const SILInstruction *) = delete;
+  static bool classof(const SILUndef *) = delete;
+  static bool classof(const SILArgument *) = delete;
+  static bool classof(const MultipleValueInstructionResult *) { return true; }
+  static bool classof(const SILNode *node) {
+    // This is an abstract class without anything implementing it right now, so
+    // just return false. This will be fixed in a subsequent commit.
+    return false;
+  }
+
+protected:
+  /// Set the ownership kind assigned to this result.
+  ///
+  /// This is stored in SILNode in the subclass data.
+  void setOwnershipKind(ValueOwnershipKind Kind);
+
+  /// Set the index of this result.
+  void setIndex(unsigned NewIndex);
+
+  static constexpr unsigned NumIndexBits = 24;
+  static constexpr uint64_t IndexMask = (uint64_t(1) << 24) - 1;
+  static constexpr uint64_t IndexBitOffset = ValueOwnershipKind::NumBits;
+};
+
+/// An instruction that may produce an arbitrary number of values.
+class MultipleValueInstruction : public SILInstruction {
+  friend class SILInstruction;
+  friend class SILInstructionResultArray;
+
+protected:
+  MultipleValueInstruction(SILInstructionKind kind, SILDebugLocation loc)
+      : SILInstruction(kind, loc) {}
+
+public:
+  void operator delete(void *Ptr, size_t)SWIFT_DELETE_OPERATOR_DELETED;
+
+  MultipleValueInstruction *clone(SILInstruction *insertPt = nullptr) {
+    return cast<MultipleValueInstruction>(SILInstruction::clone(insertPt));
+  }
+
+  SILValue getResult(unsigned Index) const { return getResults()[Index]; }
+
+  /// Return the index of \p Target if it is a result in the given
+  /// MultipleValueInstructionResult. Otherwise, returns None.
+  Optional<unsigned> getIndexOfResult(SILValue Target) const;
+
+  unsigned getNumResults() const { return getResults().size(); }
+
+  static bool classof(const SILNode *node) {
+    // This is an abstract class without anything implementing it right now, so
+    // just return false. This will be fixed in a subsequent commit.
+    return false;
+  }
+};
+
+/// A utility mixin class that must be used by /all/ subclasses of
+/// MultipleValueInstruction to store their results.
+template <SILInstructionKind Kind, typename Derived, typename DerivedResult,
+          typename... OtherTrailingTypes>
+class MultipleValueInstructionTrailingObjects
+    : protected llvm::TrailingObjects<Derived, MultipleValueInstruction *,
+                                      DerivedResult, OtherTrailingTypes...> {
+  static_assert(LLVM_IS_FINAL(DerivedResult),
+                "Expected DerivedResult to be final");
+  static_assert(
+      std::is_base_of<MultipleValueInstructionResult, DerivedResult>::value,
+      "Expected DerivedResult to be a subclass of "
+      "MultipleValueInstructionResult");
+  static_assert(sizeof(MultipleValueInstructionResult) == sizeof(DerivedResult),
+                "Expected DerivedResult to be the same size as a "
+                "MultipleValueInstructionResult");
+
+protected:
+  using TrailingObjects =
+      llvm::TrailingObjects<Derived, MultipleValueInstruction *, DerivedResult,
+                            OtherTrailingTypes...>;
+  friend TrailingObjects;
+
+  using TrailingObjects::totalSizeToAlloc;
+  using TrailingObjects::getTrailingObjects;
+
+  unsigned NumResults;
+
+  size_t numTrailingObjects(typename TrailingObjects::template OverloadToken<
+                            MultipleValueInstruction *>) const {
+    return 1;
+  }
+
+  size_t numTrailingObjects(
+      typename TrailingObjects::template OverloadToken<DerivedResult>) const {
+    return NumResults;
+  }
+
+  template <typename... Args>
+  MultipleValueInstructionTrailingObjects(
+      Derived *Parent, ArrayRef<SILType> Types,
+      ArrayRef<ValueOwnershipKind> OwnershipKinds, Args &&... OtherArgs)
+      : NumResults(Types.size()) {
+
+    // If we do not have any results, then we do not need to initialize even the
+    // parent pointer since we do not have any results that will attempt to get
+    // our parent pointer.
+    if (!NumResults)
+      return;
+
+    auto **ParentPtr =
+        this->template getTrailingObjects<MultipleValueInstruction *>();
+    *ParentPtr = static_cast<MultipleValueInstruction *>(Parent);
+
+    auto *DataPtr = this->template getTrailingObjects<DerivedResult>();
+    for (unsigned i : range(NumResults)) {
+      ::new (&DataPtr[i]) DerivedResult(i, Types[i], OwnershipKinds[i],
+                                        std::forward<Args>(OtherArgs)...);
+      assert(DataPtr[i].getParent() == Parent &&
+             "Failed to setup parent reference correctly?!");
+    }
+  }
+
+  // Destruct the Derived Results.
+  ~MultipleValueInstructionTrailingObjects() {
+    if (!NumResults)
+      return;
+    auto *DataPtr = this->template getTrailingObjects<DerivedResult>();
+    for (unsigned i : range(NumResults))
+      DataPtr[i].~DerivedResult();
+  }
+
+public:
+  SILInstructionResultArray getAllResults() const {
+    // Our results start at element 1 since we stash the pointer to our parent
+    // MultipleValueInstruction in the 0 elt slot. This allows all
+    // MultipleValueInstructionResult to find their parent
+    // MultipleValueInstruction by using pointer arithmetic.
+    auto *Result = this->template getTrailingObjects<DerivedResult>();
+    return SILInstructionResultArray(
+        {static_cast<const MultipleValueInstructionResult *>(Result),
+         NumResults});
+  };
+};
 
 /// A subclass of SILInstruction which does not produce any values.
 class NonValueInstruction : public SILInstruction {
@@ -7035,6 +7263,15 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
 
     return nullptr;
   }
+}
+
+inline SILNode *MultipleValueInstructionResult::getCanonicalSILNodeInObject() {
+  return getParent();
+}
+
+inline const SILNode *
+MultipleValueInstructionResult::getCanonicalSILNodeInObject() const {
+  return getParent();
 }
 
 } // end swift namespace

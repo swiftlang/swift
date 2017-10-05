@@ -109,7 +109,17 @@ struct ValueOwnershipKind {
     /// we
     /// use unqualified ownership. Expected to tighten over time.
     Any,
+
+    LastValueOwnershipKind = Any,
   } Value;
+
+  using UnderlyingType = std::underlying_type<innerty>::type;
+  static constexpr unsigned NumBits = 3;
+  static constexpr UnderlyingType MaxValue = (UnderlyingType(1) << NumBits);
+  static constexpr uint64_t Mask = MaxValue - 1;
+  static_assert(unsigned(ValueOwnershipKind::LastValueOwnershipKind) < MaxValue,
+                "LastValueOwnershipKind is larger than max representable "
+                "ownership value?!");
 
   ValueOwnershipKind(innerty NewValue) : Value(NewValue) {}
   ValueOwnershipKind(unsigned NewValue) : Value(innerty(NewValue)) {}
@@ -133,19 +143,22 @@ struct ValueOwnershipKind {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, ValueOwnershipKind Kind);
 
 /// This is the base class of the SIL value hierarchy, which represents a
-/// runtime computed value. Things like SILInstruction derive from this.
+/// runtime computed value. Some examples of ValueBase are SILArgument and
+/// SingleValueInstruction.
 class ValueBase : public SILNode, public SILAllocated<ValueBase> {
+  friend class Operand;
+
   SILType Type;
   Operand *FirstUse = nullptr;
-  friend class Operand;
 
   ValueBase(const ValueBase &) = delete;
   ValueBase &operator=(const ValueBase &) = delete;
 
 protected:
-  ValueBase(ValueKind kind, SILType type)
-    : SILNode(SILNodeKind(kind), SILNodeStorageLocation::Value),
-      Type(type) {}
+  ValueBase(ValueKind kind, SILType type, IsRepresentative isRepresentative)
+      : SILNode(SILNodeKind(kind), SILNodeStorageLocation::Value,
+                isRepresentative),
+        Type(type) {}
 
 public:
   ~ValueBase() {

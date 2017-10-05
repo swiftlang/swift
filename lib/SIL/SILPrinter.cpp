@@ -660,12 +660,13 @@ public:
   /// Print out the users of the SILValue \p V. Return true if we printed out
   /// either an id or a use list. Return false otherwise.
   bool printUsersOfSILNode(const SILNode *node, bool printedSlashes) {
-    TinyPtrVector<SILValue> values;
-    if (auto value = dyn_cast<ValueBase>(node)) {
-      // The base pointer of the ultimate ArrayRef here is just the
-      // ValueBase; we aren't forming a reference to a temporary array.
+    SmallVector<SILValue, 8> values;
+    if (auto *value = dyn_cast<ValueBase>(node)) {
       values.push_back(value);
     } else if (auto *inst = dyn_cast<SILInstruction>(node)) {
+      assert(!isa<SingleValueInstruction>(inst) && "SingleValueInstruction was "
+                                                   "handled by the previous "
+                                                   "value base check.");
       copy(inst->getResults(), std::back_inserter(values));
     }
 
@@ -911,8 +912,6 @@ public:
       print(cast<SILInstruction>(node));
       return;
 
-    // TODO: MultiValueInstruction
-
 #define ARGUMENT(ID, PARENT) \
     case SILNodeKind::ID:
 #include "swift/SIL/SILNodes.def"
@@ -921,6 +920,13 @@ public:
 
     case SILNodeKind::SILUndef:
       printSILUndef(cast<SILUndef>(node));
+      return;
+
+#define MULTIPLE_VALUE_INST_RESULT(ID, PARENT) \
+    case SILNodeKind::ID:
+#include "swift/SIL/SILNodes.def"
+      printSILMultipleValueInstructionResult(
+          cast<MultipleValueInstructionResult>(node));
       return;
     }
     llvm_unreachable("bad kind");
@@ -941,7 +947,38 @@ public:
     // This should really only happen during debugging.
     *this << "undef<" << undef->getType() << ">\n";
   }
-  
+
+  void printSILMultipleValueInstructionResult(
+      const MultipleValueInstructionResult *result) {
+    // This should really only happen during debugging.
+    if (result->getParent()->getNumResults() == 1) {
+      *this << "**" << Ctx.getID(result) << "** = ";
+    } else {
+      *this << '(';
+      interleave(result->getParent()->getResults(),
+                 [&](SILValue value) {
+                   if (value == SILValue(result)) {
+                     *this << "**" << Ctx.getID(result) << "**";
+                     return;
+                   }
+                   *this << Ctx.getID(value);
+                 },
+                 [&] { *this << ", "; });
+      *this << ')';
+    }
+
+    *this << " = ";
+    printInstOpCode(result->getParent());
+    auto *nonConstParent =
+        const_cast<MultipleValueInstruction *>(result->getParent());
+    visit(static_cast<SILInstruction *>(nonConstParent));
+
+    // Print users.
+    (void)printUsersOfSILNode(result, false);
+
+    *this << '\n';
+  }
+
   void printInContext(const SILNode *node) {
     auto sortByID = [&](const SILNode *a, const SILNode *b) {
       return Ctx.getID(a).Number < Ctx.getID(b).Number;
