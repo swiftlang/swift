@@ -690,6 +690,8 @@ public:
 
     switch (Meta->getKind()) {
     case MetadataKind::Class:
+      if (!cast<TargetClassMetadata<Runtime>>(Meta)->isTypeMetadata())
+        return BuiltType();
       return readNominalTypeFromMetadata(Meta, skipArtificialSubclasses);
     case MetadataKind::Struct:
       return readNominalTypeFromMetadata(Meta);

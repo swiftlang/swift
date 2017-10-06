@@ -19,8 +19,8 @@ for id in $(seq 0 $process_id_max); do
 // REQUIRES: long_test
 // REQUIRES: nonexecutable_test
 
-// FIXME: Re-enable on Linux when we're no long running out of memory.
-// REQUIRES: OS=macosx
+// FIXME: Re-enable when we're no longer running out of memory.
+// REQUIRES: rdar34771322
 __EOF__
 
 done
