@@ -6636,3 +6636,65 @@ extension Set {
     }
   }
 }
+
+extension Set {
+  @available(*, deprecated,
+    message: "Set is unordered. Define some order by, for example, sorting it first.")
+  public func elementsEqual<
+    Other : Sequence
+  >(_ other: Other) -> Bool where Other.Element == Element {
+    return self._elementsEqual(other)
+  }
+
+  @available(*, deprecated,
+    message: "Set is unordered. Define some order by, for example, sorting it first.")
+  public func elementsEqual<Other : Sequence>(
+    _ other: Other,
+    by areEquivalent: (Element, Element) throws -> Bool
+  ) rethrows -> Bool where Other.Element == Element {
+    return try self._elementsEqual(other, by: areEquivalent)
+  }
+}
+
+extension Sequence where Element : Hashable {
+  @available(*, deprecated,
+    message: "Set is unordered. Define some order by, for example, sorting it first.")
+  public func elementsEqual(
+    _ other: Set<Element>
+  ) -> Bool {
+    return self._elementsEqual(other)
+  }
+
+  @available(*, deprecated,
+    message: "Set is unordered. Define some order by, for example, sorting it first.")
+  public func elementsEqual(
+    _ other: Set<Element>,
+    by areEquivalent: (Element, Element) throws -> Bool
+  ) rethrows -> Bool {
+    return try self._elementsEqual(other, by: areEquivalent)
+  }
+}
+
+extension Dictionary {
+  @available(*, deprecated,
+    message: "Dictionary is unordered. Define some order by, for example, sorting it first.")
+  public func elementsEqual<Other : Sequence>(
+    _ other: Other,
+    by areEquivalent: (Element, Element) throws -> Bool
+  ) rethrows -> Bool where Other.Element == Element {
+    return try self._elementsEqual(other, by: areEquivalent)
+  }
+}
+
+extension Sequence {
+  @available(*, deprecated,
+    message: "Dictionary is unordered. Define some order by, for example, sorting it first.")
+  public func elementsEqual<
+    Key : Hashable, Value
+  >(
+    _ other: Dictionary<Key, Value>,
+    by areEquivalent: (Element, Element) throws -> Bool
+  ) rethrows -> Bool where Element == Dictionary<Key, Value>.Element {
+    return try self._elementsEqual(other, by: areEquivalent)
+  }
+}
