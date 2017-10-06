@@ -381,7 +381,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpScopeMaps:
     case FrontendOptions::DumpTypeRefinementContexts:
       // Textual modes.
-      Opts.setSingleOutputFilename("-");
+      Opts.setOutputFilenameToStdout();
       break;
 
     case FrontendOptions::EmitPCH:
@@ -391,7 +391,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL: {
       if (Opts.OutputFilenames.empty())
-        Opts.setSingleOutputFilename("-");
+        Opts.setOutputFilenameToStdout();
       else
         Suffix = SIL_EXTENSION;
       break;
@@ -415,7 +415,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
     case FrontendOptions::EmitAssembly: {
       if (Opts.OutputFilenames.empty())
-        Opts.setSingleOutputFilename("-");
+        Opts.setOutputFilenameToStdout();
       else
         Suffix = "s";
       break;
@@ -423,7 +423,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
     case FrontendOptions::EmitIR: {
       if (Opts.OutputFilenames.empty())
-        Opts.setSingleOutputFilename("-");
+        Opts.setOutputFilenameToStdout();
       else
         Suffix = "ll";
       break;
@@ -440,7 +440,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
     case FrontendOptions::EmitImportedModules:
       if (Opts.OutputFilenames.empty())
-        Opts.setSingleOutputFilename("-");
+        Opts.setOutputFilenameToStdout();
       else
         Suffix = "importedmodules";
       break;
@@ -452,7 +452,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       // First, if we're reading from stdin and we don't have a directory,
       // output to stdout.
       if (Opts.Inputs.isReadingFromStdin() &&  Opts.OutputFilenames.empty())
-        Opts.setSingleOutputFilename("-");
+        Opts.setOutputFilenameToStdout();
       else {
         // We have a suffix, so determine an appropriate name.
         StringRef BaseName = Opts.Inputs.baseNameOfOutput(Args, Opts.ModuleName);
@@ -471,8 +471,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         Diags.diagnose(SourceLoc(), diag::error_no_output_filename_specified);
         return true;
       }
-    } else if (Opts.getSingleOutputFilename() != "-" &&
-        llvm::sys::fs::is_directory(Opts.getSingleOutputFilename())) {
+    } else if (Opts.isOutputFileDirectory()) {
       Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
                      Opts.getSingleOutputFilename());
       return true;

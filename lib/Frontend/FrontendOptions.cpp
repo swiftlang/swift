@@ -285,7 +285,7 @@ void FrontendOptions::setModuleName(DiagnosticEngine &Diags, const llvm::opt::Ar
 
 
 StringRef FrontendOptions::originalPath() const {
-  if (!OutputFilenames.empty() && getSingleOutputFilename() != "-")
+  if (hasNamedOutputFile())
     // Put the serialized diagnostics file next to the output file.
     return getSingleOutputFilename();
   
@@ -309,7 +309,7 @@ StringRef FrontendOptions::determineFallbackModuleName() const {
     return StringRef();
   }
   StringRef OutputFilename = getSingleOutputFilename();
-  bool useOutputFilename = !OutputFilename.empty() && OutputFilename != "-" && !llvm::sys::fs::is_directory(OutputFilename);
+  bool useOutputFilename = isOutputFilePlainFile();
   return llvm::sys::path::stem(useOutputFilename ? OutputFilename : StringRef(Inputs.getFirstInputFilename()));
 }
 
@@ -335,4 +335,12 @@ void FrontendOptions::setOutputFileList(swift::DiagnosticEngine &Diags, const ll
   } else {
     OutputFilenames = Args.getAllArgValues(options::OPT_o);
   }
+}
+
+bool FrontendOptions::isOutputFileDirectory() const {
+  return hasNamedOutputFile() && llvm::sys::fs::is_directory(getSingleOutputFilename());
+}
+
+bool FrontendOptions::isOutputFilePlainFile() const {
+  return hasNamedOutputFile() && !llvm::sys::fs::is_directory(getSingleOutputFilename());
 }

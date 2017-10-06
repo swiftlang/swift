@@ -446,6 +446,22 @@ public:
     OutputFilenames.clear();
     OutputFilenames.push_back(FileName);
   }
+  
+  void setOutputFilenameToStdout() {
+    setSingleOutputFilename("-");
+  }
+  
+  bool isOutputFilenameStdout() const {
+    return getSingleOutputFilename() == "-";
+  }
+  
+  bool isOutputFileDirectory() const;
+  
+  bool isOutputFilePlainFile() const;
+  
+  bool hasNamedOutputFile() const {
+    return !OutputFilenames.empty() && !isOutputFilenameStdout();
+  }
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
