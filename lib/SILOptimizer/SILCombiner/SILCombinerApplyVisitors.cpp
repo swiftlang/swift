@@ -599,7 +599,6 @@ static bool fastDominates(SILInstruction *a, SILInstruction *b) {
 /// true.
 static SILValue getAddressOfStackInit(AllocStackInst *ASI,
                                       SILInstruction *ASIUser, bool &isCopied,
-                                      bool &bailAfterTypePropagation,
                                       SILInstruction *OrigASIUser = nullptr) {
   SILInstruction *SingleWrite = nullptr;
   // Check that this alloc_stack is initialized only once.
@@ -618,10 +617,10 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
     if (isa<DeallocStackInst>(User) || isa<DestroyAddrInst>(User) ||
         isa<DeinitExistentialAddrInst>(User)) {
       if (OrigASIUser && fastDominates(User, OrigASIUser)) {
-        bailAfterTypePropagation = true;
+        return nullptr;
       }
       if (fastDominates(User, ASIUser)) {
-        bailAfterTypePropagation = true;
+        return nullptr;
       }
       continue;
     }
@@ -667,8 +666,7 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
     assert(isCopied && "isCopied not set for a copy_addr");
     SILValue CAISrc = CAI->getSrc();
     if (auto *ASI = dyn_cast<AllocStackInst>(CAISrc))
-      return getAddressOfStackInit(ASI, CAI, isCopied, bailAfterTypePropagation,
-                                   ASIUser);
+      return getAddressOfStackInit(ASI, CAI, isCopied, ASIUser);
     return CAISrc;
   }
   return cast<InitExistentialAddrInst>(SingleWrite);
@@ -681,14 +679,13 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
 static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
                                            ArchetypeType *&OpenedArchetype,
                                            SILValue &OpenedArchetypeDef,
-                                           bool &isCopied,
-                                           bool &bailAfterTypePropagation) {
+                                           bool &isCopied) {
   isCopied = false;
   if (auto *Instance = dyn_cast<AllocStackInst>(Self)) {
     // In case the Self operand is an alloc_stack where a copy_addr copies the
     // result of an open_existential_addr to this stack location.
-    if (SILValue Src = getAddressOfStackInit(
-            Instance, AI.getInstruction(), isCopied, bailAfterTypePropagation))
+    if (SILValue Src =
+            getAddressOfStackInit(Instance, AI.getInstruction(), isCopied))
       Self = Src;
   }
 
@@ -698,8 +695,7 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
     if (!ASI)
       return nullptr;
 
-    SILValue StackWrite =
-        getAddressOfStackInit(ASI, Open, isCopied, bailAfterTypePropagation);
+    SILValue StackWrite = getAddressOfStackInit(ASI, Open, isCopied);
     if (!StackWrite)
       return nullptr;
 
@@ -912,10 +908,8 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   ArchetypeType *OpenedArchetype = nullptr;
   SILValue OpenedArchetypeDef;
   bool isCopied = false;
-  bool bailAfterTypePropagation = false;
-  SILInstruction *InitExistential =
-      findInitExistential(AI, Self, OpenedArchetype, OpenedArchetypeDef,
-                          isCopied, bailAfterTypePropagation);
+  SILInstruction *InitExistential = findInitExistential(
+      AI, Self, OpenedArchetype, OpenedArchetypeDef, isCopied);
   if (!InitExistential)
     return nullptr;
 
@@ -948,10 +942,6 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
 
   // Propagate the concrete type into the callee-operand if required.
   Propagate(ConcreteType, Conformance);
-
-  if (bailAfterTypePropagation) {
-    return nullptr;
-  }
 
   if (isCopied) {
     // If the witness method is mutating self, we cannot replace self with
