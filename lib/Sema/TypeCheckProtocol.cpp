@@ -1033,52 +1033,92 @@ RequirementEnvironment::RequirementEnvironment(
     : reqSig(reqSig) {
   ASTContext &ctx = tc.Context;
 
+  auto concreteType = conformanceDC->getSelfInterfaceType();
+  auto *conformanceSig = conformanceDC->getGenericSignatureOfContext();
+
+  // Build a substitution map from the generic parameters of the conforming
+  // type to the synthetic environment.
+  //
+  // For structs, enums and protocols, this is a 1:1 mapping; for classes,
+  // we increase the depth of each generic parameter by 1 so that we can
+  // introduce a class-bound 'Self' parameter.
+  auto substConcreteType = concreteType;
+  SubstitutionMap conformanceToSyntheticEnvMap;
+  if (conformanceSig) {
+    conformanceToSyntheticEnvMap = conformanceSig->getSubstitutionMap(
+      [&](SubstitutableType *type) {
+        auto *genericParam = cast<GenericTypeParamType>(type);
+        if (covariantSelf) {
+          return GenericTypeParamType::get(
+              genericParam->getDepth() + 1,
+              genericParam->getIndex(),
+              ctx);
+        }
+
+        return GenericTypeParamType::get(
+            genericParam->getDepth(),
+            genericParam->getIndex(),
+            ctx);
+      },
+      MakeAbstractConformanceForGenericType());
+
+    substConcreteType = concreteType.subst(conformanceToSyntheticEnvMap);
+  }
+
+  // Calculate the depth at which the requirement's generic parameters
+  // appear in the synthetic signature.
+  unsigned depth = 0;
+  if (covariantSelf) {
+    depth++;
+  }
+  if (conformanceSig) {
+    depth += conformanceSig->getGenericParams().back()->getDepth() + 1;
+  }
+
   // Build a substitution map to replace the protocol's \c Self and the type
   // parameters of the requirement into a combined context that provides the
   // type parameters of the conformance context and the parameters of the
   // requirement.
   auto selfType = cast<GenericTypeParamType>(
-                            proto->getSelfInterfaceType()->getCanonicalType());
-
-  // Add the generic signature of the context of the conformance. This includes
-  // the generic parameters from the conforming type as well as any additional
-  // constraints that might occur on the extension that declares the
-  // conformance (i.e., if the conformance is conditional).
-  GenericSignature *conformanceSig;
-  unsigned depth = 0;
-  if ((conformanceSig = conformanceDC->getGenericSignatureOfContext())) {
-    // Use the canonical signature here.
-    conformanceSig = conformanceSig->getCanonicalSignature();
-    depth = conformanceSig->getGenericParams().back()->getDepth() + 1;
-  }
-
-  // Add the generic signature of the requirement, substituting our concrete
-  // type for 'Self'. We don't need the 'Self' requirement or parameter.
-  auto concreteType = conformanceDC->getSelfInterfaceType();
+      proto->getSelfInterfaceType()->getCanonicalType());
 
   reqToSyntheticEnvMap = reqSig->getSubstitutionMap(
-    [selfType, concreteType, depth, &ctx](SubstitutableType *type) -> Type {
-      if (type->isEqual(selfType))
-        return concreteType;
+    [selfType, substConcreteType, depth, covariantSelf, &ctx]
+    (SubstitutableType *type) -> Type {
+      // If the conforming type is a class, the protocol 'Self' maps to
+      // the class-constrained 'Self'. Otherwise, it maps to the concrete
+      // type.
+      if (type->isEqual(selfType)) {
+        if (covariantSelf)
+          return GenericTypeParamType::get(/*depth=*/0, /*index=*/0, ctx);
+        return substConcreteType;
+      }
+      // Other requirement generic parameters map 1:1 with their depth
+      // increased appropriately.
       auto *genericParam = cast<GenericTypeParamType>(type);
+      // In a protocol requirement, the only generic parameter at depth 0
+      // should be 'Self', and all others at depth 1. Anything else is
+      // invalid code.
       if (genericParam->getDepth() != 1)
         return Type();
       auto substGenericParam =
         GenericTypeParamType::get(depth, genericParam->getIndex(), ctx);
       return substGenericParam;
     },
-    [selfType, concreteType, conformance, conformanceDC, &ctx](
+    [selfType, substConcreteType, conformance, conformanceDC, &ctx](
         CanType type, Type replacement, ProtocolType *protoType)
           -> Optional<ProtocolConformanceRef> {
       auto proto = protoType->getDecl();
+
+      // The protocol 'Self' conforms concretely to the conforming type.
       if (type->isEqual(selfType)) {
         ProtocolConformance *specialized = conformance;
         if (conformance && conformance->getGenericSignature()) {
           auto concreteSubs =
-            concreteType->getContextSubstitutionMap(
+            substConcreteType->getContextSubstitutionMap(
               conformanceDC->getParentModule(), conformanceDC);
           specialized =
-            ctx.getSpecializedConformance(concreteType, conformance,
+            ctx.getSpecializedConformance(substConcreteType, conformance,
                                           concreteSubs);
         }
 
@@ -1086,12 +1126,15 @@ RequirementEnvironment::RequirementEnvironment(
           return ProtocolConformanceRef(specialized);
       }
 
+      // All other generic parameters come from the requirement itself
+      // and conform abstractly.
       return ProtocolConformanceRef(proto);
     });
 
   // If the requirement itself is non-generic, the synthetic signature
   // is that of the conformance context.
-  if (reqSig->getGenericParams().size() == 1 &&
+  if (!covariantSelf &&
+      reqSig->getGenericParams().size() == 1 &&
       reqSig->getRequirements().size() == 1) {
     syntheticSignature = conformanceDC->getGenericSignatureOfContext();
     if (syntheticSignature) {
@@ -1111,11 +1154,40 @@ RequirementEnvironment::RequirementEnvironment(
            ctx,
            TypeChecker::LookUpConformance(tc, conformanceDC));
 
-  if (conformanceSig) {
-    builder.addGenericSignature(conformanceSig);
+  auto source =
+    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+
+  // If the conforming type is a class, add a class-constrained 'Self'
+  // parameter.
+  if (covariantSelf) {
+    auto paramTy = GenericTypeParamType::get(/*depth=*/0, /*index=*/0, ctx);
+    builder.addGenericParameter(paramTy);
   }
 
-  // First, add the generic parameters from the requirement.
+  // Now, add all generic parameters from the conforming type.
+  if (conformanceSig) {
+    for (auto param : conformanceSig->getGenericParams()) {
+      builder.addGenericParameter(
+          Type(param).subst(conformanceToSyntheticEnvMap)
+              ->castTo<GenericTypeParamType>());
+    }
+  }
+
+  // Next, add requirements.
+  if (covariantSelf) {
+    auto paramTy = GenericTypeParamType::get(/*depth=*/0, /*index=*/0, ctx);
+    Requirement reqt(RequirementKind::Superclass, paramTy, substConcreteType);
+    builder.addRequirement(reqt, source, nullptr);
+  }
+
+  if (conformanceSig) {
+    for (auto &reqt : conformanceSig->getRequirements()) {
+      builder.addRequirement(reqt, source, nullptr,
+                             &conformanceToSyntheticEnvMap);
+    }
+  }
+
+  // Finally, add the generic parameters from the requirement.
   for (auto genericParam : reqSig->getGenericParams().slice(1)) {
     // The only depth that makes sense is depth == 1, the generic parameters
     // of the requirement itself. Anything else is from invalid code.
@@ -1134,10 +1206,8 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
-  auto source =
-    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   for (auto &req : reqSig->getRequirements()) {
-    builder.addRequirement(req, source, conformanceDC->getParentModule(),
+    builder.addRequirement(req, source, /*inferModule=*/nullptr,
                            &reqToSyntheticEnvMap);
   }
 
