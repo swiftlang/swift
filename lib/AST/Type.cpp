@@ -1022,6 +1022,27 @@ void ProtocolType::canonicalizeProtocols(
   llvm::array_pod_sort(protocols.begin(), protocols.end(), compareProtocols);
 }
 
+static Type
+getCanonicalInputType(AnyFunctionType *funcType,
+                      llvm::function_ref<CanType(Type)> getCanonicalType) {
+  auto origInputType = funcType->getInput();
+  bool isParen = isa<ParenType>(origInputType.getPointer());
+  Type inputType = getCanonicalType(origInputType);
+
+  if (!isParen && AnyFunctionType::isCanonicalFunctionInputType(inputType))
+    return inputType;
+
+  auto flags = ParameterTypeFlags().withInOut(inputType->is<InOutType>());
+  if (auto *parenTy = dyn_cast<ParenType>(origInputType.getPointer()))
+    flags = flags.withShared(parenTy->getParameterFlags().isShared());
+
+  inputType = ParenType::get(inputType->getASTContext(),
+                             inputType->getInOutObjectType(), flags);
+  assert(AnyFunctionType::isCanonicalFunctionInputType(inputType));
+
+  return inputType;
+}
+
 /// getCanonicalType - Return the canonical version of this type, which has
 /// sugar from all levels stripped off.
 CanType TypeBase::getCanonicalType() {
@@ -1124,15 +1145,10 @@ CanType TypeBase::getCanonicalType() {
     // Transform the input and result types.
     auto &ctx = function->getInput()->getASTContext();
     auto &mod = *ctx.TheBuiltinModule;
-    Type inputTy = function->getInput()->getCanonicalType(sig, mod);
-    if (!AnyFunctionType::isCanonicalFunctionInputType(inputTy)) {
-      auto flags = ParameterTypeFlags().withInOut(inputTy->is<InOutType>());
-      if (auto parenTy = dyn_cast<ParenType>(function->getInput().getPointer()))
-        flags = flags.withShared(parenTy->getParameterFlags().isShared());
-      inputTy = ParenType::get(ctx, inputTy->getInOutObjectType(), flags);
-    }
+    auto inputTy = getCanonicalInputType(function, [&](Type type) -> CanType {
+      return type->getCanonicalType(sig, mod);
+    });
     auto resultTy = function->getResult()->getCanonicalType(sig, mod);
-
     Result = GenericFunctionType::get(sig, inputTy, resultTy,
                                       function->getExtInfo());
     assert(Result->isCanonical());
@@ -1146,14 +1162,8 @@ CanType TypeBase::getCanonicalType() {
 
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(this);
-    Type In = FT->getInput()->getCanonicalType();
-    if (!AnyFunctionType::isCanonicalFunctionInputType(In)) {
-      auto flags = ParameterTypeFlags().withInOut(In->is<InOutType>());
-      if (auto parenTy = dyn_cast<ParenType>(FT->getInput().getPointer()))
-        flags = flags.withShared(parenTy->getParameterFlags().isShared());
-      In = ParenType::get(In->getASTContext(), In->getInOutObjectType(), flags);
-      assert(AnyFunctionType::isCanonicalFunctionInputType(In));
-    }
+    auto In = getCanonicalInputType(
+        FT, [](Type type) -> CanType { return type->getCanonicalType(); });
     Type Out = FT->getResult()->getCanonicalType();
     Result = FunctionType::get(In, Out, FT->getExtInfo());
     break;
