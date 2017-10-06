@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -Xllvm -sil-disable-pass="External Definition To Declaration" -parse-sil -sil-serialize-all -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false -module-name Swift > %t.sil
+// RUN: %target-swift-frontend %s -Xllvm -sil-disable-pass="External Definition To Declaration" -parse-sil -sil-serialize-witness-tables -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false -module-name Swift > %t.sil
 // RUN: %FileCheck %s < %t.sil
 // RUN: %FileCheck -check-prefix=NEG-CHECK %s < %t.sil
 
@@ -212,7 +212,7 @@ sil hidden_external [serialized] @hidden_external_function_test : $@convention(t
   return %8 : $()
 }
 
-sil @hidden_external_function_test_caller : $@convention(thin) () -> () {
+sil [serialized] @hidden_external_function_test_caller : $@convention(thin) () -> () {
   %0 = function_ref @hidden_external_function_test : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
   %2 = tuple()
@@ -240,7 +240,7 @@ sil public_external [serialized] @public_external_function_test : $@convention(t
   return %8 : $()
 }
 
-sil @public_external_function_test_caller : $@convention(thin) () -> () {
+sil [serialized] @public_external_function_test_caller : $@convention(thin) () -> () {
   %0 = function_ref @public_external_function_test : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
   %2 = tuple()
@@ -268,7 +268,7 @@ sil shared_external [serialized] @shared_external_function_test : $@convention(t
   return %8 : $()
 }
 
-sil @shared_external_function_test_caller : $@convention(thin) () -> () {
+sil [serialized] @shared_external_function_test_caller : $@convention(thin) () -> () {
   %0 = function_ref @shared_external_function_test : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
   %2 = tuple()

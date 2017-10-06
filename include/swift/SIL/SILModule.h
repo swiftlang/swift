@@ -322,9 +322,6 @@ public:
     return wholeModule;
   }
 
-  /// Returns true if everything in this SILModule is being serialized.
-  bool isWholeModuleSerialized() const { return Options.SILSerializeAll; }
-
   /// Returns true if it is the OnoneSupport module.
   bool isOnoneSupportModule() const;
 

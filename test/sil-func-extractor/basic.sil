@@ -14,11 +14,11 @@ sil @takes_Int_inout : $@convention(thin) (@inout Int64) -> ()
 // CHECK-NOT: sil @makesInt : $@convention(thin) () -> Int64
 sil @makesInt : $@convention(thin) () -> Int64
 
-// CHECK-LABEL: sil @use_before_init : $@convention(thin) () -> Int64 {
+// CHECK-LABEL: sil [serialized] @use_before_init : $@convention(thin) () -> Int64 {
 // CHECK: bb0:
 // CHECK: return
 // CHECK: }
-sil @use_before_init : $@convention(thin) () -> Int64 {
+sil [serialized] @use_before_init : $@convention(thin) () -> Int64 {
 bb0:
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int64>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int64>, 0

@@ -13,6 +13,7 @@ public protocol mmCollectionType : mmSequenceType {
   > (_ seq: S)
 }
 
+@_inlineable
 public func test<
   EC1 : mmCollectionType,
   EC2 : mmCollectionType

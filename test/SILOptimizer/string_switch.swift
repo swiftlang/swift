@@ -2,7 +2,6 @@
 // RUN: %target-build-swift -O %s -module-name=test -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil | %FileCheck %s
 // RUN: %target-run %t.out
 // UNSUPPORTED: nonatomic_rc
-// UNSUPPORTED: resilient_stdlib
 
 import StdlibUnittest
 

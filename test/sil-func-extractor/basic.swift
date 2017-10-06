@@ -17,7 +17,7 @@
 // EXTRACT-FOO-NOT: sil hidden @_T05basic7VehicleCACSi1n_tcfc : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
 // EXTRACT-FOO-NOT: sil hidden @_T05basic7VehicleC3nowSiyF : $@convention(method) (@guaranteed Vehicle) -> Int {
 
-// EXTRACT-FOO-LABEL: sil hidden @_T05basic3fooSiyF : $@convention(thin) () -> Int {
+// EXTRACT-FOO-LABEL: sil [serialized] @_T05basic3fooSiyF : $@convention(thin) () -> Int {
 // EXTRACT-FOO:       bb0:
 // EXTRACT-FOO-NEXT:    %0 = integer_literal
 // EXTRACT-FOO:         %[[POS:.*]] = struct $Int
@@ -28,7 +28,7 @@
 // EXTRACT-TEST-NOT: sil hidden @_T05basic7VehicleCACSi1n_tcfc : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
 // EXTRACT-TEST-NOT: sil hidden @_T05basic7VehicleC3nowSiyF : $@convention(method) (@guaranteed Vehicle) -> Int {
 
-// EXTRACT-TEST-LABEL:  sil hidden @_T05basic1XV4testyyF : $@convention(method) (X) -> () {
+// EXTRACT-TEST-LABEL:  sil [serialized] @_T05basic1XV4testyyF : $@convention(method) (X) -> () {
 // EXTRACT-TEST:        bb0(%0 : $X):
 // EXTRACT-TEST-NEXT:     function_ref
 // EXTRACT-TEST-NEXT:     function_ref @_T05basic3fooSiyF : $@convention(thin) () -> Int
@@ -37,11 +37,11 @@
 // EXTRACT-TEST-NEXT:     return
 
 
-// EXTRACT-INIT-NOT: sil hidden @_T05basic3fooSiyF : $@convention(thin) () -> Int {
-// EXTRACT-INIT-NOT: sil hidden @_T05basic1XV4testyyF : $@convention(method) (X) -> () {
-// EXTRACT-INIT-NOT: sil hidden @_T05basic7VehicleC3nowSiyF : $@convention(method) (@owned Vehicle) -> Int {
+// EXTRACT-INIT-NOT: sil [serialized] @_T05basic3fooSiyF : $@convention(thin) () -> Int {
+// EXTRACT-INIT-NOT: sil [serialized] @_T05basic1XV4testyyF : $@convention(method) (X) -> () {
+// EXTRACT-INIT-NOT: sil [serialized] @_T05basic7VehicleC3nowSiyF : $@convention(method) (@owned Vehicle) -> Int {
 
-// EXTRACT-INIT-LABEL:   sil hidden @_T05basic7VehicleCACSi1n_tcfc : $@convention(method) (Int, @owned Vehicle) -> @owned Vehicle {
+// EXTRACT-INIT-LABEL:   sil [serialized] @_T05basic7VehicleCACSi1n_tcfc : $@convention(method) (Int, @owned Vehicle) -> @owned Vehicle {
 // EXTRACT-INIT:         bb0
 // EXTRACT-INIT-NEXT:      ref_element_addr
 // EXTRACT-INIT-NEXT:      begin_access [modify] [dynamic]
@@ -50,11 +50,11 @@
 // EXTRACT-INIT-NEXT:      return
 
 
-// EXTRACT-NOW-NOT: sil hidden @_T05basic3fooSiyF : $@convention(thin) () -> Int {
-// EXTRACT-NOW-NOT: sil hidden @_T05basic1XV4testyyF : $@convention(method) (X) -> () {
-// EXTRACT-NOW-NOT: sil hidden @_T05basic7VehicleCACSi1n_tcfc : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
+// EXTRACT-NOW-NOT: sil [serialized] @_T05basic3fooSiyF : $@convention(thin) () -> Int {
+// EXTRACT-NOW-NOT: sil [serialized] @_T05basic1XV4testyyF : $@convention(method) (X) -> () {
+// EXTRACT-NOW-NOT: sil [serialized] @_T05basic7VehicleCACSi1n_tcfc : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
 
-// EXTRACT-NOW-LABEL:   sil hidden @_T05basic7VehicleC3nowSiyF : $@convention(method) (@guaranteed Vehicle) -> Int {
+// EXTRACT-NOW-LABEL:   sil [serialized] @_T05basic7VehicleC3nowSiyF : $@convention(method) (@guaranteed Vehicle) -> Int {
 // EXTRACT-NOW:         bb0
 // EXTRACT-NOW:           ref_element_addr
 // EXTRACT-NOW-NEXT:      begin_access [read] [dynamic]
@@ -62,25 +62,34 @@
 // EXTRACT-NOW-NEXT:      end_access
 // EXTRACT-NOW-NEXT:      return
 
-struct X {
+public struct X {
+  @_versioned
+  @_inlineable
   func test() {
     foo()
   }
 }
 
-class Vehicle {
+public class Vehicle {
+    @_versioned
     var numOfWheels: Int
 
+    @_versioned
+    @_inlineable
     init(n: Int) {
       numOfWheels = n
     }
 
+    @_versioned
+    @_inlineable
     func now() -> Int {
         return numOfWheels
     }
 }
 
 @discardableResult
+@_versioned
+@_inlineable
 func foo() -> Int {
   return 7
 }

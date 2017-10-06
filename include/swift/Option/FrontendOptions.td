@@ -372,9 +372,6 @@ def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
 def sil_link_all : Flag<["-"], "sil-link-all">,
   HelpText<"Link all SIL functions">;
 
-def sil_serialize_all : Flag<["-"], "sil-serialize-all">,
-  HelpText<"Serialize all generated SIL">;
-
 def sil_serialize_witness_tables : Flag<["-"], "sil-serialize-witness-tables">,
   HelpText<"Serialize eligible SIL witness tables">;
 
