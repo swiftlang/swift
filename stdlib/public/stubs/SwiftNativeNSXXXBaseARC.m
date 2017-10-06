@@ -37,4 +37,17 @@ swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
       (__bridge NSString __unsafe_unretained *)opaque;
   return isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
 }
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+NS_RETURNS_RETAINED NSString *
+swift_stdlib_NSStringLowercaseString(NSString *NS_RELEASES_ARGUMENT str) {
+  return str.lowercaseString;
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+NS_RETURNS_RETAINED NSString *
+swift_stdlib_NSStringUppercaseString(NSString *NS_RELEASES_ARGUMENT str) {
+  return str.uppercaseString;
+}
+
 #endif
