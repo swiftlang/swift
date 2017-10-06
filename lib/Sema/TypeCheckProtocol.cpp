@@ -135,6 +135,7 @@ namespace {
                            DeclContext *conformanceDC,
                            GenericSignature *reqSig,
                            ProtocolDecl *proto,
+                           ClassDecl *covariantSelf,
                            ProtocolConformance *conformance);
 
     /// Retrieve the synthetic generic environment.
@@ -1029,6 +1030,7 @@ RequirementEnvironment::RequirementEnvironment(
                                            DeclContext *conformanceDC,
                                            GenericSignature *reqSig,
                                            ProtocolDecl *proto,
+                                           ClassDecl *covariantSelf,
                                            ProtocolConformance *conformance)
     : reqSig(reqSig) {
   ASTContext &ctx = tc.Context;
@@ -1169,8 +1171,64 @@ matchWitness(TypeChecker &tc,
   Type reqType, openedFullReqType;
 
   auto *reqSig = req->getInnermostDeclContext()->getGenericSignatureOfContext();
+
+  ClassDecl *covariantSelf = nullptr;
+  if (witness->getDeclContext()->getAsProtocolExtensionContext()) {
+    if (auto *classDecl = dc->getAsClassOrClassExtensionContext()) {
+      if (!classDecl->isFinal()) {
+        // If the requirement's type does not involve any associated types,
+        // we use a class-constrained generic parameter as the 'Self' type
+        // in the witness thunk.
+        //
+        // This allows the following code to type check:
+        //
+        // protocol P {
+        //   func f() -> Self
+        // }
+        //
+        // extension P {
+        //   func f() { return self }
+        // }
+        //
+        // class C : P {}
+        //
+        // When we call (C() as P).f(), we want to pass the 'Self' type
+        // from the call site, not the static 'Self' type of the conformance.
+        //
+        // On the other hand, if the requirement's type contains associated
+        // types, we use the static 'Self' type, to preserve backward
+        // compatibility with code that uses this pattern:
+        //
+        // protocol P {
+        //   associatedtype T = Self
+        //   func f() -> T
+        // }
+        //
+        // extension P where Self.T == Self {
+        //   func f() -> Self { return self }
+        // }
+        //
+        // class C : P {}
+        //
+        // It would have been much nicer to just ban this completely if
+        // the class 'C' is not final, but there is a great deal of existing
+        // code out there that relies on this behavior, most commonly by
+        // defining a non-final class conforming to 'Collection' which uses
+        // the default witness for 'Collection.Iterator', which is defined
+        // as 'IndexingIterator<Self>'.
+        auto selfKind = proto->findProtocolSelfReferences(req,
+                                             /*allowCovariantParameters=*/false,
+                                             /*skipAssocTypes=*/false);
+        if (!selfKind.other) {
+          covariantSelf = classDecl;
+        }
+      }
+    }
+  }
+
   Optional<RequirementEnvironment> reqEnvironment(
-      RequirementEnvironment(tc, dc, reqSig, proto, conformance));
+      RequirementEnvironment(tc, dc, reqSig, proto, covariantSelf,
+                             conformance));
 
   // Set up the constraint system for matching.
   auto setup = [&]() -> std::tuple<Optional<RequirementMatch>, Type, Type> {
