@@ -614,7 +614,7 @@ private:
         os << " SWIFT_UNAVAILABLE";
         skipAvailability = true;
         // If -init is unavailable, then +new should be, too:
-        const bool selectorIsInit = selectorPieces.getNumArgs() == 0 && selectorPieces.front().str() == "init";
+        const bool selectorIsInit = selector.getNumArgs() == 0 && selectorPieces.front().str() == "init";
         makeNewUnavailable = selectorIsInit;
       } else if (ctor->isDesignatedInit() &&
           !isa<ProtocolDecl>(ctor->getDeclContext())) {
