@@ -1757,7 +1757,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
       Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
       return true;
     }
-  } else if (isNoneRequested) {
+  } else if (!isNoneRequested) {
     if (getInputFilenames().empty()) {
       Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
       return true;
