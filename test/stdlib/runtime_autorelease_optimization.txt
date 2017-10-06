@@ -1,4 +1,4 @@
-// UNSUPPORTED: linux
+// REQUIRES: objc_interop
 // RUN: otool -tvV %platform-module-dir/libswiftCore.dylib | %FileCheck %s --check-prefix=CHECK-%target-cpu
 
 // Verify the autorelease return optimization sequence.
