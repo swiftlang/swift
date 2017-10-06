@@ -2553,6 +2553,7 @@ void LoadableByAddress::run() {
                 }
                 break;
               }
+              case SILInstructionKind::ConvertFunctionInst:
               case SILInstructionKind::ThinFunctionToPointerInst:
               case SILInstructionKind::ThinToThickFunctionInst: {
                 conversionInstrs.insert(
