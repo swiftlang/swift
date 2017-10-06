@@ -573,8 +573,9 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
 /// If the value is copied from another stack location, \p isCopied is set to
 /// true.
 static SILValue getAddressOfStackInit(AllocStackInst *ASI,
-                                      SILInstruction *ASIUser,
-                                      bool &isCopied) {
+                                      SILInstruction *ASIUser, bool &isCopied,
+                                      DominanceInfo *DT,
+                                      SILInstruction *OrigASIUser = nullptr) {
   SILInstruction *SingleWrite = nullptr;
   // Check that this alloc_stack is initialized only once.
   for (auto Use : ASI->getUses()) {
@@ -582,11 +583,21 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
 
     // Ignore instructions which don't write to the stack location.
     // Also ignore ASIUser (only kicks in if ASIUser is the original apply).
-    if (isa<DeallocStackInst>(User) || isa<DebugValueAddrInst>(User) ||
-        isa<DestroyAddrInst>(User) || isa<WitnessMethodInst>(User) ||
-        isa<DeinitExistentialAddrInst>(User) ||
-        isa<OpenExistentialAddrInst>(User) ||
-        User == ASIUser) {
+    if (isa<DebugValueAddrInst>(User) || isa<WitnessMethodInst>(User) ||
+        isa<OpenExistentialAddrInst>(User) || User == ASIUser) {
+      continue;
+    }
+    // Ignore instructions which destroy the stack lcoation.
+    // *as long as* they do not appear before the User!
+    // Else we will have use-after-free
+    if (isa<DeallocStackInst>(User) || isa<DestroyAddrInst>(User) ||
+        isa<DeinitExistentialAddrInst>(User)) {
+      if (OrigASIUser && DT->properlyDominates(User, OrigASIUser)) {
+        return nullptr;
+      }
+      if (DT->properlyDominates(User, ASIUser)) {
+        return nullptr;
+      }
       continue;
     }
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
@@ -631,7 +642,7 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
     assert(isCopied && "isCopied not set for a copy_addr");
     SILValue CAISrc = CAI->getSrc();
     if (auto *ASI = dyn_cast<AllocStackInst>(CAISrc))
-      return getAddressOfStackInit(ASI, CAI, isCopied);
+      return getAddressOfStackInit(ASI, CAI, isCopied, DT, ASIUser);
     return CAISrc;
   }
   return cast<InitExistentialAddrInst>(SingleWrite);
@@ -644,13 +655,13 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
 static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
                                            ArchetypeType *&OpenedArchetype,
                                            SILValue &OpenedArchetypeDef,
-                                           bool &isCopied) {
+                                           bool &isCopied, DominanceInfo *DT) {
   isCopied = false;
   if (auto *Instance = dyn_cast<AllocStackInst>(Self)) {
     // In case the Self operand is an alloc_stack where a copy_addr copies the
     // result of an open_existential_addr to this stack location.
-    if (SILValue Src = getAddressOfStackInit(Instance, AI.getInstruction(),
-                                             isCopied))
+    if (SILValue Src =
+            getAddressOfStackInit(Instance, AI.getInstruction(), isCopied, DT))
       Self = Src;
   }
 
@@ -660,7 +671,7 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
     if (!ASI)
       return nullptr;
 
-    SILValue StackWrite = getAddressOfStackInit(ASI, Open, isCopied);
+    SILValue StackWrite = getAddressOfStackInit(ASI, Open, isCopied, DT);
     if (!StackWrite)
       return nullptr;
 
@@ -873,9 +884,9 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   ArchetypeType *OpenedArchetype = nullptr;
   SILValue OpenedArchetypeDef;
   bool isCopied = false;
-  SILInstruction *InitExistential =
-    findInitExistential(AI, Self, OpenedArchetype, OpenedArchetypeDef,
-                        isCopied);
+  DominanceInfo *DT = DA->get(AI.getFunction());
+  SILInstruction *InitExistential = findInitExistential(
+      AI, Self, OpenedArchetype, OpenedArchetypeDef, isCopied, DT);
   if (!InitExistential)
     return nullptr;
 
