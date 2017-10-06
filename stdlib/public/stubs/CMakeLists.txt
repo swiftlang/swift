@@ -11,6 +11,7 @@ set(swift_stubs_objc_sources
     FoundationHelpers.mm
     OptionalBridgingHelper.mm
     Reflection.mm
+    SwiftNativeNSXXXBaseARC.m
     SwiftNativeNSXXXBase.mm.gyb)
 set(swift_stubs_unicode_normalization_sources
     UnicodeNormalization.cpp)
@@ -41,3 +42,5 @@ add_swift_library(swiftStdlibStubs OBJECT_LIBRARY TARGET_LIBRARY
   LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
   INSTALL_IN_COMPONENT stdlib)
 
+set_property(SOURCE SwiftNativeNSXXXBaseARC.m APPEND_STRING PROPERTY COMPILE_FLAGS
+    "-fobjc-arc")
