@@ -199,7 +199,7 @@ Available configurations: <Optlevel>_SINGLEFILE, <Optlevel>_MULTITHREADED")
 # Syntax for an optset:  <optimization-level>_<configuration>
 #    where "_<configuration>" is optional.
 if(NOT SWIFT_OPTIMIZATION_LEVELS)
-  set(SWIFT_OPTIMIZATION_LEVELS "Onone" "O" "Ounchecked"
+  set(SWIFT_OPTIMIZATION_LEVELS "Onone" "O" "Osize"
                                 ${SWIFT_EXTRA_BENCH_CONFIGS})
 endif()
 

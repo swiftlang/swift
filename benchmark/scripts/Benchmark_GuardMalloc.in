@@ -20,7 +20,7 @@ sys.path.append("@PATH_TO_DRIVER_LIBRARY@")
 
 import perf_test_driver  # noqa (E402 module level import not at top of file)
 
-# Regexes for the XFAIL_LIST. Matches against '([Onone|O|Ounchecked],TestName)'
+# Regexes for the XFAIL_LIST. Matches against '([Onone|O|Osize],TestName)'
 XFAIL_LIST = [
 ]
 

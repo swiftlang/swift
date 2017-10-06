@@ -61,7 +61,7 @@ def _unwrap_self(args):
     return type(args[0]).process_input(*args)
 
 
-BenchmarkDriver_OptLevels = ['Onone', 'O', 'Ounchecked']
+BenchmarkDriver_OptLevels = ['Onone', 'O', 'Osize']
 
 
 class BenchmarkDriver(object):
