@@ -15,11 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "irgen"
-#include "swift/Subsystems.h"
+#include "IRGenModule.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Platform.h"
@@ -29,50 +28,56 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
-#include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/LLVMPasses/Passes.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/LLVMPasses/PassesFwd.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/Subsystems.h"
 #include "clang/Basic/TargetInfo.h"
-#include "llvm/Bitcode/BitcodeWriterPass.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/MC/SubtargetFeature.h"
+#include "llvm/Object/ObjectFile.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormattedStream.h"
-#include "llvm/Support/TargetRegistry.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/Mutex.h"
 #include "llvm/Support/MD5.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Support/Mutex.h"
+#include "llvm/Support/Path.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetSubtargetInfo.h"
-#include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/ObjCARC.h"
-#include "llvm/Object/ObjectFile.h"
-#include "IRGenModule.h"
 
 #include <thread>
 
 using namespace swift;
 using namespace irgen;
 using namespace llvm;
+
+static cl::opt<bool> DisableObjCARCContract(
+    "disable-objc-arc-contract", cl::Hidden,
+    cl::desc("Disable running objc arc contract for testing purposes"));
 
 namespace {
 // We need this to access IRGenOptions from extension functions
@@ -446,6 +451,13 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
 
   legacy::PassManager EmitPasses;
 
+  // Make sure we do ARC contraction under optimization.  We don't
+  // rely on any other LLVM ARC transformations, but we do need ARC
+  // contraction to add the objc_retainAutoreleasedReturnValue
+  // assembly markers and remove clang.arc.used.
+  if (Opts.Optimize && !DisableObjCARCContract)
+    EmitPasses.add(createObjCARCContractPass());
+
   // Set up the final emission passes.
   switch (Opts.OutputKind) {
   case IRGenOutputKind::Module:
@@ -465,13 +477,6 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
 
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         TargetMachine->getTargetIRAnalysis()));
-
-    // Make sure we do ARC contraction under optimization.  We don't
-    // rely on any other LLVM ARC transformations, but we do need ARC
-    // contraction to add the objc_retainAutoreleasedReturnValue
-    // assembly markers.
-    if (Opts.Optimize)
-      EmitPasses.add(createObjCARCContractPass());
 
     bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, *RawOS,
                                                    FileType, !Opts.Verify);
