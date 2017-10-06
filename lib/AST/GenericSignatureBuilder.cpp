@@ -1604,6 +1604,13 @@ static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
                                               assocType2->getName().str()))
     return result;
 
+  // Prefer an associated type with no overrides (i.e., an anchor) to one
+  // that has overrides.
+  bool hasOverridden1 = !assocType1->getOverriddenDecls().empty();
+  bool hasOverridden2 = !assocType2->getOverriddenDecls().empty();
+  if (hasOverridden1 != hasOverridden2)
+    return hasOverridden1 ? +1 : -1;
+
   // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
   auto proto1 = assocType1->getProtocol();
   auto proto2 = assocType2->getProtocol();
@@ -1665,6 +1672,9 @@ TypeDecl *EquivalenceClass::lookupNestedType(
       // If this is an associated type, record whether it is the best
       // associated type we've seen thus far.
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        // Retrieve the associated type anchor.
+        assocType = assocType->getAssociatedTypeAnchor();
+
         if (!bestAssocType ||
              compareAssociatedTypes(assocType, bestAssocType) < 0)
           bestAssocType = assocType;
@@ -1730,6 +1740,8 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     entry.types.push_back(bestAssocType);
     entry.types.insert(entry.types.end(),
                        concreteDecls.begin(), concreteDecls.end());
+    assert(bestAssocType->getOverriddenDecls().empty() &&
+           "Lookup should never keep a non-anchor associated type");
   } else if (!concreteDecls.empty()) {
     // Find the best concrete type.
     auto bestConcreteTypeIter =
@@ -2552,6 +2564,11 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   if (!type) return nullptr;
 
   AssociatedTypeDecl *assocType = dyn_cast<AssociatedTypeDecl>(type);
+
+  // Always refer to the archetype anchor.
+  if (assocType)
+    assocType = assocType->getAssociatedTypeAnchor();
+
   TypeDecl *concreteDecl = assocType ? nullptr : type;
 
   // If we were asked for a complete, well-formed archetype, make sure we

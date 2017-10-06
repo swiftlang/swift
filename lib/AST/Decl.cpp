@@ -2625,6 +2625,24 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
   return SourceRange(KeywordLoc, endLoc);
 }
 
+AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
+  auto overridden = getOverriddenDecls();
+
+  // If this declaration does not override any other declarations, it's
+  // the anchor.
+  if (overridden.empty()) return const_cast<AssociatedTypeDecl *>(this);
+
+  // Find the best anchor among the anchors of the overridden decls.
+  AssociatedTypeDecl *bestAnchor = nullptr;
+  for (auto assocType : overridden) {
+    auto anchor = assocType->getAssociatedTypeAnchor();
+    if (!bestAnchor || compare(anchor, bestAnchor) < 0)
+      bestAnchor = anchor;
+  }
+
+  return bestAnchor;
+}
+
 AssociatedTypeDecl *AssociatedTypeDecl::getOverriddenDecl() const {
   auto overridden = getOverriddenDecls();
   return overridden.empty() ? nullptr : overridden.front();

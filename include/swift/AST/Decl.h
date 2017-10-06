@@ -2664,6 +2664,15 @@ public:
   /// type; can only be called after the alias type has been resolved.
   void computeType();
 
+  /// Retrieve the associated type "anchor", which is the associated type
+  /// declaration that will be used to describe this associated type in the
+  /// ABI.
+  ///
+  /// The associated type "anchor" is an associated type that does not
+  /// override any other associated type. There may be several such associated
+  /// types; select one deterministically.
+  AssociatedTypeDecl *getAssociatedTypeAnchor() const;
+
   /// Retrieve the (first) overridden associated type declaration, if any.
   AssociatedTypeDecl *getOverriddenDecl() const;
 

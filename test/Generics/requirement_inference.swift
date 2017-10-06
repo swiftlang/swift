@@ -154,11 +154,13 @@ protocol P10 {
 }
 
 // CHECK-LABEL: sameTypeConcrete1@
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.A == X3, τ_0_0.A == X3, τ_0_0.B == Int, τ_0_0.C == Int>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.A == X3, τ_0_0.B == Int, τ_0_0.C == Int>
+// FIXME: Should have a second τ_0_0.A == X3
 func sameTypeConcrete1<T : P9 & P10>(_: T) where T.A == X3, T.C == T.B, T.C == Int { }
 
 // CHECK-LABEL: sameTypeConcrete2@
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.A == τ_0_0.A, τ_0_0.B == X3, τ_0_0.C == X3>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.B == X3, τ_0_0.C == X3>
+// FIXME: Should have τ_0_0.A == τ_0_0.A
 func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3 { }
 // expected-warning@-1{{redundant superclass constraint 'T.B' : 'X3'}}
 // expected-note@-2{{same-type constraint 'T.C' == 'X3' written here}}
