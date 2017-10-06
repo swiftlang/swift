@@ -401,7 +401,7 @@ def main():
         'multiple filters are supported', metavar="PATTERN")
     parent_parser.add_argument(
         '-t', '--tests',
-        help='directory containing Benchmark_O{,none,unchecked} ' +
+        help='directory containing Benchmark_O{,none,size} ' +
         '(default: DRIVER_DIR)',
         default=DRIVER_DIR)
 
@@ -411,8 +411,8 @@ def main():
         parents=[parent_parser])
     submit_parser.add_argument(
         '-o', '--optimization', nargs='+',
-        help='optimization levels to use (default: O Onone Ounchecked)',
-        default=['O', 'Onone', 'Ounchecked'])
+        help='optimization levels to use (default: O Onone Osize)',
+        default=['O', 'Onone', 'Osize'])
     submit_parser.add_argument(
         '-i', '--iterations',
         help='number of times to run each test (default: 10)',
@@ -435,8 +435,8 @@ def main():
     run_parser.add_argument(
         '-o', '--optimization',
         metavar='OPT',
-        choices=['O', 'Onone', 'Ounchecked'],
-        help='optimization level to use: {O,Onone,Ounchecked}, (default: O)',
+        choices=['O', 'Onone', 'Osize'],
+        help='optimization level to use: {O,Onone,Osize}, (default: O)',
         default='O')
     run_parser.add_argument(
         '-i', '--iterations',
