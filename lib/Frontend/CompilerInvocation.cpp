@@ -27,7 +27,6 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 
 using namespace swift;
@@ -97,23 +96,6 @@ LLVM_ATTRIBUTE_NOINLINE
 static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
-
-/// Try to read an output file list file.
-static void readOutputFileList(DiagnosticEngine &diags,
-                         std::vector<std::string> &outputFiles,
-                         const llvm::opt::Arg *filelistPath) {
-   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-      llvm::MemoryBuffer::getFile(filelistPath->getValue());
-  if (!buffer) {
-    diags.diagnose(SourceLoc(), diag::cannot_open_file,
-                   filelistPath->getValue(), buffer.getError().message());
-  }
-  for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
-    outputFiles.push_back(line);
-  }
-}
-
-
 
 
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
@@ -371,12 +353,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   else
     Opts.InputKind = InputFileKind::IFK_Swift;
 
-  if (const Arg *A = Args.getLastArg(OPT_output_filelist)) {
-    readOutputFileList(Diags, Opts.OutputFilenames, A);
-    assert(!Args.hasArg(OPT_o) && "don't use -o with -output-filelist");
-  } else {
-    Opts.OutputFilenames = Args.getAllArgValues(OPT_o);
-  }
+  Opts.setOutputFileList(Diags, Args);
 
   Opts.setModuleName(Diags, Args);
 
@@ -1687,199 +1664,4 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
                         extendedInfo.getExtraClangImporterOptions().begin(),
                         extendedInfo.getExtraClangImporterOptions().end());
   return info.status;
-}
-
-bool FrontendInputs::shouldTreatAsSIL() const {
-  if (getInputFilenames().size() == 1) {
-    // If we have exactly one input filename, and its extension is "sil",
-    // treat the input as SIL.
-    StringRef Input(getInputFilenames()[0]);
-    return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
-  }
-  StringRef Input = primaryInputFilenameIfAny();
-  if (!Input.empty()) {
-    // If we have a primary input and it's a filename with extension "sil",
-    // treat the input as SIL.
-    return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
-  }
-  return false;
-}
-
-bool FrontendInputs::shouldTreatAsLLVM() const {
-  if (getInputFilenames().size() == 1) {
-    StringRef Input(getInputFilenames()[0]);
-    return
-    llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
-    llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
-  }
-  return false;
-}
-
-void FrontendInputs::setInputFilenamesAndPrimaryInput(DiagnosticEngine &Diags, ArgList &Args) {
-  if (const Arg *filelistPath = Args.getLastArg(options::OPT_filelist)) {
-    readInputFileList(Diags, Args, filelistPath);
-    return;
-  }
-  for (const Arg *A : Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
-    if (A->getOption().matches(options::OPT_INPUT)) {
-      addInputFilename(A->getValue());
-    } else if (A->getOption().matches(options::OPT_primary_file)) {
-      setPrimaryInput(SelectedInput(getInputFilenames().size()));
-      addInputFilename(A->getValue());
-    } else {
-      llvm_unreachable("Unknown input-related argument!");
-    }
-  }
-}
-
-bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool isREPLRequested, bool isNoneRequested) const {
-  if (isREPLRequested) {
-    if (!getInputFilenames().empty()) {
-      Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
-      return true;
-    }
-  } else if (TreatAsSIL && hasPrimaryInput()) {
-    // If we have the SIL as our primary input, we can waive the one file
-    // requirement as long as all the other inputs are SIBs.
-    for (unsigned i = 0, e = getInputFilenames().size(); i != e; ++i) {
-      if (i == getPrimaryInput()->Index)
-        continue;
-      
-      StringRef File(getInputFilenames()[i]);
-      if (!llvm::sys::path::extension(File).endswith(SIB_EXTENSION)) {
-        Diags.diagnose(SourceLoc(),
-                       diag::error_mode_requires_one_sil_multi_sib);
-        return true;
-      }
-    }
-  } else if (TreatAsSIL) {
-    if (getInputFilenames().size() != 1) {
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
-      return true;
-    }
-  } else if (!isNoneRequested) {
-    if (getInputFilenames().empty()) {
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
-      return true;
-    }
-  }
-  return false;
-}
-
-StringRef FrontendInputs::baseNameOfOutput(const llvm::opt::ArgList &Args, StringRef ModuleName) const {
-  StringRef pifn = primaryInputFilenameIfAny();
-  if (!pifn.empty()) {
-    return llvm::sys::path::stem(pifn);
-  }
-  bool UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name);
-  if (!UserSpecifiedModuleName &&  getInputFilenames().size() == 1) {
-    return llvm::sys::path::stem(getInputFilenames()[0]);
-  }
-  return ModuleName;
-}
-
-/// Try to read an input file list file.
-///
-/// Returns false on error.
-void FrontendInputs::readInputFileList(DiagnosticEngine &diags,
-                              llvm::opt::ArgList &Args,
-                              const llvm::opt::Arg *filelistPath) {
-   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-  llvm::MemoryBuffer::getFile(filelistPath->getValue());
-  if (!buffer) {
-    diags.diagnose(SourceLoc(), diag::cannot_open_file,
-                   filelistPath->getValue(), buffer.getError().message());
-    return;
-  }
-
-  const Arg *primaryFileArg = Args.getLastArg(options::OPT_primary_file);
-  unsigned primaryFileIndex = 0;
-  
-  bool foundPrimaryFile = false;
-  
-  for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
-    addInputFilename(line);
-    
-    if (foundPrimaryFile || primaryFileArg == nullptr)
-      continue;
-    if (line == primaryFileArg->getValue())
-      foundPrimaryFile = true;
-    else
-      ++primaryFileIndex;
-  }
-  
-  if (primaryFileArg && !foundPrimaryFile) {
-    diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
-                   primaryFileArg->getValue(), filelistPath->getValue());
-    return;
-  }
-  
-  if (primaryFileArg)
-    setPrimaryInput(SelectedInput(primaryFileIndex));
-  assert(!Args.hasArg(options::OPT_INPUT) && "mixing -filelist with inputs");
-}
-
-void FrontendInputs::transformInputFilenames(const llvm::function_ref<std::string(std::string)> &fn) {
-  for (auto &InputFile : InputFilenames) {
-    InputFile = fn(InputFile);
-  }
-}
-
-StringRef FrontendOptions::originalPath() const {
-  if (!OutputFilenames.empty() && getSingleOutputFilename() != "-")
-    // Put the serialized diagnostics file next to the output file.
-    return getSingleOutputFilename();
-  
-  StringRef fn = Inputs.primaryInputFilenameIfAny();
-  // If we have a primary input, so use that as the basis for the name of the
-  // serialized diagnostics file, otherwise fall back on the
-  // module name.
-  return !fn.empty() ? llvm::sys::path::filename(fn) : StringRef(ModuleName);
-}
-       
-StringRef FrontendOptions::determineFallbackModuleName() const {
-  // Note: this code path will only be taken when running the frontend
-  // directly; the driver should always pass -module-name when invoking the
-  // frontend.
-  if (RequestedAction == FrontendOptions::REPL) {
-    // Default to a module named "REPL" if we're in REPL mode.
-    return "REPL";
-  }
-  // In order to pass Driver/options.swift test must leave ModuleName empty
-  if (!Inputs.hasInputFilenames()) {
-    return StringRef();
-  }
-  StringRef OutputFilename = getSingleOutputFilename();
-  bool useOutputFilename = !OutputFilename.empty() && OutputFilename != "-" && !llvm::sys::fs::is_directory(OutputFilename);
-  return llvm::sys::path::stem(useOutputFilename ? OutputFilename : StringRef(Inputs.getFirstInputFilename()));
-}
-
-void FrontendOptions::setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args) {
-  const Arg *A = Args.getLastArg(options::OPT_module_name);
-  if (A) {
-    ModuleName = A->getValue();
-  }
-  else if (ModuleName.empty()) {
-    // The user did not specify a module name, so determine a default fallback
-    // based on other options.
-    
-    // Note: this code path will only be taken when running the frontend
-    // directly; the driver should always pass -module-name when invoking the
-    // frontend.
-    ModuleName = determineFallbackModuleName();
-  }
-  
-  if (Lexer::isIdentifier(ModuleName) &&
-      (ModuleName != STDLIB_NAME || ParseStdlib)) {
-    return;
-  }
-  if (!actionHasOutput() || isCompilingExactlyOneSwiftFile()) {
-    ModuleName = "main";
-    return;
-  }
-  auto DID = (ModuleName == STDLIB_NAME)
-   ? diag::error_stdlib_module_name
-   : diag::error_bad_module_name;
-  Diags.diagnose(SourceLoc(), DID, ModuleName, A == nullptr);
-  ModuleName = "__bad__";
 }

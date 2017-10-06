@@ -462,6 +462,8 @@ public:
   }
   
   void setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args);
+  
+  void setOutputFileList(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args );
 };
 
 }
