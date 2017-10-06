@@ -6,6 +6,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// The autorelease return optimizaion seems to be failing in the simulator.
+// XFAIL: CPU=i386
+
 import Foundation
 
 let str = "abcdefg\u{A758}hijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz\u{A759}"
