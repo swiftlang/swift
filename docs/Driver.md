@@ -14,9 +14,12 @@ The target audience for this document is people who want to integrate the Swift
 compiler into their build system, rather than using Xcode or the package
 manager (`swift build`). If you're looking to work on the driver itself...well,
 this is probably still useful to you, but you should also check out
-DriverInternals.rst and maybe DependencyAnalysis.rst as well. If you're just
-using Xcode or SwiftPM and want to find out what mysterious command-line
+[DriverInternals.rst][] and maybe [DependencyAnalysis.rst][] as well. If you're
+just using Xcode or SwiftPM and want to find out what mysterious command-line
 options you could be passing, `swiftc --help` is a better choice.
+
+  [DriverInternals.rst]: https://github.com/apple/swift/blob/master/docs/DriverInternals.rst
+  [DependencyAnalysis.rst]: https://github.com/apple/swift/blob/master/docs/DependencyAnalysis.rst
 
 If you're invoking `swift -frontend` directly, and you aren't working on the
 compiler itself...well, this document should convince you to not do that.
@@ -25,7 +28,7 @@ Some terms:
 
 - For the purposes of this document, a _module_ is a single distributable unit
   of API. (We use this term for a lot of other things too, though; check out
-  Lexicon.rst for the full list.) "Foundation" is a single module, as is the
+  [Lexicon.rst][] for the full list.) "Foundation" is a single module, as is the
   Swift standard library ("Swift"). An app is a module too.
 
 - A _compilation unit_ is a set of source files that are compiled together. In
@@ -46,6 +49,8 @@ Some terms:
 - The _REPL_ is a mode of the debugger (LLDB) that is launched by the driver
   when you invoke `swift` with no inputs. It doesn't actually come up again in
   this document, but it's probably worth mentioning for completeness.
+
+  [Lexicon.rst]: https://github.com/apple/swift/blob/master/docs/Lexicon.rst
 
 
 ## What gets run? ##
@@ -205,13 +210,15 @@ in becoming more like non-whole-module builds.
 ## Incremental Builds ##
 
 Incremental builds in Swift work by primarily by cross-file dependency
-analysis, described in DependencyAnalysis.rst. Compiling a single file might be
+analysis, described in [DependencyAnalysis.rst][]. Compiling a single file might be
 necessary because that file has changed, but it could also be because that file
 depends on something else that might have changed. From a build system
 perspective, the files in a particular module can't be extracted from each
 other; a top-level invocation of the compiler will result in a valid
 compilation of the entire module, but manually recompiling certain files is not
 guaranteed to do anything sensible.
+
+  [DependencyAnalysis.rst]: https://github.com/apple/swift/blob/master/docs/DependencyAnalysis.rst
 
 Performing an incremental build is easy; just pass `-incremental` and be sure to
 put "swift-dependencies" entries in your output file map.
