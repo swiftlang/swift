@@ -2072,8 +2072,10 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
 }
 
 void SILSerializer::writeSILVTable(const SILVTable &vt) {
-  // Do not emit vtables for non-public classes.
-  if (vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Public)
+  // Do not emit vtables for non-public classes unless everything has to be
+  // serialized.
+  if (!ShouldSerializeAll &&
+      vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Public)
     return;
   VTableList[vt.getClass()->getName()] = NextVTableID++;
   VTableOffset.push_back(Out.GetCurrentBitNo());
@@ -2082,8 +2084,9 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 
   for (auto &entry : vt.getEntries()) {
     SmallVector<ValueID, 4> ListOfValues;
-    // Do not emit entries which are not public or serialized.
-    if (entry.Implementation &&
+    // Do not emit entries which are not public or serialized, unless everything
+    // has to be serialized.
+    if (!ShouldSerializeAll && entry.Implementation &&
         !entry.Implementation->isPossiblyUsedExternally() &&
         !entry.Implementation->isSerialized())
       continue;
