@@ -348,110 +348,43 @@ internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int 
 
 //===--- Builtin.BridgeObject ---------------------------------------------===//
 
-#if arch(i386) || arch(arm)
+// TODO(<rdar://problem/34837023>): Get rid of superfluous UInt constructor
+// calls
+
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned
+internal var _objCTaggedPointerBits: UInt {
+  @inline(__always) get { return UInt(_swift_BridgeObject_TaggedPointerBits) }
+}
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned
 internal var _objectPointerSpareBits: UInt {
-    @inline(__always) get { return 0x0000_0003 }
+    @inline(__always) get {
+      return UInt(_swift_abi_SwiftSpareBitsMask) & ~_objCTaggedPointerBits
+    }
 }
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned
+internal var _objectPointerLowSpareBitShift: UInt {
+    @inline(__always) get {
+      _sanityCheck(_swift_abi_ObjCReservedLowBits < 2,
+        "num bits now differs from num-shift-amount, new platform?")
+      return UInt(_swift_abi_ObjCReservedLowBits)
+    }
+}
+
+#if arch(i386) || arch(arm) || arch(powerpc64) || arch(powerpc64le) || arch(
+  s390x)
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned
 internal var _objectPointerIsObjCBit: UInt {
     @inline(__always) get { return 0x0000_0002 }
 }
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objectPointerLowSpareBitShift: UInt {
-    @inline(__always) get { return 0 }
-}
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objCTaggedPointerBits: UInt {
-  @inline(__always) get { return 0 }
-}
-#elseif arch(x86_64)
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objectPointerSpareBits: UInt {
-  @inline(__always) get { return 0x7F00_0000_0000_0006 }
-}
+#else
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned
 internal var _objectPointerIsObjCBit: UInt {
   @inline(__always) get { return 0x4000_0000_0000_0000 }
-}
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objectPointerLowSpareBitShift: UInt {
-  @inline(__always) get { return 1 }
-}
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objCTaggedPointerBits: UInt {
-  @inline(__always) get { return 0x8000_0000_0000_0001 }
-}
-#elseif arch(arm64)
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objectPointerSpareBits: UInt {
-  @inline(__always) get { return 0x7F00_0000_0000_0007 }
-}
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objectPointerIsObjCBit: UInt {
-  @inline(__always) get { return 0x4000_0000_0000_0000 }
-}
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objectPointerLowSpareBitShift: UInt {
-    @inline(__always) get { return 0 }
-}
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objCTaggedPointerBits: UInt {
-    @inline(__always) get { return 0x8000_0000_0000_0000 }
-}
-#elseif arch(powerpc64) || arch(powerpc64le)
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objectPointerSpareBits: UInt {
-  @inline(__always) get { return 0x0000_0000_0000_0007 }
-}
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objectPointerIsObjCBit: UInt {
-  @inline(__always) get { return 0x0000_0000_0000_0002 }
-}
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objectPointerLowSpareBitShift: UInt {
-    @inline(__always) get { return 0 }
-}
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objCTaggedPointerBits: UInt {
-    @inline(__always) get { return 0 }
-}
-#elseif arch(s390x)
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objectPointerSpareBits: UInt {
-  @inline(__always) get { return 0x0000_0000_0000_0007 }
-}
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objectPointerIsObjCBit: UInt {
-  @inline(__always) get { return 0x0000_0000_0000_0002 }
-}
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objectPointerLowSpareBitShift: UInt {
-  @inline(__always) get { return 0 }
-}
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _objCTaggedPointerBits: UInt {
-  @inline(__always) get { return 0 }
 }
 #endif
 
