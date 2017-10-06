@@ -3315,7 +3315,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
     
     auto signature = SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                               /*pseudogeneric*/ false),
+                               /*pseudogeneric*/ false,
+                               /*noescape*/ false),
       ParameterConvention::Direct_Unowned,
       params, results, None, C);
     
@@ -3480,7 +3481,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
     
     auto signature = SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                               /*pseudogeneric*/ false),
+                               /*pseudogeneric*/ false,
+                               /*noescape*/ false),
       ParameterConvention::Direct_Unowned,
       params, results, None, C);
     
