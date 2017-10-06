@@ -352,8 +352,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   }
 
   if (Opts.RequestedAction == FrontendOptions::Immediate) {
-    assert(!Opts.Inputs.getInputFilenames().empty());
-    Opts.ImmediateArgv.push_back(Opts.Inputs.getInputFilenames()[0]); // argv[0]
+    Opts.ImmediateArgv.push_back(Opts.Inputs.getFirstInputFilename()); // argv[0]
     if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
       for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
         Opts.ImmediateArgv.push_back(A->getValue(i));
@@ -393,20 +392,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       // Note: this code path will only be taken when running the frontend
       // directly; the driver should always pass -module-name when invoking the
       // frontend.
-      if (Opts.RequestedAction == FrontendOptions::REPL) {
-        // Default to a module named "REPL" if we're in REPL mode.
-        ModuleName = "REPL";
-      } else if (!Opts.Inputs.getInputFilenames().empty()) {
-        StringRef OutputFilename = Opts.getSingleOutputFilename();
-        if (OutputFilename.empty() || OutputFilename == "-" ||
-            llvm::sys::fs::is_directory(OutputFilename)) {
-          ModuleName = Opts.Inputs.getInputFilenames()[0];
-        } else {
-          ModuleName = OutputFilename;
-        }
-
-        ModuleName = llvm::sys::path::stem(ModuleName);
-      }
+      ModuleName = Opts.determineFallbackModuleName();
     }
 
     if (!Lexer::isIdentifier(ModuleName) ||
@@ -1823,15 +1809,6 @@ StringRef FrontendInputs::baseNameOfOutput(bool UserSpecifiedModuleName, StringR
   return ModuleName;
 }
 
-
-// FIXME: The frontend should be dealing with symlinks, maybe similar to
-// clang's FileManager ?
-void FrontendInputs::resolvePathSymlinksInPlace() {
-  for (auto &InputFile : InputFilenames {
-    InputFile = SwiftLangSupport::resolvePathSymlinks(InputFile);
-  }
-}
-
 /// Try to read an input file list file.
 ///
 /// Returns false on error.
@@ -1873,6 +1850,12 @@ void FrontendInputs::readInputFileList(DiagnosticEngine &diags,
   assert(!Args.hasArg(options::OPT_INPUT) && "mixing -filelist with inputs");
 }
 
+void FrontendInputs::transformInputFilenames(const llvm::function_ref<std::string(std::string)> &fn) {
+  for (auto &InputFile : InputFilenames) {
+    InputFile = fn(InputFile);
+  }
+}
+
 StringRef FrontendOptions::originalPath() const {
   if (!OutputFilenames.empty() && getSingleOutputFilename() != "-")
     // Put the serialized diagnostics file next to the output file.
@@ -1883,4 +1866,18 @@ StringRef FrontendOptions::originalPath() const {
   // serialized diagnostics file, otherwise fall back on the
   // module name.
   return !fn.empty() ? llvm::sys::path::filename(fn) : StringRef(ModuleName);
+}
+       
+StringRef FrontendOptions::determineFallbackModuleName() const {
+  // Note: this code path will only be taken when running the frontend
+  // directly; the driver should always pass -module-name when invoking the
+  // frontend.
+  if (RequestedAction == FrontendOptions::REPL) {
+    // Default to a module named "REPL" if we're in REPL mode.
+    return "REPL";
+  }
+  assert(Inputs.hasInputFilenames()); // The code used to leave the ModuleName empty in this case
+  StringRef OutputFilename = getSingleOutputFilename();
+  bool useOutputFilename = !OutputFilename.empty() && OutputFilename != "-" && !llvm::sys::fs::is_directory(OutputFilename);
+  return llvm::sys::path::stem(useOutputFilename ? OutputFilename : StringRef(Inputs.getFirstInputFilename()));
 }

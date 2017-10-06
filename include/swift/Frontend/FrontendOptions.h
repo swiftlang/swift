@@ -113,6 +113,15 @@ public:
   
   bool shouldTreatAsSIL() const;
   
+  bool hasInputFilenames() const {
+    return !getInputFilenames().empty();
+  }
+  
+  std::string getFirstInputFilename() const {
+    assert(hasInputFilenames());
+    return getInputFilenames()[0];
+  }
+  
   // If we have exactly one input filename, and its extension is "bc" or "ll",
   // treat the input as LLVM_IR.
   bool shouldTreatAsLLVM() const;
@@ -149,7 +158,7 @@ public:
     return StringRef();
   }
   
-  void resolvePathSymlinksInPlace();
+  void transformInputFilenames(const llvm::function_ref<std::string(std::string)> &fn);
 };
 
 /// Options for controlling the behavior of the frontend.
@@ -430,6 +439,8 @@ public:
   }
   
   StringRef originalPath() const;
+  
+  StringRef determineFallbackModuleName() const;
 };
 
 }

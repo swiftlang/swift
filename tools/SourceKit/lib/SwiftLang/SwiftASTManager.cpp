@@ -399,7 +399,9 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   // clang's FileManager ?
   std::string PrimaryFile =
     SwiftLangSupport::resolvePathSymlinks(UnresolvedPrimaryFile);
-  Invocation.getFrontendOptions().Inputs.resolvePathSymlinksInPlace();
+  Invocation.getFrontendOptions().Inputs.transformInputFilenames( [] (std::string s) -> std::string {
+    return SwiftLangSupport::resolvePathSymlinks(s);
+  });
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;
