@@ -3018,6 +3018,19 @@ ProtocolDecl::getInheritedProtocols() const {
   return result;
 }
 
+llvm::TinyPtrVector<AssociatedTypeDecl *>
+ProtocolDecl::getAssociatedTypeMembers() const {
+  llvm::TinyPtrVector<AssociatedTypeDecl *> result;
+  if (!isObjC()) {
+    for (auto member : getMembers()) {
+      if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
+        result.push_back(ATD);
+      }
+    }
+  }
+  return result;
+}
+
 bool ProtocolDecl::walkInheritedProtocols(
               llvm::function_ref<TypeWalker::Action(ProtocolDecl *)> fn) const {
   auto self = const_cast<ProtocolDecl *>(this);
