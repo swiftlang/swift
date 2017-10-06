@@ -91,6 +91,9 @@ public:
   Optional<SelectedInput> getPrimaryInput() const {
     return PrimaryInput;
   }
+  bool isPrimaryInputAFileAt(unsigned i) {
+    return hasPrimaryInput() &&  getPrimaryInput()->isFilename()  &&  getPrimaryInput()->Index == i;
+  }
   void addInputFilename(StringRef Filename) {
     InputFilenames.push_back(Filename);
   }

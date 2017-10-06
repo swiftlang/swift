@@ -365,6 +365,8 @@ class CompilerInstance {
 
   void createSILModule();
   void setPrimarySourceFile(SourceFile *SF);
+  
+  bool setupForFileAt(unsigned i);
 
 public:
   SourceManager &getSourceMgr() { return SourceMgr; }

@@ -181,61 +181,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   }
 
   for (unsigned i = 0, e = Invocation.getInputFilenames().size(); i != e; ++i) {
-    auto &File = Invocation.getInputFilenames()[i];
-
-    // FIXME: Working with filenames is fragile, maybe use the real path
-    // or have some kind of FileManager.
-    using namespace llvm::sys::path;
-    if (Optional<unsigned> ExistingBufferID =
-            SourceMgr.getIDForBufferIdentifier(File)) {
-      if (SILMode || (MainMode && filename(File) == "main.swift"))
-        MainBufferID = ExistingBufferID.getValue();
-
-      if (PrimaryInput && PrimaryInput->isFilename() &&
-          PrimaryInput->Index == i)
-        PrimaryBufferID = ExistingBufferID.getValue();
-
-      continue; // replaced by a memory buffer.
-    }
-
-    // Open the input file.
-    using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
-    FileOrError InputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(File);
-    if (!InputFileOrErr) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
-                           File, InputFileOrErr.getError().message());
+    bool hasError = setupForFileAt(i);
+    if (hasError) {
       return true;
     }
-
-    if (serialization::isSerializedAST(InputFileOrErr.get()->getBuffer())) {
-      llvm::SmallString<128> ModuleDocFilePath(File);
-      llvm::sys::path::replace_extension(ModuleDocFilePath,
-                                         SERIALIZED_MODULE_DOC_EXTENSION);
-      FileOrError ModuleDocOrErr =
-        llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath.str());
-      if (!ModuleDocOrErr &&
-          ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
-        Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
-                             File, ModuleDocOrErr.getError().message());
-        return true;
-      }
-      PartialModules.push_back({ std::move(InputFileOrErr.get()),
-                                 ModuleDocOrErr? std::move(ModuleDocOrErr.get())
-                                               : nullptr });
-      continue;
-    }
-
-    // Transfer ownership of the MemoryBuffer to the SourceMgr.
-    unsigned BufferID =
-      SourceMgr.addNewSourceBuffer(std::move(InputFileOrErr.get()));
-
-    InputSourceCodeBufferIDs.push_back(BufferID);
-
-    if (SILMode || (MainMode && filename(File) == "main.swift"))
-      MainBufferID = BufferID;
-
-    if (PrimaryInput && PrimaryInput->isFilename() && PrimaryInput->Index == i)
-      PrimaryBufferID = BufferID;
   }
 
   // Set the primary file to the code-completion point if one exists.
@@ -754,4 +703,64 @@ void CompilerInstance::freeContextAndSIL() {
   MainModule = nullptr;
   SML = nullptr;
   PrimarySourceFile = nullptr;
+}
+
+bool CompilerInstance::setupForFileAt(unsigned i) {
+  bool MainMode = (Invocation.getInputKind() == InputFileKind::IFK_Swift);
+  bool SILMode = (Invocation.getInputKind() == InputFileKind::IFK_SIL);
+
+  auto &File = Invocation.getInputFilenames()[i];
+  
+  // FIXME: Working with filenames is fragile, maybe use the real path
+  // or have some kind of FileManager.
+  using namespace llvm::sys::path;
+  if (Optional<unsigned> ExistingBufferID =
+      SourceMgr.getIDForBufferIdentifier(File)) {
+    if (SILMode || (MainMode && filename(File) == "main.swift"))
+      MainBufferID = ExistingBufferID.getValue();
+    
+    if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
+      PrimaryBufferID = ExistingBufferID.getValue();
+    
+    return false; // replaced by a memory buffer.
+  }
+  
+  // Open the input file.
+  using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
+  FileOrError InputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(File);
+  if (!InputFileOrErr) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
+                         File, InputFileOrErr.getError().message());
+    return true;
+  }
+  
+  if (serialization::isSerializedAST(InputFileOrErr.get()->getBuffer())) {
+    llvm::SmallString<128> ModuleDocFilePath(File);
+    llvm::sys::path::replace_extension(ModuleDocFilePath,
+                                       SERIALIZED_MODULE_DOC_EXTENSION);
+    FileOrError ModuleDocOrErr =
+    llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath.str());
+    if (!ModuleDocOrErr &&
+        ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
+                           File, ModuleDocOrErr.getError().message());
+      return true;
+    }
+    PartialModules.push_back({ std::move(InputFileOrErr.get()),
+      ModuleDocOrErr? std::move(ModuleDocOrErr.get())
+      : nullptr });
+    return false;
+  }
+  
+  // Transfer ownership of the MemoryBuffer to the SourceMgr.
+  unsigned BufferID =
+  SourceMgr.addNewSourceBuffer(std::move(InputFileOrErr.get()));
+  
+  InputSourceCodeBufferIDs.push_back(BufferID);
+  
+  if (SILMode || (MainMode && filename(File) == "main.swift"))
+    MainBufferID = BufferID;
+  
+  if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
+    PrimaryBufferID = BufferID;
 }
