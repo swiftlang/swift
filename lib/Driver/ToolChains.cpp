@@ -234,13 +234,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_ImportedModules:
       FrontendModeOption = "-emit-imported-modules";
       break;
-
-    // BEGIN APPLE-ONLY OUTPUT TYPES
     case types::TY_IndexData:
       FrontendModeOption = "-typecheck";
       break;
-    // END APPLE-ONLY OUTPUT TYPES
-
     case types::TY_Remapping:
       FrontendModeOption = "-update-code";
       break;
