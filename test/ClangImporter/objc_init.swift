@@ -1,8 +1,6 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify
 
 // REQUIRES: objc_interop
-// REQUIRES: OS=macosx
-// FIXME: <rdar://problem/19452886> test/ClangModules/objc_init.swift should not require REQUIRES: OS=macosx
 
 import AppKit
 import objc_ext
@@ -59,7 +57,10 @@ class MyDocument3 : NSAwesomeDocument {
 
 func createMyDocument3(_ url: NSURL) {
   var md = MyDocument3()
+#if os(macOS)
+  // Limit this particular test to macOS; it depends on availability.
   md = try! MyDocument3(contentsOf: url as URL, ofType:"")
+#endif
   _ = md
 }
 
