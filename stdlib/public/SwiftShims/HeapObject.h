@@ -177,10 +177,12 @@ static_assert(alignof(HeapObject) == alignof(void*),
 /// Corresponding namespaced decls
 #ifdef __cplusplus
 namespace heap_object_abi {
-static const uintptr_t LeastValidPointerValue =
+static const __swift_uintptr_t LeastValidPointerValue =
     _swift_abi_LeastValidPointerValue;
-static const uintptr_t SwiftSpareBitsMask = _swift_abi_SwiftSpareBitsMask;
-static const uintptr_t ObjCReservedBitsMask = _swift_abi_ObjCReservedBitsMask;
+static const __swift_uintptr_t SwiftSpareBitsMask =
+    _swift_abi_SwiftSpareBitsMask;
+static const __swift_uintptr_t ObjCReservedBitsMask =
+    _swift_abi_ObjCReservedBitsMask;
 static const unsigned ObjCReservedLowBits = _swift_abi_ObjCReservedLowBits;
 } // heap_object_abi
 #endif // __cplusplus
