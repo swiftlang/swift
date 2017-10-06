@@ -14,17 +14,23 @@ import Foundation
 
 public struct SyntaxChildren: Sequence {
   public struct Iterator: IteratorProtocol {
-    var index: Int = 0
     let node: Syntax
+    var indexIterator: Syntax.PresentChildIndicesSequence.Iterator
+
+    init(node: Syntax) {
+      self.indexIterator = node.presentChildIndices.makeIterator()
+      self.node = node
+    }
 
     public mutating func next() -> Syntax? {
-      defer { index += 1 }
+      guard let index = indexIterator.next() else { return nil }
       return node.child(at: index)
     }
   }
+
   let node: Syntax
 
   public func makeIterator() -> SyntaxChildren.Iterator {
-    return Iterator(index: 0, node: node)
+    return Iterator(node: node)
   }
 }
