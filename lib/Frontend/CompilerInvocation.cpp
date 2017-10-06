@@ -1845,7 +1845,10 @@ StringRef FrontendOptions::determineFallbackModuleName() const {
     // Default to a module named "REPL" if we're in REPL mode.
     return "REPL";
   }
-  assert(Inputs.hasInputFilenames()); // The code used to leave the ModuleName empty in this case
+  // In order to pass Driver/options.swift test must leave ModuleName empty
+  if (!Inputs.hasInputFilenames()) {
+    return StringRef();
+  }
   StringRef OutputFilename = getSingleOutputFilename();
   bool useOutputFilename = !OutputFilename.empty() && OutputFilename != "-" && !llvm::sys::fs::is_directory(OutputFilename);
   return llvm::sys::path::stem(useOutputFilename ? OutputFilename : StringRef(Inputs.getFirstInputFilename()));
