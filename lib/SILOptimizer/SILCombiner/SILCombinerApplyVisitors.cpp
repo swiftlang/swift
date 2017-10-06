@@ -566,6 +566,31 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
   return tryToConcatenateStrings(AI, Builder);
 }
 
+// TODO:
+// Move this concrete type propagation for existentials out of sil-combine
+// We can then use DominanceAnalysis which is the right thing to do here
+// We avoid using it here due to compilation speed implications
+static bool fastDominates(SILInstruction *a, SILInstruction *b) {
+  auto aBlock = a->getParent(), bBlock = b->getParent();
+
+  // If the blocks are different, bail
+  if (aBlock != bBlock)
+    return true;
+
+  // Otherwise, they're in the same block, and we just need to check
+  // whether B comes after A.  This is a non-strict computation.
+  auto aIter = a->getIterator();
+  auto bIter = b->getIterator();
+  auto fIter = aBlock->begin();
+  while (bIter != fIter) {
+    --bIter;
+    if (aIter == bIter)
+      return true;
+  }
+
+  return false;
+}
+
 /// Returns the address of an object with which the stack location \p ASI is
 /// initialized. This is either a init_existential_addr or the source of a
 /// copy_addr. Returns a null value if the address does not dominate the
@@ -574,7 +599,7 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
 /// true.
 static SILValue getAddressOfStackInit(AllocStackInst *ASI,
                                       SILInstruction *ASIUser, bool &isCopied,
-                                      DominanceInfo *DT,
+                                      bool &bailAfterTypePropagation,
                                       SILInstruction *OrigASIUser = nullptr) {
   SILInstruction *SingleWrite = nullptr;
   // Check that this alloc_stack is initialized only once.
@@ -592,11 +617,11 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
     // Else we will have use-after-free
     if (isa<DeallocStackInst>(User) || isa<DestroyAddrInst>(User) ||
         isa<DeinitExistentialAddrInst>(User)) {
-      if (OrigASIUser && DT->properlyDominates(User, OrigASIUser)) {
-        return nullptr;
+      if (OrigASIUser && fastDominates(User, OrigASIUser)) {
+        bailAfterTypePropagation = true;
       }
-      if (DT->properlyDominates(User, ASIUser)) {
-        return nullptr;
+      if (fastDominates(User, ASIUser)) {
+        bailAfterTypePropagation = true;
       }
       continue;
     }
@@ -642,7 +667,8 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
     assert(isCopied && "isCopied not set for a copy_addr");
     SILValue CAISrc = CAI->getSrc();
     if (auto *ASI = dyn_cast<AllocStackInst>(CAISrc))
-      return getAddressOfStackInit(ASI, CAI, isCopied, DT, ASIUser);
+      return getAddressOfStackInit(ASI, CAI, isCopied, bailAfterTypePropagation,
+                                   ASIUser);
     return CAISrc;
   }
   return cast<InitExistentialAddrInst>(SingleWrite);
@@ -655,13 +681,14 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
 static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
                                            ArchetypeType *&OpenedArchetype,
                                            SILValue &OpenedArchetypeDef,
-                                           bool &isCopied, DominanceInfo *DT) {
+                                           bool &isCopied,
+                                           bool &bailAfterTypePropagation) {
   isCopied = false;
   if (auto *Instance = dyn_cast<AllocStackInst>(Self)) {
     // In case the Self operand is an alloc_stack where a copy_addr copies the
     // result of an open_existential_addr to this stack location.
-    if (SILValue Src =
-            getAddressOfStackInit(Instance, AI.getInstruction(), isCopied, DT))
+    if (SILValue Src = getAddressOfStackInit(
+            Instance, AI.getInstruction(), isCopied, bailAfterTypePropagation))
       Self = Src;
   }
 
@@ -671,7 +698,8 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
     if (!ASI)
       return nullptr;
 
-    SILValue StackWrite = getAddressOfStackInit(ASI, Open, isCopied, DT);
+    SILValue StackWrite =
+        getAddressOfStackInit(ASI, Open, isCopied, bailAfterTypePropagation);
     if (!StackWrite)
       return nullptr;
 
@@ -884,9 +912,10 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   ArchetypeType *OpenedArchetype = nullptr;
   SILValue OpenedArchetypeDef;
   bool isCopied = false;
-  DominanceInfo *DT = DA->get(AI.getFunction());
-  SILInstruction *InitExistential = findInitExistential(
-      AI, Self, OpenedArchetype, OpenedArchetypeDef, isCopied, DT);
+  bool bailAfterTypePropagation = false;
+  SILInstruction *InitExistential =
+      findInitExistential(AI, Self, OpenedArchetype, OpenedArchetypeDef,
+                          isCopied, bailAfterTypePropagation);
   if (!InitExistential)
     return nullptr;
 
@@ -919,6 +948,10 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
 
   // Propagate the concrete type into the callee-operand if required.
   Propagate(ConcreteType, Conformance);
+
+  if (bailAfterTypePropagation) {
+    return nullptr;
+  }
 
   if (isCopied) {
     // If the witness method is mutating self, we cannot replace self with

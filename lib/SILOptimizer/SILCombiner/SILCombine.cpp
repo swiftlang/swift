@@ -341,12 +341,11 @@ class SILCombine : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     auto *AA = PM->getAnalysis<AliasAnalysis>();
-    auto *DA = PM->getAnalysis<DominanceAnalysis>();
 
     // Create a SILBuilder with a tracking list for newly added
     // instructions, which we will periodically move to our worklist.
     SILBuilder B(*getFunction(), &TrackingList);
-    SILCombiner Combiner(B, AA, DA, getOptions().RemoveRuntimeAsserts);
+    SILCombiner Combiner(B, AA, getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
     assert(TrackingList.empty() &&
            "TrackingList should be fully processed by SILCombiner");

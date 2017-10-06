@@ -114,8 +114,6 @@ class SILCombiner :
 
   AliasAnalysis *AA;
 
-  DominanceAnalysis *DA;
-
   /// Worklist containing all of the instructions primed for simplification.
   SILCombineWorklist Worklist;
 
@@ -135,10 +133,9 @@ class SILCombiner :
   CastOptimizer CastOpt;
 
 public:
-  SILCombiner(SILBuilder &B, AliasAnalysis *AA, DominanceAnalysis *DA,
-              bool removeCondFails)
-      : AA(AA), DA(DA), Worklist(), MadeChange(false),
-        RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
+  SILCombiner(SILBuilder &B, AliasAnalysis *AA, bool removeCondFails)
+      : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
+        Iteration(0), Builder(B),
         CastOpt(/* ReplaceInstUsesAction */
                 [&](SingleValueInstruction *I, ValueBase *V) {
                   replaceInstUsesWith(*I, V);
