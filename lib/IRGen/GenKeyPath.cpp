@@ -330,7 +330,6 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
     
     auto linkInfo = LinkInfo::get(IGM, "swift_keyPathGenericWitnessTable",
                                   SILLinkage::PublicExternal,
-                                  /*fragile*/ false,
                                   /*sil only*/ false,
                                   NotForDefinition,
                                   /*weak imported*/ false);

@@ -1373,7 +1373,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 
-  Opts.SILSerializeAll |= Args.hasArg(OPT_sil_serialize_all);
   Opts.SILSerializeWitnessTables |=
     Args.hasArg(OPT_sil_serialize_witness_tables);
   Opts.SILSerializeVTables |=

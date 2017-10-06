@@ -461,9 +461,6 @@ SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
       if (isAvailableExternally(F->getLinkage())) {
         F->setLinkage(constant.getLinkage(ForDefinition));
       }
-      if (isMakeModuleFragile()) {
-        F->setSerialized(IsSerialized);
-      }
     }
     return F;
   }
@@ -522,13 +519,6 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                   constant, forDefinition, count);
 
   assert(F && "SILFunction should have been defined");
-
-  if (isMakeModuleFragile()) {
-    SILLinkage linkage = constant.getLinkage(forDefinition);
-    if (linkage != SILLinkage::PublicExternal) {
-      F->setSerialized(IsSerialized);
-    }
-  }
 
   emittedFunctions[constant] = F;
 
@@ -994,9 +984,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
       M.createFunction(SILLinkage::Private,
                        funcName, initSILType, nullptr,
                        SILLocation(binding), IsNotBare, IsNotTransparent,
-                       isMakeModuleFragile()
-                           ? IsSerialized
-                           : IsNotSerialized);
+                       IsNotSerialized);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   SILGenFunction(*this, *f).emitLazyGlobalInitializer(binding, pbdEntry);
   f->verify();

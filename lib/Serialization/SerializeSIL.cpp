@@ -2072,6 +2072,11 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
 }
 
 void SILSerializer::writeSILVTable(const SILVTable &vt) {
+  // Do not emit vtables for non-public classes unless everything has to be
+  // serialized.
+  if (!ShouldSerializeAll &&
+      vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Public)
+    return;
   VTableList[vt.getClass()->getName()] = NextVTableID++;
   VTableOffset.push_back(Out.GetCurrentBitNo());
   VTableLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[VTableLayout::Code],
@@ -2079,6 +2084,12 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 
   for (auto &entry : vt.getEntries()) {
     SmallVector<ValueID, 4> ListOfValues;
+    // Do not emit entries which are not public or serialized, unless everything
+    // has to be serialized.
+    if (!ShouldSerializeAll && entry.Implementation &&
+        !entry.Implementation->isPossiblyUsedExternally() &&
+        !entry.Implementation->isSerialized())
+      continue;
     handleSILDeclRef(S, entry.Method, ListOfValues);
     addReferencedSILFunction(entry.Implementation, true);
     // Each entry is a pair of SILDeclRef and SILFunction.
@@ -2283,7 +2294,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Write out fragile WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
-    if ((ShouldSerializeAll || wt.isSerialized()) &&
+    if ((ShouldSerializeAll || SILMod->getOptions().SILSerializeWitnessTables ||
+         wt.isSerialized()) &&
         wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
       writeSILWitnessTable(wt);
   }

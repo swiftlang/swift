@@ -567,11 +567,6 @@ public:
   ///
   bool isAvailableExternally(IRGenModule &IGM) const;
 
-  /// Returns true if this function or global variable may be inlined into
-  /// another module.
-  ///
-  bool isFragile(ForDefinition_t isDefinition) const;
-
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);
@@ -686,7 +681,6 @@ public:
   static LinkInfo get(const UniversalLinkageInfo &linkInfo,
                       StringRef name,
                       SILLinkage linkage,
-                      bool isFragile,
                       bool isSILOnly,
                       ForDefinition_t isDefinition,
                       bool isWeakImported);
