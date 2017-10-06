@@ -187,6 +187,33 @@ public:
   /// The specified output files. If only a single outputfile is generated,
   /// the name of the last specified file is taken.
   std::vector<std::string> OutputFilenames;
+  
+  void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
+  
+  /// Gets the name of the specified output filename.
+  /// If multiple files are specified, the last one is returned.
+  StringRef getSingleOutputFilename() const {
+    if (OutputFilenames.size() >= 1)
+      return OutputFilenames.back();
+    return StringRef();
+  }
+  /// Sets a single filename as output filename.
+  void setSingleOutputFilename(const std::string &FileName) {
+    OutputFilenames.clear();
+    OutputFilenames.push_back(FileName);
+  }
+  void setOutputFilenameToStdout() {
+    setSingleOutputFilename("-");
+  }
+  bool isOutputFilenameStdout() const {
+    return getSingleOutputFilename() == "-";
+  }
+  bool isOutputFileDirectory() const;
+  bool isOutputFilePlainFile() const;
+  bool hasNamedOutputFile() const {
+    return !OutputFilenames.empty() && !isOutputFilenameStdout();
+  }
+  void setOutputFileList(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args );
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
@@ -431,37 +458,8 @@ public:
   /// Indicates whether the RequestedAction will immediately run code.
   bool actionIsImmediate() const;
 
-  void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
-  
-  /// Gets the name of the specified output filename.
-  /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename() const {
-    if (OutputFilenames.size() >= 1)
-      return OutputFilenames.back();
-    return StringRef();
-  }
 
-  /// Sets a single filename as output filename.
-  void setSingleOutputFilename(const std::string &FileName) {
-    OutputFilenames.clear();
-    OutputFilenames.push_back(FileName);
-  }
-  
-  void setOutputFilenameToStdout() {
-    setSingleOutputFilename("-");
-  }
-  
-  bool isOutputFilenameStdout() const {
-    return getSingleOutputFilename() == "-";
-  }
-  
-  bool isOutputFileDirectory() const;
-  
-  bool isOutputFilePlainFile() const;
-  
-  bool hasNamedOutputFile() const {
-    return !OutputFilenames.empty() && !isOutputFilenameStdout();
-  }
+
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
@@ -479,7 +477,6 @@ public:
   
   void setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args);
   
-  void setOutputFileList(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args );
 };
 
 }
