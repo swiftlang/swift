@@ -111,6 +111,10 @@ public:
     return getPrimaryInput().hasValue();
   }
   
+  bool hasUniqueInputFilename() const {
+    return getInputFilenames().size() == 1;
+  }
+  
   bool shouldTreatAsSIL() const;
   
   bool hasInputFilenames() const {
@@ -135,7 +139,7 @@ public:
     return getInputFilenames().size() == 1  &&  getInputFilenames()[0] == "-";
   }
   
-  StringRef baseNameOfOutput(bool UserSpecifiedModuleName, StringRef ModuleName) const;
+  StringRef baseNameOfOutput(const llvm::opt::ArgList &Args, StringRef ModuleName) const;
   
   bool isWholeModule() { return !hasPrimaryInput(); }
   
@@ -156,6 +160,17 @@ public:
       return getInputFilenames()[*Index];
     }
     return StringRef();
+  }
+  
+  unsigned inputFilenameCount() const { return getInputFilenames().size(); }
+  unsigned inputBufferCount() const { return getInputBuffers().size(); }
+  
+  void setPrimaryInputForInputFilename(const std::string &inputFilename) {
+    setPrimaryInput(
+                    !inputFilename.empty() && inputFilename != "-"
+                    ? SelectedInput(inputFilenameCount(), SelectedInput::InputKind::Filename)
+                    : SelectedInput(inputBufferCount(),   SelectedInput::InputKind::Buffer)
+                    );
   }
   
   void transformInputFilenames(const llvm::function_ref<std::string(std::string)> &fn);
@@ -441,6 +456,12 @@ public:
   StringRef originalPath() const;
   
   StringRef determineFallbackModuleName() const;
+  
+  bool isCompilingExactlyOneSwiftFile() const {
+    return InputKind == InputFileKind::IFK_Swift && Inputs.hasUniqueInputFilename();
+  }
+  
+  void setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args);
 };
 
 }

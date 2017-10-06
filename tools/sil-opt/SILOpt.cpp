@@ -349,14 +349,7 @@ int main(int argc, char **argv) {
   CI.addDiagnosticConsumer(&PrintDiags);
 
   if (!PerformWMO) {
-    auto &FrontendOpts = Invocation.getFrontendOptions();
-    if (!InputFilename.empty() && InputFilename != "-") {
-      Invocation.setPrimaryInput( SelectedInput(
-          FrontendOpts.InputFilenames.size()));
-    } else {
-      Invocation.setPrimaryInput( SelectedInput(
-          FrontendOpts.InputBuffers.size(), SelectedInput::InputKind::Buffer));
-    }
+    Invocation.getFrontendOptions().Inputs.setPrimaryInputForInputFilename(InputFilename);
   }
 
   if (CI.setup(Invocation))

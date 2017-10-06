@@ -378,39 +378,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.OutputFilenames = Args.getAllArgValues(OPT_o);
   }
 
-  bool UserSpecifiedModuleName = false;
-  {
-    const Arg *A = Args.getLastArg(OPT_module_name);
-    StringRef ModuleName = Opts.ModuleName;
-    if (A) {
-      ModuleName = A->getValue();
-      UserSpecifiedModuleName = true;
-    } else if (ModuleName.empty()) {
-      // The user did not specify a module name, so determine a default fallback
-      // based on other options.
-
-      // Note: this code path will only be taken when running the frontend
-      // directly; the driver should always pass -module-name when invoking the
-      // frontend.
-      ModuleName = Opts.determineFallbackModuleName();
-    }
-
-    if (!Lexer::isIdentifier(ModuleName) ||
-        (ModuleName == STDLIB_NAME && !Opts.ParseStdlib)) {
-      if (!Opts.actionHasOutput() ||
-          (Opts.InputKind == InputFileKind::IFK_Swift &&
-           Opts.Inputs.getInputFilenames().size() == 1)) {
-        ModuleName = "main";
-      } else {
-        auto DID = (ModuleName == STDLIB_NAME) ? diag::error_stdlib_module_name
-                                               : diag::error_bad_module_name;
-        Diags.diagnose(SourceLoc(), DID, ModuleName, A == nullptr);
-        ModuleName = "__bad__";
-      }
-    }
-
-    Opts.ModuleName = ModuleName;
-  }
+  Opts.setModuleName(Diags, Args);
 
   if (Opts.OutputFilenames.empty() ||
       llvm::sys::fs::is_directory(Opts.getSingleOutputFilename())) {
@@ -510,7 +478,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         Opts.setSingleOutputFilename("-");
       else {
         // We have a suffix, so determine an appropriate name.
-        StringRef BaseName = Opts.Inputs.baseNameOfOutput(UserSpecifiedModuleName, Opts.ModuleName);
+        StringRef BaseName = Opts.Inputs.baseNameOfOutput(Args, Opts.ModuleName);
         llvm::SmallString<128> Path(Opts.getSingleOutputFilename());
         llvm::sys::path::append(Path, BaseName);
         llvm::sys::path::replace_extension(Path, Suffix);
@@ -1798,11 +1766,12 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
   return false;
 }
 
-StringRef FrontendInputs::baseNameOfOutput(bool UserSpecifiedModuleName, StringRef ModuleName) const {
+StringRef FrontendInputs::baseNameOfOutput(const llvm::opt::ArgList &Args, StringRef ModuleName) const {
   StringRef pifn = primaryInputFilenameIfAny();
   if (!pifn.empty()) {
     return llvm::sys::path::stem(pifn);
   }
+  bool UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name);
   if (!UserSpecifiedModuleName &&  getInputFilenames().size() == 1) {
     return llvm::sys::path::stem(getInputFilenames()[0]);
   }
@@ -1880,4 +1849,34 @@ StringRef FrontendOptions::determineFallbackModuleName() const {
   StringRef OutputFilename = getSingleOutputFilename();
   bool useOutputFilename = !OutputFilename.empty() && OutputFilename != "-" && !llvm::sys::fs::is_directory(OutputFilename);
   return llvm::sys::path::stem(useOutputFilename ? OutputFilename : StringRef(Inputs.getFirstInputFilename()));
+}
+
+void FrontendOptions::setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args) {
+  const Arg *A = Args.getLastArg(options::OPT_module_name);
+  if (A) {
+    ModuleName = A->getValue();
+  }
+  else if (ModuleName.empty()) {
+    // The user did not specify a module name, so determine a default fallback
+    // based on other options.
+    
+    // Note: this code path will only be taken when running the frontend
+    // directly; the driver should always pass -module-name when invoking the
+    // frontend.
+    ModuleName = determineFallbackModuleName();
+  }
+  
+  if (Lexer::isIdentifier(ModuleName) &&
+      (ModuleName != STDLIB_NAME || ParseStdlib)) {
+    return;
+  }
+  if (!actionHasOutput() || isCompilingExactlyOneSwiftFile()) {
+    ModuleName = "main";
+    return;
+  }
+  auto DID = (ModuleName == STDLIB_NAME)
+   ? diag::error_stdlib_module_name
+   : diag::error_bad_module_name;
+  Diags.diagnose(SourceLoc(), DID, ModuleName, A == nullptr);
+  ModuleName = "__bad__";
 }
