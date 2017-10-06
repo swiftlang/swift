@@ -19,10 +19,10 @@
 #include <objc/runtime.h>
 #include <objc/objc.h>
 
-/// The following two routines need to be implemented in ARC because
-/// decomposedStringWithCanonicalMapping returns its result autoreleased. And we
-/// want ARC to insert 'objc_retainAutoreleasedReturnValue' and the necessary
-/// markers for the hand-off.
+// The following two routines need to be implemented in ARC because
+// decomposedStringWithCanonicalMapping returns its result autoreleased. And we
+// want ARC to insert 'objc_retainAutoreleasedReturnValue' and the necessary
+// markers for the hand-off.
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 size_t swift_stdlib_NSStringHashValue(NSString *NS_RELEASES_ARGUMENT str,
