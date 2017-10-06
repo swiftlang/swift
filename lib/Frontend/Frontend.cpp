@@ -144,7 +144,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     auto MemBuf = CodeCompletePoint.first;
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
     CodeCompletionBufferID = SourceMgr.addMemBufferCopy(MemBuf);
-    BufferIDs.push_back(*CodeCompletionBufferID);
+    InputSourceCodeBufferIDs.push_back(*CodeCompletionBufferID);
     SourceMgr.setCodeCompletionPoint(*CodeCompletionBufferID,
                                      CodeCompletePoint.second);
   }
@@ -170,7 +170,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
       PartialModules.push_back({ std::move(Copy), nullptr });
     } else {
       unsigned BufferID = SourceMgr.addNewSourceBuffer(std::move(Copy));
-      BufferIDs.push_back(BufferID);
+      InputSourceCodeBufferIDs.push_back(BufferID);
 
       if (SILMode)
         MainBufferID = BufferID;
@@ -229,7 +229,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     unsigned BufferID =
       SourceMgr.addNewSourceBuffer(std::move(InputFileOrErr.get()));
 
-    BufferIDs.push_back(BufferID);
+    InputSourceCodeBufferIDs.push_back(BufferID);
 
     if (SILMode || (MainMode && filename(File) == "main.swift"))
       MainBufferID = BufferID;
@@ -242,8 +242,8 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (CodeCompletionBufferID.hasValue())
     PrimaryBufferID = *CodeCompletionBufferID;
 
-  if (MainMode && MainBufferID == NO_SUCH_BUFFER && BufferIDs.size() == 1)
-    MainBufferID = BufferIDs.front();
+  if (MainMode && MainBufferID == NO_SUCH_BUFFER && InputSourceCodeBufferIDs.size() == 1)
+    MainBufferID = InputSourceCodeBufferIDs.front();
 
   return false;
 }
@@ -318,7 +318,7 @@ void CompilerInstance::performSema() {
   Context->LoadedModules[MainModule->getName()] = getMainModule();
 
   if (Invocation.getInputKind() == InputFileKind::IFK_SIL) {
-    assert(BufferIDs.size() == 1);
+    assert(InputSourceCodeBufferIDs.size() == 1);
     assert(MainBufferID != NO_SUCH_BUFFER);
     createSILModule();
   }
@@ -588,7 +588,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   }
 
   // Then parse all the library files.
-  for (auto BufferID : BufferIDs) {
+  for (auto BufferID : InputSourceCodeBufferIDs) {
     if (BufferID != MainBufferID) {
       parseLibraryFile(BufferID, implicitImports, PersistentState,
                        DelayedParseCB);
@@ -712,7 +712,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   PersistentParserState PersistentState;
   PersistentState.PerformConditionEvaluation = EvaluateConditionals;
   // Parse all the library files.
-  for (auto BufferID : BufferIDs) {
+  for (auto BufferID : InputSourceCodeBufferIDs) {
     if (BufferID == MainBufferID)
       continue;
 

@@ -343,7 +343,7 @@ class CompilerInstance {
   SerializedModuleLoader *SML = nullptr;
 
   /// Contains buffer IDs for input source code files.
-  std::vector<unsigned> BufferIDs;
+  std::vector<unsigned> InputSourceCodeBufferIDs;
 
   struct PartialModuleInputs {
     std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
@@ -422,7 +422,7 @@ public:
 
   SerializedModuleLoader *getSerializedModuleLoader() const { return SML; }
 
-  ArrayRef<unsigned> getInputBufferIDs() const { return BufferIDs; }
+  ArrayRef<unsigned> getInputBufferIDs() const { return InputSourceCodeBufferIDs; }
 
   ArrayRef<LinkLibrary> getLinkLibraries() const {
     return Invocation.getLinkLibraries();
