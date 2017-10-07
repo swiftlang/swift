@@ -51,7 +51,7 @@
 // CHECK: }, section "__DATA, __objc_const", align 8
 // CHECK: @_T017objc_class_export3FooCMf = internal global <{{.*i64}} }> <{
 // CHECK:   void ([[FOO]]*)* @_T017objc_class_export3FooCfD,
-// CHECK:   i8** @_T0BOWV,
+// CHECK:   i8** @_T0yXlWV,
 // CHECK:   i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" to i64),
 // CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,

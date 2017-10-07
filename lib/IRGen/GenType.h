@@ -72,7 +72,7 @@ private:
   
   const ProtocolInfo *FirstProtocol;
   const LoadableTypeInfo *NativeObjectTI = nullptr;
-  const LoadableTypeInfo *UnknownObjectTI = nullptr;
+  const LoadableTypeInfo *AnyObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
   const LoadableTypeInfo *RawPointerTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
@@ -119,7 +119,7 @@ private:
   const TypeInfo *convertProtocolType(ProtocolType *T);
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
   const LoadableTypeInfo *convertBuiltinNativeObject();
-  const LoadableTypeInfo *convertBuiltinUnknownObject();
+  const LoadableTypeInfo *convertAnyObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();
   const TypeInfo *convertResilientStruct();
   const TypeInfo *convertUnmanagedStorageType(UnmanagedStorageType *T);
@@ -134,7 +134,7 @@ public:
   const TypeInfo &getCompleteTypeInfo(CanType type);
   const TypeInfo *tryGetCompleteTypeInfo(CanType type);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
-  const LoadableTypeInfo &getUnknownObjectTypeInfo();
+  const LoadableTypeInfo &getAnyObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
   const LoadableTypeInfo &getTypeMetadataPtrTypeInfo();

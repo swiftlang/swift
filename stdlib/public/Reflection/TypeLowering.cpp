@@ -607,7 +607,7 @@ const TypeRef *TypeConverter::getUnknownObjectTypeRef() {
   if (UnknownObjectTR != nullptr)
     return UnknownObjectTR;
 
-  UnknownObjectTR = BuiltinTypeRef::create(Builder, "BO");
+  UnknownObjectTR = BuiltinTypeRef::create(Builder, "yXl");
   return UnknownObjectTR;
 }
 
@@ -1048,9 +1048,6 @@ public:
     if (B->getMangledName() == "Bo") {
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Native);
-    } else if (B->getMangledName() == "BO") {
-      return TC.getReferenceTypeInfo(ReferenceKind::Strong,
-                                     ReferenceCounting::Unknown);
     }
 
     /// Otherwise, get the fixed layout information from reflection

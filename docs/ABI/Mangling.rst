@@ -308,7 +308,7 @@ Types
   type ::= 'BB'                              // Builtin.UnsafeValueBuffer
   type ::= 'Bf' NATURAL '_'                  // Builtin.Float<n>
   type ::= 'Bi' NATURAL '_'                  // Builtin.Int<n>
-  type ::= 'BO'                              // Builtin.UnknownObject
+  type ::= 'BO'                              // Builtin.UnknownObject (no longer used)
   type ::= 'Bo'                              // Builtin.NativeObject
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= type 'Bv' NATURAL '_'             // Builtin.Vec<n>x<type>

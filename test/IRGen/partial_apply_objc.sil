@@ -171,12 +171,12 @@ entry(%x : $Int):
 // CHECK: define internal swiftcc void [[DYNAMIC_LOOKUP_BR_PARTIAL_APPLY_STUB]](i64, %swift.refcounted* swiftself) {{.*}} {
 // CHECK:   load i8*, i8** @"\01L_selector(methodWithX:)", align 8
 
-sil @dynamic_lookup_br_partial_apply : $@convention(thin) Builtin.UnknownObject -> @callee_owned Int -> () {
-entry(%o : $Builtin.UnknownObject):
-  dynamic_method_br %o : $Builtin.UnknownObject, #ObjCClass.method!1.foreign, yes, no
+sil @dynamic_lookup_br_partial_apply : $@convention(thin) AnyObject -> @callee_owned Int -> () {
+entry(%o : $AnyObject):
+  dynamic_method_br %o : $AnyObject, #ObjCClass.method!1.foreign, yes, no
 
-yes(%m : $@convention(objc_method) (Int, Builtin.UnknownObject) -> ()):
-  %p = partial_apply %m(%o) : $@convention(objc_method) (Int, Builtin.UnknownObject) -> ()
+yes(%m : $@convention(objc_method) (Int, AnyObject) -> ()):
+  %p = partial_apply %m(%o) : $@convention(objc_method) (Int, AnyObject) -> ()
   br done(%p : $@callee_owned Int -> ())
 
 no:

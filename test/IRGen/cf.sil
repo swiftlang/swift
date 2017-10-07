@@ -9,9 +9,9 @@
 
 // CHECK: [[REFRIGERATOR_NAME:@.*]] = private unnamed_addr constant [20 x i8] c"So14CCRefrigeratorC\00"
 
-// CHECK-32: @_T0So14CCRefrigeratorCN = linkonce_odr hidden global <{ {{.*}} }> <{ i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[REFRIGERATOR_NAME]], i32 0, i32 0), [[TYPE]]* null, i32 0, i8** @_T0BOWV, i32 16, [[TYPE]]* null, i8* null, i8* null, i8* null }>
+// CHECK-32: @_T0So14CCRefrigeratorCN = linkonce_odr hidden global <{ {{.*}} }> <{ i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[REFRIGERATOR_NAME]], i32 0, i32 0), [[TYPE]]* null, i32 0, i8** @_T0yXlWV, i32 16, [[TYPE]]* null, i8* null, i8* null, i8* null }>
 
-// CHECK-64: @_T0So14CCRefrigeratorCN = linkonce_odr hidden global <{ {{.*}} }> <{ i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[REFRIGERATOR_NAME]], i64 0, i64 0), [[TYPE]]* null, i64 0, i8** @_T0BOWV, i64 16, [[TYPE]]* null, i8* null, i8* null, i8* null }>
+// CHECK-64: @_T0So14CCRefrigeratorCN = linkonce_odr hidden global <{ {{.*}} }> <{ i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[REFRIGERATOR_NAME]], i64 0, i64 0), [[TYPE]]* null, i64 0, i8** @_T0yXlWV, i64 16, [[TYPE]]* null, i8* null, i8* null, i8* null }>
 
 sil_stage canonical
 

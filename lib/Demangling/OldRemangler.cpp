@@ -1018,6 +1018,7 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
   } else if (text == "Builtin.UnsafeValueBuffer") {
     Out << 'B';
   } else if (text == "Builtin.UnknownObject") {
+    // No longer used.
     Out << 'O';
   } else if (text == "Builtin.NativeObject") {
     Out << 'o';

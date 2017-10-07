@@ -72,7 +72,7 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   weak            var pqcwi: (P & Q & C)!
 
   // -- Unknown-refcounted existential without witness tables.
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN:B[Oo]]]XoWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN:(Bo|yXl)]]XoWV, i32 7)
   unowned(safe)   var aos:  AnyObject
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 7)
   unowned(unsafe) var aou:  AnyObject
@@ -82,7 +82,7 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   weak            var aowi: AnyObject!
 
   // -- Unknown-refcounted archetype
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN:B[Oo]]]XoWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN:(Bo|yXl)]]XoWV, i32 7)
   unowned(safe)   var us:  Unknown
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 7)
   unowned(unsafe) var uu:  Unknown

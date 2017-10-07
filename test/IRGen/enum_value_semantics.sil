@@ -55,7 +55,7 @@ enum MultiPayloadEmptyPayload {
 enum MultiPayloadNontrivial {
   case payload1(Builtin.NativeObject)
   case payload2(Builtin.Int64)
-  case payload3(Builtin.Int64, Builtin.UnknownObject)
+  case payload3(Builtin.Int64, Builtin.NativeObject)
   case payload4(Builtin.Int64, Builtin.Int64)
   case a
   case b
@@ -75,7 +75,7 @@ enum MultiPayloadGeneric<T> {
 enum MultiPayloadNontrivialSpareBits {
   case payload1(Builtin.NativeObject)
   case payload2(Builtin.Int64)
-  case payload3(Builtin.Int64, Builtin.UnknownObject)
+  case payload3(Builtin.Int64, Builtin.NativeObject)
   case a
   case b
   case c

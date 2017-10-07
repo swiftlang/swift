@@ -208,7 +208,6 @@ namespace {
     IMPL(BuiltinRawPointer, Trivial)
     IMPL(BuiltinNativeObject, Reference)
     IMPL(BuiltinBridgeObject, Reference)
-    IMPL(BuiltinUnknownObject, Reference)
     IMPL(BuiltinUnsafeValueBuffer, AddressOnly)
     IMPL(BuiltinVector, Trivial)
     IMPL(Class, Reference)
@@ -302,9 +301,9 @@ namespace {
           return hasNativeReferenceCounting(bound->getCanonicalType());
         }
 
-        // Ask whether Builtin.UnknownObject uses native reference counting.
+        // Ask whether AnyObject uses native reference counting.
         auto &ctx = M.getASTContext();
-        return ctx.TheUnknownObjectType->
+        return ctx.getAnyObjectType()->
                  usesNativeReferenceCounting(ResilienceExpansion::Maximal);
       }
 

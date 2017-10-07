@@ -767,6 +767,7 @@ NodePointer Demangler::demangleBuiltinType() {
       break;
     }
     case 'O':
+      // No longer used.
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                "Builtin.UnknownObject");
       break;

@@ -463,8 +463,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
 
   // The Builtin reference types can alias any class instance.
   if (LTyClass) {
-    if (RTy.is<BuiltinUnknownObjectType>() ||
-        RTy.is<BuiltinNativeObjectType>()  ||
+    if (RTy.is<BuiltinNativeObjectType>()  ||
         RTy.is<BuiltinBridgeObjectType>()) {
       return true;
     }

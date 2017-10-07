@@ -15,42 +15,42 @@ struct ReferenceStorageTypeLayout<T, ObjC: C> {
   var z: T
 
   // -- ObjC-refcounted class
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BOXoWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0yXlXoWV, i32 7)
   unowned(safe)   var cs:  C
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 7)
   unowned(unsafe) var cu:  C
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BOSgXwWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0yXlSgXwWV, i32 7)
   weak            var cwo: C?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BOSgXwWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0yXlSgXwWV, i32 7)
   weak            var cwi: C!
 
   // -- ObjC-refcounted archetype
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BOXoWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0yXlXoWV, i32 7)
   unowned(safe)   var os:  ObjC
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 7)
   unowned(unsafe) var ou:  ObjC
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BOSgXwWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0yXlSgXwWV, i32 7)
   weak            var owo: ObjC?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BOSgXwWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0yXlSgXwWV, i32 7)
   weak            var owi: ObjC!
 
   // -- Pure ObjC protocols are unknown-refcounted
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BOXoWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0yXlXoWV, i32 7)
   unowned(safe)   var ps:  P
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 7)
   unowned(unsafe) var pu:  P
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BOSgXwWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0yXlSgXwWV, i32 7)
   weak            var pwo: P?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BOSgXwWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0yXlSgXwWV, i32 7)
   weak            var pwi: P!
 
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BOXoWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0yXlXoWV, i32 7)
   unowned(safe)   var pqs:  P & Q
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 7)
   unowned(unsafe) var pqu:  P & Q
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BOSgXwWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0yXlSgXwWV, i32 7)
   weak            var pqwo: (P & Q)?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BOSgXwWV, i32 7)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0yXlSgXwWV, i32 7)
   weak            var pqwi: (P & Q)!
 
   // -- Composition with ObjC protocol and native class is native-refcounted

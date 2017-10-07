@@ -80,14 +80,6 @@ entry(%c : $C):
   return %r : $Builtin.NativeObject
 }
 
-// CHECK: define{{( protected)?}} swiftcc [[OBJCOBJ]]* @ref_to_objc_pointer_cast([[C_CLASS]]*)
-// CHECK:   bitcast [[C_CLASS]]* %0 to [[OBJCOBJ]]*
-sil @ref_to_objc_pointer_cast : $@convention(thin) C -> Builtin.UnknownObject {
-entry(%c : $C):
-  %r = unchecked_ref_cast %c : $C to $Builtin.UnknownObject
-  return %r : $Builtin.UnknownObject
-}
-
 // CHECK-LABEL: define{{( protected)?}} swiftcc %T5class1CC* @alloc_ref_dynamic(%swift.type*)
 sil @alloc_ref_dynamic : $@convention(thin) (@thick C.Type) -> @owned C {
 bb0(%0 : $@thick C.Type):

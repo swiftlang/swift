@@ -257,7 +257,7 @@ namespace {
 
     ObjCClassCacheEntry(const ClassMetadata *theClass) {
       Data.setKind(MetadataKind::ObjCClassWrapper);
-      Data.ValueWitnesses = &VALUE_WITNESS_SYM(BO);
+      Data.ValueWitnesses = &VALUE_WITNESS_SYM(yXl);
       Data.Class = theClass;
     }
 
@@ -440,9 +440,8 @@ FunctionCacheEntry::FunctionCacheEntry(Key key) {
 
   case FunctionMetadataConvention::Block:
 #if SWIFT_OBJC_INTEROP
-    // Blocks are ObjC objects, so can share the Builtin.UnknownObject value
-    // witnesses.
-    Data.ValueWitnesses = &VALUE_WITNESS_SYM(BO);
+    // Blocks are ObjC objects, so can share the AnyObject value witnesses.
+    Data.ValueWitnesses = &VALUE_WITNESS_SYM(yXl);
 #else
     assert(false && "objc block without objc interop?");
 #endif
@@ -1932,7 +1931,7 @@ getClassExistentialValueWitnesses(const Metadata *superclass,
   // FIXME: If the superclass is not @objc, use native reference counting.
   if (numWitnessTables == 0) {
 #if SWIFT_OBJC_INTEROP
-    return &VALUE_WITNESS_SYM(BO);
+    return &VALUE_WITNESS_SYM(yXl);
 #else
     return &VALUE_WITNESS_SYM(Bo);
 #endif
@@ -1988,7 +1987,7 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
   case SpecialProtocol::Error:
 #if SWIFT_OBJC_INTEROP
     // Error always has a single-ObjC-refcounted representation.
-    return &VALUE_WITNESS_SYM(BO);
+    return &VALUE_WITNESS_SYM(yXl);
 #else
     // Without ObjC interop, Error is native-refcounted.
     return &VALUE_WITNESS_SYM(Bo);

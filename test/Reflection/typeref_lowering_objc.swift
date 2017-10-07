@@ -4,6 +4,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64
+// REQUIRES: UnknownObject_removal
 
 12TypeLowering14FunctionStructV
 // CHECK:      (struct TypeLowering.FunctionStruct)

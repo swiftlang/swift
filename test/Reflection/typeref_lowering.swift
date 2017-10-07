@@ -3,6 +3,8 @@
 // RUN: %target-build-swift %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/libTypesToReflect.%target-dylib-extension
 // RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension -binary-filename %platform-module-dir/libswiftCore.%target-dylib-extension -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 
+// REQUIRES: UnknownObject_removal
+
 12TypeLowering11BasicStructV
 // CHECK-64:      (struct TypeLowering.BasicStruct)
 
@@ -981,9 +983,9 @@ Bo
 // CHECK-32:      (builtin Builtin.NativeObject)
 // CHECK-32-NEXT: (reference kind=strong refcounting=native)
 
-BO
-// CHECK-64:      (builtin Builtin.UnknownObject)
+yXl
+// CHECK-64:      (protocol_composition any_object)
 // CHECK-64-NEXT: (reference kind=strong refcounting=unknown)
 
-// CHECK-32:      (builtin Builtin.UnknownObject)
+// CHECK-32:      (protocol_composition any_object)
 // CHECK-32-NEXT: (reference kind=strong refcounting=unknown)

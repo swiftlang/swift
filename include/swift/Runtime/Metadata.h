@@ -633,11 +633,11 @@ const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bp); // Builtin.RawPoi
 #if SWIFT_OBJC_INTEROP
 // The ObjC-pointer table can be used for arbitrary ObjC pointer types.
 SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(BO); // Builtin.UnknownObject
+const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(yXl); // AnyObject
 SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable UNOWNED_VALUE_WITNESS_SYM(BO); // unowned Builtin.UnknownObject
+const ExtraInhabitantsValueWitnessTable UNOWNED_VALUE_WITNESS_SYM(yXl); // unowned AnyObject
 SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable WEAK_VALUE_WITNESS_SYM(BO); // weak Builtin.UnknownObject?
+const ValueWitnessTable WEAK_VALUE_WITNESS_SYM(yXl); // weak AnyObject?
 #endif
 
 // The () -> () table can be used for arbitrary function types.
@@ -982,10 +982,6 @@ SWIFT_RUNTIME_EXPORT
 const FullOpaqueMetadata METADATA_SYM(Bp);        // Builtin.RawPointer
 SWIFT_RUNTIME_EXPORT
 const FullOpaqueMetadata METADATA_SYM(BB);        // Builtin.UnsafeValueBuffer
-#if SWIFT_OBJC_INTEROP
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(BO);        // Builtin.UnknownObject
-#endif
 
 /// The prefix on a heap metadata.
 struct HeapMetadataHeaderPrefix {

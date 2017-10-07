@@ -1015,7 +1015,7 @@ public:
     if (!IGM.ObjCInterop)
       return IGM.getNativeObjectTypeInfo();
     else
-      return IGM.getUnknownObjectTypeInfo();
+      return IGM.getAnyObjectTypeInfo();
   }
 
   void emitValueRetain(IRGenFunction &IGF, llvm::Value *value,
@@ -1078,7 +1078,7 @@ public:
     if (Refcounting == ReferenceCounting::Native)
       return IGM.getNativeObjectTypeInfo();
     else
-      return IGM.getUnknownObjectTypeInfo();
+      return IGM.getAnyObjectTypeInfo();
   }
 
   void strongRetain(IRGenFunction &IGF, Explosion &e,

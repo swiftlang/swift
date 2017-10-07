@@ -336,7 +336,7 @@ is_unique performs depends on the argument type:
 
     - Objective-C object types require an additional check that the
       dynamic object type uses native Swift reference counting:
-      (Builtin.UnknownObject, unknown class reference, class existential)
+      (unknown class reference, class existential)
 
     - Bridged object types allow the dynamic object type check to be
       bypassed based on the pointer encoding:

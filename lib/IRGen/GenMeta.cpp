@@ -586,10 +586,6 @@ namespace {
       return emitDirectMetadataRef(type);
     }
 
-    llvm::Value *visitBuiltinUnknownObjectType(CanBuiltinUnknownObjectType type) {
-      return emitDirectMetadataRef(type);
-    }
-
     llvm::Value *visitBuiltinUnsafeValueBufferType(
                                         CanBuiltinUnsafeValueBufferType type) {
       return emitDirectMetadataRef(type);
@@ -1655,7 +1651,7 @@ namespace {
     llvm::Value *visitSILFunctionType(CanSILFunctionType type) {
       // All function types have the same layout regardless of arguments or
       // abstraction level. Use the metadata for () -> () for thick functions,
-      // or Builtin.UnknownObject for block functions.
+      // or AnyObject for block functions.
       auto &C = type->getASTContext();
       switch (type->getRepresentation()) {
       case SILFunctionType::Representation::Thin:
@@ -1675,8 +1671,8 @@ namespace {
                                       C.TheEmptyTupleType,
                                       AnyFunctionType::ExtInfo()));
       case SILFunctionType::Representation::Block:
-        // All block types look like Builtin.UnknownObject.
-        return emitDirectMetadataRef(C.TheUnknownObjectType);
+        // All block types look like AnyObject.
+        return IGF.emitTypeMetadataRef(C.getAnyObjectType());
       }
 
       llvm_unreachable("Not a valid SILFunctionType.");
@@ -1778,10 +1774,11 @@ namespace {
       auto &C = IGF.IGM.Context;
       if (t == C.TheEmptyTupleType
           || t == C.TheNativeObjectType
-          || t == C.TheUnknownObjectType
           || t == C.TheBridgeObjectType
-          || t == C.TheRawPointerType)
+          || t == C.TheRawPointerType
+          || t == C.getAnyObjectType())
         return true;
+      
       if (auto intTy = dyn_cast<BuiltinIntegerType>(t)) {
         auto width = intTy->getWidth();
         if (width.isPointerWidth())
@@ -1857,8 +1854,8 @@ namespace {
                                       C.TheEmptyTupleType,
                                       AnyFunctionType::ExtInfo()));
       case SILFunctionType::Representation::Block:
-        // All block types look like Builtin.UnknownObject.
-        return emitFromValueWitnessTable(C.TheUnknownObjectType);
+        // All block types look like AnyObject.
+        return emitFromValueWitnessTable(C.getAnyObjectType());
       }
 
       llvm_unreachable("Not a valid SILFunctionType.");
@@ -1894,7 +1891,7 @@ namespace {
       case ReferenceCounting::ObjC:
       case ReferenceCounting::Block:
       case ReferenceCounting::Unknown:
-        return emitFromValueWitnessTable(IGF.IGM.Context.TheUnknownObjectType);
+        return emitFromValueWitnessTable(IGF.IGM.Context.getAnyObjectType());
 
       case ReferenceCounting::Bridge:
       case ReferenceCounting::Error:
@@ -1957,7 +1954,7 @@ namespace {
       case ReferenceCounting::Unknown:
       case ReferenceCounting::Block:
       case ReferenceCounting::ObjC:
-        valueWitnessReferent = C.TheUnknownObjectType;
+        valueWitnessReferent = C.getAnyObjectType();
         break;
 
       case ReferenceCounting::Native:
@@ -3120,7 +3117,7 @@ namespace {
       ClassDecl *cls = Target;
       
       auto type = (cls->checkObjCAncestry() != ObjCClassKind::NonObjC
-                   ? IGM.Context.TheUnknownObjectType
+                   ? IGM.Context.getAnyObjectType()
                    : IGM.Context.TheNativeObjectType);
       auto wtable = IGM.getAddrOfValueWitnessTable(type);
       B.add(wtable);
@@ -4875,7 +4872,7 @@ namespace {
       // Without Objective-C interop, foreign classes must still use
       // Swift native reference counting.
       auto type = (IGM.ObjCInterop
-                   ? IGM.Context.TheUnknownObjectType
+                   ? IGM.Context.getAnyObjectType()
                    : IGM.Context.TheNativeObjectType);
       auto wtable = IGM.getAddrOfValueWitnessTable(type);
       B.add(wtable);

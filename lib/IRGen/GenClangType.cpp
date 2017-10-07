@@ -152,8 +152,6 @@ public:
   clang::CanQualType visitBuiltinRawPointerType(CanBuiltinRawPointerType type);
   clang::CanQualType visitBuiltinIntegerType(CanBuiltinIntegerType type);
   clang::CanQualType visitBuiltinFloatType(CanBuiltinFloatType type);
-  clang::CanQualType visitBuiltinUnknownObjectType(
-                                                CanBuiltinUnknownObjectType type);
   clang::CanQualType visitArchetypeType(CanArchetypeType type);
   clang::CanQualType visitSILFunctionType(CanSILFunctionType type);
   clang::CanQualType visitGenericTypeParamType(CanGenericTypeParamType type);
@@ -666,13 +664,6 @@ clang::CanQualType GenClangType::visitBuiltinFloatType(
   if (format == &clangTargetInfo.getDoubleFormat()) return ctx.DoubleTy;
   if (format == &clangTargetInfo.getLongDoubleFormat()) return ctx.LongDoubleTy;
   llvm_unreachable("cannot translate floating-point format to C");
-}
-
-clang::CanQualType GenClangType::visitBuiltinUnknownObjectType(
-  CanBuiltinUnknownObjectType type) {
-  auto &clangCtx = getClangASTContext();
-  auto ptrTy = clangCtx.getObjCObjectPointerType(clangCtx.VoidTy);
-  return clangCtx.getCanonicalType(ptrTy);
 }
 
 clang::CanQualType GenClangType::visitArchetypeType(CanArchetypeType type) {

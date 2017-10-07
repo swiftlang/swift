@@ -33,8 +33,8 @@ struct TypeLayoutTest<T> {
   // -- native class, use standard NativeObject value witness
   // CHECK:       store i8** getelementptr inbounds (i8*, i8** @_T0BoWV, i32 7)
   var a: C
-  // -- ObjC class, use standard UnknownObject value witness
-  // CHECK:       store i8** getelementptr inbounds (i8*, i8** @_T0BOWV, i32 7)
+  // -- ObjC class, use standard AnyObject value witness
+  // CHECK:       store i8** getelementptr inbounds (i8*, i8** @_T0yXlWV, i32 7)
   var b: O
   // -- Single-element struct, shares layout of its field (Builtin.Int64)
   // CHECK:       store i8** getelementptr inbounds (i8*, i8** @_T0Bi64_WV, i32 7)

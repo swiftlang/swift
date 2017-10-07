@@ -747,7 +747,7 @@ IRGenModule::getReferenceObjectTypeInfo(ReferenceCounting refcounting) {
   case ReferenceCounting::Native:
     return getNativeObjectTypeInfo();
   case ReferenceCounting::Unknown:
-    return getUnknownObjectTypeInfo();
+    return getAnyObjectTypeInfo();
   case ReferenceCounting::Bridge:
     return getBridgeObjectTypeInfo();
   case ReferenceCounting::Block:
@@ -771,16 +771,16 @@ const LoadableTypeInfo &TypeConverter::getNativeObjectTypeInfo() {
   return *NativeObjectTI;
 }
 
-const LoadableTypeInfo &IRGenModule::getUnknownObjectTypeInfo() {
-  return Types.getUnknownObjectTypeInfo();
+const LoadableTypeInfo &IRGenModule::getAnyObjectTypeInfo() {
+  return Types.getAnyObjectTypeInfo();
 }
 
-const LoadableTypeInfo &TypeConverter::getUnknownObjectTypeInfo() {
-  if (UnknownObjectTI) return *UnknownObjectTI;
-  UnknownObjectTI = convertBuiltinUnknownObject();
-  UnknownObjectTI->NextConverted = FirstType;
-  FirstType = UnknownObjectTI;
-  return *UnknownObjectTI;
+const LoadableTypeInfo &TypeConverter::getAnyObjectTypeInfo() {
+  if (AnyObjectTI) return *AnyObjectTI;
+  AnyObjectTI = convertAnyObject();
+  AnyObjectTI->NextConverted = FirstType;
+  FirstType = AnyObjectTI;
+  return *AnyObjectTI;
 }
 
 const LoadableTypeInfo &IRGenModule::getBridgeObjectTypeInfo() {
@@ -1190,8 +1190,6 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinNativeObject:
     return &getNativeObjectTypeInfo();
-  case TypeKind::BuiltinUnknownObject:
-    return &getUnknownObjectTypeInfo();
   case TypeKind::BuiltinBridgeObject:
     return &getBridgeObjectTypeInfo();
   case TypeKind::BuiltinUnsafeValueBuffer:

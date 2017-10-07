@@ -1839,9 +1839,11 @@ private:
                     .str());
         }
       }
-      if (c == 'O')
+      if (c == 'O') {
+        // No longer used.
         return Factory.createNode(Node::Kind::BuiltinTypeName,
-                                     "Builtin.UnknownObject");
+                                  "Builtin.UnknownObject");
+      }
       if (c == 'o')
         return Factory.createNode(Node::Kind::BuiltinTypeName,
                                      "Builtin.NativeObject");

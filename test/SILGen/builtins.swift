@@ -643,33 +643,33 @@ func isUniqueOrPinned(_ ref: inout Builtin.NativeObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
 }
 
-// UnknownObject (ObjC)
+// AnyObject (ObjC)
 // CHECK-LABEL: sil hidden @_T08builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Optional<Builtin.UnknownObject>):
+// CHECK: bb0(%0 : @trivial $*Optional<AnyObject>):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<Builtin.UnknownObject>
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<AnyObject>
 // CHECK: return
-func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
+func isUnique(_ ref: inout AnyObject?) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
 
-// UnknownObject (ObjC) nonNull
+// AnyObject (ObjC) nonNull
 // CHECK-LABEL: sil hidden @_T08builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Builtin.UnknownObject):
+// CHECK: bb0(%0 : @trivial $*AnyObject):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.UnknownObject
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*AnyObject
 // CHECK: return
-func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
+func isUnique(_ ref: inout AnyObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
 
-// UnknownObject (ObjC) pinned nonNull
+// AnyObject (ObjC) pinned nonNull
 // CHECK-LABEL: sil hidden @_T08builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Builtin.UnknownObject):
+// CHECK: bb0(%0 : @trivial $*AnyObject):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[WRITE]] : $*Builtin.UnknownObject
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[WRITE]] : $*AnyObject
 // CHECK: return
-func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
+func isUniqueOrPinned(_ ref: inout AnyObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
 }
 

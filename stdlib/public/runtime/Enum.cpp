@@ -110,14 +110,14 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   // a single empty case, then we can borrow the witnesses of the single
   // refcounted pointer type, since swift_retain and objc_retain are both
   // nil-aware. Most single-refcounted types will use the standard
-  // value witness tables for NativeObject or UnknownObject. This isn't
+  // value witness tables for NativeObject or AnyObject. This isn't
   // foolproof but should catch the common case of optional class types.
 #if OPTIONAL_OBJECT_OPTIMIZATION
   auto payloadVWT = payload->getValueWitnesses();
   if (emptyCases == 1
       && (payloadVWT == &VALUE_WITNESS_SYM(Bo)
 #if SWIFT_OBJC_INTEROP
-          || payloadVWT == &VALUE_WITNESS_SYM(BO)
+          || payloadVWT == &VALUE_WITNESS_SYM(yXl)
 #endif
           )) {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES

@@ -990,13 +990,6 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   }
 
   case MetadataKind::Opaque: {
-#if SWIFT_OBJC_INTEROP
-    // If this is the Builtin.UnknownObject type, use the dynamic type of the
-    // object reference.
-    if (T == &METADATA_SYM(BO).base) {
-      return getImplementationForClass(Value);
-    }
-#endif
     // If this is the Builtin.NativeObject type, and the heap object is a
     // class instance, use the dynamic type of the object reference.
     if (T == &METADATA_SYM(Bo).base) {

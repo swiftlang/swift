@@ -555,7 +555,7 @@ TEST(MetadataTest, getExistentialMetadata) {
   
   const ValueWitnessTable *ExpectedErrorValueWitnesses;
 #if SWIFT_OBJC_INTEROP
-  ExpectedErrorValueWitnesses = &VALUE_WITNESS_SYM(BO);
+  ExpectedErrorValueWitnesses = &VALUE_WITNESS_SYM(yXl);
 #else
   ExpectedErrorValueWitnesses = &VALUE_WITNESS_SYM(Bo);
 #endif

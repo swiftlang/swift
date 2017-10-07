@@ -169,7 +169,6 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
     llvm_unreachable("sugared canonical type?");
 
   // These types are always class references.
-  case TypeKind::BuiltinUnknownObject:
   case TypeKind::BuiltinNativeObject:
   case TypeKind::BuiltinBridgeObject:
   case TypeKind::Class:
@@ -4119,7 +4118,6 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   case TypeKind::SILBox:
     return true;
 
-  case TypeKind::BuiltinUnknownObject:
   case TypeKind::BuiltinBridgeObject:
     return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
 

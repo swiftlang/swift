@@ -3295,7 +3295,6 @@ void Serializer::writeType(Type ty) {
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinNativeObject:
   case TypeKind::BuiltinBridgeObject:
-  case TypeKind::BuiltinUnknownObject:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector: {
     TypeAliasDecl *typeAlias =

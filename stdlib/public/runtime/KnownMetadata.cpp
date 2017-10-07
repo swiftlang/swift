@@ -100,15 +100,15 @@ static const ValueWitnessTable VALUE_WITNESS_SYM(BB) =
 // need to support Objective-C.
 
 /// The basic value-witness table for ObjC object pointers.
-const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(BO) =
+const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(yXl) =
   ValueWitnessTableForBox<ObjCRetainableBox>::table;
 
 /// The basic value-witness table for ObjC unowned pointers.
-const ExtraInhabitantsValueWitnessTable swift::UNOWNED_VALUE_WITNESS_SYM(BO) =
+const ExtraInhabitantsValueWitnessTable swift::UNOWNED_VALUE_WITNESS_SYM(yXl) =
   ValueWitnessTableForBox<ObjCUnownedRetainableBox>::table;
 
 /// The basic value-witness table for ObjC weak pointers.
-const ValueWitnessTable swift::WEAK_VALUE_WITNESS_SYM(BO) =
+const ValueWitnessTable swift::WEAK_VALUE_WITNESS_SYM(yXl) =
   ValueWitnessTableForBox<ObjCWeakRetainableBox>::table;
 
 #endif
@@ -167,9 +167,6 @@ OPAQUE_METADATA(Bo)
 OPAQUE_METADATA(Bb)
 OPAQUE_METADATA(Bp)
 OPAQUE_METADATA(BB)
-#if SWIFT_OBJC_INTEROP
-OPAQUE_METADATA(BO)
-#endif
 
 /// The standard metadata for the empty tuple.
 const FullMetadata<TupleTypeMetadata> swift::

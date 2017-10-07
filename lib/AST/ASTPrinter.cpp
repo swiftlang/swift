@@ -3203,10 +3203,6 @@ public:
     Printer << "Builtin.NativeObject";
   }
 
-  void visitBuiltinUnknownObjectType(BuiltinUnknownObjectType *T) {
-    Printer << "Builtin.UnknownObject";
-  }
-
   void visitBuiltinBridgeObjectType(BuiltinBridgeObjectType *T) {
     Printer << "Builtin.BridgeObject";
   }
