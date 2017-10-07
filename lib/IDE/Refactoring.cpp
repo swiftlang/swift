@@ -1943,14 +1943,14 @@ bool RefactoringActionExpandSwitchCases::performChange() {
     InsertRange = CharSourceRange(SM, RBraceLoc, RBraceLoc);
   }
   EditorConsumerInsertStream OS(EditConsumer, SM, InsertRange);
+  if (SM.getLineNumber(SwitchS->getLBraceLoc()) ==
+      SM.getLineNumber(SwitchS->getRBraceLoc())) {
+    OS << "\n";
+  }
   auto Result = performCasesExpansionInSwitchStmt(SwitchS,
                                            DiagEngine,
                                            SwitchS->getStartLoc(),
                                            OS);
-  if (SM.getLineNumber(SwitchS->getLBraceLoc()) ==
-      SM.getLineNumber(SwitchS->getRBraceLoc())) {
-    EditConsumer.insertAfter(SM, SwitchS->getLBraceLoc(), "\n");
-  }
   return Result;
 }
 

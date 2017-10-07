@@ -6,7 +6,7 @@ enum E {
 }
 
 func foo(e: E) -> Int {
-  switch e { 
+  switch e {
 case .e1: <#code#>
 case .e2: <#code#>
 case .e3: <#code#>
