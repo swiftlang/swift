@@ -1642,7 +1642,7 @@ void Serializer::writeDefaultWitnessTable(const ProtocolDecl *proto,
   unsigned abbrCode = abbrCodes[DefaultWitnessTableLayout::Code];
   for (auto member : proto->getMembers()) {
     if (auto *value = dyn_cast<ValueDecl>(member)) {
-      ConcreteDeclRef witness = proto->getDefaultWitness(value);
+      auto witness = proto->getDefaultWitness(value);
       if (!witness)
         continue;
 
