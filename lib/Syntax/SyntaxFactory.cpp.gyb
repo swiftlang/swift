@@ -57,6 +57,82 @@ SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
   return make<UnknownSyntax>(Raw);
 }
 
+void
+SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
+  switch(Kind) {
+% for node in SYNTAX_NODES:
+  case SyntaxKind::${node.syntax_kind}: {
+% if node.children:
+    std::vector<std::pair<bool, std::function<bool(const Syntax&)>>>
+      ChildrenConditions;
+%    for child in node.children:
+%       if child.is_optional:
+%         option = "true"
+%       else:
+%         option = "false"
+%       if child.token_choices:
+%         choices = ", ".join("tok::" + choice.kind
+%                                         for choice in child.token_choices)
+    {
+      std::vector<tok> allKinds({${choices}});
+      ChildrenConditions.push_back({${option}, [allKinds](const Syntax &S) {
+        if (auto T = S.getAs<TokenSyntax>()) {
+          return std::find(allKinds.begin(), allKinds.end(),
+            T->getTokenKind()) != allKinds.end();
+        }
+        return false;
+      }});
+    }
+%       else:
+    {
+      ChildrenConditions.push_back({${option}, [](const Syntax &S) {
+        return S.getAs<${child.type_name}>().hasValue();
+      }});
+    }
+%       end
+%    end
+    std::vector<Optional<Syntax>> Parameters;
+    unsigned CurCond = 0;
+    unsigned CondSize = ChildrenConditions.size();
+    unsigned I = 0, N = Elements.size();
+    for (; I < N; ) {
+      if (CurCond == CondSize) {
+        return;
+      }
+      if (ChildrenConditions[CurCond].second(Elements[I])) {
+        CurCond ++;
+        I ++;
+        Parameters.emplace_back(Elements[I]);
+        continue;
+      }
+      if (ChildrenConditions[CurCond].first) {
+        CurCond ++;
+        Parameters.emplace_back(None);
+        continue;
+      }
+    }
+    make${node.syntax_kind}(
+      (*Parameters[0]).getAs<${node.children[0].type_name}>().getValue()
+% for i in range(1, len(node.children)):
+%   if node.children[i].is_optional:
+      , Parameters[${i}].hasValue() ?
+        (*Parameters[${i}]).getAs<${node.children[i].type_name}>().getValue() :
+        (Optional<${node.children[i].type_name}>) None
+%   else:
+      , (*Parameters[${i}]).getAs<${node.children[i].type_name}>().getValue()
+%   end
+% end
+    );
+
+% end
+    break;
+   }
+% end
+  default:
+    break;
+  }
+}
+
 % for node in SYNTAX_NODES:
 %   if node.children:
 %     child_params = []
