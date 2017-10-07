@@ -151,7 +151,7 @@ struct _Prespecialize {
     _createArrayUserWithoutSorting("a".utf8)
     _createArrayUserWithoutSorting("a".utf16)
     _createArrayUserWithoutSorting("a".unicodeScalars)
-    _createArrayUserWithoutSorting("a".characters)
+    _createArrayUserWithoutSorting("a")
   }
 
   // Force pre-specialization of Range<Int>
