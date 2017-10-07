@@ -593,18 +593,18 @@ bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.Nat
 // REMOVECLOSURES: retain_value [[ARG0]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
-// REMOVECLOSURES: [[SPECFUN0:%.*]] = function_ref @_T023guaranteed_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n
+// REMOVECLOSURES: [[SPECFUN0:%.*]] = function_ref @_T018owned_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n
 // REMOVECLOSURES: retain_value [[ARG0]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
-// REMOVECLOSURES: [[SPECFUN1:%.*]] = function_ref @_T018owned_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n
+// REMOVECLOSURES: [[SPECFUN1:%.*]] = function_ref @_T023guaranteed_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n
 // REMOVECLOSURES: retain_value [[ARG0]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
 // REMOVECLOSURES-NOT: partial_apply [[OLD_CLOSURE_CALLEE1]]
-// REMOVECLOSURES: [[SPECFUN4:%.*]] = function_ref @_T029guaranteed_apply_callee_throw014small_closure_C0Tf1cnnnnn_n
-// REMOVECLOSURES: [[SPECFUN2:%.*]] = function_ref @_T023guaranteed_apply_callee014small_closure_C0Tf1cnnnn_n
 // REMOVECLOSURES: [[SPECFUN3:%.*]] = function_ref @_T018owned_apply_callee014small_closure_C0Tf1cnnnn_n
+// REMOVECLOSURES: [[SPECFUN2:%.*]] = function_ref @_T023guaranteed_apply_callee014small_closure_C0Tf1cnnnn_n
+// REMOVECLOSURES: [[SPECFUN4:%.*]] = function_ref @_T029guaranteed_apply_callee_throw014small_closure_C0Tf1cnnnnn_n
 // REMOVECLOSURES-NOT: thin_to_thick_function [[OLD_CLOSURE_CALLEE2]]
 // REMOVECLOSURES: apply [[SPECFUN1]](
 // REMOVECLOSURES-NEXT: apply [[SPECFUN3]](

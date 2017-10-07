@@ -56,8 +56,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "closure-specialization"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
+#include "swift/Basic/Range.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -66,10 +65,12 @@
 #include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "llvm/ADT/Statistic.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
@@ -816,7 +817,24 @@ void SILClosureSpecializerTransform::gatherCallSites(
       ClosureInfo *CInfo = nullptr;
 
       // Go through all uses of our closure.
-      for (auto *Use : ClosureInst->getUses()) {
+
+      // Worklist of operands.
+      SmallVector<Operand *, 8> Uses(ClosureInst->getUses());
+
+      // Live range end points.
+      SmallVector<SILInstruction *, 8> UsePoints;
+
+      // Uses may grow in this loop.
+      for (size_t UseIndex = 0; UseIndex < Uses.size(); ++UseIndex) {
+        auto *Use = Uses[UseIndex];
+        UsePoints.push_back(Use->getUser());
+
+        // Recurse through conversions.
+        if (auto *CFI = dyn_cast<ConvertFunctionInst>(Use->getUser())) {
+          // Push Uses in reverse order so they are visited in forward order.
+          Uses.append(CFI->getUses().begin(), CFI->getUses().end());
+          continue;
+        }
         // If this use is not an apply inst or an apply inst with
         // substitutions, there is nothing interesting for us to do, so
         // continue...
@@ -859,7 +877,7 @@ void SILClosureSpecializerTransform::gatherCallSites(
         // corresponding to our partial apply.
         Optional<unsigned> ClosureIndex;
         for (unsigned i = 0, e = AI.getNumArguments(); i != e; ++i) {
-          if (AI.getArgument(i) != ClosureInst)
+          if (AI.getArgument(i) != Use->get())
             continue;
           ClosureIndex = i;
           DEBUG(llvm::dbgs() << "    Found callsite with closure argument at "
@@ -912,12 +930,8 @@ void SILClosureSpecializerTransform::gatherCallSites(
 
         // Compute the final release points of the closure. We will insert
         // release of the captured arguments here.
-        if (!CInfo) {
+        if (!CInfo)
           CInfo = new ClosureInfo(ClosureInst);
-          ValueLifetimeAnalysis VLA(CInfo->Closure);
-          VLA.computeFrontier(CInfo->LifetimeFrontier,
-                              ValueLifetimeAnalysis::AllowToModifyCFG);
-        }
 
         // Now we know that CSDesc is profitable to specialize. Add it to our
         // call site list.
@@ -925,8 +939,12 @@ void SILClosureSpecializerTransform::gatherCallSites(
           CallSiteDescriptor(CInfo, AI, ClosureIndex.getValue(),
                              ClosureParamInfo, std::move(NonFailureExitBBs)));
       }
-      if (CInfo)
+      if (CInfo) {
+        ValueLifetimeAnalysis VLA(CInfo->Closure, UsePoints);
+        VLA.computeFrontier(CInfo->LifetimeFrontier,
+                            ValueLifetimeAnalysis::AllowToModifyCFG);
         ClosureCandidates.push_back(CInfo);
+      }
     }
   }
 }
