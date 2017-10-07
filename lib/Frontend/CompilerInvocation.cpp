@@ -334,7 +334,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   }
 
   if (Opts.RequestedAction == FrontendOptions::Immediate) {
-    Opts.ImmediateArgv.push_back(Opts.Inputs.getFirstInputFilename()); // argv[0]
+    Opts.ImmediateArgv.push_back(Opts.Inputs.getFilenameOfFirstInput()); // argv[0]
     if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
       for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
         Opts.ImmediateArgv.push_back(A->getValue(i));

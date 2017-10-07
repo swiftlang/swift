@@ -28,9 +28,30 @@
 using namespace swift;
 using namespace llvm::opt;
 
+bool FrontendInputs::shouldTreatAsLLVM() const {
+  if (hasUniqueInputFilename()) {
+    StringRef Input(getInputFilenames()[0]);
+    return
+    llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
+    llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
+  }
+  return false;
+}
+
+StringRef FrontendInputs::baseNameOfOutput(const llvm::opt::ArgList &Args, StringRef ModuleName) const {
+  StringRef pifn = primaryInputFilenameIfAny();
+  if (!pifn.empty()) {
+    return llvm::sys::path::stem(pifn);
+  }
+  bool UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name);
+  if (!UserSpecifiedModuleName &&  getInputFilenames().size() == 1) {
+    return llvm::sys::path::stem(getInputFilenames()[0]);
+  }
+  return ModuleName;
+}
 
 bool FrontendInputs::shouldTreatAsSIL() const {
-  if (getInputFilenames().size() == 1) {
+  if (hasUniqueInputFilename()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
     StringRef Input(getInputFilenames()[0]);
@@ -43,33 +64,6 @@ bool FrontendInputs::shouldTreatAsSIL() const {
     return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
   }
   return false;
-}
-
-bool FrontendInputs::shouldTreatAsLLVM() const {
-  if (getInputFilenames().size() == 1) {
-    StringRef Input(getInputFilenames()[0]);
-    return
-    llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
-    llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
-  }
-  return false;
-}
-
-void FrontendInputs::setInputFilenamesAndPrimaryInput(DiagnosticEngine &Diags, llvm::opt::ArgList &Args) {
-  if (const Arg *filelistPath = Args.getLastArg(options::OPT_filelist)) {
-    readInputFileList(Diags, Args, filelistPath);
-    return;
-  }
-  for (const Arg *A : Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
-    if (A->getOption().matches(options::OPT_INPUT)) {
-      addInputFilename(A->getValue());
-    } else if (A->getOption().matches(options::OPT_primary_file)) {
-      setPrimaryInput(SelectedInput(getInputFilenames().size()));
-      addInputFilename(A->getValue());
-    } else {
-      llvm_unreachable("Unknown input-related argument!");
-    }
-  }
 }
 
 bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool isREPLRequested, bool isNoneRequested) const {
@@ -93,7 +87,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
       }
     }
   } else if (TreatAsSIL) {
-    if (getInputFilenames().size() != 1) {
+    if (!hasUniqueInputFilename()) {
       Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
       return true;
     }
@@ -106,17 +100,29 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
   return false;
 }
 
-StringRef FrontendInputs::baseNameOfOutput(const llvm::opt::ArgList &Args, StringRef ModuleName) const {
-  StringRef pifn = primaryInputFilenameIfAny();
-  if (!pifn.empty()) {
-    return llvm::sys::path::stem(pifn);
+void FrontendInputs::transformInputFilenames(const llvm::function_ref<std::string(std::string)> &fn) {
+  for (auto &InputFile : InputFilenames) {
+    InputFile = fn(InputFile);
   }
-  bool UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name);
-  if (!UserSpecifiedModuleName &&  getInputFilenames().size() == 1) {
-    return llvm::sys::path::stem(getInputFilenames()[0]);
-  }
-  return ModuleName;
 }
+
+void FrontendInputs::setInputFilenamesAndPrimaryInput(DiagnosticEngine &Diags, llvm::opt::ArgList &Args) {
+  if (const Arg *filelistPath = Args.getLastArg(options::OPT_filelist)) {
+    readInputFileList(Diags, Args, filelistPath);
+    return;
+  }
+  for (const Arg *A : Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
+    if (A->getOption().matches(options::OPT_INPUT)) {
+      addInputFilename(A->getValue());
+    } else if (A->getOption().matches(options::OPT_primary_file)) {
+      setPrimaryInput(SelectedInput(getInputFilenames().size()));
+      addInputFilename(A->getValue());
+    } else {
+      llvm_unreachable("Unknown input-related argument!");
+    }
+  }
+}
+
 
 /// Try to read an input file list file.
 ///
@@ -159,11 +165,9 @@ void FrontendInputs::readInputFileList(DiagnosticEngine &diags,
   assert(!Args.hasArg(options::OPT_INPUT) && "mixing -filelist with inputs");
 }
 
-void FrontendInputs::transformInputFilenames(const llvm::function_ref<std::string(std::string)> &fn) {
-  for (auto &InputFile : InputFilenames) {
-    InputFile = fn(InputFile);
-  }
-}
+
+
+
 
 
 bool FrontendOptions::actionHasOutput() const {
@@ -310,7 +314,7 @@ StringRef FrontendOptions::determineFallbackModuleName() const {
   }
   StringRef OutputFilename = getSingleOutputFilename();
   bool useOutputFilename = isOutputFilePlainFile();
-  return llvm::sys::path::stem(useOutputFilename ? OutputFilename : StringRef(Inputs.getFirstInputFilename()));
+  return llvm::sys::path::stem(useOutputFilename ? OutputFilename : StringRef(Inputs.getFilenameOfFirstInput()));
 }
 
 /// Try to read an output file list file.
