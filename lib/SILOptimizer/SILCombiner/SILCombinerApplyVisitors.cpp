@@ -13,19 +13,20 @@
 #define DEBUG_TYPE "sil-combine"
 #include "SILCombiner.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -566,37 +567,14 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
   return tryToConcatenateStrings(AI, Builder);
 }
 
-// TODO:
-// Move this concrete type propagation for existentials out of sil-combine
-// We can then use DominanceAnalysis which is the right thing to do here
-// We avoid using it here due to compilation speed implications
-static bool fastDominates(SILInstruction *a, SILInstruction *b) {
-  auto aBlock = a->getParent(), bBlock = b->getParent();
-
-  // If the blocks are different, bail
-  if (aBlock != bBlock)
-    return true;
-
-  // Otherwise, they're in the same block, and we just need to check
-  // whether B comes after A.  This is a non-strict computation.
-  auto aIter = a->getIterator();
-  auto bIter = b->getIterator();
-  auto fIter = aBlock->begin();
-  while (bIter != fIter) {
-    --bIter;
-    if (aIter == bIter)
-      return true;
-  }
-
-  return false;
-}
-
 /// Returns the address of an object with which the stack location \p ASI is
 /// initialized. This is either a init_existential_addr or the source of a
 /// copy_addr. Returns a null value if the address does not dominate the
 /// alloc_stack user \p ASIUser.
 /// If the value is copied from another stack location, \p isCopied is set to
 /// true.
+/// OrigASIUser is used for recursive getAddressOfStackInit calls
+/// It keeps track of the pre-recursive-call user for dominance checks
 static SILValue getAddressOfStackInit(AllocStackInst *ASI,
                                       SILInstruction *ASIUser, bool &isCopied,
                                       SILInstruction *OrigASIUser = nullptr) {
@@ -616,6 +594,10 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
     // Else we will have use-after-free
     if (isa<DeallocStackInst>(User) || isa<DestroyAddrInst>(User) ||
         isa<DeinitExistentialAddrInst>(User)) {
+      // TODO:
+      // Move this concrete type propagation for existentials out of sil-combine
+      // We can then use DominanceAnalysis which is the right thing to do here
+      // We avoid using it here due to compilation speed implications
       if (OrigASIUser && fastDominates(User, OrigASIUser)) {
         return nullptr;
       }
