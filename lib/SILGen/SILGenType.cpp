@@ -604,50 +604,30 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                   Witness witness) {
   auto requirementInfo = Types.getConstantInfo(requirement);
 
-  // Mapping from the requirement's generic signature to the witness
-  // thunk's generic signature.
-  SubstitutionMap reqtSubMap;
-
-  // The generic environment for the witness thunk.
-  GenericEnvironment *genericEnv = nullptr;
-
   // Work out the lowered function type of the SIL witness thunk.
   auto reqtOrigTy = cast<GenericFunctionType>(requirementInfo.LoweredType);
+
+  // Mapping from the requirement's generic signature to the witness
+  // thunk's generic signature.
+  auto reqtSubs = witness.getRequirementToSyntheticSubs();
+  auto reqtSubMap = reqtOrigTy->getGenericSignature()->getSubstitutionMap(reqtSubs);
+
+  // The generic environment for the witness thunk.
+  auto *genericEnv = witness.getSyntheticEnvironment();
+
+  // The type of the witness thunk.
+  auto input = reqtOrigTy->getInput().subst(reqtSubMap)->getCanonicalType();
+  auto result = reqtOrigTy->getResult().subst(reqtSubMap)->getCanonicalType();
+
   CanAnyFunctionType reqtSubstTy;
-  SubstitutionList witnessSubs;
-  if (witness.requiresSubstitution()) {
-    genericEnv = witness.getSyntheticEnvironment();
-    witnessSubs = witness.getSubstitutions();
-
-    auto reqtSubs = witness.getRequirementToSyntheticSubs();
-    reqtSubMap = reqtOrigTy->getGenericSignature()
-        ->getSubstitutionMap(reqtSubs);
-
-    auto input = reqtOrigTy->getInput().subst(reqtSubMap);
-    auto result = reqtOrigTy->getResult().subst(reqtSubMap);
-
-    if (genericEnv) {
-      auto *genericSig = genericEnv->getGenericSignature();
-      reqtSubstTy = cast<GenericFunctionType>(
-        GenericFunctionType::get(genericSig, input, result,
-                                 reqtOrigTy->getExtInfo())
-          ->getCanonicalType());
-    } else {
-      reqtSubstTy = cast<FunctionType>(
-        FunctionType::get(input, result,
-                          reqtOrigTy->getExtInfo())
-          ->getCanonicalType());
-    }
+  if (genericEnv) {
+    auto *genericSig = genericEnv->getGenericSignature();
+    reqtSubstTy = CanGenericFunctionType::get(
+        genericSig->getCanonicalSignature(),
+        input, result, reqtOrigTy->getExtInfo());
   } else {
-    reqtSubMap = SubstitutionMap::getProtocolSubstitutions(
-        conformance->getProtocol(),
-        conformance->getType(),
-        ProtocolConformanceRef(conformance));
-
-    auto input = reqtOrigTy->getInput().subst(reqtSubMap)->getCanonicalType();
-    auto result = reqtOrigTy->getResult().subst(reqtSubMap)->getCanonicalType();
-
-    reqtSubstTy = CanFunctionType::get(input, result, reqtOrigTy->getExtInfo());
+    reqtSubstTy = CanFunctionType::get(
+        input, result, reqtOrigTy->getExtInfo());
   }
 
   // Lower the witness thunk type with the requirement's abstraction level.
@@ -659,7 +639,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   Mangle::ASTMangler NewMangler;
   std::string nameBuffer = NewMangler.mangleWitnessThunk(conformance,
                                                          requirement.getDecl());
-  
+
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all
   // calls removed if possible, e.g. when we're able to devirtualize
@@ -693,6 +673,10 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   }
 
   SILGenFunction SGF(*this, *f);
+
+  // Substitutions mapping the generic parameters of the witness to
+  // archetypes of the witness thunk generic environment.
+  auto witnessSubs = witness.getSubstitutions();
 
   // Open-code certain protocol witness "thunks".
   if (maybeOpenCodeProtocolWitness(SGF, conformance, linkage,
