@@ -1879,8 +1879,7 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     return false;
 
   auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
-    auto *env = archetype->getGenericEnvironment();
-    auto paramType = env->mapTypeOutOfContext(archetype);
+    auto paramType = archetype->getInterfaceType();
 
     if (auto *GTPT = paramType->getAs<GenericTypeParamType>())
       return GTPT->getDecl();
@@ -6121,8 +6120,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
         return false;
 
       // Record substitution from generic parameter to the argument type.
-      substitutions[env->mapTypeOutOfContext(archetype)
-                        ->getCanonicalType()
+      substitutions[archetype->getInterfaceType()->getCanonicalType()
                         ->castTo<SubstitutableType>()] = argType;
     }
   }
