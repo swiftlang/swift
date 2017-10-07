@@ -2891,29 +2891,37 @@ ID SILPrintContext::getID(const SILNode *node) {
     // Lazily initialize the instruction -> ID mapping.
     if (ValueToIDMap.empty())
       F->numberValues(ValueToIDMap);
-  } else {
-    setContext(BB);
-    // Lazily initialize the instruction -> ID mapping.
-    if (ValueToIDMap.empty()) {
-      unsigned idx = 0;
-      for (auto &I : *BB) {
-        // Give the instruction itself the next ID.
-        ValueToIDMap[&I] = idx;
+    ID R = {ID::SSAValue, ValueToIDMap[node]};
+    return R;
+  }
 
-        // If there are no results, make sure we don't reuse that ID.
-        auto results = I.getResults();
-        if (results.empty()) {
-          idx++;
+  setContext(BB);
 
-        // Otherwise, assign all of the results an index.  Note that
-        // we'll assign the same ID to both the instruction and the
-        // first result.
-        } else {
-          for (auto result : results) {
-            ValueToIDMap[result] = idx++;
-          }
-        }
-      }
+  // Check if we have initialized our ValueToIDMap yet. If we have, just use
+  // that.
+  if (!ValueToIDMap.empty()) {
+    ID R = {ID::SSAValue, ValueToIDMap[node]};
+    return R;
+  }
+
+  // Otherwise, initialize the instruction -> ID mapping cache.
+  unsigned idx = 0;
+  for (auto &I : *BB) {
+    // Give the instruction itself the next ID.
+    ValueToIDMap[&I] = idx;
+
+    // If there are no results, make sure we don't reuse that ID.
+    auto results = I.getResults();
+    if (results.empty()) {
+      idx++;
+      continue;
+    }
+
+    // Otherwise, assign all of the results an index.  Note that
+    // we'll assign the same ID to both the instruction and the
+    // first result.
+    for (auto result : results) {
+      ValueToIDMap[result] = idx++;
     }
   }
 
