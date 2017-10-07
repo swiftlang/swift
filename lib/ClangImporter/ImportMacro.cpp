@@ -650,8 +650,9 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
       // If the macro is equal to an existing macro, map down to the same
       // declaration.
       if (macro->isIdenticalTo(*entry.first, clangPP, true)) {
-        known->second.push_back({macro, entry.second});
-        return entry.second;
+        ValueDecl *result = entry.second;
+        known->second.push_back({macro, result});
+        return result;
       }
     }
   }
