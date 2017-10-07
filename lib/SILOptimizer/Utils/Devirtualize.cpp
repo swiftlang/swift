@@ -712,7 +712,8 @@ DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
 //===----------------------------------------------------------------------===//
 
 static SubstitutionMap
-getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
+getSubstitutionsForProtocolConformance(ModuleDecl *M,
+                                       ProtocolConformanceRef CRef) {
   auto C = CRef.getConcrete();
 
   // Walk down to the base NormalProtocolConformance.
@@ -746,8 +747,7 @@ getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
 
   if (Subs.empty()) {
     auto *DC = NormalC->getDeclContext();
-    return NormalC->getType()
-      ->getContextSubstitutionMap(DC->getParentModule(), DC);
+    return NormalC->getType()->getContextSubstitutionMap(M, DC);
   }
 
   return NormalC->getGenericSignature()->getSubstitutionMap(Subs);
@@ -764,17 +764,50 @@ getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
 /// are written in terms of the requirement's generic signature need
 /// to be remapped to substitutions suitable for the witness signature.
 ///
+/// Supported remappings are:
+///
+/// - (Concrete witness thunk) Original substitutions:
+///   [Self := ConcreteType, R0 := X0, R1 := X1, ...]
+/// - Requirement generic signature:
+///   <Self : P, R0, R1, ...>
+/// - Witness thunk generic signature:
+///   <W0, W1, ...>
+/// - Remapped substitutions:
+///   [W0 := X0, W1 := X1, ...]
+///
+/// - (Class witness thunk) Original substitutions:
+///   [Self := C<A0, A1>, T0 := X0, T1 := X1, ...]
+/// - Requirement generic signature:
+///   <Self : P, R0, R1, ...>
+/// - Witness thunk generic signature:
+///   <Self : C<B0, B1>, B0, B1, W0, W1, ...>
+/// - Remapped substitutions:
+///   [Self := C<B0, B1>, B0 := A0, B1 := A1, W0 := X0, W1 := X1]
+///
+/// - (Default witness thunk) Original substitutions:
+///   [Self := ConcreteType, R0 := X0, R1 := X1, ...]
+/// - Requirement generic signature:
+///   <Self : P, R0, R1, ...>
+/// - Witness thunk generic signature:
+///   <Self : P, W0, W1, ...>
+/// - Remapped substitutions:
+///   [Self := ConcreteType, W0 := X0, W1 := X1, ...]
+///
 /// \param conformanceRef The (possibly-specialized) conformance
 /// \param requirementSig The generic signature of the requirement
 /// \param witnessThunkSig The generic signature of the witness method
 /// \param origSubs The substitutions from the call instruction
+/// \param isDefaultWitness True if this is a default witness method
+/// \param classWitness The ClassDecl if this is a class witness method
 static SubstitutionMap
 getWitnessMethodSubstitutions(
+    ModuleDecl *mod,
     ProtocolConformanceRef conformanceRef,
     GenericSignature *requirementSig,
     GenericSignature *witnessThunkSig,
     SubstitutionList origSubs,
-    bool isDefaultWitness) {
+    bool isDefaultWitness,
+    ClassDecl *classWitness) {
 
   if (witnessThunkSig == nullptr)
     return SubstitutionMap();
@@ -789,42 +822,67 @@ getWitnessMethodSubstitutions(
 
   // If `Self` maps to a bound generic type, this gives us the
   // substitutions for the concrete type's generic parameters.
-  auto baseSubMap = getSubstitutionsForProtocolConformance(conformanceRef);
+  auto baseSubMap = getSubstitutionsForProtocolConformance(mod, conformanceRef);
 
   unsigned baseDepth = 0;
   auto *rootConformance = conformance->getRootNormalConformance();
   if (auto *witnessSig = rootConformance->getGenericSignature())
     baseDepth = witnessSig->getGenericParams().back()->getDepth() + 1;
 
-  auto origDepth = 1;
+  // If the witness has a class-constrained 'Self' generic parameter,
+  // we have to build a new substitution map that shifts all generic
+  // parameters down by one.
+  if (classWitness != nullptr) {
+    auto *proto = conformance->getProtocol();
+    auto selfType = proto->getSelfInterfaceType();
+
+    auto selfSubMap = SubstitutionMap::getProtocolSubstitutions(
+        proto, selfType.subst(origSubMap), conformanceRef);
+    if (baseSubMap.empty()) {
+      assert(baseDepth == 0);
+      baseSubMap = selfSubMap;
+    } else {
+      baseSubMap = SubstitutionMap::combineSubstitutionMaps(
+          selfSubMap,
+          baseSubMap,
+          CombineSubstitutionMaps::AtDepth,
+          /*firstDepth=*/1,
+          /*secondDepth=*/0,
+          witnessThunkSig);
+    }
+    baseDepth += 1;
+  }
 
   return SubstitutionMap::combineSubstitutionMaps(
       baseSubMap,
       origSubMap,
       CombineSubstitutionMaps::AtDepth,
-      baseDepth,
-      origDepth,
+      /*firstDepth=*/baseDepth,
+      /*secondDepth=*/1,
       witnessThunkSig);
 }
 
 static SubstitutionMap
 getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
                               ProtocolConformanceRef CRef) {
+  auto witnessFnTy = F->getLoweredFunctionType();
+  assert(witnessFnTy->getRepresentation() ==
+         SILFunctionTypeRepresentation::WitnessMethod);
+
   auto requirementSig = AI.getOrigCalleeType()->getGenericSignature();
-  auto witnessThunkSig = F->getLoweredFunctionType()->getGenericSignature();
+  auto witnessThunkSig = witnessFnTy->getGenericSignature();
 
   SubstitutionList origSubs = AI.getSubstitutions();
 
+  auto *mod = Module.getSwiftModule();
   bool isDefaultWitness =
-    F->getLoweredFunctionType()->getRepresentation()
-      == SILFunctionTypeRepresentation::WitnessMethod &&
-    F->getLoweredFunctionType()->getDefaultWitnessMethodProtocol(
-                                                     *Module.getSwiftModule())
-      == CRef.getRequirement();
+    (witnessFnTy->getDefaultWitnessMethodProtocol(*mod)
+      == CRef.getRequirement());
+  auto *classWitness = witnessFnTy->getWitnessMethodClass(*mod);
 
   return getWitnessMethodSubstitutions(
-      CRef, requirementSig, witnessThunkSig,
-      origSubs, isDefaultWitness);
+      mod, CRef, requirementSig, witnessThunkSig,
+      origSubs, isDefaultWitness, classWitness);
 }
 
 /// Generate a new apply of a function_ref to replace an apply of a
