@@ -22,13 +22,19 @@
 // The following two routines need to be implemented in ARC because
 // decomposedStringWithCanonicalMapping returns its result autoreleased. And we
 // want ARC to insert 'objc_retainAutoreleasedReturnValue' and the necessary
-// markers for the hand-off.
+// markers for the hand-off to facilitate the remove from autorelease pool
+// optimization such that the object is not handed into the current autorelease
+// pool which might be scoped such that repeatedly placing objects into it
+// results in unbounded memory growth.
 
-// On i386 we use an autorelease pool to prevent leaking.
+// On i386 the remove from autorelease pool optimization is foiled by the
+// decomposedStringWithCanonicalMapping implementation. Instead, we use a local
+// autorelease pool to prevent leaking of the temporary object into the callers
+// autorelease pool.
 #if defined(__i386__)
 #define AUTORELEASEPOOL @autoreleasepool
 #else
-// On other platforms we rely on autorelease return optimization.
+// On other platforms we rely on the remove from autorelease pool optimization.
 #define AUTORELEASEPOOL
 #endif
 
