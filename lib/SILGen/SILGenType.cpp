@@ -639,28 +639,10 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
           ->getCanonicalType());
     }
   } else {
-    genericEnv = witnessRef.getDecl()->getInnermostDeclContext()
-                   ->getGenericEnvironmentOfContext();
-
-    auto conformanceDC = conformance->getDeclContext();
-    Type concreteTy = conformanceDC->getSelfInterfaceType();
-
-    // FIXME: conformance substitutions should be in terms of interface types
-    auto specialized = conformance;
-    if (conformance->getGenericSignature()) {
-      ASTContext &ctx = getASTContext();
-
-      auto concreteSubs = concreteTy->getContextSubstitutionMap(
-          M.getSwiftModule(),
-          conformance->getDeclContext());
-      specialized = ctx.getSpecializedConformance(concreteTy, conformance,
-                                                  concreteSubs);
-    }
-
     reqtSubMap = SubstitutionMap::getProtocolSubstitutions(
         conformance->getProtocol(),
-        concreteTy,
-        ProtocolConformanceRef(specialized));
+        conformance->getType(),
+        ProtocolConformanceRef(conformance));
 
     auto input = reqtOrigTy->getInput().subst(reqtSubMap)->getCanonicalType();
     auto result = reqtOrigTy->getResult().subst(reqtSubMap)->getCanonicalType();
