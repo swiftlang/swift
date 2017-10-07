@@ -35,7 +35,7 @@ var count: Int = 0
     count += 1
   }
 }
-@inline(never) func count_characters(_ s: String.CharacterView) {
+@inline(never) func count_characters(_ s: String) {
   for _ in s {
     count += 1
   }
@@ -48,7 +48,7 @@ var count: Int = 0
   }
 }
 @inline(never) func count_characters_rev(
-  _ s: ReversedCollection<String.CharacterView>
+  _ s: ReversedCollection<String>
 ) {
   for _ in s {
     count += 1
@@ -126,19 +126,19 @@ public var StringWalk = [
 ]
 
 % for Name in Names:
-%   for Kind in Kinds:
+%   for (Kind, View) in zip(Kinds, [".unicodeScalars", ""]):
 
 @inline(never)
 public func run_StringWalk_${Name}_${Kind}(_ N: Int) {
   for _ in 1...${Kind}Multiplier*N {
-    count_${Kind}(${Name}.${Kind})
+    count_${Kind}(${Name}${View})
   }
 }
 
 @inline(never)
 public func run_StringWalk_${Name}_${Kind}_Backwards(_ N: Int) {
   for _ in 1...${Kind}Multiplier*N {
-    count_${Kind}_rev(${Name}.${Kind}.reversed())
+    count_${Kind}_rev(${Name}${View}.reversed())
   }
 }
 
