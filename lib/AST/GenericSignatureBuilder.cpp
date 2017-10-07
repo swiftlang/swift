@@ -2685,8 +2685,7 @@ void ArchetypeType::resolveNestedType(
   auto genericEnv = getGenericEnvironment();
   auto &builder = *genericEnv->getGenericSignatureBuilder();
 
-  Type interfaceType =
-    genericEnv->mapTypeOutOfContext(const_cast<ArchetypeType *>(this));
+  Type interfaceType = getInterfaceType();
   Type memberInterfaceType =
     DependentMemberType::get(interfaceType, nested.first);
   auto equivClass =
