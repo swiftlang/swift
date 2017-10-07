@@ -1213,7 +1213,7 @@ matchWitness(TypeChecker &tc,
     if (reqGenericEnv)
       selfTy = reqGenericEnv->mapTypeIntoContext(selfTy);
 
-        // Open up the type of the requirement.
+    // Open up the type of the requirement.
     reqLocator = cs->getConstraintLocator(
                      static_cast<Expr *>(nullptr),
                      LocatorPathElt(ConstraintLocator::Requirement, req));
