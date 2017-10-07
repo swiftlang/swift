@@ -95,15 +95,15 @@ public:
   unsigned inputFilenameCount() const { return getInputFilenames().size(); }
   
   bool hasUniqueInputFilename() const {
-    return getInputFilenames().size() == 1;
+    return inputFilenameCount() == 1;
   }
-  std::string getFilenameOfFirstInput() const {
+  const std::string &getFilenameOfFirstInput() const {
     assert(hasInputFilenames());
     return getInputFilenames()[0];
   }
   
   bool isReadingFromStdin() {
-    return hasUniqueInputFilename()  &&  getInputFilenames()[0] == "-";
+    return hasUniqueInputFilename()  &&  getFilenameOfFirstInput() == "-";
   }
   
   // If we have exactly one input filename, and its extension is "bc" or "ll",

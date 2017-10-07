@@ -30,7 +30,7 @@ using namespace llvm::opt;
 
 bool FrontendInputs::shouldTreatAsLLVM() const {
   if (hasUniqueInputFilename()) {
-    StringRef Input(getInputFilenames()[0]);
+    StringRef Input(getFilenameOfFirstInput());
     return
     llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
     llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
@@ -44,8 +44,8 @@ StringRef FrontendInputs::baseNameOfOutput(const llvm::opt::ArgList &Args, Strin
     return llvm::sys::path::stem(pifn);
   }
   bool UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name);
-  if (!UserSpecifiedModuleName &&  getInputFilenames().size() == 1) {
-    return llvm::sys::path::stem(getInputFilenames()[0]);
+  if (!UserSpecifiedModuleName &&  hasUniqueInputFilename()) {
+    return llvm::sys::path::stem(getFilenameOfFirstInput());
   }
   return ModuleName;
 }
@@ -54,7 +54,7 @@ bool FrontendInputs::shouldTreatAsSIL() const {
   if (hasUniqueInputFilename()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
-    StringRef Input(getInputFilenames()[0]);
+    StringRef Input(getFilenameOfFirstInput());
     return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
   }
   StringRef Input = primaryInputFilenameIfAny();
@@ -68,14 +68,14 @@ bool FrontendInputs::shouldTreatAsSIL() const {
 
 bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool isREPLRequested, bool isNoneRequested) const {
   if (isREPLRequested) {
-    if (!getInputFilenames().empty()) {
+    if (hasInputFilenames()) {
       Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return true;
     }
   } else if (TreatAsSIL && hasPrimaryInput()) {
     // If we have the SIL as our primary input, we can waive the one file
     // requirement as long as all the other inputs are SIBs.
-    for (unsigned i = 0, e = getInputFilenames().size(); i != e; ++i) {
+    for (unsigned i = 0, e = inputFilenameCount(); i != e; ++i) {
       if (i == getPrimaryInput()->Index)
         continue;
       
@@ -92,7 +92,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
       return true;
     }
   } else if (!isNoneRequested) {
-    if (getInputFilenames().empty()) {
+    if (!hasInputFilenames()) {
       Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
       return true;
     }
@@ -115,7 +115,7 @@ void FrontendInputs::setInputFilenamesAndPrimaryInput(DiagnosticEngine &Diags, l
     if (A->getOption().matches(options::OPT_INPUT)) {
       addInputFilename(A->getValue());
     } else if (A->getOption().matches(options::OPT_primary_file)) {
-      setPrimaryInput(SelectedInput(getInputFilenames().size()));
+      setPrimaryInput(SelectedInput(inputFilenameCount()));
       addInputFilename(A->getValue());
     } else {
       llvm_unreachable("Unknown input-related argument!");

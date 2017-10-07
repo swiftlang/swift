@@ -259,15 +259,7 @@ public:
     FrontendOpts.Inputs.clearInputs();
   }
 
-  ArrayRef<std::string> getInputFilenames() const {
-    return FrontendOpts.Inputs.getInputFilenames();
-  }
-  
-  ArrayRef<llvm::MemoryBuffer*> getInputBuffers() const {
-    return FrontendOpts.Inputs.getInputBuffers();
-  }
-
-  StringRef getOutputFilename() const {
+   StringRef getOutputFilename() const {
     return FrontendOpts.getSingleOutputFilename();
   }
 

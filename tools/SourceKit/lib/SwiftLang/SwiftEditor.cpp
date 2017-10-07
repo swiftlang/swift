@@ -1712,7 +1712,7 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
         CompilerInvocation CI;
         Invok->applyTo(CI);
         auto &EditorDocs = Impl.LangSupport.getEditorDocuments();
-        for (auto &Input : CI.getInputFilenames()) {
+        for (auto &Input : CI.FrontendOpts.Inputs.getInputFilenames()) {
           if (auto EditorDoc = EditorDocs.findByPath(Input)) {
             if (EditorDoc.get() != this)
               EditorDoc->updateSemaInfo();

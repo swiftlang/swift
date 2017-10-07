@@ -160,9 +160,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
-  for (unsigned i = 0, e = Invocation.getInputBuffers().size(); i != e; ++i) {
+  for (unsigned i = 0, e = Invocation.getFrontendOptions().Inputs.inputBufferCount(); i != e; ++i) {
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    auto *InputBuffer = Invocation.getInputBuffers()[i];
+    auto *InputBuffer = Invocation.getFrontendOptions().Inputs.getInputBuffers()[i];
     auto Copy = std::unique_ptr<llvm::MemoryBuffer>(
         llvm::MemoryBuffer::getMemBufferCopy(
             InputBuffer->getBuffer(), InputBuffer->getBufferIdentifier()));
@@ -180,7 +180,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     }
   }
 
-  for (unsigned i = 0, e = Invocation.getInputFilenames().size(); i != e; ++i) {
+  for (unsigned i = 0, e = Invocation.getFrontendOptions().Inputs.inputFilenameCount(); i != e; ++i) {
     bool hasError = setupForFileAt(i);
     if (hasError) {
       return true;
@@ -709,7 +709,7 @@ bool CompilerInstance::setupForFileAt(unsigned i) {
   bool MainMode = (Invocation.getInputKind() == InputFileKind::IFK_Swift);
   bool SILMode = (Invocation.getInputKind() == InputFileKind::IFK_SIL);
 
-  auto &File = Invocation.getInputFilenames()[i];
+  auto &File = Invocation.getFrontendOptions().Inputs.getInputFilenames()[i];
   
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
@@ -763,4 +763,6 @@ bool CompilerInstance::setupForFileAt(unsigned i) {
   
   if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
     PrimaryBufferID = BufferID;
+  
+  return false;
 }

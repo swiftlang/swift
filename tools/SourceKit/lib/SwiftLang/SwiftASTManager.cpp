@@ -345,11 +345,11 @@ static void setModuleName(CompilerInvocation &Invocation) {
 
   StringRef Filename = Invocation.getOutputFilename();
   if (Filename.empty()) {
-    if (Invocation.getInputFilenames().empty()) {
+    if (!Invocation.FrontendOpts.Inputs.hasInputFilenames()) {
       Invocation.setModuleName("__main__");
       return;
     }
-    Filename = Invocation.getInputFilenames()[0];
+    Filename = Invocation.FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
   Filename = llvm::sys::path::filename(Filename);
   StringRef ModuleName = llvm::sys::path::stem(Filename);
@@ -653,7 +653,7 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
 
   // Check if the inputs changed.
   SmallVector<BufferStamp, 8> InputStamps;
-  InputStamps.reserve(Invok.Opts.Invok.getInputFilenames().size());
+  InputStamps.reserve(Invok.Opts.Inputs.inputFilenameCount();
   for (auto &File : Invok.Opts.Invok.getInputFilenames()) {
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
@@ -666,7 +666,7 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
     if (!FoundSnapshot)
       InputStamps.push_back(MgrImpl.getBufferStamp(File));
   }
-  assert(InputStamps.size() == Invok.Opts.Invok.getInputFilenames().size());
+  assert(InputStamps.size() == Invok.Opts.Inputs.inputFilenameCount();
   if (Stamps != InputStamps)
     return true;
 
@@ -738,7 +738,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
 
   SmallVector<FileContent, 8> Contents;
-  for (auto &File : Opts.Invok.getInputFilenames()) {
+  for (auto &File : Opts.Invok.FrontendOpts.Inputs.getInputFilenames()) {
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
       if (Snap->getFilename() == File) {
@@ -758,7 +758,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     }
     Contents.push_back(std::move(Content));
   }
-  assert(Contents.size() == Opts.Invok.getInputFilenames().size());
+  assert(Contents.size() == Opts.Invok.FrontendOpts.Inputs.inputFilenameCount());
 
   for (auto &Content : Contents)
     Stamps.push_back(Content.Stamp);

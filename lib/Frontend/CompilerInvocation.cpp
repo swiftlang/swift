@@ -1435,8 +1435,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   } else if (FrontendOpts.Inputs.getPrimaryInput() && FrontendOpts.Inputs.getPrimaryInput()->isFilename()) {
     unsigned Index = FrontendOpts.Inputs.getPrimaryInput()->Index;
     Opts.MainInputFilename = FrontendOpts.Inputs.getInputFilenames()[Index];
-  } else if (FrontendOpts.Inputs.getInputFilenames().size() == 1) {
-    Opts.MainInputFilename = FrontendOpts.Inputs.getInputFilenames().front();
+  } else if (FrontendOpts.Inputs.hasUniqueInputFilename()) {
+    Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
   Opts.OutputFilenames = FrontendOpts.OutputFilenames;
   Opts.ModuleName = FrontendOpts.ModuleName;

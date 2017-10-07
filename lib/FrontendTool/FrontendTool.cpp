@@ -527,14 +527,14 @@ static bool performCompile(CompilerInstance &Instance,
     auto &ImporterOpts = Invocation.getClangImporterOptions();
     auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
     if (!PCHOutDir.empty()) {
-      ImporterOpts.BridgingHeader = Invocation.getInputFilenames()[0];
+      ImporterOpts.BridgingHeader = Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput();
       // Create or validate a persistent PCH.
       auto SwiftPCHHash = Invocation.getPCHHash();
       auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
       return !PCH.hasValue();
     }
     return clangImporter->emitBridgingPCH(
-      Invocation.getInputFilenames()[0],
+      Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
       opts.getSingleOutputFilename());
   }
 
@@ -545,14 +545,14 @@ static bool performCompile(CompilerInstance &Instance,
     auto &LLVMContext = getGlobalLLVMContext();
 
     // Load in bitcode file.
-    assert(Invocation.getInputFilenames().size() == 1 &&
+    assert(Invocation.getFrontendOptions().Inputs.hasUniqueInputFilename() &&
            "We expect a single input for bitcode input!");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(Invocation.getInputFilenames()[0]);
+      llvm::MemoryBuffer::getFileOrSTDIN(Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput());
     if (!FileBufOrErr) {
       Instance.getASTContext().Diags.diagnose(SourceLoc(),
                                               diag::error_open_input_file,
-                                              Invocation.getInputFilenames()[0],
+                                              Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
                                               FileBufOrErr.getError().message());
       return true;
     }
@@ -567,7 +567,7 @@ static bool performCompile(CompilerInstance &Instance,
       // if available.
       Instance.getASTContext().Diags.diagnose(SourceLoc(),
                                               diag::error_parse_input_file,
-                                              Invocation.getInputFilenames()[0],
+                                              Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
                                               Err.getMessage());
       return true;
     }
