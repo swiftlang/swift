@@ -164,3 +164,18 @@ protocol P10 {
 // CHECK: Generic signature: <T where T : P10, T.A : C10>
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0.A : C10>
 func testP10<T>(_: T) where T: P10, T.A: C10 { }
+
+// Nested types of generic class-constrained type parameters.
+protocol Tail {
+  associatedtype E
+}
+
+protocol Rump : Tail {
+  associatedtype E = Self
+}
+
+class Horse<T>: Rump { }
+
+func hasRedundantConformanceConstraint<X : Horse<T>, T>(_: X) where X : Rump {}
+// expected-warning@-1 {{redundant conformance constraint 'X': 'Rump'}}
+// expected-note@-2 {{conformance constraint 'X': 'Rump' implied here}}
