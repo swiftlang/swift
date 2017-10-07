@@ -1379,11 +1379,15 @@ ERROR(protocol_derivation_is_broken,none,
       "protocol %0 is broken; cannot derive conformance for type %1", (Type, Type))
 ERROR(type_does_not_inherit,none,
       "%0 requires that %1 inherit from %2", (Type, Type, Type))
-NOTE(type_does_not_inherit_requirement,none,
+NOTE(type_does_not_inherit_or_conform_requirement,none,
      "requirement specified as %0 : %1%2", (Type, Type, StringRef))
 ERROR(types_not_equal,none,
       "%0 requires the types %1 and %2 be equivalent",
       (Type, Type, Type))
+ERROR(type_does_not_conform_owner,none,
+      "%0 requires that %1 conform to %2", (Type, Type, Type))
+NOTE(requirement_implied_by_conditional_conformance,none,
+     "requirement from conditional conformance of %0 to %1", (Type, Type))
 NOTE(candidate_types_equal_requirement,none,
      "candidate requires that the types %0 and %1 be equivalent "
      "(requirement specified as %2 == %3%4)",

@@ -11,15 +11,16 @@ protocol Assoc { associatedtype AT }
 
 func takes_P2<X: P2>(_: X) {}
 // expected-note@-1{{in call to function 'takes_P2'}}
-// expected-note@-2{{in call to function 'takes_P2'}}
-// expected-note@-3{{in call to function 'takes_P2'}}
-// expected-note@-4{{in call to function 'takes_P2'}}
-// expected-note@-5{{in call to function 'takes_P2'}}
-// expected-note@-6{{in call to function 'takes_P2'}}
-// expected-note@-7{{in call to function 'takes_P2'}}
-// expected-note@-8{{in call to function 'takes_P2'}}
-// expected-note@-9{{in call to function 'takes_P2'}}
-// expected-note@-10{{in call to function 'takes_P2'}}
+// expected-note@-2{{candidate requires that the types 'U' and 'V' be equivalent (requirement specified as 'U' == 'V')}}
+// expected-note@-3{{requirement from conditional conformance of 'SameTypeGeneric<U, V>' to 'P2'}}
+// expected-note@-4{{candidate requires that the types 'U' and 'Int' be equivalent (requirement specified as 'U' == 'Int')}}
+// expected-note@-5{{requirement from conditional conformance of 'SameTypeGeneric<U, Int>' to 'P2'}}
+// expected-note@-6{{candidate requires that the types 'Int' and 'Float' be equivalent (requirement specified as 'Int' == 'Float')}}
+// expected-note@-7{{requirement from conditional conformance of 'SameTypeGeneric<Int, Float>' to 'P2'}}
+// expected-note@-8{{candidate requires that 'C1' inherit from 'U' (requirement specified as 'U' : 'C1')}}
+// expected-note@-9{{requirement from conditional conformance of 'ClassFree<U>' to 'P2'}}
+// expected-note@-10{{candidate requires that 'C3' inherit from 'U' (requirement specified as 'U' : 'C3')}}
+// expected-note@-11{{requirement from conditional conformance of 'ClassMoreSpecific<U>' to 'P2'}}
 
 struct Free<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Free<T>
@@ -31,7 +32,9 @@ func free_good<U: P1>(_: U) {
 }
 func free_bad<U>(_: U) {
     takes_P2(Free<U>())
-    // expected-error@-1{{generic parameter 'X' could not be inferred}}
+    // expected-error@-1{{'<X where X : P2> (X) -> ()' requires that 'U' conform to 'P1'}}
+    // expected-note@-2{{requirement specified as 'U' : 'P1'}}
+    // expected-note@-3{{requirement from conditional conformance of 'Free<U>' to 'P2'}}
 }
 
 struct Constrained<T: P1> {}
@@ -44,7 +47,9 @@ func constrained_good<U: P1 & P3>(_: U) {
 }
 func constrained_bad<U: P1>(_: U) {
     takes_P2(Constrained<U>())
-    // expected-error@-1{{generic parameter 'X' could not be inferred}}
+    // expected-error@-1{{'<X where X : P2> (X) -> ()' requires that 'U' conform to 'P3'}}
+    // expected-note@-2{{requirement specified as 'U' : 'P3'}}
+    // expected-note@-3{{requirement from conditional conformance of 'Constrained<U>' to 'P2'}}
 }
 
 struct RedundantSame<T: P1> {}
@@ -67,7 +72,9 @@ func overlapping_sub_good<U: P4>(_: U) {
 }
 func overlapping_sub_bad<U: P1>(_: U) {
     takes_P2(OverlappingSub<U>())
-    // expected-error@-1{{generic parameter 'X' could not be inferred}}
+    // expected-error@-1{{'<X where X : P2> (X) -> ()' requires that 'U' conform to 'P4'}}
+    // expected-note@-2{{requirement specified as 'U' : 'P4'}}
+    // expected-note@-3{{requirement from conditional conformance of 'OverlappingSub<U>' to 'P2'}}
 }
 
 
@@ -104,11 +111,11 @@ func same_type_generic_good<U, V>(_: U, _: V)
 }
 func same_type_bad<U, V>(_: U, _: V) {
     takes_P2(SameTypeGeneric<U, V>())
-    // expected-error@-1{{generic parameter 'X' could not be inferred}}
+    // expected-error@-1{{cannot invoke 'takes_P2(_:)' with an argument list of type '(SameTypeGeneric<U, V>)'}}
     takes_P2(SameTypeGeneric<U, Int>())
-    // expected-error@-1{{generic parameter 'X' could not be inferred}}
+    // expected-error@-1{{cannot invoke 'takes_P2(_:)' with an argument list of type '(SameTypeGeneric<U, Int>)'}}
     takes_P2(SameTypeGeneric<Int, Float>())
-    // expected-error@-1{{generic parameter 'X' could not be inferred}}
+    // expected-error@-1{{cannot invoke 'takes_P2(_:)' with an argument list of type '(SameTypeGeneric<Int, Float>)'}}
 }
 
 
@@ -123,7 +130,9 @@ func infer_good<U: P1>(_: U) {
 }
 func infer_bad<U: P1, V>(_: U, _: V) {
     takes_P2(Infer<Constrained<U>, V>())
-    // expected-error@-1{{generic parameter 'X' could not be inferred}}
+    // expected-error@-1{{'<X where X : P2> (X) -> ()' requires that 'V' conform to 'P1'}}
+    // expected-note@-2{{requirement specified as 'V' : 'P1'}}
+    // expected-note@-3{{requirement from conditional conformance of 'Infer<Constrained<U>, V>' to 'P2'}}
     takes_P2(Infer<Constrained<V>, V>())
     // expected-error@-1{{type 'V' does not conform to protocol 'P1'}}
 }
@@ -137,10 +146,10 @@ func infer_redundant_good<U: P1>(_: U) {
     takes_P2(InferRedundant<Constrained<U>, U>())
 }
 func infer_redundant_bad<U: P1, V>(_: U, _: V) {
-    takes_P2(InferRedundant<Constrained<U>, V>())
-    // expected-error@-1{{type 'V' does not conform to protocol 'P1'}}
-    takes_P2(InferRedundant<Constrained<V>, V>())
-    // expected-error@-1{{type 'V' does not conform to protocol 'P1'}}
+  takes_P2(InferRedundant<Constrained<U>, V>())
+  // expected-error@-1{{type 'V' does not conform to protocol 'P1'}}
+  takes_P2(InferRedundant<Constrained<V>, V>())
+  // expected-error@-1{{type 'V' does not conform to protocol 'P1'}}
 }
 
 
@@ -158,7 +167,7 @@ func class_free_good<U: C1>(_: U) {
 }
 func class_free_bad<U>(_: U) {
     takes_P2(ClassFree<U>())
-    // expected-error@-1{{generic parameter 'X' could not be inferred}}
+    // expected-error@-1{{cannot invoke 'takes_P2(_:)' with an argument list of type '(ClassFree<U>)'}}
 }
 
 struct ClassMoreSpecific<T: C1> {}
@@ -171,7 +180,7 @@ func class_more_specific_good<U: C3>(_: U) {
 }
 func class_more_specific_bad<U: C1>(_: U) {
     takes_P2(ClassMoreSpecific<U>())
-    // expected-error@-1{{generic parameter 'X' could not be inferred}}
+    // expected-error@-1{{cannot invoke 'takes_P2(_:)' with an argument list of type '(ClassMoreSpecific<U>)'}}
 }
 
 

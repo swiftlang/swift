@@ -1624,6 +1624,15 @@ Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
   return expr;
 }
 
+void ParentConditionalConformance::diagnoseConformanceStack(
+    DiagnosticEngine &diags, SourceLoc loc,
+    ArrayRef<ParentConditionalConformance> conformances) {
+  for (auto history : reversed(conformances)) {
+    diags.diagnose(loc, diag::requirement_implied_by_conditional_conformance,
+                   history.ConformingType, history.Protocol);
+  }
+}
+
 GenericRequirementsCheckListener::~GenericRequirementsCheckListener() {}
 
 bool GenericRequirementsCheckListener::shouldCheck(RequirementKind kind,
@@ -1637,7 +1646,8 @@ void GenericRequirementsCheckListener::satisfiedConformance(
 }
 
 bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
-    const Requirement &req, Type first, Type second) {
+    const Requirement &req, Type first, Type second,
+    ArrayRef<ParentConditionalConformance> parents) {
   return false;
 }
 

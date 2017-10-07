@@ -1221,107 +1221,144 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     SubstOptions options) {
   bool valid = true;
 
-  for (const auto &rawReq : genericSig->getRequirements()) {
-    auto req = rawReq.subst(substitutions, conformances, options);
-    if (!req) {
-      // Another requirement will fail later; just continue.
-      valid = false;
-      continue;
-    }
+  struct RequirementSet {
+    ArrayRef<Requirement> Requirements;
+    SmallVector<ParentConditionalConformance, 4> Parents;
+  };
 
-    auto kind = req->getKind();
-    Type rawFirstType = rawReq.getFirstType();
-    Type firstType = req->getFirstType();
-    Type rawSecondType, secondType;
-    if (kind != RequirementKind::Layout) {
-      rawSecondType = rawReq.getSecondType();
-      secondType = req->getSecondType();
-    }
+  SmallVector<RequirementSet, 8> pendingReqs;
+  pendingReqs.push_back({genericSig->getRequirements(), {}});
 
-    bool requirementFailure = false;
-    if (listener && !listener->shouldCheck(kind, firstType, secondType))
-      continue;
+  while (!pendingReqs.empty()) {
+    auto current = pendingReqs.pop_back_val();
 
-    Diag<Type, Type, Type> diagnostic;
-    Diag<Type, Type, StringRef> diagnosticNote;
-
-    switch (kind) {
-    case RequirementKind::Conformance: {
-      // Protocol conformance requirements.
-      auto proto = secondType->castTo<ProtocolType>();
-      // FIXME: This should track whether this should result in a private
-      // or non-private dependency.
-      // FIXME: Do we really need "used" at this point?
-      // FIXME: Poor location information. How much better can we do here?
-      // FIXME: This call should support listener to be able to properly
-      //        diagnose problems with conformances.
-      auto result =
-          conformsToProtocol(firstType, proto->getDecl(), dc,
-                             conformanceOptions, loc, unsatisfiedDependency);
-
-      // Unsatisfied dependency case.
-      auto status = result.getStatus();
-      switch (status) {
-      case RequirementCheckResult::UnsatisfiedDependency:
-      case RequirementCheckResult::Failure:
-      case RequirementCheckResult::SubstitutionFailure:
-        // pass it on up.
-        return status;
-      case RequirementCheckResult::Success:
-        // FIXME: we should possibly have a queue of requirements (or
-        // ArrayRef<Requirements>) that this function works through, and add the
-        // conditional requirements to the end of this.
-
-        // Report the conformance.
-        if (listener && valid) {
-          listener->satisfiedConformance(rawReq.getFirstType(), firstType,
-                                         result.getConformance());
+    for (const auto &rawReq : current.Requirements) {
+      auto req = rawReq;
+      if (current.Parents.empty()) {
+        auto substed = rawReq.subst(substitutions, conformances, options);
+        if (!substed) {
+          // Another requirement will fail later; just continue.
+          valid = false;
+          continue;
         }
+
+        req = *substed;
+      }
+
+      auto kind = req.getKind();
+      Type rawFirstType = rawReq.getFirstType();
+      Type firstType = req.getFirstType();
+      Type rawSecondType, secondType;
+      if (kind != RequirementKind::Layout) {
+        rawSecondType = rawReq.getSecondType();
+        secondType = req.getSecondType();
+      }
+
+      bool requirementFailure = false;
+      if (listener && !listener->shouldCheck(kind, firstType, secondType))
+        continue;
+
+      Diag<Type, Type, Type> diagnostic;
+      Diag<Type, Type, StringRef> diagnosticNote;
+
+      switch (kind) {
+      case RequirementKind::Conformance: {
+        // Protocol conformance requirements.
+        auto proto = secondType->castTo<ProtocolType>();
+        // FIXME: This should track whether this should result in a private
+        // or non-private dependency.
+        // FIXME: Do we really need "used" at this point?
+        // FIXME: Poor location information. How much better can we do here?
+        // FIXME: This call should support listener to be able to properly
+        //        diagnose problems with conformances.
+        auto result =
+            conformsToProtocol(firstType, proto->getDecl(), dc,
+                               conformanceOptions, loc, unsatisfiedDependency);
+
+        // Unsatisfied dependency case.
+        auto status = result.getStatus();
+        switch (status) {
+        case RequirementCheckResult::Failure:
+          // A failure at the top level is diagnosed elsewhere.
+          if (current.Parents.empty())
+            return status;
+
+          diagnostic = diag::type_does_not_conform_owner;
+          diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+          requirementFailure = true;
+          break;
+        case RequirementCheckResult::UnsatisfiedDependency:
+        case RequirementCheckResult::SubstitutionFailure:
+          // pass it on up.
+          return status;
+        case RequirementCheckResult::Success: {
+          auto conformance = result.getConformance();
+          // Report the conformance.
+          if (listener && valid && current.Parents.empty()) {
+            listener->satisfiedConformance(rawFirstType, firstType,
+                                           conformance);
+          }
+
+          auto conditionalReqs = conformance.getConditionalRequirements();
+          if (!conditionalReqs.empty()) {
+            auto history = current.Parents;
+            history.push_back({firstType, proto});
+            pendingReqs.push_back({conditionalReqs, std::move(history)});
+          }
+          continue;
+        }
+        }
+
+        // Failure needs to emit a diagnostic.
+        break;
+      }
+
+      case RequirementKind::Layout: {
+        // TODO: Statically check if a the first type
+        // conforms to the layout constraint, once we
+        // support such static checks.
         continue;
       }
-    }
 
-    case RequirementKind::Layout: {
-      // TODO: Statically check if a the first type
-      // conforms to the layout constraint, once we
-      // support such static checks.
-      continue;
-    }
+      case RequirementKind::Superclass:
+        // Superclass requirements.
+        if (!isSubclassOf(firstType, secondType, dc)) {
+          diagnostic = diag::type_does_not_inherit;
+          diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+          requirementFailure = true;
+        }
+        break;
 
-    case RequirementKind::Superclass:
-      // Superclass requirements.
-      if (!isSubclassOf(firstType, secondType, dc)) {
-        diagnostic = diag::type_does_not_inherit;
-        diagnosticNote = diag::type_does_not_inherit_requirement;
-        requirementFailure = true;
+      case RequirementKind::SameType:
+        if (!firstType->isEqual(secondType)) {
+          diagnostic = diag::types_not_equal;
+          diagnosticNote = diag::types_not_equal_requirement;
+          requirementFailure = true;
+        }
+        break;
       }
-      break;
 
-    case RequirementKind::SameType:
-      if (!firstType->isEqual(secondType)) {
-        diagnostic = diag::types_not_equal;
-        diagnosticNote = diag::types_not_equal_requirement;
-        requirementFailure = true;
+      if (!requirementFailure)
+        continue;
+
+      if (listener &&
+          listener->diagnoseUnsatisfiedRequirement(rawReq, firstType,
+                                                   secondType, current.Parents))
+        return RequirementCheckResult::Failure;
+
+      if (loc.isValid()) {
+        // FIXME: Poor source-location information.
+        diagnose(loc, diagnostic, owner, firstType, secondType);
+        diagnose(noteLoc, diagnosticNote, rawFirstType, rawSecondType,
+                 genericSig->gatherGenericParamBindingsText(
+                     {rawFirstType, rawSecondType}, substitutions));
+
+        ParentConditionalConformance::diagnoseConformanceStack(Diags, noteLoc,
+                                                               current.Parents);
       }
-      break;
-    }
 
-    if (!requirementFailure)
-      continue;
-
-    if (listener &&
-        listener->diagnoseUnsatisfiedRequirement(rawReq, firstType, secondType))
       return RequirementCheckResult::Failure;
-
-    if (loc.isValid()) {
-      // FIXME: Poor source-location information.
-      diagnose(loc, diagnostic, owner, firstType, secondType);
-      diagnose(noteLoc, diagnosticNote, rawFirstType, rawSecondType,
-               genericSig->gatherGenericParamBindingsText(
-                   {rawFirstType, rawSecondType}, substitutions));
     }
-
-    return RequirementCheckResult::Failure;
   }
 
   if (valid)
