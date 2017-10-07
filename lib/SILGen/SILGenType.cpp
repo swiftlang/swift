@@ -604,6 +604,11 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                   Witness witness) {
   auto requirementInfo = Types.getConstantInfo(requirement);
 
+  // Mapping from the requirement's generic signature to the witness
+  // thunk's generic signature.
+  SubstitutionMap reqtSubMap;
+
+  // The generic environment for the witness thunk.
   GenericEnvironment *genericEnv = nullptr;
 
   // Work out the lowered function type of the SIL witness thunk.
@@ -615,8 +620,9 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     witnessSubs = witness.getSubstitutions();
 
     auto reqtSubs = witness.getRequirementToSyntheticSubs();
-    auto reqtSubMap = reqtOrigTy->getGenericSignature()
+    reqtSubMap = reqtOrigTy->getGenericSignature()
         ->getSubstitutionMap(reqtSubs);
+
     auto input = reqtOrigTy->getInput().subst(reqtSubMap);
     auto result = reqtOrigTy->getResult().subst(reqtSubMap);
 
@@ -651,13 +657,13 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                                   concreteSubs);
     }
 
-    auto reqtSubs = SubstitutionMap::getProtocolSubstitutions(
+    reqtSubMap = SubstitutionMap::getProtocolSubstitutions(
         conformance->getProtocol(),
         concreteTy,
         ProtocolConformanceRef(specialized));
 
-    auto input = reqtOrigTy->getInput().subst(reqtSubs)->getCanonicalType();
-    auto result = reqtOrigTy->getResult().subst(reqtSubs)->getCanonicalType();
+    auto input = reqtOrigTy->getInput().subst(reqtSubMap)->getCanonicalType();
+    auto result = reqtOrigTy->getResult().subst(reqtSubMap)->getCanonicalType();
 
     reqtSubstTy = CanFunctionType::get(input, result, reqtOrigTy->getExtInfo());
   }
@@ -698,15 +704,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
 
   // If the witness is a free function, there is no Self type.
   if (!isFree) {
-    if (conformance) {
-      auto conformanceDC = conformance->getDeclContext();
-      selfInterfaceType =
-        conformanceDC->mapTypeOutOfContext(conformance->getType());
-    } else {
-      auto *proto = cast<ProtocolDecl>(requirement.getDecl()->getDeclContext());
-      selfInterfaceType = proto->getSelfInterfaceType();
-    }
-
+    auto *proto = cast<ProtocolDecl>(requirement.getDecl()->getDeclContext());
+    selfInterfaceType = proto->getSelfInterfaceType().subst(reqtSubMap);
     selfType = GenericEnvironment::mapTypeIntoContext(
         genericEnv, selfInterfaceType);
   }
