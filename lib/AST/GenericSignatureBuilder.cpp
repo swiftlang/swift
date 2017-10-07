@@ -3294,10 +3294,6 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
         // If we have inherited associated type...
         if (auto inheritedAssocTypeDecl =
               dyn_cast<AssociatedTypeDecl>(inheritedType)) {
-          // Infer a same-type requirement among the same-named associated
-          // types.
-          addInferredSameTypeReq(assocTypeDecl, inheritedAssocTypeDecl);
-
           // Complain about the first redeclaration.
           if (shouldWarnAboutRedeclaration) {
             auto inheritedFromProto = inheritedAssocTypeDecl->getProtocol();
