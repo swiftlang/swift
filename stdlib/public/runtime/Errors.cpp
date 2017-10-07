@@ -332,7 +332,10 @@ swift::fatalError(uint32_t flags, const char *format, ...)
   va_start(args, format);
 
   char *log;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
   swift_vasprintf(&log, format, args);
+#pragma GCC diagnostic pop
 
   swift_reportError(flags, log);
   abort();
@@ -346,7 +349,10 @@ swift::warning(uint32_t flags, const char *format, ...)
   va_start(args, format);
 
   char *log;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
   swift_vasprintf(&log, format, args);
+#pragma GCC diagnostic pop
 
   reportNow(flags, log);
 
