@@ -138,12 +138,6 @@ Optional<Type> GenericEnvironment::getMappingIfPresent(
   return None;
 }
 
-bool GenericEnvironment::containsPrimaryArchetype(
-                                              ArchetypeType *archetype) const {
-  return static_cast<bool>(
-                       QueryArchetypeToInterfaceSubstitutions(this)(archetype));
-}
-
 Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
                                             Type type) {
   assert(!type->hasArchetype() && "already have a contextual type");

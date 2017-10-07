@@ -8998,7 +8998,7 @@ static bool hasArchetype(const GenericTypeDecl *generic,
   if (!genericEnv)
     return false;
 
-  return genericEnv->containsPrimaryArchetype(archetype);
+  return archetype->getGenericEnvironment() == genericEnv;
 }
 
 static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,

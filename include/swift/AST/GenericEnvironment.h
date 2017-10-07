@@ -151,10 +151,6 @@ public:
     return Signature->getGenericParams();
   }
 
-  /// Determine whether this generic environment contains the given
-  /// primary archetype.
-  bool containsPrimaryArchetype(ArchetypeType *archetype) const;
-
   /// Create a new, "incomplete" generic environment that will be populated
   /// by calls to \c addMapping().
   static
