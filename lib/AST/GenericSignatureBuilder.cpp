@@ -2187,10 +2187,12 @@ static void maybeAddSameTypeRequirementForNestedType(
     superConformance->getTypeWitness(assocType, builder.getLazyResolver());
   if (!concreteType) return;
 
+  // We should only have interface types here.
+  assert(!superConformance->getType()->hasArchetype());
+  assert(!concreteType->hasArchetype());
+
   // Add the same-type constraint.
   auto nestedSource = superSource->viaParent(builder, assocType);
-  concreteType = superConformance->getDeclContext()
-      ->mapTypeOutOfContext(concreteType);
 
   builder.addSameTypeRequirement(nestedPA, concreteType, nestedSource,
         GenericSignatureBuilder::UnresolvedHandlingKind::GenerateConstraints);
