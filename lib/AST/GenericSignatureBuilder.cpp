@@ -1856,7 +1856,8 @@ Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
   ASTContext &ctx = builder.getASTContext();
   if (parentArchetype) {
     // Create a nested archetype.
-    archetype = ArchetypeType::getNew(ctx, parentArchetype, assocType, protos,
+    auto *depMemTy = anchor->castTo<DependentMemberType>();
+    archetype = ArchetypeType::getNew(ctx, parentArchetype, depMemTy, protos,
                                       superclass, layout);
 
     // Register this archetype with its parent.
@@ -1864,8 +1865,7 @@ Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
   } else {
     // Create a top-level archetype.
     auto genericParam = anchor->castTo<GenericTypeParamType>();
-    Identifier name = genericParam->getName();
-    archetype = ArchetypeType::getNew(ctx, genericEnv, name, protos,
+    archetype = ArchetypeType::getNew(ctx, genericEnv, genericParam, protos,
                                       superclass, layout);
 
     // Register the archetype with the generic environment.
