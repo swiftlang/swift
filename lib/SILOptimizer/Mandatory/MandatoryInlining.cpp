@@ -267,6 +267,11 @@ static SILFunction *getCalleeFunction(SILFunction *F, FullApplySite AI,
     CalleeValue = SI->getSrc();
   }
 
+  // PartialApply/ThinToThick -> ConvertFunction patterns are generated
+  // by @noescape closures.
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeValue))
+    CalleeValue = CFI->getOperand();
+
   // We are allowed to see through exactly one "partial apply" instruction or
   // one "thin to thick function" instructions, since those are the patterns
   // generated when using auto closures.
