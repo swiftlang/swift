@@ -43,21 +43,11 @@ public protocol MutableCollectionAlgorithms : MutableCollection {
   /// - Complexity: O(*n*)
   @discardableResult
   mutating func rotate(shiftingToStart middle: Index) -> Index
-
-  /// Rotates the elements in `bounds` so that the element
-  /// at `middle` ends up first in `bounds`.
-  ///
-  /// - Returns: The new index of the element that was first
-  ///   pre-rotation.
-  /// - Complexity: O(*n*)
-  @discardableResult
-  mutating func rotateSubrange(
-    _ bounds: Range<Index>, shiftingToStart middle: Index
-  ) -> Index
 }
 
 // In the stdlib, this conformance wouldn't be needed
 extension Array : MutableCollectionAlgorithms {  }
+extension ArraySlice : MutableCollectionAlgorithms {  }
 
 /// In the stdlib, this would simply be MutableCollection
 extension MutableCollectionAlgorithms {
@@ -96,29 +86,8 @@ extension MutableCollectionAlgorithms {
   /// - Complexity: O(*n*)
   @discardableResult
   public mutating func rotate(shiftingToStart middle: Index) -> Index {
-    return rotateSubrange(startIndex..<endIndex, shiftingToStart: middle)
-  }
-
-  /// Rotates the elements in `bounds` so that the element
-  /// at `middle` ends up first.
-  ///
-  /// - Returns: The new index of the element that was first
-  ///   pre-rotation.
-  /// - Complexity: O(*n*)
-  @discardableResult
-  public mutating func rotateSubrange(
-    _ bounds: Range<Index>, shiftingToStart middle: Index
-  ) -> Index {
-    return _rotateSubrangeForward(bounds, shiftingToStart: middle)
-  }
-
-  // Broken out of the method above for testability purposes
-  @discardableResult
-  internal mutating func _rotateSubrangeForward(
-    _ bounds: Range<Index>, shiftingToStart middle: Index
-  ) -> Index {
-    var m = middle, s = bounds.lowerBound
-    let e = bounds.upperBound
+    var m = middle, s = startIndex
+    let e = endIndex
 
     // Handle the trivial cases
     if s == m { return e }
@@ -176,32 +145,6 @@ extension MutableCollectionAlgorithms {
 
 extension MutableCollection where Self: BidirectionalCollection {
 
-  // This could be internal, but until we have pinned accessors for
-  // slices, every mutating algorithm needs a version that takes
-  // indices in order to get performance.
-
-  /// Reverses the elements in the given subrange in place.
-  ///
-  ///     var characters: [Character] = ["^", "C", "a", "f", "é", "$""]
-  ///     let r = characters.index(after: characters.startIndex)
-  ///             ..< characters.index(before: characters.endIndex)
-  ///     characters.reverseSubrange(r)
-  ///     print(cafe.characters)
-  ///     // Prints "["^", "é", "f", "a", "C", "$"]
-  ///
-  /// - Complexity: O(*n*), where *n* is the number of elements in the
-  ///   subrange.
-  public mutating func reverseSubrange(_ bounds: Range<Index>) {
-    if bounds.isEmpty { return }
-    var f = bounds.lowerBound
-    var l = index(before: bounds.upperBound)
-    while f < l {
-      swap(&self[f], &self[l])
-      formIndex(after: &f)
-      formIndex(before: &l)
-    }
-  }
-
   @inline(__always)
   @discardableResult
   internal mutating func _reverseUntil(_ limit: Index) -> (Index, Index) {
@@ -233,10 +176,10 @@ extension MutableCollection where Self: BidirectionalCollection {
     // locality properties than either of the other implementations.
     // Benchmarks should be performed for that algorithm too, just to
     // be sure.
-    reverseSubrange(startIndex..<middle)
-    reverseSubrange(middle..<endIndex)
+    self[startIndex..<middle].reverse()
+    self[middle..<endIndex].reverse()
     let (p, q) = _reverseUntil(middle)
-    reverseSubrange(p..<q)
+    self[p..<q].reverse()
     return middle == p  ? q : p
   }
 }
@@ -608,60 +551,46 @@ extension BidirectionalCollection
 
   @discardableResult
   mutating func stablePartition(
-    choosingStartGroupBy p: (Iterator.Element) -> Bool
+    choosingStartGroupBy p: (Element) -> Bool
   ) -> Index {
-    return stablyPartitionSubrange(
-      startIndex..<endIndex,
+    return _stablePartition(
+      distance: distance(from: startIndex, to: endIndex),
       choosingStartGroupBy: p
     )
   }
 
-  mutating func stablyPartitionSubrange(
-    _ bounds: Range<Index>,
-    choosingStartGroupBy p: (Iterator.Element) -> Bool
-  ) -> Index {
-    return _stablyPartitionSubrange(
-      bounds,
-      distance: distance(from: bounds.lowerBound, to: bounds.upperBound),
-      choosingStartGroupBy: p
-    )
-  }
-
-  mutating func _stablyPartitionSubrange(
-    _ bounds: Range<Index>,
+  mutating func _stablePartition(
     distance n: IndexDistance,
-    choosingStartGroupBy p: (Iterator.Element) -> Bool
+    choosingStartGroupBy p: (Element) -> Bool
   ) -> Index {
     assert(n >= 0)
-    let (start, end) = (bounds.lowerBound, bounds.upperBound)
-    assert(n == distance(from: start, to: end))
-    if n == 0 { return start }
+    assert(n == distance(from: startIndex, to: endIndex))
+    if n == 0 { return startIndex }
     if n == 1 {
-      return p(self[start]) ? index(after: start) : start
+      return p(self[startIndex]) ? endIndex : startIndex
     }
-
 
     // divide and conquer.
     let d = n / numericCast(2)
-    let m = index(start, offsetBy: d)
+    let m = index(startIndex, offsetBy: d)
 
     // TTTTTTTTT s FFFFFFF m ?????????????
-    let s = _stablyPartitionSubrange(
-      start..<m, distance: d, choosingStartGroupBy: p)
+    let s = self[..<m]._stablePartition(
+      distance: numericCast(d), choosingStartGroupBy: p)
 
     // TTTTTTTTT s FFFFFFF m TTTTTTT e FFFFFFFF
-    let e = _stablyPartitionSubrange(
-      m..<end, distance: n - d, choosingStartGroupBy: p)
+    let e = self[m...]._stablePartition(
+      distance: numericCast(n - d), choosingStartGroupBy: p)
 
     // TTTTTTTTT s TTTTTTT m  FFFFFFF e FFFFFFFF
-    return self.rotateSubrange(s..<e, shiftingToStart: m)
+    return self[s..<e].rotate(shiftingToStart: m)
   }
 }
 
 extension Collection {
   func stablyPartitioned(
-    choosingStartGroupBy p: (Iterator.Element) -> Bool
-  ) -> [Iterator.Element] {
+    choosingStartGroupBy p: (Element) -> Bool
+  ) -> [Element] {
     var a = Array(self)
     a.stablePartition(choosingStartGroupBy: p)
     return a
@@ -709,6 +638,8 @@ extension Collection {
 //===--- Tests ------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
+func address<T>(_ p: UnsafePointer<T>) -> UInt { return UInt(bitPattern: p )}
+
 var suite = TestSuite("Algorithms")
 
 suite.test("reverseSubrange") {
@@ -719,12 +650,17 @@ suite.test("reverseSubrange") {
       let prefix = a.prefix(upTo: p)
       for q in p...l {
         let suffix = a.suffix(from: q)
+
         var b = a
-        b.reverseSubrange(p..<q)
+        b.reserveCapacity(b.count)  // guarantee unique storage
+        let id = address(b)
+
+        b[p..<q].reverse()
         expectEqual(
           b,
           Array([prefix, ArraySlice(a[p..<q].reversed()), suffix].joined()))
-        }
+        expectEqual(address(b), id)
+      }
     }
   }
 }
@@ -740,15 +676,14 @@ suite.test("rotate") {
 
         for m in p...q {
           var b = a
-          let r0 = b._rotateSubrangeForward(p..<q, shiftingToStart: m)
+          b.reserveCapacity(b.count)  // guarantee unique storage
+          let id = address(b)
+
+          let r = b[p..<q].rotate(shiftingToStart: m)
           let rotated = Array([prefix, a[m..<q], a[p..<m], suffix].joined())
           expectEqual(b, rotated)
-          expectEqual(r0, a.index(p, offsetBy: a[m..<q].count))
-
-          b = a
-          let r1 = b.rotateSubrange(p..<q, shiftingToStart: m)
-          expectEqual(b, rotated)
-          expectEqual(r1, r0)
+          expectEqual(r, a.index(p, offsetBy: a[m..<q].count))
+          expectEqual(address(b), id)
         }
       }
       var b = a
@@ -769,15 +704,14 @@ suite.test("rotateRandomAccess") {
 
         for m in p...q {
           var b = a
-          let r0 = b[p..<q].rotateRandomAccess(shiftingToStart: m)
+          b.reserveCapacity(b.count)  // guarantee unique storage
+          let id = address(b)
+
+          let r = b[p..<q].rotateRandomAccess(shiftingToStart: m)
           let rotated = Array([prefix, a[m..<q], a[p..<m], suffix].joined())
           expectEqual(b, rotated)
-          expectEqual(r0, a.index(p, offsetBy: a[m..<q].count))
-
-          b = a
-          let r1 = b[p..<q].rotateRandomAccess(shiftingToStart: m)
-          expectEqual(b, rotated)
-          expectEqual(r1, r0)
+          expectEqual(r, a.index(p, offsetBy: a[m..<q].count))
+          expectEqual(address(b), id)
         }
       }
       var b = a
@@ -803,11 +737,12 @@ suite.test("concatenate") {
 
   let h = "Hello, "
   let w = "world!"
-  let hw = concatenate(h.characters, w.characters)
+  let hw = concatenate(h, w)
   expectEqual("Hello, world!", String(hw))
 }
 
 suite.test("stablePartition") {
+  // FIXME: add test for stability
   for l in 0..<13 {
     let a = Array(0..<l)
 
@@ -823,14 +758,18 @@ suite.test("stablePartition") {
           let notf = { !f($0) }
 
           var b = a
-          var r = b.stablyPartitionSubrange(p..<q, choosingStartGroupBy: f)
+          b.reserveCapacity(b.count)  // guarantee unique storage
+          let id = address(b)
+
+          var r = b[p..<q].stablePartition(choosingStartGroupBy: f)
           expectEqual(b.prefix(upTo:p), prefix)
           expectEqual(b.suffix(from:q), suffix)
           expectEqual(b[p..<r], ArraySlice(subrange.filter(f)))
           expectEqual(b[r..<q], ArraySlice(subrange.filter(notf)))
+          expectEqual(address(b), id)
 
           b = a
-          r = b.stablyPartitionSubrange(p..<q, choosingStartGroupBy: notf)
+          r = b[p..<q].stablePartition(choosingStartGroupBy: notf)
           expectEqual(b.prefix(upTo:p), prefix)
           expectEqual(b.suffix(from:q), suffix)
           expectEqual(b[p..<r], ArraySlice(subrange.filter(notf)))
