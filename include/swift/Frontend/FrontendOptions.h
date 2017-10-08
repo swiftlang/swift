@@ -79,7 +79,8 @@ private:
   
   /// The input for which output should be generated. If not set, output will
   /// be generated for the whole module.
-  Optional<SelectedInput> PrimaryInput;
+  // a vector for now
+  std::vector<SelectedInput> PrimaryInputs;
   
 public:
   
@@ -118,21 +119,43 @@ public:
   unsigned inputBufferCount() const { return getInputBuffers().size(); }
  
   // Primary input readers
-
-  Optional<SelectedInput> getPrimaryInput() const {
-    return PrimaryInput;
-  }
-  bool hasPrimaryInput() const {
-    return getPrimaryInput().hasValue();
+  
+private:
+ 
+  void mustNotBePluralPrimaryInputs() const {
+    assert(PrimaryInputs.size() < 2 && "have not implemented >1 primary input yet");
   }
   
-  bool isWholeModule() { return !hasPrimaryInput(); }
+   const ArrayRef<SelectedInput> getPrimaryInputs() const {
+     mustNotBePluralPrimaryInputs();
+     return PrimaryInputs;
+   }
+  
+  std::vector<SelectedInput> &getMutablePrimaryInputs() {
+    mustNotBePluralPrimaryInputs();
+    return PrimaryInputs;
+  }
+public:
+  
+  unsigned primaryInputCount() const { return getPrimaryInputs().size(); }
+
+  bool hasPrimaryInput() const {
+    return primaryInputCount() > 0;
+  }
+  
+  bool isWholeModule() {
+    return !hasPrimaryInput();
+  }
+  
+  Optional<SelectedInput> getPrimaryInput() const {
+    return hasPrimaryInput() ? Optional<SelectedInput>(getPrimaryInputs()[0]) : Optional<SelectedInput>();
+  }
   
   bool isPrimaryInputAFileAt(unsigned i) {
     return hasPrimaryInput() &&  getPrimaryInput()->isFilename()  &&  getPrimaryInput()->Index == i;
   }
   bool haveAPrimaryInputFile() const {
-    return hasPrimaryInput() && getPrimaryInput()->isFilename();
+   return hasPrimaryInput() && getPrimaryInput()->isFilename();
   }
   Optional<unsigned> primaryInputFileIndex() const {
     return haveAPrimaryInputFile() ? Optional<unsigned>(getPrimaryInput()->Index) : None;
@@ -169,10 +192,11 @@ public:
   // Primary input writers
   
   void setPrimaryInput(SelectedInput si) {
-    PrimaryInput = si;
+    clearPrimaryInput();
+    getMutablePrimaryInputs().push_back(si);
   }
   void clearPrimaryInput() {
-    PrimaryInput = 0;
+    getMutablePrimaryInputs().clear();
   }
   void setPrimaryInputForInputFilename(const std::string &inputFilename) {
     setPrimaryInput(
