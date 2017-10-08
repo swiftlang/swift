@@ -252,8 +252,7 @@ internal func _gcd(_ m: Int, _ n: Int) -> Int {
   return m
 }
 
-extension MutableCollection where Self: RandomAccessCollection,
-  SubSequence: MutableCollection, SubSequence: RandomAccessCollection {
+extension MutableCollection where Self: RandomAccessCollection {
 
   /// Rotates elements through a cycle, using `sourceForIndex` to generate
   /// the source index for each movement.
@@ -382,7 +381,7 @@ public func == <C1: Collection, C2: Collection>(
 
 /// A concatenation of two collections with the same element type.
 public struct ${Self}<C1 : ${Collection}, C2: ${Collection}>: ${Collection}
-  where C1.Iterator.Element == C2.Iterator.Element {
+  where C1.Element == C2.Element {
 
   init(_base1: C1, base2: C2) {
     self._base1 = _base1
@@ -403,7 +402,7 @@ public struct ${Self}<C1 : ${Collection}, C2: ${Collection}>: ${Collection}
     return ConcatenatedCollectionIndex(second: _base2.endIndex)
   }
 
-  public subscript(i: Index) -> C1.Iterator.Element {
+  public subscript(i: Index) -> C1.Element {
     switch i._position {
     case let .first(i):
       return _base1[i]
@@ -496,7 +495,7 @@ public struct ${Self}<C1 : ${Collection}, C2: ${Collection}>: ${Collection}
 func concatenate<
   C1 : ${Collection}, C2 : ${Collection}
 >(_ first: C1, _ second: C2) -> ${Self}<C1, C2>
-where C1.Iterator.Element == C2.Iterator.Element {
+where C1.Element == C2.Element {
   return ${Self}(_base1: first, base2: second)
 }
 
@@ -506,23 +505,20 @@ where C1.Iterator.Element == C2.Iterator.Element {
 //===----------------------------------------------------------------------===//
 
 /// A position in a rotated collection.
-public struct RotatedCollectionIndex<Base : Collection> : Comparable
-where Base.SubSequence: Collection {
+public struct RotatedCollectionIndex<Base : Collection> : Comparable {
   internal let _index:
     ConcatenatedCollectionIndex<Base.SubSequence, Base.SubSequence>
 }
 
 public func < <Base: Collection>(
   lhs: RotatedCollectionIndex<Base>, rhs: RotatedCollectionIndex<Base>
-) -> Bool
-where Base.SubSequence: Collection {
+) -> Bool {
   return lhs._index < rhs._index
 }
 
 public func == <Base: Collection>(
   lhs: RotatedCollectionIndex<Base>, rhs: RotatedCollectionIndex<Base>
-) -> Bool
-where Base.SubSequence: Collection {
+) -> Bool {
   return lhs._index == rhs._index
 }
 
@@ -533,8 +529,7 @@ where Base.SubSequence: Collection {
 /// A rotated view onto a `${Collection}`.
 public struct ${Self}<
   Base : ${Collection}
-> : ${Collection}
-where Base.SubSequence: ${Collection} {
+> : ${Collection} {
   let _concatenation: Concatenated${Collection}<
     Base.SubSequence, Base.SubSequence>
 
@@ -552,7 +547,7 @@ where Base.SubSequence: ${Collection} {
     return RotatedCollectionIndex(_index: _concatenation.endIndex)
   }
 
-  public subscript(i: Index) -> Base.SubSequence.Iterator.Element {
+  public subscript(i: Index) -> Base.SubSequence.Element {
     return _concatenation[i._index]
   }
 
@@ -581,7 +576,7 @@ where Base.SubSequence: ${Collection} {
   }
 }
 
-extension ${Collection} where SubSequence: ${Collection} {
+extension ${Collection} {
   /// Returns a view of this collection with the elements reordered such the
   /// element at the given position ends up first.
   ///
@@ -609,8 +604,7 @@ extension ${Collection} where SubSequence: ${Collection} {
 
 extension BidirectionalCollection
   where Self : MutableCollectionAlgorithms,
-  SubSequence : BidirectionalCollection,
-  SubSequence.Index == Self.Index {
+  SubSequence: MutableCollectionAlgorithms {
 
   @discardableResult
   mutating func stablePartition(
@@ -675,10 +669,10 @@ extension Collection {
 }
 
 extension LazyCollectionProtocol
-  where Iterator.Element == Elements.Iterator.Element {
+  where Element == Elements.Element {
   func stablyPartitioned(
-    choosingStartGroupBy p: (Iterator.Element) -> Bool
-  ) -> LazyCollection<[Iterator.Element]> {
+    choosingStartGroupBy p: (Element) -> Bool
+  ) -> LazyCollection<[Element]> {
     return elements.stablyPartitioned(choosingStartGroupBy: p).lazy
   }
 }
@@ -691,7 +685,7 @@ extension Collection {
     /// predicate, as if `self.partition(by: predicate)` had already
     /// been called.
     func partitionPoint(
-        where predicate: (Iterator.Element) throws -> Bool
+        where predicate: (Element) throws -> Bool
         ) rethrows -> Index {
         var n = distance(from: startIndex, to: endIndex)
         var r = startIndex..<endIndex
