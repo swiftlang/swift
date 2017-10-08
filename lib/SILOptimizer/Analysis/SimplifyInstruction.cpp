@@ -167,9 +167,9 @@ visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
   return SILValue();
 }
 
-// Simplify
-//   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.Some!enumelt.1 // user: %27
-//   %2 = enum $Optional<C>, #Optional.Some!enumelt.1, %1 : $C // user: %28
+// Simplify:
+//   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.Some!enumelt.1
+//   %2 = enum $Optional<C>, #Optional.Some!enumelt.1, %1 : $C
 // to %0 since we are building the same enum.
 static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
   assert(EI->hasOperand() && "Expected an enum with an operand!");
