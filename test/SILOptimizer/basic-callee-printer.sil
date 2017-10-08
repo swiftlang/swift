@@ -425,7 +425,7 @@ bb0(%0 : $*private_proto_private_class):
 // CHECK: Function call site:
 // CHECK:   %2 = witness_method $T, #private_proto_1.theMethod!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_1> (@in_guaranteed τ_0_0) -> (){{.*}} // user: %3
 // CHECK:   %3 = apply %2<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_1> (@in_guaranteed τ_0_0) -> ()
-// CHECK: Incomplete callee list? : Yes
+// CHECK: Incomplete callee list? : No
 // CHECK: Known callees:
 // CHECK: private_proto_1_private_class_witness
 sil private @call_through_private_proto_1 : $@convention(thin) <T where T : private_proto_1> (@in T) -> () {
@@ -468,7 +468,8 @@ bb0(%0 : $*private_proto_internal_class):
 // CHECK: Function call site:
 // CHECK:   %2 = witness_method $T, #private_proto_2.theMethod!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_2> (@in_guaranteed τ_0_0) -> (){{.*}} // user: %3
 // CHECK:   %3 = apply %2<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_2> (@in_guaranteed τ_0_0) -> ()
-// CHECK: Incomplete callee list? : Yes
+// CHECK-WMO: Incomplete callee list? : No
+// CHECK-NOWMO: Incomplete callee list? : Yes
 // CHECK: Known callees:
 // CHECK: private_proto_2_internal_class_witness
 sil private @call_through_private_proto_2 : $@convention(thin) <T where T : private_proto_2> (@in T) -> () {
@@ -552,7 +553,7 @@ bb0(%0 : $*private_proto_public_class_private_method):
 // CHECK: Function call site:
 // CHECK:   %2 = witness_method $T, #private_proto_4.theMethod!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_4> (@in_guaranteed τ_0_0) -> (){{.*}} // user: %3
 // CHECK:   %3 = apply %2<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_4> (@in_guaranteed τ_0_0) -> ()
-// CHECK: Incomplete callee list? : Yes
+// CHECK: Incomplete callee list? : No
 // CHECK: Known callees:
 // CHECK: private_proto_4_public_class_private_method_witness
 sil private @call_through_private_proto_4 : $@convention(thin) <T where T : private_proto_4> (@in T) -> () {
