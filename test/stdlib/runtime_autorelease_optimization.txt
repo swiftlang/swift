@@ -1,0 +1,101 @@
+// REQUIRES: objc_interop
+// RUN: otool -tvV %platform-module-dir/libswiftCore.dylib | %FileCheck %s --check-prefix=CHECK-%target-cpu
+
+// Verify the autorelease return optimization sequence.
+
+/// Test x86-64:
+
+// CHECK-x86_64-LABEL: _swift_stdlib_NSStringHashValue:
+// CHECK-x86_64-NOT: ret
+// CHECK-x86_64: movq    {{.*}}(%rip), %rsi ## Objc selector ref: decomposedStringWithCanonicalMapping
+// CHECK-x86_64: movq    {{.*}}(%rip), [[MSG:%.*]] ## Objc message: -[%rdi decomposedStringWithCanonicalMapping]
+// CHECK-x86_64: callq   *[[MSG]]
+// CHECK-x86_64: movq    %rax, %rdi
+// CHECK-x86_64: callq   {{.*}} ## symbol stub for: _objc_retainAutoreleasedReturnValue
+// CHECK-x86_64: ret
+
+
+// CHECK-x86_64-LABEL: _swift_stdlib_NSStringHashValuePointer:
+// CHECK-x86_64-NOT: ret
+// CHECK-x86_64: movq    {{.*}}(%rip), %rsi ## Objc selector ref: decomposedStringWithCanonicalMapping
+// CHECK-x86_64: movq    {{.*}}(%rip), [[MSG:%.*]] ## Objc message: -[%rdi decomposedStringWithCanonicalMapping]
+// CHECK-x86_64: callq   *[[MSG]]
+// CHECK-x86_64: movq    %rax, %rdi
+// CHECK-x86_64: callq   {{.*}} ## symbol stub for: _objc_retainAutoreleasedReturnValue
+// CHECK-x86_64: ret
+
+/// Test i386:
+
+// CHECK-i386-LABEL: _swift_stdlib_NSStringHashValue:
+// CHECK-i386-NOT: ret
+// CHECK-i386: calll   {{.*}} ## symbol stub for: _objc_msgSend
+// CHECK-i386: movl    %ebp, %ebp
+// CHECK-i386: calll   {{.*}} ## symbol stub for: _objc_retainAutoreleasedReturnValue
+// CHECK-i386: ret
+// CHECK-i386-LABEL: _swift_stdlib_NSStringHashValuePointer:
+// CHECK-i386-NOT: ret
+// CHECK-i386: calll   {{.*}} ## symbol stub for: _objc_msgSend
+// CHECK-i386: movl    %ebp, %ebp
+// CHECK-i386: calll   {{.*}} ## symbol stub for: _objc_retainAutoreleasedReturnValue
+// CHECK-i386: ret
+
+/// Test armv7:
+
+// CHECK-armv7-LABEL: _swift_stdlib_NSStringHashValue:
+// CHECK-armv7-NOT: pop {{.*}}pc{{.*}}
+// CHECK-armv7: blx     {{.*}} @ symbol stub for: _objc_msgSend
+// CHECK-armv7: mov     r7, r7
+// CHECK-armv7: blx     {{.*}} @ symbol stub for: _objc_retainAutoreleasedReturnValue
+// CHECK-armv7: pop {{.*}}pc{{.*}}
+// CHECK-armv7-LABEL: _swift_stdlib_NSStringHashValuePointer:
+// CHECK-armv7-NOT: pop {{.*}}pc{{.*}}
+// CHECK-armv7: blx     {{.*}} @ symbol stub for: _objc_msgSend
+// CHECK-armv7: mov     r7, r7
+// CHECK-armv7: blx     {{.*}} @ symbol stub for: _objc_retainAutoreleasedReturnValue
+// CHECK-armv7: pop {{.*}}pc{{.*}}
+
+/// Test armv7s:
+
+// CHECK-armv7s-LABEL: _swift_stdlib_NSStringHashValue:
+// CHECK-armv7s-NOT: pop {{.*}}pc{{.*}}
+// CHECK-armv7s: blx     {{.*}} @ symbol stub for: _objc_msgSend
+// CHECK-armv7s: mov     r7, r7
+// CHECK-armv7s: blx     {{.*}} @ symbol stub for: _objc_retainAutoreleasedReturnValue
+// CHECK-armv7s: pop {{.*}}pc{{.*}}
+// CHECK-armv7s-LABEL: _swift_stdlib_NSStringHashValuePointer:
+// CHECK-armv7s-NOT: pop {{.*}}pc{{.*}}
+// CHECK-armv7s: blx     {{.*}} @ symbol stub for: _objc_msgSend
+// CHECK-armv7s: mov     r7, r7
+// CHECK-armv7s: blx     {{.*}} @ symbol stub for: _objc_retainAutoreleasedReturnValue
+// CHECK-armv7s: pop {{.*}}pc{{.*}}
+
+
+/// Test armv7k:
+
+// CHECK-armv7k-LABEL: _swift_stdlib_NSStringHashValue:
+// CHECK-armv7k-NOT: pop {{.*}}pc{{.*}}
+// CHECK-armv7k: blx     {{.*}} @ symbol stub for: _objc_msgSend
+// CHECK-armv7k: mov     r7, r7
+// CHECK-armv7k: blx     {{.*}} @ symbol stub for: _objc_retainAutoreleasedReturnValue
+// CHECK-armv7k: pop {{.*}}pc{{.*}}
+// CHECK-armv7k-LABEL: _swift_stdlib_NSStringHashValuePointer:
+// CHECK-armv7k-NOT: pop {{.*}}pc{{.*}}
+// CHECK-armv7k: blx     {{.*}} @ symbol stub for: _objc_msgSend
+// CHECK-armv7k: mov     r7, r7
+// CHECK-armv7k: blx     {{.*}} @ symbol stub for: _objc_retainAutoreleasedReturnValue
+// CHECK-armv7k: pop {{.*}}pc{{.*}}
+
+/// Test arm64:
+
+// CHECK-arm64-LABEL: _swift_stdlib_NSStringHashValue:
+// CHECK-arm64-NOT: ret
+// CHECK-arm64: bl      {{.*}} ; Objc message: -[x0 decomposedStringWithCanonicalMapping]
+// CHECK-arm64: mov      x29, x29
+// CHECK-arm64: bl      {{.*}} ; symbol stub for: _objc_retainAutoreleasedReturnValue
+// CHECK-arm64: ret
+// CHECK-arm64-LABEL: _swift_stdlib_NSStringHashValuePointer:
+// CHECK-arm64-NOT: ret
+// CHECK-arm64: bl      {{.*}} ; Objc message: -[x0 decomposedStringWithCanonicalMapping]
+// CHECK-arm64: mov      x29, x29
+// CHECK-arm64: bl      {{.*}} ; symbol stub for: _objc_retainAutoreleasedReturnValue
+// CHECK-arm64: ret
