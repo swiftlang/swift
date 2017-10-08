@@ -80,15 +80,15 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
                     || Kind == tok::${child.token_choices[i].kind}
 %           end
                 ;
-        }
-        return false;
-    }
+              }
+              return false;
+            }
         },
 %       else:
         {   ${option},
             [](const Syntax &S) {
-        return S.getAs<${child.type_name}>().hasValue();
-    }
+              return S.getAs<${child.type_name}>().hasValue();
+            }
         },
 %       end
 %    end
@@ -198,7 +198,7 @@ SyntaxFactory::makeBlank${node.syntax_kind}() {
   TokenSyntax
   SyntaxFactory::make${token.name}Keyword(const Trivia &LeadingTrivia,
                                           const Trivia &TrailingTrivia) {
-    return makeToken(tok::${token.kind}, "${token.text}", 
+    return makeToken(tok::${token.kind}, "${token.text}",
                      SourcePresence::Present,
                      LeadingTrivia, TrailingTrivia);
   }
@@ -256,7 +256,7 @@ TypeIdentifierSyntax SyntaxFactory::makeAnyTypeIdentifier(
     const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
   return makeTypeIdentifier("Any", LeadingTrivia, TrailingTrivia);
 }
-  
+
 TypeIdentifierSyntax SyntaxFactory::makeSelfTypeIdentifier(
     const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
   return makeTypeIdentifier("Self", LeadingTrivia, TrailingTrivia);
