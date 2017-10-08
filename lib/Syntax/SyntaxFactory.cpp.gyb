@@ -73,6 +73,7 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
 %       if child.token_choices:
         {   ${option},
             [](const Syntax &S) {
+              // check ${child.name}.
               if (auto Tok = S.getAs<TokenSyntax>()) {
                 auto Kind = Tok->getTokenKind();
                 return Kind == tok::${child.token_choices[0].kind}
@@ -87,6 +88,7 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
 %       else:
         {   ${option},
             [](const Syntax &S) {
+              // check ${child.name}.
               return S.getAs<${child.type_name}>().hasValue();
             }
         },
@@ -125,14 +127,20 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
     }
     assert(CurCond == ${len(node.children)});
     return make${node.syntax_kind}(
-      (*Parameters[0]).getAs<${node.children[0].type_name}>().getValue()
+%   if node.children[0].is_optional:
+      /* Optional ${node.children[0].name}*/ Parameters[${0}].hasValue() ?
+        (*Parameters[${0}]).getAs<${node.children[0].type_name}>().getValue() :
+        (Optional<${node.children[0].type_name}>) None
+%   else:
+      /* ${node.children[0].name}*/ (*Parameters[${0}]).getAs<${node.children[0].type_name}>().getValue()
+%   end
 % for i in range(1, len(node.children)):
 %   if node.children[i].is_optional:
-      , Parameters[${i}].hasValue() ?
+      , /* Optional ${node.children[i].name}*/ Parameters[${i}].hasValue() ?
         (*Parameters[${i}]).getAs<${node.children[i].type_name}>().getValue() :
         (Optional<${node.children[i].type_name}>) None
 %   else:
-      , (*Parameters[${i}]).getAs<${node.children[i].type_name}>().getValue()
+      , /* ${node.children[i].name}*/ (*Parameters[${i}]).getAs<${node.children[i].type_name}>().getValue()
 %   end
 % end
     );
