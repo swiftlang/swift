@@ -105,7 +105,9 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
                           ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
                           ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/${CMAKE_STATIC_LIBRARY_PREFIX}BlocksRuntime${CMAKE_STATIC_LIBRARY_SUFFIX}
                         STEP_TARGETS
-                          configure)
+                          configure
+                        BUILD_ALWAYS
+                          1)
 
     # CMake does not like the addition of INTERFACE_INCLUDE_DIRECTORIES without
     # the directory existing.  Just create the location which will be populated
