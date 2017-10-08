@@ -51,7 +51,7 @@ struct SyntaxFactory {
   static UnknownSyntax
   makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens);
 
-  static void
+  static Optional<Syntax>
   createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements);
 
 % for node in SYNTAX_NODES:

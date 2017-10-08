@@ -57,47 +57,47 @@ SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
   return make<UnknownSyntax>(Raw);
 }
 
-void
+Optional<Syntax>
 SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
   switch(Kind) {
 % for node in SYNTAX_NODES:
   case SyntaxKind::${node.syntax_kind}: {
 % if node.children:
-    std::vector<std::pair<bool, std::function<bool(const Syntax&)>>>
-      ChildrenConditions;
+    static std::pair<bool, std::function<bool(const Syntax&)>>
+      ChildrenConditions[${len(node.children)}] = {
 %    for child in node.children:
 %       if child.is_optional:
 %         option = "true"
 %       else:
 %         option = "false"
 %       if child.token_choices:
-%         choices = ", ".join("tok::" + choice.kind
-%                                         for choice in child.token_choices)
-    {
-      std::vector<tok> allKinds({${choices}});
-      ChildrenConditions.push_back({${option}, [allKinds](const Syntax &S) {
-        if (auto T = S.getAs<TokenSyntax>()) {
-          return std::find(allKinds.begin(), allKinds.end(),
-            T->getTokenKind()) != allKinds.end();
+        {   ${option},
+            [](const Syntax &S) {
+              if (auto Tok = S.getAs<TokenSyntax>()) {
+                auto Kind = Tok->getTokenKind();
+                return Kind == tok::${child.token_choices[0].kind}
+%           for i in range(1, len(child.token_choices)):
+                    || Kind == tok::${child.token_choices[i].kind}
+%           end
+                ;
         }
         return false;
-      }});
     }
+        },
 %       else:
-    {
-      ChildrenConditions.push_back({${option}, [](const Syntax &S) {
+        {   ${option},
+            [](const Syntax &S) {
         return S.getAs<${child.type_name}>().hasValue();
-      }});
     }
+        },
 %       end
 %    end
+    };
     std::vector<Optional<Syntax>> Parameters;
     unsigned CurCond = 0;
-    unsigned CondSize = ChildrenConditions.size();
-    unsigned I = 0, N = Elements.size();
-    for (; I < N; ) {
-      if (CurCond == CondSize) {
-        return;
+    for (unsigned I = 0, N = Elements.size(); I < N; ) {
+      if (CurCond == ${len(node.children)}) {
+        return None;
       }
       if (ChildrenConditions[CurCond].second(Elements[I])) {
         CurCond ++;
@@ -111,7 +111,9 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
         continue;
       }
     }
-    make${node.syntax_kind}(
+    if (CurCond != ${len(node.children)})
+      return None;
+    return make${node.syntax_kind}(
       (*Parameters[0]).getAs<${node.children[0].type_name}>().getValue()
 % for i in range(1, len(node.children)):
 %   if node.children[i].is_optional:
@@ -123,13 +125,23 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
 %   end
 % end
     );
-
+% elif node.is_syntax_collection():
+      std::vector<${node.collection_element_type}> Parts;
+      for (auto &E: Elements) {
+        if (auto P = E.getAs<${node.collection_element_type}>()) {
+          Parts.emplace_back(make<${node.collection_element_type}>(P->getRaw()));
+        } else {
+          return None;
+        }
+      }
+      return make${node.syntax_kind}(Parts);
+% else:
+    return None;
 % end
-    break;
    }
 % end
   default:
-    break;
+    return None;
   }
 }
 
