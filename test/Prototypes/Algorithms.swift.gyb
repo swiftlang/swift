@@ -71,7 +71,7 @@ extension MutableCollectionAlgorithms {
     var p = lhs.lowerBound
     var q = rhs.lowerBound
     repeat {
-      swap(&self[p], &self[q])
+      swapAt(p, q)
       formIndex(after: &p)
       formIndex(after: &q)
     }
@@ -209,7 +209,7 @@ extension MutableCollection where Self: BidirectionalCollection {
     var l = endIndex
     while f != limit && l != limit {
       formIndex(before: &l)
-      swap(&self[f], &self[l])
+      swapAt(f, l)
       formIndex(after: &f)
     }
     return (f, l)
@@ -258,15 +258,19 @@ extension MutableCollection where Self: RandomAccessCollection,
   /// Rotates elements through a cycle, using `sourceForIndex` to generate
   /// the source index for each movement.
   @inline(__always)
-  internal mutating func _rotateCycle(start: Index,
-    transform sourceForIndex: (Index) -> Index)
+  internal mutating func _rotateCycle(
+    start: Index,
+    pivot: Index,
+    plus: IndexDistance,
+    minus: IndexDistance)
   {
     let tmp = self[start]
-    var (i, j) = (start, sourceForIndex(start))
+    var i = start
+    var j = index(start, offsetBy: start < pivot ? plus : minus)
     while j != start {
       self[i] = self[j]
       i = j
-      j = sourceForIndex(j)
+      j = index(j, offsetBy: j < pivot ? plus : minus)
     }
     self[i] = tmp
   }
@@ -297,9 +301,9 @@ extension MutableCollection where Self: RandomAccessCollection,
     let cycles = _gcd(numericCast(plus), -numericCast(minus))
 
     for cycle in 1...cycles {
-      _rotateCycle(start: index(startIndex, offsetBy: numericCast(cycle))) {
-        index($0, offsetBy: $0 < pivot ? plus : minus)
-      }
+      _rotateCycle(
+        start: index(startIndex, offsetBy: numericCast(cycle)),
+        pivot: pivot, plus: plus, minus: minus)
     }
     return pivot
   }
