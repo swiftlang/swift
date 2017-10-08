@@ -1705,30 +1705,20 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
     if (Length != 0 || Buf->getBufferSize() != 0) {
       updateSemaInfo();
 
-      if (auto Invok = Impl.SemanticInfo->getInvocation()) {
-        // Update semantic info for open editor documents of the same module.
-        // FIXME: Detect edits that don't affect other files, e.g. whitespace,
-        // comments, inside a function body, etc.
-        CompilerInvocation CI;
-        Invok->applyTo(CI);
-        auto &EditorDocs = Impl.LangSupport.getEditorDocuments();
-        for (auto &Input : CI.FrontendOpts.Inputs.getInputFilenames()) {
-          if (auto EditorDoc = EditorDocs.findByPath(Input)) {
-            if (EditorDoc.get() != this)
-              EditorDoc->updateSemaInfo();
-          }
-        }
-      }
+      // FIXME: we should also update any "interesting" ASTs that depend on this
+      // document here, e.g. any ASTs for files visible in an editor. However,
+      // because our API conflates this with any file with unsaved changes we do
+      // not update all open documents, since there could be too many of them.
     }
   }
-
+  
   // Update the old syntax map offsets to account for the replaced range.
   // Also set the initial AffectedRange to cover any tokens that
   // the replaced range intersected. This allows for clients that split
   // multi-line tokens at line boundaries, and ensure all parts of these tokens
   // will be cleared.
   Impl.AffectedRange = Impl.SyntaxMap.adjustForReplacement(Offset, Length, Str.size());
-
+  
   return Snapshot;
 }
 
