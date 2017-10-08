@@ -854,7 +854,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
                                             GenericSignature *Sig,
                                             GenericEnvironment *Env) {
   auto Reqs = Sig->getRequirements();
-  auto CurrentGP = Env->mapTypeOutOfContext(Archetype)
+  auto CurrentGP = Archetype->getInterfaceType()
                        ->getCanonicalType()
                        ->getRootGenericParam();
   for (auto Req : Reqs) {
@@ -897,7 +897,7 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature *Sig,
                                 GenericEnvironment *Env,
                                 SmallVectorImpl<Requirement> &CollectedReqs) {
   auto Reqs = Sig->getRequirements();
-  auto CurrentGP = Env->mapTypeOutOfContext(Archetype)
+  auto CurrentGP = Archetype->getInterfaceType()
                        ->getCanonicalType()
                        ->getRootGenericParam();
   CollectedReqs.clear();
@@ -1304,8 +1304,7 @@ void FunctionSignaturePartialSpecializer::
 void FunctionSignaturePartialSpecializer::
     createGenericParamsForUsedCallerArchetypes() {
   for (auto CallerArchetype : UsedCallerArchetypes) {
-    auto CallerGenericParam =
-        CallerGenericEnv->mapTypeOutOfContext(CallerArchetype);
+    auto CallerGenericParam = CallerArchetype->getInterfaceType();
     assert(CallerGenericParam->is<GenericTypeParamType>());
 
     DEBUG(llvm::dbgs() << "\n\nChecking used caller archetype:\n";

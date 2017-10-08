@@ -106,9 +106,8 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
         archetype->getParent() != nullptr)
       return Type();
 
-    auto *genericEnv = archetype->getGenericEnvironment();
     type = cast<GenericTypeParamType>(
-      genericEnv->mapTypeOutOfContext(archetype)->getCanonicalType());
+      archetype->getInterfaceType()->getCanonicalType());
   }
 
   // Find the index of the replacement type based on the generic parameter we
@@ -168,8 +167,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-    auto *genericEnv = archetype->getGenericEnvironment();
-    type = genericEnv->mapTypeOutOfContext(type)->getCanonicalType();
+    type = archetype->getInterfaceType()->getCanonicalType();
   }
 
   // Error path: if we don't have a type parameter, there is no conformance.

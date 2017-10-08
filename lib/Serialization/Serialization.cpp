@@ -3418,7 +3418,7 @@ void Serializer::writeType(Type ty) {
     assert(env && "Primary archetype without generic environment?");
 
     GenericEnvironmentID envID = addGenericEnvironmentRef(env);
-    Type interfaceType = env->mapTypeOutOfContext(archetypeTy);
+    Type interfaceType = archetypeTy->getInterfaceType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,

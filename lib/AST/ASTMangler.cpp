@@ -892,8 +892,7 @@ void ASTMangler::appendType(Type type) {
 
       // Find the archetype information.
       const DeclContext *DC = DeclCtx;
-      auto GTPT = GenericEnvironment::mapTypeOutOfContext(GenericEnv, archetype)
-                      ->castTo<GenericTypeParamType>();
+      auto GTPT = archetype->getInterfaceType()->castTo<GenericTypeParamType>();
 
       // The DWARF output created by Swift is intentionally flat,
       // therefore archetypes are emitted with their DeclContext if
