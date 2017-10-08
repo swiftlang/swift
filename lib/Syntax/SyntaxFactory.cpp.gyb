@@ -63,8 +63,9 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
 % for node in SYNTAX_NODES:
   case SyntaxKind::${node.syntax_kind}: {
 % if node.children:
+%    child_count = len(node.children)
     static std::pair<bool, std::function<bool(const Syntax&)>>
-      ChildrenConditions[${len(node.children)}] = {
+      ChildrenConditions[${child_count}] = {
 %    for child in node.children:
 %       if child.is_optional:
 %         option = "true"
@@ -96,7 +97,6 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
 %       end
 %    end
     };
-%    child_count = len(node.children)
     Optional<Syntax> Parameters[${child_count}];
     unsigned CurCond = 0;
     for (unsigned I = 0, N = Elements.size(); I < N; ) {
@@ -123,7 +123,7 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
         return None;
       }
     }
-    assert(CurCond == ${len(node.children)});
+    assert(CurCond == ${child_count});
     return make${node.syntax_kind}(
 % params = []
 % for i, child in enumerate(node.children):
