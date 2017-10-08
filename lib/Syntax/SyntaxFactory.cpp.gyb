@@ -76,11 +76,12 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
               // check ${child.name}.
               if (auto Tok = S.getAs<TokenSyntax>()) {
                 auto Kind = Tok->getTokenKind();
-                return Kind == tok::${child.token_choices[0].kind}
-%           for i in range(1, len(child.token_choices)):
-                    || Kind == tok::${child.token_choices[i].kind}
+%           tok_checks = []
+%           for choice in child.token_choices:
+%             tok_checks.append("Kind == tok::%s" % choice.kind)
 %           end
-                ;
+%           all_checks = ' || '.join(tok_checks)
+                return ${all_checks};
               }
               return false;
             }
@@ -127,22 +128,20 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
     }
     assert(CurCond == ${len(node.children)});
     return make${node.syntax_kind}(
-%   if node.children[0].is_optional:
-      /* Optional ${node.children[0].name}*/ Parameters[${0}].hasValue() ?
-        (*Parameters[${0}]).getAs<${node.children[0].type_name}>().getValue() :
-        (Optional<${node.children[0].type_name}>) None
+% params = []
+% for i, child in enumerate(node.children):
+%   child = node.children[i]
+%   if child.is_optional:
+%      params.append("/*Optional %s*/ Parameters[%s].hasValue() ?" \
+%       "(*Parameters[%s]).getAs<%s>().getValue() : (Optional<%s>) None" %
+%         (child.name, i, i, child.type_name, child.type_name))
 %   else:
-      /* ${node.children[0].name}*/ (*Parameters[${0}]).getAs<${node.children[0].type_name}>().getValue()
-%   end
-% for i in range(1, len(node.children)):
-%   if node.children[i].is_optional:
-      , /* Optional ${node.children[i].name}*/ Parameters[${i}].hasValue() ?
-        (*Parameters[${i}]).getAs<${node.children[i].type_name}>().getValue() :
-        (Optional<${node.children[i].type_name}>) None
-%   else:
-      , /* ${node.children[i].name}*/ (*Parameters[${i}]).getAs<${node.children[i].type_name}>().getValue()
+%      params.append("/*%s*/ (*Parameters[%s]).getAs<%s>().getValue()" %
+%        (child.name, i, child.type_name))
 %   end
 % end
+% child_parms = '\n, '.join(params)
+      ${child_parms}
     );
 % elif node.is_syntax_collection():
       std::vector<${node.collection_element_type}> Parts;
