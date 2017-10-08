@@ -96,32 +96,29 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
 %       end
 %    end
     };
-    std::vector<Optional<Syntax>> Parameters;
+%    child_count = len(node.children)
+    Optional<Syntax> Parameters[${child_count}];
     unsigned CurCond = 0;
     for (unsigned I = 0, N = Elements.size(); I < N; ) {
       // We should use all elements.
-      if (CurCond == ${len(node.children)}) {
+      if (CurCond == ${child_count}) {
         return None;
       }
       if (ChildrenConditions[CurCond].second(Elements[I])) {
         // we find a node that satisfies the condition.
+        Parameters[CurCond].emplace(Elements[I]);
         CurCond ++;
         I ++;
-        Parameters.emplace_back(Elements[I]);
       } else if (ChildrenConditions[CurCond].first) {
         // If the unsatisfied condition is optional, move on to the next condition.
         CurCond ++;
-        Parameters.emplace_back(None);
       } else {
         // Mandatory condition is not satisfied.
         return None;
       }
     }
-    for (; CurCond < ${len(node.children)}; CurCond ++) {
-      if (ChildrenConditions[CurCond].first) {
-        // If the remaining condition is optional, stuff None.
-        Parameters.emplace_back(None);
-      } else {
+    for (; CurCond < ${child_count}; CurCond ++) {
+      if (!ChildrenConditions[CurCond].first) {
         // if the remaining condition is mandatory, we cannot create.
         return None;
       }
