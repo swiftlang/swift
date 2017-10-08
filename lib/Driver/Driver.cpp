@@ -1647,10 +1647,12 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args) const {
   if (!A)
     return nullptr;
 
-  // TODO: perform some preflight checks to ensure the file exists.
+  // TODO: https://bugs.swift.org/browse/SR-6055, perform some preflight
+  //       checks to ensure the file exists.
   auto OFM = OutputFileMap::loadFromPath(A->getValue());
   if (!OFM) {
-    // TODO: emit diagnostic with error string
+    // TODO: https://bugs.swift.org/browse/SR-6055, emit a diagnostic
+    //       with the error string explaining why the file could not be loaded.
     Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map);
   }
   return OFM;
