@@ -111,8 +111,13 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
         continue;
       }
     }
-    if (CurCond != ${len(node.children)})
-      return None;
+    for (; CurCond < ${len(node.children)}; CurCond ++) {
+      if (ChildrenConditions[CurCond].first)
+        Parameters.emplace_back(None);
+      else
+        return None;
+    }
+    assert(CurCond == ${len(node.children)});
     return make${node.syntax_kind}(
       (*Parameters[0]).getAs<${node.children[0].type_name}>().getValue()
 % for i in range(1, len(node.children)):
