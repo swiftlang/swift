@@ -2577,12 +2577,12 @@ Type TupleType::getVarArgsBaseType() const {
 ArchetypeType::ArchetypeType(
   const ASTContext &Ctx,
   llvm::PointerUnion<ArchetypeType *, GenericEnvironment *> ParentOrGenericEnv,
-  llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
+  Type InterfaceType,
   ArrayRef<ProtocolDecl *> ConformsTo,
   Type Superclass, LayoutConstraint Layout)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties::HasArchetype),
-      AssocTypeOrName(AssocTypeOrName) {
+      InterfaceType(InterfaceType) {
   // Record the parent/generic environment.
   if (auto parent = ParentOrGenericEnv.dyn_cast<ArchetypeType *>()) {
     ParentOrOpenedOrEnvironment = parent;
@@ -2644,7 +2644,7 @@ ArchetypeType::ArchetypeType(const ASTContext &Ctx, Type Existential,
 CanArchetypeType ArchetypeType::getNew(
                                    const ASTContext &Ctx,
                                    ArchetypeType *Parent,
-                                   AssociatedTypeDecl *AssocType,
+                                   DependentMemberType *InterfaceType,
                                    SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                    Type Superclass,
                                    LayoutConstraint Layout) {
@@ -2660,18 +2660,18 @@ CanArchetypeType ArchetypeType::getNew(
       alignof(ArchetypeType), arena);
 
   return CanArchetypeType(new (mem) ArchetypeType(
-      Ctx, Parent, AssocType, ConformsTo, Superclass, Layout));
+      Ctx, Parent, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
 CanArchetypeType
 ArchetypeType::getNew(const ASTContext &Ctx,
-                      GenericEnvironment *genericEnvironment,
-                      Identifier Name,
+                      GenericEnvironment *GenericEnv,
+                      GenericTypeParamType *InterfaceType,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass,
                       LayoutConstraint Layout) {
   assert(!Superclass || Superclass->getClassOrBoundGenericClass());
-  assert(genericEnvironment && "missing generic environment for archetype");
+  assert(GenericEnv && "missing generic environment for archetype");
 
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
@@ -2683,7 +2683,7 @@ ArchetypeType::getNew(const ASTContext &Ctx,
       alignof(ArchetypeType), arena);
 
   return CanArchetypeType(new (mem) ArchetypeType(
-      Ctx, genericEnvironment, Name, ConformsTo, Superclass, Layout));
+      Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
 bool ArchetypeType::requiresClass() const {
@@ -2827,11 +2827,17 @@ static void collectFullName(const ArchetypeType *Archetype,
                 Archetype->getName().str().end());
 }
 
+AssociatedTypeDecl *ArchetypeType::getAssocType() const {
+  if (auto *depMemTy = InterfaceType->getAs<DependentMemberType>())
+    return depMemTy->getAssocType();
+  return nullptr;
+}
+
 Identifier ArchetypeType::getName() const {
   if (auto assocType = getAssocType())
     return assocType->getName();
 
-  return AssocTypeOrName.get<Identifier>();
+  return InterfaceType->castTo<GenericTypeParamType>()->getName();
 }
 
 std::string ArchetypeType::getFullName() const {
