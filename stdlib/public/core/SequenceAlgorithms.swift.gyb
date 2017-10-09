@@ -334,8 +334,23 @@ ${equivalenceExplanation}
   /// - Returns: `true` if this sequence and `other` contain the same elements
   ///   in the same order.
 %   end
-  @_inlineable
+  @inline(__always)
   public func elementsEqual<OtherSequence>(
+    _ other: OtherSequence${"," if preds else ""}
+%   if preds:
+    by areEquivalent: (Element, Element) throws -> Bool
+%   end
+  ) ${rethrows_}-> Bool
+    where
+    OtherSequence: Sequence,
+    OtherSequence.Element == Element {
+    return ${"try " if preds else ""}_elementsEqual(
+      other${", by: areEquivalent" if preds else ""})
+  }
+
+  @_versioned // FIXME(sil-serialize-all)
+  @_inlineable
+  internal func _elementsEqual<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
     by areEquivalent: (Element, Element) throws -> Bool
