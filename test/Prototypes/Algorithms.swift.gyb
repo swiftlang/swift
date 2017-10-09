@@ -602,32 +602,30 @@ extension LazyCollectionProtocol
 }
 
 extension Collection {
-    /// Returns the index of the first element in the collection
-    /// that matches the predicate.
-    ///
-    /// The collection must already be partitioned according to the
-    /// predicate, as if `self.partition(by: predicate)` had already
-    /// been called.
-    func partitionPoint(
-        where predicate: (Element) throws -> Bool
-        ) rethrows -> Index {
-        var n = distance(from: startIndex, to: endIndex)
-        var r = startIndex..<endIndex
+  /// Returns the index of the first element in the collection
+  /// that matches the predicate.
+  ///
+  /// The collection must already be partitioned according to the
+  /// predicate, as if `self.partition(by: predicate)` had already
+  /// been called.
+  func partitionPoint(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Index {
+    var n = distance(from: startIndex, to: endIndex)
+    var l = startIndex
 
-        while n > 0 {
-            let half = n / 2
-            let mid = index(r.lowerBound, offsetBy: half)
-            if try predicate(self[mid]) {
-                r = r.lowerBound..<mid
-                n = half
-            }
-            else {
-                r = index(after: mid)..<r.upperBound
-                n -= half + 1
-            }
-        }
-        return r.lowerBound
+    while n > 0 {
+      let half = n / 2
+      let mid = index(l, offsetBy: half)
+      if try predicate(self[mid]) {
+        n = half
+      } else {
+        l = index(after: mid)
+        n -= half + 1
+      }
     }
+    return l
+  }
 }
 
 //===--- Tests ------------------------------------------------------------===//
