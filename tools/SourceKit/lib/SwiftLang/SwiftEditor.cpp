@@ -1711,14 +1711,14 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
       // not update all open documents, since there could be too many of them.
     }
   }
-  
+
   // Update the old syntax map offsets to account for the replaced range.
   // Also set the initial AffectedRange to cover any tokens that
   // the replaced range intersected. This allows for clients that split
   // multi-line tokens at line boundaries, and ensure all parts of these tokens
   // will be cleared.
   Impl.AffectedRange = Impl.SyntaxMap.adjustForReplacement(Offset, Length, Str.size());
-  
+
   return Snapshot;
 }
 

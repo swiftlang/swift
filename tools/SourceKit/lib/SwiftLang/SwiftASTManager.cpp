@@ -399,9 +399,10 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   // clang's FileManager ?
   std::string PrimaryFile =
     SwiftLangSupport::resolvePathSymlinks(UnresolvedPrimaryFile);
-  Invocation.getFrontendOptions().Inputs.transformInputFilenames( [] (std::string s) -> std::string {
-    return SwiftLangSupport::resolvePathSymlinks(s);
-  });
+  Invocation.getFrontendOptions().Inputs.transformInputFilenames(
+      [](std::string s) -> std::string {
+        return SwiftLangSupport::resolvePathSymlinks(s);
+      });
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;
@@ -426,8 +427,10 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
 
   if (!PrimaryFile.empty()) {
     Optional<unsigned> PrimaryIndex;
-    for (auto i : indices(Invocation.getFrontendOptions().Inputs.getInputFilenames())) {
-      auto &CurFile = Invocation.getFrontendOptions().Inputs.getInputFilenames()[i];
+    for (auto i :
+         indices(Invocation.getFrontendOptions().Inputs.getInputFilenames())) {
+      auto &CurFile =
+          Invocation.getFrontendOptions().Inputs.getInputFilenames()[i];
       if (PrimaryFile == CurFile) {
         PrimaryIndex = i;
         break;
@@ -440,7 +443,8 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
       Error = OS.str();
       return true;
     }
-    Invocation.getFrontendOptions().Inputs.setPrimaryInput(SelectedInput(*PrimaryIndex));
+    Invocation.getFrontendOptions().Inputs.setPrimaryInput(
+        SelectedInput(*PrimaryIndex));
   }
 
   return Err;
@@ -653,8 +657,10 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
 
   // Check if the inputs changed.
   SmallVector<BufferStamp, 8> InputStamps;
-  InputStamps.reserve(Invok.Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
-  for (auto &File : Invok.Opts.Invok.getFrontendOptions().Inputs.getInputFilenames()) {
+  InputStamps.reserve(
+      Invok.Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
+  for (auto &File :
+       Invok.Opts.Invok.getFrontendOptions().Inputs.getInputFilenames()) {
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
       if (Snap->getFilename() == File) {
@@ -666,7 +672,8 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
     if (!FoundSnapshot)
       InputStamps.push_back(MgrImpl.getBufferStamp(File));
   }
-  assert(InputStamps.size() == Invok.Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
+  assert(InputStamps.size() ==
+         Invok.Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
   if (Stamps != InputStamps)
     return true;
 
@@ -738,7 +745,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
 
   SmallVector<FileContent, 8> Contents;
-  for (auto &File : Opts.Invok.getFrontendOptions().Inputs.getInputFilenames()) {
+  for (auto &File :
+       Opts.Invok.getFrontendOptions().Inputs.getInputFilenames()) {
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
       if (Snap->getFilename() == File) {
@@ -758,7 +766,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     }
     Contents.push_back(std::move(Content));
   }
-  assert(Contents.size() == Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
+  assert(Contents.size() ==
+         Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
 
   for (auto &Content : Contents)
     Stamps.push_back(Content.Stamp);

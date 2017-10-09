@@ -44,8 +44,10 @@ private:
 
 public:
   bool hasUniqueInputFilename() const { return InputFilenames.size() == 1; }
-  const std::string &getFilenameOfFirstInput() const { return InputFilenames[0]; }
-  
+  const std::string &getFilenameOfFirstInput() const {
+    return InputFilenames[0];
+  }
+
   void setMainExecutablePath(const std::string &Path) {
     MainExecutablePath = Path;
   }

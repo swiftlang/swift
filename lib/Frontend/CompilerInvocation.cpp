@@ -325,16 +325,20 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     return true;
   }
 
-  bool TreatAsSIL = Args.hasArg(OPT_parse_sil) || Opts.Inputs.shouldTreatAsSIL();
+  bool TreatAsSIL =
+      Args.hasArg(OPT_parse_sil) || Opts.Inputs.shouldTreatAsSIL();
 
   bool TreatAsLLVM = Opts.Inputs.shouldTreatAsLLVM();
 
-  if (Opts.Inputs.verifyInputs(Diags, TreatAsSIL, Opts.RequestedAction == FrontendOptions::REPL, Opts.RequestedAction == FrontendOptions::NoneAction)) {
+  if (Opts.Inputs.verifyInputs(
+          Diags, TreatAsSIL, Opts.RequestedAction == FrontendOptions::REPL,
+          Opts.RequestedAction == FrontendOptions::NoneAction)) {
     return true;
   }
 
   if (Opts.RequestedAction == FrontendOptions::Immediate) {
-    Opts.ImmediateArgv.push_back(Opts.Inputs.getFilenameOfFirstInput()); // argv[0]
+    Opts.ImmediateArgv.push_back(
+        Opts.Inputs.getFilenameOfFirstInput()); // argv[0]
     if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
       for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
         Opts.ImmediateArgv.push_back(A->getValue(i));
@@ -451,11 +455,12 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
       // First, if we're reading from stdin and we don't have a directory,
       // output to stdout.
-      if (Opts.Inputs.isReadingFromStdin() &&  Opts.OutputFilenames.empty())
+      if (Opts.Inputs.isReadingFromStdin() && Opts.OutputFilenames.empty())
         Opts.setOutputFilenameToStdout();
       else {
         // We have a suffix, so determine an appropriate name.
-        StringRef BaseName = Opts.Inputs.baseNameOfOutput(Args, Opts.ModuleName);
+        StringRef BaseName =
+            Opts.Inputs.baseNameOfOutput(Args, Opts.ModuleName);
         llvm::SmallString<128> Path(Opts.getSingleOutputFilename());
         llvm::sys::path::append(Path, BaseName);
         llvm::sys::path::replace_extension(Path, Suffix);
@@ -702,7 +707,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
     Opts.SerializeBridgingHeader |=
-      !Opts.Inputs.getPrimaryInput() && !Opts.ModuleOutputPath.empty();
+        !Opts.Inputs.getPrimaryInput() && !Opts.ModuleOutputPath.empty();
   }
 
   for (const Arg *A : Args.filtered(OPT_import_module)) {
@@ -1432,7 +1437,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // in other classes.
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
     Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (FrontendOpts.Inputs.getPrimaryInput() && FrontendOpts.Inputs.getPrimaryInput()->isFilename()) {
+  } else if (FrontendOpts.Inputs.getPrimaryInput() &&
+             FrontendOpts.Inputs.getPrimaryInput()->isFilename()) {
     unsigned Index = FrontendOpts.Inputs.getPrimaryInput()->Index;
     Opts.MainInputFilename = FrontendOpts.Inputs.getInputFilenames()[Index];
   } else if (FrontendOpts.Inputs.hasUniqueInputFilename()) {

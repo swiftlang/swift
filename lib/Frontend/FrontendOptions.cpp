@@ -13,17 +13,16 @@
 #include "swift/Frontend/FrontendOptions.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Option/Options.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
-
 
 using namespace swift;
 using namespace llvm::opt;
@@ -31,20 +30,20 @@ using namespace llvm::opt;
 bool FrontendInputs::shouldTreatAsLLVM() const {
   if (hasUniqueInputFilename()) {
     StringRef Input(getFilenameOfFirstInput());
-    return
-    llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
-    llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
+    return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
+           llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
   }
   return false;
 }
 
-StringRef FrontendInputs::baseNameOfOutput(const llvm::opt::ArgList &Args, StringRef ModuleName) const {
+StringRef FrontendInputs::baseNameOfOutput(const llvm::opt::ArgList &Args,
+                                           StringRef ModuleName) const {
   StringRef pifn = primaryInputFilenameIfAny();
   if (!pifn.empty()) {
     return llvm::sys::path::stem(pifn);
   }
   bool UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name);
-  if (!UserSpecifiedModuleName &&  hasUniqueInputFilename()) {
+  if (!UserSpecifiedModuleName && hasUniqueInputFilename()) {
     return llvm::sys::path::stem(getFilenameOfFirstInput());
   }
   return ModuleName;
@@ -66,7 +65,9 @@ bool FrontendInputs::shouldTreatAsSIL() const {
   return false;
 }
 
-bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool isREPLRequested, bool isNoneRequested) const {
+bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
+                                  bool isREPLRequested,
+                                  bool isNoneRequested) const {
   if (isREPLRequested) {
     if (hasInputFilenames()) {
       Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
@@ -78,7 +79,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
     for (unsigned i = 0, e = inputFilenameCount(); i != e; ++i) {
       if (i == getPrimaryInput()->Index)
         continue;
-      
+
       StringRef File(getInputFilenames()[i]);
       if (!llvm::sys::path::extension(File).endswith(SIB_EXTENSION)) {
         Diags.diagnose(SourceLoc(),
@@ -100,18 +101,21 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
   return false;
 }
 
-void FrontendInputs::transformInputFilenames(const llvm::function_ref<std::string(std::string)> &fn) {
+void FrontendInputs::transformInputFilenames(
+    const llvm::function_ref<std::string(std::string)> &fn) {
   for (auto &InputFile : InputFilenames) {
     InputFile = fn(InputFile);
   }
 }
 
-void FrontendInputs::setInputFilenamesAndPrimaryInput(DiagnosticEngine &Diags, llvm::opt::ArgList &Args) {
+void FrontendInputs::setInputFilenamesAndPrimaryInput(
+    DiagnosticEngine &Diags, llvm::opt::ArgList &Args) {
   if (const Arg *filelistPath = Args.getLastArg(options::OPT_filelist)) {
     readInputFileList(Diags, Args, filelistPath);
     return;
   }
-  for (const Arg *A : Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
+  for (const Arg *A :
+       Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
     if (A->getOption().matches(options::OPT_INPUT)) {
       addInputFilename(A->getValue());
     } else if (A->getOption().matches(options::OPT_primary_file)) {
@@ -123,7 +127,6 @@ void FrontendInputs::setInputFilenamesAndPrimaryInput(DiagnosticEngine &Diags, l
   }
 }
 
-
 /// Try to read an input file list file.
 ///
 /// Returns false on error.
@@ -131,21 +134,21 @@ void FrontendInputs::readInputFileList(DiagnosticEngine &diags,
                                        llvm::opt::ArgList &Args,
                                        const llvm::opt::Arg *filelistPath) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-  llvm::MemoryBuffer::getFile(filelistPath->getValue());
+      llvm::MemoryBuffer::getFile(filelistPath->getValue());
   if (!buffer) {
     diags.diagnose(SourceLoc(), diag::cannot_open_file,
                    filelistPath->getValue(), buffer.getError().message());
     return;
   }
-  
+
   const Arg *primaryFileArg = Args.getLastArg(options::OPT_primary_file);
   unsigned primaryFileIndex = 0;
-  
+
   bool foundPrimaryFile = false;
-  
+
   for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
     addInputFilename(line);
-    
+
     if (foundPrimaryFile || primaryFileArg == nullptr)
       continue;
     if (line == primaryFileArg->getValue())
@@ -153,22 +156,17 @@ void FrontendInputs::readInputFileList(DiagnosticEngine &diags,
     else
       ++primaryFileIndex;
   }
-  
+
   if (primaryFileArg && !foundPrimaryFile) {
     diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
                    primaryFileArg->getValue(), filelistPath->getValue());
     return;
   }
-  
+
   if (primaryFileArg)
     setPrimaryInput(SelectedInput(primaryFileIndex));
   assert(!Args.hasArg(options::OPT_INPUT) && "mixing -filelist with inputs");
 }
-
-
-
-
-
 
 bool FrontendOptions::actionHasOutput() const {
   switch (RequestedAction) {
@@ -256,22 +254,21 @@ void FrontendOptions::forAllOutputPaths(
   }
 }
 
-
-void FrontendOptions::setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args) {
+void FrontendOptions::setModuleName(DiagnosticEngine &Diags,
+                                    const llvm::opt::ArgList &Args) {
   const Arg *A = Args.getLastArg(options::OPT_module_name);
   if (A) {
     ModuleName = A->getValue();
-  }
-  else if (ModuleName.empty()) {
+  } else if (ModuleName.empty()) {
     // The user did not specify a module name, so determine a default fallback
     // based on other options.
-    
+
     // Note: this code path will only be taken when running the frontend
     // directly; the driver should always pass -module-name when invoking the
     // frontend.
     ModuleName = determineFallbackModuleName();
   }
-  
+
   if (Lexer::isIdentifier(ModuleName) &&
       (ModuleName != STDLIB_NAME || ParseStdlib)) {
     return;
@@ -280,19 +277,17 @@ void FrontendOptions::setModuleName(DiagnosticEngine &Diags, const llvm::opt::Ar
     ModuleName = "main";
     return;
   }
-  auto DID = (ModuleName == STDLIB_NAME)
-  ? diag::error_stdlib_module_name
-  : diag::error_bad_module_name;
+  auto DID = (ModuleName == STDLIB_NAME) ? diag::error_stdlib_module_name
+                                         : diag::error_bad_module_name;
   Diags.diagnose(SourceLoc(), DID, ModuleName, A == nullptr);
   ModuleName = "__bad__";
 }
-
 
 StringRef FrontendOptions::originalPath() const {
   if (hasNamedOutputFile())
     // Put the serialized diagnostics file next to the output file.
     return getSingleOutputFilename();
-  
+
   StringRef fn = Inputs.primaryInputFilenameIfAny();
   // If we have a primary input, so use that as the basis for the name of the
   // serialized diagnostics file, otherwise fall back on the
@@ -314,7 +309,9 @@ StringRef FrontendOptions::determineFallbackModuleName() const {
   }
   StringRef OutputFilename = getSingleOutputFilename();
   bool useOutputFilename = isOutputFilePlainFile();
-  return llvm::sys::path::stem(useOutputFilename ? OutputFilename : StringRef(Inputs.getFilenameOfFirstInput()));
+  return llvm::sys::path::stem(
+      useOutputFilename ? OutputFilename
+                        : StringRef(Inputs.getFilenameOfFirstInput()));
 }
 
 /// Try to read an output file list file.
@@ -322,7 +319,7 @@ static void readOutputFileList(DiagnosticEngine &diags,
                                std::vector<std::string> &outputFiles,
                                const llvm::opt::Arg *filelistPath) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-  llvm::MemoryBuffer::getFile(filelistPath->getValue());
+      llvm::MemoryBuffer::getFile(filelistPath->getValue());
   if (!buffer) {
     diags.diagnose(SourceLoc(), diag::cannot_open_file,
                    filelistPath->getValue(), buffer.getError().message());
@@ -332,19 +329,23 @@ static void readOutputFileList(DiagnosticEngine &diags,
   }
 }
 
-void FrontendOptions::setOutputFileList(swift::DiagnosticEngine &Diags, const llvm::opt::ArgList &Args) {
+void FrontendOptions::setOutputFileList(swift::DiagnosticEngine &Diags,
+                                        const llvm::opt::ArgList &Args) {
   if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
     readOutputFileList(Diags, OutputFilenames, A);
-    assert(!Args.hasArg(options::OPT_o) && "don't use -o with -output-filelist");
+    assert(!Args.hasArg(options::OPT_o) &&
+           "don't use -o with -output-filelist");
   } else {
     OutputFilenames = Args.getAllArgValues(options::OPT_o);
   }
 }
 
 bool FrontendOptions::isOutputFileDirectory() const {
-  return hasNamedOutputFile() && llvm::sys::fs::is_directory(getSingleOutputFilename());
+  return hasNamedOutputFile() &&
+         llvm::sys::fs::is_directory(getSingleOutputFilename());
 }
 
 bool FrontendOptions::isOutputFilePlainFile() const {
-  return hasNamedOutputFile() && !llvm::sys::fs::is_directory(getSingleOutputFilename());
+  return hasNamedOutputFile() &&
+         !llvm::sys::fs::is_directory(getSingleOutputFilename());
 }

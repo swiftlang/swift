@@ -135,7 +135,8 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
     out << escape(targetName) << " :";
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!
-    for (auto const &path : reversePathSortedFilenames(opts.Inputs.getInputFilenames()))
+    for (auto const &path :
+         reversePathSortedFilenames(opts.Inputs.getInputFilenames()))
       out << ' ' << escape(path);
     // Then print dependencies we've picked up during compilation.
     for (auto const &path :
@@ -527,15 +528,16 @@ static bool performCompile(CompilerInstance &Instance,
     auto &ImporterOpts = Invocation.getClangImporterOptions();
     auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
     if (!PCHOutDir.empty()) {
-      ImporterOpts.BridgingHeader = Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput();
+      ImporterOpts.BridgingHeader =
+          Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput();
       // Create or validate a persistent PCH.
       auto SwiftPCHHash = Invocation.getPCHHash();
       auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
       return !PCH.hasValue();
     }
     return clangImporter->emitBridgingPCH(
-      Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
-      opts.getSingleOutputFilename());
+        Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
+        opts.getSingleOutputFilename());
   }
 
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
@@ -548,12 +550,13 @@ static bool performCompile(CompilerInstance &Instance,
     assert(Invocation.getFrontendOptions().Inputs.hasUniqueInputFilename() &&
            "We expect a single input for bitcode input!");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput());
+        llvm::MemoryBuffer::getFileOrSTDIN(
+            Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput());
     if (!FileBufOrErr) {
-      Instance.getASTContext().Diags.diagnose(SourceLoc(),
-                                              diag::error_open_input_file,
-                                              Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
-                                              FileBufOrErr.getError().message());
+      Instance.getASTContext().Diags.diagnose(
+          SourceLoc(), diag::error_open_input_file,
+          Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
+          FileBufOrErr.getError().message());
       return true;
     }
     llvm::MemoryBuffer *MainFile = FileBufOrErr.get().get();
@@ -565,10 +568,10 @@ static bool performCompile(CompilerInstance &Instance,
     if (!Module) {
       // TODO: Translate from the diagnostic info to the SourceManager location
       // if available.
-      Instance.getASTContext().Diags.diagnose(SourceLoc(),
-                                              diag::error_parse_input_file,
-                                              Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
-                                              Err.getMessage());
+      Instance.getASTContext().Diags.diagnose(
+          SourceLoc(), diag::error_parse_input_file,
+          Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
+          Err.getMessage());
       return true;
     }
 
