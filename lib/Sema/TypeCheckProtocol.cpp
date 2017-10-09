@@ -1152,7 +1152,7 @@ RequirementEnvironment::RequirementEnvironment(
   // because both define the capabilities of the requirement.
   GenericSignatureBuilder builder(
            ctx,
-           TypeChecker::LookUpConformance(tc, conformanceDC));
+           LookUpConformanceInModule(conformanceDC->getParentModule()));
 
   auto source =
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();

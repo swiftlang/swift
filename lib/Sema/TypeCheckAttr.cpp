@@ -1689,7 +1689,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
   // Form a new generic signature based on the old one.
   GenericSignatureBuilder Builder(D->getASTContext(),
-                                  TypeChecker::LookUpConformance(TC, DC));
+                            LookUpConformanceInModule(DC->getParentModule()));
 
   // First, add the old generic signature.
   Builder.addGenericSignature(genericSig);
