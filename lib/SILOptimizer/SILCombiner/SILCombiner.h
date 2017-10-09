@@ -237,6 +237,9 @@ public:
   SILInstruction *visitUnreachableInst(UnreachableInst *UI);
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
   SILInstruction *visitEnumInst(EnumInst *EI);
+      
+  SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
+  SILInstruction *visitInitExistentialRefInst(InitExistentialRefInst *IER);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
 
   /// Instruction visitor helpers.

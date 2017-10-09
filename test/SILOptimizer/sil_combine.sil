@@ -2081,6 +2081,19 @@ bb0(%0 : $B, %1 : $@sil_unowned B, %2 : $AnyObject, %3: $@sil_unmanaged AnyObjec
   return %9999 : $(B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject)
 }
 
+// CHECK-LABEL: sil @collapse_init_open_init_ref_cast
+// CHECK:       bb0([[Ref:%.*]]: $MyClass):
+// CHECK-NEXT:     init_existential_ref
+// CHECK-NEXT:     return
+sil @collapse_init_open_init_ref_cast : $@convention(thin) (MyClass) -> (AnyObject) {
+bb0(%0: $MyClass):
+  %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %3 = init_existential_ref %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject, $AnyObject
+  return %3 : $AnyObject
+}
+
+
 // CHECK-LABEL: sil @collapse_existential_pack_unpack_unchecked_ref_cast
 // CHECK:       bb0([[Ref:%.*]]: $MyClass):
 // CHECK-NOT:     init_existential_ref
@@ -3388,5 +3401,23 @@ bb2:                                                // Preds: bb0
 
 bb3(%16 : $Int32):                                  // Preds: bb1 bb2
   return %16 : $Int32                               // id: %17
+}
+
+
+
+// CHECK-LABEL: sil @mark_dependence_base
+// CHECK: bb0(
+// CHECK-NOT: init_existential_ref
+// CHECK-NOT: enum
+// CHECK-NEXT: mark_dependence
+// CHECK-NEXT: load
+// CHECK: return
+sil @mark_dependence_base : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64, %1 : $B):
+  %x = init_existential_ref %1 : $B : $B, $AnyObject
+  %2 = enum $Optional<AnyObject>, #Optional.some!enumelt.1, %x : $AnyObject
+  %3 = mark_dependence %0 : $*Builtin.Int64 on %2 : $Optional<AnyObject>
+  %4 = load %3 : $*Builtin.Int64
+  return %4 : $Builtin.Int64
 }
 
