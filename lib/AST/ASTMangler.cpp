@@ -533,25 +533,6 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   }
 }
 
-/// Returns true if one of the ancestor DeclContexts of \p D is either marked
-/// private or is a local context.
-static bool isInPrivateOrLocalContext(const ValueDecl *D) {
-  const DeclContext *DC = D->getDeclContext();
-  if (!DC->isTypeContext()) {
-    assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
-           "unexpected context kind");
-    return DC->isLocalContext();
-  }
-
-  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (nominal == nullptr)
-    return false;
-
-  if (nominal->getFormalAccess() <= AccessLevel::FilePrivate)
-    return true;
-  return isInPrivateOrLocalContext(nominal);
-}
-
 static bool getUnnamedParamIndex(const ParameterList *ParamList,
                                  const ParamDecl *D,
                                  unsigned &UnnamedIndex) {
@@ -593,11 +574,8 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
 }
 
 static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
-  if (!decl->hasAccess() ||
-      decl->getFormalAccess() > AccessLevel::FilePrivate ||
-      isInPrivateOrLocalContext(decl)) {
+  if (!decl->isOutermostPrivateOrFilePrivateScope())
     return StringRef();
-  }
 
   // Mangle non-local private declarations with a textual discriminator
   // based on their enclosing file.
