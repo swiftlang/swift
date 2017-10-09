@@ -51,6 +51,9 @@ struct SyntaxFactory {
   static UnknownSyntax
   makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens);
 
+  static Optional<Syntax>
+  createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements);
+
 % for node in SYNTAX_NODES:
 %   if node.children:
 %     child_params = []

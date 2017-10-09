@@ -152,6 +152,9 @@ public:
   /// Returns true if the node is "present" in the source.
   bool isPresent() const;
 
+
+  bool isToken() const;
+
   /// Print the syntax node with full fidelity to the given output stream.
   void print(llvm::raw_ostream &OS) const;
 
@@ -166,6 +169,10 @@ public:
     return Root == Other.Root && Data == Other.Data;
   }
 
+  static bool classof(const Syntax *S) {
+    // Trivially true.
+    return true;
+  }
   // TODO: hasSameStructureAs ?
 };
 
