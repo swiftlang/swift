@@ -263,55 +263,5 @@ _ = sup.init()
 sup = Sub.self
 _ = sup.init()
 
-// https://bugs.swift.org/browse/SR-617
-protocol SelfMetadataTest {
-  associatedtype T = Int
-
-  func staticTypeOfSelf() -> Any
-  func staticTypeOfSelfTakesT(_: T) -> Any
-}
-
-extension SelfMetadataTest {
-  func staticTypeOfSelf() -> Any {
-    return Self.self
-  }
-
-  func staticTypeOfSelfTakesT(_: T) -> Any {
-    return Self.self
-  }
-
-  func staticTypeOfSelfNotAWitness() -> Any {
-    return Self.self
-  }
-}
-
-class SelfMetadataBase : SelfMetadataTest {}
-
-class SelfMetadataDerived : SelfMetadataBase {}
-
-func testSelfMetadata<T : SelfMetadataTest>(_ x: T, _ t: T.T) {
-  print(x.staticTypeOfSelf())
-  print(x.staticTypeOfSelfTakesT(t))
-  print(x.staticTypeOfSelfNotAWitness())
-}
-
-// CHECK: SelfMetadataBase
-// CHECK: SelfMetadataBase
-// CHECK: SelfMetadataBase
-testSelfMetadata(SelfMetadataBase(), 0)
-
-// CHECK: SelfMetadataBase
-// CHECK: SelfMetadataBase
-// CHECK: SelfMetadataBase
-testSelfMetadata(SelfMetadataDerived() as SelfMetadataBase, 0)
-
-// This is the interesting case -- make sure the static type of 'Self'
-// is correctly passed on from the call site to the extension method
-
-// CHECK: SelfMetadataDerived
-// CHECK: SelfMetadataBase
-// CHECK: SelfMetadataDerived
-testSelfMetadata(SelfMetadataDerived(), 0)
-
 // CHECK: DONE
 print("DONE")
