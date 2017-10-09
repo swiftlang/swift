@@ -191,13 +191,15 @@ public:
   
   // Primary input writers
   
-  void setPrimaryInput(SelectedInput si) {
-    clearPrimaryInput();
-    getMutablePrimaryInputs().push_back(si);
-  }
-  void clearPrimaryInput() {
+  void clearPrimaryInputs() {
     getMutablePrimaryInputs().clear();
   }
+  
+  void setPrimaryInput(SelectedInput si) {
+    clearPrimaryInputs();
+    getMutablePrimaryInputs().push_back(si);
+  }
+
   void setPrimaryInputForInputFilename(const std::string &inputFilename) {
     setPrimaryInput(
                     !inputFilename.empty() && inputFilename != "-"

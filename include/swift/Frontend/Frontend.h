@@ -250,11 +250,7 @@ public:
   void addInputBuffer(llvm::MemoryBuffer *Buf) {
     FrontendOpts.Inputs.addInputBuffer(Buf);
   }
-    
-  void setPrimaryInput(SelectedInput pi) {
-    FrontendOpts.Inputs.setPrimaryInput(pi);
-  }
-
+  
   void clearInputs() {
     FrontendOpts.Inputs.clearInputs();
   }
