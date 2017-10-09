@@ -175,6 +175,15 @@ class DiscardableResult : NSObject {
   @objc init(evenMoreFun: ()) { super.init() }
 }
 
+// CHECK-LABEL: @interface InheritedInitializersRequired
+// CHECK-NEXT: - (nonnull instancetype)initWithEvenMoreFun OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
+// CHECK-NEXT: + (nonnull instancetype)new SWIFT_UNAVAILABLE;
+// CHECK-NEXT: @end
+@objc class InheritedInitializersRequired : InheritedInitializers {
+  @objc required init(evenMoreFun: ()) { super.init() }
+}
+
 // NEGATIVE-NOT: NotObjC
 class NotObjC {}
 
