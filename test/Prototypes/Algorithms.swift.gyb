@@ -60,6 +60,25 @@ extension ${Slice} : MutableCollectionAlgorithms {  }
 
 /// In the stdlib, this would simply be MutableCollection
 extension MutableCollectionAlgorithms {
+  /// Swaps the elements of the two given subranges, up to the upper bound of
+  /// the smaller subrange. The returned indices are the ends of the two ranges
+  /// that were actually swapped.
+  ///
+  ///     Input:
+  ///     [a b c d e f g h i j k l m n o p]
+  ///      ^^^^^^^         ^^^^^^^^^^^^^
+  ///      lhs             rhs
+  ///
+  ///     Output:
+  ///     [i j k l e f g h a b c d m n o p]
+  ///             ^               ^
+  ///             p               q
+  ///
+  /// - Precondition: !lhs.isEmpty && !rhs.isEmpty
+  /// - Postcondition: For returned indices `(p, q)`:
+  ///   - distance(from: lhs.lowerBound, to: p) ==
+  ///       distance(from: rhs.lowerBound, to: q)
+  ///   - p == lhs.upperBound || q == rhs.upperBound
   @inline(__always)
   internal mutating func _swapNonemptySubrangePrefixes(
     _ lhs: Range<Index>, _ rhs: Range<Index>
@@ -145,6 +164,21 @@ extension MutableCollectionAlgorithms {
 
 extension MutableCollection where Self: BidirectionalCollection {
 
+  /// Reverses the elements of the collection, moving from each end until
+  /// `limit` is reached from either direction. The returned indices are the
+  /// start and end of the range of unreversed elements.
+  ///
+  ///     Input:
+  ///     [a b c d e f g h i j k l m n o p]
+  ///             ^
+  ///           limit
+  ///     Output:
+  ///     [p o n m e f g h i j k l d c b a]
+  ///             ^               ^
+  ///             f               l
+  ///
+  /// - Postcondition: For returned indices `(f, l)`:
+  ///   `f == limit || l == limit`
   @inline(__always)
   @discardableResult
   internal mutating func _reverseUntil(_ limit: Index) -> (Index, Index) {
