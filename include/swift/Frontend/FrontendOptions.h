@@ -169,11 +169,19 @@ public:
   bool haveAPrimaryInputFile() const {
    return hasPrimaryInput() && getOptionalPrimaryInput()->isFilename();
   }
+  
+  bool hasUniquePrimaryInputFilename() const {
+    return countOfPrimaryInputs() == 1  &&  getPrimaryInputs()[0].isFilename();
+  }
+  
+  StringRef primaryInputFilenameIfUnique() const {
+    return hasUniqueInputFilename() ? StringRef(getInputFilenames()[getPrimaryInputs()[0].Index]) : StringRef();
+  }
 
   Optional<unsigned> primaryInputFileIndex() const {
     return haveAPrimaryInputFile() ? Optional<unsigned>(getOptionalPrimaryInput()->Index) : None;
   }
-  
+  // Will be supplanted by others
   StringRef primaryInputFilenameIfAny() const {
     if (auto Index = primaryInputFileIndex()) {
       return getInputFilenames()[*Index];
@@ -181,6 +189,7 @@ public:
     return StringRef();
   }
   
+public:
   // Multi-facet readers
   StringRef baseNameOfOutput(const llvm::opt::ArgList &Args, StringRef ModuleName) const;
   bool shouldTreatAsSIL() const;
