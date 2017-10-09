@@ -1941,6 +1941,11 @@ namespace {
     void recordTypeWitness(AssociatedTypeDecl *assocType, Type type,
                            TypeDecl *typeDecl, bool performRedeclarationCheck);
 
+    /// Enforce restrictions on non-final classes witnessing requirements
+    /// involving the protocol 'Self' type.
+    void checkNonFinalClassWitness(ValueDecl *requirement,
+                                   ValueDecl *witness);
+
     /// Resolve a (non-type) witness via name lookup.
     ResolveWitnessResult resolveWitnessViaLookup(ValueDecl *requirement);
 
@@ -3035,6 +3040,115 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
   return None;
 }
 
+void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
+                                                   ValueDecl *witness) {
+  auto *classDecl = Adoptee->getClassOrBoundGenericClass();
+
+  // If we have an initializer requirement and the conforming type
+  // is a non-final class, the witness must be 'required'.
+  // We exempt Objective-C initializers from this requirement
+  // because there is no equivalent to 'required' in Objective-C.
+  if (auto ctor = dyn_cast<ConstructorDecl>(witness)) {
+    if (!ctor->isRequired() &&
+        !ctor->getDeclContext()->getAsProtocolOrProtocolExtensionContext() &&
+        !ctor->hasClangNode()) {
+      // FIXME: We're not recovering (in the AST), so the Fix-It
+      // should move.
+      diagnoseOrDefer(requirement, false,
+        [ctor, requirement](NormalProtocolConformance *conformance) {
+          bool inExtension = isa<ExtensionDecl>(ctor->getDeclContext());
+          auto &diags = ctor->getASTContext().Diags;
+          auto diag = diags.diagnose(ctor->getLoc(),
+                                     diag::witness_initializer_not_required,
+                                     requirement->getFullName(),
+                                     inExtension,
+                                     conformance->getType());
+          if (!ctor->isImplicit() && !inExtension)
+            diag.fixItInsert(ctor->getStartLoc(), "required ");
+        });
+    }
+  }
+
+  // Check whether this requirement uses Self in a way that might
+  // prevent conformance from succeeding.
+  auto selfKind = Proto->findProtocolSelfReferences(requirement,
+                                       /*allowCovariantParameters=*/false,
+                                       /*skipAssocTypes=*/true);
+
+  if (selfKind.other) {
+    // References to Self in a position where subclasses cannot do
+    // the right thing. Complain if the adoptee is a non-final
+    // class.
+    diagnoseOrDefer(requirement, false,
+      [witness, requirement](NormalProtocolConformance *conformance) {
+        auto proto = conformance->getProtocol();
+        auto &diags = proto->getASTContext().Diags;
+        diags.diagnose(witness->getLoc(), diag::witness_self_non_subtype,
+                       proto->getDeclaredType(), requirement->getFullName(),
+                       conformance->getType());
+      });
+  } else if (selfKind.result) {
+    // The reference to Self occurs in the result type. A non-final class
+    // can satisfy this requirement with a method that returns Self.
+
+    // If the function has a dynamic Self, it's okay.
+    if (auto func = dyn_cast<FuncDecl>(witness)) {
+      if (!func->hasDynamicSelf()) {
+        diagnoseOrDefer(requirement, false,
+          [witness, requirement](NormalProtocolConformance *conformance) {
+            auto proto = conformance->getProtocol();
+            auto &diags = proto->getASTContext().Diags;
+            diags.diagnose(witness->getLoc(),
+                           diag::witness_requires_dynamic_self,
+                           requirement->getFullName(),
+                           conformance->getType(),
+                           proto->getDeclaredType());
+          });
+      }
+
+    // Constructors conceptually also have a dynamic Self
+    // return type, so they're okay.
+    } else if (!isa<ConstructorDecl>(witness)) {
+      diagnoseOrDefer(requirement, false,
+        [witness, requirement](NormalProtocolConformance *conformance) {
+          auto proto = conformance->getProtocol();
+          auto &diags = proto->getASTContext().Diags;
+          diags.diagnose(witness->getLoc(), diag::witness_self_non_subtype,
+                         proto->getDeclaredType(),
+                         requirement->getFullName(),
+                         conformance->getType());
+        });
+    }
+  } else if (selfKind.requirement) {
+    if (auto constraint = getAdopteeSelfSameTypeConstraint(classDecl,
+                                                           witness)) {
+      // A "Self ==" constraint works incorrectly with subclasses. Complain.
+      auto proto = Conformance->getProtocol();
+      auto &diags = proto->getASTContext().Diags;
+      diags.diagnose(witness->getLoc(),
+                     diag::witness_self_same_type,
+                     witness->getDescriptiveKind(),
+                     witness->getFullName(),
+                     Conformance->getType(),
+                     requirement->getDescriptiveKind(),
+                     requirement->getFullName(),
+                     proto->getDeclaredType());
+
+      if (auto requirementRepr = *constraint) {
+        diags.diagnose(requirementRepr->getEqualLoc(),
+                       diag::witness_self_weaken_same_type,
+                       requirementRepr->getFirstType(),
+                       requirementRepr->getSecondType())
+          .fixItReplace(requirementRepr->getEqualLoc(), ":");
+      }
+    }
+  }
+
+  // A non-final class can model a protocol requirement with a
+  // contravariant Self, because here the witness will always have
+  // a more general type than the requirement.
+}
+
 ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
@@ -3245,112 +3359,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
     }
 
-    ClassDecl *classDecl = Adoptee->getClassOrBoundGenericClass();
-
-    if (classDecl && !classDecl->isFinal()) {
-      // If we have an initializer requirement and the conforming type
-      // is a non-final class, the witness must be 'required'.
-      // We exempt Objective-C initializers from this requirement
-      // because there is no equivalent to 'required' in Objective-C.
-      if (auto ctor = dyn_cast<ConstructorDecl>(best.Witness)) {
-        if (!ctor->isRequired() &&
-            !ctor->getDeclContext()->getAsProtocolOrProtocolExtensionContext() &&
-            !ctor->hasClangNode()) {
-          // FIXME: We're not recovering (in the AST), so the Fix-It
-          // should move.
-          diagnoseOrDefer(requirement, false,
-            [ctor, requirement](NormalProtocolConformance *conformance) {
-              bool inExtension = isa<ExtensionDecl>(ctor->getDeclContext());
-              auto &diags = ctor->getASTContext().Diags;
-              auto diag = diags.diagnose(ctor->getLoc(),
-                                         diag::witness_initializer_not_required,
-                                         requirement->getFullName(), 
-                                         inExtension,
-                                         conformance->getType());
-              if (!ctor->isImplicit() && !inExtension)
-                diag.fixItInsert(ctor->getStartLoc(), "required ");
-            });
-        }
+    if (auto *classDecl = Adoptee->getClassOrBoundGenericClass()) {
+      if (!classDecl->isFinal()) {
+        checkNonFinalClassWitness(requirement, witness);
       }
-
-      // Check whether this requirement uses Self in a way that might
-      // prevent conformance from succeeding.
-      auto selfKind = Proto->findProtocolSelfReferences(requirement,
-                                           /*allowCovariantParameters=*/false,
-                                           /*skipAssocTypes=*/true);
-
-      if (selfKind.other) {
-        // References to Self in a position where subclasses cannot do
-        // the right thing. Complain if the adoptee is a non-final
-        // class.
-        diagnoseOrDefer(requirement, false,
-          [witness, requirement](NormalProtocolConformance *conformance) {
-            auto proto = conformance->getProtocol();
-            auto &diags = proto->getASTContext().Diags;
-            diags.diagnose(witness->getLoc(), diag::witness_self_non_subtype,
-                           proto->getDeclaredType(), requirement->getFullName(),
-                           conformance->getType());
-          });
-      } else if (selfKind.result) {
-        // The reference to Self occurs in the result type. A non-final class 
-        // can satisfy this requirement with a method that returns Self.
-
-        // If the function has a dynamic Self, it's okay.
-        if (auto func = dyn_cast<FuncDecl>(best.Witness)) {
-          if (!func->hasDynamicSelf()) {
-            diagnoseOrDefer(requirement, false,
-              [witness, requirement](NormalProtocolConformance *conformance) {
-                auto proto = conformance->getProtocol();
-                auto &diags = proto->getASTContext().Diags;
-                diags.diagnose(witness->getLoc(),
-                               diag::witness_requires_dynamic_self,
-                               requirement->getFullName(),
-                               conformance->getType(),
-                               proto->getDeclaredType());
-              });
-          }
-
-        // Constructors conceptually also have a dynamic Self
-        // return type, so they're okay.
-        } else if (!isa<ConstructorDecl>(best.Witness)) {
-          diagnoseOrDefer(requirement, false,
-            [witness, requirement](NormalProtocolConformance *conformance) {
-              auto proto = conformance->getProtocol();
-              auto &diags = proto->getASTContext().Diags;
-              diags.diagnose(witness->getLoc(), diag::witness_self_non_subtype,
-                             proto->getDeclaredType(),
-                             requirement->getFullName(),
-                             conformance->getType());
-            });
-        }
-      } else if (selfKind.requirement) {
-        if (auto constraint = getAdopteeSelfSameTypeConstraint(classDecl,
-                                                               witness)) {
-          // A "Self ==" constraint works incorrectly with subclasses. Complain.
-          auto proto = Conformance->getProtocol();
-          auto &diags = proto->getASTContext().Diags;
-          diags.diagnose(witness->getLoc(),
-                         diag::witness_self_same_type,
-                         witness->getDescriptiveKind(),
-                         witness->getFullName(),
-                         Conformance->getType(),
-                         requirement->getDescriptiveKind(),
-                         requirement->getFullName(),
-                         proto->getDeclaredType());
-
-          if (auto requirementRepr = *constraint) {
-            diags.diagnose(requirementRepr->getEqualLoc(),
-                           diag::witness_self_weaken_same_type,
-                           requirementRepr->getFirstType(),
-                           requirementRepr->getSecondType())
-              .fixItReplace(requirementRepr->getEqualLoc(), ":");
-          }
-        }
-      }
-
-      // A non-final class can model a protocol requirement with a
-      // contravariant Self, because here the witness will always have
-      // a more general type than the requirement.
     }
 
     // Record the match.
