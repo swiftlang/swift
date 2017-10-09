@@ -2207,9 +2207,6 @@ public:
     return result;
   }
 
-  /// Determine whether this Decl has either Private or FilePrivate access.
-  bool isOutermostPrivateOrFilePrivateScope() const;
-
   /// Returns the outermost DeclContext from which this declaration can be
   /// accessed, or null if the declaration is public.
   ///
