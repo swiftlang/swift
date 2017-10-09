@@ -39,6 +39,10 @@ extern template void Calculate<SILPostDomTree, swift::SILFunction>(
 
 namespace swift {
 
+/// \brief Return true if b is dominated by a inside the basic block.
+/// Also returns true if they belong to different blocks
+bool fastDominates(SILInstruction *a, SILInstruction *b);
+
 using DominatorTreeBase = llvm::DominatorTreeBase<swift::SILBasicBlock, false>;
 using PostDominatorTreeBase = llvm::DominatorTreeBase<swift::SILBasicBlock, true>;
 using DominanceInfoNode = llvm::DomTreeNodeBase<SILBasicBlock>;

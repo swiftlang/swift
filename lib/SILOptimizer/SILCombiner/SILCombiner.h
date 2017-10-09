@@ -137,7 +137,7 @@ public:
       : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
         Iteration(0), Builder(B),
         CastOpt(/* ReplaceInstUsesAction */
-                [&](SingleValueInstruction *I, ValueBase * V) {
+                [&](SingleValueInstruction *I, ValueBase *V) {
                   replaceInstUsesWith(*I, V);
                 },
                 /* EraseAction */

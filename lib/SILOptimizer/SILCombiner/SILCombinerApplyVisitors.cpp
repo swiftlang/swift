@@ -13,19 +13,20 @@
 #define DEBUG_TYPE "sil-combine"
 #include "SILCombiner.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -572,9 +573,11 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
 /// alloc_stack user \p ASIUser.
 /// If the value is copied from another stack location, \p isCopied is set to
 /// true.
+/// OrigASIUser is used for recursive getAddressOfStackInit calls
+/// It keeps track of the pre-recursive-call user for dominance checks
 static SILValue getAddressOfStackInit(AllocStackInst *ASI,
-                                      SILInstruction *ASIUser,
-                                      bool &isCopied) {
+                                      SILInstruction *ASIUser, bool &isCopied,
+                                      SILInstruction *OrigASIUser = nullptr) {
   SILInstruction *SingleWrite = nullptr;
   // Check that this alloc_stack is initialized only once.
   for (auto Use : ASI->getUses()) {
@@ -582,11 +585,25 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
 
     // Ignore instructions which don't write to the stack location.
     // Also ignore ASIUser (only kicks in if ASIUser is the original apply).
-    if (isa<DeallocStackInst>(User) || isa<DebugValueAddrInst>(User) ||
-        isa<DestroyAddrInst>(User) || isa<WitnessMethodInst>(User) ||
-        isa<DeinitExistentialAddrInst>(User) ||
-        isa<OpenExistentialAddrInst>(User) ||
-        User == ASIUser) {
+    if (isa<DebugValueAddrInst>(User) || isa<WitnessMethodInst>(User) ||
+        isa<OpenExistentialAddrInst>(User) || User == ASIUser) {
+      continue;
+    }
+    // Ignore instructions which destroy the stack lcoation.
+    // *as long as* they do not appear before the User!
+    // Else we will have use-after-free
+    if (isa<DeallocStackInst>(User) || isa<DestroyAddrInst>(User) ||
+        isa<DeinitExistentialAddrInst>(User)) {
+      // TODO:
+      // Move this concrete type propagation for existentials out of sil-combine
+      // We can then use DominanceAnalysis which is the right thing to do here
+      // We avoid using it here due to compilation speed implications
+      if (OrigASIUser && fastDominates(User, OrigASIUser)) {
+        return nullptr;
+      }
+      if (fastDominates(User, ASIUser)) {
+        return nullptr;
+      }
       continue;
     }
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
@@ -631,7 +648,7 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
     assert(isCopied && "isCopied not set for a copy_addr");
     SILValue CAISrc = CAI->getSrc();
     if (auto *ASI = dyn_cast<AllocStackInst>(CAISrc))
-      return getAddressOfStackInit(ASI, CAI, isCopied);
+      return getAddressOfStackInit(ASI, CAI, isCopied, ASIUser);
     return CAISrc;
   }
   return cast<InitExistentialAddrInst>(SingleWrite);
@@ -649,8 +666,8 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
   if (auto *Instance = dyn_cast<AllocStackInst>(Self)) {
     // In case the Self operand is an alloc_stack where a copy_addr copies the
     // result of an open_existential_addr to this stack location.
-    if (SILValue Src = getAddressOfStackInit(Instance, AI.getInstruction(),
-                                             isCopied))
+    if (SILValue Src =
+            getAddressOfStackInit(Instance, AI.getInstruction(), isCopied))
       Self = Src;
   }
 
@@ -873,9 +890,8 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   ArchetypeType *OpenedArchetype = nullptr;
   SILValue OpenedArchetypeDef;
   bool isCopied = false;
-  SILInstruction *InitExistential =
-    findInitExistential(AI, Self, OpenedArchetype, OpenedArchetypeDef,
-                        isCopied);
+  SILInstruction *InitExistential = findInitExistential(
+      AI, Self, OpenedArchetype, OpenedArchetypeDef, isCopied);
   if (!InitExistential)
     return nullptr;
 

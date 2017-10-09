@@ -10,10 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/Support/GenericDomTreeConstruction.h"
 
 using namespace swift;
@@ -30,6 +31,27 @@ template void Calculate<SILPostDomTree, swift::SILFunction>(
     SILPostDomTree &DT, swift::SILFunction &F);
 } // namespace DomTreeBuilder
 } // namespace llvm
+
+bool swift::fastDominates(SILInstruction *a, SILInstruction *b) {
+  auto aBlock = a->getParent(), bBlock = b->getParent();
+
+  // If the blocks are different, bail
+  if (aBlock != bBlock)
+    return true;
+
+  // Otherwise, they're in the same block, and we just need to check
+  // whether B comes after A.  This is a non-strict computation.
+  auto aIter = a->getIterator();
+  auto bIter = b->getIterator();
+  auto fIter = aBlock->begin();
+  while (bIter != fIter) {
+    --bIter;
+    if (aIter == bIter)
+      return true;
+  }
+
+  return false;
+}
 
 /// Compute the immediate-dominators map.
 DominanceInfo::DominanceInfo(SILFunction *F)
@@ -49,16 +71,7 @@ bool DominanceInfo::properlyDominates(SILInstruction *a, SILInstruction *b) {
 
   // Otherwise, they're in the same block, and we just need to check
   // whether B comes after A.  This is a non-strict computation.
-  auto aIter = a->getIterator();
-  auto bIter = b->getIterator();
-  auto fIter = aBlock->begin();
-  while (bIter != fIter) {
-    --bIter;
-    if (aIter == bIter)
-      return true;
-  }
-
-  return false;
+  return fastDominates(a, b);
 }
 
 /// Does value A properly dominate instruction B?
