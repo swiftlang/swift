@@ -1433,34 +1433,6 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
   llvm_unreachable("bad access semantics");
 }
 
-static bool hasPrivateOrFilePrivateFormalAccess(const ValueDecl *D) {
-  return D->hasAccess() && D->getFormalAccess() <= AccessLevel::FilePrivate;
-}
-
-/// Returns true if one of the ancestor DeclContexts of this ValueDecl is either
-/// marked private or fileprivate or is a local context.
-static bool isInPrivateOrLocalContext(const ValueDecl *D) {
-  const DeclContext *DC = D->getDeclContext();
-  if (!DC->isTypeContext()) {
-    assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
-           "unexpected context kind");
-    return DC->isLocalContext();
-  }
-
-  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (nominal == nullptr)
-    return false;
-
-  if (hasPrivateOrFilePrivateFormalAccess(nominal))
-    return true;
-  return isInPrivateOrLocalContext(nominal);
-}
-
-bool ValueDecl::isOutermostPrivateOrFilePrivateScope() const {
-  return hasPrivateOrFilePrivateFormalAccess(this) &&
-         !isInPrivateOrLocalContext(this);
-}
-
 bool AbstractStorageDecl::hasFixedLayout() const {
   // If we're in a nominal type, just query the type.
   auto *dc = getDeclContext();
