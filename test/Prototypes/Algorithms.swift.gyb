@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %empty-directory(%t)
 // RUN: %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
-// RUN: %line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone
+// RUN: %line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone -swift-version 4
 // RUN: %line-directive %t/out.swift -- %target-run %t/a.out
 
 // REQUIRES: executable_test
