@@ -758,8 +758,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     prepareGenericParamList(gp, func);
 
     // Create the generic signature builder.
-    GenericSignatureBuilder builder(Context,
-                          LookUpConformanceInModule(func->getParentModule()));
+    GenericSignatureBuilder builder(Context);
 
     // Type check the function declaration, treating all generic type
     // parameters as dependent, unresolved.
@@ -986,8 +985,7 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     prepareGenericParamList(gp, subscript);
 
     // Create the generic signature builder.
-    GenericSignatureBuilder builder(Context,
-        LookUpConformanceInModule(subscript->getParentModule()));
+    GenericSignatureBuilder builder(Context);
 
     // Type check the function declaration, treating all generic type
     // parameters as dependent, unresolved.
@@ -1119,8 +1117,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     }
 
     // Create the generic signature builder.
-    GenericSignatureBuilder builder(Context,
-                             LookUpConformanceInModule(dc->getParentModule()));
+    GenericSignatureBuilder builder(Context);
 
     // Type check the generic parameters, treating all generic type
     // parameters as dependent, unresolved.

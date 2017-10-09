@@ -475,20 +475,40 @@ private:
 
 public:
   /// Construct a new generic signature builder.
-  ///
-  /// \param lookupConformance Conformance-lookup routine that will be used
-  /// to satisfy conformance requirements for concrete types.
-  explicit GenericSignatureBuilder(ASTContext &ctx,
-                            std::function<GenericFunction> lookupConformance);
-
+  explicit GenericSignatureBuilder(ASTContext &ctx);
   GenericSignatureBuilder(GenericSignatureBuilder &&);
   ~GenericSignatureBuilder();
 
   /// Retrieve the AST context.
   ASTContext &getASTContext() const { return Context; }
 
-  /// Retrieve the conformance-lookup function used by this generic signature builder.
-  std::function<GenericFunction> getLookupConformanceFn() const;
+  /// Functor class suitable for use as a \c LookupConformanceFn to look up a
+  /// conformance in a generic signature builder.
+  class LookUpConformanceInBuilder {
+    GenericSignatureBuilder *builder;
+  public:
+    explicit LookUpConformanceInBuilder(GenericSignatureBuilder *builder)
+      : builder(builder) {}
+
+    Optional<ProtocolConformanceRef>
+    operator()(CanType dependentType,
+               Type conformingReplacementType,
+               ProtocolType *conformedProtocol) const {
+      return builder->lookupConformance(dependentType,
+                                        conformingReplacementType,
+                                        conformedProtocol);
+    }
+  };
+
+  /// Retrieve a function that can perform conformance lookup for this
+  /// builder.
+  LookUpConformanceInBuilder getLookupConformanceFn();
+
+  /// Lookup a protocol conformance in a module-agnostic manner.
+  Optional<ProtocolConformanceRef>
+  lookupConformance(CanType dependentType, Type conformingReplacementType,
+                    ProtocolType *conformedProtocol);
+
 
   /// Retrieve the lazy resolver, if there is one.
   LazyResolver *getLazyResolver() const;

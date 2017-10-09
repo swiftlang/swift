@@ -1150,9 +1150,7 @@ RequirementEnvironment::RequirementEnvironment(
   // Construct a generic signature builder by collecting the constraints
   // from the requirement and the context of the conformance together,
   // because both define the capabilities of the requirement.
-  GenericSignatureBuilder builder(
-           ctx,
-           LookUpConformanceInModule(conformanceDC->getParentModule()));
+  GenericSignatureBuilder builder(ctx);
 
   auto source =
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();

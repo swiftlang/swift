@@ -1460,8 +1460,7 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
     return known->second.get();
 
   // Create a new generic signature builder with the given signature.
-  auto builder =
-    new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
+  auto builder = new GenericSignatureBuilder(*this);
 
   // Store this generic signature builder (no generic environment yet).
   Impl.GenericSignatureBuilders[{sig, mod}] =
@@ -4725,7 +4724,7 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
 
   assert(existential.isExistentialType());
 
-  GenericSignatureBuilder builder(*this, LookUpConformanceInModule(mod));
+  GenericSignatureBuilder builder(*this);
 
   auto genericParam = GenericTypeParamType::get(0, 0, *this);
   builder.addGenericParameter(genericParam);

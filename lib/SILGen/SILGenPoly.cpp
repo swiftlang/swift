@@ -2673,7 +2673,7 @@ buildThunkSignature(SILGenFunction &SGF,
     return genericSig;
   }
 
-  GenericSignatureBuilder builder(ctx, LookUpConformanceInModule(mod));
+  GenericSignatureBuilder builder(ctx);
 
   // Add the existing generic signature.
   int depth = 0;
