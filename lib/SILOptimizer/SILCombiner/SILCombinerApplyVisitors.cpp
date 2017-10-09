@@ -14,19 +14,20 @@
 #include "SILCombiner.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Range.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -362,17 +363,27 @@ SILInstruction *PartialApplyCombiner::combine() {
 
   // Iterate over all uses of the partial_apply
   // and look for applies that use it as a callee.
-  for (auto UI = PAI->use_begin(), UE = PAI->use_end(); UI != UE; ) {
-    auto Use = *UI;
-    ++UI;
-    auto User = Use->getUser();
+
+  // Worklist of operands.
+  SmallVector<Operand *, 8> Uses(PAI->getUses());
+
+  // Uses may grow in this loop.
+  for (size_t UseIndex = 0; UseIndex < Uses.size(); ++UseIndex) {
+    auto *Use = Uses[UseIndex];
+    auto *User = Use->getUser();
+
+    // Recurse through conversions.
+    if (auto *CFI = dyn_cast<ConvertFunctionInst>(User)) {
+      Uses.append(CFI->getUses().begin(), CFI->getUses().end());
+      continue;
+    }
     // If this use of a partial_apply is not
     // an apply which uses it as a callee, bail.
     auto AI = FullApplySite::isa(User);
     if (!AI)
       continue;
 
-    if (AI.getCallee() != PAI)
+    if (AI.getCallee() != Use->get())
       continue;
 
     // We cannot handle generic apply yet. Bail.
