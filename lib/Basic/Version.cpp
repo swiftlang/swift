@@ -314,7 +314,7 @@ Optional<Version> Version::getEffectiveLanguageVersion() const {
   // a version newer than any released 4.x compiler, and the
   // "5" case should start returning getCurrentLanguageVersion. We should
   // also check for the presence of SWIFT_VERSION_PATCHLEVEL, and if that's
-  // set apply it to the "3" case, so that Swift 4 will automatically
+  // set apply it to the "3" case, so that Swift 4.0.1 will automatically
   // have a compatibility mode of 3.2.1.
   switch (Components[0]) {
   case 3:
