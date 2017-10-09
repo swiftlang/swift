@@ -1395,6 +1395,19 @@ private:
     return nullptr;
   }
 
+  /// The private discriminator is represented as an inline namespace.
+  llvm::DIScope *getFilePrivateScope(llvm::DIScope *Parent, TypeDecl *Decl,
+                                     DeclContext *Context) {
+    // Retrieve the private discriminator.
+    if (auto *SF = Context->getParentSourceFile()) {
+      auto PrivateDiscriminator = SF->getPrivateDiscriminator();
+      if (!PrivateDiscriminator.empty())
+        return DBuilder.createNameSpace(Parent, PrivateDiscriminator.str(),
+                                        /*ExportSymbols=*/true);
+    }
+    llvm_unreachable("unknown private discriminator");
+  }
+
   llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy) {
     // Is this an empty type?
     if (DbgTy.isNull())
@@ -1438,6 +1451,13 @@ private:
     }
     if (!Scope)
       Scope = getOrCreateContext(Context);
+
+    // Scope outermost fileprivate decls in an inline private discriminator
+    // namespace.
+    if (auto *Decl = DbgTy.getDecl())
+      if (Context && Decl->isOutermostPrivateOrFilePrivateScope())
+        Scope = getFilePrivateScope(Scope, Decl, Context);
+
     llvm::DIType *DITy = createType(DbgTy, MangledName, Scope, getFile(Scope));
 
     // Incrementally build the DIRefMap.
@@ -1518,9 +1538,9 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
     CU_Nodes->addOperand(*CU);
 
   // Create a module for the current compile unit.
+  auto *MDecl = IGM.getSwiftModule();
   llvm::sys::path::remove_filename(AbsMainFile);
-  MainModule = getOrCreateModule(IGM.getSwiftModule(), TheCU, Opts.ModuleName,
-                                 AbsMainFile);
+  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, AbsMainFile);
   DBuilder.createImportedModule(MainFile, MainModule, MainFile, 0);
 
   // Macro definitions that were defined by the user with "-Xcc -D" on the
