@@ -70,7 +70,7 @@ class C : P1 {
 
 //   (materializeForSet test from above)
 // CHECK-LABEL: sil private [transparent] [thunk] @_T019protocol_extensions1CCAA2P1A2aDPS2icimTW
-// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*τ_0_0):
+// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*C):
 // CHECK: function_ref @_T019protocol_extensions2P1PAAES2icig
 // CHECK: return
 
