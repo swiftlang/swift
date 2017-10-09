@@ -16,6 +16,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Option/Options.h"
 #include "swift/Strings.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
@@ -106,18 +107,31 @@ void FrontendInputs::transformInputFilenames(const llvm::function_ref<std::strin
   }
 }
 
-void FrontendInputs::setInputFilenamesAndPrimaryInputs(DiagnosticEngine &Diags, llvm::opt::ArgList &Args) {
-  assert(!havePrimaryInputs());
-  if (const Arg *filelistPath = Args.getLastArg(options::OPT_filelist)) {
-    readInputFileList(Diags, Args, filelistPath);
-    return;
+
+static llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> getBufferForArg(DiagnosticEngine &diags,
+                                                                          const llvm::opt::Arg *pathOrNull) {
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer = llvm::MemoryBuffer::getFile(
+                                                                                          pathOrNull ? pathOrNull->getValue() : "/dev/null");
+  if (!buffer) {
+    assert(pathOrNull && "could not open /dev/null");
+    diags.diagnose(SourceLoc(), diag::cannot_open_file,
+                   pathOrNull->getValue(), buffer.getError().message());
   }
+  return buffer;
+}
+
+static void splitIntoLines(const llvm::MemoryBuffer &buffer, SmallVectorImpl<StringRef> &fileNames) {
+  for (StringRef line : make_range(llvm::line_iterator(buffer), {})) {
+    fileNames.push_back(line);
+  }
+}
+
+static void getFilesDirectlyFromArgs(llvm::opt::ArgList &Args, llvm::SmallVectorImpl<StringRef> &inputFiles, llvm::SmallVectorImpl<StringRef> &primaryFiles) {
   for (const Arg *A : Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
     if (A->getOption().matches(options::OPT_INPUT)) {
-      addInputFilename(A->getValue());
+      inputFiles.push_back(A->getValue());
     } else if (A->getOption().matches(options::OPT_primary_file)) {
-      setPrimaryInput(SelectedInput(inputFilenameCount()));
-      addInputFilename(A->getValue());
+      primaryFiles.push_back(A->getValue());
     } else {
       llvm_unreachable("Unknown input-related argument!");
     }
@@ -125,48 +139,44 @@ void FrontendInputs::setInputFilenamesAndPrimaryInputs(DiagnosticEngine &Diags, 
 }
 
 
-/// Try to read an input file list file.
-///
-/// Returns false on error.
-void FrontendInputs::readInputFileList(DiagnosticEngine &diags,
-                                       llvm::opt::ArgList &Args,
-                                       const llvm::opt::Arg *filelistPath) {
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-  llvm::MemoryBuffer::getFile(filelistPath->getValue());
-  if (!buffer) {
-    diags.diagnose(SourceLoc(), diag::cannot_open_file,
-                   filelistPath->getValue(), buffer.getError().message());
+
+void FrontendInputs::setInputFilenamesAndPrimaryInputs(DiagnosticEngine &Diags, llvm::opt::ArgList &Args) {
+  SharedTimer("setInputFilenamesAndPrimaryInputs");
+  llvm::SmallVector<StringRef, 8> inputFiles; // FIXME: 8?
+  llvm::SmallVector<StringRef, 8> primaryFiles; // FIXME: 8?
+  
+  getFilesDirectlyFromArgs(Args, inputFiles, primaryFiles);
+  
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBuffer = getBufferForArg(Diags, Args.getLastArg(options::OPT_filelist));
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> primaryFilelistBuffer = getBufferForArg(Diags, Args.getLastArg(options::OPT_primary_filelist));
+  
+  if (!filelistBuffer || !primaryFilelistBuffer)
     return;
-  }
   
-  const Arg *primaryFileArg = Args.getLastArg(options::OPT_primary_file);
-  unsigned primaryFileIndex = 0;
+  splitIntoLines(       *filelistBuffer->get(),   inputFiles);
+  splitIntoLines(*primaryFilelistBuffer->get(), primaryFiles);
   
-  bool foundPrimaryFile = false;
-  
-  for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
-    addInputFilename(line);
-    
-    if (foundPrimaryFile || primaryFileArg == nullptr)
-      continue;
-    if (line == primaryFileArg->getValue())
-      foundPrimaryFile = true;
-    else
-      ++primaryFileIndex;
-  }
-  
-  if (primaryFileArg && !foundPrimaryFile) {
-    diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
-                   primaryFileArg->getValue(), filelistPath->getValue());
-    return;
-  }
-  
-  if (primaryFileArg)
-    setPrimaryInput(SelectedInput(primaryFileIndex));
-  assert(!Args.hasArg(options::OPT_INPUT) && "mixing -filelist with inputs");
+  setInputAndPrimaryFilesFromPossiblyOverlappingLists(inputFiles, primaryFiles);
 }
 
-
+void FrontendInputs::setInputAndPrimaryFilesFromPossiblyOverlappingLists(
+                                                                         llvm::SmallVectorImpl<StringRef> &inputFiles, llvm::SmallVectorImpl<StringRef> &primaryFiles) {
+  llvm::StringMap<unsigned> filelistIndices(inputFiles.size());
+  for ( auto inputFile: inputFiles ) {
+    filelistIndices.insert(llvm::StringMapEntry<unsigned>::Create(inputFile, inputFilenameCount()));
+    addInputFilename(inputFile);
+  }
+  for ( auto primaryInputFile: primaryFiles ) {
+    llvm::StringMapConstIterator<unsigned> iterator = filelistIndices.find(primaryInputFile);
+    bool wasIndexFound = iterator != filelistIndices.end();
+    unsigned nextInputFilenameIndex = inputFilenameCount();
+    if (!wasIndexFound) {
+      addInputFilename(primaryInputFile);
+    }
+    unsigned primaryIndex = wasIndexFound ? iterator->second : nextInputFilenameIndex;
+    addPrimaryInput(SelectedInput(primaryIndex, SelectedInput::InputKind::Filename));
+  }
+}
 
 
 

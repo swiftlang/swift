@@ -150,10 +150,6 @@ ERROR(error_implicit_output_file_is_directory,none,
   "the implicit output file '%0' is a directory; explicitly specify a filename "
   "using -o", (StringRef))
 
-ERROR(error_primary_file_not_found,none,
-      "primary file '%0' was not found in file list '%1'",
-      (StringRef, StringRef))
-
 ERROR(repl_must_be_initialized,none,
       "variables currently must have an initial value when entered at the "
       "top level of the REPL", ())

@@ -208,6 +208,10 @@ public:
     getMutablePrimaryInputs().clear();
   }
   
+  void addPrimaryInput(SelectedInput si) {
+    PrimaryInputs.push_back(si);
+  }
+  
   void setPrimaryInput(SelectedInput si) {
     clearPrimaryInputs();
     getMutablePrimaryInputs().push_back(si);
@@ -230,10 +234,9 @@ public:
   
   void setInputFilenamesAndPrimaryInputs(DiagnosticEngine &Diags, llvm::opt::ArgList &Args);
   
-  void readInputFileList(DiagnosticEngine &diags,
-                         llvm::opt::ArgList &Args,
-                         const llvm::opt::Arg *filelistPath);
- 
+private:
+ void setInputAndPrimaryFilesFromPossiblyOverlappingLists(llvm::SmallVectorImpl<StringRef> &inputFiles,
+                                                          llvm::SmallVectorImpl<StringRef> &primaryFiles);
 };
 
 /// Options for controlling the behavior of the frontend.
