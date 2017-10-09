@@ -45,6 +45,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
+#include "llvm/Support/Path.h"
 
 #include "GenEnum.h"
 #include "GenType.h"
@@ -471,7 +472,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   if (auto fn = dyn_cast<llvm::Function>(cache)) {
     fn->setCallingConv(cc);
 
-    if (::useDllStorage(llvm::Triple(Module.getTargetTriple())) &&
+    if (llvm::sys::path::stem(Module.getName()) != "Swift" &&
+        ::useDllStorage(llvm::Triple(Module.getTargetTriple())) &&
         (fn->getLinkage() == llvm::GlobalValue::ExternalLinkage ||
          fn->getLinkage() == llvm::GlobalValue::AvailableExternallyLinkage))
       fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
