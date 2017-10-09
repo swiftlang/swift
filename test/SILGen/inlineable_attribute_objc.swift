@@ -25,7 +25,7 @@ public class Horse : NSObject {
 // CHECK: }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T025inlineable_attribute_objc5HorseC6gallopyyFTD : $@convention(method) (@guaranteed Horse) -> ()
-// CHECK: class_method [volatile]
+// CHECK: objc_method
 // CHECK: return
 // CHECK: }
 

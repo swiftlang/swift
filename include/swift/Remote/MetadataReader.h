@@ -690,6 +690,8 @@ public:
 
     switch (Meta->getKind()) {
     case MetadataKind::Class:
+      if (!cast<TargetClassMetadata<Runtime>>(Meta)->isTypeMetadata())
+        return BuiltType();
       return readNominalTypeFromMetadata(Meta, skipArtificialSubclasses);
     case MetadataKind::Struct:
       return readNominalTypeFromMetadata(Meta);
@@ -932,33 +934,6 @@ public:
     }
 
     swift_runtime_unreachable("Unhandled IsaEncodingKind in switch.");
-  }
-
-  /// Read the parent type metadata from a nested nominal type metadata.
-  std::pair<bool, StoredPointer>
-  readParentFromMetadata(StoredPointer metadata) {
-    auto Meta = readMetadata(metadata);
-    if (!Meta)
-      return std::make_pair(false, 0);
-
-    auto descriptorAddress = readAddressOfNominalTypeDescriptor(Meta);
-    if (!descriptorAddress)
-      return std::make_pair(false, 0);
-
-    // Read the nominal type descriptor.
-    auto descriptor = readNominalTypeDescriptor(descriptorAddress);
-    if (!descriptor)
-      return std::make_pair(false, 0);
-
-    // Read the parent type if the type has one.
-    if (descriptor->GenericParams.Flags.hasParent()) {
-      StoredPointer parentAddress = getNominalParent(Meta, descriptor);
-      if (!parentAddress)
-        return std::make_pair(false, 0);
-      return std::make_pair(true, parentAddress);
-    }
-
-    return std::make_pair(false, 0);
   }
 
   /// Read a single generic type argument from a bound generic type
@@ -1209,23 +1184,19 @@ private:
     return MetadataRef(address, metadata);
   }
 
-  StoredPointer readAddressOfNominalTypeDescriptor(MetadataRef &metadata,
-                                        bool skipArtificialSubclasses = false) {
+  StoredPointer
+  readAddressOfNominalTypeDescriptor(MetadataRef &metadata,
+                                     bool skipArtificialSubclasses = false) {
     switch (metadata->getKind()) {
     case MetadataKind::Class: {
       auto classMeta = cast<TargetClassMetadata<Runtime>>(metadata);
       while (true) {
-        auto descriptorAddress =
-          resolveNullableRelativeOffset<StoredPointer>(metadata.getAddress() +
-                                         classMeta->offsetToDescriptorOffset());
-
-        // Propagate errors reading the offset.
-        if (!descriptorAddress) return 0;
+        auto descriptorAddress = classMeta->getDescription();
 
         // If this class has a null descriptor, it's artificial,
         // and we need to skip it upon request.  Otherwise, we're done.
-        if (*descriptorAddress || !skipArtificialSubclasses)
-          return *descriptorAddress;
+        if (descriptorAddress || !skipArtificialSubclasses)
+          return static_cast<uintptr_t>(descriptorAddress);
 
         auto superclassMetadataAddress = classMeta->SuperClass;
         if (!superclassMetadataAddress)
@@ -1234,8 +1205,8 @@ private:
         auto superMeta = readMetadata(superclassMetadataAddress);
         if (!superMeta)
           return 0;
-        auto superclassMeta =
-          dyn_cast<TargetClassMetadata<Runtime>>(superMeta);
+
+        auto superclassMeta = dyn_cast<TargetClassMetadata<Runtime>>(superMeta);
         if (!superclassMeta)
           return 0;
 
@@ -1248,8 +1219,7 @@ private:
     case MetadataKind::Optional:
     case MetadataKind::Enum: {
       auto valueMeta = cast<TargetValueMetadata<Runtime>>(metadata);
-      return resolveRelativeOffset<StoredPointer>(metadata.getAddress() +
-                                       valueMeta->offsetToDescriptorOffset());
+      return reinterpret_cast<uintptr_t>(valueMeta->getDescription());
     }
 
     default:
@@ -1308,32 +1278,6 @@ private:
     return OwnedProtocolDescriptorRef(Casted);
   }
 
-  StoredPointer getNominalParent(MetadataRef metadata,
-                                 NominalTypeDescriptorRef descriptor) {
-    // If this is metadata for some sort of value type, the parent type
-    // is at a fixed offset.
-    if (auto valueMetadata = dyn_cast<TargetValueMetadata<Runtime>>(metadata)) {
-      return valueMetadata->Parent;
-    }
-
-    // If this is metadata for a class type, the parent type for the
-    // most-derived class is at an offset stored in the most-derived
-    // nominal type descriptor.
-    if (auto classMetadata = dyn_cast<TargetClassMetadata<Runtime>>(metadata)) {
-      // If it does, it's immediately before the generic parameters.
-      auto offsetToParent
-        = sizeof(StoredPointer) * (descriptor->GenericParams.Offset - 1);
-      RemoteAddress addressOfParent(metadata.getAddress() + offsetToParent);
-      StoredPointer parentAddress;
-      if (!Reader->readInteger(addressOfParent, &parentAddress))
-        return StoredPointer();
-      return parentAddress;
-    }
-
-    // Otherwise, we don't know how to access its parent.  This is a failure.
-    return StoredPointer();
-  }
-
   std::vector<BuiltType>
   getGenericSubst(MetadataRef metadata, NominalTypeDescriptorRef descriptor) {
     std::vector<BuiltType> substitutions;
@@ -1387,23 +1331,13 @@ private:
     if (!typeDecl)
       return BuiltType();
 
-    // Read the parent type if the type has one.
-    BuiltType parent = BuiltType();
-    if (descriptor->GenericParams.Flags.hasParent()) {
-      StoredPointer parentAddress = getNominalParent(metadata, descriptor);
-      if (!parentAddress)
-        return BuiltType();
-      parent = readTypeFromMetadata(parentAddress);
-      if (!parent) return BuiltType();
-    }
-
     BuiltType nominal;
     if (descriptor->GenericParams.NumPrimaryParams) {
       auto args = getGenericSubst(metadata, descriptor);
       if (args.empty()) return BuiltType();
-      nominal = Builder.createBoundGenericType(typeDecl, args, parent);
+      nominal = Builder.createBoundGenericType(typeDecl, args);
     } else {
-      nominal = Builder.createNominalType(typeDecl, parent);
+      nominal = Builder.createNominalType(typeDecl);
     }
     if (!nominal) return BuiltType();
 

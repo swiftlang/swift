@@ -13,7 +13,7 @@
 // Tty ioctl request constants, needed only on Darwin and FreeBSD.
 
 // Constants available on all platforms, also available on Linux.
-#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS) || os(FreeBSD)
+#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS) || os(FreeBSD) || os(Haiku)
 
 /// Set exclusive use of tty.
 public var TIOCEXCL: UInt { return 0x2000740d }

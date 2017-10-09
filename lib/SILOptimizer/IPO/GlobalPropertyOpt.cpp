@@ -72,8 +72,8 @@ class GlobalPropertyOpt {
         return os << "field " << entry.Field->getName() << '\n';
       if (!entry.Value)
         return os << "unknown-address\n";
-      if (auto *Inst = dyn_cast<SILInstruction>(entry.Value))
-        os << Inst->getFunction()->getName() << ": " << entry.Value;
+      if (auto *Inst = entry.Value->getDefiningInstruction())
+        return os << Inst->getFunction()->getName() << ": " << entry.Value;
       if (auto *Arg = dyn_cast<SILArgument>(entry.Value))
         return os << Arg->getFunction()->getName() << ": " << entry.Value;
       return os << entry.Value;
@@ -260,13 +260,14 @@ bool GlobalPropertyOpt::canAddressEscape(SILValue V, bool acceptStore) {
       // We don't handle these instructions if we see them in store addresses.
       // So going through them lets stores be as bad as if the address would
       // escape.
-      if (canAddressEscape(User, false))
+      auto value = cast<SingleValueInstruction>(User);
+      if (canAddressEscape(value, false))
         return true;
       continue;
     }
-    if (isa<MarkDependenceInst>(User)) {
+    if (auto markDependence = dyn_cast<MarkDependenceInst>(User)) {
       unsigned opNum = UI->getOperandNumber();
-      if (opNum == 0 && canAddressEscape(User, acceptStore))
+      if (opNum == 0 && canAddressEscape(markDependence, acceptStore))
         return true;
       continue;
     }
@@ -321,11 +322,12 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       return;
     }
   } else if (isa<RefElementAddrInst>(Inst) || isa<StructElementAddrInst>(Inst)) {
-    if (isArrayAddressType(Inst->getType())) {
+    auto projection = cast<SingleValueInstruction>(Inst);
+    if (isArrayAddressType(projection->getType())) {
       // If the address of an array-field escapes, we give up for that field.
-      if (canAddressEscape(Inst, true)) {
-        setAddressEscapes(getAddrEntry(Inst));
-        DEBUG(llvm::dbgs() << "      field address escapes: " << *Inst);
+      if (canAddressEscape(projection, true)) {
+        setAddressEscapes(getAddrEntry(projection));
+        DEBUG(llvm::dbgs() << "      field address escapes: " << *projection);
       }
       return;
     }
@@ -375,10 +377,12 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
 
   // For everything else which we didn't handle above: we set the property of
   // the instruction value to false.
-  if (SILType Type = Inst->getType()) {
+  for (auto result : Inst->getResults()) {
+    SILType Type = result->getType();
     if (isArrayType(Type) || isTupleWithArray(Type.getSwiftRValueType())) {
-      DEBUG(llvm::dbgs() << "      value could be non-native array: " << *Inst);
-      setNotNative(getValueEntry(Inst));
+      DEBUG(llvm::dbgs() << "      value could be non-native array: "
+                         << *result);
+      setNotNative(getValueEntry(result));
     }
   }
 }

@@ -4071,9 +4071,14 @@ namespace {
           
           auto dc = subscript->getInnermostDeclContext();
           SmallVector<Substitution, 4> subs;
+          SubstitutionMap subMap;
+          auto indexType = subscript->getIndicesInterfaceType();
+
           if (auto sig = dc->getGenericSignatureOfContext()) {
             // Compute substitutions to refer to the member.
             solution.computeSubstitutions(sig, locator, subs);
+            subMap = sig->getSubstitutionMap(subs);
+            indexType = indexType.subst(subMap);
           }
           
           auto resolvedTy = foundDecl->openedType->castTo<AnyFunctionType>()
@@ -4082,9 +4087,13 @@ namespace {
           
           auto ref = ConcreteDeclRef(cs.getASTContext(), subscript, subs);
           
+          // Coerce the indices to the type the subscript expects.
+          auto indexExpr = coerceToType(origComponent.getIndexExpr(),
+                                        indexType,
+                                        locator);
+          
           component = KeyPathExpr::Component
-            ::forSubscriptWithPrebuiltIndexExpr(ref,
-                                            origComponent.getIndexExpr(),
+            ::forSubscriptWithPrebuiltIndexExpr(ref, indexExpr,
                                             origComponent.getSubscriptLabels(),
                                             resolvedTy,
                                             origComponent.getLoc(),
@@ -5072,16 +5081,11 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 
   // Handle existential coercions that implicitly look through ImplicitlyUnwrappedOptional<T>.
   if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
-    auto unwrappedExpr
-      = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
-    
-    auto unwrappedFromType = cs.getType(unwrappedExpr);
-    assert(!unwrappedFromType->is<AnyMetatypeType>());
-
     // FIXME: Hack. We shouldn't try to coerce existential when there is no
     // existential upcast to perform.
-    if (unwrappedFromType->isEqual(toType))
-      return unwrappedExpr;
+    if (ty->isEqual(toType)) {
+      return coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
+    }
   }
 
   Type fromInstanceType = fromType;

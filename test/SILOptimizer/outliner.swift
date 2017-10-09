@@ -56,7 +56,7 @@ public func testOutlining() {
 // CHECK-LABEL: sil shared [serializable] [noinline] @_T0So5GizmoC14stringPropertySQySSGvgToTeab_ : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
 // CHECK: bb0(%0 : $*Gizmo):
 // CHECK:   %1 = load %0 : $*Gizmo
-// CHECK:   %2 = class_method [volatile] %1 : $Gizmo, #Gizmo.stringProperty!getter.1.foreign : (Gizmo) -> () -> String!
+// CHECK:   %2 = objc_method %1 : $Gizmo, #Gizmo.stringProperty!getter.1.foreign : (Gizmo) -> () -> String!
 // CHECK:   %3 = apply %2(%1) : $@convention(objc_method) (Gizmo) -> @autoreleased Optional<NSString>
 // CHECK:   switch_enum %3 : $Optional<NSString>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 // CHECK: bb1(%5 : $NSString):
@@ -73,7 +73,7 @@ public func testOutlining() {
 
 // CHECK-LABEL: sil shared [serializable] [noinline] @_T0So5GizmoC14stringPropertySQySSGvgToTepb_ : $@convention(thin) (Gizmo) -> @owned Optional<String>
 // CHECK: bb0(%0 : $Gizmo):
-// CHECK:  %1 = class_method [volatile] %0 : $Gizmo, #Gizmo.stringProperty!getter.1.foreign : (Gizmo) -> () -> String!
+// CHECK:  %1 = objc_method %0 : $Gizmo, #Gizmo.stringProperty!getter.1.foreign : (Gizmo) -> () -> String!
 // CHECK:  %2 = apply %1(%0) : $@convention(objc_method) (Gizmo) -> @autoreleased Optional<NSString>
 // CHECK:  switch_enum %2 : $Optional<NSString>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 // CHECK:bb1(%4 : $NSString):
@@ -90,7 +90,7 @@ public func testOutlining() {
 
 // CHECK-LABEL: sil shared [serializable] [noinline] @_T0So5GizmoC14stringPropertySQySSGvsToTembnn_ : $@convention(thin) (@owned String, Gizmo) -> () {
 // CHECK: bb0(%0 : $String, %1 : $Gizmo):
-// CHECK:   %2 = class_method [volatile] %1 : $Gizmo, #Gizmo.stringProperty!setter.1.foreign : (Gizmo) -> (String!) -> ()
+// CHECK:   %2 = objc_method %1 : $Gizmo, #Gizmo.stringProperty!setter.1.foreign : (Gizmo) -> (String!) -> ()
 // CHECK:   %3 = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
 // CHECK:   %4 = apply %3(%0) : $@convention(method) (@guaranteed String) -> @owned NSString
 // CHECK:   release_value %0 : $String
@@ -101,7 +101,7 @@ public func testOutlining() {
 
 // CHECK-LABEL: sil shared [serializable] [noinline] @_T0So5GizmoC12modifyStringSQySSGAD_Si10withNumberSQyypG0D6FoobartFToTembnnnb_ : $@convention(thin) (@owned String, Int, Optional<AnyObject>, Gizmo) -> @owned Optional<String> {
 // CHECK: bb0(%0 : $String, %1 : $Int, %2 : $Optional<AnyObject>, %3 : $Gizmo):
-// CHECK:   %4 = class_method [volatile] %3 : $Gizmo, #Gizmo.modifyString!1.foreign : (Gizmo) -> (String!, Int, Any!) -> String!
+// CHECK:   %4 = objc_method %3 : $Gizmo, #Gizmo.modifyString!1.foreign : (Gizmo) -> (String!, Int, Any!) -> String!
 // CHECK:   %5 = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
 // CHECK:   %6 = apply %5(%0) : $@convention(method) (@guaranteed String) -> @owned NSString
 // CHECK:   release_value %0 : $String
@@ -126,7 +126,7 @@ public func testOutlining() {
 
 // CHECK-LABEL: sil shared [serializable] [noinline] @_T0So5GizmoC11doSomethingSQyypGSQySaySSGGFToTembnn_ : $@convention(thin) (@owned Array<String>, Gizmo) -> @owned Optional<AnyObject> {
 // CHECK: bb0(%0 : $Array<String>, %1 : $Gizmo):
-// CHECK:   %2 = class_method [volatile] %1 : $Gizmo, #Gizmo.doSomething!1.foreign : (Gizmo) -> ([String]!) -> Any!
+// CHECK:   %2 = objc_method %1 : $Gizmo, #Gizmo.doSomething!1.foreign : (Gizmo) -> ([String]!) -> Any!
 // CHECK:   %3 = function_ref @_T0Sa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF : $@convention(method) <{{.*}}> (@guaranteed Array<{{.*}}>) -> @owned NSArray
 // CHECK:   %4 = apply %3<String>(%0) : $@convention(method) <{{.*}}> (@guaranteed Array<{{.*}}>) -> @owned NSArray
 // CHECK:   release_value %0 : $Array<String>

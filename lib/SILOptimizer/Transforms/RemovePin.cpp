@@ -40,10 +40,9 @@ using namespace swift;
 /// \brief Can this instruction read the pinned bit of the reference count.
 /// Reading the pinned prevents us from moving the pin instructions across it.
 static bool mayReadPinFlag(SILInstruction *I) {
-  auto Kind = I->getKind();
-  if (Kind == ValueKind::IsUniqueOrPinnedInst)
+  if (isa<IsUniqueOrPinnedInst>(I))
     return true;
-  if (Kind != ValueKind::ApplyInst)
+  if (!isa<ApplyInst>(I))
     return false;
   if (!I->mayReadFromMemory())
     return false;
@@ -58,7 +57,7 @@ class RemovePinInsts : public SILFunctionTransform {
 
   /// The set of currently available pins that have not been invalidate by an
   /// instruction that mayRelease memory.
-  llvm::SmallPtrSet<SILInstruction *, 16> AvailablePins;
+  llvm::SmallPtrSet<StrongPinInst *, 16> AvailablePins;
 
   AliasAnalysis *AA;
 
@@ -89,9 +88,9 @@ public:
         DEBUG(llvm::dbgs() << "    Visiting: " << *CurInst);
 
         // Add StrongPinInst to available pins.
-        if (isa<StrongPinInst>(CurInst)) {
+        if (auto pin = dyn_cast<StrongPinInst>(CurInst)) {
           DEBUG(llvm::dbgs() << "        Found pin!\n");
-          AvailablePins.insert(CurInst);
+          AvailablePins.insert(pin);
           continue;
         }
 
@@ -181,11 +180,19 @@ public:
 
     for (auto *U : Users) {
       // A mark_dependence is safe if it is marking a dependence on a base that
-      // is the strong_pinned value.
+      // is the strong_pinned value:
+      //    %0 = strong_pin ...
+      //    %1 = mark_dependence ... on %0
+      // or
+      //    %0 = strong_pin ...
+      //    %1 = foo ... %0 ...
+      //    %2 = mark_dependence ... on %1
       if (auto *MD = dyn_cast<MarkDependenceInst>(U))
         if (Pin == MD->getBase() ||
-            std::find(Users.begin(), Users.end(), MD->getBase()) !=
-                Users.end()) {
+            std::find_if(Users.begin(), Users.end(),
+                         [&](SILInstruction *I) {
+                           return MD->getBase()->getDefiningInstruction() == I;
+                         }) != Users.end()) {
           MarkDeps.push_back(MD);
           continue;
         }
@@ -236,7 +243,7 @@ public:
     // TODO: We already created an ArraySemanticsCall in
     // isSafeArraySemanticFunction. I wonder if we can refactor into a third
     // method that takes an array semantic call. Then we can reuse the work.
-    ArraySemanticsCall Call(I);
+    ArraySemanticsCall Call(cast<ApplyInst>(I));
 
     // If our call does not have guaranteed self, bail.
     if (!Call.hasGuaranteedSelf())
@@ -249,7 +256,7 @@ public:
   /// Removes available pins that could be released by executing of 'I'.
   void invalidateAvailablePins(SILInstruction *I) {
     // Collect pins that we have to clear because they might have been released.
-    SmallVector<SILInstruction *, 16> RemovePin;
+    SmallVector<StrongPinInst *, 16> RemovePin;
     for (auto *P : AvailablePins) {
       if (!isSafeArraySemanticFunction(I) &&
           (mayDecrementRefCount(I, P, AA) ||

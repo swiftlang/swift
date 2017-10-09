@@ -1,6 +1,6 @@
 set(swift_stdlib_unittest_compile_flags)
 if(SWIFT_SERIALIZE_STDLIB_UNITTEST)
-  list(APPEND swift_stdlib_unittest_compile_flags "-Xfrontend" "-sil-serialize-all")
+  list(APPEND swift_stdlib_unittest_compile_flags "-Xfrontend" "-sil-serialize-witness-tables" "-Xfrontend" "-sil-serialize-vtables")
 endif()
 
 # TODO: support this on non-POSIX platforms.  It cannot be currently as it

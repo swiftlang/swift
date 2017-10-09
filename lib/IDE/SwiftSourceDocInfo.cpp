@@ -188,9 +188,19 @@ bool CursorInfoResolver::walkToExprPre(Expr *E) {
         ContainerType = ME->getBase()->getType();
       }
     }
-
+    auto IsProperCursorLocation = E->getStartLoc() == LocToResolve;
+    // Handle cursor placement after `try` in ForceTry and OptionalTry Expr.
+    auto CheckLocation = [&IsProperCursorLocation, this](SourceLoc Loc) {
+      IsProperCursorLocation = Loc == LocToResolve || IsProperCursorLocation;
+    };
+    if (auto *FTE = dyn_cast<ForceTryExpr>(E)) {
+      CheckLocation(FTE->getExclaimLoc());
+    }
+    if (auto *OTE = dyn_cast<OptionalTryExpr>(E)) {
+      CheckLocation(OTE->getQuestionLoc());
+    }
     // Keep track of trailing expressions.
-    if (!E->isImplicit() && E->getStartLoc() == LocToResolve)
+    if (!E->isImplicit() && IsProperCursorLocation)
       TrailingExprStack.push_back(E);
   }
   return true;
@@ -773,8 +783,9 @@ calculateContentRange(ArrayRef<Token> Tokens) {
   auto StartLoc = StartTok.hasComment() ?
     StartTok.getCommentStart() : StartTok.getLoc();
   auto EndLoc = EndTok.getRange().getEnd();
-  return CharSourceRange(StartLoc, (char*)EndLoc.getOpaquePointerValue() -
-    (char*)StartLoc.getOpaquePointerValue());
+  auto Length = static_cast<const char *>(EndLoc.getOpaquePointerValue()) -
+                static_cast<const char *>(StartLoc.getOpaquePointerValue());
+  return CharSourceRange(StartLoc, Length);
 }
 
 bool DeclaredDecl::operator==(const DeclaredDecl& Other) {

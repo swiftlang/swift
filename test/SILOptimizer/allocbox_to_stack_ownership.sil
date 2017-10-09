@@ -17,7 +17,7 @@ sil @simple_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : @trivial $Int):
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
-  %2 = store %0 to [trivial] %1a : $*Int
+  store %0 to [trivial] %1a : $*Int
 
   %3 = load [trivial] %1a : $*Int
   destroy_value %1 : ${ var Int }
@@ -33,7 +33,7 @@ sil @double_project_box : $@convention(thin) (Int) -> (Int, Int) {
 bb0(%0 : @trivial $Int):
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
-  %2 = store %0 to [trivial] %1a : $*Int
+  store %0 to [trivial] %1a : $*Int
   %3 = load [trivial] %1a : $*Int
 
   %1b = project_box %1 : ${ var Int }, 0
@@ -54,8 +54,8 @@ bb0:
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
   %3 = load [trivial] %1a : $*Int
-  %4 = destroy_value %1 : ${ var Int }
-  %5 = return %3 : $Int
+  destroy_value %1 : ${ var Int }
+  return %3 : $Int
 
 // CHECK: %0 = alloc_stack
 // CHECK-NOT: alloc_box
@@ -78,7 +78,7 @@ bb0:
 
 bb1:
   destroy_value %x : ${ var Int }
-  %5 = return %3 : $Int
+  return %3 : $Int
 
 // CHECK: %0 = alloc_stack
 // CHECK: bb1:
@@ -101,17 +101,17 @@ bb1(%0 : @trivial $Int):
   %aa = project_box %a : ${ var (Int, Int) }, 0
 
   %2 = struct_element_addr %1a : $*TestStruct, #TestStruct.Elt
-  %3 = store %0 to [trivial] %2 : $*Int
+  store %0 to [trivial] %2 : $*Int
 
   %b = tuple_element_addr %aa : $*(Int, Int), 0
-  %c = store %0 to [trivial] %b : $*Int
+  store %0 to [trivial] %b : $*Int
 
   %6 = struct_element_addr %1a : $*TestStruct, #TestStruct.Elt
   %7 = load [trivial] %6 : $*Int
   destroy_value %a : ${ var (Int, Int) }
   destroy_value %1 : ${ var TestStruct }
 
-  %9 = return %7 : $Int
+  return %7 : $Int
 
 // CHECK-DAG: dealloc_stack [[STRUCT]]
 // CHECK-DAG: dealloc_stack [[TUPLE]]
@@ -133,7 +133,7 @@ bb0:
   %10 = address_to_pointer %1a : $*Int to $Builtin.RawPointer
   %11 = pointer_to_address %10 : $Builtin.RawPointer to [strict] $*Int
   %12 = load [trivial] %11 : $*Int
-  %13 = return %8 : $Int
+  return %8 : $Int
   // CHECK: return
 }
 
@@ -152,7 +152,7 @@ bb0:
   %3 = apply %1(%2a) : $@convention(thin) () -> @out P
   destroy_value %2 : ${ var P }
   %0 = tuple ()
-  %6 = return %0 : $()
+  return %0 : $()
   // CHECK: return
 }
 
@@ -208,7 +208,7 @@ bb0:  // CHECK-NEXT: bb0:
   dealloc_box %1 : $<τ_0_0> { var Generic<τ_0_0> } <T>
 
   %0 = tuple ()    // CHECK: tuple ()
-  %6 = return %0 : $()
+  return %0 : $()
   // CHECK: return
 }
 
@@ -774,7 +774,7 @@ bb1:
 
 bb2:
   %1a = project_box %1 : ${ var Int }, 0
-  %2 = store %0 to [trivial] %1a : $*Int
+  store %0 to [trivial] %1a : $*Int
   dealloc_stack %as1 : $*Bool
   %3 = load [trivial] %1a : $*Int
   %as2 = alloc_stack $Bool
@@ -784,7 +784,7 @@ bb2:
 
 bb3:
   %r = tuple ()
-  %5 = return %r : $()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @wrong_nesting_with_alloc_ref
@@ -806,7 +806,7 @@ bb0(%0 : @trivial $Int):
   %3 = load [trivial] %1a : $*Int
   destroy_value %1 : ${ var Int }
   %r = tuple ()
-  %5 = return %r : $()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @nesting_and_unreachable1
@@ -841,7 +841,7 @@ bb2:
   %3 = load [trivial] %1a : $*Int
   destroy_value %1 : ${ var Int }
   %r = tuple ()
-  %5 = return %r : $()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @nesting_and_unreachable2
@@ -874,12 +874,12 @@ bb1:
   unreachable
 
 bb2:
-  %2 = store %0 to [trivial] %1a : $*Int
+  store %0 to [trivial] %1a : $*Int
   dealloc_stack %as1 : $*Bool
   %3 = load [trivial] %1a : $*Int
   destroy_value %1 : ${ var Int }
   %r = tuple ()
-  %5 = return %r : $()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @nesting_and_unreachable3
@@ -913,7 +913,7 @@ bb2:
   dealloc_stack %as1 : $*Bool
   destroy_value %1 : ${ var Int }
   %r = tuple ()
-  %5 = return %r : $()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @nesting_and_unreachable4
@@ -936,11 +936,11 @@ bb1:
   unreachable
 
 bb2:
-  %2 = store %0 to [trivial] %1a : $*Int
+  store %0 to [trivial] %1a : $*Int
   %3 = load [trivial] %1a : $*Int
   destroy_value %1 : ${ var Int }
   %r = tuple ()
-  %5 = return %r : $()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @nesting_and_unreachable5
@@ -967,11 +967,11 @@ bb1:
   unreachable
 
 bb2:
-  %2 = store %0 to [trivial] %1a : $*Int
+  store %0 to [trivial] %1a : $*Int
   %3 = load [trivial] %1a : $*Int
   destroy_value %1 : ${ var Int }
   %r = tuple ()
-  %5 = return %r : $()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @nesting_and_unreachable_critical_edge
@@ -1011,13 +1011,13 @@ bb1:
   cond_br undef, bb2, bb3
 
 bb2:
-  %2 = store %0 to [trivial] %1a : $*Int
+  store %0 to [trivial] %1a : $*Int
   %3 = load [trivial] %1a : $*Int
   dealloc_stack %as2 : $*Bool
   dealloc_stack %as1 : $*Bool
   destroy_value %1 : ${ var Int }
   %r = tuple ()
-  %5 = return %r : $()
+  return %r : $()
 
 bb3:
   destroy_value %1 : ${ var Int }

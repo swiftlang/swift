@@ -97,7 +97,7 @@ func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
 f8(3, f4) // expected-error {{in argument type '(Int) -> Int', 'Int' does not conform to expected type 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{in argument type '(Tup) -> Tup' (aka '(Int, Double) -> (Int, Double)'), 'Tup' (aka '(Int, Double)') does not conform to expected type 'P2'}}
+f8((1,2.0), f9) // expected-error {{in argument type '(Tup) -> Tup' (aka '((Int, Double)) -> (Int, Double)'), 'Tup' (aka '(Int, Double)') does not conform to expected type 'P2'}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -1101,4 +1101,21 @@ func rdar17170728() {
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
     // expected-error@-1 {{type of expression is ambiguous without more context}}
   }
+}
+
+// https://bugs.swift.org/browse/SR-5934 - failure to emit diagnostic for bad
+// generic constraints
+func elephant<T, U>(_: T) where T : Collection, T.Element == U, T.Element : Hashable {}
+// expected-note@-1 {{in call to function 'elephant'}}
+
+func platypus<T>(a: [T]) {
+    _ = elephant(a) // expected-error {{generic parameter 'U' could not be inferred}}
+}
+
+// Another case of the above.
+func badTypes() {
+  let sequence:AnySequence<[Int]> = AnySequence() { AnyIterator() { [3] }}
+  let array = [Int](sequence)
+  // expected-error@-1 {{type of expression is ambiguous without more context}}
+  // FIXME: terrible diagnostic
 }

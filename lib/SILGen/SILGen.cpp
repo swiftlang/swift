@@ -28,6 +28,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/Subsystems.h"
+#include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Debug.h"
 #include "ManagedValue.h"
 #include "RValue.h"
@@ -41,6 +42,16 @@ using namespace Lowering;
 SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
   : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
     Profiler(nullptr) {
+  SILOptions &Opts = M.getOptions();
+  if (!Opts.UseProfile.empty()) {
+    auto ReaderOrErr = llvm::IndexedInstrProfReader::create(Opts.UseProfile);
+    if (auto E = ReaderOrErr.takeError()) {
+      diagnose(SourceLoc(), diag::profile_read_error, Opts.UseProfile,
+               llvm::toString(std::move(E)));
+      Opts.UseProfile.erase();
+    }
+    PGOReader = std::move(ReaderOrErr.get());
+  }
 }
 
 SILGenModule::~SILGenModule() {
@@ -429,8 +440,8 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    C);
 
   return M.createFunction(SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION,
-                          topLevelType, nullptr, Loc, IsBare,
-                          IsNotTransparent, IsNotSerialized, IsNotThunk,
+                          topLevelType, nullptr, Loc, IsBare, IsNotTransparent,
+                          IsNotSerialized, ProfileCounter(), IsNotThunk,
                           SubclassScope::NotApplicable);
 }
 
@@ -449,9 +460,6 @@ SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
       // linkage.
       if (isAvailableExternally(F->getLinkage())) {
         F->setLinkage(constant.getLinkage(ForDefinition));
-      }
-      if (isMakeModuleFragile()) {
-        F->setSerialized(IsSerialized);
       }
     }
     return F;
@@ -483,6 +491,13 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
   return nullptr;
 }
 
+static bool hasSILBody(FuncDecl *fd) {
+  if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
+    return !isa<ProtocolDecl>(fd->getDeclContext());
+
+  return fd->getBody(/*canSynthesize=*/false);
+}
+
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                        ForDefinition_t forDefinition) {
   // If we already emitted the function, return it (potentially preparing it
@@ -490,19 +505,20 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   if (auto emitted = getEmittedFunction(constant, forDefinition))
     return emitted;
 
+  ProfileCounter count = ProfileCounter();
+  if (constant.hasDecl()) {
+    if (auto *fd = constant.getFuncDecl()) {
+      if (hasSILBody(fd)) {
+        count = loadProfilerCount(fd->getBody(/*canSynthesize=*/false));
+      }
+    }
+  }
   // Note: Do not provide any SILLocation. You can set it afterwards.
   auto *F = M.getOrCreateFunction(constant.hasDecl() ? constant.getDecl()
                                                      : (Decl *)nullptr,
-                                  constant, forDefinition);
+                                  constant, forDefinition, count);
 
   assert(F && "SILFunction should have been defined");
-
-  if (isMakeModuleFragile()) {
-    SILLinkage linkage = constant.getLinkage(forDefinition);
-    if (linkage != SILLinkage::PublicExternal) {
-      F->setSerialized(IsSerialized);
-    }
-  }
 
   emittedFunctions[constant] = F;
 
@@ -671,13 +687,6 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
     if (!hasFunction(thunk))
       emitNativeToForeignThunk(thunk);
   }
-}
-
-static bool hasSILBody(FuncDecl *fd) {
-  if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
-    return !isa<ProtocolDecl>(fd->getDeclContext());
-
-  return fd->getBody(/*canSynthesize=*/false);
 }
 
 void SILGenModule::emitFunction(FuncDecl *fd) {
@@ -975,9 +984,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
       M.createFunction(SILLinkage::Private,
                        funcName, initSILType, nullptr,
                        SILLocation(binding), IsNotBare, IsNotTransparent,
-                       isMakeModuleFragile()
-                           ? IsSerialized
-                           : IsNotSerialized);
+                       IsNotSerialized);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   SILGenFunction(*this, *f).emitLazyGlobalInitializer(binding, pbdEntry);
   f->verify();

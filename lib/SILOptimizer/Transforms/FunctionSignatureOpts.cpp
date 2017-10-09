@@ -499,8 +499,8 @@ static bool usesGenerics(SILFunction *F,
       }
 
       // Scan the result type of the instruction.
-      if (I.getType()) {
-        I.getType().getSwiftRValueType().visit(FindArchetypesAndGenericTypes);
+      for (auto V : I.getResults()) {
+        V->getType().getSwiftRValueType().visit(FindArchetypesAndGenericTypes);
       }
 
       if (UsesGenerics)
@@ -649,11 +649,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     NewFGenericEnv = nullptr;
   }
 
-  NewF = M.createFunction(
-      linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isSerialized(), F->isThunk(),
-      F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
-      nullptr, F->getDebugScope());
+  NewF = M.createFunction(linkage, Name, NewFTy, NewFGenericEnv,
+                          F->getLocation(), F->isBare(), F->isTransparent(),
+                          F->isSerialized(), F->getEntryCount(), F->isThunk(),
+                          F->getClassSubclassScope(), F->getInlineStrategy(),
+                          F->getEffectsKind(), nullptr, F->getDebugScope());
   if (F->hasUnqualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
@@ -948,8 +948,8 @@ void FunctionSignatureTransform::OwnedToGuaranteedTransformFunctionResults() {
         continue;
       }
       // Create a release to balance it out.
-      assert(isa<ApplyInst>(X) && "Unknown epilogue retain");
-      createDecrementBefore(X, dyn_cast<ApplyInst>(X)->getParent()->getTerminator());
+      auto AI = cast<ApplyInst>(X);
+      createDecrementBefore(AI, AI->getParent()->getTerminator());
     }
   }
 }
@@ -1018,12 +1018,12 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
   }
 
   SILInstruction *Call = findOnlyApply(F);
-  if (isa<ApplyInst>(Call)) {
-    Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(Call)));
-    Builder.createRetainValue(RegularLocation(SourceLoc()), Call,
+  if (auto AI = dyn_cast<ApplyInst>(Call)) {
+    Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(AI)));
+    Builder.createRetainValue(RegularLocation(SourceLoc()), AI,
                               Builder.getDefaultAtomicity());
   } else {
-    SILBasicBlock *NormalBB = dyn_cast<TryApplyInst>(Call)->getNormalBB();
+    SILBasicBlock *NormalBB = cast<TryApplyInst>(Call)->getNormalBB();
     Builder.setInsertionPoint(&*NormalBB->begin());
     Builder.createRetainValue(RegularLocation(SourceLoc()),
                               NormalBB->getArgument(0), Builder.getDefaultAtomicity());

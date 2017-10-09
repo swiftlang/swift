@@ -1,6 +1,6 @@
 
 include(CMakeParseArguments)
-
+include(SwiftBenchmarkUtils)
 
 # Run a shell command and assign output to a variable or fail with an error.
 # Example usage:
@@ -19,6 +19,157 @@ function(runcmd)
   endif()
   set(${RUNCMD_VARIABLE} ${${RUNCMD_VARIABLE}} PARENT_SCOPE)
 endfunction(runcmd)
+
+function (add_swift_benchmark_library objfile_out sibfile_out)
+  cmake_parse_arguments(BENCHLIB "" "MODULE_PATH;SOURCE_DIR;OBJECT_DIR" "SOURCES;LIBRARY_FLAGS;DEPENDS" ${ARGN})
+
+  precondition(BENCHLIB_MODULE_PATH)
+  precondition(BENCHLIB_SOURCE_DIR)
+  precondition(BENCHLIB_OBJECT_DIR)
+  precondition(BENCHLIB_SOURCES)
+
+  set(module_name_path "${BENCHLIB_MODULE_PATH}")
+  get_filename_component(module_name "${module_name_path}" NAME)
+  set(srcdir "${BENCHLIB_SOURCE_DIR}")
+  set(objdir "${BENCHLIB_OBJECT_DIR}")
+  set(sources "${BENCHLIB_SOURCES}")
+
+  set(objfile "${objdir}/${module_name}.o")
+  set(swiftmodule "${objdir}/${module_name}.swiftmodule")
+
+  precondition(objfile_out)
+  add_custom_command(
+    OUTPUT "${objfile}"
+    DEPENDS ${stdlib_dependencies} ${sources} ${BENCHLIB_DEPENDS}
+    COMMAND "${SWIFT_EXEC}"
+      ${BENCHLIB_LIBRARY_FLAGS}
+      "-force-single-frontend-invocation"
+      "-parse-as-library"
+      "-module-name" "${module_name}"
+      "-emit-module" "-emit-module-path" "${swiftmodule}"
+      "-I" "${objdir}"
+      "-o" "${objfile}"
+      ${sources})
+  set(${objfile_out} "${objfile}" PARENT_SCOPE)
+
+  if(SWIFT_BENCHMARK_EMIT_SIB)
+    precondition(sibfile_out)
+    set(sibfile "${objdir}/${module_name}.sib")
+
+    add_custom_command(
+      OUTPUT "${sibfile}"
+      DEPENDS
+      ${stdlib_dependencies} ${sources} ${BENCHLIB_DEPENDS}
+      COMMAND "${SWIFT_EXEC}"
+        ${BENCHLIB_LIBRARY_FLAGS}
+        "-force-single-frontend-invocation"
+        "-parse-as-library"
+        "-module-name" "${module_name}"
+        "-emit-sib"
+        "-I" "${objdir}"
+        "-o" "${sibfile}"
+        ${sources})
+    set(sibfile_out "${sibfile}" PARENT_SCOPE)
+  endif()
+endfunction()
+
+function(_construct_sources_for_multibench sources_out objfile_out)
+  cmake_parse_arguments(SOURCEJSONLIST "" "" "SOURCES" ${ARGN})
+
+  set(sources)
+  set(objfiles)
+
+  foreach(source ${SOURCEJSONLIST_SOURCES})
+    list(APPEND sources "${srcdir}/${source}")
+
+    get_filename_component(basename "${source}" NAME_WE)
+    set(objfile "${objdir}/${module_name}/${basename}.o")
+
+    string(CONCAT json "${json}"
+      "  \"${srcdir}/${source}\": { \"object\": \"${objfile}\" },\n")
+
+    list(APPEND objfiles "${objfile}")
+  endforeach()
+  string(CONCAT json "${json}" "}")
+  file(WRITE "${objdir}/${module_name}/outputmap.json" ${json})
+  set(${sources_out} ${sources} PARENT_SCOPE)
+  set(${objfile_out} ${objfiles} PARENT_SCOPE)
+endfunction()
+
+# Regular whole-module-compilation: only a single object file is
+# generated.
+function (add_swift_multisource_wmo_benchmark_library objfile_out)
+  cmake_parse_arguments(BENCHLIB "" "MODULE_PATH;SOURCE_DIR;OBJECT_DIR" "SOURCES;LIBRARY_FLAGS;DEPENDS" ${ARGN})
+
+  precondition(BENCHLIB_MODULE_PATH)
+  precondition(BENCHLIB_SOURCE_DIR)
+  precondition(BENCHLIB_OBJECT_DIR)
+  precondition(BENCHLIB_SOURCES)
+
+  set(module_name_path "${BENCHLIB_MODULE_PATH}")
+  get_filename_component(module_name "${module_name_path}" NAME)
+  set(srcdir "${BENCHLIB_SOURCE_DIR}")
+  set(objdir "${BENCHLIB_OBJECT_DIR}")
+
+  set(objfile "${objdir}/${module_name}.o")
+
+  set(sources)
+  foreach(source ${BENCHLIB_SOURCES})
+    list(APPEND sources "${srcdir}/${source}")
+  endforeach()
+
+  add_custom_command(
+    OUTPUT "${objfile}"
+    DEPENDS
+      ${sources} ${BENCHLIB_DEPENDS}
+    COMMAND "${SWIFT_EXEC}"
+      ${BENCHLIB_LIBRARY_FLAGS}
+      "-parse-as-library"
+      "-emit-module" "-module-name" "${module_name}"
+      "-I" "${objdir}"
+      "-o" "${objfile}"
+      ${sources})
+
+  set(${objfile_out} "${objfile}" PARENT_SCOPE)
+endfunction()
+
+function(add_swift_multisource_nonwmo_benchmark_library objfiles_out)
+  cmake_parse_arguments(BENCHLIB "" "MODULE_PATH;SOURCE_DIR;OBJECT_DIR" "SOURCES;LIBRARY_FLAGS;DEPENDS" ${ARGN})
+
+  precondition(BENCHLIB_MODULE_PATH)
+  precondition(BENCHLIB_SOURCE_DIR)
+  precondition(BENCHLIB_OBJECT_DIR)
+  precondition(BENCHLIB_SOURCES)
+
+  set(module_name_path "${BENCHLIB_MODULE_PATH}")
+  get_filename_component(module_name "${module_name_path}" NAME)
+  set(srcdir "${BENCHLIB_SOURCE_DIR}")
+  set(objdir "${BENCHLIB_OBJECT_DIR}")
+
+  set(objfile "${objdir}/${module_name}.o")
+
+  # No whole-module-compilation or multi-threaded compilation.
+  # There is an output object file for each input file. We have to write
+  # an output-map-file to specify the output object file names.
+  set(sources)
+  set(objfiles)
+  _construct_sources_for_multibench(sources objfiles
+    SOURCES ${BENCHLIB_SOURCES})
+
+  add_custom_command(
+    OUTPUT ${objfiles}
+    DEPENDS ${sources} ${BENCHLIB_DEPENDS}
+    COMMAND "${SWIFT_EXEC}"
+      ${BENCHLIB_LIBRARY_FLAGS}
+      "-parse-as-library"
+      "-emit-module-path" "${objdir}/${module_name}.swiftmodule"
+      "-module-name" "${module_name}"
+      "-I" "${objdir}"
+      "-output-file-map" "${objdir}/${module_name}/outputmap.json"
+      ${sources})
+
+  set(${objfiles_out} ${objfiles} PARENT_SCOPE)
+endfunction()
 
 function (swift_benchmark_compile_archopts)
   cmake_parse_arguments(BENCH_COMPILE_ARCHOPTS "" "PLATFORM;ARCH;OPT" "" ${ARGN})
@@ -42,7 +193,6 @@ function (swift_benchmark_compile_archopts)
   set(bench_flags "${${benchvar}}")
 
   set(common_options
-      "-swift-version" "3" # FIXME: Force Swift 3 version compatibility.
       "-c"
       "-sdk" "${sdk}"
       "-target" "${target}"
@@ -50,9 +200,11 @@ function (swift_benchmark_compile_archopts)
       "-${BENCH_COMPILE_ARCHOPTS_OPT}"
       "-no-link-objc-runtime"
       "-I" "${srcdir}/utils/ObjectiveCTests")
+  set(common_swift3_options ${common_options} "-swift-version" "3")
+  set(common_swift4_options ${common_options} "-swift-version" "4")
 
   # Always optimize the driver modules.
-  # Note that we compile the driver for Ounchecked also with -Ounchecked
+  # Note that we compile the driver for Osize also with -Osize
   # (and not with -O), because of <rdar://problem/19614516>.
   string(REPLACE "Onone" "O" driver_opt "${optflag}")
 
@@ -66,85 +218,49 @@ function (swift_benchmark_compile_archopts)
 
   set(bench_library_objects)
   set(bench_library_sibfiles)
-  foreach(module_name_path ${BENCH_DRIVER_LIBRARY_MODULES})
-    get_filename_component(module_name "${module_name_path}" NAME)
+  # Build libraries used by the driver and benchmarks.
+  foreach(module_name_path ${BENCH_LIBRARY_MODULES})
+    set(sources "${srcdir}/${module_name_path}.swift")
 
-    if("${module_name}" STREQUAL "DriverUtils")
-      set(extra_sources "${srcdir}/utils/ArgParse.swift")
-    endif()
-
-    set(objfile "${objdir}/${module_name}.o")
-    set(swiftmodule "${objdir}/${module_name}.swiftmodule")
-    list(APPEND bench_library_objects "${objfile}")
-    set(source "${srcdir}/${module_name_path}.swift")
-    add_custom_command(
-        OUTPUT "${objfile}"
-        DEPENDS ${stdlib_dependencies} "${source}" ${extra_sources}
-        COMMAND "${SWIFT_EXEC}"
-        ${common_options_driver}
-        ${BENCH_DRIVER_LIBRARY_FLAGS}
-        "-force-single-frontend-invocation"
-        "-parse-as-library"
-        "-module-name" "${module_name}"
-        "-emit-module" "-emit-module-path" "${swiftmodule}"
-        "-o" "${objfile}"
-        "${source}" ${extra_sources})
-    if(SWIFT_BENCHMARK_EMIT_SIB)
-      set(sibfile "${objdir}/${module_name}.sib")
-      list(APPEND bench_library_sibfiles "${sibfile}")
-      add_custom_command(
-          OUTPUT "${sibfile}"
-          DEPENDS
-            ${stdlib_dependencies} "${srcdir}/${module_name_path}.swift"
-            ${extra_sources}
-          COMMAND "${SWIFT_EXEC}"
-          ${common_options_driver}
-          ${BENCH_DRIVER_LIBRARY_FLAGS}
-          "-force-single-frontend-invocation"
-          "-parse-as-library"
-          "-module-name" "${module_name}"
-          "-emit-sib"
-          "-o" "${sibfile}"
-          "${source}" ${extra_sources})
+    add_swift_benchmark_library(objfile_out sibfile_out
+      MODULE_PATH "${module_name_path}"
+      SOURCE_DIR "${srcdir}"
+      OBJECT_DIR "${objdir}"
+      SOURCES ${sources}
+      LIBRARY_FLAGS ${common_swift3_options})
+    precondition(objfile_out)
+    list(APPEND bench_library_objects "${objfile_out}")
+    if (SWIFT_BENCHMARK_EMIT_SIB)
+      precondition(sibfile_out)
+      list(APPEND bench_library_sibfiles "${sibfile_out}")
     endif()
   endforeach()
+  precondition(bench_library_objects)
 
-  foreach(module_name_path ${BENCH_LIBRARY_MODULES})
+  set(bench_driver_objects)
+  set(bench_driver_sibfiles)
+  foreach(module_name_path ${BENCH_DRIVER_LIBRARY_MODULES})
+    set(sources "${srcdir}/${module_name_path}.swift")
+
     get_filename_component(module_name "${module_name_path}" NAME)
+    if("${module_name}" STREQUAL "DriverUtils")
+      list(APPEND sources "${srcdir}/utils/ArgParse.swift")
+    endif()
 
-    set(objfile "${objdir}/${module_name}.o")
-    set(swiftmodule "${objdir}/${module_name}.swiftmodule")
-    set(source "${srcdir}/${module_name_path}.swift")
-    list(APPEND bench_library_objects "${objfile}")
-    add_custom_command(
-        OUTPUT "${objfile}"
-        DEPENDS
-          ${stdlib_dependencies} "${srcdir}/${module_name_path}.swift"
-          ${extra_sources}
-        COMMAND "${SWIFT_EXEC}"
-        ${common_options}
-        "-force-single-frontend-invocation"
-        "-parse-as-library"
-        "-module-name" "${module_name}"
-        "-emit-module" "-emit-module-path" "${swiftmodule}"
-        "-o" "${objfile}"
-        "${source}" ${extra_sources})
+    set(objfile_out)
+    set(sibfile_out)
+    add_swift_benchmark_library(objfile_out sibfile_out
+      MODULE_PATH "${module_name_path}"
+      SOURCE_DIR "${srcdir}"
+      OBJECT_DIR "${objdir}"
+      SOURCES ${sources}
+      LIBRARY_FLAGS ${common_options_driver} ${BENCH_DRIVER_LIBRARY_FLAGS}
+      DEPENDS ${bench_library_objects})
+    precondition(objfile_out)
+    list(APPEND bench_driver_objects "${objfile_out}")
     if (SWIFT_BENCHMARK_EMIT_SIB)
-      set(sibfile "${objdir}/${module_name}.sib")
-      list(APPEND bench_library_sibfiles "${sibfile}")
-      add_custom_command(
-          OUTPUT "${sibfile}"
-          DEPENDS
-            ${stdlib_dependencies} "${srcdir}/${module_name_path}.swift"
-            ${extra_sources}
-          COMMAND "${SWIFT_EXEC}"
-          ${common_options}
-          "-force-single-frontend-invocation"
-          "-parse-as-library"
-          "-module-name" "${module_name}"
-          "-emit-sib"
-          "-o" "${sibfile}"
-          "${source}" ${extra_sources})
+      precondition(sibfile_out)
+      list(APPEND bench_driver_sibfiles "${sibfile_out}")
     endif()
   endforeach()
 
@@ -180,7 +296,7 @@ function (swift_benchmark_compile_archopts)
             ${stdlib_dependencies} ${bench_library_objects}
             "${srcdir}/${module_name_path}.swift"
           COMMAND "${SWIFT_EXEC}"
-          ${common_options}
+          ${common_swift3_options}
           ${extra_options}
           "-parse-as-library"
           ${bench_flags}
@@ -198,7 +314,7 @@ function (swift_benchmark_compile_archopts)
               ${stdlib_dependencies} ${bench_library_sibfiles}
               "${srcdir}/${module_name_path}.swift"
             COMMAND "${SWIFT_EXEC}"
-            ${common_options}
+            ${common_swift3_options}
             "-parse-as-library"
             ${bench_flags}
             "-module-name" "${module_name}"
@@ -210,67 +326,61 @@ function (swift_benchmark_compile_archopts)
     endif()
   endforeach()
 
-  foreach(module_name_path ${SWIFT_MULTISOURCE_BENCHES})
+  foreach(module_name_path ${SWIFT_MULTISOURCE_SWIFT3_BENCHES})
     get_filename_component(module_name "${module_name_path}" NAME)
 
     if ("${bench_flags}" MATCHES "-whole-module.*" AND
         NOT "${bench_flags}" MATCHES "-num-threads.*")
-      # Regular whole-module-compilation: only a single object file is
-      # generated.
-      set(objfile "${objdir}/${module_name}.o")
-      list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
-      set(sources)
-      foreach(source ${${module_name}_sources})
-        list(APPEND sources "${srcdir}/${source}")
-      endforeach()
-      add_custom_command(
-          OUTPUT "${objfile}"
-          DEPENDS
-            ${stdlib_dependencies} ${bench_library_objects} ${sources}
-          COMMAND "${SWIFT_EXEC}"
-          ${common_options}
-          ${bench_flags}
-          "-parse-as-library"
-          "-emit-module" "-module-name" "${module_name}"
-          "-I" "${objdir}"
-          "-o" "${objfile}"
-          ${sources})
+      set(objfile_out)
+      add_swift_multisource_wmo_benchmark_library(objfile_out
+        MODULE_PATH "${module_name_path}"
+        SOURCE_DIR "${srcdir}"
+        OBJECT_DIR "${objdir}"
+        SOURCES ${${module_name}_sources}
+        LIBRARY_FLAGS ${common_swift3_options} ${bench_flags}
+        DEPENDS ${bench_library_objects} ${stdlib_dependencies})
+      precondition(objfile_out)
+      list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
     else()
+      set(objfiles_out)
+      add_swift_multisource_nonwmo_benchmark_library(objfiles_out
+        MODULE_PATH "${module_name_path}"
+        SOURCE_DIR "${srcdir}"
+        OBJECT_DIR "${objdir}"
+        SOURCES ${${module_name}_sources}
+        LIBRARY_FLAGS ${common_swift3_options} ${bench_flags}
+        DEPENDS ${bench_library_objects} ${stdlib_dependencies})
+      precondition(objfiles_out)
+      list(APPEND SWIFT_BENCH_OBJFILES ${objfiles_out})
+    endif()
+  endforeach()
 
-      # No whole-module-compilation or multi-threaded compilation.
-      # There is an output object file for each input file. We have to write
-      # an output-map-file to specify the output object file names.
-      set(sources)
-      set(objfiles)
-      set(json "{\n")
-      foreach(source ${${module_name}_sources})
-          list(APPEND sources "${srcdir}/${source}")
+  foreach(module_name_path ${SWIFT_MULTISOURCE_SWIFT4_BENCHES})
+    get_filename_component(module_name "${module_name_path}" NAME)
 
-          get_filename_component(basename "${source}" NAME_WE)
-          set(objfile "${objdir}/${module_name}/${basename}.o")
-
-              string(CONCAT json "${json}"
-    "  \"${srcdir}/${source}\": { \"object\": \"${objfile}\" },\n")
-
-          list(APPEND objfiles "${objfile}")
-          list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
-      endforeach()
-      string(CONCAT json "${json}" "}")
-      file(WRITE "${objdir}/${module_name}/outputmap.json" ${json})
-
-      add_custom_command(
-          OUTPUT ${objfiles}
-          DEPENDS
-            ${stdlib_dependencies} ${bench_library_objects} ${sources}
-          COMMAND "${SWIFT_EXEC}"
-          ${common_options}
-          ${bench_flags}
-          "-parse-as-library"
-          "-emit-module-path" "${objdir}/${module_name}.swiftmodule"
-          "-module-name" "${module_name}"
-          "-I" "${objdir}"
-          "-output-file-map" "${objdir}/${module_name}/outputmap.json"
-          ${sources})
+    if ("${bench_flags}" MATCHES "-whole-module.*" AND
+        NOT "${bench_flags}" MATCHES "-num-threads.*")
+      set(objfile_out)
+      add_swift_multisource_wmo_benchmark_library(objfile_out
+        MODULE_PATH "${module_name_path}"
+        SOURCE_DIR "${srcdir}"
+        OBJECT_DIR "${objdir}"
+        SOURCES ${${module_name}_sources}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags}
+        DEPENDS ${bench_library_objects} ${stdlib_dependencies})
+      precondition(objfile_out)
+      list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
+    else()
+      set(objfiles_out)
+      add_swift_multisource_nonwmo_benchmark_library(objfiles_out
+        MODULE_PATH "${module_name_path}"
+        SOURCE_DIR "${srcdir}"
+        OBJECT_DIR "${objdir}"
+        SOURCES ${${module_name}_sources}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags}
+        DEPENDS ${bench_library_objects} ${stdlib_dependencies})
+      precondition(objfiles_out)
+      list(APPEND SWIFT_BENCH_OBJFILES ${objfiles_out})
     endif()
   endforeach()
 
@@ -280,10 +390,11 @@ function (swift_benchmark_compile_archopts)
       OUTPUT "${objdir}/${module_name}.o"
       DEPENDS
         ${stdlib_dependencies}
-        ${bench_library_objects} ${SWIFT_BENCH_OBJFILES}
-        ${bench_library_sibfiles} ${SWIFT_BENCH_SIBFILES} "${source}"
+        ${bench_library_objects} ${bench_driver_objects} ${SWIFT_BENCH_OBJFILES}
+        ${bench_library_sibfiles} ${bench_driver_sibfiles}
+        ${SWIFT_BENCH_SIBFILES} "${source}"
       COMMAND "${SWIFT_EXEC}"
-      ${common_options}
+      ${common_swift3_options}
       "-force-single-frontend-invocation"
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"
@@ -323,7 +434,7 @@ function (swift_benchmark_compile_archopts)
   add_custom_command(
       OUTPUT "${OUTPUT_EXEC}"
       DEPENDS
-        ${bench_library_objects} ${SWIFT_BENCH_OBJFILES}
+        ${bench_library_objects} ${bench_driver_objects} ${SWIFT_BENCH_OBJFILES}
         "${objcfile}"
       COMMAND
         "${CLANG_EXEC}"
@@ -344,6 +455,7 @@ function (swift_benchmark_compile_archopts)
         "-Xlinker" "-rpath"
         "-Xlinker" "@executable_path/../lib/swift/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
         ${bench_library_objects}
+        ${bench_driver_objects}
         ${SWIFT_BENCH_OBJFILES}
         ${objcfile}
         "-o" "${OUTPUT_EXEC}"
@@ -355,7 +467,7 @@ endfunction()
 function(swift_benchmark_compile)
   cmake_parse_arguments(SWIFT_BENCHMARK_COMPILE "" "PLATFORM" "" ${ARGN})
 
-  if(IS_SWIFT_BUILD)
+  if(NOT SWIFT_BENCHMARK_BUILT_STANDALONE)
     set(stdlib_dependencies "swift")
     foreach(stdlib_dependency ${UNIVERSAL_LIBRARY_NAMES_${SWIFT_BENCHMARK_COMPILE_PLATFORM}})
       string(FIND "${stdlib_dependency}" "Unittest" find_output)
@@ -376,12 +488,21 @@ function(swift_benchmark_compile)
       list(APPEND platform_executables ${new_output_exec})
     endforeach()
 
-    set(executable_target "swift-benchmark-${SWIFT_BENCHMARK_COMPILE_PLATFORM}-${arch}")
+    # If we are building standalone as part of a subcmake build, we add the
+    # -external suffix to all of our cmake target names. This enables the main
+    # swift build to simple create -external targets and forward them via
+    # AddExternalProject to the standalone benchmark project. The reason why
+    # this is necessary is that we want to be able to support in-tree and
+    # out-of-tree benchmark builds at the same time implying that we need some
+    # sort of way to distinguish the in-tree (which don't have the suffix) from
+    # the out of tree target (which do).
+    translate_flag(SWIFT_BENCHMARK_SUBCMAKE_BUILD "-external" external)
+    set(executable_target "swift-benchmark-${SWIFT_BENCHMARK_COMPILE_PLATFORM}-${arch}${external}")
 
     add_custom_target("${executable_target}"
         DEPENDS ${platform_executables})
 
-    if(IS_SWIFT_BUILD AND "${SWIFT_BENCHMARK_COMPILE_PLATFORM}" STREQUAL "macosx")
+    if(NOT SWIFT_BENCHMARK_BUILT_STANDALONE AND "${SWIFT_BENCHMARK_COMPILE_PLATFORM}" STREQUAL "macosx")
       add_custom_command(
           TARGET "${executable_target}"
           POST_BUILD

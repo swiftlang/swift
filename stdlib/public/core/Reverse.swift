@@ -22,6 +22,7 @@ extension MutableCollection where Self : BidirectionalCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the
   ///   collection.
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func reverse() {
     if isEmpty { return }
     var f = startIndex
@@ -378,6 +379,9 @@ public struct ReversedRandomAccessCollection<
   public typealias Index = ReversedRandomAccessIndex<Base>
 
   public typealias IndexDistance = Base.IndexDistance
+
+  public typealias Indices =
+    DefaultRandomAccessIndices<ReversedRandomAccessCollection<Base>>
 
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.

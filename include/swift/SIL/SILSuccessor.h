@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_SILSUCCESSOR_H
 #define SWIFT_SIL_SILSUCCESSOR_H
 
+#include "swift/Basic/ProfileCounter.h"
 #include <cassert>
 #include <cstddef>
 #include <iterator>
@@ -40,6 +41,9 @@ class SILSuccessor {
   /// If non-null, this is the BasicBlock that the terminator branches to.
   SILBasicBlock *SuccessorBlock = nullptr;
 
+  /// If hasValue, this is the profiled execution count of the edge
+  ProfileCounter Count;
+
   /// A pointer to the SILSuccessor that represents the previous SILSuccessor in the
   /// predecessor list for SuccessorBlock.
   ///
@@ -53,14 +57,14 @@ class SILSuccessor {
   SILSuccessor *Next = nullptr;
 
 public:
-  SILSuccessor() {}
+  SILSuccessor(ProfileCounter Count = ProfileCounter()) : Count(Count) {}
 
-  SILSuccessor(TermInst *CI)
-    : ContainingInst(CI) {
-  }
+  SILSuccessor(TermInst *CI, ProfileCounter Count = ProfileCounter())
+      : ContainingInst(CI), Count(Count) {}
 
-  SILSuccessor(TermInst *CI, SILBasicBlock *Succ)
-    : ContainingInst(CI) {
+  SILSuccessor(TermInst *CI, SILBasicBlock *Succ,
+               ProfileCounter Count = ProfileCounter())
+      : ContainingInst(CI), Count(Count) {
     *this = Succ;
   }
   
@@ -72,7 +76,9 @@ public:
   
   operator SILBasicBlock*() const { return SuccessorBlock; }
   SILBasicBlock *getBB() const { return SuccessorBlock; }
-  
+
+  ProfileCounter getCount() const { return Count; }
+
   // Do not copy or move these.
   SILSuccessor(const SILSuccessor &) = delete;
   SILSuccessor(SILSuccessor &&) = delete;

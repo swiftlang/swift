@@ -112,15 +112,19 @@ llvm::cl::opt<bool>
 
 // Visit all call results.
 // Stop when the visitor returns `false`.
-void visitCallResults(ApplySite apply,
-                      std::function<bool(SILInstruction *)> visitor) {
-  if (apply.getType().is<TupleType>()) {
-    for (auto *operand : apply.getInstruction()->getUses()) {
-      if (!visitor(operand->getUser()))
-        break;
+static void visitCallResults(ApplySite apply,
+                             llvm::function_ref<bool(SILValue)> visitor) {
+  // FIXME: this entire implementation only really works for ApplyInst.
+  auto applyInst = cast<ApplyInst>(apply);
+  if (applyInst->getType().is<TupleType>()) {
+    // TODO: MultiValueInstruction
+    for (auto *operand : applyInst->getUses()) {
+      if (auto extract = dyn_cast<TupleExtractInst>(operand->getUser()))
+        if (!visitor(extract))
+          break;
     }
   } else
-    visitor(apply.getInstruction());
+    visitor(applyInst);
 }
 
 //===----------------------------------------------------------------------===//
@@ -233,7 +237,7 @@ struct AddressLoweringState {
   ValueStorageMap valueStorageMap;
   // All call sites with formally indirect SILArgument or SILResult conventions.
   // Calls are removed from the set when rewritten.
-  SmallSetVector<SILInstruction *, 16> indirectApplies;
+  SmallSetVector<ApplySite, 16> indirectApplies;
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> returnInsts;
   // Delete these instructions after performing transformations.
@@ -250,8 +254,9 @@ struct AddressLoweringState {
 
   void markDead(SILInstruction *inst) {
 #ifndef NDEBUG
-    for (Operand *use : inst->getUses())
-      assert(instsToDelete.count(use->getUser()));
+    for (auto result : inst->getResults())
+      for (Operand *use : result->getUses())
+        assert(instsToDelete.count(use->getUser()));
 #endif
     instsToDelete.insert(inst);
   }
@@ -305,11 +310,11 @@ void OpaqueValueVisitor::mapValueStorage() {
       }
     }
     for (auto &II : *BB) {
-      if (ApplySite::isa(&II))
-        visitApply(ApplySite(&II));
+      if (auto apply = ApplySite::isa(&II))
+        visitApply(apply);
 
-      if (II.hasValue())
-        visitValue(SILValue(&II));
+      for (auto result : II.getResults())
+        visitValue(result);
     }
   }
 }
@@ -323,16 +328,16 @@ void OpaqueValueVisitor::visitApply(ApplySite applySite) {
     if (operand.get()->getType().isObject()) {
       auto argConv = calleeConv.getSILArgumentConvention(calleeArgIdx);
       if (argConv.isIndirectConvention()) {
-        pass.indirectApplies.insert(applySite.getInstruction());
+        pass.indirectApplies.insert(applySite);
       }
     }
     ++calleeArgIdx;
   }
 
   if (applySite.getSubstCalleeType()->hasIndirectFormalResults()) {
-    pass.indirectApplies.insert(applySite.getInstruction());
+    pass.indirectApplies.insert(applySite);
     if (!applySite.getType().is<TupleType>())
-      pass.valueStorageMap.insertValue(applySite.getInstruction());
+      pass.valueStorageMap.insertValue(cast<ApplyInst>(applySite));
 
     return;
   }
@@ -375,7 +380,8 @@ public:
 protected:
   void convertIndirectFunctionArgs();
   unsigned insertIndirectReturnArgs();
-  bool canProjectFrom(SILInstruction *innerVal, SILInstruction *composingUse);
+  bool canProjectFrom(SingleValueInstruction *innerVal,
+                      SILInstruction *composingUse);
   void allocateForValue(SILValue value, ValueStorage &storage);
 };
 } // end anonymous namespace
@@ -472,7 +478,7 @@ unsigned OpaqueStorageAllocation::insertIndirectReturnArgs() {
 /// 
 /// TODO: This should be a common utility.
 static SILLocation getLocForValue(SILValue value) {
-  if (auto *instr = dyn_cast<SILInstruction>(value)) {
+  if (auto *instr = value->getDefiningInstruction()) {
     return instr->getLoc();
   }
   if (auto *arg = dyn_cast<SILArgument>(value)) {
@@ -488,22 +494,24 @@ static SILLocation getLocForValue(SILValue value) {
 ///
 /// TODO: Handle struct.
 /// TODO: Make this a visitor.
-bool OpaqueStorageAllocation::canProjectFrom(SILInstruction *innerVal,
+bool OpaqueStorageAllocation::canProjectFrom(SingleValueInstruction *innerVal,
                                              SILInstruction *composingUse) {
   if (!OptimizeOpaqueAddressLowering)
     return false;
 
+  SILValue composingValue;
   switch (composingUse->getKind()) {
   default:
     return false;
-  case ValueKind::ApplyInst:
+  case SILInstructionKind::ApplyInst:
     // @in operands never need their own storage since they are non-mutating
     // uses. They simply reuse the storage allocated for their operand. So it
     // wouldn't make sense to "project" out of the apply argument.
     return false;
-  case ValueKind::EnumInst:
+  case SILInstructionKind::EnumInst:
+    composingValue = cast<EnumInst>(composingUse);
     break;
-  case ValueKind::InitExistentialValueInst: {
+  case SILInstructionKind::InitExistentialValueInst: {
     // Ensure that all opened archetypes are available at the inner value's
     // definition.
     auto *initExistential = cast<InitExistentialValueInst>(composingUse);
@@ -511,21 +519,23 @@ bool OpaqueStorageAllocation::canProjectFrom(SILInstruction *innerVal,
       if (!pass.domInfo->properlyDominates(operand.get(), innerVal))
         return false;
     }
+    composingValue = initExistential;
     break;
   }
-  case ValueKind::ReturnInst:
+  case SILInstructionKind::ReturnInst:
     return true;
-  case ValueKind::StoreInst: {
+  case SILInstructionKind::StoreInst: {
     if (cast<StoreInst>(composingUse)->getSrc() == innerVal
         && isa<CopyValueInst>(innerVal)) {
       return true;
     }
     return false;
   }
-  case ValueKind::TupleInst:
+  case SILInstructionKind::TupleInst:
+    composingValue = cast<TupleInst>(composingUse);
     break;
   }
-  ValueStorage &storage = pass.valueStorageMap.getStorage(composingUse);
+  ValueStorage &storage = pass.valueStorageMap.getStorage(composingValue);
   if (SILValue addr = storage.storageAddress) {
     if (auto *stackInst = dyn_cast<AllocStackInst>(addr)) {
       assert(pass.domInfo->properlyDominates(stackInst, innerVal));
@@ -545,11 +555,11 @@ void OpaqueStorageAllocation::allocateForValue(SILValue value,
                                                ValueStorage &storage) {
   assert(!isa<SILFunctionArgument>(value));
 
-  if (ApplySite::isa(value)) {
+  if (auto apply = ApplySite::isa(value)) {
     // Result tuples will be canonicalized during apply rewriting so the tuple
     // itself is unused.
     if (value->getType().is<TupleType>()) {
-      assert(ApplySite(value).getSubstCalleeType()->getNumResults() > 1);
+      assert(apply.getSubstCalleeType()->getNumResults() > 1);
       return;
     }
   }
@@ -564,7 +574,7 @@ void OpaqueStorageAllocation::allocateForValue(SILValue value,
     // TODO: Handle block arguments.
     // TODO: Handle subobjects with a single composition, and other non-mutating
     // uses such as @in arguments.
-    if (auto *def = dyn_cast<SILInstruction>(value)) {
+    if (auto *def = dyn_cast<SingleValueInstruction>(value)) {
       Operand *useOper = *value->use_begin();
       if (canProjectFrom(def, useOper->getUser())) {
         storage.setComposedOperand(useOper);
@@ -662,14 +672,14 @@ SILValue AddressMaterialization::materializeProjection(Operand *operand) {
   default:
     DEBUG(user->dump());
     llvm_unreachable("Unexpected subobject composition.");
-  case ValueKind::EnumInst: {
+  case SILInstructionKind::EnumInst: {
     auto *enumInst = cast<EnumInst>(user);
     SILValue enumAddr = materializeAddress(enumInst);
     return B.createInitEnumDataAddr(enumInst->getLoc(), enumAddr,
                                     enumInst->getElement(),
                                     operand->get()->getType().getAddressType());
   }
-  case ValueKind::InitExistentialValueInst: {
+  case SILInstructionKind::InitExistentialValueInst: {
     auto *initExistentialValue = cast<InitExistentialValueInst>(user);
     SILValue containerAddr = materializeAddress(initExistentialValue);
     auto canTy = initExistentialValue->getFormalConcreteType();
@@ -679,11 +689,11 @@ SILValue AddressMaterialization::materializeProjection(Operand *operand) {
         initExistentialValue->getLoc(), containerAddr, canTy,
         concreteTL.getLoweredType(), initExistentialValue->getConformances());
   }
-  case ValueKind::ReturnInst: {
+  case SILInstructionKind::ReturnInst: {
     assert(pass.loweredFnConv.hasIndirectSILResults());
     return pass.F->getArguments()[0];
   }
-  case ValueKind::TupleInst: {
+  case SILInstructionKind::TupleInst: {
     auto *tupleInst = cast<TupleInst>(user);
     // Function return values.
     if (tupleInst->hasOneUse()
@@ -717,9 +727,12 @@ class ApplyRewriter {
   ApplySite apply;
   SILBuilder argBuilder;
 
+  /// For now, we assume that the apply site is a normal apply.
+  ApplyInst *getApplyInst() const { return cast<ApplyInst>(apply); }
+
 public:
-  ApplyRewriter(SILInstruction *origCall, AddressLoweringState &pass)
-      : pass(pass), apply(origCall), argBuilder(origCall) {
+  ApplyRewriter(ApplySite origCall, AddressLoweringState &pass)
+      : pass(pass), apply(origCall), argBuilder(origCall.getInstruction()) {
     argBuilder.setSILConventions(
         SILModuleConventions::getLoweredAddressConventions());
   }
@@ -731,9 +744,10 @@ public:
 
 protected:
   void
-  canonicalizeResults(SmallVectorImpl<SILInstruction *> &directResultValues,
+  canonicalizeResults(MutableArrayRef<SingleValueInstruction *> directResultValues,
                       ArrayRef<Operand *> nonCanonicalUses);
-  SILValue materializeIndirectResultAddress(SILInstruction *origDirectResultVal,
+  SILValue materializeIndirectResultAddress(
+                                    SingleValueInstruction *origDirectResultVal,
                                             SILType argTy);
 };
 } // end anonymous namespace
@@ -762,17 +776,17 @@ static void insertStackDeallocationAtCall(AllocStackInst *allocInst,
   SILInstruction *lastUse = argLoad ? argLoad : applyInst;
 
   switch (applyInst->getKind()) {
-  case ValueKind::ApplyInst: {
+  case SILInstructionKind::ApplyInst: {
     SILBuilder deallocBuilder(&*std::next(lastUse->getIterator()));
     deallocBuilder.setSILConventions(
         SILModuleConventions::getLoweredAddressConventions());
     deallocBuilder.createDeallocStack(allocInst->getLoc(), allocInst);
     break;
   }
-  case ValueKind::TryApplyInst:
+  case SILInstructionKind::TryApplyInst:
     // TODO!!!: insert dealloc in the catch block.
     llvm_unreachable("not implemented for this instruction!");
-  case ValueKind::PartialApplyInst:
+  case SILInstructionKind::PartialApplyInst:
     llvm_unreachable("partial apply cannot have indirect results.");
   default:
     llvm_unreachable("not implemented for this instruction!");
@@ -820,19 +834,18 @@ void ApplyRewriter::rewriteIndirectParameter(Operand *operand) {
 // that result if one exists. This function will add an entry to
 // directResultValues whenever it needs to materialize a TupleExtractInst.
 void ApplyRewriter::canonicalizeResults(
-    SmallVectorImpl<SILInstruction *> &directResultValues,
+    MutableArrayRef<SingleValueInstruction *> directResultValues,
     ArrayRef<Operand *> nonCanonicalUses) {
 
-  auto *applyInst = apply.getInstruction();
+  auto *applyInst = getApplyInst();
 
   for (Operand *operand : nonCanonicalUses) {
     auto *destroyInst = dyn_cast<DestroyValueInst>(operand->getUser());
     if (!destroyInst)
       llvm::report_fatal_error("Simultaneous use of multiple call results.");
 
-    for (unsigned resultIdx = 0, endIdx = directResultValues.size();
-         resultIdx < endIdx; ++resultIdx) {
-      SILInstruction *result = directResultValues[resultIdx];
+    for (unsigned resultIdx : indices(directResultValues)) {
+      SingleValueInstruction *result = directResultValues[resultIdx];
       if (!result) {
         SILBuilder resultBuilder(std::next(SILBasicBlock::iterator(applyInst)));
         resultBuilder.setSILConventions(
@@ -856,7 +869,7 @@ void ApplyRewriter::canonicalizeResults(
 ///
 /// origDirectResultVal may be nullptr for unused results.
 SILValue ApplyRewriter::materializeIndirectResultAddress(
-    SILInstruction *origDirectResultVal, SILType argTy) {
+    SingleValueInstruction *origDirectResultVal, SILType argTy) {
 
   if (origDirectResultVal
       && origDirectResultVal->getType().isAddressOnly(pass.F->getModule())) {
@@ -891,12 +904,12 @@ SILValue ApplyRewriter::materializeIndirectResultAddress(
 void ApplyRewriter::convertApplyWithIndirectResults() {
   assert(apply.getSubstCalleeType()->hasIndirectFormalResults());
 
-  SILInstruction *origCallInst = apply.getInstruction();
+  auto *origCallInst = getApplyInst();
   SILFunctionConventions origFnConv = apply.getSubstCalleeConv();
 
   // Gather the original direct return values.
   // Canonicalize results so no user uses more than one result.
-  SmallVector<SILInstruction *, 8> origDirectResultValues(
+  SmallVector<SingleValueInstruction *, 8> origDirectResultValues(
     origFnConv.getNumDirectSILResults());
   SmallVector<Operand *, 4> nonCanonicalUses;
   if (origCallInst->getType().is<TupleType>()) {
@@ -950,7 +963,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   for_each(
     apply.getSubstCalleeType()->getResults(),
     origDirectResultValues, 
-    [&](SILResultInfo resultInfo, SILInstruction *origDirectResultVal) {
+    [&](SILResultInfo resultInfo, SingleValueInstruction *origDirectResultVal) {
       // Assume that all original results are direct in SIL.
       assert(!origFnConv.isSILIndirect(resultInfo));
 
@@ -979,17 +992,17 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   }
 
   // Create a new apply with indirect result operands.
-  SILInstruction *newCallInst;
+  ApplyInst *newCallInst;
   switch (origCallInst->getKind()) {
-  case ValueKind::ApplyInst:
+  case SILInstructionKind::ApplyInst:
     newCallInst = callBuilder.createApply(
         loc, apply.getCallee(), apply.getSubstitutions(), newCallArgs,
         cast<ApplyInst>(origCallInst)->isNonThrowing(), nullptr);
     break;
-  case ValueKind::TryApplyInst:
+  case SILInstructionKind::TryApplyInst:
     // TODO: insert dealloc in the catch block.
     llvm_unreachable("not implemented for this instruction!");
-  case ValueKind::PartialApplyInst:
+  case SILInstructionKind::PartialApplyInst:
   // Partial apply does not have formally indirect results.
   default:
     llvm_unreachable("not implemented for this instruction!");
@@ -1030,11 +1043,11 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
     }
     // Either the new call instruction has only a single direct result, or we
     // map the original tuple field to the new tuple field.
-    SILInstruction *newValue = newCallInst;
+    SILValue newValue = newCallInst;
     if (loweredCalleeConv.getNumDirectSILResults() > 1) {
-      assert(newCallInst->getType().is<TupleType>());
+      assert(newValue->getType().is<TupleType>());
       newValue = resultBuilder.createTupleExtract(
-        extractInst->getLoc(), newCallInst,
+        extractInst->getLoc(), newValue,
         newDirectResultIndices[origResultIdx]);
     }
     extractInst->replaceAllUsesWith(newValue);
@@ -1148,8 +1161,8 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
   }
   SILValue origFullResult = returnInst->getOperand();
   returnInst->setOperand(newReturnVal);
-  if (auto *fullResultInst = dyn_cast<SILInstruction>(origFullResult)) {
-    if (fullResultInst->use_empty())
+  if (auto *fullResultInst = origFullResult->getDefiningInstruction()) {
+    if (!fullResultInst->hasUsesOfAnyResult())
       pass.markDead(fullResultInst);
   }
 }
@@ -1160,8 +1173,9 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
 
 namespace {
 class AddressOnlyUseRewriter
-    : SILInstructionVisitor<AddressOnlyUseRewriter, void> {
-  friend SILVisitor<AddressOnlyUseRewriter, void>;
+    : SILInstructionVisitor<AddressOnlyUseRewriter> {
+  friend SILVisitorBase<AddressOnlyUseRewriter>;
+  friend SILInstructionVisitor<AddressOnlyUseRewriter>;
 
   AddressLoweringState &pass;
 
@@ -1182,22 +1196,21 @@ public:
   }
 
 protected:
-  void markRewritten(SILValue addr) {
-    auto &storage = pass.valueStorageMap.getStorage(currOper->getUser());
+  void markRewritten(SILValue oldValue, SILValue addr) {
+    auto &storage = pass.valueStorageMap.getStorage(oldValue);
     storage.storageAddress = addr;
     storage.markRewritten();
   }
 
-  void beforeVisit(ValueBase *V) {
-    DEBUG(llvm::dbgs() << "  REWRITE USE "; V->dump());
+  void beforeVisit(SILInstruction *I) {
+    DEBUG(llvm::dbgs() << "  REWRITE USE "; I->dump());
 
-    auto *I = cast<SILInstruction>(V);
     B.setInsertionPoint(I);
     B.setCurrentDebugScope(I->getDebugScope());
   }
 
-  void visitValueBase(ValueBase *V) {
-    DEBUG(V->dump());
+  void visitSILInstruction(SILInstruction *I) {
+    DEBUG(I->dump());
     llvm_unreachable("Unimplemented?!");
   }
 
@@ -1217,7 +1230,7 @@ protected:
     SILValue destAddr = addrMat.materializeAddress(copyInst);
     B.createCopyAddr(copyInst->getLoc(), srcAddr, destAddr, IsNotTake,
                      IsInitialization);
-    markRewritten(destAddr);
+    markRewritten(copyInst, destAddr);
   }
   
   void visitDebugValueInst(DebugValueInst *debugInst) {
@@ -1298,8 +1311,9 @@ protected:
 
 namespace {
 class AddressOnlyDefRewriter
-    : SILInstructionVisitor<AddressOnlyDefRewriter, void> {
-  friend SILVisitor<AddressOnlyDefRewriter, void>;
+    : SILInstructionVisitor<AddressOnlyDefRewriter> {
+  friend SILVisitorBase<AddressOnlyDefRewriter>;
+  friend SILInstructionVisitor<AddressOnlyDefRewriter>;
 
   AddressLoweringState &pass;
 
@@ -1317,24 +1331,27 @@ public:
   void visitInst(SILInstruction *inst) { visit(inst); }
 
 protected:
-  void beforeVisit(ValueBase *V) {
-    storage = &pass.valueStorageMap.getStorage(V);
+  void beforeVisit(SILInstruction *I) {
+    // This cast succeeds beecause only specific instructions get added to
+    // the value storage map.
+    storage = &pass.valueStorageMap.getStorage(cast<SingleValueInstruction>(I));
 
-    DEBUG(llvm::dbgs() << "REWRITE DEF "; V->dump());
+    DEBUG(llvm::dbgs() << "REWRITE DEF "; I->dump());
     if (storage->storageAddress)
       DEBUG(llvm::dbgs() << "  STORAGE "; storage->storageAddress->dump());
 
-    auto *I = cast<SILInstruction>(V);
     B.setInsertionPoint(I);
     B.setCurrentDebugScope(I->getDebugScope());
   }
 
-  void visitValueBase(ValueBase *V) {
-    DEBUG(V->dump());
+  void visitSILInstruction(SILInstruction *I) {
+    DEBUG(I->dump());
     llvm_unreachable("Unimplemented?!");
   }
 
   void visitApplyInst(ApplyInst *applyInst) {
+    assert(isa<SingleValueInstruction>(applyInst) &&
+           "beforeVisit assumes that ApplyInst is an SVI");
     assert(!storage->isRewritten());
     // Completely rewrite the apply instruction, handling any remaining
     // (loadable) indirect parameters, allocating memory for indirect
@@ -1420,8 +1437,7 @@ protected:
     // This must be an indirect result for an apply that has not yet been
     // rewritten. Rewrite the apply.
     SILValue srcVal = extractInst->getOperand();
-    assert(ApplySite::isa(srcVal));
-    ApplyRewriter(cast<SILInstruction>(srcVal), pass)
+    ApplyRewriter(cast<ApplyInst>(srcVal), pass)
         .convertApplyWithIndirectResults();
 
     assert(storage->storageAddress);
@@ -1436,7 +1452,8 @@ static void rewriteFunction(AddressLoweringState &pass) {
   for (auto &valueStorageI : pass.valueStorageMap) {
     SILValue valueDef = valueStorageI.first;
 
-    if (auto *defInst = dyn_cast<SILInstruction>(valueDef))
+    // TODO: MultiValueInstruction: ApplyInst
+    if (auto *defInst = dyn_cast<SingleValueInstruction>(valueDef))
       defVisitor.visitInst(defInst);
 
     SmallVector<Operand *, 8> uses(valueDef->getUses());
@@ -1445,12 +1462,11 @@ static void rewriteFunction(AddressLoweringState &pass) {
   }
 
   // Rewrite any remaining (loadable) indirect parameters.
-  for (SILInstruction *applyInst : pass.indirectApplies) {
-    ApplySite apply(applyInst);
+  for (ApplySite apply : pass.indirectApplies) {
     // Calls with indirect formal results have already been rewritten.
     if (apply.getSubstCalleeType()->hasIndirectFormalResults()) {
       bool isRewritten = false;
-      visitCallResults(apply, [&](SILInstruction *result) {
+      visitCallResults(apply, [&](SILValue result) {
         if (result->getType().isAddressOnly(pass.F->getModule())) {
           assert(pass.valueStorageMap.getStorage(result).isRewritten());
           isRewritten = true;
@@ -1459,13 +1475,13 @@ static void rewriteFunction(AddressLoweringState &pass) {
         return true;
       });
       if (!isRewritten) {
-        ApplyRewriter rewriter(applyInst, pass);
+        ApplyRewriter rewriter(apply, pass);
         rewriter.rewriteParameters();
         rewriter.convertApplyWithIndirectResults();
         continue;
       }
     }
-    ApplyRewriter(applyInst, pass).rewriteParameters();
+    ApplyRewriter(apply, pass).rewriteParameters();
   }
   if (pass.F->getLoweredFunctionType()->hasIndirectFormalResults())
     ReturnRewriter(pass).rewriteReturns();
@@ -1506,14 +1522,16 @@ void AddressLowering::runOnFunction(SILFunction *F) {
   // Add the rest of the instructions to the dead list in post order.
   // FIXME: make sure we cleaned up address-only BB arguments.
   for (auto &valueStorageI : reversed(pass.valueStorageMap)) {
-    auto *deadInst = dyn_cast<SILInstruction>(valueStorageI.first);
+    // TODO: MultiValueInstruction: ApplyInst
+    auto *deadInst = dyn_cast<SingleValueInstruction>(valueStorageI.first);
     if (!deadInst)
       continue;
 
     DEBUG(llvm::dbgs() << "DEAD "; deadInst->dump());
 #ifndef NDEBUG
-    for (Operand *operand : deadInst->getUses())
-      assert(pass.instsToDelete.count(operand->getUser()));
+    for (auto result : deadInst->getResults())
+      for (Operand *operand : result->getUses())
+        assert(pass.instsToDelete.count(operand->getUser()));
 #endif
     pass.instsToDelete.insert(deadInst);
   }

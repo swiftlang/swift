@@ -66,17 +66,10 @@ public:
     virtual GenericSignature::ConformsToArray
       getInterestingConformances(CanType type) const = 0;
 
-    virtual ~InterestingKeysCallback() = default;
-  };
+    /// Return the limited interesting conformances for an interesting type.
+    virtual CanType getSuperclassBound(CanType type) const = 0;
 
-  /// An implementation of InterestingKeysCallback that returns everything
-  /// fulfillable.
-  struct Everything : InterestingKeysCallback {
-    bool isInterestingType(CanType type) const override;
-    bool hasInterestingType(CanType type) const override;
-    bool hasLimitedInterestingConformances(CanType type) const override;
-    GenericSignature::ConformsToArray
-      getInterestingConformances(CanType type) const override;
+    virtual ~InterestingKeysCallback() = default;
   };
 
   FulfillmentMap() = default;
@@ -140,18 +133,9 @@ public:
   }
 
 private:
-  bool searchParentTypeMetadata(IRGenModule &IGM, NominalTypeDecl *typeDecl,
-                                CanType parent,
-                                unsigned source, MetadataPath &&path,
-                                const InterestingKeysCallback &keys);
-
-  bool searchNominalTypeMetadata(IRGenModule &IGM, CanNominalType type,
+  bool searchNominalTypeMetadata(IRGenModule &IGM, CanType type,
                                  unsigned source, MetadataPath &&path,
                                  const InterestingKeysCallback &keys);
-
-  bool searchBoundGenericTypeMetadata(IRGenModule &IGM, CanBoundGenericType type,
-                                      unsigned source, MetadataPath &&path,
-                                      const InterestingKeysCallback &keys);
 
   /// Search the given witness table for useful fulfillments.
   ///
@@ -168,5 +152,3 @@ private:
 }
 
 #endif
-
-

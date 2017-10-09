@@ -14,6 +14,28 @@
 
 import TestsUtils
 
+public let ArrayAppend = [
+  BenchmarkInfo(name: "ArrayAppend", runFunction: run_ArrayAppend, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendArrayOfInt", runFunction: run_ArrayAppendArrayOfInt, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendAscii", runFunction: run_ArrayAppendAscii, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendFromGeneric", runFunction: run_ArrayAppendFromGeneric, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendGenericStructs", runFunction: run_ArrayAppendGenericStructs, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendLatin1", runFunction: run_ArrayAppendLatin1, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendLazyMap", runFunction: run_ArrayAppendLazyMap, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendOptionals", runFunction: run_ArrayAppendOptionals, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendRepeatCol", runFunction: run_ArrayAppendRepeatCol, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendReserved", runFunction: run_ArrayAppendReserved, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendSequence", runFunction: run_ArrayAppendSequence, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendStrings", runFunction: run_ArrayAppendStrings, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendToFromGeneric", runFunction: run_ArrayAppendToFromGeneric, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendToGeneric", runFunction: run_ArrayAppendToGeneric, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendUTF16", runFunction: run_ArrayAppendUTF16, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayPlusEqualArrayOfInt", runFunction: run_ArrayPlusEqualArrayOfInt, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayPlusEqualFiveElementCollection", runFunction: run_ArrayPlusEqualFiveElementCollection, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayPlusEqualSingleElementCollection", runFunction: run_ArrayPlusEqualSingleElementCollection, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayPlusEqualThreeElements", runFunction: run_ArrayPlusEqualThreeElements, tags: [.validation, .api, .Array]),
+]
+
 // Append single element
 @inline(never)
 public func run_ArrayAppend(_ N: Int) {

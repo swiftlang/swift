@@ -71,12 +71,6 @@ public:
     OS << '_';
   }
 
-  void visitParentMetadataSource(const ParentMetadataSource *P) {
-    OS << 'P';
-    visit(P->getChild());
-    OS << '_';
-  }
-
   void visitSelfMetadataSource(const SelfMetadataSource *S) {
     OS << 'S';
   }
@@ -154,13 +148,6 @@ public:
     printHeader("generic-argument");
     printField("index", GA->getIndex());
     printRec(GA->getSource());
-    closeForm();
-  }
-
-  void
-  visitParentMetadataSource(const ParentMetadataSource *P) {
-    printHeader("parent-of");
-    printRec(P->getChild());
     closeForm();
   }
 
@@ -928,7 +915,7 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     // extra inhabitants as these. But maybe it's best not to codify
     // that in the ABI anyway.
     CanType thinFunction = CanFunctionType::get(
-      AnyFunctionType::CanParamArrayRef({}), Context.TheEmptyTupleType,
+      AnyFunctionType::CanParamArrayRef(), Context.TheEmptyTupleType,
       AnyFunctionType::ExtInfo().withRepresentation(
           FunctionTypeRepresentation::Thin));
     BuiltinTypes.insert(thinFunction);

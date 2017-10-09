@@ -42,12 +42,6 @@ func _toNSArray<T, U : AnyObject>(_ a: [T], f: (T) -> U) -> NSArray {
   return result
 }
 
-func _toNSRange(_ r: Range<String.Index>) -> NSRange {
-  return NSRange(
-    location: r.lowerBound.encodedOffset,
-    length: r.upperBound.encodedOffset - r.lowerBound.encodedOffset)
-}
-
 #if !DEPLOYMENT_RUNTIME_SWIFT
 // We only need this for UnsafeMutablePointer, but there's not currently a way
 // to write that constraint.
@@ -439,10 +433,26 @@ extension StringProtocol where Index == String.Index {
     return self._ephemeralString._bridgeToObjectiveC()
   }
 
+  // self can be a Substring so we need to subtract/add this offset when
+  // passing _ns to the Foundation APIs. Will be 0 if self is String.
+  @_inlineable
+  @_versioned
+  internal var _substringOffset: Int {
+    return self.startIndex.encodedOffset
+  }
+
   /// Return an `Index` corresponding to the given offset in our UTF-16
   /// representation.
   func _index(_ utf16Index: Int) -> Index {
-    return Index(encodedOffset: utf16Index)
+    return Index(encodedOffset: utf16Index + _substringOffset)
+  }
+
+  @_inlineable
+  @_versioned
+  internal func _toRelativeNSRange(_ r: Range<String.Index>) -> NSRange {
+    return NSRange(
+      location: r.lowerBound.encodedOffset - _substringOffset,
+      length: r.upperBound.encodedOffset - r.lowerBound.encodedOffset)
   }
 
   /// Return a `Range<Index>` corresponding to the given `NSRange` of
@@ -603,7 +613,7 @@ extension StringProtocol where Index == String.Index {
     return locale != nil ? _ns.compare(
       aString,
       options: mask,
-      range: _toNSRange(
+      range: _toRelativeNSRange(
         range ?? startIndex..<endIndex
       ),
       locale: locale?._bridgeToObjectiveC()
@@ -612,7 +622,7 @@ extension StringProtocol where Index == String.Index {
     : range != nil ? _ns.compare(
       aString,
       options: mask,
-      range: _toNSRange(range!)
+      range: _toRelativeNSRange(range!)
     )
 
     : !mask.isEmpty ? _ns.compare(aString, options: mask)
@@ -1050,7 +1060,7 @@ extension StringProtocol where Index == String.Index {
     T : StringProtocol, R : RangeExpression
   >(in range: R, with replacement: T) -> String where R.Bound == Index {
     return _ns.replacingCharacters(
-      in: _toNSRange(range.relative(to: self)),
+      in: _toRelativeNSRange(range.relative(to: self)),
       with: replacement._ephemeralString)
   }
 
@@ -1083,7 +1093,7 @@ extension StringProtocol where Index == String.Index {
       of: target,
       with: replacement,
       options: options,
-      range: _toNSRange(
+      range: _toRelativeNSRange(
         searchRange ?? startIndex..<endIndex
       )
     )
@@ -1208,7 +1218,7 @@ extension StringProtocol where Index == String.Index {
   ) where R.Bound == Index {
     let range = range.relative(to: self)
     _ns.enumerateLinguisticTags(
-      in: _toNSRange(range),
+      in: _toRelativeNSRange(range),
       scheme: tagScheme._ephemeralString,
       options: opts,
       orthography: orthography != nil ? orthography! : nil
@@ -1273,7 +1283,7 @@ extension StringProtocol where Index == String.Index {
     ) -> Void
   ) where R.Bound == Index {
     _ns.enumerateSubstrings(
-      in: _toNSRange(range.relative(to: self)), options: opts) {
+      in: _toRelativeNSRange(range.relative(to: self)), options: opts) {
       var stop_ = false
 
       body($0,
@@ -1346,7 +1356,7 @@ extension StringProtocol where Index == String.Index {
         usedLength: usedBufferCount,
         encoding: encoding.rawValue,
         options: options,
-        range: _toNSRange(range.relative(to: self)),
+        range: _toRelativeNSRange(range.relative(to: self)),
         remaining: $0)
     }
   }
@@ -1373,7 +1383,7 @@ extension StringProtocol where Index == String.Index {
           contentsEnd in self._ns.getLineStart(
             start, end: end,
             contentsEnd: contentsEnd,
-            for: _toNSRange(range.relative(to: self)))
+            for: _toRelativeNSRange(range.relative(to: self)))
         }
       }
     }
@@ -1401,7 +1411,7 @@ extension StringProtocol where Index == String.Index {
           contentsEnd in self._ns.getParagraphStart(
             start, end: end,
             contentsEnd: contentsEnd,
-            for: _toNSRange(range.relative(to: self)))
+            for: _toRelativeNSRange(range.relative(to: self)))
         }
       }
     }
@@ -1428,7 +1438,8 @@ extension StringProtocol where Index == String.Index {
   public func lineRange<
     R : RangeExpression
   >(for aRange: R) -> Range<Index> where R.Bound == Index {
-    return _range(_ns.lineRange(for: _toNSRange(aRange.relative(to: self))))
+    return _range(_ns.lineRange(
+      for: _toRelativeNSRange(aRange.relative(to: self))))
   }
 
 #if !DEPLOYMENT_RUNTIME_SWIFT
@@ -1453,7 +1464,7 @@ extension StringProtocol where Index == String.Index {
     var nsTokenRanges: NSArray?
     let result = tokenRanges._withNilOrAddress(of: &nsTokenRanges) {
       self._ns.linguisticTags(
-        in: _toNSRange(range.relative(to: self)),
+        in: _toRelativeNSRange(range.relative(to: self)),
         scheme: tagScheme._ephemeralString,
         options: opts,
         orthography: orthography,
@@ -1477,7 +1488,7 @@ extension StringProtocol where Index == String.Index {
     R : RangeExpression
   >(for aRange: R) -> Range<Index> where R.Bound == Index {
     return _range(
-      _ns.paragraphRange(for: _toNSRange(aRange.relative(to: self))))
+      _ns.paragraphRange(for: _toRelativeNSRange(aRange.relative(to: self))))
   }
 #endif
 
@@ -1504,7 +1515,7 @@ extension StringProtocol where Index == String.Index {
       _ns.rangeOfCharacter(
         from: aSet,
         options: mask,
-        range: _toNSRange(
+        range: _toRelativeNSRange(
           aRange ?? startIndex..<endIndex
         )
       )
@@ -1535,7 +1546,7 @@ extension StringProtocol where Index == String.Index {
     // and output ranges due (if nothing else) to locale changes
     return _range(
       _ns.rangeOfComposedCharacterSequences(
-        for: _toNSRange(range.relative(to: self))))
+        for: _toRelativeNSRange(range.relative(to: self))))
   }
 
   // - (NSRange)rangeOfString:(NSString *)aString
@@ -1570,13 +1581,13 @@ extension StringProtocol where Index == String.Index {
       locale != nil ? _ns.range(
         of: aString,
         options: mask,
-        range: _toNSRange(
+        range: _toRelativeNSRange(
           searchRange ?? startIndex..<endIndex
         ),
         locale: locale
       )
       : searchRange != nil ? _ns.range(
-        of: aString, options: mask, range: _toNSRange(searchRange!)
+        of: aString, options: mask, range: _toRelativeNSRange(searchRange!)
       )
       : !mask.isEmpty ? _ns.range(of: aString, options: mask)
       : _ns.range(of: aString)
@@ -1687,7 +1698,7 @@ extension StringProtocol where Index == String.Index {
   @available(swift, deprecated: 4.0,
     message: "Please use String slicing subscript.")
   public func substring(with aRange: Range<Index>) -> String {
-    return _ns.substring(with: _toNSRange(aRange))
+    return _ns.substring(with: _toRelativeNSRange(aRange))
   }
 }
 

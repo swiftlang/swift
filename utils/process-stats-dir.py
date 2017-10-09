@@ -260,13 +260,29 @@ def write_comparison(args, old_stats, new_stats):
     regressions = sum(1 for row in rows if row.delta > 0)
 
     if args.markdown:
+
+        def format_field(field, row, args):
+            if field == 'name' and args.group_by_module:
+                return re.sub(r'^(\w+)\.', r'\1<br/>', row.name)
+            elif field == 'delta_pct' and args.github_emoji:
+                if row.delta_pct > 0:
+                    return str(row.delta_pct) + " :no_entry:"
+                else:
+                    return str(row.delta_pct) + " :white_check_mark:"
+            else:
+                return str(vars(row)[field])
+
         out = args.output
         out.write(' | '.join(OutputRow._fields))
         out.write('\n')
         out.write(' | '.join('---:' for _ in OutputRow._fields))
         out.write('\n')
         for row in rows:
-            out.write(' | '.join(str(v) for v in row))
+            name = row.name
+            if args.group_by_module:
+                name
+            out.write(' | '.join(format_field(f, row, args)
+                                 for f in OutputRow._fields))
             out.write('\n')
     else:
         out = csv.DictWriter(args.output, OutputRow._fields,
@@ -295,11 +311,18 @@ def compare_stats_dirs(args):
     if len(args.remainder) != 2:
         raise ValueError("Expected exactly 2 stats-dirs")
 
+    vargs = vars(args)
+    if args.select_stats_from_csv_baseline is not None:
+        b = read_stats_dict_from_csv(args.select_stats_from_csv_baseline)
+        if args.group_by_module:
+            pat = re.compile('^\w+\.')
+            vargs['select_stat'] = set(re.sub(pat, '', k) for k in b.keys())
+        else:
+            vargs['select_stat'] = b.keys()
+
     (old, new) = args.remainder
-    old_stats = merge_all_jobstats(load_stats_dir(old, **vars(args)),
-                                   **vars(args))
-    new_stats = merge_all_jobstats(load_stats_dir(new, **vars(args)),
-                                   **vars(args))
+    old_stats = merge_all_jobstats(load_stats_dir(old, **vargs), **vargs)
+    new_stats = merge_all_jobstats(load_stats_dir(new, **vargs), **vargs)
 
     return write_comparison(args, old_stats.stats, new_stats.stats)
 
@@ -344,6 +367,9 @@ def main():
                         default=[],
                         action="append",
                         help="Select specific statistics")
+    parser.add_argument("--select-stats-from-csv-baseline",
+                        type=argparse.FileType('rb', 0), default=None,
+                        help="Select statistics present in a CSV baseline")
     parser.add_argument("--exclude-timers",
                         default=False,
                         action="store_true",
@@ -364,6 +390,10 @@ def main():
                         default=False,
                         action="store_true",
                         help="Write output in markdown table format")
+    parser.add_argument("--github-emoji",
+                        default=False,
+                        action="store_true",
+                        help="Add github-emoji indicators to markdown")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")

@@ -59,7 +59,6 @@
     "Sequence.swift",
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",
-    "Index.swift",
     "Indices.swift",
     "Existential.swift",
     "WriteBackMutableSlice.swift",

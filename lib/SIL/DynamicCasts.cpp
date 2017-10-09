@@ -1175,14 +1175,12 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
 
 /// Carry out the operations required for an indirect conditional cast
 /// using a scalar cast operation.
-void swift::
-emitIndirectConditionalCastWithScalar(SILBuilder &B, ModuleDecl *M,
-                                      SILLocation loc,
-                                      CastConsumptionKind consumption,
-                                      SILValue src, CanType sourceType,
-                                      SILValue dest, CanType targetType,
-                                      SILBasicBlock *indirectSuccBB,
-                                      SILBasicBlock *indirectFailBB) {
+void swift::emitIndirectConditionalCastWithScalar(
+    SILBuilder &B, ModuleDecl *M, SILLocation loc,
+    CastConsumptionKind consumption, SILValue src, CanType sourceType,
+    SILValue dest, CanType targetType, SILBasicBlock *indirectSuccBB,
+    SILBasicBlock *indirectFailBB, ProfileCounter TrueCount,
+    ProfileCounter FalseCount) {
   assert(canUseScalarCheckedCastInstructions(B.getModule(),
                                              sourceType, targetType));
 
@@ -1207,7 +1205,7 @@ emitIndirectConditionalCastWithScalar(SILBuilder &B, ModuleDecl *M,
 
   SILType targetValueType = dest->getType().getObjectType();
   B.createCheckedCastBranch(loc, /*exact*/ false, srcValue, targetValueType,
-                            scalarSuccBB, scalarFailBB);
+                            scalarSuccBB, scalarFailBB, TrueCount, FalseCount);
 
   // Emit the success block.
   B.setInsertionPoint(scalarSuccBB); {

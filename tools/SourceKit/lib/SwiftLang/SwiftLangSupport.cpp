@@ -421,6 +421,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindExprDictionary;
     case SyntaxStructureKind::ObjectLiteralExpression:
       return KindExprObjectLiteral;
+    case SyntaxStructureKind::TupleExpression:
+      return KindExprTuple;
     case SyntaxStructureKind::Argument:
       return KindExprArg;
   }
@@ -711,6 +713,14 @@ std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
       fileHandle, full_path, sizeof(full_path), FILE_NAME_NORMALIZED);
   return (success ? full_path : InputPath);
 #endif
+}
+
+void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {
+  std::vector<Statistic *> stats = {
+#define SWIFT_STATISTIC(VAR, UID, DESC) &Stats.VAR,
+#include "SwiftStatistics.def"
+  };
+  receiver(stats);
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

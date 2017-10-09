@@ -28,7 +28,7 @@ class SwiftGizmo : Gizmo {
     // CHECK-NEXT:   [[UPCAST_SELF:%.*]] = upcast [[SELF]] : $SwiftGizmo to $Gizmo
     // CHECK-NEXT:   [[BORROWED_UPCAST_SELF:%.*]] = begin_borrow [[UPCAST_SELF]]
     // CHECK-NEXT:   [[DOWNCAST_BORROWED_UPCAST_SELF:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF]] : $Gizmo to $SwiftGizmo
-    // CHECK-NEXT:   super_method [volatile] [[DOWNCAST_BORROWED_UPCAST_SELF]] : $SwiftGizmo
+    // CHECK-NEXT:   objc_super_method [[DOWNCAST_BORROWED_UPCAST_SELF]] : $SwiftGizmo
     // CHECK-NEXT:   end_borrow [[BORROWED_UPCAST_SELF]] from [[UPCAST_SELF]]
     // CHECK:   return
     super.init()
@@ -46,7 +46,7 @@ class SwiftGizmo : Gizmo {
     // CHECK-NOT: ref_element_addr
 
     // Call super -dealloc.
-    // CHECK:   [[SUPER_DEALLOC:%[0-9]+]] = super_method [[SELF]] : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : (Gizmo) -> () -> (), $@convention(objc_method) (Gizmo) -> ()
+    // CHECK:   [[SUPER_DEALLOC:%[0-9]+]] = objc_super_method [[SELF]] : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : (Gizmo) -> () -> (), $@convention(objc_method) (Gizmo) -> ()
     // CHECK:   [[SUPER:%[0-9]+]] = upcast [[SELF]] : $SwiftGizmo to $Gizmo
     // CHECK:   [[SUPER_DEALLOC_RESULT:%[0-9]+]] = apply [[SUPER_DEALLOC]]([[SUPER]]) : $@convention(objc_method) (Gizmo) -> ()
     // CHECK:   end_lifetime [[SUPER]]

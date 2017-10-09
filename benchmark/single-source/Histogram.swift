@@ -14,6 +14,11 @@
 // <rdar://problem/17384894>
 import TestsUtils
 
+public let Histogram = BenchmarkInfo(
+  name: "Histogram",
+  runFunction: run_Histogram,
+  tags: [.validation, .algorithm])
+
 typealias rrggbb_t = UInt32
 
 func output_sorted_sparse_rgb_histogram<S: Sequence>(_ samples: S, _ N: Int)

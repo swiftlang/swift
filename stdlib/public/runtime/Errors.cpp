@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_WIN32)
+#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_WIN32) || defined(__HAIKU__)
 #  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
 #else
 #  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
@@ -332,7 +332,10 @@ swift::fatalError(uint32_t flags, const char *format, ...)
   va_start(args, format);
 
   char *log;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
   swift_vasprintf(&log, format, args);
+#pragma GCC diagnostic pop
 
   swift_reportError(flags, log);
   abort();
@@ -346,7 +349,10 @@ swift::warning(uint32_t flags, const char *format, ...)
   va_start(args, format);
 
   char *log;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
   swift_vasprintf(&log, format, args);
+#pragma GCC diagnostic pop
 
   reportNow(flags, log);
 

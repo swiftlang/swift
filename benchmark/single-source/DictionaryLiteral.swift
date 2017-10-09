@@ -14,6 +14,11 @@
 // rdar://problem/19804127
 import TestsUtils
 
+public let DictionaryLiteral = BenchmarkInfo(
+  name: "DictionaryLiteral",
+  runFunction: run_DictionaryLiteral,
+  tags: [.validation, .api, .Dictionary])
+
 @inline(never)
 func makeDictionary() -> [Int: Int] {
   return [1: 3, 2: 2, 3: 1]

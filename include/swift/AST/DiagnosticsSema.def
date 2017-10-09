@@ -333,7 +333,7 @@ ERROR(cannot_convert_default_arg_value,none,
 ERROR(cannot_convert_default_arg_value_protocol,none,
       "default argument value of type %0 does not conform to %1", (Type,Type))
 ERROR(cannot_convert_default_arg_value_nil,none,
-      "nil default argument value of cannot be converted to type %0", (Type))
+      "nil default argument value cannot be converted to type %0", (Type))
 
 ERROR(cannot_convert_argument_value,none,
       "cannot convert value of type %0 to expected argument type %1",
@@ -603,7 +603,7 @@ NOTE(serialization_compatibility_version_mismatch,none,
      (StringRef, StringRef, StringRef))
 
 ERROR(reserved_member_name,none,
-      "type member may not be named %0, since it would conflict with the"
+      "type member must not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))
 
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
@@ -641,7 +641,7 @@ NOTE(unspaced_binary_operators_candidate,none,
      "could be %select{binary|postfix}2 %0 and %select{prefix|binary}2 %1",
      (Identifier, Identifier, bool))
 ERROR(unspaced_unary_operator,none,
-      "unary operators may not be juxtaposed; parenthesize inner expression",
+      "unary operators must not be juxtaposed; parenthesize inner expression",
       ())
 
 
@@ -961,7 +961,7 @@ NOTE(unbound_generic_parameter_explicit_fix,none,
 
 
 ERROR(string_index_not_integer,none,
-      "String may not be indexed with %0, it has variable size elements",
+      "String must not be indexed with %0, it has variable size elements",
       (Type))
 NOTE(string_index_not_integer_note,none,
      "consider using an existing high level algorithm, "
@@ -1017,12 +1017,12 @@ ERROR(mutating_invalid_classes,none,
       "classes or class-bound protocols", (bool))
 
 ERROR(functions_mutating_and_not,none,
-      "method may not be declared both "
+      "method must not be declared both "
       "%select{nonmutating|mutating|__consuming}0 and "
       "%select{nonmutating|mutating|__consuming}1",
       (unsigned, unsigned))
 ERROR(static_functions_not_mutating,none,
-      "static functions may not be declared mutating", ())
+      "static functions must not be declared mutating", ())
 
 ERROR(transparent_stored_property,none,
       "@_transparent cannot be applied to stored properties", ())
@@ -1347,7 +1347,7 @@ ERROR(extension_specialization,none,
       "constrained extension must be declared on the unspecialized generic "
       "type %0 with constraints specified by a 'where' clause", (Identifier))
 ERROR(extension_stored_property,none,
-      "extensions may not contain stored properties", ())
+      "extensions must not contain stored properties", ())
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0", (Type))
 ERROR(extension_constrained_inheritance,none,
@@ -1993,7 +1993,7 @@ WARNING(enum_case_access_warn,none,
         "uses %select{a private|a fileprivate|an internal|%error|%error}1 type",
         (AccessLevel, AccessLevel))
 ERROR(enum_stored_property,none,
-      "enums may not contain stored properties", ())
+      "enums must not contain stored properties", ())
 
 // Enum raw types
 ERROR(multiple_enum_raw_types,none,
@@ -2190,9 +2190,9 @@ ERROR(attr_only_one_decl_kind,none,
 ERROR(attr_only_on_parameters,none,
       "%0 may only be used on parameters", (StringRef))
 ERROR(attr_not_on_variadic_parameters,none,
-      "%0 may not be used on variadic parameters", (StringRef))
+      "%0 must not be used on variadic parameters", (StringRef))
 ERROR(attr_not_on_subscript_parameters,none,
-      "%0 may not be used on subscript parameters", (StringRef))
+      "%0 must not be used on subscript parameters", (StringRef))
 
 ERROR(override_final,none,
       "%0 overrides a 'final' %1", (DescriptiveDeclKind, DescriptiveDeclKind))
@@ -2294,10 +2294,10 @@ NOTE(attr_ApplicationMain_script_here,none,
 ERROR(lazy_not_on_let,none,
       "'lazy' cannot be used on a let", ())
 ERROR(lazy_not_on_computed,none,
-      "'lazy' may not be used on a computed property", ())
+      "'lazy' must not be used on a computed property", ())
 
 ERROR(lazy_on_already_lazy_global,none,
-      "'lazy' may not be used on an already-lazy global", ())
+      "'lazy' must not be used on an already-lazy global", ())
 ERROR(lazy_not_in_protocol,none,
       "'lazy' isn't allowed on a protocol requirement", ())
 ERROR(lazy_requires_initializer,none,
@@ -2309,7 +2309,7 @@ ERROR(lazy_requires_single_var,none,
 ERROR(lazy_must_be_property,none,
       "lazy is only valid for members of a struct or class", ())
 ERROR(lazy_not_observable,none,
-      "lazy properties may not have observers", ())
+      "lazy properties must not have observers", ())
 
 // Debugger function attribute.
 ERROR(attr_for_debugger_support_only,none,
@@ -3108,7 +3108,7 @@ ERROR(invalid_ownership_type,none,
       "class and class-bound protocol types, not %1",
       (/*Ownership*/unsigned, Type))
 ERROR(invalid_ownership_protocol_type,none,
-      "'%select{strong|weak|unowned|unowned}0' may not be applied to "
+      "'%select{strong|weak|unowned|unowned}0' must not be applied to "
       "non-class-bound %1; consider adding a protocol conformance that has a class bound",
       (/*Ownership*/unsigned, Type))
 ERROR(invalid_weak_ownership_not_optional,none,
@@ -3206,7 +3206,7 @@ ERROR(objc_in_generic_extension,none,
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
-      "@objc protocols may not have operator requirements", ())
+      "@objc protocols must not have operator requirements", ())
 WARNING(objc_inference_swift3_dynamic,none,
         "inference of '@objc' for 'dynamic' members is deprecated", ())
 WARNING(objc_inference_swift3_objc_derived,none,
@@ -3721,6 +3721,11 @@ WARNING(pbd_never_used_stmtcond, none,
         "value %0 was defined but never used; consider replacing "
         "with boolean test",
         (Identifier))
+WARNING(unused_setter_parameter, none,
+        "setter argument %0 was never used, but the property was accessed",
+        (Identifier))
+NOTE(fixit_for_unused_setter_parameter, none,
+     "did you mean to use %0 instead of accessing the property's current value?", (Identifier))
 
 WARNING(pbd_never_used, none,
         "initialization of %select{variable|immutable value}1 %0 was never used"

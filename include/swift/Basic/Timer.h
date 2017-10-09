@@ -47,11 +47,12 @@ namespace swift {
   };
 
   /// A SharedTimer for recursive routines.
-  /// Declare as a static, and use as below:
   /// void example() {
-  ///     static RecursiveSharedTimer timer("lookupDirect");
-  ///     auto guard = RecursiveSharedTimer::Guard(timer);
-  ///     (void)guard;
+  ///  RecursiveSharedTimer::Guard guard; // MUST BE AT TOP SCOPE of function to
+  ///  work right! if (auto s = getASTContext().Stats) {
+  ///    guard =
+  ///    ctx.Stats->getFrontendRecursiveSharedTimers().NominalTypeDecl__lookupDirect.getGuard();
+  //  }
   ///   ...
   /// }
 
@@ -76,13 +77,33 @@ namespace swift {
     RecursiveSharedTimer(StringRef name) : name(name) {}
 
     struct Guard {
-      RecursiveSharedTimer &recursiveTimer;
-      Guard &operator=(Guard &) = delete;
-      Guard(RecursiveSharedTimer &rst) : recursiveTimer(rst) {
-        recursiveTimer.enterRecursiveFunction();
+      RecursiveSharedTimer *recursiveTimerOrNull;
+
+      Guard(RecursiveSharedTimer *rst) : recursiveTimerOrNull(rst) {
+        if (recursiveTimerOrNull)
+          recursiveTimerOrNull->enterRecursiveFunction();
       }
-      ~Guard() { recursiveTimer.exitRecursiveFunction(); }
+      ~Guard() {
+        if (recursiveTimerOrNull)
+          recursiveTimerOrNull->exitRecursiveFunction();
+      }
+
+      // All this stuff is to do an RAII object that be moved.
+      Guard() : recursiveTimerOrNull(nullptr) {}
+      Guard(Guard &&other) {
+        recursiveTimerOrNull = other.recursiveTimerOrNull;
+        other.recursiveTimerOrNull = nullptr;
+      }
+      Guard &operator=(Guard &&other) {
+        recursiveTimerOrNull = other.recursiveTimerOrNull;
+        other.recursiveTimerOrNull = nullptr;
+        return *this;
+      }
+      Guard(const Guard &) = delete;
+      Guard &operator=(const Guard &) = delete;
     };
+
+    Guard getGuard() { return Guard(this); }
   };
 } // end namespace swift
 

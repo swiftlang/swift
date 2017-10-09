@@ -106,36 +106,42 @@ extension Strideable {
 %   Availability = '@available(swift, %s, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")' % (VersionInfo) if VersionInfo else ''
 
 extension ${Base} {
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   ${Availability}
   public static func + (lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: rhs)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   ${Availability}
   public static func + (lhs: Self.Stride, rhs: Self) -> Self {
     return rhs.advanced(by: lhs)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   ${Availability}
   public static func - (lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: -rhs)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   ${Availability}
   public static func - (lhs: Self, rhs: Self) -> Self.Stride {
     return rhs.distance(to: lhs)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   ${Availability}
   public static func += (lhs: inout Self, rhs: Self.Stride) {
     lhs = lhs.advanced(by: rhs)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   ${Availability}
   public static func -= (lhs: inout Self, rhs: Self.Stride) {
@@ -247,6 +253,7 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   @_versioned
   internal let _stride: Element.Stride
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self, children: ["from": _start, "to": _end, "by": _stride])
   }
@@ -342,6 +349,7 @@ public struct StrideThrough<
   @_versioned
   internal let _stride: Element.Stride
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self,
       children: ["from": _start, "through": _end, "by": _stride])

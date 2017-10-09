@@ -562,8 +562,10 @@ class alignas(1 << DeclAlignInBits) Decl {
   class AssociatedTypeDeclBitfields {
     friend class AssociatedTypeDecl;
     unsigned : NumTypeDeclBits;
+    unsigned ComputedOverridden : 1;
+    unsigned HasOverridden : 1;
   };
-  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits };
+  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits + 2 };
   static_assert(NumAssociatedTypeDeclBits <= 32, "fits in an unsigned");
 
   class ImportDeclBitfields {
@@ -2662,6 +2664,33 @@ public:
   /// type; can only be called after the alias type has been resolved.
   void computeType();
 
+  /// Retrieve the associated type "anchor", which is the associated type
+  /// declaration that will be used to describe this associated type in the
+  /// ABI.
+  ///
+  /// The associated type "anchor" is an associated type that does not
+  /// override any other associated type. There may be several such associated
+  /// types; select one deterministically.
+  AssociatedTypeDecl *getAssociatedTypeAnchor() const;
+
+  /// Retrieve the (first) overridden associated type declaration, if any.
+  AssociatedTypeDecl *getOverriddenDecl() const;
+
+  /// Retrieve the set of associated types overridden by this associated
+  /// type.
+  ArrayRef<AssociatedTypeDecl *> getOverriddenDecls() const;
+
+  /// Whether the overridden declarations have already been computed.
+  bool overriddenDeclsComputed() const {
+    return AssociatedTypeDeclBits.ComputedOverridden;
+  }
+
+  /// Record the set of overridden declarations.
+  ///
+  /// \returns the array recorded in the AST.
+  ArrayRef<AssociatedTypeDecl *> setOverriddenDecls(
+                                   ArrayRef<AssociatedTypeDecl *> overridden);
+
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;
 
@@ -3544,6 +3573,11 @@ public:
   /// Retrieve the set of protocols inherited from this protocol.
   llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
 
+  /// Retrieve the set of AssociatedTypeDecl members of this protocol; this
+  /// saves loading the set of members in cases where there's no possibility of
+  /// a protocol having nested types (ObjC protocols).
+  llvm::TinyPtrVector<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
+
   /// Walk all of the protocols inherited by this protocol, transitively,
   /// invoking the callback function for each protocol.
   ///
@@ -3775,7 +3809,7 @@ enum class AddressorKind : unsigned char {
   NotAddressor,
   /// \brief This is an unsafe addressor; it simply returns an address.
   Unsafe,
-  /// \brief This is an owning addressor; it returns a Builtin.UnknownObject
+  /// \brief This is an owning addressor; it returns an AnyObject
   /// which should be released when the caller is done with the object.
   Owning,
   /// \brief This is an owning addressor; it returns a Builtin.NativeObject
@@ -4583,7 +4617,7 @@ public:
   /// Clone constructor, allocates a new ParamDecl identical to the first.
   /// Intentionally not defined as a typical copy constructor to avoid
   /// accidental copies.
-  ParamDecl(ParamDecl *PD);
+  ParamDecl(ParamDecl *PD, bool withTypes);
   
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const { return ArgumentName; }

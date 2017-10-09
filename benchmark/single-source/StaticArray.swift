@@ -16,6 +16,11 @@
 
 import TestsUtils
 
+public let StaticArrayTest = BenchmarkInfo(
+  name: "StaticArray",
+  runFunction: run_StaticArray,
+  tags: [.validation, .api, .Array])
+
 protocol StaticArrayProtocol {
   associatedtype ElemTy
   init(_ defaultValue : ElemTy)

@@ -1879,8 +1879,7 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     return false;
 
   auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
-    auto *env = archetype->getGenericEnvironment();
-    auto paramType = env->mapTypeOutOfContext(archetype);
+    auto paramType = archetype->getInterfaceType();
 
     if (auto *GTPT = paramType->getAs<GenericTypeParamType>())
       return GTPT->getDecl();
@@ -3289,17 +3288,41 @@ namespace {
           patternElt.first->setType(patternElt.second);
       
       for (auto paramDeclElt : ParamDeclTypes)
-        if (!paramDeclElt.first->hasType())
-          paramDeclElt.first->setType(paramDeclElt.second);
+        if (!paramDeclElt.first->hasType()) {
+          paramDeclElt.first->setType(getParamBaseType(paramDeclElt));
+        }
 
       for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes)
-        if (!paramDeclIfaceElt.first->hasInterfaceType())
-          paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second);
+        if (!paramDeclIfaceElt.first->hasInterfaceType()) {
+          paramDeclIfaceElt.first->setInterfaceType(
+              getParamBaseType(paramDeclIfaceElt));
+        }
 
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
           if (D->hasInterfaceType())
             D->setInvalid(D->getInterfaceType()->hasError());
+    }
+
+  private:
+    static Type getParamBaseType(std::pair<ParamDecl *, Type> &storedParam) {
+      ParamDecl *param;
+      Type storedType;
+
+      std::tie(param, storedType) = storedParam;
+
+      // FIXME: We are currently in process of removing `InOutType`
+      //        so `VarDecl::get{Interface}Type` is going to wrap base
+      //        type into `InOutType` if its flag indicates that it's
+      //        an `inout` parameter declaration. But such type can't
+      //        be restored directly using `VarDecl::set{Interface}Type`
+      //        caller needs additional logic to extract base type.
+      if (auto *IOT = storedType->getAs<InOutType>()) {
+        assert(param->isInOut());
+        return IOT->getObjectType();
+      }
+
+      return storedType;
     }
   };
 } // end anonymous namespace
@@ -6097,8 +6120,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
         return false;
 
       // Record substitution from generic parameter to the argument type.
-      substitutions[env->mapTypeOutOfContext(archetype)
-                        ->getCanonicalType()
+      substitutions[archetype->getInterfaceType()->getCanonicalType()
                         ->castTo<SubstitutableType>()] = argType;
     }
   }
@@ -6190,11 +6212,15 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
 
   auto result = TC.checkGenericArguments(
       dc, callExpr->getLoc(), fnExpr->getLoc(), AFD->getInterfaceType(),
-      env->getGenericSignature(), QueryTypeSubstitutionMap{substitutions},
+      env->getGenericSignature(), substitutionFn,
       LookUpConformanceInModule{dc->getParentModule()}, nullptr,
       ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
 
-  return result != RequirementCheckResult::Success;
+  assert(result != RequirementCheckResult::UnsatisfiedDependency);
+
+  // Note: If result is RequirementCheckResult::SubstitutionFailure, we did
+  // not emit a diagnostic, so we must return false in that case.
+  return result == RequirementCheckResult::Failure;
 }
 
 /// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,
@@ -8970,7 +8996,7 @@ static bool hasArchetype(const GenericTypeDecl *generic,
   if (!genericEnv)
     return false;
 
-  return genericEnv->containsPrimaryArchetype(archetype);
+  return archetype->getGenericEnvironment() == genericEnv;
 }
 
 static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,

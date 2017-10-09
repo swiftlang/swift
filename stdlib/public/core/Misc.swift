@@ -14,6 +14,7 @@
 
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _countLeadingZeros(_ value: Int64) -> Int64 {
@@ -21,6 +22,7 @@ func _countLeadingZeros(_ value: Int64) -> Int64 {
 }
 
 /// Returns if `x` is a power of 2.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _isPowerOf2(_ x: UInt) -> Bool {
@@ -33,6 +35,7 @@ func _isPowerOf2(_ x: UInt) -> Bool {
 }
 
 /// Returns if `x` is a power of 2.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _isPowerOf2(_ x: Int) -> Bool {
@@ -45,6 +48,7 @@ func _isPowerOf2(_ x: Int) -> Bool {
 }
 
 #if _runtime(_ObjC)
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func _autorelease(_ x: AnyObject) {
   Builtin.retain(x)
@@ -57,7 +61,9 @@ public func _autorelease(_ x: AnyObject) {
 ///
 /// This function is primarily useful to call various runtime functions
 /// written in C++.
-func _withUninitializedString<R>(
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _withUninitializedString<R>(
   _ body: (UnsafeMutablePointer<String>) -> R
 ) -> (R, String) {
   let stringPtr = UnsafeMutablePointer<String>.allocate(capacity: 1)
@@ -72,11 +78,13 @@ func _withUninitializedString<R>(
 // with type names that we are nested in.
 // But we can place it behind #if _runtime(_Native) and remove it from ABI on
 // Apple platforms, deferring discussions mentioned above.
+@_inlineable // FIXME(sil-serialize-all)
 @_silgen_name("swift_getTypeName")
 public func _getTypeName(_ type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the demangled qualified name of a metatype.
+@_inlineable // FIXME(sil-serialize-all)
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
@@ -84,14 +92,17 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
     input: UnsafeBufferPointer(start: stringPtr, count: count))
 }
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_getTypeByName")
-func _getTypeByName(
+internal func _getTypeByName(
     _ name: UnsafePointer<UInt8>,
     _ nameLength: UInt)
   -> Any.Type?
 
 /// Lookup a class given a name. Until the demangled encoding of type
 /// names is stabilized, this is limited to top-level class names (Foo.bar).
+@_inlineable // FIXME(sil-serialize-all)
 public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
@@ -115,6 +126,7 @@ func _typeByName(_ name: String) -> Any.Type? {
 ///      floorLog2(9) == floorLog2(15) == 3
 ///
 /// TODO: Implement version working on Int instead of Int64.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _floorLog2(_ x: Int64) -> Int {

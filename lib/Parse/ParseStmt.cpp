@@ -579,7 +579,12 @@ ParserResult<Stmt> Parser::parseStmt() {
 ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   if (Tok.isNot(tok::l_brace)) {
     diagnose(Tok, ID);
-    return nullptr;
+
+    // Attempt to recover by looking for a left brace on the same line
+    while (Tok.isNot(tok::eof, tok::l_brace) && !Tok.isAtStartOfLine())
+      skipSingle();
+    if (Tok.isNot(tok::l_brace))
+      return nullptr;
   }
   SourceLoc LBLoc = consumeToken(tok::l_brace);
 
@@ -1765,15 +1770,17 @@ static bool isStmtForCStyle(Parser &P) {
   auto HasLParen = P.consumeIf(tok::l_paren);
 
   // Skip until we see ';', or something that ends control part.
-  while (P.Tok.isNot(tok::eof, tok::kw_in, tok::semi, tok::l_brace,
-                     tok::r_brace, tok::r_paren) && !P.isStartOfStmt()) {
+  while (true) {
+    if (P.Tok.isAny(tok::eof, tok::kw_in, tok::l_brace, tok::r_brace,
+                    tok::r_paren) || P.isStartOfStmt())
+      return false;
     // If we saw newline before ';', consider it is a foreach statement.
     if (!HasLParen && P.Tok.isAtStartOfLine())
       return false;
+    if (P.Tok.is(tok::semi))
+      return true;
     P.skipSingle();
   }
-
-  return P.Tok.is(tok::semi);
 }
 
 /// 

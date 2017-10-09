@@ -925,8 +925,6 @@ static bool performCompile(CompilerInstance &Instance,
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
       serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-      serializationOpts.SerializeAllSIL =
-          Invocation.getSILOptions().SILSerializeAll;
       if (opts.SerializeBridgingHeader)
         serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
       serializationOpts.ModuleLinkName = opts.ModuleLinkName;
@@ -1360,13 +1358,17 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     StringRef OutFile = FEOpts.getSingleOutputFilename();
     StringRef OutputType = llvm::sys::path::extension(OutFile);
     std::string TripleName = LangOpts.Target.normalize();
+    auto &SM = Instance->getSourceMgr();
+    auto Trace = Invocation.getFrontendOptions().TraceStats;
     StatsReporter = llvm::make_unique<UnifiedStatsReporter>("swift-frontend",
                                                             FEOpts.ModuleName,
                                                             InputName,
                                                             TripleName,
                                                             OutputType,
                                                             OptType,
-                                                            StatsOutputDir);
+                                                            StatsOutputDir,
+                                                            &SM,
+                                                            Trace);
   }
 
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();

@@ -100,6 +100,9 @@ SILFunctionType::getDefaultWitnessMethodProtocol(ModuleDecl &M) const {
   assert(getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod);
   auto selfTy = getSelfInstanceType();
   if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
+    auto superclass = GenericSig->getSuperclassBound(paramTy, M);
+    if (superclass)
+      return nullptr;
     assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
     auto protos = GenericSig->getConformsTo(paramTy, M);
     assert(protos.size() == 1);
@@ -864,9 +867,14 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     for (auto capture : loweredCaptures.getCaptures()) {
       if (capture.isDynamicSelfMetadata()) {
         ParameterConvention convention = ParameterConvention::Direct_Unowned;
+        auto dynamicSelfInterfaceType = GenericEnvironment::mapTypeOutOfContext(
+          function->getGenericEnvironment(),
+          loweredCaptures.getDynamicSelfType());
+        
         auto selfMetatype = MetatypeType::get(
-            loweredCaptures.getDynamicSelfType(),
+            dynamicSelfInterfaceType,
             MetatypeRepresentation::Thick);
+        
         auto canSelfMetatype = getCanonicalType(selfMetatype);
         SILParameterInfo param(canSelfMetatype, convention);
         inputs.push_back(param);

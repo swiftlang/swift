@@ -719,87 +719,7 @@ namespace {
     using type = R;
   };
 }
-  
-namespace heap_object_abi {
-  
-// The extra inhabitants and spare bits of heap object pointers.
-// These must align with the values in IRGen's SwiftTargetInfo.cpp.
-#if defined(__x86_64__)
 
-# ifdef __APPLE__
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER;
-# else
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
-# endif
-static const uintptr_t SwiftSpareBitsMask =
-  SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK;
-static const uintptr_t ObjCReservedBitsMask =
-  SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK;
-static const unsigned ObjCReservedLowBits =
-  SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS;
-
-#elif defined(__arm64__)
-
-# ifdef __APPLE__
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER;
-# else
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
-# endif
-static const uintptr_t SwiftSpareBitsMask =
-  SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK;
-static const uintptr_t ObjCReservedBitsMask =
-  SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK;
-static const unsigned ObjCReservedLowBits =
-  SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS;
-
-#elif defined(__powerpc64__)
-
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
-static const uintptr_t SwiftSpareBitsMask =
-  SWIFT_ABI_POWERPC64_SWIFT_SPARE_BITS_MASK;
-static const uintptr_t ObjCReservedBitsMask =
-  SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK;
-static const unsigned ObjCReservedLowBits =
-  SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS;
-
-#elif defined(__s390x__)
-
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
-static const uintptr_t SwiftSpareBitsMask =
-  SWIFT_ABI_S390X_SWIFT_SPARE_BITS_MASK;
-static const uintptr_t ObjCReservedBitsMask =
-  SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK;
-static const unsigned ObjCReservedLowBits =
-  SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS;
-
-#else
-
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
-static const uintptr_t SwiftSpareBitsMask =
-# if __i386__
-  SWIFT_ABI_I386_SWIFT_SPARE_BITS_MASK
-# elif __arm__
-  SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK
-# else
-  SWIFT_ABI_DEFAULT_SWIFT_SPARE_BITS_MASK
-# endif
-  ;
-static const uintptr_t ObjCReservedBitsMask =
-  SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK;
-static const unsigned ObjCReservedLowBits =
-  SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS;
-
-#endif
-
-}
-  
 template <typename Runtime> struct TargetNominalTypeDescriptor;
 template <typename Runtime> struct TargetGenericMetadata;
 template <typename Runtime> struct TargetClassMetadata;
@@ -966,9 +886,7 @@ public:
 
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
-  const ConstTargetFarRelativeDirectPointer<Runtime,
-                                            TargetNominalTypeDescriptor,
-                                            /*nullable*/ true> &
+  ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
   getNominalTypeDescriptor() const {
     switch (getKind()) {
     case MetadataKind::Class: {
@@ -982,7 +900,8 @@ public:
     case MetadataKind::Struct:
     case MetadataKind::Enum:
     case MetadataKind::Optional:
-      return static_cast<const TargetStructMetadata<Runtime> *>(this)->Description;
+      return static_cast<const TargetStructMetadata<Runtime> *>(this)
+          ->Description;
     case MetadataKind::ForeignClass:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
@@ -999,11 +918,7 @@ public:
 
     swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
-  
-  /// Get the generic metadata pattern from which this generic type instance was
-  /// instantiated, or null if the type is not generic.
-  const TargetGenericMetadata<Runtime> *getGenericPattern() const;
-  
+
   /// Get the class object for this type if it has one, or return null if the
   /// type is not a class (or not a class with a class object).
   const TargetClassMetadata<Runtime> *getClassObject() const;
@@ -1102,6 +1017,13 @@ struct TargetHeapMetadata : TargetMetadata<Runtime> {
 };
 using HeapMetadata = TargetHeapMetadata<InProcess>;
 
+struct GenericContextDescriptor {
+  /// The number of primary type parameters. This is always less than or equal
+  /// to NumGenericRequirements; it counts only the type parameters
+  /// and not any required witness tables.
+  uint32_t NumPrimaryParams;
+};
+
 /// Header for a generic parameter descriptor. This is a variable-sized
 /// structure that describes how to find and parse a generic parameter vector
 /// within the type metadata for an instance of a nominal type.
@@ -1109,8 +1031,7 @@ struct GenericParameterDescriptor {
   /// The offset to the first generic argument from the start of
   /// metadata record.
   ///
-  /// This is meaningful if either NumGenericRequirements is nonzero or
-  /// (for classes) if Flags.hasParent() is true.
+  /// This is meaningful if NumGenericRequirements is nonzero.
   uint32_t Offset;
 
   /// The amount of generic requirement data in the metadata record, in
@@ -1126,6 +1047,10 @@ struct GenericParameterDescriptor {
   /// and not any required witness tables.
   uint32_t NumPrimaryParams;
 
+  /// The number of types that this type is nested inside of, including itself
+  /// (so this value is at least 1).
+  uint16_t NestingDepth;
+
   /// Flags for this generic parameter descriptor.
   GenericParameterDescriptorFlags Flags;
 
@@ -1135,7 +1060,12 @@ struct GenericParameterDescriptor {
 
   /// True if the nominal type is generic in any way.
   bool isGeneric() const {
-    return hasGenericRequirements() || Flags.hasGenericParent();
+    return hasGenericRequirements();
+  }
+
+  GenericContextDescriptor getContext(unsigned depth) const {
+    assert(depth < NestingDepth);
+    return ((const GenericContextDescriptor *)(this + 1))[depth];
   }
 
   // TODO: add meaningful descriptions of the generic requirements.
@@ -1273,9 +1203,7 @@ struct TargetNominalTypeDescriptor {
     } Enum;
   };
   
-  RelativeDirectPointerIntPair<TargetGenericMetadata<Runtime>,
-                               NominalTypeKind, /*Nullable*/ true>
-    GenericMetadataPatternAndKind;
+  NominalTypeKind Kind;
 
   using NonGenericMetadataAccessFunction = const Metadata *();
 
@@ -1290,19 +1218,12 @@ struct TargetNominalTypeDescriptor {
   TargetRelativeDirectPointer<Runtime, NonGenericMetadataAccessFunction,
                               /*Nullable*/ true> AccessFunction;
 
-  /// A pointer to the generic metadata pattern that is used to instantiate
-  /// instances of this type. Zero if the type is not generic.
-  TargetGenericMetadata<Runtime> *getGenericMetadataPattern() const {
-    return const_cast<TargetGenericMetadata<Runtime>*>(
-                                    GenericMetadataPatternAndKind.getPointer());
-  }
-
   NonGenericMetadataAccessFunction *getAccessFunction() const {
     return AccessFunction.get();
   }
 
   NominalTypeKind getKind() const {
-    return GenericMetadataPatternAndKind.getInt();
+    return Kind;
   }
 
   int32_t offsetToNameOffset() const {
@@ -1316,12 +1237,13 @@ struct TargetNominalTypeDescriptor {
         !GenericParams.Flags.hasVTable())
       return nullptr;
 
-    auto asWords = reinterpret_cast<const void * const*>(this + 1);
+    auto asWords = reinterpret_cast<const uint32_t *>(this + 1);
 
     // TODO: Once we emit reflective descriptions of generic requirements,
     // skip the right number of words here.
 
-    return reinterpret_cast<const VTableDescriptor *>(asWords);
+    return reinterpret_cast<const VTableDescriptor *>(asWords
+        + GenericParams.NestingDepth);
   }
 
   /// The generic parameter descriptor header. This describes how to find and
@@ -1364,20 +1286,16 @@ struct TargetClassMetadata : public TargetHeapMetadata<Runtime> {
       Description(nullptr), IVarDestroyer(ivarDestroyer) {}
 
   // Description's copy ctor is deleted so we have to do this the hard way.
-  TargetClassMetadata(const TargetClassMetadata& other)
-    : TargetHeapMetadata<Runtime>(other),
-      SuperClass(other.SuperClass),
-      CacheData{other.CacheData[0], other.CacheData[1]},
-      Data(other.Data),
-      Flags(other.Flags),
-      InstanceAddressPoint(other.InstanceAddressPoint),
-      InstanceSize(other.InstanceSize),
-      InstanceAlignMask(other.InstanceAlignMask),
-      Reserved(other.Reserved),
-      ClassSize(other.ClassSize),
-      ClassAddressPoint(other.ClassAddressPoint),
-      Description(other.Description.get()),
-      IVarDestroyer(other.IVarDestroyer) {}
+  TargetClassMetadata(const TargetClassMetadata &other)
+      : TargetHeapMetadata<Runtime>(other),
+        SuperClass(other.SuperClass),
+        CacheData{other.CacheData[0], other.CacheData[1]},
+        Data(other.Data), Flags(other.Flags),
+        InstanceAddressPoint(other.InstanceAddressPoint),
+        InstanceSize(other.InstanceSize),
+        InstanceAlignMask(other.InstanceAlignMask), Reserved(other.Reserved),
+        ClassSize(other.ClassSize), ClassAddressPoint(other.ClassAddressPoint),
+        Description(other.Description), IVarDestroyer(other.IVarDestroyer) {}
 
   /// The metadata for the superclass.  This is null for the root class.
   ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> SuperClass;
@@ -1439,8 +1357,7 @@ private:
   /// if this is an artificial subclass.  We currently provide no
   /// supported mechanism for making a non-artificial subclass
   /// dynamically.
-  ConstTargetFarRelativeDirectPointer<Runtime, TargetNominalTypeDescriptor,
-                                      /*nullable*/ true> Description;
+  ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor> Description;
 
   /// A function for destroying instance variables, used to clean up
   /// after an early return from a constructor.
@@ -1454,15 +1371,12 @@ private:
   //   - "tabulated" virtual methods
 
 public:
-  const ConstTargetFarRelativeDirectPointer<Runtime,
-                                            TargetNominalTypeDescriptor,
-                                            /*nullable*/ true> &
+  ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
   getDescription() const {
     assert(isTypeMetadata());
-    assert(!isArtificialSubclass());
     return Description;
   }
-  
+
   void setDescription(const TargetNominalTypeDescriptor<Runtime> *
                       description) {
     Description = description;
@@ -1565,21 +1479,6 @@ public:
       return nullptr;
     
     return getter(this);
-  }
-
-  /// Return the parent type for a given level in the class hierarchy, or
-  /// null if that level does not have a parent type.
-  const TargetMetadata<Runtime> *
-  getParentType(const TargetNominalTypeDescriptor<Runtime> *theClass) const {
-    if (!theClass->GenericParams.Flags.hasParent())
-      return nullptr;
-
-    auto metadataAsWords = reinterpret_cast<const Metadata * const *>(this);
-    return metadataAsWords[theClass->GenericParams.Offset - 1];
-  }
-
-  StoredPointer offsetToDescriptorOffset() const {
-    return offsetof(TargetClassMetadata<Runtime>, Description);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1744,22 +1643,11 @@ template <typename Runtime>
 struct TargetValueMetadata : public TargetMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   TargetValueMetadata(MetadataKind Kind,
-    ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
-                      description,
-    ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> parent)
-    : TargetMetadata<Runtime>(Kind),
-      Description(description),
-      Parent(parent)
-  {}
+                      const TargetNominalTypeDescriptor<Runtime> *description)
+      : TargetMetadata<Runtime>(Kind), Description(description) {}
 
   /// An out-of-line description of the type.
-  ConstTargetFarRelativeDirectPointer<Runtime, TargetNominalTypeDescriptor>
-  Description;
-
-  /// The parent type of this member type, or null if this is not a
-  /// member type.  It's acceptable to make this a direct pointer because
-  /// parent types are relatively uncommon.
-  TargetPointer<Runtime, const TargetMetadata<Runtime>> Parent;
+  const TargetNominalTypeDescriptor<Runtime> *Description;
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Struct
@@ -1779,17 +1667,8 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
   }
 
   const TargetNominalTypeDescriptor<Runtime> *getDescription() const {
-    return Description.get();
+    return Description;
   }
-
-  StoredPointer offsetToDescriptorOffset() const {
-    return offsetof(TargetValueMetadata<Runtime>, Description);
-  }
-
-  StoredPointer offsetToParentOffset() const {
-    return offsetof(TargetValueMetadata<Runtime>, Parent);
-  }
-  
 };
 using ValueMetadata = TargetValueMetadata<InProcess>;
 

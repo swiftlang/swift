@@ -194,6 +194,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
   if (const Arg *A = Args.getLastArg(OPT_stats_output_dir)) {
     Opts.StatsOutputDir = A->getValue();
+    if (Args.getLastArg(OPT_trace_stats_events)) {
+      Opts.TraceStats = true;
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_validate_tbd_against_ir_EQ)) {
@@ -1370,9 +1373,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 
-  Opts.SILSerializeAll |= Args.hasArg(OPT_sil_serialize_all);
   Opts.SILSerializeWitnessTables |=
     Args.hasArg(OPT_sil_serialize_witness_tables);
+  Opts.SILSerializeVTables |=
+    Args.hasArg(OPT_sil_serialize_vtables);
 
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
@@ -1455,6 +1459,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ExternalPassPipelineFilename = A->getValue();
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
+  const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);
+  Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";
+
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
   Opts.EnableGuaranteedClosureContexts |=
     Args.hasArg(OPT_enable_guaranteed_closure_contexts);
@@ -1636,6 +1643,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
+  const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);
+  Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";
+
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
 
   Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);

@@ -19,7 +19,7 @@ namespace swift {
 namespace sil {
 
 class ValueOwnershipKindClassifier
-    : public SILVisitor<ValueOwnershipKindClassifier, ValueOwnershipKind> {
+    : public SILValueVisitor<ValueOwnershipKindClassifier, ValueOwnershipKind> {
 
 public:
   ValueOwnershipKindClassifier() = default;
@@ -33,9 +33,6 @@ public:
     return visitForwardingInst(I, I->getAllOperands());
   }
 
-  ValueOwnershipKind visitValueBase(ValueBase *V) {
-    llvm_unreachable("unimplemented method on ValueBaseOwnershipVisitor");
-  }
 #define VALUE(Id, Parent) ValueOwnershipKind visit##Id(Id *ID);
 #include "swift/SIL/SILNodes.def"
 };

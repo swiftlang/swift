@@ -558,9 +558,12 @@ ManagedValue SILGenBuilder::createUnconditionalCheckedCast(SILLocation loc,
 void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                                             ManagedValue operand, SILType type,
                                             SILBasicBlock *trueBlock,
-                                            SILBasicBlock *falseBlock) {
+                                            SILBasicBlock *falseBlock,
+                                            ProfileCounter Target1Count,
+                                            ProfileCounter Target2Count) {
   SILBuilder::createCheckedCastBranch(loc, isExact, operand.forward(SGF), type,
-                                      trueBlock, falseBlock);
+                                      trueBlock, falseBlock, Target1Count,
+                                      Target2Count);
 }
 
 void SILGenBuilder::createCheckedCastValueBranch(SILLocation loc,
@@ -688,10 +691,18 @@ ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
 ManagedValue SILGenBuilder::createSuperMethod(SILLocation loc,
                                               ManagedValue operand,
                                               SILDeclRef member,
-                                              SILType methodTy,
-                                              bool isVolatile) {
+                                              SILType methodTy) {
   SILValue v = SILBuilder::createSuperMethod(loc, operand.getValue(), member,
-                                             methodTy, isVolatile);
+                                             methodTy);
+  return ManagedValue::forUnmanaged(v);
+}
+
+ManagedValue SILGenBuilder::createObjCSuperMethod(SILLocation loc,
+                                                  ManagedValue operand,
+                                                  SILDeclRef member,
+                                                  SILType methodTy) {
+  SILValue v = SILBuilder::createObjCSuperMethod(loc, operand.getValue(), member,
+                                                 methodTy);
   return ManagedValue::forUnmanaged(v);
 }
 
@@ -713,16 +724,26 @@ void SwitchEnumBuilder::emit() && {
   {
     // TODO: We could store the data in CaseBB form and not have to do this.
     llvm::SmallVector<DeclBlockPair, 8> caseBlocks;
+    llvm::SmallVector<ProfileCounter, 8> caseBlockCounts;
     std::transform(caseDataArray.begin(), caseDataArray.end(),
                    std::back_inserter(caseBlocks),
                    [](NormalCaseData &caseData) -> DeclBlockPair {
                      return {caseData.decl, caseData.block};
                    });
+    std::transform(caseDataArray.begin(), caseDataArray.end(),
+                   std::back_inserter(caseBlockCounts),
+                   [](NormalCaseData &caseData) -> ProfileCounter {
+                     return caseData.count;
+                   });
     SILBasicBlock *defaultBlock =
         defaultBlockData ? defaultBlockData->block : nullptr;
+    ProfileCounter defaultBlockCount =
+        defaultBlockData ? defaultBlockData->count : ProfileCounter();
+    ArrayRef<ProfileCounter> caseBlockCountsRef = caseBlockCounts;
     if (isAddressOnly) {
       builder.createSwitchEnumAddr(loc, optional.getValue(), defaultBlock,
-                                   caseBlocks);
+                                   caseBlocks, caseBlockCountsRef,
+                                   defaultBlockCount);
     } else {
       if (optional.getType().isAddress()) {
         // TODO: Refactor this into a maybe load.
@@ -733,7 +754,8 @@ void SwitchEnumBuilder::emit() && {
         }
       }
       builder.createSwitchEnum(loc, optional.forward(getSGF()), defaultBlock,
-                               caseBlocks);
+                               caseBlocks, caseBlockCountsRef,
+                               defaultBlockCount);
     }
   }
 

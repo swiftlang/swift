@@ -4341,9 +4341,10 @@ namespace {
       SmallVector<TypeLoc, 4> inheritedTypes;
       Type superclassType;
       if (decl->getSuperClass()) {
-        auto clangSuperclassType =
-          Impl.getClangASTContext().getObjCObjectPointerType(
-              clang::QualType(decl->getSuperClassType(), 0));
+        clang::QualType clangSuperclassType =
+          decl->getSuperClassType()->stripObjCKindOfTypeAndQuals(clangCtx);
+        clangSuperclassType =
+          clangCtx.getObjCObjectPointerType(clangSuperclassType);
         superclassType = Impl.importType(clangSuperclassType,
                                          ImportTypeKind::Abstract,
                                          isInSystemModule(dc),
@@ -6715,7 +6716,7 @@ void SwiftDeclConverter::importInheritedConstructors(
 
   auto curObjCClass = cast<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
 
-  auto inheritConstructors = [&](DeclRange members,
+  auto inheritConstructors = [&](ArrayRef<ValueDecl *> members,
                                  Optional<CtorInitializerKind> kind) {
     const auto &languageVersion =
         Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
@@ -6815,10 +6816,8 @@ void SwiftDeclConverter::importInheritedConstructors(
   // If we have a superclass, import from it.
   if (auto superclassClangDecl = superclass->getClangDecl()) {
     if (isa<clang::ObjCInterfaceDecl>(superclassClangDecl)) {
-      inheritConstructors(superclass->getMembers(), kind);
-
-      for (auto ext : superclass->getExtensions())
-        inheritConstructors(ext->getMembers(), kind);
+      inheritConstructors(superclass->lookupDirect(Impl.SwiftContext.Id_init),
+                          kind);
     }
   }
 }
@@ -7653,7 +7652,8 @@ GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     (void) result;
   }
 
-  return builder.computeGenericSignature(SourceLoc());
+  return std::move(builder).computeGenericSignature(*dc->getParentModule(),
+                                                    SourceLoc());
 }
 
 // Calculate the generic environment from an imported generic param list.
@@ -7977,6 +7977,12 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
+  RecursiveSharedTimer::Guard guard;
+  if (auto s = D->getASTContext().Stats) {
+    guard = s->getFrontendRecursiveSharedTimers()
+                .ClangImporter__Implementation__loadAllMembers.getGuard();
+  }
+
   assert(D);
 
   // Check whether we're importing an Objective-C container of some sort.

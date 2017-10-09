@@ -41,6 +41,15 @@ def lazy ((Name, Expr)) : return (Name + 'Lazy', '(' + Expr + ').lazy')
 Sequences = Sequences + map(lazy, Sequences)
 }%
 
+public let PrefixWhile = [
+% for (Name, Expr) in Sequences:
+  BenchmarkInfo(
+    name: "PrefixWhile${Name}",
+    runFunction: run_PrefixWhile${Name},
+    tags: [.validation, .api${', .Array' if Name == 'Array' else ''}]),
+% end
+]
+
 % for (Name, Expr) in Sequences:
 @inline(never)
 public func run_PrefixWhile${Name}(_ N: Int) {

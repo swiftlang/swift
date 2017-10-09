@@ -65,7 +65,7 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
 static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // First strip off RC identity preserving casts.
   if (isRCIdentityPreservingCast(V->getKind()))
-    return cast<SILInstruction>(V)->getOperand(0);
+    return cast<SingleValueInstruction>(V)->getOperand(0);
 
   // Then if we have a struct_extract that is extracting a non-trivial member
   // from a struct with no other non-trivial members, a ref count operation on
@@ -481,14 +481,14 @@ SILValue RCIdentityFunctionInfo::getRCIdentityRoot(SILValue V) {
 /// means that from an RC use perspective, the object can be ignored since it is
 /// up to the frontend to communicate via fix_lifetime and mark_dependence these
 /// dependencies.
-static bool isNonOverlappingTrivialAccess(SILInstruction *User) {
-  if (auto *TEI = dyn_cast<TupleExtractInst>(User)) {
+static bool isNonOverlappingTrivialAccess(SILValue value) {
+  if (auto *TEI = dyn_cast<TupleExtractInst>(value)) {
     // If the tuple we are extracting from only has one non trivial element and
     // we are not extracting from that element, this is an ARC escape.
     return TEI->isTrivialEltOfOneRCIDTuple();
   }
 
-  if (auto *SEI = dyn_cast<StructExtractInst>(User)) {
+  if (auto *SEI = dyn_cast<StructExtractInst>(value)) {
     // If the struct we are extracting from only has one non trivial element and
     // we are not extracting from that element, this is an ARC escape.
     return SEI->isTrivialFieldOfOneRCIDStruct();
@@ -524,26 +524,28 @@ void RCIdentityFunctionInfo::getRCUsers(
       if (!VisitedInsts.insert(User).second)
         continue;
 
-      // Otherwise attempt to strip off one layer of RC identical instructions
-      // from User.
-      SILValue StrippedRCID = stripRCIdentityPreservingInsts(User);
+      for (auto value : User->getResults()) {
+        // Otherwise attempt to strip off one layer of RC identical instructions
+        // from User.
+        SILValue StrippedRCID = stripRCIdentityPreservingInsts(value);
 
-      // If StrippedRCID is not V, then we know that User's result is
-      // conservatively not RCIdentical to V.
-      if (StrippedRCID != V) {
-        // If the user is extracting a trivial field of an aggregate structure
-        // that does not overlap with the ref counted part of the aggregate, we
-        // can ignore it.
-        if (isNonOverlappingTrivialAccess(User))
+        // If StrippedRCID is not V, then we know that User's result is
+        // conservatively not RCIdentical to V.
+        if (StrippedRCID != V) {
+          // If the user is extracting a trivial field of an aggregate structure
+          // that does not overlap with the ref counted part of the aggregate, we
+          // can ignore it.
+          if (isNonOverlappingTrivialAccess(value))
+            continue;
+
+          // Otherwise, it is an RC user that our user wants.
+          Users.push_back(User);
           continue;
+        }
 
-        // Otherwise, it is an RC user that our user wants.
-        Users.push_back(User);
-        continue;
+        // Otherwise, add the result to our list to continue searching.
+        Worklist.push_back(value);
       }
-
-      // Otherwise, add all of User's uses to our list to continue searching.
-      Worklist.push_back(User);
     }
   }
 }

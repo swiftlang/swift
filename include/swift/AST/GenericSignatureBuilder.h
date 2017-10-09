@@ -30,6 +30,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/MapVector.h"
@@ -117,7 +118,7 @@ public:
   typedef Constraint<Type> ConcreteConstraint;
 
   /// Describes an equivalence class of potential archetypes.
-  struct EquivalenceClass {
+  struct EquivalenceClass : llvm::ilist_node<EquivalenceClass> {
     /// The list of protocols to which this equivalence class conforms.
     ///
     /// The keys form the (semantic) list of protocols to which this type
@@ -197,6 +198,11 @@ public:
     /// Note that this equivalence class has been modified.
     void modified(GenericSignatureBuilder &builder);
 
+    EquivalenceClass(const EquivalenceClass &) = delete;
+    EquivalenceClass(EquivalenceClass &&) = delete;
+    EquivalenceClass &operator=(const EquivalenceClass &) = delete;
+    EquivalenceClass &operator=(EquivalenceClass &&) = delete;
+
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
     /// that concrete type as written.
@@ -215,6 +221,24 @@ public:
     /// a superclass requirement.
     bool isConformanceSatisfiedBySuperclass(ProtocolDecl *proto) const;
 
+    /// Lookup a nested type with the given name within this equivalence
+    /// class.
+    ///
+    /// \param otherConcreteTypes If non-null, will be filled in the all of the
+    /// concrete types we found (other than the result) with the same name.
+    TypeDecl *lookupNestedType(
+                   Identifier name,
+                   SmallVectorImpl<TypeDecl *> *otherConcreteTypes = nullptr);
+
+    /// Retrieve the "anchor" type that canonically describes this equivalence
+    /// class, for use in the canonical type.
+    Type getAnchor(ArrayRef<GenericTypeParamType *> genericParams);
+
+    /// \brief Retrieve (or build) the contextual type corresponding to
+    /// this equivalence class within the given generic environment.
+    Type getTypeInContext(GenericSignatureBuilder &builder,
+                          GenericEnvironment *genericEnv);
+
     /// Dump a debugging representation of this equivalence class.
     void dump(llvm::raw_ostream &out) const;
 
@@ -232,6 +256,17 @@ public:
       /// anchor was cached.
       unsigned numMembers;
     } archetypeAnchorCache;
+
+    /// Describes a cached nested type.
+    struct CachedNestedType {
+      unsigned numConformancesPresent;
+      CanType superclassPresent;
+      llvm::TinyPtrVector<TypeDecl *> types;
+    };
+
+    /// Cached nested-type information, which contains the best declaration
+    /// for a given name.
+    llvm::SmallDenseMap<Identifier, CachedNestedType> nestedTypeNameCache;
   };
 
   friend class RequirementSource;
@@ -522,9 +557,6 @@ public:
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
 
-  /// \brief Build the generic signature.
-  GenericSignature *getGenericSignature();
-
   /// Infer requirements from the given type, recursively.
   ///
   /// This routine infers requirements from a type that occurs within the
@@ -558,11 +590,18 @@ public:
   /// \brief Finalize the set of requirements and compute the generic
   /// signature.
   ///
-  /// After this point, one cannot introduce new requirements.
+  /// After this point, one cannot introduce new requirements, and the
+  /// generic signature builder no longer has valid state.
   GenericSignature *computeGenericSignature(
+                      ModuleDecl &module,
                       SourceLoc loc,
-                      bool allowConcreteGenericParams = false);
+                      bool allowConcreteGenericParams = false,
+                      bool allowBuilderToMove = true) &&;
 
+  /// Compute the requirement signature for the given protocol.
+  static GenericSignature *computeRequirementSignature(ProtocolDecl *proto);
+
+private:
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
   ///
@@ -572,6 +611,7 @@ public:
                 ArrayRef<GenericTypeParamType *> genericParams,
                 bool allowConcreteGenericParams=false);
 
+public:
   /// Process any delayed requirements that can be handled now.
   void processDelayedRequirements();
 
@@ -672,6 +712,7 @@ private:
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
+public:
   /// \brief Resolve the given type to the potential archetype it names.
   ///
   /// The \c resolutionKind parameter describes how resolution should be
@@ -687,7 +728,6 @@ private:
   resolvePotentialArchetype(Type type,
                             ArchetypeResolutionKind resolutionKind);
 
-public:
   /// \brief Resolve the equivalence class for the given type parameter,
   /// which provides information about that type.
   ///
@@ -702,18 +742,6 @@ public:
   EquivalenceClass *resolveEquivalenceClass(
                       Type type,
                       ArchetypeResolutionKind resolutionKind);
-
-  /// \brief Resolve the given type to the potential archetype it names.
-  ///
-  /// The \c resolutionKind parameter describes how resolution should be
-  /// performed. If the potential archetype named by the given dependent type
-  /// already exists, it will be always returned. If it doesn't exist yet,
-  /// the \c resolutionKind dictates whether the potential archetype will
-  /// be created or whether null will be returned.
-  ///
-  /// For any type that cannot refer to an archetype, this routine returns null.
-  PotentialArchetype *resolveArchetype(Type type,
-                                       ArchetypeResolutionKind resolutionKind);
 
   /// \brief Resolve the given type as far as this Builder knows how.
   ///
@@ -768,16 +796,6 @@ public:
     /// This is a root requirement source, which can be described by a
     /// \c TypeRepr.
     Inferred,
-
-    /// A requirement inferred from part of the signature of a declaration
-    /// but for which we don't want to produce warnings, e.g., the result
-    /// type of a generic function:
-    ///
-    /// func f<T>() -> Set<T> { ... } // infers T: Hashable, but don't warn
-    ///
-    /// This is a root requirement source, which can be described by a
-    /// \c TypeRepr.
-    QuietlyInferred,
 
     /// A requirement for the creation of the requirement signature of a
     /// protocol.
@@ -889,7 +907,6 @@ private:
 
     case Explicit:
     case Inferred:
-    case QuietlyInferred:
     case NestedTypeNameMatch:
     case ConcreteTypeBinding:
     case Superclass:
@@ -930,7 +947,6 @@ private:
     switch (kind) {
     case Explicit:
     case Inferred:
-    case QuietlyInferred:
     case RequirementSignatureSelf:
     case NestedTypeNameMatch:
     case ConcreteTypeBinding:
@@ -1052,8 +1068,7 @@ public:
   /// inferred from some part of a generic declaration's signature, e.g., the
   /// parameter or result type of a generic function.
   static const RequirementSource *forInferred(PotentialArchetype *root,
-                                              const TypeRepr *typeRepr,
-                                              bool quietly);
+                                              const TypeRepr *typeRepr);
 
   /// Retrieve a requirement source representing the requirement signature
   /// computation for a protocol.
@@ -1150,7 +1165,7 @@ public:
 
   /// Whether the requirement is inferred or derived from an inferred
   /// requirement.
-  bool isInferredRequirement(bool includeQuietInferred) const;
+  bool isInferredRequirement() const;
 
   /// Classify the kind of this source for diagnostic purposes.
   unsigned classifyDiagKind() const;
@@ -1272,8 +1287,6 @@ class GenericSignatureBuilder::FloatingRequirementSource {
     Explicit,
     /// An inferred requirement source lacking a root.
     Inferred,
-    /// A quietly inferred requirement source lacking a root.
-    QuietlyInferred,
     /// A requirement source augmented by an abstract protocol requirement
     AbstractProtocol,
     /// A requirement source for a nested-type-name match introduced by
@@ -1319,9 +1332,8 @@ public:
     return { Explicit, requirementRepr };
   }
 
-  static FloatingRequirementSource forInferred(const TypeRepr *typeRepr,
-                                               bool quietly) {
-    return { quietly? QuietlyInferred : Inferred, typeRepr };
+  static FloatingRequirementSource forInferred(const TypeRepr *typeRepr) {
+    return { Inferred, typeRepr };
   }
 
   static FloatingRequirementSource viaProtocolRequirement(
@@ -1330,6 +1342,7 @@ public:
                                      bool inferred) {
     FloatingRequirementSource result{ AbstractProtocol, base };
     result.protocolReq.protocol = inProtocol;
+    result.protocolReq.written = WrittenRequirementLoc();
     result.protocolReq.inferred = inferred;
     return result;
   }
@@ -1439,18 +1452,13 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// associated type.
   PotentialArchetype(PotentialArchetype *parent, Identifier name);
 
-  /// \brief Construct a new potential archetype for an associated type.
-  PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
-    : parentOrBuilder(parent), identifier(assocType)
-  {
-    assert(parent != nullptr && "Not an associated type?");
-  }
-
   /// \brief Construct a new potential archetype for a concrete declaration.
   PotentialArchetype(PotentialArchetype *parent, TypeDecl *concreteDecl)
     : parentOrBuilder(parent), identifier(concreteDecl)
   {
-    assert(parent != nullptr && "Not an associated type?");
+    assert(parent != nullptr && "Not a nested type?");
+    assert(!isa<AssociatedTypeDecl>(concreteDecl) ||
+      cast<AssociatedTypeDecl>(concreteDecl)->getOverriddenDecls().empty());
   }
 
   /// \brief Construct a new potential archetype for a generic parameter.
@@ -1475,6 +1483,12 @@ private:
     return pa->parentOrBuilder.get<GenericSignatureBuilder *>();
   }
 
+  // Replace the generic signature builder.
+  void replaceBuilder(GenericSignatureBuilder *builder) {
+    assert(parentOrBuilder.is<GenericSignatureBuilder *>());
+    parentOrBuilder = builder;
+  }
+
   friend class GenericSignatureBuilder;
   friend class GenericSignature;
 
@@ -1488,6 +1502,12 @@ public:
   /// when this potential archetype is an associated type.
   PotentialArchetype *getParent() const { 
     return parentOrBuilder.dyn_cast<PotentialArchetype *>();
+  }
+
+  /// Retrieve the type declaration to which this nested type was resolved.
+  TypeDecl *getResolvedType() const {
+    assert(getParent() && "Not an associated type");
+    return identifier.assocTypeOrConcrete;
   }
 
   /// Retrieve the associated type to which this potential archetype
@@ -1632,13 +1652,8 @@ public:
                                     ArchetypeResolutionKind kind,
                                     GenericSignatureBuilder &builder);
 
-  /// \brief Retrieve (or create) a nested type with a known associated type.
-  PotentialArchetype *getNestedType(AssociatedTypeDecl *assocType,
-                                    GenericSignatureBuilder &builder);
-
-  /// \brief Retrieve (or create) a nested type with a known concrete type
-  /// declaration.
-  PotentialArchetype *getNestedType(TypeDecl *concreteDecl,
+  /// \brief Retrieve (or create) a nested type with a known type.
+  PotentialArchetype *getNestedType(TypeDecl *type,
                                     GenericSignatureBuilder &builder);
 
   /// \brief Retrieve (or create) a nested type that is the current best
@@ -1658,8 +1673,8 @@ public:
   /// type or typealias of the given protocol, unless the \c kind implies that
   /// a potential archetype should not be created if it's missing.
   PotentialArchetype *updateNestedTypeForConformance(
-                      PointerUnion<AssociatedTypeDecl *, TypeDecl *> type,
-                      ArchetypeResolutionKind kind);
+                        TypeDecl *type,
+                        ArchetypeResolutionKind kind);
 
   /// Update the named nested type when we know this type conforms to the given
   /// protocol.
@@ -1671,11 +1686,6 @@ public:
                         Identifier name,
                         ProtocolDecl *protocol,
                         ArchetypeResolutionKind kind);
-
-  /// \brief Retrieve (or build) the type corresponding to the potential
-  /// archetype within the given generic environment.
-  Type getTypeInContext(GenericSignatureBuilder &builder,
-                        GenericEnvironment *genericEnv);
 
   /// Retrieve the dependent type that describes this potential
   /// archetype.

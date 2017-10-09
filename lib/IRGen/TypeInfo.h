@@ -41,6 +41,7 @@ namespace irgen {
   class Address;
   class StackAddress;
   class IRGenFunction;
+  class IRGenTypeVerifierFunction;
   class IRGenModule;
   class Explosion;
   class ExplosionSchema;
@@ -467,6 +468,12 @@ public:
 
   /// Get the native (abi) convention for a parameter value of this type.
   const NativeConventionSchema &nativeParameterValueSchema(IRGenModule &IGM) const;
+  
+  /// Emit verifier code that compares compile-time constant knowledge of
+  /// this kind of type's traits to its runtime manifestation.
+  virtual void verify(IRGenTypeVerifierFunction &IGF,
+                      llvm::Value *typeMetadata,
+                      SILType T) const;
 };
 
 } // end namespace irgen

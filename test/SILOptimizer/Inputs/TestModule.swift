@@ -5,6 +5,7 @@ protocol Proto {
 }
 
 public struct MyStruct : Proto {
+  @_versioned
   func confx() {
   }
 

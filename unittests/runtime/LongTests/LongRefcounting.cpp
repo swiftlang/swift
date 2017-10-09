@@ -143,7 +143,7 @@ const uint64_t maxRC = 1ULL << (32 - 2);
 
 TEST(LongRefcountingTest, retain_max) {
   // Don't generate millions of failures if something goes wrong.
-  ::testing::FLAGS_gtest_break_on_failure = "true";
+  ::testing::FLAGS_gtest_break_on_failure = true;
 
   size_t deinited = 0;
   auto object = allocTestObject(&deinited, 1);
@@ -162,7 +162,7 @@ TEST(LongRefcountingTest, retain_max) {
 
 TEST(LongRefcountingTest, retain_overflow_DeathTest) {
   // Don't generate millions of failures if something goes wrong.
-  ::testing::FLAGS_gtest_break_on_failure = "true";
+  ::testing::FLAGS_gtest_break_on_failure = true;
 
   size_t deinited = 0;
   auto object = allocTestObject(&deinited, 1);
@@ -176,7 +176,7 @@ TEST(LongRefcountingTest, retain_overflow_DeathTest) {
 
 TEST(LongRefcountingTest, nonatomic_retain_max) {
   // Don't generate millions of failures if something goes wrong.
-  ::testing::FLAGS_gtest_break_on_failure = "true";
+  ::testing::FLAGS_gtest_break_on_failure = true;
 
   size_t deinited = 0;
   auto object = allocTestObject(&deinited, 1);
@@ -195,7 +195,7 @@ TEST(LongRefcountingTest, nonatomic_retain_max) {
 
 TEST(LongRefcountingTest, nonatomic_retain_overflow_DeathTest) {
   // Don't generate millions of failures if something goes wrong.
-  ::testing::FLAGS_gtest_break_on_failure = "true";
+  ::testing::FLAGS_gtest_break_on_failure = true;
 
   size_t deinited = 0;
   auto object = allocTestObject(&deinited, 1);
@@ -237,7 +237,7 @@ const uint64_t maxURC = (1ULL << (32 - 1)) - 1;
 
 TEST(LongRefcountingTest, unowned_retain_max) {
   // Don't generate millions of failures if something goes wrong.
-  ::testing::FLAGS_gtest_break_on_failure = "true";
+  ::testing::FLAGS_gtest_break_on_failure = true;
 
   size_t deinited = 0;
   auto object = allocTestObject(&deinited, 1);
@@ -269,7 +269,7 @@ TEST(LongRefcountingTest, unowned_retain_max) {
 
 TEST(LongRefcountingTest, unowned_retain_overflow_DeathTest) {
   // Don't generate millions of failures if something goes wrong.
-  ::testing::FLAGS_gtest_break_on_failure = "true";
+  ::testing::FLAGS_gtest_break_on_failure = true;
 
   size_t deinited = 0;
   auto object = allocTestObject(&deinited, 1);
@@ -284,7 +284,7 @@ TEST(LongRefcountingTest, unowned_retain_overflow_DeathTest) {
 
 TEST(LongRefcountingTest, nonatomic_unowned_retain_max) {
   // Don't generate millions of failures if something goes wrong.
-  ::testing::FLAGS_gtest_break_on_failure = "true";
+  ::testing::FLAGS_gtest_break_on_failure = true;
 
   size_t deinited = 0;
   auto object = allocTestObject(&deinited, 1);
@@ -316,7 +316,7 @@ TEST(LongRefcountingTest, nonatomic_unowned_retain_max) {
 
 TEST(LongRefcountingTest, nonatomic_unowned_retain_overflow_DeathTest) {
   // Don't generate millions of failures if something goes wrong.
-  ::testing::FLAGS_gtest_break_on_failure = "true";
+  ::testing::FLAGS_gtest_break_on_failure = true;
 
   size_t deinited = 0;
   auto object = allocTestObject(&deinited, 1);

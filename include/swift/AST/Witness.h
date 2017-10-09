@@ -150,13 +150,6 @@ public:
   /// Determines whether there is a witness at all.
   explicit operator bool() const { return !storage.isNull(); }
 
-  /// Implicit conversion to the \c ConcreteDeclRef, which is used by a
-  /// number of clients.
-  ///
-  /// FIXME: We probably want this to go away eventually, because clients using
-  /// it will all need to be cognizant of the synthetic environment.
-  operator ConcreteDeclRef() const { return getDeclRef(); }
-
   /// Determine whether this witness requires any substitutions.
   bool requiresSubstitution() const { return storage.is<StoredWitness *>(); }
 

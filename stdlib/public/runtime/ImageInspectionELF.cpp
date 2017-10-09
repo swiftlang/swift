@@ -18,7 +18,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#if defined(__ELF__) || defined(__ANDROID__)
+#if (defined(__ELF__) || defined(__ANDROID__)) && !defined(__HAIKU__)
 
 #include "ImageInspection.h"
 #include "swift/Runtime/Debug.h"

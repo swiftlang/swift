@@ -58,7 +58,7 @@ bool swift::getIntegerIndex(SILValue IndexVal, unsigned &IndexConst) {
 //                               Projection
 //===----------------------------------------------------------------------===//
 
-Projection::Projection(SILInstruction *I) : Value() {
+Projection::Projection(SingleValueInstruction *I) : Value() {
   if (!I)
     return;
   /// Initialize given the specific instruction type and verify with asserts
@@ -68,7 +68,7 @@ Projection::Projection(SILInstruction *I) : Value() {
   // be None so the Projection will be invalid.
   default:
     return;
-  case ValueKind::StructElementAddrInst: {
+  case SILInstructionKind::StructElementAddrInst: {
     auto *SEAI = cast<StructElementAddrInst>(I);
     Value = ValueTy(ProjectionKind::Struct, SEAI->getFieldNo());
     assert(getKind() == ProjectionKind::Struct);
@@ -77,7 +77,7 @@ Projection::Projection(SILInstruction *I) : Value() {
            SEAI->getType());
     break;
   }
-  case ValueKind::StructExtractInst: {
+  case SILInstructionKind::StructExtractInst: {
     auto *SEI = cast<StructExtractInst>(I);
     Value = ValueTy(ProjectionKind::Struct, SEI->getFieldNo());
     assert(getKind() == ProjectionKind::Struct);
@@ -86,7 +86,7 @@ Projection::Projection(SILInstruction *I) : Value() {
            SEI->getType());
     break;
   }
-  case ValueKind::RefElementAddrInst: {
+  case SILInstructionKind::RefElementAddrInst: {
     auto *REAI = cast<RefElementAddrInst>(I);
     Value = ValueTy(ProjectionKind::Class, REAI->getFieldNo());
     assert(getKind() == ProjectionKind::Class);
@@ -95,14 +95,14 @@ Projection::Projection(SILInstruction *I) : Value() {
            REAI->getType());
     break;
   }
-  case ValueKind::RefTailAddrInst: {
+  case SILInstructionKind::RefTailAddrInst: {
     auto *RTAI = cast<RefTailAddrInst>(I);
     auto *Ty = RTAI->getTailType().getSwiftRValueType().getPointer();
     Value = ValueTy(ProjectionKind::TailElems, Ty);
     assert(getKind() == ProjectionKind::TailElems);
     break;
   }
-  case ValueKind::ProjectBoxInst: {
+  case SILInstructionKind::ProjectBoxInst: {
     auto *PBI = cast<ProjectBoxInst>(I);
     Value = ValueTy(ProjectionKind::Box, static_cast<uintptr_t>(0));
     assert(getKind() == ProjectionKind::Box);
@@ -112,7 +112,7 @@ Projection::Projection(SILInstruction *I) : Value() {
     (void) PBI;
     break;
   }
-  case ValueKind::TupleExtractInst: {
+  case SILInstructionKind::TupleExtractInst: {
     auto *TEI = cast<TupleExtractInst>(I);
     Value = ValueTy(ProjectionKind::Tuple, TEI->getFieldNo());
     assert(getKind() == ProjectionKind::Tuple);
@@ -121,7 +121,7 @@ Projection::Projection(SILInstruction *I) : Value() {
            TEI->getType());
     break;
   }
-  case ValueKind::TupleElementAddrInst: {
+  case SILInstructionKind::TupleElementAddrInst: {
     auto *TEAI = cast<TupleElementAddrInst>(I);
     Value = ValueTy(ProjectionKind::Tuple, TEAI->getFieldNo());
     assert(getKind() == ProjectionKind::Tuple);
@@ -130,7 +130,7 @@ Projection::Projection(SILInstruction *I) : Value() {
            TEAI->getType());
     break;
   }
-  case ValueKind::UncheckedEnumDataInst: {
+  case SILInstructionKind::UncheckedEnumDataInst: {
     auto *UEDI = cast<UncheckedEnumDataInst>(I);
     Value = ValueTy(ProjectionKind::Enum, UEDI->getElementNo());
     assert(getKind() == ProjectionKind::Enum);
@@ -139,7 +139,7 @@ Projection::Projection(SILInstruction *I) : Value() {
            UEDI->getType());
     break;
   }
-  case ValueKind::UncheckedTakeEnumDataAddrInst: {
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
     auto *UTEDAI = cast<UncheckedTakeEnumDataAddrInst>(I);
     Value = ValueTy(ProjectionKind::Enum, UTEDAI->getElementNo());
     assert(getKind() == ProjectionKind::Enum);
@@ -148,7 +148,7 @@ Projection::Projection(SILInstruction *I) : Value() {
            UTEDAI->getType());
     break;
   }
-  case ValueKind::IndexAddrInst: {
+  case SILInstructionKind::IndexAddrInst: {
     // We can represent all integers provided here since getIntegerIndex only
     // returns 32 bit values. When that changes, this code will need to be
     // updated and a MaxLargeIndex will need to be used here. Currently we
@@ -163,7 +163,7 @@ Projection::Projection(SILInstruction *I) : Value() {
     }
     break;
   }
-  case ValueKind::UpcastInst: {
+  case SILInstructionKind::UpcastInst: {
     auto *Ty = I->getType().getSwiftRValueType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(ProjectionKind::Upcast, Ty);
@@ -172,7 +172,7 @@ Projection::Projection(SILInstruction *I) : Value() {
            I->getType());
     break;
   }
-  case ValueKind::UncheckedRefCastInst: {
+  case SILInstructionKind::UncheckedRefCastInst: {
     auto *Ty = I->getType().getSwiftRValueType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(ProjectionKind::RefCast, Ty);
@@ -181,8 +181,8 @@ Projection::Projection(SILInstruction *I) : Value() {
            I->getType());
     break;
   }
-  case ValueKind::UncheckedBitwiseCastInst:
-  case ValueKind::UncheckedAddrCastInst: {
+  case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::UncheckedAddrCastInst: {
     auto *Ty = I->getType().getSwiftRValueType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(ProjectionKind::BitwiseCast, Ty);
@@ -194,7 +194,7 @@ Projection::Projection(SILInstruction *I) : Value() {
   }
 }
 
-NullablePtr<SILInstruction>
+NullablePtr<SingleValueInstruction>
 Projection::createObjectProjection(SILBuilder &B, SILLocation Loc,
                                    SILValue Base) const {
   SILType BaseTy = Base->getType();
@@ -232,7 +232,7 @@ Projection::createObjectProjection(SILBuilder &B, SILLocation Loc,
   llvm_unreachable("Unhandled ProjectionKind in switch.");
 }
 
-NullablePtr<SILInstruction>
+NullablePtr<SingleValueInstruction>
 Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
                                     SILValue Base) const {
   SILType BaseTy = Base->getType();
@@ -361,7 +361,7 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
     if (!AP.isValid())
       break;
     P.Path.push_back(AP);
-    Iter = cast<SILInstruction>(*Iter).getOperand(0);
+    Iter = cast<SingleValueInstruction>(*Iter).getOperand(0);
   }
 
   // Return None if we have an empty projection list or if Start == Iter.
@@ -774,7 +774,7 @@ Projection::operator<(const Projection &Other) const {
   }
 }
 
-NullablePtr<SILInstruction>
+NullablePtr<SingleValueInstruction>
 Projection::
 createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
                                    SILType BaseType,
@@ -804,7 +804,7 @@ SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
       break;
     case ProjectionKind::Enum:
       if (auto *EI = dyn_cast<EnumInst>(I)) {
-        if (EI->getElement() == getEnumElementDecl(I->getType())) {
+        if (EI->getElement() == getEnumElementDecl(EI->getType())) {
           assert(EI->hasOperand() && "expected data operand");
           return EI->getOperand();
         }
@@ -853,7 +853,7 @@ ProjectionTreeNode::getParent(const ProjectionTree &Tree) const {
   return Tree.getNode(Parent.getValue());
 }
 
-NullablePtr<SILInstruction>
+NullablePtr<SingleValueInstruction>
 ProjectionTreeNode::
 createProjection(SILBuilder &B, SILLocation Loc, SILValue Arg) const {
   if (!Proj)
@@ -876,8 +876,17 @@ processUsersOfValue(ProjectionTree &Tree,
 
     DEBUG(llvm::dbgs() << "        " << *User);
 
-    // First try to create a Projection for User.
-    auto P = Projection(User);
+    // The projections we can handle are always single-value instructions.
+    auto projectionInst = dyn_cast<SingleValueInstruction>(User);
+    if (!projectionInst) {
+      DEBUG(llvm::dbgs() << "            Failed to create projection. Adding "
+            "to non projection user!\n");
+      addNonProjectionUser(Op);
+      continue;
+    }
+
+    // Check whether the user is such a projection.
+    auto P = Projection(projectionInst);
 
     // If we fail to create a projection, add User as a user to this node and
     // continue.
@@ -889,8 +898,6 @@ processUsersOfValue(ProjectionTree &Tree,
     }
 
     DEBUG(llvm::dbgs() << "            Created projection.\n");
-
-    assert(User->hasValue() && "Projections should have a value");
 
     // we have a projection to the next level children, create the next
     // level children nodes lazily.
@@ -906,7 +913,7 @@ processUsersOfValue(ProjectionTree &Tree,
       DEBUG(llvm::dbgs() << "            Found child for projection: "
             << ChildNode->getType() << "\n");
 
-      SILValue V = SILValue(User);
+      SILValue V = SILValue(projectionInst);
       Worklist.push_back({V, ChildNode});
     } else {
       DEBUG(llvm::dbgs() << "            Did not find a child for projection!. "
@@ -993,7 +1000,7 @@ createNextLevelChildren(ProjectionTree &Tree) {
   createNextLevelChildrenForTuple(Tree, TT);
 }
 
-SILInstruction *
+SingleValueInstruction *
 ProjectionTreeNode::
 createAggregate(SILBuilder &B, SILLocation Loc, ArrayRef<SILValue> Args) const {
   assert(Initialized && "Node must be initialized to create aggregates");
@@ -1042,7 +1049,7 @@ public:
     });
   }
 
-  SILInstruction *createInstruction() const {
+  SingleValueInstruction *createInstruction() const {
     assert(isComplete() && "Cannot create instruction until the aggregate is "
            "complete");
     assert(!Invalidated && "Must not be invalidated to create an instruction");
@@ -1157,7 +1164,7 @@ ProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
   }
 
   // Form and return the aggregate.
-  NullablePtr<swift::SILInstruction> AI =
+  NullablePtr<SingleValueInstruction> AI =
       Projection::createAggFromFirstLevelProjections(Builder, Loc,
                                                      Node->getType(),
                                                      ChildValues);
@@ -1293,8 +1300,9 @@ createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
       // projection to the worklist for processing.
       for (unsigned ChildIdx : reversed(Node->ChildProjections)) {
         const ProjectionTreeNode *ChildNode = getNode(ChildIdx);
-        SILInstruction *I = ChildNode->createProjection(B, Loc, V).get();
-        DEBUG(llvm::dbgs() << "    Adding Child: " << I->getType() << ": " << *I);
+        auto I = ChildNode->createProjection(B, Loc, V).get();
+        DEBUG(llvm::dbgs() << "    Adding Child: " << I->getType() << ": "
+                           << *I);
         Worklist.push_back(std::make_tuple(ChildNode, SILValue(I)));
       }
     } else {

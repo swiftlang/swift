@@ -39,7 +39,7 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
   // The deallocation of a stack allocation must be in the loop, otherwise the
   // deallocation will be fed by a phi node of two allocations.
   if (I->isAllocatingStack()) {
-    for (auto *UI : I->getUses()) {
+    for (auto *UI : cast<SingleValueInstruction>(I)->getUses()) {
       if (UI->getUser()->isDeallocatingStack()) {
         if (!contains(UI->getUser()->getParent()))
           return false;
@@ -64,7 +64,8 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
       isa<OpenExistentialMetatypeInst>(I) ||
       isa<OpenExistentialValueInst>(I) || isa<OpenExistentialBoxInst>(I) ||
       isa<OpenExistentialBoxValueInst>(I)) {
-    for (auto *UI : I->getUses())
+    SingleValueInstruction *OI = cast<SingleValueInstruction>(I);
+    for (auto *UI : OI->getUses())
       if (!contains(UI->getUser()))
         return false;
     return true;

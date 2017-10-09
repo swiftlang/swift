@@ -497,10 +497,6 @@ void SerializedASTFile::collectLinkLibraries(
   if (isSIB()) {
     collectLinkLibrariesFromImports(callback);
   } else {
-    if (File.getAssociatedModule()->getResilienceStrategy()
-        == ResilienceStrategy::Fragile) {
-      collectLinkLibrariesFromImports(callback);
-    }
     File.collectLinkLibraries(callback);
   }
 }

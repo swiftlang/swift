@@ -41,12 +41,15 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
 
-#define DEBUG_TYPE "protocol-conformance-checking"
+#define DEBUG_TYPE "Protocol conformance checking"
 #include "llvm/Support/Debug.h"
+
+STATISTIC(NumRequirementEnvironments, "# of requirement environments");
 
 using namespace swift;
 
@@ -998,7 +1001,10 @@ matchWitness(TypeChecker &tc,
 
       if (reqParams[i].isShared() != witnessParams[i].isShared())
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
-      
+
+      if (reqParams[i].isInOut() != witnessParams[i].isInOut())
+        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+
       // Gross hack: strip a level of unchecked-optionality off both
       // sides when matching against a protocol imported from Objective-C.
       auto types = getTypesToCompare(req, reqParams[i].getType(),
@@ -1016,8 +1022,6 @@ matchWitness(TypeChecker &tc,
                                    std::get<1>(types))) {
         return *result;
       }
-
-      // FIXME: Consider default arguments here?
     }
 
     // If the witness is 'throws', the requirement must be.
@@ -1065,27 +1069,16 @@ RequirementEnvironment::RequirementEnvironment(
   auto selfType = cast<GenericTypeParamType>(
                             proto->getSelfInterfaceType()->getCanonicalType());
 
-  // Construct a generic signature builder by collecting the constraints
-  // from the requirement and the context of the conformance together,
-  // because both define the capabilities of the requirement.
-  GenericSignatureBuilder builder(
-           ctx,
-           TypeChecker::LookUpConformance(tc, conformanceDC));
-
-  SmallVector<GenericTypeParamType*, 4> allGenericParams;
-
   // Add the generic signature of the context of the conformance. This includes
   // the generic parameters from the conforming type as well as any additional
   // constraints that might occur on the extension that declares the
   // conformance (i.e., if the conformance is conditional).
+  GenericSignature *conformanceSig;
   unsigned depth = 0;
-  if (auto *conformanceSig = conformanceDC->getGenericSignatureOfContext()) {
+  if ((conformanceSig = conformanceDC->getGenericSignatureOfContext())) {
     // Use the canonical signature here.
     conformanceSig = conformanceSig->getCanonicalSignature();
-    allGenericParams.append(conformanceSig->getGenericParams().begin(),
-                            conformanceSig->getGenericParams().end());
-    builder.addGenericSignature(conformanceSig);
-    depth = allGenericParams.back()->getDepth() + 1;
+    depth = conformanceSig->getGenericParams().back()->getDepth() + 1;
   }
 
   // Add the generic signature of the requirement, substituting our concrete
@@ -1125,6 +1118,32 @@ RequirementEnvironment::RequirementEnvironment(
       return ProtocolConformanceRef(proto);
     });
 
+  // If the requirement itself is non-generic, the synthetic signature
+  // is that of the conformance context.
+  if (reqSig->getGenericParams().size() == 1 &&
+      reqSig->getRequirements().size() == 1) {
+    syntheticSignature = conformanceDC->getGenericSignatureOfContext();
+    if (syntheticSignature) {
+      syntheticSignature = syntheticSignature->getCanonicalSignature();
+      syntheticEnvironment =
+        syntheticSignature->createGenericEnvironment(
+                                     *conformanceDC->getParentModule());
+    }
+
+    return;
+  }
+
+  // Construct a generic signature builder by collecting the constraints
+  // from the requirement and the context of the conformance together,
+  // because both define the capabilities of the requirement.
+  GenericSignatureBuilder builder(
+           ctx,
+           TypeChecker::LookUpConformance(tc, conformanceDC));
+
+  if (conformanceSig) {
+    builder.addGenericSignature(conformanceSig);
+  }
+
   // First, add the generic parameters from the requirement.
   for (auto genericParam : reqSig->getGenericParams().slice(1)) {
     // The only depth that makes sense is depth == 1, the generic parameters
@@ -1137,12 +1156,10 @@ RequirementEnvironment::RequirementEnvironment(
     auto substGenericParam =
       GenericTypeParamType::get(depth, genericParam->getIndex(), ctx);
 
-    allGenericParams.push_back(substGenericParam);
     builder.addGenericParameter(substGenericParam);
   }
 
-  // If there were no generic parameters, we're done.
-  if (allGenericParams.empty()) return;
+  ++NumRequirementEnvironments;
 
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
@@ -1156,7 +1173,10 @@ RequirementEnvironment::RequirementEnvironment(
   // Produce the generic signature and environment.
   // FIXME: Pass in a source location for the conformance, perhaps? It seems
   // like this could fail.
-  syntheticSignature = builder.computeGenericSignature(SourceLoc());
+  syntheticSignature =
+    std::move(builder).computeGenericSignature(
+                                           *conformanceDC->getParentModule(),
+                                           SourceLoc());
   syntheticEnvironment = syntheticSignature->createGenericEnvironment(
                                              *conformanceDC->getParentModule());
 }
@@ -1191,7 +1211,7 @@ matchWitness(TypeChecker &tc,
     if (reqGenericEnv)
       selfTy = reqGenericEnv->mapTypeIntoContext(selfTy);
 
-        // Open up the type of the requirement.
+    // Open up the type of the requirement.
     reqLocator = cs->getConstraintLocator(
                      static_cast<Expr *>(nullptr),
                      LocatorPathElt(ConstraintLocator::Requirement, req));
@@ -2349,12 +2369,10 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   // Form a string describing the associated type deductions.
   // FIXME: Determine which associated types matter, and only print those.
   llvm::SmallString<128> withAssocTypes;
-  for (auto member : conformance->getProtocol()->getMembers()) {
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      if (conformance->usesDefaultDefinition(assocType)) {
-        Type witness = conformance->getTypeWitness(assocType, nullptr);
-        addAssocTypeDeductionString(withAssocTypes, assocType, witness);
-      }
+  for (auto assocType : conformance->getProtocol()->getAssociatedTypeMembers()) {
+    if (conformance->usesDefaultDefinition(assocType)) {
+      Type witness = conformance->getTypeWitness(assocType, nullptr);
+      addAssocTypeDeductionString(withAssocTypes, assocType, witness);
     }
   }
   if (!withAssocTypes.empty())
@@ -4256,11 +4274,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   Conformance->setState(ProtocolConformanceState::CheckingTypeWitnesses);
   SWIFT_DEFER { Conformance->setState(initialState); };
 
-  for (auto member : Proto->getMembers()) {
-    auto assocType = dyn_cast<AssociatedTypeDecl>(member);
-    if (!assocType)
-      continue;
-
+  for (auto assocType : Proto->getAssociatedTypeMembers()) {
     // If we already have a type witness, do nothing.
     if (Conformance->hasTypeWitness(assocType))
       continue;
@@ -4329,23 +4343,21 @@ void ConformanceChecker::resolveTypeWitnesses() {
     TypeSubstitutionMap substitutions;
     substitutions[Proto->mapTypeIntoContext(selfType)
         ->castTo<ArchetypeType>()] = Adoptee;
-    for (auto member : Proto->getMembers()) {
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        auto archetype = Proto->mapTypeIntoContext(
-            assocType->getDeclaredInterfaceType())
-                ->getAs<ArchetypeType>();
-        if (!archetype)
-          continue;
-        if (Conformance->hasTypeWitness(assocType)) {
-          substitutions[archetype] =
-            Conformance->getTypeWitness(assocType, nullptr);
-        } else {
-          auto known = typeWitnesses.begin(assocType);
-          if (known != typeWitnesses.end())
-            substitutions[archetype] = known->first;
-          else
-            substitutions[archetype] = ErrorType::get(archetype);
-        }
+    for (auto assocType : Proto->getAssociatedTypeMembers()) {
+      auto archetype = Proto->mapTypeIntoContext(
+        assocType->getDeclaredInterfaceType())
+        ->getAs<ArchetypeType>();
+      if (!archetype)
+        continue;
+      if (Conformance->hasTypeWitness(assocType)) {
+        substitutions[archetype] =
+          Conformance->getTypeWitness(assocType, nullptr);
+      } else {
+        auto known = typeWitnesses.begin(assocType);
+        if (known != typeWitnesses.end())
+          substitutions[archetype] = known->first;
+        else
+          substitutions[archetype] = ErrorType::get(archetype);
       }
     }
 
@@ -4473,25 +4485,23 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // substitution of type witness bindings into other type witness bindings.
   auto checkCurrentTypeWitnesses = [&]() -> bool {
     // Fold the dependent member types within this type.
-    for (auto member : Proto->getMembers()) {
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        if (Conformance->hasTypeWitness(assocType))
-          continue;
+    for (auto assocType : Proto->getAssociatedTypeMembers()) {
+      if (Conformance->hasTypeWitness(assocType))
+        continue;
 
-        // If the type binding does not have a type parameter, there's nothing
-        // to do.
-        auto known = typeWitnesses.begin(assocType);
-        assert(known != typeWitnesses.end());
-        if (!known->first->hasTypeParameter() &&
-            !known->first->hasDependentMember())
-          continue;
+      // If the type binding does not have a type parameter, there's nothing
+      // to do.
+      auto known = typeWitnesses.begin(assocType);
+      assert(known != typeWitnesses.end());
+      if (!known->first->hasTypeParameter() &&
+          !known->first->hasDependentMember())
+        continue;
 
-        Type replaced = known->first.transform(foldDependentMemberTypes);
-        if (replaced.isNull())
-          return true;
-        
-        known->first = replaced;
-      }
+      Type replaced = known->first.transform(foldDependentMemberTypes);
+      if (replaced.isNull())
+        return true;
+
+      known->first = replaced;
     }
 
     // Check any same-type requirements in the protocol's requirement signature.
@@ -4586,6 +4596,24 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
           typeWitnesses.insert(assocType, {derivedType, reqDepth});
           continue;
+        }
+
+        // If there is a generic parameter of the named type, use that.
+        if (auto gpList = DC->getGenericParamsOfContext()) {
+          GenericTypeParamDecl *foundGP = nullptr;
+          for (auto gp : *gpList) {
+            if (gp->getName() == assocType->getName()) {
+              foundGP = gp;
+              break;
+            }
+          }
+
+          if (foundGP) {
+            auto gpType = DC->mapTypeIntoContext(
+                            foundGP->getDeclaredInterfaceType());
+            typeWitnesses.insert(assocType, {gpType, reqDepth});
+            continue;
+          }
         }
 
         // The solution is incomplete.

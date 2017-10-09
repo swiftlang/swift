@@ -115,7 +115,7 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
     ValueBase *Def = Op.get();
 
     // Operand is defined outside the loop.
-    if (auto *Inst = dyn_cast<SILInstruction>(Def))
+    if (auto *Inst = Def->getDefiningInstruction())
       return !L->contains(Inst->getParent());
     if (auto *Arg = dyn_cast<SILArgument>(Def))
       return !L->contains(Arg->getParent());

@@ -35,7 +35,7 @@ class Generic<T>: NSObject {
 
 // CHECK-LABEL: sil hidden @_T018objc_generic_class11SubGeneric1CfD : $@convention(method) <U, V> (@owned SubGeneric1<U, V>) -> () {
 // CHECK:       bb0([[SELF:%.*]] : @owned $SubGeneric1<U, V>):
-// CHECK:         [[SUPER_DEALLOC:%.*]] = super_method [[SELF]] : $SubGeneric1<U, V>, #Generic.deinit!deallocator.foreign : <T> (Generic<T>) -> () -> (), $@convention(objc_method) <τ_0_0> (Generic<τ_0_0>) -> ()
+// CHECK:         [[SUPER_DEALLOC:%.*]] = objc_super_method [[SELF]] : $SubGeneric1<U, V>, #Generic.deinit!deallocator.foreign : <T> (Generic<T>) -> () -> (), $@convention(objc_method) <τ_0_0> (Generic<τ_0_0>) -> ()
 // CHECK:         [[SUPER:%.*]] = upcast [[SELF:%.*]] : $SubGeneric1<U, V> to $Generic<Int>
 // CHECK:         apply [[SUPER_DEALLOC]]<Int>([[SUPER]])
 class SubGeneric1<U, V>: Generic<Int> {

@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_SILFUNCTION_H
 #define SWIFT_SIL_SILFUNCTION_H
 
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILLinkage.h"
@@ -180,6 +181,10 @@ private:
   /// The function's effects attribute.
   EffectsKind EffectsKindAttr;
 
+  /// Has value if there's a profile for this function
+  /// Contains Function Entry Count
+  ProfileCounter EntryCount;
+
   /// True if this function is inlined at least once. This means that the
   /// debug info keeps a pointer to this function.
   bool Inlined = false;
@@ -204,9 +209,9 @@ private:
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
               Optional<SILLocation> loc, IsBare_t isBareSILFunction,
               IsTransparent_t isTrans, IsSerialized_t isSerialized,
-              IsThunk_t isThunk, SubclassScope classSubclassScope,
-              Inline_t inlineStrategy, EffectsKind E,
-              SILFunction *insertBefore,
+              ProfileCounter entryCount, IsThunk_t isThunk,
+              SubclassScope classSubclassScope, Inline_t inlineStrategy,
+              EffectsKind E, SILFunction *insertBefore,
               const SILDebugScope *debugScope);
 
   static SILFunction *
@@ -214,7 +219,7 @@ private:
          CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
          Optional<SILLocation> loc, IsBare_t isBareSILFunction,
          IsTransparent_t isTrans, IsSerialized_t isSerialized,
-         IsThunk_t isThunk = IsNotThunk,
+         ProfileCounter entryCount, IsThunk_t isThunk = IsNotThunk,
          SubclassScope classSubclassScope = SubclassScope::NotApplicable,
          Inline_t inlineStrategy = InlineDefault,
          EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
@@ -235,6 +240,8 @@ public:
   SILFunctionConventions getConventions() const {
     return SILFunctionConventions(LoweredType, getModule());
   }
+
+  ProfileCounter getEntryCount() const { return EntryCount; }
 
   bool isNoReturnFunction() const;
 
@@ -776,9 +783,12 @@ public:
   /// '@function_mangled_name'.
   void printName(raw_ostream &OS) const;
 
-  /// Assigns consecutive numbers to all SILValues in the function.
-  void numberValues(llvm::DenseMap<const ValueBase*,
-                    unsigned> &ValueToNumberMap) const;
+  /// Assigns consecutive numbers to all the SILNodes in the function.
+  /// For instructions, both the instruction node and the value nodes of
+  /// any results will be assigned numbers; the instruction node will
+  /// be numbered the same as the first result, if there are any results.
+  void numberValues(llvm::DenseMap<const SILNode*, unsigned> &nodeToNumberMap)
+    const;
 
   ASTContext &getASTContext() const;
 

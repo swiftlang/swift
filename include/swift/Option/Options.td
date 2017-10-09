@@ -194,6 +194,9 @@ def driver_time_compilation : Flag<["-"], "driver-time-compilation">,
 def stats_output_dir: Separate<["-"], "stats-output-dir">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Directory to write unified compilation-statistics files to">;
+def trace_stats_events: Flag<["-"], "trace-stats-events">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Trace changes to stats in -stats-output-dir">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -637,6 +640,10 @@ def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption]>,
 def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts">;
+
+def profile_use : CommaJoined<["-"], "profile-use=">,
+  Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<profdata>">,
+  HelpText<"Supply a profdata file to enable profile-guided optimization">;
 
 def profile_coverage_mapping : Flag<["-"], "profile-coverage-mapping">,
   Flags<[FrontendOption, NoInteractiveOption]>,

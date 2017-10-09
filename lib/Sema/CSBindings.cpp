@@ -123,6 +123,40 @@ static bool shouldBindToValueType(Constraint *constraint) {
   llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
+void ConstraintSystem::PotentialBindings::addPotentialBinding(
+    PotentialBinding binding, bool allowJoinMeet) {
+  assert(!binding.BindingType->is<ErrorType>());
+
+  // If this is a non-defaulted supertype binding,
+  // check whether we can combine it with another
+  // supertype binding by computing the 'join' of the types.
+  if (binding.Kind == AllowedBindingKind::Supertypes &&
+      !binding.BindingType->hasTypeVariable() && !binding.DefaultedProtocol &&
+      !binding.isDefaultableBinding() && allowJoinMeet) {
+    if (lastSupertypeIndex) {
+      // Can we compute a join?
+      auto &lastBinding = Bindings[*lastSupertypeIndex];
+      auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
+      auto bindingType = binding.BindingType->getWithoutSpecifierType();
+      auto join = Type::join(lastType, bindingType);
+      if (join) {
+        auto anyType = join->getASTContext().TheAnyType;
+        if (!join->isEqual(anyType) || lastType->isEqual(anyType) ||
+            bindingType->isEqual(anyType)) {
+          // Replace the last supertype binding with the join. We're done.
+          lastBinding.BindingType = join;
+          return;
+        }
+      }
+    }
+
+    // Record this as the most recent supertype index.
+    lastSupertypeIndex = Bindings.size();
+  }
+
+  Bindings.push_back(std::move(binding));
+}
+
 /// \brief Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
@@ -154,16 +188,9 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       continue;
 
     switch (constraint->getKind()) {
-    case ConstraintKind::BindParam:
-      if (simplifyType(constraint->getSecondType())
-              ->getAs<TypeVariableType>() == typeVar) {
-        result.IsRHSOfBindParam = true;
-      }
-
-      LLVM_FALLTHROUGH;
-
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
+    case ConstraintKind::BindParam:
     case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
@@ -333,6 +360,10 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     assert(constraint->getClassification() ==
                ConstraintClassification::Relational &&
            "only relational constraints handled here");
+
+    // Record constraint which contributes to the
+    // finding of pontential bindings.
+    result.Sources.insert(constraint);
 
     auto first = simplifyType(constraint->getFirstType());
     auto second = simplifyType(constraint->getSecondType());

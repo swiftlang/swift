@@ -20,21 +20,22 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/SILOptions.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
-#include "swift/SIL/Notifications.h"
+#include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/Optional.h"
@@ -248,7 +249,7 @@ public:
 
   /// Send the invalidation message that \p V is being deleted to all
   /// registered handlers. The order of handlers is deterministic but arbitrary.
-  void notifyDeleteHandlers(ValueBase *V);
+  void notifyDeleteHandlers(SILNode *node);
 
   /// \brief This converts Swift types to SILTypes.
   mutable Lowering::TypeConverter Types;
@@ -321,8 +322,11 @@ public:
     return wholeModule;
   }
 
-  /// Returns true if everything in this SILModule is being serialized.
-  bool isWholeModuleSerialized() const { return Options.SILSerializeAll; }
+  /// Returns true if it is the OnoneSupport module.
+  bool isOnoneSupportModule() const;
+
+  /// Returns true if it is the optimized OnoneSupport module.
+  bool isOptimizedOnoneSupportModule() const;
 
   SILOptions &getOptions() const { return Options; }
 
@@ -483,12 +487,12 @@ public:
 
   /// \brief Return the declaration of a utility function that can,
   /// but needn't, be shared between modules.
-  SILFunction *getOrCreateSharedFunction(SILLocation loc,
-                                         StringRef name,
+  SILFunction *getOrCreateSharedFunction(SILLocation loc, StringRef name,
                                          CanSILFunctionType type,
                                          IsBare_t isBareSILFunction,
                                          IsTransparent_t isTransparent,
                                          IsSerialized_t isSerialized,
+                                         ProfileCounter entryCount,
                                          IsThunk_t isThunk);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
@@ -497,30 +501,34 @@ public:
       SILLocation loc, StringRef name, SILLinkage linkage,
       CanSILFunctionType type, IsBare_t isBareSILFunction,
       IsTransparent_t isTransparent, IsSerialized_t isSerialized,
+      ProfileCounter entryCount = ProfileCounter(),
       IsThunk_t isThunk = IsNotThunk,
       SubclassScope subclassScope = SubclassScope::NotApplicable);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
   /// exist.
-  SILFunction *getOrCreateFunction(SILLocation loc,
-                                   SILDeclRef constant,
-                                   ForDefinition_t forDefinition);
+  SILFunction *
+  getOrCreateFunction(SILLocation loc, SILDeclRef constant,
+                      ForDefinition_t forDefinition,
+                      ProfileCounter entryCount = ProfileCounter());
 
   /// \brief Create a function declaration.
   ///
   /// This signature is a direct copy of the signature of SILFunction::create()
   /// in order to simplify refactoring all SILFunction creation use-sites to use
   /// SILModule. Eventually the uses should probably be refactored.
-  SILFunction *createFunction(
-      SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
-      GenericEnvironment *genericEnv, Optional<SILLocation> loc,
-      IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-      IsSerialized_t isSerialized, IsThunk_t isThunk = IsNotThunk,
-      SubclassScope subclassScope = SubclassScope::NotApplicable,
-      Inline_t inlineStrategy = InlineDefault,
-      EffectsKind EK = EffectsKind::Unspecified,
-      SILFunction *InsertBefore = nullptr,
-      const SILDebugScope *DebugScope = nullptr);
+  SILFunction *
+  createFunction(SILLinkage linkage, StringRef name,
+                 CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
+                 Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+                 IsTransparent_t isTrans, IsSerialized_t isSerialized,
+                 ProfileCounter entryCount = ProfileCounter(),
+                 IsThunk_t isThunk = IsNotThunk,
+                 SubclassScope subclassScope = SubclassScope::NotApplicable,
+                 Inline_t inlineStrategy = InlineDefault,
+                 EffectsKind EK = EffectsKind::Unspecified,
+                 SILFunction *InsertBefore = nullptr,
+                 const SILDebugScope *DebugScope = nullptr);
 
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced

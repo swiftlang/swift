@@ -13,8 +13,7 @@
 %{
 from gyb_stdlib_support import (
     TRAVERSALS,
-    collectionForTraversal,
-    sliceTypeName
+    collectionForTraversal
 )
 }%
 
@@ -104,7 +103,6 @@ public struct LazyMapSequence<Base : Sequence, Element>
 
 % for Traversal in TRAVERSALS:
 %   Self = "LazyMap" + collectionForTraversal(Traversal)
-%   Slice = sliceTypeName(traversal=Traversal, mutable=False, rangeReplaceable=False)
 
 /// A `Collection` whose elements consist of those in a `Base`
 /// `Collection` passed through a transform function returning `Element`.
@@ -150,20 +148,12 @@ public struct ${Self}<
     return _transform(_base[position])
   }
 
-  @_inlineable
-  public subscript(bounds: Range<Base.Index>) -> ${Slice}<${Self}> {
-    return ${Slice}(base: self, bounds: bounds)
-  }
+  public typealias SubSequence = ${Self}<Base.SubSequence, Element>
 
-  // FIXME(ABI)#46 (Associated Types with where clauses): we actually want to add:
-  //
-  //   typealias SubSequence = ${Self}<Base.SubSequence, Element>
-  //
-  // so that all slicing optimizations of the base collection can kick in.
-  //
-  // We can't do that right now though, because that would force a lot of
-  // constraints on `Base.SubSequence`, limiting the possible contexts where
-  // the `.lazy.map` API can be used.
+  @_inlineable
+  public subscript(bounds: Range<Base.Index>) -> SubSequence {
+    return SubSequence(_base: _base[bounds], transform: _transform)
+  }
 
   public typealias IndexDistance = Base.IndexDistance
 

@@ -33,6 +33,7 @@
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -2551,8 +2552,8 @@ private:
   };
 
   struct PotentialBindings {
-    typedef std::tuple<bool, bool, bool, bool, bool,
-                       unsigned char, unsigned int> BindingScore;
+    typedef std::tuple<bool, bool, bool, bool, unsigned char, unsigned int>
+        BindingScore;
 
     TypeVariableType *TypeVar;
 
@@ -2574,11 +2575,11 @@ private:
     /// The number of defaultable bindings.
     unsigned NumDefaultableBindings = 0;
 
-    /// Is this type variable on the RHS of a BindParam constraint?
-    bool IsRHSOfBindParam = false;
-
     /// Tracks the position of the last known supertype in the group.
     Optional<unsigned> lastSupertypeIndex;
+
+    /// A set of all constraints which contribute to pontential bindings.
+    llvm::SmallPtrSet<Constraint *, 8> Sources;
 
     PotentialBindings(TypeVariableType *typeVar) : TypeVar(typeVar) {}
 
@@ -2593,7 +2594,6 @@ private:
     static BindingScore formBindingScore(const PotentialBindings &b) {
       return std::make_tuple(!b.hasNonDefaultableBindings(),
                              b.FullyBound,
-                             b.IsRHSOfBindParam,
                              b.SubtypeOfExistentialType,
                              b.InvolvesTypeVariables,
                              static_cast<unsigned char>(b.LiteralBinding),
@@ -2604,7 +2604,29 @@ private:
     /// \c x is a better set of bindings that \c y.
     friend bool operator<(const PotentialBindings &x,
                           const PotentialBindings &y) {
-      return formBindingScore(x) < formBindingScore(y);
+      if (formBindingScore(x) < formBindingScore(y))
+        return true;
+
+      if (!x.hasNonDefaultableBindings())
+        return false;
+
+      llvm::SmallPtrSet<Constraint *, 8> intersection(x.Sources);
+      llvm::set_intersect(intersection, y.Sources);
+
+      // Some relational constraints dictate certain
+      // ordering when it comes to attempting binding
+      // of type variables, where left-hand side is
+      // always more preferrable than right-hand side.
+      for (const auto *constraint : intersection) {
+        if (constraint->getKind() != ConstraintKind::Subtype)
+          continue;
+
+        auto lhs = constraint->getFirstType();
+        if (auto *typeVar = lhs->getAs<TypeVariableType>())
+          return x.TypeVar == typeVar;
+      }
+
+      return false;
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
@@ -2629,34 +2651,7 @@ private:
     /// \brief Add a potential binding to the list of bindings,
     /// coalescing supertype bounds when we are able to compute the meet.
     void addPotentialBinding(PotentialBinding binding,
-                             bool allowJoinMeet = true) {
-      assert(!binding.BindingType->is<ErrorType>());
-
-      // If this is a non-defaulted supertype binding,
-      // check whether we can combine it with another
-      // supertype binding by computing the 'join' of the types.
-      if (binding.Kind == AllowedBindingKind::Supertypes &&
-          !binding.BindingType->hasTypeVariable() &&
-          !binding.DefaultedProtocol && !binding.isDefaultableBinding() &&
-          allowJoinMeet) {
-        if (lastSupertypeIndex) {
-          // Can we compute a join?
-          auto &lastBinding = Bindings[*lastSupertypeIndex];
-          auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
-          auto bindingType = binding.BindingType->getWithoutSpecifierType();
-          if (auto join = Type::join(lastType, bindingType)) {
-            // Replace the last supertype binding with the join. We're done.
-            lastBinding.BindingType = join;
-            return;
-          }
-        }
-
-        // Record this as the most recent supertype index.
-        lastSupertypeIndex = Bindings.size();
-      }
-
-      Bindings.push_back(std::move(binding));
-    }
+                             bool allowJoinMeet = true);
 
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
@@ -2672,35 +2667,32 @@ private:
       if (NumDefaultableBindings > 0)
         out << "#defaultable_bindings=" << NumDefaultableBindings << " ";
 
-      out << "bindings=";
-      if (!Bindings.empty()) {
-        interleave(Bindings,
-                   [&](const PotentialBinding &binding) {
-                     auto type = binding.BindingType;
-                     auto &ctx = type->getASTContext();
-                     llvm::SaveAndRestore<bool> debugConstraints(
-                         ctx.LangOpts.DebugConstraintSolver, true);
-                     switch (binding.Kind) {
-                     case AllowedBindingKind::Exact:
-                       break;
+      out << "bindings={";
+      interleave(Bindings,
+                 [&](const PotentialBinding &binding) {
+                   auto type = binding.BindingType;
+                   auto &ctx = type->getASTContext();
+                   llvm::SaveAndRestore<bool> debugConstraints(
+                       ctx.LangOpts.DebugConstraintSolver, true);
+                   switch (binding.Kind) {
+                   case AllowedBindingKind::Exact:
+                     break;
 
-                     case AllowedBindingKind::Subtypes:
-                       out << "(subtypes of) ";
-                       break;
+                   case AllowedBindingKind::Subtypes:
+                     out << "(subtypes of) ";
+                     break;
 
-                     case AllowedBindingKind::Supertypes:
-                       out << "(supertypes of) ";
-                       break;
-                     }
-                     if (binding.DefaultedProtocol)
-                       out << "(default from "
-                           << (*binding.DefaultedProtocol)->getName() << ") ";
-                     out << type.getString();
-                   },
-                   [&]() { out << " "; });
-      } else {
-        out << "{}";
-      }
+                   case AllowedBindingKind::Supertypes:
+                     out << "(supertypes of) ";
+                     break;
+                   }
+                   if (binding.DefaultedProtocol)
+                     out << "(default from "
+                         << (*binding.DefaultedProtocol)->getName() << ") ";
+                   out << type.getString();
+                 },
+                 [&]() { out << "; "; });
+      out << "}";
     }
 
     void dump(ConstraintSystem *cs,

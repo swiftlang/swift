@@ -193,7 +193,7 @@ namespace {
 /// one or more captures from 'inout' (by-reference) to by-value.
 class ClosureCloner : public SILClonerWithScopes<ClosureCloner> {
 public:
-  friend class SILVisitor<ClosureCloner>;
+  friend class SILInstructionVisitor<ClosureCloner>;
   friend class SILCloner<ClosureCloner>;
 
   ClosureCloner(SILFunction *Orig, IsSerialized_t Serialized,
@@ -428,8 +428,9 @@ ClosureCloner::initCloned(SILFunction *Orig, IsSerialized_t Serialized,
   auto *Fn = M.createFunction(
       Orig->getLinkage(), ClonedName, ClonedTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
-      Orig->isThunk(), Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
-      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
+      Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
+      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
+      Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs())
     Fn->addSemanticsAttr(Attr);
   if (Orig->hasUnqualifiedOwnership()) {
@@ -677,11 +678,10 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
     // Loads of a struct_element_addr of an argument get replaced with a
     // struct_extract of the new passed in value. The value should be borrowed
     // already, so we can just extract the value.
-    SILBuilderWithPostProcess<ClosureCloner, 1> B(this, LI);
-    assert(B.getFunction().hasUnqualifiedOwnership() ||
+    assert(getBuilder().getFunction().hasUnqualifiedOwnership() ||
            Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed));
-    Val =
-        B.emitStructExtract(LI->getLoc(), Val, SEAI->getField(), LI->getType());
+    Val = getBuilder().emitStructExtract(LI->getLoc(), Val, SEAI->getField(),
+                                         LI->getType());
 
     // If we were performing a load [copy], then we need to a perform a copy
     // here since when cloning, we do not eliminate the destroy on the copied
@@ -814,8 +814,8 @@ public:
   /// Visit a random value base.
   ///
   /// These are considered to be escapes.
-  bool visitValueBase(ValueBase *V) {
-    DEBUG(llvm::dbgs() << "    FAIL! Have unknown escaping user: " << *V);
+  bool visitSILInstruction(SILInstruction *I) {
+    DEBUG(llvm::dbgs() << "    FAIL! Have unknown escaping user: " << *I);
     return false;
   }
 
@@ -850,7 +850,7 @@ public:
   }
 
   /// Add the Operands of a transitive use instruction to the worklist.
-  void addUserOperandsToWorklist(SILInstruction *I) {
+  void addUserOperandsToWorklist(SingleValueInstruction *I) {
     for (auto *User : I->getUses()) {
       Worklist.push_back(User);
     }
@@ -1046,7 +1046,8 @@ static bool scanUsesForEscapesAndMutations(Operand *Op,
   // derived from a projection like instruction). In fact such a thing may not
   // even make any sense!
   if (isa<CopyValueInst>(User) || isa<MarkUninitializedInst>(User)) {
-    return all_of(User->getUses(), [&State](Operand *UserOp) -> bool {
+    return all_of(cast<SingleValueInstruction>(User)->getUses(),
+                  [&State](Operand *UserOp) -> bool {
       return scanUsesForEscapesAndMutations(UserOp, State);
     });
   }
@@ -1178,7 +1179,7 @@ static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
 
   // Otherwise, handle the alloc_box case. If we have a mark_uninitialized on
   // the box, we create the project value through that.
-  SILInstruction *Box = cast<AllocBoxInst>(PartialOperand);
+  SingleValueInstruction *Box = cast<AllocBoxInst>(PartialOperand);
   if (auto *Op = Box->getSingleUse()) {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(Op->getUser())) {
       Box = MUI;

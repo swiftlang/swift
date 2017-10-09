@@ -20,7 +20,6 @@ using namespace sil;
 #define CONSTANT_OWNERSHIP_INST(OWNERSHIP, INST)                               \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *Arg) {                                                       \
-    assert(Arg->hasValue() && "Expected to have a result");                    \
     if (ValueOwnershipKind::OWNERSHIP == ValueOwnershipKind::Trivial) {        \
       assert((Arg->getType().isAddress() ||                                    \
               Arg->getType().isTrivial(Arg->getModule())) &&                   \
@@ -60,12 +59,10 @@ CONSTANT_OWNERSHIP_INST(Owned, ObjCMetatypeToObject)
 // not though.
 CONSTANT_OWNERSHIP_INST(Trivial, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, AllocStack)
-CONSTANT_OWNERSHIP_INST(Trivial, BindMemory)
 CONSTANT_OWNERSHIP_INST(Trivial, BeginAccess)
-CONSTANT_OWNERSHIP_INST(Trivial, BeginUnpairedAccess)
 CONSTANT_OWNERSHIP_INST(Trivial, BridgeObjectToWord)
 CONSTANT_OWNERSHIP_INST(Trivial, ClassMethod)
-CONSTANT_OWNERSHIP_INST(Trivial, DynamicMethod)
+CONSTANT_OWNERSHIP_INST(Trivial, ObjCMethod)
 CONSTANT_OWNERSHIP_INST(Trivial, ExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, FloatLiteral)
 CONSTANT_OWNERSHIP_INST(Trivial, FunctionRef)
@@ -79,7 +76,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, IntegerLiteral)
 CONSTANT_OWNERSHIP_INST(Trivial, IsNonnull)
 CONSTANT_OWNERSHIP_INST(Trivial, IsUnique)
 CONSTANT_OWNERSHIP_INST(Trivial, IsUniqueOrPinned)
-CONSTANT_OWNERSHIP_INST(Trivial, MarkFunctionEscape)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, Metatype)
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCToThickMetatype)
@@ -101,15 +97,14 @@ CONSTANT_OWNERSHIP_INST(Trivial, StringLiteral)
 CONSTANT_OWNERSHIP_INST(Trivial, ConstStringLiteral)
 CONSTANT_OWNERSHIP_INST(Trivial, StructElementAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, SuperMethod)
+CONSTANT_OWNERSHIP_INST(Trivial, ObjCSuperMethod)
 CONSTANT_OWNERSHIP_INST(Trivial, TailAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, ThickToObjCMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, ThinFunctionToPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, TupleElementAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedAddrCast)
-CONSTANT_OWNERSHIP_INST(Trivial, UncheckedRefCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedTakeEnumDataAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, UncheckedTrivialBitCast)
-CONSTANT_OWNERSHIP_INST(Trivial, UnconditionalCheckedCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, ValueMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, WitnessMethod)
 CONSTANT_OWNERSHIP_INST(Trivial, StoreBorrow)
@@ -153,77 +148,6 @@ CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
 // of the cast, or the programmer must use Builtin.fixLifetime.
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Unowned, UncheckedBitwiseCast)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
-
-// These are instructions that do not have any result, so we should never reach
-// this point in the code since we need a SILValue to compute
-// ValueOwnershipKind. We define methods so that all instructions have a method
-// on the visitor (causing the compiler to warn if a new instruction is added
-// within a method being added).
-#define NO_RESULT_OWNERSHIP_INST(INST)                                         \
-  ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
-      INST##Inst *I) {                                                         \
-    assert(!I->hasValue() && "Expected an instruction without a result");      \
-    llvm_unreachable("Instruction without a result can not have ownership");   \
-  }
-NO_RESULT_OWNERSHIP_INST(DeallocStack)
-NO_RESULT_OWNERSHIP_INST(DeallocRef)
-NO_RESULT_OWNERSHIP_INST(DeallocPartialRef)
-NO_RESULT_OWNERSHIP_INST(DeallocValueBuffer)
-NO_RESULT_OWNERSHIP_INST(DeallocBox)
-NO_RESULT_OWNERSHIP_INST(DeallocExistentialBox)
-NO_RESULT_OWNERSHIP_INST(EndAccess)
-NO_RESULT_OWNERSHIP_INST(EndBorrow)
-NO_RESULT_OWNERSHIP_INST(EndBorrowArgument)
-NO_RESULT_OWNERSHIP_INST(EndUnpairedAccess)
-NO_RESULT_OWNERSHIP_INST(Store)
-NO_RESULT_OWNERSHIP_INST(StoreWeak)
-NO_RESULT_OWNERSHIP_INST(StoreUnowned)
-NO_RESULT_OWNERSHIP_INST(Assign)
-NO_RESULT_OWNERSHIP_INST(DebugValue)
-NO_RESULT_OWNERSHIP_INST(DebugValueAddr)
-NO_RESULT_OWNERSHIP_INST(CopyAddr)
-NO_RESULT_OWNERSHIP_INST(DestroyAddr)
-NO_RESULT_OWNERSHIP_INST(StrongRetain)
-NO_RESULT_OWNERSHIP_INST(StrongRelease)
-NO_RESULT_OWNERSHIP_INST(StrongRetainUnowned)
-NO_RESULT_OWNERSHIP_INST(StrongUnpin)
-NO_RESULT_OWNERSHIP_INST(UnmanagedRetainValue)
-NO_RESULT_OWNERSHIP_INST(UnmanagedReleaseValue)
-NO_RESULT_OWNERSHIP_INST(UnmanagedAutoreleaseValue)
-NO_RESULT_OWNERSHIP_INST(UnownedRetain)
-NO_RESULT_OWNERSHIP_INST(UnownedRelease)
-NO_RESULT_OWNERSHIP_INST(RetainValue)
-NO_RESULT_OWNERSHIP_INST(ReleaseValue)
-NO_RESULT_OWNERSHIP_INST(RetainValueAddr)
-NO_RESULT_OWNERSHIP_INST(ReleaseValueAddr)
-NO_RESULT_OWNERSHIP_INST(SetDeallocating)
-NO_RESULT_OWNERSHIP_INST(AutoreleaseValue)
-NO_RESULT_OWNERSHIP_INST(FixLifetime)
-NO_RESULT_OWNERSHIP_INST(DestroyValue)
-NO_RESULT_OWNERSHIP_INST(AllocGlobal)
-NO_RESULT_OWNERSHIP_INST(InjectEnumAddr)
-NO_RESULT_OWNERSHIP_INST(DeinitExistentialAddr)
-NO_RESULT_OWNERSHIP_INST(DeinitExistentialValue)
-NO_RESULT_OWNERSHIP_INST(CondFail)
-NO_RESULT_OWNERSHIP_INST(EndLifetime)
-
-// Terminators. These do not produce SILValue, so they do not have a
-// ValueOwnershipKind. They do have ownership implications in terms of the
-// SILArguments that they feed into. But that code is in SILArgument.
-NO_RESULT_OWNERSHIP_INST(Unreachable)
-NO_RESULT_OWNERSHIP_INST(Return)
-NO_RESULT_OWNERSHIP_INST(Throw)
-NO_RESULT_OWNERSHIP_INST(TryApply)
-NO_RESULT_OWNERSHIP_INST(Branch)
-NO_RESULT_OWNERSHIP_INST(CondBranch)
-NO_RESULT_OWNERSHIP_INST(SwitchValue)
-NO_RESULT_OWNERSHIP_INST(SwitchEnum)
-NO_RESULT_OWNERSHIP_INST(SwitchEnumAddr)
-NO_RESULT_OWNERSHIP_INST(DynamicMethodBranch)
-NO_RESULT_OWNERSHIP_INST(CheckedCastBranch)
-NO_RESULT_OWNERSHIP_INST(CheckedCastValueBranch)
-NO_RESULT_OWNERSHIP_INST(CheckedCastAddrBranch)
-#undef NO_RESULT_OWNERSHIP_INST
 
 // For a forwarding instruction, we loop over all operands and make sure that
 // all non-trivial values have the same ownership.
@@ -281,7 +205,6 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *I,
 #define FORWARDING_OWNERSHIP_INST(INST)                                        \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *I) {                                                         \
-    assert(I->hasValue() && "Expected to have a value");                       \
     return visitForwardingInst(I);                                             \
   }
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
@@ -404,7 +327,6 @@ struct ValueOwnershipKindBuiltinVisitor
                                         llvm::Intrinsic::ID ID) {
     // LLVM intrinsics do not traffic in ownership, so if we have a result, it
     // must be trivial.
-    assert(BI->hasValue() && "Can only get here if we have a SILValue");
     assert(BI->getType().isTrivial(BI->getModule()) &&
            "LLVM intrinsics should always be trivial");
     return ValueOwnershipKind::Trivial;
@@ -420,7 +342,6 @@ struct ValueOwnershipKindBuiltinVisitor
 #define CONSTANT_OWNERSHIP_BUILTIN(OWNERSHIP, ID)                              \
   ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
       BuiltinInst *BI, StringRef Attr) {                                       \
-    assert(BI->hasValue() && "Expected to have type");                         \
     if (ValueOwnershipKind::OWNERSHIP == ValueOwnershipKind::Trivial) {        \
       assert(BI->getType().isTrivial(BI->getModule()) &&                       \
              "Only trivial types can have trivial ownership");                 \
@@ -505,8 +426,6 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, ZExt)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, ZExtOrBitCast)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_ORD)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_UNO)
-CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastToUnknownObject)
-CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastFromUnknownObject)
 CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastToNativeObject)
 CONSTANT_OWNERSHIP_BUILTIN(Unowned, UnsafeCastToNativeObject)
 CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastFromNativeObject)

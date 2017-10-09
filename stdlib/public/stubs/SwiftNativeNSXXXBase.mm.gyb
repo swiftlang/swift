@@ -24,9 +24,9 @@
 // To trick Swift into using its fast refcounting and allocation
 // directly (rather than going through objc_msgSend to arrive at the
 // implementations defined here), we define subclasses on the Swift
-// side but hide the inheritance relationship from the Swift compiler
-// and only establish it dynamically, in the '+ load' method of each
-// class defined here.
+// side but we establish the inheritance relationship with
+// the special @_swift_native_objc_runtime_base attribute rather
+// than directly subclassing the classes defined here.
 //
 //===----------------------------------------------------------------------===//
 
@@ -71,6 +71,10 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 }
 - (id)autorelease {
   return _objc_rootAutorelease(self);
+}
+- (NSUInteger)retainCount {
+  auto SELF = reinterpret_cast<HeapObject *>(self);
+  return swift_retainCount(SELF);
 }
 
 - (BOOL)_tryRetain {
@@ -140,25 +144,6 @@ swift_stdlib_CFStringHashCString(const uint8_t *bytes, CFIndex len) {
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t
-swift_stdlib_NSStringHashValue(NSString *NS_RELEASES_ARGUMENT str,
-                               bool isASCII) {
-  size_t Result =
-      isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
-
-  swift_unknownRelease(str);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t
-swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
-  NSString *str = (NSString *)opaque;
-  return isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
-}
-
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
                                        NSString *prefix) {
   auto Length = CFStringGetLength((__bridge CFStringRef)theString);
@@ -204,22 +189,6 @@ bool swift_stdlib_NSStringHasSuffixNFDPointer(void *theString,
       (__bridge CFStringRef)theString, (__bridge CFStringRef)suffix,
       CFRangeMake(0, Length),
       kCFCompareAnchored | kCFCompareBackwards | kCFCompareNonliteral, nullptr);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-NS_RETURNS_RETAINED NSString *
-swift_stdlib_NSStringLowercaseString(NSString *NS_RELEASES_ARGUMENT str) {
-  NSString *Result = objc_retain(str.lowercaseString);
-  swift_unknownRelease(str);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-NS_RETURNS_RETAINED NSString *
-swift_stdlib_NSStringUppercaseString(NSString *NS_RELEASES_ARGUMENT str) {
-  NSString *Result = objc_retain(str.uppercaseString);
-  swift_unknownRelease(str);
   return Result;
 }
 

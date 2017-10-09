@@ -524,7 +524,8 @@ SILInstruction *SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *CFI) 
   auto Converted = CFI->getConverted();
   while (!CFI->use_empty()) {
     auto *Use = *(CFI->use_begin());
-    assert(!Use->getUser()->hasValue() && "Did not expect user with a result!");
+    assert(Use->getUser()->getResults().empty() &&
+           "Did not expect user with a result!");
     Use->set(Converted);
   }
 

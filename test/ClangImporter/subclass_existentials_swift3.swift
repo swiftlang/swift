@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -o - -primary-file %s -swift-version 3
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -o - -primary-file %s -swift-version 3 -I %S/Inputs/custom-modules/
 
 // REQUIRES: objc_interop
 
 import Foundation
+import SubclassExistentialsExtra
 
 // FIXME: Consider better diagnostics here.
 
@@ -33,4 +34,12 @@ class OldSwiftLaundryService : NSLaundry {
   func dry() -> Coat {
     return g!
   }
+}
+
+func testInheritanceFromComposition(_ object: CompositionSubObject, _ specific: CompositionSubSpecific) {
+  let _: NSObject = object
+  let _: NSCopying = object
+
+  let _: SomeSpecificSubclass = specific
+  let _: NSCopying = specific
 }

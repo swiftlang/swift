@@ -656,12 +656,9 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
   }
 
   // Otherwise, perform substitutions to create this witness now.
-  auto *genericSig = GenericConformance->getGenericSignature();
 
-  auto substitutionMap =
-      genericSig->getSubstitutionMap(GenericSubstitutions);
-
-  // Local function to determine whether we will end up
+  // Local function to determine whether we will end up referring to a
+  // tentative witness that may not be chosen.
   auto normal = GenericConformance->getRootNormalConformance();
   auto isTentativeWitness = [&] {
     if (normal->getState() != ProtocolConformanceState::CheckingTypeWitnesses)
@@ -678,6 +675,12 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
     return { Type(), nullptr };
 
   auto *typeDecl = genericWitnessAndDecl.second;
+
+  // Form the substitution.
+  auto *genericSig = GenericConformance->getGenericSignature();
+  if (!genericSig) return { Type(), nullptr };
+
+  auto substitutionMap = genericSig->getSubstitutionMap(GenericSubstitutions);
 
   // Apply the substitution we computed above
   auto specializedType

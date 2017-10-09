@@ -66,3 +66,7 @@ var o = C()
 var p: UnsafeMutablePointer<C>? = nil
 
 _ = p =*= &o
+
+
+func rdar25963182(_ bytes: [UInt8] = nil) {}
+// expected-error@-1 {{nil default argument value cannot be converted to type}}

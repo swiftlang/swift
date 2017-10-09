@@ -18,6 +18,13 @@
 // For comparison, we always create three arrays of 200,000 words.
 // An integer enum takes two words.
 
+import TestsUtils
+
+public let ArrayOfGenericPOD = BenchmarkInfo(
+  name: "ArrayOfGenericPOD",
+  runFunction: run_ArrayOfGenericPOD,
+  tags: [.validation, .api, .Array])
+
 class RefArray<T> {
   var array: [T]
 

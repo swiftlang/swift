@@ -48,7 +48,7 @@ The following build options are available:
       (default: "macosx;iphoneos;appletvos;watchos")
 * `-DSWIFT_OPTIMIZATION_LEVELS`
     * A list of Swift optimization levels to build against
-      (default: "O;Onone;Ounchecked")
+      (default: "O;Onone;Osize")
 * `-DSWIFT_BENCHMARK_EMIT_SIB`
     * A boolean value indicating whether .sib files should be generated
       alongside .o files (default: FALSE)
@@ -92,7 +92,7 @@ Using the Benchmark Driver
 
 * `$ ./Benchmark_O --num-iters=1 --num-samples=1`
 * `$ ./Benchmark_Onone --list`
-* `$ ./Benchmark_Ounchecked Ackermann`
+* `$ ./Benchmark_Osize Ackermann`
 
 ### Note
 As a shortcut, you can also refer to benchmarks by their ordinal numbers.
@@ -105,20 +105,11 @@ You can use ordinal numbers instead of test names like this:
 Using the Harness Generator
 ---------------------------
 
-`scripts/generate_harness/generate_harness.py` generates and replaces
-`CMakeLists.txt` and `utils/main.swift` from single and multiple file tests
-contained in the directories `single-source` and `multi-source`. It gathers
-information about the tests and then generates the files from templates using
-`gyb`. The motivation for creating this script was to eliminate the need to
-manually add at least three lines to harness files (one to `CMakeLists.txt` and
-two to `utils/main.swift`) for every new benchmark added.
+`scripts/generate_harness/generate_harness.py` runs `gyb` to automate generation
+of some benchmarks.
 
-**Warning:**
-
-Since `CMakeLists.txt` and `utils/main.swift` are now generated from templates,
-they should not be directly modified. Work may be lost if the harness is
-executed after making changes to derived files. Instead, modifications should
-be made to the `*.gyb` template files.
+** FIXME ** `gyb` should be invoked automatically during the
+   build so that manually invoking `generate_harness.py` is not required.
 
 ### Generating harness files
 

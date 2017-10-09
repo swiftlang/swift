@@ -12,6 +12,13 @@
 
 import TestsUtils
 
+public let StringBuilder = [
+  BenchmarkInfo(name: "StringAdder", runFunction: run_StringAdder, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "StringBuilder", runFunction: run_StringBuilder, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "StringBuilderLong", runFunction: run_StringBuilderLong, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "StringUTF16Builder", runFunction: run_StringUTF16Builder, tags: [.validation, .api, .String]),
+]
+
 @inline(never)
 func buildString(_ i: String) -> String {
   var sb = i

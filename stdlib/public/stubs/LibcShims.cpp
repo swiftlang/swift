@@ -109,7 +109,7 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 void _swift_stdlib_destroyTLS(void *);
 
 static void
-#if defined(_M_X86)
+#if defined(_M_IX86)
 __stdcall
 #endif
 _swift_stdlib_destroyTLS_CCAdjustmentThunk(void *ptr) {
@@ -169,7 +169,10 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
   return malloc_size(ptr);
 }
-#elif defined(__GNU_LIBRARY__) || defined(__CYGWIN__) || defined(__ANDROID__)
+#elif defined(__GNU_LIBRARY__) || defined(__CYGWIN__) || defined(__ANDROID__) || defined(__HAIKU__)
+#if defined(__HAIKU__)
+#define _GNU_SOURCE
+#endif
 #include <malloc.h>
 SWIFT_RUNTIME_STDLIB_INTERFACE
 size_t swift::_swift_stdlib_malloc_size(const void *ptr) {

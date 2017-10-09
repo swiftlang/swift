@@ -40,8 +40,8 @@ public struct CollectionMisuseResiliencyChecks {
 }
 
 % for inc, protocol, direction, end in (
-%  ('inc', '_Indexable', 'after', 'end'),
-%  ('dec', '_BidirectionalIndexable', 'before', 'start')):
+%  ('inc', 'Collection', 'after', 'end'),
+%  ('dec', 'BidirectionalCollection', 'before', 'start')):
 
 /// Test that the elements of `instances` satisfy
 /// ${'some of ' if inc == 'dec' else ''}the semantic
@@ -88,7 +88,7 @@ internal func _checkIncrementalAdvance<Instances, BaseCollection>(
   ${TRACE}
 ) where
   Instances : Collection,
-  BaseCollection : _Indexable,
+  BaseCollection : Collection,
   Instances.Iterator.Element == BaseCollection.Index {
   for i in instances {
     let d: BaseCollection.IndexDistance = sign > 0 ?
@@ -122,7 +122,7 @@ public func checkForwardIndex<Instances, BaseCollection>(
   endIndex: Instances.Iterator.Element, ${TRACE}
 ) where
   Instances : Collection,
-  BaseCollection : _Indexable,
+  BaseCollection : Collection,
   Instances.Iterator.Element == BaseCollection.Index {
 
   checkIncrementable(instances, of: baseCollection,
@@ -149,7 +149,7 @@ public func checkBidirectionalIndex<Instances, BaseCollection>(
   ${TRACE}
 ) where
   Instances: Collection,
-  BaseCollection : _BidirectionalIndexable,
+  BaseCollection : BidirectionalCollection,
   Instances.Iterator.Element == BaseCollection.Index {
 
   checkForwardIndex(instances, of: baseCollection,
@@ -185,7 +185,7 @@ public func checkRandomAccessIndex<Instances, Distances, BaseCollection>(
 ) where
   Instances : Collection,
   Distances : Collection,
-  BaseCollection : _RandomAccessIndexable,
+  BaseCollection : RandomAccessCollection,
   Instances.Iterator.Element == BaseCollection.Index,
   Distances.Iterator.Element == BaseCollection.IndexDistance {
 
@@ -214,7 +214,7 @@ public func checkAdvancesAndDistances<Instances, Distances, BaseCollection>(
 ) where
   Instances : Collection,
   Distances : Collection,
-  BaseCollection : _Indexable,
+  BaseCollection : Collection,
   Instances.Iterator.Element == BaseCollection.Index,
   Distances.Iterator.Element == BaseCollection.IndexDistance {
 
@@ -257,8 +257,7 @@ public func checkCollection<${genericParam}, C : Collection>(
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
-) where C.Iterator.Element == ${Element},
-  C.SubSequence : Collection {
+) where C.Iterator.Element == ${Element} {
 
   checkForwardCollection(expected, collection, message(),
     stackTrace: stackTrace, showFrame: showFrame, file: file, line: line,
@@ -278,7 +277,6 @@ public func check${Traversal}Collection<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
   C.Iterator.Element == ${Element},
-  C.SubSequence : ${TraversalCollection},
   ${Element} : Equatable {
 
   check${Traversal}Collection(
@@ -298,8 +296,7 @@ public func check${Traversal}Collection<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
 ) where
-  C.Iterator.Element == ${Element},
-  C.SubSequence : ${TraversalCollection} {
+  C.Iterator.Element == ${Element} {
 
   checkOneLevelOf${Traversal}Collection(expected, collection, ${trace},
     resiliencyChecks: resiliencyChecks, sameValue: sameValue)
@@ -504,8 +501,7 @@ ${genericParam}, S : ${TraversalCollection}
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
 ) where
-  S.Iterator.Element == ${Element},
-  S.SubSequence : ${TraversalCollection} {
+  S.Iterator.Element == ${Element} {
 
   let expectedArray = Array(expected)
 

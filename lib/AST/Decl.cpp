@@ -1459,7 +1459,6 @@ bool AbstractStorageDecl::hasFixedLayout() const {
   switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Resilient:
     return false;
-  case ResilienceStrategy::Fragile:
   case ResilienceStrategy::Default:
     return true;
   }
@@ -1594,6 +1593,8 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
     return sdd->getOverriddenDecl();
   if (auto cd = dyn_cast<ConstructorDecl>(this))
     return cd->getOverriddenDecl();
+  if (auto at = dyn_cast<AssociatedTypeDecl>(this))
+    return at->getOverriddenDecl();
   return nullptr;
 }
 
@@ -2217,7 +2218,6 @@ bool NominalTypeDecl::hasFixedLayout() const {
   switch (getParentModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Resilient:
     return false;
-  case ResilienceStrategy::Fragile:
   case ResilienceStrategy::Default:
     return true;
   }
@@ -2516,7 +2516,11 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        TrailingWhereClause *trailingWhere)
     : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
       KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
-      TrailingWhere(trailingWhere) {}
+      TrailingWhere(trailingWhere) {
+
+  AssociatedTypeDeclBits.ComputedOverridden = false;
+  AssociatedTypeDeclBits.HasOverridden = false;
+}
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
@@ -2527,6 +2531,8 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
       KeywordLoc(keywordLoc), TrailingWhere(trailingWhere),
       Resolver(definitionResolver), ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
+  AssociatedTypeDeclBits.ComputedOverridden = false;
+  AssociatedTypeDeclBits.HasOverridden = false;
 }
 
 void AssociatedTypeDecl::computeType() {
@@ -2551,6 +2557,29 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
     endLoc = getInherited().back().getSourceRange().End;
   }
   return SourceRange(KeywordLoc, endLoc);
+}
+
+AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
+  auto overridden = getOverriddenDecls();
+
+  // If this declaration does not override any other declarations, it's
+  // the anchor.
+  if (overridden.empty()) return const_cast<AssociatedTypeDecl *>(this);
+
+  // Find the best anchor among the anchors of the overridden decls.
+  AssociatedTypeDecl *bestAnchor = nullptr;
+  for (auto assocType : overridden) {
+    auto anchor = assocType->getAssociatedTypeAnchor();
+    if (!bestAnchor || compare(anchor, bestAnchor) < 0)
+      bestAnchor = anchor;
+  }
+
+  return bestAnchor;
+}
+
+AssociatedTypeDecl *AssociatedTypeDecl::getOverriddenDecl() const {
+  auto overridden = getOverriddenDecls();
+  return overridden.empty() ? nullptr : overridden.front();
 }
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
@@ -2954,6 +2983,19 @@ ProtocolDecl::getInheritedProtocols() const {
   return result;
 }
 
+llvm::TinyPtrVector<AssociatedTypeDecl *>
+ProtocolDecl::getAssociatedTypeMembers() const {
+  llvm::TinyPtrVector<AssociatedTypeDecl *> result;
+  if (!isObjC()) {
+    for (auto member : getMembers()) {
+      if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
+        result.push_back(ATD);
+      }
+    }
+  }
+  return result;
+}
+
 bool ProtocolDecl::walkInheritedProtocols(
               llvm::function_ref<TypeWalker::Action(ProtocolDecl *)> fn) const {
   auto self = const_cast<ProtocolDecl *>(this);
@@ -3333,27 +3375,9 @@ void ProtocolDecl::createGenericParamsIfMissing() {
 void ProtocolDecl::computeRequirementSignature() {
   assert(!RequirementSignature && "already computed requirement signature");
 
-  auto module = getParentModule();
-
-  auto selfType = getSelfInterfaceType()->castTo<GenericTypeParamType>();
-  auto requirement =
-    Requirement(RequirementKind::Conformance, selfType,
-                getDeclaredInterfaceType());
-
-  GenericSignatureBuilder builder(getASTContext(),
-                                  LookUpConformanceInModule(module));
-  builder.addGenericParameter(selfType);
-  auto selfPA =
-      builder.resolveArchetype(selfType, ArchetypeResolutionKind::WellFormed);
-
-  builder.addRequirement(
-         requirement,
-         GenericSignatureBuilder::RequirementSource
-           ::forRequirementSignature(selfPA, this),
-         nullptr);
-
   // Compute and record the signature.
-  auto requirementSig = builder.computeGenericSignature(SourceLoc());
+  auto requirementSig =
+    GenericSignatureBuilder::computeRequirementSignature(this);
   RequirementSignature = requirementSig->getRequirements().data();
   assert(RequirementSignature != nullptr);
   NumRequirementsInSignature = requirementSig->getRequirements().size();
@@ -4151,10 +4175,13 @@ ParamDecl::ParamDecl(Specifier specifier,
 
 /// Clone constructor, allocates a new ParamDecl identical to the first.
 /// Intentionally not defined as a copy constructor to avoid accidental copies.
-ParamDecl::ParamDecl(ParamDecl *PD)
+ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
   : VarDecl(DeclKind::Param, /*IsStatic*/false, PD->getSpecifier(),
             /*IsCaptureList*/false, PD->getNameLoc(), PD->getName(),
-            PD->hasType() ? PD->getType() : Type(), PD->getDeclContext()),
+            PD->hasType() && withTypes
+              ? PD->getType()->getInOutObjectType()
+              : Type(),
+            PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     SpecifierLoc(PD->getSpecifierLoc()),
@@ -4162,8 +4189,11 @@ ParamDecl::ParamDecl(ParamDecl *PD)
     IsTypeLocImplicit(PD->IsTypeLocImplicit),
     defaultArgumentKind(PD->defaultArgumentKind) {
   typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
-  if (PD->hasInterfaceType())
-    setInterfaceType(PD->getInterfaceType());
+  if (!withTypes && typeLoc.getTypeRepr())
+    typeLoc.setType(Type());
+
+  if (withTypes && PD->hasInterfaceType())
+    setInterfaceType(PD->getInterfaceType()->getInOutObjectType());
 }
 
 

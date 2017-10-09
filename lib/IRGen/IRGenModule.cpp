@@ -39,6 +39,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -802,6 +803,11 @@ llvm::AttributeList IRGenModule::getAllocAttrs() {
   return AllocAttrs;
 }
 
+/// Disable thumb-mode until debugger support is there.
+bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
+  return feature == "+thumb-mode";
+}
+
 /// Construct initial function attributes from options.
 void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs) {
   // Add DisableFPElim. 
@@ -820,7 +826,11 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs) {
   if (CPU != "")
     Attrs.addAttribute("target-cpu", CPU);
 
-  std::vector<std::string> Features = ClangOpts.Features;
+  std::vector<std::string> Features;
+  for (auto &F : ClangOpts.Features)
+    if (!shouldRemoveTargetFeature(F))
+        Features.push_back(F);
+
   if (!Features.empty()) {
     SmallString<64> allFeatures;
     // Sort so that the target features string is canonical.
@@ -1124,6 +1134,16 @@ bool IRGenModule::finalize() {
 /// IRGenModule.
 void IRGenModule::emitLazyPrivateDefinitions() {
   emitLazyObjCProtocolDefinitions();
+}
+
+llvm::MDNode *IRGenModule::createProfileWeights(uint64_t TrueCount,
+                                                uint64_t FalseCount) const {
+  uint64_t MaxWeight = std::max(TrueCount, FalseCount);
+  uint64_t Scale = (MaxWeight > UINT32_MAX) ? UINT32_MAX : 1;
+  uint32_t ScaledTrueCount = (TrueCount / Scale) + 1;
+  uint32_t ScaledFalseCount = (FalseCount / Scale) + 1;
+  llvm::MDBuilder MDHelper(getLLVMContext());
+  return MDHelper.createBranchWeights(ScaledTrueCount, ScaledFalseCount);
 }
 
 void IRGenModule::unimplemented(SourceLoc loc, StringRef message) {

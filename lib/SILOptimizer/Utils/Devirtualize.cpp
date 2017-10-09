@@ -329,8 +329,8 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
         continue;
       }
       // Look through strong_pin instructions.
-      if (isa<StrongPinInst>(V)) {
-        WorkList.push_back(cast<SILInstruction>(V)->getOperand(0));
+      if (auto pin = dyn_cast<StrongPinInst>(V)) {
+        WorkList.push_back(pin->getOperand());
         continue;
       }
     }
@@ -542,11 +542,6 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
       return false;
   }
 
-  if (MI->isVolatile()) {
-    // dynamic dispatch is semantically required, can't devirtualize
-    return false;
-  }
-
   return true;
 }
 
@@ -621,9 +616,10 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   SmallVector<Operand *, 4> OriginalResultUses;
 
   if (!isa<TryApplyInst>(AI)) {
-    NewAI = B.createApply(AI.getLoc(), FRI, Subs, NewArgs,
-                          cast<ApplyInst>(AI)->isNonThrowing());
-    ResultValue = NewAI.getInstruction();
+    auto apply = B.createApply(AI.getLoc(), FRI, Subs, NewArgs,
+                               cast<ApplyInst>(AI)->isNonThrowing());
+    NewAI = apply;
+    ResultValue = apply;
   } else {
     auto *TAI = cast<TryApplyInst>(AI);
     // Create new normal and error BBs only if:
@@ -693,7 +689,6 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
         Use->set(ResultValue);
       }
     }
-    return std::make_pair(NewAI.getInstruction(), NewAI);
   }
 
   // We need to return a pair of values here:
@@ -890,7 +885,7 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
     // Check if any casting is required for the return value.
     ResultValue = castValueToABICompatibleType(&Builder, Loc, NewAI,
                                                NewAI->getType(), AI.getType());
-    SAI = ApplySite::isa(NewAI);
+    SAI = NewAI;
   }
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     SAI = Builder.createTryApply(Loc, FRI, NewSubs, Arguments,
@@ -905,7 +900,7 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
     // Check if any casting is required for the return value.
     ResultValue = castValueToABICompatibleType(
         &Builder, Loc, NewPAI, NewPAI->getType(), PAI->getType());
-    SAI = ApplySite::isa(NewPAI);
+    SAI = NewPAI;
   }
 
   NumWitnessDevirt++;

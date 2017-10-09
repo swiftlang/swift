@@ -1513,7 +1513,7 @@ class Bar {
 
 
 // CHECK-LABEL: @dont_jumpthread_switch_enum
-// CHECK: class_method
+// CHECK: objc_method
 // CHECK: switch_enum
 // CHECK: return
 
@@ -1538,7 +1538,7 @@ bb2:
   br bb3(%1 : $Builtin.Int32, %14 : $Builtin.Int32, %16 : $Optional<Int32>)
 
 bb3(%18 : $Builtin.Int32, %19 : $Builtin.Int32, %20 : $Optional<Int32>):
-  %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : (Bar) -> () -> (), $@convention(objc_method) (Bar) -> ()
+  %101 = objc_method %100 : $Bar, #Bar.foo!1.foreign : (Bar) -> () -> (), $@convention(objc_method) (Bar) -> ()
   switch_enum %20 : $Optional<Int32>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb5
 
 bb4:
@@ -2830,7 +2830,7 @@ bb2(%11 : $Builtin.Int32):
   br bb6(%15 : $Builtin.Int8)
 
 bb4:
-  %60 = debug_value %0 : $TestEnum
+  debug_value %0 : $TestEnum
   %22 = alloc_existential_box $Error, $MyError2
   %23 = project_existential_box $MyError2 in %22 : $Error
   switch_enum %0 : $TestEnum, case #TestEnum.none!enumelt: bbnone, case #TestEnum.int64!enumelt.1: bb7, case #TestEnum.string!enumelt.1: bb10

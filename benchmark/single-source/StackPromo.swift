@@ -9,6 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+import TestsUtils
+
+public let StackPromo = BenchmarkInfo(
+  name: "StackPromo",
+  runFunction: run_StackPromo,
+  tags: [.regression])
 
 protocol Proto {
   func at() -> Int

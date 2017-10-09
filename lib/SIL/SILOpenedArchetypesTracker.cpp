@@ -16,7 +16,7 @@
 using namespace swift;
 
 void SILOpenedArchetypesTracker::addOpenedArchetypeDef(CanArchetypeType archetype,
-                                                       SILValue Def) {
+                                                       SingleValueInstruction *Def) {
   auto OldDef = getOpenedArchetypeDef(archetype);
   if (OldDef) {
     if (auto *OldI = dyn_cast<GlobalAddrInst>(OldDef)) {
@@ -25,7 +25,7 @@ void SILOpenedArchetypesTracker::addOpenedArchetypeDef(CanArchetypeType archetyp
       OldDef->replaceAllUsesWith(Def);
       // Remove the placeholder instruction.
       OldI->eraseFromParent();
-      OldDef = SILValue();
+      OldDef = nullptr;
     }
   }
   assert((!OldDef || OldDef == Def) &&
@@ -65,7 +65,7 @@ bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
     auto &SILMod = CurF->getModule();
     // Create a placeholder representing a forward definition.
     // Add the placeholder at the beginning of the entry block.
-    SILValue Placeholder;
+    SingleValueInstruction *Placeholder;
     if (!CurF->getEntryBlock()->empty()) {
       SILBuilder B(CurF->getEntryBlock()->begin());
       Placeholder =
@@ -95,7 +95,9 @@ bool SILOpenedArchetypesTracker::registerOpenedArchetypes(
   auto Archetype = getOpenedArchetypeOf(I);
   if (!Archetype)
     return false;
-  addOpenedArchetypeDef(Archetype, I);
+  auto SVI =
+    const_cast<SingleValueInstruction*>(cast<SingleValueInstruction>(I));
+  addOpenedArchetypeDef(Archetype, SVI);
   return true;
 }
 
@@ -108,8 +110,8 @@ bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(
   bool Registered = false;
   for (auto &Op : I->getTypeDependentOperands()) {
     auto OpenedArchetypeDef = Op.get();
-    if (auto *DefInst = dyn_cast<SILInstruction>(OpenedArchetypeDef)) {
-      addOpenedArchetypeDef(getOpenedArchetypeOf(DefInst), OpenedArchetypeDef);
+    if (auto *DefInst = dyn_cast<SingleValueInstruction>(OpenedArchetypeDef)) {
+      addOpenedArchetypeDef(getOpenedArchetypeOf(DefInst), DefInst);
       Registered = true;
     }
   }
@@ -122,19 +124,23 @@ void SILOpenedArchetypesTracker::unregisterOpenedArchetypes(
     const SILInstruction *I) {
   assert(I->getFunction() == getFunction() &&
          "Instruction does not belong to a proper SILFunction");
-  auto Archetype = getOpenedArchetypeOf(I);
+  auto archetype = getOpenedArchetypeOf(I);
   // Remove the archetype definition if it was registered before.
   // It may happen that this archetype was not registered in the
   // SILOpenedArchetypesTracker, because the tracker was created
   // without scanning the whole function and thus may not aware
   // of all opened archetypes of the function.
-  if (Archetype && getOpenedArchetypeDef(Archetype))
-    removeOpenedArchetypeDef(Archetype, I);
+  if (archetype) {
+    auto def = getOpenedArchetypeDef(archetype);
+    if (def == I) {
+      OpenedArchetypeDefs.erase(archetype);
+    }
+  }
 }
 
 void SILOpenedArchetypesTracker::handleDeleteNotification(
-    swift::ValueBase *Value) {
-  if (auto I = dyn_cast<SILInstruction>(Value))
+    swift::SILNode *node) {
+  if (auto I = dyn_cast<SILInstruction>(node))
     if (I->getFunction() == getFunction())
       unregisterOpenedArchetypes(I);
 }
@@ -145,7 +151,8 @@ CanArchetypeType swift::getOpenedArchetypeOf(const SILInstruction *I) {
   if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
       isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialBoxValueInst>(I) ||
       isa<OpenExistentialMetatypeInst>(I) || isa<OpenExistentialValueInst>(I)) {
-    auto Ty = getOpenedArchetypeOf(I->getType().getSwiftRValueType());
+    auto SVI = cast<SingleValueInstruction>(I);
+    auto Ty = getOpenedArchetypeOf(SVI->getType().getSwiftRValueType());
     assert(Ty && Ty->isOpenedExistential() &&
            "Type should be an opened archetype");
     return Ty;
@@ -180,9 +187,9 @@ SILValue SILOpenedArchetypesState::getOpenedArchetypeDef(
   // First perform a quick check.
   for (auto &Op : OpenedArchetypeOperands) {
     auto Def = Op.get();
-    if (isa<SILInstruction>(Def) &&
-        getOpenedArchetypeOf(cast<SILInstruction>(Def)) == archetypeTy)
-      return Def;
+    if (auto SVI = dyn_cast<SingleValueInstruction>(Def))
+      if (getOpenedArchetypeOf(SVI) == archetypeTy)
+        return Def;
   }
   // Then use a regular lookup.
   if (OpenedArchetypesTracker)

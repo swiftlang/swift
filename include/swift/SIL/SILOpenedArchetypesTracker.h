@@ -31,7 +31,8 @@ namespace swift {
 /// The intended clients of this class are SILGen, SIL deserializers, etc.
 class SILOpenedArchetypesTracker : public DeleteNotificationHandler {
 public:
-  typedef llvm::DenseMap<ArchetypeType *, SILValue> OpenedArchetypeDefsMap;
+  using OpenedArchetypeDefsMap =
+    llvm::DenseMap<ArchetypeType*, SingleValueInstruction*>;
 
   SILOpenedArchetypesTracker(SILOpenedArchetypesTracker &Tracker)
       : SILOpenedArchetypesTracker(Tracker.F, Tracker) {}
@@ -57,19 +58,13 @@ public:
   }
 
   // Register a definition of a given opened archetype.
-  void addOpenedArchetypeDef(CanArchetypeType archetype, SILValue Def);
+  void addOpenedArchetypeDef(CanArchetypeType archetype,
+                             SingleValueInstruction *def);
 
-  void removeOpenedArchetypeDef(CanArchetypeType archetype, SILValue Def) {
-    auto FoundDef = getOpenedArchetypeDef(archetype);
-    assert(FoundDef &&
-           "Opened archetype definition is not registered in SILFunction");
-    if (FoundDef == Def)
-      OpenedArchetypeDefs.erase(archetype);
-  }
-
-  // Return the SILValue defining a given archetype.
-  // If the defining value is not known, return an empty SILValue.
-  SILValue getOpenedArchetypeDef(CanArchetypeType archetype) const {
+  // Return the SILInstruciton* defining a given archetype.
+  // If the defining value is not known, return a null instruction.
+  SingleValueInstruction *
+  getOpenedArchetypeDef(CanArchetypeType archetype) const {
     return OpenedArchetypeDefs.lookup(archetype);
   }
 
@@ -107,7 +102,7 @@ public:
   bool needsNotifications() { return true; }
 
   // Handle notifications about removals of instructions.
-  void handleDeleteNotification(swift::ValueBase *Value);
+  void handleDeleteNotification(SILNode *node);
 
   // Dump the contents.
   void dump() const;

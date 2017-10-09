@@ -16,6 +16,13 @@
 //
 // For comparison, we always create three arrays of 200,000 words.
 
+import TestsUtils
+
+public let ArrayOfPOD = BenchmarkInfo(
+  name: "ArrayOfPOD",
+  runFunction: run_ArrayOfPOD,
+  tags: [.validation, .api, .Array])
+
 class RefArray<T> {
   var array : [T]
 

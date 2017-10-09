@@ -20,7 +20,7 @@ import SwiftPrivateLibcExtras
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
 #endif
 
@@ -378,25 +378,14 @@ public func expectTrapping<Bound>(
 public func expectType<T>(_: T.Type, _ x: inout T) {}
 public func expectEqualType<T>(_: T.Type, _: T.Type) {}
 
-public func expectSequenceType<X : Sequence>(_ x: X) -> X
-  where
-  X.SubSequence : Sequence,
-  X.SubSequence.Iterator.Element == X.Iterator.Element,
-  X.SubSequence.SubSequence == X.SubSequence {
+public func expectSequenceType<X : Sequence>(_ x: X) -> X {
   return x
 }
 
 % for Mutable in ['', 'Mutable']:
 public func expect${Mutable}CollectionType<X : ${Mutable}Collection>(
   _ x: X.Type
-) where
-  // FIXME(ABI)#2 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-%   if Mutable == '':
-  X.SubSequence : Collection,
-%   end
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#3 (Recursive Protocol Constraints): can't have this constraint now.
-  X.Indices : Collection {}
+) {}
 % end
 
 /// A slice is a `Collection` that when sliced returns an instance of
@@ -417,13 +406,7 @@ public func expectSequenceAssociatedTypes<X : Sequence>(
   sequenceType: X.Type,
   iteratorType: X.Iterator.Type,
   subSequenceType: X.SubSequence.Type
-) where
-  // FIXME(ABI)#4 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-  X.SubSequence : Sequence,
-  X.SubSequence.Iterator.Element == X.Iterator.Element,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#5 (Recursive Protocol Constraints): can't have this constraint now.
-  X.SubSequence.SubSequence == X.SubSequence {}
+) {}
 
 /// Check that all associated types of a `Collection` are what we expect them
 /// to be.
@@ -434,12 +417,7 @@ public func expectCollectionAssociatedTypes<X : Collection>(
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) where
-  // FIXME(ABI)#6 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-  X.SubSequence : Collection,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#7 (Recursive Protocol Constraints): can't have this constraint now.
-  X.Indices : Collection {}
+) {}
 
 /// Check that all associated types of a `BidirectionalCollection` are what we
 /// expect them to be.
@@ -450,12 +428,7 @@ public func expectBidirectionalCollectionAssociatedTypes<X : BidirectionalCollec
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) where
-  // FIXME(ABI)#8 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-  X.SubSequence : BidirectionalCollection,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#9 (Recursive Protocol Constraints): can't have this constraint now.
-  X.Indices : BidirectionalCollection {}
+) {}
 
 /// Check that all associated types of a `RandomAccessCollection` are what we
 /// expect them to be.
@@ -466,12 +439,7 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) where
-  // FIXME(ABI)#10 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-  X.SubSequence : RandomAccessCollection,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#11 (Recursive Protocol Constraints): can't have this constraint now.
-  X.Indices : RandomAccessCollection {}
+) {}
 
 public struct AssertionResult : CustomStringConvertible {
   init(isPass: Bool) {
@@ -659,7 +627,7 @@ func _stdlib_installTrapInterceptor()
 #endif
 
 // Avoid serializing references to objc_setUncaughtExceptionHandler in SIL.
-@inline(never) @_semantics("stdlib_binary_only")
+@inline(never)
 func _childProcess() {
   _stdlib_installTrapInterceptor()
 
@@ -1464,6 +1432,7 @@ public enum OSVersion : CustomStringConvertible {
   case ps4
   case windowsCygnus
   case windows
+  case haiku
 
   public var description: String {
     switch self {
@@ -1493,6 +1462,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Cygwin"
     case .windows:
       return "Windows"
+    case .haiku:
+      return "Haiku"
     }
   }
 }
@@ -1535,6 +1506,8 @@ func _getOSVersion() -> OSVersion {
   return .windowsCygnus
 #elseif os(Windows)
   return .windows
+#elseif os(Haiku)
+  return .haiku
 #else
   let productVersion = _stdlib_getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)
@@ -1616,6 +1589,8 @@ public enum TestRunPredicate : CustomStringConvertible {
   case windowsAny(reason: String)
 
   case windowsCygnusAny(reason: String)
+  
+  case haikuAny(reason: String)
 
   case objCRuntime(/*reason:*/ String)
   case nativeRuntime(/*reason:*/ String)
@@ -1708,6 +1683,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case .windowsCygnusAny(reason: let reason):
       return "windowsCygnusAny(*, reason: \(reason))"
+      
+    case .haikuAny(reason: let reason):
+      return "haikuAny(*, reason: \(reason))"
 
     case .objCRuntime(let reason):
       return "Objective-C runtime, reason: \(reason))"
@@ -1987,6 +1965,14 @@ public enum TestRunPredicate : CustomStringConvertible {
     case .windowsCygnusAny:
       switch _getRunningOSVersion() {
       case .windowsCygnus:
+        return true
+      default:
+        return false
+      }
+  
+    case .haikuAny:
+      switch _getRunningOSVersion() {
+      case .haiku:
         return true
       default:
         return false

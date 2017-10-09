@@ -105,8 +105,8 @@ bb0:
   class_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
   // CHECK: super_method undef : $D, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
   super_method undef : $D, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
-  // CHECK: dynamic_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
-  dynamic_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  // CHECK: objc_method undef : $C, #C.fn!1.foreign : (C) -> () -> (), $@convention(objc_method) (C) -> ()
+  objc_method undef : $C, #C.fn!1.foreign : (C) -> () -> (), $@convention(objc_method) (C) -> ()
 
   // Function Application
 

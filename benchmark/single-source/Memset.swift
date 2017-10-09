@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let Memset = BenchmarkInfo(
+  name: "Memset",
+  runFunction: run_Memset,
+  tags: [.validation])
+
 @inline(never)
 func memset(_ a: inout [Int], _ c: Int) {
   for i in 0..<a.count {

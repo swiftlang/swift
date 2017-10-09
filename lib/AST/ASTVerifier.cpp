@@ -170,11 +170,11 @@ struct LazyGenericEnvironment {
     if (isLazy()) return true;
 
     if (auto genericEnv = storage.dyn_cast<GenericEnvironment *>())
-      return genericEnv->containsPrimaryArchetype(archetype);
+      return archetype->getGenericEnvironment() == genericEnv;
 
     if (auto dc = storage.dyn_cast<DeclContext *>()) {
       if (auto genericEnv = dc->getGenericEnvironmentOfContext())
-        return genericEnv->containsPrimaryArchetype(archetype);
+        return archetype->getGenericEnvironment() == genericEnv;
     }
 
     return false;
@@ -924,6 +924,8 @@ public:
       verifyCheckedBase(S);
     }
     void verifyChecked(DeferStmt *S) {
+      auto FT = S->getTempDecl()->getInterfaceType()->castTo<AnyFunctionType>();
+      assert(FT->isNoEscape() && "Defer statements must not escape");
       verifyCheckedBase(S);
     }
 

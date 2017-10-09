@@ -40,7 +40,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   debug_value_addr [[OPT_ANY:%.*]] : $*Optional<Any>
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]]
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]]
   // CHECK:   [[BORROWED_STRING:%.*]] = begin_borrow [[STRING]]
   // CHECK:   [[STRING_COPY:%.*]] = copy_value [[BORROWED_STRING]]
   // CHECK:   [[BRIDGE_STRING:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
@@ -56,7 +56,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(string)
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[BORROWED_NSSTRING:%.*]] = begin_borrow [[NSSTRING]]
   // CHECK:   [[NSSTRING_COPY:%.*]] = copy_value [[BORROWED_NSSTRING]]
   // CHECK:   [[ANYOBJECT:%.*]] = init_existential_ref [[NSSTRING_COPY]] : $NSString : $NSString, $AnyObject
@@ -67,7 +67,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(nsString)
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[BORROWED_CLASS_GENERIC:%.*]] = begin_borrow [[CLASS_GENERIC]]
   // CHECK:   [[CLASS_GENERIC_COPY:%.*]] = copy_value [[BORROWED_CLASS_GENERIC]]
   // CHECK:   [[ANYOBJECT:%.*]] = init_existential_ref [[CLASS_GENERIC_COPY]] : $T : $T, $AnyObject
@@ -78,7 +78,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(classGeneric)
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[BORROWED_OBJECT:%.*]] = begin_borrow [[OBJECT]]
   // CHECK:   [[OBJECT_COPY:%.*]] = copy_value [[BORROWED_OBJECT]]
   // CHECK:   end_borrow [[BORROWED_OBJECT]] from [[OBJECT]]
@@ -88,7 +88,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(object)
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[BORROWED_CLASS_EXISTENTIAL:%.*]] = begin_borrow [[CLASS_EXISTENTIAL]]
   // CHECK:   [[CLASS_EXISTENTIAL_COPY:%.*]] = copy_value [[BORROWED_CLASS_EXISTENTIAL]]
   // CHECK:   [[OPENED:%.*]] = open_existential_ref [[CLASS_EXISTENTIAL_COPY]] : $CP
@@ -102,7 +102,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // These cases perform a universal bridging conversion.
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[COPY:%.*]] = alloc_stack $U
   // CHECK:   copy_addr [[GENERIC]] to [initialization] [[COPY]]
   // CHECK:   // function_ref _bridgeAnythingToObjectiveC
@@ -115,7 +115,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(generic)
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[COPY:%.*]] = alloc_stack $P
   // CHECK:   copy_addr [[EXISTENTIAL]] to [initialization] [[COPY]]
   // CHECK:   [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*P to $*[[OPENED_TYPE:@opened.*P]],
@@ -133,7 +133,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(existential)
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
   // CHECK:   [[ERROR_COPY:%.*]] = copy_value [[BORROWED_ERROR]] : $Error
   // CHECK:   [[ERROR_BOX:%[0-9]+]] = open_existential_box [[ERROR_COPY]] : $Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]]) Error
@@ -150,7 +150,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(error)
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[COPY:%.*]] = alloc_stack $Any
   // CHECK:   copy_addr [[ANY]] to [initialization] [[COPY]]
   // CHECK:   [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
@@ -167,7 +167,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(any)
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[TMP:%.*]] = alloc_stack $KnownUnbridged
   // CHECK:   store [[KNOWN_UNBRIDGED]] to [trivial] [[TMP]]
   // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref @_T0s27_bridgeAnythingToObjectiveC{{.*}}F
@@ -179,7 +179,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // These cases bridge using Optional's _ObjectiveCBridgeable conformance.
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[BORROWED_OPT_STRING:%.*]] = begin_borrow [[OPT_STRING]]
   // CHECK:   [[OPT_STRING_COPY:%.*]] = copy_value [[BORROWED_OPT_STRING]]
   // CHECK:   [[BRIDGE_OPTIONAL:%.*]] = function_ref @_T0Sq19_bridgeToObjectiveCyXlyF
@@ -192,7 +192,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(optionalA)
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[BORROWED_OPT_NSSTRING:%.*]] = begin_borrow [[OPT_NSSTRING]]
   // CHECK:   [[OPT_NSSTRING_COPY:%.*]] = copy_value [[BORROWED_OPT_NSSTRING]]
   // CHECK:   [[BRIDGE_OPTIONAL:%.*]] = function_ref @_T0Sq19_bridgeToObjectiveCyXlyF
@@ -205,7 +205,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(optionalB)
 
   // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[TMP:%.*]] = alloc_stack $Optional<Any>
   // CHECK:   copy_addr [[OPT_ANY]] to [initialization] [[TMP]]
   // CHECK:   [[BRIDGE_OPTIONAL:%.*]] = function_ref @_T0Sq19_bridgeToObjectiveCyXlyF
@@ -285,7 +285,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK: [[OPT_OPT_C:%.*]] : $*Optional<Optional<Any>>
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]]
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]]
   // CHECK: [[BORROWED_STRING:%.*]] = begin_borrow [[STRING]]
   // CHECK: [[STRING_COPY:%.*]] = copy_value [[BORROWED_STRING]]
   // CHECK: [[BRIDGE_STRING:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
@@ -301,7 +301,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(string)
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK: [[BORROWED_NSSTRING:%.*]] = begin_borrow [[NSSTRING]]
   // CHECK: [[NSSTRING_COPY:%.*]] = copy_value [[BORROWED_NSSTRING]]
   // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[NSSTRING_COPY]] : $NSString : $NSString, $AnyObject
@@ -312,7 +312,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(nsString)
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK: [[BORROWED_OBJECT:%.*]] = begin_borrow [[OBJECT]]
   // CHECK: [[OBJECT_COPY:%.*]] = copy_value [[BORROWED_OBJECT]]
   // CHECK: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[OBJECT_COPY]]
@@ -322,7 +322,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(object)
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK: [[BORROWED_CLASS_GENERIC:%.*]] = begin_borrow [[CLASS_GENERIC]]
   // CHECK: [[CLASS_GENERIC_COPY:%.*]] = copy_value [[BORROWED_CLASS_GENERIC]]
   // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[CLASS_GENERIC_COPY]] : $T : $T, $AnyObject
@@ -333,7 +333,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(classGeneric)
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK: [[BORROWED_CLASS_EXISTENTIAL:%.*]] = begin_borrow [[CLASS_EXISTENTIAL]]
   // CHECK: [[CLASS_EXISTENTIAL_COPY:%.*]] = copy_value [[BORROWED_CLASS_EXISTENTIAL]]
   // CHECK: [[OPENED:%.*]] = open_existential_ref [[CLASS_EXISTENTIAL_COPY]] : $CP
@@ -345,7 +345,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(classExistential)
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $U
   // CHECK-NEXT: copy_addr [[GENERIC]] to [initialization] [[COPY]]
   // CHECK-NEXT: // function_ref _bridgeAnythingToObjectiveC
@@ -359,7 +359,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(generic)
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $P
   // CHECK-NEXT: copy_addr [[EXISTENTIAL]] to [initialization] [[COPY]]
   // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*P to $*[[OPENED_TYPE:@opened.*P]],
@@ -378,7 +378,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(existential)
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK: [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
   // CHECK-NEXT: [[ERROR_COPY:%.*]] = copy_value [[BORROWED_ERROR]] : $Error
   // CHECK-NEXT: [[ERROR_BOX:%[0-9]+]] = open_existential_box [[ERROR_COPY]] : $Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]]) Error
@@ -396,7 +396,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(error)
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $Any
   // CHECK-NEXT: copy_addr [[ANY]] to [initialization] [[COPY]]
   // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
@@ -415,7 +415,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(any)
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $NSIdLover,
   // CHECK: [[TMP:%.*]] = alloc_stack $KnownUnbridged
   // CHECK: store [[KNOWN_UNBRIDGED]] to [trivial] [[TMP]]
   // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_T0s27_bridgeAnythingToObjectiveC{{.*}}F
@@ -426,7 +426,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(knownUnbridged)
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]]
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]]
   // CHECK: [[BORROWED_OPT_STRING:%.*]] = begin_borrow [[OPT_STRING]]
   // CHECK: [[OPT_STRING_COPY:%.*]] = copy_value [[BORROWED_OPT_STRING]]
   // CHECK: switch_enum [[OPT_STRING_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
@@ -453,11 +453,11 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(optString)
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]]
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]]
   receiver.takesNullableId(optNSString)
 
   // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]]
+  // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_SELF]]
   // CHECK: [[BORROWED_OPT_OBJECT:%.*]] = begin_borrow [[OPT_OBJECT]]
   // CHECK: [[OPT_OBJECT_COPY:%.*]] = copy_value [[BORROWED_OPT_OBJECT]]
   // CHECK: apply [[METHOD]]([[OPT_OBJECT_COPY]], [[BORROWED_SELF]])

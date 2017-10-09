@@ -14,59 +14,181 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// VALUE(Id, Parent)
-///   The expression enumerator value is a ValueKind.  The node's class name is
+/// NODE(ID, PARENT)
+///
+///   A concrete subclass of SILNode.  ID is the name of the class as well
+///   as a member of SILNodeKind.  PARENT is the name of its abstract
+///   superclass.
+#ifndef NODE
+#define NODE(ID, PARENT)
+#endif
+
+/// SINGLE_VALUE_INST(Id, Parent, TextualName, MemBehavior, MayRelease)
+///
+///   A concrete subclass of SingleValueInstruction, which inherits from
+///   both ValueBase and SILInstruction.  ID is a member of both ValueKind
+///   and SILInstructionKind.
+#ifndef SINGLE_VALUE_INST
+#ifdef VALUE
+#define SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  VALUE(ID, PARENT)
+#else
+#define SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+#endif
+
+/// VALUE(ID, PARENT)
+///
+///   A concrete subclass of ValueBase.  ID is a member of ValueKind.
+///   ID is a member of ValueKind.  The node's class name is
 ///   Id, and the name of its base class (in the SILValue hierarchy) is Parent.
 #ifndef VALUE
-#define VALUE(Id, Parent)
+#define VALUE(ID, PARENT) NODE(ID, PARENT)
 #endif
 
-/// ARGUMENT(Id, Parent)
-///   The expression enumerator value is a ValueKind. The node's class name is
-///   Id and the name of its base class (in the SILValue hierarchy) is Parent.
+/// ARGUMENT(ID, PARENT)
+///
+///   A concrete subclass of SILArgument, which is a subclass of ValueBase.
 #ifndef ARGUMENT
-#define ARGUMENT(Id, Parent) VALUE(Id, Parent)
+#define ARGUMENT(ID, PARENT) VALUE(ID, PARENT)
 #endif
 
-/// INST(Id, Parent, TextualName, MemBehavior, MayRelease)
+/// INST(ID, PARENT)
 ///
-///   The expression enumerator value is a ValueKind.  The node's class name is
-///   Id, and the name of its base class (in the SILInstruction hierarchy) is
-///   Parent. TextualName is the textual name of the instruction. MemBehavior is
-///   an enum value that reflects the memory behavior of the
-///   instruction. MayRelease indicates whether the execution of the instruction
-///   may result in memory being released.
+///   A concrete subclass of SILInstruction.  ID is a member of
+///   SILInstructionKind.
 #ifndef INST
-#define INST(Id, Parent, TextualName, MemBehavior, MayRelease) VALUE(Id, Parent)
+#define INST(ID, PARENT) NODE(ID, PARENT)
 #endif
 
-/// TERMINATOR(Id, Parent, TextualName, MemBehavior, MayRelease)
-///   Expands for terminator instructions. The expression enumerator value is a
-///   ValueKind.  The node's class name is Id, and the name of its base class
-///   (in the SILInstruction hierarchy) is Parent. TextualName is the name of
-///   the instruction in textual SIL.  MemBehavior is an enum value that
-///   reflects the memory behavior of the instruction. MayRelease indicates
-///   whether the execution of the instruction may result in memory being
-///   released.
-#ifndef TERMINATOR
-#define TERMINATOR(Id, Parent, TextualName, MemBehavior, MayRelease)     \
-      INST(Id, Parent, TextualName, MemBehavior, MayRelease)
-#endif
-
-/// An abstract value base is an abstract base class in the hierarchy; it is
-/// never a most-derived type, and it does not have an enumerator in ValueKind.
+/// FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 ///
-/// Most metaprograms do not care about abstract expressions, so the default
-/// is to ignore them.
-#ifndef ABSTRACT_VALUE
-#define ABSTRACT_VALUE(Id, Parent)
+///   A macro which includes a bunch of secondary information about
+///   an instruction.  In addition to the information from INST:
+///
+///   NAME is the name of the instruction in SIL assembly.
+///   The argument will be a bare identifier, not a string literal.
+///
+///   MEMBEHAVIOR is an enum value that reflects the memory behavior of
+///   the instruction.
+///
+///   MAYRELEASE indicates whether the execution of the
+///   instruction may result in memory being released.
+#ifndef FULL_INST
+#define FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) INST(ID, PARENT)
 #endif
 
-/// A convenience for determining the range of values.  These will always
-/// appear immediately after the last member.
-#ifndef VALUE_RANGE
-#define VALUE_RANGE(Id, First, Last)
+/// NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+///
+///   ID is a SILInstructionKind and the name of a subclass of SILInstruction
+///   that does not inherit from ValueBase.
+#ifndef NON_VALUE_INST
+#define NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 #endif
+
+/// TERMINATOR(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+///
+///   ID is a member of TerminatorKind and the name of a subclass of TermInst.
+#ifndef TERMINATOR
+#define TERMINATOR(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+
+/// ABSTRACT_NODE(ID, PARENT)
+///
+///   An abstract class in the SILNode hierarchy.   It does not have an
+///   enumerator in SILNodeKind and is never the most-derived type of a
+///   node.  ID is the name of the class.
+///
+///   PARENT is the name of its abstract superclass in the node
+///   hierarchy, which will be either a subject of an ABSTRACT_NODE
+///   entry or SILNode.  SingleValueInstruction considers its superclass
+///   to be SILInstruction for the purposes of the node hierarchy.
+#ifndef ABSTRACT_NODE
+#define ABSTRACT_NODE(ID, PARENT)
+#endif
+
+// Handle SingleValueInstruction.
+#ifdef ABSTRACT_VALUE
+#define ABSTRACT_VALUE_AND_INST(ID, VALUE_PARENT, INST_PARENT) \
+  ABSTRACT_VALUE(ID, VALUE_PARENT)
+#else
+#define ABSTRACT_VALUE_AND_INST(ID, VALUE_PARENT, INST_PARENT) \
+  ABSTRACT_INST(ID, INST_PARENT)
+#endif
+
+/// ABSTRACT_SINGLE_VALUE_INST(ID, PARENT)
+///
+///   An abstract subclass of SingleValueInstruction, which is therefore
+///   in both the ValueBase and SILInstruction hierarchies.
+#ifndef ABSTRACT_SINGLE_VALUE_INST
+#ifdef ABSTRACT_VALUE
+#define ABSTRACT_SINGLE_VALUE_INST(ID, PARENT) ABSTRACT_VALUE(ID, PARENT)
+#else
+#define ABSTRACT_SINGLE_VALUE_INST(ID, PARENT) ABSTRACT_INST(ID, PARENT)
+#endif
+#endif
+
+/// ABSTRACT_VALUE(ID, PARENT)
+///
+///   An abstract class in the ValueBase hierarchy.   It does not have an
+///   enumerator in ValueKind and is never the most-derived type of a
+///   node.  ID is the name of the class.
+///
+///   PARENT is the name of its abstract superclass in the ValueBase
+///   hierarchy, which be either a subject of an ABSTRACT_VALUE
+///   entry or ValueBase.
+#ifndef ABSTRACT_VALUE
+#define ABSTRACT_VALUE(ID, PARENT) ABSTRACT_NODE(ID, PARENT)
+#endif
+
+/// ABSTRACT_INST(ID, PARENT)
+///
+///   An abstract class in the SILInstruction hierarchy.   It does not
+///   enumerator in SILInstructionKind and is never the most-derived type
+///   of a node.  ID is the name of the class.
+///
+///   PARENT is the name of its abstract superclass in the SILInstruction
+///   hierarchy, which be either a subject of an ABSTRACT_INST
+///   entry or SILInstruction.
+#ifndef ABSTRACT_INST
+#define ABSTRACT_INST(ID, PARENT) ABSTRACT_NODE(ID, PARENT)
+#endif
+
+/// NODE_RANGE(ID, PARENT)
+///
+///   The enumerator range of an abstract class in the SILNode hierarchy.
+///   This will always appear right after the last member of the class.
+#ifndef NODE_RANGE
+#define NODE_RANGE(ID, FIRST, LAST)
+#endif
+
+#ifndef SINGLE_VALUE_INST_RANGE
+#ifdef VALUE_RANGE
+#define SINGLE_VALUE_INST_RANGE(ID, FIRST, LAST) VALUE_RANGE(ID, FIRST, LAST)
+#else
+#define SINGLE_VALUE_INST_RANGE(ID, FIRST, LAST) INST_RANGE(ID, FIRST, LAST)
+#endif
+#endif
+
+/// VALUE_RANGE(ID, PARENT)
+///
+///   The enumerator range of an abstract class in the ValueBase hierarchy.
+#ifndef VALUE_RANGE
+#define VALUE_RANGE(ID, FIRST, LAST) NODE_RANGE(ID, FIRST, LAST)
+#endif
+
+/// INST_RANGE(ID, PARENT)
+///
+///   The enumerator range of an abstract class in the SILInstruction
+///   hierarchy.
+#ifndef INST_RANGE
+#define INST_RANGE(ID, FIRST, LAST) NODE_RANGE(ID, FIRST, LAST)
+#endif
+
+ABSTRACT_NODE(ValueBase, SILNode)
 
 ABSTRACT_VALUE(SILArgument, ValueBase)
   ARGUMENT(SILPHIArgument, SILArgument)
@@ -75,219 +197,120 @@ ABSTRACT_VALUE(SILArgument, ValueBase)
 
 VALUE(SILUndef, ValueBase)
 
-// Please keep the order of instructions consistent with the order of their
-// descriptions in the SIL reference in docs/SIL.rst.
+ABSTRACT_NODE(SILInstruction, SILNode)
 
-ABSTRACT_VALUE(SILInstruction, ValueBase)
+ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // Allocation instructions.
-  ABSTRACT_VALUE(AllocationInst, SILInstruction)
-    INST(AllocStackInst, AllocationInst, alloc_stack, None, DoesNotRelease)
-    INST(AllocRefInst, AllocationInst, alloc_ref, None, DoesNotRelease)
-    INST(AllocRefDynamicInst, AllocationInst, alloc_ref_dynamic, None, DoesNotRelease)
-    INST(AllocValueBufferInst, AllocationInst, alloc_value_buffer, None, DoesNotRelease)
-    INST(AllocBoxInst, AllocationInst, alloc_box, None, DoesNotRelease)
-    INST(AllocExistentialBoxInst, AllocationInst, alloc_existential_box, MayWrite, DoesNotRelease)
-    VALUE_RANGE(AllocationInst, AllocStackInst, AllocExistentialBoxInst)
+  ABSTRACT_SINGLE_VALUE_INST(AllocationInst, SingleValueInstruction)
+    SINGLE_VALUE_INST(AllocStackInst, alloc_stack,
+                      AllocationInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(AllocRefInst, alloc_ref,
+                      AllocationInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(AllocRefDynamicInst, alloc_ref_dynamic,
+                      AllocationInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(AllocValueBufferInst, alloc_value_buffer,
+                      AllocationInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(AllocBoxInst, alloc_box,
+                      AllocationInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(AllocExistentialBoxInst, alloc_existential_box,
+                      AllocationInst, MayWrite, DoesNotRelease)
+    SINGLE_VALUE_INST_RANGE(AllocationInst, AllocStackInst, AllocExistentialBoxInst)
 
-  // Deallocation instructions.
-  ABSTRACT_VALUE(DeallocationInst, SILInstruction)
-    INST(DeallocStackInst, DeallocationInst, dealloc_stack, MayHaveSideEffects, DoesNotRelease)
-    INST(DeallocRefInst, DeallocationInst, dealloc_ref, MayHaveSideEffects, DoesNotRelease)
-    INST(DeallocPartialRefInst, DeallocationInst, dealloc_partial_ref, MayHaveSideEffects,
-         DoesNotRelease)
-    INST(DeallocValueBufferInst, DeallocationInst, dealloc_value_buffer, MayHaveSideEffects,
-         DoesNotRelease)
-    INST(DeallocBoxInst, DeallocationInst, dealloc_box, MayHaveSideEffects, DoesNotRelease)
-    INST(DeallocExistentialBoxInst, DeallocationInst, dealloc_existential_box, MayHaveSideEffects,
-         DoesNotRelease)
-    VALUE_RANGE(DeallocationInst, DeallocStackInst, DeallocExistentialBoxInst)
-
-  // Accessing memory
-  INST(LoadInst, SILInstruction, load, MayRead, DoesNotRelease)
-  INST(LoadBorrowInst, SILInstruction, load_borrow, MayRead, DoesNotRelease)
-  INST(BeginBorrowInst, SILInstruction, begin_borrow, MayHaveSideEffects, DoesNotRelease)
-  INST(EndBorrowInst, SILInstruction, end_borrow, MayHaveSideEffects, DoesNotRelease)
-  INST(EndBorrowArgumentInst, SILInstruction, end_borrow_argument, MayHaveSideEffects, DoesNotRelease)
-  INST(BeginAccessInst, SILInstruction, begin_access, MayHaveSideEffects, DoesNotRelease)
-  INST(EndAccessInst, SILInstruction, end_access, MayHaveSideEffects, DoesNotRelease)
-  INST(BeginUnpairedAccessInst, SILInstruction, begin_unpaired_access, MayHaveSideEffects, DoesNotRelease)
-  INST(EndUnpairedAccessInst, SILInstruction, end_unpaired_access, MayHaveSideEffects, DoesNotRelease)
-  INST(LoadUnownedInst, SILInstruction, load_unowned, MayRead, DoesNotRelease)
-  INST(LoadWeakInst, SILInstruction, load_weak, MayRead, DoesNotRelease)
-  INST(StoreInst, SILInstruction, store, MayWrite, DoesNotRelease)
-  INST(StoreBorrowInst, SILInstruction, store_borrow, MayWrite, DoesNotRelease)
-  INST(AssignInst, SILInstruction, assign, MayWrite, DoesNotRelease)
-  INST(MarkUninitializedInst, SILInstruction, mark_uninitialized, None, DoesNotRelease)
-  INST(MarkUninitializedBehaviorInst, SILInstruction, mark_uninitialized_behavior, None, DoesNotRelease)
-  INST(MarkFunctionEscapeInst, SILInstruction, mark_function_escape, None, DoesNotRelease)
-  INST(DebugValueInst, SILInstruction, debug_value, None, DoesNotRelease)
-  INST(DebugValueAddrInst, SILInstruction, debug_value_addr, None, DoesNotRelease)
-  INST(StoreUnownedInst, SILInstruction, store_unowned, MayWrite, DoesNotRelease)
-  INST(StoreWeakInst, SILInstruction, store_weak, MayWrite, DoesNotRelease)
-  INST(CopyAddrInst, SILInstruction, copy_addr, MayHaveSideEffects, MayRelease)
-  INST(DestroyAddrInst, SILInstruction, destroy_addr, MayHaveSideEffects, MayRelease)
-  INST(ProjectValueBufferInst, SILInstruction, project_value_buffer, MayRead, DoesNotRelease)
-  INST(ProjectBoxInst, SILInstruction, project_box, None, DoesNotRelease)
-  INST(ProjectExistentialBoxInst, SILInstruction, project_existential_box, None, DoesNotRelease)
-  ABSTRACT_VALUE(IndexingInst, SILInstruction)
-    INST(IndexAddrInst, IndexingInst, index_addr, None, DoesNotRelease)
-    INST(TailAddrInst, IndexingInst, tail_addr, None, DoesNotRelease)
-    INST(IndexRawPointerInst, IndexingInst, index_raw_pointer, None, DoesNotRelease)
-    VALUE_RANGE(IndexingInst, IndexAddrInst, IndexRawPointerInst)
-
-  // BindMemory has no physical side effect. Semantically it writes to
-  // its affected memory region because any reads or writes accessing
-  // that memory must be dependent on the bind operation.
-  INST(BindMemoryInst, SILInstruction, bind_memory, MayWrite, DoesNotRelease)
-
-  // Reference Counting
-  ABSTRACT_VALUE(RefCountingInst, SILInstruction)
-    INST(StrongRetainInst, RefCountingInst, strong_retain, MayHaveSideEffects, DoesNotRelease)
-    INST(StrongReleaseInst, RefCountingInst, strong_release, MayHaveSideEffects, MayRelease)
-    INST(StrongRetainUnownedInst, RefCountingInst, strong_retain_unowned, MayHaveSideEffects,
-         DoesNotRelease)
-    INST(StrongPinInst, RefCountingInst, strong_pin, MayHaveSideEffects, DoesNotRelease)
-    INST(StrongUnpinInst, RefCountingInst, strong_unpin, MayHaveSideEffects, DoesNotRelease)
-    INST(UnownedRetainInst, RefCountingInst, unowned_retain, MayHaveSideEffects, DoesNotRelease)
-    INST(UnownedReleaseInst, RefCountingInst, unowned_release, MayHaveSideEffects,
-         MayRelease)
-    INST(UnmanagedRetainValueInst, RefCountingInst, unmanaged_retain_value, MayHaveSideEffects, DoesNotRelease)
-    INST(UnmanagedReleaseValueInst, RefCountingInst, unmanaged_release_value, MayHaveSideEffects, MayRelease)
-    INST(UnmanagedAutoreleaseValueInst, RefCountingInst, unmanaged_autorelease_value, MayHaveSideEffects, DoesNotRelease)
-    INST(RetainValueInst, RefCountingInst, retain_value, MayHaveSideEffects, DoesNotRelease)
-    INST(RetainValueAddrInst, RefCountingInst, retain_value_addr, MayHaveSideEffects, DoesNotRelease)
-    INST(ReleaseValueInst, RefCountingInst, release_value, MayHaveSideEffects, MayRelease)
-    INST(ReleaseValueAddrInst, RefCountingInst, release_value_addr, MayHaveSideEffects, MayRelease)
-    INST(SetDeallocatingInst, RefCountingInst, set_deallocating, MayHaveSideEffects,
-         DoesNotRelease)
-    INST(AutoreleaseValueInst, RefCountingInst, autorelease_value, MayHaveSideEffects,
-         DoesNotRelease)
-    VALUE_RANGE(RefCountingInst, StrongRetainInst, AutoreleaseValueInst)
-  // FIXME: Is MayHaveSideEffects appropriate?
-  INST(FixLifetimeInst, SILInstruction, fix_lifetime, MayHaveSideEffects, DoesNotRelease)
-  INST(MarkDependenceInst, SILInstruction, mark_dependence, None, DoesNotRelease)
-  INST(CopyBlockInst, SILInstruction, copy_block, MayHaveSideEffects, DoesNotRelease)
-  INST(CopyValueInst, SILInstruction, copy_value, MayHaveSideEffects, DoesNotRelease)
-  INST(CopyUnownedValueInst, SILInstruction, copy_unowned_value, MayHaveSideEffects, DoesNotRelease)
-  INST(DestroyValueInst, SILInstruction, destroy_value, MayHaveSideEffects, MayRelease)
-  INST(EndLifetimeInst, SILInstruction, end_lifetime, MayHaveSideEffects, MayRelease)
-  INST(UncheckedOwnershipConversionInst, SILInstruction, unchecked_ownership_conversion, MayHaveSideEffects, MayRelease)
-
-  // IsUnique does not actually write to memory but should be modeled
-  // as such. Its operand is a pointer to an object reference. The
-  // optimizer should not assume that the same object is pointed to after
-  // the isUnique instruction. It appears to write a new object reference.
-  INST(IsUniqueInst, SILInstruction, is_unique, MayHaveSideEffects, DoesNotRelease)
-  INST(IsUniqueOrPinnedInst, SILInstruction, is_unique_or_pinned, MayHaveSideEffects, DoesNotRelease)
-
-  INST(AllocGlobalInst, SILInstruction, alloc_global, MayHaveSideEffects, DoesNotRelease)
+  ABSTRACT_SINGLE_VALUE_INST(IndexingInst, SingleValueInstruction)
+    SINGLE_VALUE_INST(IndexAddrInst, index_addr,
+                      IndexingInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(TailAddrInst, tail_addr,
+                      IndexingInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(IndexRawPointerInst, index_raw_pointer,
+                      IndexingInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST_RANGE(IndexingInst, IndexAddrInst, IndexRawPointerInst)
 
   // Literals
-  ABSTRACT_VALUE(LiteralInst, SILInstruction)
-    INST(FunctionRefInst, LiteralInst, function_ref, None, DoesNotRelease)
-    INST(GlobalAddrInst, LiteralInst, global_addr, None, DoesNotRelease)
-    INST(GlobalValueInst, LiteralInst, global_value, None, DoesNotRelease)
-    INST(IntegerLiteralInst, LiteralInst, integer_literal, None, DoesNotRelease)
-    INST(FloatLiteralInst, LiteralInst, float_literal, None, DoesNotRelease)
-    INST(StringLiteralInst, LiteralInst, string_literal, None, DoesNotRelease)
-    INST(ConstStringLiteralInst, LiteralInst, const_string_literal, None, DoesNotRelease)
-    VALUE_RANGE(LiteralInst, FunctionRefInst, ConstStringLiteralInst)
+  ABSTRACT_SINGLE_VALUE_INST(LiteralInst, SingleValueInstruction)
+    SINGLE_VALUE_INST(FunctionRefInst, function_ref,
+                      LiteralInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(GlobalAddrInst, global_addr,
+                      LiteralInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(GlobalValueInst, global_value,
+                      LiteralInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(IntegerLiteralInst, integer_literal,
+                      LiteralInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(FloatLiteralInst, float_literal,
+                      LiteralInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(StringLiteralInst, string_literal,
+                      LiteralInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ConstStringLiteralInst, const_string_literal,
+                      LiteralInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST_RANGE(LiteralInst, FunctionRefInst, ConstStringLiteralInst)
 
   // Dynamic Dispatch
-  ABSTRACT_VALUE(MethodInst, SILInstruction)
-    INST(ClassMethodInst, MethodInst, class_method, None, DoesNotRelease)
-    INST(SuperMethodInst, MethodInst, super_method, None, DoesNotRelease)
-    INST(WitnessMethodInst, MethodInst, witness_method, None, DoesNotRelease)
-    INST(DynamicMethodInst, MethodInst, dynamic_method, None, DoesNotRelease)
-    VALUE_RANGE(MethodInst, ClassMethodInst, DynamicMethodInst)
-
-  // Function Application
-  INST(ApplyInst, SILInstruction, apply, MayHaveSideEffects, MayRelease)
-  INST(PartialApplyInst, SILInstruction, partial_apply, MayHaveSideEffects, DoesNotRelease)
-  INST(BuiltinInst, SILInstruction, builtin, MayHaveSideEffects, MayRelease)
-
-  // Metatypes
-  INST(MetatypeInst, SILInstruction, metatype, None, DoesNotRelease)
-  INST(ValueMetatypeInst, SILInstruction, value_metatype, MayRead, DoesNotRelease)
-  INST(ExistentialMetatypeInst, SILInstruction, existential_metatype, MayRead, DoesNotRelease)
-  INST(ObjCProtocolInst, SILInstruction, objc_protocol, None, DoesNotRelease)
-
-  // Aggregate Types
-  INST(ObjectInst, SILInstruction, object, None, DoesNotRelease)
-  INST(TupleInst, SILInstruction, tuple, None, DoesNotRelease)
-  INST(TupleExtractInst, SILInstruction, tuple_extract, None, DoesNotRelease)
-  INST(TupleElementAddrInst, SILInstruction, tuple_element_addr, None, DoesNotRelease)
-  INST(StructInst, SILInstruction, struct, None, DoesNotRelease)
-  INST(StructExtractInst, SILInstruction, struct_extract, None, DoesNotRelease)
-  INST(StructElementAddrInst, SILInstruction, struct_element_addr, None, DoesNotRelease)
-  INST(RefElementAddrInst, SILInstruction, ref_element_addr, None, DoesNotRelease)
-  INST(RefTailAddrInst, SILInstruction, ref_tail_addr, None, DoesNotRelease)
-
-  // Enums
-  INST(EnumInst, SILInstruction, enum, None, DoesNotRelease)
-  INST(UncheckedEnumDataInst, SILInstruction, unchecked_enum_data, None, DoesNotRelease)
-  INST(InitEnumDataAddrInst, SILInstruction, init_enum_data_addr, None, DoesNotRelease)
-  INST(UncheckedTakeEnumDataAddrInst, SILInstruction, unchecked_take_enum_data_addr, MayWrite, DoesNotRelease)
-  INST(InjectEnumAddrInst, SILInstruction, inject_enum_addr, MayWrite, DoesNotRelease)
-  INST(SelectEnumInst, SILInstruction, select_enum, None, DoesNotRelease)
-  INST(SelectEnumAddrInst, SILInstruction, select_enum_addr, MayRead, DoesNotRelease)
-  INST(SelectValueInst, SILInstruction, select_value, None, DoesNotRelease)
-
-  // Protocol and Protocol Composition Types
-  INST(InitExistentialAddrInst, SILInstruction, init_existential_addr, MayWrite, DoesNotRelease)
-  INST(InitExistentialValueInst, SILInstruction, init_existential_value, MayWrite, DoesNotRelease)
-  INST(DeinitExistentialAddrInst, SILInstruction, deinit_existential_addr, MayHaveSideEffects,
-       DoesNotRelease)
-  INST(DeinitExistentialValueInst, SILInstruction, deinit_existential_value, MayHaveSideEffects,
-       DoesNotRelease)
-  INST(OpenExistentialAddrInst, SILInstruction, open_existential_addr, MayRead, DoesNotRelease)
-  INST(InitExistentialRefInst, SILInstruction, init_existential_ref, None, DoesNotRelease)
-  INST(OpenExistentialRefInst, SILInstruction, open_existential_ref, None, DoesNotRelease)
-  INST(InitExistentialMetatypeInst, SILInstruction, init_existential_metatype, None, DoesNotRelease)
-  INST(OpenExistentialMetatypeInst, SILInstruction, open_existential_metatype, None, DoesNotRelease)
-  INST(OpenExistentialBoxInst, SILInstruction, open_existential_box, MayRead, DoesNotRelease)
-  INST(OpenExistentialValueInst, SILInstruction, open_existential_value, MayRead, DoesNotRelease)
-  INST(OpenExistentialBoxValueInst, SILInstruction, open_existential_box_value, MayRead, DoesNotRelease)
-
-  // Blocks
-  INST(ProjectBlockStorageInst, SILInstruction, project_block_storage, None, DoesNotRelease)
-  INST(InitBlockStorageHeaderInst, SILInstruction, init_block_storage_header, None, DoesNotRelease)
-
-  // Key paths
-  // TODO: The only "side effect" is potentially retaining the returned key path
-  // object; is there a more specific effect?
-  INST(KeyPathInst, SILInstruction, keypath, MayHaveSideEffects, DoesNotRelease)
+  ABSTRACT_SINGLE_VALUE_INST(MethodInst, SingleValueInstruction)
+    SINGLE_VALUE_INST(ClassMethodInst, class_method,
+                      MethodInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(SuperMethodInst, super_method,
+                      MethodInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ObjCMethodInst, objc_method,
+                      MethodInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ObjCSuperMethodInst, objc_super_method,
+                      MethodInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(WitnessMethodInst, witness_method,
+                      MethodInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST_RANGE(MethodInst, ClassMethodInst, WitnessMethodInst)
 
   // Conversions
-  ABSTRACT_VALUE(ConversionInst, SILInstruction)
-    INST(UpcastInst, ConversionInst, upcast, None, DoesNotRelease)
-    INST(AddressToPointerInst, ConversionInst, address_to_pointer, None, DoesNotRelease)
-    INST(PointerToAddressInst, ConversionInst, pointer_to_address, None, DoesNotRelease)
-    INST(UncheckedRefCastInst, ConversionInst, unchecked_ref_cast, None, DoesNotRelease)
-    INST(UncheckedAddrCastInst, ConversionInst, unchecked_addr_cast, None, DoesNotRelease)
-    INST(UncheckedTrivialBitCastInst, ConversionInst, unchecked_trivial_bit_cast, None, DoesNotRelease)
-    INST(UncheckedBitwiseCastInst, ConversionInst, unchecked_bitwise_cast, None, DoesNotRelease)
-    INST(RefToRawPointerInst, ConversionInst, ref_to_raw_pointer, None, DoesNotRelease)
-    INST(RawPointerToRefInst, ConversionInst, raw_pointer_to_ref, None, DoesNotRelease)
-    INST(RefToUnownedInst, ConversionInst, ref_to_unowned, None, DoesNotRelease)
-    INST(UnownedToRefInst, ConversionInst, unowned_to_ref, None, DoesNotRelease)
-    INST(RefToUnmanagedInst, ConversionInst, ref_to_unmanaged, None, DoesNotRelease)
-    INST(UnmanagedToRefInst, ConversionInst, unmanaged_to_ref, None, DoesNotRelease)
-    INST(ConvertFunctionInst, ConversionInst, convert_function, None, DoesNotRelease)
-    INST(ThinFunctionToPointerInst, ConversionInst, thin_function_to_pointer, None, DoesNotRelease)
-    INST(PointerToThinFunctionInst, ConversionInst, pointer_to_thin_function, None, DoesNotRelease)
-    INST(RefToBridgeObjectInst, ConversionInst, ref_to_bridge_object, None, DoesNotRelease)
-    INST(BridgeObjectToRefInst, ConversionInst, bridge_object_to_ref, None, DoesNotRelease)
-    INST(BridgeObjectToWordInst, ConversionInst, bridge_object_to_word, None, DoesNotRelease)
-    INST(ThinToThickFunctionInst, ConversionInst, thin_to_thick_function, None, DoesNotRelease)
-    INST(ThickToObjCMetatypeInst, ConversionInst, thick_to_objc_metatype, None, DoesNotRelease)
-    INST(ObjCToThickMetatypeInst, ConversionInst, objc_to_thick_metatype, None, DoesNotRelease)
-    INST(ObjCMetatypeToObjectInst, ConversionInst, objc_metatype_to_object, None, DoesNotRelease)
-    INST(ObjCExistentialMetatypeToObjectInst, ConversionInst, objc_existential_metatype_to_object, None,
-         DoesNotRelease)
+  ABSTRACT_SINGLE_VALUE_INST(ConversionInst, SingleValueInstruction)
+    SINGLE_VALUE_INST(UpcastInst, upcast,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(AddressToPointerInst, address_to_pointer,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(PointerToAddressInst, pointer_to_address,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(UncheckedRefCastInst, unchecked_ref_cast,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(UncheckedAddrCastInst, unchecked_addr_cast,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(UncheckedTrivialBitCastInst, unchecked_trivial_bit_cast,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(UncheckedBitwiseCastInst, unchecked_bitwise_cast,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(RefToRawPointerInst, ref_to_raw_pointer,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(RawPointerToRefInst, raw_pointer_to_ref,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(RefToUnownedInst, ref_to_unowned,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(UnownedToRefInst, unowned_to_ref,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(RefToUnmanagedInst, ref_to_unmanaged,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(UnmanagedToRefInst, unmanaged_to_ref,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ConvertFunctionInst, convert_function,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ThinFunctionToPointerInst, thin_function_to_pointer,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(PointerToThinFunctionInst, pointer_to_thin_function,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(RefToBridgeObjectInst, ref_to_bridge_object,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(BridgeObjectToRefInst, bridge_object_to_ref,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(BridgeObjectToWordInst, bridge_object_to_word,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ThinToThickFunctionInst, thin_to_thick_function,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ThickToObjCMetatypeInst, thick_to_objc_metatype,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ObjCToThickMetatypeInst, objc_to_thick_metatype,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ObjCMetatypeToObjectInst, objc_metatype_to_object,
+                      ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ObjCExistentialMetatypeToObjectInst, objc_existential_metatype_to_object,
+                      ConversionInst, None, DoesNotRelease)
     // unconditional_checked_cast_value reads the source value and produces
     // a new value with a potentially different representation.
-    INST(UnconditionalCheckedCastValueInst, ConversionInst, unconditional_checked_cast_value, MayRead, MayRelease)
+    SINGLE_VALUE_INST(UnconditionalCheckedCastValueInst, unconditional_checked_cast_value,
+                      ConversionInst, MayRead, MayRelease)
     // unconditional_checked_cast_inst is only MayRead to prevent a subsequent
     // release of the cast's source from being hoisted above the cast:
     // retain X
@@ -299,41 +322,314 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     // should never happen.  Since unconditional_checked_cast is a
     // scalar cast that doesn't affect the value's representation, its
     // side effect can then be modeled as None.
-    INST(UnconditionalCheckedCastInst, ConversionInst, unconditional_checked_cast, MayRead, DoesNotRelease)
-    VALUE_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
-  INST(IsNonnullInst, SILInstruction, is_nonnull, None, DoesNotRelease)
-  INST(UnconditionalCheckedCastAddrInst, SILInstruction, unconditional_checked_cast_addr, MayHaveSideEffects,
-       MayRelease)
-  INST(UncheckedRefCastAddrInst, SILInstruction, unchecked_ref_cast_addr, MayHaveSideEffects,
+    SINGLE_VALUE_INST(UnconditionalCheckedCastInst, unconditional_checked_cast,
+                      ConversionInst, MayRead, DoesNotRelease)
+    SINGLE_VALUE_INST_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
+
+  SINGLE_VALUE_INST(MarkDependenceInst, mark_dependence,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(CopyBlockInst, copy_block,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+  SINGLE_VALUE_INST(CopyValueInst, copy_value,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+  SINGLE_VALUE_INST(CopyUnownedValueInst, copy_unowned_value,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+  SINGLE_VALUE_INST(UncheckedOwnershipConversionInst, unchecked_ownership_conversion,
+                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
+  SINGLE_VALUE_INST(StrongPinInst, strong_pin,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+
+  // IsUnique does not actually write to memory but should be modeled
+  // as such. Its operand is a pointer to an object reference. The
+  // optimizer should not assume that the same object is pointed to after
+  // the isUnique instruction. It appears to write a new object reference.
+  SINGLE_VALUE_INST(IsUniqueInst, is_unique,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+  SINGLE_VALUE_INST(IsUniqueOrPinnedInst, is_unique_or_pinned,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+
+  // Accessing memory
+  SINGLE_VALUE_INST(LoadInst, load,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(LoadBorrowInst, load_borrow,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(BeginBorrowInst, begin_borrow,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+  SINGLE_VALUE_INST(StoreBorrowInst, store_borrow,
+                    SILInstruction, MayWrite, DoesNotRelease)
+  SINGLE_VALUE_INST(BeginAccessInst, begin_access,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+  SINGLE_VALUE_INST(LoadUnownedInst, load_unowned,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(LoadWeakInst, load_weak,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(MarkUninitializedInst, mark_uninitialized,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(MarkUninitializedBehaviorInst, mark_uninitialized_behavior,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(ProjectValueBufferInst, project_value_buffer,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(ProjectBoxInst, project_box,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(ProjectExistentialBoxInst, project_existential_box,
+                    SingleValueInstruction, None, DoesNotRelease)
+
+  // Function Application
+  SINGLE_VALUE_INST(ApplyInst, apply,
+                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
+  SINGLE_VALUE_INST(BuiltinInst, builtin,
+                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
+  SINGLE_VALUE_INST(PartialApplyInst, partial_apply,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+  
+  // Metatypes
+  SINGLE_VALUE_INST(MetatypeInst, metatype,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(ValueMetatypeInst, value_metatype,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(ExistentialMetatypeInst, existential_metatype,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(ObjCProtocolInst, objc_protocol,
+                    SingleValueInstruction, None, DoesNotRelease)
+
+  // Aggregate Types
+  SINGLE_VALUE_INST(ObjectInst, object,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(TupleInst, tuple,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(TupleExtractInst, tuple_extract,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(TupleElementAddrInst, tuple_element_addr,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(StructInst, struct,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(StructExtractInst, struct_extract,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(StructElementAddrInst, struct_element_addr,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(RefElementAddrInst, ref_element_addr,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(RefTailAddrInst, ref_tail_addr,
+                    SingleValueInstruction, None, DoesNotRelease)
+
+  // Enums
+  SINGLE_VALUE_INST(EnumInst, enum,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(UncheckedEnumDataInst, unchecked_enum_data,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(InitEnumDataAddrInst, init_enum_data_addr,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(UncheckedTakeEnumDataAddrInst, unchecked_take_enum_data_addr,
+                    SingleValueInstruction, MayWrite, DoesNotRelease)
+  SINGLE_VALUE_INST(SelectEnumInst, select_enum,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(SelectEnumAddrInst, select_enum_addr,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(SelectValueInst, select_value,
+                    SingleValueInstruction, None, DoesNotRelease)
+
+  // Protocol and Protocol Composition Types
+  SINGLE_VALUE_INST(InitExistentialAddrInst, init_existential_addr,
+                    SingleValueInstruction, MayWrite, DoesNotRelease)
+  SINGLE_VALUE_INST(InitExistentialValueInst, init_existential_value,
+                    SingleValueInstruction, MayWrite, DoesNotRelease)
+  SINGLE_VALUE_INST(OpenExistentialAddrInst, open_existential_addr,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(InitExistentialRefInst, init_existential_ref,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(OpenExistentialRefInst, open_existential_ref,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(InitExistentialMetatypeInst, init_existential_metatype,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(OpenExistentialMetatypeInst, open_existential_metatype,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(OpenExistentialBoxInst, open_existential_box,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(OpenExistentialValueInst, open_existential_value,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(OpenExistentialBoxValueInst, open_existential_box_value,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+
+  // Blocks
+  SINGLE_VALUE_INST(ProjectBlockStorageInst, project_block_storage,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(InitBlockStorageHeaderInst, init_block_storage_header,
+                    SingleValueInstruction, None, DoesNotRelease)
+
+  // Key paths
+  // TODO: The only "side effect" is potentially retaining the returned key path
+  // object; is there a more specific effect?
+  SINGLE_VALUE_INST(KeyPathInst, keypath,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+
+  SINGLE_VALUE_INST(IsNonnullInst, is_nonnull,
+                    SingleValueInstruction, None, DoesNotRelease)
+
+  SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, IsNonnullInst)
+
+NODE_RANGE(ValueBase, SILPHIArgument, IsNonnullInst)
+
+// Terminators
+ABSTRACT_INST(TermInst, SILInstruction)
+  TERMINATOR(UnreachableInst, unreachable,
+             TermInst, None, DoesNotRelease)
+  TERMINATOR(ReturnInst, return,
+             TermInst, None, DoesNotRelease)
+  TERMINATOR(ThrowInst, throw,
+             TermInst, None, DoesNotRelease)
+  TERMINATOR(TryApplyInst, try_apply,
+             TermInst, MayHaveSideEffects, MayRelease)
+  TERMINATOR(BranchInst, br,
+             TermInst, None, DoesNotRelease)
+  TERMINATOR(CondBranchInst, cond_br,
+             TermInst, None, DoesNotRelease)
+  TERMINATOR(SwitchValueInst, switch_value,
+             TermInst, None, DoesNotRelease)
+  TERMINATOR(SwitchEnumInst, switch_enum,
+             TermInst, None, DoesNotRelease)
+  TERMINATOR(SwitchEnumAddrInst, switch_enum_addr,
+             TermInst, MayRead, DoesNotRelease)
+  TERMINATOR(DynamicMethodBranchInst, dynamic_method_br,
+             TermInst, None, DoesNotRelease)
+  TERMINATOR(CheckedCastBranchInst, checked_cast_br,
+             TermInst, None, DoesNotRelease)
+  TERMINATOR(CheckedCastAddrBranchInst, checked_cast_addr_br,
+             TermInst, MayHaveSideEffects, MayRelease)
+  TERMINATOR(CheckedCastValueBranchInst, checked_cast_value_br,
+             TermInst, None, DoesNotRelease)
+  INST_RANGE(TermInst, UnreachableInst, CheckedCastValueBranchInst)
+
+// Deallocation instructions.
+ABSTRACT_INST(DeallocationInst, SILInstruction)
+  NON_VALUE_INST(DeallocStackInst, dealloc_stack,
+                 DeallocationInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(DeallocRefInst, dealloc_ref,
+                 DeallocationInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(DeallocPartialRefInst, dealloc_partial_ref,
+                 DeallocationInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(DeallocValueBufferInst, dealloc_value_buffer,
+                 DeallocationInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(DeallocBoxInst, dealloc_box,
+                 DeallocationInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(DeallocExistentialBoxInst, dealloc_existential_box,
+                 DeallocationInst, MayHaveSideEffects, DoesNotRelease)
+  INST_RANGE(DeallocationInst, DeallocStackInst, DeallocExistentialBoxInst)
+
+// Reference Counting
+ABSTRACT_INST(RefCountingInst, SILInstruction)
+  NON_VALUE_INST(StrongRetainInst, strong_retain,
+                 RefCountingInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(StrongReleaseInst, strong_release,
+                 RefCountingInst, MayHaveSideEffects, MayRelease)
+  NON_VALUE_INST(StrongRetainUnownedInst, strong_retain_unowned,
+                 RefCountingInst, MayHaveSideEffects,
        DoesNotRelease)
+  NON_VALUE_INST(StrongUnpinInst, strong_unpin,
+                 RefCountingInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(UnownedRetainInst, unowned_retain,
+                 RefCountingInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(UnownedReleaseInst, unowned_release,
+                 RefCountingInst, MayHaveSideEffects,
+       MayRelease)
+  NON_VALUE_INST(UnmanagedRetainValueInst, unmanaged_retain_value,
+                 RefCountingInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(UnmanagedReleaseValueInst, unmanaged_release_value,
+                 RefCountingInst, MayHaveSideEffects, MayRelease)
+  NON_VALUE_INST(UnmanagedAutoreleaseValueInst, unmanaged_autorelease_value,
+                 RefCountingInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(RetainValueInst, retain_value,
+                 RefCountingInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(RetainValueAddrInst, retain_value_addr,
+                 RefCountingInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(ReleaseValueInst, release_value,
+                 RefCountingInst, MayHaveSideEffects, MayRelease)
+  NON_VALUE_INST(ReleaseValueAddrInst, release_value_addr,
+                 RefCountingInst, MayHaveSideEffects, MayRelease)
+  NON_VALUE_INST(SetDeallocatingInst, set_deallocating,
+                 RefCountingInst, MayHaveSideEffects,
+       DoesNotRelease)
+  NON_VALUE_INST(AutoreleaseValueInst, autorelease_value,
+                 RefCountingInst, MayHaveSideEffects,
+       DoesNotRelease)
+  INST_RANGE(RefCountingInst, StrongRetainInst, AutoreleaseValueInst)
 
-  // Runtime failure
-  // FIXME: Special MemBehavior for runtime failure?
-  INST(CondFailInst, SILInstruction, cond_fail, MayHaveSideEffects, DoesNotRelease)
+// BindMemory has no physical side effect. Semantically it writes to
+// its affected memory region because any reads or writes accessing
+// that memory must be dependent on the bind operation.
+NON_VALUE_INST(BindMemoryInst, bind_memory,
+               SILInstruction, MayWrite, DoesNotRelease)
 
-  // Terminators
-  ABSTRACT_VALUE(TermInst, SILInstruction)
-    TERMINATOR(UnreachableInst, TermInst, unreachable, None, DoesNotRelease)
-    TERMINATOR(ReturnInst, TermInst, return, None, DoesNotRelease)
-    TERMINATOR(ThrowInst, TermInst, throw, None, DoesNotRelease)
-    TERMINATOR(TryApplyInst, TermInst, try_apply, MayHaveSideEffects, MayRelease)
-    TERMINATOR(BranchInst, TermInst, br, None, DoesNotRelease)
-    TERMINATOR(CondBranchInst, TermInst, cond_br, None, DoesNotRelease)
-    TERMINATOR(SwitchValueInst, TermInst, switch_value, None, DoesNotRelease)
-    TERMINATOR(SwitchEnumInst, TermInst, switch_enum, None, DoesNotRelease)
-    TERMINATOR(SwitchEnumAddrInst, TermInst, switch_enum_addr, MayRead, DoesNotRelease)
-    TERMINATOR(DynamicMethodBranchInst, TermInst, dynamic_method_br, None, DoesNotRelease)
-    TERMINATOR(CheckedCastBranchInst, TermInst, checked_cast_br, None, DoesNotRelease)
-    TERMINATOR(CheckedCastAddrBranchInst, TermInst, checked_cast_addr_br, MayHaveSideEffects,
-               MayRelease)
-    TERMINATOR(CheckedCastValueBranchInst, TermInst, checked_cast_value_br, None, DoesNotRelease)
-    VALUE_RANGE(TermInst, UnreachableInst, CheckedCastValueBranchInst)
+// FIXME: Is MayHaveSideEffects appropriate?
+NON_VALUE_INST(FixLifetimeInst, fix_lifetime,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
-  VALUE_RANGE(SILInstruction, AllocStackInst, CheckedCastValueBranchInst)
+NON_VALUE_INST(DestroyValueInst, destroy_value,
+               SILInstruction, MayHaveSideEffects, MayRelease)
+NON_VALUE_INST(EndBorrowInst, end_borrow,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+NON_VALUE_INST(EndBorrowArgumentInst, end_borrow_argument,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+NON_VALUE_INST(EndAccessInst, end_access,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+NON_VALUE_INST(BeginUnpairedAccessInst, begin_unpaired_access,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+NON_VALUE_INST(EndUnpairedAccessInst, end_unpaired_access,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+NON_VALUE_INST(StoreInst, store,
+               SILInstruction, MayWrite, DoesNotRelease)
+NON_VALUE_INST(AssignInst, assign,
+               SILInstruction, MayWrite, DoesNotRelease)
+NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
+               SILInstruction, None, DoesNotRelease)
+NON_VALUE_INST(DebugValueInst, debug_value,
+               SILInstruction, None, DoesNotRelease)
+NON_VALUE_INST(DebugValueAddrInst, debug_value_addr,
+               SILInstruction, None, DoesNotRelease)
+NON_VALUE_INST(StoreUnownedInst, store_unowned,
+               SILInstruction, MayWrite, DoesNotRelease)
+NON_VALUE_INST(StoreWeakInst, store_weak,
+               SILInstruction, MayWrite, DoesNotRelease)
+NON_VALUE_INST(CopyAddrInst, copy_addr,
+               SILInstruction, MayHaveSideEffects, MayRelease)
+NON_VALUE_INST(DestroyAddrInst, destroy_addr,
+               SILInstruction, MayHaveSideEffects, MayRelease)
+NON_VALUE_INST(EndLifetimeInst, end_lifetime,
+               SILInstruction, MayHaveSideEffects, MayRelease)
+NON_VALUE_INST(InjectEnumAddrInst, inject_enum_addr,
+               SILInstruction, MayWrite, DoesNotRelease)
+NON_VALUE_INST(DeinitExistentialAddrInst, deinit_existential_addr,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+NON_VALUE_INST(DeinitExistentialValueInst, deinit_existential_value,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+NON_VALUE_INST(UnconditionalCheckedCastAddrInst, unconditional_checked_cast_addr,
+               SILInstruction, MayHaveSideEffects, MayRelease)
+NON_VALUE_INST(UncheckedRefCastAddrInst, unchecked_ref_cast_addr,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+NON_VALUE_INST(AllocGlobalInst, alloc_global,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
+// Runtime failure
+// FIXME: Special MemBehavior for runtime failure?
+NON_VALUE_INST(CondFailInst, cond_fail,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+
+NODE_RANGE(SILInstruction, AllocStackInst, CondFailInst)
+NODE_RANGE(SILNode, SILPHIArgument, CondFailInst)
+
+#undef SINGLE_VALUE_INST_RANGE
+#undef INST_RANGE
 #undef VALUE_RANGE
+#undef NODE_RANGE
+#undef ABSTRACT_SINGLE_VALUE_INST
+#undef ABSTRACT_INST
 #undef ABSTRACT_VALUE
+#undef ABSTRACT_NODE
+#undef ABSTRACT_VALUE_AND_INST
 #undef TERMINATOR
+#undef NON_VALUE_INST
+#undef SINGLE_VALUE_INST
+#undef FULL_INST
 #undef INST
 #undef ARGUMENT
 #undef VALUE
+#undef NODE

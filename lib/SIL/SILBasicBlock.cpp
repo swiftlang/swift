@@ -95,6 +95,14 @@ void SILBasicBlock::remove(SILInstruction *I) {
   InstList.remove(I);
 }
 
+void SILBasicBlock::eraseInstructions() {
+ for (auto It = begin(); It != end();) {
+    auto *Inst = &*It++;
+    Inst->replaceAllUsesOfAllResultsWithUndef();
+    Inst->eraseFromParent();
+  }
+}
+
 /// Returns the iterator following the erased instruction.
 SILBasicBlock::iterator SILBasicBlock::erase(SILInstruction *I) {
   // Notify the delete handlers that this instruction is going away.

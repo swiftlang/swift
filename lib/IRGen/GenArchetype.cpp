@@ -208,7 +208,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   // to this conformance from concrete sources.
 
   auto signature = environment->getGenericSignature()->getCanonicalSignature();
-  auto archetypeDepType = environment->mapTypeOutOfContext(archetype);
+  auto archetypeDepType = archetype->getInterfaceType();
 
   auto astPath = signature->getConformanceAccessPath(archetypeDepType, protocol,
                                                      *IGF.IGM.getSwiftModule());

@@ -43,7 +43,7 @@ class SimplifyUnreachableContainingBlocks : public SILFunctionTransform {
         auto *I = &*II;
         ++II;
 
-        I->replaceAllUsesWithUndef();
+        I->replaceAllUsesOfAllResultsWithUndef();
         I->eraseFromParent();
       }
     }

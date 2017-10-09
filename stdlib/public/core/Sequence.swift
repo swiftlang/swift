@@ -331,19 +331,9 @@ public protocol Sequence {
   associatedtype Iterator : IteratorProtocol where Iterator.Element == Element
 
   /// A type that represents a subsequence of some of the sequence's elements.
-  associatedtype SubSequence
-  // FIXME(ABI)#104 (Recursive Protocol Constraints):
-  // FIXME(ABI)#105 (Associated Types with where clauses):
-  // associatedtype SubSequence : Sequence
-  //   where
-  //   Element == SubSequence.Element,
-  //   SubSequence.SubSequence == SubSequence
-  //
-  // (<rdar://problem/20715009> Implement recursive protocol
-  // constraints)
-  //
-  // These constraints allow processing collections in generic code by
-  // repeatedly slicing them in a loop.
+  associatedtype SubSequence : Sequence = AnySequence<Element>
+    where Element == SubSequence.Element,
+          SubSequence.SubSequence == SubSequence
 
   /// Returns an iterator over the elements of this sequence.
   func makeIterator() -> Iterator
@@ -889,149 +879,6 @@ extension Sequence {
     return Array(result)
   }
 
-  /// Returns a subsequence, up to the given maximum length, containing the
-  /// final elements of the sequence.
-  ///
-  /// The sequence must be finite. If the maximum length exceeds the number of
-  /// elements in the sequence, the result contains all the elements in the
-  /// sequence.
-  ///
-  ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.suffix(2))
-  ///     // Prints "[4, 5]"
-  ///     print(numbers.suffix(10))
-  ///     // Prints "[1, 2, 3, 4, 5]"
-  ///
-  /// - Parameter maxLength: The maximum number of elements to return. The
-  ///   value of `maxLength` must be greater than or equal to zero.
-  /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @_inlineable
-  public func suffix(_ maxLength: Int) -> AnySequence<Element> {
-    _precondition(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
-    if maxLength == 0 { return AnySequence([]) }
-    // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
-    // Put incoming elements into a ring buffer to save space. Once all
-    // elements are consumed, reorder the ring buffer into an `Array`
-    // and return it. This saves memory for sequences particularly longer
-    // than `maxLength`.
-    var ringBuffer: [Element] = []
-    ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedCount))
-
-    var i = ringBuffer.startIndex
-
-    for element in self {
-      if ringBuffer.count < maxLength {
-        ringBuffer.append(element)
-      } else {
-        ringBuffer[i] = element
-        i += 1
-        i %= maxLength
-      }
-    }
-
-    if i != ringBuffer.startIndex {
-      let s0 = ringBuffer[i..<ringBuffer.endIndex]
-      let s1 = ringBuffer[0..<i]
-      return AnySequence([s0, s1].joined())
-    }
-    return AnySequence(ringBuffer)
-  }
-
-  /// Returns the longest possible subsequences of the sequence, in order, that
-  /// don't contain elements satisfying the given predicate. Elements that are
-  /// used to split the sequence are not returned as part of any subsequence.
-  ///
-  /// The following examples show the effects of the `maxSplits` and
-  /// `omittingEmptySubsequences` parameters when splitting a string using a
-  /// closure that matches spaces. The first use of `split` returns each word
-  /// that was originally separated by one or more spaces.
-  ///
-  ///     let line = "BLANCHE:   I don't want realism. I want magic!"
-  ///     print(line.split(whereSeparator: { $0 == " " })
-  ///               .map(String.init))
-  ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
-  ///
-  /// The second example passes `1` for the `maxSplits` parameter, so the
-  /// original string is split just once, into two new strings.
-  ///
-  ///     print(
-  ///        line.split(maxSplits: 1, whereSeparator: { $0 == " " })
-  ///                       .map(String.init))
-  ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
-  ///
-  /// The final example passes `true` for the `allowEmptySlices` parameter, so
-  /// the returned array contains empty strings where spaces were repeated.
-  ///
-  ///     print(
-  ///         line.split(
-  ///             omittingEmptySubsequences: false,
-  ///             whereSeparator: { $0 == " " }
-  ///         ).map(String.init))
-  ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
-  ///
-  /// - Parameters:
-  ///   - maxSplits: The maximum number of times to split the sequence, or one
-  ///     less than the number of subsequences to return. If `maxSplits + 1`
-  ///     subsequences are returned, the last one is a suffix of the original
-  ///     sequence containing the remaining elements. `maxSplits` must be
-  ///     greater than or equal to zero. The default value is `Int.max`.
-  ///   - omittingEmptySubsequences: If `false`, an empty subsequence is
-  ///     returned in the result for each pair of consecutive elements
-  ///     satisfying the `isSeparator` predicate and for each element at the
-  ///     start or end of the sequence satisfying the `isSeparator` predicate.
-  ///     If `true`, only nonempty subsequences are returned. The default
-  ///     value is `true`.
-  ///   - isSeparator: A closure that returns `true` if its argument should be
-  ///     used to split the sequence; otherwise, `false`.
-  /// - Returns: An array of subsequences, split from this sequence's elements.
-  @_inlineable
-  public func split(
-    maxSplits: Int = Int.max,
-    omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [AnySequence<Element>] {
-    _precondition(maxSplits >= 0, "Must take zero or more splits")
-    var result: [AnySequence<Element>] = []
-    var subSequence: [Element] = []
-
-    @discardableResult
-    func appendSubsequence() -> Bool {
-      if subSequence.isEmpty && omittingEmptySubsequences {
-        return false
-      }
-      result.append(AnySequence(subSequence))
-      subSequence = []
-      return true
-    }
-
-    if maxSplits == 0 {
-      // We aren't really splitting the sequence.  Convert `self` into an
-      // `Array` using a fast entry point.
-      subSequence = Array(self)
-      appendSubsequence()
-      return result
-    }
-
-    var iterator = self.makeIterator()
-    while let element = iterator.next() {
-      if try isSeparator(element) {
-        if !appendSubsequence() {
-          continue
-        }
-        if result.count == maxSplits {
-          break
-        }
-      } else {
-        subSequence.append(element)
-      }
-    }
-    while let element = iterator.next() {
-      subSequence.append(element)
-    }
-    appendSubsequence()
-    return result
-  }
-
   /// Returns a value less than or equal to the number of elements in
   /// the sequence, nondestructively.
   ///
@@ -1186,7 +1033,7 @@ extension Sequence where Element : Equatable {
     separator: Element,
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true
-  ) -> [AnySequence<Element>] {
+  ) -> [SubSequence] {
     return split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
@@ -1194,10 +1041,150 @@ extension Sequence where Element : Equatable {
   }
 }
 
-extension Sequence where
-  SubSequence : Sequence,
-  SubSequence.Element == Element,
-  SubSequence.SubSequence == SubSequence {
+extension Sequence where SubSequence == AnySequence<Element> {
+
+  /// Returns the longest possible subsequences of the sequence, in order, that
+  /// don't contain elements satisfying the given predicate. Elements that are
+  /// used to split the sequence are not returned as part of any subsequence.
+  ///
+  /// The following examples show the effects of the `maxSplits` and
+  /// `omittingEmptySubsequences` parameters when splitting a string using a
+  /// closure that matches spaces. The first use of `split` returns each word
+  /// that was originally separated by one or more spaces.
+  ///
+  ///     let line = "BLANCHE:   I don't want realism. I want magic!"
+  ///     print(line.split(whereSeparator: { $0 == " " })
+  ///               .map(String.init))
+  ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
+  ///
+  /// The second example passes `1` for the `maxSplits` parameter, so the
+  /// original string is split just once, into two new strings.
+  ///
+  ///     print(
+  ///        line.split(maxSplits: 1, whereSeparator: { $0 == " " })
+  ///                       .map(String.init))
+  ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
+  ///
+  /// The final example passes `true` for the `allowEmptySlices` parameter, so
+  /// the returned array contains empty strings where spaces were repeated.
+  ///
+  ///     print(
+  ///         line.split(
+  ///             omittingEmptySubsequences: false,
+  ///             whereSeparator: { $0 == " " }
+  ///         ).map(String.init))
+  ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
+  ///
+  /// - Parameters:
+  ///   - maxSplits: The maximum number of times to split the sequence, or one
+  ///     less than the number of subsequences to return. If `maxSplits + 1`
+  ///     subsequences are returned, the last one is a suffix of the original
+  ///     sequence containing the remaining elements. `maxSplits` must be
+  ///     greater than or equal to zero. The default value is `Int.max`.
+  ///   - omittingEmptySubsequences: If `false`, an empty subsequence is
+  ///     returned in the result for each pair of consecutive elements
+  ///     satisfying the `isSeparator` predicate and for each element at the
+  ///     start or end of the sequence satisfying the `isSeparator` predicate.
+  ///     If `true`, only nonempty subsequences are returned. The default
+  ///     value is `true`.
+  ///   - isSeparator: A closure that returns `true` if its argument should be
+  ///     used to split the sequence; otherwise, `false`.
+  /// - Returns: An array of subsequences, split from this sequence's elements.
+  @_inlineable
+  public func split(
+    maxSplits: Int = Int.max,
+    omittingEmptySubsequences: Bool = true,
+    whereSeparator isSeparator: (Element) throws -> Bool
+  ) rethrows -> [AnySequence<Element>] {
+    _precondition(maxSplits >= 0, "Must take zero or more splits")
+    var result: [AnySequence<Element>] = []
+    var subSequence: [Element] = []
+
+    @discardableResult
+    func appendSubsequence() -> Bool {
+      if subSequence.isEmpty && omittingEmptySubsequences {
+        return false
+      }
+      result.append(AnySequence(subSequence))
+      subSequence = []
+      return true
+    }
+
+    if maxSplits == 0 {
+      // We aren't really splitting the sequence.  Convert `self` into an
+      // `Array` using a fast entry point.
+      subSequence = Array(self)
+      appendSubsequence()
+      return result
+    }
+
+    var iterator = self.makeIterator()
+    while let element = iterator.next() {
+      if try isSeparator(element) {
+        if !appendSubsequence() {
+          continue
+        }
+        if result.count == maxSplits {
+          break
+        }
+      } else {
+        subSequence.append(element)
+      }
+    }
+    while let element = iterator.next() {
+      subSequence.append(element)
+    }
+    appendSubsequence()
+    return result
+  }
+
+  /// Returns a subsequence, up to the given maximum length, containing the
+  /// final elements of the sequence.
+  ///
+  /// The sequence must be finite. If the maximum length exceeds the number of
+  /// elements in the sequence, the result contains all the elements in the
+  /// sequence.
+  ///
+  ///     let numbers = [1, 2, 3, 4, 5]
+  ///     print(numbers.suffix(2))
+  ///     // Prints "[4, 5]"
+  ///     print(numbers.suffix(10))
+  ///     // Prints "[1, 2, 3, 4, 5]"
+  ///
+  /// - Parameter maxLength: The maximum number of elements to return. The
+  ///   value of `maxLength` must be greater than or equal to zero.
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @_inlineable
+  public func suffix(_ maxLength: Int) -> AnySequence<Element> {
+    _precondition(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
+    if maxLength == 0 { return AnySequence([]) }
+    // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
+    // Put incoming elements into a ring buffer to save space. Once all
+    // elements are consumed, reorder the ring buffer into an `Array`
+    // and return it. This saves memory for sequences particularly longer
+    // than `maxLength`.
+    var ringBuffer: [Element] = []
+    ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedCount))
+
+    var i = ringBuffer.startIndex
+
+    for element in self {
+      if ringBuffer.count < maxLength {
+        ringBuffer.append(element)
+      } else {
+        ringBuffer[i] = element
+        i += 1
+        i %= maxLength
+      }
+    }
+
+    if i != ringBuffer.startIndex {
+      let s0 = ringBuffer[i..<ringBuffer.endIndex]
+      let s1 = ringBuffer[0..<i]
+      return AnySequence([s0, s1].joined())
+    }
+    return AnySequence(ringBuffer)
+  }
 
   /// Returns a subsequence containing all but the given number of initial
   /// elements.

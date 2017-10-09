@@ -1322,6 +1322,9 @@ public:
   /// Revert the dependent types within the given generic parameter list.
   void revertGenericParamList(GenericParamList *genericParams);
 
+  /// Revert the dependent types within a set of requirements.
+  void revertGenericRequirements(MutableArrayRef<RequirementRepr> requirements);
+
   /// Configure the interface type of a function declaration.
   void configureInterfaceType(AbstractFunctionDecl *func,
                               GenericSignature *sig);
@@ -1367,6 +1370,9 @@ public:
   /// context, if not available as part of the \c dc argument (used
   /// for SIL parsing).
   ///
+  /// \param ext The extension for which we're checking the generic
+  /// environment, or null if we're not checking an extension.
+  ///
   /// \param inferRequirements When non-empty, callback that will be invoked
   /// to perform any additional requirement inference that contributes to the
   /// generic environment..
@@ -1377,6 +1383,7 @@ public:
                         DeclContext *dc,
                         GenericSignature *outerSignature,
                         bool allowConcreteGenericParams,
+                        ExtensionDecl *ext,
                         llvm::function_ref<void(GenericSignatureBuilder &)>
                           inferRequirements);
 
@@ -1394,9 +1401,10 @@ public:
                         GenericParamList *genericParams,
                         DeclContext *dc,
                         GenericSignature *outerSignature,
-                        bool allowConcreteGenericParams) {
+                        bool allowConcreteGenericParams,
+                        ExtensionDecl *ext) {
     return checkGenericEnvironment(genericParams, dc, outerSignature,
-                                   allowConcreteGenericParams,
+                                   allowConcreteGenericParams, ext,
                                    [&](GenericSignatureBuilder &) { });
   }
 
@@ -1409,6 +1417,14 @@ public:
                            DeclContext *lookupDC,
                            TypeResolutionOptions options = None,
                            GenericTypeResolver *resolver = nullptr);
+
+  /// Validate the given requirements.
+  void validateRequirements(SourceLoc whereLoc,
+                            MutableArrayRef<RequirementRepr> requirements,
+                            DeclContext *dc,
+                            TypeResolutionOptions options,
+                            GenericTypeResolver *resolver,
+                            GenericSignatureBuilder *builder = nullptr);
 
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
@@ -1445,7 +1461,8 @@ public:
 
   /// Validate a protocol's where clause, along with the where clauses of
   /// its associated types.
-  void validateWhereClauses(ProtocolDecl *protocol);
+  void validateWhereClauses(ProtocolDecl *protocol,
+                            GenericTypeResolver *resolver);
 
   /// Resolve the types in the inheritance clause of the given
   /// declaration context, which will be a nominal type declaration or

@@ -15,6 +15,11 @@
 import Foundation
 import TestsUtils
 
+public let Hanoi = BenchmarkInfo(
+  name: "Hanoi",
+  runFunction: run_Hanoi,
+  tags: [.validation, .algorithm])
+
 struct Move {
    var from: String
    var to: String

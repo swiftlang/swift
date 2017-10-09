@@ -2193,7 +2193,7 @@ func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
 } // CHECK: {{^}$}}
 
 @objc protocol OperatorInProtocol {
-  static func +(lhs: Self, rhs: Self) -> Self // expected-error {{@objc protocols may not have operator requirements}}
+  static func +(lhs: Self, rhs: Self) -> Self // expected-error {{@objc protocols must not have operator requirements}}
 }
 
 class AdoptsOperatorInProtocol : OperatorInProtocol {

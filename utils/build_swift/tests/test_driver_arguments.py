@@ -446,7 +446,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(args.build_ios_simulator)
 
             # Also implies that the tests should be skipped
-            self.assertFalse(args.test_ios_device)
+            self.assertFalse(args.test_ios_host)
             self.assertFalse(args.test_ios_simulator)
 
     def test_implied_defaults_skip_build_tvos(self):
@@ -456,7 +456,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(args.build_tvos_simulator)
 
             # Also implies that the tests should be skipped
-            self.assertFalse(args.test_tvos_device)
+            self.assertFalse(args.test_tvos_host)
             self.assertFalse(args.test_tvos_simulator)
 
     def test_implied_defaults_skip_build_watchos(self):
@@ -466,7 +466,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(args.build_watchos_simulator)
 
             # Also implies that the tests should be skipped
-            self.assertFalse(args.test_watchos_device)
+            self.assertFalse(args.test_watchos_host)
             self.assertFalse(args.test_watchos_simulator)
 
     def test_implied_defaults_validation_test(self):
@@ -503,37 +503,37 @@ class TestDriverArgumentParser(unittest.TestCase):
     def test_implied_defaults_skip_test_ios(self):
         with self.assertNotRaises(ParserError):
             args = self.parse_args(['--skip-test-ios'])
-            self.assertFalse(args.test_ios_device)
+            self.assertFalse(args.test_ios_host)
             self.assertFalse(args.test_ios_simulator)
 
     def test_implied_defaults_skip_test_tvos(self):
         with self.assertNotRaises(ParserError):
             args = self.parse_args(['--skip-test-tvos'])
-            self.assertFalse(args.test_tvos_device)
+            self.assertFalse(args.test_tvos_host)
             self.assertFalse(args.test_tvos_simulator)
 
     def test_implied_defaults_skip_test_watchos(self):
         with self.assertNotRaises(ParserError):
             args = self.parse_args(['--skip-test-watchos'])
-            self.assertFalse(args.test_watchos_device)
+            self.assertFalse(args.test_watchos_host)
             self.assertFalse(args.test_watchos_simulator)
 
     def test_implied_defaults_skip_build_android(self):
         with self.assertNotRaises(ParserError):
             args = self.parse_args(['--android', '0'])
-            self.assertFalse(args.test_android_device)
+            self.assertFalse(args.test_android_host)
 
         with self.assertNotRaises(ParserError):
             args = self.parse_args(['--skip-build-android'])
-            self.assertFalse(args.test_android_device)
+            self.assertFalse(args.test_android_host)
 
     def test_implied_defaults_host_test(self):
         with self.assertNotRaises(ParserError):
             args = self.parse_args(['--host-test', '0'])
-            self.assertFalse(args.test_ios_device)
-            self.assertFalse(args.test_tvos_device)
-            self.assertFalse(args.test_watchos_device)
-            self.assertFalse(args.test_android_device)
+            self.assertFalse(args.test_ios_host)
+            self.assertFalse(args.test_tvos_host)
+            self.assertFalse(args.test_watchos_host)
+            self.assertFalse(args.test_android_host)
 
 
 if __name__ == '__main__':

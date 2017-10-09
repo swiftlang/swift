@@ -342,7 +342,9 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
   }
 
-  SilCombiner->replaceInstUsesWith(*AI.getInstruction(), NAI.getInstruction());
+  if (auto apply = dyn_cast<ApplyInst>(AI))
+    SilCombiner->replaceInstUsesWith(*apply,
+                                     cast<ApplyInst>(NAI.getInstruction()));
   SilCombiner->eraseInstFromFunction(*AI.getInstruction());
   return true;
 }
@@ -417,6 +419,12 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   if (SubstCalleeTy->hasArchetype() || ConvertCalleeTy->hasArchetype())
     return nullptr;
 
+  // Bail if the result type of the converted callee is different from the callee's
+  // result type of the apply instruction.
+  if (SubstCalleeTy->getAllResultsType() != ConvertCalleeTy->getAllResultsType()) {
+    return nullptr;
+  }
+
   // Ok, we can now perform our transformation. Grab AI's operands and the
   // relevant types from the ConvertFunction function type and AI.
   Builder.setCurrentDebugScope(AI.getDebugScope());
@@ -461,9 +469,13 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
     NAI = Builder.createTryApply(AI.getLoc(), FRI, 
                                  SubstitutionList(), Args,
                                  TAI->getNormalBB(), TAI->getErrorBB());
-  else
+  else {
     NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionList(), Args,
                               cast<ApplyInst>(AI)->isNonThrowing());
+    assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsType() ==
+           AI.getSubstCalleeType()->getAllResultsType() &&
+           "Function types should be the same");
+  }
   return NAI;
 }
 
@@ -477,6 +489,7 @@ SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
   for (auto *Use : Value->getUses()) {
     SILInstruction *Inst = Use->getUser();
     if (isa<RefCountingInst>(Inst) ||
+        isa<StrongPinInst>(Inst) ||
         isa<DebugValueInst>(Inst)) {
       Uses.push_back(Inst);
       continue;
@@ -485,7 +498,7 @@ SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
         isa<StructExtractInst>(Inst) ||
         isa<PointerToAddressInst>(Inst)) {
       Uses.push_back(Inst);
-      if (recursivelyCollectARCUsers(Uses, Inst))
+      if (recursivelyCollectARCUsers(Uses, cast<SingleValueInstruction>(Inst)))
         continue;
     }
     return false;
@@ -557,8 +570,11 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
 /// initialized. This is either a init_existential_addr or the source of a
 /// copy_addr. Returns a null value if the address does not dominate the
 /// alloc_stack user \p ASIUser.
+/// If the value is copied from another stack location, \p isCopied is set to
+/// true.
 static SILValue getAddressOfStackInit(AllocStackInst *ASI,
-                                      SILInstruction *ASIUser) {
+                                      SILInstruction *ASIUser,
+                                      bool &isCopied) {
   SILInstruction *SingleWrite = nullptr;
   // Check that this alloc_stack is initialized only once.
   for (auto Use : ASI->getUses()) {
@@ -578,6 +594,7 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
         if (SingleWrite)
           return SILValue();
         SingleWrite = CAI;
+        isCopied = true;
       }
       continue;
     }
@@ -611,23 +628,29 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
   if (auto *CAI = dyn_cast<CopyAddrInst>(SingleWrite)) {
     // Try to derive the type from the copy_addr that was used to
     // initialize the alloc_stack.
+    assert(isCopied && "isCopied not set for a copy_addr");
     SILValue CAISrc = CAI->getSrc();
     if (auto *ASI = dyn_cast<AllocStackInst>(CAISrc))
-      return getAddressOfStackInit(ASI, CAI);
+      return getAddressOfStackInit(ASI, CAI, isCopied);
     return CAISrc;
   }
-  return SingleWrite;
+  return cast<InitExistentialAddrInst>(SingleWrite);
 }
 
 /// Find the init_existential, which could be used to determine a concrete
 /// type of the \p Self.
+/// If the value is copied from another stack location, \p isCopied is set to
+/// true.
 static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
                                            ArchetypeType *&OpenedArchetype,
-                                           SILValue &OpenedArchetypeDef) {
+                                           SILValue &OpenedArchetypeDef,
+                                           bool &isCopied) {
+  isCopied = false;
   if (auto *Instance = dyn_cast<AllocStackInst>(Self)) {
     // In case the Self operand is an alloc_stack where a copy_addr copies the
     // result of an open_existential_addr to this stack location.
-    if (SILValue Src = getAddressOfStackInit(Instance, AI.getInstruction()))
+    if (SILValue Src = getAddressOfStackInit(Instance, AI.getInstruction(),
+                                             isCopied))
       Self = Src;
   }
 
@@ -637,7 +660,7 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
     if (!ASI)
       return nullptr;
 
-    SILValue StackWrite = getAddressOfStackInit(ASI, Open);
+    SILValue StackWrite = getAddressOfStackInit(ASI, Open, isCopied);
     if (!StackWrite)
       return nullptr;
 
@@ -744,8 +767,8 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
     NewAI = Builder.createApply(AI.getLoc(), AI.getCallee(), Substitutions,
                                 Args, cast<ApplyInst>(AI)->isNonThrowing());
 
-  if (isa<ApplyInst>(NewAI))
-    replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction());
+  if (auto apply = dyn_cast<ApplyInst>(NewAI))
+    replaceInstUsesWith(*cast<ApplyInst>(AI.getInstruction()), apply);
   eraseInstFromFunction(*AI.getInstruction());
 
   return NewAI.getInstruction();
@@ -753,7 +776,8 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
 
 /// Derive a concrete type of self and conformance from the init_existential
 /// instruction.
-static Optional<std::tuple<ProtocolConformanceRef, CanType, SILValue, SILValue>>
+static Optional<std::tuple<ProtocolConformanceRef, CanType,
+                           SingleValueInstruction*, SILValue>>
 getConformanceAndConcreteType(ASTContext &Ctx,
                               FullApplySite AI,
                               SILInstruction *InitExistential,
@@ -763,7 +787,7 @@ getConformanceAndConcreteType(ASTContext &Ctx,
   CanType ConcreteType;
   // The existential type result of the found init_existential.
   CanType ExistentialType;
-  SILValue ConcreteTypeDef;
+  SingleValueInstruction *ConcreteTypeDef = nullptr;
   SILValue NewSelf;
 
   // FIXME: Factor this out. All we really need here is the ExistentialSig
@@ -812,7 +836,8 @@ getConformanceAndConcreteType(ASTContext &Ctx,
   if (ConcreteType->isOpenedExistential()) {
     assert(!InitExistential->getTypeDependentOperands().empty() &&
            "init_existential is supposed to have a typedef operand");
-    ConcreteTypeDef = InitExistential->getTypeDependentOperands()[0].get();
+    ConcreteTypeDef = cast<SingleValueInstruction>(
+      InitExistential->getTypeDependentOperands()[0].get());
   }
 
   return std::make_tuple(*ExactConformance, ConcreteType,
@@ -847,8 +872,10 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   // determine a concrete type of the self.
   ArchetypeType *OpenedArchetype = nullptr;
   SILValue OpenedArchetypeDef;
+  bool isCopied = false;
   SILInstruction *InitExistential =
-    findInitExistential(AI, Self, OpenedArchetype, OpenedArchetypeDef);
+    findInitExistential(AI, Self, OpenedArchetype, OpenedArchetypeDef,
+                        isCopied);
   if (!InitExistential)
     return nullptr;
 
@@ -863,7 +890,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
 
   ProtocolConformanceRef Conformance = std::get<0>(*ConformanceAndConcreteType);
   CanType ConcreteType = std::get<1>(*ConformanceAndConcreteType);
-  SILValue ConcreteTypeDef = std::get<2>(*ConformanceAndConcreteType);
+  auto ConcreteTypeDef = std::get<2>(*ConformanceAndConcreteType);
   SILValue NewSelf = std::get<3>(*ConformanceAndConcreteType);
 
   SILOpenedArchetypesTracker *OldOpenedArchetypesTracker =
@@ -882,6 +909,18 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   // Propagate the concrete type into the callee-operand if required.
   Propagate(ConcreteType, Conformance);
 
+  if (isCopied) {
+    // If the witness method is mutating self, we cannot replace self with
+    // the source of a copy. Otherwise the call would modify another value than
+    // the original self.
+    switch (AI.getArgumentConvention(AI.getNumArguments() - 1)) {
+      case SILArgumentConvention::ConventionType::Indirect_Inout:
+      case SILArgumentConvention::ConventionType::Indirect_InoutAliasable:
+        return nullptr;
+      default:
+        break;
+    }
+  }
   // Create a new apply instruction that uses the concrete type instead
   // of the existential type.
   auto *NewAI = createApplyWithConcreteType(AI, NewSelf, Self, ConcreteType,

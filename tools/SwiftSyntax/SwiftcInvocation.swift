@@ -55,34 +55,39 @@ struct ProcessResult {
 ///   - arguments: A list of strings to pass to the process as arguments.
 /// - Returns: A ProcessResult containing stdout, stderr, and the exit code.
 func run(_ executable: URL, arguments: [String] = []) -> ProcessResult {
-  let stdoutPipe = Pipe()
-  var stdoutData = Data()
-  stdoutPipe.fileHandleForReading.readabilityHandler = { file in
-    stdoutData.append(file.availableData)
+  // Use an autoreleasepool to prevent memory- and file-descriptor leaks.
+  return autoreleasepool {
+    () -> ProcessResult in
+    
+    let stdoutPipe = Pipe()
+    var stdoutData = Data()
+    stdoutPipe.fileHandleForReading.readabilityHandler = { file in
+      stdoutData.append(file.availableData)
+    }
+    
+    let stderrPipe = Pipe()
+    var stderrData = Data()
+    stderrPipe.fileHandleForReading.readabilityHandler = { file in
+      stderrData.append(file.availableData)
+    }
+    
+    let process = Process()
+    
+    process.terminationHandler = { process in
+      stdoutPipe.fileHandleForReading.readabilityHandler = nil
+      stderrPipe.fileHandleForReading.readabilityHandler = nil
+    }
+    
+    process.launchPath = executable.path
+    process.arguments = arguments
+    process.standardOutput = stdoutPipe
+    process.standardError = stderrPipe
+    process.launch()
+    process.waitUntilExit()
+    return ProcessResult(exitCode: Int(process.terminationStatus),
+                         stdoutData: stdoutData,
+                         stderrData: stderrData)
   }
-
-  let stderrPipe = Pipe()
-  var stderrData = Data()
-  stderrPipe.fileHandleForReading.readabilityHandler = { file in
-    stderrData.append(file.availableData)
-  }
-
-  let process = Process()
-
-  process.terminationHandler = { process in
-    stdoutPipe.fileHandleForReading.readabilityHandler = nil
-    stderrPipe.fileHandleForReading.readabilityHandler = nil
-  }
-
-  process.launchPath = executable.path
-  process.arguments = arguments
-  process.standardOutput = stdoutPipe
-  process.standardError = stderrPipe
-  process.launch()
-  process.waitUntilExit()
-  return ProcessResult(exitCode: Int(process.terminationStatus),
-                       stdoutData: stdoutData,
-                       stderrData: stderrData)
 }
 
 /// Finds the dylib or executable which the provided address falls in.

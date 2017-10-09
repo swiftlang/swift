@@ -194,7 +194,7 @@ func missingControllingExprInForEach() {
   // expected-error @+3 {{expected pattern}}
   // expected-error @+2 {{expected Sequence expression for for-each loop}}
   // expected-error @+1 {{expected '{' to start the body of for-each loop}}
-  for for in { // expected-error {{expected pattern}} expected-error {{expected Sequence expression for for-each loop}}
+  for for in {
   }
 
   for i in { // expected-error {{expected Sequence expression for for-each loop}}
@@ -215,6 +215,18 @@ func missingControllingExprInForEach() {
     var x = 42
   }
 #endif
+  
+  // SR-5943
+  struct User { let name: String? }
+  let users = [User]()
+  for user in users whe { // expected-error {{expected '{' to start the body of for-each loop}}
+    if let name = user.name {
+      let key = "\(name)"
+    }
+  }
+
+  for // expected-error {{expected pattern}} expected-error {{Sequence expression for for-each loop}}
+  ; // expected-error {{expected '{' to start the body of for-each loop}}
 }
 
 func missingControllingExprInSwitch() {

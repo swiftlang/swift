@@ -12,6 +12,12 @@
 
 import TestsUtils
 
+
+public let Dictionary = [
+  BenchmarkInfo(name: "Dictionary", runFunction: run_Dictionary, tags: [.validation, .api, .Dictionary]),
+  BenchmarkInfo(name: "DictionaryOfObjects", runFunction: run_DictionaryOfObjects, tags: [.validation, .api, .Dictionary]),
+]
+
 @inline(never)
 public func run_Dictionary(scale: Int) {
   let Input = [

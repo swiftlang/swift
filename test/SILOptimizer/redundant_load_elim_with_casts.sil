@@ -75,14 +75,14 @@ bb0(%0 : $B, %1 : $*Agg1):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <B>, 0
   %3 = load %1 : $*Agg1
-  %4 = store %3 to %1 : $*Agg1
+  store %3 to %1 : $*Agg1
   %5 = load %2a : $*B
-  %6 = store %3 to %1 : $*Agg1
+  store %3 to %1 : $*Agg1
   %7 = load %2a : $*B
-  %8 = strong_retain %5 : $B   //%7 and %5 should really be one load.
-  %9 = strong_retain %7 : $B
+  strong_retain %5 : $B   //%7 and %5 should really be one load.
+  strong_retain %7 : $B
   %10 = tuple()
-  %11 = return %10 : $()
+  return %10 : $()
 }
 
 // FIXME: When RLE uses TBAA it should remove the second load.
@@ -99,7 +99,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $A2):
   store %1 to %5 : $*A2
   %20 = load %2 : $*A
   %30 = tuple(%3 : $A, %20 : $A)
-  %31 = return %30 : $(A, A)
+  return %30 : $(A, A)
 }
 
 // Even with TBAA, RLE should not remove the second load.
@@ -121,7 +121,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $A2):
   bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $A
   %20 = load %2 : $*A
   %30 = tuple(%3 : $A, %20 : $A)
-  %31 = return %30 : $(A, A)
+  return %30 : $(A, A)
 }
 
 // *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.

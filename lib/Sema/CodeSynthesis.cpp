@@ -104,7 +104,8 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
 
   // Clone the parameter list over for a new decl, so we get new ParamDecls.
   auto indices = subscript->getIndices()->clone(context,
-                                                ParameterList::Implicit);
+                                                ParameterList::Implicit|
+                                                ParameterList::WithoutTypes);
   if (prefix.empty())
     return indices;
   
@@ -2074,7 +2075,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
         classDecl->getGenericEnvironment());
 
     for (auto *decl : *bodyParams) {
-      auto paramTy = decl->getInterfaceType();
+      auto paramTy = decl->getInterfaceType()->getInOutObjectType();
 
       // Apply the superclass substitutions to produce a contextual
       // type in terms of the derived class archetypes.
@@ -2088,7 +2089,9 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   } else {
     for (auto *decl : *bodyParams) {
       if (!decl->hasType())
-        decl->setType(classDecl->mapTypeIntoContext(decl->getInterfaceType()));
+        decl->setType(
+          classDecl->mapTypeIntoContext(
+            decl->getInterfaceType()->getInOutObjectType()));
     }
   }
 
@@ -2114,6 +2117,12 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // Inherit the @_versioned attribute.
   if (superclassCtor->getAttrs().hasAttribute<VersionedAttr>()) {
     auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
+    ctor->getAttrs().add(clonedAttr);
+  }
+
+  // Inherit the @_inlineable attribute.
+  if (superclassCtor->getAttrs().hasAttribute<InlineableAttr>()) {
+    auto *clonedAttr = new (ctx) InlineableAttr(/*implicit=*/true);
     ctor->getAttrs().add(clonedAttr);
   }
 

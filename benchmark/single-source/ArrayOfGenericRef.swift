@@ -15,6 +15,13 @@
 //
 // For comparison, we always create three arrays of 10,000 words.
 
+import TestsUtils
+
+public let ArrayOfGenericRef = BenchmarkInfo(
+  name: "ArrayOfGenericRef",
+  runFunction: run_ArrayOfGenericRef,
+  tags: [.validation, .api, .Array])
+
 protocol Constructible {
   associatedtype Element
   init(e:Element)

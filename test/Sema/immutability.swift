@@ -119,7 +119,7 @@ struct SomeStruct {
   
   static let type_let = 5  // expected-note {{change 'let' to 'var' to make it mutable}} {{10-13=var}}
 
-  mutating static func f() {  // expected-error {{static functions may not be declared mutating}} {{3-12=}}
+  mutating static func f() {  // expected-error {{static functions must not be declared mutating}} {{3-12=}}
   }
   
   mutating func g() {
@@ -374,7 +374,7 @@ func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
   ++y  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 }
 
-func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{26-30=}}
+func invalid_inout(inout var x : Int) { // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{26-30=}}
 // expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}{{20-25=}}{{34-34=inout }}
 }
 func invalid_var(var x: Int) { // expected-error {{'var' as a parameter attribute is not allowed}}
@@ -488,11 +488,11 @@ struct F { // expected-note 1 {{in declaration of 'F'}}
   mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{expected declaration}}
   }
   
-  mutating nonmutating func g() {}  // expected-error {{method may not be declared both mutating and nonmutating}}
-  __consuming nonmutating func h() {}  // expected-error {{method may not be declared both __consuming and nonmutating}}
-  __consuming mutating func i() {}  // expected-error {{method may not be declared both __consuming and mutating}}
-  nonmutating mutating func j() {}  // expected-error {{method may not be declared both nonmutating and mutating}}
-  __consuming nonmutating mutating func k() {}  // expected-error {{method may not be declared both __consuming and mutating}} expected-error {{method may not be declared both nonmutating and mutating}}
+  mutating nonmutating func g() {}  // expected-error {{method must not be declared both mutating and nonmutating}}
+  __consuming nonmutating func h() {}  // expected-error {{method must not be declared both __consuming and nonmutating}}
+  __consuming mutating func i() {}  // expected-error {{method must not be declared both __consuming and mutating}}
+  nonmutating mutating func j() {}  // expected-error {{method must not be declared both nonmutating and mutating}}
+  __consuming nonmutating mutating func k() {}  // expected-error {{method must not be declared both __consuming and mutating}} expected-error {{method must not be declared both nonmutating and mutating}}
 }
 
 protocol SingleIntProperty {
@@ -610,8 +610,8 @@ func f(a : FooClass, b : LetStructMembers) {
 class MutableSubscripts {
   var x : Int = 0
 
-  subscript(x: inout Int) -> () { x += 1 } // expected-error {{'inout' may not be used on subscript parameters}}
-  subscript<T>(x: inout T) -> () { // expected-error {{'inout' may not be used on subscript parameters}}
+  subscript(x: inout Int) -> () { x += 1 } // expected-error {{'inout' must not be used on subscript parameters}}
+  subscript<T>(x: inout T) -> () { // expected-error {{'inout' must not be used on subscript parameters}}
     fatalError()
   }
 
@@ -628,8 +628,7 @@ func sr4214() {
     return f(x)
   }
 
-  // expected-error@+1 {{expression type '(inout MutableSubscripts) -> ()' is ambiguous without more context}}
-  let closure = { val in val.x = 7 } as (inout MutableSubscripts) -> ()
+  let closure = { val in val.x = 7 } as (inout MutableSubscripts) -> () // Ok
   var v = MutableSubscripts()
   closure(&v)
   // FIXME: This diagnostic isn't really all that much better

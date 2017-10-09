@@ -195,6 +195,8 @@ public:
     EmitObject, ///< Emit object file
   };
 
+  bool isCreatingSIL() { return RequestedAction >= EmitSILGen; }
+
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = NoneAction;
 
@@ -219,6 +221,9 @@ public:
 
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;
+
+  /// Trace changes to stats to files in StatsOutputDir.
+  bool TraceStats = false;
 
   /// Indicates whether function body parsing should be delayed
   /// until the end of all files.

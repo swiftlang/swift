@@ -93,7 +93,7 @@ enum ImproperlyHasIVars {
   case Flopsy
   case Mopsy
 
-  var ivar : Int // expected-error{{enums may not contain stored properties}}
+  var ivar : Int // expected-error{{enums must not contain stored properties}}
 }
 
 // We used to crash on this.  rdar://14678675

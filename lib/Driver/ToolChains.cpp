@@ -144,6 +144,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_warn_swift3_objc_inference);
   inputArgs.AddLastArg(arguments, options::OPT_suppress_warnings);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
+  inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
   inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
@@ -151,6 +152,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
   inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_stats_output_dir);
+  inputArgs.AddLastArg(arguments, options::OPT_trace_stats_events);
   inputArgs.AddLastArg(arguments,
                        options::OPT_solver_shrink_unsolved_threshold);
   inputArgs.AddLastArg(arguments, options::OPT_O_Group);
@@ -232,13 +234,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_ImportedModules:
       FrontendModeOption = "-emit-imported-modules";
       break;
-
-    // BEGIN APPLE-ONLY OUTPUT TYPES
     case types::TY_IndexData:
       FrontendModeOption = "-typecheck";
       break;
-    // END APPLE-ONLY OUTPUT TYPES
-
     case types::TY_Remapping:
       FrontendModeOption = "-update-code";
       break;
@@ -1514,7 +1512,7 @@ bool toolchains::GenericUnix::shouldProvideRPathToLinker() const {
 
 std::string toolchains::GenericUnix::getPreInputObjectPath(
     StringRef RuntimeLibraryPath) const {
-  // On Linux and FreeBSD (really, ELF binaries) we need to add objects
+  // On Linux and FreeBSD and Haiku (really, ELF binaries) we need to add objects
   // to provide markers and size for the metadata sections.
   SmallString<128> PreInputObjectPath = RuntimeLibraryPath;
   llvm::sys::path::append(PreInputObjectPath,
@@ -1559,7 +1557,13 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Linker = getDefaultLinker();
   }
   if (!Linker.empty()) {
+#if defined(__HAIKU__)
+    // For now, passing -fuse-ld on Haiku doesn't work as swiftc doesn't recognise
+    // it. Passing -use-ld= as the argument works fine.
+    Arguments.push_back(context.Args.MakeArgString("-use-ld=" + Linker));
+#else
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
+#endif
   }
 
   // Configure the toolchain.

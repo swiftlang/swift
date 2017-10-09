@@ -10,6 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+import TestsUtils
+
+public let ReversedCollections = [
+  BenchmarkInfo(name: "ReversedArray", runFunction: run_ReversedArray, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ReversedBidirectional", runFunction: run_ReversedBidirectional, tags: [.validation, .api]),
+  BenchmarkInfo(name: "ReversedDictionary", runFunction: run_ReversedDictionary, tags: [.validation, .api, .Dictionary]),
+]
+
 // These benchmarks compare the performance of iteration through several
 // collection types after being reversed.
 var x = 0

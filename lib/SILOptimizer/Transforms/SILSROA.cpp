@@ -50,7 +50,7 @@ class SROAMemoryUseAnalyzer {
   // Stores to AI.
   llvm::SmallVector<StoreInst *, 4> Stores;
   // Instructions which extract from aggregates.
-  llvm::SmallVector<SILInstruction *, 4> ExtractInsts;
+  llvm::SmallVector<SingleValueInstruction *, 4> ExtractInsts;
 
   // TupleType if we are visiting a tuple.
   TupleType *TT = nullptr;
@@ -65,17 +65,17 @@ public:
   void chopUpAlloca(std::vector<AllocStackInst *> &Worklist);
 
 private:
-  SILInstruction *createAgg(SILBuilder &B, SILLocation Loc, SILType Ty,
-                                  ArrayRef<SILValue> Elements);
-  SILInstruction *createAggProjection(SILBuilder &B, SILLocation Loc,
-                                      SILValue Operand, unsigned EltNo);
+  SILValue createAgg(SILBuilder &B, SILLocation Loc, SILType Ty,
+                     ArrayRef<SILValue> Elements);
+  SILValue createAggProjection(SILBuilder &B, SILLocation Loc,
+                               SILValue Operand, unsigned EltNo);
   unsigned getEltNoForProjection(SILInstruction *Inst);
   void createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations);
 };
 
 } // end anonymous namespace
 
-SILInstruction *
+SILValue 
 SROAMemoryUseAnalyzer::createAgg(SILBuilder &B, SILLocation Loc,
                                  SILType Ty,
                                  ArrayRef<SILValue> Elements) {
@@ -87,7 +87,7 @@ SROAMemoryUseAnalyzer::createAgg(SILBuilder &B, SILLocation Loc,
   return B.createStruct(Loc, Ty, Elements);
 }
 
-SILInstruction *
+SILValue
 SROAMemoryUseAnalyzer::createAggProjection(SILBuilder &B, SILLocation Loc,
                                            SILValue Operand,
                                            unsigned EltNo) {
@@ -237,8 +237,8 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     for (auto *NewAI : NewAllocations)
       Elements.push_back(B.createLoad(LI->getLoc(), NewAI,
                                       LoadOwnershipQualifier::Unqualified));
-    auto *Agg = createAgg(B, LI->getLoc(), LI->getType().getObjectType(),
-                          Elements);
+    SILValue Agg = createAgg(B, LI->getLoc(), LI->getType().getObjectType(),
+                             Elements);
     LI->replaceAllUsesWith(Agg);
     LI->eraseFromParent();
   }

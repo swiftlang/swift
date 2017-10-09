@@ -14,6 +14,11 @@
 // for performance measuring.
 import TestsUtils
 
+public let Phonebook = BenchmarkInfo(
+  name: "Phonebook",
+  runFunction: run_Phonebook,
+  tags: [.validation, .api, .String])
+
 var words = [
   "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
   "Charles", "Thomas", "Christopher", "Daniel", "Matthew", "Donald", "Anthony",

@@ -127,7 +127,11 @@ class HostSpecificConfiguration(object):
             test = (
                 deployment_platform not in invocation.platforms_to_skip_test)
             test_host_only = None
-            build_benchmark = build and deployment_target.supports_benchmark
+            dt_supports_benchmark = deployment_target.supports_benchmark
+            build_benchmarks = build and dt_supports_benchmark
+            build_external_benchmarks = all([build, dt_supports_benchmark,
+                                             args.build_external_benchmarks])
+
             # FIXME: Note, `build-script-impl` computed a property here
             # w.r.t. testing, but it was actually unused.
 
@@ -161,13 +165,20 @@ class HostSpecificConfiguration(object):
                 else:
                     self.swift_stdlib_build_targets.append(
                         "swift-test-stdlib-" + name)
-            if build_benchmark:
+            if build_benchmarks:
                 self.swift_benchmark_build_targets.append(
                     "swift-benchmark-" + name)
                 # FIXME: This probably should respect `args.benchmark`, but
                 # a typo in build-script-impl meant we always would do this.
                 self.swift_benchmark_run_targets.append(
                     "check-swift-benchmark-" + name)
+
+            if build_external_benchmarks:
+                # Add support for the external benchmarks.
+                self.swift_benchmark_build_targets.append(
+                    "swift-benchmark-{}-external".format(name))
+                self.swift_benchmark_run_targets.append(
+                    "check-swift-benchmark-{}-external".format(name))
             if test:
                 if test_host_only:
                     suffix = "-non-executable"
@@ -304,7 +315,7 @@ class BuildScriptInvocation(object):
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
         if not args.test_osx:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
-        if not args.test_ios_device:
+        if not args.test_ios_host:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
         else:
             exit_rejecting_arguments("error: iOS device tests are not " +
@@ -315,7 +326,7 @@ class BuildScriptInvocation(object):
         if not args.test_ios_32bit_simulator:
             self.platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator.i386)
-        if not args.test_tvos_device:
+        if not args.test_tvos_host:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
         else:
             exit_rejecting_arguments("error: tvOS device tests are not " +
@@ -323,7 +334,7 @@ class BuildScriptInvocation(object):
         if not args.test_tvos_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.AppleTVSimulator)
-        if not args.test_watchos_device:
+        if not args.test_watchos_host:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
         else:
             exit_rejecting_arguments("error: watchOS device tests are not " +
@@ -332,16 +343,16 @@ class BuildScriptInvocation(object):
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator)
 
-        if not args.test_android_device:
+        if not args.test_android_host:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
 
         self.platforms_to_skip_test_host = set()
-        if not args.test_ios_device:
+        if not args.test_ios_host:
             self.platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
-        if not args.test_tvos_device:
+        if not args.test_tvos_host:
             self.platforms_to_skip_test_host.add(
                 StdlibDeploymentTarget.AppleTV)
-        if not args.test_watchos_device:
+        if not args.test_watchos_host:
             self.platforms_to_skip_test_host.add(
                 StdlibDeploymentTarget.AppleWatch)
 
@@ -506,6 +517,9 @@ class BuildScriptInvocation(object):
                           "--skip-build-swift"]
         if not args.build_benchmarks:
             impl_args += ["--skip-build-benchmarks"]
+        # Currently we do not build external benchmarks by default.
+        if args.build_external_benchmarks:
+            impl_args += ["--skip-build-external-benchmarks=0"]
         if not args.build_foundation:
             impl_args += ["--skip-build-foundation"]
         if not args.build_xctest:
@@ -579,21 +593,21 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-cygwin"]
         if not args.test_osx:
             impl_args += ["--skip-test-osx"]
-        if not args.test_ios_device:
+        if not args.test_ios_host:
             impl_args += ["--skip-test-ios-host"]
         if not args.test_ios_simulator:
             impl_args += ["--skip-test-ios-simulator"]
         if not args.test_ios_32bit_simulator:
             impl_args += ["--skip-test-ios-32bit-simulator"]
-        if not args.test_tvos_device:
+        if not args.test_tvos_host:
             impl_args += ["--skip-test-tvos-host"]
         if not args.test_tvos_simulator:
             impl_args += ["--skip-test-tvos-simulator"]
-        if not args.test_watchos_device:
+        if not args.test_watchos_host:
             impl_args += ["--skip-test-watchos-host"]
         if not args.test_watchos_simulator:
             impl_args += ["--skip-test-watchos-simulator"]
-        if not args.test_android_device:
+        if not args.test_android_host:
             impl_args += ["--skip-test-android-host"]
         if args.build_runtime_with_host_compiler:
             impl_args += ["--build-runtime-with-host-compiler"]

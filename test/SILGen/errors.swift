@@ -670,7 +670,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK: } // end sil function '_T06errors16supportStructureyAA6BridgeVz_SS4nametKF'
 
 struct OwnedBridge {
-  var owner : Builtin.UnknownObject
+  var owner : AnyObject
   subscript(name: String) -> Pylon {
     addressWithOwner { return (someValidPointer(), owner) }
     mutableAddressWithOwner { return (someValidPointer(), owner) }
@@ -700,13 +700,13 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK-NEXT: try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 // CHECK:    [[BB_NORMAL]]
 // CHECK-NEXT: end_access [[WRITE]]
-// CHECK-NEXT: destroy_value [[OWNER]] : $Builtin.UnknownObject
+// CHECK-NEXT: destroy_value [[OWNER]] : $AnyObject
 // CHECK-NEXT: end_borrow [[BORROWED_ARG2]] from [[ARG2]]
 // CHECK-NEXT: destroy_value [[ARG2]] : $String
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 // CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : @owned $Error):
-// CHECK-NEXT: destroy_value [[OWNER]] : $Builtin.UnknownObject
+// CHECK-NEXT: destroy_value [[OWNER]] : $AnyObject
 // CHECK-NEXT: end_access [[WRITE]]
 // CHECK-NEXT: end_borrow [[BORROWED_ARG2]] from [[ARG2]]
 // CHECK-NEXT: destroy_value [[ARG2]] : $String

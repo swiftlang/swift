@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 366; // Last change: default argument resilience expansion
+const uint16_t VERSION_MINOR = 369; // Last change: associated type overrides
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -815,10 +815,11 @@ namespace decls_block {
 
   using AssociatedTypeDeclLayout = BCRecordLayout<
     ASSOCIATED_TYPE_DECL,
-    IdentifierIDField, // name
-    DeclContextIDField,// context decl
-    TypeIDField,       // default definition
-    BCFixed<1>         // implicit flag
+    IdentifierIDField,   // name
+    DeclContextIDField,  // context decl
+    TypeIDField,         // default definition
+    BCFixed<1>,          // implicit flag
+    BCArray<DeclIDField> // overridden associated types
   >;
 
   using StructLayout = BCRecordLayout<

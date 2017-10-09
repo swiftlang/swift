@@ -210,31 +210,67 @@ class _OptionalBoolAction(argparse.Action):
 _register(action, 'optional_bool', _OptionalBoolAction)
 
 
-class _OptionalTrueAction(_OptionalBoolAction):
+_TRUE_VALUES = [True, 1, 'true', 'True', 'TRUE', '1']
+_FALSE_VALUES = [False, 0, 'false', 'False', 'FALSE', '0']
+
+
+class _OnOffAction(argparse.Action):
+    """Action that can be toggled on or off, defaulting to the off state. An
+    optional bool-ish argument can be passed to set the state manually.
+    """
+
+    def __init__(self, **kwargs):
+        assert 'choices' in kwargs and len(kwargs['choices']) == 2
+
+        self._on_value, self._off_value = kwargs.pop('choices')
+        kwargs['nargs'] = '?'
+
+        if 'default' not in kwargs:
+            kwargs['default'] = self._off_value
+
+        if 'metavar' not in kwargs:
+            kwargs['metavar'] = 'BOOL'
+
+        super(_OnOffAction, self).__init__(**kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if values is None:
+            val = self._on_value
+        elif values in _TRUE_VALUES:
+            val = self._on_value
+        elif values in _FALSE_VALUES:
+            val = self._off_value
+        else:
+            raise argparse.ArgumentTypeError(
+                values + ' is not a boolean value')
+
+        setattr(namespace, self.dest, val)
+
+
+class _EnableAction(_OnOffAction):
     """Action that defaults to False when absent and to True when parsed with
     the option to override the value by passing a bool-like value as an
     argument.
     """
 
-    def __init__(self, *args, **kwargs):
-        kwargs['const'] = True
-        kwargs['default'] = kwargs.pop('default', False)
-        super(_OptionalTrueAction, self).__init__(*args, **kwargs)
+    def __init__(self, **kwargs):
+        kwargs['choices'] = (True, False)
+        super(_EnableAction, self).__init__(**kwargs)
 
 
-_register(action, 'optional_true', _OptionalTrueAction)
+_register(action, 'enable', _EnableAction)
 
 
-class _OptionalFalseAction(_OptionalBoolAction):
+class _DisableAction(_OnOffAction):
     """Action that defaults to True when absent and to False when parsed with
     the option to override the value by passing a bool-like value as an
-    argument.
+    argument. When overridden the resulting value is negated, thus passing
+    'True' will result in the destination being set to False.
     """
 
-    def __init__(self, *args, **kwargs):
-        kwargs['const'] = False
-        kwargs['default'] = kwargs.pop('default', True)
-        super(_OptionalFalseAction, self).__init__(*args, **kwargs)
+    def __init__(self, **kwargs):
+        kwargs['choices'] = (False, True)
+        super(_DisableAction, self).__init__(**kwargs)
 
 
-_register(action, 'optional_false', _OptionalFalseAction)
+_register(action, 'disable', _DisableAction)
