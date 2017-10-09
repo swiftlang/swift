@@ -45,9 +45,16 @@ public protocol MutableCollectionAlgorithms : MutableCollection {
   mutating func rotate(shiftingToStart middle: Index) -> Index
 }
 
-// In the stdlib, this conformance wouldn't be needed
+// In the stdlib, these conformances wouldn't be needed
 extension Array : MutableCollectionAlgorithms {  }
 extension ArraySlice : MutableCollectionAlgorithms {  }
+
+% for Traversal in TRAVERSALS:
+%   for RangeReplaceable in [ False, True ]:
+%     Slice = sliceTypeName(traversal=Traversal, mutable=True, rangeReplaceable=RangeReplaceable)
+extension ${Slice} : MutableCollectionAlgorithms {  }
+%   end
+% end
 
 /// In the stdlib, this would simply be MutableCollection
 extension MutableCollectionAlgorithms {
