@@ -68,6 +68,11 @@ bool Syntax::isMissing() const {
   return getRaw()->isMissing();
 }
 
+bool Syntax::isToken() const {
+  return getRaw()->isToken();
+}
+
+
 llvm::Optional<Syntax> Syntax::getParent() const {
   auto ParentData = getData().Parent;
   if (ParentData == nullptr) return llvm::None;
