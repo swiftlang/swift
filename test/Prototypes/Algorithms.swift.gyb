@@ -34,7 +34,9 @@ from gyb_stdlib_support import (
 //===----------------------------------------------------------------------===//
 
 // In the stdlib, this would simply be MutableCollection
-public protocol MutableCollectionAlgorithms : MutableCollection {
+public protocol MutableCollectionAlgorithms : MutableCollection
+  where SubSequence : MutableCollectionAlgorithms
+{
   /// Rotates the elements of the collection so that the element
   /// at `middle` ends up first.
   ///
@@ -74,15 +76,6 @@ extension MutableCollectionAlgorithms {
     }
     while p != lhs.upperBound && q != rhs.upperBound
     return (p, q)
-  }
-
-  @inline(__always)
-  internal mutating func _swapSubrangePrefixes(
-    _ lhs: Range<Index>, with rhs: Range<Index>
-  ) -> (Index, Index) {
-    return lhs.isEmpty || rhs.isEmpty
-      ? (lhs.lowerBound, rhs.lowerBound)
-      : _swapNonemptySubrangePrefixes(lhs, rhs)
   }
 
   /// Rotates the elements of the collection so that the element
@@ -183,11 +176,11 @@ extension MutableCollection where Self: BidirectionalCollection {
     // locality properties than either of the other implementations.
     // Benchmarks should be performed for that algorithm too, just to
     // be sure.
-    self[startIndex..<middle].reverse()
-    self[middle..<endIndex].reverse()
+    self[..<middle].reverse()
+    self[middle...].reverse()
     let (p, q) = _reverseUntil(middle)
     self[p..<q].reverse()
-    return middle == p  ? q : p
+    return middle == p ? q : p
   }
 }
 
@@ -209,17 +202,15 @@ extension MutableCollection where Self: RandomAccessCollection {
   @inline(__always)
   internal mutating func _rotateCycle(
     start: Index,
-    pivot: Index,
-    plus: IndexDistance,
-    minus: IndexDistance)
-  {
+    sourceOffsetForIndex: (Index) -> IndexDistance
+  ) {
     let tmp = self[start]
     var i = start
-    var j = index(start, offsetBy: start < pivot ? plus : minus)
+    var j = index(start, offsetBy: sourceOffsetForIndex(start))
     while j != start {
       self[i] = self[j]
       i = j
-      j = index(j, offsetBy: j < pivot ? plus : minus)
+      j = index(j, offsetBy: sourceOffsetForIndex(j))
     }
     self[i] = tmp
   }
@@ -252,7 +243,7 @@ extension MutableCollection where Self: RandomAccessCollection {
     for cycle in 1...cycles {
       _rotateCycle(
         start: index(startIndex, offsetBy: numericCast(cycle)),
-        pivot: pivot, plus: plus, minus: minus)
+        sourceOffsetForIndex: { $0 < pivot ? plus : minus })
     }
     return pivot
   }
@@ -293,35 +284,33 @@ public struct ConcatenatedCollectionIndex<
 
   internal let _position:
     _ConcatenatedCollectionIndexRepresentation<C1.Index, C2.Index>
-}
 
-public func < <C1: Collection, C2: Collection>(
-  lhs: ConcatenatedCollectionIndex<C1, C2>,
-  rhs: ConcatenatedCollectionIndex<C1, C2>
-) -> Bool {
-  switch (lhs._position, rhs._position) {
-  case (.first, .second):
-    return true
-  case (.second, .first):
-    return false
-  case let (.first(l), .first(r)):
-    return l < r
-  case let (.second(l), .second(r)):
-    return l < r
+  public static func < (
+    lhs: ConcatenatedCollectionIndex, rhs: ConcatenatedCollectionIndex
+  ) -> Bool {
+    switch (lhs._position, rhs._position) {
+    case (.first, .second):
+      return true
+    case (.second, .first):
+      return false
+    case let (.first(l), .first(r)):
+      return l < r
+    case let (.second(l), .second(r)):
+      return l < r
+    }
   }
-}
 
-public func == <C1: Collection, C2: Collection>(
-  lhs: ConcatenatedCollectionIndex<C1, C2>,
-  rhs: ConcatenatedCollectionIndex<C1, C2>
-) -> Bool {
-  switch (lhs._position, rhs._position) {
-  case let (.first(l), .first(r)):
-    return l == r
-  case let (.second(l), .second(r)):
-    return l == r
-  default:
-    return false
+  public static func == (
+    lhs: ConcatenatedCollectionIndex, rhs: ConcatenatedCollectionIndex
+  ) -> Bool {
+    switch (lhs._position, rhs._position) {
+    case let (.first(l), .first(r)):
+      return l == r
+    case let (.second(l), .second(r)):
+      return l == r
+    default:
+      return false
+    }
   }
 }
 
@@ -458,18 +447,18 @@ where C1.Element == C2.Element {
 public struct RotatedCollectionIndex<Base : Collection> : Comparable {
   internal let _index:
     ConcatenatedCollectionIndex<Base.SubSequence, Base.SubSequence>
-}
 
-public func < <Base: Collection>(
-  lhs: RotatedCollectionIndex<Base>, rhs: RotatedCollectionIndex<Base>
-) -> Bool {
-  return lhs._index < rhs._index
-}
+  public static func < (
+    lhs: RotatedCollectionIndex, rhs: RotatedCollectionIndex
+  ) -> Bool {
+    return lhs._index < rhs._index
+  }
 
-public func == <Base: Collection>(
-  lhs: RotatedCollectionIndex<Base>, rhs: RotatedCollectionIndex<Base>
-) -> Bool {
-  return lhs._index == rhs._index
+  public static func == (
+    lhs: RotatedCollectionIndex, rhs: RotatedCollectionIndex
+  ) -> Bool {
+    return lhs._index == rhs._index
+  }
 }
 
 % for Traversal in TRAVERSALS:
@@ -484,7 +473,7 @@ public struct ${Self}<
     Base.SubSequence, Base.SubSequence>
 
   init(_base: Base, shiftingToStart i: Base.Index) {
-    _concatenation = concatenate(_base.suffix(from: i), _base.prefix(upTo: i))
+    _concatenation = concatenate(_base[i...], _base[..<i])
   }
 
   public typealias Index = RotatedCollectionIndex<Base>
@@ -553,8 +542,7 @@ extension ${Collection} {
 //===----------------------------------------------------------------------===//
 
 extension BidirectionalCollection
-  where Self : MutableCollectionAlgorithms,
-  SubSequence: MutableCollectionAlgorithms {
+  where Self : MutableCollectionAlgorithms {
 
   @discardableResult
   mutating func stablePartition(
@@ -654,9 +642,9 @@ suite.test("reverseSubrange") {
     let a = Array(0..<l)
 
     for p in a.startIndex...a.endIndex {
-      let prefix = a.prefix(upTo: p)
+      let prefix = a[..<p]
       for q in p...l {
-        let suffix = a.suffix(from: q)
+        let suffix = a[q...]
 
         var b = a
         b.reserveCapacity(b.count)  // guarantee unique storage
@@ -677,9 +665,9 @@ suite.test("rotate") {
     let a = Array(0..<l)
 
     for p in a.startIndex...a.endIndex {
-      let prefix = a.prefix(upTo: p)
+      let prefix = a[..<p]
       for q in p...l {
-        let suffix = a.suffix(from: q)
+        let suffix = a[q...]
 
         for m in p...q {
           var b = a
@@ -705,9 +693,9 @@ suite.test("rotateRandomAccess") {
     let a = Array(0..<l)
 
     for p in a.startIndex...a.endIndex {
-      let prefix = a.prefix(upTo: p)
+      let prefix = a[..<p]
       for q in p...l {
-        let suffix = a.suffix(from: q)
+        let suffix = a[q...]
 
         for m in p...q {
           var b = a
@@ -754,9 +742,9 @@ suite.test("stablePartition") {
     let a = Array(0..<l)
 
     for p in a.startIndex...a.endIndex {
-      let prefix = a.prefix(upTo: p)
+      let prefix = a[..<p]
       for q in p...l {
-        let suffix = a.suffix(from: q)
+        let suffix = a[q...]
 
         let subrange = a[p..<q]
 
@@ -769,7 +757,7 @@ suite.test("stablePartition") {
           let id = address(b)
 
           var r = b[p..<q].stablePartition(choosingStartGroupBy: f)
-          expectEqual(b.prefix(upTo:p), prefix)
+          expectEqual(b[..<p], prefix)
           expectEqual(b.suffix(from:q), suffix)
           expectEqual(b[p..<r], ArraySlice(subrange.filter(f)))
           expectEqual(b[r..<q], ArraySlice(subrange.filter(notf)))
@@ -777,7 +765,7 @@ suite.test("stablePartition") {
 
           b = a
           r = b[p..<q].stablePartition(choosingStartGroupBy: notf)
-          expectEqual(b.prefix(upTo:p), prefix)
+          expectEqual(b[..<p], prefix)
           expectEqual(b.suffix(from:q), suffix)
           expectEqual(b[p..<r], ArraySlice(subrange.filter(notf)))
           expectEqual(b[r..<q], ArraySlice(subrange.filter(f)))
@@ -789,13 +777,13 @@ suite.test("stablePartition") {
         let notf = { !f($0) }
         var b = a
         var r = b.stablePartition(choosingStartGroupBy: f)
-        expectEqual(b.prefix(upTo: r), ArraySlice(a.filter(f)))
-        expectEqual(b.suffix(from: r), ArraySlice(a.filter(notf)))
+        expectEqual(b[..<r], ArraySlice(a.filter(f)))
+        expectEqual(b[r...], ArraySlice(a.filter(notf)))
 
         b = a
         r = b.stablePartition(choosingStartGroupBy: notf)
-        expectEqual(b.prefix(upTo: r), ArraySlice(a.filter(notf)))
-        expectEqual(b.suffix(from: r), ArraySlice(a.filter(f)))
+        expectEqual(b[..<r], ArraySlice(a.filter(notf)))
+        expectEqual(b[r...], ArraySlice(a.filter(f)))
       }
     }
   }
