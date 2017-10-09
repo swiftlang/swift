@@ -3155,6 +3155,8 @@ ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
 
+  auto *nominal = Adoptee->getAnyNominal();
+
   // Resolve all associated types before trying to resolve this witness.
   resolveTypeWitnesses();
 
@@ -3168,23 +3170,21 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
   // Determine whether we can derive a witness for this requirement.
   bool canDerive = false;
-  if (auto *nominal = Adoptee->getAnyNominal()) {
-    // Can a witness for this requirement be derived for this nominal type?
-    if (auto derivable = DerivedConformance::getDerivableRequirement(
-                           nominal,
-                           requirement)) {
-      if (derivable == requirement) {
-        // If it's the same requirement, we can derive it here.
-        canDerive = true;
-      } else {
-        // Otherwise, go satisfy the derivable requirement, which can introduce
-        // a member that could in turn satisfy *this* requirement.
-        auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
-        if (auto conformance =
-              TC.conformsToProtocol(Adoptee, derivableProto, DC, None)) {
-          if (conformance->isConcrete())
-            (void)conformance->getConcrete()->getWitnessDecl(derivable, &TC);
-        }
+  // Can a witness for this requirement be derived for this nominal type?
+  if (auto derivable = DerivedConformance::getDerivableRequirement(
+                         nominal,
+                         requirement)) {
+    if (derivable == requirement) {
+      // If it's the same requirement, we can derive it here.
+      canDerive = true;
+    } else {
+      // Otherwise, go satisfy the derivable requirement, which can introduce
+      // a member that could in turn satisfy *this* requirement.
+      auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
+      if (auto conformance =
+            TC.conformsToProtocol(Adoptee, derivableProto, DC, None)) {
+        if (conformance->isConcrete())
+          (void)conformance->getConcrete()->getWitnessDecl(derivable, &TC);
       }
     }
   }
@@ -3231,8 +3231,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         });
     }
 
-    AccessScope nominalAccessScope =
-        Adoptee->getAnyNominal()->getFormalAccessScope(DC);
+    auto nominalAccessScope = nominal->getFormalAccessScope(DC);
     auto check = checkWitness(nominalAccessScope, requirement, best);
 
     switch (check.Kind) {
@@ -3448,10 +3447,9 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
 
   // Find the declaration that derives the protocol conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
-  if (auto *nominal = Adoptee->getAnyNominal()) {
-    if (nominal->derivesProtocolConformance(Proto))
-      derivingTypeDecl = nominal;
-  }
+  auto *nominal = Adoptee->getAnyNominal();
+  if (nominal->derivesProtocolConformance(Proto))
+    derivingTypeDecl = nominal;
 
   if (!derivingTypeDecl) {
     return ResolveWitnessResult::Missing;
@@ -5606,14 +5604,13 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   // Note that we check the module name to smooth over the difference
   // between an imported Objective-C module and its overlay.
   if (Proto->isSpecificProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
-    if (auto nominal = Adoptee->getAnyNominal()) {
-      if (!TC.Context.isTypeBridgedInExternalModule(nominal)) {
-        if (nominal->getParentModule() != DC->getParentModule() &&
-            !isInOverlayModuleForImportedModule(DC, nominal)) {
-          auto nominalModule = nominal->getParentModule();
-          TC.diagnose(Loc, diag::nonlocal_bridged_to_objc, nominal->getName(),
-                      Proto->getName(), nominalModule->getName());
-        }
+    auto nominal = Adoptee->getAnyNominal();
+    if (!TC.Context.isTypeBridgedInExternalModule(nominal)) {
+      if (nominal->getParentModule() != DC->getParentModule() &&
+          !isInOverlayModuleForImportedModule(DC, nominal)) {
+        auto nominalModule = nominal->getParentModule();
+        TC.diagnose(Loc, diag::nonlocal_bridged_to_objc, nominal->getName(),
+                    Proto->getName(), nominalModule->getName());
       }
     }
   }
