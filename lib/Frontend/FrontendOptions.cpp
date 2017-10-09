@@ -76,7 +76,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
     // If we have the SIL as our primary input, we can waive the one file
     // requirement as long as all the other inputs are SIBs.
     for (unsigned i = 0, e = inputFilenameCount(); i != e; ++i) {
-      if (i == getPrimaryInput()->Index)
+      if (i == getOptionalPrimaryInput()->Index)
         continue;
       
       StringRef File(getInputFilenames()[i]);
@@ -106,7 +106,8 @@ void FrontendInputs::transformInputFilenames(const llvm::function_ref<std::strin
   }
 }
 
-void FrontendInputs::setInputFilenamesAndPrimaryInput(DiagnosticEngine &Diags, llvm::opt::ArgList &Args) {
+void FrontendInputs::setInputFilenamesAndPrimaryInputs(DiagnosticEngine &Diags, llvm::opt::ArgList &Args) {
+  assert(!havePrimaryInputs());
   if (const Arg *filelistPath = Args.getLastArg(options::OPT_filelist)) {
     readInputFileList(Diags, Args, filelistPath);
     return;

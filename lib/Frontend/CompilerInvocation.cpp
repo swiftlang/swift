@@ -225,7 +225,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.Inputs.setInputFilenamesAndPrimaryInput(Diags, Args);
+  Opts.Inputs.setInputFilenamesAndPrimaryInputs(Diags, Args);
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
@@ -702,7 +702,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
     Opts.SerializeBridgingHeader |=
-      !Opts.Inputs.getPrimaryInput() && !Opts.ModuleOutputPath.empty();
+      !Opts.Inputs.hasPrimaryInput() && !Opts.ModuleOutputPath.empty();
   }
 
   for (const Arg *A : Args.filtered(OPT_import_module)) {
@@ -1432,8 +1432,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // in other classes.
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
     Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (FrontendOpts.Inputs.getPrimaryInput() && FrontendOpts.Inputs.getPrimaryInput()->isFilename()) {
-    unsigned Index = FrontendOpts.Inputs.getPrimaryInput()->Index;
+  } else if (FrontendOpts.Inputs.hasPrimaryInput() && FrontendOpts.Inputs.getOptionalPrimaryInput()->isFilename()) {
+    unsigned Index = FrontendOpts.Inputs.getOptionalPrimaryInput()->Index;
     Opts.MainInputFilename = FrontendOpts.Inputs.getInputFilenames()[Index];
   } else if (FrontendOpts.Inputs.hasUniqueInputFilename()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();

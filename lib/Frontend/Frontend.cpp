@@ -156,7 +156,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().EnableAccessControl = false;
 
   const Optional<SelectedInput> &PrimaryInput =
-    Invocation.getFrontendOptions().Inputs.getPrimaryInput();
+    Invocation.getFrontendOptions().Inputs.getOptionalPrimaryInput();
 
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.

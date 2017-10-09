@@ -126,39 +126,52 @@ private:
     assert(PrimaryInputs.size() < 2 && "have not implemented >1 primary input yet");
   }
   
-   const ArrayRef<SelectedInput> getPrimaryInputs() const {
+   const ArrayRef<SelectedInput> getPrimaryInput() const {
      mustNotBePluralPrimaryInputs();
      return PrimaryInputs;
    }
+  
+  const ArrayRef<SelectedInput> getPrimaryInputs() const {
+    return PrimaryInputs;
+  }
   
   std::vector<SelectedInput> &getMutablePrimaryInputs() {
     mustNotBePluralPrimaryInputs();
     return PrimaryInputs;
   }
 public:
-  
+  // TO BE DELETED
   unsigned primaryInputCount() const { return getPrimaryInputs().size(); }
+  
+  unsigned countOfPrimaryInputs() const {
+    return getPrimaryInputs().size();
+  }
 
   bool hasPrimaryInput() const {
     return primaryInputCount() > 0;
+  }
+  bool havePrimaryInputs() const {
+    return countOfPrimaryInputs() > 0;
   }
   
   bool isWholeModule() {
     return !hasPrimaryInput();
   }
   
-  Optional<SelectedInput> getPrimaryInput() const {
+  // TO BE DELETED
+  Optional<SelectedInput> getOptionalPrimaryInput() const {
     return hasPrimaryInput() ? Optional<SelectedInput>(getPrimaryInputs()[0]) : Optional<SelectedInput>();
   }
   
   bool isPrimaryInputAFileAt(unsigned i) {
-    return hasPrimaryInput() &&  getPrimaryInput()->isFilename()  &&  getPrimaryInput()->Index == i;
+    return hasPrimaryInput() &&  getOptionalPrimaryInput()->isFilename()  &&  getOptionalPrimaryInput()->Index == i;
   }
   bool haveAPrimaryInputFile() const {
-   return hasPrimaryInput() && getPrimaryInput()->isFilename();
+   return hasPrimaryInput() && getOptionalPrimaryInput()->isFilename();
   }
+
   Optional<unsigned> primaryInputFileIndex() const {
-    return haveAPrimaryInputFile() ? Optional<unsigned>(getPrimaryInput()->Index) : None;
+    return haveAPrimaryInputFile() ? Optional<unsigned>(getOptionalPrimaryInput()->Index) : None;
   }
   
   StringRef primaryInputFilenameIfAny() const {
@@ -215,7 +228,7 @@ public:
     InputBuffers.clear();
   }
   
-  void setInputFilenamesAndPrimaryInput(DiagnosticEngine &Diags, llvm::opt::ArgList &Args);
+  void setInputFilenamesAndPrimaryInputs(DiagnosticEngine &Diags, llvm::opt::ArgList &Args);
   
   void readInputFileList(DiagnosticEngine &diags,
                          llvm::opt::ArgList &Args,
