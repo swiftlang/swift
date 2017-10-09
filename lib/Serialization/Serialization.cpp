@@ -2720,6 +2720,10 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(assocType);
 
     auto contextID = addDeclContextRef(assocType->getDeclContext());
+    SmallVector<DeclID, 4> overriddenAssocTypeIDs;
+    for (auto overridden : assocType->getOverriddenDecls()) {
+      overriddenAssocTypeIDs.push_back(addDeclRef(overridden));
+    }
 
     unsigned abbrCode = DeclTypeAbbrCodes[AssociatedTypeDeclLayout::Code];
     AssociatedTypeDeclLayout::emitRecord(
@@ -2727,7 +2731,8 @@ void Serializer::writeDecl(const Decl *D) {
       addDeclBaseNameRef(assocType->getName()),
       contextID,
       addTypeRef(assocType->getDefaultDefinitionType()),
-      assocType->isImplicit());
+      assocType->isImplicit(),
+      overriddenAssocTypeIDs);
     break;
   }
 

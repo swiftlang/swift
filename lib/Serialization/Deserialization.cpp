@@ -2502,11 +2502,13 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclContextID contextID;
     TypeID defaultDefinitionID;
     bool isImplicit;
+    ArrayRef<uint64_t> rawOverriddenIDs;
 
     decls_block::AssociatedTypeDeclLayout::readRecord(scratch, nameID,
                                                       contextID,
                                                       defaultDefinitionID,
-                                                      isImplicit);
+                                                      isImplicit,
+                                                      rawOverriddenIDs);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2533,6 +2535,17 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       assocType->setImplicit();
 
     assocType->setCheckedInheritanceClause();
+
+    // Overridden associated types.
+    SmallVector<AssociatedTypeDecl *, 2> overriddenAssocTypes;
+    for (auto overriddenID : rawOverriddenIDs) {
+      if (auto overriddenAssocType =
+              dyn_cast_or_null<AssociatedTypeDecl>(getDecl(overriddenID))) {
+        overriddenAssocTypes.push_back(overriddenAssocType);
+      }
+    }
+    (void)assocType->setOverriddenDecls(overriddenAssocTypes);
+
     break;
   }
 

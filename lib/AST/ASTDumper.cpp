@@ -667,6 +667,15 @@ namespace {
                    [&](const RequirementRepr &req) { req.print(OS); },
                    [&] { OS << ", "; });
       }
+      if (decl->overriddenDeclsComputed()) {
+        OS << " overridden=";
+        interleave(decl->getOverriddenDecls(),
+                   [&](AssociatedTypeDecl *overridden) {
+                     OS << overridden->getProtocol()->getName();
+                   }, [&]() {
+                     OS << ", ";
+                   });
+      }
 
       OS << ")";
     }

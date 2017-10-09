@@ -1604,6 +1604,13 @@ static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
                                               assocType2->getName().str()))
     return result;
 
+  // Prefer an associated type with no overrides (i.e., an anchor) to one
+  // that has overrides.
+  bool hasOverridden1 = !assocType1->getOverriddenDecls().empty();
+  bool hasOverridden2 = !assocType2->getOverriddenDecls().empty();
+  if (hasOverridden1 != hasOverridden2)
+    return hasOverridden1 ? +1 : -1;
+
   // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
   auto proto1 = assocType1->getProtocol();
   auto proto2 = assocType2->getProtocol();
@@ -1655,6 +1662,7 @@ TypeDecl *EquivalenceClass::lookupNestedType(
 
   // Look for types with the given name in protocols that we know about.
   AssociatedTypeDecl *bestAssocType = nullptr;
+  llvm::SmallSetVector<AssociatedTypeDecl *, 4> assocTypeAnchors;
   SmallVector<TypeDecl *, 4> concreteDecls;
   for (const auto &conforms : conformsTo) {
     ProtocolDecl *proto = conforms.first;
@@ -1665,6 +1673,10 @@ TypeDecl *EquivalenceClass::lookupNestedType(
       // If this is an associated type, record whether it is the best
       // associated type we've seen thus far.
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        // Retrieve the associated type anchor.
+        assocType = assocType->getAssociatedTypeAnchor();
+        assocTypeAnchors.insert(assocType);
+
         if (!bestAssocType ||
              compareAssociatedTypes(assocType, bestAssocType) < 0)
           bestAssocType = assocType;
@@ -1721,6 +1733,22 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     }
   }
 
+  // Infer same-type constraints among same-named associated type anchors.
+  if (assocTypeAnchors.size() > 1) {
+    auto &builder = *members.front()->getBuilder();
+    auto anchorType = getAnchor({ });
+    auto inferredSource = FloatingRequirementSource::forInferred(nullptr);
+    for (auto assocType : assocTypeAnchors) {
+      if (assocType == bestAssocType) continue;
+
+      builder.addRequirement(
+        Requirement(RequirementKind::SameType,
+                    DependentMemberType::get(anchorType, bestAssocType),
+                    DependentMemberType::get(anchorType, assocType)),
+        inferredSource, nullptr);
+    }
+  }
+
   // Form the new cache entry.
   CachedNestedType entry;
   entry.numConformancesPresent = conformsTo.size();
@@ -1730,6 +1758,8 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     entry.types.push_back(bestAssocType);
     entry.types.insert(entry.types.end(),
                        concreteDecls.begin(), concreteDecls.end());
+    assert(bestAssocType->getOverriddenDecls().empty() &&
+           "Lookup should never keep a non-anchor associated type");
   } else if (!concreteDecls.empty()) {
     // Find the best concrete type.
     auto bestConcreteTypeIter =
@@ -2552,6 +2582,11 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   if (!type) return nullptr;
 
   AssociatedTypeDecl *assocType = dyn_cast<AssociatedTypeDecl>(type);
+
+  // Always refer to the archetype anchor.
+  if (assocType)
+    assocType = assocType->getAssociatedTypeAnchor();
+
   TypeDecl *concreteDecl = assocType ? nullptr : type;
 
   // If we were asked for a complete, well-formed archetype, make sure we
@@ -3276,10 +3311,6 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
         // If we have inherited associated type...
         if (auto inheritedAssocTypeDecl =
               dyn_cast<AssociatedTypeDecl>(inheritedType)) {
-          // Infer a same-type requirement among the same-named associated
-          // types.
-          addInferredSameTypeReq(assocTypeDecl, inheritedAssocTypeDecl);
-
           // Complain about the first redeclaration.
           if (shouldWarnAboutRedeclaration) {
             auto inheritedFromProto = inheritedAssocTypeDecl->getProtocol();
@@ -5472,53 +5503,6 @@ static void collapseSameTypeComponentsThroughDelayedRequirements(
                          collapsedParents.end());
 }
 
-/// Check whether two potential archetypes "structurally" match, e.g.,
-/// the names match up to the root (which must match).
-static bool potentialArchetypesStructurallyMatch(PotentialArchetype *pa1,
-                                                 PotentialArchetype *pa2) {
-  auto parent1 = pa1->getParent();
-  auto parent2 = pa2->getParent();
-  if (!parent1 && !parent2)
-    return pa1->getGenericParamKey() == pa2->getGenericParamKey();
-
-  // Check for depth mismatch.
-  if (static_cast<bool>(parent1) != static_cast<bool>(parent2))
-    return false;
-
-  // Check names.
-  if (pa1->getNestedName() != pa2->getNestedName())
-    return false;
-
-  return potentialArchetypesStructurallyMatch(parent1, parent2);
-}
-
-/// Look for structurally-equivalent types within the given equivalence class,
-/// collapsing their components.
-static void collapseStructurallyEquivalentSameTypeComponents(
-              EquivalenceClass *equivClass,
-              llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
-              SmallVectorImpl<unsigned> &collapsedParents,
-              unsigned &remainingComponents) {
-  for (unsigned i : indices(equivClass->members)) {
-    auto pa1 = equivClass->members[i];
-    auto rep1 = findRepresentative(collapsedParents, componentOf[pa1]);
-    for (unsigned j : indices(equivClass->members).slice(i + 1)) {
-      auto pa2 = equivClass->members[j];
-      auto rep2 = findRepresentative(collapsedParents, componentOf[pa2]);
-      if (rep1 == rep2) continue;
-
-      auto depth = pa1->getNestingDepth();
-      if (depth < 2 || depth != pa2->getNestingDepth()) continue;
-
-      if (potentialArchetypesStructurallyMatch(pa1, pa2) &&
-          unionSets(collapsedParents, rep1, rep2)) {
-        --remainingComponents;
-        rep1 = findRepresentative(collapsedParents, componentOf[pa1]);
-      }
-    }
-  }
-}
-
 /// Collapse same-type components within an equivalence class, minimizing the
 /// number of requirements required to express the equivalence class.
 static void collapseSameTypeComponents(
@@ -5577,14 +5561,6 @@ static void collapseSameTypeComponents(
     // Collapse same-type components by looking at the delayed requirements.
     collapseSameTypeComponentsThroughDelayedRequirements(
       builder, equivClass, componentOf, collapsedParents, remainingComponents);
-  }
-
-  if (remainingComponents > 1) {
-    // Collapse structurally-equivalent components.
-    collapseStructurallyEquivalentSameTypeComponents(equivClass,
-                                                     componentOf,
-                                                     collapsedParents,
-                                                     remainingComponents);
   }
 
   // If needed, collapse the same-type components merged by a derived

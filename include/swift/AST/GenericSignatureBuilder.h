@@ -1452,18 +1452,13 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// associated type.
   PotentialArchetype(PotentialArchetype *parent, Identifier name);
 
-  /// \brief Construct a new potential archetype for an associated type.
-  PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
-    : parentOrBuilder(parent), identifier(assocType)
-  {
-    assert(parent != nullptr && "Not an associated type?");
-  }
-
   /// \brief Construct a new potential archetype for a concrete declaration.
   PotentialArchetype(PotentialArchetype *parent, TypeDecl *concreteDecl)
     : parentOrBuilder(parent), identifier(concreteDecl)
   {
-    assert(parent != nullptr && "Not an associated type?");
+    assert(parent != nullptr && "Not a nested type?");
+    assert(!isa<AssociatedTypeDecl>(concreteDecl) ||
+      cast<AssociatedTypeDecl>(concreteDecl)->getOverriddenDecls().empty());
   }
 
   /// \brief Construct a new potential archetype for a generic parameter.
