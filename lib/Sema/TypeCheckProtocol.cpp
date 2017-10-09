@@ -1022,8 +1022,6 @@ matchWitness(TypeChecker &tc,
                                    std::get<1>(types))) {
         return *result;
       }
-
-      // FIXME: Consider default arguments here?
     }
 
     // If the witness is 'throws', the requirement must be.
@@ -4276,7 +4274,6 @@ void ConformanceChecker::resolveTypeWitnesses() {
   SWIFT_DEFER { Conformance->setState(initialState); };
 
   for (auto assocType : Proto->getAssociatedTypeMembers()) {
-
     // If we already have a type witness, do nothing.
     if (Conformance->hasTypeWitness(assocType))
       continue;
@@ -4597,6 +4594,24 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
           typeWitnesses.insert(assocType, {derivedType, reqDepth});
           continue;
+        }
+
+        // If there is a generic parameter of the named type, use that.
+        if (auto gpList = DC->getGenericParamsOfContext()) {
+          GenericTypeParamDecl *foundGP = nullptr;
+          for (auto gp : *gpList) {
+            if (gp->getName() == assocType->getName()) {
+              foundGP = gp;
+              break;
+            }
+          }
+
+          if (foundGP) {
+            auto gpType = DC->mapTypeIntoContext(
+                            foundGP->getDeclaredInterfaceType());
+            typeWitnesses.insert(assocType, {gpType, reqDepth});
+            continue;
+          }
         }
 
         // The solution is incomplete.

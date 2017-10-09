@@ -195,9 +195,9 @@ public protocol Thenable {
     func then(_ success: (_: T) -> T) -> Self
 }
 
-public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>' does not conform to protocol 'Thenable'}}
-    public func then(_ success: @escaping (_ t: T, _: CorePromise<T>) -> T) -> Self {
-        return self.then() { (t: T) -> T in
+public class CorePromise<U> : Thenable { // expected-error{{type 'CorePromise<U>' does not conform to protocol 'Thenable'}}
+    public func then(_ success: @escaping (_ t: U, _: CorePromise<U>) -> U) -> Self {
+        return self.then() { (t: U) -> U in // expected-error{{contextual closure type '(U, CorePromise<U>) -> U' expects 2 arguments, but 1 was used in closure body}}
             return success(t: t, self)
         }
     }
@@ -390,3 +390,13 @@ protocol P13 {
 struct S13 : P13 { // expected-error{{type 'S13' does not conform to protocol 'P13'}}
   func foo(arg: inout Int) {}
 }
+
+// "Infer" associated type from generic parameter.
+protocol P14 {
+  associatedtype Value
+}
+
+struct P14a<Value>: P14 { }
+
+struct P14b<Value> { }
+extension P14b: P14 { }
