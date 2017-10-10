@@ -1452,6 +1452,11 @@ ERROR(witness_requires_dynamic_self,none,
       "method %0 in non-final class %1 must return `Self` to conform to "
       "protocol %2",
       (DeclName, Type, Type))
+ERROR(witness_requires_class_implementation,none,
+      "method %0 in non-final class %1 cannot be implemented in a "
+      "protocol extension because it returns `Self` and has associated type "
+      "requirements",
+      (DeclName, Type))
 ERROR(witness_not_accessible_proto,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be declared "
@@ -3115,6 +3120,13 @@ ERROR(invalid_weak_ownership_not_optional,none,
       "'weak' variable should have optional type %0", (Type))
 ERROR(invalid_weak_let,none,
       "'weak' must be a mutable variable, because it may change at runtime", ())
+ERROR(ownership_invalid_in_protocols,none,
+      "'%select{strong|weak|unowned|unowned}0' cannot be applied to a property declaration in a protocol",
+      (/*Ownership*/unsigned))
+WARNING(ownership_invalid_in_protocols_compat_warning,none,
+      "'%select{strong|weak|unowned|unowned}0' should not be applied to a property declaration "
+      "in a protocol and will be disallowed in future versions",
+      (/*Ownership*/unsigned))
 
 // required
 ERROR(required_initializer_nonclass,none,

@@ -314,18 +314,35 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
                        selfTy);
 
   if (auto *proto = fnType->getDefaultWitnessMethodProtocol(M)) {
-    // The Self type is abstract, so we must pass in a witness table.
+    // The Self type is abstract, so we can fulfill its metadata from
+    // the Self metadata parameter.
     addSelfMetadataFulfillment(selfTy);
 
-    // Look at the witness table for the conformance.
+    // The witness table for the Self : P conformance can be
+    // fulfilled from the Self witness table parameter.
     Sources.emplace_back(MetadataSource::Kind::SelfWitnessTable,
                          MetadataSource::InvalidSourceIndex,
                          selfTy);
     addSelfWitnessTableFulfillment(selfTy, proto);
+  } else if (auto *classDecl = fnType->getWitnessMethodClass(M)) {
+    // The Self type is abstract, so we can fulfill its metadata from
+    // the Self metadata parameter.
+    addSelfMetadataFulfillment(selfTy);
+
+    // FIXME: We should fulfill the witness table too, but we don't
+    // have the original protocol anymore -- we should store it as part
+    // of the @convention(witness_method) bit in the SILFunctionType's
+    // ExtInfo
   } else {
     // If the Self type is concrete, we have a witness thunk with a
     // fully substituted Self type. The witness table parameter is not
     // used.
+    //
+    // FIXME: As above, we should fulfill the Self metadata and
+    // conformance from our two special paramaters here. However, the
+    // Self metadata will be inexact.
+    //
+    // For now, just fulfill the generic arguments of 'Self'.
     considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
   }
 }

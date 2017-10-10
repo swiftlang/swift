@@ -134,9 +134,22 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
 
     TheCallees.getPointer()->push_back(WitnessFn);
 
-    // FIXME: For now, conservatively assume that unknown functions
-    //        can be called from any witness_method call site.
-    TheCallees.setInt(true);
+    // If we can't resolve the witness, conservatively assume it can call
+    // anything.
+    if (!Requirement.getDecl()->isProtocolRequirement() ||
+        !WT.getConformance()->hasWitness(Requirement.getDecl())) {
+      TheCallees.setInt(true);
+      continue;
+    }
+
+    auto Witness = WT.getConformance()->getWitness(Requirement.getDecl(),
+                                                   nullptr);
+    auto DeclRef = SILDeclRef(Witness.getDecl());
+
+    bool canCallUnknown = !calleesAreStaticallyKnowable(M, DeclRef);
+
+    if (canCallUnknown)
+      TheCallees.setInt(true);
   }
 }
 

@@ -850,7 +850,7 @@ struct ObservingPropertiesWithOwnershipTypesInferred {
 
 // <rdar://problem/16554876> property accessor synthesization of weak variables doesn't work
 protocol WeakPropertyProtocol {
- weak var maybePresent : Ref? { get set }
+ var maybePresent : Ref? { get set }
 }
 
 struct WeakPropertyStruct : WeakPropertyProtocol {

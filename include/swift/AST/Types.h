@@ -3520,9 +3520,15 @@ public:
 
   CanType getSelfInstanceType() const;
 
-  /// If this a @convention(witness_method) function with an abstract
-  /// self parameter, return the protocol constraint for the Self type.
+  /// If this is a @convention(witness_method) function with a protocol
+  /// constrained self parameter, return the protocol constraint for
+  /// the Self type.
   ProtocolDecl *getDefaultWitnessMethodProtocol(ModuleDecl &M) const;
+
+  /// If this is a @convention(witness_method) function with a class
+  /// constrained self parameter, return the class constraint for the
+  /// Self type.
+  ClassDecl *getWitnessMethodClass(ModuleDecl &M) const;
 
   ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
 

@@ -1132,13 +1132,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 #endif
 
-  Opts.EnableObjCInterop = Target.isOSDarwin();
-  if (auto A = Args.getLastArg(OPT_enable_objc_interop,
-                               OPT_disable_objc_interop)) {
-    Opts.EnableObjCInterop
-      = A->getOption().matches(OPT_enable_objc_interop);
-  }
-
+  Opts.EnableObjCInterop =
+      Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
+                   Target.isOSDarwin());
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
   // Must be processed after any other language options that could affect
