@@ -30,6 +30,20 @@ from operator import attrgetter
 from jobstats import load_stats_dir, merge_all_jobstats
 
 
+# Perform any custom processing of args here, in particular the
+# select_stats_from_csv_baseline step, which is a bit subtle.
+def vars_of_args(args):
+    vargs = vars(args)
+    if args.select_stats_from_csv_baseline is not None:
+        b = read_stats_dict_from_csv(args.select_stats_from_csv_baseline)
+        if args.group_by_module:
+            pat = re.compile('^\w+\.')
+            vargs['select_stat'] = set(re.sub(pat, '', k) for k in b.keys())
+        else:
+            vargs['select_stat'] = b.keys()
+    return vargs
+
+
 # Passed args with 2-element remainder ["old", "new"], return a list of tuples
 # of the form [(name, (oldstats, newstats))] where each name is a common subdir
 # of each of "old" and "new", and the stats are those found in the respective
@@ -38,14 +52,15 @@ def load_paired_stats_dirs(args):
     assert(len(args.remainder) == 2)
     paired_stats = []
     (old, new) = args.remainder
+    vargs = vars_of_args(args)
     for p in sorted(os.listdir(old)):
         full_old = os.path.join(old, p)
         full_new = os.path.join(new, p)
         if not (os.path.exists(full_old) and os.path.isdir(full_old) and
                 os.path.exists(full_new) and os.path.isdir(full_new)):
             continue
-        old_stats = load_stats_dir(full_old, **vars(args))
-        new_stats = load_stats_dir(full_new, **vars(args))
+        old_stats = load_stats_dir(full_old, **vargs)
+        new_stats = load_stats_dir(full_new, **vargs)
         if len(old_stats) == 0 or len(new_stats) == 0:
             continue
         paired_stats.append((p, (old_stats, new_stats)))
@@ -54,15 +69,17 @@ def load_paired_stats_dirs(args):
 
 def write_catapult_trace(args):
     allstats = []
+    vargs = vars_of_args(args)
     for path in args.remainder:
-        allstats += load_stats_dir(path, **vars(args))
+        allstats += load_stats_dir(path, **vargs)
     json.dump([s.to_catapult_trace_obj() for s in allstats], args.output)
 
 
 def write_lnt_values(args):
+    vargs = vars_of_args(args)
     for d in args.remainder:
-        stats = load_stats_dir(d, **vars(args))
-        merged = merge_all_jobstats(stats, **vars(args))
+        stats = load_stats_dir(d, **vargs)
+        merged = merge_all_jobstats(stats, **vargs)
         j = merged.to_lnt_test_obj(args)
         if args.lnt_submit is None:
             json.dump(j, args.output, indent=4)
@@ -90,12 +107,13 @@ def show_paired_incrementality(args):
                   "name"]
     out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
     out.writeheader()
+    vargs = vars_of_args(args)
 
     for (name, (oldstats, newstats)) in load_paired_stats_dirs(args):
         olddriver = merge_all_jobstats((x for x in oldstats
-                                        if x.is_driver_job()), **vars(args))
+                                        if x.is_driver_job()), **vargs)
         newdriver = merge_all_jobstats((x for x in newstats
-                                        if x.is_driver_job()), **vars(args))
+                                        if x.is_driver_job()), **vargs)
         if olddriver is None or newdriver is None:
             continue
         oldpct = olddriver.incrementality_percentage()
@@ -115,8 +133,9 @@ def show_incrementality(args):
     out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
     out.writeheader()
 
+    vargs = vars_of_args(args)
     for path in args.remainder:
-        stats = load_stats_dir(path, **vars(args))
+        stats = load_stats_dir(path, **vargs)
         for s in stats:
             if s.is_driver_job():
                 pct = s.incrementality_percentage()
@@ -192,10 +211,11 @@ def read_stats_dict_from_csv(f, select_stat=''):
 # next baseline-set is done.
 def set_csv_baseline(args):
     existing = None
+    vargs = vars_of_args(args)
     if os.path.exists(args.set_csv_baseline):
         with open(args.set_csv_baseline, "r") as f:
-            existing = read_stats_dict_from_csv(f,
-                                                select_stat=args.select_stat)
+            ss = vargs['select_stat']
+            existing = read_stats_dict_from_csv(f, select_stat=ss)
             print ("updating %d baseline entries in %s" %
                    (len(existing), args.set_csv_baseline))
     else:
@@ -205,8 +225,8 @@ def set_csv_baseline(args):
         out = csv.DictWriter(f, fieldnames, dialect='excel-tab',
                              quoting=csv.QUOTE_NONNUMERIC)
         m = merge_all_jobstats((s for d in args.remainder
-                                for s in load_stats_dir(d, **vars(args))),
-                               **vars(args))
+                                for s in load_stats_dir(d, **vargs)),
+                               **vargs)
         if m is None:
             print "no stats found"
             return 1
@@ -295,11 +315,12 @@ def write_comparison(args, old_stats, new_stats):
 
 
 def compare_to_csv_baseline(args):
+    vargs = vars_of_args(args)
     old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline,
-                                         select_stat=args.select_stat)
+                                         select_stat=vargs['select_stat'])
     m = merge_all_jobstats((s for d in args.remainder
-                            for s in load_stats_dir(d, **vars(args))),
-                           **vars(args))
+                            for s in load_stats_dir(d, **vargs)),
+                           **vargs)
     old_stats = dict((k, v) for (k, (_, v)) in old_stats.items())
     new_stats = m.stats
 
@@ -311,15 +332,7 @@ def compare_stats_dirs(args):
     if len(args.remainder) != 2:
         raise ValueError("Expected exactly 2 stats-dirs")
 
-    vargs = vars(args)
-    if args.select_stats_from_csv_baseline is not None:
-        b = read_stats_dict_from_csv(args.select_stats_from_csv_baseline)
-        if args.group_by_module:
-            pat = re.compile('^\w+\.')
-            vargs['select_stat'] = set(re.sub(pat, '', k) for k in b.keys())
-        else:
-            vargs['select_stat'] = b.keys()
-
+    vargs = vars_of_args(args)
     (old, new) = args.remainder
     old_stats = merge_all_jobstats(load_stats_dir(old, **vargs), **vargs)
     new_stats = merge_all_jobstats(load_stats_dir(new, **vargs), **vargs)
