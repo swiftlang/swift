@@ -689,9 +689,8 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
 }
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
-  auto moduleDecl = IGM.getSwiftModule();
   auto genericSig = IGM.getSILTypes().getCurGenericContext();
-  return genericSig->getCanonicalSignature().getGenericEnvironment(*moduleDecl);
+  return genericSig->getCanonicalSignature().getGenericEnvironment();
 }
 
 GenericEnvironment *IRGenModule::getGenericEnvironment() {
@@ -962,8 +961,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
   auto canGenericSig = genericSig->getCanonicalSignature();
-  auto module = IGM.getSwiftModule();
-  auto canGenericEnv = canGenericSig.getGenericEnvironment(*module);
+  auto canGenericEnv = canGenericSig.getGenericEnvironment();
   if (canGenericEnv == genericEnv) return t;
 
   // Map the archetype out of its own generic environment and into the
@@ -1711,8 +1709,7 @@ bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
   auto canGenericSig = genericSig->getCanonicalSignature();
-  auto module = IGM.getSwiftModule();
-  auto canGenericEnv = canGenericSig.getGenericEnvironment(*module);
+  auto canGenericEnv = canGenericSig.getGenericEnvironment();
 
   // If this archetype is in the canonical generic environment, it's an
   // exemplar archetype.

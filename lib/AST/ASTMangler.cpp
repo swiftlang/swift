@@ -1680,8 +1680,8 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
   // dependent type, but can't yet. Shouldn't need this side channel.
 
   appendIdentifier(assocTy->getName().str());
-  if (!OptimizeProtocolNames || !CurGenericSignature || !Mod
-      || CurGenericSignature->getConformsTo(dmt->getBase(), *Mod).size() > 1) {
+  if (!OptimizeProtocolNames || !CurGenericSignature
+      || CurGenericSignature->getConformsTo(dmt->getBase()).size() > 1) {
     appendAnyGenericType(assocTy->getProtocol());
   }
 }

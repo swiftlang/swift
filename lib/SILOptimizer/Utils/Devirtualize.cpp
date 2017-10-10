@@ -876,7 +876,7 @@ getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
 
   auto *mod = Module.getSwiftModule();
   bool isDefaultWitness =
-    (witnessFnTy->getDefaultWitnessMethodProtocol(*mod)
+    (witnessFnTy->getDefaultWitnessMethodProtocol()
       == CRef.getRequirement());
   auto *classWitness = witnessFnTy->getWitnessMethodClass(*mod);
 

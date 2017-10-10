@@ -1239,7 +1239,7 @@ CanType TypeBase::getCanonicalType(GenericSignature *sig,
   if (!sig)
     return getCanonicalType();
 
-  return sig->getCanonicalTypeInContext(this, mod);
+  return sig->getCanonicalTypeInContext(this);
 }
 
 TypeBase *TypeBase::reconstituteSugar(bool Recursive) {

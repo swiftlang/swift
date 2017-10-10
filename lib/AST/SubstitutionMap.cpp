@@ -133,8 +133,7 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
 
   // The generic parameter may have been made concrete by the generic signature,
   // substitute into the concrete type.
-  ModuleDecl &anyModule = *genericParam->getASTContext().getStdlibModule();
-  if (auto concreteType = genericSig->getConcreteType(genericParam, anyModule)){
+  if (auto concreteType = genericSig->getConcreteType(genericParam)){
     // Set the replacement type to an error, to block infinite recursion.
     replacementType = ErrorType::get(concreteType);
 
@@ -191,14 +190,13 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     };
 
   auto genericSig = getGenericSignature();
-  auto &mod = *proto->getModuleContext();
 
   // If the type doesn't conform to this protocol, fail.
-  if (!genericSig->conformsToProtocol(type, proto, mod))
+  if (!genericSig->conformsToProtocol(type, proto))
     return None;
 
   auto accessPath =
-    genericSig->getConformanceAccessPath(type, proto, mod);
+    genericSig->getConformanceAccessPath(type, proto);
 
   // Fall through because we cannot yet evaluate an access path.
   Optional<ProtocolConformanceRef> conformance;

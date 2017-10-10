@@ -3632,12 +3632,10 @@ GenericFunctionType::get(GenericSignature *sig,
   // it's canonical.  Unfortunately, isCanonicalTypeInContext can cause
   // new GenericFunctionTypes to be created and thus invalidate our insertion
   // point.
-  auto &moduleForCanonicality = *ctx.TheBuiltinModule;
   bool isCanonical = sig->isCanonical()
     && isCanonicalFunctionInputType(input)
-    && sig->isCanonicalTypeInContext(unwrapParenType(input),
-                                     moduleForCanonicality)
-    && sig->isCanonicalTypeInContext(output, moduleForCanonicality);
+    && sig->isCanonicalTypeInContext(unwrapParenType(input))
+    && sig->isCanonicalTypeInContext(output);
 
   if (auto result
         = ctx.Impl.GenericFunctionTypes.FindNodeOrInsertPos(id, insertPos)) {

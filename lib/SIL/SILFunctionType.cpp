@@ -96,15 +96,15 @@ CanType SILFunctionType::getSelfInstanceType() const {
 }
 
 ProtocolDecl *
-SILFunctionType::getDefaultWitnessMethodProtocol(ModuleDecl &M) const {
+SILFunctionType::getDefaultWitnessMethodProtocol() const {
   assert(getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod);
   auto selfTy = getSelfInstanceType();
   if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
     assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
-    auto superclass = GenericSig->getSuperclassBound(paramTy, M);
+    auto superclass = GenericSig->getSuperclassBound(paramTy);
     if (superclass)
       return nullptr;
-    auto protos = GenericSig->getConformsTo(paramTy, M);
+    auto protos = GenericSig->getConformsTo(paramTy);
     assert(protos.size() == 1);
     return protos[0];
   }
@@ -118,7 +118,7 @@ SILFunctionType::getWitnessMethodClass(ModuleDecl &M) const {
   auto genericSig = getGenericSignature();
   if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
     assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
-    auto superclass = genericSig->getSuperclassBound(paramTy, M);
+    auto superclass = genericSig->getSuperclassBound(paramTy);
     if (superclass)
       return superclass->getClassOrBoundGenericClass();
   }
@@ -305,8 +305,8 @@ enum class ConventionsKind : uint8_t {
       // If the substituted type is returned indirectly, so must the
       // unsubstituted type.
       if ((origType.isTypeParameter()
-           && !origType.isConcreteType(*M.getSwiftModule())
-           && !origType.requiresClass(*M.getSwiftModule()))
+           && !origType.isConcreteType()
+           && !origType.requiresClass())
           || substTL.isAddressOnly()) {
         return true;
 
@@ -462,8 +462,6 @@ enum class ConventionsKind : uint8_t {
     bool isFormallyPassedIndirectly(AbstractionPattern origType,
                                     CanType substType,
                                     const TypeLowering &substTL) {
-      auto &mod = *M.getSwiftModule();
-
       // If the C type of the argument is a const pointer, but the Swift type
       // isn't, treat it as indirect.
       if (origType.isClangType()
@@ -474,8 +472,8 @@ enum class ConventionsKind : uint8_t {
 
       // If the substituted type is passed indirectly, so must the
       // unsubstituted type.
-      if ((origType.isTypeParameter() && !origType.isConcreteType(mod)
-           && !origType.requiresClass(mod))
+      if ((origType.isTypeParameter() && !origType.isConcreteType()
+           && !origType.requiresClass())
           || substTL.isAddressOnly()) {
         return true;
 

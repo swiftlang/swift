@@ -118,9 +118,8 @@ void ProtocolRequirementTypeResolver::recordParamType(ParamDecl *decl,
 
 CompleteGenericTypeResolver::CompleteGenericTypeResolver(
                                               TypeChecker &tc,
-                                              GenericSignature *genericSig,
-                                              ModuleDecl &module)
-  : tc(tc), genericSig(genericSig), module(module),
+                                              GenericSignature *genericSig)
+  : tc(tc), genericSig(genericSig),
     builder(*tc.Context.getOrCreateGenericSignatureBuilder(
                                genericSig->getCanonicalSignature()))
 {
@@ -223,8 +222,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 }
 
 bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {
-  return genericSig->getCanonicalTypeInContext(type1, module)
-           == genericSig->getCanonicalTypeInContext(type2, module);
+  return genericSig->getCanonicalTypeInContext(type1)
+           == genericSig->getCanonicalTypeInContext(type2);
 }
 
 void
@@ -792,8 +791,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     sig = func->getDeclContext()->getGenericSignatureOfContext();
   }
 
-  CompleteGenericTypeResolver completeResolver(*this, sig,
-                                               *func->getModuleContext());
+  CompleteGenericTypeResolver completeResolver(*this, sig);
   if (checkGenericFuncSignature(*this, nullptr, func, completeResolver))
     invalid = true;
 
@@ -1019,8 +1017,7 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     sig = subscript->getDeclContext()->getGenericSignatureOfContext();
   }
 
-  CompleteGenericTypeResolver completeResolver(*this, sig,
-                                               *subscript->getModuleContext());
+  CompleteGenericTypeResolver completeResolver(*this, sig);
   if (checkGenericSubscriptSignature(*this, nullptr, subscript, completeResolver))
     invalid = true;
 
@@ -1167,8 +1164,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
             ->getGenericSignatureOfContext();
   }
 
-  CompleteGenericTypeResolver completeResolver(*this, sig,
-                                               *dc->getParentModule());
+  CompleteGenericTypeResolver completeResolver(*this, sig);
   if (recursivelyVisitGenericParams) {
     visitOuterToInner(genericParams,
                       [&](GenericParamList *gpList) {

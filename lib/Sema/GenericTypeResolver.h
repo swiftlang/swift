@@ -132,12 +132,10 @@ public:
 class CompleteGenericTypeResolver : public GenericTypeResolver {
   TypeChecker &tc;
   GenericSignature *genericSig;
-  ModuleDecl &module;
   GenericSignatureBuilder &builder;
 
 public:
-  CompleteGenericTypeResolver(TypeChecker &tc, GenericSignature *genericSig,
-                              ModuleDecl &module);
+  CompleteGenericTypeResolver(TypeChecker &tc, GenericSignature *genericSig);
 
   virtual Type mapTypeIntoContext(Type type);
 
