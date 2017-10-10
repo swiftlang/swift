@@ -85,7 +85,7 @@ internal struct _ThreadLocalStorage {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   static internal func getUBreakIterator(
-    for core: _StringCore
+    for core: _LegacyStringCore
   ) -> OpaquePointer {
     _sanityCheck(core._owner != nil || core._baseAddress != nil,
       "invalid StringCore")

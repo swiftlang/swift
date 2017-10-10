@@ -25,7 +25,7 @@
 // CHECK-NOT: {{^}}import
 // CHECK-NOT: _Double
 // CHECK-NOT: _StringBuffer
-// CHECK-NOT: _StringCore
+// CHECK-NOT: _LegacyStringCore
 // CHECK-NOT: _ArrayBody
 // DONT_CHECK-NOT: {{([^I]|$)([^n]|$)([^d]|$)([^e]|$)([^x]|$)([^a]|$)([^b]|$)([^l]|$)([^e]|$)}}
 // CHECK-NOT: buffer: _ArrayBuffer

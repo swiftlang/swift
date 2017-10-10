@@ -68,10 +68,10 @@ extension String {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct _CharacterView {
     @_versioned
-    internal var _core: _StringCore
+    internal var _core: _LegacyStringCore
 
     /// The offset of this view's `_core` from an original core. This works
-    /// around the fact that `_StringCore` is always zero-indexed.
+    /// around the fact that `_LegacyStringCore` is always zero-indexed.
     /// `_coreOffset` should be subtracted from `UnicodeScalarIndex.encodedOffset`
     /// before that value is used as a `_core` index.
     @_versioned
@@ -86,7 +86,7 @@ extension String {
     
     @_inlineable // FIXME(sil-serialize-all)
     public // @testable
-    init(_ _core: _StringCore, coreOffset: Int = 0) {
+    init(_ _core: _LegacyStringCore, coreOffset: Int = 0) {
       self._core = _core
       self._coreOffset = coreOffset
     }
@@ -189,7 +189,7 @@ extension String._CharacterView : _SwiftStringView {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var _persistentContent : String {
-    // FIXME: we might want to make sure our _StringCore isn't somehow a slice
+    // FIXME: we might want to make sure our _LegacyStringCore isn't somehow a slice
     // of some larger storage before blindly wrapping/returning it as
     // persistent.  That said, if current benchmarks are measuring these cases,
     // we might end up regressing something by copying the storage.  For now,
@@ -385,7 +385,7 @@ extension String._CharacterView : BidirectionalCollection {
       return 1
     }
 
-    // Our relative offset from the _StringCore's baseAddress pointer. If our
+    // Our relative offset from the _LegacyStringCore's baseAddress pointer. If our
     // _core is not a substring, this is the same as start.encodedOffset. Otherwise,
     // it is the code unit relative offset into the substring and not the
     // absolute offset into the outer string.
@@ -522,7 +522,7 @@ extension String._CharacterView : BidirectionalCollection {
       return 1
     }
 
-    // The relative offset from the _StringCore's baseAddress pointer for the
+    // The relative offset from the _LegacyStringCore's baseAddress pointer for the
     // one-past-the-end and the last code unit under consideration.  If our
     // _core is not a substring, these are the same as positions. Otherwise,
     // these are code unit relative offsets into the substring and not the
@@ -569,7 +569,7 @@ extension String._CharacterView : BidirectionalCollection {
     let startOffset = 0
     let numCodeUnits = endOffset - startOffset
     _sanityCheck(unicodeScalars.startIndex.encodedOffset - _coreOffset == 0,
-      "position/offset mismatch in _StringCore as a substring")
+      "position/offset mismatch in _LegacyStringCore as a substring")
     _sanityCheck(numCodeUnits >= 2,
       "should have at least two code units")
 
