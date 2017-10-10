@@ -869,9 +869,6 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     // signature from the AST for that.
     auto origGenericSig
       = function->getGenericSignature();
-    auto getCanonicalType = [origGenericSig, &M](Type t) -> CanType {
-      return t->getCanonicalType(origGenericSig);
-    };
 
     auto &Types = M.Types;
     auto loweredCaptures = Types.getLoweredLocalCaptures(*function);
@@ -887,7 +884,8 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
             dynamicSelfInterfaceType,
             MetatypeRepresentation::Thick);
         
-        auto canSelfMetatype = getCanonicalType(selfMetatype);
+        auto canSelfMetatype =
+          selfMetatype->getCanonicalType(origGenericSig);
         SILParameterInfo param(canSelfMetatype, convention);
         inputs.push_back(param);
 
@@ -896,7 +894,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
 
       auto *VD = capture.getDecl();
       auto type = VD->getInterfaceType();
-      auto canType = getCanonicalType(type);
+      auto canType = type->getCanonicalType(origGenericSig);
 
       auto &loweredTL = Types.getTypeLowering(
                               AbstractionPattern(genericSig, canType), canType);

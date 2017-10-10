@@ -2822,10 +2822,6 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                       ? DefaultThickCalleeConvention
                       : ParameterConvention::Direct_Unowned});
 
-  auto getCanonicalType = [&](Type t) -> CanType {
-    return t->getCanonicalType(genericSig);
-  };
-
   // Map the parameter and expected types out of context to get the interface
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;
@@ -2834,7 +2830,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     auto paramIfaceTy = GenericEnvironment::mapTypeOutOfContext(
         genericEnv, param.getType());
     interfaceParams.push_back(
-      SILParameterInfo(getCanonicalType(paramIfaceTy),
+      SILParameterInfo(paramIfaceTy->getCanonicalType(genericSig),
                        param.getConvention()));
   }
 
@@ -2842,7 +2838,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   for (auto &result : expectedType->getResults()) {
     auto resultIfaceTy = GenericEnvironment::mapTypeOutOfContext(
         genericEnv, result.getType());
-    auto interfaceResult = result.getWithType(getCanonicalType(resultIfaceTy));
+    auto interfaceResult =
+      result.getWithType(resultIfaceTy->getCanonicalType(genericSig));
     interfaceResults.push_back(interfaceResult);
   }
 
@@ -2852,7 +2849,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     auto errorIfaceTy = GenericEnvironment::mapTypeOutOfContext(
         genericEnv, errorResult.getType());
     interfaceErrorResult = SILResultInfo(
-        getCanonicalType(errorIfaceTy),
+        errorIfaceTy->getCanonicalType(genericSig),
         expectedType->getErrorResult().getConvention());
   }
   
