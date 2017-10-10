@@ -150,17 +150,17 @@ preset=buildbot_incremental,tools=RA,stdlib=RD,smoketest=macosx,single-thread
 
 ### Testing Compiler Performance
 
-The following commands will:
+Platform        | Comment | Check Status
+------------    | ------- | ------------
+macOS platform  | @swift-ci Please test compiler performance       | Compiles full source compatibility test suite and measures compiler performance
+macOS platform  | @swift-ci Please smoke test compiler performance | Compiles a subset of source compatibility test suite and measures compiler performance
+
+These commands will:
 
 1. Build a set of projects from the compatibility test suite
 2. Collect counters and timers reported by the compiler
 3. Compare the obtained data to the baseline (stored in git) and HEAD (version of a compiler built without the PR changes)
 4. Report the results in a pull request comment
-
-Platform        | Comment | Check Status
-------------    | ------- | ------------
-macOS platform  | @swift-ci Please test compiler performance       | Compiles full source compatibility test suite and measures compiler performance
-macOS platform  | @swift-ci Please smoke test compiler performance | Compiles a subset of source compatibility test suite and measures compiler performance
 
 For the detailed explanation of how compiler performance is measured, please refer to [this document](https://github.com/apple/swift/blob/master/docs/CompilerPerformance.md).
 
