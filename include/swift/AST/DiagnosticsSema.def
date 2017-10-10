@@ -3120,6 +3120,13 @@ ERROR(invalid_weak_ownership_not_optional,none,
       "'weak' variable should have optional type %0", (Type))
 ERROR(invalid_weak_let,none,
       "'weak' must be a mutable variable, because it may change at runtime", ())
+ERROR(ownership_invalid_in_protocols,none,
+      "'%select{strong|weak|unowned|unowned}0' cannot be applied to a property declaration in a protocol",
+      (/*Ownership*/unsigned))
+WARNING(ownership_invalid_in_protocols_compat_warning,none,
+      "'%select{strong|weak|unowned|unowned}0' should not be applied to a property declaration "
+      "in a protocol and will be disallowed in future versions",
+      (/*Ownership*/unsigned))
 
 // required
 ERROR(required_initializer_nonclass,none,
