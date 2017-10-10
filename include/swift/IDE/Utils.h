@@ -160,6 +160,7 @@ struct ResolvedCursorInfo {
   ValueDecl *ValueD = nullptr;
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtTyRef = nullptr;
+  SourceFile *SF = nullptr;
   ModuleEntity Mod;
   SourceLoc Loc;
   bool IsRef = true;
@@ -174,6 +175,7 @@ struct ResolvedCursorInfo {
   ResolvedCursorInfo(ValueDecl *ValueD,
                      TypeDecl *CtorTyRef,
                      ExtensionDecl *ExtTyRef,
+                     SourceFile *SF,
                      SourceLoc Loc,
                      bool IsRef,
                      Type Ty,
@@ -182,21 +184,26 @@ struct ResolvedCursorInfo {
                         ValueD(ValueD),
                         CtorTyRef(CtorTyRef),
                         ExtTyRef(ExtTyRef),
+                        SF(SF),
                         Loc(Loc),
                         IsRef(IsRef),
                         Ty(Ty),
                         DC(ValueD->getDeclContext()),
                         ContainerType(ContainerType) {}
   ResolvedCursorInfo(ModuleEntity Mod,
+                     SourceFile *SF,
                      SourceLoc Loc) :
                         Kind(CursorInfoKind::ModuleRef),
+                        SF(SF),
                         Mod(Mod),
-                        Loc(Loc) { }
-  ResolvedCursorInfo(Stmt *TrailingStmt) :
+                        Loc(Loc) {}
+  ResolvedCursorInfo(Stmt *TrailingStmt, SourceFile *SF) :
                         Kind(CursorInfoKind::StmtStart),
+                        SF(SF),
                         TrailingStmt(TrailingStmt) {}
-  ResolvedCursorInfo(Expr* TrailingExpr) :
+  ResolvedCursorInfo(Expr* TrailingExpr, SourceFile *SF) :
                         Kind(CursorInfoKind::ExprStart),
+                        SF(SF),
                         TrailingExpr(TrailingExpr) {}
   bool isValid() const { return !isInvalid(); }
   bool isInvalid() const { return Kind == CursorInfoKind::Invalid; }

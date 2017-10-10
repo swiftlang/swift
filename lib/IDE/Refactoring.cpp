@@ -633,15 +633,6 @@ public:
   }
 };
 
-struct ApplicabilityContext {
-  DiagnosticEngine &DiagEngine;
-  SourceFile *SF;
-  ApplicabilityContext(DiagnosticEngine &DiagEngine,
-                       SourceFile *SF):
-  DiagEngine(DiagEngine),
-  SF(SF) {}
-};
-
 #define CURSOR_REFACTORING(KIND, NAME, ID)                                    \
 class RefactoringAction##KIND: public TokenBasedRefactoringAction {           \
   public:                                                                     \
@@ -650,10 +641,9 @@ class RefactoringAction##KIND: public TokenBasedRefactoringAction {           \
                           DiagnosticConsumer &DiagConsumer) :                 \
     TokenBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {}      \
   bool performChange() override;                                              \
-  static bool isApplicable(ResolvedCursorInfo Tok, ApplicabilityContext &ACtx);\
+  static bool isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag);   \
   bool isApplicable() {                                                       \
-    auto Context = ApplicabilityContext(DiagEngine, TheFile);                 \
-    return RefactoringAction##KIND::isApplicable(CursorInfo, Context) ;       \
+    return RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine) ;    \
   }                                                                           \
 };
 #include "swift/IDE/RefactoringKinds.def"
@@ -679,16 +669,15 @@ class RefactoringAction##KIND: public RangeBasedRefactoringAction {           \
                           DiagnosticConsumer &DiagConsumer) :                 \
     RangeBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {}      \
   bool performChange() override;                                              \
-  static bool isApplicable(ResolvedRangeInfo Info, ApplicabilityContext &ACtx);\
+  static bool isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag);   \
   bool isApplicable() {                                                       \
-    auto Context = ApplicabilityContext(DiagEngine, TheFile);                 \
-    return RefactoringAction##KIND::isApplicable(RangeInfo, Context) ;        \
+    return RefactoringAction##KIND::isApplicable(RangeInfo, DiagEngine) ;     \
   }                                                                           \
 };
 #include "swift/IDE/RefactoringKinds.def"
 
 bool RefactoringActionLocalRename::
-isApplicable(ResolvedCursorInfo CursorInfo, ApplicabilityContext &ACtx) {
+isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
   if (CursorInfo.Kind != CursorInfoKind::ValueRef)
     return false;
   auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD);
@@ -887,7 +876,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
 }
 
 bool RefactoringActionExtractFunction::
-isApplicable(ResolvedRangeInfo Info, ApplicabilityContext &ACtx) {
+isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
   switch (Info.Kind) {
   case RangeKind::PartOfExpression:
   case RangeKind::SingleDecl:
@@ -896,7 +885,7 @@ isApplicable(ResolvedRangeInfo Info, ApplicabilityContext &ACtx) {
   case RangeKind::SingleExpression:
   case RangeKind::SingleStatement:
   case RangeKind::MultiStatement: {
-    return checkExtractConditions(Info, ACtx.DiagEngine).
+    return checkExtractConditions(Info, Diag).
       success({CannotExtractReason::VoidType});
   }
   }
@@ -1414,14 +1403,14 @@ bool RefactoringActionExtractExprBase::performChange() {
 }
 
 bool RefactoringActionExtractExpr::
-isApplicable(ResolvedRangeInfo Info, ApplicabilityContext &ACtx) {
+isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
   switch (Info.Kind) {
     case RangeKind::SingleExpression:
       // We disallow extract literal expression for two reasons:
       // (1) since we print the type for extracted expression, the type of a
       // literal may print as "int2048" where it is not typically users' choice;
       // (2) Extracting one literal provides little value for users.
-      return checkExtractConditions(Info, ACtx.DiagEngine).success();
+      return checkExtractConditions(Info, Diag).success();
     case RangeKind::PartOfExpression:
     case RangeKind::SingleDecl:
     case RangeKind::SingleStatement:
@@ -1438,10 +1427,10 @@ bool RefactoringActionExtractExpr::performChange() {
 }
 
 bool RefactoringActionExtractRepeatedExpr::
-isApplicable(ResolvedRangeInfo Info, ApplicabilityContext &ACtx) {
+isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
   switch (Info.Kind) {
     case RangeKind::SingleExpression:
-      return checkExtractConditions(Info, ACtx.DiagEngine).
+      return checkExtractConditions(Info, Diag).
         success({CannotExtractReason::Literal});
     case RangeKind::PartOfExpression:
     case RangeKind::SingleDecl:
@@ -1532,7 +1521,7 @@ static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo Cur
 }
 
 bool RefactoringActionCollapseNestedIfExpr::
-isApplicable(ResolvedCursorInfo Tok, ApplicabilityContext &ACtx) {
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   return findCollapseNestedIfTarget(Tok).isValid();
 }
 
@@ -1649,7 +1638,7 @@ static void interpolatedExpressionForm(Expr *E, SourceManager &SM,
 }
 
 bool RefactoringActionConvertStringsConcatenationToInterpolation::
-isApplicable(ResolvedRangeInfo Info, ApplicabilityContext &ACtx) {
+isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
   auto RangeContext = Info.RangeContext;
   if (RangeContext) {
     auto &Ctx = Info.RangeContext->getASTContext();
@@ -1762,7 +1751,7 @@ getUnsatisfiedRequirements(const DeclContext *DC) {
 }
 
 bool RefactoringActionFillProtocolStub::
-isApplicable(ResolvedCursorInfo Tok, ApplicabilityContext &ACtx) {
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   return FillProtocolStubContext::getContextFromCursorInfo(Tok).canProceed();
 };
 
@@ -1879,8 +1868,7 @@ static SwitchStmt* findEnclosingSwitchStmt(CaseStmt *CS,
 }
 
 bool RefactoringActionExpandDefault::
-isApplicable(ResolvedCursorInfo CursorInfo, ApplicabilityContext &ACtx) {
-  auto &Diag = ACtx.DiagEngine;
+isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
   auto Exit = [&](bool Applicable) {
     if (!Applicable)
       Diag.diagnose(SourceLoc(), diag::invalid_default_location);
@@ -1890,8 +1878,8 @@ isApplicable(ResolvedCursorInfo CursorInfo, ApplicabilityContext &ACtx) {
     return Exit(false);
   if (auto *CS = dyn_cast<CaseStmt>(CursorInfo.TrailingStmt)) {
     auto EnclosingSwitchStmt = findEnclosingSwitchStmt(CS,
-                                                       ACtx.SF,
-                                                       ACtx.DiagEngine);
+                                                       CursorInfo.SF,
+                                                       Diag);
     if (!EnclosingSwitchStmt)
       return false;
     auto EnumD = getEnumDeclFromSwitchStmt(EnclosingSwitchStmt);
@@ -1917,7 +1905,7 @@ bool RefactoringActionExpandDefault::performChange() {
 }
 
 bool RefactoringActionExpandSwitchCases::
-isApplicable(ResolvedCursorInfo CursorInfo, ApplicabilityContext &ACtx) {
+isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &DiagEngine) {
   if (!CursorInfo.TrailingStmt)
     return false;
   if (auto *Switch = dyn_cast<SwitchStmt>(CursorInfo.TrailingStmt)) {
@@ -1978,7 +1966,7 @@ static Expr *findLocalizeTarget(ResolvedCursorInfo CursorInfo) {
 }
 
 bool RefactoringActionLocalizeString::
-isApplicable(ResolvedCursorInfo Tok, ApplicabilityContext &ACtx) {
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   return findLocalizeTarget(Tok);
 }
 
@@ -2022,7 +2010,7 @@ static CharSourceRange
 }
 
 bool RefactoringActionConvertToDoCatch::
-isApplicable(ResolvedCursorInfo Tok, ApplicabilityContext &ACtx) {
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   if (!Tok.TrailingExpr)
     return false;
   return isa<ForceTryExpr>(Tok.TrailingExpr);
@@ -2110,7 +2098,7 @@ static void insertUnderscoreInDigits(StringRef Digits,
 }
 
 bool RefactoringActionSimplifyNumberLiteral::
-isApplicable(ResolvedCursorInfo Tok, ApplicabilityContext &ACtx) {
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   if (auto *Literal = getTrailingNumberLiteral(Tok)) {
     llvm::SmallString<64> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
@@ -2326,9 +2314,8 @@ collectAvailableRefactorings(SourceFile *SF,
     }
   }
   DiagnosticEngine DiagEngine(SF->getASTContext().SourceMgr);
-  auto Context = ApplicabilityContext(DiagEngine, SF);
 #define CURSOR_REFACTORING(KIND, NAME, ID)                                     \
-  if (RefactoringAction##KIND::isApplicable(CursorInfo, Context))           \
+  if (RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine))           \
     AllKinds.push_back(RefactoringKind::KIND);
 #include "swift/IDE/RefactoringKinds.def"
 
@@ -2364,7 +2351,6 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
   ASTContext &Ctx = SF->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
   DiagnosticEngine DiagEngine(SM);
-  auto Context = ApplicabilityContext(DiagEngine, SF);
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
     [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
 
@@ -2373,7 +2359,7 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
   ResolvedRangeInfo Result = Resolver.resolve();
 
 #define RANGE_REFACTORING(KIND, NAME, ID)                                     \
-  if (RefactoringAction##KIND::isApplicable(Result, Context))              \
+  if (RefactoringAction##KIND::isApplicable(Result, DiagEngine))              \
     Scratch.push_back(RefactoringKind::KIND);
 #include "swift/IDE/RefactoringKinds.def"
 
