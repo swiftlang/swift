@@ -176,7 +176,7 @@ extension String {
     ) -> Index? {
       // FIXME: swift-3-indexing-model: range check i?
       let d = i.encodedOffset.distance(to: limit.encodedOffset)
-      if (d > 0) ? (d < n) : (d > n) {
+      if (d >= 0) ? (d < n) : (d > n) {
         return nil
       }
       return Index(encodedOffset: i.encodedOffset.advanced(by: n))
