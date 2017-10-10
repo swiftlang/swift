@@ -307,6 +307,10 @@ public:
     }
     return SourceFile::ImplicitModuleImportKind::Stdlib;
   }
+  
+  /// Return false on error
+  bool setupForToolInputFile(const std::string &InputFilename, const std::string &ModuleNameArg, bool alwaysSetModuleToMain, serialization::ExtendedValidationInfo &extendedInfo);
+  bool hasSerializedAST() { return FrontendOpts.InputKind == InputFileKind::IFK_SIL; }
 };
 
 /// A class which manages the state and execution of the compiler.

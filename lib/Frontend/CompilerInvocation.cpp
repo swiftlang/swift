@@ -30,6 +30,8 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/LineIterator.h"
 #include "swift/Basic/Statistic.h"
+
+
 using namespace swift;
 using namespace llvm::opt;
 
@@ -132,7 +134,6 @@ namespace swift {
       SharedTimer("setInputFilenamesAndPrimaryInputs");
       
       getFilesDirectlyFromArgs();
-      
       if (!filelistBuffer || !primaryFilelistBuffer)
         return;
       
@@ -148,13 +149,13 @@ namespace swift {
     DiagnosticEngine &Diags;
     const llvm::opt::ArgList &Args;
     FrontendOptions &Opts;
- 
-  public:
     
+  public:
     FrontendArgsToOptionsConverter(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args, FrontendOptions &Opts) :
     Diags(Diags), Args(Args), Opts(Opts) {}
     
   private:
+    /// Try to read an output file list file.
     void readOutputFileList(std::vector<std::string> &outputFiles,
                             const llvm::opt::Arg *filelistPath) {
       llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
@@ -1718,4 +1719,35 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
                         extendedInfo.getExtraClangImporterOptions().begin(),
                         extendedInfo.getExtraClangImporterOptions().end());
   return info.status;
+}
+
+bool CompilerInvocation::setupForToolInputFile(const std::string &InputFilename, const std::string &ModuleNameArg, bool alwaysSetModuleToMain, serialization::ExtendedValidationInfo &extendedInfo) {
+  // Load the input file.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+  llvm::MemoryBuffer::getFileOrSTDIN(InputFilename);
+  if (!FileBufOrErr) {
+    fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
+    return false;
+  }
+  
+  // If it looks like we have an AST, set the source file kind to SIL and the
+  // name of the module to the file's name.
+  addInputBuffer(FileBufOrErr.get().get());
+  
+  auto result = serialization::validateSerializedAST(
+                                                     FileBufOrErr.get()->getBuffer(), &extendedInfo);
+  bool HasSerializedAST = result.status == serialization::Status::Valid;
+  
+  if (HasSerializedAST) {
+    const StringRef Stem = ModuleNameArg.size() ?
+    StringRef(ModuleNameArg) :
+    llvm::sys::path::stem(InputFilename);
+    setModuleName(Stem);
+    setInputKind(InputFileKind::IFK_Swift_Library);
+  } else {
+    const StringRef Name = !alwaysSetModuleToMain && ModuleNameArg.size() ? StringRef(ModuleNameArg) : "main";
+    setModuleName(Name);
+    setInputKind(InputFileKind::IFK_SIL);
+  }
+  return true;
 }
