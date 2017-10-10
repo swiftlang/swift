@@ -128,20 +128,6 @@ def _apply_default_arguments(args):
         raise ValueError("error: --watchos-all is unavailable in open-source "
                          "Swift.\nUse --watchos to skip watchOS device tests.")
 
-    # SwiftPM and XCTest have a dependency on Foundation.
-    # On OS X, Foundation is built automatically using xcodebuild.
-    # On Linux, we must ensure that it is built manually.
-    if ((args.build_swiftpm or args.build_xctest) and
-            platform.system() != "Darwin"):
-        args.build_foundation = True
-
-    # Foundation has a dependency on libdispatch.
-    # On OS X, libdispatch is provided by the OS.
-    # On Linux, we must ensure that it is built manually.
-    if (args.build_foundation and
-            platform.system() != "Darwin"):
-        args.build_libdispatch = True
-
     # Propagate global --skip-build
     if args.skip_build:
         args.build_linux = False
@@ -252,25 +238,6 @@ def _apply_default_arguments(args):
         args.test_tvos_host = False
         args.test_watchos_host = False
         args.test_android_host = False
-
-    if args.build_subdir is None:
-        args.build_subdir = \
-            workspace.compute_build_subdir(args)
-
-    # Add optional stdlib-deployment-targets
-    if args.android:
-        args.stdlib_deployment_targets.append(
-            StdlibDeploymentTarget.Android.armv7.name)
-
-    # Infer platform flags from manually-specified configure targets.
-    # This doesn't apply to Darwin platforms, as they are
-    # already configured. No building without the platform flag, though.
-
-    android_tgts = [tgt for tgt in args.stdlib_deployment_targets
-                    if StdlibDeploymentTarget.Android.contains(tgt)]
-    if not args.android and len(android_tgts) > 0:
-        args.android = True
-        args.build_android = False
 
 
 def create_argument_parser():
