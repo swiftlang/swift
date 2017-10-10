@@ -222,6 +222,11 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
                                                unsigned source,
                                                MetadataPath &&path,
                                          const InterestingKeysCallback &keys) {
+  // We can't use an objective-c parent type as we don't populate the parent
+  // type correctly.
+  if (type->getDecl()->hasClangNode())
+    return false;
+
   // Nominal types add no generic arguments themselves, but they
   // may have the arguments of their parents.
   return searchParentTypeMetadata(IGM, type->getDecl(), type.getParent(),
