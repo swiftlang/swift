@@ -333,7 +333,6 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements() {
   // change.)
   assert(canTypeSig.getGenericParams() == canExtensionSig.getGenericParams());
 
-  auto mod = DC->getParentModule();
   // Find the requirements in the extension that aren't proved by the original
   // type, these are the ones that make the conformance conditional.
   SmallVector<Requirement, 4> reqs;

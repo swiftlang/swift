@@ -203,6 +203,15 @@ public:
     EquivalenceClass &operator=(const EquivalenceClass &) = delete;
     EquivalenceClass &operator=(EquivalenceClass &&) = delete;
 
+    /// Record the conformance of this equivalence class to the given
+    /// protocol as found via the given requirement source.
+    ///
+    /// \returns true if this conformance is new to the equivalence class,
+    /// and false otherwise.
+    bool recordConformanceConstraint(PotentialArchetype *pa,
+                                     ProtocolDecl *proto,
+                                     const RequirementSource *source);
+
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
     /// that concrete type as written.

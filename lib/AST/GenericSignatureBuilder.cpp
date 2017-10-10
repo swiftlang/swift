@@ -1549,6 +1549,27 @@ unsigned GenericSignatureBuilder::PotentialArchetype::getNestingDepth() const {
   return Depth;
 }
 
+bool EquivalenceClass::recordConformanceConstraint(
+                                 PotentialArchetype *pa,
+                                 ProtocolDecl *proto,
+                                 const RequirementSource *source) {
+  // If we haven't seen a conformance to this protocol yet, add it.
+  bool inserted = false;
+  auto known = conformsTo.find(proto);
+  if (known == conformsTo.end()) {
+    known = conformsTo.insert({ proto, { }}).first;
+    inserted = true;
+    modified(*pa->getBuilder());
+    ++NumConformances;
+  }
+
+  // Record this conformance source.
+  known->second.push_back({pa, proto, source});
+  ++NumConformanceConstraints;
+
+  return inserted;
+}
+
 Optional<ConcreteConstraint>
 EquivalenceClass::findAnyConcreteConstraintAsWritten(
                                       PotentialArchetype *preferredPA) const {
@@ -2119,11 +2140,8 @@ GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
   }
 
   concreteSource = concreteSource->viaConcrete(*this, *conformance);
-  paEquivClass->conformsTo[proto].push_back({pa, proto, concreteSource});
-  ++NumConformanceConstraints;
-
+  paEquivClass->recordConformanceConstraint(pa, proto, concreteSource);
   addConditionalRequirements(*this, *conformance);
-
   return concreteSource;
 }
 
@@ -2154,11 +2172,8 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
 
   superclassSource =
     superclassSource->viaSuperclass(*this, *conformance);
-  paEquivClass->conformsTo[proto].push_back({pa, proto, superclassSource});
-  ++NumConformanceConstraints;
-
+  paEquivClass->recordConformanceConstraint(pa, proto, superclassSource);
   addConditionalRequirements(*this, *conformance);
-
   return superclassSource;
 }
 
@@ -2261,19 +2276,8 @@ bool PotentialArchetype::addConformance(ProtocolDecl *proto,
                                         GenericSignatureBuilder &builder) {
   // Check whether we already knew about this conformance.
   auto equivClass = getOrCreateEquivalenceClass();
-  auto known = equivClass->conformsTo.find(proto);
-  if (known != equivClass->conformsTo.end()) {
-    // We already knew about this conformance; record this specific constraint.
-    known->second.push_back({this, proto, source});
-    ++NumConformanceConstraints;
+  if (!equivClass->recordConformanceConstraint(this, proto, source))
     return false;
-  }
-
-  // Add the conformance along with this constraint.
-  equivClass->conformsTo[proto].push_back({this, proto, source});
-  equivClass->modified(builder);
-  ++NumConformanceConstraints;
-  ++NumConformances;
 
   // If there is a concrete type that resolves this conformance requirement,
   // record the conformance.
@@ -3913,6 +3917,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
       T1->addConformance(entry.first, entry.second.front().source, *this);
 
       auto &constraints1 = equivClass->conformsTo[entry.first];
+      // FIXME: Go through recordConformanceConstraint()?
       constraints1.insert(constraints1.end(),
                           entry.second.begin() + 1,
                           entry.second.end());
