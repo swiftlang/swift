@@ -26,7 +26,7 @@ extension String {
     let u16 = x._core[start.encodedOffset..<end.encodedOffset]
     if start.samePosition(in: x.unicodeScalars) != nil
     && end.samePosition(in: x.unicodeScalars) != nil {
-      self = String(_StringCore(u16))
+      self = String(_LegacyStringCore(u16))
     }
     else {
       self = String(decoding: u16, as: UTF16.self)
@@ -324,7 +324,7 @@ extension Substring : _SwiftStringView {
   public // @testable
   var _ephemeralContent: String {
     let wholeCore = _wholeString._core
-    let subCore : _StringCore = wholeCore[
+    let subCore : _LegacyStringCore = wholeCore[
       startIndex.encodedOffset..<endIndex.encodedOffset]
     // Check that we haven't allocated a new buffer for the result, if we have
     // contiguous storage.

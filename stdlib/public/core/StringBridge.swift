@@ -56,7 +56,7 @@ func _cocoaStringToSwiftString_NonASCII(
   let length = _stdlib_binary_CFStringGetLength(cfImmutableValue)
   let start = _stdlib_binary_CFStringGetCharactersPtr(cfImmutableValue)
 
-  return String(_StringCore(
+  return String(_LegacyStringCore(
     baseAddress: start,
     count: length,
     elementShift: 1,
@@ -105,8 +105,8 @@ internal func _cocoaStringReadAll(
 @_versioned // FIXME(sil-serialize-all)
 @inline(never) // Hide the CF dependency
 internal func _cocoaStringSlice(
-  _ target: _StringCore, _ bounds: Range<Int>
-) -> _StringCore {
+  _ target: _LegacyStringCore, _ bounds: Range<Int>
+) -> _LegacyStringCore {
   _sanityCheck(target.hasCocoaBuffer)
   
   let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
@@ -125,7 +125,7 @@ internal func _cocoaStringSlice(
 @_versioned // FIXME(sil-serialize-all)
 @inline(never) // Hide the CF dependency
 internal func _cocoaStringSubscript(
-  _ target: _StringCore, _ position: Int
+  _ target: _LegacyStringCore, _ position: Int
 ) -> UTF16.CodeUnit {
   let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
 
@@ -180,7 +180,7 @@ extension String {
       start = UnsafeMutableRawPointer(mutating: nulTerminatedASCII)
     }
 
-    self._core = _StringCore(
+    self._core = _LegacyStringCore(
       baseAddress: start,
       count: length,
       elementShift: isUTF16 ? 1 : 0,
@@ -224,7 +224,7 @@ public protocol _NSStringCore :
 @_fixed_layout // FIXME(sil-serialize-all)
 public final class _NSContiguousString : _SwiftNativeNSString {
   @_inlineable // FIXME(sil-serialize-all)
-  public init(_ _core: _StringCore) {
+  public init(_ _core: _LegacyStringCore) {
     _sanityCheck(
       _core.hasContiguousStorage,
       "_NSContiguousString requires contiguous storage")
@@ -352,7 +352,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     return try body(selfAsPointer, rhsAsPointer)
   }
 
-  public let _core: _StringCore
+  public let _core: _LegacyStringCore
 }
 
 extension String {

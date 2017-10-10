@@ -222,7 +222,7 @@ where Source.Iterator.Element == SourceEncoding.CodeUnit {
   return try body(a, targetLength)
 }
 
-extension _StringCore {
+extension _LegacyStringCore {
   /// Invokes `body` on a null-terminated sequence of code units in the given
   /// encoding corresponding to the substring in `bounds`.
   @_inlineable // FIXME(sil-serialize-all)
@@ -290,7 +290,7 @@ extension String {
   ) where C.Iterator.Element == Encoding.CodeUnit {
     let (b,_) = _StringBuffer.fromCodeUnits(
       codeUnits, encoding: sourceEncoding, repairIllFormedSequences: true)
-    self = String(_StringCore(b!))
+    self = String(_LegacyStringCore(b!))
   }
   
   /// Creates a string from the null-terminated sequence of bytes at the given
@@ -681,17 +681,17 @@ public struct String {
   ///     let alsoEmpty = String()
   @_inlineable // FIXME(sil-serialize-all)
   public init() {
-    _core = _StringCore()
+    _core = _LegacyStringCore()
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
-  init(_ _core: _StringCore) {
+  init(_ _core: _LegacyStringCore) {
     self._core = _core
   }
 
   public // @testable
-  var _core: _StringCore
+  var _core: _LegacyStringCore
 }
 
 extension String {
@@ -770,7 +770,7 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
     utf16CodeUnitCount: Builtin.Word
   ) {
     self = String(
-      _StringCore(
+      _LegacyStringCore(
         baseAddress: UnsafeMutableRawPointer(start),
         count: Int(utf16CodeUnitCount),
         elementShift: 1,
@@ -789,7 +789,7 @@ extension String : _ExpressibleByBuiltinStringLiteral {
     isASCII: Builtin.Int1) {
     if Bool(isASCII) {
       self = String(
-        _StringCore(
+        _LegacyStringCore(
           baseAddress: UnsafeMutableRawPointer(start),
           count: Int(utf8CodeUnitCount),
           elementShift: 0,
@@ -902,7 +902,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public // SPI(Foundation)
   init(_storage: _StringBuffer) {
-    _core = _StringCore(_storage)
+    _core = _LegacyStringCore(_storage)
   }
 }
 
