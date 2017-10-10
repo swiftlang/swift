@@ -98,11 +98,11 @@ bb0(%0 : $*U):
 } // end sil function 'simple_generic_caller2'
 
 // Check that a partial specialization for simple_generic_callee<U, Int32> was created.
-// CHECK-LABEL: sil shared [noinline] @_T021simple_generic_calleexs5Int32Vq_RszACRs0_r1_lItiy_Tp5 : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 == τ_0_1, τ_0_2 == Int32> (@in τ_0_0, Int32) -> ()
+// CHECK-LABEL: sil shared [noinline] @_T021simple_generic_calleexs5Int32Vq_RszACRs0_r1_lIetiy_Tp5 : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 == τ_0_1, τ_0_2 == Int32> (@in τ_0_0, Int32) -> ()
 
 
 // Check that a partial specialization for simple_generic_callee<S<U>, Int32> was created.
-// CHECK-LABEL: sil shared [noinline] @_T021simple_generic_callee4main1SVyxGs5Int32VAERs_AGRs0_r1_lItyy_Tp5 : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_1 == S<τ_0_0>, τ_0_2 == Int32> (S<τ_0_0>, Int32) -> ()
+// CHECK-LABEL: sil shared [noinline] @_T021simple_generic_callee4main1SVyxGs5Int32VAERs_AGRs0_r1_lIetyy_Tp5 : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_1 == S<τ_0_0>, τ_0_2 == Int32> (S<τ_0_0>, Int32) -> ()
 
 // Check that no partial specializations are produced if all substitutions in the substitution list
 // are archetypes.
@@ -127,7 +127,7 @@ bb0(%0 : $*U):
 // Check that partial specialization is not peformed for generic type parameters where
 // the substitution contains an open existential.
 // CHECK-LABEL: sil @simple_generic_caller4 : $@convention(thin) (@in P, Builtin.Int1) -> ()
-// CHECK: function_ref @_T021simple_generic_calleexBi1_Bi1_Rs_r0_lItiy_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int1> (@in τ_0_0, Builtin.Int1) -> () 
+// CHECK: function_ref @_T021simple_generic_calleexBi1_Bi1_Rs_r0_lIetiy_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int1> (@in τ_0_0, Builtin.Int1) -> ()
 // CHECK: // end sil function 'simple_generic_caller4' 
 sil @simple_generic_caller4 : $@convention(thin) (@in P, Builtin.Int1) -> () {
 bb0(%0 : $*P, %1: $Builtin.Int1):

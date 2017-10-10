@@ -150,7 +150,7 @@ func curry_pod_AnyObject(_ x: AnyObject) -> (Int) -> Int {
 // CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : @trivial $@convention(objc_method) (Optional<CurryTest>, @opened({{.*}}) AnyObject) -> @autoreleased Optional<CurryTest>):
 // CHECK:   [[OPENED_ANY_COPY_2:%.*]] = copy_value [[OPENED_ANY_COPY]]
 // CHECK:   [[PA:%.*]] = partial_apply [[METHOD]]([[OPENED_ANY_COPY_2]])
-// CHECK:   [[THUNK:%.*]] = function_ref @_T0So9CurryTestCSgACIxyo_A2CIxxo_TR
+// CHECK:   [[THUNK:%.*]] = function_ref @_T0So9CurryTestCSgACIexyo_A2CIexxo_TR
 // CHECK:   partial_apply [[THUNK]]([[PA]])
 // CHECK: } // end sil function '_T013objc_currying31curry_normalOwnership_AnyObjectSQySo9CurryTestCGAEcyXlF'
 func curry_normalOwnership_AnyObject(_ x: AnyObject) -> (CurryTest!) -> CurryTest! {
@@ -183,7 +183,7 @@ func curry_weirdOwnership_AnyObject(_ x: AnyObject) -> (CurryTest!) -> CurryTest
 // CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : @trivial $@convention(objc_method) (Optional<NSString>, @opened({{.*}}) AnyObject) -> @autoreleased Optional<NSString>):
 // CHECK:   [[OPENED_ANY_COPY_2:%.*]] = copy_value [[OPENED_ANY_COPY]]
 // CHECK:   [[PA:%.*]] = partial_apply [[METHOD]]([[OPENED_ANY_COPY_2]])
-// CHECK:   [[THUNK:%.*]] = function_ref @_T0So8NSStringCSgACIxyo_SSSgADIxxo_TR
+// CHECK:   [[THUNK:%.*]] = function_ref @_T0So8NSStringCSgACIexyo_SSSgADIexxo_TR
 // CHECK:   partial_apply [[THUNK]]([[PA]])
 // CHECK: } // end sil function '_T013objc_currying23curry_bridged_AnyObjectSQySSGACcyXlF'
 func curry_bridged_AnyObject(_ x: AnyObject) -> (String!) -> String! {

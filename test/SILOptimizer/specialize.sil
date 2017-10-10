@@ -391,18 +391,18 @@ bb0(%0 : $Int32, %1 : $<τ_0_0> { var τ_0_0 } <T>):
 }
 
 // check that there is a generic specialization of boo
-// CHECK-LABEL: sil shared [noinline] @_T03booxs5Int32VSfACIxyid_4main1PRzSfRs_r0_lItio_Tp5AD1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32, @in Float) -> Int32
-// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @_T011boo_closures5Int32VSfxz_x_lXXAC4main1PRzSfRs_r0_lItyyxd_TP5AD1CV_TG5
+// CHECK-LABEL: sil shared [noinline] @_T03booxs5Int32VSfACIexyid_4main1PRzSfRs_r0_lIetio_Tp5AD1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32, @in Float) -> Int32
+// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @_T011boo_closures5Int32VSfxz_x_lXXAC4main1PRzSfRs_r0_lIetyyxd_TP5AD1CV_TG5
 // CHECK: partial_apply [[CLOSURE_SPECIALIZATION:%[0-9]+]]
 // CHECK: return
 
 // Check that there is a generic specialization of a closure from boo
-// CHECK-LABEL: sil shared [noinline] @_T011boo_closures5Int32VSfxz_x_lXXAC4main1PRzSfRs_r0_lItyyxd_Tp5AD1CV_Tg5
+// CHECK-LABEL: sil shared [noinline] @_T011boo_closures5Int32VSfxz_x_lXXAC4main1PRzSfRs_r0_lIetyyxd_Tp5AD1CV_Tg5
 // CHECK: return
 
 // Check that there is a generic specialization of foo
 // CHECK-LABEL: sil shared [noinline] @_T03foo4main1CV_ADTg5 : $@convention(thin) (C, C) -> @owned @callee_owned (Int32, Float) -> Int32
-// CHECK: function_ref @_T03booxs5Int32VSfACIxyid_4main1PRzSfRs_r0_lItio_Tp5AD1CV_Tg5
+// CHECK: function_ref @_T03booxs5Int32VSfACIexyid_4main1PRzSfRs_r0_lIetio_Tp5AD1CV_Tg5
 // check that it invokes a generic specialization of the reabstraction thunk helper which invokes a specialization boo
 // CHECK: [[THUNK_SPECIALIZATION:%[0-9]+]] = function_ref @_T0053_TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVs5Int32iSf_dS1__f2_dj2_di2_dJ2__4main1CV_ADTg5
 // CHECK-NOT: apply
@@ -585,13 +585,13 @@ bb0:
 
 // Test a specialization of a self-recursive generic closure.
 
-// CHECK-LABEL: sil shared @_T027selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lItnny_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, @in_guaranteed Builtin.Int64, Builtin.Int64) -> ()
-// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @_T027selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lItnny_Tp5
+// CHECK-LABEL: sil shared @_T027selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnny_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, @in_guaranteed Builtin.Int64, Builtin.Int64) -> ()
+// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @_T027selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnny_Tp5
 // CHECK: partial_apply [[SPECIALIZED_FN]]{{.*}}({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, @in_guaranteed Builtin.Int64, Builtin.Int64) -> ()
 
 // CHECK-LABEL: sil @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> ()
 // Refer to the specialized version of the function
-// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @_T027selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lItnny_Tp5
+// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @_T027selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnny_Tp5
 // CHECK: partial_apply [[SPECIALIZED_FN]]<R>({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, @in_guaranteed Builtin.Int64, Builtin.Int64) -> ()
 sil @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> () {
 bb0(%0 : $*R, %1 : $*S, %2 : $Builtin.Int64):

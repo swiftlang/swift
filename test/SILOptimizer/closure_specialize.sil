@@ -54,10 +54,10 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int):
 }
 
 // CHECK-LABEL: sil @_T07specgen6callerySiF : $@convention(thin) (Int) -> () {
-// CHECK: [[ID1:%[0-9]+]] = function_ref @_T07specgen12take_closureyySi_SitcF023_T07specgen6callerySiFyE8_SitcfU_SiTf1c_n : $@convention(thin) (Int) -> ()
-// CHECK: [[ID2:%[0-9]+]] = function_ref @_T07specgen13take_closure2yySi_SitcF023_T07specgen6callerySiFyE8_SitcfU_SiTf1c_n : $@convention(thin) (Int) -> ()
-// CHECK: apply [[ID1]](%0) : $@convention(thin) (Int) -> ()
+// CHECK: [[ID1:%[0-9]+]] = function_ref @_T07specgen13take_closure2yySi_SitcF023_T07specgen6callerySiFyE8_SitcfU_SiTf1c_n : $@convention(thin) (Int) -> ()
+// CHECK: [[ID2:%[0-9]+]] = function_ref @_T07specgen12take_closureyySi_SitcF023_T07specgen6callerySiFyE8_SitcfU_SiTf1c_n : $@convention(thin) (Int) -> ()
 // CHECK: apply [[ID2]](%0) : $@convention(thin) (Int) -> ()
+// CHECK: apply [[ID1]](%0) : $@convention(thin) (Int) -> ()
 sil @_T07specgen6callerySiF : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   // function_ref specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
@@ -108,10 +108,10 @@ bb0(%0 : $Int, %1 : $Int):
 }
 
 // CHECK-LABEL: sil @_T07specgen11tttficallerySiF : $@convention(thin) (Int) -> () {
-// CHECK: [[ID1:%[0-9]+]] = function_ref @_T07specgen12take_closureyySi_SitcF26_T07specgen6calleeySi_SitFTf1c_n : $@convention(thin) () -> ()
-// CHECK: [[ID2:%[0-9]+]] = function_ref @_T07specgen13take_closure2yySi_SitcF26_T07specgen6calleeySi_SitFTf1c_n : $@convention(thin) () -> ()
-// CHECK: apply [[ID1]]() : $@convention(thin) () -> ()
+// CHECK: [[ID1:%[0-9]+]] = function_ref @_T07specgen13take_closure2yySi_SitcF26_T07specgen6calleeySi_SitFTf1c_n : $@convention(thin) () -> ()
+// CHECK: [[ID2:%[0-9]+]] = function_ref @_T07specgen12take_closureyySi_SitcF26_T07specgen6calleeySi_SitFTf1c_n : $@convention(thin) () -> ()
 // CHECK: apply [[ID2]]() : $@convention(thin) () -> ()
+// CHECK: apply [[ID1]]() : $@convention(thin) () -> ()
 sil @_T07specgen11tttficallerySiF : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   // function_ref specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()

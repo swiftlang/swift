@@ -109,7 +109,7 @@ func readBoxRead() {
   var x = 3
   let c = { _ = x }
   // Inside may-escape closure `c`: [read] [dynamic]
-  // Inside never-escape closure: [read] [static]
+  // Inside never-escape closure: [read] [dynamic]
   doTwo(c, { _ = x })
   x = 42
 }
