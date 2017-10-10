@@ -404,7 +404,8 @@ public protocol Collection : Sequence
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence : Collection = Slice<Self>
-    where SubSequence.Index == Index
+    where SubSequence.Index == Index,
+          SubSequence.IndexDistance == IndexDistance
 
   /// Accesses the element at the specified position.
   ///
