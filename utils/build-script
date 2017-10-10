@@ -40,7 +40,7 @@ from swift_build_support.swift_build_support.SwiftBuildSupport import (
     SWIFT_REPO_NAME,
     SWIFT_SOURCE_ROOT,
     get_all_preset_names,
-    get_preset_options,  
+    get_preset_options,
 )
 
 from swift_build_support.swift_build_support.cmake import CMake
@@ -2060,7 +2060,7 @@ iterations with -O",
         "--swift-user-visible-version",
         help="User-visible version of the embedded Swift compiler",
         type=arguments.type.swift_compiler_version,
-        default="4.0.1",
+        default="4.0.2",
         metavar="MAJOR.MINOR")
 
     parser.add_argument(
