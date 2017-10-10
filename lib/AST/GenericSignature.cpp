@@ -158,14 +158,14 @@ ASTContext &GenericSignature::getASTContext(
     return requirements.front().getFirstType()->getASTContext();
 }
 
-GenericSignatureBuilder *GenericSignature::getGenericSignatureBuilder(ModuleDecl &mod) {
+GenericSignatureBuilder *GenericSignature::getGenericSignatureBuilder() {
   // The generic signature builder is associated with the canonical signature.
   if (!isCanonical())
-    return getCanonicalSignature()->getGenericSignatureBuilder(mod);
+    return getCanonicalSignature()->getGenericSignatureBuilder();
 
   // generic signature builders are stored on the ASTContext.
-  return getASTContext().getOrCreateGenericSignatureBuilder(CanGenericSignature(this),
-                                                     &mod);
+  return getASTContext().getOrCreateGenericSignatureBuilder(
+                                             CanGenericSignature(this));
 }
 
 bool GenericSignature::isCanonical() const {
@@ -232,9 +232,8 @@ GenericSignature::getCanonicalSignature() const {
            CanonicalSignatureOrASTContext.get<GenericSignature*>());
 }
 
-GenericEnvironment *GenericSignature::createGenericEnvironment(
-                                                             ModuleDecl &mod) {
-  auto *builder = getGenericSignatureBuilder(mod);
+GenericEnvironment *GenericSignature::createGenericEnvironment() {
+  auto *builder = getGenericSignatureBuilder();
   return GenericEnvironment::getIncomplete(this, builder);
 }
 
@@ -483,7 +482,7 @@ getSubstitutions(const SubstitutionMap &subMap,
 bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {
   if (!type->isTypeParameter()) return false;
 
-  auto &builder = *getGenericSignatureBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
     builder.resolveEquivalenceClass(
                                   type,
@@ -514,7 +513,7 @@ bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {
 Type GenericSignature::getSuperclassBound(Type type, ModuleDecl &mod) {
   if (!type->isTypeParameter()) return nullptr;
 
-  auto &builder = *getGenericSignatureBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
   builder.resolveEquivalenceClass(
                                 type,
@@ -535,7 +534,7 @@ SmallVector<ProtocolDecl *, 2>
 GenericSignature::getConformsTo(Type type, ModuleDecl &mod) {
   if (!type->isTypeParameter()) return { };
 
-  auto &builder = *getGenericSignatureBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
     builder.resolveEquivalenceClass(
                                   type,
@@ -562,7 +561,7 @@ bool GenericSignature::conformsToProtocol(Type type, ProtocolDecl *proto,
   // FIXME: Deal with concrete conformances here?
   if (!type->isTypeParameter()) return false;
 
-  auto &builder = *getGenericSignatureBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
     builder.resolveEquivalenceClass(
                                   type,
@@ -587,7 +586,7 @@ bool GenericSignature::isConcreteType(Type type, ModuleDecl &mod) {
 Type GenericSignature::getConcreteType(Type type, ModuleDecl &mod) {
   if (!type->isTypeParameter()) return Type();
 
-  auto &builder = *getGenericSignatureBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
     builder.resolveEquivalenceClass(
                                   type,
@@ -601,7 +600,7 @@ LayoutConstraint GenericSignature::getLayoutConstraint(Type type,
                                                        ModuleDecl &mod) {
   if (!type->isTypeParameter()) return LayoutConstraint();
 
-  auto &builder = *getGenericSignatureBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
     builder.resolveEquivalenceClass(
                                   type,
@@ -619,7 +618,7 @@ bool GenericSignature::areSameTypeParameterInContext(Type type1, Type type2,
   if (type1.getPointer() == type2.getPointer())
     return true;
 
-  auto &builder = *getGenericSignatureBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder();
   auto equivClass1 =
     builder.resolveEquivalenceClass(
                              type1,
@@ -648,7 +647,7 @@ bool GenericSignature::isCanonicalTypeInContext(Type type, ModuleDecl &mod) {
   if (!type->hasTypeParameter())
     return true;
 
-  auto &builder = *getGenericSignatureBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder();
   return isCanonicalTypeInContext(type, builder);
 }
 
@@ -723,7 +722,7 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type,
   if (!type->hasTypeParameter())
     return CanType(type);
 
-  auto &builder = *getGenericSignatureBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder();
   return getCanonicalTypeInContext(type, builder);
 }
 
@@ -731,9 +730,8 @@ GenericEnvironment *CanGenericSignature::getGenericEnvironment(
                                                      ModuleDecl &module) const {
   // generic signature builders are stored on the ASTContext.
   return module.getASTContext().getOrCreateCanonicalGenericEnvironment(
-           module.getASTContext().getOrCreateGenericSignatureBuilder(*this, &module),
-           *this,
-           module);
+           module.getASTContext().getOrCreateGenericSignatureBuilder(*this),
+           *this);
 }
 
 /// Remove all of the associated type declarations from the given type
@@ -773,7 +771,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
   assert(type->isTypeParameter() && "not a type parameter");
 
   // Resolve this type to a potential archetype.
-  auto &builder = *getGenericSignatureBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
     builder.resolveEquivalenceClass(
                                   type,
@@ -867,8 +865,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
       // Get a generic signature for the protocol's signature.
       auto inProtoSig = inProtocol->getGenericSignature();
-      auto &inProtoSigBuilder = *inProtoSig->getGenericSignatureBuilder(
-                                                                *inProtocol->getModuleContext());
+      auto &inProtoSigBuilder = *inProtoSig->getGenericSignatureBuilder();
 
       // Retrieve the stored type, but erase all of the specific associated
       // type declarations; we don't want any details of the enclosing context

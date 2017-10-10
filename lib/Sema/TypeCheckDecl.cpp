@@ -4239,7 +4239,7 @@ public:
       gp->setOuterParameters(dc->getGenericParamsOfContext());
 
       auto *sig = TC.validateGenericSubscriptSignature(SD);
-      auto *env = sig->createGenericEnvironment(*SD->getModuleContext());
+      auto *env = sig->createGenericEnvironment();
       SD->setGenericEnvironment(env);
 
       // Revert the types within the signature so it can be type-checked with
@@ -5219,7 +5219,7 @@ public:
         env = cast<SubscriptDecl>(storage)->getGenericEnvironment();
         assert(env && "accessor has generics but subscript is not generic");
       } else {
-        env = sig->createGenericEnvironment(*FD->getModuleContext());
+        env = sig->createGenericEnvironment();
       }
       FD->setGenericEnvironment(env);
 
@@ -6970,7 +6970,7 @@ public:
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
       auto *sig = TC.validateGenericFuncSignature(CD);
-      auto *env = sig->createGenericEnvironment(*CD->getModuleContext());
+      auto *env = sig->createGenericEnvironment();
       CD->setGenericEnvironment(env);
 
       // Revert the types within the signature so it can be type-checked with

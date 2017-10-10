@@ -1034,7 +1034,7 @@ ModuleFile::getGenericSignatureOrEnvironment(
 
   // Form the generic environment. Record it now so that deserialization of
   // the archetypes in the environment can refer to this environment.
-  auto genericEnv = signature->createGenericEnvironment(*getAssociatedModule());
+  auto genericEnv = signature->createGenericEnvironment();
   envOrOffset = genericEnv;
 
   return genericEnv;
@@ -4878,8 +4878,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       syntheticSig = GenericSignature::get(genericParams, requirements);
 
       // Create the synthetic environment.
-      syntheticEnv =
-        syntheticSig->createGenericEnvironment(*getAssociatedModule());
+      syntheticEnv = syntheticSig->createGenericEnvironment();
 
       // Requirement -> synthetic substitutions.
       if (unsigned numReqSubstitutions = *rawIDIter++) {

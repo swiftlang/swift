@@ -613,7 +613,6 @@ public:
   /// After this point, one cannot introduce new requirements, and the
   /// generic signature builder no longer has valid state.
   GenericSignature *computeGenericSignature(
-                      ModuleDecl &module,
                       SourceLoc loc,
                       bool allowConcreteGenericParams = false,
                       bool allowBuilderToMove = true) &&;

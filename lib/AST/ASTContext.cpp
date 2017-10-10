@@ -252,8 +252,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::DenseMap<const DeclContext *, LazyContextData *> LazyContexts;
 
   /// Stored generic signature builders for canonical generic signatures.
-  llvm::DenseMap<std::pair<GenericSignature *, ModuleDecl *>,
-                 std::unique_ptr<GenericSignatureBuilder>>
+  llvm::DenseMap<GenericSignature *, std::unique_ptr<GenericSignatureBuilder>>
     GenericSignatureBuilders;
 
   /// Canonical generic environments for canonical generic signatures.
@@ -1436,26 +1435,24 @@ void ASTContext::getVisibleTopLevelClangModules(
 
 void ASTContext::registerGenericSignatureBuilder(
                                        GenericSignature *sig,
-                                       ModuleDecl &module,
                                        GenericSignatureBuilder &&builder) {
   auto canSig = sig->getCanonicalSignature();
-  auto known = Impl.GenericSignatureBuilders.find({canSig, &module});
+  auto known = Impl.GenericSignatureBuilders.find(canSig);
   if (known != Impl.GenericSignatureBuilders.end()) {
     ++NumRegisteredGenericSignatureBuildersAlready;
     return;
   }
 
   ++NumRegisteredGenericSignatureBuilders;
-  Impl.GenericSignatureBuilders[{canSig, &module}] =
+  Impl.GenericSignatureBuilders[canSig] =
     llvm::make_unique<GenericSignatureBuilder>(std::move(builder));
 }
 
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
-                                                      CanGenericSignature sig,
-                                                      ModuleDecl *mod) {
+                                                      CanGenericSignature sig) {
   // Check whether we already have a generic signature builder for this
   // signature and module.
-  auto known = Impl.GenericSignatureBuilders.find({sig, mod});
+  auto known = Impl.GenericSignatureBuilders.find(sig);
   if (known != Impl.GenericSignatureBuilders.end())
     return known->second.get();
 
@@ -1463,7 +1460,7 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   auto builder = new GenericSignatureBuilder(*this);
 
   // Store this generic signature builder (no generic environment yet).
-  Impl.GenericSignatureBuilders[{sig, mod}] =
+  Impl.GenericSignatureBuilders[sig] =
     std::unique_ptr<GenericSignatureBuilder>(builder);
 
   builder->addGenericSignature(sig);
@@ -1533,13 +1530,12 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
                                               GenericSignatureBuilder *builder,
-                                              GenericSignature *sig,
-                                              ModuleDecl &module) {
+                                              GenericSignature *sig) {
   auto known = Impl.CanonicalGenericEnvironments.find(builder);
   if (known != Impl.CanonicalGenericEnvironments.end())
     return known->second;
 
-  auto env = sig->createGenericEnvironment(module);
+  auto env = sig->createGenericEnvironment();
   Impl.CanonicalGenericEnvironments[builder] = env;
   return env;
 }
@@ -4735,7 +4731,7 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   builder.addRequirement(requirement, source, nullptr);
 
-  CanGenericSignature genericSig(std::move(builder).computeGenericSignature(*mod, SourceLoc()));
+  CanGenericSignature genericSig(std::move(builder).computeGenericSignature(SourceLoc()));
 
   auto result = Impl.ExistentialSignatures.insert(
     std::make_pair(existential, genericSig));

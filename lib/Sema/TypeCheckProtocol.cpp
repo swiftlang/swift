@@ -1140,8 +1140,7 @@ RequirementEnvironment::RequirementEnvironment(
     if (syntheticSignature) {
       syntheticSignature = syntheticSignature->getCanonicalSignature();
       syntheticEnvironment =
-        syntheticSignature->createGenericEnvironment(
-                                     *conformanceDC->getParentModule());
+        syntheticSignature->createGenericEnvironment();
     }
 
     return;
@@ -1220,11 +1219,8 @@ RequirementEnvironment::RequirementEnvironment(
   // FIXME: Pass in a source location for the conformance, perhaps? It seems
   // like this could fail.
   syntheticSignature =
-    std::move(builder).computeGenericSignature(
-                                           *conformanceDC->getParentModule(),
-                                           SourceLoc());
-  syntheticEnvironment = syntheticSignature->createGenericEnvironment(
-                                             *conformanceDC->getParentModule());
+    std::move(builder).computeGenericSignature(SourceLoc());
+  syntheticEnvironment = syntheticSignature->createGenericEnvironment();
 }
 
 static RequirementMatch

@@ -6323,7 +6323,6 @@ static void collectRequirements(GenericSignatureBuilder &builder,
 }
 
 GenericSignature *GenericSignatureBuilder::computeGenericSignature(
-                                          ModuleDecl &module,
                                           SourceLoc loc,
                                           bool allowConcreteGenericParams,
                                           bool allowBuilderToMove) && {
@@ -6348,7 +6347,7 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
       !Impl->HadAnyRedundantConstraints) {
     // Register this generic signature builer as the canonical builder for the
     // given signature.
-    Context.registerGenericSignatureBuilder(sig, module, std::move(*this));
+    Context.registerGenericSignatureBuilder(sig, std::move(*this));
   }
 
   // Wipe out the internal state, ensuring that nobody uses this builder for
@@ -6360,7 +6359,6 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
 
 GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
                                                      ProtocolDecl *proto) {
-  auto module = proto->getParentModule();
   GenericSignatureBuilder builder(proto->getASTContext());
 
   // Add the 'self' parameter.
@@ -6383,7 +6381,7 @@ GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
                  nullptr);
 
   return std::move(builder).computeGenericSignature(
-           *module, SourceLoc(),
+           SourceLoc(),
            /*allowConcreteGenericPArams=*/false,
            /*allowBuilderToMove=*/false);
 }

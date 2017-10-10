@@ -2695,9 +2695,9 @@ buildThunkSignature(SILGenFunction &SGF,
   builder.addRequirement(newRequirement, source, nullptr);
 
   GenericSignature *genericSig =
-    std::move(builder).computeGenericSignature(*mod, SourceLoc(),
+    std::move(builder).computeGenericSignature(SourceLoc(),
                                     /*allowConcreteGenericParams=*/true);
-  genericEnv = genericSig->createGenericEnvironment(*mod);
+  genericEnv = genericSig->createGenericEnvironment();
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
     ->castTo<ArchetypeType>();

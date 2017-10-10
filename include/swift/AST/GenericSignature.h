@@ -132,7 +132,7 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
                                    ArrayRef<Requirement> requirements);
 
   /// Retrieve the generic signature builder for the given generic signature.
-  GenericSignatureBuilder *getGenericSignatureBuilder(ModuleDecl &mod);
+  GenericSignatureBuilder *getGenericSignatureBuilder();
 
   friend class ArchetypeType;
 
@@ -256,7 +256,7 @@ public:
   /// Create a new generic environment that provides fresh contextual types
   /// (archetypes) that correspond to the interface types in this generic
   /// signature.
-  GenericEnvironment *createGenericEnvironment(ModuleDecl &mod);
+  GenericEnvironment *createGenericEnvironment();
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {
