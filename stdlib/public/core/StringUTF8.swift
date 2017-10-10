@@ -1,4 +1,4 @@
-//===--- StringUTF8.swift - A UTF8 view of _StringCore --------------------===//
+//===--- StringUTF8.swift - A UTF8 view of _LegacyStringCore --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  _StringCore currently has three representations: Native ASCII,
+//  _LegacyStringCore currently has three representations: Native ASCII,
 //  Native UTF-16, and Opaque Cocoa.  Expose each of these as UTF-8 in a
 //  way that will hopefully be efficient to traverse
 //
@@ -99,7 +99,7 @@ extension String {
 
     /// Underlying UTF-16-compatible representation 
     @_versioned
-    internal let _core: _StringCore
+    internal let _core: _LegacyStringCore
 
     /// Distances to `(startIndex, endIndex)` from the endpoints of _core,
     /// measured in UTF-8 code units.
@@ -112,7 +112,7 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal init(_ _core: _StringCore,
+    internal init(_ _core: _LegacyStringCore,
       legacyOffsets: (Int, Int) = (0, 0)
     ) {
       self._core = _core
@@ -423,7 +423,7 @@ extension String {
     // since we no longer have access to the length of the original string when
     // there is no owner and elements have been dropped from the end.
     if let nativeBuffer = utf8._core.nativeBuffer {
-      let wholeString = String(_StringCore(nativeBuffer))
+      let wholeString = String(_LegacyStringCore(nativeBuffer))
       let offset = (utf8._core._baseAddress! - nativeBuffer.start)
         &>> utf8._core.elementShift
 
@@ -462,7 +462,7 @@ extension String.UTF8View {
   public struct Iterator {
     internal typealias _OutputBuffer = UInt64
     @_versioned // FIXME(sil-serialize-all)
-    internal let _source: _StringCore
+    internal let _source: _LegacyStringCore
     @_versioned // FIXME(sil-serialize-all)
     internal var _sourceIndex: Int
     @_versioned // FIXME(sil-serialize-all)
@@ -476,7 +476,7 @@ extension String.UTF8View {
 extension String.UTF8View.Iterator : IteratorProtocol {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init(_ source: _StringCore) {
+  internal init(_ source: _LegacyStringCore) {
     _source = source
     _sourceIndex = 0
     _buffer = 0

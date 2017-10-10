@@ -19,18 +19,18 @@ class ZZZ {
 
 class C {}
 
-sil @stringcore_invariant_check : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
+sil @stringcore_invariant_check : $@convention(thin) (@owned _LegacyStringCore) -> @owned Optional<_CocoaString>
 sil @reabstraction_thunk : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
 
-// CHECK-LABEL: sil @dead_closure_elimination : $@convention(thin) (@owned _StringCore) -> ()
+// CHECK-LABEL: sil @dead_closure_elimination : $@convention(thin) (@owned _LegacyStringCore) -> ()
 // CHECK: bb0
 // CHECK-NEXT: release_value
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @dead_closure_elimination : $@convention(thin) (@owned _StringCore) -> () {
-bb0(%0 : $_StringCore):
-  %1 = function_ref @stringcore_invariant_check : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
-  %2 = partial_apply %1(%0) : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
+sil @dead_closure_elimination : $@convention(thin) (@owned _LegacyStringCore) -> () {
+bb0(%0 : $_LegacyStringCore):
+  %1 = function_ref @stringcore_invariant_check : $@convention(thin) (@owned _LegacyStringCore) -> @owned Optional<_CocoaString>
+  %2 = partial_apply %1(%0) : $@convention(thin) (@owned _LegacyStringCore) -> @owned Optional<_CocoaString>
   %3 = function_ref @reabstraction_thunk : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
   %4 = partial_apply %3(%2) : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
   strong_release %4 : $@callee_owned () -> @out Optional<_CocoaString>
@@ -45,10 +45,10 @@ bb0(%0 : $_StringCore):
 // CHECK-NEXT:   release_value
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-sil @dead_closure_elimination2 : $@convention(thin) (@owned _StringCore) -> () {
-bb0(%0 : $_StringCore):
-  %1 = function_ref @stringcore_invariant_check : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
-  %2 = partial_apply %1(%0) : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
+sil @dead_closure_elimination2 : $@convention(thin) (@owned _LegacyStringCore) -> () {
+bb0(%0 : $_LegacyStringCore):
+  %1 = function_ref @stringcore_invariant_check : $@convention(thin) (@owned _LegacyStringCore) -> @owned Optional<_CocoaString>
+  %2 = partial_apply %1(%0) : $@convention(thin) (@owned _LegacyStringCore) -> @owned Optional<_CocoaString>
   %3 = function_ref @reabstraction_thunk : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
   %4 = partial_apply %3(%2) : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
   br bb1

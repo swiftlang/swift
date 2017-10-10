@@ -258,13 +258,13 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal init(_ _core: _StringCore) {
+    internal init(_ _core: _LegacyStringCore) {
       self.init(_core, offset: 0, length: _core.count)
     }
 
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal init(_ _core: _StringCore, offset: Int, length: Int) {
+    internal init(_ _core: _LegacyStringCore, offset: Int, length: Int) {
       self._offset = offset
       self._length = length
       self._core = _core
@@ -287,7 +287,7 @@ extension String {
     @_versioned // FIXME(sil-serialize-all)
     internal var _length: Int
     @_versioned // FIXME(sil-serialize-all)
-    internal let _core: _StringCore
+    internal let _core: _LegacyStringCore
   }
 
   /// A UTF-16 encoding of `self`.
@@ -327,7 +327,7 @@ extension String {
     // semantics may be impossible to preserve in the case of string literals,
     // since we no longer have access to the length of the original string when
     // there is no owner and elements are dropped from the end.
-    let wholeString = utf16._core.nativeBuffer.map { String(_StringCore($0)) }
+    let wholeString = utf16._core.nativeBuffer.map { String(_LegacyStringCore($0)) }
        ?? String(utf16._core)
 
     guard
