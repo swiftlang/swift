@@ -69,8 +69,6 @@ enum class InputFileKind {
 /// Information about all the inputs to the frontend.
 class FrontendInputs {
 private:
-  // FIXME: (dmu) create a class for the inputs
-
   /// The names of input files to the frontend.
   std::vector<std::string> InputFilenames;
 
