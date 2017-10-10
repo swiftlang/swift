@@ -5996,7 +5996,9 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
                                                     genericParams),
                        equivClass->concreteType, equivClass->superclass);
       }
-    } else if (representativeConstraint.source->getLoc().isValid()) {
+    } else if (representativeConstraint.source->getLoc().isValid() &&
+               !representativeConstraint.source->isDerivedRequirement() &&
+               !representativeConstraint.source->isInferredRequirement()) {
       // It does fulfill the requirement; diagnose the redundancy.
       Diags.diagnose(representativeConstraint.source->getLoc(),
                      diag::redundant_superclass_constraint,
