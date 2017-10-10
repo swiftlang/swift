@@ -1207,6 +1207,13 @@ RequirementEnvironment::RequirementEnvironment(
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
   for (auto &req : reqSig->getRequirements()) {
+    // FIXME: This should not be necessary, since the constraint is redundant,
+    // but we need it to work around some crashes for now.
+    if (req.getKind() == RequirementKind::Conformance &&
+        req.getFirstType()->isEqual(selfType) &&
+        req.getSecondType()->isEqual(proto->getDeclaredType()))
+      continue;
+
     builder.addRequirement(req, source, /*inferModule=*/nullptr,
                            &reqToSyntheticEnvMap);
   }
