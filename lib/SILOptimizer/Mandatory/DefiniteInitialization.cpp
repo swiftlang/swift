@@ -1094,7 +1094,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
           if (auto *DSCE = dyn_cast<SelfApplyExpr>(CE->getFn()))
             // Normal method calls are curried, so they are:
             // (call_expr (dot_syntax_call_expr (decl_ref_expr METHOD)))
-            FD = dyn_cast<FuncDecl>(DSCE->getCalledValue());
+            FD = dyn_cast_or_null<FuncDecl>(DSCE->getCalledValue());
           else
             // Operators and normal function calls are just (CallExpr DRE)
             FD = dyn_cast_or_null<FuncDecl>(CE->getCalledValue());
