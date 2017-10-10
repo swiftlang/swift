@@ -1,4 +1,4 @@
-// RUN: %swift -typecheck -swift-version 3 %s -verify
+// RUN: %target-swift-frontend -typecheck -swift-version 3 %s -verify
 
 func testPopFirst() {
   var str = "abc"
