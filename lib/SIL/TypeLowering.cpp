@@ -1735,9 +1735,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
 
   // The result type might be written in terms of type parameters
   // that have been made fully concrete.
-  CanType canResultTy = resultTy->getCanonicalType(
-      AFD->getGenericSignature(),
-      *TC.M.getSwiftModule());
+  CanType canResultTy = resultTy->getCanonicalType(AFD->getGenericSignature());
 
   // Get the generic signature from the surrounding context.
   auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
@@ -1766,8 +1764,7 @@ static CanAnyFunctionType getDestructorInterfaceType(TypeConverter &TC,
                                                      bool isDeallocating,
                                                      bool isForeign) {
   auto classType = dd->getDeclContext()->getDeclaredInterfaceType()
-    ->getCanonicalType(dd->getGenericSignatureOfContext(),
-                       *TC.M.getSwiftModule());
+    ->getCanonicalType(dd->getGenericSignatureOfContext());
 
   assert((!isForeign || isDeallocating)
          && "There are no foreign destroying destructors");
@@ -1797,8 +1794,7 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(TypeConverter &TC,
                                                             bool isObjC,
                                                             bool isDestroyer) {
   auto classType = cd->getDeclaredInterfaceType()
-    ->getCanonicalType(cd->getGenericSignatureOfContext(),
-                       *TC.M.getSwiftModule());
+    ->getCanonicalType(cd->getGenericSignatureOfContext());
 
   CanType emptyTupleTy = TupleType::getEmpty(TC.Context);
   auto resultType = (isDestroyer ? emptyTupleTy : classType);
@@ -2095,10 +2091,8 @@ getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
     }
   }
 
-  auto canSelfType = selfType->getCanonicalType(
-    genericSig, *M.getSwiftModule());
-  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(
-    genericSig, *M.getSwiftModule());
+  auto canSelfType = selfType->getCanonicalType(genericSig);
+  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(genericSig);
 
   // Create the SILFunctionType for the callback.
   SILParameterInfo params[] = {
@@ -2508,7 +2502,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
         ->getGenericSignatureOfContext();
     loweredInterfaceType =
       env->mapTypeOutOfContext(loweredInterfaceType)
-        ->getCanonicalType(homeSig, *M.getSwiftModule());
+        ->getCanonicalType(homeSig);
   }
   
   auto boxType = getInterfaceBoxTypeForCapture(captured,

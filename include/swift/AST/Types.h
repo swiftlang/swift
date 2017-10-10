@@ -393,7 +393,7 @@ public:
 
   /// getCanonicalType - Stronger canonicalization which folds away equivalent
   /// associated types, or type parameters that have been made concrete.
-  CanType getCanonicalType(GenericSignature *sig, ModuleDecl &mod);
+  CanType getCanonicalType(GenericSignature *sig);
 
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.

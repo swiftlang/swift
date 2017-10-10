@@ -2822,9 +2822,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                       ? DefaultThickCalleeConvention
                       : ParameterConvention::Direct_Unowned});
 
-  auto &mod = *F.getModule().getSwiftModule();
   auto getCanonicalType = [&](Type t) -> CanType {
-    return t->getCanonicalType(genericSig, mod);
+    return t->getCanonicalType(genericSig);
   };
 
   // Map the parameter and expected types out of context to get the interface
