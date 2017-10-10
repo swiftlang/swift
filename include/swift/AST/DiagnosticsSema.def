@@ -216,6 +216,10 @@ ERROR(cannot_pass_rvalue_inout,none,
 ERROR(cannot_assign_to_literal,none,
       "cannot assign to a literal value", ())
 
+ERROR(property_use_in_init_without_explicit_self,none,
+"reference to property %0 in initialiser requires explicit 'self.' to make"
+" capture semantics explicit", (Identifier))
+
 ERROR(cannot_call_with_no_params,none,
       "cannot invoke %select{|initializer for type }1'%0' with no arguments",
       (StringRef, bool))
