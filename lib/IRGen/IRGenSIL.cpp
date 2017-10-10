@@ -1953,10 +1953,9 @@ static llvm::Value *getObjCClassForValue(IRGenFunction &IGF,
 static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
                                               CanSILFunctionType origCalleeType,
                                               SubstitutionList subs) {
-  auto &M = *IGF.getSwiftModule();
   llvm::Value *wtable;
 
-  if (auto *proto = origCalleeType->getDefaultWitnessMethodProtocol(M)) {
+  if (auto *proto = origCalleeType->getDefaultWitnessMethodProtocol()) {
     // The generic signature for a witness method with abstract Self must
     // have exactly one protocol requirement.
     //

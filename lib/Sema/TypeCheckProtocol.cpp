@@ -1140,8 +1140,7 @@ RequirementEnvironment::RequirementEnvironment(
     if (syntheticSignature) {
       syntheticSignature = syntheticSignature->getCanonicalSignature();
       syntheticEnvironment =
-        syntheticSignature->createGenericEnvironment(
-                                     *conformanceDC->getParentModule());
+        syntheticSignature->createGenericEnvironment();
     }
 
     return;
@@ -1150,9 +1149,7 @@ RequirementEnvironment::RequirementEnvironment(
   // Construct a generic signature builder by collecting the constraints
   // from the requirement and the context of the conformance together,
   // because both define the capabilities of the requirement.
-  GenericSignatureBuilder builder(
-           ctx,
-           TypeChecker::LookUpConformance(tc, conformanceDC));
+  GenericSignatureBuilder builder(ctx);
 
   auto source =
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
@@ -1222,11 +1219,8 @@ RequirementEnvironment::RequirementEnvironment(
   // FIXME: Pass in a source location for the conformance, perhaps? It seems
   // like this could fail.
   syntheticSignature =
-    std::move(builder).computeGenericSignature(
-                                           *conformanceDC->getParentModule(),
-                                           SourceLoc());
-  syntheticEnvironment = syntheticSignature->createGenericEnvironment(
-                                             *conformanceDC->getParentModule());
+    std::move(builder).computeGenericSignature(SourceLoc());
+  syntheticEnvironment = syntheticSignature->createGenericEnvironment();
 }
 
 static RequirementMatch
@@ -3537,18 +3531,17 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
                                                ProtocolDecl *proto,
                                                AssociatedTypeDecl *assocType, 
                                                Type type) {
-  auto *moduleDecl = dc->getParentModule();
   auto *genericSig = proto->getGenericSignature();
   auto *depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
                                          assocType);
 
-  if (auto superclass = genericSig->getSuperclassBound(depTy, *moduleDecl)) {
+  if (auto superclass = genericSig->getSuperclassBound(depTy)) {
     if (!superclass->isExactSuperclassOf(type))
       return superclass->getAnyNominal();
   }
 
   // Check protocol conformances.
-  for (auto reqProto : genericSig->getConformsTo(depTy, *moduleDecl)) {
+  for (auto reqProto : genericSig->getConformsTo(depTy)) {
     if (!tc.conformsToProtocol(type, reqProto, dc, None))
       return reqProto;
 
@@ -5849,8 +5842,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
     auto interfaceType = DC->mapTypeOutOfContext(T);
     if (interfaceType->isTypeParameter()) {
       auto genericSig = DC->getGenericSignatureOfContext();
-      auto path = genericSig->getConformanceAccessPath(interfaceType, Proto,
-                                                       *DC->getParentModule());
+      auto path = genericSig->getConformanceAccessPath(interfaceType, Proto);
 
       // Debugging aid: display the conformance access path for archetype
       // conformances.

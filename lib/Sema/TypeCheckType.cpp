@@ -342,8 +342,7 @@ Type TypeChecker::resolveTypeInContext(
       //
       // Get the superclass of the 'Self' type parameter.
       auto *sig = foundDC->getGenericSignatureOfContext();
-      auto superclassType = sig->getSuperclassBound(
-        selfType, *foundDC->getParentModule());
+      auto superclassType = sig->getSuperclassBound(selfType);
       assert(superclassType);
       selfType = superclassType;
     }

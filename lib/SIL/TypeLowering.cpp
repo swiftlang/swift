@@ -256,11 +256,10 @@ namespace {
 
     RetTy visitAbstractTypeParamType(CanType type) {
       if (auto genericSig = getGenericSignature()) {
-        auto &mod = *M.getSwiftModule();
-        if (genericSig->requiresClass(type, mod)) {
+        if (genericSig->requiresClass(type)) {
           return asImpl().handleReference(type);
-        } else if (genericSig->isConcreteType(type, mod)) {
-          return asImpl().visit(genericSig->getConcreteType(type, mod)
+        } else if (genericSig->isConcreteType(type)) {
+          return asImpl().visit(genericSig->getConcreteType(type)
                                     ->getCanonicalType());
         } else {
           return asImpl().handleAddressOnly(type);
@@ -284,20 +283,19 @@ namespace {
 
     bool hasNativeReferenceCounting(CanType type) {
       if (type->isTypeParameter()) {
-        auto &mod = *M.getSwiftModule();
         auto signature = getGenericSignature();
         assert(signature && "dependent type without generic signature?!");
 
-        if (auto concreteType = signature->getConcreteType(type, mod))
+        if (auto concreteType = signature->getConcreteType(type))
           return hasNativeReferenceCounting(concreteType->getCanonicalType());
 
-        assert(signature->requiresClass(type, mod));
+        assert(signature->requiresClass(type));
 
         // If we have a superclass bound, recurse on that.  This should
         // always terminate: even if we allow
         //   <T, U: T, V: U, ...>
         // at some point the type-checker should prove acyclic-ness.
-        auto bound = signature->getSuperclassBound(type, mod);
+        auto bound = signature->getSuperclassBound(type);
         if (bound) {
           return hasNativeReferenceCounting(bound->getCanonicalType());
         }
@@ -492,7 +490,7 @@ namespace {
       // signature plumbed through.
       if (Sig && type->hasTypeParameter()) {
         type = Sig->getCanonicalSignature()
-          .getGenericEnvironment(*M.getSwiftModule())
+          .getGenericEnvironment()
           ->mapTypeIntoContext(type)
           ->getCanonicalType();
       }
@@ -1737,9 +1735,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
 
   // The result type might be written in terms of type parameters
   // that have been made fully concrete.
-  CanType canResultTy = resultTy->getCanonicalType(
-      AFD->getGenericSignature(),
-      *TC.M.getSwiftModule());
+  CanType canResultTy = resultTy->getCanonicalType(AFD->getGenericSignature());
 
   // Get the generic signature from the surrounding context.
   auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
@@ -1768,8 +1764,7 @@ static CanAnyFunctionType getDestructorInterfaceType(TypeConverter &TC,
                                                      bool isDeallocating,
                                                      bool isForeign) {
   auto classType = dd->getDeclContext()->getDeclaredInterfaceType()
-    ->getCanonicalType(dd->getGenericSignatureOfContext(),
-                       *TC.M.getSwiftModule());
+    ->getCanonicalType(dd->getGenericSignatureOfContext());
 
   assert((!isForeign || isDeallocating)
          && "There are no foreign destroying destructors");
@@ -1799,8 +1794,7 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(TypeConverter &TC,
                                                             bool isObjC,
                                                             bool isDestroyer) {
   auto classType = cd->getDeclaredInterfaceType()
-    ->getCanonicalType(cd->getGenericSignatureOfContext(),
-                       *TC.M.getSwiftModule());
+    ->getCanonicalType(cd->getGenericSignatureOfContext());
 
   CanType emptyTupleTy = TupleType::getEmpty(TC.Context);
   auto resultType = (isDestroyer ? emptyTupleTy : classType);
@@ -2097,10 +2091,8 @@ getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
     }
   }
 
-  auto canSelfType = selfType->getCanonicalType(
-    genericSig, *M.getSwiftModule());
-  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(
-    genericSig, *M.getSwiftModule());
+  auto canSelfType = selfType->getCanonicalType(genericSig);
+  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(genericSig);
 
   // Create the SILFunctionType for the callback.
   SILParameterInfo params[] = {
@@ -2468,8 +2460,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   // Instantiate the layout with identity substitutions.
   auto subMap = signature->getSubstitutionMap(
     [&](SubstitutableType *type) -> Type {
-      return signature->getCanonicalTypeInContext(type,
-                                                  *M.getSwiftModule());
+      return signature->getCanonicalTypeInContext(type);
     },
     [](Type depTy, Type replacementTy, ProtocolType *conformedTy)
     -> ProtocolConformanceRef {
@@ -2485,7 +2476,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   auto loweredContextType = loweredInterfaceType;
   auto contextBoxTy = boxTy;
   if (signature) {
-    auto env = signature.getGenericEnvironment(*M.getSwiftModule());
+    auto env = signature.getGenericEnvironment();
     loweredContextType = env->mapTypeIntoContext(loweredContextType)
                             ->getCanonicalType();
     contextBoxTy = cast<SILBoxType>(
@@ -2511,7 +2502,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
         ->getGenericSignatureOfContext();
     loweredInterfaceType =
       env->mapTypeOutOfContext(loweredInterfaceType)
-        ->getCanonicalType(homeSig, *M.getSwiftModule());
+        ->getCanonicalType(homeSig);
   }
   
   auto boxType = getInterfaceBoxTypeForCapture(captured,

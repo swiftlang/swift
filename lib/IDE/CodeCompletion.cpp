@@ -1956,7 +1956,7 @@ public:
       }
 
       if (t->isTypeParameter()) {
-        auto protos = genericSig->getConformsTo(t, *M);
+        auto protos = genericSig->getConformsTo(t);
         if (!protos.empty())
           return buildProtocolComposition(protos);
       }

@@ -1143,12 +1143,10 @@ CanType TypeBase::getCanonicalType() {
       ->getCanonicalSignature();
     
     // Transform the input and result types.
-    auto &ctx = function->getInput()->getASTContext();
-    auto &mod = *ctx.TheBuiltinModule;
     auto inputTy = getCanonicalInputType(function, [&](Type type) -> CanType {
-      return type->getCanonicalType(sig, mod);
+      return type->getCanonicalType(sig);
     });
-    auto resultTy = function->getResult()->getCanonicalType(sig, mod);
+    auto resultTy = function->getResult()->getCanonicalType(sig);
     Result = GenericFunctionType::get(sig, inputTy, resultTy,
                                       function->getExtInfo());
     assert(Result->isCanonical());
@@ -1234,12 +1232,11 @@ CanType TypeBase::getCanonicalType() {
   return CanType(Result);
 }
 
-CanType TypeBase::getCanonicalType(GenericSignature *sig,
-                                   ModuleDecl &mod) {
+CanType TypeBase::getCanonicalType(GenericSignature *sig) {
   if (!sig)
     return getCanonicalType();
 
-  return sig->getCanonicalTypeInContext(this, mod);
+  return sig->getCanonicalTypeInContext(this);
 }
 
 TypeBase *TypeBase::reconstituteSugar(bool Recursive) {

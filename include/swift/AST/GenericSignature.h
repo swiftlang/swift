@@ -132,7 +132,7 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
                                    ArrayRef<Requirement> requirements);
 
   /// Retrieve the generic signature builder for the given generic signature.
-  GenericSignatureBuilder *getGenericSignatureBuilder(ModuleDecl &mod);
+  GenericSignatureBuilder *getGenericSignatureBuilder();
 
   friend class ArchetypeType;
 
@@ -256,7 +256,7 @@ public:
   /// Create a new generic environment that provides fresh contextual types
   /// (archetypes) that correspond to the interface types in this generic
   /// signature.
-  GenericEnvironment *createGenericEnvironment(ModuleDecl &mod);
+  GenericEnvironment *createGenericEnvironment();
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -264,46 +264,47 @@ public:
   }
   
   /// Determine whether the given dependent type is required to be a class.
-  bool requiresClass(Type type, ModuleDecl &mod);
+  bool requiresClass(Type type);
 
   /// Determine the superclass bound on the given dependent type.
-  Type getSuperclassBound(Type type, ModuleDecl &mod);
+  Type getSuperclassBound(Type type);
 
   using ConformsToArray = SmallVector<ProtocolDecl *, 2>;
   /// Determine the set of protocols to which the given dependent type
   /// must conform.
-  ConformsToArray getConformsTo(Type type, ModuleDecl &mod);
+  ConformsToArray getConformsTo(Type type);
 
   /// Determine whether the given dependent type conforms to this protocol.
-  bool conformsToProtocol(Type type, ProtocolDecl *proto, ModuleDecl &mod);
+  bool conformsToProtocol(Type type, ProtocolDecl *proto);
 
   /// Determine whether the given dependent type is equal to a concrete type.
-  bool isConcreteType(Type type, ModuleDecl &mod);
+  bool isConcreteType(Type type);
 
   /// Return the concrete type that the given dependent type is constrained to,
   /// or the null Type if it is not the subject of a concrete same-type
   /// constraint.
-  Type getConcreteType(Type type, ModuleDecl &mod);
+  Type getConcreteType(Type type);
 
   /// Return the layout constraint that the given dependent type is constrained
   /// to, or the null LayoutConstraint if it is not the subject of layout
   /// constraint.
-  LayoutConstraint getLayoutConstraint(Type type, ModuleDecl &mod);
+  LayoutConstraint getLayoutConstraint(Type type);
 
   /// Return whether two type parameters represent the same type under this
   /// generic signature.
   ///
   /// The type parameters must be known to not be concrete within the context.
-  bool areSameTypeParameterInContext(Type type1, Type type2, ModuleDecl &mod);
+  bool areSameTypeParameterInContext(Type type1, Type type2);
 
   /// Return the canonical version of the given type under this generic
   /// signature.
-  CanType getCanonicalTypeInContext(Type type, ModuleDecl &mod);
-  bool isCanonicalTypeInContext(Type type, ModuleDecl &mod);
+  CanType getCanonicalTypeInContext(Type type);
+  bool isCanonicalTypeInContext(Type type);
 
   /// Return the canonical version of the given type under this generic
   /// signature.
-  CanType getCanonicalTypeInContext(Type type, GenericSignatureBuilder &builder);
+  CanType getCanonicalTypeInContext(Type type,
+                                    GenericSignatureBuilder &builder);
   bool isCanonicalTypeInContext(Type type, GenericSignatureBuilder &builder);
 
   /// Retrieve the conformance access path used to extract the conformance of
@@ -319,8 +320,7 @@ public:
   ///
   /// \seealso ConformanceAccessPath
   ConformanceAccessPath getConformanceAccessPath(Type type,
-                                                 ProtocolDecl *protocol,
-                                                 ModuleDecl &mod);
+                                                 ProtocolDecl *protocol);
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,

@@ -118,12 +118,10 @@ void ProtocolRequirementTypeResolver::recordParamType(ParamDecl *decl,
 
 CompleteGenericTypeResolver::CompleteGenericTypeResolver(
                                               TypeChecker &tc,
-                                              GenericSignature *genericSig,
-                                              ModuleDecl &module)
-  : tc(tc), genericSig(genericSig), module(module),
+                                              GenericSignature *genericSig)
+  : tc(tc), genericSig(genericSig),
     builder(*tc.Context.getOrCreateGenericSignatureBuilder(
-                               genericSig->getCanonicalSignature(),
-                               &module))
+                               genericSig->getCanonicalSignature()))
 {
 }
 
@@ -224,8 +222,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 }
 
 bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {
-  return genericSig->getCanonicalTypeInContext(type1, module)
-           == genericSig->getCanonicalTypeInContext(type2, module);
+  return genericSig->getCanonicalTypeInContext(type1)
+           == genericSig->getCanonicalTypeInContext(type2);
 }
 
 void
@@ -758,7 +756,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     prepareGenericParamList(gp, func);
 
     // Create the generic signature builder.
-    GenericSignatureBuilder builder(Context, LookUpConformance(*this, func));
+    GenericSignatureBuilder builder(Context);
 
     // Type check the function declaration, treating all generic type
     // parameters as dependent, unresolved.
@@ -768,8 +766,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
     // The generic function signature is complete and well-formed. Determine
     // the type of the generic function.
-    sig = std::move(builder).computeGenericSignature(*func->getParentModule(),
-                                                     func->getLoc());
+    sig = std::move(builder).computeGenericSignature(func->getLoc());
 
     // The generic signature builder now has all of the requirements, although
     // there might still be errors that have not yet been diagnosed. Revert the
@@ -794,8 +791,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     sig = func->getDeclContext()->getGenericSignatureOfContext();
   }
 
-  CompleteGenericTypeResolver completeResolver(*this, sig,
-                                               *func->getModuleContext());
+  CompleteGenericTypeResolver completeResolver(*this, sig);
   if (checkGenericFuncSignature(*this, nullptr, func, completeResolver))
     invalid = true;
 
@@ -985,8 +981,7 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     prepareGenericParamList(gp, subscript);
 
     // Create the generic signature builder.
-    GenericSignatureBuilder builder(Context,
-                                    LookUpConformance(*this, subscript));
+    GenericSignatureBuilder builder(Context);
 
     // Type check the function declaration, treating all generic type
     // parameters as dependent, unresolved.
@@ -998,8 +993,7 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     // The generic subscript signature is complete and well-formed. Determine
     // the type of the generic subscript.
     sig =
-      std::move(builder).computeGenericSignature(*subscript->getParentModule(),
-                                                 subscript->getLoc());
+      std::move(builder).computeGenericSignature(subscript->getLoc());
 
     // The generic signature builder now has all of the requirements, although
     // there might still be errors that have not yet been diagnosed. Revert the
@@ -1023,8 +1017,7 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     sig = subscript->getDeclContext()->getGenericSignatureOfContext();
   }
 
-  CompleteGenericTypeResolver completeResolver(*this, sig,
-                                               *subscript->getModuleContext());
+  CompleteGenericTypeResolver completeResolver(*this, sig);
   if (checkGenericSubscriptSignature(*this, nullptr, subscript, completeResolver))
     invalid = true;
 
@@ -1118,7 +1111,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     }
 
     // Create the generic signature builder.
-    GenericSignatureBuilder builder(Context, LookUpConformance(*this, dc));
+    GenericSignatureBuilder builder(Context);
 
     // Type check the generic parameters, treating all generic type
     // parameters as dependent, unresolved.
@@ -1138,7 +1131,6 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 
     // Record the generic type parameter types and the requirements.
     sig = std::move(builder).computeGenericSignature(
-                                         *dc->getParentModule(),
                                          genericParams->getSourceRange().Start,
                                          allowConcreteGenericParams);
 
@@ -1172,8 +1164,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
             ->getGenericSignatureOfContext();
   }
 
-  CompleteGenericTypeResolver completeResolver(*this, sig,
-                                               *dc->getParentModule());
+  CompleteGenericTypeResolver completeResolver(*this, sig);
   if (recursivelyVisitGenericParams) {
     visitOuterToInner(genericParams,
                       [&](GenericParamList *gpList) {
@@ -1185,8 +1176,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
   }
 
   // Form the generic environment.
-  ModuleDecl *module = dc->getParentModule();
-  return sig->createGenericEnvironment(*module);
+  return sig->createGenericEnvironment();
 }
 
 void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
