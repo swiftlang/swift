@@ -148,6 +148,14 @@ preset=buildbot_incremental,tools=RA,stdlib=RD,smoketest=macosx,single-thread
 
 ```
 
+### Testing Compiler Performance
+
+Platform        | Comment | Check Status
+------------    | ------- | ------------
+macOS platform  | @swift-ci Please test compiler performance       | Compiles full source compatibility test suite and measures compiler performance
+macOS platform  | @swift-ci Please smoke test compiler performance | Compiles a subset of source compatibility test suite and measures compiler performance
+
+
 ## Cross Repository Testing
 
 Simply provide the URL from corresponding pull requests in the same comment as "@swift-ci Please test" phrase. List all of the pull requests and then provide the specific test phrase you would like to trigger. Currently, it will only merge the main pull request you requested testing from as opposed to all of the PR's.
