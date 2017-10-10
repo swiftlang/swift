@@ -1651,7 +1651,7 @@ ${operatorComment(x.nonMaskingOperator, False)}
 extension BinaryInteger {
   // FIXME(ABI): using Int as the return type is wrong.
   @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
+  @inline(__always)
   public func distance(to other: Self) -> Int {
     if !Self.isSigned {
       if self > other {
@@ -1680,7 +1680,7 @@ extension BinaryInteger {
 
   // FIXME(ABI): using Int as the parameter type is wrong.
   @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
+  @inline(__always)
   public func advanced(by n: Int) -> Self {
     if !Self.isSigned {
       return n < (0 as Int)
