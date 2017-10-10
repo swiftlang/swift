@@ -823,8 +823,8 @@ StringTests.test("stringCoreReserve")
 #endif
 }
 
-func makeStringCore(_ base: String) -> _StringCore {
-  var x = _StringCore()
+func makeStringCore(_ base: String) -> _LegacyStringCore {
+  var x = _LegacyStringCore()
   // make sure some - but not all - replacements will have to grow the buffer
   x.reserveCapacity(base._core.count * 3 / 2)
   x.append(contentsOf: base._core)

@@ -65,7 +65,7 @@ extension String {
   {
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal init(_ _core: _StringCore, coreOffset: Int = 0) {
+    internal init(_ _core: _LegacyStringCore, coreOffset: Int = 0) {
       self._core = _core
       self._coreOffset = coreOffset
     }
@@ -74,12 +74,12 @@ extension String {
     @_versioned // FIXME(sil-serialize-all)
     internal struct _ScratchIterator : IteratorProtocol {
       @_versioned
-      internal var core: _StringCore
+      internal var core: _LegacyStringCore
       @_versioned // FIXME(sil-serialize-all)
       internal var idx: Int
       @_inlineable // FIXME(sil-serialize-all)
       @_versioned // FIXME(sil-serialize-all)
-      internal init(_ core: _StringCore, _ pos: Int) {
+      internal init(_ core: _LegacyStringCore, _ pos: Int) {
         self.idx = pos
         self.core = core
       }
@@ -194,7 +194,7 @@ extension String {
     public struct Iterator : IteratorProtocol {
       @_inlineable // FIXME(sil-serialize-all)
       @_versioned // FIXME(sil-serialize-all)
-      internal init(_ _base: _StringCore) {
+      internal init(_ _base: _LegacyStringCore) {
         self._iterator = _base.makeIterator()
         if _base.hasContiguousStorage {
           self._baseSet = true
@@ -261,7 +261,7 @@ extension String {
       @_versioned // FIXME(sil-serialize-all)
       internal var _base: UnsafeBufferPointer<UInt16>.Iterator!
       @_versioned // FIXME(sil-serialize-all)
-      internal var _iterator: IndexingIterator<_StringCore>
+      internal var _iterator: IndexingIterator<_LegacyStringCore>
     }
 
     /// Returns an iterator over the Unicode scalars that make up this view.
@@ -283,10 +283,10 @@ extension String {
     }
 
     @_versioned // FIXME(sil-serialize-all)
-    internal var _core: _StringCore
+    internal var _core: _LegacyStringCore
     
     /// The offset of this view's `_core` from an original core. This works
-    /// around the fact that `_StringCore` is always zero-indexed.
+    /// around the fact that `_LegacyStringCore` is always zero-indexed.
     /// `_coreOffset` should be subtracted from `UnicodeScalarIndex.encodedOffset`
     /// before that value is used as a `_core` index.
     @_versioned // FIXME(sil-serialize-all)
@@ -342,7 +342,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// Creates an empty view instance.
   @_inlineable // FIXME(sil-serialize-all)
   public init() {
-    self = String.UnicodeScalarView(_StringCore())
+    self = String.UnicodeScalarView(_LegacyStringCore())
   }
   
   /// Reserves enough space in the view's underlying storage to store the

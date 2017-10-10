@@ -222,7 +222,7 @@ extension Character
     default:
       _representation = Character(
         _largeRepresentationString: String(
-          _StringCore(
+          _LegacyStringCore(
             baseAddress: UnsafeMutableRawPointer(start), 
             count: utf16.count,
             elementShift: 1,
@@ -313,9 +313,9 @@ extension Character {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  internal var _largeUTF16 : _StringCore? {
+  internal var _largeUTF16 : _LegacyStringCore? {
     guard case .large(let storage) = _representation else { return nil }
-    return _StringCore(_StringBuffer(storage))
+    return _LegacyStringCore(_StringBuffer(storage))
   }
 }
 
