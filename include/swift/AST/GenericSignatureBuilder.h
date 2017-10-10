@@ -1198,6 +1198,14 @@ public:
   /// path.
   bool isDerivedRequirement() const;
 
+  /// Whether we should diagnose a redundant constraint based on this
+  /// requirement source.
+  ///
+  /// \param primary Whether this is the "primary" requirement source, on which
+  /// a "redundant constraint" warning would be emitted vs. the requirement
+  /// source that would be used for the accompanying note.
+  bool shouldDiagnoseRedundancy(bool primary) const;
+
   /// Determine whether the given derived requirement \c source, when rooted at
   /// the potential archetype \c pa, is actually derived from the same
   /// requirement. Such "self-derived" requirements do not make the original
