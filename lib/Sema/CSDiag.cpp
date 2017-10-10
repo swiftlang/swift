@@ -7046,6 +7046,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   return true;
 }
 
+
+// Start work here:
 bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   // Diagnose obvious assignments to literals.
   if (isa<LiteralExpr>(assignExpr->getDest()->getValueProvidingExpr())) {
