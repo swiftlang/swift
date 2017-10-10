@@ -109,6 +109,14 @@ NS_ASSUME_NONNULL_BEGIN
 - (void) shouldBeTrueCBool: (_Bool)value;
 @end
 
+@interface OuterType : NSObject
+@end
+
+__attribute__((swift_name("OuterType.InnerType")))
+@interface OuterTypeInnerType : NSObject
+@property NSArray<OuterType *> *things;
+@end
+
 NS_ASSUME_NONNULL_END
 
 #endif
