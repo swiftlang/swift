@@ -100,13 +100,27 @@ SILFunctionType::getDefaultWitnessMethodProtocol(ModuleDecl &M) const {
   assert(getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod);
   auto selfTy = getSelfInstanceType();
   if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
+    assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
     auto superclass = GenericSig->getSuperclassBound(paramTy, M);
     if (superclass)
       return nullptr;
-    assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
     auto protos = GenericSig->getConformsTo(paramTy, M);
     assert(protos.size() == 1);
     return protos[0];
+  }
+
+  return nullptr;
+}
+
+ClassDecl *
+SILFunctionType::getWitnessMethodClass(ModuleDecl &M) const {
+  auto selfTy = getSelfInstanceType();
+  auto genericSig = getGenericSignature();
+  if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
+    assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
+    auto superclass = genericSig->getSuperclassBound(paramTy, M);
+    if (superclass)
+      return superclass->getClassOrBoundGenericClass();
   }
 
   return nullptr;
