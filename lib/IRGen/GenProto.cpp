@@ -92,11 +92,11 @@ protected:
   FulfillmentMap Fulfillments;
 
   GenericSignature::ConformsToArray getConformsTo(Type t) {
-    return Generics->getConformsTo(t, M);
+    return Generics->getConformsTo(t);
   }
 
   CanType getSuperclassBound(Type t) {
-    if (auto superclassTy = Generics->getSuperclassBound(t, M))
+    if (auto superclassTy = Generics->getSuperclassBound(t))
       return superclassTy->getCanonicalType();
     return CanType();
   }
@@ -313,7 +313,7 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
                        MetadataSource::InvalidSourceIndex,
                        selfTy);
 
-  if (auto *proto = fnType->getDefaultWitnessMethodProtocol(M)) {
+  if (auto *proto = fnType->getDefaultWitnessMethodProtocol()) {
     // The Self type is abstract, so we can fulfill its metadata from
     // the Self metadata parameter.
     addSelfMetadataFulfillment(selfTy);
@@ -554,7 +554,7 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
 
       // Mark this as the cached witness table for Self.
 
-      if (auto *proto = FnType->getDefaultWitnessMethodProtocol(M)) {
+      if (auto *proto = FnType->getDefaultWitnessMethodProtocol()) {
         auto selfTy = FnType->getSelfInstanceType();
         CanType argTy = getTypeInContext(selfTy);
         auto archetype = cast<ArchetypeType>(argTy);
@@ -2602,8 +2602,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // Figure out what we're actually still required to pass 
   PolymorphicConvention convention(IGM, fnType);
   convention.enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
-    assert(generics->isCanonicalTypeInContext(reqt.TypeParameter,
-                                              *IGM.getSwiftModule()));
+    assert(generics->isCanonicalTypeInContext(reqt.TypeParameter));
     Requirements.push_back(reqt);
   });
 

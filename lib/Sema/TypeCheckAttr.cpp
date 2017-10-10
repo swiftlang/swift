@@ -1688,8 +1688,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   }
 
   // Form a new generic signature based on the old one.
-  GenericSignatureBuilder Builder(D->getASTContext(),
-                                  TypeChecker::LookUpConformance(TC, DC));
+  GenericSignatureBuilder Builder(D->getASTContext());
 
   // First, add the old generic signature.
   Builder.addGenericSignature(genericSig);
@@ -1852,7 +1851,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
   // Check the result.
   (void)std::move(Builder).computeGenericSignature(
-                                        *DC->getParentModule(),
                                         attr->getLocation(),
                                         /*allowConcreteGenericParams=*/true);
 }

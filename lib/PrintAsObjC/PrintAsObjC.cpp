@@ -1944,13 +1944,12 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
 
   /// Returns true if \p paramTy has any constraints other than being
   /// class-bound ("conforms to" AnyObject).
-  static bool isConstrained(ModuleDecl &mod,
-                            GenericSignature *sig,
+  static bool isConstrained(GenericSignature *sig,
                             GenericTypeParamType *paramTy) {
-    if (sig->getSuperclassBound(paramTy, mod))
+    if (sig->getSuperclassBound(paramTy))
       return true;
 
-    auto conformsTo = sig->getConformsTo(paramTy, mod);
+    auto conformsTo = sig->getConformsTo(paramTy);
     return conformsTo.size() > 0;
   }
 
@@ -1967,7 +1966,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
     for_each(boundGeneric->getGenericArgs(),
              sig->getInnermostGenericParams(),
              [&](Type argTy, GenericTypeParamType *paramTy) {
-      if (isObjCGeneric && isConstrained(M, sig, paramTy))
+      if (isObjCGeneric && isConstrained(sig, paramTy))
         NeedsDefinition = true;
       visit(argTy);
       NeedsDefinition = false;

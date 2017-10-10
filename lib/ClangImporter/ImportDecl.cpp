@@ -7638,8 +7638,7 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 
 GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
-  GenericSignatureBuilder builder(SwiftContext,
-                           LookUpConformanceInModule(dc->getParentModule()));
+  GenericSignatureBuilder builder(SwiftContext);
   SmallVector<GenericTypeParamType *, 4> allGenericParams;
   for (auto param : *genericParams) {
     builder.addGenericParameter(param);
@@ -7652,15 +7651,13 @@ GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     (void) result;
   }
 
-  return std::move(builder).computeGenericSignature(*dc->getParentModule(),
-                                                    SourceLoc());
+  return std::move(builder).computeGenericSignature(SourceLoc());
 }
 
 // Calculate the generic environment from an imported generic param list.
 GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
     GenericParamList *genericParams, DeclContext *dc) {
-  return buildGenericSignature(genericParams, dc)->createGenericEnvironment(
-                                                       *dc->getParentModule());
+  return buildGenericSignature(genericParams, dc)->createGenericEnvironment();
 }
 
 DeclContext *

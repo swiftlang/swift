@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -101,9 +102,6 @@ STATISTIC(NumDelayedRequirementUnresolved,
 struct GenericSignatureBuilder::Implementation {
   /// Allocator.
   llvm::BumpPtrAllocator Allocator;
-
-  /// Function used to look up conformances.
-  std::function<GenericFunction> LookupConformance;
 
   /// The generic parameters that this generic signature builder is working
   /// with.
@@ -2078,10 +2076,10 @@ GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
 
   // Lookup the conformance of the concrete type to this protocol.
   auto conformance =
-    getLookupConformanceFn()(pa->getDependentType({ })->getCanonicalType(),
-                             concrete,
-                             proto->getDeclaredInterfaceType()
-                              ->castTo<ProtocolType>());
+      lookupConformance(pa->getDependentType({ })->getCanonicalType(),
+                        concrete,
+                        proto->getDeclaredInterfaceType()
+                          ->castTo<ProtocolType>());
   if (!conformance) {
     if (!concrete->hasError() && concreteSource->getLoc().isValid()) {
       Impl->HadAnyError = true;
@@ -2111,10 +2109,10 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
 
   // Lookup the conformance of the superclass to this protocol.
   auto conformance =
-    getLookupConformanceFn()(pa->getDependentType({ })->getCanonicalType(),
-                             superclass,
-                             proto->getDeclaredInterfaceType()
-                               ->castTo<ProtocolType>());
+    lookupConformance(pa->getDependentType({ })->getCanonicalType(),
+                      superclass,
+                      proto->getDeclaredInterfaceType()
+                        ->castTo<ProtocolType>());
   if (!conformance) return nullptr;
 
   // Conformance to this protocol is redundant; update the requirement source
@@ -2878,10 +2876,8 @@ void EquivalenceClass::modified(GenericSignatureBuilder &builder) {
 }
 
 GenericSignatureBuilder::GenericSignatureBuilder(
-                               ASTContext &ctx,
-                               std::function<GenericFunction> lookupConformance)
+                               ASTContext &ctx)
   : Context(ctx), Diags(Context.Diags), Impl(new Implementation) {
-  Impl->LookupConformance = std::move(lookupConformance);
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumGenericSignatureBuilders++;
 }
@@ -2906,9 +2902,29 @@ GenericSignatureBuilder::GenericSignatureBuilder(
 
 GenericSignatureBuilder::~GenericSignatureBuilder() = default;
 
-std::function<GenericFunction>
-GenericSignatureBuilder::getLookupConformanceFn() const {
-  return Impl->LookupConformance;
+auto
+GenericSignatureBuilder::getLookupConformanceFn()
+    -> LookUpConformanceInBuilder {
+  return LookUpConformanceInBuilder(this);
+}
+
+Optional<ProtocolConformanceRef>
+GenericSignatureBuilder::lookupConformance(CanType dependentType,
+                                           Type conformingReplacementType,
+                                           ProtocolType *conformedProtocol) {
+  if (conformingReplacementType->isTypeParameter())
+    return ProtocolConformanceRef(conformedProtocol->getDecl());
+
+  // Figure out which module to look into.
+  // FIXME: When lookupConformance() starts respecting modules, we'll need
+  // to do some filtering here.
+  ModuleDecl *searchModule = conformedProtocol->getDecl()->getParentModule();
+  auto result = searchModule->lookupConformance(conformingReplacementType,
+                                                conformedProtocol->getDecl());
+  if (result && getLazyResolver())
+    getLazyResolver()->markConformanceUsed(*result, searchModule);
+
+  return result;
 }
 
 LazyResolver *GenericSignatureBuilder::getLazyResolver() const { 
@@ -6312,7 +6328,6 @@ static void collectRequirements(GenericSignatureBuilder &builder,
 }
 
 GenericSignature *GenericSignatureBuilder::computeGenericSignature(
-                                          ModuleDecl &module,
                                           SourceLoc loc,
                                           bool allowConcreteGenericParams,
                                           bool allowBuilderToMove) && {
@@ -6335,12 +6350,9 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
   // over-minimizing.
   if (allowBuilderToMove && !Impl->HadAnyError &&
       !Impl->HadAnyRedundantConstraints) {
-    // Set the conformance lookup function to something that works canonically.
-    Impl->LookupConformance = LookUpConformanceInModule(&module);
-
     // Register this generic signature builer as the canonical builder for the
     // given signature.
-    Context.registerGenericSignatureBuilder(sig, module, std::move(*this));
+    Context.registerGenericSignatureBuilder(sig, std::move(*this));
   }
 
   // Wipe out the internal state, ensuring that nobody uses this builder for
@@ -6352,9 +6364,7 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
 
 GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
                                                      ProtocolDecl *proto) {
-  auto module = proto->getParentModule();
-  GenericSignatureBuilder builder(proto->getASTContext(),
-                                  LookUpConformanceInModule(module));
+  GenericSignatureBuilder builder(proto->getASTContext());
 
   // Add the 'self' parameter.
   auto selfType =
@@ -6376,7 +6386,7 @@ GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
                  nullptr);
 
   return std::move(builder).computeGenericSignature(
-           *module, SourceLoc(),
+           SourceLoc(),
            /*allowConcreteGenericPArams=*/false,
            /*allowBuilderToMove=*/false);
 }

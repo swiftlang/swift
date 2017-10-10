@@ -862,22 +862,20 @@ private:
   /// generic signature builder for the given signature, if we don't already
   /// have one.
   void registerGenericSignatureBuilder(GenericSignature *sig,
-                                       ModuleDecl &module,
                                        GenericSignatureBuilder &&builder);
   friend class GenericSignatureBuilder;
 
 public:
   /// Retrieve or create the stored generic signature builder for the given
   /// canonical generic signature and module.
-  GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(CanGenericSignature sig,
-                                                ModuleDecl *mod);
+  GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(
+                                                     CanGenericSignature sig);
 
   /// Retrieve or create the canonical generic environment of a canonical
   /// generic signature builder.
   GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
                                        GenericSignatureBuilder *builder,
-                                       GenericSignature *sig,
-                                       ModuleDecl &module);
+                                       GenericSignature *sig);
 
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,

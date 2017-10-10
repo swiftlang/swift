@@ -393,7 +393,7 @@ public:
 
   /// getCanonicalType - Stronger canonicalization which folds away equivalent
   /// associated types, or type parameters that have been made concrete.
-  CanType getCanonicalType(GenericSignature *sig, ModuleDecl &mod);
+  CanType getCanonicalType(GenericSignature *sig);
 
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
@@ -3523,7 +3523,7 @@ public:
   /// If this is a @convention(witness_method) function with a protocol
   /// constrained self parameter, return the protocol constraint for
   /// the Self type.
-  ProtocolDecl *getDefaultWitnessMethodProtocol(ModuleDecl &M) const;
+  ProtocolDecl *getDefaultWitnessMethodProtocol() const;
 
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the

@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_LAZYRESOLVER_H
 #define SWIFT_AST_LAZYRESOLVER_H
 
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 
@@ -102,6 +103,10 @@ public:
   /// is usable for the given type.
   virtual bool isProtocolExtensionUsable(DeclContext *dc, Type type,
                                          ExtensionDecl *protocolExtension) = 0;
+
+  /// Mark the given conformance as "used" from the given declaration context.
+  virtual void markConformanceUsed(ProtocolConformanceRef conformance,
+                                   DeclContext *dc) = 0;
 };
 
 /// An implementation of LazyResolver that delegates to another.
@@ -170,6 +175,11 @@ public:
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
                                  ExtensionDecl *protocolExtension) override {
     return Principal.isProtocolExtensionUsable(dc, type, protocolExtension);
+  }
+
+  void markConformanceUsed(ProtocolConformanceRef conformance,
+                           DeclContext *dc) override {
+    return Principal.markConformanceUsed(conformance, dc);
   }
 };
 

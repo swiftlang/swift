@@ -485,16 +485,14 @@ namespace {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
                                              GenericTypeParams);
 
-      GenericSignatureBuilder Builder(ctx,
-                               LookUpConformanceInModule(ctx.TheBuiltinModule));
+      GenericSignatureBuilder Builder(ctx);
       for (auto gp : GenericTypeParams) {
         Builder.addGenericParameter(gp);
       }
 
       auto GenericSig =
-        std::move(Builder).computeGenericSignature(*ctx.TheBuiltinModule,
-                                                   SourceLoc());
-      GenericEnv = GenericSig->createGenericEnvironment(*ctx.TheBuiltinModule);
+        std::move(Builder).computeGenericSignature(SourceLoc());
+      GenericEnv = GenericSig->createGenericEnvironment();
     }
 
     template <class G>

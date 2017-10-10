@@ -715,8 +715,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
     // account by the substGenericArgs. So, canonicalize in the context of the
     // specialized signature.
     FnTy = cast<SILFunctionType>(
-        CanSpecializedGenericSig->getCanonicalTypeInContext(
-            FnTy, *M.getSwiftModule()));
+        CanSpecializedGenericSig->getCanonicalTypeInContext(FnTy));
   }
   assert(FnTy);
 
@@ -785,8 +784,7 @@ getGenericEnvironmentAndSignatureWithRequirements(
     GenericSignature *OrigGenSig, GenericEnvironment *OrigGenericEnv,
     ArrayRef<Requirement> Requirements, SILModule &M) {
   // Form a new generic signature based on the old one.
-  GenericSignatureBuilder Builder(M.getASTContext(),
-                           LookUpConformanceInModule(M.getSwiftModule()));
+  GenericSignatureBuilder Builder(M.getASTContext());
 
   // First, add the old generic signature.
   Builder.addGenericSignature(OrigGenSig);
@@ -800,10 +798,10 @@ getGenericEnvironmentAndSignatureWithRequirements(
   }
 
   auto NewGenSig =
-    std::move(Builder).computeGenericSignature(*M.getSwiftModule(),
+    std::move(Builder).computeGenericSignature(
                                    SourceLoc(),
                                    /*allowConcreteGenericParams=*/true);
-  auto NewGenEnv = NewGenSig->createGenericEnvironment(*M.getSwiftModule());
+  auto NewGenEnv = NewGenSig->createGenericEnvironment();
   return { NewGenEnv, NewGenSig };
 }
 
@@ -1150,7 +1148,7 @@ public:
       : CallerGenericSig(CallerGenericSig), CallerGenericEnv(CallerGenericEnv),
         CalleeGenericSig(CalleeGenericSig), CalleeGenericEnv(CalleeGenericEnv),
         M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()),
-        Builder(Ctx, LookUpConformanceInModule(SM)) {
+        Builder(Ctx) {
     SpecializedGenericSig = nullptr;
     SpecializedGenericEnv = nullptr;
     CalleeInterfaceToCallerArchetypeMap =
@@ -1166,7 +1164,7 @@ public:
       : CallerGenericSig(CalleeGenericSig), CallerGenericEnv(CalleeGenericEnv),
         CalleeGenericSig(CalleeGenericSig), CalleeGenericEnv(CalleeGenericEnv),
         M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()),
-        Builder(Ctx, LookUpConformanceInModule(SM)) {
+        Builder(Ctx) {
 
     // Create the new generic signature using provided requirements.
     std::tie(SpecializedGenericEnv, SpecializedGenericSig) =
@@ -1346,7 +1344,7 @@ void FunctionSignaturePartialSpecializer::
   for (auto GP : CalleeGenericSig->getGenericParams()) {
     auto CanTy = GP->getCanonicalType();
     auto CanTyInContext =
-        CalleeGenericSig->getCanonicalTypeInContext(CanTy, *SM);
+        CalleeGenericSig->getCanonicalTypeInContext(CanTy);
     auto Replacement = CanTyInContext.subst(CalleeInterfaceToCallerArchetypeMap);
     DEBUG(llvm::dbgs() << "\n\nChecking callee generic parameter:\n";
           CanTy->dump());
@@ -1490,10 +1488,10 @@ FunctionSignaturePartialSpecializer::
 
   // Finalize the archetype builder.
   auto GenSig =
-      std::move(Builder).computeGenericSignature(*M.getSwiftModule(),
+      std::move(Builder).computeGenericSignature(
                                       SourceLoc(),
                                       /*allowConcreteGenericParams=*/true);
-  auto GenEnv = GenSig->createGenericEnvironment(*M.getSwiftModule());
+  auto GenEnv = GenSig->createGenericEnvironment();
   return { GenEnv, GenSig };
 }
 

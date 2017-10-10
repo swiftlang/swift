@@ -642,7 +642,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   
   GenericEnvironment *genericEnv = nullptr;
   if (auto sig = pattern->getGenericSignature()) {
-    genericEnv = sig->createGenericEnvironment(*getSwiftModule());
+    genericEnv = sig->createGenericEnvironment();
     enumerateGenericSignatureRequirements(pattern->getGenericSignature(),
       [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   }

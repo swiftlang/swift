@@ -53,8 +53,7 @@ TypeConverter::getIndicesAbstractionPattern(SubscriptDecl *decl) {
   if (auto sig = decl->getGenericSignatureOfContext())
     genericSig = sig->getCanonicalSignature();
   auto indicesTy = decl->getIndicesInterfaceType();
-  auto indicesCanTy = indicesTy->getCanonicalType(genericSig,
-                                                  *decl->getParentModule());
+  auto indicesCanTy = indicesTy->getCanonicalType(genericSig);
   return AbstractionPattern(genericSig, indicesCanTy);
 }
 

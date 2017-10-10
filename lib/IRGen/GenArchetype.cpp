@@ -210,8 +210,8 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   auto signature = environment->getGenericSignature()->getCanonicalSignature();
   auto archetypeDepType = archetype->getInterfaceType();
 
-  auto astPath = signature->getConformanceAccessPath(archetypeDepType, protocol,
-                                                     *IGF.IGM.getSwiftModule());
+  auto astPath = signature->getConformanceAccessPath(archetypeDepType,
+                                                     protocol);
 
   auto i = astPath.begin(), e = astPath.end();
   assert(i != e && "empty path!");
