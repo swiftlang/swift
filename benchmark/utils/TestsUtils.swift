@@ -170,20 +170,6 @@ public func CheckResults(
     }
 }
 
-// Due to potential overhead of passing closures around on the
-// performance measurements, this version is now deprecated
-@available(*, deprecated,
-  message: "For debugging test failures only! Use the version without message.")
-public func CheckResults(
-    _ resultsMatch: Bool,
-    _ message: @autoclosure () -> String
-    ) {
-    guard resultsMatch else {
-        print(message())
-        abort()
-    }
-}
-
 public func False() -> Bool { return false }
 
 /// This is a dummy protocol to test the speed of our protocol dispatch.
