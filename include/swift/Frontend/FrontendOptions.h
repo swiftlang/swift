@@ -139,15 +139,11 @@ public:
   // TO BE DELETED
   unsigned primaryInputCount() const { return getPrimaryInputs().size(); }
   
-  unsigned countOfPrimaryInputs() const {
-    return getPrimaryInputs().size();
-  }
-
   bool hasPrimaryInput() const {
     return primaryInputCount() > 0;
   }
   bool havePrimaryInputs() const {
-    return countOfPrimaryInputs() > 0;
+    return primaryInputCount() > 0;
   }
   
   bool isWholeModule() {
@@ -167,7 +163,7 @@ public:
   }
   
   bool hasUniquePrimaryInputFilename() const {
-    return countOfPrimaryInputs() == 1  &&  getPrimaryInputs()[0].isFilename();
+    return primaryInputCount() == 1  &&  getPrimaryInputs()[0].isFilename();
   }
   
   llvm::Optional<StringRef> uniquePrimaryInputFilename() const {
