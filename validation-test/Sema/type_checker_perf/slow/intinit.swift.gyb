@@ -1,0 +1,10 @@
+// RUN: not %scale-test --begin 1 --end 4 --step 1 %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+var result = 0
+
+result = result
+% for i in xrange(0, N):
+      &+ (Int(exactly: ${i}) ?? 0)
+% end
