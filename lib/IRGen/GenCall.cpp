@@ -1071,11 +1071,12 @@ bool irgen::hasSelfContextParameter(CanSILFunctionType fnType) {
     return metatype->getRepresentation() != MetatypeRepresentation::Thin;
   }
 
-  // Classes and class-bounded archetypes.
+  // Classes and class-bounded archetypes or ObjC existentials.
   // No need to apply this to existentials.
   // The direct check for SubstitutableType works because only
   // class-bounded generic types can be passed directly.
-  if (type->mayHaveSuperclass() || isa<SubstitutableType>(type)) {
+  if (type->mayHaveSuperclass() || isa<SubstitutableType>(type) ||
+      type->isObjCExistentialType()) {
     return true;
   }
 
