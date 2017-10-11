@@ -179,3 +179,12 @@ class Horse<T>: Rump { }
 func hasRedundantConformanceConstraint<X : Horse<T>, T>(_: X) where X : Rump {}
 // expected-warning@-1 {{redundant conformance constraint 'X': 'Rump'}}
 // expected-note@-2 {{conformance constraint 'X': 'Rump' implied here}}
+
+// SR-5862
+protocol X {
+	associatedtype Y : A
+}
+
+// CHECK-DAG: .noRedundancyWarning@
+// CHECK: Generic signature: <C where C : X, C.Y == B>
+func noRedundancyWarning<C : X>(_ wrapper: C) where C.Y == B {}

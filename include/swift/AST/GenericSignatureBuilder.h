@@ -203,6 +203,15 @@ public:
     EquivalenceClass &operator=(const EquivalenceClass &) = delete;
     EquivalenceClass &operator=(EquivalenceClass &&) = delete;
 
+    /// Record the conformance of this equivalence class to the given
+    /// protocol as found via the given requirement source.
+    ///
+    /// \returns true if this conformance is new to the equivalence class,
+    /// and false otherwise.
+    bool recordConformanceConstraint(PotentialArchetype *pa,
+                                     ProtocolDecl *proto,
+                                     const RequirementSource *source);
+
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
     /// that concrete type as written.
@@ -1197,6 +1206,14 @@ public:
   /// signature, because the information can be re-derived by following the
   /// path.
   bool isDerivedRequirement() const;
+
+  /// Whether we should diagnose a redundant constraint based on this
+  /// requirement source.
+  ///
+  /// \param primary Whether this is the "primary" requirement source, on which
+  /// a "redundant constraint" warning would be emitted vs. the requirement
+  /// source that would be used for the accompanying note.
+  bool shouldDiagnoseRedundancy(bool primary) const;
 
   /// Determine whether the given derived requirement \c source, when rooted at
   /// the potential archetype \c pa, is actually derived from the same
