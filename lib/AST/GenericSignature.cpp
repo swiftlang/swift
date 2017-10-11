@@ -678,14 +678,17 @@ bool GenericSignature::isRequirementSatisfied(Requirement requirement) {
   case RequirementKind::Layout: {
     auto requiredLayout = requirement.getLayoutConstraint();
 
-    if (canFirstType->isTypeParameter())
-      return getLayoutConstraint(canFirstType) == requiredLayout;
-    else {
-      // The requirement is on a concrete type, so it's either globally correct
-      // or globally incorrect, independent of this generic context. The latter
-      // case should be diagnosed elsewhere, so let's assume it's correct.
-      return true;
+    if (canFirstType->isTypeParameter()) {
+      if (auto layout = getLayoutConstraint(canFirstType))
+        return static_cast<bool>(layout.merge(requiredLayout));
+
+      return false;
     }
+
+    // The requirement is on a concrete type, so it's either globally correct
+    // or globally incorrect, independent of this generic context. The latter
+    // case should be diagnosed elsewhere, so let's assume it's correct.
+    return true;
   }
   }
 }

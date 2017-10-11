@@ -1736,17 +1736,6 @@ static bool isMethodDecl(const Decl *decl) {
     && decl->getDeclContext()->isTypeContext();
 }
 
-static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
-  if (!type->hasTypeParameter())
-    return true;
-
-  return !type.findIf([methodDepth](Type t) -> bool {
-    if (auto *gp = t->getAs<GenericTypeParamType>())
-      return gp->getDepth() >= methodDepth;
-    return false;
-  });
-}
-
 CanType ASTMangler::getDeclTypeForMangling(
     const ValueDecl *decl,
     ArrayRef<GenericTypeParamType *> &genericParams,
@@ -1803,25 +1792,12 @@ CanType ASTMangler::getDeclTypeForMangling(
 
         requirementsBuf.clear();
         for (auto &reqt : sig->getRequirements()) {
-          switch (reqt.getKind()) {
-        case RequirementKind::Conformance:
-        case RequirementKind::Layout:
-        case RequirementKind::Superclass:
-          // We don't need the requirement if the constrained type is below the
-          // method depth.
-          if (genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth))
+          // If the requirement is satisfied by the enclosing context,
+          // we don't need to mangle it here.
+          if (parentGenericSig->isRequirementSatisfied(reqt))
             continue;
-          break;
-        case RequirementKind::SameType:
-          // We don't need the requirement if both types are below the method
-          // depth, or non-dependent.
-          if (genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth) &&
-              genericParamIsBelowDepth(reqt.getSecondType(), initialParamDepth))
-            continue;
-          break;
-          }
 
-          // If we fell through the switch, mangle the requirement.
+          // Mangle the requirement.
           requirementsBuf.push_back(reqt);
         }
         requirements = requirementsBuf;
