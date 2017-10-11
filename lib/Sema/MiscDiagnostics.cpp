@@ -2835,7 +2835,7 @@ void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
 static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
   if (E == nullptr || isa<ErrorExpr>(E)) return;
 
-  // Shallow walker. just dig into implicit expression.
+  // Find call expression with trailing closure.
   class DiagnoseWalker : public ASTWalker {
     TypeChecker &TC;
 
@@ -2871,13 +2871,31 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
     DiagnoseWalker(TypeChecker &tc) : TC(tc) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      // Dig into implicit expression.
-      if (E->isImplicit()) return { true, E };
-      // Diagnose call expression.
-      if (auto CE = dyn_cast<CallExpr>(E))
+      if (E->isImplicit())
+        return { true, E };
+
+      switch (E->getKind()) {
+      case ExprKind::Closure:
+      case ExprKind::Paren:
+      case ExprKind::Tuple:
+      case ExprKind::TupleShuffle:
+      case ExprKind::ObjectLiteral:
+      case ExprKind::Array:
+      case ExprKind::Dictionary:
+        // Don't dig into expression which syntactically enclose other
+        // expressinos. e.g. [...], (...), and { ... }
+        return { false, E };
+      case ExprKind::Call: {
+        auto *CE = cast<CallExpr>(E);
+        // Diagnose call expression.
         diagnoseIt(CE);
-      // Don't dig any further.
-      return { false, E };
+        // Only dig into the callee.
+        CE->getFn()->walk(*this);
+        return { false, E };
+      }
+      default:
+        return { true, E };
+      }
     }
   };
 

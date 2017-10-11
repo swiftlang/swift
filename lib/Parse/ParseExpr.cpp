@@ -983,22 +983,44 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
   if (P.peekToken().isAtStartOfLine())
     return false;
   
-  
   // Determine if the {} goes with the expression by eating it, and looking
-  // to see if it is immediately followed by '{', 'where', or comma.  If so,
-  // we consider it to be part of the proceeding expression.
+  // to see if it is immediately followed by '{', 'where', ',', or any possible
+  // postfix or binary expression on the same line. If so, we consider it to be
+  // part of the proceeding expression at this point. Sema will emit a diagnostic
+  // later. See: Sema/MiscDiagnostics.cpp#checkStmtConditionTrailingClosure
   Parser::BacktrackingScope backtrack(P);
   P.consumeToken(tok::l_brace);
   P.skipUntil(tok::r_brace);
-  SourceLoc endLoc;
-  if (!P.consumeIf(tok::r_brace, endLoc) ||
-      P.Tok.isNot(tok::l_brace, tok::kw_where, tok::comma)) {
+  if (!P.consumeIf(tok::r_brace))
+    return false;
+
+  switch (P.Tok.getKind()) {
+  case tok::l_brace:
+  case tok::kw_where:
+  case tok::comma:
+    // e.g.:
+    //   for x in ary.map { $0 + 1 }
+    //     where ... {
+    return true;
+  case tok::period:
+  case tok::period_prefix:
+  case tok::l_paren:
+  case tok::l_square:
+  case tok::question_postfix:
+  case tok::exclaim_postfix:
+  case tok::oper_binary_spaced:
+  case tok::oper_binary_unspaced:
+  case tok::question_infix:
+  case tok::equal:
+  case tok::kw_is:
+  case tok::kw_as:
+  case tok::colon:
+    // e.g.:
+    //   if ary.map { $0 + 1 }[0] == 1 {}
+    return !P.Tok.isAtStartOfLine();
+  default:
     return false;
   }
-
-  // Recoverable case. Just return true here and Sema will emit a diagnostic
-  // later. see: Sema/MiscDiagnostics.cpp#checkStmtConditionTrailingClosure
-  return true;
 }
 
 

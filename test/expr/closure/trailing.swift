@@ -138,6 +138,7 @@ limitXY(someInt, toGamut: intArray) {}  // expected-error {{extra argument 'toGa
 // <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lowsy diagnostics
 func retBool(x: () -> Int) -> Bool {}
 func maybeInt(_: () -> Int) -> Int? {}
+func retAny(x: () -> Int) -> Any {}
 class Foo23036383 {
   init() {}
   func map(_: (Int) -> Int) -> Int? {}
@@ -203,6 +204,24 @@ func r23036383(foo: Foo23036383?, obj: Foo23036383) {
   if let _ = maybeInt { 1 }, retBool { 1 } { }
   // expected-error@-1 {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{28-28=)}} 
   // expected-error@-2 {{trailing closure requires parentheses for disambiguation in this context}} {{37-38=(x: }} {{43-43=)}} 
+}
+
+// SR-5869 - trailing closure not parsed correctly in if-statement conditional.
+func SR5869() {
+  let ary: [Int] = []
+  for _ in ary.map { $0 } .filter { $0 % 2 == 0 } { }
+  // expected-error@-1 {{trailing closure requires parentheses for disambiguation in this context}} {{34-35=(}} {{50-50=)}}
+  // expected-error@-2 {{trailing closure requires parentheses for disambiguation in this context}} {{19-20=(}} {{26-26=)}}
+  if ary.map { $0 + 1 }[0] == 1 { } // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{13-14=(}} {{24-24=)}}
+  if ary.map { $0 + 1 } == [1,2,3] { } // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{13-14=(}} {{24-24=)}}
+  if retAny { 1 } is Int { } // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{12-13=(x: }} {{18-18=)}}
+  if let _ = retAny { 1 } as? Int { } // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{20-21=(x: }} {{26-26=)}}
+  if retAny { 1 } is Int { } // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{12-13=(x: }} {{18-18=)}}
+  if retBool { 1 } ? retBool { 2 } : retBool { 3 } {}
+  // expected-error@-1 {{trailing closure requires parentheses for disambiguation in this context}} {{13-14=(x: }} {{19-19=)}}
+  // expected-error@-2 {{trailing closure requires parentheses for disambiguation in this context}} {{29-30=(x: }} {{35-35=)}}
+  // expected-error@-3 {{trailing closure requires parentheses for disambiguation in this context}} {{45-46=(x: }} {{51-51=)}}
+  if let _ = (retAny { 1 } as? Int) { } // OK.
 }
 
 func overloadOnLabel(a: () -> Void) {}
