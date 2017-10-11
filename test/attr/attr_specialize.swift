@@ -182,7 +182,6 @@ public protocol Proto: class {
 }
 
 @_specialize(where T: _RefCountedObject)
-// expected-warning@-1{{redundant layout constraint 'T' : '_RefCountedObject'}}
 @_specialize(where T: _Trivial)
 // expected-error@-1{{generic parameter 'T' has conflicting layout constraints '_Trivial' and '_NativeClass'}}
 @_specialize(where T: _Trivial(64))
