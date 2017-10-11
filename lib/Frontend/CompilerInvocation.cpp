@@ -149,6 +149,12 @@ namespace swift {
     const llvm::opt::ArgList &Args;
     FrontendOptions &Opts;
  
+  public:
+    
+    FrontendArgsToOptionsConverter(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args, FrontendOptions &Opts) :
+    Diags(Diags), Args(Args), Opts(Opts) {}
+    
+  private:
     void readOutputFileList(std::vector<std::string> &outputFiles,
                             const llvm::opt::Arg *filelistPath) {
       llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
@@ -174,10 +180,6 @@ namespace swift {
     static void debugFailWithCrash() {
       LLVM_BUILTIN_TRAP;
     }
-    
-  public:
-    FrontendArgsToOptionsConverter(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args, FrontendOptions &Opts) :
-    Diags(Diags), Args(Args), Opts(Opts) {}
     
     void setOutputFileList() {
       if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
@@ -229,29 +231,12 @@ namespace swift {
       }
       return Opts.ModuleName;
     }
-    
+  public:
+    bool ParseFrontendArgs();
+   };
+} // end namespace swift
 
-  };
-} // end namespace swift;
-
-
-// This is a separate function so that it shows up in stack traces.
-LLVM_ATTRIBUTE_NOINLINE
-static void debugFailWithAssertion() {
-  // This assertion should always fail, per the user's request, and should
-  // not be converted to llvm_unreachable.
-  assert(0 && "This is an assertion!");
-}
-
-// This is a separate function so that it shows up in stack traces.
-LLVM_ATTRIBUTE_NOINLINE
-static void debugFailWithCrash() {
-  LLVM_BUILTIN_TRAP;
-}
-
-
-static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
-                              DiagnosticEngine &Diags) {
+bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_debug_crash_Group)) {
@@ -505,8 +490,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   else
     Opts.InputKind = InputFileKind::IFK_Swift;
 
-  FrontendArgsToOptionsConverter(Diags, Args, Opts).setOutputFileList();
-  FrontendArgsToOptionsConverter(Diags, Args, Opts).setModuleName();
+  setOutputFileList();
+  setModuleName();
 
   if (Opts.OutputFilenames.empty() ||
       llvm::sys::fs::is_directory(Opts.getSingleOutputFilename())) {
@@ -606,7 +591,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         Opts.setOutputFilenameToStdout();
       else {
         // We have a suffix, so determine an appropriate name.
-        StringRef BaseName = FrontendArgsToOptionsConverter(Diags, Args, Opts).baseNameOfOutput();
+        StringRef BaseName = baseNameOfOutput();
         llvm::SmallString<128> Path(Opts.getSingleOutputFilename());
         llvm::sys::path::append(Path, BaseName);
         llvm::sys::path::replace_extension(Path, Suffix);
@@ -1753,7 +1738,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags)) {
+  if (FrontendArgsToOptionsConverter(Diags, ParsedArgs, FrontendOpts).ParseFrontendArgs()) {
     return true;
   }
 
