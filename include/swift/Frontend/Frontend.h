@@ -313,7 +313,7 @@ public:
                         bool alwaysSetModuleToMain,
                         serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
-    return FrontendOpts.InputKind == InputFileKind::IFK_SIL;
+    return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
 };
 
