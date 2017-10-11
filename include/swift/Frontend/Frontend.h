@@ -306,8 +306,8 @@ public:
     return SourceFile::ImplicitModuleImportKind::Stdlib;
   }
 
-  /// Return false on error
-  bool
+  /// Return value includes the buffer so caller can keep it alive.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
   setupForToolInputFile(const std::string &InputFilename,
                         const std::string &ModuleNameArg,
                         bool alwaysSetModuleToMain,

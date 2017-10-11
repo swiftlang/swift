@@ -168,8 +168,10 @@ int main(int argc, char **argv) {
   Opts.OutputKind = OutputKind;
 
   serialization::ExtendedValidationInfo extendedInfo;
-  if (!Invocation.setupForToolInputFile(InputFilename, ModuleName, false,
-                                        extendedInfo))
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+  Invocation.setupForToolInputFile(InputFilename, ModuleName, false,
+                                   extendedInfo);
+  if (!FileBufOrErr)
     exit(-1);
 
   CompilerInstance CI;

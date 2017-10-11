@@ -1708,7 +1708,8 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
   return info.status;
 }
 
-bool CompilerInvocation::setupForToolInputFile(
+llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
+CompilerInvocation::setupForToolInputFile(
     const std::string &InputFilename, const std::string &ModuleNameArg,
     bool alwaysSetModuleToMain,
     serialization::ExtendedValidationInfo &extendedInfo) {
@@ -1717,7 +1718,7 @@ bool CompilerInvocation::setupForToolInputFile(
       llvm::MemoryBuffer::getFileOrSTDIN(InputFilename);
   if (!FileBufOrErr) {
     fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
-    return false;
+    return FileBufOrErr;
   }
 
   // If it looks like we have an AST, set the source file kind to SIL and the
@@ -1741,5 +1742,5 @@ bool CompilerInvocation::setupForToolInputFile(
     setModuleName(Name);
     setInputKind(InputFileKind::IFK_SIL);
   }
-  return true;
+  return FileBufOrErr;
 }

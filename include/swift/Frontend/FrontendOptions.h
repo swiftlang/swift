@@ -193,7 +193,9 @@ public:
 
   // Input buffer writers
 
-  void addInputBuffer(llvm::MemoryBuffer *Buf) { InputBuffers.push_back(Buf); }
+  void addInputBuffer(llvm::MemoryBuffer *Buf) {
+    InputBuffers.push_back(Buf);
+  }
 
   // Primary input writers
 
