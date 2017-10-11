@@ -28,7 +28,8 @@
 #include "llvm/Option/Option.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
-
+#include "llvm/Support/LineIterator.h"
+#include "swift/Basic/Statistic.h"
 using namespace swift;
 using namespace llvm::opt;
 
@@ -82,6 +83,66 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
 
   llvm_unreachable("Unhandled InputFileKind in switch.");
 }
+
+namespace swift {
+  class ArgsToFrontendInputsConverter {
+    const ArgList &Args;
+    FrontendInputs &Inputs;
+    const llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBuffer;
+    const llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> primaryFilelistBuffer;
+    llvm::SmallVector<StringRef, 8> inputFiles; // FIXME: 8?
+    llvm::SmallVector<StringRef, 8> primaryFiles; // FIXME: 8?
+    
+    static void splitIntoLines(const llvm::MemoryBuffer &buffer, SmallVectorImpl<StringRef> &fileNames) {
+      for (StringRef line : make_range(llvm::line_iterator(buffer), {})) {
+        fileNames.push_back(line);
+      }
+    }
+    void getFilesDirectlyFromArgs() {
+      for (const Arg *A : Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
+        if (A->getOption().matches(options::OPT_INPUT)) {
+          inputFiles.push_back(A->getValue());
+        } else if (A->getOption().matches(options::OPT_primary_file)) {
+          primaryFiles.push_back(A->getValue());
+        } else {
+          llvm_unreachable("Unknown input-related argument!");
+        }
+      }
+    }
+    static llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> getBufferForArg(DiagnosticEngine &diags,
+                                                                              const llvm::opt::Arg *pathOrNull) {
+      llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer = llvm::MemoryBuffer::getFile(
+                                                                                              pathOrNull ? pathOrNull->getValue() : "/dev/null");
+      if (!buffer) {
+        assert(pathOrNull && "could not open /dev/null");
+        diags.diagnose(SourceLoc(), diag::cannot_open_file,
+                       pathOrNull->getValue(), buffer.getError().message());
+      }
+      return buffer;
+    }
+  public:
+    ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args, FrontendInputs &Inputs)
+    : Args(Args), Inputs(Inputs),
+    filelistBuffer(getBufferForArg(Diags, Args.getLastArg(options::OPT_filelist))),
+    primaryFilelistBuffer(getBufferForArg(Diags, Args.getLastArg(options::OPT_primary_filelist)))
+    {}
+    
+    void convert() {
+      SharedTimer("setInputFilenamesAndPrimaryInputs");
+      
+      getFilesDirectlyFromArgs();
+      
+      if (!filelistBuffer || !primaryFilelistBuffer)
+        return;
+      
+      splitIntoLines(       *filelistBuffer->get(),   inputFiles);
+      splitIntoLines(*primaryFilelistBuffer->get(), primaryFiles);
+      
+      Inputs.setInputAndPrimaryFilesFromPossiblyOverlappingLists(inputFiles, primaryFiles);
+     }
+  };
+}
+
 
 // This is a separate function so that it shows up in stack traces.
 LLVM_ATTRIBUTE_NOINLINE
@@ -225,7 +286,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.Inputs.setInputFilenamesAndPrimaryInputs(Diags, Args);
+  ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert();
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 

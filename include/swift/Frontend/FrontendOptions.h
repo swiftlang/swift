@@ -241,11 +241,10 @@ public:
     InputBuffers.clear();
   }
   
-  void setInputFilenamesAndPrimaryInputs(DiagnosticEngine &Diags, llvm::opt::ArgList &Args);
-  
 private:
- void setInputAndPrimaryFilesFromPossiblyOverlappingLists(llvm::SmallVectorImpl<StringRef> &inputFiles,
-                                                          llvm::SmallVectorImpl<StringRef> &primaryFiles);
+  friend class ArgsToFrontendInputsConverter;
+  void setInputAndPrimaryFilesFromPossiblyOverlappingLists(llvm::SmallVectorImpl<StringRef> &inputFiles,
+                                                           llvm::SmallVectorImpl<StringRef> &primaryFiles);
 };
 
 /// Options for controlling the behavior of the frontend.

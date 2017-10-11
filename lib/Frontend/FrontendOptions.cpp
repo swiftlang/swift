@@ -107,58 +107,6 @@ void FrontendInputs::transformInputFilenames(const llvm::function_ref<std::strin
   }
 }
 
-
-static llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> getBufferForArg(DiagnosticEngine &diags,
-                                                                          const llvm::opt::Arg *pathOrNull) {
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer = llvm::MemoryBuffer::getFile(
-                                                                                          pathOrNull ? pathOrNull->getValue() : "/dev/null");
-  if (!buffer) {
-    assert(pathOrNull && "could not open /dev/null");
-    diags.diagnose(SourceLoc(), diag::cannot_open_file,
-                   pathOrNull->getValue(), buffer.getError().message());
-  }
-  return buffer;
-}
-
-static void splitIntoLines(const llvm::MemoryBuffer &buffer, SmallVectorImpl<StringRef> &fileNames) {
-  for (StringRef line : make_range(llvm::line_iterator(buffer), {})) {
-    fileNames.push_back(line);
-  }
-}
-
-static void getFilesDirectlyFromArgs(llvm::opt::ArgList &Args, llvm::SmallVectorImpl<StringRef> &inputFiles, llvm::SmallVectorImpl<StringRef> &primaryFiles) {
-  for (const Arg *A : Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
-    if (A->getOption().matches(options::OPT_INPUT)) {
-      inputFiles.push_back(A->getValue());
-    } else if (A->getOption().matches(options::OPT_primary_file)) {
-      primaryFiles.push_back(A->getValue());
-    } else {
-      llvm_unreachable("Unknown input-related argument!");
-    }
-  }
-}
-
-
-
-void FrontendInputs::setInputFilenamesAndPrimaryInputs(DiagnosticEngine &Diags, llvm::opt::ArgList &Args) {
-  SharedTimer("setInputFilenamesAndPrimaryInputs");
-  llvm::SmallVector<StringRef, 8> inputFiles; // FIXME: 8?
-  llvm::SmallVector<StringRef, 8> primaryFiles; // FIXME: 8?
-  
-  getFilesDirectlyFromArgs(Args, inputFiles, primaryFiles);
-  
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBuffer = getBufferForArg(Diags, Args.getLastArg(options::OPT_filelist));
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> primaryFilelistBuffer = getBufferForArg(Diags, Args.getLastArg(options::OPT_primary_filelist));
-  
-  if (!filelistBuffer || !primaryFilelistBuffer)
-    return;
-  
-  splitIntoLines(       *filelistBuffer->get(),   inputFiles);
-  splitIntoLines(*primaryFilelistBuffer->get(), primaryFiles);
-  
-  setInputAndPrimaryFilesFromPossiblyOverlappingLists(inputFiles, primaryFiles);
-}
-
 void FrontendInputs::setInputAndPrimaryFilesFromPossiblyOverlappingLists(
                                                                          llvm::SmallVectorImpl<StringRef> &inputFiles, llvm::SmallVectorImpl<StringRef> &primaryFiles) {
   llvm::StringMap<unsigned> filelistIndices(inputFiles.size());
