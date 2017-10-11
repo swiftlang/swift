@@ -257,7 +257,8 @@ function(_compile_swift_files
     if (NOT SWIFT_STDLIB_ENABLE_RESILIENCE)
       if (SWIFT_STDLIB_SIL_SERIALIZE_ALL)
         list(APPEND swift_flags "-Xfrontend" "-sil-serialize-witness-tables"
-                                "-Xfrontend" "-sil-serialize-vtables")
+                                "-Xfrontend" "-sil-serialize-vtables"
+                                "-Xfrontend" "-sil-serialize-early")
       endif()
     endif()
   endif()
