@@ -337,6 +337,18 @@ namespace swift {
         !Opts.Inputs.havePrimaryInputs() && !Opts.ModuleOutputPath.empty();
       }
     }
+    void setImplicitImportModuleNames() {
+      using namespace options;
+      for (const Arg *A : Args.filtered(OPT_import_module)) {
+        Opts.ImplicitImportModuleNames.push_back(A->getValue());
+      }
+    }
+    void setLLVMArgs() {
+      using namespace options;
+      for (const Arg *A : Args.filtered(OPT_Xllvm)) {
+        Opts.LLVMArgs.push_back(A->getValue());
+      }
+    }
     
   public:
     bool ParseFrontendArgs();
@@ -440,14 +452,8 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
       !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
 
   setImportObjCHeaderOptions();
-
-  for (const Arg *A : Args.filtered(OPT_import_module)) {
-    Opts.ImplicitImportModuleNames.push_back(A->getValue());
-  }
-
-  for (const Arg *A : Args.filtered(OPT_Xllvm)) {
-    Opts.LLVMArgs.push_back(A->getValue());
-  }
+  setImplicitImportModuleNames();
+  setLLVMArgs();
 
   return false;
 }
