@@ -464,6 +464,7 @@ Property behaviors are implemented using private protocol conformances.
 
 ::
 
+  generic-signature ::= requirement* 'n'     // zero generic parameters
   generic-signature ::= requirement* 'l'     // one generic parameter
   generic-signature ::= requirement* 'r' GENERIC-PARAM-COUNT* 'l'
 

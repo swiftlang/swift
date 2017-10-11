@@ -454,7 +454,7 @@ protected:
   NodePointer demangleSubscript();
   NodePointer demangleProtocolList();
   NodePointer demangleProtocolListType();
-  NodePointer demangleGenericSignature(bool hasParamCounts);
+  NodePointer demangleGenericSignature(llvm::Optional<unsigned> knownCount);
   NodePointer demangleGenericRequirement();
   NodePointer demangleGenericType();
   NodePointer demangleValueWitness();

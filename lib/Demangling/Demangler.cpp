@@ -405,13 +405,14 @@ NodePointer Demangler::demangleOperator() {
     case 'h': return createType(createWithChild(Node::Kind::Shared,
                                                 popTypeAndGetChild()));
     case 'i': return demangleSubscript();
-    case 'l': return demangleGenericSignature(/*hasParamCounts*/ false);
+    case 'l': return demangleGenericSignature(1);
     case 'm': return createType(createWithChild(Node::Kind::Metatype,
                                                 popNode(Node::Kind::Type)));
+    case 'n': return demangleGenericSignature(0);
     case 'o': return demangleOperatorIdentifier();
     case 'p': return demangleProtocolListType();
     case 'q': return createType(demangleGenericParamIndex());
-    case 'r': return demangleGenericSignature(/*hasParamCounts*/ true);
+    case 'r': return demangleGenericSignature(llvm::None);
     case 's': return createNode(Node::Kind::Module, STDLIB_NAME);
     case 't': return popTuple();
     case 'u': return demangleGenericType();
@@ -1940,9 +1941,10 @@ NodePointer Demangler::demangleProtocolListType() {
   return createType(ProtoList);
 }
 
-NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
+NodePointer Demangler::demangleGenericSignature(
+                                        llvm::Optional<unsigned> knownCount) {
   NodePointer Sig = createNode(Node::Kind::DependentGenericSignature);
-  if (hasParamCounts) {
+  if (!knownCount) {
     while (!nextIf('l')) {
       int count = 0;
       if (!nextIf('z'))
@@ -1953,7 +1955,8 @@ NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
                                         count), *this);
     }
   } else {
-    Sig->addChild(createNode(Node::Kind::DependentGenericParamCount, 1),
+    Sig->addChild(createNode(Node::Kind::DependentGenericParamCount,
+                             *knownCount),
                   *this);
   }
   size_t NumCounts = Sig->getNumChildren();

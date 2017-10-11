@@ -729,6 +729,13 @@ void Remangler::mangleDependentGenericSignature(Node *node) {
       mangleChildNode(node, Idx);
     }
   }
+
+  // If there are no generic parameters, mangle that.
+  if (ParamCountEnd == 1 && node->getChild(0)->getIndex() == 0) {
+    Buffer << 'n';
+    return;
+  }
+
   // If there's only one generic param, mangle nothing.
   if (ParamCountEnd == 1 && node->getChild(0)->getIndex() == 1) {
     Buffer << 'l';

@@ -1672,6 +1672,8 @@ void ASTMangler::appendGenericSignatureParts(
     appendRequirement(reqt);
   }
 
+  if (params.size() == 0)
+    return appendOperator("n");
   if (params.size() == 1 && params[0]->getDepth() == initialParamDepth)
     return appendOperator("l");
 
