@@ -3010,6 +3010,8 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     if (!conformance) return failed();
     if (!conformance->isConcrete()) return failed();
+    assert(conformance->getConditionalRequirements().empty() &&
+           "unhandled conditional requirements");
 
     // Retrieve the type witness.
     auto witness =

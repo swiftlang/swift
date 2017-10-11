@@ -399,3 +399,28 @@ protocol P31 { }
 // CHECK-LABEL: .sameTypeNameMatch1@
 // CHECK: Generic signature: <T where T : P29, T : P30, T.X : P31, T.X == T.X>
 func sameTypeNameMatch1<T: P29 & P30>(_: T) where T.X: P31 { }
+
+// ----------------------------------------------------------------------------
+// Infer requirements from conditional conformances
+// ----------------------------------------------------------------------------
+
+protocol P32 {}
+protocol P33 {
+  associatedtype A: P32
+}
+protocol P34 {}
+struct Foo<T> {}
+extension Foo: P32 where T: P34 {}
+
+// Inference chain: U.A: P32 => Foo<V>: P32 => V: P34
+
+// CHECK-LABEL: conditionalConformance1@
+// CHECK: Generic signature: <U, V where U : P33, V : P34, U.A == Foo<V>>
+// CHECK: Canonical generic signature: <τ_0_0, τ_0_1 where τ_0_0 : P33, τ_0_1 : P34, τ_0_0.A == Foo<τ_0_1>>
+func conditionalConformance1<U: P33, V>(_: U) where U.A == Foo<V> {}
+
+struct Bar<U: P32> {}
+// CHECK-LABEL: conditionalConformance2@
+// CHECK: Generic signature: <V where V : P34>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P34>
+func conditionalConformance2<V>(_: Bar<Foo<V>>) {}

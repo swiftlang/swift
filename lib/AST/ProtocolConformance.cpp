@@ -107,6 +107,8 @@ ProtocolConformanceRef::subst(Type origType,
   if (auto result = conformances(origType->getCanonicalType(),
                                  substType,
                                  proto->getDeclaredType())) {
+    assert(result->getConditionalRequirements().empty() &&
+           "unhandled conditional requirements");
     return *result;
   }
 
@@ -283,6 +285,63 @@ bool ProtocolConformance::isBehaviorConformance() const {
 
 AbstractStorageDecl *ProtocolConformance::getBehaviorDecl() const {
   return getRootNormalConformance()->getBehaviorDecl();
+}
+
+ArrayRef<Requirement> ProtocolConformance::getConditionalRequirements() const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirements, ());
+}
+
+ArrayRef<Requirement>
+ProtocolConformanceRef::getConditionalRequirements() const {
+  if (isConcrete())
+    return getConcrete()->getConditionalRequirements();
+  else
+    // An abstract conformance is never conditional: any conditionality in the
+    // concrete types that will eventually pass through this at runtime is
+    // completely pre-checked and packaged up.
+    return {};
+}
+
+void NormalProtocolConformance::differenceAndStoreConditionalRequirements() {
+  assert(ConditionalRequirements.size() == 0 &&
+         "should not recompute conditional requirements");
+  auto &ctxt = getProtocol()->getASTContext();
+  auto DC = getDeclContext();
+  // Only conformances in extensions can be conditional
+  if (!isa<ExtensionDecl>(DC))
+    return;
+
+  auto typeSig = DC->getAsNominalTypeOrNominalTypeExtensionContext()
+                     ->getGenericSignature();
+  auto extensionSig = DC->getGenericSignatureOfContext();
+
+  // If the type is generic, the extension should be too, and vice versa.
+  assert((bool)typeSig == (bool)extensionSig &&
+         "unexpected generic-ness mismatch on conformance");
+  if (!typeSig)
+    return;
+
+  auto canExtensionSig = extensionSig->getCanonicalSignature();
+  auto canTypeSig = typeSig->getCanonicalSignature();
+  if (canTypeSig == canExtensionSig)
+    return;
+
+  // The extension signature should be a superset of the type signature, meaning
+  // every thing in the type signature either is included too or is implied by
+  // something else. The most important bit is having the same type
+  // parameters. (NB. if/when Swift gets parameterized extensions, this needs to
+  // change.)
+  assert(canTypeSig.getGenericParams() == canExtensionSig.getGenericParams());
+
+  auto mod = DC->getParentModule();
+  // Find the requirements in the extension that aren't proved by the original
+  // type, these are the ones that make the conformance conditional.
+  SmallVector<Requirement, 4> reqs;
+  for (auto requirement : canExtensionSig->getRequirements()) {
+    if (!canTypeSig->isRequirementSatisfied(requirement))
+      reqs.push_back(requirement);
+  }
+  ConditionalRequirements = ctxt.AllocateCopy(reqs);
 }
 
 void NormalProtocolConformance::setSignatureConformances(
@@ -635,6 +694,24 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
     GenericSubstitutions(substitutions)
 {
   assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
+
+  // Substitute the conditional requirements so that they're phrased in terms of
+  // the specialized types, not the conformance-declaring decl's types.
+  auto subMap = getSubstitutionMap();
+  SmallVector<Requirement, 4> newReqs;
+  for (auto oldReq : GenericConformance->getConditionalRequirements()) {
+    newReqs.push_back(*oldReq.subst(subMap));
+  }
+  auto &ctxt = getProtocol()->getASTContext();
+  ConditionalRequirements = ctxt.AllocateCopy(newReqs);
+}
+
+SubstitutionMap SpecializedProtocolConformance::getSubstitutionMap() const {
+  auto *genericSig = GenericConformance->getGenericSignature();
+  if (genericSig)
+    return genericSig->getSubstitutionMap(GenericSubstitutions);
+
+  return SubstitutionMap();
 }
 
 bool SpecializedProtocolConformance::hasTypeWitness(
@@ -683,8 +760,7 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
   auto substitutionMap = genericSig->getSubstitutionMap(GenericSubstitutions);
 
   // Apply the substitution we computed above
-  auto specializedType
-    = genericWitness.subst(substitutionMap, options);
+  auto specializedType = genericWitness.subst(getSubstitutionMap(), options);
   if (!specializedType) {
     if (isTentativeWitness())
       return { Type(), nullptr };
@@ -708,8 +784,7 @@ SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
   ProtocolConformanceRef conformance =
     GenericConformance->getAssociatedConformance(assocType, protocol, resolver);
 
-  auto genericSig = GenericConformance->getGenericSignature();
-  auto subMap = genericSig->getSubstitutionMap(GenericSubstitutions);
+  auto subMap = getSubstitutionMap();
 
   Type origType =
     (conformance.isConcrete()
@@ -728,9 +803,7 @@ SpecializedProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
   if (!baseWitness || !baseWitness.isSpecialized())
     return baseWitness;
 
-  auto genericSig = GenericConformance->getGenericSignature();
-  auto specializationMap =
-    genericSig->getSubstitutionMap(GenericSubstitutions);
+  auto specializationMap = getSubstitutionMap();
 
   auto witnessDecl = baseWitness.getDecl();
   auto witnessSig =
@@ -858,11 +931,8 @@ ProtocolConformance::subst(Type substType,
   case ProtocolConformanceKind::Specialized: {
     // Substitute the substitutions in the specialized conformance.
     auto spec = cast<SpecializedProtocolConformance>(this);
-    auto genericConformance
-      = cast<SpecializedProtocolConformance>(this)->getGenericConformance();
-    auto subMap =
-      genericConformance->getGenericSignature()
-        ->getSubstitutionMap(spec->getGenericSubstitutions());
+    auto genericConformance = spec->getGenericConformance();
+    auto subMap = spec->getSubstitutionMap();
 
     return substType->getASTContext()
       .getSpecializedConformance(substType, genericConformance,

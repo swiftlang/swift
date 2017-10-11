@@ -294,6 +294,10 @@ public:
   /// Get the property declaration for a behavior conformance, if this is one.
   AbstractStorageDecl *getBehaviorDecl() const;
 
+  /// Get any additional requirements that are required for this conformance to
+  /// be satisfied.
+  ArrayRef<Requirement> getConditionalRequirements() const;
+
   /// Substitute the conforming type and produce a ProtocolConformance that
   /// applies to the substituted type.
   ProtocolConformance *subst(Type substType,
@@ -349,6 +353,10 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// requirement signature of the protocol.
   ArrayRef<ProtocolConformanceRef> SignatureConformances;
 
+  /// Any additional requirements that are required for this conformance to
+  /// apply, e.g. 'Something: Baz' in 'extension Foo: Bar where Something: Baz'.
+  ArrayRef<Requirement> ConditionalRequirements;
+
   /// The lazy member loader provides callbacks for populating imported and
   /// deserialized conformances.
   ///
@@ -365,6 +373,7 @@ class NormalProtocolConformance : public ProtocolConformance,
     : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
       ProtocolAndState(protocol, state), Loc(loc), ContextAndInvalid(dc, false)
   {
+    differenceAndStoreConditionalRequirements();
   }
 
   NormalProtocolConformance(Type conformingType,
@@ -375,9 +384,12 @@ class NormalProtocolConformance : public ProtocolConformance,
       ProtocolAndState(protocol, state), Loc(loc),
       ContextAndInvalid(behaviorStorage, false)
   {
+    differenceAndStoreConditionalRequirements();
   }
 
   void resolveLazyInfo() const;
+
+  void differenceAndStoreConditionalRequirements();
 
 public:
   /// Get the protocol being conformed to.
@@ -395,6 +407,13 @@ public:
     } else {
       return context.get<AbstractStorageDecl *>()->getDeclContext();
     }
+  }
+
+  /// Get any additional requirements that are required for this conformance to
+  /// be satisfied, e.g. for Array<T>: Equatable, T: Equatable also needs
+  /// to be satisfied.
+  ArrayRef<Requirement> getConditionalRequirements() const {
+    return ConditionalRequirements;
   }
 
   /// Retrieve the state of this conformance.
@@ -580,6 +599,10 @@ class SpecializedProtocolConformance : public ProtocolConformance,
   /// generic conformance.
   mutable TypeWitnessMap TypeWitnesses;
 
+  /// Any conditional requirements, in substituted form. (E.g. given Foo<T>: Bar
+  /// where T: Bar, Foo<Baz<U>> will include Baz<U>: Bar.)
+  ArrayRef<Requirement> ConditionalRequirements;
+
   friend class ASTContext;
 
   SpecializedProtocolConformance(Type conformingType,
@@ -597,6 +620,15 @@ public:
   /// the generic conformance.
   SubstitutionList getGenericSubstitutions() const {
     return GenericSubstitutions;
+  }
+
+  /// Get the substitution map representing the substitutions used to produce
+  /// this specialized conformance.
+  SubstitutionMap getSubstitutionMap() const;
+
+  /// Get any requirements that must be satisfied for this conformance to apply.
+  ArrayRef<Requirement> getConditionalRequirements() const {
+    return ConditionalRequirements;
   }
 
   /// Get the protocol being conformed to.
@@ -695,6 +727,11 @@ public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const {
     return InheritedConformance->getProtocol();
+  }
+
+  /// Get any requirements that must be satisfied for this conformance to apply.
+  ArrayRef<Requirement> getConditionalRequirements() const {
+    return InheritedConformance->getConditionalRequirements();
   }
 
   /// Get the declaration context that contains the conforming extension or

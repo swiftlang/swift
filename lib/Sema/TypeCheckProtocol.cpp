@@ -1178,9 +1178,9 @@ RequirementEnvironment::RequirementEnvironment(
   }
 
   if (conformanceSig) {
-    for (auto &reqt : conformanceSig->getRequirements()) {
-      builder.addRequirement(reqt, source, nullptr,
-                             &conformanceToSyntheticEnvMap);
+    for (auto &rawReq : conformanceSig->getRequirements()) {
+      if (auto req = rawReq.subst(conformanceToSyntheticEnvMap))
+        builder.addRequirement(*req, source, nullptr);
     }
   }
 
@@ -1203,16 +1203,16 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
-  for (auto &req : reqSig->getRequirements()) {
+  for (auto &rawReq : reqSig->getRequirements()) {
     // FIXME: This should not be necessary, since the constraint is redundant,
     // but we need it to work around some crashes for now.
-    if (req.getKind() == RequirementKind::Conformance &&
-        req.getFirstType()->isEqual(selfType) &&
-        req.getSecondType()->isEqual(proto->getDeclaredType()))
+    if (rawReq.getKind() == RequirementKind::Conformance &&
+        rawReq.getFirstType()->isEqual(selfType) &&
+        rawReq.getSecondType()->isEqual(proto->getDeclaredType()))
       continue;
 
-    builder.addRequirement(req, source, /*inferModule=*/nullptr,
-                           &reqToSyntheticEnvMap);
+    if (auto req = rawReq.subst(reqToSyntheticEnvMap))
+      builder.addRequirement(*req, source, conformanceDC->getParentModule());
   }
 
   // Produce the generic signature and environment.
@@ -5968,6 +5968,9 @@ bool TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
         WasUnsatisfied |= result.hasUnsatisfiedDependency();
         if (WasUnsatisfied)
           return Action::Stop;
+        if (result.getStatus() == RequirementCheckResult::Success)
+          assert(result.getConformance().getConditionalRequirements().empty() &&
+                 "cannot conform conditionally to _ObjectiveCBridgeable");
 
         // Set and Dictionary bridging also requires the conformance
         // of the key type to Hashable.
@@ -6062,6 +6065,9 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
   auto conformance = conformsToProtocol(type, bridgedStoredNSError, dc,
                                         ConformanceCheckFlags::Used);
   if (conformance && conformance->isConcrete()) {
+    assert(conformance->getConditionalRequirements().empty() &&
+           "cannot conform condtionally to _BridgedStoredNSError");
+
     // Hack: If we've used a conformance to the _BridgedStoredNSError
     // protocol, also use the RawRepresentable and _ErrorCodeProtocol
     // conformances on the Code associated type witness.
@@ -6080,6 +6086,9 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
                      (ConformanceCheckFlags::SuppressDependencyTracking|
                       ConformanceCheckFlags::Used));
   if (conformance && conformance->isConcrete()) {
+    assert(conformance->getConditionalRequirements().empty() &&
+           "cannot conform condtionally to _ErrorCodeProtocol");
+
     if (Type errorType = ProtocolConformanceRef::getTypeWitnessByName(
           type, *conformance, Context.Id_ErrorType, this)) {
       (void)conformsToProtocol(errorType, bridgedStoredNSError, dc,
@@ -6561,6 +6570,12 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         // Infer @_staticInitializeObjCMetadata if needed.
         inferStaticInitializeObjCMetadata(classDecl);
       }
+    }
+
+    // When requested, print out information about this conformance.
+    if (Context.LangOpts.DebugGenericSignatures) {
+      dc->dumpContext();
+      conformance->dump();
     }
   }
 

@@ -3470,58 +3470,18 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
     return TC->isProtocolExtensionUsable(&DC, BaseTy, const_cast<ExtensionDecl*>(ED));
   ConstraintSystem CS(*TC, &DC, Options);
   auto Loc = CS.getConstraintLocator(nullptr);
-  std::vector<Identifier> Scratch;
   bool Failed = false;
-  SmallVector<Type, 3> TypeScratch;
 
   // Prepare type substitution map.
   SubstitutionMap Substitutions = BaseTy->getContextSubstitutionMap(
     DC.getParentModule(), ED);
-  auto resolveType = [&](Type Ty) {
-    return Ty.subst(Substitutions);
-  };
-
-  auto createMemberConstraint = [&](Requirement &Req, ConstraintKind Kind) {
-    auto First = resolveType(Req.getFirstType());
-    auto Second = resolveType(Req.getSecondType());
-    if (First.isNull() || Second.isNull()) {
-      Failed = true;
-      return;
-    }
-    // Add constraints accordingly.
-    CS.addConstraint(Kind, First, Second, Loc);
-  };
 
   // For every requirement, add a constraint.
   for (auto Req : ED->getGenericRequirements()) {
-    switch(Req.getKind()) {
-      case RequirementKind::Conformance:
-        createMemberConstraint(Req, ConstraintKind::ConformsTo);
-        break;
-      case RequirementKind::Layout:
-        if (Req.getLayoutConstraint()->isClass()) {
-          auto First = resolveType(Req.getFirstType());
-          CS.addConstraint(ConstraintKind::ConformsTo, First,
-                           CS.getASTContext().getAnyObjectType(),
-                           Loc);
-        }
-
-        // Nothing else can appear outside of @_specialize yet, and Sema
-        // doesn't know how to check.
-        break;
-      case RequirementKind::Superclass: {
-        createMemberConstraint(Req, ConstraintKind::Subtype);
-
-        auto First = resolveType(Req.getFirstType());
-        CS.addConstraint(ConstraintKind::ConformsTo, First,
-                         CS.getASTContext().getAnyObjectType(),
-                         Loc);
-
-        break;
-      }
-      case RequirementKind::SameType:
-        createMemberConstraint(Req, ConstraintKind::Equal);
-        break;
+    if (auto resolved = Req.subst(Substitutions)) {
+      CS.addConstraint(*resolved, Loc);
+    } else {
+      Failed = true;
     }
   }
   if (Failed)
