@@ -243,6 +243,21 @@ namespace swift {
         Diags.diagnose(SourceLoc(), diag::stats_disabled);
 #endif
     }
+    
+    void setDebugTimeOptions() {
+      using namespace options;
+      Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
+      Opts.DebugTimeExpressionTypeChecking |=
+      Args.hasArg(OPT_debug_time_expression_type_checking);
+      Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
+      if (const Arg *A = Args.getLastArg(OPT_stats_output_dir)) {
+        Opts.StatsOutputDir = A->getValue();
+        if (Args.getLastArg(OPT_trace_stats_events)) {
+          Opts.TraceStats = true;
+        }
+      }
+    }
+
   public:
     bool ParseFrontendArgs();
    };
@@ -274,17 +289,7 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
   Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
 
   setPrintStatsOptions();
-
-  Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
-  Opts.DebugTimeExpressionTypeChecking |=
-    Args.hasArg(OPT_debug_time_expression_type_checking);
-  Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
-  if (const Arg *A = Args.getLastArg(OPT_stats_output_dir)) {
-    Opts.StatsOutputDir = A->getValue();
-    if (Args.getLastArg(OPT_trace_stats_events)) {
-      Opts.TraceStats = true;
-    }
-  }
+  setDebugTimeOptions();
 
   if (const Arg *A = Args.getLastArg(OPT_validate_tbd_against_ir_EQ)) {
     using Mode = FrontendOptions::TBDValidationMode;
