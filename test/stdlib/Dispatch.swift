@@ -9,10 +9,6 @@
 
 // REQUIRES: objc_interop
 
-// FIXME: rdar://34751238 DispatchTime.addSubtract test traps
-// XFAIL: CPU=armv7 || CPU=armv7k || CPU=armv7s || CPU=arm64
-
-
 import Dispatch
 import Foundation
 import StdlibUnittest
@@ -117,6 +113,31 @@ DispatchAPI.test("DispatchTime comparisons") {
             return $0 < $1 ? .lt : $0 == $1 ? .eq : .gt
         })
     }
+}
+
+DispatchAPI.test("DispatchTime.create") {
+	var info = mach_timebase_info_data_t(numer: 1, denom: 1)
+	mach_timebase_info(&info)
+	let scales = info.numer != info.denom
+
+	// Simple tests for non-overflow behavior
+	var time = DispatchTime(uptimeNanoseconds: 0)
+	expectEqual(time.uptimeNanoseconds, 0)
+
+	time = DispatchTime(uptimeNanoseconds: 15 * NSEC_PER_SEC)
+	expectEqual(time.uptimeNanoseconds, 15 * NSEC_PER_SEC)
+
+	// On platforms where the timebase scale is not 1, the next two cases
+	// overflow and become DISPATCH_TIME_FOREVER (UInt64.max) instead of trapping.
+	time = DispatchTime(uptimeNanoseconds: UInt64.max - 1)
+	expectEqual(time.uptimeNanoseconds, scales ? UInt64.max : UInt64.max - UInt64(1))
+
+	time = DispatchTime(uptimeNanoseconds: UInt64.max / 2) 
+	expectEqual(time.uptimeNanoseconds, scales ? UInt64.max : UInt64.max / 2)
+
+	// UInt64.max must always be returned as UInt64.max.
+	time = DispatchTime(uptimeNanoseconds: UInt64.max)
+	expectEqual(time.uptimeNanoseconds, UInt64.max)
 }
 
 DispatchAPI.test("DispatchTime.addSubtract") {
