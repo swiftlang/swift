@@ -418,17 +418,24 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                 ConvertFunctionInst *CFI) {
   // We only handle simplification of static function references. If we don't
   // have one, bail.
-  auto *FRI = dyn_cast<FunctionRefInst>(CFI->getOperand());
+  SILValue funcOper = CFI->getOperand();
+  if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(funcOper))
+    funcOper = TTI->getOperand();
+
+  auto *FRI = dyn_cast<FunctionRefInst>(funcOper);
   if (!FRI)
     return nullptr;
 
   // Grab our relevant callee types...
   CanSILFunctionType SubstCalleeTy = AI.getSubstCalleeType();
-  auto ConvertCalleeTy =
-      CFI->getOperand()->getType().castTo<SILFunctionType>();
+  auto ConvertCalleeTy = funcOper->getType().castTo<SILFunctionType>();
 
   // ... and make sure they have no unsubstituted generics. If they do, bail.
   if (SubstCalleeTy->hasArchetype() || ConvertCalleeTy->hasArchetype())
+    return nullptr;
+
+  // Indirect results are not currently handled.
+  if (AI.hasIndirectSILResults())
     return nullptr;
 
   // Bail if the result type of the converted callee is different from the callee's
