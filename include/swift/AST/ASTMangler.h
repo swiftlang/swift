@@ -195,7 +195,17 @@ protected:
 
   void appendTypeList(Type listTy);
 
-  void appendGenericSignature(const GenericSignature *sig);
+  /// Append a generic signature to the mangling.
+  ///
+  /// \param sig The generic signature.
+  ///
+  /// \param contextSig The signature of the known context. This function
+  /// will only mangle the difference between \c sig and \c contextSig.
+  ///
+  /// \returns \c true if a generic signature was appended, \c false
+  /// if it was empty.
+  bool appendGenericSignature(const GenericSignature *sig,
+                              GenericSignature *contextSig = nullptr);
 
   void appendRequirement(const Requirement &reqt);
 
@@ -218,10 +228,8 @@ protected:
   void appendInitializerEntity(const VarDecl *var);
 
   CanType getDeclTypeForMangling(const ValueDecl *decl,
-                                 ArrayRef<GenericTypeParamType *> &genericParams,
-                                 unsigned &initialParamIndex,
-                                 ArrayRef<Requirement> &requirements,
-                                 SmallVectorImpl<Requirement> &requirementsBuf);
+                                 GenericSignature *&genericSig,
+                                 GenericSignature *&parentGenericSig);
 
   void appendDeclType(const ValueDecl *decl, bool isFunctionMangling = false);
 
