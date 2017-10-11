@@ -329,6 +329,15 @@ namespace swift {
     bool determineCorrectOutputFilenameIfMissingOrDirectory();
     void determineSupplementaryOutputFilenames();
     
+    void setImportObjCHeaderOptions() {
+      using namespace options;
+      if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
+        Opts.ImplicitObjCHeaderPath = A->getValue();
+        Opts.SerializeBridgingHeader |=
+        !Opts.Inputs.havePrimaryInputs() && !Opts.ModuleOutputPath.empty();
+      }
+    }
+    
   public:
     bool ParseFrontendArgs();
    };
@@ -430,11 +439,7 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
   Opts.EnableSerializationNestedTypeLookupTable &=
       !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
 
-  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
-    Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |=
-      !Opts.Inputs.hasPrimaryInput() && !Opts.ModuleOutputPath.empty();
-  }
+  setImportObjCHeaderOptions();
 
   for (const Arg *A : Args.filtered(OPT_import_module)) {
     Opts.ImplicitImportModuleNames.push_back(A->getValue());
