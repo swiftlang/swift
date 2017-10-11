@@ -172,8 +172,8 @@ public:
     return countOfPrimaryInputs() == 1  &&  getPrimaryInputs()[0].isFilename();
   }
   
-  StringRef primaryInputFilenameIfUnique() const {
-    return hasUniqueInputFilename() ? StringRef(getInputFilenames()[getPrimaryInputs()[0].Index]) : StringRef();
+  llvm::Optional<StringRef> uniquePrimaryInputFilename() const {
+    return hasUniquePrimaryInputFilename() ? llvm::Optional<StringRef>(getInputFilenames()[getPrimaryInputs()[0].Index]) : llvm::Optional<StringRef>();
   }
 
   Optional<unsigned> primaryInputFileIndex() const {
