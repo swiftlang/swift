@@ -3195,8 +3195,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
   // Determine whether we can derive a witness for this requirement.
   bool canDerive = false;
+
   // Can a witness for this requirement be derived for this nominal type?
   if (auto derivable = DerivedConformance::getDerivableRequirement(
+                         TC,
                          nominal,
                          requirement)) {
     if (derivable == requirement) {
@@ -3473,7 +3475,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   // Find the declaration that derives the protocol conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
   auto *nominal = Adoptee->getAnyNominal();
-  if (nominal->derivesProtocolConformance(Proto))
+  if (DerivedConformance::derivesProtocolConformance(TC, nominal, Proto))
     derivingTypeDecl = nominal;
 
   if (!derivingTypeDecl) {
@@ -4569,7 +4571,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
     // Can we derive conformances for this protocol and adoptee?
     NominalTypeDecl *derivingTypeDecl = Adoptee->getAnyNominal();
-    if (!derivingTypeDecl->derivesProtocolConformance(Proto))
+    if (!DerivedConformance::derivesProtocolConformance(TC, derivingTypeDecl,
+                                                        Proto))
       return Type();
 
     // Try to derive the type witness.
@@ -5691,7 +5694,8 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
   // conformance to RawRepresentable was inferred.
   if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
-        enumDecl->derivesProtocolConformance(Proto) && enumDecl->hasRawType()) {
+        DerivedConformance::derivesProtocolConformance(TC, enumDecl, Proto) &&
+        enumDecl->hasRawType()) {
 
       auto rawType = enumDecl->getRawType();
 
@@ -6633,7 +6637,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     // is implied for enums which already declare a raw type.
     if (auto enumDecl = dyn_cast<EnumDecl>(existingDecl)) {
       if (diag.Protocol->isSpecificProtocol(KnownProtocolKind::RawRepresentable)
-          && enumDecl->derivesProtocolConformance(diag.Protocol)
+          && DerivedConformance::derivesProtocolConformance(*this, enumDecl,
+                                                            diag.Protocol)
           && enumDecl->hasRawType()
           && enumDecl->getInherited()[0].getSourceRange().isValid()) {
         diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
