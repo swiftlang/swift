@@ -881,10 +881,14 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   // Create it in the current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);
-  auto thunkedFn = B.createPartialApply(loc, thunkValue,
-                                    SILType::getPrimitiveObjectType(substFnTy),
-                                    subs, block.forward(*this),
-                                SILType::getPrimitiveObjectType(loweredFuncTy));
+  SingleValueInstruction *thunkedFn = B.createPartialApply(
+      loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy), subs,
+      block.forward(*this), SILType::getPrimitiveObjectType(loweredFuncTy));
+  if (loweredFuncTy->isNoEscape()) {
+    auto &funcTL = getTypeLowering(loweredFuncTy);
+    thunkedFn =
+        B.createConvertFunction(loc, thunkedFn, funcTL.getLoweredType());
+  }
   return emitManagedRValueWithCleanup(thunkedFn);
 }
 
