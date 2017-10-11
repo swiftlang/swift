@@ -187,13 +187,16 @@ protected:
 
   void appendAnyGenericType(const GenericTypeDecl *decl);
 
-  void appendFunctionType(AnyFunctionType *fn, bool forceSingleParam);
+  void appendFunctionType(AnyFunctionType *fn);
 
-  void appendFunctionSignature(AnyFunctionType *fn, bool forceSingleParam);
+  void appendFunctionSignature(AnyFunctionType *fn);
 
-  void appendParams(Type ParamsTy, bool forceSingleParam);
+  void appendFunctionInputType(ArrayRef<AnyFunctionType::Param> params);
+  void appendFunctionResultType(Type resultType);
 
   void appendTypeList(Type listTy);
+  void appendTypeListElement(Identifier name, Type elementType,
+                             ParameterTypeFlags flags);
 
   /// Append a generic signature to the mangling.
   ///
