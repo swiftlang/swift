@@ -278,7 +278,20 @@ namespace swift {
         Opts.TBDInstallName = A->getValue();
       }
     }
-
+    
+    void setUnsignedIntegerArgument(options::ID optionID, unsigned max,
+                                    unsigned &valueToSet) {
+      if (const Arg *A = Args.getLastArg(optionID)) {
+        unsigned attempt;
+        if (StringRef(A->getValue()).getAsInteger(max, attempt)) {
+          Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                         A->getAsString(Args), A->getValue());
+        } else {
+          valueToSet = attempt;
+        }
+      }
+    }
+    
   public:
     bool ParseFrontendArgs();
    };
@@ -313,35 +326,13 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
   setDebugTimeOptions();
   setTBDOptions();
 
-  if (const Arg *A = Args.getLastArg(OPT_warn_long_function_bodies)) {
-    unsigned attempt;
-    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-    } else {
-      Opts.WarnLongFunctionBodies = attempt;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_warn_long_expression_type_checking)) {
-    unsigned attempt;
-    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-    } else {
-      Opts.WarnLongExpressionTypeChecking = attempt;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_solver_expression_time_threshold_EQ)) {
-    unsigned attempt;
-    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-    } else {
-      Opts.SolverExpressionTimeThreshold = attempt;
-    }
-  }
+  setUnsignedIntegerArgument(OPT_warn_long_function_bodies, 10,
+                             Opts.WarnLongFunctionBodies);
+  setUnsignedIntegerArgument(OPT_warn_long_expression_type_checking, 10,
+                             Opts.WarnLongExpressionTypeChecking);
+  setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ, 10,
+                             Opts.SolverExpressionTimeThreshold);setUnsignedIntegerArgument(OPT_warn_long_function_bodies, 10,
+                                                                                            Opts.WarnLongFunctionBodies);
 
   Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
   if (Args.hasArg(OPT_disable_playground_transform))
