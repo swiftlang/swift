@@ -600,6 +600,28 @@ tests.test("MultiplyMinByMinusOne") {
   _ = f(Int.min)
 }
 
+tests.test("Strideable") {
+  func dist<T: BinaryInteger>(_ a: T, _ b: T) -> Int {
+    return a.distance(to: b)
+  }
+% for u in ['U', '']:
+  let ${u}x = ${u}Int.max - 10
+  expectEqual(${u}x.advanced(by: 10), ${u}Int.max)
+  expectEqual(${u}Int.max.advanced(by: -10), ${u}x)
+  expectEqual(dist(${u}x, ${u}Int.max), 10)
+  expectEqual(dist(${u}Int.max, ${u}x), -10)
+
+  // FIXME: The compiler spuriously flags these as overflowing:
+  // https://bugs.swift.org/browse/SR-5882
+  // expectEqual(${u}x.distance(to: ${u}Int.max), 10)
+% end
+
+  expectEqual(dist(UInt8.min, UInt8.max), 255)
+  expectEqual(dist(UInt8.max, UInt8.min), -255)
+  expectEqual(dist(Int8.min, Int8.max), 255)
+  expectEqual(dist(Int8.max, Int8.min), -255)
+}
+
 tests.test("signum/generic") {
   func check<T : BinaryInteger>(_ expected: T, _ x: T) {
     expectEqual(expected, x.signum())
