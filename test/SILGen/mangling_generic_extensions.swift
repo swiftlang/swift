@@ -53,7 +53,7 @@ extension Runcible {
 }
 
 extension Runcible where Self.Spoon == Self.Hat {
-  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions8RunciblePA2aBRz5SpoonQz3HatRtzlE5runceyyF
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions8RunciblePAA5SpoonQz3HatRtzrlE5runceyyF
   func runce() {}
 }
 
