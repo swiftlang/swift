@@ -3674,19 +3674,16 @@ NOTE(resilience_decl_declared_here,
 NOTE(resilience_decl_declared_here_versioned,
      none, "%0 %1 is not '@_versioned' or public", (DescriptiveDeclKind, DeclName))
 
-ERROR(designated_init_in_extension_resilient,none,
-      "initializer declared in an extension of "
-      "non-'@_fixed_layout' type %0 must delegate to another initializer", (Type))
+ERROR(designated_init_in_cross_module_extension,none,
+      "initializer for %0 %1 must use \"self.init(...)\" or \"self = ...\" "
+      "because it is not in module %2",
+      (DescriptiveDeclKind, Type, Identifier))
 
 ERROR(designated_init_inlineable_resilient,none,
-      "initializer for non-'@_fixed_layout' type %0 is "
-      "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
-      "delegate to another initializer", (Type, unsigned))
-
-ERROR(class_designated_init_inlineable_resilient,none,
-      "initializer for class %0 is "
-      "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
-      "delegate to another initializer", (Type, unsigned))
+      "initializer for %select{non-'@_fixed_layout' struct|class}0 %1 is "
+      "'%select{@_transparent|@inline(__always)|@_inlineable|%error}2' and must "
+      "delegate to another initializer",
+      (bool, Type, /*FragileFunctionKind*/unsigned))
 
 ERROR(inlineable_stored_property,
       none, "'@_inlineable' attribute cannot be applied to stored properties", ())

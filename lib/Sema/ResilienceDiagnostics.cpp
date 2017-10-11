@@ -136,38 +136,47 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
 }
 
 void TypeChecker::diagnoseResilientConstructor(ConstructorDecl *ctor) {
-  auto nominalDecl = ctor->getDeclContext()
-    ->getAsNominalTypeOrNominalTypeExtensionContext();
+  const DeclContext *containingContext = ctor->getDeclContext();
+  const NominalTypeDecl *nominalDecl =
+      containingContext->getAsNominalTypeOrNominalTypeExtensionContext();
 
-  // These restrictions only apply to concrete types, and not protocol
-  // extensions.
-  if (isa<ProtocolDecl>(nominalDecl))
+  // These restrictions only apply to structs and classes.
+  if (isa<ProtocolDecl>(nominalDecl) || isa<EnumDecl>(nominalDecl))
     return;
 
-  bool isDelegating =
-      (ctor->getDelegatingOrChainedInitKind(&Diags) ==
-       ConstructorDecl::BodyInitKind::Delegating);
+  if (ctor->getDelegatingOrChainedInitKind(&Diags) ==
+        ConstructorDecl::BodyInitKind::Delegating) {
+    return;
+  }
 
-  if (!isDelegating &&
-      !nominalDecl->hasFixedLayout(ctor->getParentModule(),
-                                   ctor->getResilienceExpansion())) {
-    if (ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      // An @_inlineable designated initializer defined in a resilient type
-      // cannot initialize stored properties directly, and must chain to
-      // another initializer.
-      diagnose(ctor->getLoc(),
-               isa<ClassDecl>(nominalDecl)
-                 ? diag::class_designated_init_inlineable_resilient
-                 : diag::designated_init_inlineable_resilient,
-               nominalDecl->getDeclaredInterfaceType(),
-               getFragileFunctionKind(ctor));
-    } else {
-      // A designated initializer defined on an extension of a resilient
-      // type from a different resilience domain cannot initialize stored
-      // properties directly, and must chain to another initializer.
-      diagnose(ctor->getLoc(),
-               diag::designated_init_in_extension_resilient,
-               nominalDecl->getDeclaredInterfaceType());
-    }
+  // An initializer defined on an extension of a struct from another module
+  // cannot initialize stored properties directly, and must chain to another
+  // initializer.
+  if (isa<ExtensionDecl>(containingContext) &&
+      nominalDecl->getParentModule() != containingContext->getParentModule()) {
+    // Classes already can't have designated initializers in extensions, and
+    // we diagnose this elsewhere.
+    if (isa<ClassDecl>(nominalDecl))
+      return;
+
+    diagnose(ctor->getLoc(),
+             diag::designated_init_in_cross_module_extension,
+             nominalDecl->getDescriptiveKind(),
+             nominalDecl->getDeclaredInterfaceType(),
+             nominalDecl->getParentModule()->getName());
+    return;
+  }
+
+  // Within the module, we're only concerned about inlinable initializers on
+  // non-fixed-layout types.
+  if (ctor->getResilienceExpansion() == ResilienceExpansion::Minimal &&
+      !nominalDecl->hasFixedLayout()) {
+    // An @_inlineable designated initializer defined in a resilient type
+    // cannot initialize stored properties directly, and must chain to
+    // another initializer.
+    diagnose(ctor->getLoc(), diag::designated_init_inlineable_resilient,
+             isa<ClassDecl>(nominalDecl),
+             nominalDecl->getDeclaredInterfaceType(),
+             getFragileFunctionKind(ctor));
   }
 }

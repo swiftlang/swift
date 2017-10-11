@@ -6,9 +6,10 @@
 import resilient_struct
 import resilient_protocol
 
-// Point is @_fixed_layout -- this is OK
+// Even though Point is @_fixed_layout this is not allowed.
 extension Point {
   init(xx: Int, yy: Int) {
+  // expected-error@-1 {{initializer for struct 'Point' must use "self.init(...)" or "self = ..." because it is not in module 'resilient_struct'}}
     self.x = xx
     self.y = yy
   }
@@ -17,7 +18,7 @@ extension Point {
 // Size is not @_fixed_layout, so we cannot define a new designated initializer
 extension Size {
   init(ww: Int, hh: Int) {
-  // expected-error@-1 {{initializer declared in an extension of non-'@_fixed_layout' type 'Size' must delegate to another initializer}}
+  // expected-error@-1 {{initializer for struct 'Size' must use "self.init(...)" or "self = ..." because it is not in module 'resilient_struct'}}
     self.w = ww
     self.h = hh
   }
@@ -30,7 +31,7 @@ extension Size {
   // FIXME: This should be allowed, but Sema doesn't distinguish this
   // case from memberwise initialization, and DI explodes the value type
   init(other: Size) {
-  // expected-error@-1 {{initializer declared in an extension of non-'@_fixed_layout' type 'Size' must delegate to another initializer}}
+  // expected-error@-1 {{initializer for struct 'Size' must use "self.init(...)" or "self = ..." because it is not in module 'resilient_struct'}}
     self = other
   }
 }
@@ -41,17 +42,17 @@ public struct Animal {
   public let name: String
 
   @_inlineable public init(name: String) {
-  // expected-error@-1 {{initializer for non-'@_fixed_layout' type 'Animal' is '@_inlineable' and must delegate to another initializer}}
+  // expected-error@-1 {{initializer for non-'@_fixed_layout' struct 'Animal' is '@_inlineable' and must delegate to another initializer}}
     self.name = name
   }
 
   @inline(__always) public init(dog: String) {
-  // expected-error@-1 {{initializer for non-'@_fixed_layout' type 'Animal' is '@inline(__always)' and must delegate to another initializer}}
+  // expected-error@-1 {{initializer for non-'@_fixed_layout' struct 'Animal' is '@inline(__always)' and must delegate to another initializer}}
     self.name = dog
   }
 
   @_transparent public init(cat: String) {
-  // expected-error@-1 {{initializer for non-'@_fixed_layout' type 'Animal' is '@_transparent' and must delegate to another initializer}}
+  // expected-error@-1 {{initializer for non-'@_fixed_layout' struct 'Animal' is '@_transparent' and must delegate to another initializer}}
     self.name = cat
   }
 
@@ -63,7 +64,7 @@ public struct Animal {
   // FIXME: This should be allowed, but Sema doesn't distinguish this
   // case from memberwise initialization, and DI explodes the value type
   @_inlineable public init(other: Animal) {
-  // expected-error@-1 {{initializer for non-'@_fixed_layout' type 'Animal' is '@_inlineable' and must delegate to another initializer}}
+  // expected-error@-1 {{initializer for non-'@_fixed_layout' struct 'Animal' is '@_inlineable' and must delegate to another initializer}}
     self = other
   }
 }
