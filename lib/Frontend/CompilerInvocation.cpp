@@ -305,6 +305,7 @@ namespace swift {
       }
     }
     void setDumpScopeMapLocations() const;
+    FrontendOptions::ActionType determineWhatUserAskedFrontendToDo() const;
   public:
     bool ParseFrontendArgs();
    };
@@ -364,67 +365,7 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
   
   setDumpScopeMapLocations();
 
-  // Determine what the user has asked the frontend to do.
-  FrontendOptions::ActionType &Action = Opts.RequestedAction;
-  if (const Arg *A = Args.getLastArg(OPT_modes_Group)) {
-    Option Opt = A->getOption();
-    if (Opt.matches(OPT_emit_object)) {
-      Action = FrontendOptions::EmitObject;
-    } else if (Opt.matches(OPT_emit_assembly)) {
-      Action = FrontendOptions::EmitAssembly;
-    } else if (Opt.matches(OPT_emit_ir)) {
-      Action = FrontendOptions::EmitIR;
-    } else if (Opt.matches(OPT_emit_bc)) {
-      Action = FrontendOptions::EmitBC;
-    } else if (Opt.matches(OPT_emit_sil)) {
-      Action = FrontendOptions::EmitSIL;
-    } else if (Opt.matches(OPT_emit_silgen)) {
-      Action = FrontendOptions::EmitSILGen;
-    } else if (Opt.matches(OPT_emit_sib)) {
-      Action = FrontendOptions::EmitSIB;
-    } else if (Opt.matches(OPT_emit_sibgen)) {
-      Action = FrontendOptions::EmitSIBGen;
-    } else if (Opt.matches(OPT_emit_pch)) {
-      Action = FrontendOptions::EmitPCH;
-    } else if (Opt.matches(OPT_emit_imported_modules)) {
-      Action = FrontendOptions::EmitImportedModules;
-    } else if (Opt.matches(OPT_parse)) {
-      Action = FrontendOptions::Parse;
-    } else if (Opt.matches(OPT_typecheck)) {
-      Action = FrontendOptions::Typecheck;
-    } else if (Opt.matches(OPT_dump_parse)) {
-      Action = FrontendOptions::DumpParse;
-    } else if (Opt.matches(OPT_dump_ast)) {
-      Action = FrontendOptions::DumpAST;
-    } else if (Opt.matches(OPT_emit_syntax)) {
-      Action = FrontendOptions::EmitSyntax;
-    } else if (Opt.matches(OPT_merge_modules)) {
-      Action = FrontendOptions::MergeModules;
-    } else if (Opt.matches(OPT_dump_scope_maps)) {
-      Action = FrontendOptions::DumpScopeMaps;
-    } else if (Opt.matches(OPT_dump_type_refinement_contexts)) {
-      Action = FrontendOptions::DumpTypeRefinementContexts;
-    } else if (Opt.matches(OPT_dump_interface_hash)) {
-      Action = FrontendOptions::DumpInterfaceHash;
-    } else if (Opt.matches(OPT_print_ast)) {
-      Action = FrontendOptions::PrintAST;
-    } else if (Opt.matches(OPT_repl) ||
-               Opt.matches(OPT_deprecated_integrated_repl)) {
-      Action = FrontendOptions::REPL;
-    } else if (Opt.matches(OPT_interpret)) {
-      Action = FrontendOptions::Immediate;
-    } else {
-      llvm_unreachable("Unhandled mode option");
-    }
-  } else {
-    // We don't have a mode, so determine a default.
-    if (Args.hasArg(OPT_emit_module, OPT_emit_module_path)) {
-      // We've been told to emit a module, but have no other mode indicators.
-      // As a result, put the frontend into EmitModuleOnly mode.
-      // (Setting up module output will be handled below.)
-      Action = FrontendOptions::EmitModuleOnly;
-    }
-  }
+  Opts.RequestedAction = determineWhatUserAskedFrontendToDo();
 
   if (Opts.RequestedAction == FrontendOptions::Immediate &&
       Opts.Inputs.hasPrimaryInput()) {
@@ -455,7 +396,7 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
     Opts.InputKind = InputFileKind::IFK_LLVM_IR;
   else if (Args.hasArg(OPT_parse_as_library))
     Opts.InputKind = InputFileKind::IFK_Swift_Library;
-  else if (Action == FrontendOptions::REPL)
+  else if (Opts.RequestedAction == FrontendOptions::REPL)
     Opts.InputKind = InputFileKind::IFK_Swift_REPL;
   else
     Opts.InputKind = InputFileKind::IFK_Swift;
@@ -770,6 +711,69 @@ void FrontendArgsToOptionsConverter::setDumpScopeMapLocations() const {
     Diags.diagnose(SourceLoc(), diag::error_no_source_location_scope_map);
 }
 
+FrontendOptions::ActionType
+FrontendArgsToOptionsConverter::determineWhatUserAskedFrontendToDo() const {
+  using namespace options;
+  const Arg *A = Args.getLastArg(OPT_modes_Group);
+  if (!A) {
+    // We don't have a mode, so determine a default.
+    if (Args.hasArg(OPT_emit_module, OPT_emit_module_path)) {
+      // We've been told to emit a module, but have no other mode indicators.
+      // As a result, put the frontend into EmitModuleOnly mode.
+      // (Setting up module output will be handled below.)
+      return FrontendOptions::EmitModuleOnly;
+    }
+    return Opts.RequestedAction;
+  }
+  Option Opt = A->getOption();
+  if (Opt.matches(OPT_emit_object))
+    return FrontendOptions::EmitObject;
+  if (Opt.matches(OPT_emit_assembly))
+    return FrontendOptions::EmitAssembly;
+  if (Opt.matches(OPT_emit_ir))
+    return FrontendOptions::EmitIR;
+  if (Opt.matches(OPT_emit_bc))
+    return FrontendOptions::EmitBC;
+  if (Opt.matches(OPT_emit_sil))
+    return FrontendOptions::EmitSIL;
+  if (Opt.matches(OPT_emit_silgen))
+    return FrontendOptions::EmitSILGen;
+  if (Opt.matches(OPT_emit_sib))
+    return FrontendOptions::EmitSIB;
+  if (Opt.matches(OPT_emit_sibgen))
+    return FrontendOptions::EmitSIBGen;
+  if (Opt.matches(OPT_emit_pch))
+    return FrontendOptions::EmitPCH;
+  if (Opt.matches(OPT_emit_imported_modules))
+    return FrontendOptions::EmitImportedModules;
+  if (Opt.matches(OPT_parse))
+    return FrontendOptions::Parse;
+  if (Opt.matches(OPT_typecheck))
+    return FrontendOptions::Typecheck;
+  if (Opt.matches(OPT_dump_parse))
+    return FrontendOptions::DumpParse;
+  if (Opt.matches(OPT_dump_ast))
+    return FrontendOptions::DumpAST;
+  if (Opt.matches(OPT_emit_syntax))
+    return FrontendOptions::EmitSyntax;
+  if (Opt.matches(OPT_merge_modules))
+    return FrontendOptions::MergeModules;
+  if (Opt.matches(OPT_dump_scope_maps))
+    return FrontendOptions::DumpScopeMaps;
+  
+  if (Opt.matches(OPT_dump_type_refinement_contexts))
+    return FrontendOptions::DumpTypeRefinementContexts;
+  if (Opt.matches(OPT_dump_interface_hash))
+    return FrontendOptions::DumpInterfaceHash;
+  if (Opt.matches(OPT_print_ast))
+    return FrontendOptions::PrintAST;
+  if (Opt.matches(OPT_repl) || Opt.matches(OPT_deprecated_integrated_repl))
+    return FrontendOptions::REPL;
+  if (Opt.matches(OPT_interpret))
+    return FrontendOptions::Immediate;
+  
+  llvm_unreachable("Unhandled mode option");
+}
 
 static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
                                  ArgList &Args, DiagnosticEngine &diags) {
