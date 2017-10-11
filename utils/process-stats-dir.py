@@ -17,6 +17,7 @@
 
 import argparse
 import csv
+import itertools
 import json
 import os
 import platform
@@ -30,6 +31,17 @@ from operator import attrgetter
 from jobstats import load_stats_dir, merge_all_jobstats
 
 
+MODULE_PAT = re.compile('^(\w+)\.')
+
+
+def module_name_of_stat(name):
+    return re.match(MODULE_PAT, name).groups()[0]
+
+
+def stat_name_minus_module(name):
+    return re.sub(MODULE_PAT, '', name)
+
+
 # Perform any custom processing of args here, in particular the
 # select_stats_from_csv_baseline step, which is a bit subtle.
 def vars_of_args(args):
@@ -37,8 +49,8 @@ def vars_of_args(args):
     if args.select_stats_from_csv_baseline is not None:
         b = read_stats_dict_from_csv(args.select_stats_from_csv_baseline)
         if args.group_by_module:
-            pat = re.compile('^\w+\.')
-            vargs['select_stat'] = set(re.sub(pat, '', k) for k in b.keys())
+            vargs['select_stat'] = set(stat_name_minus_module(k)
+                                       for k in b.keys())
         else:
             vargs['select_stat'] = b.keys()
     return vargs
@@ -259,52 +271,101 @@ def compare_stats(args, old_stats, new_stats):
         old = old_stats[name]
         new = new_stats.get(name, 0)
         (delta, delta_pct) = diff_and_pct(old, new)
-        if ((name.startswith("time.") or '.time.' in name) and
-           abs(delta) < args.delta_usec_thresh):
-            continue
-        if abs(delta_pct) < args.delta_pct_thresh:
-            continue
         yield OutputRow(name=name,
                         old=int(old), new=int(new),
                         delta=int(delta),
                         delta_pct=delta_pct)
 
 
+IMPROVED = -1
+UNCHANGED = 0
+REGRESSED = 1
+
+
+def row_state(row, args):
+    delta_pct_over_thresh = abs(row.delta_pct) > args.delta_pct_thresh
+    if (row.name.startswith("time.") or '.time.' in row.name):
+        # Timers are judged as changing if they exceed
+        # the percentage _and_ absolute-time thresholds
+        delta_usec_over_thresh = abs(row.delta) > args.delta_usec_thresh
+        if delta_pct_over_thresh and delta_usec_over_thresh:
+            return (REGRESSED if row.delta > 0 else IMPROVED)
+    elif delta_pct_over_thresh:
+        return (REGRESSED if row.delta > 0 else IMPROVED)
+    else:
+        return UNCHANGED
+
+
 def write_comparison(args, old_stats, new_stats):
-    regressions = 0
     rows = list(compare_stats(args, old_stats, new_stats))
     sort_key = (attrgetter('delta_pct')
                 if args.sort_by_delta_pct
                 else attrgetter('name'))
-    rows.sort(key=sort_key, reverse=args.sort_descending)
-    regressions = sum(1 for row in rows if row.delta > 0)
+
+    regressed = [r for r in rows if row_state(r, args) == REGRESSED]
+    unchanged = [r for r in rows if row_state(r, args) == UNCHANGED]
+    improved = [r for r in rows if row_state(r, args) == IMPROVED]
+    regressions = len(regressed)
 
     if args.markdown:
 
-        def format_field(field, row, args):
+        def format_field(field, row):
             if field == 'name' and args.group_by_module:
-                return re.sub(r'^(\w+)\.', r'\1<br/>', row.name)
-            elif field == 'delta_pct' and args.github_emoji:
-                if row.delta_pct > 0:
-                    return str(row.delta_pct) + " :no_entry:"
-                else:
-                    return str(row.delta_pct) + " :white_check_mark:"
+                return stat_name_minus_module(row.name)
+            elif field == 'delta_pct':
+                s = str(row.delta_pct) + "%"
+                if args.github_emoji:
+                    if row_state(row, args) == REGRESSED:
+                        s += " :no_entry:"
+                    elif row_state(row, args) == IMPROVED:
+                        s += " :white_check_mark:"
+                return s
             else:
                 return str(vars(row)[field])
 
-        out = args.output
-        out.write(' | '.join(OutputRow._fields))
-        out.write('\n')
-        out.write(' | '.join('---:' for _ in OutputRow._fields))
-        out.write('\n')
-        for row in rows:
-            name = row.name
-            if args.group_by_module:
-                name
-            out.write(' | '.join(format_field(f, row, args)
-                                 for f in OutputRow._fields))
+        def format_table(elts):
+            out = args.output
             out.write('\n')
+            out.write(' | '.join(OutputRow._fields))
+            out.write('\n')
+            out.write(' | '.join('---:' for _ in OutputRow._fields))
+            out.write('\n')
+            for e in elts:
+                out.write(' | '.join(format_field(f, e)
+                                     for f in OutputRow._fields))
+                out.write('\n')
+
+        def format_details(name, elts, is_closed):
+            out = args.output
+            details = '<details>\n' if is_closed else '<details open>\n'
+            out.write(details)
+            out.write('<summary>%s (%d)</summary>\n'
+                      % (name, len(elts)))
+            if args.group_by_module:
+                def keyfunc(e):
+                    return module_name_of_stat(e.name)
+                elts.sort(key=attrgetter('name'))
+                for mod, group in itertools.groupby(elts, keyfunc):
+                    groupelts = list(group)
+                    groupelts.sort(key=sort_key, reverse=args.sort_descending)
+                    out.write(details)
+                    out.write('<summary>%s in %s (%d)</summary>\n'
+                              % (name, mod, len(groupelts)))
+                    format_table(groupelts)
+                    out.write('</details>\n')
+            else:
+                elts.sort(key=sort_key, reverse=args.sort_descending)
+                format_table(elts)
+            out.write('</details>\n')
+
+        format_details('Regressed', regressed, args.close_regressions)
+        format_details('Improved', improved, True)
+        format_details('Unchanged (abs(delta) < %s%% or %susec)' %
+                       (args.delta_pct_thresh, args.delta_usec_thresh),
+                       unchanged, True)
+
     else:
+        rows.sort(key=sort_key, reverse=args.sort_descending)
         out = csv.DictWriter(args.output, OutputRow._fields,
                              dialect='excel-tab')
         out.writeheader()
@@ -403,6 +464,14 @@ def main():
                         default=False,
                         action="store_true",
                         help="Write output in markdown table format")
+    parser.add_argument("--include-unchanged",
+                        default=False,
+                        action="store_true",
+                        help="Include unchanged stats values in comparison")
+    parser.add_argument("--close-regressions",
+                        default=False,
+                        action="store_true",
+                        help="Close regression details in markdown")
     parser.add_argument("--github-emoji",
                         default=False,
                         action="store_true",
