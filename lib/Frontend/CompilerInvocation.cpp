@@ -231,6 +231,7 @@ namespace swift {
       }
       return Opts.ModuleName;
     }
+    void parseDebugCrashGroup();
   public:
     bool ParseFrontendArgs();
    };
@@ -239,22 +240,7 @@ namespace swift {
 bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
   using namespace options;
 
-  if (const Arg *A = Args.getLastArg(OPT_debug_crash_Group)) {
-    Option Opt = A->getOption();
-    if (Opt.matches(OPT_debug_assert_immediately)) {
-      debugFailWithAssertion();
-    } else if (Opt.matches(OPT_debug_crash_immediately)) {
-      debugFailWithCrash();
-    } else if (Opt.matches(OPT_debug_assert_after_parse)) {
-      // Set in FrontendOptions
-      Opts.CrashMode = FrontendOptions::DebugCrashMode::AssertAfterParse;
-    } else if (Opt.matches(OPT_debug_crash_after_parse)) {
-      // Set in FrontendOptions
-      Opts.CrashMode = FrontendOptions::DebugCrashMode::CrashAfterParse;
-    } else {
-      llvm_unreachable("Unknown debug_crash_Group option!");
-    }
-  }
+  parseDebugCrashGroup();
 
   if (const Arg *A = Args.getLastArg(OPT_dump_api_path)) {
     Opts.DumpAPIPath = A->getValue();
@@ -850,6 +836,27 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
   }
 
   return false;
+}
+
+void FrontendArgsToOptionsConverter::parseDebugCrashGroup() {
+  using namespace options;
+  
+  if (const Arg *A = Args.getLastArg(OPT_debug_crash_Group)) {
+    Option Opt = A->getOption();
+    if (Opt.matches(OPT_debug_assert_immediately)) {
+      debugFailWithAssertion();
+    } else if (Opt.matches(OPT_debug_crash_immediately)) {
+      debugFailWithCrash();
+    } else if (Opt.matches(OPT_debug_assert_after_parse)) {
+      // Set in FrontendOptions
+      Opts.CrashMode = FrontendOptions::DebugCrashMode::AssertAfterParse;
+    } else if (Opt.matches(OPT_debug_crash_after_parse)) {
+      // Set in FrontendOptions
+      Opts.CrashMode = FrontendOptions::DebugCrashMode::CrashAfterParse;
+    } else {
+      llvm_unreachable("Unknown debug_crash_Group option!");
+    }
+  }
 }
 
 static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
