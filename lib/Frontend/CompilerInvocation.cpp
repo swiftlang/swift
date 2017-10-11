@@ -315,6 +315,7 @@ namespace swift {
     }
     void setDumpScopeMapLocations() const;
     FrontendOptions::ActionType determineWhatUserAskedFrontendToDo() const;
+    bool setupForSILOrLLVM();
   public:
     bool ParseFrontendArgs();
    };
@@ -395,16 +396,8 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
     }
   }
 
-  if (TreatAsSIL)
-    Opts.InputKind = InputFileKind::IFK_SIL;
-  else if (TreatAsLLVM)
-    Opts.InputKind = InputFileKind::IFK_LLVM_IR;
-  else if (Args.hasArg(OPT_parse_as_library))
-    Opts.InputKind = InputFileKind::IFK_Swift_Library;
-  else if (Opts.RequestedAction == FrontendOptions::REPL)
-    Opts.InputKind = InputFileKind::IFK_Swift_REPL;
-  else
-    Opts.InputKind = InputFileKind::IFK_Swift;
+  if (setupForSILOrLLVM())
+    return true;
 
   setOutputFileList();
   setModuleName();
@@ -778,6 +771,41 @@ FrontendArgsToOptionsConverter::determineWhatUserAskedFrontendToDo() const {
     return FrontendOptions::Immediate;
   
   llvm_unreachable("Unhandled mode option");
+}
+
+bool FrontendArgsToOptionsConverter::setupForSILOrLLVM() {
+  using namespace options;
+  bool TreatAsSIL =
+  Args.hasArg(OPT_parse_sil) || Opts.Inputs.shouldTreatAsSIL();
+  bool TreatAsLLVM = Opts.Inputs.shouldTreatAsLLVM();
+  
+  if (Opts.Inputs.verifyInputs(
+                               Diags, TreatAsSIL, Opts.RequestedAction == FrontendOptions::REPL,
+                               Opts.RequestedAction == FrontendOptions::NoneAction)) {
+    return true;
+  }
+  if (Opts.RequestedAction == FrontendOptions::Immediate) {
+    Opts.ImmediateArgv.push_back(
+                                 Opts.Inputs.getFilenameOfFirstInput()); // argv[0]
+    if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
+      for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
+        Opts.ImmediateArgv.push_back(A->getValue(i));
+      }
+    }
+  }
+  
+  if (TreatAsSIL)
+    Opts.InputKind = InputFileKind::IFK_SIL;
+  else if (TreatAsLLVM)
+    Opts.InputKind = InputFileKind::IFK_LLVM_IR;
+  else if (Args.hasArg(OPT_parse_as_library))
+    Opts.InputKind = InputFileKind::IFK_Swift_Library;
+  else if (Opts.RequestedAction == FrontendOptions::ActionType::REPL)
+    Opts.InputKind = InputFileKind::IFK_Swift_REPL;
+  else
+    Opts.InputKind = InputFileKind::IFK_Swift;
+  
+  return false;
 }
 
 static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
