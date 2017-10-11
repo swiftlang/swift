@@ -169,7 +169,8 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
   serialization::ExtendedValidationInfo extendedInfo;
-  if (!Invocation.setupForToolInputFile(InputFilename, ModuleName, true, extendedInfo))
+  if (!Invocation.setupForToolInputFile(InputFilename, ModuleName, true,
+                                        extendedInfo))
     exit(-1);
 
   SILOptions &SILOpts = Invocation.getSILOptions();

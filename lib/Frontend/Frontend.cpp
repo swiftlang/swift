@@ -173,9 +173,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
         MainBufferID = BufferID;
 
       const Optional<SelectedInput> &PrimaryInput =
-      Invocation.getFrontendOptions().Inputs.getOptionalPrimaryInput();
-      
-     if (PrimaryInput && PrimaryInput->isBuffer() && PrimaryInput->Index == i)
+          Invocation.getFrontendOptions().Inputs.getOptionalPrimaryInput();
+
+      if (PrimaryInput && PrimaryInput->isBuffer() && PrimaryInput->Index == i)
         PrimaryBufferID = BufferID;
     }
   }

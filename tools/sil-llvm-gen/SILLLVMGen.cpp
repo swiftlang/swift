@@ -168,7 +168,8 @@ int main(int argc, char **argv) {
   Opts.OutputKind = OutputKind;
 
   serialization::ExtendedValidationInfo extendedInfo;
-  if (!Invocation.setupForToolInputFile(InputFilename, ModuleName, false, extendedInfo))
+  if (!Invocation.setupForToolInputFile(InputFilename, ModuleName, false,
+                                        extendedInfo))
     exit(-1);
 
   CompilerInstance CI;

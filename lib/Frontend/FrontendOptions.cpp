@@ -13,18 +13,17 @@
 #include "swift/Frontend/FrontendOptions.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Parse/Lexer.h"
-#include "swift/Option/Options.h"
-#include "swift/Strings.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Option/Options.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Strings.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
-
 
 using namespace swift;
 using namespace llvm::opt;
@@ -95,21 +94,26 @@ void FrontendInputs::transformInputFilenames(const llvm::function_ref<std::strin
 }
 
 void FrontendInputs::setInputAndPrimaryFilesFromPossiblyOverlappingLists(
-                                                                         llvm::SmallVectorImpl<StringRef> &inputFiles, llvm::SmallVectorImpl<StringRef> &primaryFiles) {
+    llvm::SmallVectorImpl<StringRef> &inputFiles,
+    llvm::SmallVectorImpl<StringRef> &primaryFiles) {
   llvm::StringMap<unsigned> filelistIndices(inputFiles.size());
-  for ( auto inputFile: inputFiles ) {
-    filelistIndices.insert(llvm::StringMapEntry<unsigned>::Create(inputFile, inputFilenameCount()));
+  for (auto inputFile : inputFiles) {
+    filelistIndices.insert(llvm::StringMapEntry<unsigned>::Create(
+        inputFile, inputFilenameCount()));
     addInputFilename(inputFile);
   }
-  for ( auto primaryInputFile: primaryFiles ) {
-    llvm::StringMapConstIterator<unsigned> iterator = filelistIndices.find(primaryInputFile);
+  for (auto primaryInputFile : primaryFiles) {
+    llvm::StringMapConstIterator<unsigned> iterator =
+        filelistIndices.find(primaryInputFile);
     bool wasIndexFound = iterator != filelistIndices.end();
     unsigned nextInputFilenameIndex = inputFilenameCount();
     if (!wasIndexFound) {
       addInputFilename(primaryInputFile);
     }
-    unsigned primaryIndex = wasIndexFound ? iterator->second : nextInputFilenameIndex;
-    addPrimaryInput(SelectedInput(primaryIndex, SelectedInput::InputKind::Filename));
+    unsigned primaryIndex =
+        wasIndexFound ? iterator->second : nextInputFilenameIndex;
+    addPrimaryInput(
+        SelectedInput(primaryIndex, SelectedInput::InputKind::Filename));
   }
 }
 
@@ -232,43 +236,45 @@ StringRef FrontendOptions::determineFallbackModuleName() const {
 }
 
 bool FrontendOptions::isOutputFileDirectory() const {
-  return hasNamedOutputFile() && llvm::sys::fs::is_directory(getSingleOutputFilename());
+  return hasNamedOutputFile() &&
+         llvm::sys::fs::is_directory(getSingleOutputFilename());
 }
 
 bool FrontendOptions::isOutputFilePlainFile() const {
-  return hasNamedOutputFile() && !llvm::sys::fs::is_directory(getSingleOutputFilename());
+  return hasNamedOutputFile() &&
+         !llvm::sys::fs::is_directory(getSingleOutputFilename());
 }
 
 bool FrontendOptions::canEmitDependencies() const {
   if (DependenciesFilePath.empty())
     return true;
   switch (RequestedAction) {
-    case NoneAction:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-    case Immediate:
-    case REPL:
-      return false;
-    case Parse:
-    case Typecheck:
-    case MergeModules:
-    case EmitModuleOnly:
-    case EmitPCH:
-    case EmitSILGen:
-    case EmitSIL:
-    case EmitSIBGen:
-    case EmitSIB:
-    case EmitIR:
-    case EmitBC:
-    case EmitAssembly:
-    case EmitObject:
-    case EmitImportedModules:
-      return true;
+  case NoneAction:
+  case DumpParse:
+  case DumpInterfaceHash:
+  case DumpAST:
+  case EmitSyntax:
+  case PrintAST:
+  case DumpScopeMaps:
+  case DumpTypeRefinementContexts:
+  case Immediate:
+  case REPL:
+    return false;
+  case Parse:
+  case Typecheck:
+  case MergeModules:
+  case EmitModuleOnly:
+  case EmitPCH:
+  case EmitSILGen:
+  case EmitSIL:
+  case EmitSIBGen:
+  case EmitSIB:
+  case EmitIR:
+  case EmitBC:
+  case EmitAssembly:
+  case EmitObject:
+  case EmitImportedModules:
+    return true;
   }
 }
 
@@ -276,32 +282,32 @@ bool FrontendOptions::canEmitHeader() const {
   if (ObjCHeaderOutputPath.empty())
     return true;
   switch (RequestedAction) {
-    case NoneAction:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case EmitPCH:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-    case Immediate:
-    case REPL:
-      return false;
-    case Parse:
-    case Typecheck:
-    case MergeModules:
-    case EmitModuleOnly:
-    case EmitSILGen:
-    case EmitSIL:
-    case EmitSIBGen:
-    case EmitSIB:
-    case EmitIR:
-    case EmitBC:
-    case EmitAssembly:
-    case EmitObject:
-    case EmitImportedModules:
-      return true;
+  case NoneAction:
+  case DumpParse:
+  case DumpInterfaceHash:
+  case DumpAST:
+  case EmitSyntax:
+  case PrintAST:
+  case EmitPCH:
+  case DumpScopeMaps:
+  case DumpTypeRefinementContexts:
+  case Immediate:
+  case REPL:
+    return false;
+  case Parse:
+  case Typecheck:
+  case MergeModules:
+  case EmitModuleOnly:
+  case EmitSILGen:
+  case EmitSIL:
+  case EmitSIBGen:
+  case EmitSIB:
+  case EmitIR:
+  case EmitBC:
+  case EmitAssembly:
+  case EmitObject:
+  case EmitImportedModules:
+    return true;
   }
 }
 
@@ -309,32 +315,32 @@ bool FrontendOptions::canEmitLoadedModuleTrace() const {
   if (LoadedModuleTracePath.empty())
     return true;
   switch (RequestedAction) {
-    case NoneAction:
-    case Parse:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-    case Immediate:
-    case REPL:
-      return false;
-    case Typecheck:
-    case MergeModules:
-    case EmitModuleOnly:
-    case EmitPCH:
-    case EmitSILGen:
-    case EmitSIL:
-    case EmitSIBGen:
-    case EmitSIB:
-    case EmitIR:
-    case EmitBC:
-    case EmitAssembly:
-    case EmitObject:
-    case EmitImportedModules:
-      return true;
+  case NoneAction:
+  case Parse:
+  case DumpParse:
+  case DumpInterfaceHash:
+  case DumpAST:
+  case EmitSyntax:
+  case PrintAST:
+  case DumpScopeMaps:
+  case DumpTypeRefinementContexts:
+  case Immediate:
+  case REPL:
+    return false;
+  case Typecheck:
+  case MergeModules:
+  case EmitModuleOnly:
+  case EmitPCH:
+  case EmitSILGen:
+  case EmitSIL:
+  case EmitSIBGen:
+  case EmitSIB:
+  case EmitIR:
+  case EmitBC:
+  case EmitAssembly:
+  case EmitObject:
+  case EmitImportedModules:
+    return true;
   }
 }
 
@@ -342,127 +348,126 @@ bool FrontendOptions::canEmitModule() const {
   if (ModuleOutputPath.empty() && ModuleDocOutputPath.empty())
     return true;
   switch (RequestedAction) {
-    case NoneAction:
-    case Parse:
-    case Typecheck:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case EmitPCH:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-    case EmitSILGen:
-    case Immediate:
-    case REPL:
-      return false;
-    case MergeModules:
-    case EmitModuleOnly:
-    case EmitSIL:
-    case EmitSIBGen:
-    case EmitSIB:
-    case EmitIR:
-    case EmitBC:
-    case EmitAssembly:
-    case EmitObject:
-    case EmitImportedModules:
-      return true;
+  case NoneAction:
+  case Parse:
+  case Typecheck:
+  case DumpParse:
+  case DumpInterfaceHash:
+  case DumpAST:
+  case EmitSyntax:
+  case PrintAST:
+  case EmitPCH:
+  case DumpScopeMaps:
+  case DumpTypeRefinementContexts:
+  case EmitSILGen:
+  case Immediate:
+  case REPL:
+    return false;
+  case MergeModules:
+  case EmitModuleOnly:
+  case EmitSIL:
+  case EmitSIBGen:
+  case EmitSIB:
+  case EmitIR:
+  case EmitBC:
+  case EmitAssembly:
+  case EmitObject:
+  case EmitImportedModules:
+    return true;
   }
 }
 
 const char *FrontendOptions::computeSuffix() {
   switch (RequestedAction) {
-    case NoneAction:
-      return nullptr;
-      
-    case Parse:
-    case Typecheck:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-      // Textual modes.
-      return nullptr;
-      
-    case EmitPCH:
-      return PCH_EXTENSION;
-      
-    case EmitSILGen:
-    case EmitSIL:
-      return SIL_EXTENSION;
-      
-    case EmitSIBGen:
-    case EmitSIB:
-      return SIB_EXTENSION;
-      
-    case MergeModules:
-    case EmitModuleOnly:
-      return SERIALIZED_MODULE_EXTENSION;
-      
-    case Immediate:
-    case REPL:
-      // These modes have no frontend-generated output.
-      return nullptr;
-      
-    case EmitAssembly:
-      return "s";
-      
-    case EmitIR:
-      return "ll";
-      
-    case EmitBC:
-      return "bc";
-      
-    case EmitObject:
-      return "o";
-      
-    case EmitImportedModules:
-      return "importedmodules";
+  case NoneAction:
+    return nullptr;
+
+  case Parse:
+  case Typecheck:
+  case DumpParse:
+  case DumpInterfaceHash:
+  case DumpAST:
+  case EmitSyntax:
+  case PrintAST:
+  case DumpScopeMaps:
+  case DumpTypeRefinementContexts:
+    // Textual modes.
+    return nullptr;
+
+  case EmitPCH:
+    return PCH_EXTENSION;
+
+  case EmitSILGen:
+  case EmitSIL:
+    return SIL_EXTENSION;
+
+  case EmitSIBGen:
+  case EmitSIB:
+    return SIB_EXTENSION;
+
+  case MergeModules:
+  case EmitModuleOnly:
+    return SERIALIZED_MODULE_EXTENSION;
+
+  case Immediate:
+  case REPL:
+    // These modes have no frontend-generated output.
+    return nullptr;
+
+  case EmitAssembly:
+    return "s";
+
+  case EmitIR:
+    return "ll";
+
+  case EmitBC:
+    return "bc";
+
+  case EmitObject:
+    return "o";
+
+  case EmitImportedModules:
+    return "importedmodules";
   }
 }
 
 void FrontendOptions::clearOrSetOutputFilenameToStdoutAccordiingToAction() {
   switch (RequestedAction) {
-    case NoneAction:
-    case EmitPCH:
-    case EmitSIBGen:
-    case EmitSIB:
-    case MergeModules:
-    case EmitModuleOnly:
-    case EmitBC:
-    case EmitObject:
-      break;
-      
-    case Parse:
-    case Typecheck:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-    case EmitImportedModules:
+  case NoneAction:
+  case EmitPCH:
+  case EmitSIBGen:
+  case EmitSIB:
+  case MergeModules:
+  case EmitModuleOnly:
+  case EmitBC:
+  case EmitObject:
+    break;
+
+  case Parse:
+  case Typecheck:
+  case DumpParse:
+  case DumpInterfaceHash:
+  case DumpAST:
+  case EmitSyntax:
+  case PrintAST:
+  case DumpScopeMaps:
+  case DumpTypeRefinementContexts:
+  case EmitImportedModules:
+    setOutputFilenameToStdout();
+    break;
+
+  case EmitSILGen:
+  case EmitSIL:
+  case EmitAssembly:
+  case EmitIR:
+    if (OutputFilenames.empty())
       setOutputFilenameToStdout();
-      break;
-      
-    case EmitSILGen:
-    case EmitSIL:
-    case EmitAssembly:
-    case EmitIR:
-      if (OutputFilenames.empty())
-        setOutputFilenameToStdout();
-      break;
-      
-    case Immediate:
-    case REPL:
-      // These modes have no frontend-generated output.
-      OutputFilenames.clear();
-      break;
+    break;
+
+  case Immediate:
+  case REPL:
+    // These modes have no frontend-generated output.
+    OutputFilenames.clear();
+    break;
   }
 }
-
