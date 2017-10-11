@@ -6150,8 +6150,9 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
       return !(first->hasTypeParameter() || first->isTypeVariableOrMember());
     }
 
-    bool diagnoseUnsatisfiedRequirement(const Requirement &req, Type first,
-                                        Type second) override {
+    bool diagnoseUnsatisfiedRequirement(
+        const Requirement &req, Type first, Type second,
+        ArrayRef<ParentConditionalConformance> parents) override {
       Diag<Type, Type, Type, Type, StringRef> note;
       switch (req.getKind()) {
       case RequirementKind::Conformance:
@@ -6201,6 +6202,10 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
                   rawFirstType, rawSecondType,
                   genericSig->gatherGenericParamBindingsText(
                                  {rawFirstType, rawSecondType}, Substitutions));
+
+      ParentConditionalConformance::diagnoseConformanceStack(
+          TC.Diags, Candidate->getLoc(), parents);
+
       return true;
     }
   };

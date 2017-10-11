@@ -2604,6 +2604,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                 ConformanceCheckFlags::InExpression)) {
       CheckedConformances.push_back({getConstraintLocator(locator),
                                      *conformance});
+
+      // This conformance may be conditional, in which case we need to consider
+      // those requirements as constraints too.
+      //
+      // FIXME: this doesn't seem to be right; the requirements are sometimes
+      // phrased in terms of the type's generic parameters, not type variables
+      // in this context.
+      for (auto req : conformance->getConditionalRequirements()) {
+        addConstraint(req, locator);
+      }
       return SolutionKind::Solved;
     }
     break;
@@ -4859,6 +4869,43 @@ ConstraintSystem::addKeyPathConstraint(Type keypath,
   }
 }
 
+void ConstraintSystem::addConstraint(Requirement req,
+                                     ConstraintLocatorBuilder locator,
+                                     bool isFavored) {
+  bool conformsToAnyObject = false;
+  Optional<ConstraintKind> kind;
+  switch (req.getKind()) {
+  case RequirementKind::Conformance:
+    kind = ConstraintKind::ConformsTo;
+    break;
+  case RequirementKind::Superclass:
+    conformsToAnyObject = true;
+    kind = ConstraintKind::Subtype;
+    break;
+  case RequirementKind::SameType:
+    kind = ConstraintKind::Equal;
+    break;
+  case RequirementKind::Layout:
+    // Only a class constraint can be modeled as a constraint, and only that can
+    // appear outside of a @_specialize at the moment anyway.
+    if (req.getLayoutConstraint()->isClass()) {
+      conformsToAnyObject = true;
+      break;
+    }
+    return;
+  }
+
+  auto firstType = req.getFirstType();
+  if (kind) {
+    addConstraint(*kind, req.getFirstType(), req.getSecondType(), locator,
+                  isFavored);
+  }
+
+  if (conformsToAnyObject) {
+    auto anyObject = getASTContext().getAnyObjectType();
+    addConstraint(ConstraintKind::ConformsTo, firstType, anyObject, locator);
+  }
+}
 
 void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                      Type second,

@@ -296,6 +296,12 @@ public:
   /// The type parameters must be known to not be concrete within the context.
   bool areSameTypeParameterInContext(Type type1, Type type2);
 
+  /// Determine if \c sig can prove \c requirement, meaning that it can deduce
+  /// T: Foo or T == U (etc.) with the information it knows. This includes
+  /// checking against global state, if any/all of the types in the requirement
+  /// are concrete, not type parameters.
+  bool isRequirementSatisfied(Requirement requirement);
+
   /// Return the canonical version of the given type under this generic
   /// signature.
   CanType getCanonicalTypeInContext(Type type);
