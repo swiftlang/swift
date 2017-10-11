@@ -1649,25 +1649,48 @@ ${operatorComment(x.nonMaskingOperator, False)}
 extension BinaryInteger {
   // FIXME(ABI): using Int as the return type is wrong.
   @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
+  @inline(__always)
   public func distance(to other: Self) -> Int {
-    let distance = other - self
-    if let result = Int(exactly: distance) {
-      return result
+    if !Self.isSigned {
+      if self > other {
+        if let result = Int(exactly: self - other) {
+          return -result
+        }
+      } else {
+        if let result = Int(exactly: other - self) {
+          return result
+        }
+      }
+    } else {
+      let isNegative = self < (0 as Self)
+      if isNegative == (other < (0 as Self)) {
+        if let result = Int(exactly: other - self) {
+          return result
+        }
+      } else {
+        if let result = Int(exactly: self.magnitude + other.magnitude) {
+          return isNegative ? result : -result
+        }
+      }
     }
     _preconditionFailure("Distance is not representable in Int")
   }
 
   // FIXME(ABI): using Int as the parameter type is wrong.
   @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
+  @inline(__always)
   public func advanced(by n: Int) -> Self {
-    var advanced: Int = Int(self)
-    advanced += n
-    if let result = Self(exactly: advanced) {
-      return result
+    if !Self.isSigned {
+      return n < (0 as Int)
+        ? self - Self(-n)
+        : self + Self(n)
     }
-    _preconditionFailure("The result of advanced(by:) is not representable")
+    if (self < (0 as Self)) == (n < (0 as Self)) {
+      return self + Self(n)
+    }
+    return self.magnitude < n.magnitude
+      ? Self(Int(self) + n)
+      : self + Self(n)
   }
 }
 
