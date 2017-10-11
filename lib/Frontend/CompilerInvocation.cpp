@@ -292,6 +292,15 @@ namespace swift {
       }
     }
     
+    void setPlaygroundOptions() {
+      using namespace options;
+      Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
+      if (Args.hasArg(OPT_disable_playground_transform))
+        Opts.PlaygroundTransform = false;
+      Opts.PlaygroundHighPerformance |=
+      Args.hasArg(OPT_playground_high_performance);
+    }
+    
     void setHelpOptions() {
       using namespace options;
       if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
@@ -348,11 +357,7 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
                              Opts.SolverExpressionTimeThreshold);setUnsignedIntegerArgument(OPT_warn_long_function_bodies, 10,
                                                                                             Opts.WarnLongFunctionBodies);
 
-  Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
-  if (Args.hasArg(OPT_disable_playground_transform))
-    Opts.PlaygroundTransform = false;
-  Opts.PlaygroundHighPerformance |=
-    Args.hasArg(OPT_playground_high_performance);
+  setPlaygroundOptions();
 
   // This can be enabled independently of the playground transform.
   Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
