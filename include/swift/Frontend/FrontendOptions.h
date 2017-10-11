@@ -540,8 +540,14 @@ public:
   bool isCompilingExactlyOneSwiftFile() const {
     return InputKind == InputFileKind::IFK_Swift && Inputs.hasUniqueInputFilename();
   }
+  
+private:
+  bool canEmitDependencies() const;
+  bool canEmitHeader() const;
+  bool canEmitLoadedModuleTrace() const;
+  bool canEmitModule() const;
 };
-
+  
 }
 
 #endif

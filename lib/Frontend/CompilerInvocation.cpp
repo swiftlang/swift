@@ -232,6 +232,7 @@ namespace swift {
       return Opts.ModuleName;
     }
     void parseDebugCrashGroup();
+    bool canEmitWhatActionCallsFor() const;
   public:
     bool ParseFrontendArgs();
    };
@@ -677,139 +678,9 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
                           SERIALIZED_MODULE_DOC_EXTENSION,
                           false);
 
-  if (!Opts.DependenciesFilePath.empty()) {
-    switch (Opts.RequestedAction) {
-    case FrontendOptions::NoneAction:
-    case FrontendOptions::DumpParse:
-    case FrontendOptions::DumpInterfaceHash:
-    case FrontendOptions::DumpAST:
-    case FrontendOptions::EmitSyntax:
-    case FrontendOptions::PrintAST:
-    case FrontendOptions::DumpScopeMaps:
-    case FrontendOptions::DumpTypeRefinementContexts:
-    case FrontendOptions::Immediate:
-    case FrontendOptions::REPL:
-      Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
-      return true;
-    case FrontendOptions::Parse:
-    case FrontendOptions::Typecheck:
-    case FrontendOptions::MergeModules:
-    case FrontendOptions::EmitModuleOnly:
-    case FrontendOptions::EmitPCH:
-    case FrontendOptions::EmitSILGen:
-    case FrontendOptions::EmitSIL:
-    case FrontendOptions::EmitSIBGen:
-    case FrontendOptions::EmitSIB:
-    case FrontendOptions::EmitIR:
-    case FrontendOptions::EmitBC:
-    case FrontendOptions::EmitAssembly:
-    case FrontendOptions::EmitObject:
-    case FrontendOptions::EmitImportedModules:
-      break;
-    }
-  }
-
-  if (!Opts.ObjCHeaderOutputPath.empty()) {
-    switch (Opts.RequestedAction) {
-    case FrontendOptions::NoneAction:
-    case FrontendOptions::DumpParse:
-    case FrontendOptions::DumpInterfaceHash:
-    case FrontendOptions::DumpAST:
-    case FrontendOptions::EmitSyntax:
-    case FrontendOptions::PrintAST:
-    case FrontendOptions::EmitPCH:
-    case FrontendOptions::DumpScopeMaps:
-    case FrontendOptions::DumpTypeRefinementContexts:
-    case FrontendOptions::Immediate:
-    case FrontendOptions::REPL:
-      Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
-      return true;
-    case FrontendOptions::Parse:
-    case FrontendOptions::Typecheck:
-    case FrontendOptions::MergeModules:
-    case FrontendOptions::EmitModuleOnly:
-    case FrontendOptions::EmitSILGen:
-    case FrontendOptions::EmitSIL:
-    case FrontendOptions::EmitSIBGen:
-    case FrontendOptions::EmitSIB:
-    case FrontendOptions::EmitIR:
-    case FrontendOptions::EmitBC:
-    case FrontendOptions::EmitAssembly:
-    case FrontendOptions::EmitObject:
-    case FrontendOptions::EmitImportedModules:
-      break;
-    }
-  }
-
-  if (!Opts.LoadedModuleTracePath.empty()) {
-    switch (Opts.RequestedAction) {
-    case FrontendOptions::NoneAction:
-    case FrontendOptions::Parse:
-    case FrontendOptions::DumpParse:
-    case FrontendOptions::DumpInterfaceHash:
-    case FrontendOptions::DumpAST:
-    case FrontendOptions::EmitSyntax:
-    case FrontendOptions::PrintAST:
-    case FrontendOptions::DumpScopeMaps:
-    case FrontendOptions::DumpTypeRefinementContexts:
-    case FrontendOptions::Immediate:
-    case FrontendOptions::REPL:
-      Diags.diagnose(SourceLoc(),
-                     diag::error_mode_cannot_emit_loaded_module_trace);
-      return true;
-    case FrontendOptions::Typecheck:
-    case FrontendOptions::MergeModules:
-    case FrontendOptions::EmitModuleOnly:
-    case FrontendOptions::EmitPCH:
-    case FrontendOptions::EmitSILGen:
-    case FrontendOptions::EmitSIL:
-    case FrontendOptions::EmitSIBGen:
-    case FrontendOptions::EmitSIB:
-    case FrontendOptions::EmitIR:
-    case FrontendOptions::EmitBC:
-    case FrontendOptions::EmitAssembly:
-    case FrontendOptions::EmitObject:
-    case FrontendOptions::EmitImportedModules:
-      break;
-    }
-  }
-
-  if (!Opts.ModuleOutputPath.empty() ||
-      !Opts.ModuleDocOutputPath.empty()) {
-    switch (Opts.RequestedAction) {
-    case FrontendOptions::NoneAction:
-    case FrontendOptions::Parse:
-    case FrontendOptions::Typecheck:
-    case FrontendOptions::DumpParse:
-    case FrontendOptions::DumpInterfaceHash:
-    case FrontendOptions::DumpAST:
-    case FrontendOptions::EmitSyntax:
-    case FrontendOptions::PrintAST:
-    case FrontendOptions::EmitPCH:
-    case FrontendOptions::DumpScopeMaps:
-    case FrontendOptions::DumpTypeRefinementContexts:
-    case FrontendOptions::EmitSILGen:
-    case FrontendOptions::Immediate:
-    case FrontendOptions::REPL:
-      if (!Opts.ModuleOutputPath.empty())
-        Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
-      else
-        Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
-      return true;
-    case FrontendOptions::MergeModules:
-    case FrontendOptions::EmitModuleOnly:
-    case FrontendOptions::EmitSIL:
-    case FrontendOptions::EmitSIBGen:
-    case FrontendOptions::EmitSIB:
-    case FrontendOptions::EmitIR:
-    case FrontendOptions::EmitBC:
-    case FrontendOptions::EmitAssembly:
-    case FrontendOptions::EmitObject:
-    case FrontendOptions::EmitImportedModules:
-      break;
-    }
-  }
-
+  if (!canEmitWhatActionCallsFor())
+    return true;
+ 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
     Opts.ModuleLinkName = A->getValue();
   }
@@ -857,6 +728,30 @@ void FrontendArgsToOptionsConverter::parseDebugCrashGroup() {
       llvm_unreachable("Unknown debug_crash_Group option!");
     }
   }
+}
+
+bool FrontendArgsToOptionsConverter::canEmitWhatActionCallsFor() const {
+  if (!Opts.canEmitDependencies()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
+    return true;
+  }
+  if (!Opts.canEmitHeader()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
+    return true;
+  }
+  if (!Opts.canEmitLoadedModuleTrace()) {
+    Diags.diagnose(SourceLoc(),
+                   diag::error_mode_cannot_emit_loaded_module_trace);
+    return true;
+  }
+  if (!Opts.canEmitModule()) {
+    if (!Opts.ModuleOutputPath.empty())
+      Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
+    else
+      Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
+    return true;
+  }
+  return false;
 }
 
 static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
