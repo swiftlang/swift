@@ -372,3 +372,98 @@ bool FrontendOptions::canEmitModule() const {
   }
 }
 
+const char *FrontendOptions::computeSuffix() {
+  switch (RequestedAction) {
+    case NoneAction:
+      return nullptr;
+      
+    case Parse:
+    case Typecheck:
+    case DumpParse:
+    case DumpInterfaceHash:
+    case DumpAST:
+    case EmitSyntax:
+    case PrintAST:
+    case DumpScopeMaps:
+    case DumpTypeRefinementContexts:
+      // Textual modes.
+      return nullptr;
+      
+    case EmitPCH:
+      return PCH_EXTENSION;
+      
+    case EmitSILGen:
+    case EmitSIL:
+      return SIL_EXTENSION;
+      
+    case EmitSIBGen:
+    case EmitSIB:
+      return SIB_EXTENSION;
+      
+    case MergeModules:
+    case EmitModuleOnly:
+      return SERIALIZED_MODULE_EXTENSION;
+      
+    case Immediate:
+    case REPL:
+      // These modes have no frontend-generated output.
+      return nullptr;
+      
+    case EmitAssembly:
+      return "s";
+      
+    case EmitIR:
+      return "ll";
+      
+    case EmitBC:
+      return "bc";
+      
+    case EmitObject:
+      return "o";
+      
+    case EmitImportedModules:
+      return "importedmodules";
+  }
+}
+
+void FrontendOptions::clearOrSetOutputFilenameToStdoutAccordiingToAction() {
+  switch (RequestedAction) {
+    case NoneAction:
+    case EmitPCH:
+    case EmitSIBGen:
+    case EmitSIB:
+    case MergeModules:
+    case EmitModuleOnly:
+    case EmitBC:
+    case EmitObject:
+      break;
+      
+    case Parse:
+    case Typecheck:
+    case DumpParse:
+    case DumpInterfaceHash:
+    case DumpAST:
+    case EmitSyntax:
+    case PrintAST:
+    case DumpScopeMaps:
+    case DumpTypeRefinementContexts:
+    case EmitImportedModules:
+      setOutputFilenameToStdout();
+      break;
+      
+    case EmitSILGen:
+    case EmitSIL:
+    case EmitAssembly:
+    case EmitIR:
+      if (OutputFilenames.empty())
+        setOutputFilenameToStdout();
+      break;
+      
+    case Immediate:
+    case REPL:
+      // These modes have no frontend-generated output.
+      OutputFilenames.clear();
+      break;
+  }
+}
+

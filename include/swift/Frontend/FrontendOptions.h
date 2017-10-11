@@ -127,9 +127,11 @@ private:
      return PrimaryInputs;
    }
   
+public:
   const ArrayRef<SelectedInput> getPrimaryInputs() const {
     return PrimaryInputs;
   }
+private:
   
   std::vector<SelectedInput> &getMutablePrimaryInputs() {
     mustNotBePluralPrimaryInputs();
@@ -546,6 +548,9 @@ private:
   bool canEmitHeader() const;
   bool canEmitLoadedModuleTrace() const;
   bool canEmitModule() const;
+  
+  const char *computeSuffix();
+  void clearOrSetOutputFilenameToStdoutAccordiingToAction();
 };
   
 }

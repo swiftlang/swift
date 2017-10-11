@@ -220,17 +220,27 @@ namespace swift {
       Opts.ModuleName = "__bad__";
     }
     
-    StringRef baseNameOfOutput() {
-      StringRef pifn = Opts.Inputs.primaryInputFilenameIfAny();
-      if (!pifn.empty()) {
-        return llvm::sys::path::stem(pifn);
+    llvm::SmallVector<StringRef, 8> BaseNamesOfOutputs;
+    
+    llvm::SmallVectorImpl<StringRef> &computeBaseNamesOfOutputs() {
+      BaseNamesOfOutputs.clear();
+      for (const SelectedInput &SI : Opts.Inputs.getPrimaryInputs()) {
+        if (!SI.isFilename())
+          continue;
+        BaseNamesOfOutputs.push_back(
+                                     llvm::sys::path::stem(Opts.Inputs.getInputFilenames()[SI.Index]));
       }
+      if (!BaseNamesOfOutputs.empty())
+        return BaseNamesOfOutputs;
       bool UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name);
-      if (!UserSpecifiedModuleName &&  Opts.Inputs.hasUniqueInputFilename()) {
-        return llvm::sys::path::stem(Opts.Inputs.getFilenameOfFirstInput());
-      }
-      return Opts.ModuleName;
+      StringRef pathToStem =
+      !UserSpecifiedModuleName && Opts.Inputs.hasUniqueInputFilename()
+      ? Opts.Inputs.getFilenameOfFirstInput()
+      : Opts.ModuleName;
+      BaseNamesOfOutputs.push_back(llvm::sys::path::stem(pathToStem));
+      return BaseNamesOfOutputs;
     }
+    
     void parseDebugCrashGroup();
     bool canEmitWhatActionCallsFor() const;
     
@@ -316,6 +326,8 @@ namespace swift {
     void setDumpScopeMapLocations() const;
     FrontendOptions::ActionType determineWhatUserAskedFrontendToDo() const;
     bool setupForSILOrLLVM();
+    bool determineCorrectOutputFilenameIfMissingOrDirectory();
+    
   public:
     bool ParseFrontendArgs();
    };
@@ -398,130 +410,10 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
 
   if (setupForSILOrLLVM())
     return true;
-
   setOutputFileList();
   setModuleName();
-
-  if (Opts.OutputFilenames.empty() ||
-      llvm::sys::fs::is_directory(Opts.getSingleOutputFilename())) {
-    // No output filename was specified, or an output directory was specified.
-    // Determine the correct output filename.
-
-    // Note: this should typically only be used when invoking the frontend
-    // directly, as the driver will always pass -o with an appropriate filename
-    // if output is required for the requested action.
-
-    StringRef Suffix;
-    switch (Opts.RequestedAction) {
-    case FrontendOptions::NoneAction:
-      break;
-
-    case FrontendOptions::Parse:
-    case FrontendOptions::Typecheck:
-    case FrontendOptions::DumpParse:
-    case FrontendOptions::DumpInterfaceHash:
-    case FrontendOptions::DumpAST:
-    case FrontendOptions::EmitSyntax:
-    case FrontendOptions::PrintAST:
-    case FrontendOptions::DumpScopeMaps:
-    case FrontendOptions::DumpTypeRefinementContexts:
-      // Textual modes.
-      Opts.setOutputFilenameToStdout();
-      break;
-
-    case FrontendOptions::EmitPCH:
-      Suffix = PCH_EXTENSION;
-      break;
-
-    case FrontendOptions::EmitSILGen:
-    case FrontendOptions::EmitSIL: {
-      if (Opts.OutputFilenames.empty())
-        Opts.setOutputFilenameToStdout();
-      else
-        Suffix = SIL_EXTENSION;
-      break;
-    }
-
-    case FrontendOptions::EmitSIBGen:
-    case FrontendOptions::EmitSIB:
-      Suffix = SIB_EXTENSION;
-      break;
-
-    case FrontendOptions::MergeModules:
-    case FrontendOptions::EmitModuleOnly:
-      Suffix = SERIALIZED_MODULE_EXTENSION;
-      break;
-
-    case FrontendOptions::Immediate:
-    case FrontendOptions::REPL:
-      // These modes have no frontend-generated output.
-      Opts.OutputFilenames.clear();
-      break;
-
-    case FrontendOptions::EmitAssembly: {
-      if (Opts.OutputFilenames.empty())
-        Opts.setOutputFilenameToStdout();
-      else
-        Suffix = "s";
-      break;
-    }
-
-    case FrontendOptions::EmitIR: {
-      if (Opts.OutputFilenames.empty())
-        Opts.setOutputFilenameToStdout();
-      else
-        Suffix = "ll";
-      break;
-    }
-
-    case FrontendOptions::EmitBC: {
-      Suffix = "bc";
-      break;
-    }
-
-    case FrontendOptions::EmitObject:
-      Suffix = "o";
-      break;
-
-    case FrontendOptions::EmitImportedModules:
-      if (Opts.OutputFilenames.empty())
-        Opts.setOutputFilenameToStdout();
-      else
-        Suffix = "importedmodules";
-      break;
-    }
-
-    if (!Suffix.empty()) {
-      // We need to deduce a file name.
-
-      // First, if we're reading from stdin and we don't have a directory,
-      // output to stdout.
-      if (Opts.Inputs.isReadingFromStdin() &&  Opts.OutputFilenames.empty())
-        Opts.setOutputFilenameToStdout();
-      else {
-        // We have a suffix, so determine an appropriate name.
-        StringRef BaseName = baseNameOfOutput();
-        llvm::SmallString<128> Path(Opts.getSingleOutputFilename());
-        llvm::sys::path::append(Path, BaseName);
-        llvm::sys::path::replace_extension(Path, Suffix);
-
-        Opts.setSingleOutputFilename(Path.str());
-      }
-    }
-
-    if (Opts.OutputFilenames.empty()) {
-      if (Opts.RequestedAction != FrontendOptions::REPL &&
-          Opts.RequestedAction != FrontendOptions::Immediate &&
-          Opts.RequestedAction != FrontendOptions::NoneAction) {
-        Diags.diagnose(SourceLoc(), diag::error_no_output_filename_specified);
-        return true;
-      }
-    } else if (Opts.isOutputFileDirectory()) {
-      Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
-                     Opts.getSingleOutputFilename());
-      return true;
-    }
-  }
+  if (determineCorrectOutputFilenameIfMissingOrDirectory())
+    return true;
 
   auto determineOutputFilename = [&](std::string &output,
                                      OptSpecifier optWithoutPath,
@@ -805,6 +697,64 @@ bool FrontendArgsToOptionsConverter::setupForSILOrLLVM() {
   else
     Opts.InputKind = InputFileKind::IFK_Swift;
   
+  return false;
+}
+
+bool FrontendArgsToOptionsConverter::
+determineCorrectOutputFilenameIfMissingOrDirectory() {
+  if (!Opts.OutputFilenames.empty() &&
+      !llvm::sys::fs::is_directory(Opts.getSingleOutputFilename()))
+    return false;
+  
+  // No output filename was specified, or an output directory was specified.
+  // Determine the correct output filename.
+  
+  // Note: this should typically only be used when invoking the frontend
+  // directly, as the driver will always pass -o with an appropriate filename
+  // if output is required for the requested action.
+  
+  StringRef Suffix = Opts.computeSuffix();
+  Opts.clearOrSetOutputFilenameToStdoutAccordiingToAction();
+  
+  if (!Suffix.empty()) {
+    // We need to deduce a file name.
+    
+    // First, if we're reading from stdin and we don't have a directory,
+    // output to stdout.
+    if (Opts.Inputs.isReadingFromStdin() && Opts.OutputFilenames.empty())
+      Opts.setOutputFilenameToStdout();
+    else {
+      // We have a suffix, so determine an appropriate name.
+      auto &baseNames = computeBaseNamesOfOutputs();
+      if (!Opts.Inputs.isWholeModule() &&
+          baseNames.size() != Opts.OutputFilenames.size()) {
+        Diags.diagnose(
+                       SourceLoc(),
+                       diag::error_output_filenames_dont_match_primary_filenames,
+                       Opts.OutputFilenames.size(), baseNames.size());
+        return true;
+      }
+      for (unsigned index : indices(Opts.OutputFilenames)) {
+        llvm::SmallString<128> Path(Opts.OutputFilenames[index]);
+        llvm::sys::path::append(Path, baseNames[index]);
+        llvm::sys::path::replace_extension(Path, Suffix);
+        Opts.OutputFilenames[index] = Path.str();
+      }
+    }
+  }
+  
+  if (Opts.OutputFilenames.empty()) {
+    if (Opts.RequestedAction != FrontendOptions::REPL &&
+        Opts.RequestedAction != FrontendOptions::Immediate &&
+        Opts.RequestedAction != FrontendOptions::NoneAction) {
+      Diags.diagnose(SourceLoc(), diag::error_no_output_filename_specified);
+      return true;
+    }
+  } else if (Opts.isOutputFileDirectory()) {
+    Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
+                   Opts.getSingleOutputFilename());
+    return true;
+  }
   return false;
 }
 
