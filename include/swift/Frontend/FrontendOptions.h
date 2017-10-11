@@ -65,8 +65,6 @@ enum class InputFileKind {
 /// Information about all the inputs to the frontend.
 class FrontendInputs {
 private:
-  // FIXME: (dmu) create a class for the inputs
-  
   /// The names of input files to the frontend.
   std::vector<std::string> InputFilenames;
   
@@ -118,12 +116,12 @@ public:
   
 private:
  
-  void mustNotBePluralPrimaryInputs() const {
+  void mustNotBeMoreThanOnePrimaryInput() const {
     assert(PrimaryInputs.size() < 2 && "have not implemented >1 primary input yet");
   }
   
    const ArrayRef<SelectedInput> getPrimaryInput() const {
-     mustNotBePluralPrimaryInputs();
+     mustNotBeMoreThanOnePrimaryInput();
      return PrimaryInputs;
    }
   
@@ -134,7 +132,7 @@ public:
 private:
   
   std::vector<SelectedInput> &getMutablePrimaryInputs() {
-    mustNotBePluralPrimaryInputs();
+    mustNotBeMoreThanOnePrimaryInput();
     return PrimaryInputs;
   }
 public:
