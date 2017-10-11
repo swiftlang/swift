@@ -573,6 +573,11 @@ bool RequirementSource::isDerivedRequirement() const {
   llvm_unreachable("Unhandled RequirementSourceKind in switch.");
 }
 
+bool RequirementSource::shouldDiagnoseRedundancy(bool primary) const {
+  return !isInferredRequirement() && getLoc().isValid() &&
+         (!primary || !isDerivedRequirement());
+}
+
 bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa,
                                             bool &derivedViaConcrete) const {
   return getMinimalConformanceSource(pa, /*proto=*/nullptr, derivedViaConcrete)
@@ -1544,6 +1549,27 @@ unsigned GenericSignatureBuilder::PotentialArchetype::getNestingDepth() const {
   return Depth;
 }
 
+bool EquivalenceClass::recordConformanceConstraint(
+                                 PotentialArchetype *pa,
+                                 ProtocolDecl *proto,
+                                 const RequirementSource *source) {
+  // If we haven't seen a conformance to this protocol yet, add it.
+  bool inserted = false;
+  auto known = conformsTo.find(proto);
+  if (known == conformsTo.end()) {
+    known = conformsTo.insert({ proto, { }}).first;
+    inserted = true;
+    modified(*pa->getBuilder());
+    ++NumConformances;
+  }
+
+  // Record this conformance source.
+  known->second.push_back({pa, proto, source});
+  ++NumConformanceConstraints;
+
+  return inserted;
+}
+
 Optional<ConcreteConstraint>
 EquivalenceClass::findAnyConcreteConstraintAsWritten(
                                       PotentialArchetype *preferredPA) const {
@@ -2114,11 +2140,8 @@ GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
   }
 
   concreteSource = concreteSource->viaConcrete(*this, *conformance);
-  paEquivClass->conformsTo[proto].push_back({pa, proto, concreteSource});
-  ++NumConformanceConstraints;
-
+  paEquivClass->recordConformanceConstraint(pa, proto, concreteSource);
   addConditionalRequirements(*this, *conformance);
-
   return concreteSource;
 }
 
@@ -2149,11 +2172,8 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
 
   superclassSource =
     superclassSource->viaSuperclass(*this, *conformance);
-  paEquivClass->conformsTo[proto].push_back({pa, proto, superclassSource});
-  ++NumConformanceConstraints;
-
+  paEquivClass->recordConformanceConstraint(pa, proto, superclassSource);
   addConditionalRequirements(*this, *conformance);
-
   return superclassSource;
 }
 
@@ -2256,19 +2276,8 @@ bool PotentialArchetype::addConformance(ProtocolDecl *proto,
                                         GenericSignatureBuilder &builder) {
   // Check whether we already knew about this conformance.
   auto equivClass = getOrCreateEquivalenceClass();
-  auto known = equivClass->conformsTo.find(proto);
-  if (known != equivClass->conformsTo.end()) {
-    // We already knew about this conformance; record this specific constraint.
-    known->second.push_back({this, proto, source});
-    ++NumConformanceConstraints;
+  if (!equivClass->recordConformanceConstraint(this, proto, source))
     return false;
-  }
-
-  // Add the conformance along with this constraint.
-  equivClass->conformsTo[proto].push_back({this, proto, source});
-  equivClass->modified(builder);
-  ++NumConformanceConstraints;
-  ++NumConformances;
 
   // If there is a concrete type that resolves this conformance requirement,
   // record the conformance.
@@ -3908,6 +3917,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
       T1->addConformance(entry.first, entry.second.front().source, *this);
 
       auto &constraints1 = equivClass->conformsTo[entry.first];
+      // FIXME: Go through recordConformanceConstraint()?
       constraints1.insert(constraints1.end(),
                           entry.second.begin() + 1,
                           entry.second.end());
@@ -5090,10 +5100,9 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       // If this requirement is not derived or inferred (but has a useful
       // location) complain that it is redundant.
       Impl->HadAnyRedundantConstraints = true;
-      if (!constraint.source->isDerivedRequirement() &&
-          !constraint.source->isInferredRequirement() &&
-          constraint.source->getLoc().isValid() &&
-          !representativeConstraint->source->isInferredRequirement()) {
+      if (constraint.source->shouldDiagnoseRedundancy(true) &&
+          representativeConstraint &&
+          representativeConstraint->source->shouldDiagnoseRedundancy(false)) {
         Diags.diagnose(constraint.source->getLoc(),
                        redundancyDiag,
                        constraint.archetype->getDependentType(genericParams),
@@ -5710,9 +5719,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
     for (const auto &constraint : constraints) {
       // If the source/destination are identical, complain.
       if (constraint.archetype == constraint.value) {
-        if (!constraint.source->isDerivedRequirement() &&
-            !constraint.source->isInferredRequirement() &&
-            constraint.source->getLoc().isValid()) {
+        if (constraint.source->shouldDiagnoseRedundancy(true)) {
           Diags.diagnose(constraint.source->getLoc(),
                          diag::redundant_same_type_constraint,
                          constraint.archetype->getDependentType(genericParams),
@@ -5822,15 +5829,9 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
         if (lhs.source != rhs.source || lhs.target != rhs.target)
           return false;
 
-        // We have two edges connected the same components. If both
-        // have locations, diagnose them.
-        if (lhs.constraint.source->getLoc().isInvalid() ||
-            rhs.constraint.source->getLoc().isInvalid())
-          return true;
-
-        // If the constraint source is inferred, don't diagnose it.
-        if (lhs.constraint.source->isInferredRequirement() ||
-            rhs.constraint.source->isInferredRequirement())
+        // Check whethe we should diagnose redundancy for both constraints.
+        if (!lhs.constraint.source->shouldDiagnoseRedundancy(true) ||
+            !rhs.constraint.source->shouldDiagnoseRedundancy(false))
           return true;
 
         Diags.diagnose(lhs.constraint.source->getLoc(),
@@ -5859,10 +5860,8 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       // If both the source and target are already connected, this edge is
       // not part of the spanning tree.
       if (connected[edge.source] && connected[edge.target]) {
-        if (edge.constraint.source->getLoc().isValid() &&
-            !edge.constraint.source->isInferredRequirement() &&
-            firstEdge.constraint.source->getLoc().isValid() &&
-            !firstEdge.constraint.source->isInferredRequirement()) {
+        if (edge.constraint.source->shouldDiagnoseRedundancy(true) &&
+            firstEdge.constraint.source->shouldDiagnoseRedundancy(false)) {
           Diags.diagnose(edge.constraint.source->getLoc(),
                          diag::redundant_same_type_constraint,
                          edge.constraint.archetype->getDependentType(
@@ -5975,28 +5974,35 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
   // If we have a concrete type, check it.
   // FIXME: Substitute into the concrete type.
   if (equivClass->concreteType) {
+    auto existing = equivClass->findAnyConcreteConstraintAsWritten(
+                                           representativeConstraint.archetype);
     // Make sure the concrete type fulfills the superclass requirement.
-    if (!equivClass->superclass->isExactSuperclassOf(equivClass->concreteType)) {
-      if (auto existing = equivClass->findAnyConcreteConstraintAsWritten(
-                            representativeConstraint.archetype)) {
-        Impl->HadAnyError = true;
-
+    if (!equivClass->superclass->isExactSuperclassOf(equivClass->concreteType)){
+      Impl->HadAnyError = true;
+      if (existing) {
         Diags.diagnose(existing->source->getLoc(), diag::type_does_not_inherit,
                        existing->archetype->getDependentType(
                                                    genericParams),
                        existing->value, equivClass->superclass);
 
-        // FIXME: Note the representative constraint.
+        if (representativeConstraint.source->getLoc().isValid()) {
+          Diags.diagnose(representativeConstraint.source->getLoc(),
+                         diag::superclass_redundancy_here,
+                         representativeConstraint.source->classifyDiagKind(),
+                         representativeConstraint.archetype->getDependentType(
+                                                                 genericParams),
+                         equivClass->superclass);
+        }
       } else if (representativeConstraint.source->getLoc().isValid()) {
-        Impl->HadAnyError = true;
-
         Diags.diagnose(representativeConstraint.source->getLoc(),
                        diag::type_does_not_inherit,
                        representativeConstraint.archetype->getDependentType(
                                                     genericParams),
                        equivClass->concreteType, equivClass->superclass);
       }
-    } else if (representativeConstraint.source->getLoc().isValid()) {
+    } else if (representativeConstraint.source->shouldDiagnoseRedundancy(true)
+               && existing &&
+               existing->source->shouldDiagnoseRedundancy(false)) {
       // It does fulfill the requirement; diagnose the redundancy.
       Diags.diagnose(representativeConstraint.source->getLoc(),
                      diag::redundant_superclass_constraint,
@@ -6004,16 +6010,11 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
                                                   genericParams),
                      representativeConstraint.value);
 
-      if (auto existing = equivClass->findAnyConcreteConstraintAsWritten(
-                            representativeConstraint.archetype)) {
-        if (!existing->source->isInferredRequirement()) {
-          Diags.diagnose(existing->source->getLoc(),
-                         diag::same_type_redundancy_here,
-                         existing->source->classifyDiagKind(),
-                         existing->archetype->getDependentType(genericParams),
-                         existing->value);
-        }
-      }
+      Diags.diagnose(existing->source->getLoc(),
+                     diag::same_type_redundancy_here,
+                     existing->source->classifyDiagKind(),
+                     existing->archetype->getDependentType(genericParams),
+                     existing->value);
     }
   }
 }
