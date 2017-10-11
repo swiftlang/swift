@@ -49,7 +49,6 @@ static unsigned getElementCountRec(SILModule &Module, SILType T,
   if (IsSelfOfNonDelegatingInitializer) {
     // Protocols never have a stored properties.
     if (auto *NTD = T.getNominalOrBoundGenericNominal()) {
-
       unsigned NumElements = 0;
       for (auto *VD : NTD->getStoredProperties())
         NumElements +=
@@ -137,6 +136,8 @@ static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo,
         return getElementTypeRec(Module, FieldType, EltNo, false);
       EltNo -= NumFieldElements;
     }
+    // This can only happen if we look at a symbolic element number of an empty
+    // tuple.
     llvm::report_fatal_error("invalid element number");
   }
 
@@ -145,13 +146,21 @@ static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo,
   // for each of the tuple members.
   if (IsSelfOfNonDelegatingInitializer) {
     if (auto *NTD = T.getNominalOrBoundGenericNominal()) {
+      bool HasStoredProperties = false;
       for (auto *VD : NTD->getStoredProperties()) {
+        HasStoredProperties = true;
         auto FieldType = T.getFieldType(VD, Module);
         unsigned NumFieldElements =
             getElementCountRec(Module, FieldType, false);
         if (EltNo < NumFieldElements)
           return getElementTypeRec(Module, FieldType, EltNo, false);
         EltNo -= NumFieldElements;
+      }
+
+      // If we do not have any stored properties and were passed an EltNo of 0,
+      // just return self.
+      if (!HasStoredProperties && EltNo == 0) {
+        return T;
       }
       llvm::report_fatal_error("invalid element number");
     }
@@ -206,22 +215,26 @@ SILValue DIMemoryObjectInfo::emitElementAddress(
     // lifetimes for each of the tuple members.
     if (IsSelf) {
       if (auto *NTD = PointeeType.getNominalOrBoundGenericNominal()) {
-        // If we have a class, we can use a borrow directly and avoid ref count
-        // traffic.
-        if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress()) {
-          SILValue Original = Ptr;
-          SILValue Borrowed = Ptr = B.createLoadBorrow(Loc, Ptr);
-          EndBorrowList.emplace_back(Borrowed, Original);
-        }
-
+        bool HasStoredProperties = false;
         for (auto *VD : NTD->getStoredProperties()) {
+          if (!HasStoredProperties) {
+            HasStoredProperties = true;
+            // If we have a class, we can use a borrow directly and avoid ref
+            // count traffic.
+            if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress()) {
+              SILValue Original = Ptr;
+              SILValue Borrowed = Ptr = B.createLoadBorrow(Loc, Ptr);
+              EndBorrowList.emplace_back(Borrowed, Original);
+            }
+          }
+
           auto FieldType = PointeeType.getFieldType(VD, Module);
           unsigned NumFieldElements =
               getElementCountRec(Module, FieldType, false);
           if (EltNo < NumFieldElements) {
-            if (isa<StructDecl>(NTD))
+            if (isa<StructDecl>(NTD)) {
               Ptr = B.createStructElementAddr(Loc, Ptr, VD);
-            else {
+            } else {
               assert(isa<ClassDecl>(NTD));
               SILValue Original, Borrowed;
               if (Ptr.getOwnershipKind() != ValueOwnershipKind::Guaranteed) {
@@ -241,6 +254,12 @@ SILValue DIMemoryObjectInfo::emitElementAddress(
           }
           EltNo -= NumFieldElements;
         }
+
+        if (!HasStoredProperties) {
+          assert(EltNo == 0 && "Element count problem");
+          return Ptr;
+        }
+
         continue;
       }
     }
@@ -301,7 +320,9 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
   // If this is indexing into a field of 'self', look it up.
   if (isNonDelegatingInit() && !isDerivedClassSelfOnly()) {
     if (auto *NTD = MemorySILType.getNominalOrBoundGenericNominal()) {
+      bool HasStoredProperty = false;
       for (auto *VD : NTD->getStoredProperties()) {
+        HasStoredProperty = true;
         auto FieldType = MemorySILType.getFieldType(VD, Module);
         unsigned NumFieldElements =
             getElementCountRec(Module, FieldType, false);
@@ -313,6 +334,10 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
         }
         Element -= NumFieldElements;
       }
+
+      // If we do not have any stored properties, we have nothing of interest.
+      if (!HasStoredProperty)
+        return nullptr;
     }
   }
 
