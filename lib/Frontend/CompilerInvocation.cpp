@@ -233,6 +233,16 @@ namespace swift {
     }
     void parseDebugCrashGroup();
     bool canEmitWhatActionCallsFor() const;
+    
+    void setPrintStatsOptions() {
+      using namespace options;
+      Opts.PrintStats |= Args.hasArg(OPT_print_stats);
+      Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
+#if defined(NDEBUG) && !defined(LLVM_ENABLE_STATS)
+      if (Opts.PrintStats || Opts.PrintClangStats)
+        Diags.diagnose(SourceLoc(), diag::stats_disabled);
+#endif
+    }
   public:
     bool ParseFrontendArgs();
    };
@@ -263,12 +273,7 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
 
-  Opts.PrintStats |= Args.hasArg(OPT_print_stats);
-  Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
-#if defined(NDEBUG) && !defined(LLVM_ENABLE_STATS)
-  if (Opts.PrintStats || Opts.PrintClangStats)
-    Diags.diagnose(SourceLoc(), diag::stats_disabled);
-#endif
+  setPrintStatsOptions();
 
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeExpressionTypeChecking |=
