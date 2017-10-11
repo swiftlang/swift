@@ -420,27 +420,6 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
     return true;
   }
 
-  bool TreatAsSIL =
-      Args.hasArg(OPT_parse_sil) || Opts.Inputs.shouldTreatAsSIL();
-
-  bool TreatAsLLVM = Opts.Inputs.shouldTreatAsLLVM();
-
-  if (Opts.Inputs.verifyInputs(
-          Diags, TreatAsSIL, Opts.RequestedAction == FrontendOptions::REPL,
-          Opts.RequestedAction == FrontendOptions::NoneAction)) {
-    return true;
-  }
-
-  if (Opts.RequestedAction == FrontendOptions::Immediate) {
-    Opts.ImmediateArgv.push_back(
-        Opts.Inputs.getFilenameOfFirstInput()); // argv[0]
-    if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
-      for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
-        Opts.ImmediateArgv.push_back(A->getValue(i));
-      }
-    }
-  }
-
   if (setupForSILOrLLVM())
     return true;
   setOutputFileList();
@@ -493,25 +472,25 @@ void FrontendArgsToOptionsConverter::parseDebugCrashGroup() {
 bool FrontendArgsToOptionsConverter::canEmitWhatActionCallsFor() const {
   if (!Opts.canEmitDependencies()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
-    return true;
+    return false;
   }
   if (!Opts.canEmitHeader()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
-    return true;
+    return false;
   }
   if (!Opts.canEmitLoadedModuleTrace()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_loaded_module_trace);
-    return true;
+    return false;
   }
   if (!Opts.canEmitModule()) {
     if (!Opts.ModuleOutputPath.empty())
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
     else
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
-    return true;
+    return false;
   }
-  return false;
+  return true;
 }
 
 void FrontendArgsToOptionsConverter::setDumpScopeMapLocations() const {
