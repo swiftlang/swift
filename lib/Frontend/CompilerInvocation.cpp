@@ -292,6 +292,19 @@ namespace swift {
       }
     }
     
+    void setHelpOptions() {
+      using namespace options;
+      if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
+        if (A->getOption().matches(OPT_help)) {
+          Opts.PrintHelp = true;
+        } else if (A->getOption().matches(OPT_help_hidden)) {
+          Opts.PrintHelpHidden = true;
+        } else {
+          llvm_unreachable("Unknown help option parsed");
+        }
+      }
+    }
+
   public:
     bool ParseFrontendArgs();
    };
@@ -343,16 +356,8 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
   // This can be enabled independently of the playground transform.
   Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
 
-  if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
-    if (A->getOption().matches(OPT_help)) {
-      Opts.PrintHelp = true;
-    } else if (A->getOption().matches(OPT_help_hidden)) {
-      Opts.PrintHelpHidden = true;
-    } else {
-      llvm_unreachable("Unknown help option parsed");
-    }
-  }
-
+  setHelpOptions();
+  
   ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert();
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
