@@ -156,6 +156,13 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
   SILValue toFn = getNextUncurryLevelRef(*this, vd, thunk,
                                          selfArg, subs);
 
+  // A curry thunk is serialized only if the target callee is serialized.
+  if (auto *FRI = dyn_cast<FunctionRefInst>(toFn)) {
+    if (FRI->getReferencedFunction()->isSerialized() ==
+        IsSerialized_t::IsNotSerialized)
+      getFunction().setSerialized(IsNotSerialized);
+  }
+
   // FIXME: Using the type from the ConstantInfo instead of looking at
   // getConstantOverrideInfo() for methods looks suspect in the presence
   // of covariant overrides and multiple vtable entries.
