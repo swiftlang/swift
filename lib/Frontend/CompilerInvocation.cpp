@@ -304,7 +304,7 @@ namespace swift {
         }
       }
     }
-
+    void setDumpScopeMapLocations() const;
   public:
     bool ParseFrontendArgs();
    };
@@ -361,6 +361,8 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
   ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert();
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
+  
+  setDumpScopeMapLocations();
 
   // Determine what the user has asked the frontend to do.
   FrontendOptions::ActionType &Action = Opts.RequestedAction;
@@ -400,34 +402,6 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
       Action = FrontendOptions::MergeModules;
     } else if (Opt.matches(OPT_dump_scope_maps)) {
       Action = FrontendOptions::DumpScopeMaps;
-
-      StringRef value = A->getValue();
-      if (value == "expanded") {
-        // Note: fully expanded the scope map.
-      } else {
-        // Parse a comma-separated list of line:column for lookups to
-        // perform (and dump the result of).
-        SmallVector<StringRef, 4> locations;
-        value.split(locations, ',');
-
-        bool invalid = false;
-        for (auto location : locations) {
-          auto lineColumnStr = location.split(':');
-          unsigned line, column;
-          if (lineColumnStr.first.getAsInteger(10, line) ||
-              lineColumnStr.second.getAsInteger(10, column)) {
-            Diags.diagnose(SourceLoc(), diag::error_invalid_source_location_str,
-                           location);
-            invalid = true;
-            continue;
-          }
-
-          Opts.DumpScopeMapLocations.push_back({line, column});
-        }
-
-        if (!invalid && Opts.DumpScopeMapLocations.empty())
-          Diags.diagnose(SourceLoc(), diag::error_no_source_location_scope_map);
-      }
     } else if (Opt.matches(OPT_dump_type_refinement_contexts)) {
       Action = FrontendOptions::DumpTypeRefinementContexts;
     } else if (Opt.matches(OPT_dump_interface_hash)) {
@@ -762,6 +736,40 @@ bool FrontendArgsToOptionsConverter::canEmitWhatActionCallsFor() const {
   }
   return false;
 }
+
+void FrontendArgsToOptionsConverter::setDumpScopeMapLocations() const {
+  using namespace options;
+  const Arg *A = Args.getLastArg(OPT_modes_Group);
+  if (!A || !A->getOption().matches(OPT_dump_scope_maps))
+    return;
+  StringRef value = A->getValue();
+  if (value == "expanded") {
+    // Note: fully expanded the scope map.
+    return;
+  }
+  // Parse a comma-separated list of line:column for lookups to
+  // perform (and dump the result of).
+  SmallVector<StringRef, 4> locations;
+  value.split(locations, ',');
+  
+  bool invalid = false;
+  for (auto location : locations) {
+    auto lineColumnStr = location.split(':');
+    unsigned line, column;
+    if (lineColumnStr.first.getAsInteger(10, line) ||
+        lineColumnStr.second.getAsInteger(10, column)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_source_location_str,
+                     location);
+      invalid = true;
+      continue;
+    }
+    Opts.DumpScopeMapLocations.push_back({line, column});
+  }
+  
+  if (!invalid && Opts.DumpScopeMapLocations.empty())
+    Diags.diagnose(SourceLoc(), diag::error_no_source_location_scope_map);
+}
+
 
 static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
                                  ArgList &Args, DiagnosticEngine &diags) {
