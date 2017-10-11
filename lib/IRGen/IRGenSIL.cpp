@@ -1461,6 +1461,11 @@ static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
 void IRGenModule::emitSILFunction(SILFunction *f) {
   if (f->isExternalDeclaration())
     return;
+  // Do not emit bodies of public_external functions.
+  // The only exception is transparent functions.
+  if (hasPublicVisibility(f->getLinkage()) && f->isAvailableExternally() &&
+      !f->isTransparent())
+    return;
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
   IRGenSILFunction(*this, f).emitSILFunction();
