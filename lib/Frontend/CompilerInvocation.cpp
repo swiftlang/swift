@@ -327,6 +327,7 @@ namespace swift {
     FrontendOptions::ActionType determineWhatUserAskedFrontendToDo() const;
     bool setupForSILOrLLVM();
     bool determineCorrectOutputFilenameIfMissingOrDirectory();
+    void determineSupplementaryOutputFilenames();
     
   public:
     bool ParseFrontendArgs();
@@ -414,84 +415,7 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
   setModuleName();
   if (determineCorrectOutputFilenameIfMissingOrDirectory())
     return true;
-
-  auto determineOutputFilename = [&](std::string &output,
-                                     OptSpecifier optWithoutPath,
-                                     OptSpecifier optWithPath,
-                                     const char *extension,
-                                     bool useMainOutput) {
-    if (const Arg *A = Args.getLastArg(optWithPath)) {
-      Args.ClaimAllArgs(optWithoutPath);
-      output = A->getValue();
-      return;
-    }
-
-    if (!Args.hasArg(optWithoutPath))
-      return;
-
-    if (useMainOutput && !Opts.OutputFilenames.empty()) {
-      output = Opts.getSingleOutputFilename();
-      return;
-    }
-
-    if (!output.empty())
-      return;
-
-    llvm::SmallString<128> Path(Opts.originalPath());
-    llvm::sys::path::replace_extension(Path, extension);
-    output = Path.str();
-  };
-
-  determineOutputFilename(Opts.DependenciesFilePath,
-                          OPT_emit_dependencies,
-                          OPT_emit_dependencies_path,
-                          "d", false);
-  determineOutputFilename(Opts.ReferenceDependenciesFilePath,
-                          OPT_emit_reference_dependencies,
-                          OPT_emit_reference_dependencies_path,
-                          "swiftdeps", false);
-  determineOutputFilename(Opts.SerializedDiagnosticsPath,
-                          OPT_serialize_diagnostics,
-                          OPT_serialize_diagnostics_path,
-                          "dia", false);
-  determineOutputFilename(Opts.ObjCHeaderOutputPath,
-                          OPT_emit_objc_header,
-                          OPT_emit_objc_header_path,
-                          "h", false);
-  determineOutputFilename(Opts.LoadedModuleTracePath,
-                          OPT_emit_loaded_module_trace,
-                          OPT_emit_loaded_module_trace_path,
-                          "trace.json", false);
-
-  determineOutputFilename(Opts.TBDPath, OPT_emit_tbd, OPT_emit_tbd_path, "tbd",
-                          false);
-
-  if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
-    Opts.FixitsOutputPath = A->getValue();
-  }
-
-  bool IsSIB =
-    Opts.RequestedAction == FrontendOptions::EmitSIB ||
-    Opts.RequestedAction == FrontendOptions::EmitSIBGen;
-  bool canUseMainOutputForModule =
-    Opts.RequestedAction == FrontendOptions::MergeModules ||
-    Opts.RequestedAction == FrontendOptions::EmitModuleOnly ||
-    IsSIB;
-  auto ext = IsSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
-  auto sibOpt = Opts.RequestedAction == FrontendOptions::EmitSIB ?
-    OPT_emit_sib : OPT_emit_sibgen;
-  determineOutputFilename(Opts.ModuleOutputPath,
-                          IsSIB ? sibOpt : OPT_emit_module,
-                          OPT_emit_module_path,
-                          ext,
-                          canUseMainOutputForModule);
-
-  determineOutputFilename(Opts.ModuleDocOutputPath,
-                          OPT_emit_module_doc,
-                          OPT_emit_module_doc_path,
-                          SERIALIZED_MODULE_DOC_EXTENSION,
-                          false);
-
+  determineSupplementaryOutputFilenames();
   if (!canEmitWhatActionCallsFor())
     return true;
  
@@ -756,6 +680,85 @@ determineCorrectOutputFilenameIfMissingOrDirectory() {
     return true;
   }
   return false;
+}
+
+void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
+  using namespace options;
+  auto determineOutputFilename = [&](std::string &output,
+                                     OptSpecifier optWithoutPath,
+                                     OptSpecifier optWithPath,
+                                     const char *extension,
+                                     bool useMainOutput) {
+    if (const Arg *A = Args.getLastArg(optWithPath)) {
+      Args.ClaimAllArgs(optWithoutPath);
+      output = A->getValue();
+      return;
+    }
+    
+    if (!Args.hasArg(optWithoutPath))
+      return;
+    
+    if (useMainOutput && !Opts.OutputFilenames.empty()) {
+      output = Opts.getSingleOutputFilename();
+      return;
+    }
+    
+    if (!output.empty())
+      return;
+    
+    llvm::SmallString<128> Path(Opts.originalPath());
+    llvm::sys::path::replace_extension(Path, extension);
+    output = Path.str();
+  };
+  
+  determineOutputFilename(Opts.DependenciesFilePath,
+                          OPT_emit_dependencies,
+                          OPT_emit_dependencies_path,
+                          "d", false);
+  determineOutputFilename(Opts.ReferenceDependenciesFilePath,
+                          OPT_emit_reference_dependencies,
+                          OPT_emit_reference_dependencies_path,
+                          "swiftdeps", false);
+  determineOutputFilename(Opts.SerializedDiagnosticsPath,
+                          OPT_serialize_diagnostics,
+                          OPT_serialize_diagnostics_path,
+                          "dia", false);
+  determineOutputFilename(Opts.ObjCHeaderOutputPath,
+                          OPT_emit_objc_header,
+                          OPT_emit_objc_header_path,
+                          "h", false);
+  determineOutputFilename(Opts.LoadedModuleTracePath,
+                          OPT_emit_loaded_module_trace,
+                          OPT_emit_loaded_module_trace_path,
+                          "trace.json", false);
+  
+  determineOutputFilename(Opts.TBDPath, OPT_emit_tbd, OPT_emit_tbd_path, "tbd",
+                          false);
+  
+  if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
+    Opts.FixitsOutputPath = A->getValue();
+  }
+  
+  bool IsSIB = Opts.RequestedAction == FrontendOptions::EmitSIB ||
+  Opts.RequestedAction == FrontendOptions::EmitSIBGen;
+  bool canUseMainOutputForModule =
+  Opts.RequestedAction == FrontendOptions::MergeModules ||
+  Opts.RequestedAction == FrontendOptions::EmitModuleOnly || IsSIB;
+  auto ext = IsSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
+  auto sibOpt = Opts.RequestedAction == FrontendOptions::EmitSIB
+  ? OPT_emit_sib
+  : OPT_emit_sibgen;
+  determineOutputFilename(Opts.ModuleOutputPath,
+                          IsSIB ? sibOpt : OPT_emit_module,
+                          OPT_emit_module_path,
+                          ext,
+                          canUseMainOutputForModule);
+  
+  determineOutputFilename(Opts.ModuleDocOutputPath,
+                          OPT_emit_module_doc,
+                          OPT_emit_module_doc_path,
+                          SERIALIZED_MODULE_DOC_EXTENSION,
+                          false);
 }
 
 static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
