@@ -21,11 +21,12 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
+#include <algorithm>
 #include <cassert>
 #include <functional>
 #include <iterator>
+#include <numeric>
 #include <type_traits>
-#include <algorithm>
 
 namespace swift {
 
@@ -784,6 +785,11 @@ template <typename Container, typename OutputIterator, typename UnaryOperation>
 inline OutputIterator transform(const Container &C, OutputIterator result,
                                 UnaryOperation op) {
   return std::transform(C.begin(), C.end(), result, op);
+}
+
+template <typename Container, typename T, typename BinaryOperation>
+inline T accumulate(const Container &C, T init, BinaryOperation op) {
+  return std::accumulate(C.begin(), C.end(), init, op);
 }
 
 /// Provides default implementations of !=, <=, >, and >= based on == and <.

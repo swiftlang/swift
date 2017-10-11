@@ -22,6 +22,65 @@ let sequenceCount = 4096
 let prefixCount = sequenceCount - 1024
 let sumCount = prefixCount * (prefixCount - 1) / 2
 
+public let PrefixWhile = [
+  BenchmarkInfo(
+    name: "PrefixWhileCountableRange",
+    runFunction: run_PrefixWhileCountableRange,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileSequence",
+    runFunction: run_PrefixWhileSequence,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnySequence",
+    runFunction: run_PrefixWhileAnySequence,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnySeqCntRange",
+    runFunction: run_PrefixWhileAnySeqCntRange,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnySeqCRangeIter",
+    runFunction: run_PrefixWhileAnySeqCRangeIter,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnyCollection",
+    runFunction: run_PrefixWhileAnyCollection,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileArray",
+    runFunction: run_PrefixWhileArray,
+    tags: [.validation, .api, .Array]),
+  BenchmarkInfo(
+    name: "PrefixWhileCountableRangeLazy",
+    runFunction: run_PrefixWhileCountableRangeLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileSequenceLazy",
+    runFunction: run_PrefixWhileSequenceLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnySequenceLazy",
+    runFunction: run_PrefixWhileAnySequenceLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnySeqCntRangeLazy",
+    runFunction: run_PrefixWhileAnySeqCntRangeLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnySeqCRangeIterLazy",
+    runFunction: run_PrefixWhileAnySeqCRangeIterLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnyCollectionLazy",
+    runFunction: run_PrefixWhileAnyCollectionLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileArrayLazy",
+    runFunction: run_PrefixWhileArrayLazy,
+    tags: [.validation, .api]),
+]
+
 @inline(never)
 public func run_PrefixWhileCountableRange(_ N: Int) {
   let s = 0..<sequenceCount

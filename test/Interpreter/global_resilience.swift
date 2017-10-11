@@ -10,16 +10,15 @@
 
 // RUN: %target-run %t/main %t/libresilient_struct.%target-dylib-extension %t/libresilient_global.%target-dylib-extension
 
-// RUN: %target-build-swift-dylib(%t/libresilient_struct.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
-// RUN: %target-codesign %t/libresilient_struct.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/libresilient_struct_wmo.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
+// RUN: %target-codesign %t/libresilient_struct_wmo.%target-dylib-extension
 
-// RUN: %target-build-swift-dylib(%t/libresilient_global.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_global.swift -emit-module -emit-module-path %t/resilient_global.swiftmodule -module-name resilient_global -I%t -L%t -lresilient_struct -whole-module-optimization
+// RUN: %target-build-swift-dylib(%t/libresilient_global_wmo.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_global.swift -emit-module -emit-module-path %t/resilient_global.swiftmodule -module-name resilient_global -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
+// RUN: %target-codesign %t/libresilient_global_wmo.%target-dylib-extension
 
-// RUN: %target-codesign %t/libresilient_global.%target-dylib-extension
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct_wmo -lresilient_global_wmo -o %t/main -Xlinker -rpath -Xlinker %t
 
-// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_global -o %t/main -Xlinker -rpath -Xlinker %t
-
-// RUN: %target-run %t/main %t/libresilient_struct.%target-dylib-extension %t/libresilient_global.%target-dylib-extension
+// RUN: %target-run %t/main %t/libresilient_struct_wmo.%target-dylib-extension %t/libresilient_global_wmo.%target-dylib-extension
 
 // REQUIRES: executable_test
 

@@ -65,6 +65,9 @@ public enum BenchmarkCategory : String {
   // reimplementing or call into code paths that have known opportunities for
   // significant optimization.
   case cpubench
+
+  // Explicit skip marker
+  case skip
 }
 
 public struct BenchmarkInfo {
@@ -163,20 +166,6 @@ public func CheckResults(
     ) {
     guard _fastPath(resultsMatch) else {
         print("Incorrect result in \(function), \(file):\(line)")
-        abort()
-    }
-}
-
-// Due to potential overhead of passing closures around on the
-// performance measurements, this version is now deprecated
-@available(*, deprecated,
-  message: "For debugging test failures only! Use the version without message.")
-public func CheckResults(
-    _ resultsMatch: Bool,
-    _ message: @autoclosure () -> String
-    ) {
-    guard resultsMatch else {
-        print(message())
         abort()
     }
 }

@@ -393,7 +393,7 @@ public:
 
   /// getCanonicalType - Stronger canonicalization which folds away equivalent
   /// associated types, or type parameters that have been made concrete.
-  CanType getCanonicalType(GenericSignature *sig, ModuleDecl &mod);
+  CanType getCanonicalType(GenericSignature *sig);
 
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
@@ -3520,9 +3520,15 @@ public:
 
   CanType getSelfInstanceType() const;
 
-  /// If this a @convention(witness_method) function with an abstract
-  /// self parameter, return the protocol constraint for the Self type.
-  ProtocolDecl *getDefaultWitnessMethodProtocol(ModuleDecl &M) const;
+  /// If this is a @convention(witness_method) function with a protocol
+  /// constrained self parameter, return the protocol constraint for
+  /// the Self type.
+  ProtocolDecl *getDefaultWitnessMethodProtocol() const;
+
+  /// If this is a @convention(witness_method) function with a class
+  /// constrained self parameter, return the class constraint for the
+  /// Self type.
+  ClassDecl *getWitnessMethodClass(ModuleDecl &M) const;
 
   ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
 
@@ -4041,7 +4047,7 @@ class ArchetypeType final : public SubstitutableType,
 
   llvm::PointerUnion3<ArchetypeType *, TypeBase *,
                       GenericEnvironment *> ParentOrOpenedOrEnvironment;
-  llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName;
+  Type InterfaceType;
   MutableArrayRef<std::pair<Identifier, Type>> NestedTypes;
 
   void populateNestedTypes() const;
@@ -4053,7 +4059,7 @@ public:
   /// The ConformsTo array will be copied into the ASTContext by this routine.
   static CanTypeWrapper<ArchetypeType>
                         getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                               AssociatedTypeDecl *AssocType,
+                               DependentMemberType *InterfaceType,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass, LayoutConstraint Layout);
 
@@ -4063,8 +4069,8 @@ public:
   /// by this routine.
   static CanTypeWrapper<ArchetypeType>
                         getNew(const ASTContext &Ctx,
-                               GenericEnvironment *genericEnvironment,
-                               Identifier Name,
+                               GenericEnvironment *GenericEnv,
+                               GenericTypeParamType *InterfaceType,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass, LayoutConstraint Layout);
 
@@ -4108,15 +4114,17 @@ public:
   /// Note: opened archetypes currently don't have generic environments.
   GenericEnvironment *getGenericEnvironment() const;
 
+  /// Retrieve the interface type of this associated type, which will either
+  /// be a GenericTypeParamType or a DependentMemberType.
+  Type getInterfaceType() const { return InterfaceType; }
+
   /// Retrieve the associated type to which this archetype (if it is a nested
   /// archetype) corresponds.
   ///
   /// This associated type will have the same name as the archetype and will
   /// be a member of one of the protocols to which the parent archetype
   /// conforms.
-  AssociatedTypeDecl *getAssocType() const {
-    return AssocTypeOrName.dyn_cast<AssociatedTypeDecl *>();
-  }
+  AssociatedTypeDecl *getAssocType() const;
 
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
@@ -4224,7 +4232,7 @@ private:
           const ASTContext &Ctx,
           llvm::PointerUnion<ArchetypeType *, GenericEnvironment *>
             ParentOrGenericEnv,
-          llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
+          Type InterfaceType,
           ArrayRef<ProtocolDecl *> ConformsTo,
           Type Superclass, LayoutConstraint Layout);
 

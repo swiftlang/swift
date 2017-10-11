@@ -926,9 +926,6 @@ static bool checkInputExistence(const Driver &D, const DerivedArgList &Args,
 void Driver::buildInputs(const ToolChain &TC,
                          const DerivedArgList &Args,
                          InputFileList &Inputs) const {
-  types::ID InputType = types::TY_Nothing;
-  Arg *InputTypeArg = nullptr;
-
   llvm::StringMap<StringRef> SourceFileNames;
 
   for (Arg *A : Args) {
@@ -936,29 +933,19 @@ void Driver::buildInputs(const ToolChain &TC,
       StringRef Value = A->getValue();
       types::ID Ty = types::TY_INVALID;
 
-      if (InputType == types::TY_Nothing) {
-        // If there was an explicit arg for this, claim it.
-        if (InputTypeArg)
-          InputTypeArg->claim();
-
-        // stdin must be handled specially.
-        if (Value.equals("-")) {
-          // By default, treat stdin as Swift input.
-          // FIXME: should we limit this inference to specific modes?
-          Ty = types::TY_Swift;
-        } else {
-          // Otherwise lookup by extension.
-          Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
-
-          if (Ty == types::TY_INVALID) {
-            // FIXME: should we adjust this inference in certain modes?
-            Ty = types::TY_Object;
-          }
-        }
+      // stdin must be handled specially.
+      if (Value.equals("-")) {
+        // By default, treat stdin as Swift input.
+        Ty = types::TY_Swift;
       } else {
-        assert(InputTypeArg && "InputType set w/o InputTypeArg");
-        InputTypeArg->claim();
-        Ty = InputType;
+        // Otherwise lookup by extension.
+        Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
+
+        if (Ty == types::TY_INVALID) {
+          // By default, treat inputs with no extension, or with an
+          // extension that isn't recognized, as object files.
+          Ty = types::TY_Object;
+        }
       }
 
       if (checkInputExistence(*this, Args, Diags, Value))
@@ -973,8 +960,6 @@ void Driver::buildInputs(const ToolChain &TC,
         }
       }
     }
-
-    // FIXME: add -x support (or equivalent)
   }
 }
 
@@ -1158,12 +1143,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       break;
 
-    // BEGIN APPLE-ONLY OUTPUT ACTIONS
     case options::OPT_index_file:
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       OI.CompilerOutputType = types::TY_IndexData;
       break;
-    // END APPLE-ONLY OUTPUT ACTIONS
 
     case options::OPT_update_code:
       OI.CompilerOutputType = types::TY_Remapping;

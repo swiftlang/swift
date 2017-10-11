@@ -175,12 +175,14 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     }
   }
 
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct Words : Collection {
     public enum _IndexValue {
       case low(Base.Magnitude.Words.Index)
       case high(Base.Words.Index)
     }
     
+    @_fixed_layout // FIXME(sil-serialize-all)
     public struct Index : Comparable {
       public var _value: _IndexValue
 

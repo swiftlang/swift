@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
-struct _StringBufferIVars {
+internal struct _StringBufferIVars {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal init(_elementWidth: Int) {
@@ -56,6 +57,7 @@ struct _StringBufferIVars {
 // _HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>, but
 // <rdar://problem/15520519> (Can't call static method of derived
 // class of generic class with dependent argument type) prevents it.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct _StringBuffer {
 
   // Make this a buffer of UTF-16 code units so that it's properly

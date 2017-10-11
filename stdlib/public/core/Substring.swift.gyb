@@ -87,6 +87,7 @@ extension String {
 ///   when there is no other reference to the original string. Storing
 ///   substrings may, therefore, prolong the lifetime of string data that is
 ///   no longer otherwise accessible, which can appear to be memory leakage.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct Substring : StringProtocol {
   public typealias Index = String.Index
   public typealias IndexDistance = String.IndexDistance
@@ -430,6 +431,7 @@ extension Substring {
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
   % end
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct ${View} {
     @_versioned // FIXME(sil-serialize-all)
     internal var _slice: ${RangeReplaceable}BidirectionalSlice<String.${View}>

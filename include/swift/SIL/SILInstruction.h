@@ -4829,17 +4829,13 @@ public:
 /// method lookup.
 class MethodInst : public SingleValueInstruction {
   SILDeclRef Member;
-  bool Volatile;
 public:
   MethodInst(SILInstructionKind Kind, SILDebugLocation DebugLoc, SILType Ty,
-             SILDeclRef Member, bool Volatile = false)
-      : SingleValueInstruction(Kind, DebugLoc, Ty), Member(Member), Volatile(Volatile) {
+             SILDeclRef Member)
+      : SingleValueInstruction(Kind, DebugLoc, Ty), Member(Member) {
   }
 
   SILDeclRef getMember() const { return Member; }
-
-  /// True if this dynamic dispatch is semantically required.
-  bool isVolatile() const { return Volatile; }
 
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(MethodInst)
 };
@@ -4854,8 +4850,8 @@ class ClassMethodInst
   friend SILBuilder;
 
   ClassMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                  SILDeclRef Member, SILType Ty, bool Volatile = false)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member, Volatile) {}
+                  SILDeclRef Member, SILType Ty)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
 };
 
 /// SuperMethodInst - Given the address of a value of class type and a method
@@ -4867,8 +4863,44 @@ class SuperMethodInst
   friend SILBuilder;
 
   SuperMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                  SILDeclRef Member, SILType Ty, bool Volatile = false)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member, Volatile) {}      
+                  SILDeclRef Member, SILType Ty)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
+};
+
+/// ObjCMethodInst - Given the address of a value of class type and a method
+/// constant, extracts the implementation of that method for the dynamic
+/// instance type of the class.
+class ObjCMethodInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::ObjCMethodInst,
+          ObjCMethodInst,
+          MethodInst>
+{
+  friend SILBuilder;
+
+  ObjCMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
+                 ArrayRef<SILValue> TypeDependentOperands,
+                 SILDeclRef Member, SILType Ty)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                               TypeDependentOperands, Ty, Member) {}
+
+  static ObjCMethodInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand,
+         SILDeclRef Member, SILType Ty, SILFunction *F,
+         SILOpenedArchetypesState &OpenedArchetypes);
+};
+
+/// ObjCSuperMethodInst - Given the address of a value of class type and a method
+/// constant, extracts the implementation of that method for the superclass of
+/// the static type of the class.
+class ObjCSuperMethodInst
+  : public UnaryInstructionBase<SILInstructionKind::ObjCSuperMethodInst, MethodInst>
+{
+  friend SILBuilder;
+
+  ObjCSuperMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
+                      SILDeclRef Member, SILType Ty)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
 };
 
 /// WitnessMethodInst - Given a type, a protocol conformance,
@@ -4884,18 +4916,32 @@ class WitnessMethodInst final
   CanType LookupType;
   ProtocolConformanceRef Conformance;
   unsigned NumOperands;
+  bool Volatile;
 
   WitnessMethodInst(SILDebugLocation DebugLoc, CanType LookupType,
                     ProtocolConformanceRef Conformance, SILDeclRef Member,
                     SILType Ty, ArrayRef<SILValue> TypeDependentOperands,
                     bool Volatile = false)
-      : InstructionBase(DebugLoc, Ty, Member, Volatile),
+      : InstructionBase(DebugLoc, Ty, Member),
         LookupType(LookupType), Conformance(Conformance),
-        NumOperands(TypeDependentOperands.size()) {
+        NumOperands(TypeDependentOperands.size()),
+        Volatile(Volatile) {
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                            TypeDependentOperands);
   }
 
+  /// Create a witness method call of a protocol requirement, passing in a lookup
+  /// type and conformance.
+  ///
+  /// At runtime, the witness is looked up in the conformance of the lookup type
+  /// to the protocol.
+  ///
+  /// The lookup type is usually an archetype, but it will be concrete if the
+  /// witness_method instruction is inside a function body that was specialized.
+  ///
+  /// The conformance must exactly match the requirement; the caller must handle
+  /// the case where the requirement is defined in a base protocol that is
+  /// refined by the conforming protocol.
   static WitnessMethodInst *
   create(SILDebugLocation DebugLoc, CanType LookupType,
          ProtocolConformanceRef Conformance, SILDeclRef Member, SILType Ty,
@@ -4916,6 +4962,8 @@ public:
              ->getAsProtocolOrProtocolExtensionContext();
   }
 
+  bool isVolatile() const { return Volatile; }
+
   ProtocolConformanceRef getConformance() const { return Conformance; }
 
   ArrayRef<Operand> getAllOperands() const {
@@ -4933,30 +4981,6 @@ public:
   MutableArrayRef<Operand> getTypeDependentOperands() {
     return { getTrailingObjects<Operand>(), NumOperands };
   }
-};
-
-/// Given the address of a value of AnyObject protocol type and a method
-/// constant referring to some Objective-C method, performs dynamic method
-/// lookup to extract the implementation of that method. This method lookup
-/// can fail at run-time
-class DynamicMethodInst final
-  : public UnaryInstructionWithTypeDependentOperandsBase<
-                                   SILInstructionKind::DynamicMethodInst,
-                                   DynamicMethodInst,
-                                   MethodInst>
-{
-  friend SILBuilder;
-
-  DynamicMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                    ArrayRef<SILValue> TypeDependentOperands,
-                    SILDeclRef Member, SILType Ty, bool Volatile)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                               TypeDependentOperands, Ty, Member, Volatile) {}
-
-  static DynamicMethodInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand,
-         SILDeclRef Member, SILType Ty, bool Volatile, SILFunction *F,
-         SILOpenedArchetypesState &OpenedArchetypes);
 };
 
 /// Access allowed to the opened value by the open_existential_addr instruction.

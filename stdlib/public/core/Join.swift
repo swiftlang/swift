@@ -20,6 +20,7 @@ internal enum _JoinIteratorState {
 
 /// An iterator that presents the elements of the sequences traversed
 /// by a base iterator, concatenated using a given separator.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct JoinedIterator<Base : IteratorProtocol> : IteratorProtocol
   where Base.Element : Sequence {
 
@@ -95,6 +96,7 @@ public struct JoinedIterator<Base : IteratorProtocol> : IteratorProtocol
 
 /// A sequence that presents the elements of a base sequence of sequences
 /// concatenated using a given separator.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct JoinedSequence<Base : Sequence> : Sequence
   where Base.Element : Sequence {
 

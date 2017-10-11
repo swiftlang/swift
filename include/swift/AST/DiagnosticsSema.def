@@ -1350,9 +1350,6 @@ ERROR(extension_stored_property,none,
       "extensions must not contain stored properties", ())
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0", (Type))
-ERROR(extension_constrained_inheritance,none,
-      "extension of type %0 with constraints cannot have an "
-      "inheritance clause", (Type))
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
 ERROR(objc_generic_extension_using_type_parameter,none,
@@ -1382,11 +1379,15 @@ ERROR(protocol_derivation_is_broken,none,
       "protocol %0 is broken; cannot derive conformance for type %1", (Type, Type))
 ERROR(type_does_not_inherit,none,
       "%0 requires that %1 inherit from %2", (Type, Type, Type))
-NOTE(type_does_not_inherit_requirement,none,
+NOTE(type_does_not_inherit_or_conform_requirement,none,
      "requirement specified as %0 : %1%2", (Type, Type, StringRef))
 ERROR(types_not_equal,none,
       "%0 requires the types %1 and %2 be equivalent",
       (Type, Type, Type))
+ERROR(type_does_not_conform_owner,none,
+      "%0 requires that %1 conform to %2", (Type, Type, Type))
+NOTE(requirement_implied_by_conditional_conformance,none,
+     "requirement from conditional conformance of %0 to %1", (Type, Type))
 NOTE(candidate_types_equal_requirement,none,
      "candidate requires that the types %0 and %1 be equivalent "
      "(requirement specified as %2 == %3%4)",
@@ -1452,6 +1453,11 @@ ERROR(witness_requires_dynamic_self,none,
       "method %0 in non-final class %1 must return `Self` to conform to "
       "protocol %2",
       (DeclName, Type, Type))
+ERROR(witness_requires_class_implementation,none,
+      "method %0 in non-final class %1 cannot be implemented in a "
+      "protocol extension because it returns `Self` and has associated type "
+      "requirements",
+      (DeclName, Type))
 ERROR(witness_not_accessible_proto,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be declared "
@@ -3115,6 +3121,13 @@ ERROR(invalid_weak_ownership_not_optional,none,
       "'weak' variable should have optional type %0", (Type))
 ERROR(invalid_weak_let,none,
       "'weak' must be a mutable variable, because it may change at runtime", ())
+ERROR(ownership_invalid_in_protocols,none,
+      "'%select{strong|weak|unowned|unowned}0' cannot be applied to a property declaration in a protocol",
+      (/*Ownership*/unsigned))
+WARNING(ownership_invalid_in_protocols_compat_warning,none,
+      "'%select{strong|weak|unowned|unowned}0' should not be applied to a property declaration "
+      "in a protocol and will be disallowed in future versions",
+      (/*Ownership*/unsigned))
 
 // required
 ERROR(required_initializer_nonclass,none,

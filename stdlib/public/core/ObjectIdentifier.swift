@@ -14,6 +14,7 @@
 ///
 /// In Swift, only class instances and metatypes have unique identities. There
 /// is no notion of identity for structs, enums, functions, or tuples.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct ObjectIdentifier : Hashable {
   @_versioned // FIXME(sil-serialize-all)
   internal let _value: Builtin.RawPointer

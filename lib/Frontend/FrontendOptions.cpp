@@ -31,9 +31,8 @@ using namespace llvm::opt;
 bool FrontendInputs::shouldTreatAsLLVM() const {
   if (hasUniqueInputFilename()) {
     StringRef Input(getFilenameOfFirstInput());
-    return
-    llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
-    llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
+    return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
+           llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
   }
   return false;
 }
@@ -53,7 +52,9 @@ bool FrontendInputs::shouldTreatAsSIL() const {
   return false;
 }
 
-bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool isREPLRequested, bool isNoneRequested) const {
+bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
+                                  bool isREPLRequested,
+                                  bool isNoneRequested) const {
   if (isREPLRequested) {
     if (hasInputFilenames()) {
       Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
@@ -65,7 +66,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
     for (unsigned i = 0, e = inputFilenameCount(); i != e; ++i) {
       if (i == getOptionalPrimaryInput()->Index)
         continue;
-      
+
       StringRef File(getInputFilenames()[i]);
       if (!llvm::sys::path::extension(File).endswith(SIB_EXTENSION)) {
         Diags.diagnose(SourceLoc(),
@@ -87,7 +88,8 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool
   return false;
 }
 
-void FrontendInputs::transformInputFilenames(const llvm::function_ref<std::string(std::string)> &fn) {
+void FrontendInputs::transformInputFilenames(
+    const llvm::function_ref<std::string(std::string)> &fn) {
   for (auto &InputFile : InputFilenames) {
     InputFile = fn(InputFile);
   }
@@ -116,9 +118,6 @@ void FrontendInputs::setInputAndPrimaryFilesFromPossiblyOverlappingLists(
         SelectedInput(primaryIndex, SelectedInput::InputKind::Filename));
   }
 }
-
-
-
 
 bool FrontendOptions::actionHasOutput() const {
   switch (RequestedAction) {
@@ -210,7 +209,7 @@ StringRef FrontendOptions::originalPath() const {
   if (hasNamedOutputFile())
     // Put the serialized diagnostics file next to the output file.
     return getSingleOutputFilename();
-  
+
   StringRef fn = Inputs.primaryInputFilenameIfAny();
   // If we have a primary input, so use that as the basis for the name of the
   // serialized diagnostics file, otherwise fall back on the
@@ -232,7 +231,9 @@ StringRef FrontendOptions::determineFallbackModuleName() const {
   }
   StringRef OutputFilename = getSingleOutputFilename();
   bool useOutputFilename = isOutputFilePlainFile();
-  return llvm::sys::path::stem(useOutputFilename ? OutputFilename : StringRef(Inputs.getFilenameOfFirstInput()));
+  return llvm::sys::path::stem(
+      useOutputFilename ? OutputFilename
+                        : StringRef(Inputs.getFilenameOfFirstInput()));
 }
 
 bool FrontendOptions::isOutputFileDirectory() const {

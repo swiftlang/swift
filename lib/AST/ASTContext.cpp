@@ -192,6 +192,12 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
+  /// func _mixForSynthesizedHashValue(Int, Int) -> Int
+  FuncDecl *MixForSynthesizedHashValueDecl = nullptr;
+
+  /// func _mixInt(Int) -> Int
+  FuncDecl *MixIntDecl = nullptr;
+  
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
 
@@ -252,8 +258,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::DenseMap<const DeclContext *, LazyContextData *> LazyContexts;
 
   /// Stored generic signature builders for canonical generic signatures.
-  llvm::DenseMap<std::pair<GenericSignature *, ModuleDecl *>,
-                 std::unique_ptr<GenericSignatureBuilder>>
+  llvm::DenseMap<GenericSignature *, std::unique_ptr<GenericSignatureBuilder>>
     GenericSignatureBuilders;
 
   /// Canonical generic environments for canonical generic signatures.
@@ -277,6 +282,10 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 
   /// The existential signature <T : P> for each P.
   llvm::DenseMap<CanType, CanGenericSignature> ExistentialSignatures;
+
+  /// Overridden associated type declarations.
+  llvm::DenseMap<const AssociatedTypeDecl *, ArrayRef<AssociatedTypeDecl *>>
+    AssociatedTypeOverrides;
 
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
@@ -932,27 +941,78 @@ static bool isBuiltinWordType(Type type) {
   return false;
 }
 
-FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
-  if (Impl.GetBoolDecl)
-    return Impl.GetBoolDecl;
+/// Looks up all implementations of an operator (globally and declared in types)
+/// and passes potential matches to the given callback. The search stops when
+/// the callback returns true (in which case the matching function declaration
+/// is returned); otherwise, nullptr is returned if there are no matches.
+/// \p C The AST context.
+/// \p oper The name of the operator.
+/// \p contextType If the operator is declared on a type, then only operators
+///     defined on this type should be considered.
+/// \p callback A callback that takes as its two arguments the input type and
+///     result type of a candidate function declaration and returns true if the
+///     function matches the desired criteria.
+/// \return The matching function declaration, or nullptr if there was no match.
+template <int ExpectedCandidateCount, typename MatchFuncCallback>
+static FuncDecl *lookupOperatorFunc(const ASTContext &ctx, StringRef oper,
+                                    Type contextType,
+                                    MatchFuncCallback &callback) {
+  SmallVector<ValueDecl *, ExpectedCandidateCount> candidates;
+  ctx.lookupInSwiftModule(oper, candidates);
 
-  // Look for the function.
-  Type input, output;
-  auto decl = findLibraryIntrinsic(*this, "_getBool", resolver);
+  for (auto candidate : candidates) {
+    // All operator declarations should be functions, but make sure.
+    auto *funcDecl = dyn_cast<FuncDecl>(candidate);
+    if (!funcDecl)
+      continue;
+
+    if (funcDecl->getDeclContext()->isTypeContext()) {
+      auto contextTy = funcDecl->getDeclContext()->getDeclaredInterfaceType();
+      if (!contextTy->isEqual(contextType)) continue;
+    }
+
+    if (auto resolver = ctx.getLazyResolver())
+      resolver->resolveDeclSignature(funcDecl);
+
+    Type inputType, resultType;
+    if (!isNonGenericIntrinsic(funcDecl, /*allowTypeMembers=*/true, inputType,
+                               resultType))
+      continue;
+
+    if (callback(inputType, resultType))
+      return funcDecl;
+  }
+
+  return nullptr;
+}
+
+/// Looks up the implementation (assumed to be singular) of a globally-defined
+/// standard library intrinsic function and passes the potential match to the
+/// given callback if it was found. If the callback returns true, then the
+/// match is returned; otherwise, nullptr is returned.
+/// \p ctx The AST context.
+/// \p name The name of the function.
+/// \p resolver The lazy resolver.
+/// \p callback A callback that takes as its two arguments the input type and
+///     result type of the candidate function declaration and returns true if
+///     the function matches the desired criteria.
+/// \return The matching function declaration, or nullptr if there was no match.
+template <typename MatchFuncCallback>
+static FuncDecl *lookupLibraryIntrinsicFunc(const ASTContext &ctx,
+                                            StringRef name,
+                                            LazyResolver *resolver,
+                                            MatchFuncCallback &callback) {
+  Type inputType, resultType;
+  auto decl = findLibraryIntrinsic(ctx, name, resolver);
   if (!decl ||
-      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
+      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, inputType,
+                             resultType))
     return nullptr;
 
-  // Input must be Builtin.Int1
-  if (!isBuiltinInt1Type(input))
-    return nullptr;
+  if (callback(inputType, resultType))
+    return decl;
 
-  // Output must be a global type named Bool.
-  if (!output->isEqual(getBoolDecl()->getDeclaredType()))
-    return nullptr;
-
-  Impl.GetBoolDecl = decl;
-  return decl;
+  return nullptr;
 }
 
 FuncDecl *ASTContext::getEqualIntDecl() const {
@@ -964,45 +1024,74 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
 
   auto intType = getIntDecl()->getDeclaredType();
   auto boolType = getBoolDecl()->getDeclaredType();
-  SmallVector<ValueDecl *, 30> equalFuncs;
-  lookupInSwiftModule("==", equalFuncs);
-  
-  // Find the overload for Int.
-  for (ValueDecl *vd : equalFuncs) {
-    // All "==" decls should be functions, but who knows...
-    auto *funcDecl = dyn_cast<FuncDecl>(vd);
-    if (!funcDecl)
-      continue;
-
-    if (funcDecl->getDeclContext()->isTypeContext()) {
-      auto contextTy = funcDecl->getDeclContext()->getDeclaredInterfaceType();
-      if (!contextTy->isEqual(intType)) continue;
-    }
-
-    if (auto resolver = getLazyResolver())
-      resolver->resolveDeclSignature(funcDecl);
-
-    Type input, resultType;
-    if (!isNonGenericIntrinsic(funcDecl, /*allowTypeMembers=*/true, input,
-                               resultType))
-      continue;
-    
+  auto callback = [&](Type inputType, Type resultType) {
     // Check for the signature: (Int, Int) -> Bool
-    auto tupleType = dyn_cast<TupleType>(input.getPointer());
+    auto tupleType = dyn_cast<TupleType>(inputType.getPointer());
     assert(tupleType);
-    if (tupleType->getNumElements() != 2)
-      continue;
+    return tupleType->getNumElements() == 2 &&
+        tupleType->getElementType(0)->isEqual(intType) &&
+        tupleType->getElementType(1)->isEqual(intType) &&
+        resultType->isEqual(boolType);
+  };
 
-    auto argType1 = tupleType->getElementType(0);
-    auto argType2 = tupleType->getElementType(1);
-    if (argType1->isEqual(intType) &&
-        argType2->isEqual(intType) &&
-        resultType->isEqual(boolType)) {
-      Impl.EqualIntDecl = funcDecl;
-      return funcDecl;
-    }
-  }
-  return nullptr;
+  auto decl = lookupOperatorFunc<32>(*this, "==", intType, callback);
+  Impl.EqualIntDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
+  if (Impl.GetBoolDecl)
+    return Impl.GetBoolDecl;
+
+  auto callback = [&](Type inputType, Type resultType) {
+    // Look for the signature (Builtin.Int1) -> Bool
+    return isBuiltinInt1Type(inputType) &&
+        resultType->isEqual(getBoolDecl()->getDeclaredType());
+  };
+
+  auto decl = lookupLibraryIntrinsicFunc(*this, "_getBool", resolver, callback);
+  Impl.GetBoolDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getMixForSynthesizedHashValueDecl() const {
+  if (Impl.MixForSynthesizedHashValueDecl)
+    return Impl.MixForSynthesizedHashValueDecl;
+
+  auto resolver = getLazyResolver();
+  auto intType = getIntDecl()->getDeclaredType();
+
+  auto callback = [&](Type inputType, Type resultType) {
+    // Look for the signature (Int, Int) -> Int
+    auto tupleType = dyn_cast<TupleType>(inputType.getPointer());
+    assert(tupleType);
+    return tupleType->getNumElements() == 2 &&
+        tupleType->getElementType(0)->isEqual(intType) &&
+        tupleType->getElementType(1)->isEqual(intType) &&
+        resultType->isEqual(intType);
+  };
+
+  auto decl = lookupLibraryIntrinsicFunc(
+      *this, "_mixForSynthesizedHashValue", resolver, callback);
+  Impl.MixForSynthesizedHashValueDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getMixIntDecl() const {
+  if (Impl.MixIntDecl)
+    return Impl.MixIntDecl;
+
+  auto resolver = getLazyResolver();
+  auto intType = getIntDecl()->getDeclaredType();
+
+  auto callback = [&](Type inputType, Type resultType) {
+    // Look for the signature (Int) -> Int
+    return inputType->isEqual(intType) && resultType->isEqual(intType);
+  };
+
+  auto decl = lookupLibraryIntrinsicFunc(*this, "_mixInt", resolver, callback);
+  Impl.MixIntDecl = decl;
+  return decl;
 }
 
 FuncDecl *ASTContext::getArrayAppendElementDecl() const {
@@ -1432,35 +1521,32 @@ void ASTContext::getVisibleTopLevelClangModules(
 
 void ASTContext::registerGenericSignatureBuilder(
                                        GenericSignature *sig,
-                                       ModuleDecl &module,
                                        GenericSignatureBuilder &&builder) {
   auto canSig = sig->getCanonicalSignature();
-  auto known = Impl.GenericSignatureBuilders.find({canSig, &module});
+  auto known = Impl.GenericSignatureBuilders.find(canSig);
   if (known != Impl.GenericSignatureBuilders.end()) {
     ++NumRegisteredGenericSignatureBuildersAlready;
     return;
   }
 
   ++NumRegisteredGenericSignatureBuilders;
-  Impl.GenericSignatureBuilders[{canSig, &module}] =
+  Impl.GenericSignatureBuilders[canSig] =
     llvm::make_unique<GenericSignatureBuilder>(std::move(builder));
 }
 
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
-                                                      CanGenericSignature sig,
-                                                      ModuleDecl *mod) {
+                                                      CanGenericSignature sig) {
   // Check whether we already have a generic signature builder for this
   // signature and module.
-  auto known = Impl.GenericSignatureBuilders.find({sig, mod});
+  auto known = Impl.GenericSignatureBuilders.find(sig);
   if (known != Impl.GenericSignatureBuilders.end())
     return known->second.get();
 
   // Create a new generic signature builder with the given signature.
-  auto builder =
-    new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
+  auto builder = new GenericSignatureBuilder(*this);
 
   // Store this generic signature builder (no generic environment yet).
-  Impl.GenericSignatureBuilders[{sig, mod}] =
+  Impl.GenericSignatureBuilders[sig] =
     std::unique_ptr<GenericSignatureBuilder>(builder);
 
   builder->addGenericSignature(sig);
@@ -1530,15 +1616,133 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
                                               GenericSignatureBuilder *builder,
-                                              GenericSignature *sig,
-                                              ModuleDecl &module) {
+                                              GenericSignature *sig) {
   auto known = Impl.CanonicalGenericEnvironments.find(builder);
   if (known != Impl.CanonicalGenericEnvironments.end())
     return known->second;
 
-  auto env = sig->createGenericEnvironment(module);
+  auto env = sig->createGenericEnvironment();
   Impl.CanonicalGenericEnvironments[builder] = env;
   return env;
+}
+
+/// Minimize the set of overridden associated types, eliminating any
+/// associated types that are overridden by other associated types.
+static void minimizeOverriddenAssociatedTypes(
+                           SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) {
+  // Mark associated types that are "worse" than some other associated type,
+  // because they come from an inherited protocol.
+  bool anyWorse = false;
+  std::vector<bool> worseThanAny(assocTypes.size(), false);
+  for (unsigned i : indices(assocTypes)) {
+    auto proto1 = assocTypes[i]->getProtocol();
+    for (unsigned j : range(i + 1, assocTypes.size())) {
+      auto proto2 = assocTypes[j]->getProtocol();
+      if (proto1->inheritsFrom(proto2)) {
+        anyWorse = true;
+        worseThanAny[j] = true;
+      } else if (proto2->inheritsFrom(proto1)) {
+        anyWorse = true;
+        worseThanAny[i] = true;
+        break;
+      }
+    }
+  }
+
+  // If we didn't find any associated types that were "worse", we're done.
+  if (!anyWorse) return;
+
+  // Copy in the associated types that aren't worse than any other associated
+  // type.
+  unsigned nextIndex = 0;
+  for (unsigned i : indices(assocTypes)) {
+    if (worseThanAny[i]) continue;
+    assocTypes[nextIndex++] = assocTypes[i];
+  }
+
+  assocTypes.erase(assocTypes.begin() + nextIndex, assocTypes.end());
+}
+
+/// Sort associated types just based on the protocol.
+static int compareSimilarAssociatedTypes(AssociatedTypeDecl *const *lhs,
+                                         AssociatedTypeDecl *const *rhs) {
+  auto lhsProto = (*lhs)->getProtocol();
+  auto rhsProto = (*rhs)->getProtocol();
+  return ProtocolType::compareProtocols(&lhsProto, &rhsProto);
+}
+
+ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::getOverriddenDecls() const {
+  // If we already computed the set of overridden associated types, return it.
+  if (AssociatedTypeDeclBits.ComputedOverridden) {
+    // We didn't override any associated types, so return the empty set.
+    if (!AssociatedTypeDeclBits.HasOverridden)
+      return { };
+
+    // Look up the overrides.
+    auto known = getASTContext().Impl.AssociatedTypeOverrides.find(this);
+    assert(known != getASTContext().Impl.AssociatedTypeOverrides.end());
+    return known->second;
+  }
+
+  // Find associated types with the given name in all of the inherited
+  // protocols.
+  SmallVector<AssociatedTypeDecl *, 4> inheritedAssociatedTypes;
+  auto proto = getProtocol();
+  proto->walkInheritedProtocols([&](ProtocolDecl *inheritedProto) {
+    if (proto == inheritedProto) return TypeWalker::Action::Continue;
+
+    // Objective-C protocols
+    if (inheritedProto->isObjC()) return TypeWalker::Action::Continue;
+
+    // Look for associated types with the same name.
+    bool foundAny = false;
+    for (auto member : inheritedProto->lookupDirect(
+                                              getFullName(),
+                                              /*ignoreNewExtensions=*/true)) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        inheritedAssociatedTypes.push_back(assocType);
+        foundAny = true;
+      }
+    }
+
+    return foundAny ? TypeWalker::Action::SkipChildren
+                    : TypeWalker::Action::Continue;
+  });
+
+  // Minimize the set of inherited associated types, eliminating any that
+  // themselves are overridden.
+  minimizeOverriddenAssociatedTypes(inheritedAssociatedTypes);
+
+  // Sort the set of inherited associated types.
+  llvm::array_pod_sort(inheritedAssociatedTypes.begin(),
+                       inheritedAssociatedTypes.end(),
+                       compareSimilarAssociatedTypes);
+
+  return const_cast<AssociatedTypeDecl *>(this)
+    ->setOverriddenDecls(inheritedAssociatedTypes);
+}
+
+ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::setOverriddenDecls(
+                                  ArrayRef<AssociatedTypeDecl *> overridden) {
+  assert(!AssociatedTypeDeclBits.ComputedOverridden &&
+         "Overridden decls already computed");
+  AssociatedTypeDeclBits.ComputedOverridden = true;
+
+  // If the set of overridden declarations is empty, note that.
+  if (overridden.empty()) {
+    AssociatedTypeDeclBits.HasOverridden = false;
+    return { };
+  }
+
+  // Record the overrides in the context.
+  auto &ctx = getASTContext();
+  AssociatedTypeDeclBits.HasOverridden = true;
+  auto overriddenCopy = ctx.AllocateCopy(overridden);
+  auto inserted =
+    ctx.Impl.AssociatedTypeOverrides.insert({this, overriddenCopy}).second;
+  (void)inserted;
+  assert(inserted && "Already recorded associated type overrides");
+  return overriddenCopy;
 }
 
 bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
@@ -3514,12 +3718,10 @@ GenericFunctionType::get(GenericSignature *sig,
   // it's canonical.  Unfortunately, isCanonicalTypeInContext can cause
   // new GenericFunctionTypes to be created and thus invalidate our insertion
   // point.
-  auto &moduleForCanonicality = *ctx.TheBuiltinModule;
   bool isCanonical = sig->isCanonical()
     && isCanonicalFunctionInputType(input)
-    && sig->isCanonicalTypeInContext(unwrapParenType(input),
-                                     moduleForCanonicality)
-    && sig->isCanonicalTypeInContext(output, moduleForCanonicality);
+    && sig->isCanonicalTypeInContext(unwrapParenType(input))
+    && sig->isCanonicalTypeInContext(output);
 
   if (auto result
         = ctx.Impl.GenericFunctionTypes.FindNodeOrInsertPos(id, insertPos)) {
@@ -4055,8 +4257,7 @@ GenericEnvironment *GenericEnvironment::getIncomplete(
 
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature->getGenericParams().size();
-  size_t bytes = totalSizeToAlloc<Type, ArchetypeToInterfaceMapping>(
-                                           numGenericParams, numGenericParams);
+  size_t bytes = totalSizeToAlloc<Type>(numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   return new (mem) GenericEnvironment(signature, builder);
 }
@@ -4603,7 +4804,7 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
 
   assert(existential.isExistentialType());
 
-  GenericSignatureBuilder builder(*this, LookUpConformanceInModule(mod));
+  GenericSignatureBuilder builder(*this);
 
   auto genericParam = GenericTypeParamType::get(0, 0, *this);
   builder.addGenericParameter(genericParam);
@@ -4614,7 +4815,7 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   builder.addRequirement(requirement, source, nullptr);
 
-  CanGenericSignature genericSig(std::move(builder).computeGenericSignature(*mod, SourceLoc()));
+  CanGenericSignature genericSig(std::move(builder).computeGenericSignature(SourceLoc()));
 
   auto result = Impl.ExistentialSignatures.insert(
     std::make_pair(existential, genericSig));

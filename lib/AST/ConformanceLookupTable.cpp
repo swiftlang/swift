@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
@@ -1131,7 +1132,7 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
 
       auto normal = conf->getRootNormalConformance();
       normal->forEachValueWitness(resolver, [&](ValueDecl *req,
-                                              ConcreteDeclRef witness) {
+                                                Witness witness) {
         if (witness.getDecl() == member)
           reqs.push_back(req);
       });

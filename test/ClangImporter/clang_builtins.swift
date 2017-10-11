@@ -1,5 +1,7 @@
-// RUN: not %target-swift-frontend -swift-version 3 -typecheck %s 2>&1 | %FileCheck -check-prefix=CHECK-3 -check-prefix=CHECK-%target-runtime-3 %s
-// RUN: not %target-swift-frontend -swift-version 4 -typecheck %s 2>&1 | %FileCheck -check-prefix=CHECK-4 -check-prefix=CHECK-%target-runtime-4 %s
+// RUN: not %target-swift-frontend -swift-version 3 -typecheck %s 2> %t.3.txt
+// RUN: %FileCheck -check-prefix=CHECK-3 -check-prefix=CHECK-%target-runtime-3 %s < %t.3.txt
+// RUN: not %target-swift-frontend -swift-version 4 -typecheck %s 2> %t.4.txt
+// RUN: %FileCheck -check-prefix=CHECK-4 -check-prefix=CHECK-%target-runtime-4 %s < %t.4.txt
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   import Darwin
@@ -25,6 +27,7 @@ func test() {
   // CHECK-4: [[@LINE-2]]:16: error: cannot convert value of type '({{.+}}) -> Int'{{( [(]aka .+[)])?}} to specified type 'Int'
 }
 
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 // These functions aren't consistently available across platforms, so only
 // test for them on Apple platforms.
 func testApple() {
@@ -42,3 +45,4 @@ func testApple() {
   // CHECK-objc-3: [[@LINE-1]]:16: error: cannot convert value of type '({{.+}}) -> Int'{{( [(]aka .+[)])?}} to specified type 'Int'
   // CHECK-objc-4: [[@LINE-2]]:16: error: cannot convert value of type '({{.+}}) -> Int'{{( [(]aka .+[)])?}} to specified type 'Int'
 }
+#endif

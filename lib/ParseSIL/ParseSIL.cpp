@@ -3783,10 +3783,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::SuperMethodInst:
-  case SILInstructionKind::DynamicMethodInst: {
-    bool IsVolatile = false;
-    if (parseSILOptional(IsVolatile, *this, "volatile"))
-      return true;
+  case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::ObjCSuperMethodInst: {
     SILDeclRef Member;
     SILType MethodTy;
     SourceLoc TyLoc;
@@ -3806,16 +3804,16 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     switch (Opcode) {
     default: llvm_unreachable("Out of sync with parent switch");
     case SILInstructionKind::ClassMethodInst:
-      ResultVal = B.createClassMethod(InstLoc, Val, Member, MethodTy,
-                                      IsVolatile);
+      ResultVal = B.createClassMethod(InstLoc, Val, Member, MethodTy);
       break;
     case SILInstructionKind::SuperMethodInst:
-      ResultVal = B.createSuperMethod(InstLoc, Val, Member, MethodTy,
-                                      IsVolatile);
+      ResultVal = B.createSuperMethod(InstLoc, Val, Member, MethodTy);
       break;
-    case SILInstructionKind::DynamicMethodInst:
-      ResultVal = B.createDynamicMethod(InstLoc, Val, Member, MethodTy,
-                                       IsVolatile);
+    case SILInstructionKind::ObjCMethodInst:
+      ResultVal = B.createObjCMethod(InstLoc, Val, Member, MethodTy);
+      break;
+    case SILInstructionKind::ObjCSuperMethodInst:
+      ResultVal = B.createObjCSuperMethod(InstLoc, Val, Member, MethodTy);
       break;
     }
     break;

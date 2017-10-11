@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A wrapper around a bitmap storage with room for at least `bitCount` bits.
+@_fixed_layout // FIXME(sil-serialize-all)
 public // @testable
 struct _UnsafeBitMap {
   public // @testable

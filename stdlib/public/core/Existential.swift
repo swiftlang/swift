@@ -14,6 +14,7 @@
 // Policy.swift.  Similar components should usually be defined next to
 // their respective protocols.
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct _CollectionOf<
   IndexType : Strideable, Element

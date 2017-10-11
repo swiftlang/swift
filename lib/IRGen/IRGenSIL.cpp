@@ -892,8 +892,9 @@ public:
 
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
+  void visitObjCMethodInst(ObjCMethodInst *i);
+  void visitObjCSuperMethodInst(ObjCSuperMethodInst *i);
   void visitWitnessMethodInst(WitnessMethodInst *i);
-  void visitDynamicMethodInst(DynamicMethodInst *i);
 
   void visitAllocValueBufferInst(AllocValueBufferInst *i);
   void visitProjectValueBufferInst(ProjectValueBufferInst *i);
@@ -1952,10 +1953,9 @@ static llvm::Value *getObjCClassForValue(IRGenFunction &IGF,
 static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
                                               CanSILFunctionType origCalleeType,
                                               SubstitutionList subs) {
-  auto &M = *IGF.getSwiftModule();
   llvm::Value *wtable;
 
-  if (auto *proto = origCalleeType->getDefaultWitnessMethodProtocol(M)) {
+  if (auto *proto = origCalleeType->getDefaultWitnessMethodProtocol()) {
     // The generic signature for a witness method with abstract Self must
     // have exactly one protocol requirement.
     //
@@ -4999,12 +4999,6 @@ IRGenSILFunction::visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i) {
   }
 }
 
-void IRGenSILFunction::visitDynamicMethodInst(DynamicMethodInst *i) {
-  assert(i->getMember().isForeign && "dynamic_method requires [objc] method");
-  setLoweredObjCMethod(i, i->getMember());
-  return;
-}
-
 void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   // For Objective-C classes we need to arrange for a msgSend
   // to happen when the method is called.
@@ -5113,12 +5107,7 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
 }
 
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
-  if (i->getMember().isForeign) {
-    setLoweredObjCMethodBounded(i, i->getMember(),
-                                i->getOperand()->getType(),
-                                /*startAtSuper=*/true);
-    return;
-  }
+  assert(!i->getMember().isForeign);
 
   auto base = getLoweredExplosion(i->getOperand());
   auto baseType = i->getOperand()->getType();
@@ -5134,20 +5123,22 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   setLoweredFunctionPointer(i, fn);
 }
 
+void IRGenSILFunction::visitObjCSuperMethodInst(swift::ObjCSuperMethodInst *i) {
+  assert(i->getMember().isForeign);
+  setLoweredObjCMethodBounded(i, i->getMember(),
+                              i->getOperand()->getType(),
+                              /*startAtSuper=*/true);
+}
+
 void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
-  // For Objective-C classes we need to arrange for a msgSend
-  // to happen when the method is called.
-  if (i->getMember().isForeign) {
-    setLoweredObjCMethod(i, i->getMember());
-    return;
-  }
-  
+  assert(!i->getMember().isForeign);
+
   Explosion base = getLoweredExplosion(i->getOperand());
   llvm::Value *baseValue = base.claimNext();
-  
+
   SILDeclRef method = i->getMember();
   auto methodType = i->getType().castTo<SILFunctionType>();
- 
+
   // For Swift classes, get the method implementation from the vtable.
   // FIXME: better explosion kind, map as static.
   FunctionPointer fn = emitVirtualMethodValue(*this, baseValue,
@@ -5156,6 +5147,13 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
                                               /*useSuperVTable*/ false);
 
   setLoweredFunctionPointer(i, fn);
+}
+
+void IRGenSILFunction::visitObjCMethodInst(swift::ObjCMethodInst *i) {
+  // For Objective-C classes we need to arrange for a msgSend
+  // to happen when the method is called.
+  assert(i->getMember().isForeign);
+  setLoweredObjCMethod(i, i->getMember());
 }
 
 void IRGenModule::emitSILStaticInitializers() {

@@ -134,9 +134,22 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
 
     TheCallees.getPointer()->push_back(WitnessFn);
 
-    // FIXME: For now, conservatively assume that unknown functions
-    //        can be called from any witness_method call site.
-    TheCallees.setInt(true);
+    // If we can't resolve the witness, conservatively assume it can call
+    // anything.
+    if (!Requirement.getDecl()->isProtocolRequirement() ||
+        !WT.getConformance()->hasWitness(Requirement.getDecl())) {
+      TheCallees.setInt(true);
+      continue;
+    }
+
+    auto Witness = WT.getConformance()->getWitness(Requirement.getDecl(),
+                                                   nullptr);
+    auto DeclRef = SILDeclRef(Witness.getDecl());
+
+    bool canCallUnknown = !calleesAreStaticallyKnowable(M, DeclRef);
+
+    if (canCallUnknown)
+      TheCallees.setInt(true);
   }
 }
 
@@ -176,6 +189,9 @@ CalleeList CalleeCache::getCalleeList(SILDeclRef Decl) const {
 
 // Return a callee list for the given witness method.
 CalleeList CalleeCache::getCalleeList(WitnessMethodInst *WMI) const {
+  if (WMI->isVolatile())
+    return CalleeList();
+
   // First attempt to see if we can narrow it down to a single
   // function based on the conformance.
   if (auto *CalleeFn = getSingleCalleeForWitnessMethod(WMI))
@@ -218,7 +234,8 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
     return getCalleeList(cast<ClassMethodInst>(Callee));
 
   case ValueKind::SuperMethodInst:
-  case ValueKind::DynamicMethodInst:
+  case ValueKind::ObjCMethodInst:
+  case ValueKind::ObjCSuperMethodInst:
     return CalleeList();
   }
 }

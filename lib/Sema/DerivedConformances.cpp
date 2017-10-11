@@ -23,7 +23,87 @@
 using namespace swift;
 using namespace DerivedConformance;
 
-ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
+bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
+                                                    NominalTypeDecl *nominal,
+                                                    ProtocolDecl *protocol) {
+  // Only known protocols can be derived.
+  auto knownProtocol = protocol->getKnownProtocolKind();
+  if (!knownProtocol)
+    return false;
+
+  if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    switch (*knownProtocol) {
+        // The presence of a raw type is an explicit declaration that
+        // the compiler should derive a RawRepresentable conformance.
+      case KnownProtocolKind::RawRepresentable:
+        return enumDecl->hasRawType();
+
+        // Enums without associated values can implicitly derive Equatable and
+        // Hashable conformance.
+      case KnownProtocolKind::Equatable:
+        return canDeriveEquatable(tc, enumDecl, protocol);
+      case KnownProtocolKind::Hashable:
+        return canDeriveHashable(tc, enumDecl, protocol);
+
+        // @objc enums can explicitly derive their _BridgedNSError conformance.
+      case KnownProtocolKind::BridgedNSError:
+        return enumDecl->isObjC() && enumDecl->hasCases()
+            && enumDecl->hasOnlyCasesWithoutAssociatedValues();
+
+        // Enums without associated values and enums with a raw type of String
+        // or Int can explicitly derive CodingKey conformance.
+      case KnownProtocolKind::CodingKey: {
+        Type rawType = enumDecl->getRawType();
+        if (rawType) {
+          auto parentDC = enumDecl->getDeclContext();
+          ASTContext &C = parentDC->getASTContext();
+
+          auto nominal = rawType->getAnyNominal();
+          return nominal == C.getStringDecl() || nominal == C.getIntDecl();
+        }
+
+        // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
+        // empty enumas are allowed to conform as well.
+        return enumDecl->hasOnlyCasesWithoutAssociatedValues();
+      }
+
+      default:
+        return false;
+    }
+  } else if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
+    // Structs and classes can explicitly derive Encodable and Decodable
+    // conformance (explicitly meaning we can synthesize an implementation if
+    // a type conforms manually).
+    if (*knownProtocol == KnownProtocolKind::Encodable ||
+        *knownProtocol == KnownProtocolKind::Decodable) {
+      // FIXME: This is not actually correct. We cannot promise to always
+      // provide a witness here for all structs and classes. Unfortunately,
+      // figuring out whether this is actually possible requires much more
+      // context -- a TypeChecker and the parent decl context at least -- and is
+      // tightly coupled to the logic within DerivedConformance.
+      // This unfortunately means that we expect a witness even if one will not
+      // be produced, which requires DerivedConformance::deriveCodable to output
+      // its own diagnostics.
+      return true;
+    }
+
+    // Structs can explicitly derive Equatable and Hashable conformance.
+    if (auto structDecl = dyn_cast<StructDecl>(nominal)) {
+      switch (*knownProtocol) {
+        case KnownProtocolKind::Equatable:
+          return canDeriveEquatable(tc, structDecl, protocol);
+        case KnownProtocolKind::Hashable:
+          return canDeriveHashable(tc, structDecl, protocol);
+        default:
+          return false;
+      }
+    }
+  }
+  return false;
+}
+
+ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
+                                                       NominalTypeDecl *nominal,
                                                        ValueDecl *requirement) {
   // Note: whenever you update this function, also update
   // TypeChecker::deriveProtocolRequirement.
@@ -37,8 +117,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    // Check whether this nominal type derives conformances to the
-    if (!nominal->derivesProtocolConformance(proto)) return nullptr;
+    // Check whether this nominal type derives conformances to the protocol.
+    if (!derivesProtocolConformance(tc, nominal, proto)) return nullptr;
 
     // Retrieve the requirement.
     auto results = proto->lookupDirect(name);

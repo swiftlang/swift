@@ -18,6 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 /// An iterator that never produces an element.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
   /// Creates an instance.
   @_inlineable // FIXME(sil-serialize-all)
@@ -31,6 +32,7 @@ public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
 }
 
 /// A collection whose element type is `Element` but that is always empty.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct EmptyCollection<Element> :
   RandomAccessCollection, MutableCollection
 {

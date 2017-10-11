@@ -203,6 +203,15 @@ public:
     EquivalenceClass &operator=(const EquivalenceClass &) = delete;
     EquivalenceClass &operator=(EquivalenceClass &&) = delete;
 
+    /// Record the conformance of this equivalence class to the given
+    /// protocol as found via the given requirement source.
+    ///
+    /// \returns true if this conformance is new to the equivalence class,
+    /// and false otherwise.
+    bool recordConformanceConstraint(PotentialArchetype *pa,
+                                     ProtocolDecl *proto,
+                                     const RequirementSource *source);
+
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
     /// that concrete type as written.
@@ -412,11 +421,14 @@ private:
 
   /// \brief Add a new type requirement specifying that the given
   /// type conforms-to or is a superclass of the second type.
-  ConstraintResult addTypeRequirement(
-                          UnresolvedType subject,
-                          UnresolvedType constraint,
-                          FloatingRequirementSource source,
-                          UnresolvedHandlingKind unresolvedHandling);
+  ///
+  /// \param inferForModule Infer additional requirements from the types
+  /// relative to the given module.
+  ConstraintResult addTypeRequirement(UnresolvedType subject,
+                                      UnresolvedType constraint,
+                                      FloatingRequirementSource source,
+                                      UnresolvedHandlingKind unresolvedHandling,
+                                      ModuleDecl *inferForModule);
 
   /// Note that we have added the nested type nestedPA
   void addedNestedType(PotentialArchetype *nestedPA);
@@ -475,20 +487,40 @@ private:
 
 public:
   /// Construct a new generic signature builder.
-  ///
-  /// \param lookupConformance Conformance-lookup routine that will be used
-  /// to satisfy conformance requirements for concrete types.
-  explicit GenericSignatureBuilder(ASTContext &ctx,
-                            std::function<GenericFunction> lookupConformance);
-
+  explicit GenericSignatureBuilder(ASTContext &ctx);
   GenericSignatureBuilder(GenericSignatureBuilder &&);
   ~GenericSignatureBuilder();
 
   /// Retrieve the AST context.
   ASTContext &getASTContext() const { return Context; }
 
-  /// Retrieve the conformance-lookup function used by this generic signature builder.
-  std::function<GenericFunction> getLookupConformanceFn() const;
+  /// Functor class suitable for use as a \c LookupConformanceFn to look up a
+  /// conformance in a generic signature builder.
+  class LookUpConformanceInBuilder {
+    GenericSignatureBuilder *builder;
+  public:
+    explicit LookUpConformanceInBuilder(GenericSignatureBuilder *builder)
+      : builder(builder) {}
+
+    Optional<ProtocolConformanceRef>
+    operator()(CanType dependentType,
+               Type conformingReplacementType,
+               ProtocolType *conformedProtocol) const {
+      return builder->lookupConformance(dependentType,
+                                        conformingReplacementType,
+                                        conformedProtocol);
+    }
+  };
+
+  /// Retrieve a function that can perform conformance lookup for this
+  /// builder.
+  LookUpConformanceInBuilder getLookupConformanceFn();
+
+  /// Lookup a protocol conformance in a module-agnostic manner.
+  Optional<ProtocolConformanceRef>
+  lookupConformance(CanType dependentType, Type conformingReplacementType,
+                    ProtocolType *conformedProtocol);
+
 
   /// Retrieve the lazy resolver, if there is one.
   LazyResolver *getLazyResolver() const;
@@ -551,8 +583,7 @@ public:
   /// inconsistent, in which case a diagnostic will have been issued.
   ConstraintResult addRequirement(const Requirement &req,
                                   FloatingRequirementSource source,
-                                  ModuleDecl *inferForModule,
-                                  const SubstitutionMap *subMap = nullptr);
+                                  ModuleDecl *inferForModule);
 
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
@@ -593,7 +624,6 @@ public:
   /// After this point, one cannot introduce new requirements, and the
   /// generic signature builder no longer has valid state.
   GenericSignature *computeGenericSignature(
-                      ModuleDecl &module,
                       SourceLoc loc,
                       bool allowConcreteGenericParams = false,
                       bool allowBuilderToMove = true) &&;
@@ -1177,6 +1207,14 @@ public:
   /// path.
   bool isDerivedRequirement() const;
 
+  /// Whether we should diagnose a redundant constraint based on this
+  /// requirement source.
+  ///
+  /// \param primary Whether this is the "primary" requirement source, on which
+  /// a "redundant constraint" warning would be emitted vs. the requirement
+  /// source that would be used for the accompanying note.
+  bool shouldDiagnoseRedundancy(bool primary) const;
+
   /// Determine whether the given derived requirement \c source, when rooted at
   /// the potential archetype \c pa, is actually derived from the same
   /// requirement. Such "self-derived" requirements do not make the original
@@ -1452,18 +1490,13 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// associated type.
   PotentialArchetype(PotentialArchetype *parent, Identifier name);
 
-  /// \brief Construct a new potential archetype for an associated type.
-  PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
-    : parentOrBuilder(parent), identifier(assocType)
-  {
-    assert(parent != nullptr && "Not an associated type?");
-  }
-
   /// \brief Construct a new potential archetype for a concrete declaration.
   PotentialArchetype(PotentialArchetype *parent, TypeDecl *concreteDecl)
     : parentOrBuilder(parent), identifier(concreteDecl)
   {
-    assert(parent != nullptr && "Not an associated type?");
+    assert(parent != nullptr && "Not a nested type?");
+    assert(!isa<AssociatedTypeDecl>(concreteDecl) ||
+      cast<AssociatedTypeDecl>(concreteDecl)->getOverriddenDecls().empty());
   }
 
   /// \brief Construct a new potential archetype for a generic parameter.

@@ -89,6 +89,10 @@ public:
   StringRef getText() const {
     return getRawToken()->getText();
   }
+
+  static bool classof(const Syntax *S) {
+    return S->isToken();
+  }
 };
 
 } // end namespace syntax

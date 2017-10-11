@@ -67,51 +67,43 @@ class FrontendInputs {
 private:
   /// The names of input files to the frontend.
   std::vector<std::string> InputFilenames;
-  
+
   /// Input buffers which may override the file contents of input files.
   std::vector<llvm::MemoryBuffer *> InputBuffers;
 
   /// The input for which output should be generated. If not set, output will
   /// be generated for the whole module.
-  // a vector for now
   std::vector<SelectedInput> PrimaryInputs;
 
 public:
-  
   // Readers:
-  
+
   // Input filename readers
-  ArrayRef<std::string> getInputFilenames() const {
-    return InputFilenames;
-  }
-  bool hasInputFilenames() const {
-    return !getInputFilenames().empty();
-  }
+  ArrayRef<std::string> getInputFilenames() const { return InputFilenames; }
+  bool hasInputFilenames() const { return !getInputFilenames().empty(); }
   unsigned inputFilenameCount() const { return getInputFilenames().size(); }
-  
-  bool hasUniqueInputFilename() const {
-    return inputFilenameCount() == 1;
-  }
+
+  bool hasUniqueInputFilename() const { return inputFilenameCount() == 1; }
   const std::string &getFilenameOfFirstInput() const {
     assert(hasInputFilenames());
     return getInputFilenames()[0];
   }
-  
+
   bool isReadingFromStdin() {
-    return hasUniqueInputFilename()  &&  getFilenameOfFirstInput() == "-";
+    return hasUniqueInputFilename() && getFilenameOfFirstInput() == "-";
   }
-  
+
   // If we have exactly one input filename, and its extension is "bc" or "ll",
   // treat the input as LLVM_IR.
   bool shouldTreatAsLLVM() const;
-  
+
   // Input buffer readers
-  
-  ArrayRef<llvm::MemoryBuffer*> getInputBuffers() const {
+
+  ArrayRef<llvm::MemoryBuffer *> getInputBuffers() const {
     return InputBuffers;
   }
   unsigned inputBufferCount() const { return getInputBuffers().size(); }
- 
+
   // Primary input readers
 
 private:
@@ -186,24 +178,23 @@ public:
 public:
   // Multi-facet readers
   bool shouldTreatAsSIL() const;
-  
+
   /// Return true for error
-  bool verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL, bool isREPLRequested, bool isNoneRequested) const;
-  
+  bool verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
+                    bool isREPLRequested, bool isNoneRequested) const;
+
   // Input filename writers
-  
+
   void addInputFilename(StringRef Filename) {
     InputFilenames.push_back(Filename);
   }
-  void transformInputFilenames(const llvm::function_ref<std::string(std::string)> &fn);
-  
-  // Input buffer writers
-  
-  void addInputBuffer(llvm::MemoryBuffer *Buf) {
-    InputBuffers.push_back(Buf);
-  }
+  void transformInputFilenames(
+      const llvm::function_ref<std::string(std::string)> &fn);
 
-  
+  // Input buffer writers
+
+  void addInputBuffer(llvm::MemoryBuffer *Buf) { InputBuffers.push_back(Buf); }
+
   // Primary input writers
 
   void clearPrimaryInputs() { getMutablePrimaryInputs().clear(); }
@@ -216,15 +207,15 @@ public:
   }
 
   void setPrimaryInputForInputFilename(const std::string &inputFilename) {
-    setPrimaryInput(
-                    !inputFilename.empty() && inputFilename != "-"
-                    ? SelectedInput(inputFilenameCount(), SelectedInput::InputKind::Filename)
-                    : SelectedInput(inputBufferCount(),   SelectedInput::InputKind::Buffer)
-                    );
+    setPrimaryInput(!inputFilename.empty() && inputFilename != "-"
+                        ? SelectedInput(inputFilenameCount(),
+                                        SelectedInput::InputKind::Filename)
+                        : SelectedInput(inputBufferCount(),
+                                        SelectedInput::InputKind::Buffer));
   }
-  
+
   // Multi-faceted writers
-  
+
   void clearInputs() {
     InputFilenames.clear();
     InputBuffers.clear();
@@ -243,16 +234,16 @@ class FrontendOptions {
 
 public:
   FrontendInputs Inputs;
-  
+
   /// The kind of input on which the frontend should operate.
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
   /// The specified output files. If only a single outputfile is generated,
   /// the name of the last specified file is taken.
   std::vector<std::string> OutputFilenames;
-  
+
   void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
-  
+
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   StringRef getSingleOutputFilename() const {
@@ -265,9 +256,7 @@ public:
     OutputFilenames.clear();
     OutputFilenames.push_back(FileName);
   }
-  void setOutputFilenameToStdout() {
-    setSingleOutputFilename("-");
-  }
+  void setOutputFilenameToStdout() { setSingleOutputFilename("-"); }
   bool isOutputFilenameStdout() const {
     return getSingleOutputFilename() == "-";
   }
@@ -520,21 +509,19 @@ public:
   /// Indicates whether the RequestedAction will immediately run code.
   bool actionIsImmediate() const;
 
-
-
-
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
     return llvm::hash_value(0);
   }
-  
+
   StringRef originalPath() const;
-  
+
   StringRef determineFallbackModuleName() const;
-  
+
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::IFK_Swift && Inputs.hasUniqueInputFilename();
+    return InputKind == InputFileKind::IFK_Swift &&
+           Inputs.hasUniqueInputFilename();
   }
 
 private:

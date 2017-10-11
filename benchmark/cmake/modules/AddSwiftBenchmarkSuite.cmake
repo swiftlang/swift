@@ -204,7 +204,7 @@ function (swift_benchmark_compile_archopts)
   set(common_swift4_options ${common_options} "-swift-version" "4")
 
   # Always optimize the driver modules.
-  # Note that we compile the driver for Ounchecked also with -Ounchecked
+  # Note that we compile the driver for Osize also with -Osize
   # (and not with -O), because of <rdar://problem/19614516>.
   string(REPLACE "Onone" "O" driver_opt "${optflag}")
 
@@ -488,15 +488,15 @@ function(swift_benchmark_compile)
       list(APPEND platform_executables ${new_output_exec})
     endforeach()
 
-    # If we are building standalone, we add the -external suffix to all of our
-    # cmake target names. This enables the main swift build to simple create
-    # -external targets and forward them via AddExternalProject to the
-    # standalone benchmark project. The reason why this is necessary is that we
-    # want to be able to support in-tree and out-of-tree benchmark builds at the
-    # same time implying that we need some sort of way to distinguish the
-    # in-tree (which don't have the suffix) from the out of tree target (which
-    # do).
-    translate_flag(SWIFT_BENCHMARK_BUILT_STANDALONE "-external" external)
+    # If we are building standalone as part of a subcmake build, we add the
+    # -external suffix to all of our cmake target names. This enables the main
+    # swift build to simple create -external targets and forward them via
+    # AddExternalProject to the standalone benchmark project. The reason why
+    # this is necessary is that we want to be able to support in-tree and
+    # out-of-tree benchmark builds at the same time implying that we need some
+    # sort of way to distinguish the in-tree (which don't have the suffix) from
+    # the out of tree target (which do).
+    translate_flag(SWIFT_BENCHMARK_SUBCMAKE_BUILD "-external" external)
     set(executable_target "swift-benchmark-${SWIFT_BENCHMARK_COMPILE_PLATFORM}-${arch}${external}")
 
     add_custom_target("${executable_target}"

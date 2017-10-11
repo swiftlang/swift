@@ -705,14 +705,14 @@ public:
 
   /// Is this an interface type that is subject to a concrete
   /// same-type constraint?
-  bool isConcreteType(ModuleDecl &module) const {
+  bool isConcreteType() const {
     assert(isTypeParameter());
     return (getKind() != Kind::Opaque &&
             GenericSig != nullptr &&
-            GenericSig->isConcreteType(getType(), module));
+            GenericSig->isConcreteType(getType()));
   }
 
-  bool requiresClass(ModuleDecl &module) {
+  bool requiresClass() {
     switch (getKind()) {
     case Kind::Opaque:
       return false;
@@ -725,7 +725,7 @@ public:
                isa<GenericTypeParamType>(type)) {
         assert(GenericSig &&
                "Dependent type in pattern without generic signature?");
-        return GenericSig->requiresClass(type, module);
+        return GenericSig->requiresClass(type);
       }
       return false;
     }

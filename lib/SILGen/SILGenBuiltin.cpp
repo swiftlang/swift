@@ -368,16 +368,6 @@ static ManagedValue emitBuiltinCastToNativeObject(SILGenFunction &SGF,
 }
 
 
-/// Specialized emitter for Builtin.castToUnknownObject.
-static ManagedValue emitBuiltinCastToUnknownObject(SILGenFunction &SGF,
-                                         SILLocation loc,
-                                         SubstitutionList substitutions,
-                                         ArrayRef<ManagedValue> args,
-                                         SGFContext C) {
-  return emitCastToReferenceType(SGF, loc, substitutions, args, C,
-                        SILType::getUnknownObjectType(SGF.F.getASTContext()));
-}
-
 static ManagedValue emitCastFromReferenceType(SILGenFunction &SGF,
                                          SILLocation loc,
                                          SubstitutionList substitutions,
@@ -413,15 +403,6 @@ static ManagedValue emitCastFromReferenceType(SILGenFunction &SGF,
 
 /// Specialized emitter for Builtin.castFromNativeObject.
 static ManagedValue emitBuiltinCastFromNativeObject(SILGenFunction &SGF,
-                                         SILLocation loc,
-                                         SubstitutionList substitutions,
-                                         ArrayRef<ManagedValue> args,
-                                         SGFContext C) {
-  return emitCastFromReferenceType(SGF, loc, substitutions, args, C);
-}
-
-/// Specialized emitter for Builtin.castFromUnknownObject.
-static ManagedValue emitBuiltinCastFromUnknownObject(SILGenFunction &SGF,
                                          SILLocation loc,
                                          SubstitutionList substitutions,
                                          ArrayRef<ManagedValue> args,

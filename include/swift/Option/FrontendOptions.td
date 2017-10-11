@@ -300,6 +300,9 @@ def disable_tsan_inout_instrumentation : Flag<["-"],
   "disable-tsan-inout-instrumentation">,
   HelpText<"Disable treatment of inout parameters as Thread Sanitizer accesses">;
 
+def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
+  HelpText<"Deprecated, will be removed in future versions.">;
+
 def enable_infer_import_as_member :
   Flag<["-"], "enable-infer-import-as-member">,
   HelpText<"Infer when a global could be imported as a member">;
@@ -371,11 +374,11 @@ def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
 def sil_link_all : Flag<["-"], "sil-link-all">,
   HelpText<"Link all SIL functions">;
 
-def sil_serialize_all : Flag<["-"], "sil-serialize-all">,
-  HelpText<"Serialize all generated SIL">;
-
 def sil_serialize_witness_tables : Flag<["-"], "sil-serialize-witness-tables">,
   HelpText<"Serialize eligible SIL witness tables">;
+
+def sil_serialize_vtables : Flag<["-"], "sil-serialize-vtables">,
+  HelpText<"Serialize eligible SIL vtables">;
 
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;

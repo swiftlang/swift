@@ -6,5 +6,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-class a<a{{{}}func b{extension{class a<a{{}class a:RangeReplaceableCollection
+// RUN: not %target-swift-frontend %s -emit-ir
+protocol P{typealias e:A
+protocol A:P{}typealias a
+class a<a

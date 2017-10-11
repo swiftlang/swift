@@ -19,8 +19,8 @@ import Builtin
 // CHECK-SAME:   i32 2,
 // --       field names
 // CHECK-SAME:   [3 x i8]* [[SINGLEDYNAMIC_FIELDS]]
-// --       generic metadata pattern, kind 1 (struct)
-// CHECK-SAME:   i32 add ({{.*}}@_T015generic_structs13SingleDynamicVMP{{.*}}, i32 1)
+// --       kind 1 (struct)
+// CHECK-SAME:   i32 1
 // --       generic parameter vector offset
 // CHECK-SAME:   i32 3,
 // --       generic parameter count, primary count
@@ -66,8 +66,8 @@ import Builtin
 // CHECK-SAME: i32 2,
 // --       field names
 // CHECK-SAME: [5 x i8]* [[DYNAMICWITHREQUIREMENTS_FIELDS]]
-// --       generic metadata pattern
-// CHECK-SAME: i32 add ({{.*}}@_T015generic_structs23DynamicWithRequirementsVMP{{.*}}, i32 1)
+// --       kind 1 (struct)
+// CHECK-SAME: i32 1,
 // --       generic parameter vector offset
 // CHECK-SAME: i32 4,
 // --       generic requirements count; generic arguments count

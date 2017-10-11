@@ -23,6 +23,65 @@ let dropCount = 1024
 let suffixCount = sequenceCount - dropCount
 let sumCount = suffixCount * (2 * sequenceCount - suffixCount - 1) / 2
 
+public let DropWhile = [
+  BenchmarkInfo(
+    name: "DropWhileCountableRange",
+    runFunction: run_DropWhileCountableRange,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropWhileSequence",
+    runFunction: run_DropWhileSequence,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropWhileAnySequence",
+    runFunction: run_DropWhileAnySequence,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropWhileAnySeqCntRange",
+    runFunction: run_DropWhileAnySeqCntRange,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropWhileAnySeqCRangeIter",
+    runFunction: run_DropWhileAnySeqCRangeIter,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropWhileAnyCollection",
+    runFunction: run_DropWhileAnyCollection,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropWhileArray",
+    runFunction: run_DropWhileArray,
+    tags: [.validation, .api, .Array]),
+  BenchmarkInfo(
+    name: "DropWhileCountableRangeLazy",
+    runFunction: run_DropWhileCountableRangeLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropWhileSequenceLazy",
+    runFunction: run_DropWhileSequenceLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropWhileAnySequenceLazy",
+    runFunction: run_DropWhileAnySequenceLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropWhileAnySeqCntRangeLazy",
+    runFunction: run_DropWhileAnySeqCntRangeLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropWhileAnySeqCRangeIterLazy",
+    runFunction: run_DropWhileAnySeqCRangeIterLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropWhileAnyCollectionLazy",
+    runFunction: run_DropWhileAnyCollectionLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropWhileArrayLazy",
+    runFunction: run_DropWhileArrayLazy,
+    tags: [.validation, .api]),
+]
+
 @inline(never)
 public func run_DropWhileCountableRange(_ N: Int) {
   let s = 0..<sequenceCount

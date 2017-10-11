@@ -13,6 +13,11 @@
 import TestsUtils
 import Foundation
 
+public let IterateData = BenchmarkInfo(
+  name: "IterateData",
+  runFunction: run_IterateData,
+  tags: [.validation, .api])
+
 @inline(never)
 func generateData() -> Data {
   var data = Data(count: 16 * 1024)

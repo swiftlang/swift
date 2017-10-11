@@ -400,6 +400,7 @@ extension Unicode.Scalar : Comparable {
 }
 
 extension Unicode.Scalar {
+  @_fixed_layout // FIXME(sil-serialize-all)
   public struct UTF16View {
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)

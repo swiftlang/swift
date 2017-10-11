@@ -107,8 +107,11 @@ struct TestConfig {
   /// The filters applied to our test names.
   var filters = [String]()
 
-  /// The tag that we want to run
+  /// The tags that we want to run
   var tags = Set<BenchmarkCategory>()
+
+  /// Tests tagged with any of these will not be executed
+  var skipTags: Set<BenchmarkCategory> = [.unstable, .skip]
 
   /// The scalar multiple of the amount of times a test should be run. This
   /// enables one to cause tests to run for N iterations longer than they
@@ -127,14 +130,6 @@ struct TestConfig {
   /// Is verbose output enabled?
   var verbose: Bool = false
 
-  /// Should we only run the "pre-commit" tests?
-  var onlyPrecommit: Bool = true
-
-  /// Temporary option to only run tests that have been registered with
-  /// BenchmarkInfo. This will go away as soon as the benchmarks have been
-  /// categorized.
-  var onlyRegistered: Bool = false
-
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
   var afterRunSleep: Int?
@@ -145,8 +140,8 @@ struct TestConfig {
   mutating func processArguments() -> TestAction {
     let validOptions = [
       "--iter-scale", "--num-samples", "--num-iters",
-      "--verbose", "--delim", "--run-all", "--list", "--sleep",
-      "--registered", "--tags"
+      "--verbose", "--delim", "--list", "--sleep",
+      "--tags", "--skip-tags"
     ]
     let maybeBenchArgs: Arguments? = parseArgs(validOptions)
     if maybeBenchArgs == nil {
@@ -198,8 +193,23 @@ struct TestConfig {
       }
     }
 
-    if let _ = benchArgs.optionalArgsMap["--run-all"] {
-      onlyPrecommit = false
+    if let x = benchArgs.optionalArgsMap["--skip-tags"] {
+      // if the --skip-tags parameter is specified, we need to ignore the
+      // default and start from a clean slate.
+      skipTags = []
+
+      // We support specifying multiple tags by splitting on comma, i.e.:
+      //
+      //  --skip-tags=array,set
+      //
+      // FIXME: If we used Error instead of .fail, then we could have a cleaner
+      // impl here using map on x and tags.formUnion.
+      for t in x.split(separator: ",") {
+        guard let cat = BenchmarkCategory(rawValue: String(t)) else {
+          return .fail("Unknown benchmark category: '\(t)'")
+        }
+        skipTags.insert(cat)
+      }
     }
 
     if let x = benchArgs.optionalArgsMap["--sleep"] {
@@ -217,72 +227,52 @@ struct TestConfig {
       return .listTests
     }
 
-    if let _ = benchArgs.optionalArgsMap["--registered"] {
-      onlyRegistered = true
-    }
-
     return .run
   }
 
   mutating func findTestsToRun() {
     // Begin by creating a set of our non-legacy registeredBenchmarks
-    var allTests = Set<BenchmarkInfo>(registeredBenchmarks)
+    var allTests = Set(registeredBenchmarks)
 
-    // If we are supposed to only run registered tests there isn't anything
-    // further to do (in the future anyways).
-    if onlyRegistered {
-      // FIXME: for now unstable/extra benchmarks are not registered at all, but
-      // soon they will be handled with a default exclude list.
-      onlyPrecommit = false
-    } else {
-      // Merge legacy benchmark info into allTests. If we already have a
-      // registered benchmark info, formUnion leaves this alone. This allows for
-      // us to perform incremental work.
-      for testList in [precommitTests, otherTests, stringTests] {
-        allTests.formUnion(testList)
-      }
+    // Merge legacy benchmark info into allTests. If we already have a
+    // registered benchmark info, formUnion leaves this alone. This allows for
+    // us to perform incremental work.
+    for testList in [precommitTests, otherTests, stringTests] {
+      allTests.formUnion(testList)
     }
 
-    let benchmarkNameFilter: Set<String>? = {
-      if !filters.isEmpty {
-        return Set(filters)
-      }
-
-      if onlyPrecommit {
-        return Set(precommitTests.map { $0.name })
-      }
-
-      return nil
-    }()
+    let benchmarkNameFilter = Set(filters)
 
     // t is needed so we don't capture an ivar of a mutable inout self.
     let t = tags
-    var filteredTests = allTests.filter {
-      benchInfo in
+    let st = skipTags
+    let filteredTests = Array(allTests.filter { benchInfo in
       if !t.isSubset(of: benchInfo.tags) {
+        return false
+      }
+
+      if !st.isDisjoint(with: benchInfo.tags) {
         return false
       }
 
       // If the user did not specified a benchmark name filter and our tags are
       // a subset of the specified tags by the user, return true. We want to run
       // this test.
-      guard let benchFilter = benchmarkNameFilter else {
+      if benchmarkNameFilter.isEmpty {
         return true
       }
 
       // Otherwise, we need to check if our benchInfo's name is in the benchmark
       // name filter list. If it isn't, then we shouldn't process it.
-      return benchFilter.contains(benchInfo.name)
-    }.map { $0 }.sorted()
+      return benchmarkNameFilter.contains(benchInfo.name)
+    }).sorted()
 
     if (filteredTests.isEmpty) {
       return
     }
 
-    tests = zip(1...filteredTests.count, filteredTests).map {
-      t -> Test in
-      let (ordinal, benchInfo) = t
-      return Test(benchInfo: benchInfo, index: ordinal)
+    tests = filteredTests.enumerated().map {
+      Test(benchInfo: $0.element, index: $0.offset + 1)
     }
   }
 }

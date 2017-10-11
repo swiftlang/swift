@@ -1322,33 +1322,16 @@ extension Set {
 }
 
 extension Set : CustomStringConvertible, CustomDebugStringConvertible {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func makeDescription(isDebug: Bool) -> String {
-    var result = isDebug ? "Set([" : "["
-    var first = true
-    for member in self {
-      if first {
-        first = false
-      } else {
-        result += ", "
-      }
-      debugPrint(member, terminator: "", to: &result)
-    }
-    result += isDebug ? "])" : "]"
-    return result
-  }
-
   /// A string that represents the contents of the set.
   @_inlineable // FIXME(sil-serialize-all)
   public var description: String {
-    return makeDescription(isDebug: false)
+    return _makeCollectionDescription(for: self, withTypeName: nil)
   }
 
   /// A string that represents the contents of the set, suitable for debugging.
   @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
-    return makeDescription(isDebug: true)
+    return _makeCollectionDescription(for: self, withTypeName: "Set")
   }
 }
 
@@ -2553,7 +2536,10 @@ extension Dictionary {
   }
 
   /// A view of a dictionary's keys.
-  public struct Keys : Collection, Equatable {
+  @_fixed_layout // FIXME(sil-serialize-all)
+  public struct Keys
+    : Collection, Equatable,
+      CustomStringConvertible, CustomDebugStringConvertible {
     public typealias Element = Key
 
     @_versioned // FIXME(sil-serialize-all)
@@ -2637,11 +2623,22 @@ extension Dictionary {
 
       return true
     }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    public var description: String {
+      return _makeCollectionDescription(for: self, withTypeName: nil)
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    public var debugDescription: String {
+      return _makeCollectionDescription(for: self, withTypeName: "Dictionary.Keys")
+    }
   }
 
   /// A view of a dictionary's values.
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Values : MutableCollection {
+  public struct Values
+    : MutableCollection, CustomStringConvertible, CustomDebugStringConvertible {
     public typealias Element = Value
 
     @_versioned // FIXME(sil-serialize-all)
@@ -2697,6 +2694,16 @@ extension Dictionary {
     @_inlineable // FIXME(sil-serialize-all)
     public var isEmpty: Bool {
       return count == 0
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    public var description: String {
+      return _makeCollectionDescription(for: self, withTypeName: nil)
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    public var debugDescription: String {
+      return _makeCollectionDescription(for: self, withTypeName: "Dictionary.Values")
     }
   }
 }
@@ -2861,9 +2868,7 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 ///
 /// - Precondition: `SwiftKey` and `SwiftValue` are bridged to Objective-C,
 ///   and at least one of them requires non-trivial bridging.
-@_inlineable // FIXME(sil-serialize-all)
 @inline(never)
-@_semantics("stdlib_binary_only")
 public func _dictionaryBridgeToObjectiveC<
   SwiftKey, SwiftValue, ObjCKey, ObjCValue
 >(
@@ -3129,6 +3134,7 @@ collections = [
 // NOTE: The precise layout of this type is relied on in the runtime
 // to provide a statically allocated empty singleton. 
 // See stdlib/public/stubs/GlobalObjects.cpp for details.
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 @objc_non_lazy_realization
 internal class _RawNative${Self}Storage:
@@ -3289,6 +3295,7 @@ internal class _RawNative${Self}Storage:
 }
 
 // See the docs at the top of this file for a description of this type
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
 internal class _TypedNative${Self}Storage<${TypeParameters}> :
   _RawNative${Self}Storage {
@@ -3358,6 +3365,7 @@ internal class _TypedNative${Self}Storage<${TypeParameters}> :
 
 
 // See the docs at the top of this file for a description of this type
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
 final internal class _HashableTypedNative${Self}Storage<${TypeParametersDecl}> :
   _TypedNative${Self}Storage<${TypeParameters}> {
@@ -4183,6 +4191,7 @@ extension _Native${Self}Buffer
 #if _runtime(_ObjC)
 /// An NSEnumerator that works with any Native${Self}Buffer of
 /// verbatim bridgeable elements. Used by the various NS${Self} impls.
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 final internal class _Native${Self}NSEnumerator<${TypeParameters}>
   : _SwiftNativeNSEnumerator, _NSEnumerator {
@@ -4268,6 +4277,7 @@ final internal class _Native${Self}NSEnumerator<${TypeParameters}>
 /// This is the fallback implementation for situations where toll-free bridging
 /// isn't possible. On first access, a Native${Self}Buffer of AnyObject will be
 /// constructed containing all the bridged elements.
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
   : _SwiftNativeNS${Self}, _NS${Self}Core {
@@ -5727,6 +5737,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   compareOperators = ["<", "<=", ">", ">=", "=="]
 }%
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
 internal struct _Native${Self}Index<${TypeParameters}> : Comparable {
   @_versioned
@@ -5756,6 +5767,7 @@ extension _Native${Self}Index {
 
 
 #if _runtime(_ObjC)
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
 internal struct _Cocoa${Self}Index : Comparable {
   // Assumption: we rely on NSDictionary.getObjects when being
@@ -5879,6 +5891,7 @@ elif Self == 'Dictionary':
 }%
 
 ${SubscriptingWithIndexDoc}
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct Index : Comparable {
   // Index for native buffer is efficient.  Index for bridged NS${Self} is
   // not, because neither NSEnumerator nor fast enumeration support moving
@@ -6004,6 +6017,7 @@ extension ${Self}.Index {
 }
 
 #if _runtime(_ObjC)
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
 final internal class _Cocoa${Self}Iterator : IteratorProtocol {
   internal typealias Element = ${AnySequenceType}
@@ -6118,6 +6132,7 @@ internal enum ${Self}IteratorRepresentation<${TypeParametersDecl}> {
 }
 
 /// An iterator over the members of a `${Self}<${TypeParameters}>`.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
   // ${Self} has a separate IteratorProtocol and Index because of efficiency
   // and implementability reasons.
@@ -6250,6 +6265,7 @@ extension ${Self} : CustomReflectable {
 ///
 /// Using a builder can be faster than inserting members into an empty
 /// `${Self}`.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct _${Self}Builder<${TypeParametersDecl}> {
 %if Self == 'Set':
   public typealias Key = ${TypeParameters}

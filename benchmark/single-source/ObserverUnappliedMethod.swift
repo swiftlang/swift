@@ -10,6 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+import TestsUtils
+
+public let ObserverUnappliedMethod = BenchmarkInfo(
+  name: "ObserverUnappliedMethod",
+  runFunction: run_ObserverUnappliedMethod,
+  tags: [.validation])
+
 class Observer {
   @inline(never)
   func receive(_ value: Int) {

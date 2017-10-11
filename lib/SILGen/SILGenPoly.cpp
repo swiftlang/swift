@@ -2673,7 +2673,7 @@ buildThunkSignature(SILGenFunction &SGF,
     return genericSig;
   }
 
-  GenericSignatureBuilder builder(ctx, LookUpConformanceInModule(mod));
+  GenericSignatureBuilder builder(ctx);
 
   // Add the existing generic signature.
   int depth = 0;
@@ -2695,9 +2695,9 @@ buildThunkSignature(SILGenFunction &SGF,
   builder.addRequirement(newRequirement, source, nullptr);
 
   GenericSignature *genericSig =
-    std::move(builder).computeGenericSignature(*mod, SourceLoc(),
+    std::move(builder).computeGenericSignature(SourceLoc(),
                                     /*allowConcreteGenericParams=*/true);
-  genericEnv = genericSig->createGenericEnvironment(*mod);
+  genericEnv = genericSig->createGenericEnvironment();
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
     ->castTo<ArchetypeType>();
@@ -2822,11 +2822,6 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                       ? DefaultThickCalleeConvention
                       : ParameterConvention::Direct_Unowned});
 
-  auto &mod = *F.getModule().getSwiftModule();
-  auto getCanonicalType = [&](Type t) -> CanType {
-    return t->getCanonicalType(genericSig, mod);
-  };
-
   // Map the parameter and expected types out of context to get the interface
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;
@@ -2835,7 +2830,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     auto paramIfaceTy = GenericEnvironment::mapTypeOutOfContext(
         genericEnv, param.getType());
     interfaceParams.push_back(
-      SILParameterInfo(getCanonicalType(paramIfaceTy),
+      SILParameterInfo(paramIfaceTy->getCanonicalType(genericSig),
                        param.getConvention()));
   }
 
@@ -2843,7 +2838,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   for (auto &result : expectedType->getResults()) {
     auto resultIfaceTy = GenericEnvironment::mapTypeOutOfContext(
         genericEnv, result.getType());
-    auto interfaceResult = result.getWithType(getCanonicalType(resultIfaceTy));
+    auto interfaceResult =
+      result.getWithType(resultIfaceTy->getCanonicalType(genericSig));
     interfaceResults.push_back(interfaceResult);
   }
 
@@ -2853,7 +2849,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     auto errorIfaceTy = GenericEnvironment::mapTypeOutOfContext(
         genericEnv, errorResult.getType());
     interfaceErrorResult = SILResultInfo(
-        getCanonicalType(errorIfaceTy),
+        errorIfaceTy->getCanonicalType(genericSig),
         expectedType->getErrorResult().getConvention());
   }
   
@@ -3258,20 +3254,21 @@ getWitnessFunctionType(SILGenModule &SGM,
 static SILValue
 getWitnessFunctionRef(SILGenFunction &SGF,
                       SILDeclRef witness,
+                      CanSILFunctionType witnessFTy,
                       WitnessDispatchKind witnessKind,
                       SmallVectorImpl<ManagedValue> &witnessParams,
                       SILLocation loc) {
-  SILGenModule &SGM = SGF.SGM;
-
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
-    return SGF.emitDynamicMethodRef(loc, witness,
-                                    SGM.Types.getConstantInfo(witness));
-  case WitnessDispatchKind::Class:
+    return SGF.emitDynamicMethodRef(loc, witness, witnessFTy);
+  case WitnessDispatchKind::Class: {
     SILValue selfPtr = witnessParams.back().getValue();
-    return SGF.B.createClassMethod(loc, selfPtr, witness);
+    assert(!witness.isForeign);
+    return SGF.B.createClassMethod(loc, selfPtr, witness,
+                                   SILType::getPrimitiveObjectType(witnessFTy));
+  }
   }
 
   llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
@@ -3335,9 +3332,10 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
 
   // Translate the argument values from the requirement abstraction level to
   // the substituted signature of the witness.
-  auto witnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
+  auto origWitnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
+  auto witnessFTy = origWitnessFTy;
   if (!witnessSubs.empty())
-    witnessFTy = witnessFTy->substGenericArgs(SGM.M, witnessSubs);
+    witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs);
 
   SmallVector<ManagedValue, 8> witnessParams;
 
@@ -3374,7 +3372,9 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
                witnessOrigTy.getFunctionInputType(),
                witnessSubstTy.getInput());
 
-  SILValue witnessFnRef = getWitnessFunctionRef(*this, witness, witnessKind,
+  SILValue witnessFnRef = getWitnessFunctionRef(*this, witness,
+                                                origWitnessFTy,
+                                                witnessKind,
                                                 witnessParams, loc);
 
   // Collect the arguments.

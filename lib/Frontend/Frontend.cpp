@@ -57,7 +57,8 @@ void CompilerInstance::createSILModule() {
   assert(MainModule && "main module not created yet");
   // Assume WMO if a -primary-file option was not provided.
   TheSILModule = SILModule::createEmptyModule(
-    getMainModule(), Invocation.getSILOptions(), Invocation.getFrontendOptions().Inputs.isWholeModule());
+      getMainModule(), Invocation.getSILOptions(),
+      Invocation.getFrontendOptions().Inputs.isWholeModule());
 }
 
 void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
@@ -157,9 +158,12 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
-  for (unsigned i = 0, e = Invocation.getFrontendOptions().Inputs.inputBufferCount(); i != e; ++i) {
+  for (unsigned i = 0,
+                e = Invocation.getFrontendOptions().Inputs.inputBufferCount();
+       i != e; ++i) {
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    auto *InputBuffer = Invocation.getFrontendOptions().Inputs.getInputBuffers()[i];
+    auto *InputBuffer =
+        Invocation.getFrontendOptions().Inputs.getInputBuffers()[i];
     auto Copy = std::unique_ptr<llvm::MemoryBuffer>(
         llvm::MemoryBuffer::getMemBufferCopy(
             InputBuffer->getBuffer(), InputBuffer->getBufferIdentifier()));
@@ -180,7 +184,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     }
   }
 
-  for (unsigned i = 0, e = Invocation.getFrontendOptions().Inputs.inputFilenameCount(); i != e; ++i) {
+  for (unsigned i = 0,
+                e = Invocation.getFrontendOptions().Inputs.inputFilenameCount();
+       i != e; ++i) {
     bool hasError = setupForFileAt(i);
     if (hasError) {
       return true;
@@ -191,7 +197,8 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (CodeCompletionBufferID.hasValue())
     PrimaryBufferID = *CodeCompletionBufferID;
 
-  if (MainMode && MainBufferID == NO_SUCH_BUFFER && InputSourceCodeBufferIDs.size() == 1)
+  if (MainMode && MainBufferID == NO_SUCH_BUFFER &&
+      InputSourceCodeBufferIDs.size() == 1)
     MainBufferID = InputSourceCodeBufferIDs.front();
 
   return false;
@@ -206,8 +213,6 @@ ModuleDecl *CompilerInstance::getMainModule() {
 
     if (Invocation.getFrontendOptions().EnableResilience)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
-    else if (Invocation.getSILOptions().SILSerializeAll)
-      MainModule->setResilienceStrategy(ResilienceStrategy::Fragile);
   }
   return MainModule;
 }
@@ -710,59 +715,59 @@ bool CompilerInstance::setupForFileAt(unsigned i) {
   bool SILMode = (Invocation.getInputKind() == InputFileKind::IFK_SIL);
 
   auto &File = Invocation.getFrontendOptions().Inputs.getInputFilenames()[i];
-  
+
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
   using namespace llvm::sys::path;
   if (Optional<unsigned> ExistingBufferID =
-      SourceMgr.getIDForBufferIdentifier(File)) {
+          SourceMgr.getIDForBufferIdentifier(File)) {
     if (SILMode || (MainMode && filename(File) == "main.swift"))
       MainBufferID = ExistingBufferID.getValue();
-    
+
     if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
       PrimaryBufferID = ExistingBufferID.getValue();
-    
+
     return false; // replaced by a memory buffer.
   }
-  
+
   // Open the input file.
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
   FileOrError InputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(File);
   if (!InputFileOrErr) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
-                         File, InputFileOrErr.getError().message());
+    Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, File,
+                         InputFileOrErr.getError().message());
     return true;
   }
-  
+
   if (serialization::isSerializedAST(InputFileOrErr.get()->getBuffer())) {
     llvm::SmallString<128> ModuleDocFilePath(File);
     llvm::sys::path::replace_extension(ModuleDocFilePath,
                                        SERIALIZED_MODULE_DOC_EXTENSION);
     FileOrError ModuleDocOrErr =
-    llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath.str());
+        llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath.str());
     if (!ModuleDocOrErr &&
         ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
-                           File, ModuleDocOrErr.getError().message());
+      Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, File,
+                           ModuleDocOrErr.getError().message());
       return true;
     }
-    PartialModules.push_back({ std::move(InputFileOrErr.get()),
-      ModuleDocOrErr? std::move(ModuleDocOrErr.get())
-      : nullptr });
+    PartialModules.push_back(
+        {std::move(InputFileOrErr.get()),
+         ModuleDocOrErr ? std::move(ModuleDocOrErr.get()) : nullptr});
     return false;
   }
-  
+
   // Transfer ownership of the MemoryBuffer to the SourceMgr.
   unsigned BufferID =
-  SourceMgr.addNewSourceBuffer(std::move(InputFileOrErr.get()));
-  
+      SourceMgr.addNewSourceBuffer(std::move(InputFileOrErr.get()));
+
   InputSourceCodeBufferIDs.push_back(BufferID);
-  
+
   if (SILMode || (MainMode && filename(File) == "main.swift"))
     MainBufferID = BufferID;
-  
+
   if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
     PrimaryBufferID = BufferID;
-  
+
   return false;
 }

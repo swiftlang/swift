@@ -9,7 +9,7 @@ import ImportAsMember.Class
 func testInstanceTypeFactoryMethod(queen: Bee) {
   // CHECK: bb0([[QUEEN:%[0-9]+]] : @owned $Optional<Bee>, [[HIVE_META:%[0-9]+]] : @trivial $@thick Hive.Type):
   // CHECK-NEXT:   [[HIVE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[HIVE_META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
-  // CHECK-NEXT:   [[FACTORY:%[0-9]+]] = class_method [volatile] [[HIVE_META_OBJC]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
+  // CHECK-NEXT:   [[FACTORY:%[0-9]+]] = objc_method [[HIVE_META_OBJC]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK-NEXT:   [[HIVE:%[0-9]+]] = apply [[FACTORY]]([[QUEEN]], [[HIVE_META_OBJC]]) : $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK-NEXT:   destroy_value [[QUEEN]]
   // CHECK-NEXT:   return [[HIVE]] : $Optional<Hive>
@@ -30,7 +30,7 @@ extension Hive {
   // CHECK:   [[BORROWED_SELF:%.*]] = load_borrow [[PB_BOX]]
   // CHECK:   [[META:%[0-9]+]] = value_metatype $@thick Hive.Type, [[BORROWED_SELF]] : $Hive
   // CHECK:   end_borrow [[BORROWED_SELF]] from [[PB_BOX]]
-  // CHECK:   [[FACTORY:%[0-9]+]] = class_method [volatile] [[META]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
+  // CHECK:   [[FACTORY:%[0-9]+]] = objc_method [[META]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
   // CHECK:   [[BORROWED_QUEEN:%.*]] = begin_borrow [[QUEEN]]
   // CHECK:   [[COPIED_BORROWED_QUEEN:%.*]] = copy_value [[BORROWED_QUEEN]]
@@ -88,7 +88,7 @@ class SubHive : Hive {
   // CHECK:   [[UPCAST_BORROWED_SELF:%.*]] = upcast [[BORROWED_SELF]] : $SubHive to $Hive
   // CHECK:   [[METATYPE:%.*]] = value_metatype $@thick Hive.Type, [[UPCAST_BORROWED_SELF:%.*]]
   // CHECK:   end_borrow [[BORROWED_SELF]] from [[PB_BOX]]
-  // CHECK:   [[HIVE_INIT_FN:%.*]] = class_method [volatile] [[METATYPE]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign
+  // CHECK:   [[HIVE_INIT_FN:%.*]] = objc_method [[METATYPE]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign
   // CHECK:   [[OBJC_METATYPE:%.*]] = thick_to_objc_metatype [[METATYPE]]
   // CHECK:   [[QUEEN:%.*]] = unchecked_ref_cast {{.*}} : $Bee to $Optional<Bee>
   // CHECK:   apply [[HIVE_INIT_FN]]([[QUEEN]], [[OBJC_METATYPE]]) : $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>

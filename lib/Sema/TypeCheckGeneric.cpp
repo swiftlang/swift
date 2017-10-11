@@ -118,12 +118,10 @@ void ProtocolRequirementTypeResolver::recordParamType(ParamDecl *decl,
 
 CompleteGenericTypeResolver::CompleteGenericTypeResolver(
                                               TypeChecker &tc,
-                                              GenericSignature *genericSig,
-                                              ModuleDecl &module)
-  : tc(tc), genericSig(genericSig), module(module),
+                                              GenericSignature *genericSig)
+  : tc(tc), genericSig(genericSig),
     builder(*tc.Context.getOrCreateGenericSignatureBuilder(
-                               genericSig->getCanonicalSignature(),
-                               &module))
+                               genericSig->getCanonicalSignature()))
 {
 }
 
@@ -224,8 +222,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 }
 
 bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {
-  return genericSig->getCanonicalTypeInContext(type1, module)
-           == genericSig->getCanonicalTypeInContext(type2, module);
+  return genericSig->getCanonicalTypeInContext(type1)
+           == genericSig->getCanonicalTypeInContext(type2);
 }
 
 void
@@ -758,7 +756,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     prepareGenericParamList(gp, func);
 
     // Create the generic signature builder.
-    GenericSignatureBuilder builder(Context, LookUpConformance(*this, func));
+    GenericSignatureBuilder builder(Context);
 
     // Type check the function declaration, treating all generic type
     // parameters as dependent, unresolved.
@@ -768,8 +766,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
     // The generic function signature is complete and well-formed. Determine
     // the type of the generic function.
-    sig = std::move(builder).computeGenericSignature(*func->getParentModule(),
-                                                     func->getLoc());
+    sig = std::move(builder).computeGenericSignature(func->getLoc());
 
     // The generic signature builder now has all of the requirements, although
     // there might still be errors that have not yet been diagnosed. Revert the
@@ -794,8 +791,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     sig = func->getDeclContext()->getGenericSignatureOfContext();
   }
 
-  CompleteGenericTypeResolver completeResolver(*this, sig,
-                                               *func->getModuleContext());
+  CompleteGenericTypeResolver completeResolver(*this, sig);
   if (checkGenericFuncSignature(*this, nullptr, func, completeResolver))
     invalid = true;
 
@@ -873,8 +869,12 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
 
     // 'throws' only applies to the innermost function.
     AnyFunctionType::ExtInfo info;
-    if (i == 0 && func->hasThrows())
-      info = info.withThrows();
+    if (i == 0) {
+      info = info.withThrows(func->hasThrows());
+      // Defer bodies must not escape.
+      if (auto fd = dyn_cast<FuncDecl>(func))
+        info = info.withNoEscape(fd->isDeferBody());
+    }
     
     assert(std::all_of(argTy.begin(), argTy.end(), [](const AnyFunctionType::Param &aty){
       return !aty.getType()->hasArchetype();
@@ -981,8 +981,7 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     prepareGenericParamList(gp, subscript);
 
     // Create the generic signature builder.
-    GenericSignatureBuilder builder(Context,
-                                    LookUpConformance(*this, subscript));
+    GenericSignatureBuilder builder(Context);
 
     // Type check the function declaration, treating all generic type
     // parameters as dependent, unresolved.
@@ -994,8 +993,7 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     // The generic subscript signature is complete and well-formed. Determine
     // the type of the generic subscript.
     sig =
-      std::move(builder).computeGenericSignature(*subscript->getParentModule(),
-                                                 subscript->getLoc());
+      std::move(builder).computeGenericSignature(subscript->getLoc());
 
     // The generic signature builder now has all of the requirements, although
     // there might still be errors that have not yet been diagnosed. Revert the
@@ -1019,8 +1017,7 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     sig = subscript->getDeclContext()->getGenericSignatureOfContext();
   }
 
-  CompleteGenericTypeResolver completeResolver(*this, sig,
-                                               *subscript->getModuleContext());
+  CompleteGenericTypeResolver completeResolver(*this, sig);
   if (checkGenericSubscriptSignature(*this, nullptr, subscript, completeResolver))
     invalid = true;
 
@@ -1114,7 +1111,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     }
 
     // Create the generic signature builder.
-    GenericSignatureBuilder builder(Context, LookUpConformance(*this, dc));
+    GenericSignatureBuilder builder(Context);
 
     // Type check the generic parameters, treating all generic type
     // parameters as dependent, unresolved.
@@ -1134,7 +1131,6 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 
     // Record the generic type parameter types and the requirements.
     sig = std::move(builder).computeGenericSignature(
-                                         *dc->getParentModule(),
                                          genericParams->getSourceRange().Start,
                                          allowConcreteGenericParams);
 
@@ -1168,8 +1164,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
             ->getGenericSignatureOfContext();
   }
 
-  CompleteGenericTypeResolver completeResolver(*this, sig,
-                                               *dc->getParentModule());
+  CompleteGenericTypeResolver completeResolver(*this, sig);
   if (recursivelyVisitGenericParams) {
     visitOuterToInner(genericParams,
                       [&](GenericParamList *gpList) {
@@ -1181,8 +1176,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
   }
 
   // Form the generic environment.
-  ModuleDecl *module = dc->getParentModule();
-  return sig->createGenericEnvironment(*module);
+  return sig->createGenericEnvironment();
 }
 
 void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
@@ -1227,103 +1221,144 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     SubstOptions options) {
   bool valid = true;
 
-  for (const auto &rawReq : genericSig->getRequirements()) {
-    auto req = rawReq.subst(substitutions, conformances, options);
-    if (!req) {
-      // Another requirement will fail later; just continue.
-      valid = false;
-      continue;
-    }
+  struct RequirementSet {
+    ArrayRef<Requirement> Requirements;
+    SmallVector<ParentConditionalConformance, 4> Parents;
+  };
 
-    auto kind = req->getKind();
-    Type rawFirstType = rawReq.getFirstType();
-    Type firstType = req->getFirstType();
-    Type rawSecondType, secondType;
-    if (kind != RequirementKind::Layout) {
-      rawSecondType = rawReq.getSecondType();
-      secondType = req->getSecondType();
-    }
+  SmallVector<RequirementSet, 8> pendingReqs;
+  pendingReqs.push_back({genericSig->getRequirements(), {}});
 
-    bool requirementFailure = false;
-    if (listener && !listener->shouldCheck(kind, firstType, secondType))
-      continue;
+  while (!pendingReqs.empty()) {
+    auto current = pendingReqs.pop_back_val();
 
-    Diag<Type, Type, Type> diagnostic;
-    Diag<Type, Type, StringRef> diagnosticNote;
-
-    switch (kind) {
-    case RequirementKind::Conformance: {
-      // Protocol conformance requirements.
-      auto proto = secondType->castTo<ProtocolType>();
-      // FIXME: This should track whether this should result in a private
-      // or non-private dependency.
-      // FIXME: Do we really need "used" at this point?
-      // FIXME: Poor location information. How much better can we do here?
-      // FIXME: This call should support listener to be able to properly
-      //        diagnose problems with conformances.
-      auto result =
-          conformsToProtocol(firstType, proto->getDecl(), dc,
-                             conformanceOptions, loc, unsatisfiedDependency);
-
-      // Unsatisfied dependency case.
-      auto status = result.getStatus();
-      switch (status) {
-      case RequirementCheckResult::UnsatisfiedDependency:
-      case RequirementCheckResult::Failure:
-      case RequirementCheckResult::SubstitutionFailure:
-        // pass it on up.
-        return status;
-      case RequirementCheckResult::Success:
-        // Report the conformance.
-        if (listener && valid) {
-          listener->satisfiedConformance(rawReq.getFirstType(), firstType,
-                                         result.getConformance());
+    for (const auto &rawReq : current.Requirements) {
+      auto req = rawReq;
+      if (current.Parents.empty()) {
+        auto substed = rawReq.subst(substitutions, conformances, options);
+        if (!substed) {
+          // Another requirement will fail later; just continue.
+          valid = false;
+          continue;
         }
+
+        req = *substed;
+      }
+
+      auto kind = req.getKind();
+      Type rawFirstType = rawReq.getFirstType();
+      Type firstType = req.getFirstType();
+      Type rawSecondType, secondType;
+      if (kind != RequirementKind::Layout) {
+        rawSecondType = rawReq.getSecondType();
+        secondType = req.getSecondType();
+      }
+
+      bool requirementFailure = false;
+      if (listener && !listener->shouldCheck(kind, firstType, secondType))
+        continue;
+
+      Diag<Type, Type, Type> diagnostic;
+      Diag<Type, Type, StringRef> diagnosticNote;
+
+      switch (kind) {
+      case RequirementKind::Conformance: {
+        // Protocol conformance requirements.
+        auto proto = secondType->castTo<ProtocolType>();
+        // FIXME: This should track whether this should result in a private
+        // or non-private dependency.
+        // FIXME: Do we really need "used" at this point?
+        // FIXME: Poor location information. How much better can we do here?
+        // FIXME: This call should support listener to be able to properly
+        //        diagnose problems with conformances.
+        auto result =
+            conformsToProtocol(firstType, proto->getDecl(), dc,
+                               conformanceOptions, loc, unsatisfiedDependency);
+
+        // Unsatisfied dependency case.
+        auto status = result.getStatus();
+        switch (status) {
+        case RequirementCheckResult::Failure:
+          // A failure at the top level is diagnosed elsewhere.
+          if (current.Parents.empty())
+            return status;
+
+          diagnostic = diag::type_does_not_conform_owner;
+          diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+          requirementFailure = true;
+          break;
+        case RequirementCheckResult::UnsatisfiedDependency:
+        case RequirementCheckResult::SubstitutionFailure:
+          // pass it on up.
+          return status;
+        case RequirementCheckResult::Success: {
+          auto conformance = result.getConformance();
+          // Report the conformance.
+          if (listener && valid && current.Parents.empty()) {
+            listener->satisfiedConformance(rawFirstType, firstType,
+                                           conformance);
+          }
+
+          auto conditionalReqs = conformance.getConditionalRequirements();
+          if (!conditionalReqs.empty()) {
+            auto history = current.Parents;
+            history.push_back({firstType, proto});
+            pendingReqs.push_back({conditionalReqs, std::move(history)});
+          }
+          continue;
+        }
+        }
+
+        // Failure needs to emit a diagnostic.
+        break;
+      }
+
+      case RequirementKind::Layout: {
+        // TODO: Statically check if a the first type
+        // conforms to the layout constraint, once we
+        // support such static checks.
         continue;
       }
-    }
 
-    case RequirementKind::Layout: {
-      // TODO: Statically check if a the first type
-      // conforms to the layout constraint, once we
-      // support such static checks.
-      continue;
-    }
+      case RequirementKind::Superclass:
+        // Superclass requirements.
+        if (!isSubclassOf(firstType, secondType, dc)) {
+          diagnostic = diag::type_does_not_inherit;
+          diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+          requirementFailure = true;
+        }
+        break;
 
-    case RequirementKind::Superclass:
-      // Superclass requirements.
-      if (!isSubclassOf(firstType, secondType, dc)) {
-        diagnostic = diag::type_does_not_inherit;
-        diagnosticNote = diag::type_does_not_inherit_requirement;
-        requirementFailure = true;
+      case RequirementKind::SameType:
+        if (!firstType->isEqual(secondType)) {
+          diagnostic = diag::types_not_equal;
+          diagnosticNote = diag::types_not_equal_requirement;
+          requirementFailure = true;
+        }
+        break;
       }
-      break;
 
-    case RequirementKind::SameType:
-      if (!firstType->isEqual(secondType)) {
-        diagnostic = diag::types_not_equal;
-        diagnosticNote = diag::types_not_equal_requirement;
-        requirementFailure = true;
+      if (!requirementFailure)
+        continue;
+
+      if (listener &&
+          listener->diagnoseUnsatisfiedRequirement(rawReq, firstType,
+                                                   secondType, current.Parents))
+        return RequirementCheckResult::Failure;
+
+      if (loc.isValid()) {
+        // FIXME: Poor source-location information.
+        diagnose(loc, diagnostic, owner, firstType, secondType);
+        diagnose(noteLoc, diagnosticNote, rawFirstType, rawSecondType,
+                 genericSig->gatherGenericParamBindingsText(
+                     {rawFirstType, rawSecondType}, substitutions));
+
+        ParentConditionalConformance::diagnoseConformanceStack(Diags, noteLoc,
+                                                               current.Parents);
       }
-      break;
-    }
 
-    if (!requirementFailure)
-      continue;
-
-    if (listener &&
-        listener->diagnoseUnsatisfiedRequirement(rawReq, firstType, secondType))
       return RequirementCheckResult::Failure;
-
-    if (loc.isValid()) {
-      // FIXME: Poor source-location information.
-      diagnose(loc, diagnostic, owner, firstType, secondType);
-      diagnose(noteLoc, diagnosticNote, rawFirstType, rawSecondType,
-               genericSig->gatherGenericParamBindingsText(
-                   {rawFirstType, rawSecondType}, substitutions));
     }
-
-    return RequirementCheckResult::Failure;
   }
 
   if (valid)

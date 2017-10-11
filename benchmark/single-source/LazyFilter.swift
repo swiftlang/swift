@@ -14,6 +14,11 @@
 // collections.
 import TestsUtils
 
+public let LazyFilter = [
+  BenchmarkInfo(name: "LazilyFilteredArrays", runFunction: run_LazilyFilteredArrays, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "LazilyFilteredRange", runFunction: run_LazilyFilteredRange, tags: [.validation, .api, .Array]),
+]
+
 @inline(never)
 public func run_LazilyFilteredRange(_ N: Int) {
   var res = 123

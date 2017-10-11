@@ -1879,8 +1879,7 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     return false;
 
   auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
-    auto *env = archetype->getGenericEnvironment();
-    auto paramType = env->mapTypeOutOfContext(archetype);
+    auto paramType = archetype->getInterfaceType();
 
     if (auto *GTPT = paramType->getAs<GenericTypeParamType>())
       return GTPT->getDecl();
@@ -6121,8 +6120,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
         return false;
 
       // Record substitution from generic parameter to the argument type.
-      substitutions[env->mapTypeOutOfContext(archetype)
-                        ->getCanonicalType()
+      substitutions[archetype->getInterfaceType()->getCanonicalType()
                         ->castTo<SubstitutableType>()] = argType;
     }
   }
@@ -6152,8 +6150,9 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
       return !(first->hasTypeParameter() || first->isTypeVariableOrMember());
     }
 
-    bool diagnoseUnsatisfiedRequirement(const Requirement &req, Type first,
-                                        Type second) override {
+    bool diagnoseUnsatisfiedRequirement(
+        const Requirement &req, Type first, Type second,
+        ArrayRef<ParentConditionalConformance> parents) override {
       Diag<Type, Type, Type, Type, StringRef> note;
       switch (req.getKind()) {
       case RequirementKind::Conformance:
@@ -6203,6 +6202,10 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
                   rawFirstType, rawSecondType,
                   genericSig->gatherGenericParamBindingsText(
                                  {rawFirstType, rawSecondType}, Substitutions));
+
+      ParentConditionalConformance::diagnoseConformanceStack(
+          TC.Diags, Candidate->getLoc(), parents);
+
       return true;
     }
   };
@@ -8998,7 +9001,7 @@ static bool hasArchetype(const GenericTypeDecl *generic,
   if (!genericEnv)
     return false;
 
-  return genericEnv->containsPrimaryArchetype(archetype);
+  return archetype->getGenericEnvironment() == genericEnv;
 }
 
 static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,

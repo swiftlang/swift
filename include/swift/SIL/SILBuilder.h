@@ -1185,33 +1185,28 @@ public:
   }
 
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
-                                     SILDeclRef Member, SILType MethodTy,
-                                     bool Volatile = false) {
+                                     SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) ClassMethodInst(
-        getSILDebugLocation(Loc), Operand, Member, MethodTy, Volatile));
+        getSILDebugLocation(Loc), Operand, Member, MethodTy));
   }
-
-  ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
-                                     SILDeclRef Member, bool Volatile = false) {
-    auto MethodTy = getModule().Types.getConstantOverrideType(Member);
-    return createClassMethod(Loc, Operand, Member,
-                             SILType::getPrimitiveObjectType(MethodTy),
-                             Volatile);
-  }
-
-  /// Emit a class_method reference to the least derived overridden decl for
-  /// the given method, and upcast the "self" pointer to the matching superclass
-  /// type.
-  std::pair<ClassMethodInst *, SILValue> emitClassMethod(SILLocation Loc,
-                                                         SILValue Self,
-                                                         SILDeclRef Member,
-                                                         bool Volatile = false);
 
   SuperMethodInst *createSuperMethod(SILLocation Loc, SILValue Operand,
-                                     SILDeclRef Member, SILType MethodTy,
-                                     bool Volatile = false) {
+                                     SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) SuperMethodInst(
-        getSILDebugLocation(Loc), Operand, Member, MethodTy, Volatile));
+        getSILDebugLocation(Loc), Operand, Member, MethodTy));
+  }
+
+  ObjCMethodInst *createObjCMethod(SILLocation Loc, SILValue Operand,
+                                   SILDeclRef Member, SILType MethodTy) {
+    return insert(ObjCMethodInst::create(
+        getSILDebugLocation(Loc), Operand, Member, MethodTy,
+        &getFunction(), OpenedArchetypes));
+  }
+
+  ObjCSuperMethodInst *createObjCSuperMethod(SILLocation Loc, SILValue Operand,
+                                             SILDeclRef Member, SILType MethodTy) {
+    return insert(new (getModule()) ObjCSuperMethodInst(
+        getSILDebugLocation(Loc), Operand, Member, MethodTy));
   }
 
   WitnessMethodInst *createWitnessMethod(SILLocation Loc, CanType LookupTy,
@@ -1221,14 +1216,6 @@ public:
     return insert(WitnessMethodInst::create(
         getSILDebugLocation(Loc), LookupTy, Conformance, Member, MethodTy,
         &getFunction(), OpenedArchetypes, Volatile));
-  }
-
-  DynamicMethodInst *createDynamicMethod(SILLocation Loc, SILValue Operand,
-                                         SILDeclRef Member, SILType MethodTy,
-                                         bool Volatile = false) {
-    return insert(DynamicMethodInst::create(
-        getSILDebugLocation(Loc), Operand, Member, MethodTy, Volatile,
-        &getFunction(), OpenedArchetypes));
   }
 
   OpenExistentialAddrInst *

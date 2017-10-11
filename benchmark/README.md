@@ -48,7 +48,7 @@ The following build options are available:
       (default: "macosx;iphoneos;appletvos;watchos")
 * `-DSWIFT_OPTIMIZATION_LEVELS`
     * A list of Swift optimization levels to build against
-      (default: "O;Onone;Ounchecked")
+      (default: "O;Onone;Osize")
 * `-DSWIFT_BENCHMARK_EMIT_SIB`
     * A boolean value indicating whether .sib files should be generated
       alongside .o files (default: FALSE)
@@ -92,7 +92,7 @@ Using the Benchmark Driver
 
 * `$ ./Benchmark_O --num-iters=1 --num-samples=1`
 * `$ ./Benchmark_Onone --list`
-* `$ ./Benchmark_Ounchecked Ackermann`
+* `$ ./Benchmark_Osize Ackermann`
 
 ### Note
 As a shortcut, you can also refer to benchmarks by their ordinal numbers.

@@ -41,7 +41,7 @@ import Builtin
 
 sil @putchar : $@convention(c) (Builtin.Int64) -> ()
 
-sil @target_func : $@convention(thin) () -> () {
+sil [serialized] @target_func : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @putchar : $@convention(c) (Builtin.Int64) -> ()
   // "swift\n" in ASCII
@@ -61,7 +61,7 @@ bb0:
   return %9999 : $()
 }
 
-sil @function_2 : $@convention(thin) () -> () {
+sil [serialized] @function_2 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @target_func : $@convention(thin) () -> ()
   apply %0() : $@convention(thin) () -> ()
@@ -73,7 +73,7 @@ bb0:
   return %9999 : $()
 }
 
-sil @function_3 : $@convention(thin) () -> () {
+sil [serialized] @function_3 : $@convention(thin) () -> () {
 bb0:
   // Make sure we only eliminate one.
   %0 = function_ref @target_func : $@convention(thin) () -> ()

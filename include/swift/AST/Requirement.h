@@ -120,6 +120,7 @@ public:
   }
 
   void dump() const;
+  void dump(raw_ostream &out) const;
   void print(raw_ostream &os, const PrintOptions &opts) const;
   void print(ASTPrinter &printer, const PrintOptions &opts) const;
 };

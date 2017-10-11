@@ -15,6 +15,7 @@
 from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
+    defaultIndicesForTraversal,
     sliceTypeName,
     protocolsForCollectionFeatures
 )
@@ -96,13 +97,9 @@ def get_slice_doc_comment(Self):
 %   for Mutable in [ False, True ]:
 %     for RangeReplaceable in [ False, True ]:
 %       Self = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
-%       BaseRequirements = ['_' + collectionForTraversal(Traversal).replace('Collection', 'Indexable')]
-%       if Mutable:
-%         BaseRequirements.append('_MutableIndexable')
-%       if RangeReplaceable:
-%         BaseRequirements.append('_RangeReplaceableIndexable')
-%       BaseRequirements = ' & '.join(BaseRequirements)
+%       BaseRequirements = ' & '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 %       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
+%       Indices = defaultIndicesForTraversal(Traversal)
 
 ${get_slice_doc_comment(Self)}
 %     if Mutable:
@@ -114,11 +111,12 @@ ${get_slice_doc_comment(Self)}
 ///   subsequence type that takes your index invalidation requirements into
 ///   account.
 %     end
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct ${Self}<Base : ${BaseRequirements}>
   : ${SelfProtocols} {
 
   public typealias Index = Base.Index
-  public typealias IndexDistance = Base.IndexDistance
+  public typealias IndexDistance = Base.IndexDistance  
 
   public var _startIndex: Index
   public var _endIndex: Index
@@ -165,13 +163,10 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
-  // FIXME(ABI)#67 (Associated Types with where clauses):
-  //
-  //   public typealias Indices = Base.Indices
-  //   public var indices: Indices { ... }
-  //
-  // We can't do it right now because we don't have enough
-  // constraints on the Base.Indices type in this context.
+  public typealias Indices = Base.Indices
+  public var indices: Indices { 
+    return _base.indices[_startIndex..<_endIndex]
+  }
 
   @_inlineable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {

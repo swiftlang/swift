@@ -163,6 +163,7 @@ extension LazySequenceProtocol where Elements == Self {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceProtocol`
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct LazySequence<Base : Sequence>
   : LazySequenceProtocol, _SequenceWrapper {
 

@@ -1688,8 +1688,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   }
 
   // Form a new generic signature based on the old one.
-  GenericSignatureBuilder Builder(D->getASTContext(),
-                                  TypeChecker::LookUpConformance(TC, DC));
+  GenericSignatureBuilder Builder(D->getASTContext());
 
   // First, add the old generic signature.
   Builder.addGenericSignature(genericSig);
@@ -1852,7 +1851,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
   // Check the result.
   (void)std::move(Builder).computeGenericSignature(
-                                        *DC->getParentModule(),
                                         attr->getLocation(),
                                         /*allowConcreteGenericParams=*/true);
 }
@@ -2006,6 +2004,10 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
 }
 
 void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
+  // Don't check ownership attribute if the declaration is already marked invalid.
+  if (var->isInvalid())
+    return;
+
   Type type = var->getType();
   Type interfaceType = var->getInterfaceType();
 
@@ -2052,6 +2054,20 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
     }
 
     diagnose(var->getStartLoc(), D, (unsigned) ownershipKind, underlyingType);
+    attr->setInvalid();
+  } else if (dyn_cast<ProtocolDecl>(var->getDeclContext())) {
+    // Ownership does not make sense in protocols.
+    if (Context.isSwiftVersionAtLeast(5))
+      diagnose(attr->getLocation(),
+        diag::ownership_invalid_in_protocols,
+        (unsigned) ownershipKind)
+        .fixItRemove(attr->getRange());
+    else
+      diagnose(attr->getLocation(),
+        diag::ownership_invalid_in_protocols_compat_warning,
+        (unsigned) ownershipKind)
+        .fixItRemove(attr->getRange());
+
     attr->setInvalid();
   }
 

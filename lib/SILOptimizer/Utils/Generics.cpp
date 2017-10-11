@@ -715,8 +715,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
     // account by the substGenericArgs. So, canonicalize in the context of the
     // specialized signature.
     FnTy = cast<SILFunctionType>(
-        CanSpecializedGenericSig->getCanonicalTypeInContext(
-            FnTy, *M.getSwiftModule()));
+        CanSpecializedGenericSig->getCanonicalTypeInContext(FnTy));
   }
   assert(FnTy);
 
@@ -785,8 +784,7 @@ getGenericEnvironmentAndSignatureWithRequirements(
     GenericSignature *OrigGenSig, GenericEnvironment *OrigGenericEnv,
     ArrayRef<Requirement> Requirements, SILModule &M) {
   // Form a new generic signature based on the old one.
-  GenericSignatureBuilder Builder(M.getASTContext(),
-                           LookUpConformanceInModule(M.getSwiftModule()));
+  GenericSignatureBuilder Builder(M.getASTContext());
 
   // First, add the old generic signature.
   Builder.addGenericSignature(OrigGenSig);
@@ -800,10 +798,10 @@ getGenericEnvironmentAndSignatureWithRequirements(
   }
 
   auto NewGenSig =
-    std::move(Builder).computeGenericSignature(*M.getSwiftModule(),
+    std::move(Builder).computeGenericSignature(
                                    SourceLoc(),
                                    /*allowConcreteGenericParams=*/true);
-  auto NewGenEnv = NewGenSig->createGenericEnvironment(*M.getSwiftModule());
+  auto NewGenEnv = NewGenSig->createGenericEnvironment();
   return { NewGenEnv, NewGenSig };
 }
 
@@ -854,7 +852,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
                                             GenericSignature *Sig,
                                             GenericEnvironment *Env) {
   auto Reqs = Sig->getRequirements();
-  auto CurrentGP = Env->mapTypeOutOfContext(Archetype)
+  auto CurrentGP = Archetype->getInterfaceType()
                        ->getCanonicalType()
                        ->getRootGenericParam();
   for (auto Req : Reqs) {
@@ -897,7 +895,7 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature *Sig,
                                 GenericEnvironment *Env,
                                 SmallVectorImpl<Requirement> &CollectedReqs) {
   auto Reqs = Sig->getRequirements();
-  auto CurrentGP = Env->mapTypeOutOfContext(Archetype)
+  auto CurrentGP = Archetype->getInterfaceType()
                        ->getCanonicalType()
                        ->getRootGenericParam();
   CollectedReqs.clear();
@@ -1150,7 +1148,7 @@ public:
       : CallerGenericSig(CallerGenericSig), CallerGenericEnv(CallerGenericEnv),
         CalleeGenericSig(CalleeGenericSig), CalleeGenericEnv(CalleeGenericEnv),
         M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()),
-        Builder(Ctx, LookUpConformanceInModule(SM)) {
+        Builder(Ctx) {
     SpecializedGenericSig = nullptr;
     SpecializedGenericEnv = nullptr;
     CalleeInterfaceToCallerArchetypeMap =
@@ -1166,7 +1164,7 @@ public:
       : CallerGenericSig(CalleeGenericSig), CallerGenericEnv(CalleeGenericEnv),
         CalleeGenericSig(CalleeGenericSig), CalleeGenericEnv(CalleeGenericEnv),
         M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()),
-        Builder(Ctx, LookUpConformanceInModule(SM)) {
+        Builder(Ctx) {
 
     // Create the new generic signature using provided requirements.
     std::tie(SpecializedGenericEnv, SpecializedGenericSig) =
@@ -1304,8 +1302,7 @@ void FunctionSignaturePartialSpecializer::
 void FunctionSignaturePartialSpecializer::
     createGenericParamsForUsedCallerArchetypes() {
   for (auto CallerArchetype : UsedCallerArchetypes) {
-    auto CallerGenericParam =
-        CallerGenericEnv->mapTypeOutOfContext(CallerArchetype);
+    auto CallerGenericParam = CallerArchetype->getInterfaceType();
     assert(CallerGenericParam->is<GenericTypeParamType>());
 
     DEBUG(llvm::dbgs() << "\n\nChecking used caller archetype:\n";
@@ -1347,7 +1344,7 @@ void FunctionSignaturePartialSpecializer::
   for (auto GP : CalleeGenericSig->getGenericParams()) {
     auto CanTy = GP->getCanonicalType();
     auto CanTyInContext =
-        CalleeGenericSig->getCanonicalTypeInContext(CanTy, *SM);
+        CalleeGenericSig->getCanonicalTypeInContext(CanTy);
     auto Replacement = CanTyInContext.subst(CalleeInterfaceToCallerArchetypeMap);
     DEBUG(llvm::dbgs() << "\n\nChecking callee generic parameter:\n";
           CanTy->dump());
@@ -1452,7 +1449,7 @@ void FunctionSignaturePartialSpecializer::addRequirements(
 
   for (auto &reqReq : Reqs) {
     DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n"; reqReq.dump());
-    Builder.addRequirement(reqReq, source, SM, &SubsMap);
+    Builder.addRequirement(*reqReq.subst(SubsMap), source, SM);
   }
 }
 
@@ -1491,10 +1488,10 @@ FunctionSignaturePartialSpecializer::
 
   // Finalize the archetype builder.
   auto GenSig =
-      std::move(Builder).computeGenericSignature(*M.getSwiftModule(),
+      std::move(Builder).computeGenericSignature(
                                       SourceLoc(),
                                       /*allowConcreteGenericParams=*/true);
-  auto GenEnv = GenSig->createGenericEnvironment(*M.getSwiftModule());
+  auto GenEnv = GenSig->createGenericEnvironment();
   return { GenEnv, GenSig };
 }
 
@@ -2274,11 +2271,12 @@ void swift::trySpecializeApplyOfGeneric(
   if (F->isSerialized() && RefF->isSerialized())
     Serialized = IsSerializable;
 
-  // If it is OnoneSupport consider all specializations as serialized.
+  // If it is OnoneSupport consider all specializations as non-serialized
+  // as we do not SIL serialize their bodies.
   // It is important to set this flag here, because it affects the
   // mangling of the specialization's name.
   if (Apply.getModule().isOptimizedOnoneSupportModule())
-    Serialized = IsSerialized;
+    Serialized = IsNotSerialized;
 
   ReabstractionInfo ReInfo(Apply, RefF, Apply.getSubstitutions());
   if (!ReInfo.canBeSpecialized())

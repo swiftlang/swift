@@ -7,7 +7,7 @@
 
 sil_stage canonical
 
-sil @test : $@convention(thin) () -> () {
+sil [serialized] @test : $@convention(thin) () -> () {
 bb0:
 // CHECK: string_literal utf8 "\u{0B}"
   %1 = string_literal utf8 "\u{0B}"

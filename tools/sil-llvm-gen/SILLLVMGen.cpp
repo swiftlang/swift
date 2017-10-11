@@ -177,8 +177,8 @@ int main(int argc, char **argv) {
   CI.addDiagnosticConsumer(&PrintDiags);
 
   if (!PerformWMO) {
-    Invocation.getFrontendOptions().Inputs
-      .setPrimaryInputForInputFilename(InputFilename);
+    Invocation.getFrontendOptions().Inputs.setPrimaryInputForInputFilename(
+        InputFilename);
   }
 
   if (CI.setup(Invocation))

@@ -533,25 +533,6 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   }
 }
 
-/// Returns true if one of the ancestor DeclContexts of \p D is either marked
-/// private or is a local context.
-static bool isInPrivateOrLocalContext(const ValueDecl *D) {
-  const DeclContext *DC = D->getDeclContext();
-  if (!DC->isTypeContext()) {
-    assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
-           "unexpected context kind");
-    return DC->isLocalContext();
-  }
-
-  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (nominal == nullptr)
-    return false;
-
-  if (nominal->getFormalAccess() <= AccessLevel::FilePrivate)
-    return true;
-  return isInPrivateOrLocalContext(nominal);
-}
-
 static bool getUnnamedParamIndex(const ParameterList *ParamList,
                                  const ParamDecl *D,
                                  unsigned &UnnamedIndex) {
@@ -593,11 +574,8 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
 }
 
 static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
-  if (!decl->hasAccess() ||
-      decl->getFormalAccess() > AccessLevel::FilePrivate ||
-      isInPrivateOrLocalContext(decl)) {
+  if (!decl->isOutermostPrivateOrFilePrivateScope())
     return StringRef();
-  }
 
   // Mangle non-local private declarations with a textual discriminator
   // based on their enclosing file.
@@ -892,8 +870,7 @@ void ASTMangler::appendType(Type type) {
 
       // Find the archetype information.
       const DeclContext *DC = DeclCtx;
-      auto GTPT = GenericEnvironment::mapTypeOutOfContext(GenericEnv, archetype)
-                      ->castTo<GenericTypeParamType>();
+      auto GTPT = archetype->getInterfaceType()->castTo<GenericTypeParamType>();
 
       // The DWARF output created by Swift is intentionally flat,
       // therefore archetypes are emitted with their DeclContext if
@@ -1703,8 +1680,8 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
   // dependent type, but can't yet. Shouldn't need this side channel.
 
   appendIdentifier(assocTy->getName().str());
-  if (!OptimizeProtocolNames || !CurGenericSignature || !Mod
-      || CurGenericSignature->getConformsTo(dmt->getBase(), *Mod).size() > 1) {
+  if (!OptimizeProtocolNames || !CurGenericSignature
+      || CurGenericSignature->getConformsTo(dmt->getBase()).size() > 1) {
     appendAnyGenericType(assocTy->getProtocol());
   }
 }

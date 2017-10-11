@@ -628,7 +628,7 @@ Some additional meaningful categories of type:
 
 - A *heap object reference* type is a type whose representation consists of a
   single strong-reference-counted pointer. This includes all class types,
-  the ``Builtin.NativeObject`` and ``Builtin.UnknownObject`` types, and
+  the ``Builtin.NativeObject`` and ``AnyObject`` types, and
   archetypes that conform to one or more class protocols.
 - A *reference type* is more general in that its low-level representation may
   include additional global pointers alongside a strong-reference-counted
@@ -734,7 +734,7 @@ The following types are considered layout-compatible:
   ``B`` and a derived class ``D`` inheriting from ``B``, a value of
   type ``B`` referencing an instance of type ``D`` is layout compatible with
   both ``B`` and ``D``, as well as ``Builtin.NativeObject`` and
-  ``Builtin.UnknownObject``. It is not layout compatible with an unrelated class
+  ``AnyObject``. It is not layout compatible with an unrelated class
   type ``E``.
 - For payloaded enums, the payload type of the first payloaded case is
   layout-compatible with the enum (*not* commutatively).
@@ -1034,11 +1034,13 @@ VTables
   sil-vtable-entry ::= sil-decl-ref ':' sil-linkage? sil-function-name
 
 SIL represents dynamic dispatch for class methods using the `class_method`_,
-`super_method`_, and `dynamic_method`_ instructions. The potential destinations
-for these dispatch operations are tracked in ``sil_vtable`` declarations for
-every class type. The declaration contains a mapping from every method of the
-class (including those inherited from its base class) to the SIL function that
-implements the method for that class::
+`super_method`_, `objc_method`_, and `objc_super_method`_ instructions.
+
+The potential destinations for `class_method`_ and `super_method`_ are
+tracked in ``sil_vtable`` declarations for every class type. The declaration
+contains a mapping from every method of the class (including those inherited
+from its base class) to the SIL function that implements the method for that
+class::
 
   class A {
     func foo()
@@ -1592,9 +1594,9 @@ typed, so aliasing of classes is constrained by the type system as follows:
   including a Swift class instance, a box allocated by ``alloc_box``,
   or a thick function's closure context.
   It may not alias natively Objective-C class instances.
-* A ``Builtin.UnknownObject`` or ``Builtin.BridgeObject`` may alias
-  any class instance, whether Swift or Objective-C, but may not alias
-  non-class-instance heap objects.
+* An ``AnyObject`` or ``Builtin.BridgeObject`` may alias any class instance,
+  whether Swift or Objective-C, but may not alias non-class-instance
+  heap objects.
 * Two values of the same class type ``$C`` may alias. Two values of related
   class type ``$B`` and ``$D``, where there is a subclass relationship between
   ``$B`` and ``$D``, may alias. Two values of unrelated class types may not
@@ -2937,24 +2939,18 @@ method name segment.
 Dynamic Dispatch
 ~~~~~~~~~~~~~~~~
 
-These instructions perform dynamic lookup of class and generic methods. They
-share a common set of attributes::
+These instructions perform dynamic lookup of class and generic methods.
 
-  sil-method-attributes ::= '[' 'volatile'? ']'
+The ``class_method`` and ``super_method`` instructions must reference
+Swift native methods and always use vtable dispatch.
 
-The ``volatile`` attribute on a dynamic dispatch instruction indicates that
-the method lookup is semantically required (as, for example, in Objective-C).
-When the type of a dynamic dispatch instruction's operand is known,
-optimization passes can promote non-``volatile`` dispatch instructions
-into static ``function_ref`` instructions.
+The ``objc_method`` and ``objc_super_method`` instructions must reference
+Objective-C methods (indicated by the ``foreign`` marker on a method
+reference, as in ``#NSObject.description!1.foreign``).
 
-If a dynamic dispatch instruction references an Objective-C method
-(indicated by the ``foreign`` marker on a method reference, as in
-``#NSObject.description!1.foreign``), then the instruction
-represents an ``objc_msgSend`` invocation. ``objc_msgSend`` invocations can
-only be used as the callee of an ``apply`` instruction or ``partial_apply``
-instruction. They cannot be stored or used as ``apply`` or ``partial_apply``
-arguments.  ``objc_msgSend`` invocations must always be ``volatile``.
+Note that ``objc_msgSend`` invocations can only be used as the callee
+of an ``apply`` instruction or ``partial_apply`` instruction. They cannot
+be stored or used as ``apply`` or ``partial_apply`` arguments.
 
 class_method
 ````````````
@@ -2963,30 +2959,55 @@ class_method
   sil-instruction ::= 'class_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = class_method %0 : $T, #T.method!1 : $@convention(thin) U -> V
+  %1 = class_method %0 : $T, #T.method!1 : $@convention(class_method) U -> V
   // %0 must be of a class type or class metatype $T
-  // #T.method!1 must be a reference to a dynamically-dispatched method of T or
-  // of one of its superclasses, at uncurry level >= 1
+  // #T.method!1 must be a reference to a Swift native method of T or
+  // of one of its superclasses, at uncurry level == 1
   // %1 will be of type $U -> V
 
 Looks up a method based on the dynamic type of a class or class metatype
-instance. It is undefined behavior if the class value is null and the
-method is not an Objective-C method.
+instance. It is undefined behavior if the class value is null.
 
-If:
+If the static type of the class instance is known, or the method is known
+to be final, then the instruction is a candidate for devirtualization
+optimization. A devirtualization pass can consult the module's `VTables`_
+to find the SIL function that implements the method and promote the
+instruction to a static `function_ref`_.
 
-- the instruction is not ``[volatile]``,
-- the referenced method is not a ``foreign`` method,
-- and the static type of the class instance is known, or the method is known
-  to be final,
+objc_method
+```````````
+::
 
-then the instruction is a candidate for devirtualization optimization. A
-devirtualization pass can consult the module's `VTables`_ to find the
-SIL function that implements the method and promote the instruction to a
-static `function_ref`_.
+  sil-instruction ::= 'objc_method' sil-method-attributes?
+                        sil-operand ',' sil-decl-ref ':' sil-type
+
+  %1 = objc_method %0 : $T, #T.method!1.foreign : $@convention(objc_method) U -> V
+  // %0 must be of a class type or class metatype $T
+  // #T.method!1 must be a reference to an Objective-C method of T or
+  // of one of its superclasses, at uncurry level == 1
+  // %1 will be of type $U -> V
+
+Performs Objective-C method dispatch using ``objc_msgSend()``.
+
+Objective-C method calls are never candidates for devirtualization.
 
 super_method
 ````````````
+::
+
+  sil-instruction ::= 'super_method' sil-method-attributes?
+                        sil-operand ',' sil-decl-ref ':' sil-type
+
+  %1 = super_method %0 : $T, #Super.method!1 : $@convention(thin) U -> V
+  // %0 must be of a non-root class type or class metatype $T
+  // #Super.method!1 must be a reference to a native Swift method of T's
+  // superclass or of one of its ancestor classes, at uncurry level >= 1
+  // %1 will be of type $@convention(thin) U -> V
+
+Looks up a method in the superclass of a class or class metatype instance.
+
+objc_super_method
+`````````````````
 ::
 
   sil-instruction ::= 'super_method' sil-method-attributes?
@@ -2998,11 +3019,8 @@ super_method
   // superclass or of one of its ancestor classes, at uncurry level >= 1
   // %1 will be of type $@convention(thin) U -> V
 
-Looks up a method in the superclass of a class or class metatype instance.
-Note that for native Swift methods, ``super.method`` calls are statically
-dispatched, so this instruction is only valid for Objective-C methods.
-It is undefined behavior if the class value is null and the method is
-not an Objective-C method.
+This instruction performs an Objective-C message send using
+``objc_msgSuper()``.
 
 witness_method
 ``````````````
@@ -3025,40 +3043,6 @@ constrained by that protocol. The result will be generic on the ``Self``
 archetype of the original protocol and have the ``witness_method`` calling
 convention. If the referenced protocol is an ``@objc`` protocol, the
 resulting type has the ``objc`` calling convention.
-
-dynamic_method
-``````````````
-::
-
-  sil-instruction ::= 'dynamic_method' sil-method-attributes?
-                      sil-operand ',' sil-decl-ref ':' sil-type
-
-  %1 = dynamic_method %0 : $P, #X.method!1 : $@convention(thin) U -> V
-  // %0 must be of a protocol or protocol composition type $P,
-  // where $P contains the Swift.DynamicLookup protocol
-  // #X.method!1 must be a reference to an @objc method of any class
-  // or protocol type
-  //
-  // The "self" argument of the method type $@convention(thin) U -> V must be
-  //   Builtin.UnknownObject
-
-Looks up the implementation of an Objective-C method with the same
-selector as the named method for the dynamic type of the
-value inside an existential container. The "self" operand of the result
-function value is represented using an opaque type, the value for which must
-be projected out as a value of type ``Builtin.UnknownObject``.
-
-It is undefined behavior if the dynamic type of the operand does not
-have an implementation for the Objective-C method with the selector to
-which the ``dynamic_method`` instruction refers, or if that
-implementation has parameter or result types that are incompatible
-with the method referenced by ``dynamic_method``.
-This instruction should only be used in cases where its result will be
-immediately consumed by an operation that performs the selector check
-itself (e.g., an ``apply`` that lowers to ``objc_msgSend``).
-To query whether the operand has an implementation for the given
-method and safely handle the case where it does not, use
-`dynamic_method_br`_.
 
 Function Application
 ~~~~~~~~~~~~~~~~~~~~
@@ -4363,7 +4347,7 @@ ref_to_raw_pointer
   sil-instruction ::= 'ref_to_raw_pointer' sil-operand 'to' sil-type
 
   %1 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
-  // $C must be a class type, or Builtin.NativeObject, or Builtin.UnknownObject
+  // $C must be a class type, or Builtin.NativeObject, or AnyObject
   // %1 will be of type $Builtin.RawPointer
 
 Converts a heap object reference to a ``Builtin.RawPointer``. The ``RawPointer``
@@ -4378,7 +4362,7 @@ raw_pointer_to_ref
   sil-instruction ::= 'raw_pointer_to_ref' sil-operand 'to' sil-type
 
   %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
-  // $C must be a class type, or Builtin.NativeObject, or Builtin.UnknownObject
+  // $C must be a class type, or Builtin.NativeObject, or AnyObject
   // %1 will be of type $C
 
 Converts a ``Builtin.RawPointer`` back to a heap object reference. Casting

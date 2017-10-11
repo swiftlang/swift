@@ -54,8 +54,7 @@ static SILLocation getLocForValue(SILValue value) {
 
 static GenericEnvironment *getGenericEnvironment(SILModule &Mod,
                                                  CanSILFunctionType loweredTy) {
-  return loweredTy->getGenericSignature()->createGenericEnvironment(
-                                                         *Mod.getSwiftModule());
+  return loweredTy->getGenericSignature()->createGenericEnvironment();
 }
 
 /// Utility to determine if this is a large loadable type
@@ -275,7 +274,8 @@ static bool modResultType(GenericEnvironment *genEnv,
   }
   auto singleResult = loweredTy->getSingleResult();
   auto resultStorageType = singleResult.getSILStorageType();
-  if (isLargeLoadableType(genEnv, resultStorageType, Mod)) {
+  auto newResultStorageType = getNewSILType(genEnv, resultStorageType, Mod);
+  if (resultStorageType != newResultStorageType) {
     return true;
   }
   return false;
@@ -406,7 +406,7 @@ struct StructLoweringState {
   SmallVector<SILInstruction *, 16> instsToMod;
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> returnInsts;
-  // All return instructions that are modified
+  // All (large type) return instructions that are modified
   SmallVector<ReturnInst *, 8> modReturnInsts;
   // All destroy_value instrs should be replaced with _addr version
   SmallVector<SILInstruction *, 16> destroyValueInstsToMod;
@@ -475,7 +475,8 @@ void LargeValueVisitor::mapValueStorage() {
       }
       case SILInstructionKind::ClassMethodInst:
       case SILInstructionKind::SuperMethodInst:
-      case SILInstructionKind::DynamicMethodInst:
+      case SILInstructionKind::ObjCMethodInst:
+      case SILInstructionKind::ObjCSuperMethodInst:
       case SILInstructionKind::WitnessMethodInst: {
         // TODO Any more instructions to add here?
         auto *MI = dyn_cast<MethodInst>(currIns);
@@ -799,12 +800,39 @@ void LargeValueVisitor::visitPointerToAddressInst(PointerToAddressInst *instr) {
   }
 }
 
+static bool modNonFuncTypeResultType(GenericEnvironment *genEnv,
+                                     CanSILFunctionType loweredTy,
+                                     irgen::IRGenModule &Mod) {
+  if (!modifiableFunction(loweredTy)) {
+    return false;
+  }
+  if (loweredTy->getNumResults() != 1) {
+    return false;
+  }
+  auto singleResult = loweredTy->getSingleResult();
+  auto resultStorageType = singleResult.getSILStorageType();
+  if (isLargeLoadableType(genEnv, resultStorageType, Mod)) {
+    return true;
+  }
+  return false;
+}
+
+static bool modNonFuncTypeResultType(SILFunction *F, irgen::IRGenModule &Mod) {
+  GenericEnvironment *genEnv = F->getGenericEnvironment();
+  auto loweredTy = F->getLoweredFunctionType();
+  if (!genEnv && loweredTy->isPolymorphic()) {
+    genEnv = getGenericEnvironment(F->getModule(), loweredTy);
+  }
+
+  return modNonFuncTypeResultType(genEnv, loweredTy, Mod);
+}
+
 void LargeValueVisitor::visitReturnInst(ReturnInst *instr) {
   if (!modResultType(pass.F, pass.Mod)) {
     visitInstr(instr);
-  } else {
+  } else if (modNonFuncTypeResultType(pass.F, pass.Mod)) {
     pass.modReturnInsts.push_back(instr);
-  }
+  } // else: function signature return instructions remain as-is
 }
 
 void LargeValueVisitor::visitDeallocInst(DeallocStackInst *instr) {
@@ -1207,7 +1235,7 @@ void LoadableStorageAllocation::convertIndirectFunctionArgs() {
   }
 
   // Convert the result type to indirect if necessary:
-  if (modResultType(pass.F, pass.Mod)) {
+  if (modNonFuncTypeResultType(pass.F, pass.Mod)) {
     insertIndirectReturnArgs();
   }
 }
@@ -1257,8 +1285,15 @@ void LoadableStorageAllocation::convertApplyResults() {
       if (!isLargeLoadableType(genEnv, resultStorageType, pass.Mod)) {
         // Make sure it is a function type
         auto canType = resultStorageType.getSwiftRValueType();
-        assert(dyn_cast<SILFunctionType>(canType.getPointer()) &&
-               "Expected SILFunctionType for the result type");
+        if (!dyn_cast<SILFunctionType>(canType.getPointer())) {
+          // Check if it is an optional funciton type
+          OptionalTypeKind optKind;
+          auto optionalType = canType.getAnyOptionalObjectType(optKind);
+          assert(optionalType &&
+                 "Expected SILFunctionType or Optional for the result type");
+          assert(dyn_cast<SILFunctionType>(optionalType.getPointer()) &&
+                 "Expected a SILFunctionType inside the optional Type");
+        }
         continue;
       }
       auto newSILType = getNewSILType(genEnv, resultStorageType, pass.Mod);
@@ -1984,7 +2019,6 @@ static void rewriteFunction(StructLoweringState &pass,
         getNewSILFunctionType(genEnvForMethod, currSILFunctionType, pass.Mod);
     auto member = instr->getMember();
     auto loc = instr->getLoc();
-    bool isVolatile = instr->isVolatile();
     SILBuilder methodBuilder(instr);
     MethodInst *newInstr = nullptr;
 
@@ -1992,29 +2026,21 @@ static void rewriteFunction(StructLoweringState &pass,
     case SILInstructionKind::ClassMethodInst: {
       SILValue selfValue = instr->getOperand(0);
       newInstr = methodBuilder.createClassMethod(loc, selfValue, member,
-                                                 newSILType, isVolatile);
+                                                 newSILType);
       break;
     }
     case SILInstructionKind::SuperMethodInst: {
       SILValue selfValue = instr->getOperand(0);
       newInstr = methodBuilder.createSuperMethod(loc, selfValue, member,
-                                                 newSILType, isVolatile);
-      break;
-    }
-    case SILInstructionKind::DynamicMethodInst: {
-      auto *DMI = dyn_cast<DynamicMethodInst>(instr);
-      assert(DMI && "ValueKind is Witness Method but dyn_cast failed");
-      SILValue selfValue = instr->getOperand(0);
-      newInstr = methodBuilder.createDynamicMethod(loc, selfValue, member,
-                                                   newSILType, isVolatile);
+                                                 newSILType);
       break;
     }
     case SILInstructionKind::WitnessMethodInst: {
       auto *WMI = dyn_cast<WitnessMethodInst>(instr);
+      assert(!WMI->isVolatile());
       assert(WMI && "ValueKind is Witness Method but dyn_cast failed");
       newInstr = methodBuilder.createWitnessMethod(
-          loc, WMI->getLookupType(), WMI->getConformance(), member, newSILType,
-          isVolatile);
+          loc, WMI->getLookupType(), WMI->getConformance(), member, newSILType);
       break;
     }
     default:
@@ -2030,6 +2056,8 @@ static void rewriteFunction(StructLoweringState &pass,
     auto loc = instr->getLoc(); // SILLocation::RegularKind
     auto regLoc = RegularLocation(loc.getSourceLoc());
     SILBuilder retBuilder(instr);
+    assert(modNonFuncTypeResultType(pass.F, pass.Mod) &&
+           "Expected a regular type");
     // Before we return an empty tuple, init return arg:
     auto *entry = pass.F->getEntryBlock();
     auto *retArg = entry->getArgument(0);
@@ -2247,7 +2275,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   // Find the new alloc we created earlier.
   // and pass it as first parameter:
   if (applyInst->getKind() != SILInstructionKind::PartialApplyInst &&
-      modResultType(genEnv, origCanType, *currIRMod) &&
+      modNonFuncTypeResultType(genEnv, origCanType, *currIRMod) &&
       modifiableApply(applySite, *getIRGenModule())) {
     assert(allApplyRetToAllocMap.find(applyInst) !=
            allApplyRetToAllocMap.end());

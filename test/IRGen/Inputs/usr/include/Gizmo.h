@@ -137,3 +137,10 @@ struct StructOfNSStrings {
 };
 
 struct StructOfNSStrings useStructOfNSStringsInObjC(struct StructOfNSStrings);
+
+@interface OuterType : NSObject
+@end
+
+__attribute__((swift_name("OuterType.InnerType")))
+@interface OuterTypeInnerType : NSObject
+@end

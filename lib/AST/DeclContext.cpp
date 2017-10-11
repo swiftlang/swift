@@ -17,6 +17,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
@@ -89,6 +90,10 @@ ClassDecl *DeclContext::getAsClassOrClassExtensionContext() const {
 
 EnumDecl *DeclContext::getAsEnumOrEnumExtensionContext() const {
   return dyn_cast_or_null<EnumDecl>(getAsTypeOrTypeExtensionContext());
+}
+
+StructDecl *DeclContext::getAsStructOrStructExtensionContext() const {
+  return dyn_cast_or_null<StructDecl>(getAsTypeOrTypeExtensionContext());
 }
 
 ProtocolDecl *DeclContext::getAsProtocolOrProtocolExtensionContext() const {

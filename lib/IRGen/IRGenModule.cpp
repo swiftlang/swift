@@ -472,7 +472,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     fn->setCallingConv(cc);
 
     if (::useDllStorage(llvm::Triple(Module.getTargetTriple())) &&
-        (fn->getLinkage() == llvm::GlobalValue::ExternalLinkage ||
+        ((fn->getLinkage() == llvm::GlobalValue::ExternalLinkage &&
+          fn->isDeclaration()) ||
          fn->getLinkage() == llvm::GlobalValue::AvailableExternallyLinkage))
       fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 
@@ -803,6 +804,11 @@ llvm::AttributeList IRGenModule::getAllocAttrs() {
   return AllocAttrs;
 }
 
+/// Disable thumb-mode until debugger support is there.
+bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
+  return feature == "+thumb-mode";
+}
+
 /// Construct initial function attributes from options.
 void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs) {
   // Add DisableFPElim. 
@@ -821,7 +827,11 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs) {
   if (CPU != "")
     Attrs.addAttribute("target-cpu", CPU);
 
-  std::vector<std::string> Features = ClangOpts.Features;
+  std::vector<std::string> Features;
+  for (auto &F : ClangOpts.Features)
+    if (!shouldRemoveTargetFeature(F))
+        Features.push_back(F);
+
   if (!Features.empty()) {
     SmallString<64> allFeatures;
     // Sort so that the target features string is canonical.

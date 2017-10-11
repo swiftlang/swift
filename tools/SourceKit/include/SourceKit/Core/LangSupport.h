@@ -251,6 +251,9 @@ public:
   virtual bool valueForOption(UIdent Key, StringRef &Val) = 0;
 };
 
+struct Statistic;
+typedef std::function<void(ArrayRef<Statistic *> stats)> StatisticsReceiver;
+
 struct RefactoringInfo {
   UIdent Kind;
   StringRef KindName;
@@ -626,6 +629,8 @@ public:
                           StringRef ModuleName,
                           ArrayRef<const char *> Args,
                           DocInfoConsumer &Consumer) = 0;
+
+  virtual void getStatistics(StatisticsReceiver) = 0;
 };
 
 } // namespace SourceKit

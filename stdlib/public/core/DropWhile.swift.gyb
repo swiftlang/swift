@@ -25,6 +25,7 @@ from gyb_stdlib_support import (
 /// This is the associated iterator for the `LazyDropWhileSequence`,
 /// `LazyDropWhileCollection`, and `LazyDropWhileBidirectionalCollection`
 /// types.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct LazyDropWhileIterator<Base : IteratorProtocol> :
   IteratorProtocol, Sequence {
 
@@ -64,6 +65,7 @@ public struct LazyDropWhileIterator<Base : IteratorProtocol> :
 
 /// A sequence whose elements consist of the elements that follow the initial
 /// consecutive elements of some base sequence that satisfy a given predicate.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct LazyDropWhileSequence<Base : Sequence> : LazySequenceProtocol {
 
   public typealias Elements = LazyDropWhileSequence
@@ -112,6 +114,7 @@ extension LazySequenceProtocol {
 
 /// A position in a `LazyDropWhileCollection` or
 /// `LazyDropWhileBidirectionalCollection` instance.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct LazyDropWhileIndex<Base : Collection> : Comparable {
   /// The position corresponding to `self` in the underlying collection.
   public let base: Base.Index
@@ -151,6 +154,7 @@ public struct LazyDropWhileIndex<Base : Collection> : Comparable {
 ///   performance given by the `Collection` protocol. Be aware, therefore,
 ///   that general operations on `${Self}` instances may not have the
 ///   documented complexity.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct ${Self}<
   Base : ${Collection}
 > : LazyCollectionProtocol, ${Collection} {

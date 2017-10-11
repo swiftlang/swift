@@ -355,6 +355,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::CheckedCastValueBranchInst:
   case SILInstructionKind::CheckedCastAddrBranchInst:
   case SILInstructionKind::ClassMethodInst:
+  case SILInstructionKind::ObjCMethodInst:
   case SILInstructionKind::CondBranchInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::CopyBlockInst:
@@ -383,7 +384,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::UnmanagedAutoreleaseValueInst:
   case SILInstructionKind::DynamicMethodBranchInst:
-  case SILInstructionKind::DynamicMethodInst:
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::IndexAddrInst:
   case SILInstructionKind::TailAddrInst:
@@ -422,6 +422,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::StrongRetainUnownedInst:
   case SILInstructionKind::StrongUnpinInst:
   case SILInstructionKind::SuperMethodInst:
+  case SILInstructionKind::ObjCSuperMethodInst:
   case SILInstructionKind::SwitchEnumAddrInst:
   case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::SwitchValueInst:

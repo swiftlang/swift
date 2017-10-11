@@ -1711,14 +1711,14 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
       // not update all open documents, since there could be too many of them.
     }
   }
-  
+
   // Update the old syntax map offsets to account for the replaced range.
   // Also set the initial AffectedRange to cover any tokens that
   // the replaced range intersected. This allows for clients that split
   // multi-line tokens at line boundaries, and ensure all parts of these tokens
   // will be cleared.
   Impl.AffectedRange = Impl.SyntaxMap.adjustForReplacement(Offset, Length, Str.size());
-  
+
   return Snapshot;
 }
 
@@ -2073,6 +2073,8 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
       LOG_WARN_FUNC("Document already exists in editorOpen(..): " << Name);
       Snapshot = nullptr;
     }
+    auto numOpen = ++Stats.numOpenDocs;
+    Stats.maxOpenDocs.updateMax(numOpen);
   }
 
   if (!Snapshot) {
@@ -2095,8 +2097,12 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 
 void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
   auto Removed = EditorDocuments.remove(Name);
-  if (!Removed)
+  if (Removed) {
+    --Stats.numOpenDocs;
+  } else {
     IFaceGenContexts.remove(Name);
+  }
+
   if (Removed && RemoveCache)
     Removed->removeCachedAST();
   // FIXME: Report error if Name did not apply to anything ?

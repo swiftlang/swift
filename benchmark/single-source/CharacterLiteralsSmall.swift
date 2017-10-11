@@ -15,6 +15,11 @@
 // represented as a packed integer.
 import TestsUtils
 
+public let CharacterLiteralsSmall = BenchmarkInfo(
+  name: "CharacterLiteralsSmall",
+  runFunction: run_CharacterLiteralsSmall,
+  tags: [.validation, .api, .String])
+
 @inline(never)
 func makeCharacter_UTF8Length1() -> Character {
   return "a"

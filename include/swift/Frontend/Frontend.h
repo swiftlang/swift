@@ -251,11 +251,9 @@ public:
     FrontendOpts.Inputs.addInputBuffer(Buf);
   }
 
-  void clearInputs() {
-    FrontendOpts.Inputs.clearInputs();
-  }
+  void clearInputs() { FrontendOpts.Inputs.clearInputs(); }
 
-   StringRef getOutputFilename() const {
+  StringRef getOutputFilename() const {
     return FrontendOpts.getSingleOutputFilename();
   }
 
@@ -363,7 +361,7 @@ class CompilerInstance {
 
   void createSILModule();
   void setPrimarySourceFile(SourceFile *SF);
-  
+
   bool setupForFileAt(unsigned i);
 
 public:
@@ -422,7 +420,9 @@ public:
 
   SerializedModuleLoader *getSerializedModuleLoader() const { return SML; }
 
-  ArrayRef<unsigned> getInputBufferIDs() const { return InputSourceCodeBufferIDs; }
+  ArrayRef<unsigned> getInputBufferIDs() const {
+    return InputSourceCodeBufferIDs;
+  }
 
   ArrayRef<LinkLibrary> getLinkLibraries() const {
     return Invocation.getLinkLibraries();

@@ -27,7 +27,6 @@
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
-#include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Witness.h"
@@ -62,6 +61,7 @@ namespace swift {
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
+  class LazyResolver;
   class ModuleDecl;
   class NameAliasType;
   class EnumCaseDecl;
@@ -562,8 +562,10 @@ class alignas(1 << DeclAlignInBits) Decl {
   class AssociatedTypeDeclBitfields {
     friend class AssociatedTypeDecl;
     unsigned : NumTypeDeclBits;
+    unsigned ComputedOverridden : 1;
+    unsigned HasOverridden : 1;
   };
-  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits };
+  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits + 2 };
   static_assert(NumAssociatedTypeDeclBits <= 32, "fits in an unsigned");
 
   class ImportDeclBitfields {
@@ -2207,6 +2209,9 @@ public:
     return result;
   }
 
+  /// Determine whether this Decl has either Private or FilePrivate access.
+  bool isOutermostPrivateOrFilePrivateScope() const;
+
   /// Returns the outermost DeclContext from which this declaration can be
   /// accessed, or null if the declaration is public.
   ///
@@ -2662,6 +2667,33 @@ public:
   /// type; can only be called after the alias type has been resolved.
   void computeType();
 
+  /// Retrieve the associated type "anchor", which is the associated type
+  /// declaration that will be used to describe this associated type in the
+  /// ABI.
+  ///
+  /// The associated type "anchor" is an associated type that does not
+  /// override any other associated type. There may be several such associated
+  /// types; select one deterministically.
+  AssociatedTypeDecl *getAssociatedTypeAnchor() const;
+
+  /// Retrieve the (first) overridden associated type declaration, if any.
+  AssociatedTypeDecl *getOverriddenDecl() const;
+
+  /// Retrieve the set of associated types overridden by this associated
+  /// type.
+  ArrayRef<AssociatedTypeDecl *> getOverriddenDecls() const;
+
+  /// Whether the overridden declarations have already been computed.
+  bool overriddenDeclsComputed() const {
+    return AssociatedTypeDeclBits.ComputedOverridden;
+  }
+
+  /// Record the set of overridden declarations.
+  ///
+  /// \returns the array recorded in the AST.
+  ArrayRef<AssociatedTypeDecl *> setOverriddenDecls(
+                                   ArrayRef<AssociatedTypeDecl *> overridden);
+
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;
 
@@ -2916,14 +2948,6 @@ public:
   /// This is used by deserialization of module files to report
   /// conformances.
   void registerProtocolConformance(ProtocolConformance *conformance);
-
-  /// \brief True if the type can implicitly derive a conformance for the given
-  /// protocol.
-  ///
-  /// If true, explicit conformance checking will synthesize implicit
-  /// declarations for requirements of the protocol that are not satisfied by
-  /// the type's explicit members.
-  bool derivesProtocolConformance(ProtocolDecl *protocol) const;
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
@@ -3552,6 +3576,11 @@ public:
   /// Retrieve the set of protocols inherited from this protocol.
   llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
 
+  /// Retrieve the set of AssociatedTypeDecl members of this protocol; this
+  /// saves loading the set of members in cases where there's no possibility of
+  /// a protocol having nested types (ObjC protocols).
+  llvm::TinyPtrVector<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
+
   /// Walk all of the protocols inherited by this protocol, transitively,
   /// invoking the callback function for each protocol.
   ///
@@ -3783,7 +3812,7 @@ enum class AddressorKind : unsigned char {
   NotAddressor,
   /// \brief This is an unsafe addressor; it simply returns an address.
   Unsafe,
-  /// \brief This is an owning addressor; it returns a Builtin.UnknownObject
+  /// \brief This is an owning addressor; it returns an AnyObject
   /// which should be released when the caller is done with the object.
   Owning,
   /// \brief This is an owning addressor; it returns a Builtin.NativeObject

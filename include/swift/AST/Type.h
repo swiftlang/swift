@@ -577,7 +577,7 @@ public:
 
   /// Retrieve the canonical generic environment associated with this
   /// generic signature.
-  GenericEnvironment *getGenericEnvironment(ModuleDecl &module) const;
+  GenericEnvironment *getGenericEnvironment() const;
 
   GenericSignature *operator->() const {
     return Signature;

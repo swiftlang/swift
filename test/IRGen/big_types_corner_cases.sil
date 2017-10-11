@@ -140,6 +140,28 @@ bb0(%0 : $Builtin.Int64, %1 : $() -> @owned BigStruct):
   return undef : $BigStruct
 }
 
+// CHECK-LABEL: define swiftcc void @poninter_to_mod_ret(i8*, %swift.refcounted*) #0 {
+// CHECK: [[BITCAST:%.*]] = bitcast i8* %0 to { i8*, %swift.refcounted* } (%swift.refcounted*)*
+// CHECK: [[CALL:%.*]] = call swiftcc { i8*, %swift.refcounted* } [[BITCAST]](%swift.refcounted* swiftself %1)
+// CHECK: extractvalue { i8*, %swift.refcounted* } [[CALL]], 0
+// CHECK: extractvalue { i8*, %swift.refcounted* } [[CALL]], 1
+// CHECK: ret void
+sil @poninter_to_mod_ret : $@convention(thin) (@owned @callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct) -> () {
+bb0(%funcpointer : $@callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct):
+  %papply = apply %funcpointer() : $@callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: define swiftcc { i64, i64 } @ret_pointer_to_mod() #0 {
+// CHECK-NEXT: entry
+// CHECK-NEXT: ret { i64, i64 } zeroinitializer
+sil @ret_pointer_to_mod : $@convention(thin) () -> @owned Optional<@callee_owned () -> @owned Optional<BigStruct>> {
+bb0:
+  %0 = enum $Optional<@callee_owned () -> @owned Optional<BigStruct>>, #Optional.none!enumelt // user: %1
+  return %0 : $Optional<@callee_owned () -> @owned Optional<BigStruct>> // id: %1
+}
+
 //////////////////////
 // Autoclosure Test //
 //////////////////////

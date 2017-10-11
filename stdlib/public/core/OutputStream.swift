@@ -343,11 +343,9 @@ internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
   }
 }
 
-@_inlineable // FIXME(sil-serialize-all)
 @_versioned
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
-@_semantics("stdlib_binary_only")
 internal func _print_unlocked<T, TargetStream : TextOutputStream>(
   _ value: T, _ target: inout TargetStream
 ) {
@@ -509,6 +507,7 @@ internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
 // OutputStreams
 //===----------------------------------------------------------------------===//
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct _Stdout : TextOutputStream {
   @_inlineable // FIXME(sil-serialize-all)
@@ -596,6 +595,7 @@ extension Unicode.Scalar : TextOutputStreamable {
 /// A hook for playgrounds to print through.
 public var _playgroundPrintHook : ((String) -> Void)? = {_ in () }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct _TeeStream<
   L : TextOutputStream,

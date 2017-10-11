@@ -255,14 +255,12 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
                          options, resolver);
   }
 
-  for (auto member : protocol->getMembers()) {
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      if (auto whereClause = assocType->getTrailingWhereClause()) {
-        revertGenericRequirements(whereClause->getRequirements());
-        validateRequirements(whereClause->getWhereLoc(),
-                             whereClause->getRequirements(),
-                             protocol, options, resolver);
-      }
+  for (auto assocType : protocol->getAssociatedTypeMembers()) {
+    if (auto whereClause = assocType->getTrailingWhereClause()) {
+      revertGenericRequirements(whereClause->getRequirements());
+      validateRequirements(whereClause->getWhereLoc(),
+                           whereClause->getRequirements(),
+                           protocol, options, resolver);
     }
   }
 }
@@ -368,17 +366,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
         ext->setInherited({ });
         return;
       }
-    }
-
-    // Constrained extensions cannot have inheritance clauses.
-    if (!inheritedClause.empty() &&
-        ext->getGenericParams() &&
-        ext->getGenericParams()->hasTrailingWhereClause()) {
-      diagnose(ext->getLoc(), diag::extension_constrained_inheritance,
-               ext->getExtendedType())
-      .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
-                             inheritedClause.back().getSourceRange().End));
-      ext->setInherited({ });
     }
   }
 
@@ -2995,7 +2982,13 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     // primitive literal protocols.
     auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
         ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
-        return TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(), None);
+        auto conformance =
+            TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(), None);
+        if (conformance)
+          assert(conformance->getConditionalRequirements().empty() &&
+                 "conditionally conforming to literal protocol not currently "
+                 "supported");
+        return conformance;
     };
 
     static auto otherLiteralProtocolKinds = {
@@ -3251,10 +3244,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // First, satisfy any associated type requirements.
   Substitution valueSub;
   AssociatedTypeDecl *valueReqt = nullptr;
-  for (auto requirementDecl : behaviorProto->getMembers()) {
-    auto assocTy = dyn_cast<AssociatedTypeDecl>(requirementDecl);
-    if (!assocTy)
-      continue;
+  for (auto assocTy : behaviorProto->getAssociatedTypeMembers()) {
   
     // Match a Value associated type requirement to the property type.
     if (assocTy->getName() != TC.Context.Id_Value) {
@@ -4244,7 +4234,7 @@ public:
       gp->setOuterParameters(dc->getGenericParamsOfContext());
 
       auto *sig = TC.validateGenericSubscriptSignature(SD);
-      auto *env = sig->createGenericEnvironment(*SD->getModuleContext());
+      auto *env = sig->createGenericEnvironment();
       SD->setGenericEnvironment(env);
 
       // Revert the types within the signature so it can be type-checked with
@@ -5224,7 +5214,7 @@ public:
         env = cast<SubscriptDecl>(storage)->getGenericEnvironment();
         assert(env && "accessor has generics but subscript is not generic");
       } else {
-        env = sig->createGenericEnvironment(*FD->getModuleContext());
+        env = sig->createGenericEnvironment();
       }
       FD->setGenericEnvironment(env);
 
@@ -5404,11 +5394,11 @@ public:
       return pointerType;
 
     // For non-native owning addressors, the return type is actually
-    //   (Unsafe{,Mutable}Pointer<T>, Builtin.UnknownObject)
+    //   (Unsafe{,Mutable}Pointer<T>, AnyObject)
     case AddressorKind::Owning: {
       TupleTypeElt elts[] = {
         pointerType,
-        TC.Context.TheUnknownObjectType
+        TC.Context.getAnyObjectType()
       };
       return TupleType::get(elts, TC.Context);
     }
@@ -5983,12 +5973,9 @@ public:
         // Canonicalize with respect to the override's generic signature, if any.
         auto *genericSig = decl->getInnermostDeclContext()
           ->getGenericSignatureOfContext();
-        auto *module = dc->getParentModule();
 
-        auto canDeclTy =
-          declTy->getCanonicalType(genericSig, *module);
-        auto canParentDeclTy =
-          parentDeclTy->getCanonicalType(genericSig, *module);
+        auto canDeclTy = declTy->getCanonicalType(genericSig);
+        auto canParentDeclTy = parentDeclTy->getCanonicalType(genericSig);
 
         if (canDeclTy == canParentDeclTy) {
           matches.push_back({parentDecl, true, parentDeclTy});
@@ -6975,7 +6962,7 @@ public:
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
       auto *sig = TC.validateGenericFuncSignature(CD);
-      auto *env = sig->createGenericEnvironment(*CD->getModuleContext());
+      auto *env = sig->createGenericEnvironment();
       CD->setGenericEnvironment(env);
 
       // Revert the types within the signature so it can be type-checked with
@@ -7711,10 +7698,8 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
 
-    for (auto member : proto->getMembers()) {
-      if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
-        validateDeclForNameLookup(ATD);
-      }
+    for (auto ATD : proto->getAssociatedTypeMembers()) {
+      validateDeclForNameLookup(ATD);
     }
 
     // Make sure the protocol is fully validated by the end of Sema.
