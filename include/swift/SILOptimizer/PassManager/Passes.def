@@ -134,10 +134,6 @@ PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
 PASS(EscapeAnalysisDumper, "escapes-dump",
      "Dump Escape Analysis Results")
-PASS(ExternalDefsToDecls, "external-defs-to-decls",
-     "External Definition To Declaration Conversion")
-PASS(ExternalFunctionDefinitionsElimination, "external-func-definition-elim",
-     "External Function Definition Elimination")
 PASS(FunctionOrderPrinter, "function-order-printer",
      "Print Function Order for Testing")
 PASS(FunctionSignatureOpts, "function-signature-opts",
