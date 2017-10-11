@@ -21,10 +21,6 @@
 
 namespace llvm {
   class MemoryBuffer;
-  namespace opt {
-    class ArgList;
-    class Arg;
-  }
 }
 
 namespace swift {
@@ -191,7 +187,6 @@ public:
   
 public:
   // Multi-facet readers
-  StringRef baseNameOfOutput(const llvm::opt::ArgList &Args, StringRef ModuleName) const;
   bool shouldTreatAsSIL() const;
   
   /// Return true for error
@@ -249,6 +244,7 @@ private:
 
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
+  friend class FrontendArgsToOptionsConverter;
 public:
   FrontendInputs Inputs;
   
@@ -284,7 +280,6 @@ public:
   bool hasNamedOutputFile() const {
     return !OutputFilenames.empty() && !isOutputFilenameStdout();
   }
-  void setOutputFileList(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args );
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
@@ -545,9 +540,6 @@ public:
   bool isCompilingExactlyOneSwiftFile() const {
     return InputKind == InputFileKind::IFK_Swift && Inputs.hasUniqueInputFilename();
   }
-  
-  void setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args);
-  
 };
 
 }

@@ -39,18 +39,6 @@ bool FrontendInputs::shouldTreatAsLLVM() const {
   return false;
 }
 
-StringRef FrontendInputs::baseNameOfOutput(const llvm::opt::ArgList &Args, StringRef ModuleName) const {
-  StringRef pifn = primaryInputFilenameIfAny();
-  if (!pifn.empty()) {
-    return llvm::sys::path::stem(pifn);
-  }
-  bool UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name);
-  if (!UserSpecifiedModuleName &&  hasUniqueInputFilename()) {
-    return llvm::sys::path::stem(getFilenameOfFirstInput());
-  }
-  return ModuleName;
-}
-
 bool FrontendInputs::shouldTreatAsSIL() const {
   if (hasUniqueInputFilename()) {
     // If we have exactly one input filename, and its extension is "sil",
@@ -215,38 +203,6 @@ void FrontendOptions::forAllOutputPaths(
   }
 }
 
-
-void FrontendOptions::setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args) {
-  const Arg *A = Args.getLastArg(options::OPT_module_name);
-  if (A) {
-    ModuleName = A->getValue();
-  }
-  else if (ModuleName.empty()) {
-    // The user did not specify a module name, so determine a default fallback
-    // based on other options.
-    
-    // Note: this code path will only be taken when running the frontend
-    // directly; the driver should always pass -module-name when invoking the
-    // frontend.
-    ModuleName = determineFallbackModuleName();
-  }
-  
-  if (Lexer::isIdentifier(ModuleName) &&
-      (ModuleName != STDLIB_NAME || ParseStdlib)) {
-    return;
-  }
-  if (!actionHasOutput() || isCompilingExactlyOneSwiftFile()) {
-    ModuleName = "main";
-    return;
-  }
-  auto DID = (ModuleName == STDLIB_NAME)
-  ? diag::error_stdlib_module_name
-  : diag::error_bad_module_name;
-  Diags.diagnose(SourceLoc(), DID, ModuleName, A == nullptr);
-  ModuleName = "__bad__";
-}
-
-
 StringRef FrontendOptions::originalPath() const {
   if (hasNamedOutputFile())
     // Put the serialized diagnostics file next to the output file.
@@ -274,30 +230,6 @@ StringRef FrontendOptions::determineFallbackModuleName() const {
   StringRef OutputFilename = getSingleOutputFilename();
   bool useOutputFilename = isOutputFilePlainFile();
   return llvm::sys::path::stem(useOutputFilename ? OutputFilename : StringRef(Inputs.getFilenameOfFirstInput()));
-}
-
-/// Try to read an output file list file.
-static void readOutputFileList(DiagnosticEngine &diags,
-                               std::vector<std::string> &outputFiles,
-                               const llvm::opt::Arg *filelistPath) {
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-  llvm::MemoryBuffer::getFile(filelistPath->getValue());
-  if (!buffer) {
-    diags.diagnose(SourceLoc(), diag::cannot_open_file,
-                   filelistPath->getValue(), buffer.getError().message());
-  }
-  for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
-    outputFiles.push_back(line);
-  }
-}
-
-void FrontendOptions::setOutputFileList(swift::DiagnosticEngine &Diags, const llvm::opt::ArgList &Args) {
-  if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
-    readOutputFileList(Diags, OutputFilenames, A);
-    assert(!Args.hasArg(options::OPT_o) && "don't use -o with -output-filelist");
-  } else {
-    OutputFilenames = Args.getAllArgValues(options::OPT_o);
-  }
 }
 
 bool FrontendOptions::isOutputFileDirectory() const {

@@ -84,6 +84,7 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
   llvm_unreachable("Unhandled InputFileKind in switch.");
 }
 
+
 namespace swift {
   class ArgsToFrontendInputsConverter {
     const ArgList &Args;
@@ -141,7 +142,97 @@ namespace swift {
       Inputs.setInputAndPrimaryFilesFromPossiblyOverlappingLists(inputFiles, primaryFiles);
      }
   };
-}
+  
+  class FrontendArgsToOptionsConverter {
+  private:
+    DiagnosticEngine &Diags;
+    const llvm::opt::ArgList &Args;
+    FrontendOptions &Opts;
+ 
+    void readOutputFileList(std::vector<std::string> &outputFiles,
+                            const llvm::opt::Arg *filelistPath) {
+      llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
+      llvm::MemoryBuffer::getFile(filelistPath->getValue());
+      if (!buffer) {
+        Diags.diagnose(SourceLoc(), diag::cannot_open_file,
+                       filelistPath->getValue(), buffer.getError().message());
+      }
+      for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
+        outputFiles.push_back(line);
+      }
+    }
+    
+    // This is a separate function so that it shows up in stack traces.
+    LLVM_ATTRIBUTE_NOINLINE
+    static void debugFailWithAssertion() {
+      // This assertion should always fail, per the user's request, and should
+      // not be converted to llvm_unreachable.
+      assert(0 && "This is an assertion!");
+    }
+    // This is a separate function so that it shows up in stack traces.
+    LLVM_ATTRIBUTE_NOINLINE
+    static void debugFailWithCrash() {
+      LLVM_BUILTIN_TRAP;
+    }
+    
+  public:
+    FrontendArgsToOptionsConverter(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args, FrontendOptions &Opts) :
+    Diags(Diags), Args(Args), Opts(Opts) {}
+    
+    void setOutputFileList() {
+      if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
+        readOutputFileList(Opts.OutputFilenames, A);
+        assert(!Args.hasArg(options::OPT_o) && "don't use -o with -output-filelist");
+      } else {
+        Opts.OutputFilenames = Args.getAllArgValues(options::OPT_o);
+      }
+    }
+    
+    void setModuleName() {
+      const Arg *A = Args.getLastArg(options::OPT_module_name);
+      if (A) {
+        Opts.ModuleName = A->getValue();
+      }
+      else if (Opts.ModuleName.empty()) {
+        // The user did not specify a module name, so determine a default fallback
+        // based on other options.
+        
+        // Note: this code path will only be taken when running the frontend
+        // directly; the driver should always pass -module-name when invoking the
+        // frontend.
+        Opts.ModuleName = Opts.determineFallbackModuleName();
+      }
+      
+      if (Lexer::isIdentifier(Opts.ModuleName) &&
+          (Opts.ModuleName != STDLIB_NAME || Opts.ParseStdlib)) {
+        return;
+      }
+      if (!Opts.actionHasOutput() || Opts.isCompilingExactlyOneSwiftFile()) {
+        Opts.ModuleName = "main";
+        return;
+      }
+      auto DID = (Opts.ModuleName == STDLIB_NAME)
+      ? diag::error_stdlib_module_name
+      : diag::error_bad_module_name;
+      Diags.diagnose(SourceLoc(), DID, Opts.ModuleName, A == nullptr);
+      Opts.ModuleName = "__bad__";
+    }
+    
+    StringRef baseNameOfOutput() {
+      StringRef pifn = Opts.Inputs.primaryInputFilenameIfAny();
+      if (!pifn.empty()) {
+        return llvm::sys::path::stem(pifn);
+      }
+      bool UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name);
+      if (!UserSpecifiedModuleName &&  Opts.Inputs.hasUniqueInputFilename()) {
+        return llvm::sys::path::stem(Opts.Inputs.getFilenameOfFirstInput());
+      }
+      return Opts.ModuleName;
+    }
+    
+
+  };
+} // end namespace swift;
 
 
 // This is a separate function so that it shows up in stack traces.
@@ -414,9 +505,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   else
     Opts.InputKind = InputFileKind::IFK_Swift;
 
-  Opts.setOutputFileList(Diags, Args);
-
-  Opts.setModuleName(Diags, Args);
+  FrontendArgsToOptionsConverter(Diags, Args, Opts).setOutputFileList();
+  FrontendArgsToOptionsConverter(Diags, Args, Opts).setModuleName();
 
   if (Opts.OutputFilenames.empty() ||
       llvm::sys::fs::is_directory(Opts.getSingleOutputFilename())) {
@@ -516,7 +606,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         Opts.setOutputFilenameToStdout();
       else {
         // We have a suffix, so determine an appropriate name.
-        StringRef BaseName = Opts.Inputs.baseNameOfOutput(Args, Opts.ModuleName);
+        StringRef BaseName = FrontendArgsToOptionsConverter(Diags, Args, Opts).baseNameOfOutput();
         llvm::SmallString<128> Path(Opts.getSingleOutputFilename());
         llvm::sys::path::append(Path, BaseName);
         llvm::sys::path::replace_extension(Path, Suffix);
