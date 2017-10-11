@@ -155,9 +155,6 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (SILMode)
     Invocation.getLangOptions().EnableAccessControl = false;
 
-  const Optional<SelectedInput> &PrimaryInput =
-    Invocation.getFrontendOptions().Inputs.getOptionalPrimaryInput();
-
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
   for (unsigned i = 0, e = Invocation.getFrontendOptions().Inputs.inputBufferCount(); i != e; ++i) {
@@ -175,7 +172,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
       if (SILMode)
         MainBufferID = BufferID;
 
-      if (PrimaryInput && PrimaryInput->isBuffer() && PrimaryInput->Index == i)
+      const Optional<SelectedInput> &PrimaryInput =
+      Invocation.getFrontendOptions().Inputs.getOptionalPrimaryInput();
+      
+     if (PrimaryInput && PrimaryInput->isBuffer() && PrimaryInput->Index == i)
         PrimaryBufferID = BufferID;
     }
   }
