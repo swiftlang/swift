@@ -11,7 +11,7 @@
 // CHECK-NEXT:  @_inlineable init
 // CHECK-NEXT: }
 
-// CHECK: sil @unknown : $@convention(thin) () -> ()
+// CHECK: sil{{.*}} @unknown : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil [serialized] @_T0s1XV4testyyF : $@convention(method) (X) -> ()
 // CHECK: bb0
