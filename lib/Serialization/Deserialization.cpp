@@ -3740,13 +3740,12 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     SmallVector<Identifier, 2> argNames;
     for (auto argNameID : argNameAndDependencyIDs.slice(1, numArgNames-1))
       argNames.push_back(getIdentifier(argNameID));
-    DeclName name(ctx, baseName, argNames);
 
     for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames+1)) {
       auto dependency = getTypeChecked(dependencyID);
       if (!dependency) {
         return llvm::make_error<TypeError>(
-          name, takeErrorInfo(dependency.takeError()));
+          baseName, takeErrorInfo(dependency.takeError()));
       }
     }
 
@@ -3754,9 +3753,19 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     if (declOrOffset.isComplete())
       return declOrOffset;
 
+    auto *paramList = maybeReadParameterList();
+
+    DeclName name;
+    if (!paramList) {
+      assert(argNames.empty());
+      name = DeclName(baseName);
+    } else {
+      name = DeclName(ctx, baseName, argNames);
+    }
+
     auto elem = createDecl<EnumElementDecl>(SourceLoc(),
                                             name,
-                                            maybeReadParameterList(),
+                                            paramList,
                                             SourceLoc(),
                                             nullptr,
                                             DC);

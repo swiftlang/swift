@@ -1950,6 +1950,7 @@ void ValueDecl::setInterfaceType(Type type) {
   if (!type.isNull() && isa<ParamDecl>(this)) {
     assert(!type->is<InOutType>() && "caller did not pass a base type");
   }
+
   // lldb creates global typealiases with archetypes in them.
   // FIXME: Add an isDebugAlias() flag, like isDebugVar().
   //
@@ -5295,7 +5296,14 @@ bool EnumElementDecl::computeType() {
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
   if (auto *PL = getParameterList()) {
-    auto paramTy = PL->getType(getASTContext());
+    // A parameter type of (Void) indicates that the user wants an empty
+    // payload.
+    Type paramTy;
+    if (PL->size() == 1 && PL->get(0)->getType()->isVoid()) {
+      paramTy = TupleType::getEmpty(getASTContext());
+    } else {
+      paramTy = PL->getType(getASTContext());
+    }
     resultTy = FunctionType::get(paramTy->mapTypeOutOfContext(), resultTy);
   }
 

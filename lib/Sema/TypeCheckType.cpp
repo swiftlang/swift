@@ -1763,10 +1763,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   };
 
   // Remember whether this is a function parameter.
-  bool isFunctionParam =
-    options.contains(TypeResolutionFlags::FunctionInput) ||
-    options.contains(TypeResolutionFlags::ImmediateFunctionInput);
+  bool isParam = options.contains(TypeResolutionFlags::FunctionInput) ||
+                 options.contains(TypeResolutionFlags::ImmediateFunctionInput);
+
   bool isVariadicFunctionParam =
+    !options.contains(TypeResolutionFlags::EnumCase) &&
     options.contains(TypeResolutionFlags::VariadicFunctionInput);
 
   // The type we're working with, in case we want to build it differently
@@ -1972,7 +1973,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     // @autoclosure is only valid on parameters.
-    if (!isFunctionParam && attrs.has(TAK_autoclosure)) {
+    if (!isParam && attrs.has(TAK_autoclosure)) {
       TC.diagnose(attrs.getLoc(TAK_autoclosure),
                   isVariadicFunctionParam
                       ? diag::attr_not_on_variadic_parameters
@@ -2030,7 +2031,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           isVariadicFunctionParam && Context.isSwiftVersion3();
 
       // The attribute is meaningless except on parameter types.
-      if (!isFunctionParam && !skipDiagnostic) {
+      bool isEnum = options.contains(TypeResolutionFlags::EnumCase);
+      if ((isEnum || !isParam) && !skipDiagnostic) {
         auto loc = attrs.getLoc(TAK_escaping);
         auto attrRange = getTypeAttrRangeWithAt(TC, loc);
 
@@ -2641,10 +2643,13 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
 
 Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
                                             TypeResolutionOptions options) {
-  // inout is only valid for (non-subscript) function parameters.
+  // inout is only valid for (non-Subscript and non-EnumCaseDecl)
+  // function parameters.
   if ((options & TypeResolutionFlags::SubscriptParameters) ||
+      (options & TypeResolutionFlags::EnumCase) ||
         (!(options & TypeResolutionFlags::FunctionInput) &&
          !(options & TypeResolutionFlags::ImmediateFunctionInput))) {
+
     decltype(diag::attr_only_on_parameters) diagID;
     if (options & TypeResolutionFlags::SubscriptParameters) {
       diagID = diag::attr_not_on_subscript_parameters;
@@ -2885,8 +2890,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   // or SIL, either.
   if (!isImmediateFunctionInput) {
     if (elements.size() == 1 && elements[0].hasName()
-        && !(options & TypeResolutionFlags::SILType)
-        && !(options & TypeResolutionFlags::EnumCase)) {
+        && !(options & TypeResolutionFlags::SILType)) {
       if (!complained) {
         TC.diagnose(repr->getElementNameLoc(0),
                     diag::tuple_single_element)

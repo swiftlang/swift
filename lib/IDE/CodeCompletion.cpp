@@ -2785,8 +2785,11 @@ public:
     setClangDeclKeywords(EED, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(EED->getName().str());
-    if (auto *params = EED->getParameterList())
+    if (auto *params = EED->getParameterList()) {
+      Builder.addLeftParen();
       addParameters(Builder, params);
+      Builder.addRightParen();
+    }
 
     // Enum element is of function type such as EnumName.type -> Int ->
     // EnumName; however we should show Int -> EnumName as the type

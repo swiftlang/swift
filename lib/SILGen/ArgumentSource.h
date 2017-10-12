@@ -225,9 +225,11 @@ public:
   bool isTuple() const & { return StoredKind == Kind::Tuple; }
   bool isTupleShuffleExpr() const & {
     if (StoredKind == Kind::Expr) {
-      if (auto *TSE = dyn_cast<TupleShuffleExpr>(asKnownExpr())) {
+      auto *e = asKnownExpr();
+      if (auto *TSE = dyn_cast<TupleShuffleExpr>(e)) {
         return llvm::any_of(TSE->getElementMapping(), [](const int &i) {
-          return i == TupleShuffleExpr::DefaultInitialize;
+          return i == TupleShuffleExpr::DefaultInitialize
+              || i == TupleShuffleExpr::CallerDefaultInitialize;
         });
       }
     }

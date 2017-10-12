@@ -544,13 +544,13 @@ public:
       assert(Substitutions.empty());
       return IndirectValue;
 
+    case Kind::EnumElement:
+      LLVM_FALLTHROUGH;
     case Kind::StandaloneFunction: {
       auto constantInfo = SGF.getConstantInfo(*constant);
       SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
       return ManagedValue::forUnmanaged(ref);
     }
-    case Kind::EnumElement:
-      llvm_unreachable("Should have been curried");
     case Kind::ClassMethod: {
       auto methodTy = SGF.SGM.Types.getConstantOverrideType(*constant);
 
@@ -3639,9 +3639,8 @@ CallEmission::applyFirstLevelCallee(SGFContext C) {
     return applyPartiallyAppliedSuperMethod(C);
   }
 
-
-  if (isEnumElementConstructor() && llvm::all_of(uncurriedSites, [](const CallSite &s){
-     return !s.isArgTupleShuffle();
+  if (isEnumElementConstructor() && !llvm::any_of(uncurriedSites, [](const CallSite &s){
+     return s.isArgTupleShuffle();
    })) {
     return applyEnumElementConstructor(C);
   }

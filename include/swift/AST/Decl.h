@@ -5758,7 +5758,7 @@ public:
   {
     Bits.EnumElementDecl.Recursiveness =
         static_cast<unsigned>(ElementRecursiveness::NotRecursive);
-    EnumElementDeclBits.DefaultArgumentResilienceExpansion =
+    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
         static_cast<unsigned>(ResilienceExpansion::Maximal);
   }
 
@@ -5811,18 +5811,18 @@ public:
     Bits.EnumElementDecl.Recursiveness = static_cast<unsigned>(recursiveness);
   }
 
-    /// The ResilienceExpansion for default arguments.
+  /// The ResilienceExpansion for default arguments.
   ///
   /// In Swift 4 mode, default argument expressions are serialized, and must
   /// obey the restrictions imposed upon inlineable function bodies.
   ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
     return ResilienceExpansion(
-        EnumElementDeclBits.DefaultArgumentResilienceExpansion);
+        Bits.EnumElementDecl.DefaultArgumentResilienceExpansion);
   }
 
   /// Set the ResilienceExpansion for default arguments.
   void setDefaultArgumentResilienceExpansion(ResilienceExpansion expansion) {
-    EnumElementDeclBits.DefaultArgumentResilienceExpansion =
+    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
         unsigned(expansion);
   }
 

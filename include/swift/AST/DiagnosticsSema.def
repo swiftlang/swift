@@ -3025,8 +3025,7 @@ WARNING(swift3_ignore_specialized_enum_element_call,none,
 
 ERROR(ambiguous_enum_element_in_pattern,none,
       "enum case %0 is ambiguous without explicit pattern matching "
-      "associated values",
-      (Identifier))
+      "associated values", (Identifier))
 NOTE(ambiguous_enum_element_candidate,none,
      "found potentially matching case %0", (DeclName))
 

@@ -1391,9 +1391,10 @@ void TypeChecker::checkDefaultArguments(ArrayRef<ParameterList *> paramLists,
   } else {
     auto *EED = cast<EnumElementDecl>(VD);
     auto expansion = EED->getParentEnum()->getResilienceExpansion();
-    if (!Context.isSwiftVersion3() &&
+    // Enum payloads parameter lists may have default arguments as of Swift 5.
+    if (Context.isSwiftVersionAtLeast(5) &&
         EED->getFormalAccessScope(/*useDC=*/nullptr,
-                                   /*respectVersionedAttr=*/true).isPublic())
+                                  /*respectVersionedAttr=*/true).isPublic())
       expansion = ResilienceExpansion::Minimal;
 
     EED->setDefaultArgumentResilienceExpansion(expansion);

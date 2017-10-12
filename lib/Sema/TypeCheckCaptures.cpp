@@ -429,11 +429,12 @@ public:
 
       // Can default parameter initializers capture state?  That seems like
       // a really bad idea.
-      for (auto *paramList : AFD->getParameterLists())
+      for (auto *paramList : AFD->getParameterLists()) {
         for (auto param : *paramList) {
           if (auto E = param->getDefaultValue())
             E->walk(*this);
         }
+      }
       return false;
     }
 

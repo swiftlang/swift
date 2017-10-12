@@ -79,7 +79,7 @@ func _XCTFailureDescription(_ assertionType: _XCTAssertionType, _ formatIndex: I
 enum _XCTThrowableBlockResult {
   case success
   case failedWithError(error: Error)
-  case failedWithException(className: String, name: String, reason: String)
+  case failedWithException(_ className: String, _ name: String, _ reason: String)
   case failedWithUnknownException
 }
 
@@ -102,9 +102,9 @@ func _XCTRunThrowableBlock(_ block: () throws -> Void) -> _XCTThrowableBlockResu
 
     if exceptionResult["type"] == "objc" {
       return .failedWithException(
-        className: exceptionResult["className"]!,
-        name: exceptionResult["name"]!,
-        reason: exceptionResult["reason"]!)
+        exceptionResult["className"]!,
+        exceptionResult["name"]!,
+        exceptionResult["reason"]!)
     } else {
       return .failedWithUnknownException
     }

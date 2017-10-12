@@ -26,7 +26,7 @@ func testE(e: E) {
     break
   case .C(): // Ok.
     break
-  case .D(let payload): // Ok. 'payload' has type '()'.
+  case .D(let payload):
     let _: () = payload
     break
   default:
@@ -35,7 +35,7 @@ func testE(e: E) {
 
   guard
     case .C() = e, // Ok. SILGen assert this, but no-assert Swift3 GM build didn't assert.
-    case .D(let payload) = e // FIXME: Should be rejected. Swift3 IRGen verifier did catch this.
+    case .D(let payload) = e
   else { return }
   print(payload)
 }
@@ -49,6 +49,6 @@ do {
   try canThrow()
 } catch E.A() { // Ok.
   // ..
-} catch E.B(let payload) { // Ok. 'payload' has type '()'.
+} catch E.B(let payload) {
   let _: () = payload
 }

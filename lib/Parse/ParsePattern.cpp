@@ -173,10 +173,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     // Diagnose and insert 'Void' where appropriate.
     if (paramContext == ParameterContextKind::EnumElement) {
       decltype(diag::enum_element_empty_arglist) diagnostic;
-      if (Context.isSwiftVersion3()) {
-        diagnostic = diag::enum_element_empty_arglist_swift3;
-      } else {
+      if (Context.isSwiftVersionAtLeast(5)) {
         diagnostic = diag::enum_element_empty_arglist;
+      } else {
+        diagnostic = diag::enum_element_empty_arglist_swift3;
       }
 
       diagnose(leftParenLoc, diagnostic)
@@ -276,8 +276,27 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
            paramContext == ParameterContextKind::EnumElement) &&
           !param.FirstName.empty() &&
           param.SecondNameLoc.isValid()) {
+        enum KeywordArgumentDiagnosticContextKind {
+          Operator    = 0,
+          Closure     = 1,
+          EnumElement = 2,
+        } diagContextKind;
+
+        switch (paramContext) {
+        case ParameterContextKind::Operator:
+          diagContextKind = Operator;
+          break;
+        case ParameterContextKind::Closure:
+          diagContextKind = Closure;
+          break;
+        case ParameterContextKind::EnumElement:
+          diagContextKind = EnumElement;
+          break;
+        default:
+          llvm_unreachable("Unhandled parameter context kind!");
+        }
         diagnose(param.FirstNameLoc, diag::parameter_operator_keyword_argument,
-                 isClosure)
+                 unsigned(diagContextKind))
           .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
         param.FirstName = param.SecondName;
         param.FirstNameLoc = param.SecondNameLoc;
@@ -426,8 +445,11 @@ mapParsedParameters(Parser &parser,
                                      paramInfo.SpecifierLoc,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName, Type(),
-                                     parser.CurDeclContext);    
-    if (argNameLoc.isInvalid() && paramNameLoc.isInvalid())
+                                     parser.CurDeclContext);
+    // If we're not parsing an enum case, lack of a SourceLoc for both
+    // names indicates the parameter is synthetic.
+    if (paramContext != Parser::ParameterContextKind::EnumElement &&
+        argNameLoc.isInvalid() && paramNameLoc.isInvalid())
       param->setImplicit();
 
     // If we diagnosed this parameter as a parse error, propagate to the decl.
@@ -436,16 +458,21 @@ mapParsedParameters(Parser &parser,
     
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
-      // If 'inout' was specified, turn the type into an in-out type.
-      if (paramInfo.SpecifierKind == VarDecl::Specifier::InOut) {
-        type = validateParameterWithSpecifier<InOutTypeRepr>(parser, paramInfo,
-                                                             "inout");
-      } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Shared) {
-        type = validateParameterWithSpecifier<SharedTypeRepr>(parser, paramInfo,
-                                                              "__shared");
-      } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Owned) {
-        type = validateParameterWithSpecifier<OwnedTypeRepr>(parser, paramInfo,
-                                                             "__owned");
+      if (paramContext != Parser::ParameterContextKind::EnumElement) {
+        // If 'inout' was specified, turn the type into an in-out type.
+        if (paramInfo.SpecifierKind == VarDecl::Specifier::InOut) {
+          type = validateParameterWithSpecifier<InOutTypeRepr>(parser,
+                                                               paramInfo,
+                                                               "inout");
+        } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Shared) {
+          type = validateParameterWithSpecifier<SharedTypeRepr>(parser,
+                                                                paramInfo,
+                                                                "__shared");
+        } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Owned) {
+          type = validateParameterWithSpecifier<OwnedTypeRepr>(parser,
+                                                               paramInfo,
+                                                               "__owned");
+        }
       }
       param->getTypeLoc() = TypeLoc(type);
     } else if (paramContext != Parser::ParameterContextKind::Closure) {

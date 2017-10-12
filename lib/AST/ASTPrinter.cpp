@@ -2217,6 +2217,13 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     auto ArgName = param->getArgumentName();
     auto BodyName = param->getName();
     switch (Options.ArgAndParamPrinting) {
+    case PrintOptions::ArgAndParamPrintingMode::EnumElement:
+      if (ArgName.empty() && BodyName.empty() && !param->getDefaultValue()) {
+        // Don't print anything, in the style of a tuple element.
+        return;
+      }
+      // Else, print the argument only.
+      LLVM_FALLTHROUGH;
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
       Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
 
@@ -2560,9 +2567,22 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
       Printer.printName(elt->getName());
     });
 
-  if (auto argTy = elt->getArgumentInterfaceType()) {
-    if (!Options.SkipPrivateStdlibDecls || !argTy.isPrivateStdlibType())
-      argTy.print(Printer, Options);
+  if (auto *PL = elt->getParameterList()) {
+    if (PL->size() == 1 && PL->get(0)->hasType()
+          && PL->get(0)->getType()->isVoid()) {
+      auto &ctx = elt->getASTContext();
+      TupleType::get({ TupleType::getEmpty(ctx) }, ctx).print(Printer, Options);
+    } else {
+      llvm::SaveAndRestore<PrintOptions::ArgAndParamPrintingMode>
+        mode(Options.ArgAndParamPrinting,
+             PrintOptions::ArgAndParamPrintingMode::EnumElement);
+      printParameterList(PL,
+                         elt->hasInterfaceType()
+                           ? elt->getArgumentInterfaceType()
+                           : nullptr,
+                         /*isCurried=*/false,
+                         /*isAPINameByDefault*/[]()->bool{return true;});
+    }
   }
 
   auto *raw = elt->getRawValueExpr();
@@ -4233,6 +4253,13 @@ void swift::printEnumElementsAsCases(
     // If the enum element has no payloads, return.
     if (!PL)
       return;
+
+    // Print an empty-but-non-NULL parameter list as '(Void)'
+    if (PL->size() == 0) {
+      OS << "(Void)";
+      return;
+    }
+
     OS << "(";
     // Print each element in the pattern match.
     for (auto i = PL->begin(); i != PL->end(); ++i) {

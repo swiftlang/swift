@@ -879,7 +879,7 @@ WARNING(parameter_extraneous_double_up,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
 ERROR(parameter_operator_keyword_argument,none,
-      "%select{operator|closure}0 cannot have keyword arguments", (bool))
+      "%select{operator|closure|enum case}0 cannot have keyword arguments", (unsigned))
 
 ERROR(parameter_unnamed,none,
       "unnamed parameters must be written with the empty name '_'", ())

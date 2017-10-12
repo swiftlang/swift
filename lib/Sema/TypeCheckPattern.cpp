@@ -1049,18 +1049,20 @@ recur:
   case PatternKind::Paren: {
     auto PP = cast<ParenPattern>(P);
     // Paren Patterns may not match enum payloads when not in Swift 3 mode.
-    if ((options & TR_EnumPatternPayload) && type->is<TupleType>() && !PP->isImplicit()) {
-      if (Context.isSwiftVersion3()) {
-        diagnose(PP->getStartLoc(),
-                 diag::paren_pattern_in_tuple_context_warn_swift3, type)
-          .highlight(PP->getSourceRange());
-
-        // Fall through to old pattern matching behavior
-      } else {
+    if (options.contains(TypeResolutionFlags::EnumCase)
+        && type->is<TupleType>() && !PP->isImplicit()) {
+      if (Context.isSwiftVersionAtLeast(5)) {
         diagnose(PP->getStartLoc(), diag::paren_pattern_in_tuple_context,
                  type)
-          .highlight(PP->getSourceRange());
+        .highlight(PP->getSourceRange());
         return true;
+      } else {
+        // FIXME: Re-enable this post-discussion on Swift Evolution.
+//        diagnose(PP->getStartLoc(),
+//                 diag::paren_pattern_in_tuple_context_warn_swift3, type)
+//          .highlight(PP->getSourceRange());
+
+        // Fall through to old pattern matching behavior
       }
     }
 
@@ -1474,7 +1476,7 @@ recur:
     if (!elt) {
       SmallVector<Identifier, 4> components;
       DeclName lookupName = EEP->getName();
-      if (EEP->hasSubPattern() && !Context.isSwiftVersion3()) {
+      if (EEP->hasSubPattern() && Context.isSwiftVersionAtLeast(5)) {
         /// Gather any argument names so we can perform lookup with a full name.
         if (auto *ArgP = dyn_cast<TuplePattern>(EEP->getSubPattern())) {
           for (auto &comp : ArgP->getElements()) {

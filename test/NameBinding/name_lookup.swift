@@ -558,13 +558,13 @@ func foo() {
 }
 
 enum MyGenericEnum<T> {
-  case one(T)
-  case oneTwo(T)
+  case one(T) // expected-note {{did you mean 'one'?}}
+  case oneTwo(T) // expected-note {{did you mean 'oneTwo'?}}
 }
 
 func foo1() {
-  _ = MyGenericEnum<Int>.One // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'One'; did you mean 'one'}}{{26-29=one}}
-  _ = MyGenericEnum<Int>.OneTwo // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'OneTwo'; did you mean 'oneTwo'}}{{26-32=oneTwo}}
+  _ = MyGenericEnum<Int>.One // expected-error {{type 'MyGenericEnum<Int>' has no member 'One'}}
+  _ = MyGenericEnum<Int>.OneTwo // expected-error {{type 'MyGenericEnum<Int>' has no member 'OneTwo'}}
 }
 
 // SR-4082
