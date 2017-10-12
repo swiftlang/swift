@@ -992,8 +992,20 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
 
   // Propagate the concrete type into a callee-operand, which is a
   // witness_method instruction.
-  auto PropagateIntoOperand = [this, &WMI, &AI](CanType ConcreteType,
-                                           ProtocolConformanceRef Conformance) {
+  auto PropagateIntoOperand = [this, &WMI, &AI](
+      CanType ConcreteType, ProtocolConformanceRef Conformance) {
+    if (ConcreteType == WMI->getLookupType() &&
+        Conformance == WMI->getConformance()) {
+      // If we create a new instruction that’s the same as the old one we’ll
+      // cause an infinite loop:
+      // NewWMI will be added to the Builder’s tracker list.
+      // SILCombine, in turn, uses the tracker list to populate the worklist
+      // As such, if we don’t remove the witness method later on in the pass, we
+      // are stuck:
+      // We will re-create the same instruction and re-populate the worklist
+      // with it
+      return;
+    }
     // Keep around the dependence on the open instruction unless we've
     // actually eliminated the use.
     auto *NewWMI = Builder.createWitnessMethod(WMI->getLoc(),
@@ -1006,7 +1018,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
     MutableArrayRef<Operand> Operands = AI.getInstruction()->getAllOperands();
     for (auto &Op : Operands) {
       if (Op.get() == WMI)
-         Op.set(NewWMI); 
+        Op.set(NewWMI);
     }
     if (WMI->use_empty())
       eraseInstFromFunction(*WMI);
