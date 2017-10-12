@@ -302,6 +302,14 @@ public:
   /// are concrete, not type parameters.
   bool isRequirementSatisfied(Requirement requirement);
 
+  /// Return the requirements of this generic signature that are not also
+  /// satisfied by \c otherSig.
+  ///
+  /// \param otherSig Another generic signature whose generic parameters are
+  /// equivalent to or a subset of the generic parameters in this signature.
+  SmallVector<Requirement, 4> requirementsNotSatisfiedBy(
+                                               GenericSignature *otherSig);
+
   /// Return the canonical version of the given type under this generic
   /// signature.
   CanType getCanonicalTypeInContext(Type type);
