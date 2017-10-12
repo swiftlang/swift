@@ -325,7 +325,7 @@ For more details about any of the information below, please run::
 ```````````
 
 The "types" log reports on LLDB's process of constructing SwiftASTContexts and
-errors that may occur. The two main tasks here are::
+errors that may occur. The two main tasks here are:
 
 1. Constructing the SwiftASTContext for a specific single Swift module. This is
    used to implement frame local variable dumping via the lldb ``frame
