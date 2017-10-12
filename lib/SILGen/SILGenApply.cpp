@@ -4277,20 +4277,6 @@ CallEmission::applyEnumElementConstructor(unsigned uncurryLevel, SGFContext C) {
   auto substFnType =
       SGF.getSILFunctionType(origFormalType, firstLevelResult.formalType);
 
-  // Now that we know the substFnType, check if we assumed that we were
-  // passing self at +0. If we did and self is not actually passed at +0,
-  // retain Self.
-  if (assumedPlusZeroSelf) {
-    // If the final emitted function does not have a self param or it does
-    // have a self param that is consumed, convert what we think is self
-    // to
-    // be plus zero.
-    if (!substFnType->hasSelfParam() ||
-        substFnType->getSelfParameter().isConsumed()) {
-      convertSelfToPlusOneFromPlusZero();
-    }
-  }
-
   // We have a fully-applied enum element constructor: open-code the
   // construction.
   EnumElementDecl *element = callee.getEnumElementDecl();
