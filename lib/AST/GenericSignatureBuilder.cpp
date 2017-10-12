@@ -3012,11 +3012,46 @@ auto GenericSignatureBuilder::resolvePotentialArchetype(
 EquivalenceClass *GenericSignatureBuilder::resolveEquivalenceClass(
                                     Type type,
                                     ArchetypeResolutionKind resolutionKind) {
-  auto pa = resolvePotentialArchetype(type, resolutionKind)
-              .dyn_cast<PotentialArchetype *>();
-  if (!pa) return nullptr;
+  // The equivalence class of a generic type is known directly.
+  if (auto genericParam = type->getAs<GenericTypeParamType>()) {
+    unsigned index = GenericParamKey(genericParam).findIndexIn(
+                                                           Impl->GenericParams);
+    if (index < Impl->GenericParams.size())
+      return Impl->PotentialArchetypes[index]->getOrCreateEquivalenceClass();
 
-  return pa->getOrCreateEquivalenceClass();
+    return nullptr;
+  }
+
+  // The equivalence class of a dependent member type is determined by its
+  // base equivalence class.
+  if (auto depMemTy = type->getAs<DependentMemberType>()) {
+    // Find the equivalence class of the base.
+    auto baseEquivClass = resolveEquivalenceClass(depMemTy->getBase(),
+                                                  resolutionKind);
+    if (!baseEquivClass) return nullptr;
+
+    // Find the nested type declaration for this.
+    TypeDecl *nestedTypeDecl;
+    if (auto assocType = depMemTy->getAssocType()) {
+      nestedTypeDecl = assocType;
+    } else {
+      nestedTypeDecl = baseEquivClass->lookupNestedType(depMemTy->getName());
+      if (!nestedTypeDecl) return nullptr;
+    }
+
+    // Retrieve the anchor of the base equivalence class.
+    auto baseAnchorPA =
+      baseEquivClass->members.front()->getArchetypeAnchor(*this);
+    auto nestedPA =
+      baseAnchorPA->updateNestedTypeForConformance(nestedTypeDecl,
+                                                   resolutionKind);
+    if (!nestedPA)
+      return nullptr;
+
+    return nestedPA->getOrCreateEquivalenceClass();
+  }
+
+  return nullptr;
 }
 
 /// Resolve any unresolved dependent member types using the given builder.
