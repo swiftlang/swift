@@ -39,10 +39,30 @@ public func test(_ a: Int, _ b: Int) {
 public func test(_ t: (Int, Int)) {
 }
 
+// CHECK: sil @_T04test0A7NoLabelySi_Sit_tF :
+public func testNoLabel(_: (Int, Int)) {
+}
+
+// CHECK: sil @_T04test0A5FnArgyySi_SitcF :
+public func testFnArg(_: (Int, Int) -> Void) {
+}
+
+// CHECK: sil @_T04test0A5FnArgyySi_Sit_tcF :
+public func testFnArg(_: ((Int, Int)) -> Void) {
+}
+
 // CHECK: sil @_T04test3fooyyt_tF :
 public func foo(_: ()) {
 }
 
 // CHECK: sil @_T04test3fooyyF :
 public func foo() {
+}
+
+public func baz() {
+  // CHECK: function_ref @_T04test3bazyyFySi_Sit_tcfU_ :
+  let _: ((Int, Int)) -> Void = { x in }
+
+  // CHECK: function_ref @_T04test3bazyyFySi_SitcfU0_ :
+  let _: (Int, Int) -> Void = { x, y in }
 }
