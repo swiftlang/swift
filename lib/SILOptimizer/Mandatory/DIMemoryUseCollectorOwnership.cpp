@@ -1561,6 +1561,8 @@ class DelegatingInitElementUseCollector {
   const DIMemoryObjectInfo &TheMemory;
   DIElementUseInfo &UseInfo;
 
+  void collectValueTypeInitSelfUses(SingleValueInstruction *I);
+
 public:
   DelegatingInitElementUseCollector(const DIMemoryObjectInfo &TheMemory,
                                     DIElementUseInfo &UseInfo)
@@ -1684,15 +1686,9 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
   }
 }
 
-void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses() {
-  // When we're analyzing a delegating constructor, we aren't field sensitive at
-  // all.  Just treat all members of self as uses of the single
-  // non-field-sensitive value.
-  assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
-
-  auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
-
-  for (auto UI : MUI->getUses()) {
+void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses(
+    SingleValueInstruction *I) {
+  for (auto UI : I->getUses()) {
     auto *User = UI->getUser();
 
     // destroy_addr is a release of the entire value. This can result from an
@@ -1731,10 +1727,30 @@ void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses() {
       }
     }
 
+    // Look through begin_access
+    if (auto *BAI = dyn_cast<BeginAccessInst>(User)) {
+      collectValueTypeInitSelfUses(BAI);
+      continue;
+    }
+
+    // Ignore end_access
+    if (isa<EndAccessInst>(User))
+      continue;
+
     // We can safely handle anything else as an escape.  They should all happen
     // after self.init is invoked.
     UseInfo.trackUse(DIMemoryUse(User, Kind, 0, 1));
   }
+}
+
+void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses() {
+  // When we're analyzing a delegating constructor, we aren't field sensitive at
+  // all.  Just treat all members of self as uses of the single
+  // non-field-sensitive value.
+  assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
+
+  auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
+  collectValueTypeInitSelfUses(MUI);
 }
 
 void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
