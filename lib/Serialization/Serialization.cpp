@@ -769,7 +769,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
 
     {
-      llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 3);
+      llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);
 
       options_block::IsSIBLayout IsSIB(Out);
       IsSIB.emit(ScratchRecord, options.IsSIB);
