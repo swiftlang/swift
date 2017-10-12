@@ -18,7 +18,6 @@
 
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Strings.h"
@@ -136,8 +135,6 @@ public:
             Diags, Args.getLastArg(options::OPT_primary_filelist))) {}
 
   void convert() {
-    SharedTimer("setInputFilenamesAndPrimaryInputs");
-
     getFilesDirectlyFromArgs();
     if (!filelistBuffer || !primaryFilelistBuffer)
       return;
