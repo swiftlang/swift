@@ -84,6 +84,13 @@ public func pub_function()
     key.namelength: 7,
     key.bodyoffset: 48,
     key.bodylength: 31,
+    key.attributes: [
+      {
+        key.offset: 26,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ],
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -92,7 +99,14 @@ public func pub_function()
         key.offset: 61,
         key.length: 17,
         key.nameoffset: 66,
-        key.namelength: 12
+        key.namelength: 12,
+        key.attributes: [
+          {
+            key.offset: 54,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ]
       }
     ]
   },
@@ -103,6 +117,13 @@ public func pub_function()
     key.offset: 89,
     key.length: 19,
     key.nameoffset: 94,
-    key.namelength: 14
+    key.namelength: 14,
+    key.attributes: [
+      {
+        key.offset: 82,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ]
   }
 ]
