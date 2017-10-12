@@ -636,9 +636,9 @@ bool FrontendArgsToOptionsConverter::
   // if output is required for the requested action.
 
   StringRef Suffix = Opts.computeSuffix();
-  Opts.clearOrSetOutputFilenameToStdoutAccordiingToAction();
+  bool changedOutput = Opts.clearOrSetOutputFilenameToStdoutAccordiingToAction();
 
-  if (!Suffix.empty()) {
+  if (!changedOutput && !Suffix.empty()) {
     // We need to deduce a file name.
 
     // First, if we're reading from stdin and we don't have a directory,

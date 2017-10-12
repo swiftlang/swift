@@ -258,7 +258,9 @@ public:
     OutputFilenames.clear();
     OutputFilenames.push_back(FileName);
   }
-  void setOutputFilenameToStdout() { setSingleOutputFilename("-"); }
+  void setOutputFilenameToStdout() {
+    setSingleOutputFilename("-");
+  }
   bool isOutputFilenameStdout() const {
     return getSingleOutputFilename() == "-";
   }
@@ -533,7 +535,8 @@ private:
   bool canEmitModule() const;
 
   const char *computeSuffix();
-  void clearOrSetOutputFilenameToStdoutAccordiingToAction();
+  /// Return true if changed output filename.
+  bool clearOrSetOutputFilenameToStdoutAccordiingToAction();
 };
 }
 

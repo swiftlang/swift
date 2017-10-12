@@ -432,43 +432,45 @@ const char *FrontendOptions::computeSuffix() {
   }
 }
 
-void FrontendOptions::clearOrSetOutputFilenameToStdoutAccordiingToAction() {
+bool FrontendOptions::clearOrSetOutputFilenameToStdoutAccordiingToAction() {
   switch (RequestedAction) {
-  case NoneAction:
-  case EmitPCH:
-  case EmitSIBGen:
-  case EmitSIB:
-  case MergeModules:
-  case EmitModuleOnly:
-  case EmitBC:
-  case EmitObject:
-    break;
-
-  case Parse:
-  case Typecheck:
-  case DumpParse:
-  case DumpInterfaceHash:
-  case DumpAST:
-  case EmitSyntax:
-  case PrintAST:
-  case DumpScopeMaps:
-  case DumpTypeRefinementContexts:
-  case EmitImportedModules:
-    setOutputFilenameToStdout();
-    break;
-
-  case EmitSILGen:
-  case EmitSIL:
-  case EmitAssembly:
-  case EmitIR:
-    if (OutputFilenames.empty())
+    case NoneAction:
+    case EmitPCH:
+    case EmitSIBGen:
+    case EmitSIB:
+    case MergeModules:
+    case EmitModuleOnly:
+    case EmitBC:
+    case EmitObject:
+      return false;
+      
+    case Parse:
+    case Typecheck:
+    case DumpParse:
+    case DumpInterfaceHash:
+    case DumpAST:
+    case EmitSyntax:
+    case PrintAST:
+    case DumpScopeMaps:
+    case DumpTypeRefinementContexts:
+    case EmitImportedModules:
       setOutputFilenameToStdout();
-    break;
-
-  case Immediate:
-  case REPL:
+      return true;
+      
+    case EmitSILGen:
+    case EmitSIL:
+    case EmitAssembly:
+    case EmitIR:
+      if (OutputFilenames.empty()) {
+        setOutputFilenameToStdout();
+        return true;;
+      }
+      return false;
+      
+    case Immediate:
+    case REPL:
     // These modes have no frontend-generated output.
     OutputFilenames.clear();
-    break;
+    return true;
   }
 }
