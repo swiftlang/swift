@@ -35,7 +35,14 @@
           key.length: 21,
           key.typename: "Int",
           key.nameoffset: 55,
-          key.namelength: 7
+          key.namelength: 7,
+          key.attributes: [
+            {
+              key.offset: 44,
+              key.length: 6,
+              key.attribute: source.decl.attribute.public
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -46,7 +53,14 @@
           key.length: 22,
           key.typename: "Int",
           key.nameoffset: 87,
-          key.namelength: 8
+          key.namelength: 8,
+          key.attributes: [
+            {
+              key.offset: 75,
+              key.length: 7,
+              key.attribute: source.decl.attribute.private
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -57,7 +71,14 @@
           key.nameoffset: 122,
           key.namelength: 9,
           key.bodyoffset: 133,
-          key.bodylength: 0
+          key.bodylength: 0,
+          key.attributes: [
+            {
+              key.offset: 108,
+              key.length: 8,
+              key.attribute: source.decl.attribute.internal
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -68,7 +89,14 @@
           key.nameoffset: 154,
           key.namelength: 8,
           key.bodyoffset: 164,
-          key.bodylength: 0
+          key.bodylength: 0,
+          key.attributes: [
+            {
+              key.offset: 137,
+              key.length: 11,
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ]
         }
       ]
     },
@@ -83,6 +111,13 @@
       key.namelength: 9,
       key.bodyoffset: 193,
       key.bodylength: 193,
+      key.attributes: [
+        {
+          key.offset: 169,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ],
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -104,7 +139,14 @@
           key.length: 21,
           key.typename: "Int",
           key.nameoffset: 231,
-          key.namelength: 7
+          key.namelength: 7,
+          key.attributes: [
+            {
+              key.offset: 220,
+              key.length: 6,
+              key.attribute: source.decl.attribute.public
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -115,7 +157,14 @@
           key.length: 22,
           key.typename: "Int",
           key.nameoffset: 263,
-          key.namelength: 8
+          key.namelength: 8,
+          key.attributes: [
+            {
+              key.offset: 251,
+              key.length: 7,
+              key.attribute: source.decl.attribute.private
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -126,7 +175,14 @@
           key.nameoffset: 298,
           key.namelength: 9,
           key.bodyoffset: 309,
-          key.bodylength: 0
+          key.bodylength: 0,
+          key.attributes: [
+            {
+              key.offset: 284,
+              key.length: 8,
+              key.attribute: source.decl.attribute.internal
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -137,7 +193,14 @@
           key.nameoffset: 330,
           key.namelength: 8,
           key.bodyoffset: 340,
-          key.bodylength: 0
+          key.bodylength: 0,
+          key.attributes: [
+            {
+              key.offset: 313,
+              key.length: 11,
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.class,
@@ -176,6 +239,13 @@
       key.namelength: 9,
       key.bodyoffset: 415,
       key.bodylength: 149,
+      key.attributes: [
+        {
+          key.offset: 389,
+          key.length: 8,
+          key.attribute: source.decl.attribute.internal
+        }
+      ],
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -197,7 +267,14 @@
           key.length: 21,
           key.typename: "Int",
           key.nameoffset: 453,
-          key.namelength: 7
+          key.namelength: 7,
+          key.attributes: [
+            {
+              key.offset: 442,
+              key.length: 6,
+              key.attribute: source.decl.attribute.public
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -208,7 +285,14 @@
           key.length: 22,
           key.typename: "Int",
           key.nameoffset: 485,
-          key.namelength: 8
+          key.namelength: 8,
+          key.attributes: [
+            {
+              key.offset: 473,
+              key.length: 7,
+              key.attribute: source.decl.attribute.private
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -219,7 +303,14 @@
           key.nameoffset: 520,
           key.namelength: 9,
           key.bodyoffset: 531,
-          key.bodylength: 0
+          key.bodylength: 0,
+          key.attributes: [
+            {
+              key.offset: 506,
+              key.length: 8,
+              key.attribute: source.decl.attribute.internal
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -230,7 +321,14 @@
           key.nameoffset: 552,
           key.namelength: 8,
           key.bodyoffset: 562,
-          key.bodylength: 0
+          key.bodylength: 0,
+          key.attributes: [
+            {
+              key.offset: 535,
+              key.length: 11,
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ]
         }
       ]
     },
@@ -245,6 +343,13 @@
       key.namelength: 10,
       key.bodyoffset: 593,
       key.bodylength: 193,
+      key.attributes: [
+        {
+          key.offset: 567,
+          key.length: 7,
+          key.attribute: source.decl.attribute.private
+        }
+      ],
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -266,7 +371,14 @@
           key.length: 21,
           key.typename: "Int",
           key.nameoffset: 631,
-          key.namelength: 7
+          key.namelength: 7,
+          key.attributes: [
+            {
+              key.offset: 620,
+              key.length: 6,
+              key.attribute: source.decl.attribute.public
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -277,7 +389,14 @@
           key.length: 22,
           key.typename: "Int",
           key.nameoffset: 663,
-          key.namelength: 8
+          key.namelength: 8,
+          key.attributes: [
+            {
+              key.offset: 651,
+              key.length: 7,
+              key.attribute: source.decl.attribute.private
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -288,7 +407,14 @@
           key.nameoffset: 698,
           key.namelength: 9,
           key.bodyoffset: 709,
-          key.bodylength: 0
+          key.bodylength: 0,
+          key.attributes: [
+            {
+              key.offset: 684,
+              key.length: 8,
+              key.attribute: source.decl.attribute.internal
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -299,7 +425,14 @@
           key.nameoffset: 730,
           key.namelength: 8,
           key.bodyoffset: 740,
-          key.bodylength: 0
+          key.bodylength: 0,
+          key.attributes: [
+            {
+              key.offset: 713,
+              key.length: 11,
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.class,
@@ -347,7 +480,14 @@
       key.nameoffset: 819,
       key.namelength: 9,
       key.bodyoffset: 830,
-      key.bodylength: 0
+      key.bodylength: 0,
+      key.attributes: [
+        {
+          key.offset: 807,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.function.free,
@@ -358,7 +498,14 @@
       key.nameoffset: 845,
       key.namelength: 10,
       key.bodyoffset: 857,
-      key.bodylength: 0
+      key.bodylength: 0,
+      key.attributes: [
+        {
+          key.offset: 832,
+          key.length: 7,
+          key.attribute: source.decl.attribute.private
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.function.free,
@@ -369,7 +516,14 @@
       key.nameoffset: 873,
       key.namelength: 9,
       key.bodyoffset: 884,
-      key.bodylength: 0
+      key.bodylength: 0,
+      key.attributes: [
+        {
+          key.offset: 859,
+          key.length: 8,
+          key.attribute: source.decl.attribute.internal
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.enum,
@@ -381,6 +535,13 @@
       key.namelength: 7,
       key.bodyoffset: 908,
       key.bodylength: 25,
+      key.attributes: [
+        {
+          key.offset: 887,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ],
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.enumcase,
@@ -429,7 +590,14 @@
       key.length: 28,
       key.typename: "Int",
       key.nameoffset: 953,
-      key.namelength: 14
+      key.namelength: 14,
+      key.attributes: [
+        {
+          key.offset: 936,
+          key.length: 12,
+          key.attribute: source.decl.attribute.setter_access.private
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.var.global,
@@ -442,7 +610,19 @@
       key.nameoffset: 1004,
       key.namelength: 14,
       key.bodyoffset: 1026,
-      key.bodylength: 31
+      key.bodylength: 31,
+      key.attributes: [
+        {
+          key.offset: 987,
+          key.length: 12,
+          key.attribute: source.decl.attribute.setter_access.private
+        },
+        {
+          key.offset: 980,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.var.global,
@@ -455,7 +635,19 @@
       key.nameoffset: 1087,
       key.namelength: 12,
       key.bodyoffset: 1107,
-      key.bodylength: 31
+      key.bodylength: 31,
+      key.attributes: [
+        {
+          key.offset: 1066,
+          key.length: 16,
+          key.attribute: source.decl.attribute.setter_access.fileprivate
+        },
+        {
+          key.offset: 1059,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.var.global,
@@ -468,7 +660,19 @@
       key.nameoffset: 1165,
       key.namelength: 13,
       key.bodyoffset: 1186,
-      key.bodylength: 31
+      key.bodylength: 31,
+      key.attributes: [
+        {
+          key.offset: 1147,
+          key.length: 13,
+          key.attribute: source.decl.attribute.setter_access.internal
+        },
+        {
+          key.offset: 1140,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.var.global,
@@ -480,7 +684,14 @@
       key.nameoffset: 1231,
       key.namelength: 10,
       key.bodyoffset: 1249,
-      key.bodylength: 21
+      key.bodylength: 21,
+      key.attributes: [
+        {
+          key.offset: 1220,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.var.global,
@@ -490,7 +701,14 @@
       key.length: 19,
       key.typename: "Int",
       key.nameoffset: 1284,
-      key.namelength: 9
+      key.namelength: 9,
+      key.attributes: [
+        {
+          key.offset: 1273,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.function.free,
@@ -512,7 +730,14 @@
       key.nameoffset: 1331,
       key.namelength: 9,
       key.bodyoffset: 1342,
-      key.bodylength: 0
+      key.bodylength: 0,
+      key.attributes: [
+        {
+          key.offset: 1319,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.function.free,
@@ -523,7 +748,14 @@
       key.nameoffset: 1357,
       key.namelength: 10,
       key.bodyoffset: 1369,
-      key.bodylength: 0
+      key.bodylength: 0,
+      key.attributes: [
+        {
+          key.offset: 1344,
+          key.length: 7,
+          key.attribute: source.decl.attribute.private
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.function.free,
@@ -534,7 +766,14 @@
       key.nameoffset: 1385,
       key.namelength: 9,
       key.bodyoffset: 1396,
-      key.bodylength: 0
+      key.bodylength: 0,
+      key.attributes: [
+        {
+          key.offset: 1371,
+          key.length: 8,
+          key.attribute: source.decl.attribute.internal
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.extension,
@@ -638,6 +877,13 @@
       key.namelength: 9,
       key.bodyoffset: 1605,
       key.bodylength: 25,
+      key.attributes: [
+        {
+          key.offset: 1576,
+          key.length: 7,
+          key.attribute: source.decl.attribute.private
+        }
+      ],
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -662,6 +908,13 @@
       key.namelength: 9,
       key.bodyoffset: 1662,
       key.bodylength: 29,
+      key.attributes: [
+        {
+          key.offset: 1632,
+          key.length: 8,
+          key.attribute: source.decl.attribute.internal
+        }
+      ],
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -686,6 +939,13 @@
       key.namelength: 9,
       key.bodyoffset: 1721,
       key.bodylength: 27,
+      key.attributes: [
+        {
+          key.offset: 1693,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ],
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -716,7 +976,14 @@
       key.offset: 1783,
       key.length: 24,
       key.nameoffset: 1793,
-      key.namelength: 8
+      key.namelength: 8,
+      key.attributes: [
+        {
+          key.offset: 1776,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.typealias,
@@ -725,7 +992,14 @@
       key.offset: 1816,
       key.length: 25,
       key.nameoffset: 1826,
-      key.namelength: 9
+      key.namelength: 9,
+      key.attributes: [
+        {
+          key.offset: 1808,
+          key.length: 7,
+          key.attribute: source.decl.attribute.private
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.typealias,
@@ -734,7 +1008,14 @@
       key.offset: 1851,
       key.length: 24,
       key.nameoffset: 1861,
-      key.namelength: 8
+      key.namelength: 8,
+      key.attributes: [
+        {
+          key.offset: 1842,
+          key.length: 8,
+          key.attribute: source.decl.attribute.internal
+        }
+      ]
     }
   ]
 }
