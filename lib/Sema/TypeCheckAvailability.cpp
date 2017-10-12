@@ -2093,6 +2093,14 @@ bool TypeChecker::diagnoseExplicitUnavailability(
     return false;
   }
 
+  // Calling unavailable code from within code with the same
+  // unavailability is OK -- the eventual caller can't call the
+  // enclosing code in the same situations it wouldn't be able to
+  // call this code.
+  if (isInsideUnavailableDeclaration(R, DC)) {
+    return false;
+  }
+
   SourceLoc Loc = R.Start;
   auto Name = D->getFullName();
 
