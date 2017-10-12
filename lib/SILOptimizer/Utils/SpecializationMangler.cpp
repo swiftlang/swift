@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Demangling/ManglingMacros.h"
 

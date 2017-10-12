@@ -19,6 +19,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -180,6 +181,35 @@ AbstractionPattern::getOptional(AbstractionPattern object,
                                 ->getCanonicalType());
   }
   llvm_unreachable("bad kind");
+}
+
+bool AbstractionPattern::isConcreteType() const {
+  assert(isTypeParameter());
+  return (getKind() != Kind::Opaque &&
+          GenericSig != nullptr &&
+          GenericSig->isConcreteType(getType()));
+}
+
+bool AbstractionPattern::requiresClass() {
+  switch (getKind()) {
+  case Kind::Opaque:
+    return false;
+  case Kind::Type:
+  case Kind::Discard: {
+    auto type = getType();
+    if (auto archetype = dyn_cast<ArchetypeType>(type))
+      return archetype->requiresClass();
+    else if (isa<DependentMemberType>(type) ||
+             isa<GenericTypeParamType>(type)) {
+      assert(GenericSig &&
+             "Dependent type in pattern without generic signature?");
+      return GenericSig->requiresClass(type);
+    }
+    return false;
+  }
+  default:
+    return false;
+  }
 }
 
 bool AbstractionPattern::matchesTuple(CanTupleType substType) {

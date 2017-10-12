@@ -23,7 +23,6 @@
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -1460,20 +1459,10 @@ public:
   GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the innermost generic parameter types.
-  ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const {
-    if (auto sig = getGenericSignature())
-      return sig->getInnermostGenericParams();
-    else
-      return { };
-  }
+  ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const;
 
   /// Retrieve the generic requirements.
-  ArrayRef<Requirement> getGenericRequirements() const {
-    if (auto sig = getGenericSignature())
-      return sig->getRequirements();
-    else
-      return { };
-  }
+  ArrayRef<Requirement> getGenericRequirements() const;
 
   /// Set a lazy generic environment.
   void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,

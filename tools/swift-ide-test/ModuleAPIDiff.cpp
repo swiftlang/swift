@@ -12,6 +12,7 @@
 
 #include "ModuleAPIDiff.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/FrontendUtil.h"

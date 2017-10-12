@@ -20,6 +20,7 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/SourceEntityWalker.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"

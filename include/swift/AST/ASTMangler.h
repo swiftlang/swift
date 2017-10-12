@@ -16,7 +16,6 @@
 #include "swift/Basic/Mangler.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/GenericSignature.h"
 
 namespace swift {
 

@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "deserialize"
 #include "DeserializeSIL.h"
 #include "swift/Basic/Defer.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Serialization/ModuleFile.h"
 #include "SILFormat.h"
