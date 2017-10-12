@@ -1709,22 +1709,13 @@ void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses(
     // Stores *to* the allocation are writes.  If the value being stored is a
     // call to self.init()... then we have a self.init call.
     if (auto *AI = dyn_cast<AssignInst>(User)) {
-      if (auto *AssignSource = AI->getOperand(0)->getDefiningInstruction())
-        if (isSelfInitUse(AssignSource))
-          Kind = DIUseKind::SelfInit;
-      if (auto *AssignSource = dyn_cast<SILArgument>(AI->getOperand(0))) {
-        if (AssignSource->getParent() == AI->getParent()) {
-          if (isSelfInitUse(AssignSource)) {
-            Kind = DIUseKind::SelfInit;
-          }
-        }
-      }
+      if (AI->getDest() == I)
+        Kind = DIUseKind::InitOrAssign;
     }
 
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
-      if (isSelfInitUse(CAI)) {
-        Kind = DIUseKind::SelfInit;
-      }
+      if (CAI->getDest() == I)
+        Kind = DIUseKind::InitOrAssign;
     }
 
     // Look through begin_access

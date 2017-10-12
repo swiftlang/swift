@@ -20,7 +20,7 @@ struct ValueStruct {
 
   init(a: Float) {
     self.init()
-    self.init() // expected-error {{'self.init' called multiple times in initializer}}
+    self.init() // this is now OK
   }
 
   init(c: Bool) {
@@ -39,14 +39,13 @@ struct ValueStruct {
     self = ValueStruct()
   }
 
-  // FIXME: doesn't work yet
   init(e: Bool) {
     if e {
       self.init()
     } else {
-      self = ValueStruct() // expected-error {{}}
+      self = ValueStruct()
     }
-  } // expected-error {{}}
+  }
 }
 
 enum ValueEnum {
@@ -67,7 +66,7 @@ enum ValueEnum {
 
   init(a: Float) {
     self.init()
-    self.init() // expected-error {{'self.init' called multiple times in initializer}}
+    self.init() // this is now OK
   }
 
   init(c: Bool) {
@@ -86,14 +85,13 @@ enum ValueEnum {
     self = ValueEnum()
   }
 
-  // FIXME: doesn't work yet
   init(e: Bool) {
     if e {
-      self = ValueEnum() // expected-error {{}}
+      self = ValueEnum()
     } else {
       self.init()
     }
-  } // expected-error {{}}
+  }
 }
 
 struct AddressStruct {
@@ -118,12 +116,11 @@ struct AddressStruct {
     self = AddressStruct()
   } // expected-error {{return from initializer without initializing all stored properties}}
 
-  // FIXME: doesn't work yet
   init(e: Bool) {
     if e {
-      self = AddressStruct() // expected-error {{}}
+      self = AddressStruct()
     } else {
       self.init()
     }
-  } // expected-error {{}}
+  }
 }
