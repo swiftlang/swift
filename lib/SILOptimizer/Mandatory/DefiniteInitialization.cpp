@@ -1161,21 +1161,32 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 
     if (!shouldEmitError(Inst)) return;
 
-    auto diagID = diag::self_before_superselfinit;
-
     // If this is a load with a single user that is a return, then this is
     // a return before self.init.   Emit a specific diagnostic.
     if (auto *LI = dyn_cast<LoadInst>(Inst))
       if (LI->hasOneUse() &&
           isa<ReturnInst>((*LI->use_begin())->getUser())) {
-        diagID = diag::superselfinit_not_called_before_return;
+        diagnose(Module, Inst->getLoc(),
+                 diag::superselfinit_not_called_before_return,
+                 (unsigned)TheMemory.isDelegatingInit());
+        return;
       }
     if (isa<ReturnInst>(Inst)) {
-      diagID = diag::superselfinit_not_called_before_return;
+      diagnose(Module, Inst->getLoc(),
+               diag::superselfinit_not_called_before_return,
+               (unsigned)TheMemory.isDelegatingInit());
+      return;
     }
 
-    diagnose(Module, Inst->getLoc(), diagID,
-             (unsigned)TheMemory.isDelegatingInit());
+    if (TheMemory.isDelegatingInit()) {
+      if (TheMemory.isClassInitSelf()) {
+        diagnose(Module, Inst->getLoc(), diag::self_before_selfinit);
+      } else {
+        diagnose(Module, Inst->getLoc(), diag::self_before_selfinit_value_type);
+      }
+    } else {
+      diagnose(Module, Inst->getLoc(), diag::self_before_superinit);
+    }
     return;
   }
 
@@ -1185,7 +1196,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 
     auto diagID = diag::use_of_self_before_fully_init;
     if (TheMemory.isProtocolInitSelf())
-      diagID = diag::use_of_self_before_fully_init_protocol;
+      diagID = diag::self_before_selfinit_value_type;
 
     diagnose(Module, Inst->getLoc(), diagID);
     noteUninitializedMembers(Use);
@@ -1587,7 +1598,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
       if (TheMemory.isProtocolInitSelf()) {
         if (!shouldEmitError(Inst)) return;
         diagnose(Module, Inst->getLoc(),
-                 diag::return_from_protocol_init_without_initing_self);
+                 diag::return_from_init_without_initing_self);
         return;
       }
 
@@ -1627,8 +1638,15 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   // generic error, depending on what kind of failure this is.
   if (!SuperInitDone) {
     if (!shouldEmitError(Inst)) return;
-    diagnose(Module, Inst->getLoc(), diag::self_before_superselfinit,
-             (unsigned)TheMemory.isDelegatingInit());
+    if (TheMemory.isDelegatingInit()) {
+      if (TheMemory.isClassInitSelf()) {
+        diagnose(Module, Inst->getLoc(), diag::self_before_selfinit);
+      } else {
+        diagnose(Module, Inst->getLoc(), diag::self_before_selfinit_value_type);
+      }
+    } else {
+      diagnose(Module, Inst->getLoc(), diag::self_before_superinit);
+    }
     return;
   }
 
@@ -1649,7 +1667,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
 
     auto diagID = diag::use_of_self_before_fully_init;
     if (TheMemory.isProtocolInitSelf())
-      diagID = diag::use_of_self_before_fully_init_protocol;
+      diagID = diag::self_before_selfinit_value_type;
     diagnose(Module, Inst->getLoc(), diagID);
     noteUninitializedMembers(Use);
     return;

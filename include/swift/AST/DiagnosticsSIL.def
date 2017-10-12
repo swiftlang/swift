@@ -151,36 +151,35 @@ ERROR(ivar_not_initialized_at_implicit_superinit,none,
       (StringRef, bool))
 
 ERROR(self_use_before_fully_init,none,
-      "use of 'self' in %select{method call|property access}1 %0 before "
+      "'self' used in %select{method call|property access}1 %0 before "
       "%select{all stored properties are initialized|"
-      "super.init initializes self|"
-      "self.init initializes self}2", (DeclBaseName, bool, unsigned))
+      "'super.init' call|"
+      "'self.init' call}2", (DeclBaseName, bool, unsigned))
 ERROR(use_of_self_before_fully_init,none,
       "'self' used before all stored properties are initialized", ())
-ERROR(use_of_self_before_fully_init_protocol,none,
-      "'self' used before chaining to another self.init requirement", ())
 
 
 NOTE(stored_property_not_initialized,none,
      "'%0' not initialized", (StringRef))
 
 ERROR(selfinit_multiple_times,none,
-      "%select{super|self}0.init called multiple times in initializer",
+      "'%select{super|self}0.init' called multiple times in initializer",
       (unsigned))
 ERROR(superselfinit_not_called_before_return,none,
-      "%select{super|self}0.init isn't called on all paths before returning "
+      "'%select{super|self}0.init' isn't called on all paths before returning "
       "from initializer", (unsigned))
-ERROR(self_before_superselfinit,none,
-      "'self' used before %select{super|self}0.init call",
-      (unsigned))
+ERROR(self_before_superinit,none,
+      "'self' used before 'super.init' call", ())
+ERROR(self_before_selfinit,none,
+      "'self' used before 'self.init' call", ())
+ERROR(self_before_selfinit_value_type,none,
+      "'self' used before 'self.init' call or assignment to 'self'", ())
 ERROR(self_inside_catch_superselfinit,none,
       "'self' used inside 'catch' block reachable from "
       "%select{super|self}0.init call",
       (unsigned))
 ERROR(return_from_init_without_initing_self,none,
-      "return from enum initializer method without storing to 'self'", ())
-ERROR(return_from_protocol_init_without_initing_self,none,
-      "protocol extension initializer never chained to 'self.init'", ())
+      "return from initializer before 'self.init' call or assignment to 'self'", ())
 ERROR(return_from_init_without_initing_stored_properties,none,
       "return from initializer without initializing all"
       " stored properties", ())

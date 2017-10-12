@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership %s -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership %s -swift-version 5 -verify | %FileCheck %s
 
 // Ensure that convenience initializers on concrete types can
 // delegate to factory initializers defined in protocol
@@ -18,7 +18,7 @@ extension TriviallyConstructible {
   }
 
   init(throwingMiddle: Int) throws {
-    try self.init(lower: throwingMiddle)
+    self.init(lower: throwingMiddle)
   }
 }
 
