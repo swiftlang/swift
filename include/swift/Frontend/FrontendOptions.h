@@ -84,6 +84,11 @@ public:
   unsigned inputFilenameCount() const { return getInputFilenames().size(); }
 
   bool hasUniqueInputFilename() const { return inputFilenameCount() == 1; }
+  
+  llvm::Optional<std::string> getUniqueInputFilename() {
+    return inputFilenameCount() == 1  ? llvm::Optional<std::string>(getInputFilenames()[0]) : None;
+  }
+  
   const std::string &getFilenameOfFirstInput() const {
     assert(hasInputFilenames());
     return getInputFilenames()[0];
@@ -111,7 +116,14 @@ private:
     assert(PrimaryInputs.size() < 2 &&
            "have not implemented >1 primary input yet");
   }
-
+public:
+  bool hasPrimaryInputFilenames() const {
+    for (const SelectedInput &SI: getPrimaryInputs())
+      if (SI.isFilename())
+        return true;
+    return false;
+  }
+private:
   const ArrayRef<SelectedInput> getPrimaryInput() const {
     mustNotBeMoreThanOnePrimaryInput();
     return PrimaryInputs;

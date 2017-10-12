@@ -185,7 +185,7 @@ private:
   LLVM_ATTRIBUTE_NOINLINE
   static void debugFailWithCrash() { LLVM_BUILTIN_TRAP; }
 
-  void setOutputFileList() {
+  void setOutputFilesFromCommandLineArguments() {
     if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
       readOutputFileList(Opts.OutputFilenames, A);
       assert(!Args.hasArg(options::OPT_o) &&
@@ -226,23 +226,31 @@ private:
   llvm::SmallVector<StringRef, 8> BaseNamesOfOutputs;
 
   llvm::SmallVectorImpl<StringRef> &computeBaseNamesOfOutputs() {
+    std::vector<std::string> namesToStem;
+    if (Opts.Inputs.hasPrimaryInputFilenames())
+      copyNamesOfPrimaryFilesInto(namesToStem);
+    // IS MODULENAME SAFE HERE
+    else if (auto UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name)) {
+      namesToStem.push_back(std::string(UserSpecifiedModuleName->getValue()));
+    }
+    else if (auto uniqueFN = Opts.Inputs.getUniqueInputFilename()) {
+      namesToStem.push_back(uniqueFN.getValue());
+    }
     BaseNamesOfOutputs.clear();
+    for (StringRef nameToStem: namesToStem)
+      BaseNamesOfOutputs.push_back(llvm::sys::path::stem(nameToStem));
+  
+    return BaseNamesOfOutputs;
+  }
+  
+  void copyNamesOfPrimaryFilesInto(std::vector<std::string> &result) {
     for (const SelectedInput &SI : Opts.Inputs.getPrimaryInputs()) {
       if (!SI.isFilename())
         continue;
-      BaseNamesOfOutputs.push_back(
-          llvm::sys::path::stem(Opts.Inputs.getInputFilenames()[SI.Index]));
+      result.push_back(Opts.Inputs.getInputFilenames()[SI.Index]);
     }
-    if (!BaseNamesOfOutputs.empty())
-      return BaseNamesOfOutputs;
-    bool UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name);
-    StringRef pathToStem =
-        !UserSpecifiedModuleName && Opts.Inputs.hasUniqueInputFilename()
-            ? Opts.Inputs.getFilenameOfFirstInput()
-            : Opts.ModuleName;
-    BaseNamesOfOutputs.push_back(llvm::sys::path::stem(pathToStem));
-    return BaseNamesOfOutputs;
   }
+
 
   void parseDebugCrashGroup();
   bool canEmitWhatActionCallsFor() const;
@@ -419,11 +427,13 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
 
   if (setupForSILOrLLVM())
     return true;
-  setOutputFileList();
-  setModuleName();
+  
+  setOutputFilesFromCommandLineArguments();
   if (determineCorrectOutputFilenameIfMissingOrDirectory())
     return true;
   determineSupplementaryOutputFilenames();
+
+  setModuleName();
   if (!canEmitWhatActionCallsFor())
     return true;
 
@@ -648,6 +658,11 @@ bool FrontendArgsToOptionsConverter::
     else {
       // We have a suffix, so determine an appropriate name.
       auto &baseNames = computeBaseNamesOfOutputs();
+      // If user did not specify any, but we need some
+      if (Opts.OutputFilenames.empty()) {
+        for (unsigned i = 0;  i < baseNames.size();  ++i)
+          Opts.OutputFilenames.push_back(std::string(""));
+      }
       if (!Opts.Inputs.isWholeModule() &&
           baseNames.size() != Opts.OutputFilenames.size()) {
         Diags.diagnose(
