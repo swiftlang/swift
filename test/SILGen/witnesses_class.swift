@@ -83,28 +83,28 @@ class UsesDefaults<X : Barable> : HasDefaults {}
 
 // Covariant Self:
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T015witnesses_class12UsesDefaultsCyxGAA03HasD0A2A7BarableRzlAaEP10hasDefaultyyFTW : $@convention(witness_method) <τ_0_0><τ_1_0 where τ_0_0 : UsesDefaults<τ_1_0>, τ_1_0 : Barable> (@in_guaranteed τ_0_0) -> ()
+// CHECK-LABEL: sil private [transparent] [thunk] @_T015witnesses_class12UsesDefaultsCyxGAA03HasD0A2aEP10hasDefaultyyFTW : $@convention(witness_method) <τ_0_0><τ_1_0 where τ_0_0 : UsesDefaults<τ_1_0>, τ_1_0 : Barable> (@in_guaranteed τ_0_0) -> ()
 // CHECK: [[FN:%.*]] = function_ref @_T015witnesses_class11HasDefaultsPAAE10hasDefaultyyF : $@convention(method) <τ_0_0 where τ_0_0 : HasDefaults> (@in_guaranteed τ_0_0) -> ()
 // CHECK: apply [[FN]]<τ_0_0>(
 // CHECK: return
 
 // Invariant Self, since type signature contains an associated type:
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T015witnesses_class12UsesDefaultsCyxGAA03HasD0A2A7BarableRzlAaEP16hasDefaultTakesTy1TQzFTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : Barable> (@in UsesDefaults<τ_0_0>, @in_guaranteed UsesDefaults<τ_0_0>) -> ()
+// CHECK-LABEL: sil private [transparent] [thunk] @_T015witnesses_class12UsesDefaultsCyxGAA03HasD0A2aEP16hasDefaultTakesTy1TQzFTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : Barable> (@in UsesDefaults<τ_0_0>, @in_guaranteed UsesDefaults<τ_0_0>) -> ()
 // CHECK: [[FN:%.*]] = function_ref @_T015witnesses_class11HasDefaultsPAAE16hasDefaultTakesTy1TQzF : $@convention(method) <τ_0_0 where τ_0_0 : HasDefaults> (@in τ_0_0.T, @in_guaranteed τ_0_0) -> ()
 // CHECK: apply [[FN]]<UsesDefaults<τ_0_0>>(
 // CHECK: return
 
 // Covariant Self:
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T015witnesses_class12UsesDefaultsCyxGAA03HasD0A2A7BarableRzlAaEP17hasDefaultGenericyqd__AA7FooableRd__lFTW : $@convention(witness_method) <τ_0_0><τ_1_0 where τ_0_0 : UsesDefaults<τ_1_0>, τ_1_0 : Barable><τ_2_0 where τ_2_0 : Fooable> (@owned τ_2_0, @in_guaranteed τ_0_0) -> ()
+// CHECK-LABEL: sil private [transparent] [thunk] @_T015witnesses_class12UsesDefaultsCyxGAA03HasD0A2aEP17hasDefaultGenericyqd__AA7FooableRd__lFTW : $@convention(witness_method) <τ_0_0><τ_1_0 where τ_0_0 : UsesDefaults<τ_1_0>, τ_1_0 : Barable><τ_2_0 where τ_2_0 : Fooable> (@owned τ_2_0, @in_guaranteed τ_0_0) -> ()
 // CHECK: [[FN:%.*]] = function_ref @_T015witnesses_class11HasDefaultsPAAE17hasDefaultGenericyqd__AA7FooableRd__lF : $@convention(method) <τ_0_0 where τ_0_0 : HasDefaults><τ_1_0 where τ_1_0 : Fooable> (@owned τ_1_0, @in_guaranteed τ_0_0) -> ()
 // CHECK: apply [[FN]]<τ_0_0, τ_2_0>(
 // CHECK: return
 
 // Invariant Self, since type signature contains an associated type:
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T015witnesses_class12UsesDefaultsCyxGAA03HasD0A2A7BarableRzlAaEP23hasDefaultGenericTakesTy1TQz_qd__tAA7FooableRd__lFTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : Barable><τ_1_0 where τ_1_0 : Fooable> (@in UsesDefaults<τ_0_0>, @owned τ_1_0, @in_guaranteed UsesDefaults<τ_0_0>) -> ()
+// CHECK-LABEL: sil private [transparent] [thunk] @_T015witnesses_class12UsesDefaultsCyxGAA03HasD0A2aEP23hasDefaultGenericTakesTy1TQz_qd__tAA7FooableRd__lFTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : Barable><τ_1_0 where τ_1_0 : Fooable> (@in UsesDefaults<τ_0_0>, @owned τ_1_0, @in_guaranteed UsesDefaults<τ_0_0>) -> ()
 // CHECK: [[FN:%.*]] = function_ref @_T015witnesses_class11HasDefaultsPAAE23hasDefaultGenericTakesTy1TQz_qd__tAA7FooableRd__lF : $@convention(method) <τ_0_0 where τ_0_0 : HasDefaults><τ_1_0 where τ_1_0 : Fooable> (@in τ_0_0.T, @owned τ_1_0, @in_guaranteed τ_0_0) -> ()
 // CHECK: apply [[FN]]<UsesDefaults<τ_0_0>, τ_1_0>(
 // CHECK: return
