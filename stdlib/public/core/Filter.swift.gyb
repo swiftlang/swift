@@ -91,6 +91,9 @@ public struct LazyFilterSequence<Base : Sequence>
     if !_include(element) {
       return false
     }
+    if let baseContains = base._customContainsEquatableElement(element) {
+      return baseContains
+    }
     return nil
   }
 
@@ -168,6 +171,9 @@ public struct ${Self}<
   ) -> Bool? {
     if !_predicate(element) {
       return false
+    }
+    if let baseContains = _base._customContainsEquatableElement(element) {
+      return baseContains
     }
     return nil
   }
