@@ -98,6 +98,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
                         CMAKE_ARGS
                           -DCMAKE_C_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang
                           -DCMAKE_CXX_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang++
+                          -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
                           -DCMAKE_SWIFT_COMPILER=$<TARGET_FILE:swift>c
                           -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                           -DENABLE_SWIFT=YES

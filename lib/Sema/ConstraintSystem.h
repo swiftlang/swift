@@ -1681,6 +1681,10 @@ public:
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(Fix fix, ConstraintLocatorBuilder locator);
   
+  /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
+  /// constraint system, return the decl that it references.
+  ValueDecl *findResolvedMemberRef(ConstraintLocator *locator);
+
   /// \brief Try to salvage the constraint system by applying (speculative)
   /// fixes to the underlying expression.
   ///
