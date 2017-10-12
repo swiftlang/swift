@@ -109,7 +109,7 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK: bb0([[ARRAY:%.*]] : @owned $Array<Int>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<Int>> }, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
-// CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @_T0s10CollectionPssAARzs16IndexingIteratorVyxG0C0RtzlE04makeC0AEyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in_guaranteed τ_0_0) -> @out IndexingIterator<τ_0_0>
+// CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @_T0s10CollectionPss16IndexingIteratorVyxG0C0RtzrlE04makeC0AEyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in_guaranteed τ_0_0) -> @out IndexingIterator<τ_0_0>
 // CHECK:   [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<Int>
 // CHECK:   store_borrow [[BORROWED_ARRAY]] to [[BORROWED_ARRAY_STACK]]
@@ -214,7 +214,7 @@ func existentialBreak(_ xx: [P]) {
 // CHECK: bb0([[ARRAY:%.*]] : @owned $Array<P>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<P>> }, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
-// CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @_T0s10CollectionPssAARzs16IndexingIteratorVyxG0C0RtzlE04makeC0AEyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in_guaranteed τ_0_0) -> @out IndexingIterator<τ_0_0>
+// CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @_T0s10CollectionPss16IndexingIteratorVyxG0C0RtzrlE04makeC0AEyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in_guaranteed τ_0_0) -> @out IndexingIterator<τ_0_0>
 // CHECK:   [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<P>
 // CHECK:   store_borrow [[BORROWED_ARRAY]] to [[BORROWED_ARRAY_STACK]]
@@ -379,7 +379,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK: bb0([[ARRAY:%.*]] : @owned $Array<GenericStruct<T>>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box $<τ_0_0> { var IndexingIterator<Array<GenericStruct<τ_0_0>>> } <T>, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
-// CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @_T0s10CollectionPssAARzs16IndexingIteratorVyxG0C0RtzlE04makeC0AEyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in_guaranteed τ_0_0) -> @out IndexingIterator<τ_0_0>
+// CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @_T0s10CollectionPss16IndexingIteratorVyxG0C0RtzrlE04makeC0AEyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in_guaranteed τ_0_0) -> @out IndexingIterator<τ_0_0>
 // CHECK:   [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<GenericStruct<T>>
 // CHECK:   store_borrow [[BORROWED_ARRAY]] to [[BORROWED_ARRAY_STACK]]
