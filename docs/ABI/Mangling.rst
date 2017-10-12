@@ -343,7 +343,7 @@ Types
 
   function-signature ::= params-type params-type throws? // results and parameters
 
-  params-type := type                        // tuple in case of multiple parameters
+  params-type := type                        // tuple in case of multiple parameters or a single parameter with a single tuple type
   params-type := empty-list                  // shortcut for no parameters
 
   throws ::= 'K'                             // 'throws' annotation on function types

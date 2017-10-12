@@ -2347,7 +2347,8 @@ public:
     /// FIXME(Remove InOutType): This is mostly for copying between param
     /// types and should go away.
     Type getPlainType() const { return Ty; }
-    
+
+    bool hasLabel() const { return !Label.empty(); }
     Identifier getLabel() const { return Label; }
     
     ParameterTypeFlags getParameterFlags() const { return Flags; }
