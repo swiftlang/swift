@@ -1956,8 +1956,6 @@ NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
     Sig->addChild(createNode(Node::Kind::DependentGenericParamCount, 1),
                   *this);
   }
-  if (Sig->getNumChildren() == 0)
-    return nullptr;
   size_t NumCounts = Sig->getNumChildren();
   while (NodePointer Req = popNode(isRequirement)) {
     Sig->addChild(Req, *this);

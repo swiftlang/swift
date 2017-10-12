@@ -1311,7 +1311,9 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
       appendModule(ExtD->getParentModule());
       if (sig && ExtD->isConstrainedExtension()) {
         Mod = ExtD->getModuleContext();
-        appendGenericSignature(sig);
+        auto nominalSig = ExtD->getAsNominalTypeOrNominalTypeExtensionContext()
+                            ->getGenericSignatureOfContext();
+        appendGenericSignature(sig, nominalSig);
       }
       return appendOperator("E");
     }
@@ -1589,16 +1591,30 @@ bool ASTMangler::appendGenericSignature(const GenericSignature *sig,
       --firstParam;
     genericParams = genericParams.slice(firstParam);
 
-    for (auto &reqt : canSig->getRequirements()) {
-      // If the requirement is satisfied by the context signature,
-      // we don't need to mangle it here.
-      if (contextSig->isRequirementSatisfied(reqt))
-        continue;
+    // Special case: if we would be mangling zero generic parameters, but
+    // the context signature is a single, unconstrained generic parameter,
+    // it's better to mangle the complete canonical signature because we
+    // have a special-case mangling for that.
+    if (genericParams.empty() &&
+        contextSig->getGenericParams().size() == 1 &&
+        contextSig->getRequirements().empty()) {
+      initialParamDepth = 0;
+      genericParams = canSig->getGenericParams();
+      requirements = canSig->getRequirements();
+    } else {
+      // Otherwise, only include those requirements that aren't satisfied by the
+      // context signature.
+      for (auto &reqt : canSig->getRequirements()) {
+        // If the requirement is satisfied by the context signature,
+        // we don't need to mangle it here.
+        if (contextSig->isRequirementSatisfied(reqt))
+          continue;
 
-      // Mangle the requirement.
-      requirementsBuffer.push_back(reqt);
+        // Mangle the requirement.
+        requirementsBuffer.push_back(reqt);
+      }
+      requirements = requirementsBuffer;
     }
-    requirements = requirementsBuffer;
   } else {
     // Use the complete canonical signature.
     initialParamDepth = 0;

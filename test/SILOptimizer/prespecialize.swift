@@ -11,7 +11,7 @@
 // CHECK-LABEL: sil [noinline] @_T013prespecialize4testySaySiGz_Si4sizetF 
 //
 // function_ref specialized Collection<A where ...>.makeIterator() -> IndexingIterator<A>
-// CHECK: function_ref @_T0s10CollectionPssAARzs16IndexingIteratorVyxG0C0RtzlE04makeC0AEyFs14CountableRangeVySiG_Tg5
+// CHECK: function_ref @_T0s10CollectionPss16IndexingIteratorVyxG0C0RtzrlE04makeC0AEyFs14CountableRangeVySiG_Tg5
 //
 // function_ref specialized IndexingIterator.next() -> A.Element?
 // CHECK: function_ref @_T0s16IndexingIteratorV4next7ElementQzSgyFs14CountableRangeVySiG_Tg5

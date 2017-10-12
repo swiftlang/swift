@@ -1034,7 +1034,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "Self",
-    key.usr: "s:4cake4ProtPA2aBRzSi7ElementRtzlE4Selfxmfp",
+    key.usr: "s:4cake4ProtPAASi7ElementRtzrlE4Selfxmfp",
     key.offset: 1202,
     key.length: 4
   },
@@ -1540,8 +1540,8 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "extfoo()",
-        key.usr: "s:4cake4ProtPA2aBRzSi7ElementRtzlE6extfooyyF::SYNTHESIZED::s:4cake2C1C",
-        key.original_usr: "s:4cake4ProtPA2aBRzSi7ElementRtzlE6extfooyyF",
+        key.usr: "s:4cake4ProtPAASi7ElementRtzrlE6extfooyyF::SYNTHESIZED::s:4cake2C1C",
+        key.original_usr: "s:4cake4ProtPAASi7ElementRtzrlE6extfooyyF",
         key.offset: 252,
         key.length: 13,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>extfoo</decl.name>()</decl.function.method.instance>"
@@ -1719,8 +1719,8 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "extfoo()",
-        key.usr: "s:4cake4ProtPA2aBRzSi7ElementRtzlE6extfooyyF::SYNTHESIZED::s:4cake2C2C",
-        key.original_usr: "s:4cake4ProtPA2aBRzSi7ElementRtzlE6extfooyyF",
+        key.usr: "s:4cake4ProtPAASi7ElementRtzrlE6extfooyyF::SYNTHESIZED::s:4cake2C2C",
+        key.original_usr: "s:4cake4ProtPAASi7ElementRtzrlE6extfooyyF",
         key.offset: 613,
         key.length: 13,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>extfoo</decl.name>()</decl.function.method.instance>"
@@ -2004,7 +2004,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "extfoo()",
-        key.usr: "s:4cake4ProtPA2aBRzSi7ElementRtzlE6extfooyyF",
+        key.usr: "s:4cake4ProtPAASi7ElementRtzrlE6extfooyyF",
         key.offset: 1229,
         key.length: 13,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>extfoo</decl.name>()</decl.function.method.instance>"
