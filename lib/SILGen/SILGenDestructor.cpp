@@ -13,6 +13,7 @@
 #include "SILGenFunction.h"
 #include "RValue.h"
 #include "Scope.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/TypeLowering.h"
 

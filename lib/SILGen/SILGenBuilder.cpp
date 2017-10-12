@@ -16,6 +16,7 @@
 #include "SILGenFunction.h"
 #include "Scope.h"
 #include "SwitchCaseFullExpr.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
 
 using namespace swift;

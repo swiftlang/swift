@@ -21,6 +21,30 @@
 
 using namespace swift;
 
+size_t GenericEnvironment::numTrailingObjects(OverloadToken<Type>) const {
+  return Signature->getGenericParams().size();
+}
+
+/// Retrieve the array containing the context types associated with the
+/// generic parameters, stored in parallel with the generic parameters of the
+/// generic signature.
+MutableArrayRef<Type> GenericEnvironment::getContextTypes() {
+  return MutableArrayRef<Type>(getTrailingObjects<Type>(),
+                               Signature->getGenericParams().size());
+}
+
+/// Retrieve the array containing the context types associated with the
+/// generic parameters, stored in parallel with the generic parameters of the
+/// generic signature.
+ArrayRef<Type> GenericEnvironment::getContextTypes() const {
+  return ArrayRef<Type>(getTrailingObjects<Type>(),
+                        Signature->getGenericParams().size());
+}
+
+ArrayRef<GenericTypeParamType *> GenericEnvironment::getGenericParams() const {
+  return Signature->getGenericParams();
+}
+
 GenericEnvironment::GenericEnvironment(GenericSignature *signature,
                                        GenericSignatureBuilder *builder)
   : Signature(signature), Builder(builder)

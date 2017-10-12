@@ -16,7 +16,6 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -25,6 +24,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ASTMangler.h"
@@ -621,6 +622,22 @@ TrailingWhereClause *TrailingWhereClause::create(
   unsigned size = totalSizeToAlloc<RequirementRepr>(requirements.size());
   void *mem = ctx.Allocate(size, alignof(TrailingWhereClause));
   return new (mem) TrailingWhereClause(whereLoc, requirements);
+}
+
+ArrayRef<GenericTypeParamType *>
+GenericContext::getInnermostGenericParamTypes() const {
+  if (auto sig = getGenericSignature())
+    return sig->getInnermostGenericParams();
+  else
+    return { };
+}
+
+/// Retrieve the generic requirements.
+ArrayRef<Requirement> GenericContext::getGenericRequirements() const {
+  if (auto sig = getGenericSignature())
+    return sig->getRequirements();
+  else
+    return { };
 }
 
 void GenericContext::setGenericParams(GenericParamList *params) {

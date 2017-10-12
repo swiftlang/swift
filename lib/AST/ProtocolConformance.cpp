@@ -335,12 +335,8 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements() {
 
   // Find the requirements in the extension that aren't proved by the original
   // type, these are the ones that make the conformance conditional.
-  SmallVector<Requirement, 4> reqs;
-  for (auto requirement : canExtensionSig->getRequirements()) {
-    if (!canTypeSig->isRequirementSatisfied(requirement))
-      reqs.push_back(requirement);
-  }
-  ConditionalRequirements = ctxt.AllocateCopy(reqs);
+  ConditionalRequirements =
+    ctxt.AllocateCopy(canExtensionSig->requirementsNotSatisfiedBy(canTypeSig));
 }
 
 void NormalProtocolConformance::setSignatureConformances(

@@ -1602,17 +1602,7 @@ bool ASTMangler::appendGenericSignature(const GenericSignature *sig,
       genericParams = canSig->getGenericParams();
       requirements = canSig->getRequirements();
     } else {
-      // Otherwise, only include those requirements that aren't satisfied by the
-      // context signature.
-      for (auto &reqt : canSig->getRequirements()) {
-        // If the requirement is satisfied by the context signature,
-        // we don't need to mangle it here.
-        if (contextSig->isRequirementSatisfied(reqt))
-          continue;
-
-        // Mangle the requirement.
-        requirementsBuffer.push_back(reqt);
-      }
+      requirementsBuffer = canSig->requirementsNotSatisfiedBy(contextSig);
       requirements = requirementsBuffer;
     }
   } else {

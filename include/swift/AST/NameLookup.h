@@ -28,6 +28,7 @@ namespace swift {
   class DeclContext;
   class DeclName;
   class Expr;
+  class GenericSignatureBuilder;
   class LazyResolver;
   class TupleType;
   class Type;
