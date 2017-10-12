@@ -20,6 +20,15 @@ using namespace swift;
 /// A utility pass to serialize a SILModule at any place inside the optimization
 /// pipeline.
 class SerializeSILPass : public SILModuleTransform {
+  /// Removes [serialized] from all functions. This allows for more
+  /// optimizations and for a better dead function elimination.
+  void removeSerializedFlagFromAllFunctions(SILModule &M) {
+    for (auto &F : M) {
+      if (!F.isAvailableExternally())
+        F.setSerialized(IsSerialized_t::IsNotSerialized);
+    }
+  }
+
 public:
   SerializeSILPass() {}
   void run() override {
@@ -33,6 +42,7 @@ public:
     // contain all the symbols which were alive at the time of serialization.
     DEBUG(llvm::dbgs() << "Serializing SILModule in SerializeSILPass\n");
     getModule()->serialize();
+    removeSerializedFlagFromAllFunctions(M);
   }
 };
 
