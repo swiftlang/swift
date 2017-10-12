@@ -326,7 +326,8 @@ public:
     }
 
     const void * const *getArguments() const {
-      return &FlagsArgsAndResult[1];
+      return getFlags().getNumArguments() == 0
+              ? nullptr : &FlagsArgsAndResult[1];
     }
   };
 

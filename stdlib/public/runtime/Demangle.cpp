@@ -331,15 +331,20 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     }
 
     NodePointer totalInput = nullptr;
-    if (inputs.size() > 1) {
+    switch (inputs.size()) {
+    case 1:
+      totalInput = inputs.front();
+      break;
+
+    // This covers both none and multiple parameters.
+    default:
       auto tuple = Dem.createNode(Node::Kind::Tuple);
       for (auto &input : inputs)
         tuple->addChild(input, Dem);
       totalInput = tuple;
-    } else {
-      totalInput = inputs.front();
+      break;
     }
-    
+
     NodePointer args = Dem.createNode(Node::Kind::ArgumentTuple);
     args->addChild(totalInput, Dem);
     
