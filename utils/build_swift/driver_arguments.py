@@ -8,14 +8,12 @@
 
 import argparse
 import multiprocessing
-import platform
 
 import android.adb.commands
 
 from swift_build_support.swift_build_support import arguments
 from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
-from swift_build_support.swift_build_support import workspace
 
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
@@ -62,13 +60,6 @@ def _apply_default_arguments(args):
     # Set the default build variant.
     if args.build_variant is None:
         args.build_variant = "Debug"
-
-    # Set the default stdlib-deployment-targets, if none were provided.
-    if args.stdlib_deployment_targets is None:
-        stdlib_targets = \
-            StdlibDeploymentTarget.default_stdlib_deployment_targets()
-        args.stdlib_deployment_targets = [
-            target.name for target in stdlib_targets]
 
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
@@ -178,16 +169,6 @@ def _apply_default_arguments(args):
     # --test-optimize-size implies --test.
     if args.test_optimize_for_size:
         args.test = True
-
-    # --test-paths implies --test and/or --validation-test
-    # depending on what directories/files have been specified.
-    if args.test_paths:
-        for path in args.test_paths:
-            if path.startswith('test'):
-                args.test = True
-            elif path.startswith('validation-test'):
-                args.test = True
-                args.validation_test = True
 
     # If none of tests specified skip swift stdlib test on all platforms
     if not args.test and not args.validation_test and not args.long_test:

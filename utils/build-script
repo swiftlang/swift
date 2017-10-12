@@ -262,6 +262,13 @@ class BuildScriptInvocation(object):
         if ninja_required and toolchain.ninja is None:
             args.build_ninja = True
 
+        # Set the default stdlib-deployment-targets, if none were provided.
+        if args.stdlib_deployment_targets is None:
+            stdlib_targets = \
+                StdlibDeploymentTarget.default_stdlib_deployment_targets()
+            args.stdlib_deployment_targets = [
+                target.name for target in stdlib_targets]
+
         # SwiftPM and XCTest have a dependency on Foundation.
         # On OS X, Foundation is built automatically using xcodebuild.
         # On Linux, we must ensure that it is built manually.
