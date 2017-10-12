@@ -2106,7 +2106,8 @@ static void addConditionalRequirements(GenericSignatureBuilder &builder,
 const RequirementSource *
 GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
                                                     ProtocolDecl *proto) {
-  auto concrete = pa->getConcreteType();
+  auto equivClass = pa->getEquivalenceClassIfPresent();
+  auto concrete = equivClass ? equivClass->concreteType : Type();
   if (!concrete) return nullptr;
 
   // Conformance to this protocol is redundant; update the requirement source
@@ -2149,7 +2150,8 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
                                                         PotentialArchetype *pa,
                                                         ProtocolDecl *proto) {
   // Get the superclass constraint.
-  Type superclass = pa->getSuperclass();
+  auto equivClass = pa->getEquivalenceClassIfPresent();
+  Type superclass = equivClass ? equivClass->superclass : nullptr;
   if (!superclass) return nullptr;
 
   // Lookup the conformance of the superclass to this protocol.
@@ -2710,7 +2712,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
           type = type.subst(subMap, SubstFlags::UseErrorType);
         } else {
           // Substitute in the superclass type.
-          auto superclass = getSuperclass();
+          auto superclass = getEquivalenceClassIfPresent()->superclass;
           auto superclassDecl = superclass->getClassOrBoundGenericClass();
           type = superclass->getTypeOfMember(
                    superclassDecl->getParentModule(), concreteDecl,
@@ -3580,7 +3582,8 @@ void GenericSignatureBuilder::updateSuperclass(
   // Local function to handle the update of superclass conformances
   // when the superclass constraint changes.
   auto updateSuperclassConformances = [&] {
-    for (auto proto : T->getConformsTo()) {
+    for (const auto &conforms : equivClass->conformsTo) {
+      auto proto = conforms.first;
       if (auto superSource = resolveSuperConformance(T, proto)) {
         for (auto assocType : proto->getAssociatedTypeMembers()) {
 
@@ -4029,8 +4032,8 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
 
   // Make sure the concrete type fulfills the conformance requirements of
   // this equivalence class.
-  for (auto protocol : rep->getConformsTo()) {
-    if (!resolveConcreteConformance(rep, protocol))
+  for (const auto &conforms : equivClass->conformsTo) {
+    if (!resolveConcreteConformance(rep, conforms.first))
       return ConstraintResult::Conflicting;
   }
 
@@ -6185,7 +6188,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
     if (knownAnchor != equivClass->derivedSameTypeComponents.end()) {
       // If this equivalence class is bound to a concrete type, equate the
       // anchor with a concrete type.
-      if (Type concreteType = rep->getConcreteType()) {
+      if (Type concreteType = equivClass->concreteType) {
         // If the parent of this anchor is also a concrete type, don't
         // create a requirement.
         if (!archetype->isGenericParam() &&

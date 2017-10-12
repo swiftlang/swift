@@ -1593,41 +1593,12 @@ public:
     return identifier.assocTypeOrConcrete;
   }
 
-  /// Retrieve the set of protocols to which this potential archetype
-  /// conforms.
-  SmallVector<ProtocolDecl *, 4> getConformsTo() const {
-    SmallVector<ProtocolDecl *, 4> result;
-
-    if (auto equiv = getEquivalenceClassIfPresent()) {
-      for (const auto &entry : equiv->conformsTo)
-        result.push_back(entry.first);
-    }
-
-    return result;
-  }
-
   /// Add a conformance to this potential archetype.
   ///
   /// \returns true if the conformance was new, false if it already existed.
   bool addConformance(ProtocolDecl *proto,
                       const RequirementSource *source,
                       GenericSignatureBuilder &builder);
-
-  /// Retrieve the superclass of this archetype.
-  Type getSuperclass() const {
-    if (auto equiv = getEquivalenceClassIfPresent())
-      return equiv->superclass;
-    
-    return nullptr;
-  }
-
-  /// Retrieve the layout constraint of this archetype.
-  LayoutConstraint getLayout() const {
-    if (auto equivClass = getEquivalenceClassIfPresent())
-      return equivClass->layout;
-
-    return LayoutConstraint();
-  }
 
   /// Retrieve the set of nested types.
   const llvm::MapVector<Identifier, StoredNestedType> &getNestedTypes() const {
@@ -1741,14 +1712,6 @@ public:
     return false;
   }
   
-  /// Get the concrete type this potential archetype is constrained to.
-  Type getConcreteType() const {
-    if (auto equivClass = getEquivalenceClassIfPresent())
-      return equivClass->concreteType;
-
-    return Type();
-  }
-
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const,
       "only for use within the debugger");
