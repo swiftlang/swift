@@ -1178,6 +1178,22 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
       return;
     }
 
+    if (!TheMemory.isClassInitSelf()) {
+      // If this is a copy_addr into the indirect result, then we're looking at
+      // the implicit "return self" in an address-only initializer.  Emit a
+      // specific diagnostic.
+      if (auto *CA = dyn_cast<CopyAddrInst>(Inst)) {
+        if (CA->isInitializationOfDest() &&
+            !CA->getFunction()->getArguments().empty() &&
+            SILValue(CA->getFunction()->getArgument(0)) == CA->getDest()) {
+          diagnose(Module, Inst->getLoc(),
+                   diag::superselfinit_not_called_before_return,
+                   (unsigned)TheMemory.isDelegatingInit());
+          return;
+        }
+      }
+    }
+
     if (TheMemory.isDelegatingInit()) {
       if (TheMemory.isClassInitSelf()) {
         diagnose(Module, Inst->getLoc(), diag::self_before_selfinit);

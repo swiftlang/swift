@@ -108,7 +108,7 @@ struct AddressStruct {
     }
 
     self.init()
-  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 
   init(d: Bool) {
     if d {
