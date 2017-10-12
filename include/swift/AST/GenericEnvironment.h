@@ -17,9 +17,10 @@
 #ifndef SWIFT_AST_GENERIC_ENVIRONMENT_H
 #define SWIFT_AST_GENERIC_ENVIRONMENT_H
 
+#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/GenericParamKey.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericParamKey.h"
 #include "swift/Basic/Compiler.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -44,25 +45,17 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
 
   friend TrailingObjects;
 
-  size_t numTrailingObjects(OverloadToken<Type>) const {
-    return Signature->getGenericParams().size();
-  }
+  size_t numTrailingObjects(OverloadToken<Type>) const;
 
   /// Retrieve the array containing the context types associated with the
   /// generic parameters, stored in parallel with the generic parameters of the
   /// generic signature.
-  MutableArrayRef<Type> getContextTypes() {
-    return MutableArrayRef<Type>(getTrailingObjects<Type>(),
-                                 Signature->getGenericParams().size());
-  }
+  MutableArrayRef<Type> getContextTypes();
 
   /// Retrieve the array containing the context types associated with the
   /// generic parameters, stored in parallel with the generic parameters of the
   /// generic signature.
-  ArrayRef<Type> getContextTypes() const {
-    return ArrayRef<Type>(getTrailingObjects<Type>(),
-                          Signature->getGenericParams().size());
-  }
+  ArrayRef<Type> getContextTypes() const;
 
   GenericEnvironment(GenericSignature *signature,
                      GenericSignatureBuilder *builder);
@@ -90,9 +83,7 @@ public:
     return Signature;
   }
 
-  ArrayRef<GenericTypeParamType *> getGenericParams() const {
-    return Signature->getGenericParams();
-  }
+  ArrayRef<GenericTypeParamType *> getGenericParams() const;
 
   /// Create a new, "incomplete" generic environment that will be populated
   /// by calls to \c addMapping().

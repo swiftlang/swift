@@ -693,6 +693,29 @@ bool GenericSignature::isRequirementSatisfied(Requirement requirement) {
   }
 }
 
+SmallVector<Requirement, 4> GenericSignature::requirementsNotSatisfiedBy(
+                                                 GenericSignature *otherSig) {
+  SmallVector<Requirement, 4> result;
+
+  // If the signatures are the same, all requirements are satisfied.
+  if (otherSig == this) return result;
+
+  // If there is no other signature, no requirements are satisfied.
+  if (!otherSig){
+    result.insert(result.end(),
+                  getRequirements().begin(), getRequirements().end());
+    return result;
+  }
+
+  // Find the requirements that aren't satisfied.
+  for (const auto &req : getRequirements()) {
+    if (!otherSig->isRequirementSatisfied(req))
+      result.push_back(req);
+  }
+
+  return result;
+}
+
 bool GenericSignature::isCanonicalTypeInContext(Type type) {
   // If the type isn't independently canonical, it's certainly not canonical
   // in this context.
