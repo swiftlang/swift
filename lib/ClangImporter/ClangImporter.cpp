@@ -2004,6 +2004,11 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
     }
   }
 
+  // Macros can be "redeclared" too, by putting an equivalent definition in two
+  // different modules.
+  if (ClangNode.getAsMacro())
+    return true;
+
   return false;
 }
 
