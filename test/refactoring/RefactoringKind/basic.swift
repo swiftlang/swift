@@ -216,6 +216,14 @@ func testForceTry() {
   func throwingFunc() throws -> Int { return 3 }
   let _ = try! throwingFunc()
 }
+
+func testSwitchExpand() {
+  enum AccountType {
+    case savings, checking
+  }
+  let account: AccountType = .savings
+  switch account { }
+}
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -301,6 +309,9 @@ func testForceTry() {
 // RUN: %refactor -source-filename %s -pos=217:13 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
 // RUN: %refactor -source-filename %s -pos=217:14 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
 
+// RUN: %refactor -source-filename %s -pos=225:3 | %FileCheck %s -check-prefix=CHECK-EXPAND-SWITCH
+
+
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
 // CHECK1-NEXT: Action ends
@@ -342,3 +353,4 @@ func testForceTry() {
 
 // CHECK-TRY-CATCH: Convert To Do/Catch
 
+// CHECK-EXPAND-SWITCH: Expand Switch Cases
