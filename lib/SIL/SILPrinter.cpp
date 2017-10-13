@@ -660,13 +660,13 @@ public:
   /// Print out the users of the SILValue \p V. Return true if we printed out
   /// either an id or a use list. Return false otherwise.
   bool printUsersOfSILNode(const SILNode *node, bool printedSlashes) {
-    SILInstruction::ResultArrayRef values;
+    TinyPtrVector<SILValue> values;
     if (auto value = dyn_cast<ValueBase>(node)) {
       // The base pointer of the ultimate ArrayRef here is just the
       // ValueBase; we aren't forming a reference to a temporary array.
-      values = ArrayRef<ValueBase>(value, 1);
-    } else if (auto inst = dyn_cast<SILInstruction>(node)) {
-      values = inst->getResults();
+      values.push_back(value);
+    } else if (auto *inst = dyn_cast<SILInstruction>(node)) {
+      copy(inst->getResults(), std::back_inserter(values));
     }
 
     // If the set of values is empty, we need to print the ID of

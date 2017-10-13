@@ -44,6 +44,7 @@ class DeclRefExpr;
 class FloatLiteralExpr;
 class FuncDecl;
 class IntegerLiteralExpr;
+class NonValueInstruction;
 class SILBasicBlock;
 class SILBuilder;
 class SILDebugLocation;
@@ -86,6 +87,114 @@ SILInstructionKind getSILInstructionKind(StringRef InstName);
 
 /// Map SILInstructionKind to a corresponding SILInstruction name.
 StringRef getSILInstructionName(SILInstructionKind Kind);
+
+/// A formal SIL reference to a list of values, suitable for use as the result
+/// of a SILInstruction.
+///
+/// *NOTE* Most multiple value instructions will not have many results, so if we
+/// want we can cache up to 3 bytes in the lower bits of the value.
+///
+/// *NOTE* Most of this defined out of line further down in the file to work
+/// around forward declaration issues.
+class SILInstructionResultArray {
+  const uint8_t *Pointer;
+  unsigned Size;
+
+public:
+  SILInstructionResultArray() : Pointer(nullptr), Size(0) {}
+  SILInstructionResultArray(const SingleValueInstruction *SVI);
+
+  SILInstructionResultArray(const SILInstructionResultArray &Other) = default;
+  SILInstructionResultArray &
+  operator=(const SILInstructionResultArray &Other) = default;
+  SILInstructionResultArray(SILInstructionResultArray &&Other) = default;
+  SILInstructionResultArray &
+  operator=(SILInstructionResultArray &&Other) = default;
+
+  SILValue operator[](size_t Index) const;
+
+  bool empty() const { return Size == 0; }
+
+  size_t size() const { return Size; }
+
+  class iterator;
+
+  iterator begin() const;
+  iterator end() const;
+
+  using range = llvm::iterator_range<iterator>;
+  range getValues() const;
+
+  using type_range = llvm::iterator_range<
+      llvm::mapped_iterator<iterator, std::function<SILType(SILValue)>>>;
+  type_range getTypes() const;
+
+  bool operator==(const SILInstructionResultArray &rhs);
+  bool operator!=(const SILInstructionResultArray &other) {
+    return !(*this == other);
+  }
+
+  /// Returns true if both this and \p rhs have the same result types.
+  ///
+  /// *NOTE* This does not imply that the actual return SILValues are the
+  /// same. Just that the types are the same.
+  bool hasSameTypes(const SILInstructionResultArray &rhs);
+
+private:
+  /// Return the offset 1 past the end of the array or None if we are not
+  /// actually storing anything.
+  Optional<unsigned> getStartOffset() const {
+    return empty() ? None : Optional<unsigned>(0);
+  }
+
+  /// Return the offset 1 past the end of the array or None if we are not
+  /// actually storing anything.
+  Optional<unsigned> getEndOffset() const {
+    return empty() ? None : Optional<unsigned>(size());
+  }
+};
+
+class SILInstructionResultArray::iterator
+    : public std::iterator<std::bidirectional_iterator_tag, SILValue,
+                           ptrdiff_t> {
+  /// Our "parent" array.
+  ///
+  /// This is actually a value type reference into a SILInstruction of some
+  /// sort. So we can just have our own copy. This also allows us to not worry
+  /// about our underlying array having too short of a lifetime.
+  SILInstructionResultArray Parent;
+
+  /// The index into the parent array.
+  Optional<unsigned> Index;
+
+public:
+  iterator() = default;
+  iterator(const SILInstructionResultArray &Parent,
+           Optional<unsigned> Index = 0)
+      : Parent(Parent), Index(Index) {}
+
+  SILValue operator*() const { return Parent[Index.getValue()]; }
+
+  SILValue operator->() const { return operator*(); }
+
+  iterator &operator++() {
+    ++Index.getValue();
+    return *this;
+  }
+
+  iterator operator++(int) {
+    iterator copy = *this;
+    ++Index.getValue();
+    return copy;
+  }
+
+  friend bool operator==(iterator lhs, iterator rhs) {
+    assert(lhs.Parent.Pointer == rhs.Parent.Pointer);
+    return lhs.Index == rhs.Index;
+  }
+
+  friend bool operator!=(iterator lhs, iterator rhs) { return !(lhs == rhs); }
+};
 
 /// This is the root class for all instructions that can be used as the
 /// contents of a Swift SILBasicBlock.
@@ -143,7 +252,7 @@ class SILInstruction
 
   /// An internal method which retrieves the result values of the
   /// instruction as an array of ValueBase objects.
-  ArrayRef<ValueBase> getResultsImpl() const;
+  SILInstructionResultArray getResultsImpl() const;
 
 protected:
   SILInstruction(SILInstructionKind kind, SILDebugLocation DebugLoc)
@@ -318,18 +427,13 @@ public:
     getAllOperands()[Num1].swap(getAllOperands()[Num2]);
   }
 
-  using ResultArrayRef =
-    ArrayRefView<ValueBase,SILValue,projectValueBaseAsSILValue>;
-
   /// Return the list of results produced by this instruction.
-  ResultArrayRef getResults() const { return getResultsImpl(); }
-
-  using ResultTypeArrayRef =
-    ArrayRefView<ValueBase,SILType,projectValueBaseType>;
+  SILInstructionResultArray getResults() const { return getResultsImpl(); }
+  unsigned getNumResults() const { return getResults().size(); }
 
   /// Return the types of the results produced by this instruction.
-  ResultTypeArrayRef getResultTypes() const {
-    return getResultsImpl();
+  SILInstructionResultArray::type_range getResultTypes() const {
+    return getResultsImpl().getTypes();
   }
 
   MemoryBehavior getMemoryBehavior() const;
@@ -364,9 +468,9 @@ public:
       return false;
     }
 
-    if (getResultTypes() != RHS->getResultTypes())
+    if (!getResults().hasSameTypes(RHS->getResults()))
       return false;
-    
+
     // Check operands.
     for (unsigned i = 0, e = getNumOperands(); i != e; ++i)
       if (!opEqual(getOperand(i), RHS->getOperand(i)))
@@ -504,8 +608,8 @@ class SingleValueInstruction : public SILInstruction, public ValueBase {
   }
 
   friend class SILInstruction;
-  ArrayRef<ValueBase> getResultsImpl() const {
-    return ArrayRef<ValueBase>(this, 1);
+  SILInstructionResultArray getResultsImpl() const {
+    return SILInstructionResultArray(this);
   }
 public:
   SingleValueInstruction(SILInstructionKind kind, SILDebugLocation loc,
@@ -547,9 +651,7 @@ public:
   }
 
   /// Override this to reflect the more efficient access pattern.
-  ResultArrayRef getResults() const {
-    return getResultsImpl();
-  }
+  SILInstructionResultArray getResults() const { return getResultsImpl(); }
 
   static bool classof(const SILNode *node) {
     return isSingleValueInstKind(node->getKind());
@@ -599,7 +701,14 @@ public:
 
   /// Doesn't produce any results.
   SILType getType() const = delete;
-  ResultArrayRef getResults() const = delete;
+  SILInstructionResultArray getResults() const = delete;
+
+  static bool classof(const ValueBase *value) = delete;
+  static bool classof(const SILNode *N) {
+    return N->getKind() >= SILNodeKind::First_NonValueInstruction &&
+           N->getKind() <= SILNodeKind::Last_NonValueInstruction;
+  }
+  static bool classof(const NonValueInstruction *) { return true; }
 };
 #define DEFINE_ABSTRACT_NON_VALUE_INST_BOILERPLATE(ID)          \
   static bool classof(const ValueBase *value) = delete;         \
