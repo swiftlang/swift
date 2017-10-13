@@ -32,3 +32,4 @@ func test_indirect_by_val_alignment() {
 // armv7s: define hidden swiftcc void  @_T011c_functions30test_indirect_by_val_alignmentyyF()
 // armv7: define hidden swiftcc void  @_T011c_functions30test_indirect_by_val_alignmentyyF()
 // i386: define hidden swiftcc void  @_T011c_functions30test_indirect_by_val_alignmentyyF()
+// s390x: define hidden swiftcc void  @_T011c_functions30test_indirect_by_val_alignmentyyF()
