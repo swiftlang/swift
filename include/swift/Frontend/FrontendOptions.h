@@ -213,7 +213,9 @@ public:
 
   void clearPrimaryInputs() { getMutablePrimaryInputs().clear(); }
 
-  void addPrimaryInput(SelectedInput si) { PrimaryInputs.push_back(si); }
+  void addPrimaryInput(SelectedInput si) {
+    PrimaryInputs.push_back(si);
+  }
 
   void setPrimaryInput(SelectedInput si) {
     clearPrimaryInputs();

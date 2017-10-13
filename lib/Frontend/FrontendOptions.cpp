@@ -95,27 +95,26 @@ void FrontendInputs::transformInputFilenames(
   }
 }
 
+// The compiler wants primaries first as of 10-13-17, so this routine does that.
 void FrontendInputs::setInputAndPrimaryFilesFromPossiblyOverlappingLists(
     llvm::SmallVectorImpl<StringRef> &inputFiles,
     llvm::SmallVectorImpl<StringRef> &primaryFiles) {
-  llvm::StringMap<unsigned> filelistIndices(inputFiles.size());
-  for (auto inputFile : inputFiles) {
-    filelistIndices.insert(llvm::StringMapEntry<unsigned>::Create(
-        inputFile, inputFilenameCount()));
-    addInputFilename(inputFile);
-  }
-  for (auto primaryInputFile : primaryFiles) {
-    llvm::StringMapConstIterator<unsigned> iterator =
-        filelistIndices.find(primaryInputFile);
-    bool wasIndexFound = iterator != filelistIndices.end();
-    unsigned nextInputFilenameIndex = inputFilenameCount();
-    if (!wasIndexFound) {
-      addInputFilename(primaryInputFile);
-    }
-    unsigned primaryIndex =
-        wasIndexFound ? iterator->second : nextInputFilenameIndex;
+  llvm::StringMap<unsigned> indexOfPrimaryInInput(primaryFiles.size());
+  for (auto primaryFile: primaryFiles) {
+    unsigned primaryIndex = inputFilenameCount();
+    auto entry = llvm::StringMapEntry<unsigned>::Create(
+                                           primaryFile, inputFilenameCount());
+    indexOfPrimaryInInput.insert(entry);
+    addInputFilename(primaryFile);
     addPrimaryInput(
-        SelectedInput(primaryIndex, SelectedInput::InputKind::Filename));
+                    SelectedInput(primaryIndex, SelectedInput::InputKind::Filename));
+  }
+  for (auto inputFile : inputFiles) {
+    llvm::StringMapConstIterator<unsigned> iterator =
+    indexOfPrimaryInInput.find(inputFile);
+    bool wasIndexFound = iterator != indexOfPrimaryInInput.end();
+    if (!wasIndexFound)
+      addInputFilename(inputFile);
   }
 }
 
