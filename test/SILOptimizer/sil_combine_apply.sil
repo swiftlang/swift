@@ -343,3 +343,20 @@ bb0(%0 : $*MutatingProto, %1 : $MStruct):
   return %27 : $()
 }
 
+// CHECK-LABEL: sil @dont_replace_copied_self_in_mutating_method_call2
+sil @dont_replace_copied_self_in_mutating_method_call2 : $@convention(thin) (@thick MutatingProto.Type) -> (@out MutatingProto) {
+bb0(%0 : $*MutatingProto, %1 : $@thick MutatingProto.Type):
+  %alloc1 = alloc_stack $MutatingProto, let, name "p"
+  %openType = open_existential_metatype %1 : $@thick MutatingProto.Type to $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto).Type
+  %initType =  init_existential_addr %alloc1 : $*MutatingProto, $@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto
+  %alloc2 = alloc_stack $MutatingProto
+  copy_addr %alloc1 to [initialization] %alloc2 : $*MutatingProto
+  %oeaddr = open_existential_addr mutable_access %alloc2 : $*MutatingProto to $*@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto
+  %witmethod = witness_method $@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto, #MutatingProto.mutatingMethod!1 : <Self where Self : MutatingProto> (inout Self) -> () -> (), %openType : $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto).Type : $@convention(witness_method) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
+  // CHECK: apply {{%.*}}<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto>({{%.*}}) : $@convention(witness_method) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> () // type-defs
+  %apply = apply %witmethod<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto>(%oeaddr) : $@convention(witness_method) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
+  dealloc_stack %alloc2 : $*MutatingProto
+  dealloc_stack %alloc1 : $*MutatingProto
+  %27 = tuple ()
+  return %27 : $()
+}
