@@ -988,16 +988,16 @@ enum MyAwesomeEnum {
 // <rdar://problem/20679379> DI crashes on initializers on protocol extensions
 extension SomeProtocol {
   init?() {
-    let a = self  // expected-error {{variable 'self' used before being initialized}}
+    let a = self  // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
     self = a
   }
 
   init(a : Int) {
-  } // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 
   init(c : Float) {
-    protoMe()   // expected-error {{variable 'self' used before being initialized}}
-  } // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
+    protoMe()   // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
 
@@ -1042,7 +1042,7 @@ protocol ProtocolInitTest {
 
 extension ProtocolInitTest {
   init() {
-  }  // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
+  }  // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 
   init(b : Float) {
     self.init(a: 42)  // ok
@@ -1066,7 +1066,7 @@ extension ProtocolInitTest {
 
   init(test4 ii: Int) {
     i = ii         // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
-  }                // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
+  }                // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
 // <rdar://problem/22436880> Function accepting UnsafeMutablePointer is able to change value of immutable value

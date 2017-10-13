@@ -5306,6 +5306,12 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // get the kind out of the finder.
   auto Kind = finder.Kind;
 
+  // Protocol extension initializers are always delegating.
+  if (Kind == BodyInitKind::None) {
+    if (getDeclContext()->getAsProtocolExtensionContext()) {
+      Kind = BodyInitKind::Delegating;
+    }
+  }
 
   // If we didn't find any delegating or chained initializers, check whether
   // the initializer was explicitly marked 'convenience'.

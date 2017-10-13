@@ -105,15 +105,6 @@ public:
     return false;
   }
 
-  /// True if the memory object is the 'self' argument of an initializer in a
-  /// protocol extension.
-  bool isProtocolInitSelf() const {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->isRootSelf() && isa<ArchetypeType>(getType()))
-        return true;
-    return false;
-  }
-
   /// True if the memory object is the 'self' argument of an enum initializer.
   bool isEnumInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))

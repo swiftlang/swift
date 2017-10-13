@@ -691,13 +691,6 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
   assert(TheMemory.isAnyInitSelf() && !TheMemory.isDelegatingInit() &&
          "Not a designated initializer");
 
-  // Root protocol initializers (ones that reassign to self, not delegating to
-  // self.init) have no members to initialize and self itself has already been
-  // reported to be uninit in the primary diagnostic.
-  if (TheMemory.isProtocolInitSelf())
-    return;
-
-
   // Determine which members, specifically are uninitialized.
   AvailabilitySet Liveness =
     getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
@@ -1210,11 +1203,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
       !TheMemory.isClassInitSelf()) {
     if (!shouldEmitError(Inst)) return;
 
-    auto diagID = diag::use_of_self_before_fully_init;
-    if (TheMemory.isProtocolInitSelf())
-      diagID = diag::self_before_selfinit_value_type;
-
-    diagnose(Module, Inst->getLoc(), diagID);
+    diagnose(Module, Inst->getLoc(), diag::use_of_self_before_fully_init);
     noteUninitializedMembers(Use);
     return;
   }
@@ -1611,13 +1600,6 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
         return;
       }
 
-      if (TheMemory.isProtocolInitSelf()) {
-        if (!shouldEmitError(Inst)) return;
-        diagnose(Module, Inst->getLoc(),
-                 diag::return_from_init_without_initing_self);
-        return;
-      }
-
       if (TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf() &&
           !TheMemory.isDelegatingInit()) {
         if (!shouldEmitError(Inst)) return;
@@ -1681,10 +1663,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
       TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf()) {
     if (!shouldEmitError(Inst)) return;
 
-    auto diagID = diag::use_of_self_before_fully_init;
-    if (TheMemory.isProtocolInitSelf())
-      diagID = diag::self_before_selfinit_value_type;
-    diagnose(Module, Inst->getLoc(), diagID);
+    diagnose(Module, Inst->getLoc(), diag::use_of_self_before_fully_init);
     noteUninitializedMembers(Use);
     return;
   }
