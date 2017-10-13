@@ -1262,12 +1262,6 @@ static bool isSelfInitUse(SILInstruction *I) {
         if (Fn->getName().startswith("selfinit"))
           return true;
 
-    // If this is a copy_addr to a delegating self MUI, then we treat it as a
-    // self init for the purposes of testcases.
-    if (auto *CAI = dyn_cast<CopyAddrInst>(I))
-      if (auto *MUI = dyn_cast<MarkUninitializedInst>(CAI->getDest()))
-        if (MUI->isDelegatingSelf())
-          return true;
     return false;
   }
 
@@ -1642,13 +1636,6 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
           UseInfo.trackUse(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
           continue;
         }
-      }
-    }
-
-    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
-      if (isSelfInitUse(CAI)) {
-        UseInfo.trackUse(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
-        continue;
       }
     }
 

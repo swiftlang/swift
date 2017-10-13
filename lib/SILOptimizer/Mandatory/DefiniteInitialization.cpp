@@ -1719,7 +1719,8 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
   auto *Inst = InstInfo.Inst;
 
   assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
-  
+  assert(TheMemory.getType()->hasReferenceSemantics());
+
   if (getSelfConsumedAtInst(Inst) != DIKind::No) {
     // FIXME: more specific diagnostics here, handle this case gracefully below.
     if (!shouldEmitError(Inst))
@@ -1743,10 +1744,6 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
       diagnose(Module, Inst->getLoc(), diag::selfinit_multiple_times, 1);
     return;
   }
-
-  // If this is a copy_addr, make sure we remember that it is an initialization.
-  if (auto *CAI = dyn_cast<CopyAddrInst>(InstInfo.Inst))
-    CAI->setIsInitializationOfDest(IsInitialization);
 
   // Lower Assign instructions if needed.
   if (isa<AssignInst>(InstInfo.Inst))
