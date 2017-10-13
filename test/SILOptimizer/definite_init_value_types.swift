@@ -79,11 +79,11 @@ enum ValueEnum {
 
   init(d: Bool) {
     if d {
-      return // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
+      return
     }
 
     self = ValueEnum()
-  }
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 
   init(e: Bool) {
     if e {

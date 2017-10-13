@@ -333,19 +333,19 @@ func conditionalInitOrAssign(_ c : Bool, x : Int) {
 
 enum NotInitializedUnion {
   init() {
-  } // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
   case X
   case Y
 }
 
 extension NotInitializedUnion {
   init(a : Int) {
-  } // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
 enum NotInitializedGenericUnion<T> {
   init() { 
-  } // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
   case X
 }
 
@@ -972,7 +972,7 @@ enum AddressOnlyEnumWithInit<T> {
   case X(T), Y
   
   init() {
-  } // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
 
@@ -982,7 +982,7 @@ enum MyAwesomeEnum {
 
   init?() {
 
-  } // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
 }
 
 // <rdar://problem/20679379> DI crashes on initializers on protocol extensions
@@ -1179,19 +1179,19 @@ enum SR1469_Enum1 {
   
   init?(x: Int) {
     if x == 42 {
-      return // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
+      return
     }
     // many lines later
     self = .A
-  }
+  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
 }
 
 enum SR1469_Enum2 {
   case A, B
   
   init?() {
-    return // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
-  }
+    return
+  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
 }
 enum SR1469_Enum3 {
   case A, B
@@ -1201,7 +1201,7 @@ enum SR1469_Enum3 {
       self = .A
       return
     }
-  } // expected-error {{return from initializer before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
 }
 
 class BadFooSuper {

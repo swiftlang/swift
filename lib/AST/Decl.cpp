@@ -5306,9 +5306,10 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // get the kind out of the finder.
   auto Kind = finder.Kind;
 
-  // Protocol extension initializers are always delegating.
+  // Protocol extension and enum initializers are always delegating.
   if (Kind == BodyInitKind::None) {
-    if (getDeclContext()->getAsProtocolExtensionContext()) {
+    if (getDeclContext()->getAsProtocolExtensionContext() ||
+        getDeclContext()->getAsEnumOrEnumExtensionContext()) {
       Kind = BodyInitKind::Delegating;
     }
   }

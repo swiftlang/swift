@@ -105,16 +105,6 @@ public:
     return false;
   }
 
-  /// True if the memory object is the 'self' argument of an enum initializer.
-  bool isEnumInitSelf() const {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->isRootSelf())
-        if (auto decl = getType()->getAnyNominal())
-          if (isa<EnumDecl>(decl))
-            return true;
-    return false;
-  }
-
   /// True if the memory object is the 'self' argument of a struct initializer.
   bool isStructInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
@@ -173,7 +163,7 @@ public:
   bool isNonDelegatingInit() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst)) {
       if (MUI->isDerivedClassSelf() || MUI->isDerivedClassSelfOnly() ||
-          (MUI->isRootSelf() && !isEnumInitSelf()))
+          MUI->isRootSelf())
         return true;
     }
     return false;
