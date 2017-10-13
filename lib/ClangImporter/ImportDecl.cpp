@@ -3772,7 +3772,7 @@ namespace {
 
       // If the method has a related result type that is representable
       // in Swift as DynamicSelf, do so.
-      if (decl->hasRelatedResultType()) {
+      if (!prop && decl->hasRelatedResultType()) {
         result->setDynamicSelf(true);
         resultTy = DynamicSelfType::get(dc->getSelfInterfaceType(),
                                         Impl.SwiftContext);
