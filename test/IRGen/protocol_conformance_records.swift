@@ -44,7 +44,7 @@ public class NativeClassType: Runcible {
 // -- nominal type descriptor
 // CHECK-SAME:           @_T028protocol_conformance_records17NativeGenericTypeVMn
 // -- witness table
-// CHECK-SAME:           @_T028protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAWP
+// CHECK-SAME:           @_T028protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAlWP
 // -- flags 0x04: unique nominal type descriptor
 // CHECK-SAME:           i32 4
 // CHECK-SAME:         },
