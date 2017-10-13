@@ -1120,13 +1120,11 @@ public:
                                 bool isSuper, bool isDirectAccessorUse,
                                 RValue &&optionalSubscripts,
                                 SILValue buffer, SILValue callbackStorage);
-  bool maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
+  bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
-                                       Type selfInterfaceType,
-                                       Type selfType,
+                                       Type selfInterfaceType, Type selfType,
                                        GenericEnvironment *genericEnv,
-                                       FuncDecl *requirement,
-                                       FuncDecl *witness,
+                                       FuncDecl *requirement, FuncDecl *witness,
                                        SubstitutionList witnessSubs);
   void emitMaterializeForSet(FuncDecl *decl);
 

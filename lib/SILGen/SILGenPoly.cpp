@@ -2967,8 +2967,9 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   // We do not, conversion is trivial.
   auto expectedEI = expectedFnType->getExtInfo();
   auto newEI = expectedEI.withRepresentation(fnType->getRepresentation());
-  auto newFnType = adjustFunctionType(expectedFnType, newEI,
-                                      fnType->getCalleeConvention());
+  auto newFnType =
+      adjustFunctionType(expectedFnType, newEI, fnType->getCalleeConvention(),
+                         fnType->getWitnessMethodConformanceOrNone());
   // Apply any ABI-compatible conversions before doing thin-to-thick.
   if (fnType != newFnType) {
     SILType resTy = SILType::getPrimitiveObjectType(newFnType);

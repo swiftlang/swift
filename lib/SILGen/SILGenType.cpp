@@ -490,9 +490,9 @@ public:
                         : SILLinkage::Private);
     }
 
-    SILFunction *witnessFn =
-      SGM.emitProtocolWitness(Conformance, witnessLinkage, witnessSerialized,
-                              requirementRef, witnessRef, isFree, witness);
+    SILFunction *witnessFn = SGM.emitProtocolWitness(
+        ProtocolConformanceRef(Conformance), witnessLinkage, witnessSerialized,
+        requirementRef, witnessRef, isFree, witness);
     Entries.push_back(
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
@@ -575,15 +575,10 @@ SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
   return table;
 }
 
-static bool maybeOpenCodeProtocolWitness(SILGenFunction &SGF,
-                                         ProtocolConformance *conformance,
-                                         SILLinkage linkage,
-                                         Type selfInterfaceType,
-                                         Type selfType,
-                                         GenericEnvironment *genericEnv,
-                                         SILDeclRef requirement,
-                                         SILDeclRef witness,
-                                         SubstitutionList witnessSubs) {
+static bool maybeOpenCodeProtocolWitness(
+    SILGenFunction &SGF, ProtocolConformanceRef conformance, SILLinkage linkage,
+    Type selfInterfaceType, Type selfType, GenericEnvironment *genericEnv,
+    SILDeclRef requirement, SILDeclRef witness, SubstitutionList witnessSubs) {
   if (auto witnessFn = dyn_cast<FuncDecl>(witness.getDecl())) {
     if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
       auto reqFn = cast<FuncDecl>(requirement.getDecl());
@@ -598,14 +593,10 @@ static bool maybeOpenCodeProtocolWitness(SILGenFunction &SGF,
   return false;
 }
 
-SILFunction *
-SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
-                                  SILLinkage linkage,
-                                  IsSerialized_t isSerialized,
-                                  SILDeclRef requirement,
-                                  SILDeclRef witnessRef,
-                                  IsFreeFunctionWitness_t isFree,
-                                  Witness witness) {
+SILFunction *SILGenModule::emitProtocolWitness(
+    ProtocolConformanceRef conformance, SILLinkage linkage,
+    IsSerialized_t isSerialized, SILDeclRef requirement, SILDeclRef witnessRef,
+    IsFreeFunctionWitness_t isFree, Witness witness) {
   auto requirementInfo = Types.getConstantInfo(requirement);
 
   // Work out the lowered function type of the SIL witness thunk.
@@ -639,14 +630,15 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // underlying function in the thunk.
 
   // Lower the witness thunk type with the requirement's abstraction level.
-  auto witnessSILFnType =
-    getNativeSILFunctionType(M, AbstractionPattern(reqtOrigTy),
-                             reqtSubstTy, witnessRef);
+  auto witnessSILFnType = getNativeSILFunctionType(
+      M, AbstractionPattern(reqtOrigTy), reqtSubstTy, witnessRef, conformance);
 
   // Mangle the name of the witness thunk.
   Mangle::ASTMangler NewMangler;
-  std::string nameBuffer = NewMangler.mangleWitnessThunk(conformance,
-                                                         requirement.getDecl());
+  auto manglingConformance =
+      conformance.isConcrete() ? conformance.getConcrete() : nullptr;
+  std::string nameBuffer =
+      NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
 
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all
@@ -745,11 +737,9 @@ public:
                                SILDeclRef witnessRef,
                                IsFreeFunctionWitness_t isFree,
                                Witness witness) {
-    SILFunction *witnessFn = SGM.emitProtocolWitness(nullptr,
-                                                     SILLinkage::Private,
-                                                     IsNotSerialized,
-                                                     requirementRef, witnessRef,
-                                                     isFree, witness);
+    SILFunction *witnessFn = SGM.emitProtocolWitness(
+        ProtocolConformanceRef(Proto), SILLinkage::Private, IsNotSerialized,
+        requirementRef, witnessRef, isFree, witness);
     auto entry = SILDefaultWitnessTable::Entry(requirementRef, witnessFn);
     DefaultWitnesses.push_back(entry);
   }

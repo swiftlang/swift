@@ -3805,15 +3805,14 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
   if (errorResult) errorResult->profile(id);
 }
 
-SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
-                                 ParameterConvention calleeConvention,
-                                 ArrayRef<SILParameterInfo> params,
-                                 ArrayRef<SILResultInfo> normalResults,
-                                 Optional<SILResultInfo> errorResult,
-                                 const ASTContext &ctx,
-                                 RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::SILFunction, &ctx, properties),
-      GenericSig(genericSig) {
+SILFunctionType::SILFunctionType(
+    GenericSignature *genericSig, ExtInfo ext,
+    ParameterConvention calleeConvention, ArrayRef<SILParameterInfo> params,
+    ArrayRef<SILResultInfo> normalResults, Optional<SILResultInfo> errorResult,
+    const ASTContext &ctx, RecursiveTypeProperties properties,
+    Optional<ProtocolConformanceRef> witnessMethodConformance)
+    : TypeBase(TypeKind::SILFunction, &ctx, properties), GenericSig(genericSig),
+      WitnessMethodConformance(witnessMethodConformance) {
 
   SILFunctionTypeBits.HasErrorResult = errorResult.hasValue();
   SILFunctionTypeBits.ExtInfo = ext.Bits;
@@ -3840,6 +3839,13 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
     getMutableAllResultsCache() = CanType();
   }
 #ifndef NDEBUG
+  if (ext.getRepresentation() == Representation::WitnessMethod)
+    assert(WitnessMethodConformance &&
+           "witness_method SIL function without a conformance");
+  else
+    assert(!WitnessMethodConformance &&
+           "non-witness_method SIL function with a conformance");
+
   // Make sure the interface types are sane.
   if (genericSig) {
     for (auto gparam : genericSig->getGenericParams()) {
@@ -3885,12 +3891,11 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
   return CanSILBlockStorageType(storageTy);
 }
 
-CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
-                                        ExtInfo ext, ParameterConvention callee,
-                                        ArrayRef<SILParameterInfo> params,
-                                        ArrayRef<SILResultInfo> normalResults,
-                                        Optional<SILResultInfo> errorResult,
-                                        const ASTContext &ctx) {
+CanSILFunctionType SILFunctionType::get(
+    GenericSignature *genericSig, ExtInfo ext, ParameterConvention callee,
+    ArrayRef<SILParameterInfo> params, ArrayRef<SILResultInfo> normalResults,
+    Optional<SILResultInfo> errorResult, const ASTContext &ctx,
+    Optional<ProtocolConformanceRef> witnessMethodConformance) {
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, callee, params, normalResults,
                            errorResult);
@@ -3928,9 +3933,9 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
     properties.removeHasDependentMember();
   }
 
-  auto fnType =
-      new (mem) SILFunctionType(genericSig, ext, callee, params, normalResults,
-                                errorResult, ctx, properties);
+  auto fnType = new (mem)
+      SILFunctionType(genericSig, ext, callee, params, normalResults,
+                      errorResult, ctx, properties, witnessMethodConformance);
   ctx.Impl.SILFunctionTypes.InsertNode(fnType, insertPos);
   return CanSILFunctionType(fnType);
 }

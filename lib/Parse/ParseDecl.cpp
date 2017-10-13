@@ -1587,6 +1587,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   bool isAutoclosureEscaping = false;
   SourceRange autoclosureEscapingParenRange;
   StringRef conventionName;
+  StringRef witnessMethodProtocol;
 
   // Handle @autoclosure(escaping)
   if (attr == TAK_autoclosure) {
@@ -1623,6 +1624,25 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 
     conventionName = Tok.getText();
     consumeToken(tok::identifier);
+
+    if (conventionName == "witness_method") {
+      if (Tok.isNot(tok::colon)) {
+        if (!justChecking)
+          diagnose(Tok,
+                   diag::convention_attribute_witness_method_expected_colon);
+        return true;
+      }
+      consumeToken(tok::colon);
+      if (Tok.isNot(tok::identifier)) {
+        if (!justChecking)
+          diagnose(Tok,
+                   diag::convention_attribute_witness_method_expected_protocol);
+        return true;
+      }
+
+      witnessMethodProtocol = Tok.getText();
+      consumeToken(tok::identifier);
+    }
 
     // Parse the ')'.  We can't use parseMatchingToken if we're in
     // just-checking mode.
@@ -1770,6 +1790,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // Convention attribute.
   case TAK_convention:
     Attributes.convention = conventionName;
+    Attributes.conventionWitnessMethodProtocol = witnessMethodProtocol;
     break;
   }
 

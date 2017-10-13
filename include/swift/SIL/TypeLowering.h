@@ -67,21 +67,30 @@ inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
   
 /// Given a SIL function type, return a type that is identical except
 /// for using the given ExtInfo.
-CanSILFunctionType adjustFunctionType(CanSILFunctionType type,
-                                      SILFunctionType::ExtInfo extInfo,
-                                      ParameterConvention calleeConv);
-inline CanSILFunctionType adjustFunctionType(CanSILFunctionType type,
-                                      SILFunctionType::ExtInfo extInfo) {
-  return adjustFunctionType(type, extInfo, type->getCalleeConvention());
+CanSILFunctionType
+adjustFunctionType(CanSILFunctionType type, SILFunctionType::ExtInfo extInfo,
+                   ParameterConvention calleeConv,
+                   Optional<ProtocolConformanceRef> witnessMethodConformance);
+inline CanSILFunctionType
+adjustFunctionType(CanSILFunctionType type, SILFunctionType::ExtInfo extInfo,
+                   Optional<ProtocolConformanceRef> witnessMethodConformance) {
+  return adjustFunctionType(type, extInfo, type->getCalleeConvention(),
+                            witnessMethodConformance);
 }
-inline CanSILFunctionType adjustFunctionType(CanSILFunctionType t,
-                                         SILFunctionType::Representation rep) {
+inline CanSILFunctionType
+adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep,
+                   Optional<ProtocolConformanceRef> witnessMethodConformance) {
   if (t->getRepresentation() == rep) return t;
   auto extInfo = t->getExtInfo().withRepresentation(rep);
-  
-  return adjustFunctionType(t, extInfo,
-                    extInfo.hasContext() ? DefaultThickCalleeConvention
-                                         : ParameterConvention::Direct_Unowned);
+
+  return adjustFunctionType(
+      t, extInfo, extInfo.hasContext() ? DefaultThickCalleeConvention
+                                       : ParameterConvention::Direct_Unowned,
+      witnessMethodConformance);
+}
+inline CanSILFunctionType
+adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep) {
+  return adjustFunctionType(t, rep, t->getWitnessMethodConformanceOrNone());
 }
   
 
@@ -658,11 +667,10 @@ public:
   /// whose type cannot be represented in the AST because it is
   /// a polymorphic function value. This function returns the
   /// unsubstituted lowered type of this callback.
-  CanSILFunctionType
-  getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
-                                   CanGenericSignature genericSig,
-                                   Type selfType,
-                                   SILFunctionTypeRepresentation rep);
+  CanSILFunctionType getMaterializeForSetCallbackType(
+      AbstractStorageDecl *storage, CanGenericSignature genericSig,
+      Type selfType, SILFunctionTypeRepresentation rep,
+      Optional<ProtocolConformanceRef> witnessMethodConformance);
 
   /// Return the SILFunctionType for a native function value of the
   /// given type.

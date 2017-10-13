@@ -17,16 +17,17 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "libsil"
-#include "swift/SIL/SILType.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "clang/Analysis/DomainSpecific/CocoaConventions.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILType.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -178,25 +179,27 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
 #include "swift/SIL/BridgedTypes.def"
 
 /// Adjust a function type to have a slightly different type.
-CanAnyFunctionType Lowering::adjustFunctionType(CanAnyFunctionType t,
-                                          AnyFunctionType::ExtInfo extInfo) {
+CanAnyFunctionType
+Lowering::adjustFunctionType(CanAnyFunctionType t,
+                             AnyFunctionType::ExtInfo extInfo) {
   if (t->getExtInfo() == extInfo)
     return t;
   return CanAnyFunctionType(t->withExtInfo(extInfo));
 }
 
 /// Adjust a function type to have a slightly different type.
-CanSILFunctionType Lowering::adjustFunctionType(CanSILFunctionType type,
-                                               SILFunctionType::ExtInfo extInfo,
-                                               ParameterConvention callee) {
-  if (type->getExtInfo() == extInfo &&
-      type->getCalleeConvention() == callee)
+CanSILFunctionType Lowering::adjustFunctionType(
+    CanSILFunctionType type, SILFunctionType::ExtInfo extInfo,
+    ParameterConvention callee,
+    Optional<ProtocolConformanceRef> witnessMethodConformance) {
+  if (type->getExtInfo() == extInfo && type->getCalleeConvention() == callee &&
+      type->getWitnessMethodConformanceOrNone() == witnessMethodConformance)
     return type;
 
   return SILFunctionType::get(type->getGenericSignature(), extInfo, callee,
                               type->getParameters(), type->getResults(),
                               type->getOptionalErrorResult(),
-                              type->getASTContext());
+                              type->getASTContext(), witnessMethodConformance);
 }
 
 namespace {
@@ -768,13 +771,12 @@ static bool isPseudogeneric(SILDeclRef c) {
 /// using runtime call construction.
 ///
 /// \param conventions - conventions as expressed for the original type
-static CanSILFunctionType getSILFunctionType(SILModule &M,
-                        AbstractionPattern origType,
-                        CanAnyFunctionType substFnInterfaceType,
-                        AnyFunctionType::ExtInfo extInfo,
-                        const Conventions &conventions,
-                        const ForeignInfo &foreignInfo,
-                        Optional<SILDeclRef> constant) {
+static CanSILFunctionType getSILFunctionType(
+    SILModule &M, AbstractionPattern origType,
+    CanAnyFunctionType substFnInterfaceType, AnyFunctionType::ExtInfo extInfo,
+    const Conventions &conventions, const ForeignInfo &foreignInfo,
+    Optional<SILDeclRef> constant,
+    Optional<ProtocolConformanceRef> witnessMethodConformance) {
   // Per above, only fully honor opaqueness in the abstraction pattern
   // for thick or polymorphic functions.  We don't need to worry about
   // non-opaque patterns because the type-checker forbids non-thick
@@ -957,10 +959,9 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     .withIsPseudogeneric(pseudogeneric)
     .withNoEscape(extInfo.isNoEscape());
   
-  return SILFunctionType::get(genericSig,
-                              silExtInfo, calleeConvention,
-                              inputs, results, errorResult,
-                              M.getASTContext());
+  return SILFunctionType::get(genericSig, silExtInfo, calleeConvention, inputs,
+                              results, errorResult, M.getASTContext(),
+                              witnessMethodConformance);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1123,11 +1124,11 @@ getSILFunctionTypeForAbstractCFunction(SILModule &M,
                                        AnyFunctionType::ExtInfo extInfo,
                                        Optional<SILDeclRef> constant);
 
-static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
-                                         AbstractionPattern origType,
-                                         CanAnyFunctionType substInterfaceType,
-                                         AnyFunctionType::ExtInfo extInfo,
-                                         Optional<SILDeclRef> constant) {
+static CanSILFunctionType getNativeSILFunctionType(
+    SILModule &M, AbstractionPattern origType,
+    CanAnyFunctionType substInterfaceType, AnyFunctionType::ExtInfo extInfo,
+    Optional<SILDeclRef> constant,
+    Optional<ProtocolConformanceRef> witnessMethodConformance) {
   switch (extInfo.getSILRepresentation()) {
   case SILFunctionType::Representation::Block:
   case SILFunctionType::Representation::CFunctionPointer:
@@ -1143,10 +1144,10 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
   case SILFunctionType::Representation::WitnessMethod: {
     switch (constant ? constant->kind : SILDeclRef::Kind::Func) {
     case SILDeclRef::Kind::Initializer:
-      return getSILFunctionType(M, origType, substInterfaceType,
-                                extInfo, DefaultInitializerConventions(),
-                                ForeignInfo(), constant);
-    
+      return getSILFunctionType(M, origType, substInterfaceType, extInfo,
+                                DefaultInitializerConventions(), ForeignInfo(),
+                                constant, witnessMethodConformance);
+
     case SILDeclRef::Kind::Func:
     case SILDeclRef::Kind::Allocator:
     case SILDeclRef::Kind::Destroyer:
@@ -1157,13 +1158,13 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
     case SILDeclRef::Kind::EnumElement:
-      return getSILFunctionType(M, origType, substInterfaceType,
-                                extInfo, DefaultConventions(),
-                                ForeignInfo(), constant);
+      return getSILFunctionType(M, origType, substInterfaceType, extInfo,
+                                DefaultConventions(), ForeignInfo(), constant,
+                                witnessMethodConformance);
     case SILDeclRef::Kind::Deallocator:
-      return getSILFunctionType(M, origType, substInterfaceType,
-                                extInfo, DeallocatorConventions(),
-                                ForeignInfo(), constant);
+      return getSILFunctionType(M, origType, substInterfaceType, extInfo,
+                                DeallocatorConventions(), ForeignInfo(),
+                                constant, witnessMethodConformance);
     }
   }
   }
@@ -1171,10 +1172,10 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
-CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
-                                             AbstractionPattern origType,
-                                             CanAnyFunctionType substType,
-                                             Optional<SILDeclRef> constant) {
+CanSILFunctionType swift::getNativeSILFunctionType(
+    SILModule &M, AbstractionPattern origType, CanAnyFunctionType substType,
+    Optional<SILDeclRef> constant,
+    Optional<ProtocolConformanceRef> witnessMethodConformance) {
   AnyFunctionType::ExtInfo extInfo;
 
   // Preserve type information from the original type if possible.
@@ -1186,7 +1187,8 @@ CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
     extInfo = substType->getExtInfo();
   }
 
-  return ::getNativeSILFunctionType(M, origType, substType, extInfo, constant);
+  return ::getNativeSILFunctionType(M, origType, substType, extInfo, constant,
+                                    witnessMethodConformance);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1502,9 +1504,10 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
     auto origPattern =
       AbstractionPattern::getObjCMethod(origType, method, foreignInfo.Error);
-    return getSILFunctionType(M, origPattern, substInterfaceType,
-                              extInfo, ObjCMethodConventions(method),
-                              foreignInfo, constant);
+    return getSILFunctionType(M, origPattern, substInterfaceType, extInfo,
+                              ObjCMethodConventions(method), foreignInfo,
+                              constant,
+                              /*witnessMethodConformance=*/None);
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
@@ -1514,9 +1517,9 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
         ? AbstractionPattern::getCFunctionAsMethod(origType, clangType,
                                                    foreignInfo.Self)
         : AbstractionPattern(origType, clangType);
-    return getSILFunctionType(M, origPattern, substInterfaceType,
-                              extInfo, CFunctionConventions(func),
-                              foreignInfo, constant);
+    return getSILFunctionType(M, origPattern, substInterfaceType, extInfo,
+                              CFunctionConventions(func), foreignInfo, constant,
+                              /*witnessMethodConformance=*/None);
   }
 
   llvm_unreachable("call to unknown kind of C function");
@@ -1544,14 +1547,16 @@ getSILFunctionTypeForAbstractCFunction(SILModule &M,
     }
     if (fnType) {
       return getSILFunctionType(M, origType, substType, extInfo,
-                                CFunctionTypeConventions(fnType),
-                                ForeignInfo(), constant);
+                                CFunctionTypeConventions(fnType), ForeignInfo(),
+                                constant,
+                                /*witnessMethodConformance=*/None);
     }
   }
 
   // TODO: Ought to support captures in block funcs.
   return getSILFunctionType(M, origType, substType, extInfo,
-                            DefaultBlockConventions(), ForeignInfo(), constant);
+                            DefaultBlockConventions(), ForeignInfo(), constant,
+                            /*witnessMethodConformance=*/None);
 }
 
 /// Try to find a clang method declaration for the given function.
@@ -1755,11 +1760,10 @@ getSILFunctionTypeForSelectorFamily(SILModule &M, SelectorFamily family,
                                     AnyFunctionType::ExtInfo extInfo,
                                     const ForeignInfo &foreignInfo,
                                     Optional<SILDeclRef> constant) {
-  return getSILFunctionType(M, AbstractionPattern(origType),
-                            substInterfaceType,
-                            extInfo,
-                            SelectorFamilyConventions(family),
-                            foreignInfo, constant);
+  return getSILFunctionType(M, AbstractionPattern(origType), substInterfaceType,
+                            extInfo, SelectorFamilyConventions(family),
+                            foreignInfo, constant,
+                            /*witnessMethodConformance=*/None);
 }
 
 static bool isImporterGeneratedAccessor(const clang::Decl *clangDecl,
@@ -1792,11 +1796,19 @@ getUncachedSILFunctionTypeForConstant(SILModule &M,
   auto extInfo = origLoweredInterfaceType->getExtInfo();
 
   if (!constant.isForeign) {
-    return ::getNativeSILFunctionType(M,
-                  AbstractionPattern(origLoweredInterfaceType),
-                  origLoweredInterfaceType,
-                  extInfo,
-                  constant);
+    Optional<ProtocolConformanceRef> witnessMethodConformance;
+
+    if (extInfo.getSILRepresentation() ==
+        SILFunctionTypeRepresentation::WitnessMethod) {
+      auto proto = constant.getDecl()
+                       ->getDeclContext()
+                       ->getAsProtocolOrProtocolExtensionContext();
+      witnessMethodConformance = ProtocolConformanceRef(proto);
+    }
+
+    return ::getNativeSILFunctionType(
+        M, AbstractionPattern(origLoweredInterfaceType),
+        origLoweredInterfaceType, extInfo, constant, witnessMethodConformance);
   }
 
   ForeignInfo foreignInfo;
@@ -2144,9 +2156,9 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
   }
 
   // Build the SILFunctionType for the vtable thunk.
-  CanSILFunctionType fnTy = getNativeSILFunctionType(M, basePattern,
-                                               overrideLoweredInterfaceTy,
-                                               derived);
+  CanSILFunctionType fnTy = getNativeSILFunctionType(
+      M, basePattern, overrideLoweredInterfaceTy, derived,
+      /*witnessMethodConformance=*/None);
 
   // Build the SILConstantInfo and cache it.
   auto resultBuf = M.allocate(sizeof(SILConstantInfo),
@@ -2220,12 +2232,27 @@ namespace {
         substParams.push_back(subst(origParam));
       }
 
-      return SILFunctionType::get(nullptr,
-                                  origType->getExtInfo(),
-                                  origType->getCalleeConvention(),
-                                  substParams, substResults,
-                                  substErrorResult,
-                                  getASTContext());
+      Optional<ProtocolConformanceRef> witnessMethodConformance;
+      if (auto conformance = origType->getWitnessMethodConformanceOrNone()) {
+        assert(origType->getExtInfo().hasSelfParam());
+        auto selfType = origType->getSelfParameter().getType();
+        // The Self type can be nested in a few layers of metatypes (etc.), e.g.
+        // for a mutable static variable the materializeForSet currently has its
+        // last argument as a Self.Type.Type metatype.
+        while (1) {
+          auto next = selfType->getRValueInstanceType()->getCanonicalType();
+          if (next == selfType)
+            break;
+          selfType = next;
+        }
+        witnessMethodConformance =
+            conformance->subst(selfType, Subst, Conformances);
+      }
+
+      return SILFunctionType::get(nullptr, origType->getExtInfo(),
+                                  origType->getCalleeConvention(), substParams,
+                                  substResults, substErrorResult,
+                                  getASTContext(), witnessMethodConformance);
     }
 
     SILType subst(SILType type) {

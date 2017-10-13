@@ -332,13 +332,11 @@ public:
   SILWitnessTable *getWitnessTable(ProtocolConformance *conformance);
   
   /// Emit a protocol witness entry point.
-  SILFunction *emitProtocolWitness(ProtocolConformance *conformance,
-                                   SILLinkage linkage,
-                                   IsSerialized_t isSerialized,
-                                   SILDeclRef requirement,
-                                   SILDeclRef witnessRef,
-                                   IsFreeFunctionWitness_t isFree,
-                                   Witness witness);
+  SILFunction *
+  emitProtocolWitness(ProtocolConformanceRef conformance, SILLinkage linkage,
+                      IsSerialized_t isSerialized, SILDeclRef requirement,
+                      SILDeclRef witnessRef, IsFreeFunctionWitness_t isFree,
+                      Witness witness);
 
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);

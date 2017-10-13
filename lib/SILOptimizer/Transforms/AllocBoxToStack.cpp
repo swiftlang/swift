@@ -631,7 +631,7 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
       OrigFTI->getGenericSignature(), OrigFTI->getExtInfo(),
       OrigFTI->getCalleeConvention(), ClonedInterfaceArgTys,
       OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
-      M.getASTContext());
+      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrNone());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
