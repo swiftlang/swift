@@ -292,8 +292,7 @@ def row_state(row, args):
             return (REGRESSED if row.delta > 0 else IMPROVED)
     elif delta_pct_over_thresh:
         return (REGRESSED if row.delta > 0 else IMPROVED)
-    else:
-        return UNCHANGED
+    return UNCHANGED
 
 
 def write_comparison(args, old_stats, new_stats):
@@ -370,7 +369,8 @@ def write_comparison(args, old_stats, new_stats):
                              dialect='excel-tab')
         out.writeheader()
         for row in rows:
-            out.writerow(row._asdict())
+            if row_state(row, args) != UNCHANGED:
+                out.writerow(row._asdict())
 
     return regressions
 
