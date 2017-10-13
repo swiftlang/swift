@@ -1801,57 +1801,25 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
   return collectAvailableRefactorings(SF, Tok, Scratch, /*Exclude rename*/false);
 }
 
-bool RefactoringActionExpandDefault::
-isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
-  auto Exit = [&](bool Applicable) {
-    if (!Applicable)
-      Diag.diagnose(SourceLoc(), diag::invalid_default_location);
-    return Applicable;
-  };
-  if (CursorInfo.Kind != CursorInfoKind::StmtStart)
-    return Exit(false);
-  if (auto *CS = dyn_cast<CaseStmt>(CursorInfo.TrailingStmt)) {
-    return Exit(CS->isDefault());
+static EnumDecl* getEnumDeclFromSwitchStmt(SwitchStmt *SwitchS) {
+  if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
+    return SubjectTy->getAnyNominal()->getAsEnumOrEnumExtensionContext();
   }
-  return Exit(false);
+  return nullptr;
 }
 
-bool RefactoringActionExpandDefault::performChange() {
-  // Try to find the switch statement enclosing the default statement.
-  auto *CS = static_cast<CaseStmt*>(CursorInfo.TrailingStmt);
-  auto IsSwitch = [](ASTNode Node) {
-    return Node.is<Stmt*>() &&
-      Node.get<Stmt*>()->getKind() == StmtKind::Switch;
-  };
-  ContextFinder Finder(*TheFile, CS, IsSwitch);
-  Finder.resolve();
-
-  // If failed to find the switch statement, issue error.
-  if (Finder.getContexts().empty()) {
-    DiagEngine.diagnose(CS->getStartLoc(), diag::no_parent_switch);
-    return true;
-  }
-  auto *SwitchS = static_cast<SwitchStmt*>(Finder.getContexts().back().
-    get<Stmt*>());
-
-  // To find the subject enum decl for this switch statement; if failing,
-  // issue errors.
-  EnumDecl *SubjectED = nullptr;
-  if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
-    SubjectED = SubjectTy->getAnyNominal()->getAsEnumOrEnumExtensionContext();
-  }
-  if (!SubjectED) {
-    DiagEngine.diagnose(CS->getStartLoc(), diag::no_subject_enum);
-    return true;
-  }
-
+static bool performCasesExpansionInSwitchStmt(SwitchStmt *SwitchS,
+                                              DiagnosticEngine &DiagEngine,
+                                              SourceLoc ExpandedStmtLoc,
+                                              EditorConsumerInsertStream &OS
+                                              ) {
   // Assume enum elements are not handled in the switch statement.
+  auto EnumDecl = getEnumDeclFromSwitchStmt(SwitchS);
+  assert(EnumDecl);
   llvm::DenseSet<EnumElementDecl*> UnhandledElements;
-  SubjectED->getAllElements(UnhandledElements);
-  bool FoundDefault = false;
+  EnumDecl->getAllElements(UnhandledElements);
   for (auto Current : SwitchS->getCases()) {
-    if (Current == CS) {
-      FoundDefault = true;
+    if (Current->isDefault()) {
       continue;
     }
     // For each handled enum element, remove it from the bucket.
@@ -1862,25 +1830,117 @@ bool RefactoringActionExpandDefault::performChange() {
     }
   }
 
-  // If we've not seen the default statement inside the switch statement, issue
-  // error.
-  if (!FoundDefault) {
-    DiagEngine.diagnose(CS->getStartLoc(), diag::no_parent_switch);
-    return true;
-  }
-
   // If all enum elements are handled in the switch statement, issue error.
   if (UnhandledElements.empty()) {
-    DiagEngine.diagnose(CS->getStartLoc(), diag::no_remaining_cases);
+    DiagEngine.diagnose(ExpandedStmtLoc, diag::no_remaining_cases);
     return true;
   }
 
-  // Good to go, change the code!
+  printEnumElementsAsCases(UnhandledElements, OS);
+  return false;
+}
+
+// Finds SwitchStmt that contains given CaseStmt.
+static SwitchStmt* findEnclosingSwitchStmt(CaseStmt *CS,
+                                           SourceFile *SF,
+                                           DiagnosticEngine &DiagEngine) {
+  auto IsSwitch = [](ASTNode Node) {
+    return Node.is<Stmt*>() &&
+    Node.get<Stmt*>()->getKind() == StmtKind::Switch;
+  };
+  ContextFinder Finder(*SF, CS, IsSwitch);
+  Finder.resolve();
+
+  // If failed to find the switch statement, issue error.
+  if (Finder.getContexts().empty()) {
+    DiagEngine.diagnose(CS->getStartLoc(), diag::no_parent_switch);
+    return nullptr;
+  }
+  auto *SwitchS = static_cast<SwitchStmt*>(Finder.getContexts().back().
+                                           get<Stmt*>());
+  // Make sure that CaseStmt is included in switch that was found.
+  auto Cases = SwitchS->getCases();
+  auto Default = std::find(Cases.begin(), Cases.end(), CS);
+  if (Default == Cases.end()) {
+    DiagEngine.diagnose(CS->getStartLoc(), diag::no_parent_switch);
+    return nullptr;
+  }
+  return SwitchS;
+}
+
+bool RefactoringActionExpandDefault::
+isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
+  auto Exit = [&](bool Applicable) {
+    if (!Applicable)
+      Diag.diagnose(SourceLoc(), diag::invalid_default_location);
+    return Applicable;
+  };
+  if (CursorInfo.Kind != CursorInfoKind::StmtStart)
+    return Exit(false);
+  if (auto *CS = dyn_cast<CaseStmt>(CursorInfo.TrailingStmt)) {
+    auto EnclosingSwitchStmt = findEnclosingSwitchStmt(CS,
+                                                       CursorInfo.SF,
+                                                       Diag);
+    if (!EnclosingSwitchStmt)
+      return false;
+    auto EnumD = getEnumDeclFromSwitchStmt(EnclosingSwitchStmt);
+    auto IsApplicable = CS->isDefault() && EnumD != nullptr;
+    return IsApplicable;
+  }
+  return Exit(false);
+}
+
+bool RefactoringActionExpandDefault::performChange() {
+  // If we've not seen the default statement inside the switch statement, issue
+  // error.
+  auto *CS = static_cast<CaseStmt*>(CursorInfo.TrailingStmt);
+  auto *SwitchS = findEnclosingSwitchStmt(CS, TheFile, DiagEngine);
+  assert(SwitchS);
   EditorConsumerInsertStream OS(EditConsumer, SM,
                                 Lexer::getCharSourceRangeFromSourceRange(SM,
                                   CS->getLabelItemsRange()));
-  printEnumElementsAsCases(UnhandledElements, OS);
+  return performCasesExpansionInSwitchStmt(SwitchS,
+                                           DiagEngine,
+                                           CS->getStartLoc(),
+                                           OS);
+}
+
+bool RefactoringActionExpandSwitchCases::
+isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &DiagEngine) {
+  if (!CursorInfo.TrailingStmt)
+    return false;
+  if (auto *Switch = dyn_cast<SwitchStmt>(CursorInfo.TrailingStmt)) {
+    return getEnumDeclFromSwitchStmt(Switch);
+  }
   return false;
+}
+
+bool RefactoringActionExpandSwitchCases::performChange() {
+  auto *SwitchS = dyn_cast<SwitchStmt>(CursorInfo.TrailingStmt);
+  assert(SwitchS);
+
+  auto InsertRange = CharSourceRange();
+  auto Cases = SwitchS->getCases();
+  auto Default = std::find_if(Cases.begin(), Cases.end(), [](CaseStmt *Stmt) {
+    return Stmt->isDefault();
+  });
+  if (Default != Cases.end()) {
+    auto DefaultRange = (*Default)->getLabelItemsRange();
+    InsertRange = Lexer::getCharSourceRangeFromSourceRange(SM, DefaultRange);
+  } else {
+    auto RBraceLoc = SwitchS->getRBraceLoc();
+    InsertRange = CharSourceRange(SM, RBraceLoc, RBraceLoc);
+  }
+  EditorConsumerInsertStream OS(EditConsumer, SM, InsertRange);
+  if (SM.getLineNumber(SwitchS->getLBraceLoc()) ==
+      SM.getLineNumber(SwitchS->getRBraceLoc())) {
+    OS << "\n";
+  }
+  auto Result = performCasesExpansionInSwitchStmt(SwitchS,
+                                           DiagEngine,
+                                           SwitchS->getStartLoc(),
+                                           OS);
+  return Result;
 }
 
 static Expr *findLocalizeTarget(ResolvedCursorInfo CursorInfo) {

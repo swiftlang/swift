@@ -80,7 +80,7 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
     return false;
 
   if (Loc == LocToResolve) {
-    CursorInfo = { D, CtorTyRef, ExtTyRef, Loc, IsRef, Ty, ContainerType };
+    CursorInfo = { D, CtorTyRef, ExtTyRef, &SrcFile, Loc, IsRef, Ty, ContainerType };
     return true;
   }
   return false;
@@ -88,7 +88,7 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
 
 bool CursorInfoResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
   if (Loc == LocToResolve) {
-    CursorInfo = { Mod, Loc };
+    CursorInfo = { Mod, &SrcFile, Loc };
     return true;
   }
   return false;
@@ -97,13 +97,13 @@ bool CursorInfoResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
 bool CursorInfoResolver::tryResolve(Stmt *St) {
   if (auto *LST = dyn_cast<LabeledStmt>(St)) {
     if (LST->getStartLoc() == LocToResolve) {
-      CursorInfo = { St };
+      CursorInfo = { St, &SrcFile };
       return true;
     }
   }
   if (auto *CS = dyn_cast<CaseStmt>(St)) {
     if (CS->getStartLoc() == LocToResolve) {
-      CursorInfo = { St };
+      CursorInfo = { St, &SrcFile };
       return true;
     }
   }
@@ -211,7 +211,7 @@ bool CursorInfoResolver::walkToExprPost(Expr *E) {
     return false;
   if (!TrailingExprStack.empty() && TrailingExprStack.back() == E) {
     // We return the outtermost expression in the token info.
-    CursorInfo = { TrailingExprStack.front() };
+    CursorInfo = { TrailingExprStack.front(), &SrcFile };
     return false;
   }
   return true;
