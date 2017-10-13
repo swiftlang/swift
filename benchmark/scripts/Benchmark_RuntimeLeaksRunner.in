@@ -84,7 +84,7 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
     def run_test(self, data, num_iters):
         try:
             p = subprocess.Popen([
-                data['path'], "--run-all",
+                data['path'],
                 "--num-samples={}".format(data['num_samples']),
                 "--num-iters={}".format(num_iters), data['test_name']],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
