@@ -118,14 +118,15 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   std::vector<const TypeRef *> Void;
   auto VoidResult = Builder.createTupleType(Void, "", false);
-  auto Param1 = Builder.createNominalType(ABC, nullptr);
-  auto Param2 = Builder.createNominalType(XYZ, nullptr);
+  Param Param1 = Builder.createNominalType(ABC, nullptr);
+  Param Param2 = Builder.createNominalType(XYZ, nullptr);
 
   std::vector<Param> VoidParams;
   std::vector<Param> Parameters1{Param1, Param2};
   std::vector<Param> Parameters2{Param1, Param1};
 
-  auto Result = Builder.createTupleType({Param1, Param2}, "", false);
+  auto Result =
+      Builder.createTupleType({Param1.getType(), Param2.getType()}, "", false);
 
   auto F1 =
       Builder.createFunctionType(Parameters1, Result, FunctionTypeFlags());
@@ -144,6 +145,42 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   EXPECT_EQ(F4, F5);
   EXPECT_NE(F4, F1);
+
+  // Test parameter with and without inout/shared/variadic and/or label.
+  ParameterTypeFlags paramFlags;
+  auto inoutFlags = paramFlags.withInOut(true);
+  auto variadicFlags = paramFlags.withVariadic(true);
+  auto sharedFlags = paramFlags.withShared(true);
+
+  auto F6 = Builder.createFunctionType({Param1.withFlags(inoutFlags)}, Result,
+                                       FunctionTypeFlags());
+  auto F6_1 = Builder.createFunctionType({Param1.withFlags(inoutFlags)}, Result,
+                                         FunctionTypeFlags());
+  EXPECT_EQ(F6, F6_1);
+
+  auto F7 = Builder.createFunctionType({Param1.withFlags(variadicFlags)},
+                                       Result, FunctionTypeFlags());
+  auto F7_1 = Builder.createFunctionType({Param1.withFlags(variadicFlags)},
+                                         Result, FunctionTypeFlags());
+  EXPECT_EQ(F7, F7_1);
+
+  auto F8 = Builder.createFunctionType({Param1.withFlags(sharedFlags)}, Result,
+                                       FunctionTypeFlags());
+  auto F8_1 = Builder.createFunctionType({Param1.withFlags(sharedFlags)},
+                                         Result, FunctionTypeFlags());
+  EXPECT_EQ(F8, F8_1);
+
+  auto F9 = Builder.createFunctionType({Param1}, Result, FunctionTypeFlags());
+  auto F9_1 = Builder.createFunctionType({Param1.withLabel("foo")}, Result,
+                                         FunctionTypeFlags());
+  EXPECT_NE(F9, F9_1);
+
+  EXPECT_NE(F6, F7);
+  EXPECT_NE(F6, F8);
+  EXPECT_NE(F6, F9);
+  EXPECT_NE(F7, F8);
+  EXPECT_NE(F7, F9);
+  EXPECT_NE(F8, F9);
 
   auto VoidVoid1 =
       Builder.createFunctionType(VoidParams, VoidResult, FunctionTypeFlags());

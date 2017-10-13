@@ -125,8 +125,8 @@ public:
       break;
     }
 
-    for (auto Param : F->getParameters())
-      printRec(Param);
+    for (const auto &Param : F->getParameters())
+      printRec(Param.getType());
     printRec(F->getResult());
 
     OS << ')';
@@ -256,8 +256,8 @@ struct TypeRefIsConcrete
   }
 
   bool visitFunctionTypeRef(const FunctionTypeRef *F) {
-    for (auto Param : F->getParameters())
-      if (!visit(Param))
+    for (const auto &Param : F->getParameters())
+      if (!visit(Param.getType()))
         return false;
     return visit(F->getResult());
   }
@@ -475,9 +475,11 @@ public:
   }
 
   const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
-    std::vector<const TypeRef *> SubstitutedParams;
-    for (auto Param : F->getParameters())
-      SubstitutedParams.push_back(visit(Param));
+    std::vector<remote::FunctionParam<const TypeRef *>> SubstitutedParams;
+    for (const auto &Param : F->getParameters()) {
+      auto typeRef = Param.getType();
+      SubstitutedParams.push_back(Param.withType(visit(typeRef)));
+    }
 
     auto SubstitutedResult = visit(F->getResult());
 
@@ -588,9 +590,11 @@ public:
   }
 
   const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
-    std::vector<const TypeRef *> SubstitutedParams;
-    for (auto Param : F->getParameters())
-      SubstitutedParams.push_back(visit(Param));
+    std::vector<remote::FunctionParam<const TypeRef *>> SubstitutedParams;
+    for (const auto &Param : F->getParameters()) {
+      auto typeRef = Param.getType();
+      SubstitutedParams.push_back(Param.withType(visit(typeRef)));
+    }
 
     auto SubstitutedResult = visit(F->getResult());
 
@@ -798,7 +802,8 @@ bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
         return false;
 
       for (auto index : indices(oParams)) {
-        if (!deriveSubstitutions(Subs, oParams[index], sParams[index]))
+        if (!deriveSubstitutions(Subs, oParams[index].getType(),
+                                 sParams[index].getType()))
           return false;
       }
 

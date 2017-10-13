@@ -799,8 +799,8 @@ public:
 
   MetatypeRepresentation visitFunctionTypeRef(const FunctionTypeRef *F) {
     auto result = visit(F->getResult());
-    for (auto Param : F->getParameters())
-      result = combineRepresentations(result, visit(Param));
+    for (const auto &Param : F->getParameters())
+      result = combineRepresentations(result, visit(Param.getType()));
     return result;
   }
 

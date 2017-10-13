@@ -31,9 +31,12 @@ namespace swift {
 namespace remote {
 
 template <typename BuiltType> class FunctionParam {
-  BuiltType Type;
   StringRef Label;
+  BuiltType Type;
   ParameterTypeFlags Flags;
+
+  FunctionParam(StringRef label, BuiltType type, ParameterTypeFlags flags)
+      : Label(label), Type(type), Flags(flags) {}
 
 public:
   explicit FunctionParam() {}
@@ -50,6 +53,18 @@ public:
   void setVariadic() { Flags = Flags.withVariadic(true); }
   void setShared() { Flags = Flags.withShared(true); }
   void setInOut() { Flags = Flags.withInOut(true); }
+
+  FunctionParam withLabel(StringRef label) const {
+    return FunctionParam(label, Type, Flags);
+  }
+
+  FunctionParam withType(BuiltType type) const {
+    return FunctionParam(Label, type, Flags);
+  }
+
+  FunctionParam withFlags(ParameterTypeFlags flags) const {
+    return FunctionParam(Label, Type, flags);
+  }
 };
 
 /// A utility class for constructing abstract types from
