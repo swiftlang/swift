@@ -123,6 +123,9 @@ public:
 
   void populateCloned();
 
+  SILValue cloneCalleeConversion(SILValue calleeValue, SILValue NewClosure,
+                                 SILBuilder &Builder);
+
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
   static SILFunction *cloneFunction(const CallSiteDescriptor &CallSiteDesc,
                                     StringRef NewName) {
@@ -185,6 +188,11 @@ public:
   }
 
   unsigned getClosureIndex() const { return ClosureIndex; }
+
+  // Get the closure value passed to the apply (on the caller side).
+  SILValue getClosureCallerArg() const {
+    return getApplyInst().getArgument(ClosureIndex);
+  }
 
   SILParameterInfo getClosureParameterInfo() const { return ClosureParamInfo; }
 
@@ -632,6 +640,21 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
   return Fn;
 }
 
+// Clone a chain of ConvertFunctionInsts.
+SILValue ClosureSpecCloner::cloneCalleeConversion(SILValue calleeValue,
+                                                  SILValue NewClosure,
+                                                  SILBuilder &Builder) {
+  if (calleeValue == CallSiteDesc.getClosure())
+    return NewClosure;
+
+  auto *CFI = cast<ConvertFunctionInst>(calleeValue);
+
+  calleeValue = cloneCalleeConversion(CFI->getOperand(), NewClosure, Builder);
+
+  return Builder.createConvertFunction(CallSiteDesc.getLoc(), calleeValue,
+                                       CFI->getType());
+}
+
 /// \brief Populate the body of the cloned closure, modifying instructions as
 /// necessary. This is where we create the actual specialized BB Arguments.
 void ClosureSpecCloner::populateCloned() {
@@ -683,7 +706,11 @@ void ClosureSpecCloner::populateCloned() {
   SILValue FnVal =
       Builder.createFunctionRef(CallSiteDesc.getLoc(), ClosedOverFun);
   auto *NewClosure = CallSiteDesc.createNewClosure(Builder, FnVal, NewPAIArgs);
-  ValueMap.insert(std::make_pair(ClosureArg, SILValue(NewClosure)));
+
+  // Clone a chain of ConvertFunctionInsts.
+  SILValue ConvertedCallee = cloneCalleeConversion(
+      CallSiteDesc.getClosureCallerArg(), NewClosure, Builder);
+  ValueMap.insert(std::make_pair(ClosureArg, ConvertedCallee));
 
   BBMap.insert(std::make_pair(ClosureUserEntryBB, ClonedEntryBB));
   // Recursively visit original BBs in depth-first preorder, starting with the
