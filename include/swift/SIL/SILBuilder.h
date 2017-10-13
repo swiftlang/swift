@@ -889,12 +889,6 @@ public:
                       RefToUnmanagedInst(getSILDebugLocation(Loc), op, ty));
   }
 
-  IsNonnullInst *createIsNonnull(SILLocation Loc, SILValue operand) {
-    return insert(new (getModule()) IsNonnullInst(
-        getSILDebugLocation(Loc), operand,
-        SILType::getBuiltinIntegerType(1, getASTContext())));
-  }
-
   UnconditionalCheckedCastInst *
   createUnconditionalCheckedCast(SILLocation Loc, SILValue op, SILType destTy) {
     return insert(UnconditionalCheckedCastInst::create(

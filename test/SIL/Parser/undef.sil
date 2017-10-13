@@ -244,8 +244,6 @@ bb0:
   bridge_object_to_word undef : $Builtin.BridgeObject to $Builtin.Word
   // CHECK: thin_to_thick_function undef : $@convention(thin) () -> () to $() -> ()
   thin_to_thick_function undef : $@convention(thin) () -> () to $() -> ()
-  // CHECK: is_nonnull undef : $C
-  is_nonnull undef : $C
 
   // Checked Conversions
 

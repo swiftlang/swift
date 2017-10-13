@@ -4138,49 +4138,6 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   SGF.SelfInitDelegationState = SILGenFunction::NormalSelf;
   SGF.InitDelegationSelf = ManagedValue();
 
-  // If we are using Objective-C allocation, the caller can return
-  // nil. When this happens with an explicitly-written super.init or
-  // self.init invocation, return early if we did get nil.
-  //
-  // TODO: Remove this when failable initializers are fully implemented.
-  auto classDecl = selfTy->getClassOrBoundGenericClass();
-
-  // Dig out the constructor reference to check if it is an explicit
-  // 'self.init' or 'super.init' call.
-  bool isChainToSuper = false;
-  auto *calledCtor = E->getCalledConstructor(isChainToSuper);
-
-  if (classDecl &&
-      !calledCtor->isImplicit() &&
-      usesObjCAllocator(classDecl)) {
-
-    // Check whether the new self is null. *NOTE* At this point, we can not
-    // access the actual new value using newSelf anymore. We need to grab self
-    // via the normal manner of doing so.
-    SILValue isNonnullSelf;
-    {
-      Scope S(SGF, E);
-      RValue selfRValue =
-          SGF.emitRValueForDecl(E, selfDecl, selfTy->getCanonicalType(),
-                                AccessSemantics::DirectToStorage,
-                                SGFContext::AllowGuaranteedPlusZero);
-      ManagedValue reloadedSelf =
-          std::move(selfRValue).getAsSingleValue(SGF, E);
-      isNonnullSelf = SGF.B.createIsNonnull(E, reloadedSelf.getValue());
-    }
-    Condition cond = SGF.emitCondition(isNonnullSelf, E, 
-                                       /*hasFalseCode=*/false,
-                                       /*invertValue=*/true,
-                                       { });
-
-    // If self is null, branch to the epilog.
-    cond.enterTrue(SGF);
-    SGF.Cleanups.emitBranchAndCleanups(SGF.ReturnDest, E, { });
-    cond.exitTrue(SGF);
-
-    cond.complete(SGF);
-  }
-
   return SGF.emitEmptyTupleRValue(E, C);
 }
 

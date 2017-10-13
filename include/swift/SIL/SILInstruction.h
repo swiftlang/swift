@@ -3831,16 +3831,6 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
-/// Test that an address or reference type is not null.
-class IsNonnullInst
-    : public UnaryInstructionBase<SILInstructionKind::IsNonnullInst,
-                                  SingleValueInstruction> {
-  friend SILBuilder;
-
-  IsNonnullInst(SILDebugLocation DebugLoc, SILValue Operand, SILType BoolTy)
-      : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
-};
-  
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 class UnconditionalCheckedCastInst final
