@@ -80,7 +80,7 @@ bb0(%0 : $D):
 // CHECK-LABEL: define{{( protected)?}} swiftcc { %T21subclass_existentials1GC*, i8** } @eraseToExistentialWithGeneric(%T21subclass_existentials1EC*)
 // CHECK:       [[INSTANCE:%.*]] = bitcast %T21subclass_existentials1EC* %0 to %T21subclass_existentials1GC*
 // CHECK-NEXT:  [[RESULT1:%.*]] = insertvalue { %T21subclass_existentials1GC*, i8** } undef, %T21subclass_existentials1GC* [[INSTANCE]], 0
-// CHECK-NEXT:  [[RESULT2:%.*]] = insertvalue { %T21subclass_existentials1GC*, i8** } [[RESULT1]], i8** @_T021subclass_existentials1ECyxGAA1PAAWP, 1
+// CHECK-NEXT:  [[RESULT2:%.*]] = insertvalue { %T21subclass_existentials1GC*, i8** } [[RESULT1]], i8** @_T021subclass_existentials1ECyxGAA1PAAlWP, 1
 // CHECK-NEXT:  ret { %T21subclass_existentials1GC*, i8** } [[RESULT2]]
 sil @eraseToExistentialWithGeneric : $@convention(thin) <τ_0_0> (@owned E<τ_0_0>) -> @owned G<τ_0_0> & P {
 bb0(%0 : $E<τ_0_0>):

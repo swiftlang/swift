@@ -298,11 +298,11 @@ func <~> <R: AssocReqt>(x: ConformingGeneric<R>, y: ConformingGeneric<R>) {}
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: R
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): dependent
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP16assocTypesMetho{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolA2A9AssocReqtRzlAaEP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolA2A9AssocReqtRzlAaEP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolA2A9AssocReqtRzlAaEP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolA2A9AssocReqtRzlAaEP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolA2A9AssocReqtRzlAaEP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 
 protocol AnotherProtocol {}
@@ -325,11 +325,11 @@ func <~> <AA: AnotherProtocol, BB: AnotherProtocol>(x: AA, y: BB) {}
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: S
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): dependent
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP7{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2A9AssocReqtRzlAaEP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2A9AssocReqtRzlAaEP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2A9AssocReqtRzlAaEP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2A9AssocReqtRzlAaEP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2A9AssocReqtRzlAaEP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 
 protocol InheritedProtocol1 : AnyProtocol {

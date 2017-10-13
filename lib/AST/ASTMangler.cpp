@@ -1974,7 +1974,6 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
 }
 
 void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance){
-  GenericSignature *contextSig = nullptr;
   Mod = conformance->getDeclContext()->getParentModule();
   if (auto behaviorStorage = conformance->getBehaviorDecl()) {
     auto topLevelContext =
@@ -1992,12 +1991,9 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
     appendType(conformingType->getCanonicalType());
     appendProtocolName(conformance->getProtocol());
     appendModule(conformance->getDeclContext()->getParentModule());
-
-    contextSig =
-      conformingType->getAnyNominal()->getGenericSignatureOfContext();
   }
   if (GenericSignature *Sig = conformance->getGenericSignature()) {
-    appendGenericSignature(Sig, contextSig);
+    appendGenericSignature(Sig);
   }
 }
 
