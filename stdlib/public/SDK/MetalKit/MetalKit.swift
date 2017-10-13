@@ -16,10 +16,9 @@
 @available(macOS 10.11, iOS 9.0, tvOS 9.0, *)
 extension MTKMesh {
     public class func newMeshes(asset: MDLAsset, device: MTLDevice) throws -> (modelIOMeshes: [MDLMesh], metalKitMeshes: [MTKMesh]) {
-        var resultTuple : (modelIOMeshes: [MDLMesh], metalKitMeshes: [MTKMesh])
-        resultTuple.modelIOMeshes = [MDLMesh]()
-        resultTuple.metalKitMeshes = try MTKMesh.newMeshes(from: asset, device: device, sourceMeshes: AutoreleasingUnsafeMutablePointer<NSArray?>(&resultTuple.modelIOMeshes))
-        return resultTuple
+        var modelIOMeshes: NSArray?
+        var metalKitMeshes = try MTKMesh.newMeshes(from: asset, device: device, sourceMeshes: &modelIOMeshes)
+        return (modelIOMeshes: modelIOMeshes as! [MDLMesh], metalKitMeshes: metalKitMeshes)
     }
 }
 
