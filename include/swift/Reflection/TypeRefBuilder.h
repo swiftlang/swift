@@ -209,14 +209,15 @@ public:
     return TupleTypeRef::create(*this, elements, isVariadic);
   }
 
-  const FunctionTypeRef *
-  createFunctionType(const std::vector<const TypeRef *> &args,
-                     const std::vector<bool> &inOutArgs,
-                     const TypeRef *result,
-                     FunctionTypeFlags flags) {
+  const FunctionTypeRef *createFunctionType(
+      const std::vector<remote::FunctionParam<const TypeRef *>> &params,
+      const TypeRef *result, FunctionTypeFlags flags) {
     // FIXME: don't ignore inOutArgs
     // and add test to unittests/Reflection/TypeRef.cpp
-    return FunctionTypeRef::create(*this, args, result, flags);
+    std::vector<const TypeRef *> paramTypes;
+    for (const auto &param : params)
+      paramTypes.push_back(param.getType());
+    return FunctionTypeRef::create(*this, paramTypes, result, flags);
   }
 
   const ProtocolTypeRef *createProtocolType(const std::string &mangledName,

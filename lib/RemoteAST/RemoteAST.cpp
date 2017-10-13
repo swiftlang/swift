@@ -300,11 +300,8 @@ public:
     return TupleType::get(elements, Ctx);
   }
 
-  Type createFunctionType(ArrayRef<Type> args,
-                          const std::vector<bool> &inOutArgs,
+  Type createFunctionType(ArrayRef<remote::FunctionParam<Type>> params,
                           Type output, FunctionTypeFlags flags) {
-    assert(args.size() == inOutArgs.size());
-
     FunctionTypeRepresentation representation;
     switch (flags.getConvention()) {
     case FunctionMetadataConvention::Swift:
@@ -327,26 +324,20 @@ public:
     // The result type must be materializable.
     if (!output->isMaterializable()) return Type();
 
-    // All the argument types must be materializable (before inout is applied).
-    for (auto arg : args) {
-      if (!arg->isMaterializable()) return Type();
+    llvm::SmallVector<AnyFunctionType::Param, 8> funcParams;
+    for (const auto &param : params) {
+      auto type = param.getType();
+
+      // All the argument types must be materializable.
+      if (!type->isMaterializable())
+        return Type();
+
+      auto label = Ctx.getIdentifier(param.getLabel());
+      auto flags = param.getFlags();
+      funcParams.push_back(AnyFunctionType::Param(type, label, flags));
     }
 
-    Type input;
-    if (args.size() == 1) {
-      input = args[0];
-    } else {
-      SmallVector<TupleTypeElt, 4> elts;
-      elts.reserve(args.size());
-      for (auto i : indices(args)) {
-        Type arg = args[i];
-        if (inOutArgs[i]) arg = InOutType::get(arg);
-        elts.push_back(arg);
-      }
-      input = TupleType::get(elts, Ctx);
-    }
-
-    return FunctionType::get(input, output, einfo);
+    return FunctionType::get(funcParams, output, einfo);
   }
 
   Type createProtocolType(StringRef mangledName,
