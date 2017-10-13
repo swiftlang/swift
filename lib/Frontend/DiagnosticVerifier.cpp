@@ -66,6 +66,7 @@ static std::string getDiagKindString(llvm::SourceMgr::DiagKind Kind) {
   switch (Kind) {
   case llvm::SourceMgr::DK_Error: return "error";
   case llvm::SourceMgr::DK_Warning: return "warning";
+  case llvm::SourceMgr::DK_Remark: return "remark";
   case llvm::SourceMgr::DK_Note: return "note";
   }
 
