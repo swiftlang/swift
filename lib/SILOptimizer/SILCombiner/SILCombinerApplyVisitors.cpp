@@ -472,12 +472,13 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       assert(NewOpType.isAddress() && "Addresses should map to addresses.");
       auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(UAC);
-    } else if (OldOpType.isHeapObjectReferenceType()) {
-      assert(NewOpType.isHeapObjectReferenceType() &&
-             "refs should map to refs.");
+    } else if (SILType::canRefCast(OldOpType, NewOpType, AI.getModule())) {
       auto URC = Builder.createUncheckedRefCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
     } else {
+      assert((!OldOpType.isHeapObjectReferenceType()
+              && !NewOpType.isHeapObjectReferenceType()) &&
+             "ref argument types should map to refs.");
       Args.push_back(Op);
     }
   }
