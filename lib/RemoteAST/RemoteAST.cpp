@@ -343,6 +343,7 @@ public:
         if (inOutArgs[i]) arg = InOutType::get(arg);
         elts.push_back(arg);
       }
+      input = TupleType::get(elts, Ctx);
     }
 
     return FunctionType::get(input, output, einfo);
