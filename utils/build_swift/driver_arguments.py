@@ -8,14 +8,12 @@
 
 import argparse
 import multiprocessing
-import platform
 
 import android.adb.commands
 
 from swift_build_support.swift_build_support import arguments
 from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
-from swift_build_support.swift_build_support import workspace
 
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
@@ -62,13 +60,6 @@ def _apply_default_arguments(args):
     # Set the default build variant.
     if args.build_variant is None:
         args.build_variant = "Debug"
-
-    # Set the default stdlib-deployment-targets, if none were provided.
-    if args.stdlib_deployment_targets is None:
-        stdlib_targets = \
-            StdlibDeploymentTarget.default_stdlib_deployment_targets()
-        args.stdlib_deployment_targets = [
-            target.name for target in stdlib_targets]
 
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
@@ -128,20 +119,6 @@ def _apply_default_arguments(args):
         raise ValueError("error: --watchos-all is unavailable in open-source "
                          "Swift.\nUse --watchos to skip watchOS device tests.")
 
-    # SwiftPM and XCTest have a dependency on Foundation.
-    # On OS X, Foundation is built automatically using xcodebuild.
-    # On Linux, we must ensure that it is built manually.
-    if ((args.build_swiftpm or args.build_xctest) and
-            platform.system() != "Darwin"):
-        args.build_foundation = True
-
-    # Foundation has a dependency on libdispatch.
-    # On OS X, libdispatch is provided by the OS.
-    # On Linux, we must ensure that it is built manually.
-    if (args.build_foundation and
-            platform.system() != "Darwin"):
-        args.build_libdispatch = True
-
     # Propagate global --skip-build
     if args.skip_build:
         args.build_linux = False
@@ -193,16 +170,6 @@ def _apply_default_arguments(args):
     if args.test_optimize_for_size:
         args.test = True
 
-    # --test-paths implies --test and/or --validation-test
-    # depending on what directories/files have been specified.
-    if args.test_paths:
-        for path in args.test_paths:
-            if path.startswith('test'):
-                args.test = True
-            elif path.startswith('validation-test'):
-                args.test = True
-                args.validation_test = True
-
     # If none of tests specified skip swift stdlib test on all platforms
     if not args.test and not args.validation_test and not args.long_test:
         args.test_linux = False
@@ -252,25 +219,6 @@ def _apply_default_arguments(args):
         args.test_tvos_host = False
         args.test_watchos_host = False
         args.test_android_host = False
-
-    if args.build_subdir is None:
-        args.build_subdir = \
-            workspace.compute_build_subdir(args)
-
-    # Add optional stdlib-deployment-targets
-    if args.android:
-        args.stdlib_deployment_targets.append(
-            StdlibDeploymentTarget.Android.armv7.name)
-
-    # Infer platform flags from manually-specified configure targets.
-    # This doesn't apply to Darwin platforms, as they are
-    # already configured. No building without the platform flag, though.
-
-    android_tgts = [tgt for tgt in args.stdlib_deployment_targets
-                    if StdlibDeploymentTarget.Android.contains(tgt)]
-    if not args.android and len(android_tgts) > 0:
-        args.android = True
-        args.build_android = False
 
 
 def create_argument_parser():
