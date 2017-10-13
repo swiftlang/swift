@@ -287,13 +287,6 @@ class BuildScriptInvocation(object):
             args.build_subdir = \
                 workspace.compute_build_subdir(args)
 
-        # Set the default stdlib-deployment-targets, if none were provided.
-        if args.stdlib_deployment_targets is None:
-            stdlib_targets = \
-                StdlibDeploymentTarget.default_stdlib_deployment_targets()
-            args.stdlib_deployment_targets = [
-                target.name for target in stdlib_targets]
-
         # --test-paths implies --test and/or --validation-test
         # depending on what directories/files have been specified.
         if args.test_paths:
