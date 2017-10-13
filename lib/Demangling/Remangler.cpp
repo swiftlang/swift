@@ -1799,6 +1799,14 @@ void Remangler::mangleSILBoxImmutableField(Node *node) {
   unreachable("should be part of SILBoxTypeWithLayout");
 }
 
+void Remangler::mangleAssocTypePath(Node *node) {
+  bool FirstElem = true;
+  for (NodePointer Child : *node) {
+    mangle(Child);
+    mangleListSeparator(FirstElem);
+  }
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.

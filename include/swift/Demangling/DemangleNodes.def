@@ -189,5 +189,6 @@ NODE(OutlinedConsume)
 NODE(OutlinedRetain)
 NODE(OutlinedRelease)
 NODE(OutlinedVariable)
+NODE(AssocTypePath)
 #undef CONTEXT_NODE
 #undef NODE

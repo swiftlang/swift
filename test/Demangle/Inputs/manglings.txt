@@ -271,3 +271,4 @@ _T0So11UITextFieldC4textSSSgvgToTepb_ ---> outlined bridged method (pb) of @objc
 _T0So11UITextFieldC4textSSSgvgToTeab_ ---> outlined bridged method (ab) of @objc __ObjC.UITextField.text.getter : Swift.String?
 _T0So5GizmoC11doSomethingSQyypGSQySaySSGGFToTembnn_ ---> outlined bridged method (mbnn) of @objc __ObjC.Gizmo.doSomething([Swift.String]!) -> Any!
 _T0So5GizmoC12modifyStringSQySSGAD_Si10withNumberSQyypG0D6FoobartFToTembnnnb_ ---> outlined bridged method (mbnnnb) of @objc __ObjC.Gizmo.modifyString(Swift.String!, withNumber: Swift.Int, withFoobar: Any!) -> Swift.String!
+_T04test1SVyxGAA1RA2A1ZRzAA1Y2ZZRpzl1A_AhaGPWT ---> {C} associated type witness table accessor for A.ZZ : test.Y in <A where A: test.Z, A.ZZ: test.Y> test.S<A> : test.R in test
