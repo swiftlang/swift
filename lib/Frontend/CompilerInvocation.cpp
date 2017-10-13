@@ -229,7 +229,6 @@ private:
     std::vector<std::string> namesToStem;
     if (Opts.Inputs.hasPrimaryInputFilenames())
       copyNamesOfPrimaryFilesInto(namesToStem);
-    // IS MODULENAME SAFE HERE
     else if (auto UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name)) {
       namesToStem.push_back(std::string(UserSpecifiedModuleName->getValue()));
     }
