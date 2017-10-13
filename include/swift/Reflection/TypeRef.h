@@ -331,16 +331,15 @@ public:
 };
 
 class FunctionTypeRef final : public TypeRef {
-  std::vector<const TypeRef *> Arguments;
+  std::vector<const TypeRef *> Parameters;
   const TypeRef *Result;
   FunctionTypeFlags Flags;
 
-  static TypeRefID Profile(const std::vector<const TypeRef *> &Arguments,
-                           const TypeRef *Result,
-                           FunctionTypeFlags Flags) {
+  static TypeRefID Profile(const std::vector<const TypeRef *> &Parameters,
+                           const TypeRef *Result, FunctionTypeFlags Flags) {
     TypeRefID ID;
-    for (auto Argument : Arguments) {
-      ID.addPointer(Argument);
+    for (auto Param : Parameters) {
+      ID.addPointer(Param);
     }
     ID.addPointer(Result);
     ID.addInteger(static_cast<uint64_t>(Flags.getIntValue()));
@@ -348,21 +347,20 @@ class FunctionTypeRef final : public TypeRef {
   }
 
 public:
-  FunctionTypeRef(std::vector<const TypeRef *> Arguments, const TypeRef *Result,
+  FunctionTypeRef(std::vector<const TypeRef *> Params, const TypeRef *Result,
                   FunctionTypeFlags Flags)
-    : TypeRef(TypeRefKind::Function), Arguments(Arguments), Result(Result),
-      Flags(Flags) {}
+      : TypeRef(TypeRefKind::Function), Parameters(Params), Result(Result),
+        Flags(Flags) {}
 
   template <typename Allocator>
-  static const FunctionTypeRef *create(Allocator &A,
-                                       std::vector<const TypeRef *> Arguments,
-                                       const TypeRef *Result,
-                                       FunctionTypeFlags Flags) {
-    FIND_OR_CREATE_TYPEREF(A, FunctionTypeRef, Arguments, Result, Flags);
+  static const FunctionTypeRef *
+  create(Allocator &A, std::vector<const TypeRef *> Params,
+         const TypeRef *Result, FunctionTypeFlags Flags) {
+    FIND_OR_CREATE_TYPEREF(A, FunctionTypeRef, Params, Result, Flags);
   }
 
-  const std::vector<const TypeRef *> &getArguments() const {
-    return Arguments;
+  const std::vector<const TypeRef *> &getParameters() const {
+    return Parameters;
   };
 
   const TypeRef *getResult() const {
