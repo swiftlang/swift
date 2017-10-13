@@ -5306,10 +5306,26 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // get the kind out of the finder.
   auto Kind = finder.Kind;
 
+  auto *NTD = getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+
   // Protocol extension and enum initializers are always delegating.
   if (Kind == BodyInitKind::None) {
-    if (getDeclContext()->getAsProtocolExtensionContext() ||
-        getDeclContext()->getAsEnumOrEnumExtensionContext()) {
+    if (isa<ProtocolDecl>(NTD) || isa<EnumDecl>(NTD)) {
+      Kind = BodyInitKind::Delegating;
+    }
+  }
+
+  // Struct initializers that cannot see the layout of the struct type are
+  // always delegating. This occurs if the struct type is not fixed layout,
+  // and the constructor is either inlinable or defined in another module.
+  //
+  // FIXME: Figure out the right condition to use here that does not depend
+  // on the -enable-resilience flag, and make it conditional on
+  // -swift-version 5 instead, once the "disallow memberwise cross-module
+  // initializer" proposal lands.
+  if (Kind == BodyInitKind::None) {
+    if (isa<StructDecl>(NTD) &&
+        !NTD->hasFixedLayout(getParentModule(), getResilienceExpansion())) {
       Kind = BodyInitKind::Delegating;
     }
   }
