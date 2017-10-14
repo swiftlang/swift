@@ -229,6 +229,26 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
     self.x = x
     self.y = y
   }
+
+  // Non-inlineable initializer, assigns to self -- treated as a root initializer
+
+  // CHECK-LABEL: sil @_T017struct_resilience24VersionedResilientStructVA2C5other_tcfC : $@convention(method) (@in VersionedResilientStruct, @thin VersionedResilientStruct.Type) -> @out VersionedResilientStruct
+  // CHECK:      [[SELF_BOX:%.*]] = alloc_box ${ var VersionedResilientStruct }
+  // CHECK-NEXT: [[SELF_UNINIT:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]
+  // CHECK:      return
+  @_versioned init(other: VersionedResilientStruct) {
+    self = other
+  }
+
+  // Inlineable initializer, assigns to self -- treated as a delegating initializer
+
+  // CHECK-LABEL: sil [serialized] @_T017struct_resilience24VersionedResilientStructVA2C6other2_tcfC : $@convention(method) (@in VersionedResilientStruct, @thin VersionedResilientStruct.Type) -> @out VersionedResilientStruct
+  // CHECK:      [[SELF_BOX:%.*]] = alloc_box ${ var VersionedResilientStruct }
+  // CHECK-NEXT: [[SELF_UNINIT:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
+  // CHECK:      return
+  @_versioned @_inlineable init(other2: VersionedResilientStruct) {
+    self = other2
+  }
 }
 
 // CHECK-LABEL: sil [transparent] [serialized] @_T017struct_resilience27useVersionedResilientStructAA0deF0VADF : $@convention(thin) (@in VersionedResilientStruct) -> @out VersionedResilientStruct
@@ -240,4 +260,16 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   // CHECK:       function_ref @_T017struct_resilience24VersionedResilientStructV1xSivg
 
   return VersionedResilientStruct(x: s.y, y: s.x)
+}
+
+// Initializers for resilient structs
+extension Size {
+
+  // CHECK-LABEL: sil hidden @_T016resilient_struct4SizeV0B11_resilienceEA2C5other_tcfC : $@convention(method) (@in Size, @thin Size.Type) -> @out Size
+  // CHECK:      [[SELF_BOX:%.*]] = alloc_box ${ var Size }
+  // CHECK-NEXT: [[SELF_UNINIT:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]] : ${ var Size }
+  // CHECK:      return
+  init(other: Size) {
+    self = other
+  }
 }

@@ -105,25 +105,6 @@ public:
     return false;
   }
 
-  /// True if the memory object is the 'self' argument of an initializer in a
-  /// protocol extension.
-  bool isProtocolInitSelf() const {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->isRootSelf() && isa<ArchetypeType>(getType()))
-        return true;
-    return false;
-  }
-
-  /// True if the memory object is the 'self' argument of an enum initializer.
-  bool isEnumInitSelf() const {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->isRootSelf())
-        if (auto decl = getType()->getAnyNominal())
-          if (isa<EnumDecl>(decl))
-            return true;
-    return false;
-  }
-
   /// True if the memory object is the 'self' argument of a struct initializer.
   bool isStructInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
@@ -182,7 +163,7 @@ public:
   bool isNonDelegatingInit() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst)) {
       if (MUI->isDerivedClassSelf() || MUI->isDerivedClassSelfOnly() ||
-          (MUI->isRootSelf() && !isEnumInitSelf()))
+          MUI->isRootSelf())
         return true;
     }
     return false;
@@ -239,11 +220,8 @@ enum DIUseKind {
   /// closure that captures it.
   Escape,
 
-  /// This instruction is a call to 'super.init' in a 'self' initializer of a
-  /// derived class.
-  SuperInit,
-
-  /// This instruction is a call to 'self.init' in a delegating initializer.
+  /// This instruction is a call to 'self.init' in a delegating initializer,
+  /// or a call to 'super.init' in a designated initializer of a derived class..
   SelfInit
 };
 

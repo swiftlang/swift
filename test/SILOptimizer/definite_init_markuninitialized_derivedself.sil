@@ -265,7 +265,7 @@ bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Int):
   %13a = begin_borrow %13 : $RootClassWithIVars
   %13b = unchecked_ref_cast %13a : $RootClassWithIVars to $DerivedClassWithIVars
   %13c = upcast %13b : $DerivedClassWithIVars to $RootClassWithIVars
-  %13d = ref_element_addr %13c : $RootClassWithIVars, #RootClassWithIVars.x  // expected-error {{use of 'self' in property access 'x' before super.init initializes self}}
+  %13d = ref_element_addr %13c : $RootClassWithIVars, #RootClassWithIVars.x  // expected-error {{'self' used in property access 'x' before 'super.init' call}}
   load [trivial] %13d : $*Int
   end_borrow %13a from %13 : $RootClassWithIVars, $RootClassWithIVars
 
