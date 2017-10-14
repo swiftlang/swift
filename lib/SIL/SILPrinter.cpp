@@ -1467,10 +1467,6 @@ public:
     printUncheckedConversionInst(I, I->getOperand());
   }
 
-  void visitIsNonnullInst(IsNonnullInst *I) {
-    *this << getIDAndType(I->getOperand());
-  }
-
   void visitCopyValueInst(CopyValueInst *I) {
     *this << getIDAndType(I->getOperand());
   }

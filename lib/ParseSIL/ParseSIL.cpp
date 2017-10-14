@@ -4005,14 +4005,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     ResultVal = B.createRefTailAddr(InstLoc, Val, ResultTy);
     break;
   }
-  case SILInstructionKind::IsNonnullInst: {
-    SourceLoc Loc;
-    if (parseTypedValueRef(Val, Loc, B) ||
-        parseSILDebugLocation(InstLoc, B))
-      return true;
-    ResultVal = B.createIsNonnull(InstLoc, Val);
-    break;
-  }
   case SILInstructionKind::IndexAddrInst: {
     SILValue IndexVal;
     if (parseTypedValueRef(Val, B) ||

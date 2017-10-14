@@ -427,22 +427,6 @@ extension Hoozit {
     // CHECK: [[CTOR:%[0-9]+]] = objc_method [[SELF:%[0-9]+]] : $Hoozit, #Hoozit.init!initializer.1.foreign : (Hoozit.Type) -> (Int) -> Hoozit, $@convention(objc_method) (Int, @owned Hoozit) -> @owned Hoozit
     // CHECK: [[NEW_SELF:%[0-9]+]] = apply [[CTOR]]
     // CHECK: store [[NEW_SELF]] to [init] [[PB_BOX]] : $*Hoozit
-    // CHECK: [[RELOADED_SELF:%.*]] = load_borrow [[PB_BOX]]
-    // CHECK: [[NONNULL:%[0-9]+]] = is_nonnull [[RELOADED_SELF]] : $Hoozit
-    // CHECK: end_borrow [[RELOADED_SELF]] from [[PB_BOX]]
-    // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
-    // CHECK: [[NULL_BB]]:
-    // CHECK-NEXT: destroy_value [[X_BOX]] : ${ var X }
-    // CHECK-NEXT: br [[EPILOG_BB:bb[0-9]+]]
-
-    // CHECK: [[NONNULL_BB]]:
-    // CHECK:   [[OTHER_REF:%[0-9]+]] = function_ref @_T011objc_thunks5otheryyF : $@convention(thin) () -> ()
-    // CHECK-NEXT: apply [[OTHER_REF]]() : $@convention(thin) () -> ()
-    // CHECK-NEXT: destroy_value [[X_BOX]] : ${ var X }
-    // CHECK-NEXT: br [[EPILOG_BB]]
-    
-    // CHECK: [[EPILOG_BB]]:
-    // CHECK-NOT: super_method
     // CHECK: return
     self.init(int:Int(d))
     other()

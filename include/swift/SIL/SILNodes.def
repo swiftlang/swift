@@ -462,12 +462,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(KeyPathInst, keypath,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
-  SINGLE_VALUE_INST(IsNonnullInst, is_nonnull,
-                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, KeyPathInst)
 
-  SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, IsNonnullInst)
-
-NODE_RANGE(ValueBase, SILPHIArgument, IsNonnullInst)
+NODE_RANGE(ValueBase, SILPHIArgument, KeyPathInst)
 
 // Terminators
 ABSTRACT_INST(TermInst, SILInstruction)
