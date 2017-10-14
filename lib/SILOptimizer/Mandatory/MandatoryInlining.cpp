@@ -289,9 +289,21 @@ static SILFunction *getCalleeFunction(SILFunction *F, FullApplySite AI,
     if (!CFI)
       return CalleeValue;
 
+    // TODO: Handle argument conversion. All the code in this file needs to be
+    // cleaned up and generalized. The argument conversion handling in
+    // optimizeApplyOfConvertFunctionInst should apply to any combine
+    // involving an apply, not just a specific pattern.
+    //
+    // For now, just handle conversion that doesn't affect argument types,
+    // return types, or throws. We could trivially handle any other
+    // representation change, but the only one that doesn't affect the ABI and
+    // matters here is @noescape, so just check for that.
     auto FromCalleeTy = CFI->getOperand()->getType().castTo<SILFunctionType>();
     auto ToCalleeTy = CFI->getType().castTo<SILFunctionType>();
-    if (FromCalleeTy->getAllResultsType() != ToCalleeTy->getAllResultsType())
+    auto EscapingCalleeTy = Lowering::adjustFunctionType(
+        ToCalleeTy, ToCalleeTy->getExtInfo().withNoEscape(false),
+        ToCalleeTy->getCalleeConvention());
+    if (FromCalleeTy != EscapingCalleeTy)
       return CalleeValue;
 
     return CFI->getOperand();
