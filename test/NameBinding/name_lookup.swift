@@ -572,3 +572,32 @@ func foo2() {
   let x = 5
   if x < 0, let x = Optional(1) { } // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 }
+
+struct Person {
+  let name: String?
+}
+
+struct Company { // expected-note 2{{did you mean 'Company'?}}
+  let owner: Person?
+}
+
+func test1() {
+  let example: Company? = Company(owner: Person(name: "Owner"))
+  if let person = aCompany.owner, // expected-error {{use of unresolved identifier 'aCompany'}}
+     let aCompany = example {
+    _ = person
+  }
+}
+
+func test2() {
+  let example: Company? = Company(owner: Person(name: "Owner"))
+  guard let person = aCompany.owner, // expected-error {{use of unresolved identifier 'aCompany'}}
+        let aCompany = example else { return }
+}
+
+func test3() {
+  var c: String? = "c" // expected-note {{did you mean 'c'?}}
+  if let a = b = c, let b = c { // expected-error {{use of unresolved identifier 'b'}}
+    _ = b
+  }
+}
