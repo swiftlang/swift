@@ -1342,7 +1342,7 @@ void ElementUseCollector::checkClassSelfUpcastUsedBySuperInit(
     SILValue ClassPointer, UpcastInst *UCI, SILInstruction *SuperInitUse,
     llvm::SmallDenseMap<VarDecl *, unsigned> &EltNumbering) {
   // We remember the applyinst as the super.init site, not the upcast.
-  trackUse(DIMemoryUse(SuperInitUse, DIUseKind::SuperInit, 0,
+  trackUse(DIMemoryUse(SuperInitUse, DIUseKind::SelfInit, 0,
                        TheMemory.NumElements));
   UseInfo.trackFailableInitCall(TheMemory, SuperInitUse);
 
@@ -1722,7 +1722,7 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
     // part of the object lifecycle.
     if (auto *UCI = dyn_cast<UpcastInst>(User)) {
       if (auto *subAI = isSuperInitUse(UCI)) {
-        UseInfo.trackUse(DIMemoryUse(subAI, DIUseKind::SuperInit, 0, 1));
+        UseInfo.trackUse(DIMemoryUse(subAI, DIUseKind::SelfInit, 0, 1));
         UseInfo.trackFailableInitCall(TheMemory, subAI);
 
         // Now that we know that we have a super.init site, check if our upcast

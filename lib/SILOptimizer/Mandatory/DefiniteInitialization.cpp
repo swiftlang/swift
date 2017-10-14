@@ -550,7 +550,6 @@ namespace {
                               bool SuperInitDone,
                               bool FailedSelfUse);
 
-    void handleSuperInitUse(const DIMemoryUse &InstInfo);
     void handleSelfInitUse(DIMemoryUse &InstInfo);
     void updateInstructionForInitState(DIMemoryUse &InstInfo);
 
@@ -840,9 +839,6 @@ void LifetimeChecker::doIt() {
       break;
     case DIUseKind::Escape:
       handleEscapeUse(Use);
-      break;
-    case DIUseKind::SuperInit:
-      handleSuperInitUse(Use);
       break;
     case DIUseKind::SelfInit:
       handleSelfInitUse(Use);
@@ -1663,62 +1659,11 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
     diagnoseInitError(Use, diag::variable_used_before_initialized);
 }
 
-/// handleSuperInitUse - When processing a 'self' argument on a class, this is
-/// a call to super.init.
-void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
-  // This is an apply or try_apply.
-  auto *Inst = InstInfo.Inst;
-
-  if (getSelfConsumedAtInst(Inst) != DIKind::No) {
-    // FIXME: more specific diagnostics here, handle this case gracefully below.
-    if (!shouldEmitError(Inst))
-      return;
-    
-    diagnose(Module, Inst->getLoc(),
-             diag::self_inside_catch_superselfinit,
-             (unsigned)TheMemory.isDelegatingInit());
-    return;
-  }
-
-  // Determine the liveness states of the memory object, including the
-  // super.init state.
-  AvailabilitySet Liveness = getLivenessAtInst(Inst, 0, TheMemory.NumElements);
-
-  // super.init() calls require that super.init has not already been called. If
-  // it has, reject the program.
-  switch (Liveness.get(TheMemory.NumElements-1)) {
-  case DIKind::No:  // This is good! Keep going.
-    break;
-  case DIKind::Yes:
-  case DIKind::Partial:
-    // This is bad, only one super.init call is allowed.
-    if (shouldEmitError(Inst))
-      diagnose(Module, Inst->getLoc(), diag::selfinit_multiple_times, 0);
-    return;
-  }
-
-  // super.init also requires that all ivars are initialized before the
-  // superclass initializer runs.
-  for (unsigned i = 0, e = TheMemory.NumElements-1; i != e; ++i) {
-    if (Liveness.get(i) == DIKind::Yes) continue;
-
-    // If the super.init call is implicit generated, produce a specific
-    // diagnostic.
-    bool isImplicit = InstInfo.Inst->getLoc().getSourceLoc().isInvalid();
-    auto diag = isImplicit ? diag::ivar_not_initialized_at_implicit_superinit :
-                diag::ivar_not_initialized_at_superinit;
-    return diagnoseInitError(InstInfo, diag);
-  }
-
-  // Otherwise everything is good!
-}
-
 /// handleSelfInitUse - When processing a 'self' argument on a class, this is
-/// a call to self.init.
+/// a call to self.init or super.init.
 void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
   auto *Inst = InstInfo.Inst;
 
-  assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
   assert(TheMemory.getType()->hasReferenceSemantics());
 
   if (getSelfConsumedAtInst(Inst) != DIKind::No) {
@@ -1732,22 +1677,46 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
     return;
   }
 
-  // Determine the self.init state.  self.init() calls require that self.init
-  // has not already been called. If it has, reject the program.
-  switch (getLivenessAtInst(Inst, 0, 1).get(0)) {
+  // Determine the liveness states of the memory object, including the
+  // self/super.init state.
+  AvailabilitySet Liveness = getLivenessAtInst(Inst, 0, TheMemory.NumElements);
+
+  // self/super.init() calls require that self/super.init has not already
+  // been called. If it has, reject the program.
+  switch (Liveness.get(TheMemory.NumElements-1)) {
   case DIKind::No:  // This is good! Keep going.
     break;
   case DIKind::Yes:
   case DIKind::Partial:
-    // This is bad, only one self.init call is allowed.
-    if (EmittedErrorLocs.empty() && shouldEmitError(Inst))
-      diagnose(Module, Inst->getLoc(), diag::selfinit_multiple_times, 1);
+    // This is bad, only one super.init call is allowed.
+    if (shouldEmitError(Inst))
+      diagnose(Module, Inst->getLoc(), diag::selfinit_multiple_times,
+               TheMemory.isDelegatingInit());
     return;
   }
 
-  // Lower Assign instructions if needed.
-  if (isa<AssignInst>(InstInfo.Inst))
-    updateInstructionForInitState(InstInfo);
+  if (TheMemory.isDelegatingInit()) {
+    assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
+
+    // Lower Assign instructions if needed.
+    if (isa<AssignInst>(InstInfo.Inst))
+      updateInstructionForInitState(InstInfo);
+  } else {
+    // super.init also requires that all ivars are initialized before the
+    // superclass initializer runs.
+    for (unsigned i = 0, e = TheMemory.NumElements-1; i != e; ++i) {
+      if (Liveness.get(i) == DIKind::Yes) continue;
+
+      // If the super.init call is implicit generated, produce a specific
+      // diagnostic.
+      bool isImplicit = InstInfo.Inst->getLoc().getSourceLoc().isInvalid();
+      auto diag = isImplicit ? diag::ivar_not_initialized_at_implicit_superinit :
+                  diag::ivar_not_initialized_at_superinit;
+      return diagnoseInitError(InstInfo, diag);
+    }
+
+    // Otherwise everything is good!
+  }
 }
 
 
@@ -2121,7 +2090,6 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       break;
 
     case DIUseKind::SelfInit:
-    case DIUseKind::SuperInit:
     case DIUseKind::Initialization:
       // If this is an initialization of only trivial elements, then we don't
       // need to update the bitvector.

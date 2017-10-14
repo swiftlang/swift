@@ -220,11 +220,8 @@ enum DIUseKind {
   /// closure that captures it.
   Escape,
 
-  /// This instruction is a call to 'super.init' in a 'self' initializer of a
-  /// derived class.
-  SuperInit,
-
-  /// This instruction is a call to 'self.init' in a delegating initializer.
+  /// This instruction is a call to 'self.init' in a delegating initializer,
+  /// or a call to 'super.init' in a designated initializer of a derived class..
   SelfInit
 };
 
