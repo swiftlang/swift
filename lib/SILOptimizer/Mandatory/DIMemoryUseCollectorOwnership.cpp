@@ -438,8 +438,8 @@ void DIElementUseInfo::trackFailableInitCall(
 
   if (auto *AI = dyn_cast<ApplyInst>(I)) {
     // See if this is an optional initializer.
-    for (auto UI : AI->getUses()) {
-      SILInstruction *User = UI->getUser();
+    for (auto Op : AI->getUses()) {
+      SILInstruction *User = Op->getUser();
 
       if (!isa<SelectEnumInst>(User) && !isa<SelectEnumAddrInst>(User))
         continue;
@@ -1221,8 +1221,8 @@ static bool isUninitializedMetatypeInst(SILInstruction *I) {
   // Sometimes we get an upcast whose sole usage is a value_metatype_inst,
   // for example when calling a convenience initializer from a superclass.
   if (auto *UCI = dyn_cast<UpcastInst>(I)) {
-    for (auto *UI : UCI->getUses()) {
-      auto *User = UI->getUser();
+    for (auto *Op : UCI->getUses()) {
+      auto *User = Op->getUser();
       if (isa<ValueMetatypeInst>(User))
         continue;
       return false;
@@ -1320,6 +1320,20 @@ static bool isSelfInitUse(SILArgument *Arg) {
   return isSelfInitUse(Pred->getTerminator());
 }
 
+static bool isSelfOperand(const Operand *Op, const SILInstruction *User) {
+  unsigned operandNum = Op->getOperandNumber();
+  unsigned numOperands;
+
+  // FIXME: This should just be cast<FullApplySite>(User) but that doesn't
+  // work
+  if (auto *AI = dyn_cast<ApplyInst>(User))
+    numOperands = AI->getNumOperands();
+  else
+    numOperands = cast<TryApplyInst>(User)->getNumOperands();
+
+  return (operandNum == numOperands - 1);
+}
+
 void ElementUseCollector::collectClassSelfUses(
     SILValue ClassPointer, SILType MemorySILType,
     llvm::SmallDenseMap<VarDecl *, unsigned> &EltNumbering) {
@@ -1390,8 +1404,10 @@ void ElementUseCollector::collectClassSelfUses(
     DIUseKind Kind = DIUseKind::Load;
     if (isa<FullApplySite>(User) &&
         (isSelfInitUse(User) || isSuperInitUse(User))) {
-      Kind = DIUseKind::SelfInit;
-      UseInfo.trackFailableInitCall(TheMemory, User);
+      if (isSelfOperand(Op, User)) {
+        Kind = DIUseKind::SelfInit;
+        UseInfo.trackFailableInitCall(TheMemory, User);
+      }
     }
     
     if (isUninitializedMetatypeInst(User))
@@ -1451,8 +1467,8 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   // Handle each of these in turn.
   //
-  for (auto *UI : MUI->getUses()) {
-    SILInstruction *User = UI->getUser();
+  for (auto *Op : MUI->getUses()) {
+    SILInstruction *User = Op->getUser();
 
     // Ignore end_borrow. If we see an end_borrow it can only come from a
     // load_borrow from ourselves.
@@ -1461,13 +1477,13 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
 
     // Stores to self are initializations store or the rebind of self as
     // part of the super.init call.  Ignore both of these.
-    if (isa<StoreInst>(User) && UI->getOperandNumber() == 1)
+    if (isa<StoreInst>(User) && Op->getOperandNumber() == 1)
       continue;
 
     // For class initializers, the assign into the self box may be
     // captured as SelfInit or SuperInit elsewhere.
     if (TheMemory.isClassInitSelf() && isa<AssignInst>(User) &&
-        UI->getOperandNumber() == 1) {
+        Op->getOperandNumber() == 1) {
       // If the source of the assignment is an application of a C
       // function, there is no metatype argument, so treat the
       // assignment to the self box as the initialization.
@@ -1526,8 +1542,8 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
   auto *PBI = cast<ProjectBoxInst>(MUI->getOperand());
   auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
 
-  for (auto UI : ABI->getUses()) {
-    SILInstruction *User = UI->getUser();
+  for (auto Op : ABI->getUses()) {
+    SILInstruction *User = Op->getUser();
     if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
       UseInfo.trackDestroy(User);
     }
@@ -1536,8 +1552,8 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
 
 void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses(
     SingleValueInstruction *I) {
-  for (auto UI : I->getUses()) {
-    auto *User = UI->getUser();
+  for (auto Op : I->getUses()) {
+    auto *User = Op->getUser();
 
     // destroy_addr is a release of the entire value. This can result from an
     // early release due to a conditional initializer.
@@ -1600,8 +1616,8 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
   // the load to find out more information.
   llvm::SmallVector<Operand *, 8> Worklist(LI->use_begin(), LI->use_end());
   while (!Worklist.empty()) {
-    auto *UI = Worklist.pop_back_val();
-    auto *User = UI->getUser();
+    auto *Op = Worklist.pop_back_val();
+    auto *User = Op->getUser();
 
     // Ignore any method lookup use.
     if (isa<SuperMethodInst>(User) ||
@@ -1647,8 +1663,10 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
     // call in a delegating initializer.
     if (isa<FullApplySite>(User) &&
         (isSelfInitUse(User) || isSuperInitUse(User))) {
-      Kind = DIUseKind::SelfInit;
-      UseInfo.trackFailableInitCall(TheMemory, User);
+      if (isSelfOperand(Op, User)) {
+        Kind = DIUseKind::SelfInit;
+        UseInfo.trackFailableInitCall(TheMemory, User);
+      }
     }
 
     // If this load's value is being stored back into the delegating
