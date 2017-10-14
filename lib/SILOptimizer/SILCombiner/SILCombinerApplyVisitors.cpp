@@ -374,7 +374,20 @@ SILInstruction *PartialApplyCombiner::combine() {
 
     // Recurse through conversions.
     if (auto *CFI = dyn_cast<ConvertFunctionInst>(User)) {
-      Uses.append(CFI->getUses().begin(), CFI->getUses().end());
+      // TODO: Handle argument conversion. All the code in this file needs to be
+      // cleaned up and generalized. The argument conversion handling in
+      // optimizeApplyOfConvertFunctionInst should apply to any combine
+      // involving an apply, not just a specific pattern.
+      //
+      // For now, just handle conversion to @noescape, which is irrelevant for
+      // direct application of the closure.
+      auto ConvertCalleeTy = CFI->getType().castTo<SILFunctionType>();
+      auto EscapingCalleeTy = Lowering::adjustFunctionType(
+          ConvertCalleeTy, ConvertCalleeTy->getExtInfo().withNoEscape(false),
+          ConvertCalleeTy->getCalleeConvention());
+      if (PAI->getSubstCalleeType() == EscapingCalleeTy)
+        Uses.append(CFI->getUses().begin(), CFI->getUses().end());
+
       continue;
     }
     // If this use of a partial_apply is not

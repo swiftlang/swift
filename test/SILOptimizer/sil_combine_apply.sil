@@ -386,3 +386,35 @@ bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int8):
   %29 = tuple ()
   return %29 : $()
 }
+
+// Test function_ref -> partial_apply -> convert_function -> try_apply.
+// This is not currently combined because we don't know how to reform the
+// try_apply with a different type.
+sil @testCombineClosureHelper : $(Builtin.Int32) -> ()
+
+// CHECK-LABEL: sil @testCombineClosureResults : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK: bb0(%0 : $Builtin.Int32):
+// CHECK:  [[F:%.*]] = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK:  [[PA:%.*]] = partial_apply [[F]](%0) : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK:  [[CVT1:%.*]] = convert_function [[PA]] : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+// CHECK:  [[CVT2:%.*]] = convert_function [[CVT1]] : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
+// CHECK:  try_apply [[CVT2]]() : $@noescape @callee_owned () -> @error Error, normal bb1, error bb2
+// CHECK-LABEL: } // end sil function 'testCombineClosureResults'
+sil @testCombineClosureResults : $(Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %49 = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
+  %50 = partial_apply %49(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %51 = convert_function %50 : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+  %52 = convert_function %51 : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
+  try_apply %52() : $@noescape @callee_owned () -> @error Error, normal bb7, error bb11
+
+bb7(%callret : $()):
+  br bb99
+
+bb11(%128 : $Error):
+  br bb99
+
+bb99:
+  %empty = tuple ()
+  return %empty : $()
+}
