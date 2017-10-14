@@ -1156,18 +1156,65 @@ void ElementUseCollector::collectClassSelfUses() {
   }
 }
 
-static void
-collectBorrowedSuperUses(UpcastInst *Inst,
-                         llvm::SmallVectorImpl<UpcastInst *> &UpcastUsers) {
-  for (auto *Use : Inst->getUses()) {
-    if (auto *URCI = dyn_cast<UncheckedRefCastInst>(Use->getUser())) {
-      for (auto *InnerUse : URCI->getUses()) {
-        if (auto *InnerUpcastUser = dyn_cast<UpcastInst>(InnerUse->getUser())) {
-          UpcastUsers.push_back(InnerUpcastUser);
-        }
-      }
+static bool isSuperInitUse(SILInstruction *User) {
+  auto *LocExpr = User->getLoc().getAsASTNode<ApplyExpr>();
+  if (!LocExpr) {
+    // If we're reading a .sil file, treat a call to "superinit" as a
+    // super.init call as a hack to allow us to write testcases.
+    auto *AI = dyn_cast<ApplyInst>(User);
+    if (AI && AI->getLoc().isSILFile())
+      if (auto *Fn = AI->getReferencedFunction())
+        if (Fn->getName() == "superinit")
+          return true;
+    return false;
+  }
+
+  // This is a super.init call if structured like this:
+  // (call_expr type='SomeClass'
+  //   (dot_syntax_call_expr type='() -> SomeClass' super
+  //     (other_constructor_ref_expr implicit decl=SomeClass.init)
+  //     (super_ref_expr type='SomeClass'))
+  //   (...some argument...)
+  LocExpr = dyn_cast<ApplyExpr>(LocExpr->getFn());
+  if (!LocExpr || !isa<OtherConstructorDeclRefExpr>(LocExpr->getFn()))
+    return false;
+
+  if (LocExpr->getArg()->isSuperExpr())
+    return true;
+
+  // Instead of super_ref_expr, we can also get this for inherited delegating
+  // initializers:
+
+  // (derived_to_base_expr implicit type='C'
+  //   (declref_expr type='D' decl='self'))
+  if (auto *DTB = dyn_cast<DerivedToBaseExpr>(LocExpr->getArg())) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(DTB->getSubExpr())) {
+        ASTContext &Ctx = DRE->getDecl()->getASTContext();
+      if (DRE->getDecl()->isImplicit() &&
+          DRE->getDecl()->getBaseName() == Ctx.Id_self)
+        return true;
     }
   }
+
+  return false;
+}
+
+/// Return true if this SILBBArgument is the result of a call to super.init.
+static bool isSuperInitUse(SILArgument *Arg) {
+  // We only handle a very simple pattern here where there is a single
+  // predecessor to the block, and the predecessor instruction is a try_apply
+  // of a throwing delegated init.
+  auto *BB = Arg->getParent();
+  auto *Pred = BB->getSinglePredecessorBlock();
+
+  // The two interesting cases are where self.init throws, in which case
+  // the argument came from a try_apply, or if self.init is failable,
+  // in which case we have a switch_enum.
+  if (!Pred || (!isa<TryApplyInst>(Pred->getTerminator()) &&
+                !isa<SwitchEnumInst>(Pred->getTerminator())))
+    return false;
+
+  return isSuperInitUse(Pred->getTerminator());
 }
 
 /// isSuperInitUse - If this "upcast" is part of a call to super.init, return
@@ -1188,43 +1235,8 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
     if (!isa<FullApplySite>(User))
       continue;
 
-    auto *LocExpr = User->getLoc().getAsASTNode<ApplyExpr>();
-    if (!LocExpr) {
-      // If we're reading a .sil file, treat a call to "superinit" as a
-      // super.init call as a hack to allow us to write testcases.
-      auto *AI = dyn_cast<ApplyInst>(User);
-      if (AI && AI->getLoc().isSILFile())
-        if (auto *Fn = AI->getReferencedFunction())
-          if (Fn->getName() == "superinit")
-            return AI;
-      continue;
-    }
-
-    // This is a super.init call if structured like this:
-    // (call_expr type='SomeClass'
-    //   (dot_syntax_call_expr type='() -> SomeClass' super
-    //     (other_constructor_ref_expr implicit decl=SomeClass.init)
-    //     (super_ref_expr type='SomeClass'))
-    //   (...some argument...)
-    LocExpr = dyn_cast<ApplyExpr>(LocExpr->getFn());
-    if (!LocExpr || !isa<OtherConstructorDeclRefExpr>(LocExpr->getFn()))
-      continue;
-
-    if (LocExpr->getArg()->isSuperExpr())
+    if (isSuperInitUse(User))
       return User;
-
-    // Instead of super_ref_expr, we can also get this for inherited delegating
-    // initializers:
-
-    // (derived_to_base_expr implicit type='C'
-    //   (declref_expr type='D' decl='self'))
-    if (auto *DTB = dyn_cast<DerivedToBaseExpr>(LocExpr->getArg()))
-      if (auto *DRE = dyn_cast<DeclRefExpr>(DTB->getSubExpr())) {
-          ASTContext &Ctx = DRE->getDecl()->getASTContext();
-        if (DRE->getDecl()->isImplicit() &&
-            DRE->getDecl()->getBaseName() == Ctx.Id_self)
-          return User;
-      }
   }
 
   return nullptr;
@@ -1568,14 +1580,14 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
     // call to self.init()... then we have a self.init call.
     if (auto *AI = dyn_cast<AssignInst>(User)) {
       if (auto *AssignSource = AI->getOperand(0)->getDefiningInstruction()) {
-        if (isSelfInitUse(AssignSource)) {
+        if (isSelfInitUse(AssignSource) || isSuperInitUse(AssignSource)) {
           UseInfo.trackUse(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
           continue;
         }
       }
       if (auto *AssignSource = dyn_cast<SILArgument>(AI->getOperand(0))) {
         if (AssignSource->getParent() == AI->getParent() &&
-            isSelfInitUse(AssignSource)) {
+            (isSelfInitUse(AssignSource) || isSuperInitUse(AssignSource))) {
           UseInfo.trackUse(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
           continue;
         }
@@ -1697,13 +1709,6 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
     if (isa<StrongRetainInst>(User))
       continue;
 
-    // Look through begin_borrow.
-    if (auto borrow = dyn_cast<BeginBorrowInst>(User)) {
-      std::copy(borrow->use_begin(), borrow->use_end(),
-                std::back_inserter(Worklist));
-      continue;
-    }
-
     // Ignore end_borrow.
     if (isa<EndBorrowInst>(User))
       continue;
@@ -1716,27 +1721,13 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
       continue;
     }
 
-    // If this is an upcast instruction, it is a conversion of self to the
-    // base.  This is either part of a super.init sequence, or a general
-    // superclass access.  We special case super.init calls since they are
-    // part of the object lifecycle.
-    if (auto *UCI = dyn_cast<UpcastInst>(User)) {
-      if (auto *subAI = isSuperInitUse(UCI)) {
-        UseInfo.trackUse(DIMemoryUse(subAI, DIUseKind::SelfInit, 0, 1));
-        UseInfo.trackFailableInitCall(TheMemory, subAI);
-
-        // Now that we know that we have a super.init site, check if our upcast
-        // has any borrow users. These used to be represented by a separate
-        // load, but now with sil ownership, they are represented as borrows
-        // from the same upcast as the super init user upcast.
-        llvm::SmallVector<UpcastInst *, 4> ExtraUpcasts;
-        collectBorrowedSuperUses(UCI, ExtraUpcasts);
-        for (auto *Upcast : ExtraUpcasts) {
-          UseInfo.trackUse(
-              DIMemoryUse(Upcast, DIUseKind::Escape, 0, TheMemory.NumElements));
-        }
-        continue;
-      }
+    // Look through begin_borrow, upcast and unchecked_ref_cast.
+    if (isa<BeginBorrowInst>(User) ||
+        isa<UpcastInst>(User) ||
+        isa<UncheckedRefCastInst>(User)) {
+      auto I = cast<SingleValueInstruction>(User);
+      copy(I->getUses(), std::back_inserter(Worklist));
+      continue;
     }
 
     // We only track two kinds of uses for delegating initializers:
@@ -1748,7 +1739,8 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
 
     // If this is an ApplyInst, check to see if this is part of a self.init
     // call in a delegating initializer.
-    if (isa<FullApplySite>(User) && isSelfInitUse(User)) {
+    if (isa<FullApplySite>(User) &&
+        (isSelfInitUse(User) || isSuperInitUse(User))) {
       Kind = DIUseKind::SelfInit;
       UseInfo.trackFailableInitCall(TheMemory, User);
     }
@@ -1758,7 +1750,8 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
     // use. This is to handle situations where due to usage of a metatype to
     // allocate, we do not actually consume self.
     if (auto *SI = dyn_cast<StoreInst>(User)) {
-      if (SI->getDest() == MUI && isSelfInitUse(User)) {
+      if (SI->getDest() == MUI &&
+          (isSelfInitUse(User) || isSuperInitUse(User))) {
         continue;
       }
     }
