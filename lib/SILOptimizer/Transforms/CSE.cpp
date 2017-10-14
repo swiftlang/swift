@@ -349,10 +349,6 @@ public:
     return hash;
   }
 
-  hash_code visitIsNonnullInst(IsNonnullInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
-  }
-
   hash_code visitThinFunctionToPointerInst(ThinFunctionToPointerInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
   }
@@ -901,7 +897,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::UncheckedEnumDataInst:
-  case SILInstructionKind::IsNonnullInst:
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::RefToRawPointerInst:

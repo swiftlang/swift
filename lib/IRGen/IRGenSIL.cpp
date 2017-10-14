@@ -1009,8 +1009,6 @@ public:
   void visitBridgeObjectToRefInst(BridgeObjectToRefInst *i);
   void visitBridgeObjectToWordInst(BridgeObjectToWordInst *i);
 
-  void visitIsNonnullInst(IsNonnullInst *i);
-
   void visitIndexAddrInst(IndexAddrInst *i);
   void visitTailAddrInst(TailAddrInst *i);
   void visitIndexRawPointerInst(IndexRawPointerInst *i);
@@ -4693,35 +4691,6 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   Explosion e;
   e.add(Builder.CreateBitCast(call, resultStorageTy));
   setLoweredExplosion(I, e);
-}
-
-void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
-  // Get the value we're testing, which may be a function, an address or an
-  // instance pointer.
-  llvm::Value *val;
-
-  SILValue operand = i->getOperand();
-  auto type = operand->getType();
-  if (type.isAddress()) {
-    val = getLoweredAddress(operand).getAddress();
-  } else if (auto fnType = type.getAs<SILFunctionType>()) {
-    Explosion values = getLoweredExplosion(operand);
-    val = values.claimNext();    // Function pointer.
-    if (fnType->getRepresentation() == SILFunctionTypeRepresentation::Thick)
-      (void) values.claimNext(); // Ignore the data pointer.
-  } else {
-    Explosion values = getLoweredExplosion(operand);
-    val = values.claimNext();
-  }
-  
-  // Check that the result isn't null.
-  auto *valTy = cast<llvm::PointerType>(val->getType());
-  llvm::Value *result = Builder.CreateICmp(llvm::CmpInst::ICMP_NE,
-                                    val, llvm::ConstantPointerNull::get(valTy));
-  
-  Explosion out;
-  out.add(result);
-  setLoweredExplosion(i, out);
 }
 
 void IRGenSILFunction::visitUpcastInst(swift::UpcastInst *i) {

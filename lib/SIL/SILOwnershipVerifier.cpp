@@ -576,7 +576,6 @@ ACCEPTS_ANY_OWNERSHIP_INST(UncheckedTrivialBitCast)
 ACCEPTS_ANY_OWNERSHIP_INST(ExistentialMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
-ACCEPTS_ANY_OWNERSHIP_INST(IsNonnull)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?

@@ -806,19 +806,6 @@ bb0(%0 : $@sil_unmanaged C):
   return %3: $(C, C)
 }
 
-// CHECK-LABEL: sil @cse_is_nonnull
-// CHECK: is_nonnull
-// CHECK-NOT: is_nonnull
-// CHECK: tuple
-// CHECK: return
-sil @cse_is_nonnull : $@convention(thin) (C) -> (Builtin.Int1, Builtin.Int1) {
-bb0(%0 : $C):
-  %1 = is_nonnull %0 : $C
-  %2 = is_nonnull %0 : $C
-  %3 = tuple (%1: $Builtin.Int1, %2: $Builtin.Int1)
-  return %3: $(Builtin.Int1, Builtin.Int1)
-}
-
 enum Enum1 {
     case Case1
     case Case2

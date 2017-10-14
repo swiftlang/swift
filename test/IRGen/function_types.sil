@@ -61,18 +61,6 @@ entry(%x : $*X):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i1 @test_is_nonnull_function(i8*, %swift.refcounted*) {{.*}} {
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:  %2 = icmp ne i8* %0, null
-// CHECK-NEXT:  ret i1 %2
-// CHECK-NEXT:  }
-
-sil @test_is_nonnull_function : $@convention(thin) (() -> ()) -> Builtin.Int1 {
-bb0(%0 : $() -> ()):
-  %3 = is_nonnull %0 : $() -> ()
-  return %3 : $Builtin.Int1                                 // id: %5
-}
-
 // CHECK-LABEL: define{{( protected)?}} swiftcc i8* @test_function_to_pointer(i8*)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret i8* %0
