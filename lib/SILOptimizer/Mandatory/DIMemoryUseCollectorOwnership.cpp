@@ -1338,45 +1338,6 @@ static bool isSelfInitUse(SILArgument *Arg) {
   return isSelfInitUse(Pred->getTerminator());
 }
 
-static SILValue stripUpcastsAndBorrows(SILValue Arg) {
-  while (true) {
-    if (auto *BBI = dyn_cast<BeginBorrowInst>(Arg)) {
-      Arg = BBI->getOperand();
-      continue;
-    }
-
-    if (auto *Upcast = dyn_cast<UpcastInst>(Arg)) {
-      Arg = Upcast->getOperand();
-      continue;
-    }
-
-    return Arg;
-  }
-}
-
-/// Returns true if \p Method is a callee of a full apply site that takes in \p
-/// Pointer as an argument. In such a case, we want to ignore the class method
-/// use and allow for the use by the apply inst to take precedence.
-static bool shouldIgnoreClassMethodUseError(MethodInst *Method,
-                                            SILValue Pointer) {
-  // In order to work around use-list ordering issues, if this method is called
-  // by an apply site that has I as an argument, we want to process the apply
-  // site for errors to emit, not the class method. If we do not obey these
-  // conditions, then continue to treat the class method as an escape.
-  auto CheckFullApplySite = [&Method, &Pointer](Operand *Op) -> bool {
-    FullApplySite FAS(Op->getUser());
-    if (!FAS || (FAS.getCallee() != Method))
-      return false;
-
-    return llvm::any_of(FAS.getArgumentsWithoutIndirectResults(),
-                        [&Pointer](SILValue Arg) -> bool {
-                          return stripUpcastsAndBorrows(Arg) == Pointer;
-                        });
-  };
-
-  return llvm::any_of(Method->getUses(), CheckFullApplySite);
-}
-
 void ElementUseCollector::checkClassSelfUpcastUsedBySuperInit(
     SILValue ClassPointer, UpcastInst *UCI, SILInstruction *SuperInitUse,
     llvm::SmallDenseMap<VarDecl *, unsigned> &EltNumbering) {
@@ -1398,9 +1359,13 @@ void ElementUseCollector::checkClassSelfUpcastUsedBySuperInit(
     if (UCIOpUser == SuperInitUse)
       continue;
 
-    // Ignore any super_method or objc_super_method use.
-    if (isa<SuperMethodInst>(UCIOpUser) || isa<ObjCSuperMethodInst>(UCIOpUser))
+    // Ignore any method lookup use.
+    if (isa<SuperMethodInst>(UCIOpUser) ||
+        isa<ObjCSuperMethodInst>(UCIOpUser) ||
+        isa<ClassMethodInst>(UCIOpUser) ||
+        isa<ObjCMethodInst>(UCIOpUser)) {
       continue;
+    }
 
     // We don't care about end_borrow.
     if (isa<EndBorrowInst>(UCIOpUser))
@@ -1425,18 +1390,6 @@ void ElementUseCollector::checkClassSelfUpcastUsedBySuperInit(
       continue;
     }
 
-    if (auto *Method = dyn_cast<ClassMethodInst>(UCIOpUser)) {
-      if (shouldIgnoreClassMethodUseError(Method, ClassPointer)) {
-        continue;
-      }
-    }
-
-    if (auto *Method = dyn_cast<ObjCMethodInst>(UCIOpUser)) {
-      if (shouldIgnoreClassMethodUseError(Method, ClassPointer)) {
-        continue;
-      }
-    }
-
     // Treat all other uses as loads.
     trackUse(DIMemoryUse(UCIOpUser, DIUseKind::Load, 0, TheMemory.NumElements));
   }
@@ -1451,11 +1404,13 @@ void ElementUseCollector::collectClassSelfUses(
     auto *Op = Worklist.pop_back_val();
     auto *User = Op->getUser();
 
-    // super_method and objc_super_method always looks at the metatype
-    // for the instance, not at any of its stored properties, so it doesn't
-    // have any DI requirements.
-    if (isa<SuperMethodInst>(User) || isa<ObjCSuperMethodInst>(User))
+    // Ignore any method lookup use.
+    if (isa<SuperMethodInst>(User) ||
+        isa<ObjCSuperMethodInst>(User) ||
+        isa<ClassMethodInst>(User) ||
+        isa<ObjCMethodInst>(User)) {
       continue;
+    }
 
     // Skip end_borrow.
     if (isa<EndBorrowInst>(User))
@@ -1487,18 +1442,6 @@ void ElementUseCollector::collectClassSelfUses(
     if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
       trackDestroy(User);
       continue;
-    }
-
-    if (auto *Method = dyn_cast<ClassMethodInst>(User)) {
-      if (shouldIgnoreClassMethodUseError(Method, ClassPointer)) {
-        continue;
-      }
-    }
-
-    if (auto *Method = dyn_cast<ObjCMethodInst>(User)) {
-      if (shouldIgnoreClassMethodUseError(Method, ClassPointer)) {
-        continue;
-      }
     }
 
     // If this is an upcast instruction, it is a conversion of self to the base.
@@ -1742,11 +1685,13 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
     auto *UI = Worklist.pop_back_val();
     auto *User = UI->getUser();
 
-    // super_method and objc_super_method always looks at the metatype for
-    // the instance, not at any of/ its stored properties, so it doesn't
-    // have any DI requirements.
-    if (isa<SuperMethodInst>(User) || isa<ObjCSuperMethodInst>(User))
+    // Ignore any method lookup use.
+    if (isa<SuperMethodInst>(User) ||
+        isa<ObjCSuperMethodInst>(User) ||
+        isa<ClassMethodInst>(User) ||
+        isa<ObjCMethodInst>(User)) {
       continue;
+    }
 
     // We ignore retains of self.
     if (isa<StrongRetainInst>(User))
@@ -1769,30 +1714,6 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
     if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
       UseInfo.trackDestroy(User);
       continue;
-    }
-
-    if (auto *Method = dyn_cast<ClassMethodInst>(User)) {
-      // class_method that refers to an initializing constructor is a method
-      // lookup for delegation, which is ignored.
-      if (Method->getMember().kind == SILDeclRef::Kind::Initializer)
-        continue;
-
-      /// Returns true if \p Method used by an apply in a way that we know
-      /// will cause us to emit a better error.
-      if (shouldIgnoreClassMethodUseError(Method, LI))
-        continue;
-    }
-
-    if (auto *Method = dyn_cast<ObjCMethodInst>(User)) {
-      // class_method that refers to an initializing constructor is a method
-      // lookup for delegation, which is ignored.
-      if (Method->getMember().kind == SILDeclRef::Kind::Initializer)
-        continue;
-
-      /// Returns true if \p Method used by an apply in a way that we know
-      /// will cause us to emit a better error.
-      if (shouldIgnoreClassMethodUseError(Method, LI))
-        continue;
     }
 
     // If this is an upcast instruction, it is a conversion of self to the
