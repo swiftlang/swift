@@ -86,13 +86,14 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
 
 namespace swift {
 class ArgsToFrontendInputsConverter {
+  // Instance variables MUST be in this order.
+  DiagnosticEngine &Diags;
   const ArgList &Args;
+  const llvm::opt::Arg *pathOrNull;
   FrontendInputs &Inputs;
   const llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBuffer;
-  const llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-      primaryFilelistBuffer;
-  llvm::SmallVector<StringRef, 8> inputFiles;   // FIXME: 8?
-  llvm::SmallVector<StringRef, 8> primaryFiles; // FIXME: 8?
+  llvm::SmallVector<StringRef, 8> inputFilesAndPrimariesFromCommandLinePlusInputFilesFromFilelist;   // FIXME: 8?
+  llvm::SmallVector<StringRef, 8> primaryFilesFromCommandLine; // FIXME: 8?
 
   static void splitIntoLines(const llvm::MemoryBuffer &buffer,
                              SmallVectorImpl<StringRef> &fileNames) {
@@ -104,16 +105,17 @@ class ArgsToFrontendInputsConverter {
     for (const Arg *A :
          Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
       if (A->getOption().matches(options::OPT_INPUT)) {
-        inputFiles.push_back(A->getValue());
+        inputFilesAndPrimariesFromCommandLinePlusInputFilesFromFilelist.push_back(A->getValue());
       } else if (A->getOption().matches(options::OPT_primary_file)) {
-        primaryFiles.push_back(A->getValue());
+        inputFilesAndPrimariesFromCommandLinePlusInputFilesFromFilelist.push_back(A->getValue());
+        primaryFilesFromCommandLine.push_back(A->getValue());
       } else {
         llvm_unreachable("Unknown input-related argument!");
       }
     }
   }
   static llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-  getBufferForArg(DiagnosticEngine &diags, const llvm::opt::Arg *pathOrNull) {
+  getFilelistBuffer(DiagnosticEngine &diags, const llvm::opt::Arg *pathOrNull) {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
         llvm::MemoryBuffer::getFile(pathOrNull ? pathOrNull->getValue()
                                                : "/dev/null");
@@ -128,22 +130,39 @@ class ArgsToFrontendInputsConverter {
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
                                 FrontendInputs &Inputs)
-      : Args(Args), Inputs(Inputs),
-        filelistBuffer(
-            getBufferForArg(Diags, Args.getLastArg(options::OPT_filelist))),
-        primaryFilelistBuffer(getBufferForArg(
-            Diags, Args.getLastArg(options::OPT_primary_filelist))) {}
+      : Diags(Diags), Args(Args),
+        pathOrNull(Args.getLastArg(options::OPT_filelist)),
+        Inputs(Inputs),
+        filelistBuffer(getFilelistBuffer(Diags, pathOrNull)) {}
 
-  void convert() {
+  // At this time, the order of files in inputFiles must be preserved, and any primary files must also be in inputFiles.
+  
+  bool convert() {
+    if (!filelistBuffer)
+      return true;
+    
     getFilesDirectlyFromArgs();
-    if (!filelistBuffer || !primaryFilelistBuffer)
-      return;
-
-    splitIntoLines(*filelistBuffer->get(), inputFiles);
-    splitIntoLines(*primaryFilelistBuffer->get(), primaryFiles);
-
-    Inputs.setInputAndPrimaryFilesFromPossiblyOverlappingLists(inputFiles,
-                                                               primaryFiles);
+    splitIntoLines(*filelistBuffer->get(), inputFilesAndPrimariesFromCommandLinePlusInputFilesFromFilelist);
+ 
+    llvm::StringMap<unsigned> indexOfInputFile(primaryFilesFromCommandLine.size());
+    for (auto f: inputFilesAndPrimariesFromCommandLinePlusInputFilesFromFilelist) {
+      auto entry = llvm::StringMapEntry<unsigned>::Create(f, Inputs.inputFilenameCount());
+      indexOfInputFile.insert(entry);
+      Inputs.addInputFilename(f);
+    }
+    for (auto pf : primaryFilesFromCommandLine) {
+      llvm::StringMapConstIterator<unsigned> iterator =
+      indexOfInputFile.find(pf);
+      if (iterator != indexOfInputFile.end()) {
+        Inputs.addPrimaryInput(
+                        SelectedInput(iterator->second, SelectedInput::InputKind::Filename));
+      }
+      else {
+        Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, pf, pathOrNull->getValue());
+        return true;
+      }
+    }
+    return false;
   }
 };
 
@@ -410,7 +429,8 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
 
   setHelpOptions();
 
-  ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert();
+  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert())
+    return true;
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 

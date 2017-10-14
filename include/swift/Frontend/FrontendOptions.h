@@ -239,9 +239,6 @@ public:
 
 private:
   friend class ArgsToFrontendInputsConverter;
-  void setInputAndPrimaryFilesFromPossiblyOverlappingLists(
-      llvm::SmallVectorImpl<StringRef> &inputFiles,
-      llvm::SmallVectorImpl<StringRef> &primaryFiles);
 };
 
 /// Options for controlling the behavior of the frontend.

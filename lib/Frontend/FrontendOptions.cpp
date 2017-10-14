@@ -24,6 +24,8 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
+#include "llvm/ADT/StringExtras.h"
+
 
 using namespace swift;
 using namespace llvm::opt;
@@ -95,28 +97,8 @@ void FrontendInputs::transformInputFilenames(
   }
 }
 
-// The compiler wants primaries first as of 10-13-17, so this routine does that.
-void FrontendInputs::setInputAndPrimaryFilesFromPossiblyOverlappingLists(
-    llvm::SmallVectorImpl<StringRef> &inputFiles,
-    llvm::SmallVectorImpl<StringRef> &primaryFiles) {
-  llvm::StringMap<unsigned> indexOfPrimaryInInput(primaryFiles.size());
-  for (auto primaryFile: primaryFiles) {
-    unsigned primaryIndex = inputFilenameCount();
-    auto entry = llvm::StringMapEntry<unsigned>::Create(
-                                           primaryFile, inputFilenameCount());
-    indexOfPrimaryInInput.insert(entry);
-    addInputFilename(primaryFile);
-    addPrimaryInput(
-                    SelectedInput(primaryIndex, SelectedInput::InputKind::Filename));
-  }
-  for (auto inputFile : inputFiles) {
-    llvm::StringMapConstIterator<unsigned> iterator =
-    indexOfPrimaryInInput.find(inputFile);
-    bool wasIndexFound = iterator != indexOfPrimaryInInput.end();
-    if (!wasIndexFound)
-      addInputFilename(inputFile);
-  }
-}
+// At this time, the order of files in inputFiles must be preserved, and any primary files must also be in inputFiles.
+
 
 bool FrontendOptions::actionHasOutput() const {
   switch (RequestedAction) {
