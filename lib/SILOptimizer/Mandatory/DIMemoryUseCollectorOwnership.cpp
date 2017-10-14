@@ -602,11 +602,6 @@ private:
   void collectClassSelfUses();
   void collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
                             llvm::SmallDenseMap<VarDecl *, unsigned> &EN);
-  // FIXME: This method name is horrible. If you have a better name, please
-  // rename it.
-  void checkClassSelfUpcastUsedBySuperInit(
-      SILValue ClassPointer, UpcastInst *UCI, SILInstruction *User,
-      llvm::SmallDenseMap<VarDecl *, unsigned> &EN);
 
   void addElementUses(unsigned BaseEltNo, SILType UseTy, SILInstruction *User,
                       DIUseKind Kind);
@@ -1217,31 +1212,6 @@ static bool isSuperInitUse(SILArgument *Arg) {
   return isSuperInitUse(Pred->getTerminator());
 }
 
-/// isSuperInitUse - If this "upcast" is part of a call to super.init, return
-/// the Apply instruction for the call, otherwise return null.
-static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
-
-  // "Inst" is an Upcast instruction.  Check to see if it is used by an apply
-  // that came from a call to super.init.
-  for (auto *Op : Inst->getUses()) {
-    auto *User = Op->getUser();
-    // If this used by another upcast instruction, recursively handle it, we may
-    // have a multiple upcast chain.
-    if (auto *UCIU = dyn_cast<UpcastInst>(User))
-      if (auto *subAI = isSuperInitUse(UCIU))
-        return subAI;
-
-    // The call to super.init has to either be an apply or a try_apply.
-    if (!isa<FullApplySite>(User))
-      continue;
-
-    if (isSuperInitUse(User))
-      return User;
-  }
-
-  return nullptr;
-}
-
 static bool isUninitializedMetatypeInst(SILInstruction *I) {
   // A simple reference to "type(of:)" is always fine,
   // even if self is uninitialized.
@@ -1350,63 +1320,6 @@ static bool isSelfInitUse(SILArgument *Arg) {
   return isSelfInitUse(Pred->getTerminator());
 }
 
-void ElementUseCollector::checkClassSelfUpcastUsedBySuperInit(
-    SILValue ClassPointer, UpcastInst *UCI, SILInstruction *SuperInitUse,
-    llvm::SmallDenseMap<VarDecl *, unsigned> &EltNumbering) {
-  // We remember the applyinst as the super.init site, not the upcast.
-  trackUse(DIMemoryUse(SuperInitUse, DIUseKind::SelfInit, 0,
-                       TheMemory.NumElements));
-  UseInfo.trackFailableInitCall(TheMemory, SuperInitUse);
-
-  // We know that the super.init is the consuming point for the
-  // upcast. But we /can/ still write to the class if we borrow the upcast
-  // or escape it using perhaps an unowned convention. So add all other
-  // users of the upcast as a load. This ensures that any such uses before
-  // the super.init point is flagged as being a use before super.init.
-  llvm::SmallVector<Operand *, 32> Worklist(UCI->use_begin(), UCI->use_end());
-  while (!Worklist.empty()) {
-    auto *UCIOpUser = Worklist.pop_back_val()->getUser();
-
-    // Skip the AI.
-    if (UCIOpUser == SuperInitUse)
-      continue;
-
-    // Ignore any method lookup use.
-    if (isa<SuperMethodInst>(UCIOpUser) ||
-        isa<ObjCSuperMethodInst>(UCIOpUser) ||
-        isa<ClassMethodInst>(UCIOpUser) ||
-        isa<ObjCMethodInst>(UCIOpUser)) {
-      continue;
-    }
-
-    // We don't care about end_borrow.
-    if (isa<EndBorrowInst>(UCIOpUser))
-      continue;
-
-    // Look through begin_borrow and unchecked_ref_cast.
-    if (isa<BeginBorrowInst>(UCIOpUser) ||
-        isa<UncheckedRefCastInst>(UCIOpUser)) {
-      auto I = cast<SingleValueInstruction>(UCIOpUser);
-      copy(I->getUses(), std::back_inserter(Worklist));
-      continue;
-    }
-
-    // ref_element_addr P, #field lookups up a field.
-    if (auto *REAI = dyn_cast<RefElementAddrInst>(UCIOpUser)) {
-      assert(EltNumbering.count(REAI->getField()) &&
-             "ref_element_addr not a local field?");
-      // Recursively collect uses of the fields.  Note that fields of the class
-      // could be tuples, so they may be tracked as independent elements.
-      llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);
-      collectUses(REAI, EltNumbering[REAI->getField()]);
-      continue;
-    }
-
-    // Treat all other uses as loads.
-    trackUse(DIMemoryUse(UCIOpUser, DIUseKind::Load, 0, TheMemory.NumElements));
-  }
-}
-
 void ElementUseCollector::collectClassSelfUses(
     SILValue ClassPointer, SILType MemorySILType,
     llvm::SmallDenseMap<VarDecl *, unsigned> &EltNumbering) {
@@ -1430,13 +1343,17 @@ void ElementUseCollector::collectClassSelfUses(
 
     // ref_element_addr P, #field lookups up a field.
     if (auto *REAI = dyn_cast<RefElementAddrInst>(User)) {
-      assert(EltNumbering.count(REAI->getField()) &&
-             "ref_element_addr not a local field?");
-      // Recursively collect uses of the fields.  Note that fields of the class
-      // could be tuples, so they may be tracked as independent elements.
-      llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);
-      collectUses(REAI, EltNumbering[REAI->getField()]);
-      continue;
+      // FIXME: This is a Sema bug and breaks resilience, we should not
+      // emit ref_element_addr in such cases at all.
+      if (EltNumbering.count(REAI->getField()) != 0) {
+        assert(EltNumbering.count(REAI->getField()) &&
+               "ref_element_addr not a local field?");
+        // Recursively collect uses of the fields.  Note that fields of the class
+        // could be tuples, so they may be tracked as independent elements.
+        llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);
+        collectUses(REAI, EltNumbering[REAI->getField()]);
+        continue;
+      }
     }
 
     // retains of self in class constructors can be ignored since we do not care
@@ -1456,24 +1373,12 @@ void ElementUseCollector::collectClassSelfUses(
       continue;
     }
 
-    // If this is an upcast instruction, it is a conversion of self to the base.
-    // This is either part of a super.init sequence, or a general superclass
-    // access.
-    if (auto *UCI = dyn_cast<UpcastInst>(User)) {
-      if (auto *AI = isSuperInitUse(UCI)) {
-        checkClassSelfUpcastUsedBySuperInit(ClassPointer, UCI, AI,
-                                            EltNumbering);
-        continue;
-      }
-
-      // Otherwise, look through the upcast and continue.
-      std::copy(UCI->use_begin(), UCI->use_end(),
-                std::back_inserter(Worklist));
-      continue;
-    }
-
-    // Look through begin_borrow and copy_value.
-    if (isa<BeginBorrowInst>(User) || isa<CopyValueInst>(User)) {
+    // Look through begin_borrow, upcast, unchecked_ref_cast
+    // and copy_value.
+    if (isa<BeginBorrowInst>(User) ||
+        isa<UpcastInst>(User) ||
+        isa<UncheckedRefCastInst>(User) ||
+        isa<CopyValueInst>(User)) {
       auto value = cast<SingleValueInstruction>(User);
       std::copy(value->use_begin(), value->use_end(),
                 std::back_inserter(Worklist));
@@ -1483,7 +1388,8 @@ void ElementUseCollector::collectClassSelfUses(
     // If this is an ApplyInst, check to see if this is part of a self.init
     // call in a delegating initializer.
     DIUseKind Kind = DIUseKind::Load;
-    if (isa<FullApplySite>(User) && isSelfInitUse(User)) {
+    if (isa<FullApplySite>(User) &&
+        (isSelfInitUse(User) || isSuperInitUse(User))) {
       Kind = DIUseKind::SelfInit;
       UseInfo.trackFailableInitCall(TheMemory, User);
     }
