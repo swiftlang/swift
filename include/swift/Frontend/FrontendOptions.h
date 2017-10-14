@@ -211,7 +211,14 @@ public:
 
   // Primary input writers
 
-  void clearPrimaryInputs() { getMutablePrimaryInputs().clear(); }
+  void clearPrimaryInputs() {
+    getMutablePrimaryInputs().clear();
+  }
+  
+  void setPrimaryInputToFirstFile() {
+    clearPrimaryInputs();
+    addPrimaryInput(SelectedInput(0, SelectedInput::InputKind::Filename));
+  }
 
   void addPrimaryInput(SelectedInput si) {
     PrimaryInputs.push_back(si);
