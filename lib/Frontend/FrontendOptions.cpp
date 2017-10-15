@@ -413,7 +413,7 @@ const char *FrontendOptions::computeSuffix() {
   }
 }
 
-bool FrontendOptions::clearOrSetOutputFilenameToStdoutAccordiingToAction() {
+bool FrontendOptions::actionProducesOutputFromFrontend() const {
   switch (RequestedAction) {
     case NoneAction:
     case EmitPCH:
@@ -423,6 +423,41 @@ bool FrontendOptions::clearOrSetOutputFilenameToStdoutAccordiingToAction() {
     case EmitModuleOnly:
     case EmitBC:
     case EmitObject:
+    case Parse:
+    case Typecheck:
+    case DumpParse:
+    case DumpInterfaceHash:
+    case DumpAST:
+    case EmitSyntax:
+    case PrintAST:
+    case DumpScopeMaps:
+    case DumpTypeRefinementContexts:
+    case EmitImportedModules:
+    case EmitSILGen:
+    case EmitSIL:
+    case EmitAssembly:
+    case EmitIR:
+      return true;
+      
+    case Immediate:
+    case REPL:
+      // These modes have no frontend-generated output.
+      return false;
+  }
+}
+
+bool FrontendOptions:: actionOutputsToStdout() const {
+  switch (RequestedAction) {
+    case NoneAction:
+    case EmitPCH:
+    case EmitSIBGen:
+    case EmitSIB:
+    case MergeModules:
+    case EmitModuleOnly:
+    case EmitBC:
+    case EmitObject:
+    case Immediate:
+    case REPL:
       return false;
       
     case Parse:
@@ -435,23 +470,10 @@ bool FrontendOptions::clearOrSetOutputFilenameToStdoutAccordiingToAction() {
     case DumpScopeMaps:
     case DumpTypeRefinementContexts:
     case EmitImportedModules:
-      setOutputFilenameToStdout();
-      return true;
-      
     case EmitSILGen:
     case EmitSIL:
     case EmitAssembly:
     case EmitIR:
-      if (OutputFilenames.empty()) {
-        setOutputFilenameToStdout();
-        return true;;
-      }
-      return false;
-      
-    case Immediate:
-    case REPL:
-    // These modes have no frontend-generated output.
-    OutputFilenames.clear();
-    return true;
+     return true;
   }
 }

@@ -180,17 +180,18 @@ public:
 
 private:
   /// Try to read an output file list file.
-  void readOutputFileList(std::vector<std::string> &outputFiles,
-                          const llvm::opt::Arg *filelistPath) {
+  std::vector<std::string> readOutputFileList(const llvm::opt::Arg *filelistPath) {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
         llvm::MemoryBuffer::getFile(filelistPath->getValue());
     if (!buffer) {
       Diags.diagnose(SourceLoc(), diag::cannot_open_file,
                      filelistPath->getValue(), buffer.getError().message());
     }
+    std::vector<std::string> outputFiles;
     for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
       outputFiles.push_back(line);
     }
+    return outputFiles;
   }
 
   // This is a separate function so that it shows up in stack traces.
@@ -204,14 +205,14 @@ private:
   LLVM_ATTRIBUTE_NOINLINE
   static void debugFailWithCrash() { LLVM_BUILTIN_TRAP; }
 
-  void setOutputFilesFromCommandLineArguments() {
-    if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
-      readOutputFileList(Opts.OutputFilenames, A);
-      assert(!Args.hasArg(options::OPT_o) &&
-             "don't use -o with -output-filelist");
-    } else {
-      Opts.OutputFilenames = Args.getAllArgValues(options::OPT_o);
-    }
+  std::vector<std::string> outputFilenamesFromCommandLine() {
+    assert(
+           !(Args.hasArg(options::OPT_output_filelist) &&
+           Args.hasArg(options::OPT_o)) &&
+           "don't use -o with -output-filelist");
+    return Args.hasArg(options::OPT_output_filelist)
+    ? readOutputFileList(Args.getLastArg(options::OPT_output_filelist))
+    : Args.getAllArgValues(options::OPT_o);
   }
 
   void setModuleName() {
@@ -242,9 +243,11 @@ private:
     Opts.ModuleName = "__bad__";
   }
 
-  llvm::SmallVector<std::string, 8> BaseNamesOfOutputs;
+ 
 
-  void computeBaseNamesOfOutputs() {
+  std::vector<std::string> computeBaseNamesOfOutputs() {
+    std::vector<std::string> BaseNamesOfOutputs;
+    
     std::vector<std::string> namesToStem;
     if (Opts.Inputs.hasPrimaryInputFilenames())
       copyNamesOfPrimaryFilesInto(namesToStem);
@@ -254,9 +257,9 @@ private:
     else if (auto uniqueFN = Opts.Inputs.getUniqueInputFilename()) {
       namesToStem.push_back(uniqueFN.getValue());
     }
-    BaseNamesOfOutputs.clear();
     for (StringRef nameToStem: namesToStem)
       BaseNamesOfOutputs.push_back(llvm::sys::path::stem(nameToStem).str());
+    return BaseNamesOfOutputs;
   }
   
   void copyNamesOfPrimaryFilesInto(std::vector<std::string> &result) {
@@ -353,7 +356,7 @@ private:
   void setDumpScopeMapLocations() const;
   FrontendOptions::ActionType determineWhatUserAskedFrontendToDo() const;
   bool setupForSILOrLLVM();
-  bool determineCorrectOutputFilenameIfMissingOrDirectory();
+  bool setOutputFilenames();
   void determineSupplementaryOutputFilenames();
 
   void setImportObjCHeaderOptions() {
@@ -445,8 +448,7 @@ bool FrontendArgsToOptionsConverter::ParseFrontendArgs() {
   if (setupForSILOrLLVM())
     return true;
   
-  setOutputFilesFromCommandLineArguments();
-  if (determineCorrectOutputFilenameIfMissingOrDirectory())
+  if (setOutputFilenames())
     return true;
   determineSupplementaryOutputFilenames();
 
@@ -650,10 +652,18 @@ bool FrontendArgsToOptionsConverter::setupForSILOrLLVM() {
 }
 
 bool FrontendArgsToOptionsConverter::
-    determineCorrectOutputFilenameIfMissingOrDirectory() {
-  if (!Opts.OutputFilenames.empty() &&
-      !llvm::sys::fs::is_directory(Opts.getSingleOutputFilename()))
+setOutputFilenames() {
+  const std::vector<std::string> commandLineOutputFilenames = outputFilenamesFromCommandLine();
+  
+  if (!commandLineOutputFilenames.empty() &&
+      !llvm::sys::fs::is_directory(commandLineOutputFilenames.back())) {
+    Opts.OutputFilenames = commandLineOutputFilenames;
     return false;
+  }
+  if (Opts.Inputs.isReadingFromStdin() && commandLineOutputFilenames.empty()) {
+    Opts.OutputFilenames = commandLineOutputFilenames;
+    return false;
+  }
 
   // No output filename was specified, or an output directory was specified.
   // Determine the correct output filename.
@@ -663,39 +673,34 @@ bool FrontendArgsToOptionsConverter::
   // if output is required for the requested action.
 
   StringRef Suffix = Opts.computeSuffix();
-  bool changedOutput = Opts.clearOrSetOutputFilenameToStdoutAccordiingToAction();
-
-  if (!changedOutput && !Suffix.empty()) {
-    // We need to deduce a file name.
-
-    // First, if we're reading from stdin and we don't have a directory,
-    // output to stdout.
-    if (Opts.Inputs.isReadingFromStdin() && Opts.OutputFilenames.empty())
-      Opts.setOutputFilenameToStdout();
-    else {
-      // We have a suffix, so determine an appropriate name.
-      computeBaseNamesOfOutputs();
-      if (!Opts.OutputFilenames.empty() && !Opts.Inputs.isWholeModule() &&
-          BaseNamesOfOutputs.size() != Opts.OutputFilenames.size()) {
-        Diags.diagnose(
-            SourceLoc(),
-            diag::error_output_filenames_dont_match_primary_filenames,
-            Opts.OutputFilenames.size(), BaseNamesOfOutputs.size());
-        return true;
-      }
-      for (unsigned index : indices(BaseNamesOfOutputs)) {
-        std::string outputStem = Opts.OutputFilenames.empty() ? "" : Opts.OutputFilenames[index];
-        llvm::SmallString<128> Path(outputStem);
-        llvm::sys::path::append(Path, BaseNamesOfOutputs[index]);
-        llvm::sys::path::replace_extension(Path, Suffix);
-        if (Opts.OutputFilenames.empty())
-          Opts.OutputFilenames.push_back(Path.str());
-        else
-          Opts.OutputFilenames[index] = Path.str();
-      }
-    }
+  assert(Opts.actionProducesOutputFromFrontend() || Opts.OutputFilenames.empty());
+  assert(Opts.actionProducesOutputFromFrontend() || !Opts.actionOutputsToStdout());
+  if (commandLineOutputFilenames.empty() && (Opts.Inputs.isReadingFromStdin() || Opts.actionOutputsToStdout())) {
+    Opts.setOutputFilenameToStdout();
+    return false;
   }
-
+  
+  // We have a suffix, so determine an appropriate name.
+  std::vector<std::string> baseNames = computeBaseNamesOfOutputs();
+  if (!Opts.OutputFilenames.empty() && !Opts.Inputs.isWholeModule() &&
+      baseNames.size() != Opts.OutputFilenames.size()) {
+    Diags.diagnose(
+                   SourceLoc(),
+                   diag::error_output_filenames_dont_match_primary_filenames,
+                   Opts.OutputFilenames.size(), baseNames.size());
+    return true;
+  }
+  for (unsigned index : indices(baseNames)) {
+    std::string outputStem = Opts.OutputFilenames.empty() ? "" : Opts.OutputFilenames[index];
+    llvm::SmallString<128> Path(outputStem);
+    llvm::sys::path::append(Path, baseNames[index]);
+    llvm::sys::path::replace_extension(Path, Suffix);
+    if (Opts.OutputFilenames.empty())
+      Opts.OutputFilenames.push_back(Path.str());
+    else
+      Opts.OutputFilenames[index] = Path.str();
+  }
+  
   if (Opts.OutputFilenames.empty()) {
     if (Opts.RequestedAction != FrontendOptions::REPL &&
         Opts.RequestedAction != FrontendOptions::Immediate &&

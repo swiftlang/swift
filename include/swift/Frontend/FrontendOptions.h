@@ -554,7 +554,8 @@ private:
 
   const char *computeSuffix();
   /// Return true if changed output filename.
-  bool clearOrSetOutputFilenameToStdoutAccordiingToAction();
+  bool actionProducesOutputFromFrontend() const;
+  bool actionOutputsToStdout() const;
 };
 }
 
