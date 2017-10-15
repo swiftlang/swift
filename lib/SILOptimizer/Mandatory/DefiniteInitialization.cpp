@@ -973,13 +973,6 @@ void LifetimeChecker::emitSelfConsumedDiagnostic(SILInstruction *Inst) {
 void LifetimeChecker::handleStoreUse(unsigned UseID) {
   DIMemoryUse &InstInfo = Uses[UseID];
 
-  if (TheMemory.isAnyInitSelf()) {
-    if (getSelfConsumedAtInst(InstInfo.Inst) != DIKind::No) {
-      emitSelfConsumedDiagnostic(InstInfo.Inst);
-      return;
-    }
-  }
-
   // Determine the liveness state of the element that we care about.
   auto Liveness = getLivenessAtInst(InstInfo.Inst, InstInfo.FirstElement,
                                     InstInfo.NumElements);
@@ -995,6 +988,17 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       isFullyInitialized = false;
     if (DI != DIKind::No)
       isFullyUninitialized = false;
+  }
+
+  if (TheMemory.isNonRootClassSelf()) {
+    if (getSelfInitializedAtInst(InstInfo.Inst) != DIKind::Yes) {
+      auto SelfLiveness = getLivenessAtInst(InstInfo.Inst,
+                                            0, TheMemory.NumElements);
+      if (SelfLiveness.isAllYes()) {
+        emitSelfConsumedDiagnostic(InstInfo.Inst);
+        return;
+      }
+    }
   }
 
   // If this is a partial store into a struct and the whole struct hasn't been
