@@ -84,6 +84,19 @@ public struct LazyFilterSequence<Base : Sequence>
       _base: base.makeIterator(), _include)
   }
 
+  @_inlineable
+  public func _customContainsEquatableElement(
+    _ element: Element
+  ) -> Bool? {
+    if !_include(element) {
+      return false
+    }
+    if let baseContains = base._customContainsEquatableElement(element) {
+      return baseContains
+    }
+    return nil
+  }
+
   /// Creates an instance consisting of the elements `x` of `base` for
   /// which `isIncluded(x) == true`.
   @_inlineable // FIXME(sil-serialize-all)
@@ -150,6 +163,19 @@ public struct ${Self}<
   ) {
     self._base = _base
     self._predicate = isIncluded
+  }
+
+  @_inlineable
+  public func _customContainsEquatableElement(
+    _ element: Element
+  ) -> Bool? {
+    if !_predicate(element) {
+      return false
+    }
+    if let baseContains = _base._customContainsEquatableElement(element) {
+      return baseContains
+    }
+    return nil
   }
 
   /// The position of the first element in a non-empty collection.
