@@ -39,6 +39,10 @@ N: John McCall
 E: rjmccall@apple.com
 D: Demangler, IRGen, Runtime
 
+N: Slava Pestov
+E: spestov@apple.com
+D: Reflection, SwiftRemoteMirror
+
 N: Jordan Rose
 E: jordan_rose@apple.com
 D: ClangImporter, Serialization, (Objective-)C printer, Driver
