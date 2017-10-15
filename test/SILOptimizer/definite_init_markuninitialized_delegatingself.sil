@@ -182,13 +182,10 @@ bb1:
 bb2:
 
 // CHECK-NEXT:  [[BIT:%[0-9]+]] = load [trivial] [[CONTROL]] : $*Builtin.Int1
-// CHECK-NEXT:  cond_br [[BIT]], [[INITIALIZED:bb[0-9]+]], [[UNINITIALIZED:bb[0-9]+]]
+// CHECK-NEXT:  cond_br [[BIT]], [[INITIALIZED:bb[0-9]+]], [[EXIT:bb[0-9]+]]
 
 // CHECK: [[INITIALIZED]]:
 // CHECK-NEXT:  destroy_addr [[SELF_BOX]] : $*MyStruct3
-// CHECK-NEXT:  br [[EXIT:bb[0-9]+]]
-
-// CHECK: [[UNINITIALIZED]]:
 // CHECK-NEXT:  br [[EXIT]]
 
 // CHECK: [[EXIT]]:
@@ -208,7 +205,7 @@ sil @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
 // CHECK-LABEL: sil hidden @test_conditional_destroy_class_delegating_init
 sil hidden @test_conditional_destroy_class_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : @trivial $Builtin.Int1):
-// CHECK:  [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
+// CHECK:  [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int2
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack $MyClass3
 
   %2 = alloc_stack $MyClass3
@@ -224,8 +221,16 @@ bb1:
   %6 = apply %5(%4) : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
   store %6 to [init] %3 : $*MyClass3
 
-// CHECK:  [[SET:%[0-9]+]] = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT:  store [[SET]] to [trivial] [[CONTROL]] : $*Builtin.Int1
+// CHECK:       [[SET:%[0-9]+]] = integer_literal $Builtin.Int2, -2
+// CHECK-NEXT:  [[OLD:%.*]] = load [trivial] [[CONTROL]]
+// CHECK-NEXT:  [[UPDATE:%.*]] = builtin "or_Int2"([[OLD]] : $Builtin.Int2, [[SET]] : $Builtin.Int2)
+// CHECK-NEXT:  store [[UPDATE]] to [trivial] [[CONTROL]] : $*Builtin.Int2
+
+// CHECK:       [[SET:%[0-9]+]] = integer_literal $Builtin.Int2, 1
+// CHECK-NEXT:  [[OLD:%.*]] = load [trivial] [[CONTROL]]
+// CHECK-NEXT:  [[UPDATE:%.*]] = builtin "or_Int2"([[OLD]] : $Builtin.Int2, [[SET]] : $Builtin.Int2)
+// CHECK-NEXT:  store [[UPDATE]] to [trivial] [[CONTROL]] : $*Builtin.Int2
+
 // CHECK: [[NEW_SELF:%[0-9]+]] = apply {{.*}}({{.*}})  : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
 // CHECK-NEXT:  store [[NEW_SELF]] to [init] [[SELF_BOX]] : $*MyClass3
 
@@ -235,18 +240,29 @@ bb1:
 // CHECK: [[CHECK]]:
 bb2:
 
-// CHECK-NEXT:  [[BIT:%[0-9]+]] = load [trivial] [[CONTROL]] : $*Builtin.Int1
-// CHECK-NEXT:  cond_br [[BIT]], [[INITIALIZED:bb[0-9]+]], [[UNINITIALIZED:bb[0-9]+]]
+// CHECK-NEXT:  [[BIT:%.*]] = load [trivial] [[CONTROL]]
+// CHECK-NEXT:  [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BIT]] : $Builtin.Int2) : $Builtin.Int1
+// CHECK-NEXT:  cond_br [[COND]], [[PARTIAL:bb[0-9]+]], [[UNINITIALIZED:bb[0-9]+]]
+
+// CHECK: [[PARTIAL]]:
+// CHECK-NEXT:  [[BIT:%.*]] = load [trivial] [[CONTROL]]
+// CHECK-NEXT:  [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
+// CHECK-NEXT:  [[SHIFTED:%.*]] = builtin "lshr_Int2"([[BIT]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2) : $Builtin.Int2
+// CHECK-NEXT:  [[COND:%.*]] = builtin "trunc_Int2_Int1"([[SHIFTED]] : $Builtin.Int2) : $Builtin.Int1
+// CHECK-NEXT:  cond_br [[COND]], [[INITIALIZED:bb[0-9]+]], [[CONSUMED:bb[0-9]+]]
 
 // CHECK: [[INITIALIZED]]:
 // CHECK-NEXT:  destroy_addr [[SELF_BOX]] : $*MyClass3
 // CHECK-NEXT:  br [[EXIT:bb[0-9]+]]
 
+// CHECK: [[CONSUMED]]:
+// CHECK-NEXT:  br [[EXIT]]
+
 // CHECK: [[UNINITIALIZED]]:
 // CHECK-NEXT:  [[OLD_SELF:%[0-9]+]] = load [take] [[SELF_BOX]] : $*MyClass3
 // CHECK-NEXT:  [[METATYPE:%[0-9]+]] = value_metatype $@thick MyClass3.Type, [[OLD_SELF]] : $MyClass3
 // CHECK-NEXT:  dealloc_partial_ref [[OLD_SELF]] : $MyClass3, [[METATYPE]] : $@thick MyClass3.Type
-// CHECK-NEXT:  br [[EXIT]]
+// CHECK-NEXT:  br [[EXIT:bb[0-9]+]]
 
 // CHECK: [[EXIT]]:
 

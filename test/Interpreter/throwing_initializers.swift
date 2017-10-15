@@ -405,4 +405,36 @@ ThrowingInitTestSuite.test("InitFailure_Struct") {
   mustThrow { try Chimera(before: false, during: false, after: true) }
 }
 
+// Specific regression tests:
+
+// <https://bugs.swift.org/browse/SR-1714> - try? self.init(...)` in init? causes overrelease
+class ThrowAndFailRoot {
+  let x = LifetimeTracked(0)
+}
+
+class ThrowAndFailDerived: ThrowAndFailRoot {
+  let name: String
+  let y = LifetimeTracked(0)
+
+  init(name: String) throws {
+    self.name = name
+    super.init()
+    if name.isEmpty {
+      struct EmptyError: Error {}
+      throw EmptyError()
+    }
+  }
+
+  convenience init?(b: Bool) {
+    try? self.init(name: b ? "Bob" : "")
+  }
+}
+
+ThrowingInitTestSuite.test("ThrowsAndFailableTest") {
+  _ = ThrowAndFailDerived(b: true)!
+  if let x = ThrowAndFailDerived(b: false) { preconditionFailure() }
+}
+
+// <https://bugs.swift.org/browse/SR-3132> - Invalid pointer dequeued from free list. Runtime crash on some weird code
+
 runAllTests()
