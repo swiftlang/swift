@@ -234,6 +234,23 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   }
 
   @_inlineable
+  public func _preprocessingPass<R>(
+    _ preprocess: () throws -> R
+  ) rethrows -> R? {
+    return try preprocess()
+  }
+
+  @_inlineable
+  public func _customContainsEquatableElement(
+    _ element: Element
+  ) -> Bool? {
+    if element < _start || _end <= element {
+      return false
+    }
+    return nil
+  }
+
+  @_inlineable
   @_versioned
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     _precondition(stride != 0, "Stride size must not be zero")
@@ -331,6 +348,23 @@ public struct StrideThrough<
   @_inlineable
   public func makeIterator() -> StrideThroughIterator<Element> {
     return StrideThroughIterator(_start: _start, end: _end, stride: _stride)
+  }
+
+  @_inlineable
+  public func _preprocessingPass<R>(
+    _ preprocess: () throws -> R
+  ) rethrows -> R? {
+    return try preprocess()
+  }
+
+  @_inlineable
+  public func _customContainsEquatableElement(
+    _ element: Element
+  ) -> Bool? {
+    if element < _start || _end < element {
+      return false
+    }
+    return nil
   }
 
   @_inlineable
