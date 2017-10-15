@@ -88,10 +88,7 @@ struct _BridgeStorage<
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   var isNative: Bool {
-    @inline(__always) get {
-      return (_bitPattern(rawValue) &
-              (_objCTaggedPointerBits | _objectPointerIsObjCBit)) == 0
-    }
+    @inline(__always) get { return _isNativePointer(rawValue) }
   }
   
   @_inlineable // FIXME(sil-serialize-all)
@@ -159,9 +156,7 @@ struct _BridgeStorage<
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var _isTagged: Bool {
-    @inline(__always) get {
-      return (_bitPattern(rawValue) & _objCTaggedPointerBits) != 0
-    }
+    @inline(__always) get { return _isTaggedObject(rawValue) }
   }
 
   // rawValue is passed inout to _isUnique.  Although its value
