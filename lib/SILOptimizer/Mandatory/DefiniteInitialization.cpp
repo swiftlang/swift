@@ -353,24 +353,32 @@ namespace {
 
     /// Helper flag used during building the worklist for the dataflow analysis.
     bool isInWorkList : 1;
-    
+
     /// Availability of elements within the block.
     /// Not "empty" for all blocks which have non-load uses or contain the
     /// definition of the memory object.
     AvailabilitySet LocalAvailability;
-    
+
     /// The live out information of the block. This is the LocalAvailability
     /// plus the information merged-in from the predecessor blocks.
     AvailabilitySet OutAvailability;
-    
+
     /// Keep track of blocks where the contents of the self box are not valid
     /// because we're in an error path dominated by a self.init or super.init
     /// delegation.
     Optional<DIKind> LocalSelfConsumed;
-    
+
     /// The live out information of the block. This is the LocalSelfConsumed
     /// plus the information merged-in from the predecessor blocks.
     Optional<DIKind> OutSelfConsumed;
+
+    /// Keep track of blocks where the contents of the self box are stored to
+    /// as a result of a successful self.init or super.init call.
+    Optional<DIKind> LocalSelfInitialized;
+
+    /// The live out information of the block. This is the LocalSelfInitialized
+    /// plus the information merged-in from the predecessor blocks.
+    Optional<DIKind> OutSelfInitialized;
 
     LiveOutBlockState(unsigned NumElements)
       : HasNonLoadUse(false),
@@ -387,6 +395,10 @@ namespace {
         LocalSelfConsumed = DIKind::No;
       if (!OutSelfConsumed.hasValue())
         OutSelfConsumed = DIKind::No;
+      if (!LocalSelfInitialized.hasValue())
+        LocalSelfInitialized = DIKind::No;
+      if (!OutSelfInitialized.hasValue())
+        OutSelfInitialized = DIKind::No;
     }
 
     /// Transfer function for dataflow analysis.
@@ -429,13 +441,22 @@ namespace {
         }
       }
 
-      Optional<DIKind> result;
+      Optional<DIKind> temp;
       if (transferAvailability(Pred.OutSelfConsumed,
                                OutSelfConsumed,
                                LocalSelfConsumed,
+                               temp)) {
+        changed = true;
+        OutSelfConsumed = temp;
+      }
+
+      Optional<DIKind> result;
+      if (transferAvailability(Pred.OutSelfInitialized,
+                               OutSelfInitialized,
+                               LocalSelfInitialized,
                                result)) {
         changed = true;
-        OutSelfConsumed = result;
+        OutSelfInitialized = result;
       }
 
       return changed;
@@ -460,9 +481,17 @@ namespace {
       OutSelfConsumed = LocalSelfConsumed;
     }
 
+    /// Mark the block as storing to self, indicating the self box has been
+    /// initialized.
+    void markStoreToSelf() {
+      LocalSelfInitialized = DIKind::Yes;
+      OutSelfInitialized = DIKind::Yes;
+    }
+
     /// If true, we're not done with our dataflow analysis yet.
     bool containsUndefinedValues() {
       return (!OutSelfConsumed.hasValue() ||
+              !OutSelfInitialized.hasValue() ||
               OutAvailability.containsUnknownElements());
     }
   };
@@ -487,6 +516,7 @@ namespace {
 
     SmallVectorImpl<DIMemoryUse> &Uses;
     TinyPtrVector<TermInst *> &FailableInits;
+    TinyPtrVector<SILInstruction *> &StoresToSelf;
     SmallVectorImpl<SILInstruction *> &Destroys;
     std::vector<ConditionalDestroy> ConditionalDestroys;
 
@@ -537,6 +567,7 @@ namespace {
                                         unsigned NumElts);
 
     DIKind getSelfConsumedAtInst(SILInstruction *Inst);
+    DIKind getSelfInitializedAtInst(SILInstruction *Inst);
 
     bool isInitializedAtUse(const DIMemoryUse &Use,
                             bool *SuperInitDone = nullptr,
@@ -571,6 +602,7 @@ namespace {
     void computePredsLiveOut(SILBasicBlock *BB);
     void getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result);
     void getOutSelfConsumed(SILBasicBlock *BB, Optional<DIKind> &Result);
+    void getOutSelfInitialized(SILBasicBlock *BB, Optional<DIKind> &Result);
 
     bool shouldEmitError(SILInstruction *Inst);
     std::string getUninitElementName(const DIMemoryUse &Use);
@@ -589,7 +621,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                                  DIElementUseInfo &UseInfo)
     : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
       Uses(UseInfo.Uses), FailableInits(UseInfo.FailableInits),
-      Destroys(UseInfo.Releases) {
+      StoresToSelf(UseInfo.StoresToSelf), Destroys(UseInfo.Releases) {
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -612,6 +644,13 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     // they are live-in or a full element store.  This means that the block they
     // are in should be treated as a live out for cross-block analysis purposes.
     BBInfo.markAvailable(Use);
+  }
+
+  // Mark blocks where the self box is initialized.
+  for (auto *I : StoresToSelf) {
+    // FIXME: critical edges?
+    auto *bb = I->getParent();
+    getBlockInfo(bb).markStoreToSelf();
   }
 
   // Mark blocks where the self value has been consumed.
@@ -2460,6 +2499,14 @@ getOutSelfConsumed(SILBasicBlock *BB, Optional<DIKind> &Result) {
     Result = mergeKinds(Result, getBlockInfo(Pred).OutSelfConsumed);
 }
 
+void LifetimeChecker::
+getOutSelfInitialized(SILBasicBlock *BB, Optional<DIKind> &Result) {
+  computePredsLiveOut(BB);
+
+  for (auto *Pred : BB->getPredecessorBlocks())
+    Result = mergeKinds(Result, getBlockInfo(Pred).OutSelfInitialized);
+}
+
 AvailabilitySet
 LifetimeChecker::getLivenessAtNonTupleInst(swift::SILInstruction *Inst,
                                            swift::SILBasicBlock *InstBB,
@@ -2602,14 +2649,13 @@ DIKind LifetimeChecker::
 getSelfConsumedAtInst(SILInstruction *Inst) {
   DEBUG(llvm::dbgs() << "Get self consumed at " << *Inst);
 
-  Optional<DIKind> Result;
-
   SILBasicBlock *InstBB = Inst->getParent();
   auto &BlockInfo = getBlockInfo(InstBB);
 
   if (BlockInfo.LocalSelfConsumed.hasValue())
     return *BlockInfo.LocalSelfConsumed;
 
+  Optional<DIKind> Result;
   getOutSelfConsumed(InstBB, Result);
 
   // If the result wasn't computed, we must be analyzing code within
@@ -2617,6 +2663,45 @@ getSelfConsumedAtInst(SILInstruction *Inst) {
   // the result to unconsumed so that clients don't have to handle this.
   if (!Result.hasValue())
     Result = DIKind::No;
+
+  return *Result;
+}
+
+/// getSelfInitializedAtInst - Check if the self box in an initializer has
+/// a fully initialized value at the specified instruction.
+///
+/// Possible outcomes:
+/// - 'Yes' -- 'self' is fully initialized, and should be destroyed in the
+///   usual manner in an error path
+///
+/// - 'No', and instruction is dominated by a SelfInit use -- this means
+///   'self' was consumed by a self.init or super.init call, and we're in
+///   an error path; there's nothing to clean up
+///
+/// - 'No', and instruction is not dominated by a SelfInit use -- this means
+///   we have to do a partial cleanup, for example deallocating a class
+///   instance without destroying its members
+///
+/// Also, the full range of conditional outcomes is possible above, if the
+/// result is 'Partial'.
+DIKind LifetimeChecker::
+getSelfInitializedAtInst(SILInstruction *Inst) {
+  DEBUG(llvm::dbgs() << "Get self initialized at " << *Inst);
+
+  SILBasicBlock *InstBB = Inst->getParent();
+  auto &BlockInfo = getBlockInfo(InstBB);
+
+  if (BlockInfo.LocalSelfInitialized.hasValue())
+    return *BlockInfo.LocalSelfInitialized;
+
+  Optional<DIKind> Result;
+  getOutSelfInitialized(InstBB, Result);
+
+  // If the result wasn't computed, we must be analyzing code within
+  // an unreachable cycle that is not dominated by "TheMemory".  Just force
+  // the result to initialized so that clients don't have to handle this.
+  if (!Result.hasValue())
+    Result = DIKind::Yes;
 
   return *Result;
 }

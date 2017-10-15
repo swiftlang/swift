@@ -426,6 +426,10 @@ bool DIMemoryUse::onlyTouchesTrivialElements(
 //                      DIElementUseInfo Implementation
 //===----------------------------------------------------------------------===//
 
+void DIElementUseInfo::trackStoreToSelf(SILInstruction *I) {
+  StoresToSelf.push_back(I);
+}
+
 void DIElementUseInfo::trackFailableInitCall(
     const DIMemoryObjectInfo &MemoryInfo, SILInstruction *I) {
   // If we have a store to self inside the normal BB, we have a 'real'
@@ -1106,7 +1110,7 @@ void ElementUseCollector::collectClassSelfUses() {
   // Okay, given that we have a proper setup, we walk the use chains of the self
   // box to find any accesses to it. The possible uses are one of:
   //
-  //   1) The initialization store (TheStore).
+  //   1) The initialization store.
   //   2) Loads of the box, which have uses of self hanging off of them.
   //   3) An assign to the box, which happens at super.init.
   //   4) Potential escapes after super.init, if self is closed over.
@@ -1115,10 +1119,26 @@ void ElementUseCollector::collectClassSelfUses() {
   for (auto *Op : MUI->getUses()) {
     SILInstruction *User = Op->getUser();
 
-    // Stores to self are initializations store or the rebind of self as
-    // part of the super.init call.  Ignore both of these.
-    if (isa<StoreInst>(User) && Op->getOperandNumber() == 1)
-      continue;
+    // Stores to self.
+    if (auto *SI = dyn_cast<StoreInst>(User)) {
+      if (Op->getOperandNumber() == 1) {
+        // The initial store of 'self' into the box at the start of the
+        // function. Ignore it.
+        if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc()))
+          if (Arg->getParent() == MUI->getParent())
+            continue;
+
+        // A store of a load from the box is ignored.
+        // FIXME: SILGen should not emit these.
+        if (auto *LI = dyn_cast<LoadInst>(SI->getSrc()))
+          if (LI->getOperand() == MUI)
+            continue;
+
+        // Any other store needs to be recorded.
+        UseInfo.trackStoreToSelf(SI);
+        continue;
+      }
+    }
 
     // Ignore end_borrows. These can only come from us being the source of a
     // load_borrow.
@@ -1475,10 +1495,26 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
     if (isa<EndBorrowInst>(User))
       continue;
 
-    // Stores to self are initializations store or the rebind of self as
-    // part of the super.init call.  Ignore both of these.
-    if (isa<StoreInst>(User) && Op->getOperandNumber() == 1)
-      continue;
+    // Stores to self.
+    if (auto *SI = dyn_cast<StoreInst>(User)) {
+      if (Op->getOperandNumber() == 1) {
+        // The initial store of 'self' into the box at the start of the
+        // function. Ignore it.
+        if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc()))
+          if (Arg->getParent() == MUI->getParent())
+            continue;
+
+        // A store of a load from the box is ignored.
+        // FIXME: SILGen should not emit these.
+        if (auto *LI = dyn_cast<LoadInst>(SI->getSrc()))
+          if (LI->getOperand() == MUI)
+            continue;
+
+        // Any other store needs to be recorded.
+        UseInfo.trackStoreToSelf(SI);
+        continue;
+      }
+    }
 
     // For class initializers, the assign into the self box may be
     // captured as SelfInit or SuperInit elsewhere.
@@ -1491,6 +1527,7 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
         if (auto *Fn = AI->getCalleeFunction()) {
           if (Fn->getRepresentation() ==
               SILFunctionTypeRepresentation::CFunctionPointer) {
+            UseInfo.trackStoreToSelf(User);
             UseInfo.trackUse(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
             continue;
           }
@@ -1503,6 +1540,7 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
     if (auto *AI = dyn_cast<AssignInst>(User)) {
       if (auto *AssignSource = AI->getOperand(0)->getDefiningInstruction()) {
         if (isSelfInitUse(AssignSource) || isSuperInitUse(AssignSource)) {
+          UseInfo.trackStoreToSelf(User);
           UseInfo.trackUse(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
           continue;
         }
@@ -1510,6 +1548,7 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
       if (auto *AssignSource = dyn_cast<SILArgument>(AI->getOperand(0))) {
         if (AssignSource->getParent() == AI->getParent() &&
             (isSelfInitUse(AssignSource) || isSuperInitUse(AssignSource))) {
+          UseInfo.trackStoreToSelf(User);
           UseInfo.trackUse(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
           continue;
         }
@@ -1573,13 +1612,17 @@ void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses(
     // Stores *to* the allocation are writes.  If the value being stored is a
     // call to self.init()... then we have a self.init call.
     if (auto *AI = dyn_cast<AssignInst>(User)) {
-      if (AI->getDest() == I)
+      if (AI->getDest() == I) {
+        UseInfo.trackStoreToSelf(AI);
         Kind = DIUseKind::InitOrAssign;
+      }
     }
 
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
-      if (CAI->getDest() == I)
+      if (CAI->getDest() == I) {
+        UseInfo.trackStoreToSelf(CAI);
         Kind = DIUseKind::InitOrAssign;
+      }
     }
 
     // Look through begin_access
