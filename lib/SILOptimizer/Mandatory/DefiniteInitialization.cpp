@@ -1697,12 +1697,8 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
   auto *Inst = InstInfo.Inst;
 
   assert(TheMemory.isAnyInitSelf());
+  assert(!TheMemory.isClassInitSelf() || TheMemory.isNonRootClassSelf());
   assert(TheMemory.getType()->hasReferenceSemantics());
-
-  if (getSelfConsumedAtInst(Inst) != DIKind::No) {
-    emitSelfConsumedDiagnostic(Inst);
-    return;
-  }
 
   // Determine the liveness states of the memory object, including the
   // self/super.init state.
@@ -1716,6 +1712,11 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
   case DIKind::Yes:
   case DIKind::Partial:
     // This is bad, only one super.init call is allowed.
+    if (getSelfInitializedAtInst(Inst) != DIKind::Yes) {
+      emitSelfConsumedDiagnostic(Inst);
+      return;
+    }
+
     if (shouldEmitError(Inst))
       diagnose(Module, Inst->getLoc(), diag::selfinit_multiple_times,
                TheMemory.isDelegatingInit());
