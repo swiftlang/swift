@@ -421,12 +421,6 @@ extension _StringGuts {
 
   @_versioned
   init(_ legacyCore: _LegacyStringCore) {
-    // TODO: Try to pack small strings
-    guard true else {
-      self.init(FatalErrorString())
-      return
-    }
-
     guard !legacyCore.hasCocoaBuffer else {
       _sanityCheck(legacyCore._owner != nil,
         "how? is this yet another case we don't know about?")

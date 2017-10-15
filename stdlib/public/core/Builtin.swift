@@ -469,12 +469,8 @@ public func _bridgeObject(fromNative x: AnyObject) -> _BuiltinBridgeObject {
 public func _bridgeObject(
   fromNonTaggedObjC x: AnyObject
 ) -> _BuiltinBridgeObject {
-  guard !_isObjCTaggedPointer(x) else {
-    internalDumpHex(x)
-    _sanityCheck(false, "FAIL!")
-  }
+  _sanityCheck(!_isObjCTaggedPointer(x))
   let object = _makeObjCBridgeObject(x)
-  // FIXME: handle tagged strings...
   _sanityCheck(_isNonTaggedObjCPointer(object))
   return object
 }
@@ -492,9 +488,6 @@ public func _bridgeObject(taggingPayload x: UInt) -> _BuiltinBridgeObject {
     "out-of-range: limited bit range requires some zero top bits")
   _sanityCheck(shifted & _objCTaggedPointerBits == 0,
     "out-of-range: post-shift use of tag bits")
-  // dump(x)
-  // dump(shifted)
-  // dump(shifted | _objCTaggedPointerBits)
   return _bridgeObject(fromTagged: shifted | _objCTaggedPointerBits)
 }
 
