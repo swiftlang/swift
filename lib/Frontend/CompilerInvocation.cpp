@@ -242,9 +242,9 @@ private:
     Opts.ModuleName = "__bad__";
   }
 
-  llvm::SmallVector<StringRef, 8> BaseNamesOfOutputs;
+  llvm::SmallVector<std::string, 8> BaseNamesOfOutputs;
 
-  llvm::SmallVectorImpl<StringRef> &computeBaseNamesOfOutputs() {
+  void computeBaseNamesOfOutputs() {
     std::vector<std::string> namesToStem;
     if (Opts.Inputs.hasPrimaryInputFilenames())
       copyNamesOfPrimaryFilesInto(namesToStem);
@@ -256,9 +256,7 @@ private:
     }
     BaseNamesOfOutputs.clear();
     for (StringRef nameToStem: namesToStem)
-      BaseNamesOfOutputs.push_back(llvm::sys::path::stem(nameToStem));
-  
-    return BaseNamesOfOutputs;
+      BaseNamesOfOutputs.push_back(llvm::sys::path::stem(nameToStem).str());
   }
   
   void copyNamesOfPrimaryFilesInto(std::vector<std::string> &result) {
@@ -676,25 +674,24 @@ bool FrontendArgsToOptionsConverter::
       Opts.setOutputFilenameToStdout();
     else {
       // We have a suffix, so determine an appropriate name.
-      auto &baseNames = computeBaseNamesOfOutputs();
-      // If user did not specify any, but we need some
-      if (Opts.OutputFilenames.empty()) {
-        for (unsigned i = 0;  i < baseNames.size();  ++i)
-          Opts.OutputFilenames.push_back(std::string(""));
-      }
-      if (!Opts.Inputs.isWholeModule() &&
-          baseNames.size() != Opts.OutputFilenames.size()) {
+      computeBaseNamesOfOutputs();
+      if (!Opts.OutputFilenames.empty() && !Opts.Inputs.isWholeModule() &&
+          BaseNamesOfOutputs.size() != Opts.OutputFilenames.size()) {
         Diags.diagnose(
             SourceLoc(),
             diag::error_output_filenames_dont_match_primary_filenames,
-            Opts.OutputFilenames.size(), baseNames.size());
+            Opts.OutputFilenames.size(), BaseNamesOfOutputs.size());
         return true;
       }
-      for (unsigned index : indices(Opts.OutputFilenames)) {
-        llvm::SmallString<128> Path(Opts.OutputFilenames[index]);
-        llvm::sys::path::append(Path, baseNames[index]);
+      for (unsigned index : indices(BaseNamesOfOutputs)) {
+        std::string outputStem = Opts.OutputFilenames.empty() ? "" : Opts.OutputFilenames[index];
+        llvm::SmallString<128> Path(outputStem);
+        llvm::sys::path::append(Path, BaseNamesOfOutputs[index]);
         llvm::sys::path::replace_extension(Path, Suffix);
-        Opts.OutputFilenames[index] = Path.str();
+        if (Opts.OutputFilenames.empty())
+          Opts.OutputFilenames.push_back(Path.str());
+        else
+          Opts.OutputFilenames[index] = Path.str();
       }
     }
   }
