@@ -179,8 +179,13 @@ macro(configure_sdk_windows prefix sdk_name environment architectures)
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
 
   foreach(arch ${architectures})
-    set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
-        "${arch}-unknown-windows-${environment}")
+    if(arch STREQUAL armv7)
+      set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
+          "thumbv7-unknown-windows-${environment}")
+    else()
+      set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
+          "${arch}-unknown-windows-${environment}")
+    endif()
   endforeach()
 
   # Add this to the list of known SDKs.
