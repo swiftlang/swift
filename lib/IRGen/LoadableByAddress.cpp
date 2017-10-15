@@ -37,21 +37,6 @@
 using namespace swift;
 using namespace swift::irgen;
 
-/// Utility to derive SILLocation.
-///
-/// TODO: This should be a common utility.
-static SILLocation getLocForValue(SILValue value) {
-  if (auto *instr = value->getDefiningInstruction()) {
-    return instr->getLoc();
-  }
-  if (auto *arg = dyn_cast<SILArgument>(value)) {
-    if (arg->getDecl())
-      return RegularLocation(const_cast<ValueDecl *>(arg->getDecl()));
-  }
-  // TODO: bbargs should probably use one of their operand locations.
-  return value->getFunction()->getLocation();
-}
-
 static GenericEnvironment *getGenericEnvironment(SILModule &Mod,
                                                  CanSILFunctionType loweredTy) {
   return loweredTy->getGenericSignature()->createGenericEnvironment(
@@ -875,7 +860,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
 
   SILBuilder allocBuilder(pass.F->begin()->begin());
   AllocStackInst *allocInstr =
-      allocBuilder.createAllocStack(getLocForValue(value), value->getType());
+      allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
   SILBuilder outlinedBuilder(optimizableLoad);
   createOutlinedCopyCall(outlinedBuilder, value, allocInstr, pass);
@@ -1002,7 +987,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
 
   SILBuilder allocBuilder(pass.F->begin()->begin());
   AllocStackInst *allocInstr =
-      allocBuilder.createAllocStack(getLocForValue(value), value->getType());
+      allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
   SILBuilder outlinedBuilder(unoptimizableLoad);
   createOutlinedCopyCall(outlinedBuilder, value, allocInstr, pass);
@@ -1367,7 +1352,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 
   SILBuilder allocBuilder(pass.F->begin()->begin());
   AllocStackInst *allocInstr =
-      allocBuilder.createAllocStack(getLocForValue(value), value->getType());
+      allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
   LoadInst *loadCopy = nullptr;
   auto *applyOutlinedCopy =
@@ -1647,7 +1632,7 @@ static SILValue createCopyOfEnum(StructLoweringState &pass,
     value = allocInstr;
   }
   SILBuilder allocBuilder(pass.F->begin()->begin());
-  auto *allocInstr = allocBuilder.createAllocStack(getLocForValue(value), type);
+  auto *allocInstr = allocBuilder.createAllocStack(value.getLoc(), type);
 
   SILBuilder copyBuilder(orig);
   createOutlinedCopyCall(copyBuilder, value, allocInstr, pass);

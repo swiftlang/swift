@@ -877,7 +877,7 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
                                 : MemoryBehavior::MayHaveSideEffects;
 
     // Handle LLVM intrinsic functions.
-    const IntrinsicInfo & IInfo = BI->getIntrinsicInfo();
+    const IntrinsicInfo &IInfo = BI->getIntrinsicInfo();
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
       // Read-only.
       if (IInfo.hasAttribute(llvm::Attribute::ReadOnly) &&
