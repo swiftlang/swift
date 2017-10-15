@@ -26,6 +26,10 @@
 #define DIFF_ITEM_KEY_KIND(NAME)
 #endif
 
+#ifndef SPECIAL_CASE_ID
+#define SPECIAL_CASE_ID(NAME)
+#endif
+
 NODE_KIND(Root)
 NODE_KIND(TypeDecl)
 NODE_KIND(TypeNominal)
@@ -52,6 +56,7 @@ NODE_ANNOTATION(GenericParamDownCast)
 NODE_ANNOTATION(TypeAliasChangeFromInt)
 NODE_ANNOTATION(GetterToProperty)
 NODE_ANNOTATION(SetterToProperty)
+NODE_ANNOTATION(PropertyName)
 NODE_ANNOTATION(TypeRewritten)
 NODE_ANNOTATION(TypeRewrittenLeft)
 NODE_ANNOTATION(TypeRewrittenRight)
@@ -83,6 +88,7 @@ KEY(typeAttributes)
 KEY(declAttributes)
 KEY(declKind)
 KEY(ownership)
+KEY(superclassUsr)
 
 KNOWN_TYPE(Optional)
 KNOWN_TYPE(ImplicitlyUnwrappedOptional)
@@ -92,6 +98,7 @@ KNOWN_TYPE(Function)
 
 DIFF_ITEM_KIND(CommonDiffItem)
 DIFF_ITEM_KIND(TypeMemberDiffItem)
+DIFF_ITEM_KIND(SpecialCaseDiffItem)
 DIFF_ITEM_KIND(NoEscapeFuncParam)
 DIFF_ITEM_KIND(OverloadedFuncInfo)
 
@@ -115,11 +122,22 @@ DIFF_ITEM_KEY_KIND_STRING(RightComment)
 DIFF_ITEM_KEY_KIND_STRING(ModuleName)
 DIFF_ITEM_KEY_KIND_STRING(NewTypeName)
 DIFF_ITEM_KEY_KIND_STRING(NewPrintedName)
+DIFF_ITEM_KEY_KIND_STRING(OldTypeName)
 DIFF_ITEM_KEY_KIND_STRING(OldPrintedName)
+DIFF_ITEM_KEY_KIND_STRING(SpecialCaseId)
 
 DIFF_ITEM_KEY_KIND_INT(SelfIndex)
+DIFF_ITEM_KEY_KIND_INT(RemovedIndex)
 DIFF_ITEM_KEY_KIND_INT(Index)
 
+SPECIAL_CASE_ID(NSOpenGLSetOption)
+SPECIAL_CASE_ID(NSOpenGLGetOption)
+SPECIAL_CASE_ID(StaticAbsToSwiftAbs)
+SPECIAL_CASE_ID(NSOpenGLGetVersion)
+SPECIAL_CASE_ID(ToIntMax)
+SPECIAL_CASE_ID(ToUIntMax)
+
+#undef SPECIAL_CASE_ID
 #undef DIFF_ITEM_KEY_KIND_INT
 #undef DIFF_ITEM_KEY_KIND_STRING
 

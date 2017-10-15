@@ -210,3 +210,14 @@ _ = seven as Int // expected-error {{cannot convert value of type 'Double' to ty
 func rdar29894174(v: B?) {
   let _ = [v].flatMap { $0 as? D }
 }
+
+// When re-typechecking a solution with an 'is' cast applied,
+// we would fail to produce a diagnostic.
+func process(p: Any?) {
+  compare(p is String)
+  // expected-error@-1 {{cannot invoke 'compare' with an argument list of type '(Bool)'}}
+  // expected-note@-2 {{overloads for 'compare' exist with these partially matching parameter lists: (T, T), (T?, T?)}}
+}
+
+func compare<T>(_: T, _: T) {}
+func compare<T>(_: T?, _: T?) {}

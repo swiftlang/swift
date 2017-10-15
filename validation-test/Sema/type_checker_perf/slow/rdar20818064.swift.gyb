@@ -1,0 +1,13 @@
+// RUN: %scale-test --invert-result --begin 1 --end 5 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+typealias D = [String: Any]
+
+_ = [
+%for i in range(0, N):
+  "first": D(),
+  "second": ["key": "value"],
+  "third": ["key": D()],
+%end
+]

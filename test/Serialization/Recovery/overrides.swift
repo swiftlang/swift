@@ -1,11 +1,11 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t -module-name Lib -I %S/Inputs/custom-modules %s
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules | %FileCheck %s
 
-// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -enable-experimental-deserialization-recovery | %FileCheck -check-prefix CHECK-RECOVERY %s
+// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -Xcc -DBAD | %FileCheck -check-prefix CHECK-RECOVERY %s
 
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -enable-experimental-deserialization-recovery -D TEST -verify
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -D TEST -verify
 
 // REQUIRES: objc_interop
 
@@ -191,6 +191,7 @@ open class D1_DesignatedInitDisappears : DesignatedInitDisappearsBase {
 
 // CHECK-RECOVERY-LABEL: class D1_DesignatedInitDisappears : DesignatedInitDisappearsBase {
 // CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
 
@@ -203,6 +204,7 @@ open class D2_OnlyDesignatedInitDisappears : OnlyDesignatedInitDisappearsBase {
 // CHECK-NEXT: {{^}$}}
 
 // CHECK-RECOVERY-LABEL: class D2_OnlyDesignatedInitDisappears : OnlyDesignatedInitDisappearsBase {
+// CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
 
@@ -231,6 +233,7 @@ open class D4_UnknownInitDisappears : UnknownInitDisappearsBase {
 
 // CHECK-RECOVERY-LABEL: class D4_UnknownInitDisappears : UnknownInitDisappearsBase {
 // CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
 
@@ -244,7 +247,68 @@ open class D5_OnlyUnknownInitDisappears : OnlyUnknownInitDisappearsBase {
 // CHECK-NEXT: {{^}$}}
 
 // CHECK-RECOVERY-LABEL: class D5_OnlyUnknownInitDisappears : OnlyUnknownInitDisappearsBase {
+// CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+open class D6_UnknownInitDisappearsGrandchild : D4_UnknownInitDisappears {
+  public override init() { fatalError() }
+  public override init(value: Int) { fatalError() }
+}
+
+// CHECK-LABEL: class D6_UnknownInitDisappearsGrandchild : D4_UnknownInitDisappears {
+// CHECK-NEXT: init()
+// CHECK-NEXT: init(value: Int)
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class D6_UnknownInitDisappearsGrandchild : D4_UnknownInitDisappears {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+open class D7_UnknownInitDisappearsGrandchildRequired : D4_UnknownInitDisappears {
+  public override init() { fatalError() }
+  public required override init(value: Int) { fatalError() }
+}
+
+// CHECK-LABEL: class D7_UnknownInitDisappearsGrandchildRequired : D4_UnknownInitDisappears {
+// CHECK-NEXT: init()
+// CHECK-NEXT: init(value: Int)
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class D7_UnknownInitDisappearsGrandchildRequired : D4_UnknownInitDisappears {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+open class D8_UnknownInitDisappearsRequired : UnknownInitDisappearsBase {
+  public override init() { fatalError() }
+  public required override init(value: Int) { fatalError() }
+}
+
+// CHECK-LABEL: class D8_UnknownInitDisappearsRequired : UnknownInitDisappearsBase {
+// CHECK-NEXT: init()
+// CHECK-NEXT: init(value: Int)
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class D8_UnknownInitDisappearsRequired : UnknownInitDisappearsBase {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+open class D9_UnknownInitDisappearsRequiredGrandchild : D8_UnknownInitDisappearsRequired {
+  public override init() { fatalError() }
+  public required init(value: Int) { fatalError() }
+}
+
+// CHECK-LABEL: class D9_UnknownInitDisappearsRequiredGrandchild : D8_UnknownInitDisappearsRequired {
+// CHECK-NEXT: init()
+// CHECK-NEXT: init(value: Int)
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class D9_UnknownInitDisappearsRequiredGrandchild : D8_UnknownInitDisappearsRequired {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
 #endif // TEST

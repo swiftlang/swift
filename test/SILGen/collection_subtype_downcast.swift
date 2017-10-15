@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -sdk %S/Inputs %s | %FileCheck %s
 
 struct S { var x, y: Int }
 
 // CHECK-LABEL: sil hidden @_T027collection_subtype_downcast06array_C0SayAA1SVGSgSayypG0D0_tF :
-// CHECK:    bb0([[ARG:%.*]] : $Array<Any>):
+// CHECK:    bb0([[ARG:%.*]] : @owned $Array<Any>):
 // CHECK-NEXT: debug_value [[ARG]]
 // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
@@ -28,7 +28,7 @@ func ==(lhs: S, rhs: S) -> Bool {
 
 // FIXME: This entrypoint name should not be bridging-specific
 // CHECK-LABEL:      sil hidden @_T027collection_subtype_downcast05dict_C0s10DictionaryVyAA1SVSiGSgADyAFypG0D0_tF :
-// CHECK:    bb0([[ARG:%.*]] : $Dictionary<S, Any>):
+// CHECK:    bb0([[ARG:%.*]] : @owned $Dictionary<S, Any>):
 // CHECK-NEXT: debug_value [[ARG]]
 // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]

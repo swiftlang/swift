@@ -18,25 +18,28 @@ struct AStruct {
 
   // Subscript
   subscript(index: Int) -> Int {
-    // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici | Def,RelChild | rel: 1
+    // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVS2icip | Def,RelChild | rel: 1
     // CHECK-NEXT: RelChild | struct/Swift | AStruct | s:14swift_ide_test7AStructV
 
     // Accessor + AccessorAddressor
     unsafeAddress {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-addr/Swift |  | s:14swift_ide_test7AStructV9subscriptS2icflu | Def,RelChild,RelAcc | rel: 1
-      // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-addr/Swift |  | s:14swift_ide_test7AStructVS2icilu | Def,RelChild,RelAcc | rel: 1
+      // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVS2icip
 
       return UnsafePointer(base)
     }
 
     // Accessor + AccessorMutableAddressor
     unsafeMutableAddress {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-mutaddr/Swift |  | s:14swift_ide_test7AStructV9subscriptS2icfau | Def,RelChild,RelAcc | rel: 1
-      // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-mutaddr/Swift |  | s:14swift_ide_test7AStructVS2iciau | Def,RelChild,RelAcc | rel: 1
+      // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVS2icip
 
       return base
     }
   }
+  // CHECK: [[@LINE-20]]:13 | param/Swift | index | {{.*}} | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-21]]:20 | struct/Swift | Int | {{.*}} | Ref | rel: 0
+  // CHECK: [[@LINE-22]]:28 | struct/Swift | Int | {{.*}} | Ref | rel: 0
 }
 
 // Class
@@ -47,7 +50,7 @@ class AClass {
   func instanceMethod(a: Int, b b: Int, _ c: Int, d _: Int, _: Int) {
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF | Def,Dyn,RelChild | rel: 1
   // CHECK-NEXT: RelChild | class/Swift | AClass | s:14swift_ide_test6AClassC
-  // CHECK: [[@LINE-3]]:23 | param/Swift | a | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitFAEL_Siv | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-3]]:23 | param/Swift | a | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitFAEL_Sivp | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF
   // CHECK: [[@LINE-5]]:33 | param(local)/Swift | b | s:{{.*}} | Def,RelChild | rel: 1
   // CHECK: [[@LINE-6]]:43 | param(local)/Swift | c | s:{{.*}} | Def,RelChild | rel: 1
@@ -74,12 +77,12 @@ class AClass {
 
   // InstanceProperty
   var instanceProperty: Int {
-    // CHECK: [[@LINE-1]]:7 | instance-property/Swift | instanceProperty | s:14swift_ide_test6AClassC16instancePropertySiv | Def,RelChild | rel: 1
+    // CHECK: [[@LINE-1]]:7 | instance-property/Swift | instanceProperty | s:14swift_ide_test6AClassC16instancePropertySivp | Def,RelChild | rel: 1
     // CHECK-NEXT: RelChild | class/Swift | AClass | s:14swift_ide_test6AClassC
 
     // Accessor + AccessorGetter
     get {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:instanceProperty | s:14swift_ide_test6AClassC16instancePropertySifg | Def,Dyn,RelChild,RelAcc | rel: 1
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:instanceProperty | s:14swift_ide_test6AClassC16instancePropertySivg | Def,Dyn,RelChild,RelAcc | rel: 1
       // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | instanceProperty | s:14swift_ide_test6AClassC16instancePropertySiv
 
       return 1
@@ -87,7 +90,7 @@ class AClass {
 
     // Accessor + AccessorSetter
     set {}
-    // CHECK: [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:instanceProperty | s:14swift_ide_test6AClassC16instancePropertySifs | Def,Dyn,RelChild,RelAcc | rel: 1
+    // CHECK: [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:instanceProperty | s:14swift_ide_test6AClassC16instancePropertySivs | Def,Dyn,RelChild,RelAcc | rel: 1
     // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | instanceProperty | s:14swift_ide_test6AClassC16instancePropertySiv
   }
 
@@ -95,23 +98,23 @@ class AClass {
 
     // Accessor + AccessorWillSet
     willSet {}
-    // CHECK: [[@LINE-1]]:5 | instance-method/acc-willset/Swift | willSet:observed | s:14swift_ide_test6AClassC8observedSifw | Def,RelChild,RelAcc | rel: 1
+    // CHECK: [[@LINE-1]]:5 | instance-method/acc-willset/Swift | willSet:observed | s:14swift_ide_test6AClassC8observedSivw | Def,RelChild,RelAcc | rel: 1
     // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | observed | s:14swift_ide_test6AClassC8observedSiv
 
     // Accessor + AccessorDidSet
     didSet {}
-    // CHECK: [[@LINE-1]]:5 | instance-method/acc-didset/Swift | didSet:observed | s:14swift_ide_test6AClassC8observedSifW | Def,RelChild,RelAcc | rel: 1
+    // CHECK: [[@LINE-1]]:5 | instance-method/acc-didset/Swift | didSet:observed | s:14swift_ide_test6AClassC8observedSivW | Def,RelChild,RelAcc | rel: 1
     // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | observed | s:14swift_ide_test6AClassC8observedSiv
   }
 
   // ClassProperty
   class let classProperty = 1
-  // CHECK: [[@LINE-1]]:13 | class-property/Swift | classProperty | s:14swift_ide_test6AClassC13classPropertySivZ | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:13 | class-property/Swift | classProperty | s:14swift_ide_test6AClassC13classPropertySivpZ | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | class/Swift | AClass | s:14swift_ide_test6AClassC
 
   // StaticProperty
   static let staticProperty = 1
-  // CHECK: [[@LINE-1]]:14 | static-property/Swift | staticProperty | s:14swift_ide_test6AClassC14staticPropertySivZ | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:14 | static-property/Swift | staticProperty | s:14swift_ide_test6AClassC14staticPropertySivpZ | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | class/Swift | AClass | s:14swift_ide_test6AClassC
 
   // Constructor
@@ -175,7 +178,7 @@ func EmptyFunction() {}
 
 // Variable
 var foo = 1
-// CHECK: [[@LINE-1]]:5 | variable/Swift | foo | s:14swift_ide_test3fooSiv | Def | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable/Swift | foo | s:14swift_ide_test3fooSivp | Def | rel: 0
 
 // PrefixOperator
 prefix func -(a: AStruct) -> AStruct { return a }

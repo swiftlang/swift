@@ -54,6 +54,7 @@ public:
 
   /// Get the representative location of this type, for diagnostic
   /// purposes.
+  /// This location is not necessarily the start location of the type repr.
   SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 

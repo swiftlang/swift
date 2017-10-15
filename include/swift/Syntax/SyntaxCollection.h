@@ -14,10 +14,12 @@
 #define SWIFT_SYNTAX_SYNTAXCOLLECTION_H
 
 #include "swift/Syntax/Syntax.h"
-#include "swift/Syntax/SyntaxCollectionData.h"
 
 namespace swift {
 namespace syntax {
+
+template <SyntaxKind CollectionKind, typename Element>
+class SyntaxCollection;
 
 template <SyntaxKind CollectionKind, typename Element>
 struct SyntaxCollectionIterator {
@@ -50,27 +52,28 @@ struct SyntaxCollectionIterator {
 template <SyntaxKind CollectionKind, typename Element>
 class SyntaxCollection : public Syntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
   friend class Syntax;
-  using DataType = SyntaxCollectionData<CollectionKind, Element>;
 
 private:
-  static RC<DataType>
-  makeData(std::vector<Element> &Elements) {
+  static RC<SyntaxData>
+  makeData(std::initializer_list<Element> &Elements) {
     RawSyntax::LayoutList List;
     for (auto &Elt : Elements) {
       List.push_back(Elt.getRaw());
     }
     auto Raw = RawSyntax::make(CollectionKind, List,
                                SourcePresence::Present);
-    return DataType::make(Raw);
+    return SyntaxData::make(Raw);
   }
-
-protected:
-  SyntaxCollection(const RC<SyntaxData> Root, const DataType *Data)
-    : Syntax(Root, Data) {}
+  SyntaxCollection(const RC<SyntaxData> Root): Syntax(Root, Root.get()) {}
 
 public:
+
+  SyntaxCollection(const RC<SyntaxData> Root, const SyntaxData *Data)
+  : Syntax(Root, Data) {}
+
+  SyntaxCollection(std::initializer_list<Element> list):
+    SyntaxCollection(SyntaxCollection::makeData(list)) {}
 
   /// Returns true if the collection is empty.
   bool empty() const {
@@ -104,22 +107,8 @@ public:
     assert(Index < size());
     assert(!empty());
 
-    auto RawElement = getRaw()->Layout[Index];
-    auto *MyData = getUnsafeData<SyntaxCollection<CollectionKind, Element>>();
-
-    if (auto Data = MyData->CachedElements[Index].get()) {
-      return Element { Root, Data };
-    }
-
-    auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
-      MyData->CachedElements.data() + Index);
-
-    SyntaxData::realizeSyntaxNode<Element>(ChildPtr, RawElement, MyData, Index);
-
-    return Element {
-      Root,
-      MyData->CachedElements[Index].get()
-    };
+    auto ChildData = Data->getChild(Index);
+    return Element { Root, ChildData.get() };
   }
 
   /// Return a new collection with the given element added to the end.

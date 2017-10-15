@@ -128,3 +128,22 @@ bb4:
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil @test7 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2:
+  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  br bb3
+
+bb3:
+  unreachable
+}

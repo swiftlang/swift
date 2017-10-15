@@ -215,13 +215,12 @@ struct HasLocalizationKey {}
 func hasLocalizationKey2() {}
 
 // REQUIRES: objc_interop
-// RUN: rm -rf %t.tmp
-// RUN: mkdir -p %t.tmp
+// RUN: %empty-directory(%t.tmp)
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
 // RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1:      source.lang.swift.ref.var.global (4:5-4:9)
 // CHECK1-NEXT: glob
-// CHECK1-NEXT: s:11cursor_info4globSiv{{$}}
+// CHECK1-NEXT: s:11cursor_info4globSivp{{$}}
 // CHECK1-NEXT: Int
 
 // FIXME(integers): Disabling the checks. See <rdar://problem/31207310>
@@ -240,7 +239,7 @@ func hasLocalizationKey2() {}
 // RUN: %sourcekitd-test -req=cursor -pos=9:12 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK3 %s
 // CHECK3:      source.lang.swift.ref.var.local (8:12-8:13)
 // CHECK3-NEXT: x{{$}}
-// CHECK3-NEXT: s:11cursor_info3gooySiF1xL_Siv{{$}}
+// CHECK3-NEXT: s:11cursor_info3gooySiF1xL_Sivp{{$}}
 // CHECK3-NEXT: Int{{$}}
 // CHECK3-NEXT: _T0SiD
 // CHECK3-NEXT: <Declaration>let x: <Type usr="s:Si">Int</Type></Declaration>
@@ -600,7 +599,7 @@ func hasLocalizationKey2() {}
 // FIXME: ref.class - rdar://problem/25014968
 
 // RUN: %sourcekitd-test -req=cursor -pos=150:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK66
-// CHECK66: <decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P2</decl.name> :  <syntaxtype.keyword>class</syntaxtype.keyword>, <ref.protocol usr="s:11cursor_info2P1P">P1</ref.protocol></decl.protocol>
+// CHECK66: <decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P2</decl.name> : AnyObject, <ref.protocol usr="s:11cursor_info2P1P">P1</ref.protocol></decl.protocol>
 
 // RUN: %sourcekitd-test -req=cursor -pos=114:18 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK67
 // CHECK67: source.lang.swift.decl.associatedtype (114:18-114:19)

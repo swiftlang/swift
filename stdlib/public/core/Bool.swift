@@ -68,12 +68,14 @@ public struct Bool {
   ///
   /// Do not call this initializer directly. Instead, use the Boolean literal
   /// `false` to create a new `Bool` instance.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init() {
     let zero: Int8 = 0
     self._value = Builtin.trunc_Int8_Int1(zero._value)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @_transparent
   internal init(_ v: Builtin.Int1) { self._value = v }
@@ -81,12 +83,14 @@ public struct Bool {
   /// Creates an instance equal to the given Boolean value.
   ///
   /// - Parameter value: The Boolean value to copy.
+  @_inlineable // FIXME(sil-serialize-all)
   public init(_ value: Bool) {
     self = value
   }
 }
 
 extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(_builtinBooleanLiteral value: Builtin.Int1) {
     self._value = value
@@ -110,6 +114,7 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   /// this Boolean literal initializer behind the scenes.
   ///
   /// - Parameter value: The value of the new instance.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(booleanLiteral value: Bool) {
     self = value
@@ -118,6 +123,7 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
 
 extension Bool {
   // This is a magic entry point known to the compiler.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public // COMPILER_INTRINSIC
   func _getBuiltinLogicValue() -> Builtin.Int1 {
@@ -127,12 +133,14 @@ extension Bool {
 
 extension Bool : CustomStringConvertible {
   /// A textual representation of the Boolean value.
+  @_inlineable // FIXME(sil-serialize-all)
   public var description: String {
     return self ? "true" : "false"
   }
 }
 
 // This is a magic entry point known to the compiler.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // COMPILER_INTRINSIC
 func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
@@ -145,12 +153,13 @@ extension Bool : Equatable, Hashable {
   /// - Note: The hash value is not guaranteed to be stable across different
   ///   invocations of the same program. Do not persist the hash value across
   ///   program runs.
-  /// - SeeAlso: `Hashable`
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public var hashValue: Int {
     return self ? 1 : 0
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (lhs: Bool, rhs: Bool) -> Bool {
     return Bool(Builtin.cmp_eq_Int1(lhs._value, rhs._value))
@@ -160,10 +169,11 @@ extension Bool : Equatable, Hashable {
 extension Bool : LosslessStringConvertible {
   /// Creates a new Boolean value from the given string.
   ///
-  /// If `description` is any string other than `"true"` or `"false"`, the
-  /// result is `nil`. This initializer is case sensitive.
+  /// If the `description` value is any string other than `"true"` or
+  /// `"false"`, the result is `nil`. This initializer is case sensitive.
   ///
   /// - Parameter description: A string representation of the Boolean value.
+  @_inlineable // FIXME(sil-serialize-all)
   public init?(_ description: String) {
     if description == "true" {
       self = true
@@ -195,6 +205,7 @@ extension Bool {
   ///     // Prints "You look nice today!"
   ///
   /// - Parameter a: The Boolean value to negate.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static prefix func ! (a: Bool) -> Bool {
     return Bool(Builtin.xor_Int1(a._value, true._value))
@@ -202,9 +213,9 @@ extension Bool {
 }
 
 extension Bool {
-  /// Performs a logical AND operation on two Bool values.
+  /// Performs a logical AND operation on two Boolean values.
   ///
-  /// The logical AND operator (`&&`) combines two Bool values and returns
+  /// The logical AND operator (`&&`) combines two Boolean values and returns
   /// `true` if both of the values are `true`. If either of the values is
   /// `false`, the operator returns `false`.
   ///
@@ -234,6 +245,7 @@ extension Bool {
   /// - Parameters:
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   @inline(__always)
   public static func && (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
@@ -241,9 +253,9 @@ extension Bool {
     return lhs ? try rhs() : false
   }
 
-  /// Performs a logical OR operation on two Bool values.
+  /// Performs a logical OR operation on two Boolean values.
   ///
-  /// The logical OR operator (`||`) combines two Bool values and returns
+  /// The logical OR operator (`||`) combines two Boolean values and returns
   /// `true` if at least one of the values is `true`. If both values are
   /// `false`, the operator returns `false`.
   ///
@@ -274,6 +286,7 @@ extension Bool {
   /// - Parameters:
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   @inline(__always)
   public static func || (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows

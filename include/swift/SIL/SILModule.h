@@ -20,21 +20,22 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/SILOptions.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
-#include "swift/SIL/Notifications.h"
+#include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/Optional.h"
@@ -99,6 +100,7 @@ public:
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
   using CoverageMapListType = llvm::ilist<SILCoverageMap>;
   using LinkingMode = SILOptions::LinkingMode;
+  using ActionCallback = std::function<void()>;
 
 private:
   friend KeyPathPattern;
@@ -150,7 +152,7 @@ private:
   VTableListType vtables;
 
   /// This is a cache of vtable entries for quick look-up
-  llvm::DenseMap<std::pair<const SILVTable *, SILDeclRef>, SILFunction *>
+  llvm::DenseMap<std::pair<const SILVTable *, SILDeclRef>, SILVTable::Entry>
       VTableEntryCache;
 
   /// Lookup table for SIL witness tables from conformances.
@@ -191,7 +193,7 @@ private:
   /// The callback used by the SILLoader.
   std::unique_ptr<SerializationCallback> Callback;
 
-  // Callbacks registered by the SIL optimizer to run on each deserializaed
+  // Callbacks registered by the SIL optimizer to run on each deserialized
   // function body. This is intentionally a stateless type because the
   // ModuleDecl and SILFunction should be sufficient context.
   typedef void (*SILFunctionBodyCallback)(ModuleDecl *, SILFunction *F);
@@ -209,11 +211,15 @@ private:
   /// optimizations can assume that they see the whole module.
   bool wholeModule;
 
-  /// True if this SILModule is being completely serialized.
-  bool WholeModuleSerialized;
-
   /// The options passed into this SILModule.
   SILOptions &Options;
+
+  /// Set if the SILModule was serialized already. It is used
+  /// to ensure that the module is serialized only once.
+  bool serialized;
+
+  /// Action to be executed for serializing the SILModule.
+  ActionCallback SerializeSILAction;
 
   /// A list of clients that need to be notified when an instruction
   /// invalidation message is sent.
@@ -222,7 +228,7 @@ private:
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
   SILModule(ModuleDecl *M, SILOptions &Options, const DeclContext *associatedDC,
-            bool wholeModule, bool wholeModuleSerialized);
+            bool wholeModule);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -251,7 +257,18 @@ public:
 
   /// Send the invalidation message that \p V is being deleted to all
   /// registered handlers. The order of handlers is deterministic but arbitrary.
-  void notifyDeleteHandlers(ValueBase *V);
+  void notifyDeleteHandlers(SILNode *node);
+
+  /// Set a serialization action.
+  void setSerializeSILAction(ActionCallback SerializeSILAction);
+  ActionCallback getSerializeSILAction() const;
+
+  /// Set a flag indicating that this module is serialized already.
+  void setSerialized() { serialized = true; }
+  bool isSerialized() const { return serialized; }
+
+  /// Serialize a SIL module using the configured SerializeSILAction.
+  void serialize();
 
   /// \brief This converts Swift types to SILTypes.
   mutable Lowering::TypeConverter Types;
@@ -285,23 +302,18 @@ public:
   ///
   /// If a source file is provided, SIL will only be emitted for decls in that
   /// source file, starting from the specified element number.
-  ///
-  /// If \p makeModuleFragile is true, all functions and global variables of
-  /// the module are marked as serialized. This is used for compiling the stdlib.
   static std::unique_ptr<SILModule>
   constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr,
                Optional<unsigned> startElem = None,
-               bool makeModuleFragile = false,
                bool isWholeModule = false);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule>
   createEmptyModule(ModuleDecl *M, SILOptions &Options,
-                    bool WholeModule = false,
-                    bool WholeModuleSerialized = false) {
+                    bool WholeModule = false) {
     return std::unique_ptr<SILModule>(
-        new SILModule(M, Options, M, WholeModule, WholeModuleSerialized));
+        new SILModule(M, Options, M, WholeModule));
   }
 
   /// Get the Swift module associated with this SIL module.
@@ -329,8 +341,11 @@ public:
     return wholeModule;
   }
 
-  /// Returns true if everything in this SILModule is being serialized.
-  bool isWholeModuleSerialized() const { return WholeModuleSerialized; }
+  /// Returns true if it is the OnoneSupport module.
+  bool isOnoneSupportModule() const;
+
+  /// Returns true if it is the optimized OnoneSupport module.
+  bool isOptimizedOnoneSupportModule() const;
 
   SILOptions &getOptions() const { return Options; }
 
@@ -491,12 +506,12 @@ public:
 
   /// \brief Return the declaration of a utility function that can,
   /// but needn't, be shared between modules.
-  SILFunction *getOrCreateSharedFunction(SILLocation loc,
-                                         StringRef name,
+  SILFunction *getOrCreateSharedFunction(SILLocation loc, StringRef name,
                                          CanSILFunctionType type,
                                          IsBare_t isBareSILFunction,
                                          IsTransparent_t isTransparent,
                                          IsSerialized_t isSerialized,
+                                         ProfileCounter entryCount,
                                          IsThunk_t isThunk);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
@@ -505,30 +520,34 @@ public:
       SILLocation loc, StringRef name, SILLinkage linkage,
       CanSILFunctionType type, IsBare_t isBareSILFunction,
       IsTransparent_t isTransparent, IsSerialized_t isSerialized,
+      ProfileCounter entryCount = ProfileCounter(),
       IsThunk_t isThunk = IsNotThunk,
       SubclassScope subclassScope = SubclassScope::NotApplicable);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
   /// exist.
-  SILFunction *getOrCreateFunction(SILLocation loc,
-                                   SILDeclRef constant,
-                                   ForDefinition_t forDefinition);
+  SILFunction *
+  getOrCreateFunction(SILLocation loc, SILDeclRef constant,
+                      ForDefinition_t forDefinition,
+                      ProfileCounter entryCount = ProfileCounter());
 
   /// \brief Create a function declaration.
   ///
   /// This signature is a direct copy of the signature of SILFunction::create()
   /// in order to simplify refactoring all SILFunction creation use-sites to use
   /// SILModule. Eventually the uses should probably be refactored.
-  SILFunction *createFunction(
-      SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
-      GenericEnvironment *genericEnv, Optional<SILLocation> loc,
-      IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-      IsSerialized_t isSerialized, IsThunk_t isThunk = IsNotThunk,
-      SubclassScope subclassScope = SubclassScope::NotApplicable,
-      Inline_t inlineStrategy = InlineDefault,
-      EffectsKind EK = EffectsKind::Unspecified,
-      SILFunction *InsertBefore = nullptr,
-      const SILDebugScope *DebugScope = nullptr);
+  SILFunction *
+  createFunction(SILLinkage linkage, StringRef name,
+                 CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
+                 Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+                 IsTransparent_t isTrans, IsSerialized_t isSerialized,
+                 ProfileCounter entryCount = ProfileCounter(),
+                 IsThunk_t isThunk = IsNotThunk,
+                 SubclassScope subclassScope = SubclassScope::NotApplicable,
+                 Inline_t inlineStrategy = InlineDefault,
+                 EffectsKind EK = EffectsKind::Unspecified,
+                 SILFunction *InsertBefore = nullptr,
+                 const SILDebugScope *DebugScope = nullptr);
 
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced

@@ -145,8 +145,64 @@ class SubVariadic : SuperVariadic { } // expected-warning 4{{synthesizing a vari
 // Don't crash with invalid nesting of class in generic function
 
 func testClassInGenericFunc<T>(t: T) {
-  class A { init(t: T) {} } // expected-error {{type 'A' cannot be nested in generic function 'testClassInGenericFunc'}}
-  class B : A {} // expected-error {{type 'B' cannot be nested in generic function 'testClassInGenericFunc'}}
+  class A { init(t: T) {} } // expected-error {{type 'A' cannot be nested in generic function 'testClassInGenericFunc(t:)'}}
+  class B : A {} // expected-error {{type 'B' cannot be nested in generic function 'testClassInGenericFunc(t:)'}}
 
   _ = B(t: t)
+}
+
+// rdar://problem/34789779
+public class Node {
+  var data : Data
+
+  public struct Data {
+    var index: Int32 = 0// for helpers
+  }
+
+ init(data: inout Data/*, context: Context*/) {
+   self.data = data
+ }
+
+ public required init(node: Node) {
+   data = node.data
+ }
+}
+
+class SubNode : Node {
+  var a: Int
+
+  required init(node: Node) {
+    a = 1
+    super.init(node: node)
+  }
+
+  init(data: inout Data, additionalParam: Int) {
+    a = additionalParam
+    super.init(data: &data)
+  }
+}
+
+class GenericSubNode<T> : SubNode {
+  required init(node: Node) {
+    super.init(node: node)
+  }
+
+  init(data: inout Data, value: T) {
+    super.init(data: &data, additionalParam: 1)
+  }
+}
+
+protocol HasValue {
+  associatedtype Value
+  func getValue() -> Value
+}
+
+class GenericWrapperNode<T : HasValue> : GenericSubNode<T.Value> {
+  required init(node: Node) {
+    super.init(node: node)
+  }
+
+  init(data: inout Data, otherValue: T) {
+    super.init(data: &data, value: otherValue.getValue())
+  }
 }

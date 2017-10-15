@@ -4,6 +4,9 @@
 // FIXME: https://bugs.swift.org/browse/SR-2808
 // XFAIL: resilient_stdlib
 
+// See https://bugs.swift.org/browse/SR-5065, rdar://32511494
+// XFAIL: *
+
 sil_stage canonical
 
 import Builtin
@@ -144,7 +147,7 @@ bb0(%0 : $C):
   %1 = alloc_stack $Int
   %2 = alloc_stack $C
   store %0 to %2 : $*C
-  unconditional_checked_cast_addr take_always C in %2 : $*C to Int in %1 : $*Int
+  unconditional_checked_cast_addr C in %2 : $*C to Int in %1 : $*Int
   %4 = load %1 : $*Int
   dealloc_stack %2 : $*C
   dealloc_stack %1 : $*Int

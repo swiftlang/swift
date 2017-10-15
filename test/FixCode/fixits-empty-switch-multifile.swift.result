@@ -3,8 +3,11 @@
 
 func foo1(_ e: EMulti) {
   switch e {
-  case .e1: <#code#>
-case .e2: <#code#>
-case .e3(_): <#code#>
+  case .e1:
+<#code#>
+case .e2:
+<#code#>
+case .e3(_):
+<#code#>
 }
 }

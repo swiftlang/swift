@@ -3,7 +3,7 @@
 // RUN: %FileCheck %s --check-prefix LOC-CHECK < %t.ll
 // RUN: llc %t.ll -filetype=obj -o %t.o
 // RUN: %llvm-dwarfdump %t.o | %FileCheck %s --check-prefix DWARF-CHECK
-// DISABLED <rdar://problem/28232630>: dwarfdump --verify %t.o
+// DISABLED <rdar://problem/28232630>: %llvm-dwarfdump --verify %t.o
 
 // REQUIRES: OS=macosx
 
@@ -12,7 +12,7 @@ import Foundation
 
 class MyObject : NSObject {
   // Ensure we don't emit linetable entries for ObjC thunks.
-  // LOC-CHECK: define {{.*}} @_T04main8MyObjectC0B3ArrSo7NSArrayCfgTo
+  // LOC-CHECK: define {{.*}} @_T04main8MyObjectC0B3ArrSo7NSArrayCvgTo
   // LOC-CHECK: ret {{.*}}, !dbg ![[DBG:.*]]
   // LOC-CHECK: ret
   var MyArr = NSArray()
@@ -43,7 +43,7 @@ MyObj = NsObj as! MyObject
 MyObj.blah()
 
 public func err() {
-  // DWARF-CHECK: DW_AT_name{{.*}}NSError
+  // DWARF-CHECK: DW_AT_name ("NSError")
   // DWARF-CHECK: DW_AT_linkage_name{{.*}}_T0So7NSErrorC
   let _ = NSError(domain: "myDomain", code: 4, 
                   userInfo: [AnyHashable("a"):1,
@@ -55,12 +55,10 @@ public func err() {
 public func date() {
   // LOC-CHECK: call {{.*}} @_T0S2SBp21_builtinStringLiteral_Bw17utf8CodeUnitCountBi1_7isASCIItcfC{{.*}}, !dbg ![[L1:.*]]
   let d1 = DateFormatter()
-  // LOC-CHECK: br{{.*}}, !dbg ![[L2:.*]]
-  d1.dateFormat = "dd. mm. yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L2]]
+  d1.dateFormat = "dd. mm. yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L2:.*]]
   // LOC-CHECK: call {{.*}} @_T0S2SBp21_builtinStringLiteral_Bw17utf8CodeUnitCountBi1_7isASCIItcfC{{.*}}, !dbg ![[L3:.*]]
   let d2 = DateFormatter()
-  // LOC-CHECK: br{{.*}}, !dbg ![[L4:.*]]
-  d2.dateFormat = "mm dd yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L4]]
+  d2.dateFormat = "mm dd yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L4:.*]]
 }
 
 // Make sure we build some witness tables for enums.
@@ -69,7 +67,7 @@ func useOptions(_ opt: URL.BookmarkCreationOptions)
   return [opt, opt]
 }
 
-// LOC-CHECK: ![[THUNK:.*]] = distinct !DISubprogram({{.*}}linkageName: "_T04main8MyObjectC0B3ArrSo7NSArrayCfgTo"
+// LOC-CHECK: ![[THUNK:.*]] = distinct !DISubprogram({{.*}}linkageName: "_T04main8MyObjectC0B3ArrSo7NSArrayCvgTo"
 // LOC-CHECK-NOT:                           line:
 // LOC-CHECK-SAME:                          isDefinition: true
 // LOC-CHECK: ![[DBG]] = !DILocation(line: 0, scope: ![[THUNK]])

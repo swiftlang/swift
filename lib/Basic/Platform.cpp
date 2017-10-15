@@ -88,6 +88,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   switch (triple.getOS()) {
   case llvm::Triple::UnknownOS:
     llvm_unreachable("unknown OS");
+  case llvm::Triple::Ananas:
   case llvm::Triple::CloudABI:
   case llvm::Triple::DragonFly:
   case llvm::Triple::Fuchsia:
@@ -96,7 +97,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::NetBSD:
   case llvm::Triple::OpenBSD:
   case llvm::Triple::Solaris:
-  case llvm::Triple::Haiku:
   case llvm::Triple::Minix:
   case llvm::Triple::RTEMS:
   case llvm::Triple::NaCl:
@@ -134,6 +134,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     }
   case llvm::Triple::PS4:
     return "ps4";
+  case llvm::Triple::Haiku:
+    return "haiku";
   }
   llvm_unreachable("unsupported OS");
 }

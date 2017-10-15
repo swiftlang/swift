@@ -32,7 +32,7 @@ public:
 
   bool walkToDeclPre(Decl *D) override {
     auto *NTD = dyn_cast<NominalTypeDecl>(D);
-    if (!NTD)
+    if (!NTD || !NTD->hasInterfaceType())
       return true;
     auto Protocols = NTD->getAllProtocols();
     // We are only interested in types implementing protocols.

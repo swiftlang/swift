@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
 
 class MyClass { 
   func foo() { }
@@ -198,7 +198,7 @@ func foo() {}
 // <rdar://problem/13549626>
 // CHECK-LABEL: sil hidden @_T010statements14return_from_if{{[_0-9a-zA-Z]*}}F
 func return_from_if(_ a: Bool) -> Int {
-  // CHECK: bb0(%0 : $Bool):
+  // CHECK: bb0(%0 : @trivial $Bool):
   // CHECK: cond_br {{.*}}, [[THEN:bb[0-9]+]], [[ELSE:bb[0-9]+]]
   if a {
     // CHECK: [[THEN]]:
@@ -210,7 +210,7 @@ func return_from_if(_ a: Bool) -> Int {
     return 0
   }
   // CHECK-NOT: function_ref @foo
-  // CHECK: [[EPILOG]]([[RET:%.*]] : $Int):
+  // CHECK: [[EPILOG]]([[RET:%.*]] : @trivial $Int):
   // CHECK:   return [[RET]]
   foo()  // expected-warning {{will never be executed}}
 }
@@ -242,13 +242,13 @@ func test_break(_ i : Int) {
 
 // CHECK-LABEL: sil hidden @_T010statements13test_if_breakyAA1CCSgF : $@convention(thin) (@owned Optional<C>) -> () {
 func test_if_break(_ c : C?) {
-// CHECK: bb0([[ARG:%.*]] : $Optional<C>):
+// CHECK: bb0([[ARG:%.*]] : @owned $Optional<C>):
 label1:
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
   if let x = c {
-// CHECK: [[TRUE]]({{.*}} : $C):
+// CHECK: [[TRUE]]({{.*}} : @owned $C):
 
     // CHECK: apply
     foo()
@@ -265,7 +265,7 @@ label1:
 
 // CHECK-LABEL: sil hidden @_T010statements18test_if_else_breakyAA1CCSgF : $@convention(thin) (@owned Optional<C>) -> () {
 func test_if_else_break(_ c : C?) {
-// CHECK: bb0([[ARG:%.*]] : $Optional<C>):
+// CHECK: bb0([[ARG:%.*]] : @owned $Optional<C>):
 label2:
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
@@ -275,7 +275,7 @@ label2:
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   br [[AFTER_FALSE:bb[0-9]+]]
   if let x = c {
-    // CHECK: [[TRUE]]({{.*}} : $C):
+    // CHECK: [[TRUE]]({{.*}} : @owned $C):
     use(x)
     // CHECK:   br [[CONT:bb[0-9]+]]
     // CHECK: [[CONT]]:
@@ -295,7 +295,7 @@ label2:
 // CHECK-LABEL: sil hidden @_T010statements23test_if_else_then_breakySb_AA1CCSgtF
 func test_if_else_then_break(_ a : Bool, _ c : C?) {
 label3:
-  // CHECK: bb0({{.*}}, [[ARG2:%.*]] : $Optional<C>):
+  // CHECK: bb0({{.*}}, [[ARG2:%.*]] : @owned $Optional<C>):
   // CHECK: [[BORROWED_ARG2:%.*]] = begin_borrow [[ARG2]]
   // CHECK: [[ARG2_COPY:%.*]] = copy_value [[BORROWED_ARG2]]
   // CHECK: switch_enum [[ARG2_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
@@ -304,7 +304,7 @@ label3:
   // CHECK:   end_borrow [[BORROWED_ARG2]] from [[ARG2]]
   // CHECK:   br [[COND2:bb[0-9]+]]
   if let x = c {
-    // CHECK: [[TRUE]]({{.*}} : $C):
+    // CHECK: [[TRUE]]({{.*}} : @owned $C):
     use(x)
     // CHECK:   br [[TRUE_TRAMPOLINE:bb[0-9]+]]
     //
@@ -411,7 +411,7 @@ func test_do_labeled() {
     // CHECK: apply [[BAR]](
     bar(1)
 
-    // CHECK: [[GLOBAL:%.*]] = function_ref @_T010statements11global_condSbfau
+    // CHECK: [[GLOBAL:%.*]] = function_ref @_T010statements11global_condSbvau
     // CHECK: cond_br {{%.*}}, bb2, bb3
     if (global_cond) {
       // CHECK: bb2:
@@ -426,7 +426,7 @@ func test_do_labeled() {
     // CHECK: apply [[BAR]](
     bar(2)
 
-    // CHECK: [[GLOBAL:%.*]] = function_ref @_T010statements11global_condSbfau
+    // CHECK: [[GLOBAL:%.*]] = function_ref @_T010statements11global_condSbvau
     // CHECK: cond_br {{%.*}}, bb4, bb5
     if (global_cond) {
       // CHECK: bb4:
@@ -523,6 +523,15 @@ func defer_in_generic<T>(_ x: T) {
   generic_callee_3(x)
 }
 
+// CHECK-LABEL: sil hidden @_T010statements017defer_in_closure_C8_genericyxlF : $@convention(thin) <T> (@in T) -> ()
+func defer_in_closure_in_generic<T>(_ x: T) {
+  // CHECK-LABEL: sil private @_T010statements017defer_in_closure_C8_genericyxlFyycfU_ : $@convention(thin) <T> () -> ()
+  _ = {
+    // CHECK-LABEL: sil private @_T010statements017defer_in_closure_C8_genericyxlFyycfU_6$deferL_yylF : $@convention(thin) <T> () -> ()
+    defer { generic_callee_1(T.self) }
+  }
+}
+
 // CHECK-LABEL: sil hidden @_T010statements13defer_mutableySiF
 func defer_mutable(_ x: Int) {
   var x = x
@@ -577,7 +586,7 @@ func testRequireExprPattern(_ a : Int) {
 
 
 // CHECK-LABEL: sil hidden @_T010statements20testRequireOptional1S2iSgF
-// CHECK: bb0([[ARG:%.*]] : $Optional<Int>):
+// CHECK: bb0([[ARG:%.*]] : @trivial $Optional<Int>):
 // CHECK-NEXT:   debug_value [[ARG]] : $Optional<Int>, let, name "a"
 // CHECK-NEXT:   switch_enum [[ARG]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
 func testRequireOptional1(_ a : Int?) -> Int {
@@ -585,7 +594,7 @@ func testRequireOptional1(_ a : Int?) -> Int {
   // CHECK: [[NONE]]:
   // CHECK:   br [[ABORT:bb[0-9]+]]
 
-  // CHECK: [[SOME]]([[PAYLOAD:%.*]] : $Int):
+  // CHECK: [[SOME]]([[PAYLOAD:%.*]] : @trivial $Int):
   // CHECK-NEXT:   debug_value [[PAYLOAD]] : $Int, let, name "t"
   // CHECK-NEXT:   br [[EPILOG:bb[0-9]+]]
   //
@@ -602,7 +611,7 @@ func testRequireOptional1(_ a : Int?) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_T010statements20testRequireOptional2S2SSgF
-// CHECK: bb0([[ARG:%.*]] : $Optional<String>):
+// CHECK: bb0([[ARG:%.*]] : @owned $Optional<String>):
 // CHECK-NEXT:   debug_value [[ARG]] : $Optional<String>, let, name "a"
 // CHECK-NEXT:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]] : $Optional<String>
@@ -614,7 +623,7 @@ func testRequireOptional2(_ a : String?) -> String {
   // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK-NEXT: br [[ABORT_BB:bb[0-9]+]]
   
-  // CHECK:  [[SOME_BB]]([[STR:%.*]] : $String):
+  // CHECK:  [[SOME_BB]]([[STR:%.*]] : @owned $String):
   // CHECK-NEXT:   debug_value [[STR]] : $String, let, name "t"
   // CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
   // CHECK:  [[CONT_BB]]:
@@ -655,15 +664,15 @@ func test_is_pattern(_ y : BaseClass) {
 
 // CHECK-LABEL: sil hidden @_T010statements15test_as_patternAA12DerivedClassCAA04BaseF0CF
 func test_as_pattern(_ y : BaseClass) -> DerivedClass {
-  // CHECK: bb0([[ARG:%.*]] : $BaseClass):
+  // CHECK: bb0([[ARG:%.*]] : @owned $BaseClass):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   checked_cast_br [[ARG_COPY]] : $BaseClass to $DerivedClass
   guard case let result as DerivedClass = y else {  }
-  // CHECK: bb{{.*}}({{.*}} : $DerivedClass):
+  // CHECK: bb{{.*}}({{.*}} : @owned $DerivedClass):
 
 
-  // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : $DerivedClass):
+  // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : @owned $DerivedClass):
   // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass, let, name "result"
   // CHECK-NEXT: br [[CONT_BB:bb[0-9]+]]
   // CHECK: [[CONT_BB]]:
@@ -679,7 +688,7 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
 // CHECK-LABEL: sil hidden @_T010statements22let_else_tuple_bindingS2i_SitSgF
 func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
 
-  // CHECK: bb0([[ARG:%.*]] : $Optional<(Int, Int)>):
+  // CHECK: bb0([[ARG:%.*]] : @trivial $Optional<(Int, Int)>):
   // CHECK-NEXT:   debug_value [[ARG]] : $Optional<(Int, Int)>, let, name "a"
   // CHECK-NEXT:   switch_enum [[ARG]] : $Optional<(Int, Int)>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
@@ -687,7 +696,7 @@ func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
   _ = y
   return x
 
-  // CHECK: [[SOME_BB]]([[PAYLOAD:%.*]] : $(Int, Int)):
+  // CHECK: [[SOME_BB]]([[PAYLOAD:%.*]] : @trivial $(Int, Int)):
   // CHECK-NEXT:   [[PAYLOAD_1:%.*]] = tuple_extract [[PAYLOAD]] : $(Int, Int), 0
   // CHECK-NEXT:   debug_value [[PAYLOAD_1]] : $Int, let, name "x"
   // CHECK-NEXT:   [[PAYLOAD_2:%.*]] = tuple_extract [[PAYLOAD]] : $(Int, Int), 1

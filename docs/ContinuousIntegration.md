@@ -8,7 +8,7 @@
     - [@swift-ci](#swift-ci)
     - [Smoke Testing](#smoke-testing)
     - [Validation Testing](#validation-testing)
-    - [Lint Testing](#lint-testing)
+    - [Linting](#linting)
     - [Specific Preset Testing](#specific-preset-testing)
 - [Cross Repository Testing](#cross-repository-testing)
 - [ci.swift.org bots](#ciswiftorg-bots)
@@ -23,12 +23,12 @@ In order for the Swift project to be able to advance quickly, it is important th
 
 ### @swift-ci
 
-swift-ci pull request testing is triggered by writing a comment on this PR addressed to the GitHub user @swift-ci. Different tests will run depending on the specific comment that you use. The current test types are:
+Users with [commit access](https://swift.org/contributing/#commit-access) can trigger pull request testing by writing a comment on a PR addressed to the GitHub user @swift-ci. Different tests will run depending on the specific comment used. The current test types are:
 
 1. Smoke Testing
 2. Validation Testing
 3. Benchmarking.
-4. Lint Testing
+4. Linting
 5. Source Compatibility Testing
 6. Specific Preset Testing
 
@@ -79,7 +79,8 @@ All supported platforms     | @swift-ci Please test and merge               | Sw
 All supported platforms     | @swift-ci Please clean test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test OS X Platform
 macOS platform               | @swift-ci Please test OS X platform           | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
 macOS platform               | @swift-ci Please clean test OS X platform     | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
-macOS platform               | @swift-ci Please benchmark                    | Swift Benchmark on OS X Platform
+macOS platform               | @swift-ci Please benchmark                    | Swift Benchmark on OS X Platform (many runs - rigorous)
+macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark on OS X Platform (few runs - sanity)
 Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 macOS platform               | @swift-ci Please ASAN test                    | Swift ASAN Test OS X Platform
@@ -117,13 +118,14 @@ A validation test on Linux does the following:
 
 Platform        | Comment | Check Status
 ------------    | ------- | ------------
-macOS platform  | @swift-ci Please benchmark | Swift Benchmark on OS X Platform
+macOS platform  | @swift-ci Please benchmark       | Swift Benchmark on OS X Platform (many runs - rigorous)
+macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on OS X Platform (few runs - sanity)
 
-### Lint Testing
+### Linting
 
-Language     | Comment | Check Status
------------- | ------- | ------------
-Python       | @swift-ci Please Python lint | Python lint
+Language     | Comment | What it Does | Corresponding Local Command
+------------ | ------- | ------------ | -------------
+Python       | @swift-ci Please Python lint | Lints Python sources | `./utils/python_lint.py`
 
 ### Source Compatibility Testing
 
@@ -145,6 +147,22 @@ preset=buildbot_incremental,tools=RA,stdlib=RD,smoketest=macosx,single-thread
 @swift-ci Please test macOS with preset
 
 ```
+
+### Testing Compiler Performance
+
+Platform        | Comment | Check Status
+------------    | ------- | ------------
+macOS platform  | @swift-ci Please test compiler performance       | Compiles full source compatibility test suite and measures compiler performance
+macOS platform  | @swift-ci Please smoke test compiler performance | Compiles a subset of source compatibility test suite and measures compiler performance
+
+These commands will:
+
+1. Build a set of projects from the compatibility test suite
+2. Collect counters and timers reported by the compiler
+3. Compare the obtained data to the baseline (stored in git) and HEAD (version of a compiler built without the PR changes)
+4. Report the results in a pull request comment
+
+For the detailed explanation of how compiler performance is measured, please refer to [this document](https://github.com/apple/swift/blob/master/docs/CompilerPerformance.md).
 
 ## Cross Repository Testing
 

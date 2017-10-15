@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: not %target-swift-frontend -typecheck %S/../../Inputs/empty.swift -import-objc-header %t/fake.h 2>&1 | %FileCheck -check-prefix=MISSING-HEADER %s
 
 // RUN: cp %S/Inputs/error-on-define.h %t

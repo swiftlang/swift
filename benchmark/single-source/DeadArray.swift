@@ -13,6 +13,11 @@
 // rdar://problem/20980377
 import TestsUtils
 
+public let DeadArray = BenchmarkInfo(
+  name: "DeadArray",
+  runFunction: run_DeadArray,
+  tags: [.regression])
+
 @inline(__always)
 func debug(_ m:String) {}
 
@@ -35,5 +40,5 @@ public func run_DeadArray(_ N: Int) {
     Count = 0
     runLoop(0, var2: 0)
   }
-  CheckResults(Count == 100_000, "Incorrect number of calls in loop")
+  CheckResults(Count == 100_000)
 }

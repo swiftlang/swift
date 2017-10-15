@@ -23,7 +23,87 @@
 using namespace swift;
 using namespace DerivedConformance;
 
-ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
+bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
+                                                    NominalTypeDecl *nominal,
+                                                    ProtocolDecl *protocol) {
+  // Only known protocols can be derived.
+  auto knownProtocol = protocol->getKnownProtocolKind();
+  if (!knownProtocol)
+    return false;
+
+  if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    switch (*knownProtocol) {
+        // The presence of a raw type is an explicit declaration that
+        // the compiler should derive a RawRepresentable conformance.
+      case KnownProtocolKind::RawRepresentable:
+        return enumDecl->hasRawType();
+
+        // Enums without associated values can implicitly derive Equatable and
+        // Hashable conformance.
+      case KnownProtocolKind::Equatable:
+        return canDeriveEquatable(tc, enumDecl, protocol);
+      case KnownProtocolKind::Hashable:
+        return canDeriveHashable(tc, enumDecl, protocol);
+
+        // @objc enums can explicitly derive their _BridgedNSError conformance.
+      case KnownProtocolKind::BridgedNSError:
+        return enumDecl->isObjC() && enumDecl->hasCases()
+            && enumDecl->hasOnlyCasesWithoutAssociatedValues();
+
+        // Enums without associated values and enums with a raw type of String
+        // or Int can explicitly derive CodingKey conformance.
+      case KnownProtocolKind::CodingKey: {
+        Type rawType = enumDecl->getRawType();
+        if (rawType) {
+          auto parentDC = enumDecl->getDeclContext();
+          ASTContext &C = parentDC->getASTContext();
+
+          auto nominal = rawType->getAnyNominal();
+          return nominal == C.getStringDecl() || nominal == C.getIntDecl();
+        }
+
+        // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
+        // empty enumas are allowed to conform as well.
+        return enumDecl->hasOnlyCasesWithoutAssociatedValues();
+      }
+
+      default:
+        return false;
+    }
+  } else if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
+    // Structs and classes can explicitly derive Encodable and Decodable
+    // conformance (explicitly meaning we can synthesize an implementation if
+    // a type conforms manually).
+    if (*knownProtocol == KnownProtocolKind::Encodable ||
+        *knownProtocol == KnownProtocolKind::Decodable) {
+      // FIXME: This is not actually correct. We cannot promise to always
+      // provide a witness here for all structs and classes. Unfortunately,
+      // figuring out whether this is actually possible requires much more
+      // context -- a TypeChecker and the parent decl context at least -- and is
+      // tightly coupled to the logic within DerivedConformance.
+      // This unfortunately means that we expect a witness even if one will not
+      // be produced, which requires DerivedConformance::deriveCodable to output
+      // its own diagnostics.
+      return true;
+    }
+
+    // Structs can explicitly derive Equatable and Hashable conformance.
+    if (auto structDecl = dyn_cast<StructDecl>(nominal)) {
+      switch (*knownProtocol) {
+        case KnownProtocolKind::Equatable:
+          return canDeriveEquatable(tc, structDecl, protocol);
+        case KnownProtocolKind::Hashable:
+          return canDeriveHashable(tc, structDecl, protocol);
+        default:
+          return false;
+      }
+    }
+  }
+  return false;
+}
+
+ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
+                                                       NominalTypeDecl *nominal,
                                                        ValueDecl *requirement) {
   // Note: whenever you update this function, also update
   // TypeChecker::deriveProtocolRequirement.
@@ -37,8 +117,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    // Check whether this nominal type derives conformances to the
-    if (!nominal->derivesProtocolConformance(proto)) return nullptr;
+    // Check whether this nominal type derives conformances to the protocol.
+    if (!derivesProtocolConformance(tc, nominal, proto)) return nullptr;
 
     // Retrieve the requirement.
     auto results = proto->lookupDirect(name);
@@ -72,7 +152,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
   // Functions.
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
-    if (func->isOperator() && name.getBaseName().str() == "==")
+    if (func->isOperator() && name.getBaseName() == "==")
       return getRequirement(KnownProtocolKind::Equatable);
 
     // Encodable.encode(to: Encoder)
@@ -160,18 +240,18 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   // Compute the interface type of the getter.
   Type interfaceType = FunctionType::get(TupleType::getEmpty(C),
                                          propertyInterfaceType);
-  Type selfInterfaceType = getterDecl->computeInterfaceSelfType();
+  auto selfParam = computeSelfParam(getterDecl);
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
     getterDecl->setGenericEnvironment(
         parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, selfInterfaceType,
+    interfaceType = GenericFunctionType::get(sig, {selfParam},
                                              interfaceType,
                                              FunctionType::ExtInfo());
   } else
-    interfaceType = FunctionType::get(selfInterfaceType, interfaceType);
+    interfaceType = FunctionType::get({selfParam}, interfaceType,
+                                      FunctionType::ExtInfo());
   getterDecl->setInterfaceType(interfaceType);
-  getterDecl->setAccessibility(std::max(typeDecl->getFormalAccess(),
-                                        Accessibility::Internal));
+  copyFormalAccess(getterDecl, typeDecl);
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -195,13 +275,13 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
   auto &C = tc.Context;
   auto parentDC = cast<DeclContext>(parentDecl);
 
-  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, /*IsLet*/false,
+  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var,
                                       /*IsCaptureList*/false, SourceLoc(), name,
                                       propertyContextType, parentDC);
   propDecl->setImplicit();
   propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                          SourceLoc());
-  propDecl->setAccessibility(getterDecl->getFormalAccess());
+  copyFormalAccess(propDecl, typeDecl);
   propDecl->setInterfaceType(propertyInterfaceType);
 
   // If this is supposed to be a final property, mark it as such.
@@ -223,4 +303,15 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
   pbDecl->setImplicit();
 
   return {propDecl, pbDecl};
+}
+
+void DerivedConformance::copyFormalAccess(ValueDecl *dest, ValueDecl *source) {
+  dest->setAccess(source->getFormalAccess());
+
+  // Inherit the @_versioned attribute.
+  if (source->getAttrs().hasAttribute<VersionedAttr>()) {
+    auto &ctx = source->getASTContext();
+    auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
+    dest->getAttrs().add(clonedAttr);
+  }
 }

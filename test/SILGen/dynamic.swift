@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -emit-silgen | %FileCheck %s
@@ -68,75 +68,75 @@ protocol Proto {
 
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3{{[_0-9a-zA-Z]*}}fcTo
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC10objcMethod{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC8objcPropSifgTo
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC8objcPropSifsTo
-// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC9subscriptSiyXl4objc_tcfgTo
-// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC9subscriptSiyXl4objc_tcfsTo
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC8objcPropSivgTo
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC8objcPropSivsTo
+// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooCSiyXl4objc_tcigTo
+// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooCSiyXl4objc_tcisTo
 
 // TODO: dynamic initializing ctor must be objc dispatched
 // CHECK-LABEL: sil hidden @_T07dynamic3{{[_0-9a-zA-Z]*}}fC
 // CHECK:         function_ref @_T07dynamic3{{[_0-9a-zA-Z]*}}fcTD
 // CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3{{[_0-9a-zA-Z]*}}fcTD
-// CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.init!initializer.1.foreign :
+// CHECK:         objc_method {{%.*}} : $Foo, #Foo.init!initializer.1.foreign :
 
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3{{[_0-9a-zA-Z]*}}fcTo
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC0A6Method{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC0A4PropSifgTo
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC0A4PropSifsTo
-// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC9subscriptS2iAA_tcfgTo
-// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC9subscriptS2iAA_tcfsTo
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC0A4PropSivgTo
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC0A4PropSivsTo
+// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooCS2iAA_tcigTo
+// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooCS2iAA_tcisTo
 
 // Protocol witnesses use best appropriate dispatch
 
 // Native witnesses use vtable dispatch:
 // CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP12nativeMethod{{[_0-9a-zA-Z]*}}FTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.nativeMethod!1 :
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP10nativePropSifgTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP10nativePropSivgTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.nativeProp!getter.1 :
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP10nativePropSifsTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP10nativePropSivsTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.nativeProp!setter.1 :
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP9subscriptS2i6native_tcfgTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDPS2i6native_tcigTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!getter.1 :
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP9subscriptS2i6native_tcfsTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDPS2i6native_tcisTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!setter.1 :
 
 // @objc witnesses use vtable dispatch:
 // CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP10objcMethod{{[_0-9a-zA-Z]*}}FTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.objcMethod!1 :
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP8objcPropSifgTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP8objcPropSivgTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.objcProp!getter.1 :
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP8objcPropSifsTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP8objcPropSivsTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.objcProp!setter.1 :
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP9subscriptSiyXl4objc_tcfgTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDPSiyXl4objc_tcigTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!getter.1 :
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP9subscriptSiyXl4objc_tcfsTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDPSiyXl4objc_tcisTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!setter.1 :
 
 // Dynamic witnesses use objc dispatch:
 // CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP0A6Method{{[_0-9a-zA-Z]*}}FTW
 // CHECK:         function_ref @_T07dynamic3FooC0A6Method{{[_0-9a-zA-Z]*}}FTD
 // CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooC0A6Method{{[_0-9a-zA-Z]*}}FTD
-// CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicMethod!1.foreign :
+// CHECK:         objc_method {{%.*}} : $Foo, #Foo.dynamicMethod!1.foreign :
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP0A4PropSifgTW
-// CHECK:         function_ref @_T07dynamic3FooC0A4PropSifgTD
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooC0A4PropSifgTD
-// CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicProp!getter.1.foreign :
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP0A4PropSivgTW
+// CHECK:         function_ref @_T07dynamic3FooC0A4PropSivgTD
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooC0A4PropSivgTD
+// CHECK:         objc_method {{%.*}} : $Foo, #Foo.dynamicProp!getter.1.foreign :
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP0A4PropSifsTW
-// CHECK:         function_ref @_T07dynamic3FooC0A4PropSifsTD
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooC0A4PropSifsTD
-// CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicProp!setter.1.foreign :
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP0A4PropSivsTW
+// CHECK:         function_ref @_T07dynamic3FooC0A4PropSivsTD
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooC0A4PropSivsTD
+// CHECK:         objc_method {{%.*}} : $Foo, #Foo.dynamicProp!setter.1.foreign :
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP9subscriptS2iAA_tcfgTW
-// CHECK:         function_ref @_T07dynamic3FooC9subscriptS2iAA_tcfgTD
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooC9subscriptS2iAA_tcfgTD
-// CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!getter.1.foreign :
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDPS2iAA_tcigTW
+// CHECK:         function_ref @_T07dynamic3FooCS2iAA_tcigTD
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooCS2iAA_tcigTD
+// CHECK:         objc_method {{%.*}} : $Foo, #Foo.subscript!getter.1.foreign :
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP9subscriptS2iAA_tcfsTW
-// CHECK:         function_ref @_T07dynamic3FooC9subscriptS2iAA_tcfsTD
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooC9subscriptS2iAA_tcfsTD
-// CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!setter.1.foreign :
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDPS2iAA_tcisTW
+// CHECK:         function_ref @_T07dynamic3FooCS2iAA_tcisTD
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooCS2iAA_tcisTD
+// CHECK:         objc_method {{%.*}} : $Foo, #Foo.subscript!setter.1.foreign :
 
 // Superclass dispatch
 class Subclass: Foo {
@@ -155,20 +155,20 @@ class Subclass: Foo {
 
   override var nativeProp: Int {
     get { return super.nativeProp }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC10nativePropSifg
-    // CHECK:         function_ref @_T07dynamic3FooC10nativePropSifg : $@convention(method) (@guaranteed Foo) -> Int
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC10nativePropSivg
+    // CHECK:         function_ref @_T07dynamic3FooC10nativePropSivg : $@convention(method) (@guaranteed Foo) -> Int
     set { super.nativeProp = newValue }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC10nativePropSifs
-    // CHECK:         function_ref @_T07dynamic3FooC10nativePropSifs : $@convention(method) (Int, @guaranteed Foo) -> ()
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC10nativePropSivs
+    // CHECK:         function_ref @_T07dynamic3FooC10nativePropSivs : $@convention(method) (Int, @guaranteed Foo) -> ()
   }
 
   override subscript(native native: Int) -> Int {
     get { return super[native: native] }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC9subscriptS2i6native_tcfg
-    // CHECK:         function_ref @_T07dynamic3FooC9subscriptS2i6native_tcfg : $@convention(method) (Int, @guaranteed Foo) -> Int
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassCS2i6native_tcig
+    // CHECK:         function_ref @_T07dynamic3FooCS2i6native_tcig : $@convention(method) (Int, @guaranteed Foo) -> Int
     set { super[native: native] = newValue }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC9subscriptS2i6native_tcfs
-    // CHECK:         function_ref @_T07dynamic3FooC9subscriptS2i6native_tcfs : $@convention(method) (Int, Int, @guaranteed Foo) -> ()
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassCS2i6native_tcis
+    // CHECK:         function_ref @_T07dynamic3FooCS2i6native_tcis : $@convention(method) (Int, Int, @guaranteed Foo) -> ()
   }
 
   override init(objc: Int) {
@@ -185,20 +185,20 @@ class Subclass: Foo {
 
   override var objcProp: Int {
     get { return super.objcProp }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC8objcPropSifg
-    // CHECK:         function_ref @_T07dynamic3FooC8objcPropSifg : $@convention(method) (@guaranteed Foo) -> Int
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC8objcPropSivg
+    // CHECK:         function_ref @_T07dynamic3FooC8objcPropSivg : $@convention(method) (@guaranteed Foo) -> Int
     set { super.objcProp = newValue }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC8objcPropSifs
-    // CHECK:         function_ref @_T07dynamic3FooC8objcPropSifs : $@convention(method) (Int, @guaranteed Foo) -> ()
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC8objcPropSivs
+    // CHECK:         function_ref @_T07dynamic3FooC8objcPropSivs : $@convention(method) (Int, @guaranteed Foo) -> ()
   }
 
   override subscript(objc objc: AnyObject) -> Int {
     get { return super[objc: objc] }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC9subscriptSiyXl4objc_tcfg
-    // CHECK:         function_ref @_T07dynamic3FooC9subscriptSiyXl4objc_tcfg : $@convention(method) (@owned AnyObject, @guaranteed Foo) -> Int
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassCSiyXl4objc_tcig
+    // CHECK:         function_ref @_T07dynamic3FooCSiyXl4objc_tcig : $@convention(method) (@owned AnyObject, @guaranteed Foo) -> Int
     set { super[objc: objc] = newValue }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC9subscriptSiyXl4objc_tcfs
-    // CHECK:         function_ref @_T07dynamic3FooC9subscriptSiyXl4objc_tcfs : $@convention(method) (Int, @owned AnyObject, @guaranteed Foo) -> ()
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassCSiyXl4objc_tcis
+    // CHECK:         function_ref @_T07dynamic3FooCSiyXl4objc_tcis : $@convention(method) (Int, @owned AnyObject, @guaranteed Foo) -> ()
   }
 
   // Dynamic methods are super-dispatched by objc_msgSend
@@ -206,33 +206,50 @@ class Subclass: Foo {
     super.init(dynamic: dynamic)
   }
   // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC{{[_0-9a-zA-Z]*}}fc
-  // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.init!initializer.1.foreign :
+  // CHECK:         objc_super_method {{%.*}} : $Subclass, #Foo.init!initializer.1.foreign :
 
   override func dynamicMethod() {
     super.dynamicMethod()
   }
   // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC0A6Method{{[_0-9a-zA-Z]*}}F
-  // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.dynamicMethod!1.foreign :
+  // CHECK:         objc_super_method {{%.*}} : $Subclass, #Foo.dynamicMethod!1.foreign :
 
   override var dynamicProp: Int {
     get { return super.dynamicProp }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC0A4PropSifg
-    // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.dynamicProp!getter.1.foreign :
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC0A4PropSivg
+    // CHECK:         objc_super_method {{%.*}} : $Subclass, #Foo.dynamicProp!getter.1.foreign :
     set { super.dynamicProp = newValue }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC0A4PropSifs
-    // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.dynamicProp!setter.1.foreign :
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC0A4PropSivs
+    // CHECK:         objc_super_method {{%.*}} : $Subclass, #Foo.dynamicProp!setter.1.foreign :
   }
 
   override subscript(dynamic dynamic: Int) -> Int {
     get { return super[dynamic: dynamic] }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC9subscriptS2iAA_tcfg
-    // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.subscript!getter.1.foreign :
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassCS2iAA_tcig
+    // CHECK:         objc_super_method {{%.*}} : $Subclass, #Foo.subscript!getter.1.foreign :
     set { super[dynamic: dynamic] = newValue }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC9subscriptS2iAA_tcfs
-    // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.subscript!setter.1.foreign :
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassCS2iAA_tcis
+    // CHECK:         objc_super_method {{%.*}} : $Subclass, #Foo.subscript!setter.1.foreign :
   }
 
   dynamic override func overriddenByDynamic() {}
+}
+
+class SubclassWithInheritedInits: Foo {
+  // CHECK-LABEL: sil hidden @_T07dynamic26SubclassWithInheritedInitsC{{[_0-9a-zA-Z]*}}fc
+  // CHECK:         objc_super_method {{%.*}} : $SubclassWithInheritedInits, #Foo.init!initializer.1.foreign :
+}
+class GrandchildWithInheritedInits: SubclassWithInheritedInits {
+  // CHECK-LABEL: sil hidden @_T07dynamic28GrandchildWithInheritedInitsC{{[_0-9a-zA-Z]*}}fc
+  // CHECK:         objc_super_method {{%.*}} : $GrandchildWithInheritedInits, #SubclassWithInheritedInits.init!initializer.1.foreign :
+}
+class GrandchildOfInheritedInits: SubclassWithInheritedInits {
+  // Dynamic methods are super-dispatched by objc_msgSend
+  override init(dynamic: Int) {
+    super.init(dynamic: dynamic)
+  }
+  // CHECK-LABEL: sil hidden @_T07dynamic26GrandchildOfInheritedInitsC{{[_0-9a-zA-Z]*}}fc
+  // CHECK:         objc_super_method {{%.*}} : $GrandchildOfInheritedInits, #SubclassWithInheritedInits.init!initializer.1.foreign :
 }
 
 // CHECK-LABEL: sil hidden @_T07dynamic20nativeMethodDispatchyyF : $@convention(thin) () -> ()
@@ -271,23 +288,23 @@ func objcMethodDispatch() {
 func dynamicMethodDispatch() {
   // CHECK: function_ref @_T07dynamic3{{[_0-9a-zA-Z]*}}fC
   let c = Foo(dynamic: 0)
-  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicMethod!1.foreign 
+  // CHECK: objc_method {{%.*}} : $Foo, #Foo.dynamicMethod!1.foreign 
   c.dynamicMethod()
-  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicProp!getter.1.foreign
+  // CHECK: objc_method {{%.*}} : $Foo, #Foo.dynamicProp!getter.1.foreign
   let x = c.dynamicProp
-  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicProp!setter.1.foreign
+  // CHECK: objc_method {{%.*}} : $Foo, #Foo.dynamicProp!setter.1.foreign
   c.dynamicProp = x
-  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!getter.1.foreign
+  // CHECK: objc_method {{%.*}} : $Foo, #Foo.subscript!getter.1.foreign
   let y = c[dynamic: 0]
-  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!setter.1.foreign
+  // CHECK: objc_method {{%.*}} : $Foo, #Foo.subscript!setter.1.foreign
   c[dynamic: 0] = y
 }
 
 // CHECK-LABEL: sil hidden @_T07dynamic15managedDispatchyAA3FooCF
 func managedDispatch(_ c: Foo) {
-  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!getter.1.foreign 
+  // CHECK: objc_method {{%.*}} : $Foo, #Foo.managedProp!getter.1.foreign 
   let x = c.managedProp
-  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!setter.1.foreign
+  // CHECK: objc_method {{%.*}} : $Foo, #Foo.managedProp!setter.1.foreign
   c.managedProp = x
 }
 
@@ -295,35 +312,35 @@ func managedDispatch(_ c: Foo) {
 func foreignMethodDispatch() {
   // CHECK: function_ref @_T0So9GuisemeauC{{[_0-9a-zA-Z]*}}fC
   let g = Guisemeau()!
-  // CHECK: class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.frob!1.foreign
+  // CHECK: objc_method {{%.*}} : $Gizmo, #Gizmo.frob!1.foreign
   g.frob()
-  // CHECK: class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.count!getter.1.foreign
+  // CHECK: objc_method {{%.*}} : $Gizmo, #Gizmo.count!getter.1.foreign
   let x = g.count
-  // CHECK: class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.count!setter.1.foreign
+  // CHECK: objc_method {{%.*}} : $Gizmo, #Gizmo.count!setter.1.foreign
   g.count = x
-  // CHECK: class_method [volatile] {{%.*}} : $Guisemeau, #Guisemeau.subscript!getter.1.foreign
+  // CHECK: objc_method {{%.*}} : $Guisemeau, #Guisemeau.subscript!getter.1.foreign
   let y: Any! = g[0]
-  // CHECK: class_method [volatile] {{%.*}} : $Guisemeau, #Guisemeau.subscript!setter.1.foreign
+  // CHECK: objc_method {{%.*}} : $Guisemeau, #Guisemeau.subscript!setter.1.foreign
   g[0] = y
-  // CHECK: class_method [volatile] {{%.*}} : $NSObject, #NSObject.description!getter.1.foreign
+  // CHECK: objc_method {{%.*}} : $NSObject, #NSObject.description!getter.1.foreign
   _ = g.description
 }
 
 extension Gizmo {
   // CHECK-LABEL: sil hidden @_T0So5GizmoC7dynamicE{{[_0-9a-zA-Z]*}}fc
-  // CHECK:         class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.init!initializer.1.foreign
+  // CHECK:         objc_method {{%.*}} : $Gizmo, #Gizmo.init!initializer.1.foreign
   convenience init(convenienceInExtension: Int) {
     self.init(bellsOn: convenienceInExtension)
   }
 
   // CHECK-LABEL: sil hidden @_T0So5GizmoC7dynamicE{{[_0-9a-zA-Z]*}}fC
-  // CHECK:         class_method [volatile] {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
+  // CHECK:         objc_method {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
   convenience init(foreignClassFactory x: Int) {
     self.init(stuff: x)
   }
 
   // CHECK-LABEL: sil hidden @_T0So5GizmoC7dynamicE{{[_0-9a-zA-Z]*}}fC
-  // CHECK:         class_method [volatile] {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
+  // CHECK:         objc_method {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
   convenience init(foreignClassExactFactory x: Int) {
     self.init(exactlyStuff: x)
   }
@@ -336,10 +353,10 @@ extension Gizmo {
 // CHECK: bb0([[ARG:%.*]] : $Gizmo):
 func foreignExtensionDispatch(_ g: Gizmo) {
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.foreignObjCExtension!1.foreign : (Gizmo)
+  // CHECK: objc_method [[BORROWED_ARG]] : $Gizmo, #Gizmo.foreignObjCExtension!1.foreign : (Gizmo)
   g.foreignObjCExtension()
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.foreignDynamicExtension!1.foreign
+  // CHECK: objc_method [[BORROWED_ARG]] : $Gizmo, #Gizmo.foreignDynamicExtension!1.foreign
   g.foreignDynamicExtension()
 }
 
@@ -380,43 +397,43 @@ func objcMethodDispatchFromOtherFile() {
 func dynamicMethodDispatchFromOtherFile() {
   // CHECK: function_ref @_T07dynamic13FromOtherFile{{[_0-9a-zA-Z]*}}fC
   let c = FromOtherFile(dynamic: 0)
-  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.dynamicMethod!1.foreign
+  // CHECK: objc_method {{%.*}} : $FromOtherFile, #FromOtherFile.dynamicMethod!1.foreign
   c.dynamicMethod()
-  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.dynamicProp!getter.1.foreign
+  // CHECK: objc_method {{%.*}} : $FromOtherFile, #FromOtherFile.dynamicProp!getter.1.foreign
   let x = c.dynamicProp
-  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.dynamicProp!setter.1.foreign
+  // CHECK: objc_method {{%.*}} : $FromOtherFile, #FromOtherFile.dynamicProp!setter.1.foreign
   c.dynamicProp = x
-  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!getter.1.foreign
+  // CHECK: objc_method {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!getter.1.foreign
   let y = c[dynamic: 0]
-  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!setter.1.foreign
+  // CHECK: objc_method {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!setter.1.foreign
   c[dynamic: 0] = y
 }
 
 // CHECK-LABEL: sil hidden @_T07dynamic28managedDispatchFromOtherFileyAA0deF0CF
 func managedDispatchFromOtherFile(_ c: FromOtherFile) {
-  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.managedProp!getter.1.foreign
+  // CHECK: objc_method {{%.*}} : $FromOtherFile, #FromOtherFile.managedProp!getter.1.foreign
   let x = c.managedProp
-  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.managedProp!setter.1.foreign
+  // CHECK: objc_method {{%.*}} : $FromOtherFile, #FromOtherFile.managedProp!setter.1.foreign
   c.managedProp = x
 }
 
 // CHECK-LABEL: sil hidden @_T07dynamic0A16ExtensionMethodsyAA13ObjCOtherFileCF
 func dynamicExtensionMethods(_ obj: ObjCOtherFile) {
-  // CHECK: class_method [volatile] {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.extensionMethod!1.foreign
+  // CHECK: objc_method {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.extensionMethod!1.foreign
   obj.extensionMethod()
-  // CHECK: class_method [volatile] {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.extensionProp!getter.1.foreign
+  // CHECK: objc_method {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.extensionProp!getter.1.foreign
   _ = obj.extensionProp
 
-  // CHECK: class_method [volatile] {{%.*}} : $@thick ObjCOtherFile.Type, #ObjCOtherFile.extensionClassProp!getter.1.foreign
+  // CHECK: objc_method {{%.*}} : $@thick ObjCOtherFile.Type, #ObjCOtherFile.extensionClassProp!getter.1.foreign
   // CHECK-NEXT: thick_to_objc_metatype {{%.*}} : $@thick ObjCOtherFile.Type to $@objc_metatype ObjCOtherFile.Type
   _ = type(of: obj).extensionClassProp
 
-  // CHECK: class_method [volatile] {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.dynExtensionMethod!1.foreign
+  // CHECK: objc_method {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.dynExtensionMethod!1.foreign
   obj.dynExtensionMethod()
-  // CHECK: class_method [volatile] {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.dynExtensionProp!getter.1.foreign
+  // CHECK: objc_method {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.dynExtensionProp!getter.1.foreign
   _ = obj.dynExtensionProp
 
-  // CHECK: class_method [volatile] {{%.*}} : $@thick ObjCOtherFile.Type, #ObjCOtherFile.dynExtensionClassProp!getter.1.foreign
+  // CHECK: objc_method {{%.*}} : $@thick ObjCOtherFile.Type, #ObjCOtherFile.dynExtensionClassProp!getter.1.foreign
   // CHECK-NEXT: thick_to_objc_metatype {{%.*}} : $@thick ObjCOtherFile.Type to $@objc_metatype ObjCOtherFile.Type
   _ = type(of: obj).dynExtensionClassProp
 }
@@ -426,25 +443,28 @@ public class Base {
 }
 
 public class Sub : Base {
-  // CHECK-LABEL: sil hidden @_T07dynamic3SubC1xSbfg : $@convention(method) (@guaranteed Sub) -> Bool {
+  // CHECK-LABEL: sil hidden @_T07dynamic3SubC1xSbvg : $@convention(method) (@guaranteed Sub) -> Bool {
   // CHECK: bb0([[SELF:%.*]] : $Sub):
-  // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @_T07dynamic3SubC1xSbfgSbyKXKfu_ : $@convention(thin) (@owned Sub) -> (Bool, @error Error)
+  // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @_T07dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@owned Sub) -> (Bool, @error Error)
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:     = partial_apply [[AUTOCLOSURE]]([[SELF_COPY]])
   // CHECK:     return {{%.*}} : $Bool
-  // CHECK: } // end sil function '_T07dynamic3SubC1xSbfg'
+  // CHECK: } // end sil function '_T07dynamic3SubC1xSbvg'
 
-  // CHECK-LABEL: sil private [transparent] @_T07dynamic3SubC1xSbfgSbyKXKfu_ : $@convention(thin) (@owned Sub) -> (Bool, @error Error) {
+  // CHECK-LABEL: sil private [transparent] @_T07dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@owned Sub) -> (Bool, @error Error) {
   // CHECK: bb0([[VALUE:%.*]] : $Sub):
   // CHECK:     [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
   // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[BORROWED_VALUE]]
   // CHECK:     [[CASTED_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]
-  // CHECK:     [[SUPER:%.*]] = super_method [volatile] [[VALUE_COPY]] : $Sub, #Base.x!getter.1.foreign : (Base) -> () -> Bool, $@convention(objc_method) (Base) -> ObjCBool
+  // CHECK:     [[BORROWED_CASTED_VALUE_COPY:%.*]] = begin_borrow [[CASTED_VALUE_COPY]]
+  // CHECK:     [[DOWNCAST_FOR_SUPERMETHOD:%.*]] = unchecked_ref_cast [[BORROWED_CASTED_VALUE_COPY]]
+  // CHECK:     [[SUPER:%.*]] = objc_super_method [[DOWNCAST_FOR_SUPERMETHOD]] : $Sub, #Base.x!getter.1.foreign : (Base) -> () -> Bool, $@convention(objc_method) (Base) -> ObjCBool
+  // CHECK:     end_borrow [[BORROWED_CASTED_VALUE_COPY]]
   // CHECK:     = apply [[SUPER]]([[CASTED_VALUE_COPY]])
-  // CHECK:     destroy_value [[VALUE_COPY]]
+  // CHECK:     destroy_value [[CASTED_VALUE_COPY]]
   // CHECK:     end_borrow [[BORROWED_VALUE]] from [[VALUE]]
   // CHECK:     destroy_value [[VALUE]]
-  // CHECK: } // end sil function '_T07dynamic3SubC1xSbfgSbyKXKfu_'
+  // CHECK: } // end sil function '_T07dynamic3SubC1xSbvgSbyKXKfu_'
   override var x: Bool { return false || super.x }
 }
 
@@ -485,19 +505,19 @@ public class ConcreteDerived : GenericBase<Int> {
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK-NEXT:   #Foo.init!initializer.1: {{.*}} :   _T07dynamic3FooCACSi6native_tcfc
 // CHECK-NEXT:   #Foo.nativeMethod!1: {{.*}} :       _T07dynamic3FooC12nativeMethodyyF
-// CHECK-NEXT:   #Foo.nativeProp!getter.1: {{.*}} :  _T07dynamic3FooC10nativePropSifg     // dynamic.Foo.nativeProp.getter : Swift.Int
-// CHECK-NEXT:   #Foo.nativeProp!setter.1: {{.*}} :  _T07dynamic3FooC10nativePropSifs     // dynamic.Foo.nativeProp.setter : Swift.Int
+// CHECK-NEXT:   #Foo.nativeProp!getter.1: {{.*}} :  _T07dynamic3FooC10nativePropSivg     // dynamic.Foo.nativeProp.getter : Swift.Int
+// CHECK-NEXT:   #Foo.nativeProp!setter.1: {{.*}} :  _T07dynamic3FooC10nativePropSivs     // dynamic.Foo.nativeProp.setter : Swift.Int
 // CHECK-NEXT:   #Foo.nativeProp!materializeForSet.1
-// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} :   _T07dynamic3FooC9subscriptS2i6native_tcfg    // dynamic.Foo.subscript.getter : (native: Swift.Int) -> Swift.Int
-// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} :   _T07dynamic3FooC9subscriptS2i6native_tcfs    // dynamic.Foo.subscript.setter : (native: Swift.Int) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} :   _T07dynamic3FooCS2i6native_tcig    // dynamic.Foo.subscript.getter : (native: Swift.Int) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} :   _T07dynamic3FooCS2i6native_tcis    // dynamic.Foo.subscript.setter : (native: Swift.Int) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!materializeForSet.1
 // CHECK-NEXT:   #Foo.init!initializer.1: {{.*}} :   _T07dynamic3FooCACSi4objc_tcfc
 // CHECK-NEXT:   #Foo.objcMethod!1: {{.*}} :         _T07dynamic3FooC10objcMethodyyF
-// CHECK-NEXT:   #Foo.objcProp!getter.1: {{.*}} :    _T07dynamic3FooC8objcPropSifg  // dynamic.Foo.objcProp.getter : Swift.Int
-// CHECK-NEXT:   #Foo.objcProp!setter.1: {{.*}} :    _T07dynamic3FooC8objcPropSifs  // dynamic.Foo.objcProp.setter : Swift.Int
+// CHECK-NEXT:   #Foo.objcProp!getter.1: {{.*}} :    _T07dynamic3FooC8objcPropSivg  // dynamic.Foo.objcProp.getter : Swift.Int
+// CHECK-NEXT:   #Foo.objcProp!setter.1: {{.*}} :    _T07dynamic3FooC8objcPropSivs  // dynamic.Foo.objcProp.setter : Swift.Int
 // CHECK-NEXT:   #Foo.objcProp!materializeForSet.1
-// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} : _T07dynamic3FooC9subscriptSiyXl4objc_tcfg // dynamic.Foo.subscript.getter : (objc: Swift.AnyObject) -> Swift.Int
-// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} : _T07dynamic3FooC9subscriptSiyXl4objc_tcfs // dynamic.Foo.subscript.setter : (objc: Swift.AnyObject) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} : _T07dynamic3FooCSiyXl4objc_tcig // dynamic.Foo.subscript.getter : (objc: Swift.AnyObject) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} : _T07dynamic3FooCSiyXl4objc_tcis // dynamic.Foo.subscript.setter : (objc: Swift.AnyObject) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!materializeForSet
 // CHECK-NEXT:   #Foo.overriddenByDynamic!1: {{.*}} : _T07dynamic3FooC19overriddenByDynamic{{[_0-9a-zA-Z]*}}
 // CHECK-NEXT:   #Foo.deinit!deallocator: {{.*}}
@@ -508,15 +528,34 @@ public class ConcreteDerived : GenericBase<Int> {
 // CHECK:   #Foo.overriddenByDynamic!1: {{.*}} : public _T07dynamic8SubclassC19overriddenByDynamic{{[_0-9a-zA-Z]*}}FTD
 // CHECK: }
 
+// Check vtables for implicitly-inherited initializers
+// CHECK-LABEL: sil_vtable SubclassWithInheritedInits {
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26SubclassWithInheritedInitsCACSi6native_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26SubclassWithInheritedInitsCACSi4objc_tcfc
+// CHECK-NOT: .init!
+// CHECK: }
+
+// CHECK-LABEL: sil_vtable GrandchildWithInheritedInits {
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic28GrandchildWithInheritedInitsCACSi6native_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic28GrandchildWithInheritedInitsCACSi4objc_tcfc
+// CHECK-NOT: .init!
+// CHECK: }
+
+// CHECK-LABEL: sil_vtable GrandchildOfInheritedInits {
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26GrandchildOfInheritedInitsCACSi6native_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26GrandchildOfInheritedInitsCACSi4objc_tcfc
+// CHECK-NOT: .init!
+// CHECK: }
+
 // No vtable entry for override of @objc extension property
 // CHECK-LABEL: sil_vtable SubExt {
-// CHECK-NEXT: #BaseExt.init!initializer.1: (BaseExt.Type) -> () -> BaseExt : _T07dynamic6SubExtCACycfc // dynamic.SubExt.init() -> dynamic.SubExt
+// CHECK-NEXT: #BaseExt.init!initializer.1: (BaseExt.Type) -> () -> BaseExt : _T07dynamic6SubExtCACycfc [override] // dynamic.SubExt.init() -> dynamic.SubExt
 // CHECK-NEXT: #SubExt.deinit!deallocator: _T07dynamic6SubExtCfD // dynamic.SubExt.__deallocating_deinit
 // CHECK-NEXT: }
 
 // Dynamic thunk + vtable re-abstraction
 // CHECK-LABEL: sil_vtable ConcreteDerived {
-// CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public _T07dynamic15ConcreteDerivedC6methodySiFAA11GenericBaseCADyxFTV     // vtable thunk for dynamic.GenericBase.method(A) -> () dispatching to dynamic.ConcreteDerived.method(Swift.Int) -> ()
-// CHECK-NEXT: #GenericBase.init!initializer.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : _T07dynamic15ConcreteDerivedCACycfc      // dynamic.ConcreteDerived.init() -> dynamic.ConcreteDerived
+// CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public _T07dynamic15ConcreteDerivedC6methodySiFAA11GenericBaseCADyxFTV [override]     // vtable thunk for dynamic.GenericBase.method(A) -> () dispatching to dynamic.ConcreteDerived.method(Swift.Int) -> ()
+// CHECK-NEXT: #GenericBase.init!initializer.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : _T07dynamic15ConcreteDerivedCACycfc [override]      // dynamic.ConcreteDerived.init() -> dynamic.ConcreteDerived
 // CHECK-NEXT: #ConcreteDerived.deinit!deallocator: _T07dynamic15ConcreteDerivedCfD  // dynamic.ConcreteDerived.__deallocating_deinit
 // CHECK-NEXT: }

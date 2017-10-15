@@ -286,16 +286,11 @@ public:
 /// It de-mangles a string and it also owns the returned node-tree. This means
 /// The nodes of the tree only live as long as the Demangler itself.
 class Demangler : public NodeFactory {
-private:
+protected:
   StringRef Text;
   size_t Pos = 0;
 
-  struct NodeWithPos {
-    NodePointer Node;
-    size_t Pos;
-  };
-
-  Vector<NodeWithPos> NodeStack;
+  Vector<NodePointer> NodeStack;
   Vector<NodePointer> Substitutions;
   Vector<unsigned> PendingSubstitutions;
 
@@ -333,19 +328,25 @@ private:
     Pos--;
   }
 
+  StringRef consumeAll() {
+    StringRef str = Text.drop_front(Pos);
+    Pos = Text.size();
+    return str;
+  }
+
   void pushNode(NodePointer Nd) {
-    NodeStack.push_back({ Nd, Pos }, *this);
+    NodeStack.push_back(Nd, *this);
   }
 
   NodePointer popNode() {
-    return NodeStack.pop_back_val().Node;
+    return NodeStack.pop_back_val();
   }
 
   NodePointer popNode(Node::Kind kind) {
     if (NodeStack.empty())
       return nullptr;
 
-    Node::Kind NdKind = NodeStack.back().Node->getKind();
+    Node::Kind NdKind = NodeStack.back()->getKind();
     if (NdKind != kind)
       return nullptr;
 
@@ -356,7 +357,7 @@ private:
     if (NodeStack.empty())
       return nullptr;
 
-    Node::Kind NdKind = NodeStack.back().Node->getKind();
+    Node::Kind NdKind = NodeStack.back()->getKind();
     if (!pred(NdKind))
       return nullptr;
     
@@ -381,7 +382,7 @@ private:
     return createWithChild(kind, popNode(Node::Kind::Type));
   }
 
-  void parseAndPushNodes();
+  bool parseAndPushNodes();
 
   NodePointer changeKind(NodePointer Node, Node::Kind NewKind);
 
@@ -392,6 +393,8 @@ private:
   NodePointer demangleIndexAsNode();
   NodePointer demangleIdentifier();
   NodePointer demangleOperatorIdentifier();
+
+  std::string demangleBridgedMethodParams();
 
   NodePointer demangleMultiSubstitutions();
   NodePointer pushMultiSubstitutions(int RepeatCount, size_t SubstIdx);
@@ -444,8 +447,11 @@ private:
   NodePointer demangleWitness();
   NodePointer demangleSpecialType();
   NodePointer demangleMetatypeRepresentation();
+  NodePointer demangleAccessor(NodePointer ChildNode);
   NodePointer demangleFunctionEntity();
   NodePointer demangleEntity(Node::Kind Kind);
+  NodePointer demangleVariable();
+  NodePointer demangleSubscript();
   NodePointer demangleProtocolList();
   NodePointer demangleProtocolListType();
   NodePointer demangleGenericSignature(bool hasParamCounts);

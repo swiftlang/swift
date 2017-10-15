@@ -5,7 +5,7 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=linux-gnu
 // REQUIRES: lldb
-// REQUIRES: runtime-dladdr-backtraces
+// REQUIRES: rdar33718631
 
 // Backtraces are not emitted when optimizations are enabled. This test can not
 // run when optimizations are enabled.

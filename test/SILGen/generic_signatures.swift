@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -parse-stdlib %s
 
 protocol P {
   associatedtype Assoc

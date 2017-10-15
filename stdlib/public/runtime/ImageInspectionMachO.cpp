@@ -26,10 +26,6 @@
 #include <assert.h>
 #include <dlfcn.h>
 
-#ifndef SWIFT_RUNTIME_DLADDR_ALLOW
-#error "SWIFT_RUNTIME_DLADDR_ALLOW must be defined"
-#endif
-
 using namespace swift;
 
 namespace {
@@ -43,7 +39,7 @@ constexpr const char TypeMetadataRecordSection[] = "__swift2_types";
 template<const char *SECTION_NAME,
          void CONSUME_BLOCK(const void *start, uintptr_t size)>
 void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
-#ifdef __LP64__
+#if __POINTER_WIDTH__ == 64
   using mach_header_platform = mach_header_64;
   assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
 #else
@@ -78,7 +74,6 @@ void swift::initializeTypeMetadataRecordLookup() {
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
-#if SWIFT_RUNTIME_DLADDR_ALLOW
   Dl_info dlinfo;
   if (dladdr(address, &dlinfo) == 0) {
     return 0;
@@ -89,9 +84,6 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   info->symbolName = dlinfo.dli_sname;
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
-#else
-  return 0;
-#endif
 }
 
 #endif // defined(__APPLE__) && defined(__MACH__)

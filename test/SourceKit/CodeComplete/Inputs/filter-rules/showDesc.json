@@ -1,0 +1,16 @@
+[
+  {
+    key.kind: source.codecompletion.identifier,
+    key.hide: 1,
+    key.names: [
+      "[]"
+    ]
+  },
+  {
+    key.kind: source.codecompletion.description,
+    key.hide: 0,
+    key.names: [
+      "[Float]"
+    ]
+  }
+]

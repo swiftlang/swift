@@ -15,7 +15,7 @@ class A {
 
   // Regular methods go through the @objc property accessors.
   // CHECK-LABEL: sil hidden @_T015objc_properties1AC6method{{[_0-9a-zA-Z]*}}F
-  // CHECK: class_method {{.*}} #A.prop
+  // CHECK: objc_method {{.*}} #A.prop
   func method(_ x: Int) {
     prop = x
     method(prop)
@@ -39,11 +39,13 @@ class A {
   init(other : A, x : Int) {
     // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
     // CHECK: [[SELF_A:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $A, #A.prop
-    // CHECK: assign %1 to [[SELF_A]]
+    // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[SELF_A]] : $*Int
+    // CHECK: assign %1 to [[WRITE]]
+    // CHECK: end_access [[WRITE]] : $*Int
     // CHECK: end_borrow [[BORROWED_SELF]] from [[SELF]]
     prop = x
 
-    // CHECK: class_method
+    // CHECK: objc_method
     // CHECK: apply
     other.prop = x
   }
@@ -60,39 +62,39 @@ class A {
 
 // CHECK-LABEL: sil hidden @_T015objc_properties11testPropGet{{[_0-9a-zA-Z]*}}F
 func testPropGet(_ a: A) -> Int {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.prop!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
   return a.prop
 }
 
 // CHECK-LABEL: sil hidden @_T015objc_properties11testPropSet{{[_0-9a-zA-Z]*}}F
 func testPropSet(_ a: A, i: Int) {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.prop!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
   a.prop = i
 }
 
 // CHECK-LABEL: sil hidden @_T015objc_properties19testComputedPropGet{{[_0-9a-zA-Z]*}}F
 func testComputedPropGet(_ a: A) -> Int {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.computedProp!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
   return a.computedProp
 }
 
 // CHECK-LABEL: sil hidden @_T015objc_properties19testComputedPropSet{{[_0-9a-zA-Z]*}}F
 func testComputedPropSet(_ a: A, i: Int) {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.computedProp!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
   a.computedProp = i
 }
 
 // 'super' property references.
 class B : A {
   @objc override var computedProp: Int {
-    // CHECK-LABEL: sil hidden @_T015objc_properties1BC12computedPropSifg : $@convention(method) (@guaranteed B) -> Int
+    // CHECK-LABEL: sil hidden @_T015objc_properties1BC12computedPropSivg : $@convention(method) (@guaranteed B) -> Int
     get {
-      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
+      // CHECK: objc_super_method [[SELF:%[0-9]+]] : $B, #A.computedProp!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
       return super.computedProp
     }
-    // CHECK-LABEL: sil hidden @_T015objc_properties1BC12computedPropSifs : $@convention(method) (Int, @guaranteed B) -> ()
+    // CHECK-LABEL: sil hidden @_T015objc_properties1BC12computedPropSivs : $@convention(method) (Int, @guaranteed B) -> ()
     set(value) {
-      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
+      // CHECK: objc_super_method [[SELF:%[0-9]+]] : $B, #A.computedProp!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
       super.computedProp = value
     }
   }
@@ -101,10 +103,10 @@ class B : A {
 
 // Test the @NSCopying attribute.
 class TestNSCopying {
-  // CHECK-LABEL: sil hidden [transparent] @_T015objc_properties13TestNSCopyingC8propertySo8NSStringCfs : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
+  // CHECK-LABEL: sil hidden [transparent] @_T015objc_properties13TestNSCopyingC8propertySo8NSStringCvs : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
   // CHECK: bb0([[ARG0:%.*]] : $NSString, [[ARG1:%.*]] : $TestNSCopying):
   // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-  // CHECK:   class_method [volatile] [[BORROWED_ARG0]] : $NSString, #NSString.copy!1.foreign
+  // CHECK:   objc_method [[BORROWED_ARG0]] : $NSString, #NSString.copy!1.foreign
   @NSCopying var property : NSString
 
   @NSCopying var optionalProperty : NSString?
@@ -133,52 +135,52 @@ class TestComputedOutlet : NSObject {
 }
 
 class Singleton : NSObject {
-  // CHECK-DAG: sil hidden @_T015objc_properties9SingletonC14sharedInstanceACfgZ : $@convention(method) (@thick Singleton.Type) -> @owned Singleton
-  // CHECK-DAG: sil hidden [thunk] @_T015objc_properties9SingletonC14sharedInstanceACfgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased Singleton {
+  // CHECK-DAG: sil hidden @_T015objc_properties9SingletonC14sharedInstanceACvgZ : $@convention(method) (@thick Singleton.Type) -> @owned Singleton
+  // CHECK-DAG: sil hidden [thunk] @_T015objc_properties9SingletonC14sharedInstanceACvgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased Singleton {
   static let sharedInstance = Singleton()
 
-  // CHECK-DAG: sil hidden @_T015objc_properties9SingletonC1iSifgZ : $@convention(method) (@thick Singleton.Type) -> Int
-  // CHECK-DAG: sil hidden [thunk] @_T015objc_properties9SingletonC1iSifgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Int
+  // CHECK-DAG: sil hidden @_T015objc_properties9SingletonC1iSivgZ : $@convention(method) (@thick Singleton.Type) -> Int
+  // CHECK-DAG: sil hidden [thunk] @_T015objc_properties9SingletonC1iSivgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Int
   static let i = 2
 
-  // CHECK-DAG: sil hidden @_T015objc_properties9SingletonC1jSSfgZ : $@convention(method) (@thick Singleton.Type) -> @owned String
-  // CHECK-DAG: sil hidden [thunk] @_T015objc_properties9SingletonC1jSSfgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased NSString
-  // CHECK-DAG: sil hidden @_T015objc_properties9SingletonC1jSSfsZ : $@convention(method) (@owned String, @thick Singleton.Type) -> ()
-  // CHECK-DAG: sil hidden [thunk] @_T015objc_properties9SingletonC1jSSfsZTo : $@convention(objc_method) (NSString, @objc_metatype Singleton.Type) -> ()
+  // CHECK-DAG: sil hidden @_T015objc_properties9SingletonC1jSSvgZ : $@convention(method) (@thick Singleton.Type) -> @owned String
+  // CHECK-DAG: sil hidden [thunk] @_T015objc_properties9SingletonC1jSSvgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased NSString
+  // CHECK-DAG: sil hidden @_T015objc_properties9SingletonC1jSSvsZ : $@convention(method) (@owned String, @thick Singleton.Type) -> ()
+  // CHECK-DAG: sil hidden [thunk] @_T015objc_properties9SingletonC1jSSvsZTo : $@convention(objc_method) (NSString, @objc_metatype Singleton.Type) -> ()
   static var j = "Hello"
 
-  // CHECK-DAG: sil hidden [thunk] @_T015objc_properties9SingletonC1kSdfgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Double
-  // CHECK-DAG: sil hidden @_T015objc_properties9SingletonC1kSdfgZ : $@convention(method) (@thick Singleton.Type) -> Double
+  // CHECK-DAG: sil hidden [thunk] @_T015objc_properties9SingletonC1kSdvgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Double
+  // CHECK-DAG: sil hidden @_T015objc_properties9SingletonC1kSdvgZ : $@convention(method) (@thick Singleton.Type) -> Double
   static var k: Double {
     return 7.7
   }
 }
 
 class HasUnmanaged : NSObject {
-  // CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgfgTo
+  // CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvgTo
   // CHECK: bb0([[CLS:%.*]] : $HasUnmanaged):
   // CHECK:     [[CLS_COPY:%.*]] = copy_value [[CLS]]
   // CHECK:     [[BORROWED_CLS_COPY:%.*]] = begin_borrow [[CLS_COPY]]
-  // CHECK:     [[NATIVE:%.+]] = function_ref @_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgfg
+  // CHECK:     [[NATIVE:%.+]] = function_ref @_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvg
   // CHECK:     [[RESULT:%.+]] = apply [[NATIVE]]([[BORROWED_CLS_COPY]])
   // CHECK:     end_borrow [[BORROWED_CLS_COPY]] from [[CLS_COPY]]
   // CHECK-NOT: {{(retain|release)}}
   // CHECK:     destroy_value [[CLS_COPY]] : $HasUnmanaged
   // CHECK-NOT: {{(retain|release)}}
   // CHECK:     return [[RESULT]] : $Optional<Unmanaged<AnyObject>>
-  // CHECK: } // end sil function '_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgfgTo'
+  // CHECK: } // end sil function '_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvgTo'
 
-  // CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgfsTo
+  // CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvsTo
   // CHECK: bb0([[NEW_VALUE:%.*]] : $Optional<Unmanaged<AnyObject>>, [[SELF:%.*]] : $HasUnmanaged):
   // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $HasUnmanaged
   // CHECK-NEXT: [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT: // function_ref
-  // CHECK-NEXT: [[NATIVE:%.+]] = function_ref @_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgfs
+  // CHECK-NEXT: [[NATIVE:%.+]] = function_ref @_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvs
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[NATIVE]]([[NEW_VALUE]], [[BORROWED_SELF_COPY]])
   // CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK-NEXT: destroy_value [[SELF_COPY]] : $HasUnmanaged
   // CHECK-NEXT: return [[RESULT:%.*]]
-  // CHECK: } // end sil function '_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgfsTo'
+  // CHECK: } // end sil function '_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvsTo'
   @objc var ref: Unmanaged<AnyObject>?
 }
 
@@ -223,5 +225,26 @@ class NonObjCBaseClass : NSObject {
   }
 }
 
-// CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12ObjCSubclassC8propertySifgTo
-// CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12ObjCSubclassC8propertySifsTo
+// CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12ObjCSubclassC8propertySivgTo
+// CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12ObjCSubclassC8propertySivsTo
+
+// Make sure lazy properties that witness @objc protocol requirements are
+// correctly formed
+//
+// <https://bugs.swift.org/browse/SR-1825>
+
+@objc protocol HasProperty {
+    @objc var window: NSObject? { get set }
+}
+
+class HasLazyProperty : NSObject, HasProperty {
+  func instanceMethod() -> NSObject? {
+    return nil
+  }
+
+  lazy var window = self.instanceMethod()
+}
+
+// CHECK-LABEL: sil hidden @_T015objc_properties15HasLazyPropertyC6windowSo8NSObjectCSgvg : $@convention(method) (@guaranteed HasLazyProperty) -> @owned Optional<NSObject> {
+// CHECK: class_method %0 : $HasLazyProperty, #HasLazyProperty.instanceMethod!1 : (HasLazyProperty) -> () -> NSObject?
+// CHECK: return

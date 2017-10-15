@@ -194,6 +194,9 @@ def driver_time_compilation : Flag<["-"], "driver-time-compilation">,
 def stats_output_dir: Separate<["-"], "stats-output-dir">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Directory to write unified compilation-statistics files to">;
+def trace_stats_events: Flag<["-"], "trace-stats-events">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Trace changes to stats in -stats-output-dir">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -208,6 +211,16 @@ def emit_loaded_module_trace_path : Separate<["-"], "emit-loaded-module-trace-pa
   MetaVarName<"<path>">;
 def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-path=">,
   Flags<[FrontendOption, NoInteractiveOption]>, Alias<emit_loaded_module_trace_path>;
+
+def emit_tbd : Flag<["-"], "emit-tbd">,
+  HelpText<"Emit a TBD file">,
+  Flags<[FrontendOption, NoInteractiveOption]>;
+def emit_tbd_path : Separate<["-"], "emit-tbd-path">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit the TBD file to <path>">,
+  MetaVarName<"<path>">;
+def emit_tbd_path_EQ : Joined<["-"], "emit-tbd-path=">,
+  Flags<[FrontendOption, NoInteractiveOption]>, Alias<emit_tbd_path>;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -256,6 +269,10 @@ def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
 
+def solver_shrink_unsolved_threshold : Separate<["-"], "solver-shrink-unsolved-threshold">,
+Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+HelpText<"Set The upper bound to number of sub-expressions unsolved before termination of the shrink phrase">;
+
 def value_recursion_threshold : Separate<["-"], "value-recursion-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum depth for direct recursion in value types">;
@@ -294,6 +311,11 @@ def warn_swift3_objc_inference_minimal :
   Flag<["-"], "warn-swift3-objc-inference-minimal">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about deprecated @objc inference in Swift 3 based on direct uses of the Objective-C entrypoint">;
+
+def typo_correction_limit : Separate<["-"], "typo-correction-limit">,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"<n>">,
+  HelpText<"Limit the number of times the compiler will attempt typo correction to <n>">;
 
 def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
   Alias<warn_swift3_objc_inference_complete>,
@@ -355,6 +377,8 @@ def Onone : Flag<["-"], "Onone">, Group<O_Group>, Flags<[FrontendOption]>,
   HelpText<"Compile without any optimization">;
 def O : Flag<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>,
   HelpText<"Compile with optimizations">;
+def Osize : Flag<["-"], "Osize">, Group<O_Group>, Flags<[FrontendOption]>,
+  HelpText<"Compile with optimizations and target small code size">;
 def Ounchecked : Flag<["-"], "Ounchecked">, Group<O_Group>,
   Flags<[FrontendOption]>,
   HelpText<"Compile with optimizations and remove runtime safety checks">;
@@ -523,9 +547,6 @@ def emit_sibgen : Flag<["-"], "emit-sibgen">,
 def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
   HelpText<"Emit a list of the imported modules">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def emit_tbd : Flag<["-"], "emit-tbd">,
-  HelpText<"Emit a TBD file">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
@@ -620,6 +641,10 @@ def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts">;
 
+def profile_use : CommaJoined<["-"], "profile-use=">,
+  Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<profdata>">,
+  HelpText<"Supply a profdata file to enable profile-guided optimization">;
+
 def profile_coverage_mapping : Flag<["-"], "profile-coverage-mapping">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate coverage data for use with profiled execution counts">;
@@ -645,6 +670,18 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   MetaVarName<"<type>">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
+
+def index_file : Flag<["-"], "index-file">,
+  HelpText<"Produce index data for a source file">, ModeOpt,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def index_file_path : Separate<["-"], "index-file-path">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Produce index data for file <path>">,
+  MetaVarName<"<path>">;
+
+def index_store_path : Separate<["-"], "index-store-path">,
+  Flags<[FrontendOption]>, MetaVarName<"<path>">,
+  HelpText<"Store indexing data to <path>">;
 
 def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
   Flags<[FrontendOption]>, MetaVarName<"<enforcement>">,

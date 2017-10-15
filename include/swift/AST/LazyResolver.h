@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_LAZYRESOLVER_H
 #define SWIFT_AST_LAZYRESOLVER_H
 
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 
@@ -52,10 +53,10 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
-  /// Resolve the accessibility of a value.
+  /// Resolve the access of a value.
   ///
   /// It does no type-checking.
-  virtual void resolveAccessibility(ValueDecl *VD) = 0;
+  virtual void resolveAccessControl(ValueDecl *VD) = 0;
 
   /// Resolve the type and declaration attributes of a value.
   ///
@@ -82,9 +83,6 @@ public:
   /// Bind an extension to its extended type.
   virtual void bindExtension(ExtensionDecl *ext) = 0;
 
-  /// Introduce the accessors for a 'lazy' variable.
-  virtual void introduceLazyVarAccessors(VarDecl *var) = 0;
-
   /// Resolve the type of an extension.
   ///
   /// This can be called to ensure that the members of an extension can be
@@ -94,6 +92,9 @@ public:
   /// Resolve any implicitly-declared constructors within the given nominal.
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) = 0;
 
+  /// Resolve an implicitly-generated member with the given name.
+  virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) = 0;
+
   /// Resolve any implicitly-generated members and conformances for generated
   /// external decls.
   virtual void resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) = 0;
@@ -102,6 +103,10 @@ public:
   /// is usable for the given type.
   virtual bool isProtocolExtensionUsable(DeclContext *dc, Type type,
                                          ExtensionDecl *protocolExtension) = 0;
+
+  /// Mark the given conformance as "used" from the given declaration context.
+  virtual void markConformanceUsed(ProtocolConformanceRef conformance,
+                                   DeclContext *dc) = 0;
 };
 
 /// An implementation of LazyResolver that delegates to another.
@@ -122,8 +127,8 @@ public:
     Principal.resolveWitness(conformance, requirement);
   }
 
-  void resolveAccessibility(ValueDecl *VD) override {
-    Principal.resolveAccessibility(VD);
+  void resolveAccessControl(ValueDecl *VD) override {
+    Principal.resolveAccessControl(VD);
   }
 
   void resolveDeclSignature(ValueDecl *VD) override {
@@ -151,16 +156,16 @@ public:
     Principal.bindExtension(ext);
   }
 
-  void introduceLazyVarAccessors(VarDecl *var) override {
-    Principal.introduceLazyVarAccessors(var);
-  }
-
   void resolveExtension(ExtensionDecl *ext) override {
     Principal.resolveExtension(ext);
   }
 
   void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
     Principal.resolveImplicitConstructors(nominal);
+  }
+
+  void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
+    Principal.resolveImplicitMember(nominal, member);
   }
 
   void resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) override {
@@ -170,6 +175,11 @@ public:
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
                                  ExtensionDecl *protocolExtension) override {
     return Principal.isProtocolExtensionUsable(dc, type, protocolExtension);
+  }
+
+  void markConformanceUsed(ProtocolConformanceRef conformance,
+                           DeclContext *dc) override {
+    return Principal.markConformanceUsed(conformance, dc);
   }
 };
 
@@ -204,6 +214,7 @@ public:
 /// A class that can lazily load members from a serialized format.
 class alignas(void*) LazyMemberLoader {
   virtual void anchor();
+
 public:
   virtual ~LazyMemberLoader() = default;
 
@@ -211,37 +222,35 @@ public:
   ///
   /// The implementation should add the members to D.
   virtual void
-  loadAllMembers(Decl *D, uint64_t contextData) {
-    llvm_unreachable("unimplemented");
-  }
+  loadAllMembers(Decl *D, uint64_t contextData) = 0;
 
   /// Populates the given vector with all conformances for \p D.
   ///
   /// The implementation should \em not call setConformances on \p D.
   virtual void
   loadAllConformances(const Decl *D, uint64_t contextData,
-                      SmallVectorImpl<ProtocolConformance *> &Conformances) {
-    llvm_unreachable("unimplemented");
-  }
-
-  /// Populates the given vector with all conformances for \p D.
-  virtual void
-  finishNormalConformance(NormalProtocolConformance *conformance,
-                          uint64_t contextData) {
-    llvm_unreachable("unimplemented");
-  }
+                      SmallVectorImpl<ProtocolConformance *> &Conformances) = 0;
 
   /// Returns the default definition type for \p ATD.
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
-                                            uint64_t contextData) {
-    llvm_unreachable("unimplemented");
-  }
+                                            uint64_t contextData) = 0;
 
   /// Returns the generic environment.
   virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
-                                                     uint64_t contextData) {
-    llvm_unreachable("unimplemented");
-  }
+                                                     uint64_t contextData) = 0;
+};
+
+/// A class that can lazily load conformances from a serialized format.
+class alignas(void*) LazyConformanceLoader {
+  virtual void anchor();
+
+public:
+  virtual ~LazyConformanceLoader() = default;
+
+  /// Populates the given protocol conformance.
+  virtual void
+  finishNormalConformance(NormalProtocolConformance *conformance,
+                          uint64_t contextData) = 0;
 };
 
 }

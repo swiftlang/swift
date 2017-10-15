@@ -3,7 +3,7 @@
 // FIXME: this test only passes on platforms which have Float80.
 // <rdar://problem/19508460> Floating point enum raw values are not portable
 
-// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64
 
 enum Empty {}
 
@@ -93,7 +93,7 @@ enum ImproperlyHasIVars {
   case Flopsy
   case Mopsy
 
-  var ivar : Int // expected-error{{enums may not contain stored properties}}
+  var ivar : Int // expected-error{{enums must not contain stored properties}}
 }
 
 // We used to crash on this.  rdar://14678675
@@ -181,7 +181,7 @@ enum RawTypeWithNegativeValues : Int {
   case AutoIncAcrossZero = -1, Zero, One
 }
 
-enum RawTypeWithUnicodeScalarValues : UnicodeScalar { // expected-error {{'RawTypeWithUnicodeScalarValues' declares raw type 'UnicodeScalar', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum RawTypeWithUnicodeScalarValues : UnicodeScalar { // expected-error {{'RawTypeWithUnicodeScalarValues' declares raw type 'UnicodeScalar' (aka 'Unicode.Scalar'), but does not conform to RawRepresentable and conformance could not be synthesized}}
   case Kearney = "K"
   case Lovejoy // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Marshall = "M"
@@ -191,6 +191,12 @@ enum RawTypeWithCharacterValues : Character { // expected-error {{'RawTypeWithCh
   case First = "い"
   case Second // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Third = "は"
+}
+
+enum RawTypeWithCharacterValues_Correct : Character {
+  case First = "😅" // ok
+  case Second = "👩‍👩‍👧‍👦" // ok
+  case Third = "👋🏽" // ok
 }
 
 enum RawTypeWithCharacterValues_Error1 : Character { // expected-error {{'RawTypeWithCharacterValues_Error1' declares raw type 'Character', but does not conform to RawRepresentable and conformance could not be synthesized}}

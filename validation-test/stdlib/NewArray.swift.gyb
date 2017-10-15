@@ -11,10 +11,12 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN-DISABLED: %target-run-simple-swift | %FileCheck %s
-// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/NewArray.swift
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/NewArray.swift
 // RUN: %line-directive %t/NewArray.swift -- %target-build-swift %t/NewArray.swift -o %t/a.out -Xfrontend -disable-access-control
 // RUN: %target-run %t/a.out 2>&1 | %line-directive %t/NewArray.swift -- %FileCheck %t/NewArray.swift --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 // REQUIRES: executable_test
+// XFAIL: *
 
 import StdlibUnittest
 import StdlibCollectionUnittest

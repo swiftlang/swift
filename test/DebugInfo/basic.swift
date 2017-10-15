@@ -79,7 +79,7 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
 // CHECK-DAG: ![[INT64:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int64", {{.*}}, identifier: "_T0s5Int64VD")
 // CHECK-DAG: ![[PARAMTYPES]] = !{![[INT64]], ![[INT64]], ![[INT64]]}
 // Import of the main module with the implicit name.
-// CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[MAINFILE]], entity: ![[MAINMODULE:[0-9]+]], line: 1)
+// CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[MAINFILE]], entity: ![[MAINMODULE:[0-9]+]], file: ![[MAINFILE]], line: 1)
 // CHECK-DAG: ![[MAINMODULE]] = !DIModule({{.*}}, name: "basic"
 
 // DWARF Version

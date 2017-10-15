@@ -34,6 +34,8 @@ open class OutsideParentWithResilientProperty {
   public let s: Size
   public let color: Int32
 
+  public final lazy var laziestNumber = 0
+
   public init(p: Point, s: Size, color: Int32) {
     self.p = p
     self.s = s

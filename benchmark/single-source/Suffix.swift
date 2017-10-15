@@ -22,6 +22,65 @@ let sequenceCount = 4096
 let suffixCount = 1024
 let sumCount = suffixCount * (2 * sequenceCount - suffixCount - 1) / 2
 
+public let Suffix = [
+  BenchmarkInfo(
+    name: "SuffixCountableRange",
+    runFunction: run_SuffixCountableRange,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "SuffixSequence",
+    runFunction: run_SuffixSequence,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "SuffixAnySequence",
+    runFunction: run_SuffixAnySequence,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "SuffixAnySeqCntRange",
+    runFunction: run_SuffixAnySeqCntRange,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "SuffixAnySeqCRangeIter",
+    runFunction: run_SuffixAnySeqCRangeIter,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "SuffixAnyCollection",
+    runFunction: run_SuffixAnyCollection,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "SuffixArray",
+    runFunction: run_SuffixArray,
+    tags: [.validation, .api, .Array]),
+  BenchmarkInfo(
+    name: "SuffixCountableRangeLazy",
+    runFunction: run_SuffixCountableRangeLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "SuffixSequenceLazy",
+    runFunction: run_SuffixSequenceLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "SuffixAnySequenceLazy",
+    runFunction: run_SuffixAnySequenceLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "SuffixAnySeqCntRangeLazy",
+    runFunction: run_SuffixAnySeqCntRangeLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "SuffixAnySeqCRangeIterLazy",
+    runFunction: run_SuffixAnySeqCRangeIterLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "SuffixAnyCollectionLazy",
+    runFunction: run_SuffixAnyCollectionLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "SuffixArrayLazy",
+    runFunction: run_SuffixArrayLazy,
+    tags: [.validation, .api]),
+]
+
 @inline(never)
 public func run_SuffixCountableRange(_ N: Int) {
   let s = 0..<sequenceCount
@@ -30,8 +89,7 @@ public func run_SuffixCountableRange(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixCountableRange: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -42,8 +100,7 @@ public func run_SuffixSequence(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixSequence: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -54,8 +111,7 @@ public func run_SuffixAnySequence(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySequence: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -66,8 +122,7 @@ public func run_SuffixAnySeqCntRange(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySeqCntRange: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -78,8 +133,7 @@ public func run_SuffixAnySeqCRangeIter(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySeqCRangeIter: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -90,8 +144,7 @@ public func run_SuffixAnyCollection(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnyCollection: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -102,8 +155,7 @@ public func run_SuffixArray(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixArray: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -114,8 +166,7 @@ public func run_SuffixCountableRangeLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixCountableRangeLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -126,8 +177,7 @@ public func run_SuffixSequenceLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixSequenceLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -138,8 +188,7 @@ public func run_SuffixAnySequenceLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySequenceLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -150,8 +199,7 @@ public func run_SuffixAnySeqCntRangeLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySeqCntRangeLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -162,8 +210,7 @@ public func run_SuffixAnySeqCRangeIterLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySeqCRangeIterLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -174,8 +221,7 @@ public func run_SuffixAnyCollectionLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnyCollectionLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -186,7 +232,6 @@ public func run_SuffixArrayLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in SuffixArrayLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }

@@ -115,10 +115,7 @@ func testParseErrors3(_ c1: C1) {
 }
 
 func testParseErrors4() {
-  // Subscripts
-  // TODO: rdar://problem/31724211 -- improve diagnostic regression from
-  // global keypath subscripts
-  _ = #selector(C1.subscript) // expected-error{{}}
+  _ = #selector(C1.subscript) // expected-error{{type 'C1' has no member 'subscript'}}
 }
 
 // SR-1827
@@ -137,7 +134,7 @@ default:
 }
 
 switch optionalSel {
-case #selector(SR1827.bar): // expected-error{{expression pattern of type 'Selector' cannot match values of type 'Selector?'}} {{26-26=?}}
+case #selector(SR1827.bar): // expected-error{{expression pattern of type 'Selector' cannot match values of type 'Selector?'}} {{27-27=?}}
   break
 case #selector(SR1827.bar)!: // expected-error{{cannot force unwrap value of non-optional type 'Selector'}}
   break

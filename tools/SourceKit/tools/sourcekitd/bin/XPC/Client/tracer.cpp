@@ -121,16 +121,6 @@ struct OpRec {
   trace::StringPairs FileMap;
 };
 
-template <typename U>
-struct llvm::yaml::SequenceTraits<std::vector<U>> {
-  static size_t size(IO &Io, std::vector<U> &Vec) {
-    return Vec.size();
-  }
-  static U &element(IO &Io, std::vector<U> &Vec, size_t Index) {
-    return Vec[Index];
-  }
-};
-
 template <>
 struct llvm::yaml::MappingTraits<OpRec> {
   static void mapping(IO &Io, OpRec &Rec) {

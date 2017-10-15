@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func takeClosure(_ fn: () -> Int) {}
 
@@ -11,11 +11,11 @@ struct A {
 }
 _ = A(x: C())
 // CHECK-LABEL: sil hidden @_T07unowned1AV{{[_0-9a-zA-Z]*}}fC
-// CHECK: bb0([[X:%.*]] : $C, %1 : $@thin A.Type):
+// CHECK: bb0([[X:%.*]] : @owned $C, %1 : @trivial $@thin A.Type):
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
-// CHECK:   unowned_retain [[X_UNOWNED]]
+// CHECK:   [[X_UNOWNED_COPY:%.*]] = copy_value [[X_UNOWNED]]
 // CHECK:   destroy_value [[X]]
-// CHECK:   [[A:%.*]] = struct $A ([[X_UNOWNED]] : $@sil_unowned C)
+// CHECK:   [[A:%.*]] = struct $A ([[X_UNOWNED_COPY]] : $@sil_unowned C)
 // CHECK:   return [[A]]
 // CHECK: }
 
@@ -28,17 +28,17 @@ struct AddressOnly {
 }
 _ = AddressOnly(x: C(), p: X())
 // CHECK-LABEL: sil hidden @_T07unowned11AddressOnlyV{{[_0-9a-zA-Z]*}}fC
-// CHECK: bb0([[RET:%.*]] : $*AddressOnly, [[X:%.*]] : $C, {{.*}}):
+// CHECK: bb0([[RET:%.*]] : @trivial $*AddressOnly, [[X:%.*]] : @owned $C, {{.*}}):
 // CHECK:   [[X_ADDR:%.*]] = struct_element_addr [[RET]] : $*AddressOnly, #AddressOnly.x
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
-// CHECK:   unowned_retain [[X_UNOWNED]] : $@sil_unowned C
-// CHECK:   store [[X_UNOWNED]] to [init] [[X_ADDR]]
+// CHECK:   [[X_UNOWNED_COPY:%.*]] = copy_value [[X_UNOWNED]] : $@sil_unowned C
+// CHECK:   store [[X_UNOWNED_COPY]] to [init] [[X_ADDR]]
 // CHECK:   destroy_value [[X]]
 // CHECK: }
 
 // CHECK-LABEL:    sil hidden @_T07unowned5test0yAA1CC1c_tF : $@convention(thin) (@owned C) -> () {
 func test0(c c: C) {
-  // CHECK: bb0([[ARG:%.*]] : $C):
+  // CHECK: bb0([[ARG:%.*]] : @owned $C):
 
   var a: A
   // CHECK:   [[A1:%.*]] = alloc_box ${ var A }, var, name "a"
@@ -51,8 +51,8 @@ func test0(c c: C) {
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   [[T2:%.*]] = ref_to_unowned [[ARG_COPY]] : $C  to $@sil_unowned C
-  // CHECK:   unowned_retain [[T2]] : $@sil_unowned C
-  // CHECK:   store [[T2]] to [init] [[PBX]] : $*@sil_unowned C
+  // CHECK:   [[T2_COPY:%.*]] = copy_value [[T2]] : $@sil_unowned C
+  // CHECK:   store [[T2_COPY]] to [init] [[PBX]] : $*@sil_unowned C
   // CHECK:   destroy_value [[ARG_COPY]]
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 
@@ -62,21 +62,21 @@ func test0(c c: C) {
   // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBA]]
   // CHECK:   [[T1:%.*]] = struct_element_addr [[WRITE]] : $*A, #A.x
   // CHECK:   [[T2:%.*]] = ref_to_unowned [[ARG_COPY]] : $C
-  // CHECK:   unowned_retain [[T2]] : $@sil_unowned C
-  // CHECK:   assign [[T2]] to [[T1]] : $*@sil_unowned C
+  // CHECK:   [[T2_COPY:%.*]] = copy_value [[T2]] : $@sil_unowned C
+  // CHECK:   assign [[T2_COPY]] to [[T1]] : $*@sil_unowned C
   // CHECK:   destroy_value [[ARG_COPY]]
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 
   a.x = x
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
-  // CHECK:   [[T2:%.*]] = load [take] [[READ]] : $*@sil_unowned C     
-  // CHECK:   strong_retain_unowned  [[T2]] : $@sil_unowned C  
-  // CHECK:   [[T3:%.*]] = unowned_to_ref [[T2]] : $@sil_unowned C to $C
+  // CHECK:   [[T2:%.*]] = load_borrow [[READ]] : $*@sil_unowned C     
+  // CHECK:   [[T3:%.*]] = copy_unowned_value  [[T2]] : $@sil_unowned C  
+  // CHECK:   end_borrow [[T2]] from [[READ]]
   // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBA]]
   // CHECK:   [[XP:%.*]] = struct_element_addr [[WRITE]] : $*A, #A.x
   // CHECK:   [[T4:%.*]] = ref_to_unowned [[T3]] : $C to $@sil_unowned C
-  // CHECK:   unowned_retain [[T4]] : $@sil_unowned C  
-  // CHECK:   assign [[T4]] to [[XP]] : $*@sil_unowned C
+  // CHECK:   [[T4_COPY:%.*]] = copy_value [[T4]] : $@sil_unowned C  
+  // CHECK:   assign [[T4_COPY]] to [[XP]] : $*@sil_unowned C
   // CHECK:   destroy_value [[T3]] : $C
   // CHECK:   destroy_value [[X]]
   // CHECK:   destroy_value [[MARKED_A1]]
@@ -94,15 +94,15 @@ func testunowned_local() -> C {
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[C_COPY:%.*]] = copy_value [[BORROWED_C]]
   // CHECK: [[tmp1:%.*]] = ref_to_unowned [[C_COPY]] : $C to $@sil_unowned C
-  // CHECK: unowned_retain [[tmp1]]
-  // CHECK: store [[tmp1]] to [init] [[PB_UC]]
+  // CHECK: [[tmp1_copy:%.*]] = copy_value [[tmp1]]
+  // CHECK: store [[tmp1_copy]] to [init] [[PB_UC]]
   // CHECK: destroy_value [[C_COPY]]
   // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   unowned let uc = c
 
-  // CHECK: [[tmp2:%.*]] = load [take] [[PB_UC]]
-  // CHECK: strong_retain_unowned [[tmp2]]
-  // CHECK: [[tmp3:%.*]] = unowned_to_ref [[tmp2]]
+  // CHECK: [[tmp2:%.*]] = load_borrow [[PB_UC]]
+  // CHECK: [[tmp3:%.*]] = copy_unowned_value [[tmp2]]
+  // CHECK: end_borrow [[tmp2]] from [[PB_UC]]
   return uc
 
   // CHECK: destroy_value [[UC]]
@@ -117,12 +117,15 @@ func test_unowned_let_capture(_ aC : C) {
 }
 
 // CHECK-LABEL: sil private @_T07unowned05test_A12_let_captureyAA1CCFSiycfU_ : $@convention(thin) (@owned @sil_unowned C) -> Int {
-// CHECK: bb0([[ARG:%.*]] : $@sil_unowned C):
+// CHECK: bb0([[ARG:%.*]] : @owned $@sil_unowned C):
 // CHECK-NEXT:   debug_value %0 : $@sil_unowned C, let, name "bC", argno 1
-// CHECK-NEXT:   strong_retain_unowned [[ARG]] : $@sil_unowned C
-// CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = unowned_to_ref [[ARG]] : $@sil_unowned C to $C
-// CHECK-NEXT:   [[FUN:%.*]] = class_method [[UNOWNED_ARG]] : $C, #C.f!1 : (C) -> () -> Int, $@convention(method) (@guaranteed C) -> Int
-// CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUN]]([[UNOWNED_ARG]]) : $@convention(method) (@guaranteed C) -> Int
+// CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = copy_unowned_value [[ARG]] : $@sil_unowned C
+// CHECK-NEXT:   [[BORROWED_UNOWNED_ARG:%.*]] = begin_borrow [[UNOWNED_ARG]]
+// CHECK-NEXT:   [[FUN:%.*]] = class_method [[BORROWED_UNOWNED_ARG]] : $C, #C.f!1 : (C) -> () -> Int, $@convention(method) (@guaranteed C) -> Int
+// CHECK-NEXT:   end_borrow [[BORROWED_UNOWNED_ARG]]
+// CHECK-NEXT:   [[BORROWED_UNOWNED_ARG:%.*]] = begin_borrow [[UNOWNED_ARG]]
+// CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUN]]([[BORROWED_UNOWNED_ARG]]) : $@convention(method) (@guaranteed C) -> Int
+// CHECK-NEXT:   end_borrow [[BORROWED_UNOWNED_ARG]]
 // CHECK-NEXT:   destroy_value [[UNOWNED_ARG]]
 // CHECK-NEXT:   destroy_value [[ARG]] : $@sil_unowned C
 // CHECK-NEXT:   return [[RESULT]] : $Int
@@ -138,15 +141,16 @@ class TestUnownedMember {
 }
 
 // CHECK-LABEL: sil hidden @_T07unowned17TestUnownedMemberCAcA1CC5inval_tcfc :
-// CHECK: bb0([[ARG1:%.*]] : $C, [[SELF_PARAM:%.*]] : $TestUnownedMember):
+// CHECK: bb0([[ARG1:%.*]] : @owned $C, [[SELF_PARAM:%.*]] : @owned $TestUnownedMember):
 // CHECK:   [[SELF:%.*]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $TestUnownedMember
 // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
 // CHECK:   [[FIELDPTR:%.*]] = ref_element_addr [[BORROWED_SELF]] : $TestUnownedMember, #TestUnownedMember.member
+// CHECK:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[FIELDPTR]] : $*@sil_unowned C
 // CHECK:   [[INVAL:%.*]] = ref_to_unowned [[ARG1_COPY]] : $C to $@sil_unowned C
-// CHECK:   unowned_retain [[INVAL]] : $@sil_unowned C
-// CHECK:   assign [[INVAL]] to [[FIELDPTR]] : $*@sil_unowned C
+// CHECK:   [[INVAL_COPY:%.*]] = copy_value [[INVAL]] : $@sil_unowned C
+// CHECK:   assign [[INVAL_COPY]] to [[WRITE]] : $*@sil_unowned C
 // CHECK:   destroy_value [[ARG1_COPY]] : $C
 // CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
 // CHECK:   end_borrow [[BORROWED_SELF]] from [[SELF]]

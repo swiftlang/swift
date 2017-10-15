@@ -183,21 +183,6 @@ static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
   return llvm::ConstantInt::get(IGM.SizeTy, size.getValue());
 }
 
-/// Return the size and alignment of this type.
-std::pair<llvm::Value*,llvm::Value*>
-FixedTypeInfo::getSizeAndAlignmentMask(IRGenFunction &IGF,
-                                       SILType T) const {
-  return {FixedTypeInfo::getSize(IGF, T),
-          FixedTypeInfo::getAlignmentMask(IGF, T)};
-}
-std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
-FixedTypeInfo::getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF,
-                                                SILType T) const {
-  return std::make_tuple(FixedTypeInfo::getSize(IGF, T),
-                         FixedTypeInfo::getAlignmentMask(IGF, T),
-                         FixedTypeInfo::getStride(IGF, T));
-}
-
 llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF, SILType T) const {
   return FixedTypeInfo::getStaticSize(IGF.IGM);
 }
@@ -704,9 +689,8 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
 }
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
-  auto moduleDecl = IGM.getSwiftModule();
   auto genericSig = IGM.getSILTypes().getCurGenericContext();
-  return genericSig->getCanonicalSignature().getGenericEnvironment(*moduleDecl);
+  return genericSig->getCanonicalSignature().getGenericEnvironment();
 }
 
 GenericEnvironment *IRGenModule::getGenericEnvironment() {
@@ -977,8 +961,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
   auto canGenericSig = genericSig->getCanonicalSignature();
-  auto module = IGM.getSwiftModule();
-  auto canGenericEnv = canGenericSig.getGenericEnvironment(*module);
+  auto canGenericEnv = canGenericSig.getGenericEnvironment();
   if (canGenericEnv == genericEnv) return t;
 
   // Map the archetype out of its own generic environment and into the
@@ -1372,7 +1355,7 @@ namespace {
         return false;
 
       for (auto elt : decl->getAllElements()) {
-        if (elt->getArgumentInterfaceType() &&
+        if (elt->hasAssociatedValues() &&
             !elt->isIndirect() &&
             visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;
@@ -1626,6 +1609,14 @@ bool IRGenModule::isPOD(SILType type, ResilienceExpansion expansion) {
   return getTypeInfo(type).isPOD(expansion);
 }
 
+/// Determine whether this type is known to be empty.
+bool IRGenModule::isKnownEmpty(SILType type, ResilienceExpansion expansion) {
+  if (auto tuple = type.getAs<TupleType>()) {
+    if (tuple->getNumElements() == 0)
+      return true;
+  }
+  return getTypeInfo(type).isKnownEmpty(expansion);
+}
 
 SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size) {
   auto it = SpareBitsForTypes.find(scalarTy);
@@ -1718,8 +1709,7 @@ bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
   auto canGenericSig = genericSig->getCanonicalSignature();
-  auto module = IGM.getSwiftModule();
-  auto canGenericEnv = canGenericSig.getGenericEnvironment(*module);
+  auto canGenericEnv = canGenericSig.getGenericEnvironment();
 
   // If this archetype is in the canonical generic environment, it's an
   // exemplar archetype.
@@ -1745,6 +1735,11 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
         || structDecl->hasClangNode())
       return SILType();
 
+    // A single-field struct with custom alignment has different layout from its
+    // field.
+    if (structDecl->getAttrs().hasAttribute<AlignmentAttr>())
+      return SILType();
+
     // If there's only one stored property, we have the layout of its field.
     auto allFields = structDecl->getStoredProperties();
     
@@ -1765,11 +1760,17 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
-        && (*theCase)->getArgumentInterfaceType())
+        && (*theCase)->hasAssociatedValues())
       return t.getEnumElementType(*theCase, IGM.getSILModule());
 
     return SILType();
   }
 
   return SILType();
+}
+
+void TypeInfo::verify(IRGenTypeVerifierFunction &IGF,
+                      llvm::Value *typeMetadata,
+                      SILType T) const {
+  // By default, no type-specific verifier behavior.
 }

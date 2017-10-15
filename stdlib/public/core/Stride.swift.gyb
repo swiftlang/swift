@@ -23,6 +23,12 @@
 }%
 /// Conforming types are notionally continuous, one-dimensional
 /// values that can be offset and measured.
+///
+/// - Important: The `Strideable` protocol provides default implementations for
+///   the equal-to (`==`) and less-than (`<`) operators that depend on the
+///   `Stride` type's implementations. If a type conforming to `Strideable`
+///   is its own `Stride` type, it must provide concrete implementations of
+///   the two operators to avoid infinite recursion.
 public protocol ${Self} : ${Conformance} {
 %   if Self == '_Strideable':
   /// A type that represents the distance between two values of `Self`.
@@ -55,15 +61,34 @@ public protocol ${Self} : ${Conformance} {
 
 % end
 
-/// Compare two `Strideable`s.
-@_inlineable
-public func < <T : Strideable>(x: T, y: T) -> Bool {
-  return x.distance(to: y) > 0
+extension Strideable where Stride == Self {
+  @available(*, deprecated, message: "Strideable conformance where 'Stride == Self' requires user-defined implementation of the '<' operator")
+  public static func < (x: Self, y: Self) -> Bool {
+    fatalError("""
+      Strideable conformance where 'Stride == Self' requires user-defined \
+      implementation of the '<' operator
+      """)
+  }
+
+  @available(*, deprecated, message: "Strideable conformance where 'Stride == Self' requires user-defined implementation of the '==' operator")
+  public static func == (x: Self, y: Self) -> Bool {
+    fatalError("""
+      Strideable conformance where 'Stride == Self' requires user-defined \
+      implementation of the '==' operator
+      """)
+  }
 }
 
-@_inlineable
-public func == <T : Strideable>(x: T, y: T) -> Bool {
-  return x.distance(to: y) == 0
+extension Strideable {
+  @_inlineable
+  public static func < (x: Self, y: Self) -> Bool {
+    return x.distance(to: y) > 0
+  }
+
+  @_inlineable
+  public static func == (x: Self, y: Self) -> Bool {
+    return x.distance(to: y) == 0
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -81,36 +106,42 @@ public func == <T : Strideable>(x: T, y: T) -> Bool {
 %   Availability = '@available(swift, %s, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")' % (VersionInfo) if VersionInfo else ''
 
 extension ${Base} {
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   ${Availability}
   public static func + (lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: rhs)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   ${Availability}
   public static func + (lhs: Self.Stride, rhs: Self) -> Self {
     return rhs.advanced(by: lhs)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   ${Availability}
   public static func - (lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: -rhs)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   ${Availability}
   public static func - (lhs: Self, rhs: Self) -> Self.Stride {
     return rhs.distance(to: lhs)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   ${Availability}
   public static func += (lhs: inout Self, rhs: Self.Stride) {
     lhs = lhs.advanced(by: rhs)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   ${Availability}
   public static func -= (lhs: inout Self, rhs: Self.Stride) {
@@ -203,9 +234,26 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   }
 
   @_inlineable
+  public func _preprocessingPass<R>(
+    _ preprocess: () throws -> R
+  ) rethrows -> R? {
+    return try preprocess()
+  }
+
+  @_inlineable
+  public func _customContainsEquatableElement(
+    _ element: Element
+  ) -> Bool? {
+    if element < _start || _end <= element {
+      return false
+    }
+    return nil
+  }
+
+  @_inlineable
   @_versioned
   internal init(_start: Element, end: Element, stride: Element.Stride) {
-    _precondition(stride != 0, "stride size must not be zero")
+    _precondition(stride != 0, "Stride size must not be zero")
     // At start, striding away from end is allowed; it just makes for an
     // already-empty Sequence.
     self._start = _start
@@ -222,6 +270,7 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   @_versioned
   internal let _stride: Element.Stride
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self, children: ["from": _start, "to": _end, "by": _stride])
   }
@@ -302,9 +351,26 @@ public struct StrideThrough<
   }
 
   @_inlineable
+  public func _preprocessingPass<R>(
+    _ preprocess: () throws -> R
+  ) rethrows -> R? {
+    return try preprocess()
+  }
+
+  @_inlineable
+  public func _customContainsEquatableElement(
+    _ element: Element
+  ) -> Bool? {
+    if element < _start || _end < element {
+      return false
+    }
+    return nil
+  }
+
+  @_inlineable
   @_versioned
   internal init(_start: Element, end: Element, stride: Element.Stride) {
-    _precondition(stride != 0, "stride size must not be zero")
+    _precondition(stride != 0, "Stride size must not be zero")
     self._start = _start
     self._end = end
     self._stride = stride
@@ -317,6 +383,7 @@ public struct StrideThrough<
   @_versioned
   internal let _stride: Element.Stride
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self,
       children: ["from": _start, "through": _end, "by": _stride])
@@ -333,25 +400,4 @@ public func stride<T>(
   from start: T, through end: T, by stride: T.Stride
 ) -> StrideThrough<T> {
   return StrideThrough(_start: start, end: end, stride: stride)
-}
-
-@available(*, unavailable, renamed: "StrideToIterator")
-public struct StrideToGenerator<Element : Strideable> {}
-
-@available(*, unavailable, renamed: "StrideThroughIterator")
-public struct StrideThroughGenerator<Element : Strideable> {}
-
-extension Strideable {
-  @available(*, unavailable, message: "Use stride(from:to:by:) free function instead")
-  public func stride(to end: Self, by stride: Stride) -> StrideTo<Self> {
-    Builtin.unreachable()
-  }
-
-  @warn_unqualified_access
-  @available(*, unavailable, message: "Use stride(from:through:by:) free function instead")
-  public func stride(
-    through end: Self, by stride: Stride
-  ) -> StrideThrough<Self> {
-    Builtin.unreachable()
-  }
 }

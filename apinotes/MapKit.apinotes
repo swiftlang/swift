@@ -1,5 +1,0 @@
----
-Name:            MapKit
-Tags:
-- Name: MKErrorCode
-  NSErrorDomain: MKErrorDomain

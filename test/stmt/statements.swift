@@ -374,7 +374,7 @@ func test_guard(_ x : Int, y : Int??, cond : Bool) {
     markUsed(g)  // expected-error {{variable declared in 'guard' condition is not usable in its body}}
   }
 
-  guard let h = y, cond {}  // expected-error {{expected 'else' after 'guard' condition}}
+  guard let h = y, cond {}  // expected-error {{expected 'else' after 'guard' condition}} {{25-25=else }}
 
 
   guard case _ = x else {}  // expected-warning {{'guard' condition is always true, body is unreachable}}
@@ -384,7 +384,8 @@ func test_is_as_patterns() {
   switch 4 {
   case is Int: break        // expected-warning {{'is' test is always true}}
   case _ as Int: break  // expected-warning {{'as' test is always true}}
-  case _: break
+  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
+  case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
   }
 }
 
@@ -417,6 +418,7 @@ func testThrowNil() throws {
 // condition may have contained a SequenceExpr.
 func r23684220(_ b: Any) {
   if let _ = b ?? b {} // expected-error {{initializer for conditional binding must have Optional type, not 'Any'}}
+  // expected-warning@-1 {{left side of nil coalescing operator '??' has non-optional type 'Any', so the right side is never used}}
 }
 
 

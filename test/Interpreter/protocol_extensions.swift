@@ -1,5 +1,10 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+
+import StdlibUnittest
+
+
+var ProtocolExtensionTestSuite = TestSuite("ProtocolExtensions")
 
 // Extend a protocol with a property.
 extension Sequence {
@@ -12,9 +17,6 @@ extension Sequence {
   }
 }
 
-// CHECK: 4
-print(["a", "b", "c", "d"].myCount)
-
 // Extend a protocol with a function.
 extension Collection {
   var myIndices: Range<Index> {
@@ -26,8 +28,10 @@ extension Collection {
   }
 }
 
-// CHECK: 4
-print(["a", "b", "c", "d"].clone().myCount)
+ProtocolExtensionTestSuite.test("Count") {
+  expectEqual(4, ["a", "b", "c", "d"].myCount)
+  expectEqual(4, ["a", "b", "c", "d"].clone().myCount)
+}
 
 extension Sequence {
   public func myEnumerated() -> EnumeratedSequence<Self> {
@@ -35,17 +39,22 @@ extension Sequence {
   }
 }
 
-// CHECK: (0, a)
-// CHECK-NEXT: (1, b)
-// CHECK-NEXT: (2, c)
-for (index, element) in ["a", "b", "c"].myEnumerated() {
-  print("(\(index), \(element))")
+ProtocolExtensionTestSuite.test("Enumerated") {
+  var result: [(Int, String)] = []
+
+  for (index, element) in ["a", "b", "c"].myEnumerated() {
+    result.append((index, element))
+  }
+
+  expectTrue((0, "a") == result[0])
+  expectTrue((1, "b") == result[1])
+  expectTrue((2, "c") == result[2])
 }
 
 extension Sequence {
   public func myReduce<T>(
     _ initial: T, combine: (T, Self.Iterator.Element) -> T
-  ) -> T { 
+  ) -> T {
     var result = initial
     for value in self {
       result = combine(result, value)
@@ -54,21 +63,24 @@ extension Sequence {
   }
 }
 
-// CHECK: 15
-print([1, 2, 3, 4, 5].myReduce(0, combine: { $0 + $1 }))
-
-
 extension Sequence {
   public func myZip<S : Sequence>(_ s: S) -> Zip2Sequence<Self, S> {
     return Zip2Sequence(_sequence1: self, _sequence2: s)
   }
 }
 
-// CHECK: (1, a)
-// CHECK-NEXT: (2, b)
-// CHECK-NEXT: (3, c)
-for (a, b) in [1, 2, 3].myZip(["a", "b", "c"]) {
-  print("(\(a), \(b))")
+ProtocolExtensionTestSuite.test("Algorithms") {
+  expectEqual(15, [1, 2, 3, 4, 5].myReduce(0, combine: { $0 + $1 }))
+
+  var result: [(Int, String)] = []
+
+  for (a, b) in [1, 2, 3].myZip(["a", "b", "c"]) {
+    result.append((a, b))
+  }
+
+  expectTrue((1, "a") == result[0])
+  expectTrue((2, "b") == result[1])
+  expectTrue((3, "c") == result[2])
 }
 
 // Mutating algorithms.
@@ -98,12 +110,9 @@ extension RangeReplaceableCollection {
   }
 }
 
-// CHECK: a,b,c
-print(
-  String(
-    ",".characters.myJoin(["a".characters, "b".characters, "c".characters])
-  )
-)
+ProtocolExtensionTestSuite.test("MutatingAlgorithms") {
+  expectEqual("a,b,c", ",".myJoin(["a", "b", "c"]))
+}
 
 // Constrained extensions for specific types.
 extension Collection where Self.Iterator.Element == String {
@@ -121,45 +130,55 @@ extension Collection where Self.Iterator.Element == String {
   }
 }
 
-// CHECK: x, y, z
-print(["x", "y", "z"].myCommaSeparatedList)
-
-// CHECK: {{[tuv], [tuv], [tuv]}}
-print((["t", "u", "v"] as Set).myCommaSeparatedList)
+ProtocolExtensionTestSuite.test("ConstrainedExtension") {
+  expectEqual("x, y, z", ["x", "y", "z"].myCommaSeparatedList)
+}
 
 // Existentials
+var runExistP1 = 0
+var existP1_struct = 0
+var existP1_class = 0
+
 protocol ExistP1 {
   func existP1()
 }
 
 extension ExistP1 {
   func runExistP1() {
-    print("runExistP1")
+    main.runExistP1 += 1
     self.existP1()
   }
 }
 
 struct ExistP1_Struct : ExistP1 {
   func existP1() {
-    print("  - ExistP1_Struct")
+    existP1_struct += 1
   }
 }
 
 class ExistP1_Class : ExistP1 {
   func existP1() {
-    print("  - ExistP1_Class")
+    existP1_class += 1
   }
 }
 
-// CHECK: runExistP1
-// CHECK-NEXT: - ExistP1_Struct
-var existP1: ExistP1 = ExistP1_Struct()
-existP1.runExistP1()
+ProtocolExtensionTestSuite.test("Existentials") {
+  do {
+    let existP1: ExistP1 = ExistP1_Struct()
+    existP1.runExistP1()
 
-// CHECK: runExistP1
-// CHECK-NEXT: - ExistP1_Class
-existP1 = ExistP1_Class()
-existP1.runExistP1()
+    expectEqual(1, runExistP1)
+    expectEqual(1, existP1_struct)
+  }
+
+  do {
+    let existP1 = ExistP1_Class()
+    existP1.runExistP1()
+
+    expectEqual(2, runExistP1)
+    expectEqual(1, existP1_class)
+  }
+}
 
 protocol P {
   mutating func setValue(_ b: Bool)
@@ -188,37 +207,28 @@ func toggle(_ value: inout Bool) {
   value = !value
 }
 
-var p: P = true
-// CHECK: Bool
-print("Bool")
+ProtocolExtensionTestSuite.test("ExistentialToggle") {
+  var p: P = true
 
-// CHECK: true
-p.extValue = true
-print(p.extValue)
+  expectTrue(p.extValue)
 
-// CHECK: false
-p.extValue = false
-print(p.extValue)
+  p.extValue = false
+  expectFalse(p.extValue)
 
-// CHECK: true
-toggle(&p.extValue)
-print(p.extValue)
+  toggle(&p.extValue)
+  expectTrue(p.extValue)
 
-// CHECK: C
-print("C")
-p = C()
+  p = C()
 
-// CHECK: true
-p.extValue = true
-print(p.extValue)
+  p.extValue = true
+  expectTrue(p.extValue)
 
-// CHECK: false
-p.extValue = false
-print(p.extValue)
+  p.extValue = false
+  expectFalse(p.extValue)
 
-// CHECK: true
-toggle(&p.extValue)
-print(p.extValue)
+  toggle(&p.extValue)
+  expectTrue(p.extValue)
+}
 
 // Logical lvalues of existential type.
 struct HasP {
@@ -229,19 +239,23 @@ struct HasP {
   }
 }
 
-var hasP = HasP(_p: false)
+ProtocolExtensionTestSuite.test("ExistentialLValue") {
+  var hasP = HasP(_p: false)
 
-// CHECK: true
-hasP.p.extValue = true
-print(hasP.p.extValue)
+  hasP.p.extValue = true
+  expectTrue(hasP.p.extValue)
 
-// CHECK: false
-toggle(&hasP.p.extValue)
-print(hasP.p.extValue)
+  toggle(&hasP.p.extValue)
+  expectFalse(hasP.p.extValue)
+}
+
+var metatypes: [(Int, Any.Type)] = []
 
 // rdar://problem/20739719
 class Super: Init {
-  required init(x: Int) { print("\(x) \(type(of: self))") }
+  required init(x: Int) {
+    metatypes.append((x, type(of: self)))
+  }
 }
 
 class Sub: Super {}
@@ -249,19 +263,185 @@ class Sub: Super {}
 protocol Init { init(x: Int) }
 extension Init { init() { self.init(x: 17) } }
 
-// CHECK: 17 Super
-_ = Super()
+ProtocolExtensionTestSuite.test("ClassInitializer") {
+  _ = Super()
 
-// CHECK: 17 Sub
-_ = Sub()
+  _ = Sub()
 
-// CHECK: 17 Super
-var sup: Super.Type = Super.self
-_ = sup.init()
+  var sup: Super.Type = Super.self
+  _ = sup.init()
 
-// CHECK: 17 Sub
-sup = Sub.self
-_ = sup.init()
+  sup = Sub.self
+  _ = sup.init()
 
-// CHECK: DONE
-print("DONE")
+  expectTrue(17 == metatypes[0].0)
+  expectTrue(Super.self == metatypes[0].1)
+  expectTrue(17 == metatypes[1].0)
+  expectTrue(Sub.self == metatypes[1].1)
+  expectTrue(17 == metatypes[2].0)
+  expectTrue(Super.self == metatypes[2].1)
+  expectTrue(17 == metatypes[3].0)
+  expectTrue(Sub.self == metatypes[3].1)
+}
+
+// https://bugs.swift.org/browse/SR-617
+protocol SelfMetadataTest {
+  associatedtype T = Int
+
+  func staticTypeOfSelf() -> Any.Type
+  func staticTypeOfSelfTakesT(_: T) -> Any.Type
+  func staticTypeOfSelfCallsWitness() -> Any.Type
+}
+
+extension SelfMetadataTest {
+  func staticTypeOfSelf() -> Any.Type {
+    return Self.self
+  }
+
+  func staticTypeOfSelfTakesT(_: T) -> Any.Type {
+    return Self.self
+  }
+
+  func staticTypeOfSelfNotAWitness() -> Any.Type {
+    return Self.self
+  }
+
+  func staticTypeOfSelfCallsWitness() -> Any.Type {
+    return staticTypeOfSelf()
+  }
+}
+
+class SelfMetadataBase : SelfMetadataTest {}
+
+class SelfMetadataDerived : SelfMetadataBase {}
+
+func testSelfMetadata<T : SelfMetadataTest>(_ x: T, _ t: T.T) -> [Any.Type] {
+  return [x.staticTypeOfSelf(),
+          x.staticTypeOfSelfTakesT(t),
+          x.staticTypeOfSelfNotAWitness(),
+          x.staticTypeOfSelfCallsWitness()]
+}
+
+ProtocolExtensionTestSuite.test("WitnessSelf") {
+  do {
+    let result = testSelfMetadata(SelfMetadataBase(), 0)
+    expectTrue(SelfMetadataBase.self == result[0])
+    expectTrue(SelfMetadataBase.self == result[1])
+    expectTrue(SelfMetadataBase.self == result[2])
+    expectTrue(SelfMetadataBase.self == result[3])
+  }
+
+  do {
+    let result = testSelfMetadata(SelfMetadataDerived() as SelfMetadataBase, 0)
+    expectTrue(SelfMetadataBase.self == result[0])
+    expectTrue(SelfMetadataBase.self == result[1])
+    expectTrue(SelfMetadataBase.self == result[2])
+    expectTrue(SelfMetadataBase.self == result[3])
+  }
+
+  // This is the interesting case -- make sure the static type of 'Self'
+  // is correctly passed on from the call site to the extension method
+  do {
+    let result = testSelfMetadata(SelfMetadataDerived(), 0)
+    expectTrue(SelfMetadataDerived.self == result[0])
+    expectTrue(SelfMetadataBase.self == result[1])
+    expectTrue(SelfMetadataDerived.self == result[2])
+    expectTrue(SelfMetadataDerived.self == result[3])
+  }
+}
+
+protocol TrivialInit {
+  init()
+  init(throws: Bool) throws
+}
+
+enum SillyError : Error {
+  case error
+}
+
+struct TrivialInitStruct : TrivialInit {
+  let l = LifetimeTracked(0)
+
+  init() {}
+
+  init(throws: Bool) throws {
+    if `throws` {
+      throw SillyError.error
+    }
+  }
+}
+
+extension TrivialInit {
+  init(throwsFirst: Bool, throwsSecond: Bool, initThenInit: ()) throws {
+    try self.init(throws: throwsFirst)
+    try self.init(throws: throwsSecond)
+  }
+
+  init(throwsFirst: Bool, throwsSecond: Bool, initThenAssign: ()) throws {
+    try self.init(throws: throwsFirst)
+    self = try Self(throws: throwsSecond)
+  }
+
+  init(throwsFirst: Bool, throwsSecond: Bool, assignThenInit: ()) throws {
+    self = try Self(throws: throwsFirst)
+    try self.init(throws: throwsSecond)
+  }
+
+  init(throwsFirst: Bool, throwsSecond: Bool, assignThenAssign: ()) throws {
+    self = try Self(throws: throwsFirst)
+    try self.init(throws: throwsSecond)
+  }
+}
+
+ProtocolExtensionTestSuite.test("ExtensionInitializer") {
+  do {
+    _ = try TrivialInitStruct(throwsFirst: false, throwsSecond: false, initThenInit: ())
+    _ = try TrivialInitStruct(throwsFirst: false, throwsSecond: false, initThenAssign: ())
+    _ = try TrivialInitStruct(throwsFirst: false, throwsSecond: false, assignThenInit: ())
+    _ = try TrivialInitStruct(throwsFirst: false, throwsSecond: false, assignThenAssign: ())
+  } catch {
+    preconditionFailure()
+  }
+
+  do {
+    _ = try TrivialInitStruct(throwsFirst: true, throwsSecond: false, initThenInit: ())
+    preconditionFailure()
+  } catch { }
+
+  do {
+    _ = try TrivialInitStruct(throwsFirst: false, throwsSecond: true, initThenInit: ())
+    preconditionFailure()
+  } catch { }
+
+  do {
+    _ = try TrivialInitStruct(throwsFirst: true, throwsSecond: false, initThenAssign: ())
+    preconditionFailure()
+  } catch { }
+
+  do {
+    _ = try TrivialInitStruct(throwsFirst: false, throwsSecond: true, initThenAssign: ())
+    preconditionFailure()
+  } catch { }
+
+  do {
+    _ = try TrivialInitStruct(throwsFirst: true, throwsSecond: false, assignThenInit: ())
+    preconditionFailure()
+  } catch { }
+
+  do {
+    _ = try TrivialInitStruct(throwsFirst: false, throwsSecond: true, assignThenInit: ())
+    preconditionFailure()
+  } catch { }
+
+  do {
+    _ = try TrivialInitStruct(throwsFirst: true, throwsSecond: false, assignThenAssign: ())
+    preconditionFailure()
+  } catch { }
+
+  do {
+    _ = try TrivialInitStruct(throwsFirst: false, throwsSecond: true, assignThenAssign: ())
+    preconditionFailure()
+  } catch { }
+}
+
+runAllTests()

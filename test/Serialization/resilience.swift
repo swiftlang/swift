@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // This test checks that we serialize the -enable-resilience and -sil-serialize-all
 // flags correctly.
@@ -11,7 +11,7 @@
 // RUN: llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience2.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=RESILIENCE %s < %t/resilience2.dump.txt
 
-// RUN: %target-swift-frontend -emit-module -o %t -sil-serialize-all %s
+// RUN: %target-swift-frontend -emit-module -o %t -sil-serialize-witness-tables -sil-serialize-vtables %s
 // RUN: llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience3.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=FRAGILE %s < %t/resilience3.dump.txt
 
@@ -19,7 +19,7 @@
 
 // CHECK: <MODULE_BLOCK {{.*}}>
 // RESILIENCE: <RESILIENCE_STRATEGY abbrevid={{[0-9]+}} op0=1/>
-// FRAGILE: <RESILIENCE_STRATEGY abbrevid={{[0-9]+}} op0=2/>
+// FRAGILE-NOT: <RESILIENCE_STRATEGY abbrevid={{[0-9]+}}
 // DEFAULT-NOT: RESILIENCE_STRATEGY
 
 // CHECK: </MODULE_BLOCK>

@@ -17,7 +17,7 @@ internal func _writeBackMutableSlice<C, Slice_>(
 ) where
   C : MutableCollection,
   Slice_ : Collection,
-  C._Element == Slice_.Iterator.Element,
+  C.Element == Slice_.Element,
   C.Index == Slice_.Index {
 
   self_._failEarlyRangeCheck(bounds, bounds: self_.startIndex..<self_.endIndex)

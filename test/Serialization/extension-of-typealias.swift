@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -module-name Library -o %t -D LIBRARY %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=Library -I %t -source-filename=%s | %FileCheck %s
 // RUN: %target-swift-frontend -typecheck -I %t %s -verify

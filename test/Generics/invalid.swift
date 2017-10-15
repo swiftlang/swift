@@ -7,7 +7,7 @@ typealias gimel where A : B // expected-error {{'where' clause cannot be attache
 
 class dalet where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
 
-protocol he where A : B { // expected-error 2 {{use of undeclared type 'A'}}
+protocol he where A : B { // expected-error {{use of undeclared type 'A'}}
   // expected-error@-1 {{use of undeclared type 'B'}}
 
   associatedtype vav where A : B // expected-error{{use of undeclared type 'A'}}
@@ -53,8 +53,8 @@ func eatDinnerConcrete(d: Pizzas<Pepper>.DeepDish,
 
 func badDiagnostic1() {
 
-  _ = Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>( // expected-error {{expression type 'Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>' is ambiguous without more context}}
-      leftovers: Pizzas<ChiliFlakes>.NewYork(),
+  _ = Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>(
+      leftovers: Pizzas<ChiliFlakes>.NewYork(),  // expected-error {{cannot convert value of type 'Pizzas<ChiliFlakes>.NewYork' to expected argument type 'Pizzas<Pepper>.NewYork'}}
       transformation: { _ in HotDog() })
 }
 
@@ -101,3 +101,19 @@ protocol P1 {
   associatedtype C where ThisTypeDoesNotExist == ThisTypeDoesNotExist
   // expected-error@-1 2{{use of undeclared type 'ThisTypeDoesNotExist'}}
 }
+
+// Diagnostic referred to the wrong type - <rdar://problem/33604221>
+
+protocol E { associatedtype XYZ }
+
+class P<N> {
+  func q<A>(b:A) where A:E, N : A.XYZ { return }
+  // expected-error@-1 {{type 'N' constrained to non-protocol, non-class type 'A.XYZ'}}
+}
+
+// SR-5579
+protocol Foo {
+    associatedtype Bar where Bar.Nonsense == Int // expected-error{{'Nonsense' is not a member type of 'Self.Bar'}}
+}
+
+protocol Wibble : Foo where Bar.EvenMoreNonsense == Int { } // expected-error{{'EvenMoreNonsense' is not a member type of 'Self.Bar'}}

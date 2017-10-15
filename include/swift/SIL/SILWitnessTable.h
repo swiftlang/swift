@@ -34,8 +34,10 @@ namespace swift {
 
 class SILFunction;
 class SILModule;
+class ProtocolConformance;
 class NormalProtocolConformance;
 enum IsSerialized_t : unsigned char;
+enum class ResilienceStrategy : unsigned;
 
 /// A mapping from each requirement of a protocol to the SIL-level entity
 /// satisfying the requirement for a concrete type.
@@ -269,13 +271,18 @@ public:
   void convertToDefinition(ArrayRef<Entry> newEntries,
                            IsSerialized_t isSerialized);
 
+  // Whether a conformance should be serialized.
+  static bool conformanceIsSerialized(ProtocolConformance *conformance,
+                                      ResilienceStrategy strategy,
+                                      bool silSerializeWitnessTables);
+
   /// Print the witness table.
   void print(llvm::raw_ostream &OS, bool Verbose = false) const;
 
   /// Dump the witness table to stderr.
   void dump() const;
 };
-  
+
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//

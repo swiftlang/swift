@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
 // RUN: %FileCheck %s < %t.swiftdeps
@@ -111,7 +111,7 @@ extension ExpressibleByArrayLiteral {
 }
 
 // CHECK-DAG: OtherFileElementType
-extension ExpressibleByArrayLiteral where Element == OtherFileElementType {
+extension ExpressibleByArrayLiteral where ArrayLiteralElement == OtherFileElementType {
   func useless2() {}
 }
 

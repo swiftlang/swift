@@ -13,7 +13,8 @@ public class BridgedClass : NSObject, NSCopying {
 
 public class BridgedClassSub : BridgedClass { }
 
-// Attempt to bridge to a non-whitelisted type from another module.
+// Attempt to bridge to a type from another module. We only allow this for a
+// few specific types, like String.
 extension LazyFilterIterator : _ObjectiveCBridgeable { // expected-error{{conformance of 'LazyFilterIterator' to '_ObjectiveCBridgeable' can only be written in module 'Swift'}}
   public typealias _ObjectiveCType = BridgedClassSub
 
@@ -194,7 +195,7 @@ let d: Double = 3.14159
 inferDouble = d
 
 // rdar://problem/17962491
-_ = 1 % 3 / 3.0 // expected-error{{'%' is unavailable: Use truncatingRemainder instead}}
+_ = 1 % 3 / 3.0 // expected-error{{'%' is unavailable: For floating point numbers use truncatingRemainder instead}}
 var inferDouble2 = 1 / 3 / 3.0
 let d2: Double = 3.14159
 inferDouble2 = d2

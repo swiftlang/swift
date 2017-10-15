@@ -1,0 +1,10 @@
+func foo1() -> Int { return 0 }
+
+func foo(_ a : Int) -> Int {
+  let new_name = foo1()
+let a1 = 1 + 2 + 2 + 2 + a + new_name
+  let a2 = 1 + 2 + 2 + 2 + a + new_name
+  let a3 = 1 + 2 + 2 + 2 + a + new_name
+  return new_name + new_name + new_name + a1 + a2 + a3
+}
+

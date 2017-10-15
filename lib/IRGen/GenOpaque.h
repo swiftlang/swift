@@ -70,21 +70,6 @@ namespace irgen {
                                                         Address destBuffer,
                                                         Address srcBuffer);
 
-  /// Emit a call to do an 'allocateBuffer' operation.
-  llvm::Value *emitAllocateBufferCall(IRGenFunction &IGF,
-                                      SILType T,
-                                      Address buffer);
-
-  /// Emit a call to do a 'projectBuffer' operation.
-  llvm::Value *emitProjectBufferCall(IRGenFunction &IGF,
-                                     llvm::Value *metadata,
-                                     Address buffer);
-
-  /// Emit a call to do a 'projectBuffer' operation.
-  llvm::Value *emitProjectBufferCall(IRGenFunction &IGF,
-                                     SILType T,
-                                     Address buffer);
-
   /// Emit a call to do an 'initializeWithCopy' operation.
   void emitInitializeWithCopyCall(IRGenFunction &IGF,
                                   SILType T,
@@ -93,18 +78,6 @@ namespace irgen {
   llvm::Value *emitInitializeWithCopyCall(IRGenFunction &IGF,
                                           llvm::Value *metadata, Address dest,
                                           Address src);
-
-  /// Emit a call to do an 'initializeBufferWithCopy' operation.
-  llvm::Value *emitInitializeBufferWithCopyCall(IRGenFunction &IGF,
-                                                SILType T,
-                                                Address destBuffer,
-                                                Address srcObject);
-
-  /// Emit a call to do an 'initializeBufferWithTake' operation.
-  llvm::Value *emitInitializeBufferWithTakeCall(IRGenFunction &IGF,
-                                                SILType T,
-                                                Address destBuffer,
-                                                Address srcObject);
 
   /// Emit a call to do an 'initializeArrayWithCopy' operation.
   void emitInitializeArrayWithCopyCall(IRGenFunction &IGF,
@@ -121,6 +94,12 @@ namespace irgen {
   llvm::Value *emitInitializeWithTakeCall(IRGenFunction &IGF,
                                           llvm::Value *metadata, Address dest,
                                           Address src);
+
+  /// Emit a call to do an 'initializeArrayWithTakeNoAlias' operation.
+  void emitInitializeArrayWithTakeNoAliasCall(IRGenFunction &IGF, SILType T,
+                                              Address destObject,
+                                              Address srcObject,
+                                              llvm::Value *count);
 
   /// Emit a call to do an 'initializeArrayWithTakeFrontToBack' operation.
   void emitInitializeArrayWithTakeFrontToBackCall(IRGenFunction &IGF,
@@ -146,11 +125,33 @@ namespace irgen {
                               Address destObject,
                               Address srcObject);
 
+  /// Emit a call to do an 'assignArrayWithCopyNoAlias' operation.
+  void emitAssignArrayWithCopyNoAliasCall(IRGenFunction &IGF, SILType T,
+                                          Address destObject, Address srcObject,
+                                          llvm::Value *count);
+
+  /// Emit a call to do an 'assignArrayWithCopyFrontToBack' operation.
+  void emitAssignArrayWithCopyFrontToBackCall(IRGenFunction &IGF, SILType T,
+                                              Address destObject,
+                                              Address srcObject,
+                                              llvm::Value *count);
+
+  /// Emit a call to do an 'assignArrayWithCopyBackToFront' operation.
+  void emitAssignArrayWithCopyBackToFrontCall(IRGenFunction &IGF, SILType T,
+                                              Address destObject,
+                                              Address srcObject,
+                                              llvm::Value *count);
+
   /// Emit a call to do an 'assignWithTake' operation.
   void emitAssignWithTakeCall(IRGenFunction &IGF,
                               SILType T,
                               Address destObject,
                               Address srcObject);
+
+  /// Emit a call to do an 'assignArrayWithTake' operation.
+  void emitAssignArrayWithTakeCall(IRGenFunction &IGF, SILType T,
+                                   Address destObject, Address srcObject,
+                                   llvm::Value *count);
 
   /// Emit a call to do a 'destroy' operation.
   void emitDestroyCall(IRGenFunction &IGF,
@@ -166,22 +167,6 @@ namespace irgen {
                             Address object,
                             llvm::Value *count);
 
-  /// Emit a call to do a 'destroyBuffer' operation.
-  void emitDestroyBufferCall(IRGenFunction &IGF,
-                             llvm::Value *metadata,
-                             Address buffer);
-  void emitDestroyBufferCall(IRGenFunction &IGF,
-                             SILType T,
-                             Address buffer);
-  
-  /// Emit a call to do a 'deallocateBuffer' operation.
-  void emitDeallocateBufferCall(IRGenFunction &IGF,
-                                llvm::Value *metadata,
-                                Address buffer);
-  void emitDeallocateBufferCall(IRGenFunction &IGF,
-                                SILType T,
-                                Address buffer);
-  
   /// Emit a call to the 'getExtraInhabitantIndex' operation.
   /// The type must be dynamically known to have extra inhabitant witnesses.
   llvm::Value *emitGetExtraInhabitantIndexCall(IRGenFunction &IGF,

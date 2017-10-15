@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // Hold a reference to do to magically become non-POD.
 class Reference {}
@@ -26,7 +26,7 @@ func test0(_ ref: A) {
   ref.array[index0()] = ref.array[index1()]
 }
 // CHECK: sil hidden @_T09accessors5test0yAA1ACF : $@convention(thin) (@owned A) -> () {
-// CHECK: bb0([[ARG:%.*]] : $A):
+// CHECK: bb0([[ARG:%.*]] : @owned $A):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
 // CHECK-NEXT: [[BORROWED_ARG_LHS:%.*]] = begin_borrow [[ARG]]
@@ -45,11 +45,13 @@ func test0(_ ref: A) {
 // CHECK-NEXT: store [[T1]] to [init] [[TEMP]]
 // CHECK-NEXT: [[T0:%.*]] = load_borrow [[TEMP]]
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.getter : (Swift.Int) -> Swift.Int
-// CHECK-NEXT: [[T1:%.*]] = function_ref @_T09accessors11OrdinarySubV9subscriptS2icfg
+// CHECK-NEXT: [[T1:%.*]] = function_ref @_T09accessors11OrdinarySubVS2icig
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T1]]([[INDEX1]], [[T0]])
 // CHECK-NEXT: end_borrow [[T0]] from [[TEMP]]
 // CHECK-NEXT: destroy_addr [[TEMP]]
 //   Formal access to LHS.
+// CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter : (Swift.Int) -> Swift.Int
+// CHECK-NEXT: [[SETTER:%.*]] = function_ref @_T09accessors11OrdinarySubVS2icis
 // CHECK-NEXT: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER:%.*]] = alloc_stack $OrdinarySub
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER]]
@@ -59,12 +61,10 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*OrdinarySub on [[BORROWED_ARG_LHS]] : $A
-// CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter : (Swift.Int) -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors11OrdinarySubV9subscriptS2icfs
-// CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
+// CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 
-// CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
+// CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
 // CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout A, @thick A.Type) -> ()
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $A
 // SEMANTIC SIL TODO: This is an issue caused by the callback for materializeForSet in the class case taking the value as @inout when it should really take it as @guaranteed.
@@ -100,7 +100,7 @@ func test1(_ ref: B) {
   ref.array[index0()] = ref.array[index1()]
 }
 // CHECK-LABEL: sil hidden @_T09accessors5test1yAA1BCF : $@convention(thin) (@owned B) -> () {
-// CHECK:    bb0([[ARG:%.*]] : $B):
+// CHECK:    bb0([[ARG:%.*]] : @owned $B):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
 // CHECK-NEXT: [[BORROWED_ARG_LHS:%.*]] = begin_borrow [[ARG]]
@@ -123,11 +123,11 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on [[BORROWED_ARG_RHS]] : $B
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.getter : (Swift.Int) -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors11MutatingSubV9subscriptS2icfg : $@convention(method) (Int, @inout MutatingSub) -> Int 
+// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors11MutatingSubVS2icig : $@convention(method) (Int, @inout MutatingSub) -> Int 
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 //
-// CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
+// CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
 // CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
 // CHECK-NEXT: store_borrow [[BORROWED_ARG_RHS]] to [[TEMP2]] : $*B
@@ -139,6 +139,8 @@ func test1(_ ref: B) {
 //
 // CHECK:    [[CONT]]:
 //   Formal access to LHS.
+// CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter : (Swift.Int) -> Swift.Int
+// CHECK-NEXT: [[SETTER:%.*]] = function_ref @_T09accessors11MutatingSubVS2icis : $@convention(method) (Int, Int, @inout MutatingSub) -> () 
 // CHECK-NEXT: [[STORAGE2:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER2:%.*]] = alloc_stack $MutatingSub
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER2]]
@@ -148,12 +150,10 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on [[BORROWED_ARG_LHS]] : $B
-// CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter : (Swift.Int) -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors11MutatingSubV9subscriptS2icfs : $@convention(method) (Int, Int, @inout MutatingSub) -> () 
-// CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
+// CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 //
-// CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
+// CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
 // CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
 // CHECK-NEXT: store_borrow [[BORROWED_ARG_LHS]] to [[TEMP2]] : $*B
@@ -191,7 +191,7 @@ func test_rec(_ outer: inout RecOuter) -> Int {
 }
 // This uses the immutable addressor.
 // CHECK: sil hidden @_T09accessors8test_recSiAA8RecOuterVzF : $@convention(thin) (@inout RecOuter) -> Int {
-// CHECK:   function_ref @_T09accessors8RecOuterV5innerAA0B5InnerVflu : $@convention(method) (RecOuter) -> UnsafePointer<RecInner>
+// CHECK:   function_ref @_T09accessors8RecOuterV5innerAA0B5InnerVvlu : $@convention(method) (RecOuter) -> UnsafePointer<RecInner>
 
 struct Rec2Inner {
   subscript(i: Int) -> Int {
@@ -209,4 +209,38 @@ func test_rec2(_ outer: inout Rec2Outer) -> Int {
 }
 // This uses the mutable addressor.
 // CHECK: sil hidden @_T09accessors9test_rec2SiAA9Rec2OuterVzF : $@convention(thin) (@inout Rec2Outer) -> Int {
-// CHECK:   function_ref @_T09accessors9Rec2OuterV5innerAA0B5InnerVfau : $@convention(method) (@inout Rec2Outer) -> UnsafeMutablePointer<Rec2Inner>
+// CHECK:   function_ref @_T09accessors9Rec2OuterV5innerAA0B5InnerVvau : $@convention(method) (@inout Rec2Outer) -> UnsafeMutablePointer<Rec2Inner>
+
+struct Foo {
+  private subscript(privateSubscript x: Void) -> Void {
+    // CHECK-DAG: sil private @_T09accessors3FooVyyt16privateSubscript_tc33_D7F31B09EE737C687DC580B2014D759CLlig : $@convention(method) (Foo) -> () {
+    get {}
+  }
+  private(set) subscript(withPrivateSet x: Void) -> Void {
+    // CHECK-DAG: sil hidden @_T09accessors3FooVyyt14withPrivateSet_tcig : $@convention(method) (Foo) -> () {
+    get {}
+    // CHECK-DAG: sil private @_T09accessors3FooVyyt14withPrivateSet_tcis : $@convention(method) (@inout Foo) -> () {
+    set {}
+  }
+  subscript(withNestedClass x: Void) -> Void {
+    // Check for initializer of NestedClass
+    // CHECK-DAG: sil private @_T09accessors3FooVyyt15withNestedClass_tcig0dE0L_CAFycfc : $@convention(method) (@owned NestedClass) -> @owned NestedClass {
+    class NestedClass {}
+  }
+
+  // CHECK-DAG: sil private @_T09accessors3FooV15privateVariable33_D7F31B09EE737C687DC580B2014D759CLLytvg : $@convention(method) (Foo) -> () {
+  private var privateVariable: Void {
+    return
+  }
+  private(set) var variableWithPrivateSet: Void {
+    // CHECK-DAG: sil hidden @_T09accessors3FooV22variableWithPrivateSetytvg : $@convention(method) (Foo) -> () {
+    get {}
+    // CHECK-DAG: sil private @_T09accessors3FooV22variableWithPrivateSetytvs : $@convention(method) (@inout Foo) -> () {
+    set {}
+  }
+  var propertyWithNestedClass: Void {
+    // Check for initializer of NestedClass
+    // CHECK-DAG: sil private @_T09accessors3FooV23propertyWithNestedClassytvg0eF0L_CAFycfc : $@convention(method) (@owned NestedClass) -> @owned NestedClass {
+    class NestedClass {}
+  }
+}

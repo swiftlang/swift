@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 // High-level tests that DI handles early returns from failable and throwing
 // initializers properly. The main complication is conditional release of self
@@ -745,7 +745,9 @@ class FailableBaseClass {
 // CHECK:       bb0(%0 : $FailableBaseClass):
 // CHECK:         [[CANARY:%.*]] = apply
 // CHECK-NEXT:    [[MEMBER_ADDR:%.*]] = ref_element_addr %0
-// CHECK-NEXT:    store [[CANARY]] to [[MEMBER_ADDR]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [dynamic] [[MEMBER_ADDR]] : $*Canary
+// CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*Canary
 // CHECK-NEXT:    br bb1
 // CHECK:       bb1:
 // CHECK-NEXT:    strong_release %0
@@ -876,7 +878,9 @@ class FailableDerivedClass : FailableBaseClass {
 // CHECK:         store %0 to [[SELF_BOX]]
 // CHECK:         [[CANARY:%.*]] = apply
 // CHECK-NEXT:    [[MEMBER_ADDR:%.*]] = ref_element_addr %0
-// CHECK-NEXT:    store [[CANARY]] to [[MEMBER_ADDR]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [dynamic] [[MEMBER_ADDR]] : $*Canary
+// CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*Canary
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast %0
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers17FailableBaseClassCACSgyt28failBeforeFullInitialization_tcfc
 // CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = apply [[INIT_FN]]([[BASE_SELF]])
@@ -1334,8 +1338,9 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb6:
 // CHECK-NEXT:    br bb8
 // CHECK:       bb7:
-// CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick ThrowDerivedClass.Type, %1 : $ThrowDerivedClass
-// CHECK-NEXT:    dealloc_partial_ref %1 : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
+// CHECK-NEXT:    [[RELOADED_SELF:%.*]] = load [[SELF_BOX]]
+// CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick ThrowDerivedClass.Type, [[RELOADED_SELF]] : $ThrowDerivedClass
+// CHECK-NEXT:    dealloc_partial_ref [[RELOADED_SELF]] : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
 // CHECK-NEXT:    br bb8
 // CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]

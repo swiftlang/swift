@@ -36,9 +36,8 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
 }
 
 /// \brief Construct (int, overflow) result tuple.
-static SILInstruction *constructResultWithOverflowTuple(BuiltinInst *BI,
-                                                        APInt Res,
-                                                        bool Overflow) {
+static SILValue constructResultWithOverflowTuple(BuiltinInst *BI,
+                                                 APInt Res, bool Overflow) {
   // Get the SIL subtypes of the returned tuple type.
   SILType FuncResType = BI->getType();
   assert(FuncResType.castTo<TupleType>()->getNumElements() == 2);
@@ -57,7 +56,7 @@ static SILInstruction *constructResultWithOverflowTuple(BuiltinInst *BI,
 }
 
 /// \brief Fold arithmetic intrinsics with overflow.
-static SILInstruction *
+static SILValue
 constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
                                bool ReportOverflow,
                                Optional<bool> &ResultsInError) {
@@ -80,6 +79,11 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
   // If we can statically determine that the operation overflows,
   // warn about it if warnings are not disabled by ResultsInError being null.
   if (ResultsInError.hasValue() && Overflow && ReportOverflow) {
+    if (BI->getFunction()->isSpecialization()) {
+      // Do not report any constant propagation issues in specializations,
+      // because they are eventually not present in the original function.
+      return nullptr;
+    }
     // Try to infer the type of the constant expression that the user operates
     // on. If the intrinsic was lowered from a call to a function that takes
     // two arguments of the same type, use the type of the LHS argument.
@@ -154,7 +158,7 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
   return constructResultWithOverflowTuple(BI, Res, Overflow);
 }
 
-static SILInstruction *
+static SILValue
 constantFoldBinaryWithOverflow(BuiltinInst *BI, BuiltinValueKind ID,
                                Optional<bool> &ResultsInError) {
   OperandValueArrayRef Args = BI->getArguments();
@@ -165,9 +169,8 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, BuiltinValueKind ID,
            ResultsInError);
 }
 
-static SILInstruction *constantFoldIntrinsic(BuiltinInst *BI,
-                                             llvm::Intrinsic::ID ID,
-                                             Optional<bool> &ResultsInError) {
+static SILValue constantFoldIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID,
+                                      Optional<bool> &ResultsInError) {
   switch (ID) {
   default: break;
   case llvm::Intrinsic::expect: {
@@ -219,8 +222,7 @@ static SILInstruction *constantFoldIntrinsic(BuiltinInst *BI,
   return nullptr;
 }
 
-static SILInstruction *constantFoldCompare(BuiltinInst *BI,
-                                           BuiltinValueKind ID) {
+static SILValue constantFoldCompare(BuiltinInst *BI, BuiltinValueKind ID) {
   OperandValueArrayRef Args = BI->getArguments();
 
   // Fold for integer constant arguments.
@@ -389,7 +391,7 @@ static SILInstruction *constantFoldCompare(BuiltinInst *BI,
   return nullptr;
 }
 
-static SILInstruction *
+static SILValue
 constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
                              Optional<bool> &ResultsInError) {
   assert(ID == BuiltinValueKind::SDiv ||
@@ -457,9 +459,9 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
 ///
 /// The list of operations we constant fold might not be complete. Start with
 /// folding the operations used by the standard library.
-static SILInstruction *constantFoldBinary(BuiltinInst *BI,
-                                          BuiltinValueKind ID,
-                                          Optional<bool> &ResultsInError) {
+static SILValue constantFoldBinary(BuiltinInst *BI,
+                                   BuiltinValueKind ID,
+                                   Optional<bool> &ResultsInError) {
   switch (ID) {
   default:
     llvm_unreachable("Not all BUILTIN_BINARY_OPERATIONs are covered!");
@@ -568,7 +570,7 @@ static std::pair<bool, bool> getTypeSignedness(const BuiltinInfo &Builtin) {
   return std::pair<bool, bool>(SrcTySigned, DstTySigned);
 }
 
-static SILInstruction *
+static SILValue
 constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
                                        const BuiltinInfo &Builtin,
                                        Optional<bool> &ResultsInError) {
@@ -748,8 +750,8 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
 
 }
 
-static SILInstruction *constantFoldBuiltin(BuiltinInst *BI,
-                                           Optional<bool> &ResultsInError) {
+static SILValue constantFoldBuiltin(BuiltinInst *BI,
+                                    Optional<bool> &ResultsInError) {
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
   SILModule &M = BI->getModule();
 
@@ -966,7 +968,8 @@ constantFoldStringConcatenation(ApplyInst *AI,
     SILValue Val = Op.get();
     Op.drop();
     if (Val->use_empty()) {
-      auto *DeadI = dyn_cast<SILInstruction>(Val);
+      auto *DeadI = Val->getDefiningInstruction();
+      assert(DeadI);
       recursivelyDeleteTriviallyDeadInstructions(DeadI, /*force*/ true,
                                                  RemoveCallback);
       WorkList.remove(DeadI);
@@ -991,7 +994,7 @@ static void initializeWorklist(SILFunction &F,
                                llvm::SetVector<SILInstruction *> &WorkList) {
   for (auto &BB : F) {
     for (auto &I : BB) {
-      if (isFoldable(&I) && !I.use_empty()) {
+      if (isFoldable(&I) && I.hasUsesOfAnyResult()) {
         WorkList.insert(&I);
         continue;
       }
@@ -1046,7 +1049,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
 
   llvm::SetVector<SILInstruction *> FoldedUsers;
   CastOptimizer CastOpt(
-      [&](SILInstruction *I, ValueBase *V) { /* ReplaceInstUsesAction */
+      [&](SingleValueInstruction *I, ValueBase *V) { /* ReplaceInstUsesAction */
 
         InvalidateInstructions = true;
         I->replaceAllUsesWith(V);
@@ -1117,20 +1120,23 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
         isa<UnconditionalCheckedCastAddrInst>(I)) {
       // Try to perform cast optimizations. Invalidation is handled by a
       // callback inside the cast optimizer.
-      ValueBase *Result = nullptr;
+      SILInstruction *Result = nullptr;
       switch(I->getKind()) {
       default:
         llvm_unreachable("Unexpected instruction for cast optimizations");
-      case ValueKind::CheckedCastBranchInst:
+      case SILInstructionKind::CheckedCastBranchInst:
         Result = CastOpt.simplifyCheckedCastBranchInst(cast<CheckedCastBranchInst>(I));
         break;
-      case ValueKind::CheckedCastAddrBranchInst:
+      case SILInstructionKind::CheckedCastAddrBranchInst:
         Result = CastOpt.simplifyCheckedCastAddrBranchInst(cast<CheckedCastAddrBranchInst>(I));
         break;
-      case ValueKind::UnconditionalCheckedCastInst:
-        Result = CastOpt.optimizeUnconditionalCheckedCastInst(cast<UnconditionalCheckedCastInst>(I));
+      case SILInstructionKind::UnconditionalCheckedCastInst: {
+        auto Value =
+          CastOpt.optimizeUnconditionalCheckedCastInst(cast<UnconditionalCheckedCastInst>(I));
+        if (Value) Result = Value->getDefiningInstruction();
         break;
-      case ValueKind::UnconditionalCheckedCastAddrInst:
+      }
+      case SILInstructionKind::UnconditionalCheckedCastAddrInst:
         Result = CastOpt.optimizeUnconditionalCheckedCastAddrInst(cast<UnconditionalCheckedCastAddrInst>(I));
         break;
       }
@@ -1140,15 +1146,16 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
             isa<CheckedCastAddrBranchInst>(Result) ||
             isa<UnconditionalCheckedCastInst>(Result) ||
             isa<UnconditionalCheckedCastAddrInst>(Result))
-          WorkList.insert(cast<SILInstruction>(Result));
+          WorkList.insert(Result);
       }
       continue;
     }
 
 
     // Go through all users of the constant and try to fold them.
+    // TODO: MultiValueInstruction
     FoldedUsers.clear();
-    for (auto Use : I->getUses()) {
+    for (auto Use : cast<SingleValueInstruction>(I)->getUses()) {
       SILInstruction *User = Use->getUser();
       DEBUG(llvm::dbgs() << "    User: " << *User);
 
@@ -1195,6 +1202,10 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       if (!C)
         continue;
 
+      // We can currently only do this constant-folding of single-value
+      // instructions.
+      auto UserV = cast<SingleValueInstruction>(User);
+
       // Ok, we have succeeded. Add user to the FoldedUsers list and perform the
       // necessary cleanups, RAUWs, etc.
       FoldedUsers.insert(User);
@@ -1206,7 +1217,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       // any tuple_extract instructions using the apply.  This is a common case
       // for functions returning multiple values.
       if (auto *TI = dyn_cast<TupleInst>(C)) {
-        for (auto UI = User->use_begin(), E = User->use_end(); UI != E;) {
+        for (auto UI = UserV->use_begin(), E = UserV->use_end(); UI != E;) {
           Operand *O = *UI++;
 
           // If the user is a tuple_extract, just substitute the right value in.
@@ -1215,21 +1226,21 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
             TEI->replaceAllUsesWith(NewVal);
             TEI->dropAllReferences();
             FoldedUsers.insert(TEI);
-            if (auto *Inst = dyn_cast<SILInstruction>(NewVal))
+            if (auto *Inst = NewVal->getDefiningInstruction())
               WorkList.insert(Inst);
           }
         }
 
-        if (User->use_empty())
+        if (UserV->use_empty())
           FoldedUsers.insert(TI);
       }
 
 
       // We were able to fold, so all users should use the new folded value.
-      User->replaceAllUsesWith(C);
+      UserV->replaceAllUsesWith(C);
 
       // The new constant could be further folded now, add it to the worklist.
-      if (auto *Inst = dyn_cast<SILInstruction>(C))
+      if (auto *Inst = C->getDefiningInstruction())
         WorkList.insert(Inst);
     }
 

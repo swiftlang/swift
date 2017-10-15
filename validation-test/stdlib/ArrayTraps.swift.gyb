@@ -1,7 +1,6 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/ArrayTraps.swift
-// RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug
+// RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug -Onone
 // RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Release -O
 //
 // RUN: %line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Debug
@@ -128,7 +127,7 @@ ${ArrayTy}Traps.test("sliceBounds3/${io}")
 
 ${ArrayTy}Traps.test("PopFromEmpty")
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "can't remove last element from an empty collection" : "")
+    "Can't remove last element from an empty collection" : "")
   .code {
   var a: ${ArrayTy}<Int> = []
   expectCrashLater()

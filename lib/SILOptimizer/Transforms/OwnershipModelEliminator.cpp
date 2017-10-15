@@ -42,17 +42,16 @@ struct OwnershipModelEliminatorVisitor
   SILOpenedArchetypesTracker OpenedArchetypesTracker;
 
   OwnershipModelEliminatorVisitor(SILBuilder &B)
-      : B(B), OpenedArchetypesTracker(B.getFunction()) {
+      : B(B), OpenedArchetypesTracker(&B.getFunction()) {
     B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 
-  void beforeVisit(ValueBase *V) {
-    auto *I = cast<SILInstruction>(V);
+  void beforeVisit(SILInstruction *I) {
     B.setInsertionPoint(I);
     B.setCurrentDebugScope(I->getDebugScope());
   }
 
-  bool visitValueBase(ValueBase *V) { return false; }
+  bool visitSILInstruction(SILInstruction *I) { return false; }
   bool visitLoadInst(LoadInst *LI);
   bool visitStoreInst(StoreInst *SI);
   bool visitStoreBorrowInst(StoreBorrowInst *SI);
@@ -176,7 +175,6 @@ bool OwnershipModelEliminatorVisitor::visitUnmanagedRetainValueInst(
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
   B.emitCopyValueOperation(URVI->getLoc(), URVI->getOperand());
-  URVI->replaceAllUsesWith(URVI->getOperand());
   URVI->eraseFromParent();
   return true;
 }
@@ -268,6 +266,11 @@ struct OwnershipModelEliminator : SILModuleTransform {
       OwnershipModelEliminatorVisitor Visitor(B);
 
       for (auto &BB : F) {
+        // Change all arguments to have ValueOwnershipKind::Any.
+        for (auto *Arg : BB.getArguments()) {
+          Arg->setOwnershipKind(ValueOwnershipKind::Any);
+        }
+
         for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
           // Since we are going to be potentially removing instructions, we need
           // to make sure to increment our iterator before we perform any

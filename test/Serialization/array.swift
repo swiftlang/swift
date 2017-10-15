@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/has_array.swift
 // RUN: llvm-bcanalyzer %t/has_array.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen -I %t %s -o /dev/null

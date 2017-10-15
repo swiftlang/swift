@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class TestClass {
 
@@ -19,13 +19,13 @@ class TestDerived : TestClass {
 
 
 // CHECK-LABEL: sil hidden @{{.*}}testDirectDispatch{{.*}} : $@convention(thin) (@owned TestClass) -> Int {
-// CHECK: bb0([[ARG:%.*]] : $TestClass):
+// CHECK: bb0([[ARG:%.*]] : @owned $TestClass):
 // CHECK: [[FINALMETH:%[0-9]+]] = function_ref @_T05final9TestClassC0A6Method{{[_0-9a-zA-Z]*}}F
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: apply [[FINALMETH]]([[BORROWED_ARG]])
 // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK: [[FINALPROP:%[0-9]+]] = function_ref @_T05final9TestClassC0A8PropertySifg
+// CHECK: [[FINALPROP:%[0-9]+]] = function_ref @_T05final9TestClassC0A8PropertySivg
 // CHECK: apply [[FINALPROP]]([[BORROWED_ARG]])
 // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
 func testDirectDispatch(c : TestClass) -> Int {

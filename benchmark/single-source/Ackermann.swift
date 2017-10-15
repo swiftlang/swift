@@ -14,6 +14,11 @@
 // for performance measuring.
 import TestsUtils
 
+public let Ackermann = BenchmarkInfo(
+  name: "Ackermann",
+  runFunction: run_Ackermann,
+  tags: [.unstable, .algorithm])
+
 func ackermann(_ M: Int, _ N : Int) -> Int {
   if (M == 0) { return N + 1 }
   if (N == 0) { return ackermann(M - 1, 1) }
@@ -42,6 +47,5 @@ public func run_Ackermann(_ N: Int) {
       break
     }
   }
-  CheckResults(result == ref_result[n],
-      "IncorrectResults in Ackermann: \(result) != \(ref_result[n]).")
+  CheckResults(result == ref_result[n])
 }

@@ -13,11 +13,32 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Migrator/EditorAdapter.h"
+#include "swift/Migrator/Replacement.h"
 #include "swift/Parse/Lexer.h"
 #include "clang/Basic/SourceManager.h"
 
 using namespace swift;
 using namespace swift::migrator;
+
+std::pair<unsigned, unsigned>
+EditorAdapter::getLocInfo(swift::SourceLoc Loc) const {
+  auto SwiftBufferID = SwiftSrcMgr.findBufferContainingLoc(Loc);
+  auto Offset = SwiftSrcMgr.getLocOffsetInBuffer(Loc, SwiftBufferID);
+  return { SwiftBufferID, Offset };
+}
+
+bool
+EditorAdapter::cacheReplacement(CharSourceRange Range, StringRef Text) const {
+  unsigned SwiftBufferID, Offset;
+  std::tie(SwiftBufferID, Offset) = getLocInfo(Range.getStart());
+  Replacement R { Offset, Range.getByteLength(), Text };
+  if (Replacements.count(R)) {
+    return true;
+  } else {
+    Replacements.insert(R);
+  }
+  return false;
+}
 
 clang::FileID
 EditorAdapter::getClangFileIDForSwiftBufferID(unsigned BufferID) const {
@@ -40,8 +61,8 @@ EditorAdapter::getClangFileIDForSwiftBufferID(unsigned BufferID) const {
 
 clang::SourceLocation
 EditorAdapter::translateSourceLoc(SourceLoc SwiftLoc) const {
-  auto SwiftBufferID = SwiftSrcMgr.findBufferContainingLoc(SwiftLoc);
-  auto Offset = SwiftSrcMgr.getLocOffsetInBuffer(SwiftLoc, SwiftBufferID);
+  unsigned SwiftBufferID, Offset;
+  std::tie(SwiftBufferID, Offset) = getLocInfo(SwiftLoc);
 
   auto ClangFileID = getClangFileIDForSwiftBufferID(SwiftBufferID);
   return ClangSrcMgr.getLocForStartOfFile(ClangFileID).getLocWithOffset(Offset);
@@ -67,6 +88,10 @@ bool EditorAdapter::insert(SourceLoc Loc, StringRef Text, bool AfterToken,
   if (AfterToken)
     Loc = Lexer::getLocForEndOfToken(SwiftSrcMgr, Loc);
 
+  if (cacheReplacement(CharSourceRange { Loc, 0 }, Text)) {
+    return true;
+  }
+
   auto ClangLoc = translateSourceLoc(Loc);
   return Edits.insert(ClangLoc, Text, /*AfterToken=*/false, BeforePreviousInsertions);
 }
@@ -77,6 +102,11 @@ bool EditorAdapter::insertFromRange(SourceLoc Loc, CharSourceRange Range,
   // We don't have tokens on the clang side, so handle AfterToken in Swift
   if (AfterToken)
     Loc = Lexer::getLocForEndOfToken(SwiftSrcMgr, Loc);
+
+  if (cacheReplacement(CharSourceRange { Loc, 0 },
+                       SwiftSrcMgr.extractText(Range))) {
+    return true;
+  }
 
   auto ClangLoc = translateSourceLoc(Loc);
   auto ClangCharRange = translateCharSourceRange(Range);
@@ -92,23 +122,41 @@ bool EditorAdapter::insertWrap(StringRef Before, CharSourceRange Range,
 }
 
 bool EditorAdapter::remove(CharSourceRange Range) {
+  if (cacheReplacement(Range, "")) {
+    return true;
+  }
   auto ClangRange = translateCharSourceRange(Range);
   return Edits.remove(ClangRange);
 }
 
 bool EditorAdapter::replace(CharSourceRange Range, StringRef Text) {
+  if (cacheReplacement(Range, Text)) {
+    return true;
+  }
+
   auto ClangRange = translateCharSourceRange(Range);
   return Edits.replace(ClangRange, Text);
 }
 
 bool EditorAdapter::replaceWithInner(CharSourceRange Range,
                                      CharSourceRange InnerRange) {
+
+  if (cacheReplacement(Range, SwiftSrcMgr.extractText(InnerRange))) {
+    return true;
+  }
   auto ClangRange = translateCharSourceRange(Range);
   auto ClangInnerRange = translateCharSourceRange(InnerRange);
   return Edits.replaceWithInner(ClangRange, ClangInnerRange);
 }
+
 bool EditorAdapter::replaceText(SourceLoc Loc, StringRef Text,
-                 StringRef ReplacementText) {
+                                StringRef ReplacementText) {
+  auto Range = Lexer::getCharSourceRangeFromSourceRange(SwiftSrcMgr,
+    { Loc, Loc.getAdvancedLoc(Text.size())});
+  if (cacheReplacement(Range, Text)) {
+    return true;
+  }
+
   auto ClangLoc = translateSourceLoc(Loc);
   return Edits.replaceText(ClangLoc, Text, ReplacementText);
 }

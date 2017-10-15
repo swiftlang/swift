@@ -96,6 +96,9 @@ public:
                                 StringRef FormatString,
                                 ArrayRef<DiagnosticArgument> FormatArgs,
                                 const DiagnosticInfo &Info) = 0;
+
+  /// \returns true if an error occurred while finishing-up.
+  virtual bool finishProcessing() { return false; }
 };
   
 /// \brief DiagnosticConsumer that discards all diagnostics.

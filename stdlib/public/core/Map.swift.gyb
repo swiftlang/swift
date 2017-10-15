@@ -13,8 +13,7 @@
 %{
 from gyb_stdlib_support import (
     TRAVERSALS,
-    collectionForTraversal,
-    sliceTypeName
+    collectionForTraversal
 )
 }%
 
@@ -84,7 +83,7 @@ public struct LazyMapSequence<Base : Sequence, Element>
   /// `x` of base.
   @_inlineable
   @_versioned
-  internal init(_base: Base, transform: @escaping (Base.Iterator.Element) -> Element) {
+  internal init(_base: Base, transform: @escaping (Base.Element) -> Element) {
     self._base = _base
     self._transform = transform
   }
@@ -92,7 +91,7 @@ public struct LazyMapSequence<Base : Sequence, Element>
   @_versioned
   internal var _base: Base
   @_versioned
-  internal let _transform: (Base.Iterator.Element) -> Element
+  internal let _transform: (Base.Element) -> Element
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -104,7 +103,6 @@ public struct LazyMapSequence<Base : Sequence, Element>
 
 % for Traversal in TRAVERSALS:
 %   Self = "LazyMap" + collectionForTraversal(Traversal)
-%   Slice = sliceTypeName(traversal=Traversal, mutable=False, rangeReplaceable=False)
 
 /// A `Collection` whose elements consist of those in a `Base`
 /// `Collection` passed through a transform function returning `Element`.
@@ -150,20 +148,12 @@ public struct ${Self}<
     return _transform(_base[position])
   }
 
-  @_inlineable
-  public subscript(bounds: Range<Base.Index>) -> ${Slice}<${Self}> {
-    return ${Slice}(base: self, bounds: bounds)
-  }
+  public typealias SubSequence = ${Self}<Base.SubSequence, Element>
 
-  // FIXME(ABI)#46 (Associated Types with where clauses): we actually want to add:
-  //
-  //   typealias SubSequence = ${Self}<Base.SubSequence, Element>
-  //
-  // so that all slicing optimizations of the base collection can kick in.
-  //
-  // We can't do that right now though, because that would force a lot of
-  // constraints on `Base.SubSequence`, limiting the possible contexts where
-  // the `.lazy.map` API can be used.
+  @_inlineable
+  public subscript(bounds: Range<Base.Index>) -> SubSequence {
+    return SubSequence(_base: _base[bounds], transform: _transform)
+  }
 
   public typealias IndexDistance = Base.IndexDistance
 
@@ -234,7 +224,7 @@ public struct ${Self}<
   /// `x` of base.
   @_inlineable
   @_versioned
-  internal init(_base: Base, transform: @escaping (Base.Iterator.Element) -> Element) {
+  internal init(_base: Base, transform: @escaping (Base.Element) -> Element) {
     self._base = _base
     self._transform = transform
   }
@@ -242,7 +232,7 @@ public struct ${Self}<
   @_versioned
   internal var _base: Base
   @_versioned
-  internal let _transform: (Base.Iterator.Element) -> Element
+  internal let _transform: (Base.Element) -> Element
 }
 
 % end
@@ -255,7 +245,7 @@ extension LazySequenceProtocol {
   /// calling `transform` function on a base element.
   @_inlineable
   public func map<U>(
-    _ transform: @escaping (Elements.Iterator.Element) -> U
+    _ transform: @escaping (Elements.Element) -> U
   ) -> LazyMapSequence<Self.Elements, U> {
     return LazyMapSequence(_base: self.elements, transform: transform)
   }
@@ -275,7 +265,7 @@ extension LazyCollectionProtocol
   /// calling `transform` function on a base element.
   @_inlineable
   public func map<U>(
-    _ transform: @escaping (Elements.Iterator.Element) -> U
+    _ transform: @escaping (Elements.Element) -> U
   ) -> LazyMap${collectionForTraversal(Traversal)}<Self.Elements, U> {
     return LazyMap${collectionForTraversal(Traversal)}(
       _base: self.elements,
@@ -284,23 +274,6 @@ extension LazyCollectionProtocol
 }
 
 % end
-
-@available(*, unavailable, renamed: "LazyMapIterator")
-public struct LazyMapGenerator<Base : IteratorProtocol, Element> {}
-
-extension LazyMapSequence {
-  @available(*, unavailable, message: "use '.lazy.map' on the sequence")
-  public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
-    Builtin.unreachable()
-  }
-}
-
-extension LazyMapCollection {
-  @available(*, unavailable, message: "use '.lazy.map' on the collection")
-  public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
-    Builtin.unreachable()
-  }
-}
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

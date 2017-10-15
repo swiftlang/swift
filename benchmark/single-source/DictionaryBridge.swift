@@ -16,12 +16,17 @@
 import Foundation
 import TestsUtils
 
+public let DictionaryBridge = BenchmarkInfo(
+  name: "DictionaryBridge",
+  runFunction: run_DictionaryBridge,
+  tags: [.validation, .api, .Dictionary, .bridging])
+
 #if _runtime(_ObjC)
 class Thing : NSObject {
 
   required override init() {
     let c = type(of: self).col()
-    CheckResults(c!.count == 10, "The rules of the universe apply")
+    CheckResults(c!.count == 10)
   }
 
   private class func col() -> [String : AnyObject]? {

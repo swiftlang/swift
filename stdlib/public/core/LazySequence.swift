@@ -47,7 +47,7 @@
 ///       /// - Complexity: O(n)
 ///       func scan<ResultElement>(
 ///         _ initial: ResultElement,
-///         _ nextPartialResult: (ResultElement, Iterator.Element) -> ResultElement
+///         _ nextPartialResult: (ResultElement, Element) -> ResultElement
 ///       ) -> [ResultElement] {
 ///         var result = [initial]
 ///         for x in self {
@@ -83,7 +83,7 @@
 ///       private let initial: ResultElement
 ///       private let base: Base
 ///       private let nextPartialResult:
-///         (ResultElement, Base.Iterator.Element) -> ResultElement
+///         (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///
 /// and finally, we can give all lazy sequences a lazy `scan` method:
@@ -101,7 +101,7 @@
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
 ///         _ initial: ResultElement,
-///         _ nextPartialResult: (ResultElement, Iterator.Element) -> ResultElement
+///         _ nextPartialResult: (ResultElement, Element) -> ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(
 ///           initial: initial, base: self, nextPartialResult)
@@ -116,7 +116,7 @@
 ///   as the accumulation of `result` below are never unexpectedly
 ///   dropped or deferred:
 ///
-///       extension Sequence where Iterator.Element == Int {
+///       extension Sequence where Element == Int {
 ///         func sum() -> Int {
 ///           var result = 0
 ///           _ = self.map { result += $0 }
@@ -133,6 +133,7 @@ public protocol LazySequenceProtocol : Sequence {
   ///
   /// - See also: `elements`
   associatedtype Elements : Sequence = Self
+  where Elements.Iterator.Element == Iterator.Element
 
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.
@@ -153,6 +154,7 @@ public protocol LazySequenceProtocol : Sequence {
 /// property is provided.
 extension LazySequenceProtocol where Elements == Self {
   /// Identical to `self`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var elements: Self { return self }
 }
 
@@ -161,12 +163,15 @@ extension LazySequenceProtocol where Elements == Self {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceProtocol`
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct LazySequence<Base : Sequence>
   : LazySequenceProtocol, _SequenceWrapper {
 
   /// Creates a sequence that has the same elements as `base`, but on
   /// which some operations such as `map` and `filter` are implemented
   /// lazily.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(_base: Base) {
     self._base = _base
   }
@@ -174,6 +179,7 @@ public struct LazySequence<Base : Sequence>
   public var _base: Base
 
   /// The `Base` (presumably non-lazy) sequence from which `self` was created.
+  @_inlineable // FIXME(sil-serialize-all)
   public var elements: Base { return _base }
 }
 
@@ -181,8 +187,7 @@ extension Sequence {
   /// A sequence containing the same elements as this sequence,
   /// but on which some operations, such as `map` and `filter`, are
   /// implemented lazily.
-  ///
-  /// - SeeAlso: `LazySequenceProtocol`, `LazySequence`
+  @_inlineable // FIXME(sil-serialize-all)
   public var lazy: LazySequence<Self> {
     return LazySequence(_base: self)
   }
@@ -192,17 +197,8 @@ extension Sequence {
 /// Anything conforming to `LazySequenceProtocol` is already lazy.
 extension LazySequenceProtocol {
   /// Identical to `self`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var lazy: Self {
     return self
-  }
-}
-
-@available(*, unavailable, renamed: "LazySequenceProtocol")
-public typealias LazySequenceType = LazySequenceProtocol
-
-extension LazySequenceProtocol {
-  @available(*, unavailable, message: "Please use Array initializer instead.")
-  public var array: [Iterator.Element] {
-    Builtin.unreachable()
   }
 }

@@ -1,5 +1,0 @@
----
-Name: GLKit
-Tags:
-- Name: GLKTextureLoaderError
-  NSErrorDomain: GLKTextureLoaderErrorDomain

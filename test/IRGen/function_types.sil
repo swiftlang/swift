@@ -23,11 +23,11 @@ entry(%x : $@convention(thin) () -> ()):
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @thick_func_value(i8*, %swift.refcounted*) {{.*}} {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    call void @swift_rt_swift_retain(%swift.refcounted* %1) {{#[0-9]+}}
+// CHECK-NEXT:    call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned %1) {{#[0-9]+}}
 // CHECK-NEXT:    call void @swift_rt_swift_release(%swift.refcounted* %1) {{#[0-9]+}}
-// CHECK-NEXT:    %2 = insertvalue { i8*, %swift.refcounted* } undef, i8* %0, 0
-// CHECK-NEXT:    %3 = insertvalue { i8*, %swift.refcounted* } %2, %swift.refcounted* %1, 1
-// CHECK-NEXT:    ret { i8*, %swift.refcounted* } %3
+// CHECK-NEXT:    %3 = insertvalue { i8*, %swift.refcounted* } undef, i8* %0, 0
+// CHECK-NEXT:    %4 = insertvalue { i8*, %swift.refcounted* } %3, %swift.refcounted* %1, 1
+// CHECK-NEXT:    ret { i8*, %swift.refcounted* } %4
 // CHECK-NEXT:  }
 sil @thick_func_value : $@convention(thin) (@owned () -> ()) -> @owned () -> () {
 entry(%x : $() -> ()):
@@ -59,18 +59,6 @@ entry(%x : $*X):
   %f = function_ref @out_void_return : $@convention(thin) () -> @out X
   %z = apply %f(%x) : $@convention(thin) () -> @out X
   return %z : $()
-}
-
-// CHECK-LABEL: define{{( protected)?}} swiftcc i1 @test_is_nonnull_function(i8*, %swift.refcounted*) {{.*}} {
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:  %2 = icmp ne i8* %0, null
-// CHECK-NEXT:  ret i1 %2
-// CHECK-NEXT:  }
-
-sil @test_is_nonnull_function : $@convention(thin) (() -> ()) -> Builtin.Int1 {
-bb0(%0 : $() -> ()):
-  %3 = is_nonnull %0 : $() -> ()
-  return %3 : $Builtin.Int1                                 // id: %5
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc i8* @test_function_to_pointer(i8*)

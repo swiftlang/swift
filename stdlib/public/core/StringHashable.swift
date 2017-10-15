@@ -13,17 +13,29 @@
 import SwiftShims
 
 #if _runtime(_ObjC)
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHashValue")
-func _stdlib_NSStringHashValue(_ str: AnyObject, _ isASCII: Bool) -> Int
+internal func _stdlib_NSStringHashValue(
+  _ str: AnyObject, _ isASCII: Bool) -> Int
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHashValuePointer")
-func _stdlib_NSStringHashValuePointer(_ str: OpaquePointer, _ isASCII: Bool) -> Int
+internal func _stdlib_NSStringHashValuePointer(
+  _ str: OpaquePointer, _ isASCII: Bool) -> Int
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_CFStringHashCString")
-func _stdlib_CFStringHashCString(_ str: OpaquePointer, _ len: Int) -> Int
+internal func _stdlib_CFStringHashCString(
+  _ str: OpaquePointer, _ len: Int) -> Int
 #endif
 
-extension _Unicode {
+extension Unicode {
+  // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
+  // @_inlineable // FIXME(sil-serialize-all)
+  // @_versioned // FIXME(sil-serialize-all)
   internal static func hashASCII(
     _ string: UnsafeBufferPointer<UInt8>
   ) -> Int {
@@ -41,6 +53,9 @@ extension _Unicode {
     return hasher._finalizeAndReturnIntHash()
   }
 
+  // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
+  // @_inlineable // FIXME(sil-serialize-all)
+  // @_versioned // FIXME(sil-serialize-all)
   internal static func hashUTF16(
     _ string: UnsafeBufferPointer<UInt16>
   ) -> Int {
@@ -67,7 +82,8 @@ extension _Unicode {
   }
 }
 
-@inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
+@_versioned // FIXME(sil-serialize-all)
+@inline(never) // Hide the CF dependency
 internal func _hashString(_ string: String) -> Int {
   let core = string._core
 #if _runtime(_ObjC)
@@ -97,11 +113,11 @@ internal func _hashString(_ string: String) -> Int {
   }
 #else
   if let asciiBuffer = core.asciiBuffer {
-    return _Unicode.hashASCII(UnsafeBufferPointer(
+    return Unicode.hashASCII(UnsafeBufferPointer(
       start: asciiBuffer.baseAddress!,
       count: asciiBuffer.count))
   } else {
-    return _Unicode.hashUTF16(
+    return Unicode.hashUTF16(
       UnsafeBufferPointer(start: core.startUTF16, count: core.count))
   }
 #endif
@@ -113,6 +129,7 @@ extension String : Hashable {
   ///
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return _hashString(self)
   }

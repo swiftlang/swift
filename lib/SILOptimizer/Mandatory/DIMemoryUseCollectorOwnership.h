@@ -55,7 +55,7 @@ class DIMemoryObjectInfo {
 public:
   /// This is the instruction that represents the memory.  It is either an
   /// allocation (alloc_box, alloc_stack) or a mark_uninitialized.
-  SILInstruction *MemoryInst;
+  SingleValueInstruction *MemoryInst;
 
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
@@ -70,7 +70,7 @@ public:
   unsigned NumElements;
 
 public:
-  DIMemoryObjectInfo(SILInstruction *MemoryInst);
+  DIMemoryObjectInfo(SingleValueInstruction *MemoryInst);
 
   SILLocation getLoc() const { return MemoryInst->getLoc(); }
   SILFunction &getFunction() const { return *MemoryInst->getFunction(); }
@@ -80,7 +80,7 @@ public:
 
   CanType getType() const { return MemorySILType.getSwiftRValueType(); }
 
-  SILInstruction *getAddress() const {
+  SingleValueInstruction *getAddress() const {
     if (isa<MarkUninitializedInst>(MemoryInst) ||
         isa<AllocStackInst>(MemoryInst))
       return MemoryInst;
@@ -102,25 +102,6 @@ public:
   bool isAnyInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
       return !MUI->isVar();
-    return false;
-  }
-
-  /// True if the memory object is the 'self' argument of an initializer in a
-  /// protocol extension.
-  bool isProtocolInitSelf() const {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->isRootSelf() && isa<ArchetypeType>(getType()))
-        return true;
-    return false;
-  }
-
-  /// True if the memory object is the 'self' argument of an enum initializer.
-  bool isEnumInitSelf() const {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->isRootSelf())
-        if (auto decl = getType()->getAnyNominal())
-          if (isa<EnumDecl>(decl))
-            return true;
     return false;
   }
 
@@ -182,7 +163,7 @@ public:
   bool isNonDelegatingInit() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst)) {
       if (MUI->isDerivedClassSelf() || MUI->isDerivedClassSelfOnly() ||
-          (MUI->isRootSelf() && !isEnumInitSelf()))
+          MUI->isRootSelf())
         return true;
     }
     return false;
@@ -190,8 +171,10 @@ public:
 
   /// emitElementAddress - Given an element number (in the flattened sense)
   /// return a pointer to a leaf element of the specified number.
-  SILValue emitElementAddress(unsigned TupleEltNo, SILLocation Loc,
-                              SILBuilder &B) const;
+  SILValue
+  emitElementAddress(unsigned TupleEltNo, SILLocation Loc, SILBuilder &B,
+                     llvm::SmallVectorImpl<std::pair<SILValue, SILValue>>
+                         &EndBorrowList) const;
 
   /// getElementType - Return the swift type of the specified element.
   SILType getElementType(unsigned EltNo) const;
@@ -237,11 +220,8 @@ enum DIUseKind {
   /// closure that captures it.
   Escape,
 
-  /// This instruction is a call to 'super.init' in a 'self' initializer of a
-  /// derived class.
-  SuperInit,
-
-  /// This instruction is a call to 'self.init' in a delegating initializer.
+  /// This instruction is a call to 'self.init' in a delegating initializer,
+  /// or a call to 'super.init' in a designated initializer of a derived class..
   SelfInit
 };
 

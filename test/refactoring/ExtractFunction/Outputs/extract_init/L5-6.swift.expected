@@ -1,0 +1,13 @@
+class C {
+  var a : Int
+  var b : Int
+  fileprivate func new_name(_ a: Int, _ b: Int) {
+self.a = a
+    self.b = b
+}
+
+init(a : Int, b: Int) {
+    new_name(a, b)
+  }
+}
+

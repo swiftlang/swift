@@ -14,19 +14,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
-#include "swift/AST/NameLookup.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleLoader.h"
-#include "swift/Parse/Parser.h"
+#include "swift/AST/NameLookup.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Parse/Parser.h"
+#include "swift/Subsystems.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 #include <system_error>
 using namespace swift;
@@ -308,6 +309,7 @@ static void insertPrecedenceGroupDecl(NameBinder &binder, SourceFile &SF,
 /// nodes for unresolved value names, and we may have unresolved type names as
 /// well.  This handles import directives and forward references.
 void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
+  SharedTimer timer("Name binding");
   // Make sure we skip adding the standard library imports if the
   // source file is empty.
   if (SF.ASTStage == SourceFile::NameBound || SF.Decls.empty()) {

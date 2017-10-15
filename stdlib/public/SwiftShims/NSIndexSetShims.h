@@ -20,11 +20,11 @@ NS_BEGIN_DECLS
 - (NSUInteger)_indexOfRangeContainingIndex:(NSUInteger)value;
 @end
 
-extern NSUInteger __NSIndexSetRangeCount(NS_NON_BRIDGED(NSIndexSet *)self_) {
+NS_INLINE NSUInteger __NSIndexSetRangeCount(NS_NON_BRIDGED(NSIndexSet *)self_) {
     return [(NSIndexSet *)self_ rangeCount];
 }
 
-extern void __NSIndexSetRangeAtIndex(NS_NON_BRIDGED(NSIndexSet *)self_, NSUInteger rangeIndex, NSUInteger *location, NSUInteger *length) {
+NS_INLINE void __NSIndexSetRangeAtIndex(NS_NON_BRIDGED(NSIndexSet *)self_, NSUInteger rangeIndex, NSUInteger *location, NSUInteger *length) {
     NSRange result = [(NSIndexSet *)self_ rangeAtIndex:rangeIndex];
     *location = result.location;
     *length = result.length;

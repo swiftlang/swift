@@ -36,6 +36,11 @@ using namespace importer;
 /// Classify the given Clang enumeration to describe how to import it.
 void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
                             clang::Preprocessor &pp) {
+  assert(decl);
+  clang::PrettyStackTraceDecl trace(decl, clang::SourceLocation(),
+                                    pp.getSourceManager(), "classifying");
+  assert(decl->isThisDeclarationADefinition());
+
   // Anonymous enumerations simply get mapped to constants of the
   // underlying type of the enum, because there is no way to conjure up a
   // name for the Swift type.
@@ -63,7 +68,7 @@ void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
   // If API notes have /removed/ a FlagEnum or EnumExtensibility attribute,
   // then we don't need to check the macros.
   for (auto *attr : decl->specific_attrs<clang::SwiftVersionedAttr>()) {
-    if (!attr->getVersion().empty())
+    if (!attr->getIsReplacedByActive())
       continue;
     if (isa<clang::FlagEnumAttr>(attr->getAttrToAdd()) ||
         isa<clang::EnumExtensibilityAttr>(attr->getAttrToAdd())) {

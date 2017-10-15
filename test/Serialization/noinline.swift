@@ -1,6 +1,5 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %target-swift-frontend -emit-module -sil-serialize-all -o %t %S/Inputs/def_noinline.swift
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -sil-serialize-witness-tables -sil-serialize-vtables -o %t %S/Inputs/def_noinline.swift
 // RUN: llvm-bcanalyzer %t/def_noinline.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen -sil-link-all -I %t %s | %FileCheck %s -check-prefix=SIL
 
@@ -9,7 +8,7 @@
 import def_noinline
 
 // SIL-LABEL: sil @main
-// SIL: [[RAW:%.+]] = global_addr @_T08noinline3rawSbv : $*Bool
+// SIL: [[RAW:%.+]] = global_addr @_T08noinline3rawSbvp : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @_T012def_noinline12testNoinlineS2b1x_tF : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
 // SIL: store [[RESULT]] to [trivial] [[RAW]] : $*Bool

@@ -62,9 +62,6 @@ public:
     case StmtKind::RepeatWhile: {
       return transformRepeatWhileStmt(cast<RepeatWhileStmt>(S));
     }
-    case StmtKind::For: {
-      return transformForStmt(cast<ForStmt>(S));
-    }
     case StmtKind::ForEach: {
       return transformForEachStmt(cast<ForEachStmt>(S));
     }
@@ -187,17 +184,6 @@ public:
     return RWS;
   }
 
-  ForStmt *transformForStmt(ForStmt *FS) {
-    if (Stmt *B = FS->getBody()) {
-      Stmt *NB = transformStmt(B);
-      if (NB != B) {
-        FS->setBody(NB);
-      }
-    }
-
-    return FS;
-  }
-
   ForEachStmt *transformForEachStmt(ForEachStmt *FES) {
     if (BraceStmt *B = FES->getBody()) {
       BraceStmt *NB = transformBraceStmt(B);
@@ -270,7 +256,7 @@ public:
   }
 
   DoStmt *transformDoStmt(DoStmt *DS) {
-    if (BraceStmt *B = dyn_cast_or_null<BraceStmt>(DS->getBody())) {
+    if (auto *B = dyn_cast_or_null<BraceStmt>(DS->getBody())) {
       BraceStmt *NB = transformBraceStmt(B);
       if (NB != B) {
         DS->setBody(NB);
@@ -280,14 +266,14 @@ public:
   }
 
   DoCatchStmt *transformDoCatchStmt(DoCatchStmt *DCS) {
-    if (BraceStmt *B = dyn_cast_or_null<BraceStmt>(DCS->getBody())) {
+    if (auto *B = dyn_cast_or_null<BraceStmt>(DCS->getBody())) {
       BraceStmt *NB = transformBraceStmt(B);
       if (NB != B) {
         DCS->setBody(NB);
       }
     }
     for (CatchStmt *C : DCS->getCatches()) {
-      if (BraceStmt *CB = dyn_cast_or_null<BraceStmt>(C->getBody())) {
+      if (auto *CB = dyn_cast_or_null<BraceStmt>(C->getBody())) {
         BraceStmt *NCB = transformBraceStmt(CB);
         if (NCB != CB) {
           C->setBody(NCB);
@@ -479,7 +465,7 @@ public:
     }
 
     VarDecl *VD =
-        new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
                               MaybeLoadInitExpr->getType(), TypeCheckDC);

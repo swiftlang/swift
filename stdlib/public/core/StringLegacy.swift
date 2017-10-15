@@ -13,34 +13,21 @@
 import SwiftShims
 
 extension String {
-  /// Creates a string representing the given Unicode scalar repeated the
-  /// specified number of times.
-  ///
-  /// For example, use this initializer to create a string with ten `"0"`
-  /// scalars in a row.
-  ///
-  ///     let zeroes = String("0" as UnicodeScalar, count: 10)
-  ///     print(zeroes)
-  ///     // Prints "0000000000"
-  @available(*, unavailable, message: "Replaced by init(repeating: String, count: Int)")
-  public init(repeating repeatedValue: UnicodeScalar, count: Int) {
-    Builtin.unreachable()
-  }
-
   /// Creates a new string representing the given string repeated the specified
   /// number of times.
   ///
-  /// For example, use this initializer to create a string with ten `"00"`
-  /// strings in a row.
+  /// For example, you can use this initializer to create a string with ten
+  /// `"ab"` strings in a row.
   ///
-  ///     let zeroes = String(repeating: "00", count: 10)
-  ///     print(zeroes)
-  ///     // Prints "00000000000000000000"
+  ///     let s = String(repeating: "ab", count: 10)
+  ///     print(s)
+  ///     // Prints "abababababababababab"
   ///
   /// - Parameters:
   ///   - repeatedValue: The string to repeat.
   ///   - count: The number of times to repeat `repeatedValue` in the resulting
   ///     string.
+  @_inlineable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: String, count: Int) {
     if count == 0 {
       self = ""
@@ -57,23 +44,16 @@ extension String {
     }
   }
 
-  public var _lines : [String] {
-    return _split(separator: "\n")
-  }
-  
-  public func _split(separator: UnicodeScalar) -> [String] {
-    let scalarSlices = unicodeScalars.split { $0 == separator }
-    return scalarSlices.map { String($0) }
-  }
-
   /// A Boolean value indicating whether a string has no characters.
+  @_inlineable // FIXME(sil-serialize-all)
   public var isEmpty: Bool {
     return _core.count == 0
   }
 }
 
 extension String {
-  public init(_ _c: UnicodeScalar) {
+  @_inlineable // FIXME(sil-serialize-all)
+  public init(_ _c: Unicode.Scalar) {
     self = String._fromWellFormedCodeUnitSequence(
       UTF32.self,
       input: repeatElement(_c.value, count: 1))
@@ -83,18 +63,30 @@ extension String {
 #if _runtime(_ObjC)
 /// Determines if `theString` starts with `prefix` comparing the strings under
 /// canonical equivalence.
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHasPrefixNFD")
-func _stdlib_NSStringHasPrefixNFD(_ theString: AnyObject, _ prefix: AnyObject) -> Bool
+internal func _stdlib_NSStringHasPrefixNFD(
+  _ theString: AnyObject, _ prefix: AnyObject) -> Bool
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHasPrefixNFDPointer")
-func _stdlib_NSStringHasPrefixNFDPointer(_ theString: OpaquePointer, _ prefix: OpaquePointer) -> Bool
+internal func _stdlib_NSStringHasPrefixNFDPointer(
+  _ theString: OpaquePointer, _ prefix: OpaquePointer) -> Bool
 
 /// Determines if `theString` ends with `suffix` comparing the strings under
 /// canonical equivalence.
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHasSuffixNFD")
-func _stdlib_NSStringHasSuffixNFD(_ theString: AnyObject, _ suffix: AnyObject) -> Bool
+internal func _stdlib_NSStringHasSuffixNFD(
+  _ theString: AnyObject, _ suffix: AnyObject) -> Bool
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHasSuffixNFDPointer")
-func _stdlib_NSStringHasSuffixNFDPointer(_ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
+internal func _stdlib_NSStringHasSuffixNFDPointer(
+  _ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
 
 extension String {
   /// Returns a Boolean value indicating whether the string begins with the
@@ -125,7 +117,8 @@ extension String {
   ///     // Prints "true"
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
-  /// - Returns: `true` if the string begins with `prefix`, otherwise, `false`.
+  /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   public func hasPrefix(_ prefix: String) -> Bool {
     let selfCore = self._core
     let prefixCore = prefix._core
@@ -183,7 +176,8 @@ extension String {
   ///     // Prints "true"
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
-  /// - Returns: `true` if the string ends with `suffix`, otherwise, `false`.
+  /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   public func hasSuffix(_ suffix: String) -> Bool {
     let selfCore = self._core
     let suffixCore = suffix._core
@@ -228,7 +222,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -251,6 +245,8 @@ extension String {
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
   // FIXME(integers): support a more general BinaryInteger protocol
+  // FIXME(integers): support larger bitwidths than 64
+  @_inlineable // FIXME(sil-serialize-all)
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
@@ -266,7 +262,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -289,6 +285,7 @@ extension String {
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
   // FIXME(integers): tiebreaker between T : FixedWidthInteger and other obsoleted
+  @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
@@ -305,7 +302,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -328,6 +325,7 @@ extension String {
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
   // FIXME(integers): support a more general BinaryInteger protocol
+  @_inlineable // FIXME(sil-serialize-all)
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) where T : UnsignedInteger {
@@ -343,7 +341,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -365,13 +363,14 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use the version for FixedWidthInteger instead.")
-  public init<T : _SignedInteger>(
+  public init<T : SignedInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
     self = _int64ToString(
-      value.toIntMax(), radix: Int64(radix), uppercase: uppercase)
+      Int64(value), radix: Int64(radix), uppercase: uppercase)
   }
   
   /// Creates a string representing the given value in base 10, or some other
@@ -381,7 +380,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -403,24 +402,13 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use the version for FixedWidthInteger instead.")
   public init<T : UnsignedInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
     self = _uint64ToString(
-      value.toUIntMax(), radix: Int64(radix), uppercase: uppercase)
-  }
-}
-
-extension String {
-  @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
-  public init(count: Int, repeatedValue c: Character) {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
-  public init(count: Int, repeatedValue c: UnicodeScalar) {
-    Builtin.unreachable()
+      UInt64(value), radix: Int64(radix), uppercase: uppercase)
   }
 }

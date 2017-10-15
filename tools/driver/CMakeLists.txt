@@ -31,6 +31,10 @@ swift_create_post_build_symlink(swift
   DESTINATION "swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
   WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
+add_swift_tool_symlink(swiftc swift compiler)
+add_swift_tool_symlink(swift-autolink-extract swift autolink-driver)
+add_swift_tool_symlink(swift-format swift editor-integration)
+
 # If building as part of clang, make sure the headers are installed.
 if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swift clang-headers)

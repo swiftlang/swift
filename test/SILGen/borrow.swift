@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 import Swift
 
@@ -21,7 +21,8 @@ func useD(_ d: D) {}
 // CHECK:   [[CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK:   [[BORROWED_CLASS:%.*]] = begin_borrow [[CLASS]]
 // CHECK:   [[OFFSET:%.*]] = ref_element_addr [[BORROWED_CLASS]]
-// CHECK:   [[LOADED_VALUE:%.*]] = load [copy] [[OFFSET]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[OFFSET]] : $*D
+// CHECK:   [[LOADED_VALUE:%.*]] = load [copy] [[ACCESS]]
 // CHECK:   end_borrow [[BORROWED_CLASS]] from [[CLASS]]
 // CHECK:   apply [[FUNC]]([[LOADED_VALUE]])
 // CHECK:   destroy_value [[CLASS]]

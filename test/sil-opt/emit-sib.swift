@@ -1,7 +1,7 @@
 // <rdar://problem/27394237> IR generation CFG order isn't deterministic
 XFAIL: *
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-swiftc_driver -emit-sib %s -module-name test -assert-config Release -O -o %t/a-opt.sib
 // RUN: %target-swiftc_driver -emit-ir %t/a-opt.sib -module-name test -assert-config Release -o %t/test.ll

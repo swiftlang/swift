@@ -51,11 +51,6 @@ published should not limit its evolution in the future.
 
 .. contents:: :local:
 
-.. admonition:: TODO
-
-    - Drew Crawford is concerned about inlineable code breaking modularity;
-      you can't just release a new dylib to fix a bug.
-
 
 Introduction
 ============
@@ -155,7 +150,7 @@ versions.
 Declaring Library Version Dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Swift 2's availability model includes the notion of a *minimum deployment
+Swift's current availability model includes the notion of a *minimum deployment
 target,* the version of an OS that must be present for the program being
 compiled to run at all. For example, a program compiled with a minimum
 deployment target of iOS 9.2 will not launch on iOS 9.0.
@@ -307,7 +302,7 @@ No other changes are permitted; the following are particularly of note:
 - A versioned function may not add, remove, or reorder parameters, whether or
   not they have default arguments.
 - A versioned function that throws may not become non-throwing or vice versa.
-- The ``@noescape`` attribute may not be added to or removed from a parameter.
+- The ``@escaping`` attribute may not be added to or removed from a parameter.
   It is not a `versioned attribute` and so there is no way to guarantee that it
   is safe when a client deploys against older versions of the library.
 
@@ -445,7 +440,7 @@ argument implicitly has the same availability as the function it is attached to.
 
 .. note::
 
-    Swift 3's implementation of default arguments puts the evaluation of the
+    Swift 4.0's implementation of default arguments puts the evaluation of the
     default argument expression in the library, rather than in the client like
     C++ or C#. We plan to change this.
 
@@ -468,12 +463,6 @@ changes are permitted:
 - Adding or removing ``weak`` from a variable with ``Optional`` type.
 - Adding or removing ``unowned`` from a variable.
 - Adding or removing ``@NSCopying`` to/from a variable.
-
-.. admonition:: TODO
-
-    We need to pin down how this interacts with the "Behaviors" proposal.
-    Behaviors that just change the accessors of a global are fine, but those
-    that provide new entry points are trickier.
 
 If a public setter is added after the property is first exposed (whether the
 property is stored or computed), it must be versioned independently of the
@@ -568,13 +557,6 @@ the following changes are permitted:
 The important most aspect of a Swift struct is its value semantics, not its
 layout.
 
-.. admonition:: TODO
-
-    We need to pin down how this, and the ``@fixedContents`` attribute below,
-    interacts with the "Behaviors" proposal. Behaviors that just change the
-    accessors of a property are fine, but those that provide new entry points
-    are trickier.
-
 It is not safe to add or remove ``mutating`` or ``nonmutating`` from a member
 or accessor within a struct. These modifiers are not `versioned attributes
 <versioned attribute>` and as such there is no safety guarantee for a client
@@ -604,13 +586,6 @@ restrictions as for top-level bindings. An inlineable stored property may not
 become computed, but the offset of its storage within the struct is not
 necessarily fixed.
 
-.. note::
-
-    One possible layout algorithm would put all inlineable struct constants at
-    the start of the struct, sorted by availability, so that the offset *could*
-    be fixed. This would have to be balanced against other goals for struct
-    layout.
-
 Like top-level constants, it is *not* safe to change a ``let`` property into a
 variable or vice versa. Properties declared with ``let`` are assumed not to
 change for the entire lifetime of the program once they have been initialized.
@@ -625,17 +600,17 @@ stored subscripts. This means that the following changes are permitted:
 - Adding (but not removing) a public setter.
 - Adding or removing a non-public, non-versioned setter.
 - Changing the body of an accessor.
+- Changing index parameter internal names (i.e. the names used within the
+  accessor bodies, not the labels that are part of the subscript's full name).
+- Reordering generic requirements (but not the generic parameters themselves).
+- Adding a default argument expression to an index parameter.
+- Changing or removing a default argument is a `binary-compatible
+  source-breaking change`.
 
-Like properties, subscripts can be marked ``@inlineable``, which restricts the
-set of allowed changes:
-
-- Adding a versioned setter is still permitted.
-- Adding or removing a non-public, non-versioned setter is still permitted.
-- Changing the body of an accessor is a `binary-compatible source-breaking
-  change`.
-
-Any inlineable accessors must follow the rules for `inlineable functions`_,
-as described above.
+Like properties, subscripts can be marked ``@inlineable``, which makes changing
+the body of an accessor a `binary-compatible source-breaking change`. Any
+inlineable accessors must follow the rules for `inlineable functions`_, as
+described above.
 
 
 New Conformances
@@ -687,7 +662,8 @@ struct, even non-public ones. Additionally, all versioned instance stored
 properties in a ``@fixedContents`` struct are implicitly declared
 ``@inlineable`` (as described above for top-level variables). In effect:
 
-- Reordering all members, including stored properties, is still permitted.
+- Reordering stored instance properties (public or non-public) is not permitted.
+  Reordering all other members is still permitted.
 - Adding new stored instance properties (public or non-public) is not permitted.
   Adding any other new members is still permitted.
 - Existing instance properties may not be changed from stored to computed or
@@ -711,8 +687,8 @@ generic parameters and members of tuples.
 
 .. note::
 
-    This name is intentionally awful to encourage us to come up with a better
-    one.
+    The name ``@fixedContents`` is intentionally awful to encourage us to come
+    up with a better one.
 
 While adding or removing stored properties is forbidden, existing properties may
 still be modified in limited ways:
@@ -825,9 +801,10 @@ A library owner may opt out of this flexibility by marking a versioned enum as
 enum itself, and may not add new cases in the future. This guarantees to
 clients that the enum cases are exhaustive. In particular:
 
-- Adding new cases is not permitted
+- Adding new cases is not permitted.
 - Reordering existing cases is not permitted.
-- Adding a raw type to an enum that does not have one is still permitted.
+- Adding a raw type to an enum that does not have one is not permitted -- it's
+  used for optimization.
 - Removing a non-public case is not applicable.
 - Adding any other members is still permitted.
 - Removing any non-public, non-versioned members is still permitted.
@@ -896,10 +873,13 @@ __ #protocol-extensions
     Allowing the addition of associated types means implementing some form of
     "generalized existentials", so that existing existential values (values
     with protocol type) continue to work even if a protocol gets its first
-    associated type. Until we have that feature implemented, it is only safe to
-    add an associated type to a protocol that already has associated types, or
-    uses ``Self`` in a non-return position (i.e. one that currently cannot be
-    used as the type of a value).
+    associated type. Until we have that feature implemented, it would only be
+    safe to add an associated type to a protocol that already has associated
+    types, or uses ``Self`` in a non-return position (i.e. one that currently
+    cannot be used as the type of a value).
+    
+    As a first pass, it is likely that we will not allow adding new associated
+    types to existing protocols at all.
 
 
 Classes
@@ -932,8 +912,8 @@ little more restrictive than structs; they only allow the following changes:
 
 Finally, classes allow the following changes that do not apply to structs:
 
-- A class may be marked ``open`` if it is not already marked ``final``.
-- A class may be marked ``final`` if it is not already marked ``open``.
+- A public class may be made ``open`` if it is not already marked ``final``.
+- A non-``open`` public class may be marked ``final``.
 - Removing an explicit deinitializer. (A class with no declared deinitializer
   effectively has an implicit deinitializer.)
 - "Moving" a method, subscript, or property up to its superclass. The
@@ -948,10 +928,10 @@ Finally, classes allow the following changes that do not apply to structs:
   marked ``open`` if it is not already marked ``final``.
 - Any public method, subscript, or property may be marked ``final`` if it is not
   already marked ``open``.
-- ``@IBOutlet``, ``@IBAction``, and ``@IBInspectable`` may be added to a member
-  without providing any extra version information. Removing any of these is
-  a `binary-compatible source-breaking change` if the member remains ``@objc``,
-  and disallowed if not.
+- ``@IBOutlet``, ``@IBAction``, ``@IBInspectable``, and ``@GKInspectable`` may
+  be added to a member without providing any extra version information.
+  Removing any of these is a `binary-compatible source-breaking change` if the
+  member remains ``@objc``, and disallowed if not.
 - Likewise, ``@IBDesignable`` may be added to a class without providing any
   extra version information. Removing it is considered a `binary-compatible
   source-breaking change`.
@@ -982,7 +962,7 @@ Finally, classes allow the following changes that do not apply to structs:
 Other than those detailed above, no other changes to a class or its members
 are permitted. In particular:
 
-- ``open`` may not be removed from a class or its members.
+- An ``open`` class or member cannot become non-``open``.
 - ``final`` may not be removed from a class or its members. (The presence of
   ``final`` enables optimization.)
 - ``dynamic`` may not be added to *or* removed from any members. Existing
@@ -996,7 +976,7 @@ are permitted. In particular:
 
 .. admonition:: TODO
 
-    The ``@NSManaged`` attribute as it is in Swift 2 exposes implementation
+    The ``@NSManaged`` attribute as it is in Swift 4 exposes implementation
     details to clients in a bad way. We need to fix this.
     rdar://problem/20829214
 
@@ -1093,6 +1073,12 @@ counterparts with a few small changes:
   permitted.
 - Adding or removing a non-public, non-versioned setter is permitted.
 - Changing the body of an accessor is permitted.
+- Changing index parameter internal names is permitted.
+- Reordering generic requirements (but not the generic parameters themselves)
+  is permitted.
+- Adding a default argument expression to an index parameter is permitted.
+- Changing or removing a default argument is a `binary-compatible
+  source-breaking change`.
 
 Adding a public setter to an ``open`` subscript is a
 `binary-compatible source-breaking change`; any existing overrides will not
@@ -1642,9 +1628,7 @@ The following proposals (some currently in the process, some planned) will
 affect the model described in this document, or concern the parts of this
 document that affect language semantics:
 
-- `SE-0030 Property Behaviors`_
 - (draft) `Overridable methods in extensions`_
-- `SE-0117 Allow Allow distinguishing between public access and public overridability <SE-0117>`_
 - (planned) Restricting retroactive modeling (protocol conformances for types you don't own)
 - (planned) Default implementations in protocols
 - (planned) `Generalized existentials (values of protocol type) <Generics>`_
@@ -1658,9 +1642,7 @@ document that affect language semantics:
 - (future) Attributes for stored property accessors
 - (future) Stored properties in extensions
 
-.. _SE-0030 Property Behaviors: https://github.com/apple/swift-evolution/blob/master/proposals/0030-property-behavior-decls.md
 .. _Overridable methods in extensions: https://github.com/jrose-apple/swift-evolution/blob/overridable-members-in-extensions/proposals/nnnn-overridable-members-in-extensions.md
-.. _SE-0117: https://github.com/apple/swift-evolution/blob/master/proposals/0117-non-public-subclassable-by-default.md
 .. _Generics: https://github.com/apple/swift/blob/master/docs/GenericsManifesto.md#generalized-existentials
 
 This does not mean all of these proposals need to be accepted, only that their

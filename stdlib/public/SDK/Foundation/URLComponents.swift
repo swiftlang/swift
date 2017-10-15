@@ -194,8 +194,8 @@ public struct URLComponents : ReferenceConvertible, Hashable, Equatable, _Mutabl
     private func _toStringRange(_ r : NSRange) -> Range<String.Index>? {
         guard r.location != NSNotFound else { return nil }
         
-        let utf16Start = String.UTF16View.Index(_offset: r.location)
-        let utf16End = String.UTF16View.Index(_offset: r.location + r.length)
+        let utf16Start = String.UTF16View.Index(encodedOffset: r.location)
+        let utf16End = String.UTF16View.Index(encodedOffset: r.location + r.length)
 
         guard let s = self.string else { return nil }
         guard let start = String.Index(utf16Start, within: s) else { return nil }
@@ -364,9 +364,8 @@ extension URLComponents : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURLComponents?) -> URLComponents {
-        var result: URLComponents?
-        _forceBridgeFromObjectiveC(source!, result: &result)
-        return result!
+        guard let src = source else { return URLComponents() }
+        return URLComponents(reference: src)
     }
 }
 
@@ -470,5 +469,44 @@ extension NSURLQueryItem : _HasCustomAnyHashableRepresentation {
     @nonobjc
     public func _toCustomAnyHashable() -> AnyHashable? {
         return AnyHashable(self as URLQueryItem)
+    }
+}
+
+extension URLComponents : Codable {
+    private enum CodingKeys : Int, CodingKey {
+        case scheme
+        case user
+        case password
+        case host
+        case port
+        case path
+        case query
+        case fragment
+    }
+
+    public init(from decoder: Decoder) throws {
+        self.init()
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.scheme = try container.decodeIfPresent(String.self, forKey: .scheme)
+        self.user = try container.decodeIfPresent(String.self, forKey: .user)
+        self.password = try container.decodeIfPresent(String.self, forKey: .password)
+        self.host = try container.decodeIfPresent(String.self, forKey: .host)
+        self.port = try container.decodeIfPresent(Int.self, forKey: .port)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.query = try container.decodeIfPresent(String.self, forKey: .query)
+        self.fragment = try container.decodeIfPresent(String.self, forKey: .fragment)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(self.scheme, forKey: .scheme)
+        try container.encodeIfPresent(self.user, forKey: .user)
+        try container.encodeIfPresent(self.password, forKey: .password)
+        try container.encodeIfPresent(self.host, forKey: .host)
+        try container.encodeIfPresent(self.port, forKey: .port)
+        try container.encode(self.path, forKey: .path)
+        try container.encodeIfPresent(self.query, forKey: .query)
+        try container.encodeIfPresent(self.fragment, forKey: .fragment)
     }
 }

@@ -1,4 +1,4 @@
-// Check that each of 'swift', 'swift repl', 'swift run' invoke the REPL.
+// Check that 'swift' and 'swift repl' invoke the REPL.
 //
 // REQUIRES: swift_interpreter
 //
@@ -7,7 +7,6 @@
 // RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t.dir/usr/bin/swift)
 
 // RUN: %t.dir/usr/bin/swift -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
-// RUN: %t.dir/usr/bin/swift run -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
 // RUN: %t.dir/usr/bin/swift repl -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
 //
 // CHECK-SWIFT-INVOKES-REPL: {{.*}}/swift -frontend -repl
@@ -17,7 +16,8 @@
 // (for shebang line use). We have to run these since we can't get the driver to
 // dump what it is doing and test the argv[1] processing.
 //
-// RUN: mkdir -p %t.dir/subpath
+// RUN: %empty-directory(%t.dir)
+// RUN: %empty-directory(%t.dir/subpath)
 // RUN: echo "print(\"exec: \" + #file)" > %t.dir/stdin
 // RUN: echo "print(\"exec: \" + #file)" > %t.dir/t.swift
 // RUN: echo "print(\"exec: \" + #file)" > %t.dir/subpath/build
@@ -31,8 +31,7 @@
 
 // Check that 'swift foo' invokes 'swift-foo'.
 //
-// RUN: rm -rf %t.dir
-// RUN: mkdir -p %t.dir
+// RUN: %empty-directory(%t.dir)
 // RUN: echo "#!/bin/sh" > %t.dir/swift-foo
 // RUN: echo "echo \"exec: \$0\"" >> %t.dir/swift-foo
 // RUN: chmod +x %t.dir/swift-foo

@@ -48,8 +48,7 @@ public enum MemoryLayout<T> {
   ///
   /// When allocating memory for multiple instances of `T` using an unsafe
   /// pointer, use a multiple of the type's stride instead of its size.
-  ///
-  /// - SeeAlso: `stride`
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static var size: Int {
     return Int(Builtin.sizeof(T.self))
@@ -62,6 +61,7 @@ public enum MemoryLayout<T> {
   /// instance is incremented. `T` may have a lower minimal alignment that
   /// trades runtime performance for space efficiency. This value is always
   /// positive.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static var stride: Int {
     return Int(Builtin.strideof(T.self))
@@ -71,6 +71,7 @@ public enum MemoryLayout<T> {
   ///
   /// Use the `alignment` property for a type when allocating memory using an
   /// unsafe pointer. This value is always positive.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static var alignment: Int {
     return Int(Builtin.alignof(T.self))
@@ -100,8 +101,7 @@ extension MemoryLayout {
   ///
   /// - Parameter value: A value representative of the type to describe.
   /// - Returns: The size, in bytes, of the given value's type.
-  ///
-  /// - SeeAlso: `MemoryLayout.size`
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func size(ofValue value: T) -> Int {
     return MemoryLayout.size
@@ -130,8 +130,7 @@ extension MemoryLayout {
   ///
   /// - Parameter value: A value representative of the type to describe.
   /// - Returns: The stride, in bytes, of the given value's type.
-  ///
-  /// - SeeAlso: `MemoryLayout.stride`
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func stride(ofValue value: T) -> Int {
     return MemoryLayout.stride
@@ -157,8 +156,7 @@ extension MemoryLayout {
   /// - Parameter value: A value representative of the type to describe.
   /// - Returns: The default memory alignment, in bytes, of the given value's
   ///   type. This value is always positive.
-  ///
-  /// - SeeAlso: `MemoryLayout.alignment`
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func alignment(ofValue value: T) -> Int {
     return MemoryLayout.alignment

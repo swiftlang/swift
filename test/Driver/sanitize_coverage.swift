@@ -1,4 +1,3 @@
-// XFAIL: linux
 // Different sanitizer coverage types
 // RUN: %swiftc_driver -driver-print-jobs -sanitize-coverage=func -sanitize=address %s | %FileCheck -check-prefix=SANCOV_FUNC %s
 // RUN: %swiftc_driver -driver-print-jobs -sanitize-coverage=bb -sanitize=address %s | %FileCheck -check-prefix=SANCOV_BB %s

@@ -1,4 +1,4 @@
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out -Ounchecked
 //
 // RUN: %target-run %t/a.out

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -module-name main %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -module-name main %s | %FileCheck %s
 internal func internalFunc() {}
 
 // CHECK-LABEL: sil @_T04main3fooyyF

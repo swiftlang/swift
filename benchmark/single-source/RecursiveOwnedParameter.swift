@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let RecursiveOwnedParameter = BenchmarkInfo(
+  name: "RecursiveOwnedParameter",
+  runFunction: run_RecursiveOwnedParameter,
+  tags: [.validation, .api, .Array, .refcount])
+
 // This test recursively visits each element of an array in a class and compares
 // it with every value in a different array stored in a different class. The
 // idea is to make sure that we can get rid of the overhead from guaranteed
@@ -52,6 +57,5 @@ public func run_RecursiveOwnedParameter(_ N: Int) {
     }
   }
   let refResult = 100*N
-  CheckResults(result == refResult,
-    "IncorrectResults in RecursiveOwnedParameter: \(result) != \(refResult)")
+  CheckResults(result == refResult)
 }

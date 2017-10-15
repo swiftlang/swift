@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
+#include "swift/Strings.h"
 
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
@@ -40,8 +41,7 @@ void ConstantTracker::trackInst(SILInstruction *inst) {
 SILValue ConstantTracker::scanProjections(SILValue addr,
                                           SmallVectorImpl<Projection> *Result) {
   for (;;) {
-    if (Projection::isAddressProjection(addr)) {
-      SILInstruction *I = cast<SILInstruction>(addr);
+    if (auto *I = Projection::isAddressProjection(addr)) {
       if (Result) {
         Result->push_back(Projection(I));
       }
@@ -109,11 +109,11 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
 
   // Track the value up the dominator tree.
   for (;;) {
-    if (auto *inst = dyn_cast<SILInstruction>(val)) {
-      if (Projection::isObjectProjection(inst)) {
+    if (auto *inst = dyn_cast<SingleValueInstruction>(val)) {
+      if (auto pi = Projection::isObjectProjection(val)) {
         // Extract a member from a struct/tuple/enum.
-        projStack.push_back(Projection(inst));
-        val = inst->getOperand(0);
+        projStack.push_back(Projection(pi));
+        val = pi->getOperand(0);
         continue;
       } else if (SILValue member = getMember(inst, projStack)) {
         // The opposite of a projection instruction: composing a struct/tuple.
@@ -124,8 +124,8 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
         // A value loaded from memory.
         val = loadedVal;
         continue;
-      } else if (isa<ThinToThickFunctionInst>(inst)) {
-        val = inst->getOperand(0);
+      } else if (auto ti = dyn_cast<ThinToThickFunctionInst>(inst)) {
+        val = ti->getOperand();
         continue;
       }
       return inst;
@@ -533,4 +533,291 @@ void ShortestPathAnalysis::Weight::updateBenefit(int &Benefit,
   // We don't accumulate the benefit instead we max it.
   if (newBenefit > Benefit)
     Benefit = newBenefit;
+}
+
+// Return true if the callee has self-recursive calls.
+static bool calleeIsSelfRecursive(SILFunction *Callee) {
+  for (auto &BB : *Callee)
+    for (auto &I : BB)
+      if (auto Apply = FullApplySite::isa(&I))
+        if (Apply.getReferencedFunction() == Callee)
+          return true;
+  return false;
+}
+
+// Returns true if the callee contains a partial apply instruction,
+// whose substitutions list would contain opened existentials after
+// inlining.
+static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
+  if (!AI.hasSubstitutions())
+    return false;
+
+  SILFunction *Callee = AI.getReferencedFunction();
+  auto Subs = AI.getSubstitutions();
+
+  // Bail if there are no open existentials in the list of substitutions.
+  bool HasNoOpenedExistentials = true;
+  for (auto Sub : Subs) {
+    if (Sub.getReplacement()->hasOpenedExistential()) {
+      HasNoOpenedExistentials = false;
+      break;
+    }
+  }
+
+  if (HasNoOpenedExistentials)
+    return false;
+
+  auto SubsMap = Callee->getLoweredFunctionType()
+    ->getGenericSignature()->getSubstitutionMap(Subs);
+
+  for (auto &BB : *Callee) {
+    for (auto &I : BB) {
+      if (auto PAI = dyn_cast<PartialApplyInst>(&I)) {
+        auto PAISubs = PAI->getSubstitutions();
+        if (PAISubs.empty())
+          continue;
+
+        // Check if any of substitutions would contain open existentials
+        // after inlining.
+        auto PAISubMap = PAI->getOrigCalleeType()
+          ->getGenericSignature()->getSubstitutionMap(PAISubs);
+        PAISubMap = PAISubMap.subst(SubsMap);
+        if (PAISubMap.hasOpenedExistential())
+          return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Returns true if a given apply site should be skipped during the
+// early inlining pass.
+//
+// NOTE: Add here the checks for any specific @_semantics/@_effects
+// attributes causing a given callee to be excluded from the inlining
+// during the early inlining pass.
+static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
+  // Add here the checks for any specific @_semantics attributes that need
+  // to be skipped during the early inlining pass.
+  ArraySemanticsCall ASC(AI.getInstruction());
+  if (ASC && !ASC.canInlineEarly())
+    return true;
+
+  SILFunction *Callee = AI.getReferencedFunction();
+  if (!Callee)
+    return false;
+
+  if (Callee->hasSemanticsAttr("self_no_escaping_closure") ||
+      Callee->hasSemanticsAttr("pair_no_escaping_closure"))
+    return true;
+
+  // Add here the checks for any specific @_effects attributes that need
+  // to be skipped during the early inlining pass.
+  if (Callee->hasEffectsKind())
+    return true;
+
+  return false;
+}
+
+/// Checks if a generic callee and caller have compatible layout constraints.
+static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
+  SILFunction *Callee = AI.getReferencedFunction();
+  auto CalleeSig = Callee->getLoweredFunctionType()->getGenericSignature();
+  auto SubstParams = CalleeSig->getSubstitutableParams();
+  auto AISubs = AI.getSubstitutions();
+  for (auto idx : indices(SubstParams)) {
+    auto Param = SubstParams[idx];
+    // Map the parameter into context
+    auto ContextTy = Callee->mapTypeIntoContext(Param->getCanonicalType());
+    auto Archetype = ContextTy->getAs<ArchetypeType>();
+    if (!Archetype)
+      continue;
+    auto Layout = Archetype->getLayoutConstraint();
+    if (!Layout)
+      continue;
+    // The generic parameter has a layout constraint.
+    // Check that the substitution has the same constraint.
+    auto AIReplacement = AISubs[idx].getReplacement();
+    auto AIArchetype = AIReplacement->getAs<ArchetypeType>();
+    if (!AIArchetype)
+      return false;
+    auto AILayout = AIArchetype->getLayoutConstraint();
+    if (!AILayout)
+      return false;
+    if (AILayout != Layout)
+      return false;
+  }
+  return true;
+}
+
+// Returns the callee of an apply_inst if it is basically inlineable.
+SILFunction *swift::getEligibleFunction(FullApplySite AI,
+                                        InlineSelection WhatToInline) {
+
+  SILFunction *Callee = AI.getReferencedFunction();
+  SILFunction *EligibleCallee = nullptr;
+
+  if (!Callee) {
+    return nullptr;
+  }
+  auto ModuleName = Callee->getModule().getSwiftModule()->getName().str();
+  bool IsInStdlib = (ModuleName == STDLIB_NAME || ModuleName == SWIFT_ONONE_SUPPORT);
+
+  // Don't inline functions that are marked with the @_semantics or @effects
+  // attribute if the inliner is asked not to inline them.
+  if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
+    if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
+      if (shouldSkipApplyDuringEarlyInlining(AI))
+        return nullptr;
+      if (Callee->hasSemanticsAttr("inline_late"))
+        return nullptr;
+    }
+    // The "availability" semantics attribute is treated like global-init.
+    if (Callee->hasSemanticsAttrs() &&
+        WhatToInline != InlineSelection::Everything &&
+        (Callee->hasSemanticsAttrThatStartsWith("availability") ||
+         (Callee->hasSemanticsAttrThatStartsWith("inline_late")))) {
+      return nullptr;
+    }
+    if (Callee->hasSemanticsAttrs() &&
+        WhatToInline == InlineSelection::Everything) {
+      if (Callee->hasSemanticsAttrThatStartsWith("inline_late") && IsInStdlib) {
+        return nullptr;
+      }
+    }
+
+  } else if (Callee->isGlobalInit()) {
+    if (WhatToInline != InlineSelection::Everything) {
+      return nullptr;
+    }
+  }
+
+  // We can't inline external declarations.
+  if (Callee->empty() || Callee->isExternalDeclaration()) {
+    return nullptr;
+  }
+
+  // Explicitly disabled inlining.
+  if (Callee->getInlineStrategy() == NoInline) {
+    return nullptr;
+  }
+
+  if (!Callee->shouldOptimize()) {
+    return nullptr;
+  }
+
+  SILFunction *Caller = AI.getFunction();
+
+  // We don't support inlining a function that binds dynamic self because we
+  // have no mechanism to preserve the original function's local self metadata.
+  if (mayBindDynamicSelf(Callee)) {
+    // Check if passed Self is the same as the Self of the caller.
+    // In this case, it is safe to inline because both functions
+    // use the same Self.
+    if (AI.hasSelfArgument() && Caller->hasSelfParam()) {
+      auto CalleeSelf = stripCasts(AI.getSelfArgument());
+      auto CallerSelf = Caller->getSelfArgument();
+      if (CalleeSelf != SILValue(CallerSelf))
+        return nullptr;
+    } else
+      return nullptr;
+  }
+
+  // Detect self-recursive calls.
+  if (Caller == Callee) {
+    return nullptr;
+  }
+
+  // A non-fragile function may not be inlined into a fragile function.
+  if (Caller->isSerialized() &&
+      !Callee->hasValidLinkageForFragileInline()) {
+    if (!Callee->hasValidLinkageForFragileRef()) {
+      llvm::errs() << "caller: " << Caller->getName() << "\n";
+      llvm::errs() << "callee: " << Callee->getName() << "\n";
+      llvm_unreachable("Should never be inlining a resilient function into "
+                       "a fragile function");
+    }
+    return nullptr;
+  }
+
+  // Inlining self-recursive functions into other functions can result
+  // in excessive code duplication since we run the inliner multiple
+  // times in our pipeline
+  if (calleeIsSelfRecursive(Callee)) {
+    return nullptr;
+  }
+
+  if (!EnableSILInliningOfGenerics && AI.hasSubstitutions()) {
+    // Inlining of generics is not allowed unless it is an @inline(__always)
+    // or transparent function.
+    if (Callee->getInlineStrategy() != AlwaysInline && !Callee->isTransparent())
+      return nullptr;
+  }
+
+  // We cannot inline function with layout constraints on its generic types
+  // if the corresponding substitution type does not have the same constraints.
+  // The reason for this restriction is that we'd need to be able to express
+  // in SIL something like casting a value of generic type T into a value of
+  // generic type T: _LayoutConstraint, which is impossible currently.
+  if (EnableSILInliningOfGenerics && AI.hasSubstitutions()) {
+    if (!isCallerAndCalleeLayoutConstraintsCompatible(AI))
+      return nullptr;
+  }
+
+  // IRGen cannot handle partial_applies containing opened_existentials
+  // in its substitutions list.
+  if (calleeHasPartialApplyWithOpenedExistentials(AI)) {
+    return nullptr;
+  }
+
+  EligibleCallee = Callee;
+  return EligibleCallee;
+}
+
+/// Returns true if a given value is constant.
+/// The value is considered to be constant if it is:
+/// - a literal
+/// - a tuple or a struct whose fields are all constants
+static bool isConstantValue(SILValue V) {
+  if (isa<LiteralInst>(V))
+    return true;
+  if (auto *TI = dyn_cast<TupleInst>(V)) {
+    for (auto E : TI->getElements()) {
+      if (!isConstantValue(E))
+        return false;
+    }
+    return true;
+  }
+  if (auto *SI = dyn_cast<StructInst>(V)) {
+    for (auto E : SI->getElements()) {
+      if (!isConstantValue(E))
+        return false;
+    }
+    return true;
+  }
+  if (auto *MT = dyn_cast<MetatypeInst>(V)) {
+    if (!MT->getType().hasArchetype())
+      return true;
+  }
+  return false;
+}
+
+
+bool swift::isPureCall(FullApplySite AI, SideEffectAnalysis *SEA) {
+  // If a call has only constant arguments and the call is pure, i.e. has
+  // no side effects, then we should always inline it.
+  SideEffectAnalysis::FunctionEffects ApplyEffects;
+  SEA->getEffects(ApplyEffects, AI);
+  auto GE = ApplyEffects.getGlobalEffects();
+  if (GE.mayRead() || GE.mayWrite() || GE.mayRetain() || GE.mayRelease())
+    return false;
+  // Check if all parameters are constant.
+  auto Args = AI.getArgumentsWithoutIndirectResults();
+  for (auto Arg : Args) {
+    if (!isConstantValue(Arg)) {
+      return false;
+    }
+  }
+  return true;
 }

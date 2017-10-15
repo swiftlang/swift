@@ -1,4 +1,4 @@
-// RUN: rm -rf %t  &&  mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/Runtime.swift
 // RUN: %target-build-swift -parse-stdlib -module-name a %t/Runtime.swift -o %t.out
@@ -365,7 +365,7 @@ Runtime.test("demangleName") {
   expectEqual("\0", _stdlib_demangleName("\0"))
   expectEqual("Swift.Double", _stdlib_demangleName("_T0SdD"))
   expectEqual("x.a : x.Foo<x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>, x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>>",
-      _stdlib_demangleName("_T01x1aAA3FooCyADyADySiSiGADySiSiGGADyADySiSiGADySiSiGGGv"))
+      _stdlib_demangleName("_T01x1aAA3FooCyADyADySiSiGADySiSiGGADyADySiSiGADySiSiGGGvp"))
   expectEqual("Foobar", _stdlib_demangleName("_T013__lldb_expr_46FoobarCD"))
 }
 

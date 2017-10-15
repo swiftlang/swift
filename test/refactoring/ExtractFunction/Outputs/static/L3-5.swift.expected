@@ -1,0 +1,18 @@
+class C {
+  fileprivate func new_name() -> Int {
+var a = 3 + 1
+    a = 3
+    return a
+}
+
+func foo1() -> Int {
+    return new_name()
+  }
+
+  static func foo2() -> Int {
+    var a = 3 + 1
+    a = 3
+    return a
+  }
+}
+

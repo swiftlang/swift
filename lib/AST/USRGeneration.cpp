@@ -152,7 +152,7 @@ static bool shouldUseObjCUSR(const Decl *D) {
   if (const auto *VD = dyn_cast<ValueDecl>(D)) {
     if (isa<EnumElementDecl>(VD))
       return true;
-    return objc_translation::isVisibleToObjC(VD, Accessibility::Internal);
+    return objc_translation::isVisibleToObjC(VD, AccessLevel::Internal);
   }
 
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
@@ -215,7 +215,8 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     auto &Importer = *D->getASTContext().getClangModuleLoader();
 
     auto ClangMacroInfo = ClangN.getAsMacro();
-    bool Ignore = clang::index::generateUSRForMacro(D->getNameStr(),
+    bool Ignore = clang::index::generateUSRForMacro(
+        D->getBaseName().getIdentifier().str(),
         ClangMacroInfo->getDefinitionLoc(),
         Importer.getClangASTContext().getSourceManager(), Buf);
     if (!Ignore)

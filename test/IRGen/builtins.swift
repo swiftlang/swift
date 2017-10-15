@@ -151,7 +151,7 @@ func assign_test(_ value: Builtin.Int64, ptr: Builtin.RawPointer) {
 // CHECK: define hidden {{.*}}%swift.refcounted* @_T08builtins16load_object_test{{[_0-9a-zA-Z]*}}F
 func load_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[T0:%.*]] = load [[REFCOUNT]]*, [[REFCOUNT]]**
-  // CHECK: call void @swift_rt_swift_retain([[REFCOUNT]]* [[T0]])
+  // CHECK: call [[REFCOUNT]]* @swift_rt_swift_retain([[REFCOUNT]]* returned [[T0]])
   // CHECK: ret [[REFCOUNT]]* [[T0]]
   return Builtin.load(ptr)
 }
@@ -159,7 +159,7 @@ func load_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
 // CHECK: define hidden {{.*}}%swift.refcounted* @_T08builtins20load_raw_object_test{{[_0-9a-zA-Z]*}}F
 func load_raw_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[T0:%.*]] = load [[REFCOUNT]]*, [[REFCOUNT]]**
-  // CHECK: call void @swift_rt_swift_retain([[REFCOUNT]]* [[T0]])
+  // CHECK: call [[REFCOUNT]]* @swift_rt_swift_retain([[REFCOUNT]]* returned [[T0]])
   // CHECK: ret [[REFCOUNT]]* [[T0]]
   return Builtin.loadRaw(ptr)
 }
@@ -222,12 +222,12 @@ func sizeof_alignof_test() {
 
 // CHECK: define hidden {{.*}}void @_T08builtins27generic_sizeof_alignof_testyxlF(
 func generic_sizeof_alignof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 17
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 7
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[SIZE]], i64* [[S:%.*]]
   var s = Builtin.sizeof(T.self)
-  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 18
+  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 8
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 65535
@@ -238,7 +238,7 @@ func generic_sizeof_alignof_test<T>(_: T) {
 
 // CHECK: define hidden {{.*}}void @_T08builtins21generic_strideof_testyxlF(
 func generic_strideof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 19
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[STRIDE]], i64* [[S:%.*]]
@@ -265,7 +265,7 @@ func fence_test() {
   // CHECK: fence acquire
   Builtin.fence_acquire()
 
-  // CHECK: fence singlethread acq_rel
+  // CHECK: fence syncscope("singlethread") acq_rel
   Builtin.fence_acqrel_singlethread()
 }
 
@@ -286,7 +286,7 @@ func cmpxchg_test(_ ptr: Builtin.RawPointer, a: Builtin.Int32, b: Builtin.Int32)
   // CHECK: store i1 [[Y_SUCCESS]], i1* {{.*}}, align 1
   var (y, ySuccess) = Builtin.cmpxchg_monotonic_monotonic_volatile_Int32(ptr, a, b)
 
-  // CHECK: [[X_RES:%.*]] = cmpxchg volatile i32* {{.*}}, i32 {{.*}}, i32 {{.*}} singlethread acquire monotonic
+  // CHECK: [[X_RES:%.*]] = cmpxchg volatile i32* {{.*}}, i32 {{.*}}, i32 {{.*}} syncscope("singlethread") acquire monotonic
   // CHECK: [[X_VAL:%.*]] = extractvalue { i32, i1 } [[X_RES]], 0
   // CHECK: [[X_SUCCESS:%.*]] = extractvalue { i32, i1 } [[X_RES]], 1
   // CHECK: store i32 [[X_VAL]], i32* {{.*}}, align 4
@@ -318,11 +318,11 @@ func atomicrmw_test(_ ptr: Builtin.RawPointer, a: Builtin.Int32,
   // CHECK: atomicrmw volatile max i32* {{.*}}, i32 {{.*}} monotonic
   var y = Builtin.atomicrmw_max_monotonic_volatile_Int32(ptr, a)
   
-  // CHECK: atomicrmw volatile xchg i32* {{.*}}, i32 {{.*}} singlethread acquire
+  // CHECK: atomicrmw volatile xchg i32* {{.*}}, i32 {{.*}} syncscope("singlethread") acquire
   var x = Builtin.atomicrmw_xchg_acquire_volatile_singlethread_Int32(ptr, a)
   
   // rdar://12939803 - ER: support atomic cmpxchg/xchg with pointers
-  // CHECK: atomicrmw volatile xchg i64* {{.*}}, i64 {{.*}} singlethread acquire
+  // CHECK: atomicrmw volatile xchg i64* {{.*}}, i64 {{.*}} syncscope("singlethread") acquire
   var w = Builtin.atomicrmw_xchg_acquire_volatile_singlethread_RawPointer(ptr, ptr2)
 
 }
@@ -444,80 +444,109 @@ func destroyPODArray(_ array: Builtin.RawPointer, count: Builtin.Word) {
 }
 
 // CHECK-LABEL: define hidden {{.*}}void @_T08builtins18destroyNonPODArray{{[_0-9a-zA-Z]*}}F(i8*, i64) {{.*}} {
-// CHECK:       iter:
-// CHECK:       loop:
-// CHECK:         call {{.*}} @swift_rt_swift_release
-// CHECK:         br label %iter
+// CHECK-NOT:       loop:
+// CHECK:       call void @swift_arrayDestroy(
 func destroyNonPODArray(_ array: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.destroyArray(C.self, array, count)
 }
 
 // CHECK-LABEL: define hidden {{.*}}void @_T08builtins15destroyGenArrayyBp_Bw5countxtlF(i8*, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
 // CHECK-NOT:   loop:
-// CHECK:         call void %destroyArray
+// CHECK:         call void @swift_arrayDestroy
 func destroyGenArray<T>(_ array: Builtin.RawPointer, count: Builtin.Word, _: T) {
   Builtin.destroyArray(T.self, array, count)
 }
 
 
 // CHECK-LABEL: define hidden {{.*}}void @_T08builtins12copyPODArray{{[_0-9a-zA-Z]*}}F(i8*, i8*, i64)
-// CHECK:         mul nuw i64 4, %2
-// CHECK:         call void @llvm.memcpy.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 4, i1 false)
-// CHECK:         mul nuw i64 4, %2
-// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 4, i1 false)
-// CHECK:         mul nuw i64 4, %2
-// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 4, i1 false)
+// check:         mul nuw i64 4, %2
+// check:         call void @llvm.memcpy.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 4, i1 false)
+// check:         mul nuw i64 4, %2
+// check:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 4, i1 false)
+// check:         mul nuw i64 4, %2
+// check:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 4, i1 false)
+// check:         mul nuw i64 4, %2
+// check:         call void @llvm.memcpy.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 4, i1 false)
+// check:         mul nuw i64 4, %2
+// check:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 4, i1 false)
+// check:         mul nuw i64 4, %2
+// check:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 4, i1 false)
+// check:         mul nuw i64 4, %2
+// check:         call void @llvm.memcpy.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 4, i1 false)
 func copyPODArray(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.copyArray(Int.self, dest, src, count)
   Builtin.takeArrayFrontToBack(Int.self, dest, src, count)
   Builtin.takeArrayBackToFront(Int.self, dest, src, count)
+  Builtin.assignCopyArrayNoAlias(Int.self, dest, src, count)
+  Builtin.assignCopyArrayFrontToBack(Int.self, dest, src, count)
+  Builtin.assignCopyArrayBackToFront(Int.self, dest, src, count)
+  Builtin.assignTakeArray(Int.self, dest, src, count)
 }
 
 
 // CHECK-LABEL: define hidden {{.*}}void @_T08builtins11copyBTArray{{[_0-9a-zA-Z]*}}F(i8*, i8*, i64) {{.*}} {
-// CHECK:       iter:
-// CHECK:       loop:
-// CHECK:         call {{.*}} @swift_rt_swift_retain
-// CHECK:         br label %iter
+// CHECK-NOT:       loop:
+// CHECK:         call void @swift_arrayInitWithCopy
 // CHECK:         mul nuw i64 8, %2
 // CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 8, i1 false)
 // CHECK:         mul nuw i64 8, %2
 // CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 8, i1 false)
+// CHECK:         call void @swift_arrayAssignWithCopyNoAlias(
+// CHECK:         call void @swift_arrayAssignWithCopyFrontToBack(
+// CHECK:         call void @swift_arrayAssignWithCopyBackToFront(
+// CHECK:         call void @swift_arrayAssignWithTake(
 func copyBTArray(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.copyArray(C.self, dest, src, count)
   Builtin.takeArrayFrontToBack(C.self, dest, src, count)
   Builtin.takeArrayBackToFront(C.self, dest, src, count)
+  Builtin.assignCopyArrayNoAlias(C.self, dest, src, count)
+  Builtin.assignCopyArrayFrontToBack(C.self, dest, src, count)
+  Builtin.assignCopyArrayBackToFront(C.self, dest, src, count)
+  Builtin.assignTakeArray(C.self, dest, src, count)
 }
 
 struct W { weak var c: C? }
 
 // CHECK-LABEL: define hidden {{.*}}void @_T08builtins15copyNonPODArray{{[_0-9a-zA-Z]*}}F(i8*, i8*, i64) {{.*}} {
-// CHECK:       iter:
-// CHECK:       loop:
-// CHECK:         swift_weakCopyInit
-// CHECK:       iter{{.*}}:
-// CHECK:       loop{{.*}}:
-// CHECK:         swift_weakTakeInit
-// CHECK:       iter{{.*}}:
-// CHECK:       loop{{.*}}:
-// CHECK:         swift_weakTakeInit
+// CHECK-NOT:       loop:
+// CHECK:         call void @swift_arrayInitWithCopy(
+// CHECK-NOT:       loop{{.*}}:
+// CHECK:         call void @swift_arrayInitWithTakeFrontToBack(
+// CHECK-NOT:       loop{{.*}}:
+// CHECK:          call void @swift_arrayInitWithTakeBackToFront(
+// CHECK:         call void @swift_arrayAssignWithCopyNoAlias(
+// CHECK:         call void @swift_arrayAssignWithCopyFrontToBack(
+// CHECK:         call void @swift_arrayAssignWithCopyBackToFront(
+// CHECK:         call void @swift_arrayAssignWithTake(
 func copyNonPODArray(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.copyArray(W.self, dest, src, count)
   Builtin.takeArrayFrontToBack(W.self, dest, src, count)
   Builtin.takeArrayBackToFront(W.self, dest, src, count)
+  Builtin.assignCopyArrayNoAlias(W.self, dest, src, count)
+  Builtin.assignCopyArrayFrontToBack(W.self, dest, src, count)
+  Builtin.assignCopyArrayBackToFront(W.self, dest, src, count)
+  Builtin.assignTakeArray(W.self, dest, src, count)
 }
 
 // CHECK-LABEL: define hidden {{.*}}void @_T08builtins12copyGenArray{{[_0-9a-zA-Z]*}}F(i8*, i8*, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
 // CHECK-NOT:   loop:
-// CHECK:         call %swift.opaque* %initializeArrayWithCopy
+// CHECK:        call void @swift_arrayInitWithCopy
 // CHECK-NOT:   loop:
-// CHECK:         call %swift.opaque* %initializeArrayWithTakeFrontToBack
+// CHECK:        call void @swift_arrayInitWithTakeFrontToBack(
 // CHECK-NOT:   loop:
-// CHECK:         call %swift.opaque* %initializeArrayWithTakeBackToFront
+// CHECK:        call void @swift_arrayInitWithTakeBackToFront(
+// CHECK:        call void @swift_arrayAssignWithCopyNoAlias(
+// CHECK:        call void @swift_arrayAssignWithCopyFrontToBack(
+// CHECK:        call void @swift_arrayAssignWithCopyBackToFront(
+// CHECK:        call void @swift_arrayAssignWithTake(
 func copyGenArray<T>(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Builtin.Word, _: T) {
   Builtin.copyArray(T.self, dest, src, count)
   Builtin.takeArrayFrontToBack(T.self, dest, src, count)
   Builtin.takeArrayBackToFront(T.self, dest, src, count)
+  Builtin.assignCopyArrayNoAlias(T.self, dest, src, count)
+  Builtin.assignCopyArrayFrontToBack(T.self, dest, src, count)
+  Builtin.assignCopyArrayBackToFront(T.self, dest, src, count)
+  Builtin.assignTakeArray(T.self, dest, src, count)
 }
 
 // CHECK-LABEL: define hidden {{.*}}void @_T08builtins24conditionallyUnreachableyyF
@@ -531,7 +560,7 @@ struct Abc {
 	var value : Builtin.Word
 }
 
-// CHECK-LABEL define hidden {{.*}}@_T08builtins22assumeNonNegative_testBwAA3AbcVzF
+// CHECK-LABEL: define hidden {{.*}}@_T08builtins22assumeNonNegative_testBwAA3AbcVzF
 func assumeNonNegative_test(_ x: inout Abc) -> Builtin.Word {
   // CHECK: load {{.*}}, !range ![[R:[0-9]+]]
   return Builtin.assumeNonNegative_Word(x.value)
@@ -542,7 +571,7 @@ func return_word(_ x: Builtin.Word) -> Builtin.Word {
 	return x
 }
 
-// CHECK-LABEL define hidden {{.*}}@_T08builtins23assumeNonNegative_test2BwAA3AbcVzF
+// CHECK-LABEL: define hidden {{.*}}@_T08builtins23assumeNonNegative_test2BwBwF
 func assumeNonNegative_test2(_ x: Builtin.Word) -> Builtin.Word {
   // CHECK: call {{.*}}, !range ![[R]]
   return Builtin.assumeNonNegative_Word(return_word(x))
@@ -646,29 +675,34 @@ func acceptsBuiltinUnknownObject(_ ref: inout Builtin.UnknownObject?) {}
 // ObjC
 // CHECK-LABEL: define hidden {{.*}}i1 @_T08builtins8isUniqueBi1_BOSgzF({{%.*}}* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: bitcast [[BUILTIN_UNKNOWN_OBJECT_TY]]* %0 to %objc_object**
-// CHECK-NEXT: load %objc_object*, %objc_object** %1
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedNonObjC(%objc_object* %2)
+// CHECK-NEXT: bitcast [[BUILTIN_UNKNOWN_OBJECT_TY]]* %0 to [[UNKNOWN_OBJECT:%objc_object|%swift\.refcounted]]**
+// CHECK-NEXT: load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** %1
+// CHECK-objc-NEXT: call i1 @swift_isUniquelyReferencedNonObjC([[UNKNOWN_OBJECT]]* %2)
+// CHECK-native-NEXT: call i1 @swift_isUniquelyReferenced_native([[UNKNOWN_OBJECT]]* %2)
 // CHECK-NEXT: ret i1 %3
 func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
 // ObjC nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @_T08builtins8isUniqueBi1_BOzF(%objc_object** nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @_T08builtins8isUniqueBi1_BOzF
+// CHECK-SAME:    ([[UNKNOWN_OBJECT]]** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: load %objc_object*, %objc_object** %0
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedNonObjC_nonNull(%objc_object* %1)
+// CHECK-NEXT: load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** %0
+// CHECK-objc-NEXT: call i1 @swift_isUniquelyReferencedNonObjC_nonNull([[UNKNOWN_OBJECT]]* %1)
+// CHECK-native-NEXT: call i1 @swift_rt_swift_isUniquelyReferenced_nonNull_native([[UNKNOWN_OBJECT]]* %1)
 // CHECK-NEXT: ret i1 %2
 func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
 // ObjC pinned nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @_T08builtins16isUniqueOrPinnedBi1_BOzF(%objc_object** nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @_T08builtins16isUniqueOrPinnedBi1_BOzF
+// CHECK-SAME:    ([[UNKNOWN_OBJECT]]** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: load %objc_object*, %objc_object** %0
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(%objc_object* %1)
+// CHECK-NEXT: load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** %0
+// CHECK-native-NEXT: call i1 @swift_rt_swift_isUniquelyReferencedOrPinned_nonNull_native([[UNKNOWN_OBJECT]]* %1)
+// CHECK-objc-NEXT: call i1 @swift_isUniquelyReferencedOrPinnedNonObjC_nonNull([[UNKNOWN_OBJECT]]* %1)
 // CHECK-NEXT: ret i1 %2
 func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
   return Builtin.isUniqueOrPinned(&ref)
@@ -728,7 +762,7 @@ func isUniqueIUO(_ ref: inout Builtin.NativeObject?) -> Bool {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_ispod_test
 func generic_ispod_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 18
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 8
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[FLAGS:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i64 [[FLAGS]], 65536
@@ -745,8 +779,16 @@ func ispod_test() {
   var f = Builtin.ispod(Builtin.NativeObject)
 }
 
+// CHECK-LABEL: define {{.*}} @{{.*}}is_same_metatype
+func is_same_metatype_test(_ t1: Any.Type, _ t2: Any.Type) {
+  // CHECK: [[MT1_AS_PTR:%.*]] = bitcast %swift.type* %0 to i8*
+  // CHECK: [[MT2_AS_PTR:%.*]] = bitcast %swift.type* %1 to i8*
+  // CHECK: icmp eq i8* [[MT1_AS_PTR]], [[MT2_AS_PTR]]
+  var t = Builtin.is_same_metatype(t1, t2)
+}
+
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_unsafeGuaranteed_test
-// CHECK:  call void @{{.*}}swift_{{.*}}etain({{.*}}* %0)
+// CHECK:  call {{.*}}* @{{.*}}swift_{{.*}}etain({{.*}}* returned %0)
 // CHECK:  call void @{{.*}}swift_{{.*}}elease({{.*}}* %0)
 // CHECK:  ret {{.*}}* %0
 func generic_unsafeGuaranteed_test<T: AnyObject>(_ t : T) -> T {
@@ -756,7 +798,7 @@ func generic_unsafeGuaranteed_test<T: AnyObject>(_ t : T) -> T {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteed_test
 // CHECK:  [[LOCAL:%.*]] = alloca %swift.refcounted*
-// CHECK:  call void @swift_rt_swift_retain(%swift.refcounted* %0)
+// CHECK:  call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned %0)
 // CHECK:  store %swift.refcounted* %0, %swift.refcounted** [[LOCAL]]
 // CHECK:  call void @swift_rt_swift_release(%swift.refcounted* %0)
 // CHECK:  ret %swift.refcounted* %0
@@ -777,9 +819,9 @@ func unsafeGuaranteedEnd_test(_ x: Builtin.Int8) {
 func atomicload(_ p: Builtin.RawPointer) {
   // CHECK: [[A:%.*]] = load atomic i8*, i8** {{%.*}} unordered, align 8
   let a: Builtin.RawPointer = Builtin.atomicload_unordered_RawPointer(p)
-  // CHECK: [[B:%.*]] = load atomic i32, i32* {{%.*}} singlethread monotonic, align 4
+  // CHECK: [[B:%.*]] = load atomic i32, i32* {{%.*}} syncscope("singlethread") monotonic, align 4
   let b: Builtin.Int32 = Builtin.atomicload_monotonic_singlethread_Int32(p)
-  // CHECK: [[C:%.*]] = load atomic volatile i64, i64* {{%.*}} singlethread acquire, align 8
+  // CHECK: [[C:%.*]] = load atomic volatile i64, i64* {{%.*}} syncscope("singlethread") acquire, align 8
   let c: Builtin.Int64 =
     Builtin.atomicload_acquire_volatile_singlethread_Int64(p)
   // CHECK: [[D0:%.*]] = load atomic volatile i32, i32* {{%.*}} seq_cst, align 4
@@ -788,9 +830,9 @@ func atomicload(_ p: Builtin.RawPointer) {
 
   // CHECK: store atomic i8* [[A]], i8** {{%.*}} unordered, align 8
   Builtin.atomicstore_unordered_RawPointer(p, a)
-  // CHECK: store atomic i32 [[B]], i32* {{%.*}} singlethread monotonic, align 4
+  // CHECK: store atomic i32 [[B]], i32* {{%.*}} syncscope("singlethread") monotonic, align 4
   Builtin.atomicstore_monotonic_singlethread_Int32(p, b)
-  // CHECK: store atomic volatile i64 [[C]], i64* {{%.*}} singlethread release, align 8
+  // CHECK: store atomic volatile i64 [[C]], i64* {{%.*}} syncscope("singlethread") release, align 8
   Builtin.atomicstore_release_volatile_singlethread_Int64(p, c)
   // CHECK: [[D1:%.*]] = bitcast float [[D]] to i32
   // CHECK: store atomic volatile i32 [[D1]], i32* {{.*}} seq_cst, align 4

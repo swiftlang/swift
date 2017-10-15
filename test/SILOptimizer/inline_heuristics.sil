@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=false -debug-only=sil-inliner 2>%t/log | %FileCheck %s
 // RUN: %FileCheck %s --check-prefix=CHECK-LOG <%t/log
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=true -generic-specializer -debug-only=sil-inliner 2>%t/log | %FileCheck %s --check-prefix=CHECK-PARTIAL-SPECIALIZATION
@@ -223,26 +223,25 @@ bb0(%0 : $Int32):
 // CHECK-LOG-LABEL: Inline into caller: testCondBr
 // CHECK-LOG-NEXT: decision {{.*}}, b=50,
 
-sil @testCondBr : $@convention(thin) () -> () {
-bb0:
-
-  %0 = function_ref @condBrCallee : $@convention(thin) (Int32) -> Int32
+sil @testCondBr : $@convention(thin) (Int32) -> () {
+bb0(%a : $Int32):
+  %0 = function_ref @condBrCallee : $@convention(thin) (Int32, Int32) -> Int32
   %1 = integer_literal $Builtin.Int32, 27
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = apply %0(%2) : $@convention(thin) (Int32) -> Int32
+  %3 = apply %0(%2, %a) : $@convention(thin) (Int32, Int32) -> Int32
   %4 = tuple ()
   return %4 : $()
 }
 
-sil @condBrCallee : $@convention(thin) (Int32) -> Int32 {
-bb0(%0 : $Int32):
+sil @condBrCallee : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %r : $Int32):
   %1 = integer_literal $Builtin.Int32, 27
   %2 = struct_extract %0 : $Int32, #Int32._value
   %3 = builtin "cmp_eq_Word"(%2 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %3, bb1, bb2
 
 bb1:
-  br bb3(%0 : $Int32)
+  br bb3(%r : $Int32)
 
 bb2:
   // increase the scope length
@@ -263,24 +262,24 @@ bb3(%8 : $Int32):
 // CHECK: return %{{.*}} : $()
 
 // CHECK-LOG-LABEL: Inline into caller: testSwitchValue
-// CHECK-LOG-NEXT: decision {{.*}}, b=50,
+// CHECK-LOG-NEXT: decision {{.*}}, b=40,
 
-sil @testSwitchValue : $@convention(thin) () -> () {
-bb0:
+sil @testSwitchValue : $@convention(thin) (Int32) -> () {
+bb0(%a : $Int32):
 
-  %0 = function_ref @switchValueCallee : $@convention(thin) (Int32) -> Int32
+  %0 = function_ref @switchValueCallee : $@convention(thin) (Int32, Int32) -> Int32
   %1 = integer_literal $Builtin.Int32, 28
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = apply %0(%2) : $@convention(thin) (Int32) -> Int32
+  %3 = apply %0(%2, %a) : $@convention(thin) (Int32, Int32) -> Int32
   %4 = tuple ()
   return %4 : $()
 }
 
-sil @switchValueCallee : $@convention(thin) (Int32) -> Int32 {
-bb0(%0 : $Int32):
+sil @switchValueCallee : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %r : $Int32):
   %1 = integer_literal $Builtin.Int32, 27
   %2 = integer_literal $Builtin.Int32, 28
-  %3 = struct_extract %0 : $Int32, #Int32._value
+  %3 = struct_extract %r : $Int32, #Int32._value
   switch_value %3 : $Builtin.Int32, case %1 : bb1, case %2 : bb2, default bb3
 
 bb1:

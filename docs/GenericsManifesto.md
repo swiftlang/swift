@@ -27,7 +27,7 @@ There are a number of restrictions to the use of generics that fall out of the i
 
 ### Recursive protocol constraints (*)
 
-*The feature is being reviewed in [SE-0157](https://github.com/apple/swift-evolution/blob/master/proposals/0157-recursive-protocol-constraints.md).*
+*This feature has been accepted in [SE-0157](https://github.com/apple/swift-evolution/blob/master/proposals/0157-recursive-protocol-constraints.md) and is tracked by [SR-1445](https://bugs.swift.org/browse/SR-1445).*
 
 Currently, an associated type cannot be required to conform to its enclosing protocol (or any protocol that inherits that protocol). For example, in the standard library `SubSequence` type of a `Sequence` should itself be a `Sequence`:
 
@@ -43,7 +43,7 @@ The compiler currently rejects this protocol, which is unfortunate: it effective
 
 ### Nested generics
 
-*This feature is tracked by [SR-1446](https://bugs.swift.org/browse/SR-1446) and is planned for release with Swift 3.1.*
+*This feature was tracked by [SR-1446](https://bugs.swift.org/browse/SR-1446) and was released with Swift 3.1.*
 
 Currently, a generic type cannot be nested within another generic type, e.g.
 
@@ -57,7 +57,7 @@ There isn't much to say about this: the compiler simply needs to be improved to 
 
 ### Concrete same-type requirements
 
-*This feature is tracked by [SR-1009](https://bugs.swift.org/browse/SR-1009) and is planned for release with Swift 3.1.*
+*This feature was tracked by [SR-1009](https://bugs.swift.org/browse/SR-1009) and was released with Swift 3.1.*
 
 Currently, a constrained extension cannot use a same-type constraint to make a type parameter equivalent to a concrete type. For example:
 
@@ -90,7 +90,7 @@ var d2: Dictionary<String, Int> = d1 // okay: d1 and d2 have the same type, Dict
 
 ### Generic subscripts
 
-*This feature has been accepted in [SE-0148](https://github.com/apple/swift-evolution/blob/master/proposals/0148-generic-subscripts.md), is tracked by [SR-115](https://bugs.swift.org/browse/SR-115) and is planned for release in Swift 4.*
+*This feature has been accepted in [SE-0148](https://github.com/apple/swift-evolution/blob/master/proposals/0148-generic-subscripts.md), was tracked by [SR-115](https://bugs.swift.org/browse/SR-115) and was released with Swift 4.*
 
 Subscripts could be allowed to have generic parameters. For example, we could introduce a generic subscript on a `Collection` that allows us to pull out the values at an arbitrary set of indices:
 
@@ -186,7 +186,7 @@ There are a number of minor extensions we can make to the generics system that d
 
 ### Arbitrary requirements in protocols (*)
 
-*This feature has been accepted in [SE-0142](https://github.com/apple/swift-evolution/blob/master/proposals/0142-associated-types-constraints.md) and is under development.*
+*This feature has been accepted in [SE-0142](https://github.com/apple/swift-evolution/blob/master/proposals/0142-associated-types-constraints.md) and was released with Swift 4.*
 
 Currently, a new protocol can inherit from other protocols, introduce new associated types, and add new conformance constraints to associated types (by redeclaring an associated type from an inherited protocol). However, one cannot express more general constraints. Building on the example from "Recursive protocol constraints", we really want the element type of a `Sequence`'s `SubSequence` to be the same as the element type of the `Sequence`, e.g.,
 
@@ -202,7 +202,7 @@ Hanging the `where` clause off the associated type protocol is not ideal, but th
 
 ### Typealiases in protocols and protocol extensions (*)
 
-*The feature has been accepted in [SE-0092](https://github.com/apple/swift-evolution/blob/master/proposals/0092-typealiases-in-protocols.md) and was released with Swift 3.*
+*This feature has been accepted in [SE-0092](https://github.com/apple/swift-evolution/blob/master/proposals/0092-typealiases-in-protocols.md) and was released with Swift 3.*
 
 Now that associated types have their own keyword (thanks!), it's reasonable to bring back `typealias`. Again with the `Sequence` protocol:
 
@@ -229,7 +229,7 @@ var p3: Promise = getRandomPromise() // p3 has type Promise<Int, Error> due to t
 
 ### Generalized `class` constraints
 
-*This feature will come as a consequence of proposal [SE-0156](https://github.com/apple/swift-evolution/blob/master/proposals/0156-subclass-existentials.md) which is in review.*
+*This feature is a consequence of proposal [SE-0156](https://github.com/apple/swift-evolution/blob/master/proposals/0156-subclass-existentials.md) and was released with Swift 4.*
 
 The `class` constraint can currently only be used for defining protocols. We could generalize it to associated type and type parameter declarations, e.g.,
 
@@ -683,7 +683,7 @@ struct X : Q {
 f(X()) // okay: X conforms to P through the conformance of Q to P
 ```
 
-This is an extremely powerful feature: is allows one to map the abstractions of one domain into another domain (e.g., every `Matrix` is a `Graph`). However, similar to private conformances, it puts a major burden on the dynamic-casting runtime to chase down arbitrarily long and potentially cyclic chains of conformances, which makes efficient implementation nearly impossible.
+This is an extremely powerful feature: it allows one to map the abstractions of one domain into another domain (e.g., every `Matrix` is a `Graph`). However, similar to private conformances, it puts a major burden on the dynamic-casting runtime to chase down arbitrarily long and potentially cyclic chains of conformances, which makes efficient implementation nearly impossible.
 
 ## Potential removals
 
@@ -691,7 +691,7 @@ The generics system doesn't seem like a good candidate for a reduction in scope;
 
 ### Associated type inference
 
-*The feature has been rejected in [SE-0108](https://github.com/apple/swift-evolution/blob/master/proposals/0108-remove-assoctype-inference.md).*
+*This feature has been rejected in [SE-0108](https://github.com/apple/swift-evolution/blob/master/proposals/0108-remove-assoctype-inference.md).*
 
 Associated type inference is the process by which we infer the type bindings for associated types from other requirements. For example:
 

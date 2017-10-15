@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift
 
-// REQUIRES: executable-test
+// REQUIRES: executable_test
 
 enum Foo<T : ExpressibleByIntegerLiteral> : T where T:Equatable {
   case a = 1

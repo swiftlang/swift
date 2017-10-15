@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_SIGNATURE_H
 
 #include "llvm/IR/Attributes.h"
+#include "llvm/IR/CallingConv.h"
 #include "swift/AST/Types.h"
 
 namespace llvm {
@@ -38,6 +39,8 @@ namespace swift {
 
 namespace irgen {
 
+class IRGenModule;
+
 /// An encapsulation of different foreign calling-convention lowering
 /// information we might have.  Should be interpreted according to the
 /// abstract CC of the formal function type.
@@ -49,29 +52,58 @@ public:
 /// A signature represents something which can actually be called.
 class Signature {
   llvm::FunctionType *Type = nullptr;
-  llvm::AttributeSet Attributes;
+  llvm::AttributeList Attributes;
   ForeignFunctionInfo ForeignInfo;
+  llvm::CallingConv::ID CallingConv;
 
 public:
+  Signature() {}
+  Signature(llvm::FunctionType *fnType, llvm::AttributeList attrs,
+            llvm::CallingConv::ID callingConv)
+    : Type(fnType), Attributes(attrs), CallingConv(callingConv) {}
+
   bool isValid() const {
     return Type != nullptr;
   }
 
-  static Signature get(IRGenModule &IGM, CanSILFunctionType formalType);
+  /// Compute the signature of the given type.
+  ///
+  /// This is a private detail of the implementation of
+  /// IRGenModule::getSignature(CanSILFunctionType), which is what
+  /// clients should generally be using.
+  static Signature getUncached(IRGenModule &IGM,
+                               CanSILFunctionType formalType);
 
   llvm::FunctionType *getType() const {
     assert(isValid());
     return Type;
   }
 
-  llvm::AttributeSet getAttributes() const {
+  llvm::CallingConv::ID getCallingConv() const {
+    assert(isValid());
+    return CallingConv;
+  }
+
+  llvm::AttributeList getAttributes() const {
     assert(isValid());
     return Attributes;
   }
 
-  const ForeignFunctionInfo &getForeignInfo() const {
+  ForeignFunctionInfo getForeignInfo() const {
     assert(isValid());
     return ForeignInfo;
+  }
+
+  // The mutators below should generally only be used when building up
+  // a callee.
+
+  void setType(llvm::FunctionType *type) {
+    Type = type;
+  }
+
+  llvm::AttributeList &getMutableAttributes() & {
+    assert(isValid());
+    return Attributes;
   }
 };
 

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t  &&  mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
 // RUN: %target-build-swift -parse-stdlib %s -module-name Reflection -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/a.out

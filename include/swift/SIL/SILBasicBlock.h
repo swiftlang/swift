@@ -34,6 +34,7 @@ class SILBasicBlock :
 public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
   friend class SILSuccessor;
   friend class SILFunction;
+  friend class SILGlobalVariable;
 public:
   using InstListType = llvm::iplist<SILInstruction>;
 private:
@@ -142,6 +143,9 @@ public:
   /// Assumes that the basic blocks must reside in the same function. In asserts
   /// builds, an assert verifies that this is true.
   void moveAfter(SILBasicBlock *After);
+
+  /// \brief Moves the instruction to the iterator in this basic block.
+  void moveTo(SILBasicBlock::iterator To, SILInstruction *I);
 
   //===--------------------------------------------------------------------===//
   // SILBasicBlock Argument List Inspection and Manipulation
@@ -353,6 +357,11 @@ public:
   /// Returns true if this instruction only contains a branch instruction.
   bool isTrampoline() const;
 
+  /// Returns true if it is legal to hoist instructions into this block.
+  ///
+  /// Used by llvm::LoopInfo.
+  bool isLegalToHoistInto() const;
+
   //===--------------------------------------------------------------------===//
   // Debugging
   //===--------------------------------------------------------------------===//
@@ -379,6 +388,8 @@ public:
     for (SILInstruction &I : *this)
       I.dropAllReferences();
   }
+
+  void eraseInstructions();
 
 private:
   friend class SILArgument;
@@ -425,11 +436,8 @@ private:
 public:
   static void deleteNode(SILBasicBlock *BB) { BB->~SILBasicBlock(); }
 
-  void addNodeToList(SILBasicBlock *BB) {}
-
   void transferNodesFromList(ilist_traits<SILBasicBlock> &SrcTraits,
                              block_iterator First, block_iterator Last);
-
 private:
   static void createNode(const SILBasicBlock &);
 };

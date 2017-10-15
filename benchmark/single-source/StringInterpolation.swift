@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let StringInterpolation = BenchmarkInfo(
+  name: "StringInterpolation",
+  runFunction: run_StringInterpolation,
+  tags: [.validation, .api, .String])
+
 class RefTypePrintable : CustomStringConvertible {
   var description: String {
     return "01234567890123456789012345678901234567890123456789"
@@ -36,7 +41,7 @@ public func run_StringInterpolation(_ N: Int) {
       // with an operation on the native storage type.
       result = result &+ Int(utf16[utf16.index(before: utf16.endIndex)])
     }
-    CheckResults(result == refResult, "IncorrectResults in StringInterpolation: \(result) != \(refResult)")
+    CheckResults(result == refResult)
   }
 }
 

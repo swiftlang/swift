@@ -69,10 +69,6 @@ namespace metadataimpl {
 //   static T *initializeWithTake(T *dest, T *src);
 //   static T *assignWithCopy(T *dest, T *src);
 //   static T *assignWithTake(T *dest, T *src);
-//   static void destroyArray(T *arr, size_t n);
-//   static T *initializeArrayWithCopy(T *dest, T *src, size_t n);
-//   static T *initializeArrayWithTakeFrontToBack(T *dest, T *src, size_t n);
-//   static T *initializeArrayWithTakeBackToFront(T *dest, T *src, size_t n);
 //   // Only if numExtraInhabitants is non-zero:
 //   static void storeExtraInhabitant(T *dest, int index);
 //   static int getExtraInhabitantIndex(const T *src);
@@ -102,14 +98,6 @@ struct NativeBox {
     value->T::~T();
   }
   
-  static void destroyArray(T *array, size_t n) {
-    if (isPOD) return;
-    while (n--) {
-      array->T::~T();
-      array = next(array);
-    }
-  }
-
   static T *initializeWithCopy(T *dest, T *src) {
     return new (dest) T(*src);
   }
@@ -118,49 +106,6 @@ struct NativeBox {
     T *result = new (dest) T(std::move(*src));
     src->T::~T();
     return result;
-  }
-  
-  static T *initializeArrayWithCopy(T *dest, T *src, size_t n) {
-    if (isPOD) {
-      std::memcpy(dest, src, n * stride);
-      return dest;
-    }
-    
-    T *r = dest;
-    while (n--) {
-      new (dest) T(*src);
-      dest = next(dest); src = next(src);
-    }
-    return r;
-  }
-  
-  static T *initializeArrayWithTakeFrontToBack(T *dest, T *src, size_t n) {
-    if (isPOD) {
-      std::memmove(dest, src, n * stride);
-      return dest;
-    }
-    
-    T *r = dest;
-    while (n--) {
-      new (dest) T(*src);
-      dest = next(dest); src = next(src);
-    }
-    return r;
-  }
-  
-  static T *initializeArrayWithTakeBackToFront(T *dest, T *src, size_t n) {
-    if (isPOD) {
-      std::memmove(dest, src, n * stride);
-      return dest;
-    }
-    
-    T *r = dest;
-    dest = next(dest, n); src = next(src, n);
-    while (n--) {
-      dest = prev(dest); src = prev(src);
-      new (dest) T(*src);
-    }
-    return r;
   }
   
   static T *assignWithCopy(T *dest, T *src) {
@@ -208,28 +153,6 @@ template <class Impl, class T> struct RetainableBoxBase {
 
   static T *initializeWithTake(T *dest, T *src) {
     *dest = *src;
-    return dest;
-  }
-  
-  static void destroyArray(T *arr, size_t n) {
-    while (n--)
-      Impl::release(*arr++);
-  }
-  
-  static T *initializeArrayWithCopy(T *dest, T *src, size_t n) {
-    T *r = dest;
-    memcpy(dest, src, n * sizeof(T));
-    while (n--)
-      Impl::retain(*dest++);
-    return r;
-  }
-  
-  static T *initializeArrayWithTakeFrontToBack(T *dest, T *src, size_t n) {
-    memmove(dest, src, n * sizeof(T));
-    return dest;
-  }
-  static T *initializeArrayWithTakeBackToFront(T *dest, T *src, size_t n) {
-    memmove(dest, src, n * sizeof(T));
     return dest;
   }
   
@@ -337,38 +260,6 @@ struct WeakRetainableBoxBase {
   //   static T *initializeWithTake(T *dest, T *src);
   //   static T *assignWithCopy(T *dest, T *src);
   //   static T *assignWithTake(T *dest, T *src);
-  // The array value witnesses are implemented pessimistically assuming the
-  // type is nontrivially copyable and takable.
-
-  static void destroyArray(T *arr, size_t n) {
-    while (n--)
-      Impl::destroy(arr++);
-  }
-  
-  static T *initializeArrayWithCopy(T *dest, T *src, size_t n) {
-    T *r = dest;
-    while (n--)
-      Impl::initializeWithCopy(dest++, src++);
-    return r;
-  }
-  
-  static T *initializeArrayWithTakeFrontToBack(T *dest, T *src, size_t n) {
-    T *r = dest;
-    while (n--)
-      Impl::initializeWithTake(dest++, src++);
-    return r;
-  }
-  static T *initializeArrayWithTakeBackToFront(T *dest, T *src, size_t n) {
-    T *r = dest;
-
-    dest += n;
-    src  += n;
-
-    while (n--)
-      Impl::initializeWithTake(--dest, --src);
-
-    return r;
-  }
 };
 
 /// A box implementation class for Swift weak object pointers.
@@ -703,55 +594,6 @@ struct AggregateBox {
   static char *assignWithTake(char *dest, char *src) {
     return Helper::assignWithTake(dest, src);
   }
-  
-  static void destroyArray(char *array, size_t n) {
-    if (isPOD)
-      return;
-    while (n--) {
-      destroy(array);
-      array += stride;
-    }
-  }
-  static char *initializeArrayWithCopy(char *dest, char *src, size_t n) {
-    if (isPOD) {
-      std::memcpy(dest, src, n * stride);
-      return dest;
-    }
-    
-    char *r = dest;
-    while (n--) {
-      initializeWithCopy(dest, src);
-      dest += stride; src += stride;
-    }
-    return r;
-  }
-  static char *initializeArrayWithTakeFrontToBack(char *dest, char *src, size_t n) {
-    if (isPOD) {
-      std::memmove(dest, src, n * stride);
-      return dest;
-    }
-    
-    char *r = dest;
-    while (n--) {
-      initializeWithTake(dest, src);
-      dest += stride; src += stride;
-    }
-    return r;
-  }
-  static char *initializeArrayWithTakeBackToFront(char *dest, char *src, size_t n) {
-    if (isPOD) {
-      std::memmove(dest, src, n * stride);
-      return dest;
-    }
-    
-    char *r = dest;
-    dest += stride * n; src += stride * n;
-    while (n--) {
-      dest -= stride; src -= stride;
-      initializeWithTake(dest, src);
-    }
-    return r;
-  }
 };
   
 /// A template for using the Swift allocation APIs with a known size
@@ -769,34 +611,7 @@ struct SwiftAllocator {
 
 /// A CRTP class which provides basic implementations for a number of
 /// value witnesses relating to buffers.
-template <class Impl> struct BufferValueWitnessesBase {
-  static void destroyBuffer(ValueBuffer *buffer, const Metadata *self) {
-    Impl::destroy(Impl::projectBuffer(buffer, self), self);
-    Impl::deallocateBuffer(buffer, self);
-  }
-
-#ifndef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
-  static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
-                                                       ValueBuffer *src,
-                                                       const Metadata *self) {
-    return Impl::initializeBufferWithCopy(dest,
-                                          Impl::projectBuffer(src, self),
-                                          self);
-  }
-#endif
-
-  static OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
-                                               OpaqueValue *src,
-                                               const Metadata *self) {
-    return Impl::initializeWithCopy(Impl::allocateBuffer(dest, self), src, self);
-  }
-
-  static OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
-                                               OpaqueValue *src,
-                                               const Metadata *self) {
-    return Impl::initializeWithTake(Impl::allocateBuffer(dest, self), src, self);
-  }
-};
+template <class Impl> struct BufferValueWitnessesBase {};
 
 /// How should a type be packed into a fixed-size buffer?
 enum class FixedPacking {
@@ -821,12 +636,6 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::OffsetZero>
     : BufferValueWitnessesBase<Impl> {
   static constexpr bool isInline = true;
 
-  static OpaqueValue *allocateBuffer(ValueBuffer *buffer, const Metadata *self) {
-    return reinterpret_cast<OpaqueValue*>(buffer);
-  }
-  static OpaqueValue *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
-    return reinterpret_cast<OpaqueValue*>(buffer);
-  }
   static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
@@ -834,15 +643,12 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::OffsetZero>
                                     reinterpret_cast<OpaqueValue*>(src),
                                     self);
   }
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
     return Impl::initializeWithCopy(reinterpret_cast<OpaqueValue *>(dest),
                                     reinterpret_cast<OpaqueValue *>(src), self);
   }
-#endif
-  static void deallocateBuffer(ValueBuffer *buffer, const Metadata *self) {}
 };
 
 /// An implementation of BufferValueWitnesses suitable for types that
@@ -852,41 +658,21 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::Allocate>
     : BufferValueWitnessesBase<Impl> {
   static constexpr bool isInline = false;
 
-  static OpaqueValue *allocateBuffer(ValueBuffer *buffer, const Metadata *self) {
-    OpaqueValue *value =
-      static_cast<OpaqueValue*>(SwiftAllocator<Size, Alignment>::alloc());
-    buffer->PrivateData[0] = value;
-    return value;
-  }
-  static OpaqueValue *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
-    return reinterpret_cast<OpaqueValue*>(buffer->PrivateData[0]);
-  }
-  static void deallocateBuffer(ValueBuffer *buffer, const Metadata *self) {
-    SwiftAllocator<Size, Alignment>::dealloc(buffer->PrivateData[0]);
-  }
   static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
+    auto wtable = self->getValueWitnesses();
+    auto *srcReference = *reinterpret_cast<HeapObject **>(src);
+    *reinterpret_cast<HeapObject **>(dest) = srcReference;
 
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
-  auto wtable = self->getValueWitnesses();
-  auto *srcReference = *reinterpret_cast<HeapObject**>(src);
-  *reinterpret_cast<HeapObject**>(dest) = srcReference;
-
-  // Project the address of the value in the buffer.
-  unsigned alignMask = wtable->getAlignmentMask();
-  // Compute the byte offset of the object in the box.
-  unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-  auto *bytePtr =
-      reinterpret_cast<char *>(srcReference);
-  return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-#else
-    dest->PrivateData[0] = src->PrivateData[0];
-    return (OpaqueValue*) dest->PrivateData[0];
-#endif
+    // Project the address of the value in the buffer.
+    unsigned alignMask = wtable->getAlignmentMask();
+    // Compute the byte offset of the object in the box.
+    unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
+    auto *bytePtr = reinterpret_cast<char *>(srcReference);
+    return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
   }
 
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
@@ -901,53 +687,20 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::Allocate>
     auto *bytePtr = reinterpret_cast<char *>(reference);
     return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
   }
-#endif
 };
 
 /// A class which provides BufferValueWitnesses for types that are not
 /// fixed in size.
 template <class Impl, bool IsKnownAllocated>
 struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
-  static OpaqueValue *allocateBuffer(ValueBuffer *buffer, const Metadata *self) {
-    auto vwtable = self->getValueWitnesses();
-    if (!IsKnownAllocated && vwtable->isValueInline()) {
-      return reinterpret_cast<OpaqueValue*>(buffer);
-    } else {
-      OpaqueValue *value =
-        static_cast<OpaqueValue*>(swift_slowAlloc(vwtable->size,
-                                                  vwtable->getAlignmentMask()));
-      buffer->PrivateData[0] = value;
-      return value;
-    }
-  }
-
-  static OpaqueValue *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
-    auto vwtable = self->getValueWitnesses();
-    (void)vwtable;
-    if (!IsKnownAllocated && vwtable->isValueInline()) {
-      return reinterpret_cast<OpaqueValue*>(buffer);
-    } else {
-      return reinterpret_cast<OpaqueValue*>(buffer->PrivateData[0]);
-    }
-  }
-
-  static void deallocateBuffer(ValueBuffer *buffer, const Metadata *self) {
-    auto vwtable = self->getValueWitnesses();
-    if (IsKnownAllocated || !vwtable->isValueInline()) {
-      swift_slowDealloc(buffer->PrivateData[0], vwtable->size,
-                        vwtable->getAlignmentMask());
-    }
-  }
-
   static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
     auto vwtable = self->getValueWitnesses();
     (void)vwtable;
     if (!IsKnownAllocated && vwtable->isValueInline()) {
-      return Impl::initializeWithTake(reinterpret_cast<OpaqueValue*>(dest),
-                                      reinterpret_cast<OpaqueValue*>(src),
+      return Impl::initializeWithTake(reinterpret_cast<OpaqueValue *>(dest),
+                                      reinterpret_cast<OpaqueValue *>(src),
                                       self);
     } else {
       auto reference = src->PrivateData[0];
@@ -959,21 +712,8 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
       auto *bytePtr = reinterpret_cast<char *>(reference);
       return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
     }
-#else
-    auto vwtable = self->getValueWitnesses();
-    (void)vwtable;
-    if (!IsKnownAllocated && vwtable->isValueInline()) {
-      return Impl::initializeWithTake(reinterpret_cast<OpaqueValue*>(dest),
-                                      reinterpret_cast<OpaqueValue*>(src),
-                                      self);
-    } else {
-      dest->PrivateData[0] = src->PrivateData[0];
-      return (OpaqueValue*) dest->PrivateData[0];
-    }
-#endif
   }
 
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
@@ -995,7 +735,6 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
       return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
     }
   }
-#endif
 };
 
 /// A class which provides default implementations of various value
@@ -1054,36 +793,6 @@ struct ValueWitnesses : BufferValueWitnesses<ValueWitnesses<Box>,
                                               (typename Box::type*) src);
   }
 
-  static void destroyArray(OpaqueValue *array, size_t n, const Metadata *self) {
-    return Box::destroyArray((typename Box::type*)array, n);
-  }
-  
-  static OpaqueValue *initializeArrayWithCopy(OpaqueValue *dest,
-                                              OpaqueValue *src,
-                                              size_t n,
-                                              const Metadata *self) {
-    return (OpaqueValue*) Box::initializeArrayWithCopy((typename Box::type*) dest,
-                                                 (typename Box::type*) src, n);
-  }
-  
-  static OpaqueValue *initializeArrayWithTakeFrontToBack(OpaqueValue *dest,
-                                              OpaqueValue *src,
-                                              size_t n,
-                                              const Metadata *self) {
-    return (OpaqueValue*) Box::initializeArrayWithTakeFrontToBack(
-                                                   (typename Box::type*) dest,
-                                                   (typename Box::type*) src, n);
-  }
-  
-  static OpaqueValue *initializeArrayWithTakeBackToFront(OpaqueValue *dest,
-                                              OpaqueValue *src,
-                                              size_t n,
-                                              const Metadata *self) {
-    return (OpaqueValue*) Box::initializeArrayWithTakeBackToFront(
-                                                   (typename Box::type*) dest,
-                                                   (typename Box::type*) src, n);
-  }
-  
   // These should not get instantiated if the type doesn't have extra
   // inhabitants.
 
@@ -1123,11 +832,6 @@ struct NonFixedValueWitnesses :
     return Box::destroy((typename Box::type*) value, self);
   }
   
-  static void destroyArray(OpaqueValue *array, size_t n,
-                           const Metadata *self) {
-    return Box::destroyArray((typename Box::type*) array, n, self);
-  }
-  
   static OpaqueValue *initializeWithCopy(OpaqueValue *dest, OpaqueValue *src,
                                          const Metadata *self) {
     return (OpaqueValue*) Box::initializeWithCopy((typename Box::type*) dest,
@@ -1142,36 +846,6 @@ struct NonFixedValueWitnesses :
                                                   self);
   }
   
-  static OpaqueValue *initializeArrayWithCopy(OpaqueValue *dest,
-                                              OpaqueValue *src,
-                                              size_t n,
-                                              const Metadata *self) {
-    return (OpaqueValue*) Box::initializeArrayWithCopy(
-                                                  (typename Box::type*) dest,
-                                                  (typename Box::type*) src,
-                                                  n, self);
-  }
-  
-  static OpaqueValue *initializeArrayWithTakeFrontToBack(OpaqueValue *dest,
-                                                         OpaqueValue *src,
-                                                         size_t n,
-                                                         const Metadata *self) {
-    return (OpaqueValue*) Box::initializeArrayWithTakeFrontToBack(
-                                                  (typename Box::type*) dest,
-                                                  (typename Box::type*) src,
-                                                  n, self);
-  }
-
-  static OpaqueValue *initializeArrayWithTakeBackToFront(OpaqueValue *dest,
-                                                         OpaqueValue *src,
-                                                         size_t n,
-                                                         const Metadata *self) {
-    return (OpaqueValue*) Box::initializeArrayWithTakeBackToFront(
-                                                  (typename Box::type*) dest,
-                                                  (typename Box::type*) src,
-                                                  n, self);
-  }
-
   static OpaqueValue *assignWithCopy(OpaqueValue *dest, OpaqueValue *src,
                                      const Metadata *self) {
     return (OpaqueValue*) Box::assignWithCopy((typename Box::type*) dest,
@@ -1208,12 +882,9 @@ struct ValueWitnessTableGenerator;
 
 template <class Witnesses> struct ValueWitnessTableGenerator<Witnesses, false> {
   static constexpr const ValueWitnessTable table = {
-#define EACH_WITNESS(ID) Witnesses::ID,
-    FOR_ALL_FUNCTION_VALUE_WITNESSES(EACH_WITNESS)
-#undef EACH_WITNESS
-    Witnesses::size,
-    Witnesses::flags,
-    Witnesses::stride,
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) Witnesses::LOWER_ID,
+#include "swift/ABI/ValueWitness.def"
   };
 };
 
@@ -1221,16 +892,13 @@ template <class Witnesses> struct ValueWitnessTableGenerator<Witnesses, false> {
 template <class Witnesses> struct ValueWitnessTableGenerator<Witnesses, true> {
   static constexpr const ExtraInhabitantsValueWitnessTable table = {
     {
-#define EACH_WITNESS(ID) Witnesses::ID,
-      FOR_ALL_FUNCTION_VALUE_WITNESSES(EACH_WITNESS)
-#undef EACH_WITNESS
-      Witnesses::size,
-      Witnesses::flags,
-      Witnesses::stride,
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) Witnesses::LOWER_ID,
+#include "swift/ABI/ValueWitness.def"
     },
-    Witnesses::extraInhabitantFlags,
-    Witnesses::storeExtraInhabitant,
-    Witnesses::getExtraInhabitantIndex,
+#define WANT_ONLY_EXTRA_INHABITANT_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) Witnesses::LOWER_ID,
+#include "swift/ABI/ValueWitness.def"
   };
 };
 

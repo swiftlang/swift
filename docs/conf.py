@@ -29,7 +29,7 @@ from datetime import date
 extensions = ['sphinx.ext.intersphinx', 'sphinx.ext.todo']
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ['_templates', 'archive']
 
 # The suffix of source filenames.
 source_suffix = '.rst'
@@ -146,7 +146,7 @@ html_last_updated_fmt = '%Y-%m-%d'
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
-html_additional_pages = {'LangRef': 'archive/LangRef.html'}
+html_additional_pages = {'archive/LangRef': 'LangRef.html'}
 
 # If false, no module index is generated.
 # html_domain_indices = True

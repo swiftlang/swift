@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -target x86_64-apple-macosx10.50 -emit-module -parse-stdlib %S/../Inputs/empty.swift -o %t
 // RUN: not %target-swift-frontend -I %t -typecheck %s 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -I %t -typecheck %s -disable-target-os-checking

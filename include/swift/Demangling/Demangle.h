@@ -216,8 +216,21 @@ public:
   void dump();
 };
 
+/// Returns the length of the swift mangling prefix of the \p SymbolName.
+///
+/// Returns 0 if \p SymbolName is not a mangled swift (>= swift 4.x) name.
+int getManglingPrefixLength(const char *mangledName);
+
+/// Returns true if \p SymbolName is a mangled swift name.
+///
+/// This does not include the old (<= swift 3.x) mangling prefix "_T".
+inline bool isMangledName(llvm::StringRef MangledName) {
+  return getManglingPrefixLength(MangledName.data()) != 0;
+}
+
 /// Returns true if the mangledName starts with the swift mangling prefix.
 ///
+/// This includes the old (<= swift 3.x) mangling prefix "_T".
 /// \param mangledName A null-terminated string containing a mangled name.
 bool isSwiftSymbol(const char *mangledName);
 
@@ -252,8 +265,8 @@ public:
 
   /// Demangle the given symbol and return the parse tree.
   ///
-  /// \param MangledName The mangled symbol string, which start with the
-  /// mangling prefix _T.
+  /// \param MangledName The mangled symbol string, which start a mangling
+  /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns A parse tree for the demangled string - or a null pointer
   /// on failure.
@@ -263,8 +276,8 @@ public:
 
   /// Demangle the given type and return the parse tree.
   ///
-  /// \param MangledName The mangled type string, which does _not_ start with
-  /// the mangling prefix _T.
+  /// \param MangledName The mangled symbol string, which start a mangling
+  /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns A parse tree for the demangled string - or a null pointer
   /// on failure.
@@ -274,8 +287,8 @@ public:
   
   /// Demangle the given symbol and return the readable name.
   ///
-  /// \param MangledName The mangled symbol string, which start with the
-  /// mangling prefix _T.
+  /// \param MangledName The mangled symbol string, which start a mangling
+  /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns The demangled string.
   std::string demangleSymbolAsString(llvm::StringRef MangledName,
@@ -284,7 +297,7 @@ public:
   /// Demangle the given type and return the readable name.
   ///
   /// \param MangledName The mangled type string, which does _not_ start with
-  /// the mangling prefix _T.
+  /// a mangling prefix.
   ///
   /// \returns The demangled string.
   std::string demangleTypeAsString(llvm::StringRef MangledName,

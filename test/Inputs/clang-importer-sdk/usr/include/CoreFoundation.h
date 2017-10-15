@@ -14,6 +14,10 @@ typedef struct __attribute__((objc_bridge(NSString))) __CFString const *CFString
 typedef struct __CFTree *CFTreeRef;
 typedef const struct __attribute__((objc_bridge(CFURL))) __CFURL * CFURLRef;
 
+typedef struct __attribute__((objc_bridge(NSDictionary))) __CFDictionary const *CFDictionaryRef;
+typedef struct __attribute__((objc_bridge(NSArray))) __CFArray const *CFArrayRef;
+typedef struct __attribute__((objc_bridge(NSSet))) __CFSet const *CFSetRef;
+
 typedef CFTypeRef CFAliasForTypeRef;
 
 

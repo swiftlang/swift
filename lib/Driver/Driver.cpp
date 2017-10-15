@@ -35,6 +35,7 @@
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
@@ -141,6 +142,10 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
       if (triple.isOSVersionLT(7))
         diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
                        "iOS 7");
+      if (triple.isArch32Bit() && !triple.isOSVersionLT(11)) {
+        diags.diagnose(SourceLoc(), diag::error_ios_maximum_deployment_32,
+                       triple.getOSMajorVersion());
+      }
     } else if (triple.isWatchOS()) {
       if (triple.isOSVersionLT(2, 0)) {
           diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
@@ -156,7 +161,19 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-warnings-as-errors", "-suppress-warnings");
   }
-  
+
+  // Check for conflicting profiling flags
+  const Arg *ProfileGenerate = Args.getLastArg(options::OPT_profile_generate);
+  const Arg *ProfileUse = Args.getLastArg(options::OPT_profile_use);
+  if (ProfileGenerate && ProfileUse)
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-profile-generate", "-profile-use");
+
+  // Check if the profdata is missing
+  if (ProfileUse && !llvm::sys::fs::exists(ProfileUse->getValue()))
+    diags.diagnose(SourceLoc(), diag::error_profile_missing,
+                  ProfileUse->getValue());
+
   // Check for missing debug option when verifying debug info.
   if (Args.hasArg(options::OPT_verify_debug_info)) {
     bool hasDebugOption = true;
@@ -166,6 +183,17 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
     if (!hasDebugOption)
       diags.diagnose(SourceLoc(),
                      diag::verify_debug_info_requires_debug_option);
+  }
+
+  for (const Arg *A : Args.filtered(options::OPT_D)) {
+    StringRef name = A->getValue();
+    if (name.find('=') != StringRef::npos)
+      diags.diagnose(SourceLoc(),
+                     diag::cannot_assign_value_to_conditional_compilation_flag,
+                     name);
+    else if (!Lexer::isIdentifier(name))
+      diags.diagnose(SourceLoc(), diag::invalid_conditional_compilation_flag,
+                     name);
   }
 }
 
@@ -195,6 +223,9 @@ makeToolChain(Driver &driver, const llvm::Triple &target) {
     break;
   case llvm::Triple::Win32:
     return llvm::make_unique<toolchains::Cygwin>(driver, target);
+    break;
+  case llvm::Triple::Haiku:
+    return llvm::make_unique<toolchains::GenericUnix>(driver, target);
     break;
   default:
     return nullptr;
@@ -558,8 +589,21 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   std::unique_ptr<UnifiedStatsReporter> StatsReporter;
   if (const Arg *A =
       ArgList->getLastArgNoClaim(options::OPT_stats_output_dir)) {
+    StringRef OptType;
+    if (const Arg *OptA = ArgList->getLastArgNoClaim(options::OPT_O_Group)) {
+      OptType = OptA->getSpelling();
+    }
+    StringRef InputName;
+    if (Inputs.size() == 1) {
+      InputName = Inputs[0].second->getSpelling();
+    }
+    StringRef OutputType = types::getTypeTempSuffix(OI.CompilerOutputType);
     StatsReporter = llvm::make_unique<UnifiedStatsReporter>("swift-driver",
                                                             OI.ModuleName,
+                                                            InputName,
+                                                            DefaultTargetTriple,
+                                                            OutputType,
+                                                            OptType,
                                                             A->getValue());
   }
 
@@ -622,19 +666,6 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     }
   }
 
-  // Construct the graph of Actions.
-  ActionList Actions;
-  buildActions(*TC, *TranslatedArgList, Inputs, OI, OFM.get(),
-               rebuildEverything ? nullptr : &outOfDateMap, Actions);
-
-  if (Diags.hadAnyError())
-    return nullptr;
-
-  if (DriverPrintActions) {
-    printActions(Actions);
-    return nullptr;
-  }
-
   unsigned NumberOfParallelCommands = 1;
   if (const Arg *A = ArgList->getLastArg(options::OPT_j)) {
     if (StringRef(A->getValue()).getAsInteger(10, NumberOfParallelCommands)) {
@@ -666,8 +697,20 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                                                  SaveTemps,
                                                  ShowDriverTimeCompilation,
                                                  std::move(StatsReporter)));
+  // Construct the graph of Actions.
+  SmallVector<const Action *, 8> TopLevelActions;
+  buildActions(TopLevelActions, *TC, OI, OFM.get(),
+               rebuildEverything ? nullptr : &outOfDateMap, *C);
 
-  buildJobs(Actions, OI, OFM.get(), *TC, *C);
+  if (Diags.hadAnyError())
+    return nullptr;
+
+  if (DriverPrintActions) {
+    printActions(*C);
+    return nullptr;
+  }
+
+  buildJobs(TopLevelActions, OI, OFM.get(), *TC, *C);
 
   // For getting bulk fixits, or for when users explicitly request to continue
   // building despite errors.
@@ -823,8 +866,7 @@ Driver::parseArgStrings(ArrayRef<const char *> Args) {
   }
 
   // Check for unknown arguments.
-  for (const Arg *A : make_range(ArgList->filtered_begin(options::OPT_UNKNOWN),
-       ArgList->filtered_end())) {
+  for (const Arg *A :  ArgList->filtered(options::OPT_UNKNOWN)) {
     Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
                    A->getAsString(*ArgList));
   }
@@ -884,9 +926,6 @@ static bool checkInputExistence(const Driver &D, const DerivedArgList &Args,
 void Driver::buildInputs(const ToolChain &TC,
                          const DerivedArgList &Args,
                          InputFileList &Inputs) const {
-  types::ID InputType = types::TY_Nothing;
-  Arg *InputTypeArg = nullptr;
-
   llvm::StringMap<StringRef> SourceFileNames;
 
   for (Arg *A : Args) {
@@ -894,29 +933,19 @@ void Driver::buildInputs(const ToolChain &TC,
       StringRef Value = A->getValue();
       types::ID Ty = types::TY_INVALID;
 
-      if (InputType == types::TY_Nothing) {
-        // If there was an explicit arg for this, claim it.
-        if (InputTypeArg)
-          InputTypeArg->claim();
-
-        // stdin must be handled specially.
-        if (Value.equals("-")) {
-          // By default, treat stdin as Swift input.
-          // FIXME: should we limit this inference to specific modes?
-          Ty = types::TY_Swift;
-        } else {
-          // Otherwise lookup by extension.
-          Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
-
-          if (Ty == types::TY_INVALID) {
-            // FIXME: should we adjust this inference in certain modes?
-            Ty = types::TY_Object;
-          }
-        }
+      // stdin must be handled specially.
+      if (Value.equals("-")) {
+        // By default, treat stdin as Swift input.
+        Ty = types::TY_Swift;
       } else {
-        assert(InputTypeArg && "InputType set w/o InputTypeArg");
-        InputTypeArg->claim();
-        Ty = InputType;
+        // Otherwise lookup by extension.
+        Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
+
+        if (Ty == types::TY_INVALID) {
+          // By default, treat inputs with no extension, or with an
+          // extension that isn't recognized, as object files.
+          Ty = types::TY_Object;
+        }
       }
 
       if (checkInputExistence(*this, Args, Diags, Value))
@@ -931,8 +960,6 @@ void Driver::buildInputs(const ToolChain &TC,
         }
       }
     }
-
-    // FIXME: add -x support (or equivalent)
   }
 }
 
@@ -1008,14 +1035,14 @@ static bool isSDKTooOld(StringRef sdkPath, clang::VersionTuple minVersion,
 /// the given target.
 static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
   if (target.isMacOSX()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 12), "OSX");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 13), "OSX");
 
   } else if (target.isiOS()) {
     // Includes both iOS and TVOS.
-    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(11, 0), "Simulator", "OS");
 
   } else if (target.isWatchOS()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(3, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(4, 0), "Simulator", "OS");
 
   } else {
     return false;
@@ -1116,17 +1143,20 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       break;
 
-    case options::OPT_emit_tbd:
-      OI.CompilerOutputType = types::TY_TBD;
-      // We want the symbols from the whole module, so let's do it in one
-      // invocation.
+    case options::OPT_index_file:
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+      OI.CompilerOutputType = types::TY_IndexData;
       break;
 
+    case options::OPT_update_code:
+      OI.CompilerOutputType = types::TY_Remapping;
+      OI.LinkAction = LinkKind::None;
+      break;
     case options::OPT_parse:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
     case options::OPT_dump_ast:
+    case options::OPT_emit_syntax:
     case options::OPT_print_ast:
     case options::OPT_dump_type_refinement_contexts:
     case options::OPT_dump_scope_maps:
@@ -1285,30 +1315,39 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     }
   }
 
-  OI.SelectedSanitizer = SanitizerKind::None;
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ))
-    OI.SelectedSanitizer = parseSanitizerArgValues(A, TC.getTriple(), Diags);
+    OI.SelectedSanitizers = parseSanitizerArgValues(
+        Args, A, TC.getTriple(), Diags,
+        [&](StringRef sanitizerName) {
+          return TC.sanitizerRuntimeLibExists(Args, sanitizerName);
+        });
 
-  // Check that the sanitizer coverage flags are supported if supplied.
-  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ))
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
+
+    // Check that the sanitizer coverage flags are supported if supplied.
+    // Dismiss the output, as we will grab the value later.
     (void)parseSanitizerCoverageArgValue(A, TC.getTriple(), Diags,
-                                         OI.SelectedSanitizer);
+                                         OI.SelectedSanitizers);
+
+  }
+
 }
 
-void Driver::buildActions(const ToolChain &TC,
-                          const DerivedArgList &Args,
-                          const InputFileList &Inputs,
-                          const OutputInfo &OI,
+void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
+                          const ToolChain &TC, const OutputInfo &OI,
                           const OutputFileMap *OFM,
                           const InputInfoMap *OutOfDateMap,
-                          ActionList &Actions) const {
+                          Compilation &C) const {
+  const DerivedArgList &Args = C.getArgs();
+  ArrayRef<InputPair> Inputs = C.getInputFiles();
+
   if (!SuppressNoInputFilesError && Inputs.empty()) {
     Diags.diagnose(SourceLoc(), diag::error_no_input_files);
     return;
   }
 
-  ActionList AllModuleInputs;
-  ActionList AllLinkerInputs;
+  SmallVector<const Action *, 2> AllModuleInputs;
+  SmallVector<const Action *, 2> AllLinkerInputs;
 
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile: {
@@ -1325,9 +1364,13 @@ void Driver::buildActions(const ToolChain &TC,
         StringRef Value = A->getValue();
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
         if (Ty == types::TY_ObjCHeader) {
-          std::unique_ptr<Action> HeaderInput(new InputAction(*A, Ty));
-          PCH = new GeneratePCHJobAction(HeaderInput.release());
-          Actions.push_back(PCH);
+          auto *HeaderInput = C.createAction<InputAction>(*A, Ty);
+          StringRef PersistentPCHDir;
+          if (const Arg *A = Args.getLastArg(options::OPT_pch_output_dir)) {
+            PersistentPCHDir = A->getValue();
+          }
+          PCH = C.createAction<GeneratePCHJobAction>(HeaderInput,
+                                                     PersistentPCHDir);
         }
       }
     }
@@ -1336,7 +1379,7 @@ void Driver::buildActions(const ToolChain &TC,
       types::ID InputType = Input.first;
       const Arg *InputArg = Input.second;
 
-      std::unique_ptr<Action> Current(new InputAction(*InputArg, InputType));
+      Action *Current = C.createAction<InputAction>(*InputArg, InputType);
       switch (InputType) {
       case types::TY_Swift:
       case types::TY_SIL:
@@ -1351,41 +1394,29 @@ void Driver::buildActions(const ToolChain &TC,
         if (OutOfDateMap)
           previousBuildState = OutOfDateMap->lookup(InputArg);
         if (Args.hasArg(options::OPT_embed_bitcode)) {
-          Current.reset(new CompileJobAction(Current.release(),
-                                             types::TY_LLVM_BC,
-                                             previousBuildState));
-          AllModuleInputs.push_back(Current.get());
-          Current.reset(new BackendJobAction(Current.release(),
-                                             OI.CompilerOutputType, 0));
+          Current = C.createAction<CompileJobAction>(Current, types::TY_LLVM_BC,
+                                                     previousBuildState);
+          if (PCH)
+            cast<JobAction>(Current)->addInput(PCH);
+          AllModuleInputs.push_back(Current);
+          Current = C.createAction<BackendJobAction>(Current,
+                                                     OI.CompilerOutputType, 0);
         } else {
-          Current.reset(new CompileJobAction(Current.release(),
-                                             OI.CompilerOutputType,
-                                             previousBuildState));
-          AllModuleInputs.push_back(Current.get());
+          Current = C.createAction<CompileJobAction>(Current,
+                                                     OI.CompilerOutputType,
+                                                     previousBuildState);
+          if (PCH)
+            cast<JobAction>(Current)->addInput(PCH);
+          AllModuleInputs.push_back(Current);
         }
-        if (PCH) {
-          // FIXME: When we have a PCH job, it's officially owned by the Actions
-          // array; but it's also a secondary input to each of the current
-          // JobActions, which means that we need to flip the "owns inputs" bit
-          // on the JobActions so they don't try to free it. That in turn means
-          // we need to transfer ownership of all the JobActions' existing
-          // inputs to the Actions array, since the JobActions either own or
-          // don't own _all_ of their inputs. Ownership can't vary
-          // input-by-input.
-          auto *job = cast<JobAction>(Current.get());
-          auto inputs = job->getInputs();
-          Actions.append(inputs.begin(), inputs.end());
-          job->setOwnsInputs(false);
-          job->addInput(PCH);
-        }
-        AllLinkerInputs.push_back(Current.release());
+        AllLinkerInputs.push_back(Current);
         break;
       }
       case types::TY_SwiftModuleFile:
       case types::TY_SwiftModuleDocFile:
         // Module inputs are okay if generating a module.
         if (OI.ShouldGenerateModule) {
-          AllModuleInputs.push_back(Current.release());
+          AllModuleInputs.push_back(Current);
           break;
         }
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -1395,7 +1426,7 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_Object:
         // Object inputs are only okay if linking.
         if (OI.shouldLink()) {
-          AllLinkerInputs.push_back(Current.release());
+          AllLinkerInputs.push_back(Current);
           break;
         }
         LLVM_FALLTHROUGH;
@@ -1410,6 +1441,7 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_ClangModuleFile:
       case types::TY_SwiftDeps:
       case types::TY_Remapping:
+      case types::TY_IndexData:
       case types::TY_PCH:
       case types::TY_ImportedModules:
       case types::TY_TBD:
@@ -1442,49 +1474,45 @@ void Driver::buildActions(const ToolChain &TC,
       }
       if (HandledHere) {
         // Create a single CompileJobAction and a single BackendJobAction.
-        std::unique_ptr<JobAction> CA(new CompileJobAction(types::TY_LLVM_BC));
-        AllModuleInputs.push_back(CA.get());
+        JobAction *CA = C.createAction<CompileJobAction>(types::TY_LLVM_BC);
+        AllModuleInputs.push_back(CA);
 
         int InputIndex = 0;
         for (const InputPair &Input : Inputs) {
           types::ID InputType = Input.first;
           const Arg *InputArg = Input.second;
 
-          CA->addInput(new InputAction(*InputArg, InputType));
+          CA->addInput(C.createAction<InputAction>(*InputArg, InputType));
           if (OI.isMultiThreading()) {
             // With multi-threading we need a backend job for each output file
             // of the compilation.
-            auto *BJA = new BackendJobAction(CA.get(), OI.CompilerOutputType,
-                                             InputIndex);
-            // Only the first backend job owns the compilation job (to prevent
-            // multiple de-allocations of the compilation job).
-            BJA->setOwnsInputs(InputIndex == 0);
+            auto *BJA = C.createAction<BackendJobAction>(CA,
+                                                         OI.CompilerOutputType,
+                                                         InputIndex);
             AllLinkerInputs.push_back(BJA);
           }
           InputIndex++;
         }
-        Action *CAReleased = CA.release();
         if (!OI.isMultiThreading()) {
           // No multi-threading: the compilation only produces a single output
           // file.
-          CA.reset(new BackendJobAction(CAReleased,
-                                        OI.CompilerOutputType, 0));
-          AllLinkerInputs.push_back(CA.release());
+          CA = C.createAction<BackendJobAction>(CA, OI.CompilerOutputType, 0);
+          AllLinkerInputs.push_back(CA);
         }
         break;
       }
     }
 
     // Create a single CompileJobAction for all of the driver's inputs.
-    std::unique_ptr<JobAction> CA(new CompileJobAction(OI.CompilerOutputType));
+    auto *CA = C.createAction<CompileJobAction>(OI.CompilerOutputType);
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
       const Arg *InputArg = Input.second;
 
-      CA->addInput(new InputAction(*InputArg, InputType));
+      CA->addInput(C.createAction<InputAction>(*InputArg, InputType));
     }
-    AllModuleInputs.push_back(CA.get());
-    AllLinkerInputs.push_back(CA.release());
+    AllModuleInputs.push_back(CA);
+    AllLinkerInputs.push_back(CA);
     break;
   }
   case OutputInfo::Mode::Immediate: {
@@ -1492,14 +1520,14 @@ void Driver::buildActions(const ToolChain &TC,
       return;
 
     assert(OI.CompilerOutputType == types::TY_Nothing);
-    std::unique_ptr<JobAction> CA(new InterpretJobAction());
+    auto *CA = C.createAction<InterpretJobAction>();
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
       const Arg *InputArg = Input.second;
 
-      CA->addInput(new InputAction(*InputArg, InputType));
+      CA->addInput(C.createAction<InputAction>(*InputArg, InputType));
     }
-    Actions.push_back(CA.release());
+    TopLevelActions.push_back(CA);
     return;
   }
   case OutputInfo::Mode::REPL: {
@@ -1518,23 +1546,23 @@ void Driver::buildActions(const ToolChain &TC,
         Mode = REPLJobAction::Mode::Integrated;
     }
 
-    Actions.push_back(new REPLJobAction(Mode));
+    TopLevelActions.push_back(C.createAction<REPLJobAction>(Mode));
     return;
   }
   }
 
-  std::unique_ptr<JobAction> MergeModuleAction;
+  JobAction *MergeModuleAction = nullptr;
   if (OI.ShouldGenerateModule &&
       OI.CompilerMode != OutputInfo::Mode::SingleCompile &&
       !AllModuleInputs.empty()) {
     // We're performing multiple compilations; set up a merge module step
     // so we generate a single swiftmodule as output.
-    MergeModuleAction.reset(new MergeModuleJobAction(AllModuleInputs));
-    MergeModuleAction->setOwnsInputs(false);
+    MergeModuleAction = C.createAction<MergeModuleJobAction>(AllModuleInputs);
   }
 
   if (OI.shouldLink() && !AllLinkerInputs.empty()) {
-    auto *LinkAction = new LinkJobAction(AllLinkerInputs, OI.LinkAction);
+    auto *LinkAction = C.createAction<LinkJobAction>(AllLinkerInputs,
+                                                     OI.LinkAction);
 
     if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
         TC.getTriple().isOSCygMing()) {
@@ -1542,10 +1570,9 @@ void Driver::buildActions(const ToolChain &TC,
       // pull the info we need from the .o files directly and pass them as an
       // argument input file to the linker.
       auto *AutolinkExtractAction =
-          new AutolinkExtractJobAction(AllLinkerInputs);
-      // Takes the same inputs as the linker, but doesn't own them.
-      AutolinkExtractAction->setOwnsInputs(false);
-      // And gives its output to the linker.
+          C.createAction<AutolinkExtractJobAction>(AllLinkerInputs);
+      // Takes the same inputs as the linker...
+      // ...and gives its output to the linker.
       LinkAction->addInput(AutolinkExtractAction);
     }
 
@@ -1553,33 +1580,36 @@ void Driver::buildActions(const ToolChain &TC,
       if (OI.DebugInfoKind == IRGenDebugInfoKind::Normal) {
         if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {
           auto *ModuleWrapAction =
-              new ModuleWrapJobAction(MergeModuleAction.release());
+              C.createAction<ModuleWrapJobAction>(MergeModuleAction);
           LinkAction->addInput(ModuleWrapAction);
-        } else
-          LinkAction->addInput(MergeModuleAction.release());
-      } else
-        Actions.push_back(MergeModuleAction.release());
+        } else {
+          LinkAction->addInput(MergeModuleAction);
+        }
+        // FIXME: Adding the MergeModuleAction as top-level regardless would
+        // allow us to get rid of the special case flag for that.
+      } else {
+        TopLevelActions.push_back(MergeModuleAction);
+      }
     }
-    Actions.push_back(LinkAction);
+    TopLevelActions.push_back(LinkAction);
+
     if (TC.getTriple().isOSDarwin() &&
         OI.DebugInfoKind > IRGenDebugInfoKind::None) {
-      auto *dSYMAction = new GenerateDSYMJobAction(LinkAction);
-      dSYMAction->setOwnsInputs(false);
-      Actions.push_back(dSYMAction);
+      auto *dSYMAction = C.createAction<GenerateDSYMJobAction>(LinkAction);
+      TopLevelActions.push_back(dSYMAction);
       if (Args.hasArg(options::OPT_verify_debug_info)) {
-        auto *verifyDebugInfoAction = new VerifyDebugInfoJobAction(dSYMAction);
-        verifyDebugInfoAction->setOwnsInputs(false);
-        Actions.push_back(verifyDebugInfoAction);
+        TopLevelActions.push_back(
+            C.createAction<VerifyDebugInfoJobAction>(dSYMAction));
       }
     }
   } else {
-    // The merge module action needs to be first to force the right outputs
-    // for the other actions. However, we can't rely on it being the only
-    // action because there may be other actions (e.g. BackendJobActions) that
-    // are not merge-module inputs but nonetheless should be run.
+    // We can't rely on the merge module action being the only top-level
+    // action that needs to run. There may be other actions (e.g.
+    // BackendJobActions) that are not merge-module inputs but should be run
+    // anyway.
     if (MergeModuleAction)
-      Actions.push_back(MergeModuleAction.release());
-    Actions.append(AllLinkerInputs.begin(), AllLinkerInputs.end());
+      TopLevelActions.push_back(MergeModuleAction);
+    TopLevelActions.append(AllLinkerInputs.begin(), AllLinkerInputs.end());
   }
 }
 
@@ -1626,54 +1656,38 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args) const {
   return OFM;
 }
 
-void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
-                       const OutputFileMap *OFM, const ToolChain &TC,
-                       Compilation &C) const {
+void Driver::buildJobs(ArrayRef<const Action *> TopLevelActions,
+                       const OutputInfo &OI, const OutputFileMap *OFM,
+                       const ToolChain &TC, Compilation &C) const {
   llvm::PrettyStackTraceString CrashInfo("Building compilation jobs");
 
   const DerivedArgList &Args = C.getArgs();
   JobCacheMap JobCache;
 
-  Arg *FinalOutput = Args.getLastArg(options::OPT_o);
-  if (FinalOutput) {
-    unsigned NumOutputs = 0;
-    for (const Action *A : Actions) {
-      types::ID Type = A->getType();
-
-      // Skip any GeneratePCHJobActions or InputActions incidentally stored in
-      // Actions (for ownership), as a result of PCH-generation.
-      if (isa<GeneratePCHJobAction>(A) || isa<InputAction>(A))
-        continue;
-
-      // Only increment NumOutputs if this is an output which must have its
-      // path specified using -o.
-      // (Module outputs can be specified using -module-output-path, or will
-      // be inferred if there are other top-level outputs. dSYM outputs are
-      // based on the image.)
-      if (Type != types::TY_Nothing && Type != types::TY_SwiftModuleFile &&
-          Type != types::TY_dSYM) {
-        // Multi-threading compilation has multiple outputs, except those
-        // outputs which are produced before the llvm passes (e.g. emit-sil).
-        if (OI.isMultiThreading() && isa<CompileJobAction>(A) &&
-            types::isAfterLLVM(A->getType())) {
-          NumOutputs += cast<CompileJobAction>(A)->size();
-        } else {
-          ++NumOutputs;
-        }
-      }
+  if (Args.hasArg(options::OPT_o) && !OI.shouldLink() &&
+      !OI.ShouldTreatModuleAsTopLevelOutput) {
+    bool ShouldComplain;
+    if (OI.isMultiThreading()) {
+      // Multi-threading compilation has multiple outputs unless there's only
+      // one input.
+      ShouldComplain = C.getInputFiles().size() > 1;
+    } else {
+      // Single-threaded compilation is a problem if we're compiling more than
+      // one file.
+      ShouldComplain = 1 < llvm::count_if(C.getActions(), [](const Action *A) {
+        return isa<CompileJobAction>(A);
+      });
     }
 
-    if (NumOutputs > 1) {
+    if (ShouldComplain) {
       Diags.diagnose(SourceLoc(),
                      diag::error_cannot_specify__o_for_multiple_outputs);
-      FinalOutput = nullptr;
     }
   }
 
-  for (const Action *A : Actions) {
+  for (const Action *A : TopLevelActions) {
     if (auto *JA = dyn_cast<JobAction>(A)) {
-      (void)buildJobsForAction(C, JA, OI, OFM, TC,
-                               /*TopLevel*/true, JobCache);
+      (void)buildJobsForAction(C, JA, OI, OFM, TC, /*TopLevel*/true, JobCache);
     }
   }
 }
@@ -1748,11 +1762,13 @@ static StringRef getOutputFilename(Compilation &C,
     return Buffer.str();
   }
 
-  // FIXME: Treat GeneratePCHJobAction as non-top-level (to get tempfile and not
-  // use the -o arg) even though, based on ownership considerations within the
-  // driver, it is stored as a "top level" JobAction.
-  if (isa<GeneratePCHJobAction>(JA)) {
-    AtTopLevel = false;
+  auto ShouldPreserveOnSignal = PreserveOnSignal::No;
+
+  if (auto *PCHAct = dyn_cast<GeneratePCHJobAction>(JA)) {
+    // For a persistent PCH we don't use an output, the frontend determines
+    // the filename to use for the PCH.
+    assert(!PCHAct->isPersistentPCH());
+    ShouldPreserveOnSignal = PreserveOnSignal::Yes;
   }
 
   // We don't have an output from an Action-specific command line option,
@@ -1787,7 +1803,7 @@ static StringRef getOutputFilename(Compilation &C,
                      EC.message());
       return {};
     }
-    C.addTemporaryFile(Buffer.str());
+    C.addTemporaryFile(Buffer.str(), ShouldPreserveOnSignal);
 
     return Buffer.str();
   }
@@ -1820,7 +1836,8 @@ static StringRef getOutputFilename(Compilation &C,
 
 static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
                                types::ID outputType, const OutputInfo &OI,
-                               const TypeToPathMap *outputMap) {
+                               const TypeToPathMap *outputMap,
+                               StringRef outputPath = StringRef()) {
   StringRef outputMapPath;
   if (outputMap) {
     auto iter = outputMap->find(outputType);
@@ -1831,6 +1848,8 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
   if (!outputMapPath.empty()) {
     // Prefer a path from the OutputMap.
     output.setAdditionalOutputForType(outputType, outputMapPath);
+  } else if (!outputPath.empty()) {
+    output.setAdditionalOutputForType(outputType, outputPath);
   } else {
     // Put the auxiliary output file next to the primary output file.
     llvm::SmallString<128> path;
@@ -1847,6 +1866,58 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
     output.setAdditionalOutputForType(outputType, path);
     if (isTempFile)
       C.addTemporaryFile(path);
+  }
+}
+
+static void addDiagFileOutputForPersistentPCHAction(Compilation &C,
+                                                 const GeneratePCHJobAction *JA,
+                                                    CommandOutput &output,
+                                                    const OutputInfo &OI,
+                                                 const TypeToPathMap *outputMap,
+                                                    DiagnosticEngine &diags) {
+  assert(JA->isPersistentPCH());
+
+  // For a persistent PCH we don't use an output, the frontend determines
+  // the filename to use for the PCH. For the diagnostics file, try to
+  // determine an invocation-specific path inside the directory where the
+  // PCH is going to be written, and fallback to a temporary file if we
+  // cannot determine such a path.
+
+  StringRef pchOutDir = JA->getPersistentPCHDir();
+  StringRef headerPath = output.getBaseInput(JA->getInputIndex());
+  StringRef stem = llvm::sys::path::stem(headerPath);
+  StringRef suffix = types::getTypeTempSuffix(types::TY_SerializedDiagnostics);
+  SmallString<256> outPathBuf;
+
+  if (const Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path)) {
+    // The module file path is unique for a specific module and architecture
+    // (it won't be concurrently written to) so we can use the path as hash
+    // for determining the filename to use for the diagnostic file.
+    StringRef ModuleOutPath = A->getValue();
+    outPathBuf = pchOutDir;
+    llvm::sys::path::append(outPathBuf, stem);
+    outPathBuf += '-';
+    auto code = llvm::hash_value(ModuleOutPath);
+    outPathBuf += llvm::APInt(64, code).toString(36, /*Signed=*/false);
+    llvm::sys::path::replace_extension(outPathBuf, suffix);
+  }
+
+  if (outPathBuf.empty()) {
+    // Fallback to creating a temporary file.
+    std::error_code EC =
+    llvm::sys::fs::createTemporaryFile(stem, suffix, outPathBuf);
+    if (EC) {
+      diags.diagnose(SourceLoc(),
+                     diag::error_unable_to_make_temporary_file,
+                     EC.message());
+      return;
+    }
+    C.addTemporaryFile(outPathBuf.str());
+  }
+
+  if (!outPathBuf.empty()) {
+    addAuxiliaryOutput(C, output, types::TY_SerializedDiagnostics, OI,
+                       outputMap, outPathBuf.str());
   }
 }
 
@@ -1912,9 +1983,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   }
 
   // 2. Build up the list of input jobs.
-  ActionList InputActions;
+  SmallVector<const Action *, 4> InputActions;
   SmallVector<const Job *, 4> InputJobs;
-  for (Action *Input : *JA) {
+  for (const Action *Input : *JA) {
     if (auto *InputJobAction = dyn_cast<JobAction>(Input)) {
       InputJobs.push_back(buildJobsForAction(C, InputJobAction, OI, OFM,
                                              TC, false, JobCache));
@@ -1927,7 +1998,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   StringRef BaseInput;
   if (!InputActions.empty()) {
     // Use the first InputAction as our BaseInput.
-    InputAction *IA = cast<InputAction>(InputActions[0]);
+    const InputAction *IA = cast<InputAction>(InputActions[0]);
     BaseInput = IA->getInputArg().getValue();
   } else if (!InputJobs.empty()) {
     // Use the first Job's BaseInput as our BaseInput.
@@ -1966,8 +2037,8 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       Output->addPrimaryOutput(OutputFile, Input);
     };
     // Add an output file for each input action.
-    for (Action *A : InputActions) {
-      InputAction *IA = cast<InputAction>(A);
+    for (const Action *A : InputActions) {
+      const InputAction *IA = cast<InputAction>(A);
       OutputFunc(IA->getInputArg().getValue());
 
     }
@@ -1984,8 +2055,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   }
 
   // Choose the swiftmodule output path.
-  if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA) &&
-      Output->getPrimaryOutputType() != types::TY_SwiftModuleFile) {
+  if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA)) {
     StringRef OFMModuleOutputPath;
     if (OutputMap) {
       auto iter = OutputMap->find(types::TY_SwiftModuleFile);
@@ -2084,8 +2154,14 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   if (isa<CompileJobAction>(JA) || isa<GeneratePCHJobAction>(JA)) {
     // Choose the serialized diagnostics output path.
     if (C.getArgs().hasArg(options::OPT_serialize_diagnostics)) {
-      addAuxiliaryOutput(C, *Output, types::TY_SerializedDiagnostics, OI,
-                         OutputMap);
+      auto pchJA = dyn_cast<GeneratePCHJobAction>(JA);
+      if (pchJA && pchJA->isPersistentPCH()) {
+        addDiagFileOutputForPersistentPCHAction(C, pchJA, *Output, OI,
+                                                OutputMap, Diags);
+      } else {
+        addAuxiliaryOutput(C, *Output, types::TY_SerializedDiagnostics, OI,
+                           OutputMap);
+      }
 
       // Remove any existing diagnostics files so that clients can detect their
       // presence to determine if a command was run.
@@ -2131,6 +2207,20 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       }
 
       Output->setAdditionalOutputForType(types::TY_ModuleTrace, filename);
+    }
+
+    if (C.getArgs().hasArg(options::OPT_emit_tbd, options::OPT_emit_tbd_path)) {
+      if (OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
+        llvm::outs() << "TBD emission has been disabled, because it requires a "
+                     << "single compiler invocation: consider enabling the "
+                     << "-whole-module-optimization flag.\n";
+      } else {
+        auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
+            OI, C.getArgs(), options::OPT_emit_tbd_path, types::TY_TBD,
+            /*TreatAsTopLevelOutput=*/true, "tbd", Buf);
+
+        Output->setAdditionalOutputForType(types::TY_TBD, filename);
+      }
     }
   }
 
@@ -2273,9 +2363,9 @@ static unsigned printActions(const Action *A,
   return Id;
 }
 
-void Driver::printActions(const ActionList &Actions) const {
+void Driver::printActions(const Compilation &C) const {
   llvm::DenseMap<const Action *, unsigned> Ids;
-  for (const Action *A : Actions) {
+  for (const Action *A : C.getActions()) {
     ::printActions(A, Ids);
   }
 }

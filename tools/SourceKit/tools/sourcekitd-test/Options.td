@@ -32,6 +32,9 @@ def line : Separate<["-"], "line">,
   HelpText<"line">;
 def line_EQ : Joined<["-"], "line=">, Alias<line>;
 
+def using_swift_args : Flag<["-"], "using-swift-args">,
+  HelpText<"Interpret the compiler arguments as Swift compiler arguments">;
+
 def replace : Separate<["-"], "replace">,
   HelpText<"replace text ('text')">;
 def replace_EQ : Joined<["-"], "replace=">, Alias<replace>;
@@ -57,6 +60,10 @@ def cache_path_EQ : Joined<["-"], "cache-path=">, Alias<cache_path>;
 def req_opts : CommaJoined<["-"], "req-opts=">,
   HelpText<"Pass the comma separated options in <arg> as request specific options">,
   MetaVarName<"<arg>">;
+
+def rename_spec : Separate<["-"], "rename-spec">,
+  HelpText<"The JSON format rename spec file (req=syntactic-rename)">;
+def rename_spec_EQ : Joined<["-"], "rename-spec=">, Alias<rename_spec>;
 
 def check_interface_is_ascii : Flag<["-"], "check-interface-ascii">,
   HelpText<"Check that the module interface text is ASCII">;
@@ -103,8 +110,16 @@ def swift_name : Separate<["-"], "swift-name">,
 def objc_name : Separate<["-"], "objc-name">,
   HelpText<"Objective-C name to translate from">;
 
+def name : Separate<["-"], "name">,
+  HelpText<"The preferred name when performing semantic refactoring">;
+
 def objc_selector : Separate<["-"], "objc-selector">,
   HelpText<"Objective-C selector name to translate from">;
+
+def cancel_on_subsequent_request : Separate<["-"], "cancel-on-subsequent-request">,
+  HelpText<"Whether to cancel if there is a subsequent request using the same AST">;
+def cancel_on_subsequent_request_EQ : Joined<["-"], "cancel-on-subsequent-request=">,
+  Alias<cancel_on_subsequent_request>;
 
 def help : Flag<["-", "--"], "help">,
   HelpText<"Display available options">;

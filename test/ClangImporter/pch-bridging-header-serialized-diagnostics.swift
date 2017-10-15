@@ -8,5 +8,14 @@
 // RUN: not %target-swift-frontend -emit-pch %S/Inputs/bad-bridging-header.h -o %t.pch -serialize-diagnostics -serialize-diagnostics-path %t.dia 2>&1 | %FileCheck -check-prefix=CHECK-DIAG %s
 // RUN: c-index-test -read-diagnostics %t.dia > %t.deserialized_diagnostics.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-DIAG -input-file=%t.deserialized_diagnostics.txt %s
+
+// RUN: not %target-swift-frontend -emit-pch %S/Inputs/bad-bridging-header.h -pch-output-dir %t/pch -serialize-diagnostics -serialize-diagnostics-path %t.dia2 2>&1 | %FileCheck -check-prefix=CHECK-DIAG %s
+// RUN: c-index-test -read-diagnostics %t.dia2 > %t.deserialized_diagnostics.txt2 2>&1
+// RUN: %FileCheck -check-prefix=CHECK-DIAG -input-file=%t.deserialized_diagnostics.txt2 %s
+
+// RUN: not %target-swift-frontend -import-objc-header %S/Inputs/bad-bridging-header.h -pch-output-dir %t/pch -typecheck %s -serialize-diagnostics -serialize-diagnostics-path %t.dia3 2>&1 | %FileCheck -check-prefix=CHECK-DIAG %s
+// RUN: c-index-test -read-diagnostics %t.dia3 > %t.deserialized_diagnostics.txt3 2>&1
+// RUN: %FileCheck -check-prefix=CHECK-DIAG -input-file=%t.deserialized_diagnostics.txt3 %s
+
 // CHECK-DIAG: bad-bridging-header.h:1:10: error: 'this-header-does-not-exist.h' file not found
 // CHECK-DIAG: failed to emit precompiled header

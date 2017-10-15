@@ -2,6 +2,9 @@
 // RUN: %FileCheck %s < %t.simple.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 > %t.simple.txt
+// RUN: %FileCheck -check-prefix SIMPLE_STATIC -implicit-check-not -rpath %s < %t.simple.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix IOS_SIMPLE %s < %t.simple.txt
 
@@ -30,6 +33,9 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.cygwin.txt
 // RUN: %FileCheck -check-prefix CYGWIN-x86_64 %s < %t.cygwin.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-unknown-linux-gnu %s -Lbar -o dynlib.out 2>&1 > %t.linux.dynlib.txt
+// RUN: %FileCheck -check-prefix LINUX_DYNLIB-x86_64 %s < %t.linux.dynlib.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-macosx10.9.1 %s -sdk %S/../Inputs/clang-importer-sdk -lfoo -framework bar -Lbaz -Fgarply -Fsystem car -F cdr -Xlinker -undefined -Xlinker dynamic_lookup -o sdk.out 2>&1 > %t.complex.txt
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix COMPLEX %s < %t.complex.txt
@@ -40,7 +46,7 @@
 // RUN: %FileCheck %s < %t.simple-macosx10.10.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple-macosx10.10.txt
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: touch %t/a.o
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-use-filelists -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
@@ -67,6 +73,23 @@
 // SIMPLE-DAG: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
 // SIMPLE-NOT: -syslibroot
 // SIMPLE: -o linker
+
+
+// SIMPLE_STATIC: swift
+// SIMPLE_STATIC: -o [[OBJECTFILE:.*]]
+
+// SIMPLE_STATIC-NEXT: bin/ld{{"? }}
+// SIMPLE_STATIC: [[OBJECTFILE]]
+// SIMPLE_STATIC: -lobjc
+// SIMPLE_STATIC: -lSystem
+// SIMPLE_STATIC: -arch x86_64
+// SIMPLE_STATIC: -L [[STDLIB_PATH:[^ ]+/lib/swift_static/macosx]]
+// SIMPLE_STATIC: -lc++
+// SIMPLE_STATIC: -framework Foundation
+// SIMPLE_STATIC: -force_load_swift_libs
+// SIMPLE_STATIC: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
+// SIMPLE_STATIC: -no_objc_category_merging
+// SIMPLE_STATIC: -o linker
 
 
 // IOS_SIMPLE: swift
@@ -109,6 +132,7 @@
 // LINUX-x86_64: -o [[OBJECTFILE:.*]]
 
 // LINUX-x86_64: clang++{{"? }}
+// LINUX-x86_64-DAG: -pie
 // LINUX-x86_64-DAG: [[OBJECTFILE]]
 // LINUX-x86_64-DAG: -lswiftCore
 // LINUX-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
@@ -124,6 +148,7 @@
 // LINUX-armv6: -o [[OBJECTFILE:.*]]
 
 // LINUX-armv6: clang++{{"? }}
+// LINUX-armv6-DAG: -pie
 // LINUX-armv6-DAG: [[OBJECTFILE]]
 // LINUX-armv6-DAG: -lswiftCore
 // LINUX-armv6-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
@@ -140,6 +165,7 @@
 // LINUX-armv7: -o [[OBJECTFILE:.*]]
 
 // LINUX-armv7: clang++{{"? }}
+// LINUX-armv7-DAG: -pie
 // LINUX-armv7-DAG: [[OBJECTFILE]]
 // LINUX-armv7-DAG: -lswiftCore
 // LINUX-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
@@ -156,6 +182,7 @@
 // LINUX-thumbv7: -o [[OBJECTFILE:.*]]
 
 // LINUX-thumbv7: clang++{{"? }}
+// LINUX-thumbv7-DAG: -pie
 // LINUX-thumbv7-DAG: [[OBJECTFILE]]
 // LINUX-thumbv7-DAG: -lswiftCore
 // LINUX-thumbv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
@@ -172,6 +199,7 @@
 // ANDROID-armv7: -o [[OBJECTFILE:.*]]
 
 // ANDROID-armv7: clang++{{"? }}
+// ANDROID-armv7-DAG: -pie
 // ANDROID-armv7-DAG: [[OBJECTFILE]]
 // ANDROID-armv7-DAG: -lswiftCore
 // ANDROID-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
@@ -210,6 +238,23 @@
 // COMPLEX-DAG: -macosx_version_min 10.9.1
 // COMPLEX: -o sdk.out
 
+// LINUX_DYNLIB-x86_64: swift
+// LINUX_DYNLIB-x86_64: -o [[OBJECTFILE:.*]]
+// LINUX_DYNLIB-x86_64: -o [[AUTOLINKFILE:.*]]
+
+// LINUX_DYNLIB-x86_64: clang++{{"? }}
+// LINUX_DYNLIB-x86_64-DAG: -shared
+// LINUX_DYNLIB-x86_64-DAG: -fuse-ld=gold
+// LINUX_DYNLIB-x86_64-NOT: -pie
+// LINUX_DYNLIB-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+/lib/swift/linux]]
+// LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]/x86_64/swift_begin.o
+// LINUX_DYNLIB-x86_64-DAG: [[OBJECTFILE]]
+// LINUX_DYNLIB-x86_64-DAG: @[[AUTOLINKFILE]]
+// LINUX_DYNLIB-x86_64-DAG: [[STDLIB_PATH]]
+// LINUX_DYNLIB-x86_64-DAG: -lswiftCore
+// LINUX_DYNLIB-x86_64-DAG: -L bar
+// LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]/x86_64/swift_end.o
+// LINUX_DYNLIB-x86_64: -o dynlib.out
 
 // DEBUG: bin/swift
 // DEBUG-NEXT: bin/swift
@@ -250,7 +295,7 @@
 // the Swift driver really thinks it's been moved.
 
 // RUN: rm -rf %t
-// RUN: mkdir -p %t/DISTINCTIVE-PATH/usr/bin/
+// RUN: %empty-directory(%t/DISTINCTIVE-PATH/usr/bin)
 // RUN: touch %t/DISTINCTIVE-PATH/usr/bin/ld
 // RUN: chmod +x %t/DISTINCTIVE-PATH/usr/bin/ld
 // RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/DISTINCTIVE-PATH/usr/bin/swiftc)
@@ -263,8 +308,8 @@
 // Also test arclite detection. This uses xcrun to find arclite when it's not
 // next to Swift.
 
-// RUN: mkdir -p %t/ANOTHER-DISTINCTIVE-PATH/usr/bin
-// RUN: mkdir -p %t/ANOTHER-DISTINCTIVE-PATH/usr/lib/arc
+// RUN: %empty-directory(%t/ANOTHER-DISTINCTIVE-PATH/usr/bin)
+// RUN: %empty-directory(%t/ANOTHER-DISTINCTIVE-PATH/usr/lib/arc)
 // RUN: cp %S/Inputs/xcrun-return-self.sh %t/ANOTHER-DISTINCTIVE-PATH/usr/bin/xcrun
 
 // RUN: env PATH=%t/ANOTHER-DISTINCTIVE-PATH/usr/bin %t/DISTINCTIVE-PATH/usr/bin/swiftc -target x86_64-apple-macosx10.9 %s -### | %FileCheck -check-prefix=XCRUN_ARCLITE %s
@@ -273,7 +318,7 @@
 // XCRUN_ARCLITE: /ANOTHER-DISTINCTIVE-PATH/usr/lib/arc/libarclite_macosx.a
 // XCRUN_ARCLITE: -o {{[^ ]+}}
 
-// RUN: mkdir -p %t/DISTINCTIVE-PATH/usr/lib/arc
+// RUN: %empty-directory(%t/DISTINCTIVE-PATH/usr/lib/arc)
 
 // RUN: env PATH=%t/ANOTHER-DISTINCTIVE-PATH/usr/bin %t/DISTINCTIVE-PATH/usr/bin/swiftc -target x86_64-apple-macosx10.9 %s -### | %FileCheck -check-prefix=RELATIVE_ARCLITE %s
 

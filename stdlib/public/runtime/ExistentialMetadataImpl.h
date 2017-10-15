@@ -26,60 +26,6 @@ namespace metadataimpl {
 /// A common base class for opaque-existential and class-existential boxes.
 template<typename Impl>
 struct LLVM_LIBRARY_VISIBILITY ExistentialBoxBase {
-  template <class Container, class... A>
-  static void destroyArray(Container *array, size_t n, A... args) {
-    size_t stride = Container::getContainerStride(args...);
-    char *bytes = (char*)array;
-    while (n--) {
-      Impl::destroy((Container*)bytes, args...);
-      bytes += stride;
-    }
-  }
-  
-  template <class Container, class... A>
-  static Container *initializeArrayWithCopy(Container *dest,
-                                            Container *src,
-                                            size_t n,
-                                            A... args) {
-    size_t stride = Container::getContainerStride(args...);
-    char *destBytes = (char*)dest, *srcBytes = (char*)src;
-    while (n--) {
-      Impl::initializeWithCopy((Container*)destBytes,
-                               (Container*)srcBytes, args...);
-      destBytes += stride; srcBytes += stride;
-    }
-    return dest;
-  }
-  
-  template <class Container, class... A>
-  static Container *initializeArrayWithTakeFrontToBack(Container *dest,
-                                                       Container *src,
-                                                       size_t n,
-                                                       A... args) {
-    size_t stride = Container::getContainerStride(args...);
-    char *destBytes = (char*)dest, *srcBytes = (char*)src;
-    while (n--) {
-      Impl::initializeWithTake((Container*)destBytes,
-                               (Container*)srcBytes, args...);
-      destBytes += stride; srcBytes += stride;
-    }
-    return dest;
-  }
-  
-  template <class Container, class... A>
-  static Container *initializeArrayWithTakeBackToFront(Container *dest,
-                                                       Container *src,
-                                                       size_t n,
-                                                       A... args) {
-    size_t stride = Container::getContainerStride(args...);
-    char *destBytes = (char*)dest + n * stride, *srcBytes = (char*)src + n * stride;
-    while (n--) {
-      destBytes -= stride; srcBytes -= stride;
-      Impl::initializeWithTake((Container*)destBytes,
-                               (Container*)srcBytes, args...);
-    }
-    return dest;
-  }
 };
 
 /// A common base class for fixed and non-fixed opaque-existential box
@@ -88,7 +34,6 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
     : ExistentialBoxBase<OpaqueExistentialBoxBase> {
   template <class Container, class... A>
   static void destroy(Container *value, A... args) {
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
     auto *type = value->getType();
     auto *vwt = type->getValueWitnesses();
     if (vwt->isValueInline()) {
@@ -100,9 +45,6 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
       swift_release(
           *reinterpret_cast<HeapObject **>(value->getBuffer(args...)));
     }
-#else
-    value->getType()->vw_destroyBuffer(value->getBuffer(args...));
-#endif
   }
 
   enum class Dest {
@@ -143,7 +85,6 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
     src->copyTypeInto(dest, args...);
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
     auto *type = src->getType();
     auto *vwt = type->getValueWitnesses();
 
@@ -158,10 +99,6 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
       // initWithCopy of the reference to the cow box.
       copyReference(dest, src, Dest::Init, Source::Copy, args...);
     }
-#else
-    src->getType()->vw_initializeBufferWithCopyOfBuffer(dest->getBuffer(args...),
-                                                        src->getBuffer(args...));
-#endif
     return dest;
   }
   
@@ -169,7 +106,6 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
   static Container *initializeWithTake(Container *dest, Container *src,
                                        A... args) {
     src->copyTypeInto(dest, args...);
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
     auto *type = src->getType();
     auto *vwt = type->getValueWitnesses();
 
@@ -184,10 +120,6 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
       // initWithTake of the reference to the cow box.
       copyReference(dest, src, Dest::Init, Source::Take, args...);
     }
-#else
-    src->getType()->vw_initializeBufferWithTakeOfBuffer(dest->getBuffer(args...),
-                                                        src->getBuffer(args...));
-#endif
     return dest;
   }
 
@@ -196,7 +128,6 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
                                    A... args) {
     auto srcType = src->getType();
     auto destType = dest->getType();
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
     if (src == dest)
       return dest;
     if (srcType == destType) {
@@ -273,17 +204,6 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
       }
     }
     return dest;
-#else
-    if (srcType == destType) {
-      OpaqueValue *srcValue = srcType->vw_projectBuffer(src->getBuffer(args...));
-      OpaqueValue *destValue = srcType->vw_projectBuffer(dest->getBuffer(args...));
-      srcType->vw_assignWithCopy(destValue, srcValue);
-      return dest;
-    } else {
-      destType->vw_destroyBuffer(dest->getBuffer(args...));
-      return initializeWithCopy(dest, src, args...);
-    }
-#endif
   }
 
   template <class Container, class... A>
@@ -291,7 +211,6 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
                                    A... args) {
     auto srcType = src->getType();
     auto destType = dest->getType();
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
     if (src == dest)
       return dest;
 
@@ -374,17 +293,6 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
       }
     }
     return dest;
-#else
-    if (srcType == destType) {
-      OpaqueValue *srcValue = srcType->vw_projectBuffer(src->getBuffer(args...));
-      OpaqueValue *destValue = srcType->vw_projectBuffer(dest->getBuffer(args...));
-      srcType->vw_assignWithTake(destValue, srcValue);
-      return dest;
-    } else {
-      destType->vw_destroyBuffer(dest->getBuffer(args...));
-      return initializeWithTake(dest, src, args...);
-    }
-#endif
   }
 };
 
@@ -653,16 +561,17 @@ struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
 
   template <class Container, class... A>
   static void storeExtraInhabitant(Container *dest, int index, A... args) {
-    swift_storeHeapObjectExtraInhabitant((HeapObject**) dest->getValueSlot(),
+    Metadata **MD = const_cast<Metadata **>(dest->getValueSlot());
+    swift_storeHeapObjectExtraInhabitant(reinterpret_cast<HeapObject **>(MD),
                                          index);
   }
 
   template <class Container, class... A>
   static int getExtraInhabitantIndex(const Container *src, A... args) {
+    Metadata **MD = const_cast<Metadata **>(src->getValueSlot());
     return swift_getHeapObjectExtraInhabitantIndex(
-                                  (HeapObject* const *) src->getValueSlot());
+        reinterpret_cast<HeapObject *const *>(MD));
   }
-  
 };
 
 /// A box implementation class for an existential metatype container

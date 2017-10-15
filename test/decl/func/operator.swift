@@ -190,10 +190,10 @@ _ = n☃⃠☃⃠n     // expected-error {{ambiguous missing whitespace between 
 // expected-note @-1 {{could be binary '☃⃠' and prefix '☃⃠'}} {{12-12= }} {{18-18= }}
 // expected-note @-2 {{could be postfix '☃⃠' and binary '☃⃠'}} {{6-6= }} {{12-12= }}
 
-_ = n☃⃠☃⃠ // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
-_ = ~!n  // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
-_ = -+n  // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
-_ = -++n // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
+_ = n☃⃠☃⃠ // expected-error {{unary operators must not be juxtaposed; parenthesize inner expression}}
+_ = ~!n  // expected-error {{unary operators must not be juxtaposed; parenthesize inner expression}}
+_ = -+n  // expected-error {{unary operators must not be juxtaposed; parenthesize inner expression}}
+_ = -++n // expected-error {{unary operators must not be juxtaposed; parenthesize inner expression}}
 
 // <rdar://problem/16230507> Cannot use a negative constant as the second operator of ... operator
 _ = 3...-5  // expected-error {{ambiguous missing whitespace between unary and binary operators}} expected-note {{could be postfix '...' and binary '-'}} expected-note {{could be binary '...' and prefix '-'}}
@@ -228,7 +228,7 @@ class C0 {
 }
 
 class C1 {
-  final func %%%(lhs: C1, rhs: C1) -> C1 { return lhs }
+  final func %%%(lhs: C1, rhs: C1) -> C1 { return lhs } // expected-error{{operator '%%%' declared in type 'C1' must be 'static'}}{{3-3=static }}
 }
 
 final class C2 {

@@ -9,14 +9,72 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift
+//
+// RUN: %empty-directory(%t)
+//
+// RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
+// RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestNSNumberBridging
+// 
+// RUN: %target-run %t/TestNSNumberBridging
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-
 
 import StdlibUnittest
 import Foundation
 import CoreGraphics
+import FoundationBridgeObjC
+
+extension Float {
+    init?(reasonably value: Float) {
+        self = value
+    }
+
+    init?(reasonably value: Double) {
+        guard !value.isNaN else {
+            self = Float.nan
+            return
+        }
+
+        guard !value.isInfinite else {
+            if value.sign == .minus {
+                self = -Float.infinity
+            } else {
+                self = Float.infinity
+            }
+            return
+        }
+
+        guard abs(value) <= Double(Float.greatestFiniteMagnitude) else {
+            return nil
+        }
+        
+        self = Float(value)
+    }
+}
+
+extension Double {
+    init?(reasonably value: Float) {
+        guard !value.isNaN else {
+            self = Double.nan
+            return
+        }
+
+        guard !value.isInfinite else {
+            if value.sign == .minus {
+                self = -Double.infinity
+            } else {
+                self = Double.infinity
+            }
+            return
+        }
+
+        self = Double(value)
+    }
+
+    init?(reasonably value: Double) {
+        self = value
+    }
+}
 
 var nsNumberBridging = TestSuite("NSNumberBridging")
 
@@ -645,7 +703,7 @@ func testNSNumberBridgeFromFloat() {
             expectEqual(UInt(exactly: interestingValue), uint)
 
             let float = (number!) as? Float
-            let expectedFloat = Float(exactly: interestingValue)
+            let expectedFloat = Float(reasonably: interestingValue)
             testFloat(expectedFloat, float)
             
             let double = (number!) as? Double
@@ -685,7 +743,7 @@ func testNSNumberBridgeFromDouble() {
             expectEqual(UInt(exactly: interestingValue), uint)
 
             let float = (number!) as? Float
-            let expectedFloat = Float(exactly: interestingValue)
+            let expectedFloat = Float(reasonably: interestingValue)
             testFloat(expectedFloat, float)
             
             let double = (number!) as? Double
@@ -725,7 +783,7 @@ func testNSNumberBridgeFromCGFloat() {
             expectEqual(UInt(exactly: interestingValue.native), uint)
             
             let float = (number!) as? Float
-            let expectedFloat = Float(exactly: interestingValue.native)
+            let expectedFloat = Float(reasonably: interestingValue.native)
             testFloat(expectedFloat, float)
             
             let double = (number!) as? Double
@@ -821,6 +879,42 @@ func test_numericBitPatterns_to_floatingPointTypes() {
     }
 }
 
+func testNSNumberBridgeAnyHashable() {
+    var dict = [AnyHashable : Any]()
+    for i in -Int(UInt8.min) ... Int(UInt8.max) {
+        dict[i] = "\(i)"
+    }
+
+    // When bridging a dictionary to NSDictionary, we should be able to access
+    // the keys through either an Int (the original type boxed in AnyHashable)
+    // or NSNumber (the type Int bridged to).
+    let ns_dict = dict as NSDictionary
+    for i in -Int(UInt8.min) ... Int(UInt8.max) {
+        guard let value = ns_dict[i] as? String else {
+            expectUnreachable("Unable to look up value by Int key.")
+            continue
+        }
+
+        guard let ns_value = ns_dict[NSNumber(value: i)] as? String else {
+            expectUnreachable("Unable to look up value by NSNumber key.")
+            continue
+        }
+        
+        expectEqual(value, ns_value)
+    }
+}
+
+func testNSNumberBridgeAnyHashableObjc() {
+    let range = -Int(UInt8.min) ... Int(UInt8.max)
+    var dict = [AnyHashable : Any]()
+    for i in range {
+        dict[i] = "\(i)"
+    }
+
+    let verifier = NumberBridgingTester()
+    expectTrue(verifier.verifyKeys(in: NSRange(range), existIn: dict))
+}
+
 nsNumberBridging.test("Bridge Int8") { testNSNumberBridgeFromInt8() }
 nsNumberBridging.test("Bridge UInt8") { testNSNumberBridgeFromUInt8() }
 nsNumberBridging.test("Bridge Int16") { testNSNumberBridgeFromInt16() }
@@ -835,4 +929,6 @@ nsNumberBridging.test("Bridge Float") { testNSNumberBridgeFromFloat() }
 nsNumberBridging.test("Bridge Double") { testNSNumberBridgeFromDouble() }
 nsNumberBridging.test("Bridge CGFloat") { testNSNumberBridgeFromCGFloat() }
 nsNumberBridging.test("bitPattern to exactly") { test_numericBitPatterns_to_floatingPointTypes() }
+nsNumberBridging.test("Bridge AnyHashable") { testNSNumberBridgeAnyHashable() }
+nsNumberBridging.test("Bridge AnyHashable (ObjC)") { testNSNumberBridgeAnyHashableObjc() }
 runAllTests()

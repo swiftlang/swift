@@ -7,6 +7,7 @@ handle_gyb_sources(
 
 add_swift_unittest(SwiftBasicTests
   BlotMapVectorTest.cpp
+  CacheTest.cpp
   ClusteredBitVectorTest.cpp
   DemangleTest.cpp
   DiverseStackTest.cpp

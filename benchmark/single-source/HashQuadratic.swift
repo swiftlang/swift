@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let HashQuadratic = BenchmarkInfo(
+  name: "HashQuadratic",
+  runFunction: run_HashQuadratic,
+  tags: [.unstable, .api, .Dictionary])
+
 let size = 3_000_000
 
 @inline(never)
@@ -27,7 +32,6 @@ public func run_HashQuadratic(_ N: Int) {
             dict2[k] = v
         }
     
-        CheckResults(dict1[size/2] == dict2[size/2],
-            "Incorrect results in HashQuadratic")
+        CheckResults(dict1[size/2] == dict2[size/2])
     }
 }

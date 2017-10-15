@@ -5,7 +5,7 @@ option(SOURCEKITD_BUILD_STATIC_INPROC
 
 set(sourcekitdInProc_args
   sourcekitdInProc.cpp
-  DEPENDS SourceKitSwiftLang sourcekitdAPI
+  LINK_LIBS SourceKitSwiftLang sourcekitdAPI
   LLVM_COMPONENT_DEPENDS support coverage
 )
 
@@ -40,10 +40,6 @@ if (SOURCEKITD_BUILD_STATIC_INPROC)
   add_sourcekit_library(sourcekitdInProc_Static
     ${sourcekitdInProc_args}
   )
-endif()
-
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-  target_link_libraries(sourcekitdInProc PUBLIC BlocksRuntime)
 endif()
 
 if (SOURCEKIT_BUILT_STANDALONE)

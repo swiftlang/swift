@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass="Function Signature Optimization" -module-name=test -emit-sil -primary-file %s | %FileCheck %s
 
 // Also do an end-to-end test to check all components, including IRGen.
-// RUN: rm -rf %t && mkdir -p %t 
+// RUN: %empty-directory(%t) 
 // RUN: %target-build-swift -O -Xllvm -sil-disable-pass="Function Signature Optimization" -module-name=test %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 // REQUIRES: executable_test

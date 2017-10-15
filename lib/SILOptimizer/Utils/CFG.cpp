@@ -50,9 +50,10 @@ TermInst *swift::addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
       assert(FalseArgs.size() == Dest->getNumArguments());
     }
 
-    NewBr = Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
-                                    CBI->getTrueBB(), TrueArgs,
-                                    CBI->getFalseBB(), FalseArgs);
+    NewBr = Builder.createCondBranch(
+        CBI->getLoc(), CBI->getCondition(), CBI->getTrueBB(), TrueArgs,
+        CBI->getFalseBB(), FalseArgs, CBI->getTrueBBCount(),
+        CBI->getFalseBBCount());
   } else if (auto *BI = dyn_cast<BranchInst>(Branch)) {
     SmallVector<SILValue, 8> Args;
 
@@ -120,9 +121,10 @@ TermInst *swift::changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest,
     assert(FalseArgs.size() == CBI->getFalseBB()->getNumArguments() &&
            "Destination block's number of arguments must match");
 
-    CBI = Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
-                                    CBI->getTrueBB(), TrueArgs,
-                                    CBI->getFalseBB(), FalseArgs);
+    CBI = Builder.createCondBranch(
+        CBI->getLoc(), CBI->getCondition(), CBI->getTrueBB(), TrueArgs,
+        CBI->getFalseBB(), FalseArgs, CBI->getTrueBBCount(),
+        CBI->getFalseBBCount());
     Branch->dropAllReferences();
     Branch->eraseFromParent();
     return CBI;
@@ -205,8 +207,9 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     else
       FalseDest = NewDest;
 
-    B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(),
-                       TrueDest, TrueArgs, FalseDest, FalseArgs);
+    B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(), TrueDest,
+                       TrueArgs, FalseDest, FalseArgs, CondBr->getTrueBBCount(),
+                       CondBr->getFalseBBCount());
     CondBr->dropAllReferences();
     CondBr->eraseFromParent();
     return;
@@ -256,7 +259,8 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
     auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
     B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
-                              CBI->getCastType(), SuccessBB, FailureBB);
+                              CBI->getCastType(), SuccessBB, FailureBB,
+                              CBI->getTrueBBCount(), CBI->getFalseBBCount());
     CBI->eraseFromParent();
     return;
   }
@@ -277,10 +281,12 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
     auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
     auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
+    auto TrueCount = CBI->getTrueBBCount();
+    auto FalseCount = CBI->getFalseBBCount();
     B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
                                   CBI->getSrc(), CBI->getSourceType(),
                                   CBI->getDest(), CBI->getTargetType(),
-                                  SuccessBB, FailureBB);
+                                  SuccessBB, FailureBB, TrueCount, FalseCount);
     CBI->eraseFromParent();
     return;
   }
@@ -294,8 +300,7 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     for (auto &Op : TAI->getArgumentOperands())
       Arguments.push_back(Op.get());
 
-    B.createTryApply(TAI->getLoc(), TAI->getCallee(),
-                     TAI->getSubstCalleeSILType(), TAI->getSubstitutions(),
+    B.createTryApply(TAI->getLoc(), TAI->getCallee(), TAI->getSubstitutions(),
                      Arguments, NormalBB, ErrorBB);
 
     TAI->eraseFromParent();
@@ -373,8 +378,9 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
       FalseDest = NewDest;
     }
 
-    B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(),
-        TrueDest, TrueArgs, FalseDest, FalseArgs);
+    B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(), TrueDest,
+                       TrueArgs, FalseDest, FalseArgs, CondBr->getTrueBBCount(),
+                       CondBr->getFalseBBCount());
     CondBr->dropAllReferences();
     CondBr->eraseFromParent();
     return;
@@ -424,7 +430,8 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
     auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
     B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
-        CBI->getCastType(), SuccessBB, FailureBB);
+                              CBI->getCastType(), SuccessBB, FailureBB,
+                              CBI->getTrueBBCount(), CBI->getFalseBBCount());
     CBI->eraseFromParent();
     return;
   }
@@ -448,10 +455,12 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     assert(OldDest == CBI->getSuccessBB() || OldDest == CBI->getFailureBB() && "Invalid edge index");
     auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
     auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
+    auto TrueCount = CBI->getTrueBBCount();
+    auto FalseCount = CBI->getFalseBBCount();
     B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
-        CBI->getSrc(), CBI->getSourceType(),
-        CBI->getDest(), CBI->getTargetType(),
-        SuccessBB, FailureBB);
+                                  CBI->getSrc(), CBI->getSourceType(),
+                                  CBI->getDest(), CBI->getTargetType(),
+                                  SuccessBB, FailureBB, TrueCount, FalseCount);
     CBI->eraseFromParent();
     return;
   }
@@ -544,6 +553,14 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     return;
   }
   if (auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
+    auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
+    if (!SuccBB->getNumArguments())
+      return;
+    Args.push_back(NewEdgeBB->createPHIArgument(
+        SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+    return;
+  }
+  if (auto CBI = dyn_cast<CheckedCastValueBranchInst>(T)) {
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;

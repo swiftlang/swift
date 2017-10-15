@@ -973,7 +973,7 @@ public struct ${Self}<Element> : ${SelfProtocols} {
     // FIXME: swift-3-indexing-model: use defaults.
 //     if Self not in ['DefaultedCollection', 'DefaultedBidirectionalCollection', 'DefaultedRandomAccessCollection', 'DefaultedMutableCollection', 'DefaultedRangeReplaceableCollection']:
 
-  public subscript(bounds: Range<${Index}>) -> ${SelfSlice}<${Self}<Base._Element>> {
+  public subscript(bounds: Range<${Index}>) -> ${SelfSlice}<${Self}<Base.Element>> {
     get {
       // FIXME: swift-3-indexing-model: range check.
       return ${SelfSlice}(base: self, bounds: bounds)

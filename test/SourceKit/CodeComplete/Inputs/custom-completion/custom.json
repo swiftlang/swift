@@ -24,6 +24,13 @@
         source.lang.swift.stmt,
         source.lang.swift.type
       ]
+    },
+    {
+      key.name: "customForEach",
+      key.kind: myuid.customForEach,
+      key.context: [
+        source.lang.swift.foreach.sequence,
+      ]
     }
   ]
 }

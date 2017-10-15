@@ -35,7 +35,7 @@ entry (%0 : $AnyObject):
 // CHECK:         store
 sil @function_cast_nothrow_to_nothrow : $@convention(thin) <T> () -> () {
 entry:
-  %a = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@in ()) -> @out ()                 to () -> ()        in undef : $*(@in ()) -> @out ()
+  unconditional_checked_cast_addr () -> ()        in undef : $*(@in ()) -> @out ()                 to () -> ()        in undef : $*(@in ()) -> @out ()
   return undef : $()
 }
 
@@ -43,7 +43,7 @@ entry:
 // CHECK:         unconditional_checked_cast_addr
 sil @function_cast_nothrow_to_nothrow_substitutable : $@convention(thin) <T> () -> () {
 entry:
-  %a = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@in ()) -> @out ()                 to (T) -> T        in undef : $*(@in T) -> @out T
+  unconditional_checked_cast_addr () -> ()        in undef : $*(@in ()) -> @out ()                 to (T) -> T        in undef : $*(@in T) -> @out T
   return undef : $()
 }
 
@@ -51,14 +51,15 @@ entry:
 // CHECK:         unconditional_checked_cast_addr
 sil @function_cast_nothrow_substitutable_to_nothrow : $@convention(thin) <T> () -> () {
 entry:
-  %a = unconditional_checked_cast_addr take_on_success (T) -> T        in undef : $*(@in T) -> @out T                 to () -> ()        in undef : $*(@in ()) -> @out ()
+  unconditional_checked_cast_addr (T) -> T        in undef : $*(@in T) -> @out T                 to () -> ()        in undef : $*(@in ()) -> @out ()
   return undef : $()
 }
 
 // CHECK-LABEL: sil @function_cast_throw_to_nothrow
 // CHECK:         builtin "int_trap"
 sil @function_cast_throw_to_nothrow : $@convention(thin) <T> () -> () {
-  %b = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@in ()) -> (@out (), @error Error) to () -> ()        in undef : $*(@in ()) -> @out ()
+entry:
+  unconditional_checked_cast_addr () throws -> () in undef : $*(@in ()) -> (@out (), @error Error) to () -> ()        in undef : $*(@in ()) -> @out ()
   return undef : $()
 }
 
@@ -66,7 +67,8 @@ sil @function_cast_throw_to_nothrow : $@convention(thin) <T> () -> () {
 // CHECK-LABEL: sil @function_cast_nothrow_to_throw
 // CHECK:         unconditional_checked_cast_addr
 sil @function_cast_nothrow_to_throw : $@convention(thin) <T> () -> () {
-  %c = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@in ()) -> @out ()                 to () throws -> () in undef : $*(@in ()) -> (@out (), @error Error)
+entry:
+  unconditional_checked_cast_addr () -> ()        in undef : $*(@in ()) -> @out ()                 to () throws -> () in undef : $*(@in ()) -> (@out (), @error Error)
   return undef : $()
 }
 
@@ -74,7 +76,8 @@ sil @function_cast_nothrow_to_throw : $@convention(thin) <T> () -> () {
 // CHECK:         load
 // CHECK:         store
 sil @function_cast_throw_to_throw : $@convention(thin) <T> () -> () {
-  %d = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@in ()) -> (@out (), @error Error) to () throws -> () in undef : $*(@in ()) -> (@out (), @error Error)
+entry:
+  unconditional_checked_cast_addr () throws -> () in undef : $*(@in ()) -> (@out (), @error Error) to () throws -> () in undef : $*(@in ()) -> (@out (), @error Error)
   return undef : $()
 }
 
@@ -110,7 +113,7 @@ bb0:
 sil @destroy_source_of_removed_cast : $@convention(thin) (@in AnyObject) -> () {
 bb0(%0 : $*AnyObject):
   %2 = alloc_stack $Int
-  unconditional_checked_cast_addr take_always AnyObject in %0 : $*AnyObject to Int in %2 : $*Int
+  unconditional_checked_cast_addr AnyObject in %0 : $*AnyObject to Int in %2 : $*Int
   %3 = load %2 : $*Int
   dealloc_stack %2 : $*Int
   %r = tuple ()
@@ -129,7 +132,7 @@ protocol P {}
 sil @remove_dead_checked_cast : $@convention(thin) (@in AnyObject) -> () {
 bb0(%0 : $*AnyObject):
   %5 = alloc_stack $P
-  unconditional_checked_cast_addr take_always AnyObject in %0 : $*AnyObject to P in %5 : $*P
+  unconditional_checked_cast_addr AnyObject in %0 : $*AnyObject to P in %5 : $*P
   destroy_addr %5 : $*P
   dealloc_stack %5 : $*P
   %r = tuple ()

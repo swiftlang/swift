@@ -27,7 +27,7 @@ class HasProp {
   var HasProp: HasProp {
     return HasProp() // expected-error {{cannot call value of non-function type 'HasProp'}}{{19-21=}}
   }
-  var SomethingElse: SomethingElse? { // expected-error 2 {{use of undeclared type 'SomethingElse'}}
+  var SomethingElse: SomethingElse? { // expected-error {{use of undeclared type 'SomethingElse'}}
     return nil
   }
 }
@@ -40,12 +40,13 @@ protocol ReferenceSomeProtocol {
 func TopLevelFunc(x: TopLevelFunc) -> TopLevelFunc { return x } // expected-error 2 {{use of undeclared type 'TopLevelFunc'}}'
 func TopLevelGenericFunc<TopLevelGenericFunc : TopLevelGenericFunc>(x: TopLevelGenericFunc) -> TopLevelGenericFunc { return x } // expected-error {{inheritance from non-protocol, non-class type 'TopLevelGenericFunc'}}
 func TopLevelGenericFunc2<T : TopLevelGenericFunc2>(x: T) -> T { return x} // expected-error {{use of undeclared type 'TopLevelGenericFunc2'}}
-var TopLevelVar: TopLevelVar? { return nil } // expected-error 2 {{use of undeclared type 'TopLevelVar'}}
+var TopLevelVar: TopLevelVar? { return nil } // expected-error {{use of undeclared type 'TopLevelVar'}}
 
 
-protocol AProtocol {
-  // FIXME: Should produce an error here, but it's currently causing problems.
-  associatedtype e : e
+// FIXME: The first error is redundant, isn't correct in what it states, and
+// also should be emitted on the inheritance clause.
+protocol AProtocol { // expected-error {{type 'Self.e' constrained to non-protocol, non-class type 'Self.e'}}
+  associatedtype e : e // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
 }
 
 

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -46,6 +47,13 @@ SDKNodeKind swift::ide::api::parseSDKNodeKind(StringRef Content) {
 NodeAnnotation swift::ide::api::parseSDKNodeAnnotation(StringRef Content) {
   return llvm::StringSwitch<NodeAnnotation>(Content)
 #define NODE_ANNOTATION(NAME) .Case(#NAME, NodeAnnotation::NAME)
+#include "swift/IDE/DigesterEnums.def"
+  ;
+}
+
+SpecialCaseId swift::ide::api::parseSpecialCaseId(StringRef Content) {
+  return llvm::StringSwitch<SpecialCaseId>(Content)
+#define SPECIAL_CASE_ID(NAME) .Case(#NAME, SpecialCaseId::NAME)
 #include "swift/IDE/DigesterEnums.def"
   ;
 }
@@ -103,6 +111,50 @@ void swift::ide::api::CommonDiffItem::streamDef(llvm::raw_ostream &S) const {
 
 StringRef swift::ide::api::TypeMemberDiffItem::head() {
   return "SDK_CHANGE_TYPE_MEMBER";
+}
+
+TypeMemberDiffItemSubKind
+swift::ide::api::TypeMemberDiffItem::getSubKind() const {
+  DeclNameViewer OldName = getOldName();
+  DeclNameViewer NewName = getNewName();
+  if (!OldName.isFunction()) {
+    assert(!NewName.isFunction());
+    if (oldTypeName.empty())
+      return TypeMemberDiffItemSubKind::SimpleReplacement;
+    else
+      return TypeMemberDiffItemSubKind::QualifiedReplacement;
+  }
+  assert(OldName.isFunction());
+  bool ToProperty = !NewName.isFunction();
+  if (selfIndex) {
+    if (removedIndex) {
+      if (ToProperty)
+        llvm_unreachable("unknown situation");
+      else {
+        assert(NewName.argSize() + 2 == OldName.argSize());
+        return TypeMemberDiffItemSubKind::HoistSelfAndRemoveParam;
+      }
+    } else if (ToProperty) {
+      assert(OldName.argSize() == 1);
+      return TypeMemberDiffItemSubKind::HoistSelfAndUseProperty;
+    } else if (oldTypeName.empty()) {
+      assert(NewName.argSize() + 1 == OldName.argSize());
+      return TypeMemberDiffItemSubKind::HoistSelfOnly;
+    } else {
+      assert(NewName.argSize() == OldName.argSize());
+      return TypeMemberDiffItemSubKind::QualifiedReplacement;
+    }
+  } else if (ToProperty) {
+    assert(OldName.argSize() == 0);
+    assert(!removedIndex);
+    return TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty;
+  } else if (oldTypeName.empty()){
+    assert(NewName.argSize() == OldName.argSize());
+    return TypeMemberDiffItemSubKind::SimpleReplacement;
+  } else {
+    assert(NewName.argSize() == OldName.argSize());
+    return TypeMemberDiffItemSubKind::QualifiedReplacement;
+  }
 }
 
 void swift::ide::api::TypeMemberDiffItem::describe(llvm::raw_ostream &os) {
@@ -199,7 +251,9 @@ bool APIDiffItem::operator==(const APIDiffItem &Other) const {
   case APIDiffItemKind::ADK_CommonDiffItem: {
     auto *Left = static_cast<const CommonDiffItem*>(this);
     auto *Right = static_cast<const CommonDiffItem*>(&Other);
-    return Left->ChildIndex == Right->ChildIndex;
+    return
+      Left->DiffKind == Right->DiffKind &&
+      Left->ChildIndex == Right->ChildIndex;
   }
   case APIDiffItemKind::ADK_NoEscapeFuncParam: {
     auto *Left = static_cast<const NoEscapeFuncParam*>(this);
@@ -208,6 +262,7 @@ bool APIDiffItem::operator==(const APIDiffItem &Other) const {
   }
   case APIDiffItemKind::ADK_TypeMemberDiffItem:
   case APIDiffItemKind::ADK_OverloadedFuncInfo:
+  case APIDiffItemKind::ADK_SpecialCaseDiffItem:
     return true;
   }
 }
@@ -274,11 +329,14 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
   }
   case APIDiffItemKind::ADK_TypeMemberDiffItem: {
     Optional<uint8_t> SelfIndexShort;
+    Optional<uint8_t> RemovedIndexShort;
     if (SelfIndex)
       SelfIndexShort = SelfIndex.getValue();
+    if (RemovedIndex)
+      RemovedIndexShort = RemovedIndex.getValue();
     return new (Alloc.Allocate<TypeMemberDiffItem>())
       TypeMemberDiffItem(Usr, NewTypeName, NewPrintedName, SelfIndexShort,
-                         OldPrintedName);
+                         RemovedIndexShort, OldTypeName, OldPrintedName);
   }
   case APIDiffItemKind::ADK_NoEscapeFuncParam: {
     return new (Alloc.Allocate<NoEscapeFuncParam>())
@@ -286,6 +344,10 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
   }
   case APIDiffItemKind::ADK_OverloadedFuncInfo: {
     return new (Alloc.Allocate<OverloadedFuncInfo>()) OverloadedFuncInfo(Usr);
+  }
+  case APIDiffItemKind::ADK_SpecialCaseDiffItem: {
+    return new (Alloc.Allocate<SpecialCaseDiffItem>())
+      SpecialCaseDiffItem(Usr, SpecialCaseId);
   }
   }
 }
@@ -342,6 +404,8 @@ struct ObjectTraits<APIDiffItem*> {
       out.mapRequired(getKeyContent(DiffItemKeyKind::KK_Usr), Item->usr);
       out.mapRequired(getKeyContent(DiffItemKeyKind::KK_OldPrintedName),
                       Item->oldPrintedName);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_OldTypeName),
+                      Item->oldTypeName);
       out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NewPrintedName),
                       Item->newPrintedName);
       out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NewTypeName),
@@ -365,6 +429,8 @@ struct ObjectTraits<APIDiffItem*> {
       out.mapRequired(getKeyContent(DiffItemKeyKind::KK_Usr), Item->Usr);
       return;
     }
+    case APIDiffItemKind::ADK_SpecialCaseDiffItem:
+      llvm_unreachable("This entry should be authored only.");
     }
   }
 };
@@ -395,6 +461,7 @@ public:
   llvm::StringMap<std::vector<APIDiffItem*>> Data;
   bool PrintUsr;
   std::vector<APIDiffItem*> AllItems;
+  llvm::StringSet<> PrintedUsrs;
   void addStorePath(StringRef FileName) {
     llvm::MemoryBuffer *pMemBuffer = nullptr;
     {
@@ -428,8 +495,10 @@ public:
 
 ArrayRef<APIDiffItem*> swift::ide::api::APIDiffItemStore::
 getDiffItems(StringRef Key) const {
-  if (Impl.PrintUsr)
+  if (Impl.PrintUsr && !Impl.PrintedUsrs.count(Key)) {
     llvm::outs() << Key << "\n";
+    Impl.PrintedUsrs.insert(Key);
+  }
   return Impl.Data[Key];
 }
 

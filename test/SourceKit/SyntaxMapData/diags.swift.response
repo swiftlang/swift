@@ -6,7 +6,7 @@
     key.filepath: parse_error.swift,
     key.severity: source.diagnostic.severity.error,
     key.description: "expected '(' in argument list of function declaration",
-    key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+    key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.fixits: [
       {
         key.offset: 26,
@@ -37,7 +37,7 @@
     key.filepath: parse_error.swift,
     key.severity: source.diagnostic.severity.error,
     key.description: "expected '(' in argument list of function declaration",
-    key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+    key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.fixits: [
       {
         key.offset: 29,

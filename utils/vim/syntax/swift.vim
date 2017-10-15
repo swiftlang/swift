@@ -1,7 +1,7 @@
 " Vim syntax file
 " Language: swift
 " Maintainer: Joe Groff <jgroff@apple.com>
-" Last Change: 2013 Feb 2
+" Last Change: 2017 Aug 12
 
 if exists("b:current_syntax")
     finish
@@ -22,13 +22,11 @@ syn keyword swiftKeyword
       \ guard
       \ if
       \ in
-      \ let
       \ repeat
       \ return
       \ switch
       \ throw
       \ try
-      \ var
       \ where
       \ while
 syn match swiftMultiwordKeyword
@@ -44,6 +42,7 @@ syn keyword swiftDefinitionModifier
       \ final
       \ internal
       \ nonmutating
+      \ open
       \ override
       \ private
       \ public
@@ -51,6 +50,10 @@ syn keyword swiftDefinitionModifier
       \ rethrows
       \ static
       \ throws
+      \ weak
+
+syn keyword swiftInOutKeyword skipwhite nextgroup=swiftTypeName
+      \ inout
 
 syn keyword swiftIdentifierKeyword
       \ Self
@@ -81,6 +84,9 @@ syn keyword swiftTypeDefinition skipwhite nextgroup=swiftTypeName
       \ struct
       \ typealias
 
+syn match swiftMultiwordTypeDefinition skipwhite nextgroup=swiftTypeName
+      \ "indirect enum"
+
 syn keyword swiftVarDefinition skipwhite nextgroup=swiftVarName
       \ let
       \ var
@@ -103,7 +109,7 @@ syn match swiftImportModule contained nextgroup=swiftImportComponent
 syn match swiftImportComponent contained nextgroup=swiftImportComponent
       \ /\.\<[A-Za-z_][A-Za-z_0-9]*\>/
 
-syn match swiftTypeName contained nextgroup=swiftTypeParameters
+syn match swiftTypeName contained skipwhite nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>/
 syn match swiftVarName contained skipwhite nextgroup=swiftTypeDeclaration
       \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
@@ -111,12 +117,12 @@ syn match swiftImplicitVarName
       \ /\$\<[A-Za-z_0-9]\+\>/
 
 " TypeName[Optionality]?
-syn match swiftType contained nextgroup=swiftTypeParameters
+syn match swiftType contained skipwhite nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " [Type:Type] (dictionary) or [Type] (array)
 syn region swiftType contained contains=swiftTypePair,swiftType
       \ matchgroup=Delimiter start=/\[/ end=/\]/
-syn match swiftTypePair contained nextgroup=swiftTypeParameters,swiftTypeDeclaration
+syn match swiftTypePair contained skipwhite nextgroup=swiftTypeParameters,swiftTypeDeclaration
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " (Type[, Type]) (tuple)
 " FIXME: we should be able to use skip="," and drop swiftParamDelim
@@ -130,13 +136,13 @@ syn region swiftTypeParameters contained contains=swiftVarName,swiftConstraint
 syn keyword swiftConstraint contained
       \ where
 
-syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
+syn match swiftTypeDeclaration skipwhite nextgroup=swiftType,swiftInOutKeyword
       \ /:/
 syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
       \ /->/
 
-syn region swiftString start=/"/ skip=/\\\\\|\\"/ end=/"/ contains=swiftInterpolation
-syn region swiftInterpolation start=/\\(/ end=/)/ contained
+syn region swiftString start=/"/ skip=/\\\\\|\\"/ end=/"/ contains=swiftInterpolationRegion
+syn region swiftInterpolationRegion matchgroup=swiftInterpolation start=/\\(/ end=/)/ contained contains=TOP
 syn region swiftComment start="/\*" end="\*/" contains=swiftComment,swiftLineComment,swiftTodo
 syn region swiftLineComment start="//" end="$" contains=swiftComment,swiftTodo
 
@@ -150,7 +156,7 @@ syn match swiftOperator "\.\.[<.]" skipwhite nextgroup=swiftTypeParameters
 
 syn match swiftChar /'\([^'\\]\|\\\(["'tnr0\\]\|x[0-9a-fA-F]\{2}\|u[0-9a-fA-F]\{4}\|U[0-9a-fA-F]\{8}\)\)'/
 
-syn match swiftPreproc /#\(\<file\>\|\<line\>\)/
+syn match swiftPreproc /#\(\<file\>\|\<line\>\|\<function\>\)/
 syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\)/
 syn region swiftPreprocFalse start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
 
@@ -172,12 +178,14 @@ hi def link swiftImportComponent Identifier
 hi def link swiftKeyword Statement
 hi def link swiftMultiwordKeyword Statement
 hi def link swiftTypeDefinition Define
+hi def link swiftMultiwordTypeDefinition Define
 hi def link swiftType Type
 hi def link swiftTypePair Type
 hi def link swiftTypeName Function
 hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Define
+hi def link swiftInOutKeyword Define
 hi def link swiftFuncKeyword Function
 hi def link swiftFuncKeywordGeneral Function
 hi def link swiftVarDefinition Define

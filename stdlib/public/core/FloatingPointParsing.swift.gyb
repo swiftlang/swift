@@ -30,6 +30,8 @@ cFuncSuffix2 = {32: 'f', 64: 'd', 80: 'ld'}
 
 /// Returns `true` iff isspace(u) would return nonzero when the current
 /// locale is the C locale.
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
   return "\t\n\u{b}\u{c}\r ".utf16.contains(u)
 }
@@ -38,7 +40,7 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 %   Self = floatName(bits)
 
 % if bits == 80:
-#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
 //===--- Parsing ----------------------------------------------------------===//
@@ -123,7 +125,8 @@ extension ${Self} : LosslessStringConvertible {
   /// - Parameter text: The input string to convert to a `${Self}` instance. If
   ///   `text` has invalid characters or is in an invalid format, the result
   ///   is `nil`.
-  public init?(_ text: String) {
+  @_inlineable // FIXME(sil-serialize-all)
+  public init?<S: StringProtocol>(_ text: S) {
     let u16 = text.utf16
     func parseNTBS(_ chars: UnsafePointer<CChar>) -> (${Self}, Int) {
       var result: ${Self} = 0
@@ -133,7 +136,7 @@ extension ${Self} : LosslessStringConvertible {
       return (result, endPtr == nil ? 0 : endPtr! - chars)
     }
 
-    let (result, n) = text.withCString(parseNTBS)
+    let (result, n) = text._ephemeralString.withCString(parseNTBS)
 
     if n == 0 || n != u16.count
     || u16.contains(where: { $0 > 127 || _isspace_clocale($0) }) {

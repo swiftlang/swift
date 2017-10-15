@@ -183,3 +183,50 @@ func testHideOp10() {
   struct local {}
   local#^HIDE_OP_10^#
 }
+
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideDesc.json -tok=HIDE_DESC_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_DESC_1
+func testHideDesc1() {
+  struct Local {
+    func over(_: Int) {}
+    func over(_: Float) {}
+  }
+
+  Local().#^HIDE_DESC_1^#
+}
+// HIDE_DESC_1-NOT: over
+// HIDE_DESC_1: over(Float)
+// HIDE_DESC_1-NOT: over
+
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideDesc.json -tok=HIDE_DESC_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_DESC_2
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideDesc.json -tok=HIDE_DESC_3 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_DESC_2
+func testHideDesc2() {
+  struct Local {
+    subscript(_: Int) -> Int { return 0 }
+    subscript(_: Float) -> Float { return 0.0 }
+  }
+
+  Local()#^HIDE_DESC_2^#
+
+  let local = Local()
+  #^HIDE_DESC_3,local^#
+}
+// HIDE_DESC_2-NOT: [Int]
+// HIDE_DESC_2: [Float]
+// HIDE_DESC_2-NOT: [Int]
+
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showDesc.json -tok=SHOW_DESC_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=SHOW_DESC_2
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showDesc.json -tok=SHOW_DESC_3 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=SHOW_DESC_2
+func testHideDesc2() {
+  struct Local {
+    subscript(_: Int) -> Int { return 0 }
+    subscript(_: Float) -> Float { return 0.0 }
+  }
+
+  Local()#^SHOW_DESC_2^#
+
+  let local = Local()
+  #^SHOW_DESC_3,local^#
+}
+// SHOW_DESC_2-NOT: [Int]
+// SHOW_DESC_2: [Float]
+// SHOW_DESC_2-NOT: [Int]

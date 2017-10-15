@@ -33,7 +33,9 @@ protected:
 public:
   Darwin(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Darwin() = default;
-
+  bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
+                                 StringRef sanitizerLibName)
+      const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY GenericUnix : public ToolChain {
@@ -94,6 +96,9 @@ protected:
 public:
   GenericUnix(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~GenericUnix() = default;
+  bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
+                                 StringRef sanitizerLibName)
+      const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY Android : public GenericUnix {

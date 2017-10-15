@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let PopFront = [
+  BenchmarkInfo(name: "PopFrontArray", runFunction: run_PopFrontArray, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "PopFrontUnsafePointer", runFunction: run_PopFrontUnsafePointer, tags: [.validation, .api]),
+]
+
 let reps = 1
 let arrayCount = 1024
 
@@ -27,7 +32,7 @@ public func run_PopFrontArray(_ N: Int) {
         result += a[0]
         a.remove(at: 0)
       }
-      CheckResults(result == arrayCount, "IncorrectResults in StringInterpolation: \(result) != \(arrayCount)")
+      CheckResults(result == arrayCount)
     }
   }
 }
@@ -48,7 +53,7 @@ public func run_PopFrontUnsafePointer(_ N: Int) {
         a.assign(from: a + 1, count: count - 1)
         count -= 1
       }
-      CheckResults(result == arrayCount, "IncorrectResults in StringInterpolation: \(result) != \(arrayCount)")
+      CheckResults(result == arrayCount)
     }
   }
   a.deallocate(capacity: arrayCount)

@@ -242,7 +242,7 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
     if (!cls) cls = _getSwiftValueClass();
 
     // Check whether the class conforms to the protocol.
-    if (![cls conformsToProtocol: (Protocol*) protocol])
+    if (![cls conformsToProtocol: protocol_const_cast(protocol)])
       return false;
   }
 
@@ -344,21 +344,12 @@ static NSString *getValueDescription(_SwiftValue *self) {
 
   // Copy the value, since it will be consumed by getSummary.
   ValueBuffer copyBuf;
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   auto copy = type->allocateBufferIn(&copyBuf);
   type->vw_initializeWithCopy(copy, const_cast<OpaqueValue *>(value));
-#else
-  auto copy = type->vw_initializeBufferWithCopy(&copyBuf,
-                                              const_cast<OpaqueValue*>(value));
-#endif
 
   swift_getSummary(&tmp, copy, type);
 
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   type->deallocateBufferIn(&copyBuf);
-#else
-  type->vw_deallocateBuffer(&copyBuf);
-#endif
   return convertStringToNSString(&tmp);
 }
 

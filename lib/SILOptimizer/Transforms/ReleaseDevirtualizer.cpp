@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "llvm/ADT/Statistic.h"
 
@@ -149,9 +150,6 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
 
   DeallocType = DeallocType->substGenericArgs(M, AllocSubMap);
 
-  SILType ReturnType = Dealloc->getConventions().getSILResultType();
-  SILType DeallocSILType = SILType::getPrimitiveObjectType(DeallocType);
-
   SILBuilder B(ReleaseInst);
   if (object->getType() != AllocType)
     object = B.createUncheckedRefCast(ReleaseInst->getLoc(), object, AllocType);
@@ -169,8 +167,7 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
   if (auto *Sig = NTD->getGenericSignature())
     Sig->getSubstitutions(AllocSubMap, AllocSubsts);
 
-  B.createApply(ReleaseInst->getLoc(), MI, DeallocSILType, ReturnType,
-                AllocSubsts, { object }, false);
+  B.createApply(ReleaseInst->getLoc(), MI, AllocSubsts, {object}, false);
 
   NumReleasesDevirtualized++;
   ReleaseInst->eraseFromParent();

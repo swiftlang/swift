@@ -47,7 +47,7 @@ public func randomShuffle<T>(_ a: [T]) -> [T] {
     // FIXME: 32 bits are not enough in general case!
     let j = Int(rand32(exclusiveUpperBound: UInt32(i + 1)))
     if i != j {
-      swap(&result[i], &result[j])
+      result.swapAt(i, j)
     }
   }
   return result

@@ -69,19 +69,6 @@ struct MyError : Error {
 #if !arch(arm64)
 % end
 
-extension ${TestType} : Equatable {}
-public func ==(_ x: ${TestType}, _ y: ${TestType}) -> Bool {
-  for i in 0..<${cols} {
-//    Workaround <rdar://problem/18900352>
-%   if type in float_types:
-    if x[i] != y[i] && !(x[i].isNaN && y[i].isNaN) { return false }
-%   else:
-    if x[i] != y[i] { return false }
-% end
-  }
-  return true
-}
-
 enum Enum${TestType} : Equatable {
   case Empty
   case Value(${TestType})

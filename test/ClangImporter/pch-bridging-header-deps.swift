@@ -10,6 +10,11 @@
 // RUN: %FileCheck --check-prefix CHECK-SWIFTDEPS %s < %t.swiftdeps
 // RUN: %FileCheck --check-prefix CHECK-SWIFTDEPS2 %s < %t.swiftdeps
 
+// RUN: %target-swift-frontend -module-name test -c -emit-dependencies-path %t.persistent.d -emit-reference-dependencies-path %t.persistent.swiftdeps -primary-file %s %s -import-objc-header %S/Inputs/chained-unit-test-bridging-header-to-pch.h -pch-output-dir %t/pch
+// RUN: %FileCheck --check-prefix CHECK-DEPS %s < %t.persistent.d
+// RUN: %FileCheck --check-prefix CHECK-SWIFTDEPS %s < %t.persistent.swiftdeps
+// RUN: %FileCheck --check-prefix CHECK-SWIFTDEPS2 %s < %t.persistent.swiftdeps
+
 print(app_function(1))
 
 // CHECK-DEPS: pch-bridging-header-deps.o : {{.*}}SOURCE_DIR/test/ClangImporter/Inputs/app-bridging-header-to-pch.h {{.*}}SOURCE_DIR/test/ClangImporter/Inputs/chained-unit-test-bridging-header-to-pch.h

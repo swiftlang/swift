@@ -33,6 +33,12 @@ func callIt(fn: () -> ()) {
   fn()
 }
 
+protocol Use {
+  func use<T>(_ t: T)
+}
+
+var user: Use? = nil
+
 class BaseZ {
   final func baseCapturesSelf() -> Self {
     let fn = { [weak self] in _ = self }
@@ -41,11 +47,14 @@ class BaseZ {
   }
 }
 
-// Do not inline C.capturesSelf() into main either.
+// Do not inline C.capturesSelf() into main either. Doing so would lose the ability
+// to materialize local Self metadata.
 class Z : BaseZ {
+  @inline(__always)
   final func capturesSelf() -> Self {
     let fn = { [weak self] in _ = self }
     callIt(fn: fn)
+    user?.use(self)
     return self
   }
 

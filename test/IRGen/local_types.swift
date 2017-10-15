@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module %S/Inputs/local_types_helper.swift -o %t
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -parse-as-library %s -I %t > %t.ll
 // RUN: %FileCheck %s < %t.ll
@@ -16,7 +16,7 @@ public func singleFunc() {
 }
 
 public let singleClosure: () -> () = {
-  // CHECK-DAG: @_T011local_types13singleClosureyycvfiyycfU_06SingleD6StructL_VWV = internal constant
+  // CHECK-DAG: @_T011local_types13singleClosureyycvpfiyycfU_06SingleD6StructL_VWV = internal constant
   struct SingleClosureStruct {
     let i: Int
   }
@@ -24,7 +24,7 @@ public let singleClosure: () -> () = {
 
 public struct PatternStruct {
   public var singlePattern: Int = ({
-    // CHECK-DAG: @_T011local_types13PatternStructV06singleC0SivfiSiycfU_06SinglecD0L_VWV = internal constant
+    // CHECK-DAG: @_T011local_types13PatternStructV06singleC0SivpfiSiycfU_06SinglecD0L_VWV = internal constant
     struct SinglePatternStruct {
       let i: Int
     }

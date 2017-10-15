@@ -14,6 +14,11 @@
 // rdar://problem/19804127
 import TestsUtils
 
+public let DictionarySwap = [
+  BenchmarkInfo(name: "DictionarySwap", runFunction: run_DictionarySwap, tags: [.validation, .api, .Dictionary]),
+  BenchmarkInfo(name: "DictionarySwapOfObjects", runFunction: run_DictionarySwapOfObjects, tags: [.validation, .api, .Dictionary]),
+]
+
 @inline(never)
 public func run_DictionarySwap(_ N: Int) {
     let size = 100
@@ -23,20 +28,18 @@ public func run_DictionarySwap(_ N: Int) {
     for i in 1...size {
         dict[i] = i
     }
-    CheckResults(dict.count == size,
-                 "Incorrect dict count: \(dict.count) != \(size).")
+    CheckResults(dict.count == size)
 
     var swapped = false
     for _ in 1...10000*N {
-        swap(&dict[25]!, &dict[75]!)
+        (dict[25], dict[75]) = (dict[75]!, dict[25]!)
         swapped = !swapped
         if !swappedCorrectly(swapped, dict[25]!, dict[75]!) {
             break
         }
     }
 
-    CheckResults(swappedCorrectly(swapped, dict[25]!, dict[75]!),
-                 "Dictionary value swap failed")
+    CheckResults(swappedCorrectly(swapped, dict[25]!, dict[75]!))
 }
 
 // Return true if correctly swapped, false otherwise
@@ -70,18 +73,18 @@ public func run_DictionarySwapOfObjects(_ N: Int) {
     for i in 1...size {
         dict[Box(i)] = Box(i)
     }
-    CheckResults(dict.count == size,
-                 "Incorrect dict count: \(dict.count) != \(size).")
+    CheckResults(dict.count == size)
 
     var swapped = false
     for _ in 1...10000*N {
-        swap(&dict[Box(25)]!, &dict[Box(75)]!)
+        let b1 = Box(25)
+        let b2 = Box(75)
+        (dict[b1], dict[b2]) = (dict[b2]!, dict[b1]!)
         swapped = !swapped
         if !swappedCorrectly(swapped, dict[Box(25)]!.value, dict[Box(75)]!.value) {
             break
         }
     }
 
-    CheckResults(swappedCorrectly(swapped, dict[Box(25)]!.value, dict[Box(75)]!.value),
-                 "Dictionary value swap failed")
+    CheckResults(swappedCorrectly(swapped, dict[Box(25)]!.value, dict[Box(75)]!.value))
 }

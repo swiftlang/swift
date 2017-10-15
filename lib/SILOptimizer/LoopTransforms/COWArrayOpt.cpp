@@ -53,7 +53,7 @@ COWViewCFGFunction("view-cfg-before-cow-for", llvm::cl::init(""),
 static SILValue getAccessPath(SILValue V, SmallVectorImpl<unsigned>& Path) {
   V = stripCasts(V);
   ProjectionIndex PI(V);
-  if (!PI.isValid() || V->getKind() == ValueKind::IndexAddrInst)
+  if (!PI.isValid() || isa<IndexAddrInst>(V))
     return V;
 
   SILValue UnderlyingObject = getAccessPath(PI.Aggregate, Path);
@@ -100,10 +100,10 @@ public:
 
   UserList AggregateAddressUsers;
   UserList StructAddressUsers;
-  UserList StructLoads;
+  SmallVector<LoadInst*, 16> StructLoads;
   UserList StructValueUsers;
   UserOperList ElementAddressUsers;
-  UserOperList ElementLoads;
+  SmallVector<std::pair<LoadInst*, Operand*>, 16> ElementLoads;
   UserOperList ElementValueUsers;
   VisitedSet Visited;
 
@@ -140,11 +140,7 @@ public:
 protected:
 
   static bool definesSingleObjectType(ValueBase *V) {
-    if (auto *Arg = dyn_cast<SILArgument>(V))
-      return Arg->getType().isObject();
-    if (auto *Inst = dyn_cast<SILInstruction>(V))
-      return Inst->hasValue() && Inst->getType().isObject();
-    return false;
+    return V->getType().isObject();
   }
 
   /// If AccessPathSuffix is non-empty, then the value is the address of an
@@ -170,8 +166,8 @@ protected:
           continue;
         }
 
-        if (isa<StructElementAddrInst>(UseInst)) {
-          collectAddressUses(UseInst, AccessPathSuffix, StructVal);
+        if (auto proj = dyn_cast<StructElementAddrInst>(UseInst)) {
+          collectAddressUses(proj, AccessPathSuffix, StructVal);
           continue;
         }
 
@@ -186,8 +182,8 @@ protected:
           continue;
         }
 
-        if (isa<StructElementAddrInst>(UseInst)) {
-          collectAddressUses(UseInst, AccessPathSuffix, &*UI);
+        if (auto proj = dyn_cast<StructElementAddrInst>(UseInst)) {
+          collectAddressUses(proj, AccessPathSuffix, &*UI);
           continue;
         }
 
@@ -201,10 +197,18 @@ protected:
         continue;
       }
 
-      ProjectionIndex PI(UseInst);
+      // Check for uses of projections.
+
+      // These are all single-value instructions.
+      auto ProjInst = dyn_cast<SingleValueInstruction>(UseInst);
+      if (!ProjInst) {
+        AggregateAddressUsers.push_back(UseInst);
+        continue;
+      }
+      ProjectionIndex PI(ProjInst);
       // Do not form a path from an IndexAddrInst without otherwise
       // distinguishing it from subelement addressing.
-      if (!PI.isValid() || V->getKind() == ValueKind::IndexAddrInst) {
+      if (!PI.isValid() || isa<IndexAddrInst>(V)) {
         // Found a use of an aggregate containing the given element.
         AggregateAddressUsers.push_back(UseInst);
         continue;
@@ -220,7 +224,7 @@ protected:
 
       // Recursively check for users after stripping this component from the
       // access path.
-      collectAddressUses(UseInst, AccessPathSuffix.slice(1), nullptr);
+      collectAddressUses(ProjInst, AccessPathSuffix.slice(1), nullptr);
     }
   }
 };
@@ -631,20 +635,19 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 
 /// Returns true if this instruction is a safe array use if all of its users are
 /// also safe array users.
-static bool isTransitiveSafeUser(SILInstruction *I) {
+static SILValue isTransitiveSafeUser(SILInstruction *I) {
   switch (I->getKind()) {
-  case ValueKind::StructExtractInst:
-  case ValueKind::TupleExtractInst:
-  case ValueKind::UncheckedEnumDataInst:
-  case ValueKind::StructInst:
-  case ValueKind::TupleInst:
-  case ValueKind::EnumInst:
-  case ValueKind::UncheckedRefCastInst:
-  case ValueKind::UncheckedBitwiseCastInst:
-    assert(I->hasValue() && "We assume these are unary");
-    return true;
+  case SILInstructionKind::StructExtractInst:
+  case SILInstructionKind::TupleExtractInst:
+  case SILInstructionKind::UncheckedEnumDataInst:
+  case SILInstructionKind::StructInst:
+  case SILInstructionKind::TupleInst:
+  case SILInstructionKind::EnumInst:
+  case SILInstructionKind::UncheckedRefCastInst:
+  case SILInstructionKind::UncheckedBitwiseCastInst:
+    return cast<SingleValueInstruction>(I);
   default:
-    return false;
+    return nullptr;
   }
 }
 
@@ -667,8 +670,8 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
     /// Is this a unary transitive safe user instruction. This means that the
     /// instruction is safe only if all of its users are safe. Check this
     /// recursively.
-    if (isTransitiveSafeUser(UseInst)) {
-      if (std::all_of(UseInst->use_begin(), UseInst->use_end(),
+    if (auto inst = isTransitiveSafeUser(UseInst)) {
+      if (std::all_of(inst->use_begin(), inst->use_end(),
                       [this](Operand *Op) -> bool {
                         return checkSafeArrayElementUse(Op->getUser(),
                                                         Op->get());
@@ -765,8 +768,8 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   // all of its users are safe array element uses, recursively check its uses
   // and return false if any of them are not transitive escape array element
   // uses.
-  if (isTransitiveSafeUser(UseInst)) {
-    return std::all_of(UseInst->use_begin(), UseInst->use_end(),
+  if (auto result = isTransitiveSafeUser(UseInst)) {
+    return std::all_of(result->use_begin(), result->use_end(),
                        [this, &ArrayVal](Operand *UI) -> bool {
                          return checkSafeArrayElementUse(UI->getUser(),
                                                          ArrayVal);
@@ -874,7 +877,8 @@ bool COWArrayOpt::isArrayValueReleasedBeforeMutate(
       return false;
     StartInst = ASI;
   } else {
-    StartInst = cast<SILInstruction>(V);
+    // True because of the caller.
+    StartInst = V->getDefiningInstruction();
   }
   for (auto II = std::next(SILBasicBlock::iterator(StartInst)),
             IE = StartInst->getParent()->end();
@@ -936,9 +940,9 @@ static SILInstruction *getInstAfter(SILInstruction *I) {
 static SILValue
 stripValueProjections(SILValue V,
                       SmallVectorImpl<SILInstruction *> &ValuePrjs) {
-  while (V->getKind() == ValueKind::StructExtractInst) {
-    ValuePrjs.push_back(cast<SILInstruction>(V));
-    V = cast<SILInstruction>(V)->getOperand(0);
+  while (auto SEI = dyn_cast<StructExtractInst>(V)) {
+    ValuePrjs.push_back(SEI);
+    V = SEI->getOperand();
   }
   return V;
 }
@@ -1232,8 +1236,9 @@ bool COWArrayOpt::hoistInLoopWithOnlyNonArrayValueMutatingOperations() {
         // are release before we hit a make_unique instruction.
         ApplyInst *SemCall = Sem;
         if (Sem.getKind() == ArrayCallKind::kGetElement) {
-          SILValue Elem = (Sem.hasGetElementDirectResult() ? Inst :
-                           SemCall->getArgument(0));
+          SILValue Elem = (Sem.hasGetElementDirectResult()
+                            ? Sem.getCallResult()
+                            : SemCall->getArgument(0));
           if (!Elem->getType().isTrivial(Module))
             CreatedNonTrivialValues.insert(Elem);
         } else if (Sem.getKind() == ArrayCallKind::kMakeMutable) {
@@ -1933,7 +1938,7 @@ class RegionCloner : public SILCloner<RegionCloner> {
   SILBasicBlock *StartBB;
   SmallPtrSet<SILBasicBlock *, 16> OutsideBBs;
 
-  friend class SILVisitor<RegionCloner>;
+  friend class SILInstructionVisitor<RegionCloner>;
   friend class SILCloner<RegionCloner>;
 
 public:
@@ -2086,7 +2091,8 @@ protected:
 
       // Update outside used instruction values.
       for (auto &Inst : *OrigBB) {
-        updateSSAForValue(OrigBB, &Inst, SSAUp);
+        for (auto result : Inst.getResults())
+          updateSSAForValue(OrigBB, result, SSAUp);
       }
     }
   }
@@ -2213,6 +2219,24 @@ static void replaceArrayPropsCall(SILBuilder &B, ArraySemanticsCall C) {
   C.removeCall();
 }
 
+/// Collects all loop dominated blocks outside the loop that are immediately
+/// dominated by the loop.
+static void
+collectImmediateLoopDominatedBlocks(const SILLoop *Lp, DominanceInfoNode *Node,
+                                    SmallVectorImpl<SILBasicBlock *> &Blocks) {
+  SILBasicBlock *BB = Node->getBlock();
+
+  // Base case: First loop dominated block outside of loop.
+  if (!Lp->contains(BB)) {
+    Blocks.push_back(BB);
+    return;
+  }
+
+  // Loop contains the basic block. Look at immediately dominated nodes.
+  for (auto *Child : *Node)
+    collectImmediateLoopDominatedBlocks(Lp, Child, Blocks);
+}
+
 void ArrayPropertiesSpecializer::specializeLoopNest() {
   auto *Lp = getLoop();
   assert(Lp);
@@ -2225,21 +2249,18 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
   auto *CheckBlock = splitBasicBlockAndBranch(B,
       HoistableLoopPreheader->getTerminator(), DomTree, nullptr);
 
-  // Get the exit blocks of the original loop.
   auto *Header = CheckBlock->getSingleSuccessorBlock();
   assert(Header);
 
-  // Our loop info is not really completely valid anymore since the cloner does
-  // not update it. However, exit blocks of the original loop are still valid.
+  // Collect all loop dominated blocks (e.g exit blocks could be among them). We
+  // need to update their dominator.
+  SmallVector<SILBasicBlock *, 16> LoopDominatedBlocks;
+  collectImmediateLoopDominatedBlocks(Lp, DomTree->getNode(Header),
+                                      LoopDominatedBlocks);
+
+  // Collect all exit blocks.
   SmallVector<SILBasicBlock *, 16> ExitBlocks;
   Lp->getExitBlocks(ExitBlocks);
-
-  // Collect the exit blocks dominated by the loop - they will be dominated by
-  // the check block.
-  SmallVector<SILBasicBlock *, 16> ExitBlocksDominatedByPreheader;
-  for (auto *ExitBlock: ExitBlocks)
-    if (DomTree->dominates(CheckBlock, ExitBlock))
-      ExitBlocksDominatedByPreheader.push_back(ExitBlock);
 
   // Split the preheader before the first instruction.
   SILBasicBlock *NewPreheader =
@@ -2269,8 +2290,8 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
                      IsFastNativeArray, ClonedPreheader, NewPreheader);
   CheckBlock->getTerminator()->eraseFromParent();
 
-  // Fixup the exit blocks. They are now dominated by the check block.
-  for (auto *BB : ExitBlocksDominatedByPreheader)
+  // Fixup the loop dominated blocks. They are now dominated by the check block.
+  for (auto *BB : LoopDominatedBlocks)
     DomTree->changeImmediateDominator(DomTree->getNode(BB),
                                       DomTree->getNode(CheckBlock));
 
@@ -2292,9 +2313,16 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     if (!ShouldSpecializeArrayProps)
       return;
 
+    auto *Fn = getFunction();
+
+    // Don't hoist array property calls at Osize.
+    auto OptMode = Fn->getModule().getOptions().Optimization;
+    if (OptMode == SILOptions::SILOptMode::OptimizeForSize)
+      return;
+
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
-    SILLoopInfo *LI = LA->get(getFunction());
+    SILLoopInfo *LI = LA->get(Fn);
 
     bool HasChanged = false;
 

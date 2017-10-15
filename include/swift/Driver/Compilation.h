@@ -57,6 +57,13 @@ enum class OutputLevel {
   Parseable,
 };
 
+/// Indicates whether a temporary file should always be preserved if a part of
+/// the compilation crashes.
+enum class PreserveOnSignal : bool {
+  No,
+  Yes
+};
+
 class Compilation {
   friend class PerformJobsState;
 private:
@@ -65,6 +72,11 @@ private:
 
   /// The OutputLevel at which this Compilation should generate output.
   OutputLevel Level;
+
+  /// The Actions which were used to build the Jobs.
+  ///
+  /// This is mostly only here for lifetime management.
+  SmallVector<std::unique_ptr<const Action>, 32> Actions;
 
   /// The Jobs which will be performed by this compilation.
   SmallVector<std::unique_ptr<const Job>, 32> Jobs;
@@ -87,8 +99,8 @@ private:
 
   /// Temporary files that should be cleaned up after the compilation finishes.
   ///
-  /// These apply whether the compilation succeeds or fails.
-  std::vector<std::string> TempFilePaths;
+  /// These apply whether the compilation succeeds or fails. If the
+  llvm::StringMap<PreserveOnSignal> TempFilePaths;
 
   /// Write information about this compilation to this file.
   ///
@@ -150,10 +162,15 @@ private:
   /// -emit-loaded-module-trace, so no other job needs to do it.
   bool PassedEmitLoadedModuleTraceToFrontendJob = false;
 
-  static const Job *unwrap(const std::unique_ptr<const Job> &p) {
+  template <typename T>
+  static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
   }
-  
+
+  template <typename T>
+  using UnwrappedArrayView =
+      ArrayRefView<std::unique_ptr<T>, T *, Compilation::unwrap<T>>;
+
 public:
   Compilation(DiagnosticEngine &Diags, OutputLevel Level,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
@@ -168,20 +185,29 @@ public:
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
   ~Compilation();
 
-  ArrayRefView<std::unique_ptr<const Job>, const Job *, Compilation::unwrap>
-  getJobs() const {
+  UnwrappedArrayView<const Action> getActions() const {
+    return llvm::makeArrayRef(Actions);
+  }
+
+  template <typename SpecificAction, typename... Args>
+  SpecificAction *createAction(Args &&...args) {
+    auto newAction = new SpecificAction(std::forward<Args>(args)...);
+    Actions.emplace_back(newAction);
+    return newAction;
+  }
+
+  UnwrappedArrayView<const Job> getJobs() const {
     return llvm::makeArrayRef(Jobs);
   }
   Job *addJob(std::unique_ptr<Job> J);
 
-  void addTemporaryFile(StringRef file) {
-    TempFilePaths.push_back(file.str());
+  void addTemporaryFile(StringRef file,
+                        PreserveOnSignal preserve = PreserveOnSignal::No) {
+    TempFilePaths[file] = preserve;
   }
 
   bool isTemporaryFile(StringRef file) {
-    // TODO: Use a set instead of a linear search.
-    return std::find(TempFilePaths.begin(), TempFilePaths.end(), file) !=
-             TempFilePaths.end();
+    return TempFilePaths.count(file);
   }
 
   const llvm::opt::DerivedArgList &getArgs() const { return *TranslatedArgs; }
@@ -255,9 +281,12 @@ public:
 private:
   /// \brief Perform all jobs.
   ///
-  /// \returns exit code of the first failed Job, or 0 on success. A return
-  /// value of -2 indicates that a Job crashed during execution.
-  int performJobsImpl();
+  /// \param[out] abnormalExit Set to true if any job exits abnormally (i.e.
+  /// crashes).
+  ///
+  /// \returns exit code of the first failed Job, or 0 on success. If a Job
+  /// crashes during execution, a negative value will be returned.
+  int performJobsImpl(bool &abnormalExit);
 
   /// \brief Performs a single Job by executing in place, if possible.
   ///

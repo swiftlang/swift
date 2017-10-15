@@ -9,8 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/CollectionCasts.swift
 // RUN: %line-directive %t/CollectionCasts.swift -- %target-build-swift %t/CollectionCasts.swift -o %t/a.out
 // RUN: %line-directive %t/CollectionCasts.swift -- %target-run %t/a.out 2>&1

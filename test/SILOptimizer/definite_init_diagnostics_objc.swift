@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -sdk %S/../SILGen/Inputs %s -I %S/../SILGen/Inputs -enable-source-import -parse-stdlib -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership -sdk %S/../SILGen/Inputs %s -I %S/../SILGen/Inputs -enable-source-import -parse-stdlib -o /dev/null -verify
 // REQUIRES: objc_interop
 
 import Swift
@@ -18,16 +18,16 @@ class RequiresInitsDerived : Gizmo {
     if i > 0 {
       super.init()
     }
-  } // expected-error{{super.init isn't called on all paths before returning from initializer}}
+  } // expected-error{{'super.init' isn't called on all paths before returning from initializer}}
 
   init(d: Double) {
-    f() // expected-error {{use of 'self' in method call 'f' before super.init initializes self}}
+    f() // expected-error {{'self' used in method call 'f' before 'super.init' call}}
     super.init()
   }
 
   init(t: ()) {
-    a = 5 // expected-error {{use of 'self' in property access 'a' before super.init initializes self}}
-    b = 10 // expected-error {{use of 'self' in property access 'b' before super.init initializes self}}
+    a = 5 // expected-error {{'self' used in property access 'a' before 'super.init' call}}
+    b = 10 // expected-error {{'self' used in property access 'b' before 'super.init' call}}
     super.init()
     c = 15
   }

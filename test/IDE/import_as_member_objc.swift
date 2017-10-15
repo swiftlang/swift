@@ -13,6 +13,7 @@
 // PRINT-CLASS-NEXT:     let rawValue: Int
 // PRINT-CLASS-NEXT:     typealias RawValue = Int
 // PRINT-CLASS-NEXT:     typealias Element = SomeClass
+// PRINT-CLASS-NEXT:     typealias ArrayLiteralElement = SomeClass
 // PRINT-CLASS-NEXT:     static var fuzzyDice: SomeClass.Options { get }
 // PRINT-CLASS-NEXT:     static var spoiler: SomeClass.Options { get }
 // PRINT-CLASS-NEXT:   }

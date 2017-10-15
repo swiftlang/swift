@@ -1,0 +1,7 @@
+Name:            NotificationCenter
+Classes:
+  - Name:            NCWidgetController
+    Methods:
+      - Selector:        'widgetController'
+        MethodKind:      Class
+        SwiftName:       'widgetController()'

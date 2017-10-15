@@ -361,13 +361,139 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
   )
 }
 
-StringTests.test("String.init(_:String)") {
-  let _: String = String("" as String) // should compile without ambiguities
-}
-
 StringTests.test("[String].joined() -> String") {
   let s = ["hello", "world"].joined()
   _ = s == "" // should compile without error
+}
+
+StringTests.test("UnicodeScalarView.Iterator.Lifetime") {
+  // Tests that String.UnicodeScalarView.Iterator is maintaining the lifetime of
+  // an underlying String buffer. https://bugs.swift.org/browse/SR-5401
+  //
+  // WARNING: it is very easy to write this test so it produces false negatives
+  // (i.e. passes even when the code is broken).  The array, for example, seems
+  // to be a requirement.  So perturb this test with care!
+  let sources = ["𝓣his 𝓘s 𝓜uch 𝓛onger 𝓣han 𝓐ny 𝓢mall 𝓢tring 𝓑uffer"]
+  for s in sources {
+    // Append something to s so that it creates a dynamically-allocated buffer.
+    let i = (s + "X").unicodeScalars.makeIterator()
+    expectEqualSequence(s.unicodeScalars, IteratorSequence(i).dropLast(),
+      "Actual Contents: \(Array(IteratorSequence(i)))")
+  }
+}
+
+StringTests.test("Regression/rdar-33276845") {
+  // These two cases fail slightly differently when the code is broken
+  // See rdar://33276845
+  do {
+    let s = String(repeating: "x", count: 0xffff)
+    let a = Array(s.utf8)
+    expectNotEqual(0, a.count)
+  }
+  do {
+    let s = String(repeating: "x", count: 0x1_0010)
+    let a = Array(s.utf8)
+    expectNotEqual(0, a.count)
+  }
+}
+
+StringTests.test("Regression/corelibs-foundation") {
+  struct NSRange { var location, length: Int }
+
+  func NSFakeRange(_ location: Int, _ length: Int) -> NSRange {
+    return NSRange(location: location, length: length)
+  }
+
+  func substring(of _storage: String, with range: NSRange) -> String {
+    let start = _storage.utf16.startIndex
+    let min = _storage.utf16.index(start, offsetBy: range.location)
+    let max = _storage.utf16.index(
+      start, offsetBy: range.location + range.length)
+
+    if let substr = String(_storage.utf16[min..<max]) {
+      return substr
+    }
+    //If we come here, then the range has created unpaired surrogates on either end.
+    //An unpaired surrogate is replaced by OXFFFD - the Unicode Replacement Character.
+    //The CRLF ("\r\n") sequence is also treated like a surrogate pair, but its constinuent
+    //characters "\r" and "\n" can exist outside the pair!
+
+    let replacementCharacter = String(describing: UnicodeScalar(0xFFFD)!)
+    let CR: UInt16 = 13  //carriage return
+    let LF: UInt16 = 10  //new line
+
+    //make sure the range is of non-zero length
+    guard range.length > 0 else { return "" }
+
+    //if the range is pointing to a single unpaired surrogate
+    if range.length == 1 {
+      switch _storage.utf16[min] {
+      case CR: return "\r"
+      case LF: return "\n"
+      default: return replacementCharacter
+      }
+    }
+
+    //set the prefix and suffix characters
+    let prefix = _storage.utf16[min] == LF ? "\n" : replacementCharacter
+    let suffix = _storage.utf16[_storage.utf16.index(before: max)] == CR
+      ? "\r" : replacementCharacter
+
+    let postMin = _storage.utf16.index(after: min)
+
+    //if the range breaks a surrogate pair at the beginning of the string
+    if let substrSuffix = String(
+      _storage.utf16[postMin..<max]) {
+      return prefix + substrSuffix
+    }
+
+    let preMax = _storage.utf16.index(before: max)
+    //if the range breaks a surrogate pair at the end of the string
+    if let substrPrefix = String(_storage.utf16[min..<preMax]) {
+      return substrPrefix + suffix
+    }
+
+    //the range probably breaks surrogate pairs at both the ends
+    guard postMin <= preMax else { return prefix + suffix }
+
+    let substr =  String(_storage.utf16[postMin..<preMax])!
+    return prefix + substr + suffix
+  }
+
+  let trivial = "swift.org"
+  expectEqual(substring(of: trivial, with: NSFakeRange(0, 5)), "swift")
+
+  let surrogatePairSuffix = "Hurray🎉"
+  expectEqual(substring(of: surrogatePairSuffix, with: NSFakeRange(0, 7)), "Hurray�")
+
+  let surrogatePairPrefix = "🐱Cat"
+  expectEqual(substring(of: surrogatePairPrefix, with: NSFakeRange(1, 4)), "�Cat")
+
+  let singleChar = "😹"
+  expectEqual(substring(of: singleChar, with: NSFakeRange(0,1)), "�")
+
+  let crlf = "\r\n"
+  expectEqual(substring(of: crlf, with: NSFakeRange(0,1)), "\r")
+  expectEqual(substring(of: crlf, with: NSFakeRange(1,1)), "\n")
+  expectEqual(substring(of: crlf, with: NSFakeRange(1,0)), "")
+
+  let bothEnds1 = "😺😺"
+  expectEqual(substring(of: bothEnds1, with: NSFakeRange(1,2)), "��")
+
+  let s1 = "😺\r\n"
+  expectEqual(substring(of: s1, with: NSFakeRange(1,2)), "�\r")
+
+  let s2 = "\r\n😺"
+  expectEqual(substring(of: s2, with: NSFakeRange(1,2)), "\n�")
+
+  let s3 = "😺cats😺"
+  expectEqual(substring(of: s3, with: NSFakeRange(1,6)), "�cats�")
+
+  let s4 = "😺cats\r\n"
+  expectEqual(substring(of: s4, with: NSFakeRange(1,6)), "�cats\r")
+
+  let s5 = "\r\ncats😺"
+  expectEqual(substring(of: s5, with: NSFakeRange(1,6)), "\ncats�")
 }
 
 var CStringTests = TestSuite("CStringTests")

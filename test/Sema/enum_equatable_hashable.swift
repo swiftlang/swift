@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/enum_equatable_hashable_other.swift -verify-ignore-unknown
 
@@ -35,7 +35,7 @@ enum CustomHashable {
 
   var hashValue: Int { return 0 }
 }
-func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note{{non-matching type}}
+func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note 3 {{non-matching type}}
   return true
 }
 
@@ -50,7 +50,7 @@ enum InvalidCustomHashable {
 
   var hashValue: String { return "" } // expected-note{{previously declared here}}
 }
-func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note{{non-matching type}}
+func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note 3 {{non-matching type}}
   return ""
 }
 if InvalidCustomHashable.A == .B { }
@@ -74,7 +74,6 @@ let _: Int = FromOtherFile.A.hashValue
 func getFromOtherFile() -> AlsoFromOtherFile { return .A }
 if .A == getFromOtherFile() {}
 
-// FIXME: This should work.
 func overloadFromOtherFile() -> YetAnotherFromOtherFile { return .A }
 func overloadFromOtherFile() -> Bool { return false }
 if .A == overloadFromOtherFile() {}
@@ -89,6 +88,59 @@ enum Complex {
 if Complex.A(1) == .B { } // expected-error{{binary operator '==' cannot be applied to operands of type 'Complex' and '_'}}
 // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: }}
 
+// Enums with equatable payloads are equatable if they explicitly conform.
+enum EnumWithEquatablePayload: Equatable {
+  case A(Int)
+  case B(String, Int)
+  case C
+}
+
+if EnumWithEquatablePayload.A(1) == .B("x", 1) { }
+if EnumWithEquatablePayload.A(1) == .C { }
+if EnumWithEquatablePayload.B("x", 1) == .C { }
+
+// Enums with hashable payloads are hashable if they explicitly conform.
+enum EnumWithHashablePayload: Hashable {
+  case A(Int)
+  case B(String, Int)
+  case C
+}
+
+_ = EnumWithHashablePayload.A(1).hashValue
+_ = EnumWithHashablePayload.B("x", 1).hashValue
+_ = EnumWithHashablePayload.C.hashValue
+
+// ...and they should also inherit equatability from Hashable.
+if EnumWithHashablePayload.A(1) == .B("x", 1) { }
+if EnumWithHashablePayload.A(1) == .C { }
+if EnumWithHashablePayload.B("x", 1) == .C { }
+
+// Enums with non-hashable payloads don't derive conformance.
+struct NotHashable {}
+enum EnumWithNonHashablePayload: Hashable { // expected-error 2 {{does not conform}}
+  case A(NotHashable)
+}
+
+// Enums should be able to derive conformances based on the conformances of
+// their generic arguments.
+enum GenericHashable<T: Hashable>: Hashable {
+  case A(T)
+  case B
+}
+if GenericHashable<String>.A("a") == .B { }
+var genericHashableHash: Int = GenericHashable<String>.A("a").hashValue
+
+// But it should be an error if the generic argument doesn't have the necessary
+// constraints to satisfy the conditions for derivation.
+enum GenericNotHashable<T: Equatable>: Hashable { // expected-error {{does not conform}}
+  case A(T)
+  case B
+}
+if GenericNotHashable<String>.A("a") == .B { }
+var genericNotHashableHash: Int = GenericNotHashable<String>.A("a").hashValue // expected-error {{value of type 'GenericNotHashable<String>' has no member 'hashValue'}}
+
+// An enum with no cases should not derive conformance.
+enum NoCases: Hashable {} // expected-error 2 {{does not conform}}
 
 // rdar://19773050
 private enum Bar<T> {
@@ -120,12 +172,59 @@ public enum Medicine {
 
 extension Medicine : Equatable {}
 
-public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note{{non-matching type}}
+public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 2 {{non-matching type}}
   return true
 }
 
-// No explicit conformance and cannot be derived
-extension Complex : Hashable {} // expected-error 2 {{does not conform}}
+// No explicit conformance; it could be derived, but we don't support extensions
+// yet.
+extension Complex : Hashable {}  // expected-error 2 {{cannot be automatically synthesized in an extension}}
+
+// No explicit conformance and it cannot be derived.
+enum NotExplicitlyHashableAndCannotDerive {
+  case A(NotHashable)
+}
+extension NotExplicitlyHashableAndCannotDerive : Hashable {} // expected-error 2 {{does not conform}}
+
+// Verify that conformance (albeit manually implemented) can still be added to
+// a type in a different file.
+extension OtherFileNonconforming: Hashable {
+  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 2 {{non-matching type}}
+    return true
+  }
+  var hashValue: Int { return 0 }
+}
+// ...but synthesis in a type defined in another file doesn't work yet.
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
+
+// Verify that an indirect enum doesn't emit any errors as long as its "leaves"
+// are conformant.
+enum StringBinaryTree: Hashable {
+  indirect case tree(StringBinaryTree, StringBinaryTree)
+  case leaf(String)
+}
+
+// Add some generics to make it more complex.
+enum BinaryTree<Element: Hashable>: Hashable {
+  indirect case tree(BinaryTree, BinaryTree)
+  case leaf(Element)
+}
+
+// Verify mutually indirect enums.
+enum MutuallyIndirectA: Hashable {
+  indirect case b(MutuallyIndirectB)
+  case data(Int)
+}
+enum MutuallyIndirectB: Hashable {
+  indirect case a(MutuallyIndirectA)
+  case data(Int)
+}
+
+// Verify that it works if the enum itself is indirect, rather than the cases.
+indirect enum TotallyIndirect: Hashable {
+  case another(TotallyIndirect)
+  case end(Int)
+}
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'

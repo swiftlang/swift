@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-sil -o - -verify | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -sil-verify-all -primary-file %s -emit-sil -o - -verify | %FileCheck %s
 
 // These tests are deliberately shallow, because I do not want to depend on the
 // specifics of SIL generation, which might change for reasons unrelated to this
@@ -108,7 +108,7 @@ func test_chained_short_circuit(_ x: Bool, y: Bool, z: Bool) -> Bool {
 // recursively inlined properly)
 
 // CHECK-LABEL: sil hidden @_T018mandatory_inlining26test_chained_short_circuit{{[_0-9a-zA-Z]*}}F
-  // CHECK-NOT = apply [transparent]
+  // CHECK-NOT: = apply [transparent]
   // CHECK: return
 
 
@@ -122,7 +122,7 @@ func testInlineUnionElement() -> X {
   return X.onetransp
   // CHECK-LABEL: sil hidden @_T018mandatory_inlining22testInlineUnionElementAA1XOyF
   // CHECK: enum $X, #X.onetransp!enumelt
-  // CHECK-NOT = apply
+  // CHECK-NOT: = apply
   // CHECK: return
 }
 
@@ -136,8 +136,6 @@ func call_let_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
 // CHECK: sil hidden @{{.*}}test_let_auto_closure_with_value_capture
 // CHECK: bb0(%0 : $Bool):
 // CHECK-NEXT: debug_value %0 : $Bool
-// CHECK-NEXT: br bb1
-// CHECK: bb1:
 // CHECK-NEXT: return %0 : $Bool
 
 func test_let_auto_closure_with_value_capture(_ x: Bool) -> Bool {

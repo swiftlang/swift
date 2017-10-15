@@ -79,10 +79,10 @@ class StackNesting {
   ///
   /// Each stack location is allocated by a single allocation instruction.
   struct StackLoc {
-    StackLoc(SILInstruction *Alloc) : Alloc(Alloc) { }
+    StackLoc(AllocationInst *Alloc) : Alloc(Alloc) { }
 
     /// Back-link to the allocation instruction.
-    SILInstruction *Alloc;
+    AllocationInst *Alloc;
 
     /// Bit-set which represents all alive locations at this allocation.
     /// It obviously includes this location itself. And it includes all "outer"
@@ -91,7 +91,7 @@ class StackNesting {
   };
 
   /// Mapping from stack allocations (= locations) to bit numbers.
-  llvm::DenseMap<SILInstruction *, unsigned> StackLoc2BitNumbers;
+  llvm::DenseMap<SingleValueInstruction *, unsigned> StackLoc2BitNumbers;
 
   /// The list of stack locations. The index into this array is also the bit
   /// number in the bit-sets.

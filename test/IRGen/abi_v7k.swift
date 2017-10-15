@@ -203,12 +203,12 @@ func testMultiP(x: MultiPayload) -> Double {
 // CHECK: ret float
 // V7K-LABEL: __T08test_v7k0A3Opt
 // V7K:         tst     r1, #1
-// V7K:         str     r0, [r7, #-20]
-// V7K:         ldr     r0, [r7, #-20]
+// V7K:         str     r0, [r7, [[SLOT:#-[0-9]+]]
+// V7K:         ldr     r0, [r7, [[SLOT]]
 // V7K:         vmov    s0, r0
-// V7K:         sub     sp, r7, #16
-// V7K:         pop     {r11}
-// V7K:         pop      {r4, r5, r6, r7, pc}
+// V7K:         vstr    s0, [r7, [[SLOT2:#-[0-9]+]]
+// V7K:         vldr    s0, [r7, [[SLOT2]]
+// V7K:         pop     {{{.*}}, pc}
 func testOpt(x: Float?) -> Float {
   return x!
 }

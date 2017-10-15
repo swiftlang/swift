@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let Dictionary2 = [
+  BenchmarkInfo(name: "Dictionary2", runFunction: run_Dictionary2, tags: [.validation, .api, .Dictionary]),
+  BenchmarkInfo(name: "Dictionary2OfObjects", runFunction: run_Dictionary2OfObjects, tags: [.validation, .api, .Dictionary]),
+]
+
 @inline(never)
 public func run_Dictionary2(_ N: Int) {
   let size = 500
@@ -34,7 +39,7 @@ public func run_Dictionary2(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result, "Incorrect results in Dictionary2: \(res) != \(ref_result)")
+  CheckResults(res == ref_result)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -55,6 +60,7 @@ class Box<T : Hashable> : Hashable {
 
 @inline(never)
 public func run_Dictionary2OfObjects(_ N: Int) {
+
   let size = 500
   let ref_result = 199
   var res = 0
@@ -75,5 +81,5 @@ public func run_Dictionary2OfObjects(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result, "Incorrect results in Dictionary2AllObjects: \(res) != \(ref_result)")
+  CheckResults(res == ref_result)
 }

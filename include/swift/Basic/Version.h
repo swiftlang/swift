@@ -110,13 +110,19 @@ public:
   /// Whether this version is in the Swift 3 family
   bool isVersion3() const { return !empty() && Components[0] == 3; }
 
+  /// Whether this version is greater than or equal to the given major version
+  /// number.
+  bool isVersionAtLeast(unsigned major) const {
+    return !empty() && Components[0] >= major;
+  }
+
   /// Return this Version struct with minor and sub-minor components stripped
   Version asMajorVersion() const;
 
   /// Parse a version in the form used by the _compiler_version \#if condition.
-  static Version parseCompilerVersionString(StringRef VersionString,
-                                            SourceLoc Loc,
-                                            DiagnosticEngine *Diags);
+  static Optional<Version> parseCompilerVersionString(StringRef VersionString,
+                                                      SourceLoc Loc,
+                                                      DiagnosticEngine *Diags);
 
   /// Parse a generic version string of the format [0-9]+(.[0-9]+)*
   ///
@@ -135,15 +141,18 @@ public:
   /// SWIFT_VERSION_MINOR.
   static Version getCurrentLanguageVersion();
 
-  // Whitelist of backward-compatibility versions that we permit passing as
+  // List of backward-compatibility versions that we permit passing as
   // -swift-version <vers>
-  static std::array<StringRef, 2> getValidEffectiveVersions() {
-    return {{"3", "4"}};
+  static std::array<StringRef, 3> getValidEffectiveVersions() {
+    return {{"3", "4", "5"}};
   };
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);
 bool operator==(const Version &lhs, const Version &rhs);
+inline bool operator!=(const Version &lhs, const Version &rhs) {
+  return !(lhs == rhs);
+}
 
 raw_ostream &operator<<(raw_ostream &os, const Version &version);
 

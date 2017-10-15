@@ -1,6 +1,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_1 | %FileCheck %s -check-prefix=BAD_MEMBERS_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_2 | %FileCheck %s -check-prefix=BAD_MEMBERS_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_CALLED_IN_PLACE_1 | %FileCheck %s -check-prefix=WITH_GLOBAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_CALLED_IN_PLACE_1 | %FileCheck %s -check-prefix=WITH_GLOBAL_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_28991372 | %FileCheck %s -check-prefix=RDAR_28991372
 
 class BadMembers1 {
@@ -37,16 +37,22 @@ func badMembers2(_ a: BadMembers2) {
 
 func globalFunc() {}
 
+func globalFuncInt() -> Int { return 0 }
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LET_COMPUTED | %FileCheck %s -check-prefix=WITH_GLOBAL
 class C {
   let x : Int { #^LET_COMPUTED^# }
 }
 
 // WITH_GLOBAL: Begin completions
-// WITH_GLOBAL-DAG: Decl[FreeFunction]/CurrModule:      globalFunc()[#Void#]{{; name=.+$}}
+// WITH_GLOBAL-DAG: Decl[FreeFunction]/CurrModule: globalFunc()[#Void#]; name=globalFunc()
 // WITH_GLOBAL: End completions
 
 ({ x in 2+x })(#^CLOSURE_CALLED_IN_PLACE_1^#
+
+// WITH_GLOBAL_INT: Begin completions
+// WITH_GLOBAL_INT-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: globalFuncInt()[#Int#]; name=globalFuncInt()
+// WITH_GLOBAL_INT: End completions
 
 // rdar://19634354
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_19634354
@@ -196,3 +202,9 @@ struct S_RDAR_28991372 {
 
 S_RDAR_28991372(x: #^RDAR_28991372^#, y: <#T##Int#>)
 // RDAR_28991372: Begin completions
+
+// rdar://problem/31981486
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_31981486 | %FileCheck %s -check-prefix=RDAR_31981486
+
+protocol P where #^RDAR_31981486^#
+// RDAR_31981486: Begin completions

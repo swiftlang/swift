@@ -1,0 +1,131 @@
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -definite-init -verify | %FileCheck %s
+
+// This file tests mark_uninitialized [rootself]
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class RootClassWithIVars {
+  var x: Int          // expected-note {{'self.x' not initialized}}
+  var y: Int
+  var z: (Int, Int)   // expected-note 2 {{'self.z.1' not initialized}} expected-note {{'self.z.0' not initialized}}
+  init()
+}
+
+class RootClassWithNontrivialStoredProperties {
+  var x, y: SomeClass
+
+  init()
+}
+
+class SomeClass {}
+sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
+sil @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
+
+// CHECK-LABEL: sil @rootclass_test1
+sil @rootclass_test1 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
+bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Int):
+  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
+
+  %4 = begin_borrow %3 : $RootClassWithIVars
+  %10 = ref_element_addr %4 : $RootClassWithIVars, #RootClassWithIVars.x
+  assign %1 to %10 : $*Int
+  end_borrow %4 from %3 : $RootClassWithIVars, $RootClassWithIVars
+
+  %5 = begin_borrow %3 : $RootClassWithIVars
+  %11 = ref_element_addr %5 : $RootClassWithIVars, #RootClassWithIVars.y
+  assign %1 to %11 : $*Int
+  end_borrow %5 from %3 : $RootClassWithIVars, $RootClassWithIVars
+
+  %6 = begin_borrow %3 : $RootClassWithIVars
+  %12 = ref_element_addr %6 : $RootClassWithIVars, #RootClassWithIVars.z
+  %13 = tuple_element_addr %12 : $*(Int, Int), 0
+  assign %1 to %13 : $*Int
+  %14 = tuple_element_addr %12 : $*(Int, Int), 1
+  assign %1 to %14 : $*Int
+  end_borrow %6 from %3 : $RootClassWithIVars, $RootClassWithIVars
+
+  return %3 : $RootClassWithIVars
+}
+
+// CHECK-LABEL: sil @rootclass_test2
+sil @rootclass_test2 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
+bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Int):
+  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
+
+  %4 = begin_borrow %3 : $RootClassWithIVars
+  %10 = ref_element_addr %4 : $RootClassWithIVars, #RootClassWithIVars.x
+  assign %1 to %10 : $*Int
+  end_borrow %4 from %3 : $RootClassWithIVars, $RootClassWithIVars
+
+  %5 = begin_borrow %3 : $RootClassWithIVars
+  %11 = ref_element_addr %5 : $RootClassWithIVars, #RootClassWithIVars.y
+  assign %1 to %11 : $*Int
+  end_borrow %5 from %3 : $RootClassWithIVars, $RootClassWithIVars
+
+  %6 = begin_borrow %3 : $RootClassWithIVars
+  %12 = ref_element_addr %6 : $RootClassWithIVars, #RootClassWithIVars.z
+  %13 = tuple_element_addr %12 : $*(Int, Int), 0
+  assign %1 to %13 : $*Int
+  end_borrow %6 from %3 : $RootClassWithIVars, $RootClassWithIVars
+
+  return %3 : $RootClassWithIVars  // expected-error {{return from initializer without initializing all stored properties}}
+}
+
+// CHECK-LABEL: sil @rootclass_test3
+sil @rootclass_test3 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
+bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Int):
+  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
+
+  %4 = begin_borrow %3 : $RootClassWithIVars
+  %11 = ref_element_addr %4 : $RootClassWithIVars, #RootClassWithIVars.y
+  assign %1 to %11 : $*Int
+  end_borrow %4 from %3 : $RootClassWithIVars, $RootClassWithIVars
+
+  return %3 : $RootClassWithIVars    // expected-error {{return from initializer without initializing all stored properties}}
+}
+
+// CHECK-LABEL: sil @test_root_release
+// CHECK: bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
+// CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thick RootClassWithNontrivialStoredProperties.Type
+// CHECK-NEXT: dealloc_partial_ref %0 : $RootClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick RootClassWithNontrivialStoredProperties.Type
+sil @test_root_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
+  %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
+  destroy_value %4 : $RootClassWithNontrivialStoredProperties
+
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil @test_root_partial_release
+// CHECK: bb0([[SELF:%.*]] : @owned $RootClassWithNontrivialStoredProperties):
+// CHECK: [[FIELD_VALUE:%.*]] = alloc_ref
+// CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK: [[SELF_FIELD:%.*]] = ref_element_addr [[BORROWED_SELF]]
+// CHECK: store [[FIELD_VALUE]] to [init] [[SELF_FIELD]]
+// CHECK: end_borrow [[BORROWED_SELF]] from [[SELF]]
+// CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK: [[SELF_FIELD:%.*]] = ref_element_addr [[BORROWED_SELF]]
+// CHECK: destroy_addr [[SELF_FIELD]]
+// CHECK: end_borrow [[BORROWED_SELF]] from [[SELF]]
+// CHECK: [[METATYPE:%[0-9]+]] = metatype $@thick RootClassWithNontrivialStoredProperties.Type
+// CHECK: dealloc_partial_ref [[SELF]] : $RootClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick RootClassWithNontrivialStoredProperties.Type
+// CHECK: } // end sil function 'test_root_partial_release'
+sil @test_root_partial_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
+  %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
+
+  %1 = alloc_ref $SomeClass
+  %5 = begin_borrow %4 : $RootClassWithNontrivialStoredProperties
+  %2 = ref_element_addr %5 : $RootClassWithNontrivialStoredProperties, #RootClassWithNontrivialStoredProperties.x
+  assign %1 to %2 : $*SomeClass
+  end_borrow %5 from %4 : $RootClassWithNontrivialStoredProperties, $RootClassWithNontrivialStoredProperties
+
+  destroy_value %4 : $RootClassWithNontrivialStoredProperties
+
+  %13 = tuple ()
+  return %13 : $()
+}

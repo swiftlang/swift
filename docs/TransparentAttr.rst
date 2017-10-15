@@ -28,6 +28,8 @@ This has several consequences:
 This is all that ``@_transparent`` means.
 
 
+.. _transparent-attribute:
+
 When should you use ``@_transparent``?
 --------------------------------------
 

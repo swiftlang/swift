@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B0ySiSgz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Int>
@@ -51,8 +51,8 @@ func assign_optional_lvalue_reabstracted(_ x: inout Struct<(Int) -> Int>,
 }
 
 // CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B9_computedSiAA1SVSgz_SitF
-// CHECK:         function_ref @_T015optional_lvalue1SV8computedSifs
-// CHECK:         function_ref @_T015optional_lvalue1SV8computedSifg
+// CHECK:         function_ref @_T015optional_lvalue1SV8computedSivs
+// CHECK:         function_ref @_T015optional_lvalue1SV8computedSivg
 func assign_optional_lvalue_computed(_ x: inout S?, _ y: Int) -> Int {
   x!.computed = y
   return x!.computed

@@ -117,6 +117,20 @@ findDeallocStackInst(AllocStackInst *ASI) {
   return DSIs;
 }
 
+/// Return the deallocate ref instructions corresponding to the given
+/// AllocRefInst.
+static llvm::SmallVector<SILInstruction *, 1>
+findDeallocRefInst(AllocRefInst *ARI) {
+  llvm::SmallVector<SILInstruction *, 1> DSIs;
+  for (auto UI = ARI->use_begin(), E = ARI->use_end(); UI != E; ++UI) {
+    if (auto *D = dyn_cast<DeallocRefInst>(UI->getUser())) {
+      if (D->isDeallocatingStack())
+        DSIs.push_back(D);
+    }
+  }
+  return DSIs;
+}
+
 static inline bool isComputeMaxStoreSet(DSEKind Kind) {
   return Kind == DSEKind::ComputeMaxStoreSet;
 }
@@ -133,13 +147,14 @@ static inline bool isPerformingDSE(DSEKind Kind) {
 /// general sense but are inert from a load store perspective.
 static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
-  case ValueKind::StrongRetainInst:
-  case ValueKind::StrongRetainUnownedInst:
-  case ValueKind::UnownedRetainInst:
-  case ValueKind::RetainValueInst:
-  case ValueKind::DeallocStackInst:
-  case ValueKind::CondFailInst:
-  case ValueKind::FixLifetimeInst:
+  case SILInstructionKind::StrongRetainInst:
+  case SILInstructionKind::StrongRetainUnownedInst:
+  case SILInstructionKind::UnownedRetainInst:
+  case SILInstructionKind::RetainValueInst:
+  case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocRefInst:
+  case SILInstructionKind::CondFailInst:
+  case SILInstructionKind::FixLifetimeInst:
     return true;
   default:
     return false;
@@ -653,6 +668,16 @@ void BlockState::initStoreSetAtEndOfBlock(DSEContext &Ctx) {
         startTrackingLocation(BBDeallocateLocation, i);
       }
     }
+    if (auto *ARI = dyn_cast<AllocRefInst>(LocationVault[i].getBase())) {
+      if (!ARI->isAllocatingStack())
+        continue;
+      for (auto X : findDeallocRefInst(ARI)) {
+        SILBasicBlock *DSIBB = X->getParent();
+        if (DSIBB != BB)
+          continue;
+        startTrackingLocation(BBDeallocateLocation, i);
+      }
+    }
   }
 }
 
@@ -1084,7 +1109,8 @@ void DSEContext::processInstruction(SILInstruction *I, DSEKind Kind) {
   }  
 
   // Check whether this instruction will invalidate any other locations.
-  invalidateBase(I, getBlockState(I), Kind);
+  for (auto result : I->getResults())
+    invalidateBase(result, getBlockState(I), Kind);
 }
 
 void DSEContext::runIterativeDSE() {
@@ -1189,10 +1215,10 @@ bool DSEContext::run() {
     for (auto &X : S->LiveAddr) {
       Changed = true;
       auto I = S->LiveStores.find(X);
-      SILInstruction *Inst = cast<SILInstruction>(I->first);
+      SILInstruction *Inst = I->first->getDefiningInstruction();
       auto *IT = &*std::next(Inst->getIterator());
       SILBuilderWithScope Builder(IT);
-      Builder.createStore(Inst->getLoc(), I->second, Inst,
+      Builder.createStore(Inst->getLoc(), I->second, I->first,
                           StoreOwnershipQualifier::Unqualified);
     }
     // Delete the dead stores.

@@ -69,9 +69,8 @@ extension Container {
     _ = Container.PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
   }
 
-  // FIXME: Why do these errors happen twice?
-  var extensionInner: PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
-  var extensionInnerQualified: Container.PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
+  var extensionInner: PrivateInner? { return nil } // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
+  var extensionInnerQualified: Container.PrivateInner? { return nil } // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
 }
 
 extension Container.Inner {
@@ -86,10 +85,9 @@ extension Container.Inner {
     _ = Container.PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
   }
 
-  // FIXME: Why do these errors happen twice?
   // FIXME: Unqualified lookup won't look into Container from here.
-  var inner: PrivateInner? { return nil } // expected-error 2 {{use of undeclared type 'PrivateInner'}}
-  var innerQualified: Container.PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
+  var inner: PrivateInner? { return nil } // expected-error {{use of undeclared type 'PrivateInner'}}
+  var innerQualified: Container.PrivateInner? { return nil } // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
 }
 
 class Sub : Container {

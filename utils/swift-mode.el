@@ -20,6 +20,11 @@
     (set
      (make-local-variable 'parse-sexp-ignore-comments) t)))
 
+(unless (fboundp 'defvar-local)
+  (defmacro defvar-local (var val &optional docstring)
+    "Define VAR as a buffer-local variable with default value VAL."
+    `(make-variable-buffer-local (defvar ,var ,val ,docstring))))
+
 ;; Create mode-specific variables
 (defcustom swift-basic-offset 2
   "Default indentation width for Swift source"
@@ -34,6 +39,8 @@
   (list
    ;; Comments
    '("^#!.*" . font-lock-comment-face)
+   ;; Variables surrounded with backticks (`)
+   '("`[a-zA-Z_][a-zA-Z_0-9]*`" . font-lock-variable-name-face)
    ;; Types
    '("\\b[A-Z][a-zA-Z_0-9]*\\b" . font-lock-type-face)
    ;; Floating point constants
@@ -350,7 +357,7 @@ Use `M-x hs-show-all' to show them again."
                            1)
                           ((save-match-data
                              (looking-at
-                              "case \\|default *:\\|[a-zA-Z_][a-zA-Z0-9_]*\\(\\s-\\|\n\\)*:\\(\\s-\\|\n\\)*\\(for\\|do\\|\\while\\|switch\\)\\>"))
+                              "case \\|default *:\\|[a-zA-Z_][a-zA-Z0-9_]*\\(\\s-\\|\n\\)*:\\(\\s-\\|\n\\)*\\(for\\|do\\|\\while\\|switch\\|repeat\\)\\>"))
                            1)
                           (t 0))))))
       (indent-line-to (max target-column 0)))

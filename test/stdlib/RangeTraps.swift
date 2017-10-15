@@ -9,9 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %target-build-swift %s -o %t/a.out_Debug
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s -o %t/a.out_Debug -Onone
 // RUN: %target-build-swift %s -o %t/a.out_Release -O
 //
 // RUN: %target-run %t/a.out_Debug

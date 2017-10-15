@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend %s -S -g -o - | %FileCheck %s --check-prefix ASM-CHECK
 
-// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64
 
 import Swift
 func markUsed<T>(_ t: T) {}
@@ -52,7 +52,6 @@ func main(_ x: Int64) -> Void
 // ASM-CHECK: {{^_?_T09linetable4mainys5Int64VFyycfU_Tf2in_n:}}
 // ASM-CHECK-NOT: retq
 // The end-of-prologue should have a valid location (0 is ok, too).
-// ASM-CHECK: .loc [[FILEID]] 0 {{[0-9]+}} prologue_end
-// ASM-CHECK: .loc [[FILEID]] 34 {{[0-9]+}}
+// ASM-CHECK: .loc [[FILEID]] {{0|34}} {{[0-9]+}} prologue_end
 
 main(30)

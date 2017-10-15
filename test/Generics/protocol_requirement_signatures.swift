@@ -71,3 +71,19 @@ protocol Q6: Q2, // expected-note{{conformance constraint 'Self.X': 'P1' implied
 protocol Q7: Q2, Q3, Q4 {
     associatedtype X: P3 // expected-warning{{redeclaration of associated type 'X'}}
 }
+
+// SR-5945
+class SomeBaseClass {}
+
+// CHECK-DAG: .P4@
+// CHECK-NEXT: Requirement signature: <Self where Self == Self.BType.AType, Self.BType : P5, Self.Native : SomeBaseClass>
+protocol P4 {
+	associatedtype Native : SomeBaseClass
+  associatedtype BType : P5 where BType.AType == Self
+}
+
+// CHECK-DAG: .P5@
+// CHECK-NEXT: <Self where Self == Self.AType.BType, Self.AType : P4>
+protocol P5 {
+	associatedtype AType : P4 where AType.BType == Self
+}

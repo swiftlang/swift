@@ -30,7 +30,7 @@ protocol P {
 class PX : P {
   func g1(_ x: Int) { } // okay
   func g2(_ x: Int, other: Int) { } // okay
-  func g3(_ x: Int, y: Int, third: Int) { } // expected-error{{method 'g3(_:y:third:)' has different argument names from those required by protocol 'P' ('g3(_:other:third:)')}} {{21-21=other }}
+  func g3(_ x: Int, y: Int, third: Int) { } // expected-error{{method 'g3(_:y:third:)' has different argument labels from those required by protocol 'P' ('g3(_:other:third:)')}} {{21-21=other }}
 
   class func g4(_ x: Int) { }
 }

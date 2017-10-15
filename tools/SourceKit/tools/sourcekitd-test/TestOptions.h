@@ -45,13 +45,20 @@ enum class SourceKitRequest {
   FindUSR,
   FindInterfaceDoc,
   Open,
+  Close,
   Edit,
   PrintAnnotations,
   PrintDiags,
   ExtractComment,
   ModuleGroups,
+  SyntacticRename,
+  FindRenameRanges,
+  FindLocalRenameRanges,
   NameTranslation,
   MarkupToXML,
+  Statistics,
+#define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
+#include "swift/IDE/RefactoringKinds.def"
 };
 
 struct TestOptions {
@@ -60,6 +67,7 @@ struct TestOptions {
   std::string SourceFile;
   std::string TextInputFile;
   std::string JsonRequestPath;
+  std::string RenameSpecPath;
   llvm::Optional<std::string> SourceText;
   std::string ModuleGroupName;
   std::string InterestedUSR;
@@ -77,10 +85,12 @@ struct TestOptions {
   std::string CachePath;
   llvm::SmallVector<std::string, 4> RequestOptions;
   llvm::ArrayRef<const char *> CompilerArgs;
+  bool UsingSwiftArgs;
   std::string USR;
   std::string SwiftName;
   std::string ObjCName;
   std::string ObjCSelector;
+  std::string Name;
   bool CheckInterfaceIsASCII = false;
   bool UsedSema = false;
   bool PrintRequest = true;
@@ -90,6 +100,7 @@ struct TestOptions {
   bool SynthesizedExtensions = false;
   bool CollectActionables = false;
   bool isAsyncRequest = false;
+  llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;
 };

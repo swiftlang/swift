@@ -1,33 +1,43 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enforce-exclusivity=unchecked %s | %FileCheck --check-prefix=UNCHECKED %s
 
 class Base {
   var stored: Int = 0
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC6storedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC6storedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.stored
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
-// CHECK:   [[T2:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
+// CHECK:   [[T2:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some
 // CHECK:   [[T3:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T2]] : $Optional<Builtin.RawPointer>)
 // CHECK:   return [[T3]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK: }
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC8computedSifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Base, @thick Base.Type) -> () {
+// UNCHECKED-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC6storedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// UNCHECKED: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
+// UNCHECKED:   [[T0:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.stored
+// UNCHECKED:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
+// UNCHECKED:   [[T2:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
+// UNCHECKED:   [[T3:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T2]] : $Optional<Builtin.RawPointer>)
+// UNCHECKED:   return [[T3]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// UNCHECKED: }
+
+// CHECK-LABEL: sil private [transparent] @_T017materializeForSet4BaseC8computedSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Base, @thick Base.Type) -> () {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Base, [[SELFTYPE:%.*]] : $@thick Base.Type):
 // CHECK:   [[T0:%.*]] = load_borrow [[SELF]]
 // CHECK:   [[T1:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:   [[T2:%.*]] = load [trivial] [[T1]] : $*Int
-// CHECK:   [[SETTER:%.*]] = function_ref @_T017materializeForSet4BaseC8computedSifs
+// CHECK:   [[SETTER:%.*]] = function_ref @_T017materializeForSet4BaseC8computedSivs
 // CHECK:   apply [[SETTER]]([[T2]], [[T0]])
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC8computedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC8computedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet4BaseC8computedSifg
+// CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet4BaseC8computedSivg
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:   store [[T1]] to [trivial] [[ADDR]] : $*Int
 // CHECK:   [[BUFFER:%.*]] = address_to_pointer [[ADDR]]
-// CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet4BaseC8computedSifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Base, @thick Base.Type) -> ()
+// CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet4BaseC8computedSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Base, @thick Base.Type) -> ()
 // CHECK:   [[T2:%.*]] = thin_function_to_pointer [[T0]]
 // CHECK:   [[T3:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[T2]] : $Builtin.RawPointer
 // CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[T3]] : $Optional<Builtin.RawPointer>)
@@ -66,7 +76,7 @@ protocol Abstractable {
 
 extension Derived : Abstractable {}
 
-// CHECK: sil private [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14storedFunction6ResultQzycfmytfU_TW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Derived, @thick Derived.Type) -> ()
+// CHECK-LABEL: sil private [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14storedFunction6ResultQzycvmytfU_TW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Derived, @thick Derived.Type) -> ()
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived, %3 : $@thick Derived.Type):
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
@@ -81,7 +91,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
-// CHECK: sil private [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14storedFunction{{[_0-9a-zA-Z]*}}fmTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14storedFunction{{[_0-9a-zA-Z]*}}vmTW
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
@@ -98,7 +108,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: store [[T1]] to [init] [[RESULT_ADDR]]
 // CHECK-NEXT: [[RESULT_PTR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned () -> @out Int to $Builtin.RawPointer
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: [[T2:%.*]] = function_ref @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14storedFunction6ResultQzycfmytfU_TW
+// CHECK-NEXT: [[T2:%.*]] = function_ref @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14storedFunction6ResultQzycvmytfU_TW
 // CHECK-NEXT: [[T3:%.*]] = thin_function_to_pointer [[T2]]
 // CHECK-NEXT: [[CALLBACK:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[T3]]
 // CHECK-NEXT: [[T4:%.*]] = tuple ([[RESULT_PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
@@ -106,7 +116,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: end_borrow [[T0]] from %2
 // CHECK-NEXT: return [[T4]]
 
-// CHECK: sil private [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycfmytfU_TW :
+// CHECK-LABEL: sil private [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycvmytfU_TW :
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived, %3 : $@thick Derived.Type):
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
@@ -116,32 +126,71 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxr_SiIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
 // CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
 // CHECK-NEXT: [[ADDR:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.finalStoredFunction
-// CHECK-NEXT: assign [[NEWVALUE]] to [[ADDR]]
+// CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[ADDR]] : $*@callee_owned () -> Int
+// CHECK-NEXT: assign [[NEWVALUE]] to [[WRITE]]
+// CHECK-NEXT: end_access [[WRITE]] : $*@callee_owned () -> Int
 // CHECK-NEXT: end_borrow [[T0]] from %2
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
-// CHECK: sil private [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction{{[_0-9a-zA-Z]*}}fmTW
+// UNCHECKED-LABEL: sil private [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycvmytfU_TW :
+// UNCHECKED: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived, %3 : $@thick Derived.Type):
+// UNCHECKED-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
+// UNCHECKED-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
+// UNCHECKED-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_owned () -> @out Int
+// UNCHECKED-NEXT: [[VALUE:%.*]] = load [take] [[RESULT_ADDR]] : $*@callee_owned () -> @out Int
+// UNCHECKED-NEXT: // function_ref
+// UNCHECKED-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxr_SiIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
+// UNCHECKED-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
+// UNCHECKED-NEXT: [[ADDR:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.finalStoredFunction
+// UNCHECKED-NEXT: assign [[NEWVALUE]] to [[ADDR]]
+// UNCHECKED-NEXT: end_borrow [[T0]] from %2
+// UNCHECKED-NEXT: tuple ()
+// UNCHECKED-NEXT: return
+
+// CHECK-LABEL: sil private [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction{{[_0-9a-zA-Z]*}}vmTW
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
 // CHECK-NEXT: [[ADDR:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.finalStoredFunction
-// CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[ADDR]]
+// CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*@callee_owned () -> Int
+// CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[READ]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxd_SiIxr_TR : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[REABSTRACTOR]]([[RESULT]])
+// CHECK-NEXT: end_access [[READ]] : $*@callee_owned () -> Int
 // CHECK-NEXT: store [[T1]] to [init] [[RESULT_ADDR]]
 // CHECK-NEXT: [[RESULT_PTR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned () -> @out Int to $Builtin.RawPointer
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: [[T2:%.*]] = function_ref @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycfmytfU_TW
+// CHECK-NEXT: [[T2:%.*]] = function_ref @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycvmytfU_TW
 // CHECK-NEXT: [[T3:%.*]] = thin_function_to_pointer [[T2]]
 // CHECK-NEXT: [[CALLBACK:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[T3]]
 // CHECK-NEXT: [[T4:%.*]] = tuple ([[RESULT_PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
 // CHECK-NEXT: end_borrow [[T0]] from %2
 // CHECK-NEXT: return [[T4]]
 
-// CHECK-LABEL: sil private [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycfmZytfU_TW
+// UNCHECKED-LABEL: sil private [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction{{[_0-9a-zA-Z]*}}vmTW
+// UNCHECKED: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
+// UNCHECKED-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_owned () -> @out Int
+// UNCHECKED-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
+// UNCHECKED-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
+// UNCHECKED-NEXT: [[ADDR:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.finalStoredFunction
+// UNCHECKED-NEXT: [[RESULT:%.*]] = load [copy] [[ADDR]]
+// UNCHECKED-NEXT: function_ref
+// UNCHECKED-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxd_SiIxr_TR : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
+// UNCHECKED-NEXT: [[T1:%.*]] = partial_apply [[REABSTRACTOR]]([[RESULT]])
+// UNCHECKED-NEXT: store [[T1]] to [init] [[RESULT_ADDR]]
+// UNCHECKED-NEXT: [[RESULT_PTR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned () -> @out Int to $Builtin.RawPointer
+// UNCHECKED-NEXT: function_ref
+// UNCHECKED-NEXT: [[T2:%.*]] = function_ref @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycvmytfU_TW
+// UNCHECKED-NEXT: [[T3:%.*]] = thin_function_to_pointer [[T2]]
+// UNCHECKED-NEXT: [[CALLBACK:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[T3]]
+// UNCHECKED-NEXT: [[T4:%.*]] = tuple ([[RESULT_PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
+// UNCHECKED-NEXT: end_borrow [[T0]] from %2
+// UNCHECKED-NEXT: return [[T4]]
+
+// CHECK-LABEL: sil private [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycvmZytfU_TW
 // CHECK: bb0([[ARG1:%.*]] : $Builtin.RawPointer, [[ARG2:%.*]] : $*Builtin.UnsafeValueBuffer, [[ARG3:%.*]] : $*@thick Derived.Type, [[ARG4:%.*]] : $@thick Derived.Type.Type):
 // CHECK-NEXT: [[SELF:%.*]] = load [trivial] [[ARG3]] : $*@thick Derived.Type
 // CHECK-NEXT: [[BASE_SELF:%.*]] = upcast [[SELF]] : $@thick Derived.Type to $@thick Base.Type
@@ -149,17 +198,17 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[VALUE:%.*]] = load [take] [[BUFFER]] : $*@callee_owned () -> @out Int
 // CHECK:      [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxr_SiIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
 // CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]]) : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
-// CHECK:      [[SETTER_FN:%.*]] = function_ref @_T017materializeForSet4BaseC14staticFunctionSiycfsZ : $@convention(method) (@owned @callee_owned () -> Int, @thick Base.Type) -> ()
+// CHECK:      [[SETTER_FN:%.*]] = function_ref @_T017materializeForSet4BaseC14staticFunctionSiycvsZ : $@convention(method) (@owned @callee_owned () -> Int, @thick Base.Type) -> ()
 // CHECK-NEXT: apply [[SETTER_FN]]([[NEWVALUE]], [[BASE_SELF]]) : $@convention(method) (@owned @callee_owned () -> Int, @thick Base.Type) -> ()
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycfmZTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycvmZTW
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $@thick Derived.Type):
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[SELF:%.*]] = upcast %2 : $@thick Derived.Type to $@thick Base.Type
 // CHECK-NEXT: [[OUT:%.*]] = alloc_stack $@callee_owned () -> Int
-// CHECK:      [[GETTER:%.*]] = function_ref @_T017materializeForSet4BaseC14staticFunctionSiycfgZ : $@convention(method) (@thick Base.Type) -> @owned @callee_owned () -> Int
+// CHECK:      [[GETTER:%.*]] = function_ref @_T017materializeForSet4BaseC14staticFunctionSiycvgZ : $@convention(method) (@thick Base.Type) -> @owned @callee_owned () -> Int
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[GETTER]]([[SELF]]) : $@convention(method) (@thick Base.Type) -> @owned @callee_owned () -> Int
 // CHECK-NEXT: store [[VALUE]] to [init] [[OUT]] : $*@callee_owned () -> Int
 // CHECK-NEXT: [[VALUE:%.*]] = load [copy] [[OUT]] : $*@callee_owned () -> Int
@@ -168,7 +217,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: destroy_addr [[OUT]] : $*@callee_owned () -> Int
 // CHECK-NEXT: store [[NEWVALUE]] to [init] [[RESULT_ADDR]] : $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[ADDR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned () -> @out Int to $Builtin.RawPointer
-// CHECK:      [[CALLBACK_FN:%.*]] = function_ref @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycfmZytfU_TW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout @thick Derived.Type, @thick Derived.Type.Type) -> ()
+// CHECK:      [[CALLBACK_FN:%.*]] = function_ref @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycvmZytfU_TW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout @thick Derived.Type, @thick Derived.Type.Type) -> ()
 // CHECK-NEXT: [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK_FN]] : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout @thick Derived.Type, @thick Derived.Type.Type) -> () to $Builtin.RawPointer
 // CHECK-NEXT: [[CALLBACK:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[CALLBACK_ADDR]] : $Builtin.RawPointer
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ([[ADDR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
@@ -207,14 +256,14 @@ class HasDidSet : Base {
     didSet {}
   }
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet06HasDidC0C6storedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet06HasDidC0C6storedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasDidSet):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet06HasDidC0C6storedSifg
+// CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet06HasDidC0C6storedSivg
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:   store [[T1]] to [trivial] [[T2]] : $*Int
 // CHECK:   [[BUFFER:%.*]] = address_to_pointer [[T2]]
-// CHECK:   [[CALLBACK_FN:%.*]] = function_ref @_T017materializeForSet06HasDidC0C6storedSifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasDidSet, @thick HasDidSet.Type) -> ()
+// CHECK:   [[CALLBACK_FN:%.*]] = function_ref @_T017materializeForSet06HasDidC0C6storedSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasDidSet, @thick HasDidSet.Type) -> ()
 // CHECK:   [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK_FN]]
 // CHECK:   [[CALLBACK:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[CALLBACK_ADDR]]
 // CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
@@ -226,14 +275,14 @@ class HasDidSet : Base {
     set(value) {}
   }
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet06HasDidC0C8computedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet06HasDidC0C8computedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasDidSet):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet06HasDidC0C8computedSifg
+// CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet06HasDidC0C8computedSivg
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:   store [[T1]] to [trivial] [[T2]] : $*Int
 // CHECK:   [[BUFFER:%.*]] = address_to_pointer [[T2]]
-// CHECK:   [[CALLBACK_FN:%.*]] = function_ref @_T017materializeForSet06HasDidC0C8computedSifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasDidSet, @thick HasDidSet.Type) -> ()
+// CHECK:   [[CALLBACK_FN:%.*]] = function_ref @_T017materializeForSet06HasDidC0C8computedSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasDidSet, @thick HasDidSet.Type) -> ()
 // CHECK:   [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK_FN]]
 // CHECK:   [[CALLBACK:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[CALLBACK_ADDR]]
 // CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
@@ -246,24 +295,24 @@ class HasStoredDidSet {
     didSet {}
   }
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet012HasStoredDidC0C6storedSifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasStoredDidSet, @thick HasStoredDidSet.Type) -> () {
+// CHECK-LABEL: sil private [transparent] @_T017materializeForSet012HasStoredDidC0C6storedSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasStoredDidSet, @thick HasStoredDidSet.Type) -> () {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*HasStoredDidSet, [[METATYPE:%.*]] : $@thick HasStoredDidSet.Type):
 // CHECK:   [[SELF_VALUE:%.*]] = load_borrow [[SELF]] : $*HasStoredDidSet
 // CHECK:   [[BUFFER_ADDR:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:   [[VALUE:%.*]] = load [trivial] [[BUFFER_ADDR]] : $*Int
-// CHECK:   [[SETTER_FN:%.*]] = function_ref @_T017materializeForSet012HasStoredDidC0C6storedSifs : $@convention(method) (Int, @guaranteed HasStoredDidSet) -> ()
+// CHECK:   [[SETTER_FN:%.*]] = function_ref @_T017materializeForSet012HasStoredDidC0C6storedSivs : $@convention(method) (Int, @guaranteed HasStoredDidSet) -> ()
 // CHECK:   apply [[SETTER_FN]]([[VALUE]], [[SELF_VALUE]]) : $@convention(method) (Int, @guaranteed HasStoredDidSet) -> ()
 // CHECK:   return
 // CHECK: }
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet012HasStoredDidC0C6storedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasStoredDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet012HasStoredDidC0C6storedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasStoredDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasStoredDidSet):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet012HasStoredDidC0C6storedSifg
+// CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet012HasStoredDidC0C6storedSivg
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:   store [[T1]] to [trivial] [[T2]] : $*Int
 // CHECK:   [[BUFFER:%.*]] = address_to_pointer [[T2]]
-// CHECK:   [[CALLBACK_FN:%.*]] = function_ref @_T017materializeForSet012HasStoredDidC0C6storedSifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasStoredDidSet, @thick HasStoredDidSet.Type) -> ()
+// CHECK:   [[CALLBACK_FN:%.*]] = function_ref @_T017materializeForSet012HasStoredDidC0C6storedSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasStoredDidSet, @thick HasStoredDidSet.Type) -> ()
 // CHECK:   [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK_FN]]
 // CHECK:   [[CALLBACK:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[CALLBACK_ADDR]]
 // CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
@@ -274,17 +323,31 @@ class HasStoredDidSet {
 class HasWeak {
   weak var weakvar: HasWeak?
 }
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet7HasWeakC7weakvarACSgXwfm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasWeak) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet7HasWeakC7weakvarACSgXwvm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasWeak) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasWeak):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Optional<HasWeak>
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $HasWeak, #HasWeak.weakvar
-// CHECK:   [[T1:%.*]] = load_weak [[T0]] : $*@sil_weak Optional<HasWeak>
+// CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[T0]] : $*@sil_weak Optional<HasWeak>
+// CHECK:   [[T1:%.*]] = load_weak [[READ]] : $*@sil_weak Optional<HasWeak>
+// CHECK:   end_access [[READ]] : $*@sil_weak Optional<HasWeak>
 // CHECK:   store [[T1]] to [init] [[T2]] : $*Optional<HasWeak>
 // CHECK:   [[BUFFER:%.*]] = address_to_pointer [[T2]]
-// CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet7HasWeakC7weakvarACSgXwfmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasWeak, @thick HasWeak.Type) -> () 
+// CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet7HasWeakC7weakvarACSgXwvmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasWeak, @thick HasWeak.Type) -> () 
 // CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, {{.*}} : $Optional<Builtin.RawPointer>)
 // CHECK:   return [[T4]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK: }
+
+// UNCHECKED-LABEL: sil hidden [transparent] @_T017materializeForSet7HasWeakC7weakvarACSgXwvm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasWeak) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// UNCHECKED: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasWeak):
+// UNCHECKED:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Optional<HasWeak>
+// UNCHECKED:   [[T0:%.*]] = ref_element_addr [[SELF]] : $HasWeak, #HasWeak.weakvar
+// UNCHECKED:   [[T1:%.*]] = load_weak [[T0]] : $*@sil_weak Optional<HasWeak>
+// UNCHECKED:   store [[T1]] to [init] [[T2]] : $*Optional<HasWeak>
+// UNCHECKED:   [[BUFFER:%.*]] = address_to_pointer [[T2]]
+// UNCHECKED:   [[T0:%.*]] = function_ref @_T017materializeForSet7HasWeakC7weakvarACSgXwvmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasWeak, @thick HasWeak.Type) -> () 
+// UNCHECKED:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, {{.*}} : $Optional<Builtin.RawPointer>)
+// UNCHECKED:   return [[T4]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// UNCHECKED: }
 
 // rdar://22109071
 // Test that we don't use materializeForSet from a protocol extension.
@@ -307,7 +370,7 @@ func improveWizard(_ wizard: inout Wizard) {
 //   Call the getter and materialize the result in the temporary.
 // CHECK-NEXT:  [[T0:%.*]] = load [trivial] [[WRITE:.*]] : $*Wizard
 // CHECK-NEXT:  function_ref
-// CHECK-NEXT:  [[GETTER:%.*]] = function_ref @_T017materializeForSet5MagicPAAE5hocusSifg
+// CHECK-NEXT:  [[GETTER:%.*]] = function_ref @_T017materializeForSet5MagicPAAE5hocusSivg
 // CHECK-NEXT:  [[WTEMP:%.*]] = alloc_stack $Wizard
 // CHECK-NEXT:  store [[T0]] to [trivial] [[WTEMP]]
 // CHECK-NEXT:  [[T0:%.*]] = apply [[GETTER]]<Wizard>([[WTEMP]])
@@ -317,7 +380,7 @@ func improveWizard(_ wizard: inout Wizard) {
 // CHECK-NEXT:  apply [[IMPROVE]]([[TEMP]])
 // CHECK-NEXT:  [[T0:%.*]] = load [trivial] [[TEMP]]
 // CHECK-NEXT:  function_ref
-// CHECK-NEXT:  [[SETTER:%.*]] = function_ref @_T017materializeForSet5MagicPAAE5hocusSifs
+// CHECK-NEXT:  [[SETTER:%.*]] = function_ref @_T017materializeForSet5MagicPAAE5hocusSivs
 // CHECK-NEXT:  apply [[SETTER]]<Wizard>([[T0]], [[WRITE]])
 // CHECK-NEXT:  end_access [[WRITE]] : $*Wizard
 // CHECK-NEXT:  dealloc_stack [[TEMP]]
@@ -330,7 +393,7 @@ struct Bill : Totalled {
   var total: Int
 }
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BillV5totalSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BillV5totalSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Bill):
 // CHECK:   [[T0:%.*]] = struct_element_addr [[SELF]] : $*Bill, #Bill.total
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
@@ -339,9 +402,9 @@ struct Bill : Totalled {
 // CHECK:   return [[T4]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK: }
 
-// CHECK-LABEL:  sil private [transparent] [thunk] @_T017materializeForSet4BillVAA8TotalledA2aDP5totalSifmTW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL:  sil private [transparent] [thunk] @_T017materializeForSet4BillVAA8TotalledA2aDP5totalSivmTW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK:        bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Bill):
-// CHECK:          [[T0:%.*]] = function_ref @_T017materializeForSet4BillV5totalSifm
+// CHECK:          [[T0:%.*]] = function_ref @_T017materializeForSet4BillV5totalSivm
 // CHECK-NEXT:     [[T1:%.*]] = apply [[T0]]([[BUFFER]], [[STORAGE]], [[SELF]])
 // CHECK-NEXT:     [[LEFT:%.*]] = tuple_extract [[T1]]
 // CHECK-NEXT:     [[RIGHT:%.*]] = tuple_extract [[T1]]
@@ -372,26 +435,26 @@ struct GenericSubscriptWitness : GenericSubscriptProtocol {
   subscript<T>(_: T) -> T { get { } set { } }
 }
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet23GenericSubscriptWitnessV9subscriptxxclufmytfU_ : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenericSubscriptWitness, @thick GenericSubscriptWitness.Type) -> () {
+// CHECK-LABEL: sil private [transparent] @_T017materializeForSet23GenericSubscriptWitnessVxxcluimytfU_ : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenericSubscriptWitness, @thick GenericSubscriptWitness.Type) -> () {
 // CHECK:       bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenericSubscriptWitness, %3 : $@thick GenericSubscriptWitness.Type):
 // CHECK:         [[BUFFER:%.*]] = project_value_buffer $T in %1 : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:    [[INDICES:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
-// CHECK:         [[SETTER:%.*]] = function_ref @_T017materializeForSet23GenericSubscriptWitnessV9subscriptxxclufs : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @inout GenericSubscriptWitness) -> ()
+// CHECK:         [[SETTER:%.*]] = function_ref @_T017materializeForSet23GenericSubscriptWitnessVxxcluis : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @inout GenericSubscriptWitness) -> ()
 // CHECK-NEXT:    apply [[SETTER]]<T>([[INDICES]], [[BUFFER]], %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @inout GenericSubscriptWitness) -> ()
 // CHECK-NEXT:    dealloc_value_buffer $*T in %1 : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RESULT]] : $()
 
-// CHECK-LABEL sil hidden [transparent] [thunk] @_T017materializeForSet23GenericSubscriptWitnessVAA0dE8ProtocolA2aDP9subscriptqd__qd__clufmTW : $@convention(witness_method) <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in τ_0_0, @inout GenericSubscriptWitness) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet23GenericSubscriptWitnessVxxcluim : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in T, @inout GenericSubscriptWitness) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK:      bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*T, %3 : $*GenericSubscriptWitness):
 // CHECK-NEXT:   [[BUFFER:%.*]] = alloc_value_buffer $T in %1 : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:   copy_addr %2 to [initialization] [[BUFFER]] : $*T
 // CHECK-NEXT:   [[VALUE:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
 // CHECK-NEXT:   [[SELF:%.*]] = load [trivial] %3 : $*GenericSubscriptWitness
-// CHECK:        [[GETTER:%.*]] = function_ref @_T017materializeForSet23GenericSubscriptWitnessV9subscriptxxclufg : $@convention(method) <τ_0_0> (@in τ_0_0, GenericSubscriptWitness) -> @out τ_0_0
+// CHECK:        [[GETTER:%.*]] = function_ref @_T017materializeForSet23GenericSubscriptWitnessVxxcluig : $@convention(method) <τ_0_0> (@in τ_0_0, GenericSubscriptWitness) -> @out τ_0_0
 // CHECK-NEXT:   apply [[GETTER]]<T>([[VALUE]], %2, [[SELF]]) : $@convention(method) <τ_0_0> (@in τ_0_0, GenericSubscriptWitness) -> @out τ_0_0
 // CHECK-NEXT:   [[VALUE_PTR:%.*]] = address_to_pointer [[VALUE]] : $*T to $Builtin.RawPointer
-// CHECK:        [[CALLBACK:%.*]] = function_ref @_T017materializeForSet23GenericSubscriptWitnessV9subscriptxxclufmytfU_
+// CHECK:        [[CALLBACK:%.*]] = function_ref @_T017materializeForSet23GenericSubscriptWitnessVxxcluimytfU_
 // CHECK-NEXT:   [[CALLBACK_PTR:%.*]] = thin_function_to_pointer [[CALLBACK]] : $@convention(method) <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenericSubscriptWitness, @thick GenericSubscriptWitness.Type) -> () to $Builtin.RawPointer
 // CHECK-NEXT:   [[CALLBACK_OPTIONAL:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[CALLBACK_PTR]] : $Builtin.RawPointer
 // CHECK-NEXT:   [[RESULT:%.*]] = tuple ([[VALUE_PTR]] : $Builtin.RawPointer, [[CALLBACK_OPTIONAL]] : $Optional<Builtin.RawPointer>)
@@ -402,6 +465,28 @@ extension GenericSubscriptProtocol {
 }
 
 struct GenericSubscriptDefaultWitness : GenericSubscriptProtocol { }
+
+// Make sure we correctly infer the 'T : Magic' requirement on all the accessors
+// of the subscript.
+
+struct GenericTypeWithRequirement<T : Magic> {}
+
+protocol InferredRequirementOnSubscriptProtocol {
+  subscript<T>(i: Int) -> GenericTypeWithRequirement<T> { get set }
+}
+
+struct InferredRequirementOnSubscript : InferredRequirementOnSubscriptProtocol {
+  subscript<T>(i: Int) -> GenericTypeWithRequirement<T> {
+    get { }
+    set { }
+  }
+}
+
+// CHECK-LABEL: sil hidden @_T017materializeForSet30InferredRequirementOnSubscriptVAA015GenericTypeWithE0VyxGSicAA5MagicRzluig : $@convention(method) <T where T : Magic> (Int, InferredRequirementOnSubscript) -> GenericTypeWithRequirement<T>
+
+// CHECK-LABEL: sil hidden @_T017materializeForSet30InferredRequirementOnSubscriptVAA015GenericTypeWithE0VyxGSicAA5MagicRzluis : $@convention(method) <T where T : Magic> (GenericTypeWithRequirement<T>, Int, @inout InferredRequirementOnSubscript) -> ()
+
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet30InferredRequirementOnSubscriptVAA015GenericTypeWithE0VyxGSicAA5MagicRzluim : $@convention(method) <T where T : Magic> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @inout InferredRequirementOnSubscript) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 
 // Test for materializeForSet vs static properties of structs.
 
@@ -483,23 +568,23 @@ extension Panda {
 
 struct TuxedoPanda : Panda { }
 
-// CHECK-LABEL: sil private [transparent] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcfmytfU_TW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
+// CHECK-LABEL: sil private [transparent] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcvmytfU_TW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
 
   // FIXME: Useless re-abstractions
 
   // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIxir_A2CIxyd_TR : $@convention(thin) (TuxedoPanda, @owned @callee_owned (@in TuxedoPanda) -> @out TuxedoPanda) -> TuxedoPanda
 
-  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xxxcfs : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@owned @callee_owned (@in τ_0_0) -> @out τ_0_0, @inout τ_0_0) -> ()
+  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xxxcvs : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@owned @callee_owned (@in τ_0_0) -> @out τ_0_0, @inout τ_0_0) -> ()
 
   // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIxyd_A2CIxir_TR : $@convention(thin) (@in TuxedoPanda, @owned @callee_owned (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
 
 // CHECK: }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcfmTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcvmTW
 
 // Call the getter:
 
-  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xxxcfg : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@in_guaranteed τ_0_0) -> @owned @callee_owned (@in τ_0_0) -> @out τ_0_0
+  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xxxcvg : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@in_guaranteed τ_0_0) -> @owned @callee_owned (@in τ_0_0) -> @out τ_0_0
 
 // Result of calling the getter is re-abstracted to the maximally substituted type
 // by SILGenFunction::emitApply():
@@ -514,7 +599,7 @@ struct TuxedoPanda : Panda { }
 
 // The callback:
 
-  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcfmytfU_TW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
+  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcvmytfU_TW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
 
 // CHECK: }
 
@@ -526,15 +611,15 @@ struct LazyStructProperty {
 }
 
 // CHECK-LABEL: sil hidden @_T017materializeForSet31inoutAccessOfLazyStructPropertyyAA0ghI0Vz1l_tF
-// CHECK:   function_ref @_T017materializeForSet18LazyStructPropertyV3catSifg
-// CHECK:   function_ref @_T017materializeForSet18LazyStructPropertyV3catSifs
+// CHECK:   function_ref @_T017materializeForSet18LazyStructPropertyV3catSivg
+// CHECK:   function_ref @_T017materializeForSet18LazyStructPropertyV3catSivs
 func inoutAccessOfLazyStructProperty(l: inout LazyStructProperty) {
   increment(&l.cat)
 }
 
 // Test for materializeForSet vs lazy properties of classes.
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet17LazyClassPropertyC3catSifm
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet17LazyClassPropertyC3catSivm
 
 class LazyClassProperty {
   lazy var cat: Int = 5
@@ -553,8 +638,8 @@ final class LazyFinalClassProperty {
 }
 
 // CHECK-LABEL: sil hidden @_T017materializeForSet35inoutAccessOfLazyFinalClassPropertyyAA0ghiJ0Cz1l_tF
-// CHECK:    function_ref @_T017materializeForSet22LazyFinalClassPropertyC3catSifg
-// CHECK:    function_ref @_T017materializeForSet22LazyFinalClassPropertyC3catSifs
+// CHECK:    function_ref @_T017materializeForSet22LazyFinalClassPropertyC3catSivg
+// CHECK:    function_ref @_T017materializeForSet22LazyFinalClassPropertyC3catSivs
 func inoutAccessOfLazyFinalClassProperty(l: inout LazyFinalClassProperty) {
   increment(&l.cat)
 }
@@ -572,22 +657,22 @@ struct FooClosure {
 func testMaterializedSetter() {
   // CHECK: function_ref @_T017materializeForSet10FooClosureVACycfC
   var f = FooClosure()
-  // CHECK: function_ref @_T017materializeForSet10FooClosureV8computedS3iccSgfg
-  // CHECK: function_ref @_T017materializeForSet10FooClosureV8computedS3iccSgfs
+  // CHECK: function_ref @_T017materializeForSet10FooClosureV8computedS3iccSgvg
+  // CHECK: function_ref @_T017materializeForSet10FooClosureV8computedS3iccSgvs
   f.computed = f.computed
 }
 
 // CHECK-LABEL: sil_vtable DerivedForOverride {
-// CHECK:   #BaseForOverride.valueStored!getter.1: (BaseForOverride) -> () -> Int : _T017materializeForSet07DerivedB8OverrideC11valueStoredSifg
-// CHECK:   #BaseForOverride.valueStored!setter.1: (BaseForOverride) -> (Int) -> () : _T017materializeForSet07DerivedB8OverrideC11valueStoredSifs
-// CHECK:   #BaseForOverride.valueStored!materializeForSet.1: (BaseForOverride) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T017materializeForSet07DerivedB8OverrideC11valueStoredSifm
-// CHECK:   #BaseForOverride.valueComputed!getter.1: (BaseForOverride) -> () -> Int : _T017materializeForSet07DerivedB8OverrideC13valueComputedSifg
-// CHECK:   #BaseForOverride.valueComputed!setter.1: (BaseForOverride) -> (Int) -> () : _T017materializeForSet07DerivedB8OverrideC13valueComputedSifs
-// CHECK:   #BaseForOverride.valueComputed!materializeForSet.1: (BaseForOverride) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T017materializeForSet07DerivedB8OverrideC13valueComputedSifm
+// CHECK:   #BaseForOverride.valueStored!getter.1: (BaseForOverride) -> () -> Int : _T017materializeForSet07DerivedB8OverrideC11valueStoredSivg
+// CHECK:   #BaseForOverride.valueStored!setter.1: (BaseForOverride) -> (Int) -> () : _T017materializeForSet07DerivedB8OverrideC11valueStoredSivs
+// CHECK:   #BaseForOverride.valueStored!materializeForSet.1: (BaseForOverride) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T017materializeForSet07DerivedB8OverrideC11valueStoredSivm
+// CHECK:   #BaseForOverride.valueComputed!getter.1: (BaseForOverride) -> () -> Int : _T017materializeForSet07DerivedB8OverrideC13valueComputedSivg
+// CHECK:   #BaseForOverride.valueComputed!setter.1: (BaseForOverride) -> (Int) -> () : _T017materializeForSet07DerivedB8OverrideC13valueComputedSivs
+// CHECK:   #BaseForOverride.valueComputed!materializeForSet.1: (BaseForOverride) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T017materializeForSet07DerivedB8OverrideC13valueComputedSivm
 // CHECK: }
 
 // CHECK-LABEL: sil_witness_table hidden Bill: Totalled module materializeForSet {
-// CHECK:   method #Totalled.total!getter.1: {{.*}} : @_T017materializeForSet4BillVAA8TotalledA2aDP5totalSifgTW
-// CHECK:   method #Totalled.total!setter.1: {{.*}} : @_T017materializeForSet4BillVAA8TotalledA2aDP5totalSifsTW
-// CHECK:   method #Totalled.total!materializeForSet.1: {{.*}} : @_T017materializeForSet4BillVAA8TotalledA2aDP5totalSifmTW
+// CHECK:   method #Totalled.total!getter.1: {{.*}} : @_T017materializeForSet4BillVAA8TotalledA2aDP5totalSivgTW
+// CHECK:   method #Totalled.total!setter.1: {{.*}} : @_T017materializeForSet4BillVAA8TotalledA2aDP5totalSivsTW
+// CHECK:   method #Totalled.total!materializeForSet.1: {{.*}} : @_T017materializeForSet4BillVAA8TotalledA2aDP5totalSivmTW
 // CHECK: }

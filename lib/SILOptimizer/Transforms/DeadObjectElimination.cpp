@@ -35,7 +35,9 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Utils/IndexTrie.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -179,8 +181,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
 void static
 removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
   for (auto *I : UsersToRemove) {
-    if (!I->use_empty())
-      I->replaceAllUsesWith(SILUndef::get(I->getType(), I->getModule()));
+    I->replaceAllUsesOfAllResultsWithUndef();
     // Now we know that I should not have any uses... erase it from its parent.
     I->eraseFromParent();
   }
@@ -195,7 +196,7 @@ removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
 static bool canZapInstruction(SILInstruction *Inst) {
   // It is ok to eliminate various retains/releases. We are either removing
   // everything or nothing.
-  if (isa<RefCountingInst>(Inst))
+  if (isa<RefCountingInst>(Inst) || isa<StrongPinInst>(Inst))
     return true;
 
   // If we see a store here, we have already checked that we are storing into
@@ -253,20 +254,22 @@ hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users) {
     // At this point, we can remove the instruction as long as all of its users
     // can be removed as well. Scan its users and add them to the worklist for
     // recursive processing.
-    for (auto *Op : I->getUses()) {
-      auto *User = Op->getUser();
+    for (auto result : I->getResults()) {
+      for (auto *Op : result->getUses()) {
+        auto *User = Op->getUser();
 
-      // Make sure that we are only storing into our users, not storing our
-      // users which would be an escape.
-      if (auto *SI = dyn_cast<StoreInst>(User))
-        if (Op->get() == SI->getSrc()) {
-          DEBUG(llvm::dbgs() << "        Found store of pointer. Failure: " <<
-                *SI);
-          return true;
-        }
+        // Make sure that we are only storing into our users, not storing our
+        // users which would be an escape.
+        if (auto *SI = dyn_cast<StoreInst>(User))
+          if (Op->get() == SI->getSrc()) {
+            DEBUG(llvm::dbgs() << "        Found store of pointer. Failure: " <<
+                  *SI);
+            return true;
+          }
 
-      // Otherwise, add normal instructions to the worklist for processing.
-      Worklist.push_back(User);
+        // Otherwise, add normal instructions to the worklist for processing.
+        Worklist.push_back(User);
+      }
     }
   }
 
@@ -276,50 +279,6 @@ hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users) {
 //===----------------------------------------------------------------------===//
 //                     NonTrivial DeadObject Elimination
 //===----------------------------------------------------------------------===//
-
-namespace {
-// Trie node representing a sequence of unsigned integer indices.
-class IndexTrieNode {
-  static const unsigned RootIdx = ~0U;
-  unsigned Index;
-  llvm::SmallVector<IndexTrieNode*, 8> Children;
-
-public:
-  IndexTrieNode(): Index(RootIdx) {}
-
-  explicit IndexTrieNode(unsigned V): Index(V) {}
-
-  IndexTrieNode(IndexTrieNode &) =delete;
-  IndexTrieNode &operator=(const IndexTrieNode&) =delete;
-
-  ~IndexTrieNode() {
-    for (auto *N : Children)
-      delete N;
-  }
-
-  bool isRoot() const { return Index == RootIdx; }
-
-  bool isLeaf() const { return Children.empty(); }
-
-  unsigned getIndex() const { return Index; }
-
-  IndexTrieNode *getChild(unsigned Idx) {
-    assert(Idx != RootIdx);
-
-    auto I = std::lower_bound(Children.begin(), Children.end(), Idx,
-                              [](IndexTrieNode *a, unsigned i) {
-                                return a->Index < i;
-                              });
-    if (I != Children.end() && (*I)->Index == Idx)
-      return *I;
-    auto *N = new IndexTrieNode(Idx);
-    Children.insert(I, N);
-    return N;
-  }
-
-  ArrayRef<IndexTrieNode*> getChildren() const { return Children; }
-};
-} // end anonymous namespace
 
 namespace {
 /// Determine if an object is dead. Compute its original lifetime. Find the
@@ -430,7 +389,9 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     auto User = Op->getUser();
 
     // Lifetime endpoints that don't allow the address to escape.
-    if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User)) {
+    if (isa<RefCountingInst>(User) ||
+        isa<StrongPinInst>(User) ||
+        isa<DebugValueInst>(User)) {
       AllUsers.insert(User);
       continue;
     }
@@ -451,44 +412,46 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
       AllUsers.insert(User);
       continue;
     }
-    if (isa<PointerToAddressInst>(User)) {
+    if (auto PTAI = dyn_cast<PointerToAddressInst>(User)) {
       // Only one pointer-to-address is allowed for safety.
       if (SeenPtrToAddr)
         return false;
 
       SeenPtrToAddr = true;
-      if (!recursivelyCollectInteriorUses(User, AddressNode, IsInteriorAddress))
+      if (!recursivelyCollectInteriorUses(PTAI, AddressNode, IsInteriorAddress))
         return false;
 
       continue;
     }
     // Recursively follow projections.
-    ProjectionIndex PI(User);
-    if (PI.isValid()) {
-      IndexTrieNode *ProjAddrNode = AddressNode;
-      bool ProjInteriorAddr = IsInteriorAddress;
-      if (Projection::isAddressProjection(User)) {
-        if (User->getKind() == ValueKind::IndexAddrInst) {
-          // Don't support indexing within an interior address.
-          if (IsInteriorAddress)
-            return false;
+    if (auto ProjInst = dyn_cast<SingleValueInstruction>(User)) {
+      ProjectionIndex PI(ProjInst);
+      if (PI.isValid()) {
+        IndexTrieNode *ProjAddrNode = AddressNode;
+        bool ProjInteriorAddr = IsInteriorAddress;
+        if (Projection::isAddressProjection(ProjInst)) {
+          if (isa<IndexAddrInst>(ProjInst)) {
+            // Don't support indexing within an interior address.
+            if (IsInteriorAddress)
+              return false;
+          }
+          else if (!IsInteriorAddress) {
+            // Push an extra zero index node for the first interior address.
+            ProjAddrNode = AddressNode->getChild(0);
+            ProjInteriorAddr = true;
+          }
         }
-        else if (!IsInteriorAddress) {
-          // Push an extra zero index node for the first interior address.
-          ProjAddrNode = AddressNode->getChild(0);
-          ProjInteriorAddr = true;
+        else if (IsInteriorAddress) {
+          // Don't expect to extract values once we've taken an address.
+          return false;
         }
+        if (!recursivelyCollectInteriorUses(ProjInst,
+                                            ProjAddrNode->getChild(PI.Index),
+                                            ProjInteriorAddr)) {
+          return false;
+        }
+        continue;
       }
-      else if (IsInteriorAddress) {
-        // Don't expect to extract values once we've taken an address.
-        return false;
-      }
-      if (!recursivelyCollectInteriorUses(User,
-                                          ProjAddrNode->getChild(PI.Index),
-                                          ProjInteriorAddr)) {
-        return false;
-      }
-      continue;
     }
     // Otherwise bail.
     DEBUG(llvm::dbgs() << "        Found an escaping use: " << *User);
@@ -574,7 +537,8 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
 // TODO: This relies on the lowest level array.uninitialized not being
 // inlined. To do better we could either run this pass before semantic inlining,
 // or we could also handle calls to array.init.
-static bool removeAndReleaseArray(SILValue NewArrayValue, bool &CFGChanged) {
+static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
+                                  DeadEndBlocks &DEBlocks) {
   TupleExtractInst *ArrayDef = nullptr;
   TupleExtractInst *StorageAddress = nullptr;
   for (auto *Op : NewArrayValue->getUses()) {
@@ -629,12 +593,15 @@ static bool removeAndReleaseArray(SILValue NewArrayValue, bool &CFGChanged) {
       return false;
   }
   // For each store location, insert releases.
-  // This makes a strong assumption that the allocated object is released on all
-  // paths in which some object initialization occurs.
   SILSSAUpdater SSAUp;
   ValueLifetimeAnalysis::Frontier ArrayFrontier;
-  CFGChanged |= !VLA.computeFrontier(ArrayFrontier,
-                                     ValueLifetimeAnalysis::IgnoreExitEdges);
+  if (!VLA.computeFrontier(ArrayFrontier,
+                           ValueLifetimeAnalysis::UsersMustPostDomDef,
+                           &DEBlocks)) {
+    // In theory the allocated object must be released on all paths in which
+    // some object initialization occurs. If not (for some reason) we bail.
+    return false;
+  }
 
   DeadStorage.visitStoreLocations([&] (ArrayRef<StoreInst*> Stores) {
       insertReleases(Stores, ArrayFrontier, SSAUp);
@@ -662,7 +629,6 @@ namespace {
 class DeadObjectElimination : public SILFunctionTransform {
   llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
   llvm::SmallVector<SILInstruction*, 16> Allocations;
-  bool CFGChanged = false;
 
   void collectAllocations(SILFunction &Fn) {
     for (auto &BB : Fn)
@@ -677,9 +643,10 @@ class DeadObjectElimination : public SILFunctionTransform {
   bool processAllocRef(AllocRefInst *ARI);
   bool processAllocStack(AllocStackInst *ASI);
   bool processAllocBox(AllocBoxInst *ABI){ return false;}
-  bool processAllocApply(ApplyInst *AI);
+  bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
 
   bool processFunction(SILFunction &Fn) {
+    DeadEndBlocks DEBlocks(&Fn);
     Allocations.clear();
     DestructorAnalysisCache.clear();
     bool Changed = false;
@@ -692,17 +659,14 @@ class DeadObjectElimination : public SILFunctionTransform {
       else if (auto *A = dyn_cast<AllocBoxInst>(II))
         Changed |= processAllocBox(A);
       else if (auto *A = dyn_cast<ApplyInst>(II))
-        Changed |= processAllocApply(A);
+        Changed |= processAllocApply(A, DEBlocks);
     }
     return Changed;
   }
 
   void run() override {
-    CFGChanged = false;
     if (processFunction(*getFunction())) {
-      invalidateAnalysis(CFGChanged ?
-                         SILAnalysis::InvalidationKind::FunctionBody :
-                         SILAnalysis::InvalidationKind::CallsAndInstructions);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
 
@@ -773,7 +737,8 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   return true;
 }
 
-bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
+bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
+                                              DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
   if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized)
     return false;
@@ -789,7 +754,7 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
       return false;
   }
 
-  if (!removeAndReleaseArray(AI, CFGChanged))
+  if (!removeAndReleaseArray(AI, DEBlocks))
     return false;
 
   DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");

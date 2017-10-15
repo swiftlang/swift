@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: sed -n -e '/MODULE_A_START$/,/MODULE_A_END$/ p' %s > %t/a.swift
 // RUN: sed -n -e '/MODULE_B_START$/,/MODULE_B_END$/ p' %s > %t/b.swift
 // RUN: sed -n -e '/REPL_START$/,/REPL_END$/ p' %s > %t/repl.swift

@@ -173,63 +173,6 @@ func test() {
 }
 test()
 
-func lazyInitFunction() -> Int {
-  print("lazy property initialized")
-  return 0
-}
-
-
-class LazyPropertyClass {
-  var id : Int
-  lazy var lazyProperty = lazyInitFunction()
-
-  lazy var lazyProperty2 : Int = {
-    print("other lazy property initialized")
-    return 0
-  }()
-
-
-  init(_ ident : Int) {
-    id = ident
-    print("LazyPropertyClass.init #\(id)")
-  }
-
-  deinit {
-    print("LazyPropertyClass.deinit #\(id)")
-  }
-  
-
-}
-
-
-func testLazyProperties() {
-  print("testLazyPropertiesStart") // CHECK: testLazyPropertiesStart
-  if true {
-    var a = LazyPropertyClass(1)      // CHECK-NEXT: LazyPropertyClass.init #1
-    _ = a.lazyProperty                // CHECK-NEXT: lazy property initialized
-    _ = a.lazyProperty    // executed only once, lazy init not called again.
-    a.lazyProperty = 42   // nothing interesting happens
-    _ = a.lazyProperty2               // CHECK-NEXT: other lazy property initialized
-
-    // CHECK-NEXT: LazyPropertyClass.init #2
-    // CHECK-NEXT: LazyPropertyClass.deinit #1
-    a = LazyPropertyClass(2)
-
-    a = LazyPropertyClass(3)
-    a.lazyProperty = 42   // Store don't trigger lazy init.
-
-    // CHECK-NEXT: LazyPropertyClass.init  #3
-    // CHECK-NEXT: LazyPropertyClass.deinit #2
-    // CHECK-NEXT: LazyPropertyClass.deinit #3
-  }
-  print("testLazyPropertiesDone")    // CHECK: testLazyPropertiesDone
-}
-
-
-
-testLazyProperties()
-
-
 
 /// rdar://16805609 - <rdar://problem/16805609> Providing a 'didSet' in a generic override doesn't work
 class rdar16805609Base<T> {

@@ -837,31 +837,38 @@ static llvm::FunctionType *getTypeOfFunction(llvm::Constant *fn) {
 
 /// Emit a unary call to perform a ref-counting operation.
 ///
-/// \param fn - expected signature 'void (T)'
+/// \param fn - expected signature 'void (T)' or 'T (T)'
 static void emitUnaryRefCountCall(IRGenFunction &IGF,
                                   llvm::Constant *fn,
                                   llvm::Value *value) {
   auto cc = IGF.IGM.DefaultCC;
-  if (auto fun = dyn_cast<llvm::Function>(fn))
+  auto fun = dyn_cast<llvm::Function>(fn);
+  if (fun)
     cc = fun->getCallingConv();
 
   // Instead of casting the input, we cast the function type.
   // This tends to produce less IR, but might be evil.
-  if (value->getType() != getTypeOfFunction(fn)->getParamType(0)) {
+  auto origFnType = getTypeOfFunction(fn);
+  if (value->getType() != origFnType->getParamType(0)) {
+    auto resultTy = origFnType->getReturnType() == IGF.IGM.VoidTy
+                        ? IGF.IGM.VoidTy
+                        : value->getType();
     llvm::FunctionType *fnType =
-      llvm::FunctionType::get(IGF.IGM.VoidTy, value->getType(), false);
+      llvm::FunctionType::get(resultTy, value->getType(), false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
   
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
+  if (fun && fun->hasParamAttribute(0, llvm::Attribute::Returned))
+    call->addParamAttr(0, llvm::Attribute::Returned);
   call->setCallingConv(cc);
   call->setDoesNotThrow();
 }
 
 /// Emit a copy-like call to perform a ref-counting operation.
 ///
-/// \param fn - expected signature 'void (T, T)'
+/// \param fn - expected signature 'void (T, T)' or 'T (T, T)'
 static void emitCopyLikeCall(IRGenFunction &IGF,
                              llvm::Constant *fn,
                              llvm::Value *dest,
@@ -870,20 +877,27 @@ static void emitCopyLikeCall(IRGenFunction &IGF,
          "type mismatch in binary refcounting operation");
 
   auto cc = IGF.IGM.DefaultCC;
-  if (auto fun = dyn_cast<llvm::Function>(fn))
+  auto fun = dyn_cast<llvm::Function>(fn);
+  if (fun)
     cc = fun->getCallingConv();
 
   // Instead of casting the inputs, we cast the function type.
   // This tends to produce less IR, but might be evil.
-  if (dest->getType() != getTypeOfFunction(fn)->getParamType(0)) {
+  auto origFnType = getTypeOfFunction(fn);
+  if (dest->getType() != origFnType->getParamType(0)) {
     llvm::Type *paramTypes[] = { dest->getType(), dest->getType() };
+    auto resultTy = origFnType->getReturnType() == IGF.IGM.VoidTy
+                        ? IGF.IGM.VoidTy
+                        : dest->getType();
     llvm::FunctionType *fnType =
-      llvm::FunctionType::get(IGF.IGM.VoidTy, paramTypes, false);
+      llvm::FunctionType::get(resultTy, paramTypes, false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
   
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, {dest, src});
+  if (fun && fun->hasParamAttribute(0, llvm::Attribute::Returned))
+    call->addParamAttr(0, llvm::Attribute::Returned);
   call->setCallingConv(cc);
   call->setDoesNotThrow();
 }
@@ -923,7 +937,7 @@ static llvm::Value *emitLoadWeakLikeCall(IRGenFunction &IGF,
 
 /// Emit a call to a function with a storeWeak-like signature.
 ///
-/// \param fn - expected signature 'void (Weak*, T)'
+/// \param fn - expected signature 'void (Weak*, T)' or 'Weak* (Weak*, T)'
 static void emitStoreWeakLikeCall(IRGenFunction &IGF,
                                   llvm::Constant *fn,
                                   llvm::Value *addr,
@@ -933,20 +947,27 @@ static void emitStoreWeakLikeCall(IRGenFunction &IGF,
          "address is not of a weak or unowned reference");
 
   auto cc = IGF.IGM.DefaultCC;
-  if (auto fun = dyn_cast<llvm::Function>(fn))
+  auto fun = dyn_cast<llvm::Function>(fn);
+  if (fun)
     cc = fun->getCallingConv();
 
   // Instead of casting the inputs, we cast the function type.
   // This tends to produce less IR, but might be evil.
-  if (value->getType() != getTypeOfFunction(fn)->getParamType(1)) {
+  auto origFnType = getTypeOfFunction(fn);
+  if (value->getType() != origFnType->getParamType(1)) {
     llvm::Type *paramTypes[] = { addr->getType(), value->getType() };
+    auto resultTy = origFnType->getReturnType() == IGF.IGM.VoidTy
+                        ? IGF.IGM.VoidTy
+                        : addr->getType();
     llvm::FunctionType *fnType =
-      llvm::FunctionType::get(IGF.IGM.VoidTy, paramTypes, false);
+      llvm::FunctionType::get(resultTy, paramTypes, false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
 
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, {addr, value});
+  if (fun && fun->hasParamAttribute(0, llvm::Attribute::Returned))
+    call->addParamAttr(0, llvm::Attribute::Returned);
   call->setCallingConv(cc);
   call->setDoesNotThrow();
 }
@@ -967,6 +988,7 @@ void IRGenFunction::emitNativeStrongRetain(llvm::Value *value,
                                        : IGM.getNativeNonAtomicStrongRetainFn(),
       value);
   call->setDoesNotThrow();
+  call->addParamAttr(0, llvm::Attribute::Returned);
 }
 
 /// Emit a store of a live value to the given retaining variable.
@@ -1249,9 +1271,9 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
   // Don't inline the function, so it stays as a signal to the ARC passes.
   // The ARC passes will remove references to the function when they're
   // no longer needed.
-  fixLifetime->addAttribute(llvm::AttributeSet::FunctionIndex,
+  fixLifetime->addAttribute(llvm::AttributeList::FunctionIndex,
                             llvm::Attribute::NoInline);
-  
+
   // Give the function an empty body.
   auto entry = llvm::BasicBlock::Create(LLVMContext, "", fixLifetime);
   llvm::ReturnInst::Create(LLVMContext, entry);
@@ -1430,7 +1452,7 @@ public:
   allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name) const override {
     return OwnedAddress(IGF.getTypeInfo(boxedType).getUndefAddress(),
-                        IGF.IGM.RefCountedNull);
+                        IGF.emitAllocEmptyBoxCall());
   }
 
   void
@@ -1584,7 +1606,11 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // For fixed-sized types, we can emit concrete box metadata.
   auto &fixedTI = cast<FixedTypeInfo>(eltTI);
 
-  // For empty types, we don't really need to allocate anything.
+  // Because we assume in enum's that payloads with a Builtin.NativeObject which
+  // is also the type for indirect enum cases have extra inhabitants of pointers
+  // we can't have a nil pointer as a representation for an empty box type --
+  // nil conflicts with the extra inhabitants. We return a static singleton
+  // empty box object instead.
   if (fixedTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     if (!EmptyBoxTI)
       EmptyBoxTI = new EmptyBoxTypeInfo(IGM);

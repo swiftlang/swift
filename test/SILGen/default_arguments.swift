@@ -1,4 +1,8 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s --check-prefix=NEGATIVE
+
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 %s | %FileCheck %s --check-prefix=NEGATIVE
 
 // __FUNCTION__ used as top-level parameter produces the module name.
 // CHECK-LABEL: sil @main
@@ -74,17 +78,13 @@ func testMagicLiterals(file: String = #file,
 // Check that default argument generator functions don't leak information about
 // user's source.
 //
-// CHECK-LABEL: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA_
-// CHECK: string_literal utf16 ""
+// NEGATIVE-NOT: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA_
 //
-// CHECK-LABEL: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA0_
-// CHECK: string_literal utf16 ""
+// NEGATIVE-NOT: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA0_
 //
-// CHECK-LABEL: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA1_
-// CHECK: integer_literal $Builtin.Int2048, 0
+// NEGATIVE-NOT: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA1_
 //
-// CHECK-LABEL: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA2_
-// CHECK: integer_literal $Builtin.Int2048, 0
+// NEGATIVE-NOT: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA2_
 
 func closure(_: () -> ()) {}
 func autoclosure(_: @autoclosure () -> ()) {}
@@ -103,7 +103,7 @@ func testCallWithMagicLiterals() {
   autoclosure(testMagicLiterals())
 }
 
-// CHECK-LABEL: sil hidden @_T017default_arguments25testPropWithMagicLiteralsSifg
+// CHECK-LABEL: sil hidden @_T017default_arguments25testPropWithMagicLiteralsSivg
 // CHECK:         string_literal utf16 "testPropWithMagicLiterals"
 var testPropWithMagicLiterals: Int {
   testMagicLiterals()
@@ -130,7 +130,7 @@ class Foo {
     autoclosure(testMagicLiterals())
   }
 
-  // CHECK-LABEL: sil hidden @_T017default_arguments3FooC9subscriptS2icfg
+  // CHECK-LABEL: sil hidden @_T017default_arguments3FooCS2icig
   // CHECK:         string_literal utf16 "subscript"
   subscript(x: Int) -> Int {
     testMagicLiterals()
@@ -183,7 +183,7 @@ func takeDefaultArgUnnamed(_ x: Int = 5) { }
 
 // CHECK-LABEL: sil hidden @_T017default_arguments25testTakeDefaultArgUnnamed{{[_0-9a-zA-Z]*}}F
 func testTakeDefaultArgUnnamed(_ i: Int) {
-  // CHECK: bb0([[I:%[0-9]+]] : $Int):
+  // CHECK: bb0([[I:%[0-9]+]] : @trivial $Int):
   // CHECK:   [[FN:%[0-9]+]] = function_ref @_T017default_arguments21takeDefaultArgUnnamedySiF : $@convention(thin) (Int) -> ()
   // CHECK:   apply [[FN]]([[I]]) : $@convention(thin) (Int) -> ()
   takeDefaultArgUnnamed(i)

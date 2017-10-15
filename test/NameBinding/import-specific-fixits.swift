@@ -1,6 +1,5 @@
 // RUN: rm -f %t.*
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/ambiguous_left.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/ambiguous_right.swift
 // RUN: %target-swift-frontend -emit-module -o %t -I %t %S/Inputs/ambiguous.swift

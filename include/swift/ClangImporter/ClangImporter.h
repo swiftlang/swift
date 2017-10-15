@@ -242,8 +242,7 @@ public:
   ///
   /// \sa clang::GeneratePCHAction
   bool emitBridgingPCH(StringRef headerPath,
-                       StringRef outputPCHPath,
-                       clang::DiagnosticConsumer *Diags = nullptr);
+                       StringRef outputPCHPath);
 
   /// Returns true if a clang CompilerInstance can successfully read in a PCH,
   /// assuming it exists, with the current options. This can be used to find out
@@ -308,14 +307,25 @@ public:
 
   Optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
-                 const std::string &SwiftPCHHash);
+                 StringRef SwiftPCHHash);
   Optional<std::string>
+  /// \param isExplicit true if the PCH filename was passed directly
+  /// with -import-objc-header option.
   getPCHFilename(const ClangImporterOptions &ImporterOptions,
-                 const std::string &SwiftPCHHash);
+                 StringRef SwiftPCHHash, bool &isExplicit);
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
                              ArrayRef<clang::Module *> Exported);
-}
+
+/// Determine whether \c overlayDC is within an overlay module for the
+/// imported context enclosing \c importedDC.
+///
+/// This routine is used for various hacks that are only permitted within
+/// overlays of imported modules, e.g., Objective-C bridging conformances.
+bool isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
+                                        const DeclContext *importedDC);
+
+} // end namespace swift
 
 #endif

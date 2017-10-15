@@ -68,18 +68,15 @@ class GlobalPropertyOpt {
 
 #ifndef NDEBUG
     friend raw_ostream &operator<<(raw_ostream &os, const Entry &entry) {
-      if (entry.Field) {
-        os << "field " << entry.Field->getName() << '\n';
-      } else if (!entry.Value) {
-        os << "unknown-address\n";
-      } else if (auto *Inst = dyn_cast<SILInstruction>(entry.Value)) {
-        os << Inst->getParent()->getParent()->getName() << ": " << entry.Value;
-      } else if (auto *Arg = dyn_cast<SILArgument>(entry.Value)) {
-        os << Arg->getParent()->getParent()->getName() << ": " << entry.Value;
-      } else {
-        os << entry.Value;
-      }
-      return os;
+      if (entry.Field)
+        return os << "field " << entry.Field->getName() << '\n';
+      if (!entry.Value)
+        return os << "unknown-address\n";
+      if (auto *Inst = entry.Value->getDefiningInstruction())
+        return os << Inst->getFunction()->getName() << ": " << entry.Value;
+      if (auto *Arg = dyn_cast<SILArgument>(entry.Value))
+        return os << Arg->getFunction()->getName() << ": " << entry.Value;
+      return os << entry.Value;
     }
 #endif
   };
@@ -122,7 +119,7 @@ class GlobalPropertyOpt {
   /// Returns true if the type is a tuple which contains at least one array
   /// (we don't check for arrays in nested tuples).
   bool isTupleWithArray(CanType type) {
-    if (TupleType *tuple = dyn_cast<TupleType>(type)) {
+    if (auto tuple = dyn_cast<TupleType>(type)) {
       for (Type subType : tuple->getElementTypes()) {
         if (CanType(subType).getNominalOrBoundGenericNominal() == ArrayType)
           return true;
@@ -132,18 +129,18 @@ class GlobalPropertyOpt {
   }
 
   bool isVisibleExternally(VarDecl *decl) {
-    Accessibility accessibility = decl->getEffectiveAccess();
+    AccessLevel access = decl->getEffectiveAccess();
     SILLinkage linkage;
-    switch (accessibility) {
-      case Accessibility::Private:
-      case Accessibility::FilePrivate:
+    switch (access) {
+      case AccessLevel::Private:
+      case AccessLevel::FilePrivate:
         linkage = SILLinkage::Private;
         break;
-      case Accessibility::Internal:
+      case AccessLevel::Internal:
         linkage = SILLinkage::Hidden;
         break;
-      case Accessibility::Public:
-      case Accessibility::Open:
+      case AccessLevel::Public:
+      case AccessLevel::Open:
         linkage = SILLinkage::Public;
         break;
     }
@@ -263,13 +260,14 @@ bool GlobalPropertyOpt::canAddressEscape(SILValue V, bool acceptStore) {
       // We don't handle these instructions if we see them in store addresses.
       // So going through them lets stores be as bad as if the address would
       // escape.
-      if (canAddressEscape(User, false))
+      auto value = cast<SingleValueInstruction>(User);
+      if (canAddressEscape(value, false))
         return true;
       continue;
     }
-    if (isa<MarkDependenceInst>(User)) {
+    if (auto markDependence = dyn_cast<MarkDependenceInst>(User)) {
       unsigned opNum = UI->getOperandNumber();
-      if (opNum == 0 && canAddressEscape(User, acceptStore))
+      if (opNum == 0 && canAddressEscape(markDependence, acceptStore))
         return true;
       continue;
     }
@@ -324,11 +322,12 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       return;
     }
   } else if (isa<RefElementAddrInst>(Inst) || isa<StructElementAddrInst>(Inst)) {
-    if (isArrayAddressType(Inst->getType())) {
+    auto projection = cast<SingleValueInstruction>(Inst);
+    if (isArrayAddressType(projection->getType())) {
       // If the address of an array-field escapes, we give up for that field.
-      if (canAddressEscape(Inst, true)) {
-        setAddressEscapes(getAddrEntry(Inst));
-        DEBUG(llvm::dbgs() << "      field address escapes: " << *Inst);
+      if (canAddressEscape(projection, true)) {
+        setAddressEscapes(getAddrEntry(projection));
+        DEBUG(llvm::dbgs() << "      field address escapes: " << *projection);
       }
       return;
     }
@@ -378,10 +377,12 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
 
   // For everything else which we didn't handle above: we set the property of
   // the instruction value to false.
-  if (SILType Type = Inst->getType()) {
+  for (auto result : Inst->getResults()) {
+    SILType Type = result->getType();
     if (isArrayType(Type) || isTupleWithArray(Type.getSwiftRValueType())) {
-      DEBUG(llvm::dbgs() << "      value could be non-native array: " << *Inst);
-      setNotNative(getValueEntry(Inst));
+      DEBUG(llvm::dbgs() << "      value could be non-native array: "
+                         << *result);
+      setNotNative(getValueEntry(result));
     }
   }
 }

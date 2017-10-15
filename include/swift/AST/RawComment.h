@@ -67,6 +67,8 @@ struct RawComment {
   bool isEmpty() const {
     return Comments.empty();
   }
+
+  CharSourceRange getCharSourceRange();
 };
 
 struct CommentInfo {

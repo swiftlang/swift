@@ -115,7 +115,7 @@ public:
   using DeclTableData = SmallVector<std::pair<uint8_t, DeclID>, 4>;
   /// The in-memory representation of what will eventually be an on-disk hash
   /// table.
-  using DeclTable = llvm::MapVector<Identifier, DeclTableData>;
+  using DeclTable = llvm::MapVector<DeclBaseName, DeclTableData>;
 
   using ObjCMethodTableData =
     SmallVector<std::tuple<std::string, bool, DeclID>, 4>;
@@ -221,10 +221,10 @@ private:
 
   /// The last assigned IdentifierID for types from this module.
   ///
-  /// Note that special module IDs must not be valid IdentifierIDs, except that
-  /// 0 will always represent the empty identifier.
+  /// Note that special module IDs and IDs of special names must not be valid
+  /// IdentifierIDs, except that 0 will always represent the empty identifier.
   uint32_t /*IdentifierID*/ LastIdentifierID =
-      serialization::NUM_SPECIAL_MODULES - 1;
+      serialization::NUM_SPECIAL_IDS - 1;
 
   /// The last assigned GenericEnvironmentID for generic environments from this
   /// module.
@@ -393,12 +393,12 @@ public:
   /// \returns The ID for the given Type in this module.
   TypeID addTypeRef(Type ty);
 
-  /// Records the use of the given Identifier.
+  /// Records the use of the given DeclBaseName.
   ///
   /// The Identifier will be scheduled for serialization if necessary.
   ///
-  /// \returns The ID for the given Identifier in this module.
-  IdentifierID addIdentifierRef(Identifier ident);
+  /// \returns The ID for the given DeclBaseName in this module.
+  IdentifierID addDeclBaseNameRef(DeclBaseName ident);
 
   /// Records the use of the given Decl.
   ///

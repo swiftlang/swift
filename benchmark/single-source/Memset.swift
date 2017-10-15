@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let Memset = BenchmarkInfo(
+  name: "Memset",
+  runFunction: run_Memset,
+  tags: [.validation])
+
 @inline(never)
 func memset(_ a: inout [Int], _ c: Int) {
   for i in 0..<a.count {
@@ -26,5 +31,5 @@ public func run_Memset(_ N: Int) {
     memset(&a, 1)
     memset(&a, 0)
   }
-  CheckResults(a[87] == 0, "Incorrect result in Memset.")
+  CheckResults(a[87] == 0)
 }

@@ -1,0 +1,14 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+let _: [String : (Int, Int) -> Bool] = [
+%for i in range(0, N):
+  "lt" : (<),
+  "le" : (<=),
+  "gt" : (>),
+  "ge" : (>=),
+  "eq" : (==),
+  "ne" : (!=),
+%end
+]

@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let XorLoop = BenchmarkInfo(
+  name: "XorLoop",
+  runFunction: run_XorLoop,
+  tags: [.validation])
+
 @inline(never)
 public func run_XorLoop(_ N: Int) {
   for _ in 1...5*N {
@@ -22,7 +27,6 @@ public func run_XorLoop(_ N: Int) {
       x[i] = x[i] ^ 12345678
     }
     let res = x[10]+x[100]+x[1000]+x[10000]
-    CheckResults(res == ref_result,
-                 "Incorrect results in XorLoop: \(res) != \(ref_result)")
+    CheckResults(res == ref_result)
   }
 }

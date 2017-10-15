@@ -5,6 +5,33 @@
   "children": [
     {
       "kind": "TypeDecl",
+      "name": "C0",
+      "printedName": "C0",
+      "declKind": "Class",
+      "usr": "s:4cake2C0C",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init()",
+          "declKind": "Constructor",
+          "usr": "s:4cake2C0CACycfc",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "C0",
+              "printedName": "C0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
       "name": "S1",
       "printedName": "S1",
       "declKind": "Struct",
@@ -95,6 +122,7 @@
       "usr": "s:4cake2C1C",
       "location": "",
       "moduleName": "cake",
+      "superclassUsr": "s:4cake2C0C",
       "children": [
         {
           "kind": "Function",
@@ -118,7 +146,7 @@
           "name": "Ins",
           "printedName": "Ins",
           "declKind": "Var",
-          "usr": "s:4cake2C1C3InsACSgXwv",
+          "usr": "s:4cake2C1C3InsACSgXwvp",
           "location": "",
           "moduleName": "cake",
           "ownership": 1,
@@ -133,7 +161,7 @@
               "name": "_",
               "printedName": "_()",
               "declKind": "Func",
-              "usr": "s:4cake2C1C3InsACSgXwfg",
+              "usr": "s:4cake2C1C3InsACSgXwvg",
               "location": "",
               "moduleName": "cake",
               "children": [
@@ -156,7 +184,7 @@
               "name": "_",
               "printedName": "_()",
               "declKind": "Func",
-              "usr": "s:4cake2C1C3InsACSgXwfs",
+              "usr": "s:4cake2C1C3InsACSgXwvs",
               "location": "",
               "moduleName": "cake",
               "children": [
@@ -186,7 +214,7 @@
           "name": "Ins2",
           "printedName": "Ins2",
           "declKind": "Var",
-          "usr": "s:4cake2C1C4Ins2ACXov",
+          "usr": "s:4cake2C1C4Ins2ACXovp",
           "location": "",
           "moduleName": "cake",
           "ownership": 2,
@@ -201,7 +229,7 @@
               "name": "_",
               "printedName": "_()",
               "declKind": "Func",
-              "usr": "s:4cake2C1C4Ins2ACXofg",
+              "usr": "s:4cake2C1C4Ins2ACXovg",
               "location": "",
               "moduleName": "cake",
               "children": [
@@ -217,7 +245,7 @@
               "name": "_",
               "printedName": "_()",
               "declKind": "Func",
-              "usr": "s:4cake2C1C4Ins2ACXofs",
+              "usr": "s:4cake2C1C4Ins2ACXovs",
               "location": "",
               "moduleName": "cake",
               "children": [

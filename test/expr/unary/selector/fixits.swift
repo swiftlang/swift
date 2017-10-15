@@ -1,9 +1,7 @@
 // REQUIRES: objc_interop
 
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: rm -rf %t.overlays
-// RUN: mkdir -p %t.overlays
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t.overlays)
 
 // FIXME: BEGIN -enable-source-import hackaround
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/ObjectiveC.swift
@@ -16,8 +14,8 @@
 
 // Copy the source, apply the Fix-Its, and compile it again, making
 // sure that we've cleaned up all of the deprecation warnings.
-// RUN: mkdir -p %t.sources
-// RUN: mkdir -p %t.remapping
+// RUN: %empty-directory(%t.sources)
+// RUN: %empty-directory(%t.remapping)
 // RUN: cp %s %t.sources/fixits.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift -fixit-all -emit-fixits-path %t.remapping/fixits.remap
 // RUN: %utils/apply-fixit-edits.py %t.remapping

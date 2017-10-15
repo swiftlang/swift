@@ -13,6 +13,10 @@
 import Foundation
 @_exported import UIKit
 
+#if os(iOS) || os(tvOS)
+import _SwiftUIKitOverlayShims
+#endif
+
 //===----------------------------------------------------------------------===//
 // UIGeometry
 //===----------------------------------------------------------------------===//
@@ -190,7 +194,7 @@ extension UIView : _DefaultCustomPlaygroundQuickLookable {
       if (bounds.size.width == 0) || (bounds.size.height == 0) {
         return .view(UIImage())
       }
-  
+
       UIGraphicsBeginImageContextWithOptions(bounds.size, false, 0.0)
       // UIKit is about to update this to be optional, so make it work
       // with both older and newer SDKs. (In this context it should always
@@ -201,9 +205,9 @@ extension UIView : _DefaultCustomPlaygroundQuickLookable {
       layer.render(in: ctx)
 
       let image: UIImage! = UIGraphicsGetImageFromCurrentImageContext()
-  
+
       UIGraphicsEndImageContext()
-  
+
       _UIViewQuickLookState.views.remove(self)
       return .view(image)
     }
@@ -212,7 +216,7 @@ extension UIView : _DefaultCustomPlaygroundQuickLookable {
 #endif
 
 extension UIColor : _ExpressibleByColorLiteral {
-  @nonobjc public required convenience init(colorLiteralRed red: Float,
+  @nonobjc public required convenience init(_colorLiteralRed red: Float,
                                             green: Float,
                                             blue: Float, alpha: Float) {
     self.init(red: CGFloat(red), green: CGFloat(green),
@@ -233,3 +237,141 @@ extension UIImage : _ExpressibleByImageLiteral {
 }
 
 public typealias _ImageLiteralType = UIImage
+
+extension UIFontTextStyle {
+    @available(iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+    public var metrics: UIFontMetrics {
+        return UIFontMetrics(forTextStyle: self)
+    }
+}
+
+#if !os(watchOS) // UIContentSizeCategory not available on watchOS
+extension UIContentSizeCategory {
+    @available(iOS 11.0, tvOS 11.0,  *)
+    public var isAccessibilityCategory: Bool {
+        return __UIContentSizeCategoryIsAccessibilityCategory(self)
+    }
+
+    @available(iOS 11.0, tvOS 11.0, *)
+    public static func < (left: UIContentSizeCategory, right: UIContentSizeCategory) -> Bool {
+        return __UIContentSizeCategoryCompareToCategory(left, right) == .orderedAscending
+    }
+
+    @available(iOS 11.0, tvOS 11.0, *)
+    public static func <= (left: UIContentSizeCategory, right: UIContentSizeCategory) -> Bool {
+        return __UIContentSizeCategoryCompareToCategory(left, right) != .orderedDescending
+    }
+
+    @available(iOS 11.0, tvOS 11.0, *)
+    public static func > (left: UIContentSizeCategory, right: UIContentSizeCategory) -> Bool {
+        return __UIContentSizeCategoryCompareToCategory(left, right) == .orderedDescending
+    }
+
+    @available(iOS 11.0, tvOS 11.0, *)
+    public static func >= (left: UIContentSizeCategory, right: UIContentSizeCategory) -> Bool {
+        return __UIContentSizeCategoryCompareToCategory(left, right) != .orderedAscending
+    }
+}
+#endif
+
+//===----------------------------------------------------------------------===//
+// Focus
+//===----------------------------------------------------------------------===//
+
+#if os(iOS) || os(tvOS)
+@available(iOS 11.0, tvOS 11.0, *)
+extension UIFocusEnvironment {
+  @available(iOS 11.0, tvOS 11.0, *)
+  public func contains(_ environment: UIFocusEnvironment) -> Bool {
+    return _swift_UIKit_UIFocusEnvironmentContainsEnvironment(self, environment)
+  }
+}
+
+@available(iOS 11.0, tvOS 11.0, *)
+extension UIFocusItem {
+  @available(iOS 11.0, tvOS 11.0, *)
+  public var isFocused: Bool {
+    return self === UIScreen.main.focusedItem
+  }
+}
+#endif
+
+//===----------------------------------------------------------------------===//
+// NSItemProviderReading/Writing support
+//===----------------------------------------------------------------------===//
+
+#if os(iOS)
+
+@available(iOS 11.0, *)
+extension UIDragDropSession {
+  @available(iOS 11.0, *)
+  public func canLoadObjects<
+    T : _ObjectiveCBridgeable
+  >(ofClass: T.Type) -> Bool where T._ObjectiveCType : NSItemProviderReading {
+    return self.canLoadObjects(ofClass: T._ObjectiveCType.self);
+  }
+}
+
+@available(iOS 11.0, *)
+extension UIDropSession {
+  @available(iOS 11.0, *)
+  public func loadObjects<
+    T : _ObjectiveCBridgeable
+  >(
+    ofClass: T.Type,
+    completion: @escaping ([T]) -> Void
+  ) -> Progress where T._ObjectiveCType : NSItemProviderReading {
+    return self.loadObjects(ofClass: T._ObjectiveCType.self) { nss in
+      let natives = nss.map { $0 as! T }
+      completion(natives)
+    }
+  }
+}
+
+@available(iOS 11.0, *)
+extension UIPasteConfiguration {
+  @available(iOS 11.0, *)
+  public convenience init<
+    T : _ObjectiveCBridgeable
+  >(forAccepting _: T.Type) where T._ObjectiveCType : NSItemProviderReading {
+    self.init(forAccepting: T._ObjectiveCType.self)
+  }
+
+  @available(iOS 11.0, *)
+  public func addTypeIdentifiers<
+    T : _ObjectiveCBridgeable
+  >(forAccepting aClass: T.Type)
+  where T._ObjectiveCType : NSItemProviderReading {
+    self.addTypeIdentifiers(forAccepting: T._ObjectiveCType.self)
+  }
+}
+
+
+extension UIPasteboard {
+  @available(iOS 11.0, *)
+  public func setObjects<
+    T : _ObjectiveCBridgeable
+  >(_ objects: [T]) where T._ObjectiveCType : NSItemProviderWriting {
+    // Using a simpler `$0 as! T._ObjectiveCType` triggers and assertion in
+    // the compiler.
+    self.setObjects(objects.map { $0._bridgeToObjectiveC() })
+  }
+
+  @available(iOS 11.0, *)
+  public func setObjects<
+    T : _ObjectiveCBridgeable
+  >(
+    _ objects: [T],
+    localOnly: Bool,
+    expirationDate: Date?
+  ) where T._ObjectiveCType : NSItemProviderWriting {
+    self.setObjects(
+      // Using a simpler `$0 as! T._ObjectiveCType` triggers and assertion in
+      // the compiler.
+      objects.map { $0._bridgeToObjectiveC() },
+      localOnly: localOnly,
+      expirationDate: expirationDate)
+  }
+}
+
+#endif

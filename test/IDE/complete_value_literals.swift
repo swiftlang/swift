@@ -14,6 +14,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_0 | %FileCheck %s -check-prefix=STRING_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_1 | %FileCheck %s -check-prefix=STRING_1
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_2 | %FileCheck %s -check-prefix=STRING_2
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_3 | %FileCheck %s -check-prefix=STRING_3
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_4 | %FileCheck %s -check-prefix=STRING_4
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_5 | %FileCheck %s -check-prefix=STRING_5
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ARRAY_0 | %FileCheck %s -check-prefix=ARRAY_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ARRAY_1 | %FileCheck %s -check-prefix=ARRAY_1
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ARRAY_2 | %FileCheck %s -check-prefix=ARRAY_2
@@ -61,6 +64,13 @@ struct MyString1: ExpressibleByStringLiteral {
   init(unicodeScalarLiteral value: Character) {}
   init(extendedGraphemeClusterLiteral value: String) {}
   init(stringLiteral value: String) {}
+}
+struct MyUnicodeScalar1: ExpressibleByUnicodeScalarLiteral {
+  init(unicodeScalarLiteral value: Character) {}
+}
+struct MyCharacter1: ExpressibleByExtendedGraphemeClusterLiteral {
+  init(unicodeScalarLiteral value: Character) {}
+  init(extendedGraphemeClusterLiteral value: String) {}
 }
 struct MyArray1<Element>: ExpressibleByArrayLiteral {
   init(arrayLiteral value: Element...) {}
@@ -154,6 +164,19 @@ func testString2() {
 }
 // STRING_2: Literal[String]/None/TypeRelation[Identical]: "{#(abc)#}"[#String#];
 
+func testString3() {
+  let x: MyUnicodeScalar1 = #^STRING_3^#
+}
+// STRING_3: Literal[String]/None/TypeRelation[Identical]: "{#(abc)#}"[#MyUnicodeScalar1#];
+func testString4() {
+  let x: MyCharacter1 = #^STRING_4^#
+}
+// STRING_4: Literal[String]/None/TypeRelation[Identical]: "{#(abc)#}"[#MyCharacter1#];
+func testString5() {
+  let x: Character = #^STRING_5^#
+}
+// STRING_5: Literal[String]/None/TypeRelation[Identical]: "{#(abc)#}"[#Character#];
+
 func testArray0() {
   let x: Int = #^ARRAY_0^#
 }
@@ -201,7 +224,7 @@ func testTuple2() {
 // TUPLE_2: Literal[Tuple]/None/TypeRelation[Identical]: ({#(values)#})[#(MyInt1, MyString1, MyDouble1)#];
 
 struct MyColor1: _ExpressibleByColorLiteral {
-  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}
+  init(_colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}
 }
 func testColor0() {
   let x: Int = #^COLOR_0^#

@@ -20,8 +20,9 @@ extension LazySequenceProtocol {
   /// `s.map(transform).joined()`.
   ///
   /// - Complexity: O(1)
+  @_inlineable // FIXME(sil-serialize-all)
   public func flatMap<SegmentOfResult>(
-    _ transform: @escaping (Elements.Iterator.Element) -> SegmentOfResult
+    _ transform: @escaping (Elements.Element) -> SegmentOfResult
   ) -> LazySequence<
     FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
     return self.map(transform).joined()
@@ -37,8 +38,9 @@ extension LazySequenceProtocol {
   ///   as its argument and returns an optional value.
   ///
   /// - Complexity: O(1)
+  @_inlineable // FIXME(sil-serialize-all)
   public func flatMap<ElementOfResult>(
-    _ transform: @escaping (Elements.Iterator.Element) -> ElementOfResult?
+    _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapSequence<
     LazyFilterSequence<
       LazyMapSequence<Elements, ElementOfResult?>>,
@@ -58,8 +60,9 @@ extension LazyCollectionProtocol {
   /// `c.map(transform).joined()`.
   ///
   /// - Complexity: O(1)
+  @_inlineable // FIXME(sil-serialize-all)
   public func flatMap<SegmentOfResult>(
-    _ transform: @escaping (Elements.Iterator.Element) -> SegmentOfResult
+    _ transform: @escaping (Elements.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenCollection<
       LazyMapCollection<Elements, SegmentOfResult>>
@@ -77,8 +80,9 @@ extension LazyCollectionProtocol {
   ///   collection as its argument and returns an optional value.
   ///
   /// - Complexity: O(1)
+  @_inlineable // FIXME(sil-serialize-all)
   public func flatMap<ElementOfResult>(
-    _ transform: @escaping (Elements.Iterator.Element) -> ElementOfResult?
+    _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapCollection<
     LazyFilterCollection<
       LazyMapCollection<Elements, ElementOfResult?>>,
@@ -102,8 +106,9 @@ extension LazyCollectionProtocol
   /// `c.map(transform).joined()`.
   ///
   /// - Complexity: O(1)
+  @_inlineable // FIXME(sil-serialize-all)
   public func flatMap<SegmentOfResult>(
-    _ transform: @escaping (Elements.Iterator.Element) -> SegmentOfResult
+    _ transform: @escaping (Elements.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenBidirectionalCollection<
       LazyMapBidirectionalCollection<Elements, SegmentOfResult>>> {
@@ -120,8 +125,9 @@ extension LazyCollectionProtocol
   ///   collection as its argument and returns an optional value.
   ///
   /// - Complexity: O(1)
+  @_inlineable // FIXME(sil-serialize-all)
   public func flatMap<ElementOfResult>(
-    _ transform: @escaping (Elements.Iterator.Element) -> ElementOfResult?
+    _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapBidirectionalCollection<
     LazyFilterBidirectionalCollection<
       LazyMapBidirectionalCollection<Elements, ElementOfResult?>>,

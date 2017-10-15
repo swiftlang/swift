@@ -15,7 +15,7 @@
 
 /// Aaa.  subscript(i: Int).
 @objc public subscript(i: Int) -> Int {
-// CHECK: {{.*}}DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>subscript(_:)</Name><USR>s:14comment_to_xml21A010_AttachToEntitiesC9subscriptS2ici</USR><Declaration>@objc public subscript(i: Int) -&gt; Int { get set }</Declaration><CommentParts><Abstract><Para>Aaa.  subscript(i: Int).</Para></Abstract></CommentParts></Other>]
+// CHECK: {{.*}}DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>subscript(_:)</Name><USR>s:14comment_to_xml21A010_AttachToEntitiesCS2icip</USR><Declaration>@objc public subscript(i: Int) -&gt; Int { get set }</Declaration><CommentParts><Abstract><Para>Aaa.  subscript(i: Int).</Para></Abstract></CommentParts></Other>]
     get {
 // CHECK: {{.*}}DocCommentAsXML=none
       return 0
@@ -477,3 +477,18 @@ public func localizationKeyShouldNotAppearInDocComments() {}
 /// - LocalizationKey: ABC
 public func localizationKeyShouldNotAppearInDocComments2() {}
 // CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>localizationKeyShouldNotAppearInDocComments2()</Name><USR>s:14comment_to_xml44localizationKeyShouldNotAppearInDocComments2yyF</USR><Declaration>public func localizationKeyShouldNotAppearInDocComments2()</Declaration><CommentParts></CommentParts></Function>]
+
+/// Brief.
+///
+/// - Tag:
+/// - Tag:  
+/// - Tag: Tag_A
+/// - Tag: Tag B
+/// - Tag: Dedupe tag
+/// - Tag: Dedupe tag
+///
+/// Intentional break
+///
+/// - TAG: TAG_C
+public func tags() {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>tags()</Name><USR>s:14comment_to_xml4tagsyyF</USR><Declaration>public func tags()</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract><Tags><Tag>Tag_A</Tag><Tag>Tag B</Tag><Tag>Dedupe tag</Tag><Tag>TAG_C</Tag></Tags><Discussion><Para>Intentional break</Para></Discussion></CommentParts></Function>]

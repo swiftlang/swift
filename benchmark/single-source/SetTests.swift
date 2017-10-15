@@ -12,6 +12,17 @@
 
 import TestsUtils
 
+public let SetTests = [
+  BenchmarkInfo(name: "SetExclusiveOr", runFunction: run_SetExclusiveOr, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetExclusiveOr_OfObjects", runFunction: run_SetExclusiveOr_OfObjects, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetIntersect", runFunction: run_SetIntersect, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetIntersect_OfObjects", runFunction: run_SetIntersect_OfObjects, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetIsSubsetOf", runFunction: run_SetIsSubsetOf, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetIsSubsetOf_OfObjects", runFunction: run_SetIsSubsetOf_OfObjects, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetUnion", runFunction: run_SetUnion, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetUnion_OfObjects", runFunction: run_SetUnion_OfObjects, tags: [.validation, .api, .Set]),
+]
+
 @inline(never)
 public func run_SetIsSubsetOf(_ N: Int) {
   let size = 200
@@ -34,7 +45,7 @@ public func run_SetIsSubsetOf(_ N: Int) {
     }
   }
 
-  CheckResults(!isSubset, "Incorrect results in SetIsSubsetOf")
+  CheckResults(!isSubset)
 }
 
 @inline(never)
@@ -142,7 +153,7 @@ public func run_SetIsSubsetOf_OfObjects(_ N: Int) {
     }
   }
 
-  CheckResults(!isSubset, "Incorrect results in SetIsSubsetOf")
+  CheckResults(!isSubset)
 }
 
 @inline(never)

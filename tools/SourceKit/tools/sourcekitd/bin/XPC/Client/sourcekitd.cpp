@@ -17,7 +17,6 @@
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/TargetSelect.h"
 #include <chrono>
 #include <xpc/xpc.h>
 #include <dispatch/dispatch.h>
@@ -250,11 +249,6 @@ static void handleInterruptedConnection(xpc_object_t event, xpc_connection_t con
 
 void sourcekitd::initialize() {
   initializeTracing();
-
-  llvm::InitializeAllTargets();
-  llvm::InitializeAllTargetMCs();
-  llvm::InitializeAllAsmPrinters();
-  llvm::InitializeAllAsmParsers();
 
   assert(!GlobalConn);
   GlobalConn = xpc_connection_create(SOURCEKIT_XPCSERVICE_IDENTIFIER, nullptr);

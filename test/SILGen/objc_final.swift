@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -9,8 +9,8 @@ final class Foo {
   // CHECK-LABEL: sil hidden [thunk] @_T010objc_final3FooC3foo{{[_0-9a-zA-Z]*}}FTo
 
   @objc var prop: Int = 0
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T010objc_final3FooC4propSifgTo
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T010objc_final3FooC4propSifsTo
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T010objc_final3FooC4propSivgTo
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T010objc_final3FooC4propSivsTo
 }
 
 // CHECK-LABEL: sil hidden @_T010objc_final7callFooyAA0D0CF
@@ -22,9 +22,11 @@ func callFoo(_ x: Foo) {
 
   // Final @objc properties are still accessed directly.
   // CHECK: [[PROP:%.*]] = ref_element_addr {{%.*}} : $Foo, #Foo.prop
-  // CHECK: load [trivial] [[PROP]] : $*Int
+  // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[PROP]] : $*Int
+  // CHECK: load [trivial] [[READ]] : $*Int
   let prop = x.prop
   // CHECK: [[PROP:%.*]] = ref_element_addr {{%.*}} : $Foo, #Foo.prop
-  // CHECK: assign {{%.*}} to [[PROP]] : $*Int
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[PROP]] : $*Int
+  // CHECK: assign {{%.*}} to [[WRITE]] : $*Int
   x.prop = prop
 }

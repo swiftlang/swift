@@ -21,8 +21,6 @@
 /// To add new lazy collection operations, extend this protocol with
 /// methods that return lazy wrappers that are themselves
 /// `LazyCollectionProtocol`s.
-///
-/// - SeeAlso: `LazySequenceProtocol`, `LazyCollection`
 public protocol LazyCollectionProtocol
   : Collection, LazySequenceProtocol {
   /// A `Collection` that can contain the same elements as this one,
@@ -36,6 +34,7 @@ public protocol LazyCollectionProtocol
 /// property is provided.
 extension LazyCollectionProtocol where Elements == Self {
   /// Identical to `self`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var elements: Self { return self }
 }
 
@@ -154,7 +153,7 @@ extension ${Self} : ${TraversalCollection} {
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   @_inlineable
-  public subscript(position: Base.Index) -> Base.Iterator.Element {
+  public subscript(position: Base.Index) -> Base.Element {
     return _base[position]
   }
 
@@ -203,7 +202,7 @@ extension ${Self} : ${TraversalCollection} {
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.
   @_inlineable
-  public var first: Base.Iterator.Element? {
+  public var first: Base.Element? {
     return _base.first
   }
 
@@ -235,7 +234,7 @@ extension ${Self} : ${TraversalCollection} {
   }
 
   @_inlineable
-  public var last: Base.Iterator.Element? {
+  public var last: Base.Element? {
     return _base.last
   }
 %   end
@@ -249,8 +248,6 @@ extension ${TraversalCollection} {
   /// Use the `lazy` property when chaining operations to prevent
   /// intermediate operations from allocating storage, or when you only
   /// need a part of the final collection to avoid unnecessary computation.
-  ///
-  /// - SeeAlso: `LazySequenceProtocol`, `LazyCollectionProtocol`.
   @_inlineable
   public var lazy: ${Self}<Self> {
     return ${Self}(_base: self)
@@ -268,9 +265,6 @@ extension ${TraversalCollection} where Self : LazyCollectionProtocol {
 }
 
 % end
-
-@available(*, unavailable, renamed: "LazyCollectionProtocol")
-public typealias LazyCollectionType = LazyCollectionProtocol
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

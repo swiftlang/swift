@@ -1,14 +1,14 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 public protocol P {}
 extension Int: P {}
 
 public class A {}
 public class B: A {
-  // CHECK-LABEL: sil @_T016optional_to_bool1BC1x{{[_0-9a-zA-Z]*}}fg
+  // CHECK-LABEL: sil @_T016optional_to_bool1BC1x{{[_0-9a-zA-Z]*}}vg
   // CHECK:         select_enum {{%.*}} : $Optional<Int>
   public lazy var x: Int = 0
-  // CHECK-LABEL: sil @_T016optional_to_bool1BC1y{{[_0-9a-zA-Z]*}}fg
+  // CHECK-LABEL: sil @_T016optional_to_bool1BC1y{{[_0-9a-zA-Z]*}}vg
   // CHECK:         select_enum_addr {{%.*}} : $*Optional<P>
   public lazy var y: P = 0
 }

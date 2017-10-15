@@ -18,8 +18,7 @@
 
 import StdlibUnittest
 
-// FIXME: Various Sema and SILGen crashes if this is not ': class'
-protocol P : class {
+protocol P {
   init(protocolInit: ())
 
   func protocolMethodReturnsSelf() -> Self
@@ -142,28 +141,25 @@ protocol Q : class {}
 
 var SubclassExistentialsTestSuite = TestSuite("SubclassExistentials")
 
-// Note: we write ((A) & B) if A is generic to work around a limitation
-// in preCheckExpression().
-
 SubclassExistentialsTestSuite.test("Metadata instantiation") {
-  expectTrue(((Base<String>) & Base<String>).self == Base<String>.self)
-  expectTrue(((Base<String>) & Any).self == Base<String>.self)
+  expectTrue((Base<String> & Base<String>).self == Base<String>.self)
+  expectTrue((Base<String> & Any).self == Base<String>.self)
 
-  expectTrue(((Base<Int>) & Q).self == (Q & Base<Int>).self)
+  expectTrue((Base<Int> & Q).self == (Q & Base<Int>).self)
 
-  expectTrue(((Base<Int>) & P & Q).self == (P & (Base<Int>) & Q).self)
-  expectTrue((P & Q & (Base<Int>)).self == (Q & (Base<Int>) & P).self)
+  expectTrue((Base<Int> & P & Q).self == (P & Base<Int> & Q).self)
+  expectTrue((P & Q & Base<Int>).self == (Q & Base<Int> & P).self)
 
   expectTrue((P & Q).self == (P & Q & AnyObject).self)
   expectTrue((P & Q).self == (Q & P & AnyObject).self)
-  expectTrue(((Base<Int>) & Q).self == (Q & (Base<Int>) & AnyObject).self)
+  expectTrue((Base<Int> & Q).self == (Q & Base<Int> & AnyObject).self)
 
   expectFalse((R & AnyObject).self == R.self)
 }
 
 SubclassExistentialsTestSuite.test("Metadata to string") {
-  expectEqual("Base<Int> & P", String(describing: ((Base<Int>) & P).self))
-  expectEqual("Base<Int> & P & Q", String(describing: ((Base<Int>) & P & Q).self))
+  expectEqual("Base<Int> & P", String(describing: (Base<Int> & P).self))
+  expectEqual("Base<Int> & P & Q", String(describing: (Base<Int> & P & Q).self))
 }
 
 SubclassExistentialsTestSuite.test("Call instance methods") {
@@ -361,7 +357,7 @@ func cast<T, U>(_ t: T, to: U.Type) -> U? {
 SubclassExistentialsTestSuite.test("Dynamic downcast to subclass existential") {
   do {
     let baseInt: Base<Int> = Derived(x: 123, y: 321)
-    let derived = cast(baseInt, to: ((Base<Int>) & P).self)
+    let derived = cast(baseInt, to: (Base<Int> & P).self)
 
     expectEqual(123, derived!.x)
     expectEqual(321, derived!.y)
@@ -369,7 +365,7 @@ SubclassExistentialsTestSuite.test("Dynamic downcast to subclass existential") {
 
   do {
     let p: P = Derived(x: 123, y: 321)
-    let result = cast(p, to: ((Base<Int>) & P).self)
+    let result = cast(p, to: (Base<Int> & P).self)
 
     expectEqual(123, result!.x)
     expectEqual(321, result!.y)
@@ -377,7 +373,7 @@ SubclassExistentialsTestSuite.test("Dynamic downcast to subclass existential") {
 
   do {
     let r: R = Derived(x: 123, y: 321)
-    let result = cast(r, to: ((Base<Int>) & P).self)
+    let result = cast(r, to: (Base<Int> & P).self)
 
     expectEqual(123, result!.x)
     expectEqual(321, result!.y)
@@ -385,7 +381,7 @@ SubclassExistentialsTestSuite.test("Dynamic downcast to subclass existential") {
 
   do {
     let baseInt: Base<Int> = Derived(x: 123, y: 321)
-    let result = cast(baseInt, to: ((Base<Int>) & P).self)
+    let result = cast(baseInt, to: (Base<Int> & P).self)
 
     expectEqual(123, result!.x)
     expectEqual(321, result!.y)
@@ -446,19 +442,19 @@ SubclassExistentialsTestSuite.test("Failing dynamic downcast to subclass existen
   do {
     let baseInt: Base<Int> = Base<Int>(x: 123, y: 321)
 
-    expectNil(cast(baseInt, to: ((Base<Int>) & P).self))
+    expectNil(cast(baseInt, to: (Base<Int> & P).self))
   }
 
   do {
     let r: R = Base<Int>(x: 123, y: 321)
 
-    expectNil(cast(r, to: ((Base<Int>) & P).self))
+    expectNil(cast(r, to: (Base<Int> & P).self))
   }
 
   do {
     let conformsToP = ConformsToP(protocolInit: ())
 
-    expectNil(cast(conformsToP, to: ((Base<Int>) & P).self))
+    expectNil(cast(conformsToP, to: (Base<Int> & P).self))
   }
 }
 

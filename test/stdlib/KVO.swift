@@ -32,6 +32,9 @@ class Target : NSString {
     self.objcValue = ""
     super.init(coder: aDecoder)
   }
+  required init(itemProviderData data: Data, typeIdentifier: String) throws {
+    fatalError("don't call this initializer")
+  }
 
   func print() { 
     Swift.print("swiftValue \(self.swiftValue.value), objcValue \(objcValue)")

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/print_swift_module.swiftmodule -emit-module-doc -emit-module-doc-path %t/print_swift_module.swiftdoc %s
 // RUN: %target-swift-ide-test -print-module -print-interface -no-empty-line-between-members -module-to-print=print_swift_module -I %t -source-filename=%s > %t.syn.txt
 // RUN: %FileCheck %s -check-prefix=CHECK1 < %t.syn.txt

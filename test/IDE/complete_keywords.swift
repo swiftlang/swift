@@ -208,8 +208,8 @@
 //
 // Literals
 //
-// KW_EXPR-DAG: Literal[Boolean]/None: false[#Bool#]{{; name=.+$}}
-// KW_EXPR-DAG: Literal[Boolean]/None: true[#Bool#]{{; name=.+$}}
+// KW_EXPR-DAG: Literal[Boolean]/None{{(/TypeRelation\[Identical\])?}}: false[#Bool#]{{; name=.+$}}
+// KW_EXPR-DAG: Literal[Boolean]/None{{(/TypeRelation\[Identical\])?}}: true[#Bool#]{{; name=.+$}}
 // KW_EXPR-DAG: Literal[Nil]/None: nil{{; name=.+$}}
 // KW_EXPR: End completions
 

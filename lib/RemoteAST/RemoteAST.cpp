@@ -19,8 +19,10 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Mangler.h"
@@ -133,9 +135,17 @@ public:
 
   NominalTypeDecl *createNominalTypeDecl(const Demangle::NodePointer &node);
 
+  Type createNominalType(NominalTypeDecl *decl) {
+    // If the declaration is generic, fail.
+    if (decl->isGenericContext())
+      return Type();
+
+    return decl->getDeclaredType();
+  }
+
   Type createNominalType(NominalTypeDecl *decl, Type parent) {
     // If the declaration is generic, fail.
-    if (decl->getGenericSignature())
+    if (decl->getGenericParams())
       return Type();
 
     // Validate the parent type.
@@ -145,10 +155,40 @@ public:
     return NominalType::get(decl, parent, Ctx);
   }
 
+  Type createBoundGenericType(NominalTypeDecl *decl, ArrayRef<Type> args) {
+    // If the declaration isn't generic, fail.
+    if (!decl->isGenericContext())
+      return Type();
+
+    // Build a SubstitutionMap.
+    auto *genericSig = decl->getGenericSignature();
+    auto genericParams = genericSig->getSubstitutableParams();
+    if (genericParams.size() != args.size())
+      return Type();
+
+    auto subMap = genericSig->getSubstitutionMap(
+        [&](SubstitutableType *t) -> Type {
+          for (unsigned i = 0, e = genericParams.size(); i < e; ++i) {
+            if (t->isEqual(genericParams[i]))
+              return args[i];
+          }
+          return Type();
+        },
+        // FIXME: Wrong module
+        LookUpConformanceInModule(decl->getParentModule()));
+
+    auto origType = decl->getDeclaredInterfaceType();
+
+    // FIXME: We're not checking that the type satisfies the generic
+    // requirements of the signature here.
+    auto substType = origType.subst(subMap);
+    return substType;
+  }
+
   Type createBoundGenericType(NominalTypeDecl *decl, ArrayRef<Type> args,
                               Type parent) {
     // If the declaration isn't generic, fail.
-    if (!decl->getGenericSignature())
+    if (!decl->getGenericParams())
       return Type();
 
     // Validate the parent type.
@@ -159,7 +199,8 @@ public:
     TypeReprList genericArgReprs(args);
     GenericIdentTypeRepr genericRepr(SourceLoc(), decl->getName(),
                                      genericArgReprs.getList(), SourceRange());
-    genericRepr.setValue(decl);
+    // FIXME
+    genericRepr.setValue(decl, nullptr);
 
     Type genericType;
 
@@ -182,7 +223,8 @@ public:
           : GenericArgs(type->getGenericArgs()),
             Ident(SourceLoc(), type->getDecl()->getName(),
                   GenericArgs.getList(), SourceRange()) {
-          Ident.setValue(type->getDecl());
+          // FIXME
+          Ident.setValue(type->getDecl(), nullptr);
         }
 
         // SmallVector::emplace_back will never need to call this because
@@ -212,9 +254,12 @@ public:
           auto nominal = p->castTo<NominalType>();
           simpleComponents.emplace_back(SourceLoc(),
                                         nominal->getDecl()->getName());
+          // FIXME
+          simpleComponents.back().setValue(nominal->getDecl(), nullptr);
           componentReprs.push_back(&simpleComponents.back());
         }
       }
+      componentReprs.push_back(&genericRepr);
 
       CompoundIdentTypeRepr compoundRepr(componentReprs);
       genericType = checkTypeRepr(&compoundRepr);
@@ -298,6 +343,7 @@ public:
         if (inOutArgs[i]) arg = InOutType::get(arg);
         elts.push_back(arg);
       }
+      input = TupleType::get(elts, Ctx);
     }
 
     return FunctionType::get(input, output, einfo);

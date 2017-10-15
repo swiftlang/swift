@@ -18,6 +18,9 @@ class SuperString : NSString {
   required init?(coder aDecoder: NSCoder) {
     super.init(coder: aDecoder)
   }
+  required init(itemProviderData data: Data, typeIdentifier: String) throws {
+    fatalError("don't call this initializer")
+  }
 
   override var length: Int {
     return len

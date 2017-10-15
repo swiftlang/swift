@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %s -DLIBRARY -o %t/Lib.swiftmodule
 // RUN: %target-swift-frontend -typecheck %s -I %t -verify
 

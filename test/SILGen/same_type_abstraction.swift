@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 protocol Associated {
   associatedtype Assoc
@@ -27,9 +27,9 @@ protocol MyProtocol {
 }
 
 extension MyProtocol where Data == (ReadData, ReadData) {
-  // CHECK-LABEL: sil hidden @_T021same_type_abstraction10MyProtocolPA2aBRz8ReadDataQz_AEt0G0RtzlE07currentG0AE_AEtyF : $@convention(method) <Self where Self : MyProtocol, Self.Data == (Self.ReadData, Self.ReadData)> (@in_guaranteed Self) -> (@out Self.ReadData, @out Self.ReadData)
+  // CHECK-LABEL: sil hidden @_T021same_type_abstraction10MyProtocolPAA8ReadDataQz_AEt0G0RtzrlE07currentG0AE_AEtyF : $@convention(method) <Self where Self : MyProtocol, Self.Data == (Self.ReadData, Self.ReadData)> (@in_guaranteed Self) -> (@out Self.ReadData, @out Self.ReadData)
   func currentData() -> Data {
-    // CHECK: bb0(%0 : $*Self.ReadData, %1 : $*Self.ReadData, %2 : $*Self):
+    // CHECK: bb0(%0 : @trivial $*Self.ReadData, %1 : @trivial $*Self.ReadData, %2 : @trivial $*Self):
     // CHECK:   [[READ_FN:%.*]] = witness_method $Self, #MyProtocol.readData!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : MyProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0.ReadData
     // CHECK:   apply [[READ_FN]]<Self>(%0, %2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : MyProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0.ReadData
     // CHECK:   [[READ_FN:%.*]] = witness_method $Self, #MyProtocol.readData!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : MyProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0.ReadData
@@ -50,7 +50,7 @@ protocol Refined : Associated {
 }
 
 extension Refined {
-  // CHECK-LABEL: sil hidden @_T021same_type_abstraction7RefinedPAAEx3KeyQz12withElements_tcfC : $@convention(method) <Self where Self : Refined> (@in Self.Key, @thick Self.Type) -> @out Self
+  // CHECK-LABEL: sil hidden @_T021same_type_abstraction7RefinedPAAEx5AssocQz12withElements_tcfC : $@convention(method) <Self where Self : Refined> (@in Self.Assoc, @thick Self.Type) -> @out Self
   init(withElements newElements: Key) {
     self.init()
   }

@@ -213,3 +213,22 @@ var y = 0
 let _ = (x, (y, 0))
 takesRValue((x, (y, 0)))
 takesAny((x, (y, 0)))
+
+// SR-2600 - Closure cannot infer tuple parameter names
+typealias Closure<A, B> = ((a: A, b: B)) -> String
+
+func invoke<A, B>(a: A, b: B, _ closure: Closure<A,B>) {
+  print(closure((a, b)))
+}
+
+invoke(a: 1, b: "B") { $0.b }
+
+invoke(a: 1, b: "B") { $0.1 }
+
+invoke(a: 1, b: "B") { (c: (a: Int, b: String)) in
+  return c.b
+}
+
+invoke(a: 1, b: "B") { c in
+  return c.b
+}

@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_SILFUNCTION_H
 #define SWIFT_SIL_SILFUNCTION_H
 
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILLinkage.h"
@@ -113,6 +114,10 @@ private:
   /// The context archetypes of the function.
   GenericEnvironment *GenericEnv;
 
+  /// The information about specialization.
+  /// Only set if this function is a specialization of another function.
+  const GenericSpecializationInformation *SpecializationInfo;
+
   /// The forwarding substitutions, lazily computed.
   Optional<SubstitutionList> ForwardingSubs;
 
@@ -176,6 +181,10 @@ private:
   /// The function's effects attribute.
   EffectsKind EffectsKindAttr;
 
+  /// Has value if there's a profile for this function
+  /// Contains Function Entry Count
+  ProfileCounter EntryCount;
+
   /// True if this function is inlined at least once. This means that the
   /// debug info keeps a pointer to this function.
   bool Inlined = false;
@@ -186,6 +195,7 @@ private:
   /// *) It is inlined and the debug info keeps a reference to the function.
   /// *) It is a dead method of a class which has higher visibility than the
   ///    method itself. In this case we need to create a vtable stub for it.
+  /// *) It is a function referenced by the specialization information.
   bool Zombie = false;
 
   /// True if SILOwnership is enabled for this function.
@@ -199,9 +209,9 @@ private:
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
               Optional<SILLocation> loc, IsBare_t isBareSILFunction,
               IsTransparent_t isTrans, IsSerialized_t isSerialized,
-              IsThunk_t isThunk, SubclassScope classSubclassScope,
-              Inline_t inlineStrategy, EffectsKind E,
-              SILFunction *insertBefore,
+              ProfileCounter entryCount, IsThunk_t isThunk,
+              SubclassScope classSubclassScope, Inline_t inlineStrategy,
+              EffectsKind E, SILFunction *insertBefore,
               const SILDebugScope *debugScope);
 
   static SILFunction *
@@ -209,7 +219,7 @@ private:
          CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
          Optional<SILLocation> loc, IsBare_t isBareSILFunction,
          IsTransparent_t isTrans, IsSerialized_t isSerialized,
-         IsThunk_t isThunk = IsNotThunk,
+         ProfileCounter entryCount, IsThunk_t isThunk = IsNotThunk,
          SubclassScope classSubclassScope = SubclassScope::NotApplicable,
          Inline_t inlineStrategy = InlineDefault,
          EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
@@ -230,6 +240,8 @@ public:
   SILFunctionConventions getConventions() const {
     return SILFunctionConventions(LoweredType, getModule());
   }
+
+  ProfileCounter getEntryCount() const { return EntryCount; }
 
   bool isNoReturnFunction() const;
 
@@ -286,11 +298,10 @@ public:
   /// Mark this function as removed from the module's function list, but kept
   /// as "zombie" for debug info or vtable stub generation.
   void setZombie() {
-    assert((isInlined() || isExternallyUsedSymbol())  &&
-          "Function should be deleted instead of getting a zombie");
+    assert(!isZombie() && "Function is a zombie function already");
     Zombie = true;
   }
-  
+
   /// Returns true if this function is dead, but kept in the module's zombie list.
   bool isZombie() const { return Zombie; }
 
@@ -456,6 +467,10 @@ public:
   ///          or is raw SIL (so that the mandatory passes still run).
   bool shouldOptimize() const;
 
+  /// Returns true if this is a function that should have its ownership
+  /// verified.
+  bool shouldVerifyOwnership() const;
+
   /// Check if the function has a location.
   /// FIXME: All functions should have locations, so this method should not be
   /// necessary.
@@ -563,6 +578,20 @@ public:
     return (ClangNodeOwner ? ClangNodeOwner->getClangDecl() : nullptr);
   }
 
+  /// Returns whether this function is a specialization.
+  bool isSpecialization() const { return SpecializationInfo != nullptr; }
+
+  /// Return the specialization information.
+  const GenericSpecializationInformation *getSpecializationInfo() const {
+    assert(isSpecialization());
+    return SpecializationInfo;
+  }
+
+  void setSpecializationInfo(const GenericSpecializationInformation *Info) {
+    assert(!isSpecialization());
+    SpecializationInfo = Info;
+  }
+
   /// Retrieve the generic environment containing the mapping from interface
   /// types to context archetypes for this function. Only present if the
   /// function has a body.
@@ -667,7 +696,17 @@ public:
                           return isa<ThrowInst>(TI);
                         });
   }
-    
+
+  /// Loop over all blocks in this function and add all function exiting blocks
+  /// to output.
+  void findExitingBlocks(llvm::SmallVectorImpl<SILBasicBlock *> &output) const {
+    for (auto &Block : const_cast<SILFunction &>(*this)) {
+      if (Block.getTerminator()->isFunctionExiting()) {
+        output.emplace_back(&Block);
+      }
+    }
+  }
+
   //===--------------------------------------------------------------------===//
   // Argument Helper Methods
   //===--------------------------------------------------------------------===//
@@ -744,9 +783,12 @@ public:
   /// '@function_mangled_name'.
   void printName(raw_ostream &OS) const;
 
-  /// Assigns consecutive numbers to all SILValues in the function.
-  void numberValues(llvm::DenseMap<const ValueBase*,
-                    unsigned> &ValueToNumberMap) const;
+  /// Assigns consecutive numbers to all the SILNodes in the function.
+  /// For instructions, both the instruction node and the value nodes of
+  /// any results will be assigned numbers; the instruction node will
+  /// be numbered the same as the first result, if there are any results.
+  void numberValues(llvm::DenseMap<const SILNode*, unsigned> &nodeToNumberMap)
+    const;
 
   ASTContext &getASTContext() const;
 

@@ -499,8 +499,8 @@ static bool usesGenerics(SILFunction *F,
       }
 
       // Scan the result type of the instruction.
-      if (I.getType()) {
-        I.getType().getSwiftRValueType().visit(FindArchetypesAndGenericTypes);
+      for (auto V : I.getResults()) {
+        V->getType().getSwiftRValueType().visit(FindArchetypesAndGenericTypes);
       }
 
       if (UsesGenerics)
@@ -637,18 +637,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Create the optimized function !
   SILModule &M = F->getModule();
   std::string Name = createOptimizedSILFunctionName();
-
-  // Any function that can be seen in other compilation units within this module
-  // (either because the function is from another module, or because it public
-  // or internal) needs to be considered shared, because those compilation units
-  // may choose to do exactly the same specialization. However, specializations
-  // of serialized functions are serialized too, and so behave more like the
-  // original.
-  SILLinkage linkage = F->getLinkage();
-  auto localVisibleInOtherObjects =
-      !hasPrivateVisibility(linkage) && !F->isSerialized();
-  if (isAvailableExternally(linkage) || localVisibleInOtherObjects)
-    linkage = SILLinkage::Shared;
+  SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
   DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
 
@@ -660,11 +649,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     NewFGenericEnv = nullptr;
   }
 
-  NewF = M.createFunction(
-      linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isSerialized(), F->isThunk(),
-      F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
-      nullptr, F->getDebugScope());
+  NewF = M.createFunction(linkage, Name, NewFTy, NewFGenericEnv,
+                          F->getLocation(), F->isBare(), F->isTransparent(),
+                          F->isSerialized(), F->getEntryCount(), F->isThunk(),
+                          F->getClassSubclassScope(), F->getInlineStrategy(),
+                          F->getEffectsKind(), nullptr, F->getDebugScope());
   if (F->hasUnqualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
@@ -745,16 +734,13 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
     auto *ErrorArg =
         ErrorBlock->createPHIArgument(Error, ValueOwnershipKind::Owned);
-    Builder.createTryApply(Loc, FRI, SubstCalleeSILType, Subs,
-                           ThunkArgs, NormalBlock, ErrorBlock);
+    Builder.createTryApply(Loc, FRI, Subs, ThunkArgs, NormalBlock, ErrorBlock);
 
     Builder.setInsertionPoint(ErrorBlock);
     Builder.createThrow(Loc, ErrorArg);
     Builder.setInsertionPoint(NormalBlock);
   } else {
-    ReturnValue = Builder.createApply(Loc, FRI, SubstCalleeSILType, ResultType,
-                                      Subs, ThunkArgs,
-                                      false);
+    ReturnValue = Builder.createApply(Loc, FRI, Subs, ThunkArgs, false);
   }
 
   // Set up the return results.
@@ -962,8 +948,8 @@ void FunctionSignatureTransform::OwnedToGuaranteedTransformFunctionResults() {
         continue;
       }
       // Create a release to balance it out.
-      assert(isa<ApplyInst>(X) && "Unknown epilogue retain");
-      createDecrementBefore(X, dyn_cast<ApplyInst>(X)->getParent()->getTerminator());
+      auto AI = cast<ApplyInst>(X);
+      createDecrementBefore(AI, AI->getParent()->getTerminator());
     }
   }
 }
@@ -981,18 +967,17 @@ OwnedToGuaranteedFinalizeThunkFunction(SILBuilder &Builder, SILFunction *F) {
 
 static void createArgumentRelease(SILBuilder &Builder, ArgumentDescriptor &AD) {
   auto &F = Builder.getFunction();
-  if (AD.PInfo->getConvention() == ParameterConvention::Direct_Owned) {
-    Builder.createReleaseValue(RegularLocation(SourceLoc()),
-                               F.getArguments()[AD.Index],
-                               Builder.getDefaultAtomicity());
-    return;
-  }
-  if (AD.PInfo->getConvention() == ParameterConvention::Indirect_In) {
+  SILArgument *Arg = F.getArguments()[AD.Index];
+  if (Arg->getType().isAddress()) {
+    assert(AD.PInfo->getConvention() == ParameterConvention::Indirect_In
+           && F.getConventions().useLoweredAddresses());
     Builder.createDestroyAddr(RegularLocation(SourceLoc()),
                               F.getArguments()[AD.Index]);
     return;
   }
-  llvm_unreachable("Parameter convention is not supported");
+  Builder.createReleaseValue(RegularLocation(SourceLoc()),
+                             F.getArguments()[AD.Index],
+                             Builder.getDefaultAtomicity());
 }
 
 /// Set up epilogue work for the thunk arguments based in the given argument.
@@ -1033,12 +1018,12 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
   }
 
   SILInstruction *Call = findOnlyApply(F);
-  if (isa<ApplyInst>(Call)) {
-    Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(Call)));
-    Builder.createRetainValue(RegularLocation(SourceLoc()), Call,
+  if (auto AI = dyn_cast<ApplyInst>(Call)) {
+    Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(AI)));
+    Builder.createRetainValue(RegularLocation(SourceLoc()), AI,
                               Builder.getDefaultAtomicity());
   } else {
-    SILBasicBlock *NormalBB = dyn_cast<TryApplyInst>(Call)->getNormalBB();
+    SILBasicBlock *NormalBB = cast<TryApplyInst>(Call)->getNormalBB();
     Builder.setInsertionPoint(&*NormalBB->begin());
     Builder.createRetainValue(RegularLocation(SourceLoc()),
                               NormalBB->getArgument(0), Builder.getDefaultAtomicity());
@@ -1153,6 +1138,11 @@ public:
 
   void run() override {
     auto *F = getFunction();
+
+    // Don't run function signature optimizations at -Os.
+    if (F->getModule().getOptions().Optimization ==
+        SILOptions::SILOptMode::OptimizeForSize)
+      return;
 
     // Don't optimize callees that should not be optimized.
     if (!F->shouldOptimize())

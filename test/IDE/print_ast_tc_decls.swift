@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // Build swift modules this test depends on.
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/foo_swift_module.swift
@@ -486,7 +486,7 @@ protocol d0130_TestProtocol {
 }
 
 protocol d0150_TestClassProtocol : class {}
-// PASS_COMMON-LABEL: {{^}}protocol d0150_TestClassProtocol : class {{{$}}
+// PASS_COMMON-LABEL: {{^}}protocol d0150_TestClassProtocol : AnyObject {{{$}}
 
 @objc protocol d0151_TestClassProtocol {}
 // PASS_COMMON-LABEL: {{^}}@objc protocol d0151_TestClassProtocol {{{$}}
@@ -828,7 +828,7 @@ protocol ProtocolWithInheritance1 : FooProtocol {}
 // PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance1 : FooProtocol {{{$}}
 
 protocol ProtocolWithInheritance2 : FooProtocol, BarProtocol { }
-// PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance2 : FooProtocol, BarProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance2 : BarProtocol, FooProtocol {{{$}}
 
 protocol ProtocolWithInheritance3 : QuxProtocol, SubFooProtocol {
 }
@@ -864,10 +864,13 @@ protocol AssociatedType1 {
 // PASS_ONE_LINE-DAG: {{^}}  associatedtype AssociatedTypeDecl2 : FooProtocol{{$}}
 
   associatedtype AssociatedTypeDecl3 : FooProtocol, BarProtocol
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl3 : FooProtocol, BarProtocol{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl3 : BarProtocol, FooProtocol{{$}}
 
   associatedtype AssociatedTypeDecl4 where AssociatedTypeDecl4 : QuxProtocol, AssociatedTypeDecl4.Qux == Int
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl4 where Self.AssociatedTypeDecl4 : QuxProtocol, Self.AssociatedTypeDecl4.Qux == Int{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl4 : QuxProtocol where Self.AssociatedTypeDecl4.Qux == Int{{$}}
+
+  associatedtype AssociatedTypeDecl5: FooClass
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl5 : FooClass{{$}}
 }
 
 //===---
@@ -1098,7 +1101,7 @@ protocol d2600_ProtocolWithOperator1 {
   static postfix func <*>(_: Self)
 }
 // PASS_2500: {{^}}protocol d2600_ProtocolWithOperator1 {{{$}}
-// PASS_2500-NEXT: {{^}}  postfix static func <*>(_: Self){{$}}
+// PASS_2500-NEXT: {{^}}  postfix static func <*> (_: Self){{$}}
 // PASS_2500-NEXT: {{^}}}{{$}}
 
 struct d2601_TestAssignment {}
@@ -1107,7 +1110,7 @@ func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
   return 0
 }
 // PASS_2500-LABEL: {{^}}infix operator %%%{{$}}
-// PASS_2500: {{^}}func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
+// PASS_2500: {{^}}func %%% (lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
 
 precedencegroup BoringPrecedence {
 // PASS_2500-LABEL: {{^}}precedencegroup BoringPrecedence {{{$}}
@@ -1336,12 +1339,12 @@ extension ProtocolToExtend where Self.Assoc == Int {}
 // Protocol with where clauses
 
 protocol ProtocolWithWhereClause : QuxProtocol where Qux == Int, Self : FooProtocol {}
-// PREFER_TYPE_REPR_PRINTING: protocol ProtocolWithWhereClause : QuxProtocol where Self : FooProtocol, Self.Qux == Int {
+// PREFER_TYPE_REPR_PRINTING: protocol ProtocolWithWhereClause : FooProtocol, QuxProtocol where Self.Qux == Int {
 
 protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Qux == Int, Self : FooProtocol {
-// PREFER_TYPE_REPR_PRINTING-DAG: protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Self : FooProtocol, Self.Qux == Int {
+// PREFER_TYPE_REPR_PRINTING-DAG: protocol ProtocolWithWhereClauseAndAssoc : FooProtocol, QuxProtocol where Self.Qux == Int {
   associatedtype A1 : QuxProtocol where A1 : FooProtocol, A1.Qux : QuxProtocol, Int == A1.Qux.Qux
-// PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A1 : QuxProtocol where Self.A1 : FooProtocol, Self.A1.Qux : QuxProtocol, Self.A1.Qux.Qux == Int{{$}}
+// PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A1 : FooProtocol, QuxProtocol where Self.A1.Qux : QuxProtocol, Self.A1.Qux.Qux == Int{{$}}
 
   // FIXME: this same type requirement with Self should be printed here
   associatedtype A2 : QuxProtocol where A2.Qux == Self

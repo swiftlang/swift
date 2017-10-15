@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 // An @objc protocol can have 'unavailable'
 // methods.  They are treated as if they
@@ -24,12 +24,12 @@ class Bar : NonObjCProto { // expected-error {{type 'Bar' does not conform to pr
 }
 
 
-// Warn about unavailable witnesses.
+// Complain about unavailable witnesses (error in Swift 4, warning in Swift 3)
 protocol P {
   func foo(bar: Foo) // expected-note{{requirement 'foo(bar:)' declared here}}
 }
 
-struct ConformsToP : P {
+struct ConformsToP : P { // expected-error{{type 'ConformsToP' does not conform to protocol 'P'}}
   @available(*, unavailable)
-  func foo(bar: Foo) { } // expected-warning{{unavailable instance method 'foo(bar:)' was used to satisfy a requirement of protocol 'P'}}
+  func foo(bar: Foo) { } // expected-error{{unavailable instance method 'foo(bar:)' was used to satisfy a requirement of protocol 'P'}}
 }

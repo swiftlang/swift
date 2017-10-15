@@ -153,6 +153,24 @@ TEST(RefcountingTest, unowned_retain_release_n) {
   EXPECT_EQ(1u, value);
 }
 
+TEST(RefcountingTest, unowned_retain_release_n_overflow) {
+  // This test would test overflow on 32bit platforms.
+  // These platforms have 7 unowned reference count bits.
+  size_t value = 0;
+  auto object = allocTestObject(&value, 1);
+  EXPECT_EQ(0u, value);
+  swift_unownedRetain_n(object, 128);
+  EXPECT_EQ(129u, swift_unownedRetainCount(object));
+  swift_unownedRetain(object);
+  EXPECT_EQ(130u, swift_unownedRetainCount(object));
+  swift_unownedRelease_n(object, 128);
+  EXPECT_EQ(2u, swift_unownedRetainCount(object));
+  swift_unownedRelease(object);
+  EXPECT_EQ(1u, swift_unownedRetainCount(object));
+  swift_release(object);
+  EXPECT_EQ(1u, value);
+}
+
 TEST(RefcountingTest, isUniquelyReferenced) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
@@ -252,8 +270,10 @@ TEST(RefcountingTest, nonatomic_retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  swift_nonatomic_retain_n(object, 32);
-  swift_nonatomic_retain(object);
+  auto res = swift_nonatomic_retain_n(object, 32);
+  EXPECT_EQ(object, res);
+  res = swift_nonatomic_retain(object);
+  EXPECT_EQ(object, res);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(34u, swift_retainCount(object));
   swift_nonatomic_release_n(object, 31);
@@ -271,8 +291,10 @@ TEST(RefcountingTest, nonatomic_unknown_retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  swift_nonatomic_unknownRetain_n(object, 32);
-  swift_nonatomic_unknownRetain(object);
+  auto res = swift_nonatomic_unknownRetain_n(object, 32);
+  EXPECT_EQ(object, res);
+  res = swift_nonatomic_unknownRetain(object);
+  EXPECT_EQ(object, res);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(34u, swift_retainCount(object));
   swift_nonatomic_unknownRelease_n(object, 31);

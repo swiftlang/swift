@@ -50,7 +50,6 @@ public:
   using super::getBuilder;
   using super::readIsaMask;
   using super::readTypeFromMetadata;
-  using super::readParentFromMetadata;
   using super::readGenericArgFromMetadata;
   using super::readMetadataFromInstance;
   using typename super::StoredPointer;
@@ -244,16 +243,12 @@ public:
         if (!getReader().readInteger(ExistentialAddress, &BoxAddress))
           return false;
 
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
         // Address = BoxAddress + (sizeof(HeapObject) + alignMask) & ~alignMask)
         auto Alignment = InstanceTI->getAlignment();
         auto StartOfValue = BoxAddress + getSizeOfHeapObject();
         // Align.
         StartOfValue += Alignment - StartOfValue % Alignment;
         *OutInstanceAddress = RemoteAddress(StartOfValue);
-#else
-        *OutInstanceAddress = RemoteAddress(BoxAddress);
-#endif
       }
       return true;
     }
@@ -464,10 +459,6 @@ private:
       auto Base = cast<GenericArgumentMetadataSource>(MS)->getSource();
       return isMetadataSourceReady(Base, Builder);
     }
-    case MetadataSourceKind::Parent: {
-      auto Base = cast<ParentMetadataSource>(MS)->getChild();
-      return isMetadataSourceReady(Base, Builder);
-    }
     case MetadataSourceKind::Self:
     case MetadataSourceKind::SelfWitnessTable:
       return true;
@@ -551,19 +542,6 @@ private:
         break;
 
       return Arg;
-    }
-    case MetadataSourceKind::Parent: {
-      auto Base = readMetadataSource(Context,
-          cast<ParentMetadataSource>(MS)->getChild(),
-          Builder);
-      if (!Base.first)
-        break;
-
-      auto Parent = readParentFromMetadata(Base.second);
-      if (!Parent.first)
-        break;
-
-      return Parent;
     }
     case MetadataSourceKind::Self:
     case MetadataSourceKind::SelfWitnessTable:

@@ -93,15 +93,22 @@ add_custom_target(swift-test-stdlib ALL
 
 if(SWIFT_STDLIB_ENABLE_RESILIENCE)
   set(STDLIB_SIL_SERIALIZE_ALL)
+  set(STDLIB_SIL_SERIALIZE_WITNESS_TABLES)
+  set(STDLIB_SIL_SERIALIZE_VTABLES)
 else()
   if(SWIFT_STDLIB_SIL_SERIALIZE_ALL)
-    set(STDLIB_SIL_SERIALIZE_ALL "-Xfrontend" "-sil-serialize-all")
+    set(STDLIB_SIL_SERIALIZE_ALL)
+    set(STDLIB_SIL_SERIALIZE_WITNESS_TABLES "-Xfrontend" "-sil-serialize-witness-tables")
+    set(STDLIB_SIL_SERIALIZE_VTABLES "-Xfrontend" "-sil-serialize-vtables")
+    list(APPEND STDLIB_SIL_SERIALIZE_ALL ${STDLIB_SIL_SERIALIZE_WITNESS_TABLES}
+                                         ${STDLIB_SIL_SERIALIZE_VTABLES})
   else()
     set(STDLIB_SIL_SERIALIZE_ALL)
+    set(STDLIB_SIL_SERIALIZE_WITNESS_TABLES)
+    set(STDLIB_SIL_SERIALIZE_VTABLES)
   endif()
 endif()
 
 add_subdirectory(public)
-add_subdirectory(internal)
 add_subdirectory(private)
 

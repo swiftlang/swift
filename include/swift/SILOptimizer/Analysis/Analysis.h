@@ -10,16 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/Casting.h"
+#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ANALYSIS_H
+#define SWIFT_SILOPTIMIZER_ANALYSIS_ANALYSIS_H
+
+#include "swift/Basic/NullablePtr.h"
+#include "swift/SIL/Notifications.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
-#include "swift/SIL/Notifications.h"
+#include "llvm/Support/Casting.h"
 #include <vector>
-
-#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ANALYSIS_H
-#define SWIFT_SILOPTIMIZER_ANALYSIS_ANALYSIS_H
 
 namespace swift {
   class SILModule;
@@ -175,6 +176,17 @@ namespace swift {
     }
 
   public:
+    /// Returns true if we have an analysis for a specific function \p F without
+    /// actually constructing it.
+    bool hasAnalysis(SILFunction *F) const { return Storage.count(F); }
+
+    NullablePtr<AnalysisTy> maybeGet(SILFunction *F) {
+      auto Iter = Storage.find(F);
+      if (Iter == Storage.end())
+        return nullptr;
+      return Iter->second;
+    }
+
     /// Returns an analysis provider for a specific function \p F.
     AnalysisTy *get(SILFunction *F) {
 
@@ -253,6 +265,29 @@ namespace swift {
         return;
       verify(Iter->second);
     }
+  };
+
+  /// Given a specific type of analysis and its function info. Store the
+  /// analysis and upon request instantiate the function info, caching the
+  /// function info for subsequent requests.
+  template <class AnalysisTy, class FunctionInfoTy>
+  class LazyFunctionInfo {
+    SILFunction *F;
+    AnalysisTy *A;
+    NullablePtr<FunctionInfoTy> FTy;
+
+  public:
+    LazyFunctionInfo(SILFunction *F, AnalysisTy *A) : F(F), A(A), FTy() {}
+
+    operator FunctionInfoTy *() {
+      if (FTy.isNull()) {
+        FTy = A->get(F);
+      }
+
+      return FTy.get();
+    }
+
+    FunctionInfoTy *operator->() { return *this; }
   };
 
 #define ANALYSIS(NAME)                                                         \

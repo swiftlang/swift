@@ -50,7 +50,7 @@ ERROR(error_no_group_info,none,
 
 NOTE(previous_decldef,none,
      "previous %select{declaration|definition}0 of %1 is here",
-     (bool, Identifier))
+     (bool, DeclBaseName))
 
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
@@ -81,6 +81,9 @@ NOTE(convert_let_to_var,none,
 
 NOTE(note_typo_candidate,none,
      "did you mean '%0'?", (StringRef))
+
+NOTE(profile_read_error,none,
+     "failed to load profile data '%0': '%1'", (StringRef, StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

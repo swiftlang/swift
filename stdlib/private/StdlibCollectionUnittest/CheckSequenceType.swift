@@ -1536,13 +1536,7 @@ extension TestSuite {
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
   ) where
-    SequenceWithEquatableElement.Iterator.Element : Equatable,
-    SequenceWithEquatableElement.SubSequence : Sequence,
-    SequenceWithEquatableElement.SubSequence.Iterator.Element
-      == SequenceWithEquatableElement.Iterator.Element,
-    S.SubSequence : Sequence,
-    S.SubSequence.Iterator.Element == S.Iterator.Element,
-    S.SubSequence.SubSequence == S.SubSequence {
+    SequenceWithEquatableElement.Iterator.Element : Equatable {
 
     var testNamePrefix = testNamePrefix
 
@@ -1922,7 +1916,7 @@ self.test("\(testNamePrefix)._preprocessingPass/semantics") {
     let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
     var wasInvoked = false
     let result = s._preprocessingPass {
-      (sequence) -> OpaqueValue<Int> in
+      () -> OpaqueValue<Int> in
       wasInvoked = true
 
       expectEqualSequence(
@@ -1945,7 +1939,7 @@ self.test("\(testNamePrefix)._preprocessingPass/semantics") {
     var result: OpaqueValue<Int>?
     do {
       result = try s._preprocessingPass {
-        _ -> OpaqueValue<Int> in
+        () -> OpaqueValue<Int> in
         wasInvoked = true
         throw TestError.error2
       }

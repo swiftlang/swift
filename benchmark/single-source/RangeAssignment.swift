@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let RangeAssignment = BenchmarkInfo(
+  name: "RangeAssignment",
+  runFunction: run_RangeAssignment,
+  tags: [.validation, .api])
+
 @inline(never)
 public func run_RangeAssignment(_ scale: Int) {
   let range: Range = 100..<200
@@ -22,6 +27,5 @@ public func run_RangeAssignment(_ scale: Int) {
       vector[range] = ArraySlice(vector[range].map { $0 + alfa })
   }
 
-  CheckResults(vector[100] == Double(N),
-    "IncorrectResults in RangeAssignment: \(vector[100]) != \(N).")
+  CheckResults(vector[100] == Double(N))
 }

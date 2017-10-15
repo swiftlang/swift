@@ -185,7 +185,7 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   if (EnumDecl *toEnum = toType.getEnumOrBoundGenericEnum()) {
     for (auto toElement : toEnum->getAllElements()) {
       ++numToElements;
-      if (!toElement->getArgumentInterfaceType())
+      if (!toElement->hasAssociatedValues())
         continue;
       // Bail on multiple payloads.
       if (!toElementTy.isNull())
@@ -209,7 +209,7 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   // If any of the fromElements can be cast by value to the singleton toElement,
   // then the overall enum can be cast by value.
   for (auto fromElement : fromElements) {
-    if (!fromElement->getArgumentInterfaceType())
+    if (!fromElement->hasAssociatedValues())
       continue;
 
     auto fromElementTy = fromType.getEnumElementType(fromElement, M);
@@ -317,7 +317,7 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
-  assert(elt->getArgumentInterfaceType());
+  assert(elt->hasAssociatedValues());
 
   if (auto objectType = getSwiftRValueType().getAnyOptionalObjectType()) {
     assert(elt == M.getASTContext().getOptionalSomeDecl());
@@ -413,7 +413,7 @@ bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
     // Then if we have an enum...
     if (EnumDecl *E = Ty.getEnumOrBoundGenericEnum()) {
       for (auto Elt : E->getAllElements())
-        if (Elt->getArgumentInterfaceType())
+        if (Elt->hasAssociatedValues())
           Worklist.push_back(Ty.getEnumElementType(Elt, Mod));
       continue;
     }
@@ -707,4 +707,61 @@ bool SILType::hasAbstractionDifference(SILFunctionTypeRepresentation rep,
   // Assuming that we've applied the same substitutions to both types,
   // abstraction equality should equal type equality.
   return (*this != type2);
+}
+
+bool SILType::isLoweringOf(SILModule &Mod, CanType formalType) {
+  SILType loweredType = *this;
+
+  // Optional lowers its contained type. The difference between Optional
+  // and IUO is lowered away.
+  SILType loweredObjectType = loweredType.getAnyOptionalObjectType();
+  CanType formalObjectType = formalType.getAnyOptionalObjectType();
+
+  if (loweredObjectType) {
+    return formalObjectType &&
+           loweredObjectType.isLoweringOf(Mod, formalObjectType);
+  }
+
+  // Metatypes preserve their instance type through lowering.
+  if (loweredType.is<MetatypeType>()) {
+    if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
+      return loweredType.getMetatypeInstanceType(Mod).isLoweringOf(
+          Mod, formalMT.getInstanceType());
+    }
+  }
+
+  if (auto loweredEMT = loweredType.getAs<ExistentialMetatypeType>()) {
+    if (auto formalEMT = dyn_cast<ExistentialMetatypeType>(formalType)) {
+      return loweredEMT.getInstanceType() == formalEMT.getInstanceType();
+    }
+  }
+
+  // TODO: Function types go through a more elaborate lowering.
+  // For now, just check that a SIL function type came from some AST function
+  // type.
+  if (loweredType.is<SILFunctionType>())
+    return isa<AnyFunctionType>(formalType);
+
+  // Tuples are lowered elementwise.
+  // TODO: Will this always be the case?
+  if (auto loweredTT = loweredType.getAs<TupleType>()) {
+    if (auto formalTT = dyn_cast<TupleType>(formalType)) {
+      if (loweredTT->getNumElements() != formalTT->getNumElements())
+        return false;
+      for (unsigned i = 0, e = loweredTT->getNumElements(); i < e; ++i) {
+        auto loweredTTEltType =
+            SILType::getPrimitiveAddressType(loweredTT.getElementType(i));
+        if (!loweredTTEltType.isLoweringOf(Mod, formalTT.getElementType(i)))
+          return false;
+      }
+      return true;
+    }
+  }
+
+  // Dynamic self has the same lowering as its contained type.
+  if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
+    formalType = dynamicSelf.getSelfType();
+
+  // Other types are preserved through lowering.
+  return loweredType.getSwiftRValueType() == formalType;
 }

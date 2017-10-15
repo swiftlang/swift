@@ -113,8 +113,8 @@ func testSemanticErrors() {
   let _: String = #keyPath(AnyObject.ambiguous) // expected-error{{ambiguous reference to member 'ambiguous'}}
   let _: String = #keyPath(C.nonObjC) // expected-error{{argument of '#keyPath' refers to non-'@objc' property 'nonObjC'}}
   let _: String = #keyPath(A.propArray.UTF8View) // expected-error{{type 'String' has no member 'UTF8View'}}
-  let _: String = #keyPath(A.someMethod) // expected-error{{'#keyPath' cannot refer to instance method 'someMethod()'}}
-  let _: String = #keyPath(A) // expected-error{{empty '#keyPath' does not refer to a property}}
+  let _: String = #keyPath(A.someMethod) // expected-error{{key path cannot refer to instance method 'someMethod()'}}
+  let _: String = #keyPath(A) // expected-error{{empty key path does not refer to a property}}
   let _: String = #keyPath(A.propDict.anyKeyName.unknown) // expected-error{{type 'B' has no member 'unknown'}}
   let _: String = #keyPath(A.propNSDict.anyKeyName.unknown) // expected-error{{type 'AnyObject' has no member 'unknown'}}
 }

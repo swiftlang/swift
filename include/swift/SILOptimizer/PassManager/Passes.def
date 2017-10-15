@@ -56,10 +56,10 @@ PASS(ABCOpt, "abcopts",
      "Array Bounds Check Optimization")
 PASS(AccessEnforcementSelection, "access-enforcement-selection",
      "Access Enforcement Selection")
-PASS(InactiveAccessMarkerElimination, "inactive-access-marker-elim",
-     "Inactive Access Marker Elimination.")
-PASS(FullAccessMarkerElimination, "full-access-marker-elim",
-     "Full Access Marker Elimination.")
+PASS(AccessSummaryDumper, "access-summary-dump",
+     "Dump Address Parameter Access Summary")
+PASS(AccessMarkerElimination, "access-marker-elim",
+     "Access Marker Elimination.")
 PASS(AddressLowering, "address-lowering",
      "SIL Address Lowering")
 PASS(AllocBoxToStack, "allocbox-to-stack",
@@ -134,10 +134,6 @@ PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
 PASS(EscapeAnalysisDumper, "escapes-dump",
      "Dump Escape Analysis Results")
-PASS(ExternalDefsToDecls, "external-defs-to-decls",
-     "External Definition To Declaration Conversion")
-PASS(ExternalFunctionDefinitionsElimination, "external-func-definition-elim",
-     "External Function Definition Elimination")
 PASS(FunctionOrderPrinter, "function-order-printer",
      "Print Function Order for Testing")
 PASS(FunctionSignatureOpts, "function-signature-opts",
@@ -204,6 +200,8 @@ PASS(MoveCondFailToPreds, "move-cond-fail-to-preds",
      "Move SIL cond_fail by Hoisting Checks")
 PASS(NoReturnFolding, "noreturn-folding",
      "Prune Control Flow at No-Return Calls Using SIL unreachable")
+PASS(Outliner, "outliner",
+     "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
      "Eliminate Ownership Annotation of SIL")
 PASS(RCIdentityDumper, "rc-id-dumper",
@@ -223,9 +221,11 @@ PASS(ReleaseHoisting, "release-hoisting",
 PASS(LateReleaseHoisting, "late-release-hoisting",
      "Late SIL release Hoisting Preserving Epilogues")
 IRGEN_PASS(LoadableByAddress, "loadable-address",
-           "SIL Loadable type by-address lowering.")
+     "SIL Large Loadable type by-address lowering.")
 PASS(RemovePins, "remove-pins",
      "Remove SIL pin/unpin pairs")
+PASS(TempRValueOpt, "temp-rvalue-opt",
+     "Remove short-lived immutable temporary copies")
 PASS(SideEffectsDumper, "side-effects-dump",
      "Print Side-Effect Information for all Functions")
 PASS(SILCleanup, "cleanup",
@@ -267,6 +267,10 @@ PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
 PASS(MarkUninitializedFixup, "mark-uninitialized-fixup",
      "Temporary pass for staging in mark_uninitialized changes.")
+PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-blocks",
+     "Utility pass. Removes all non-term insts from blocks with unreachable terms")
+PASS(SerializeSILPass, "serialize-sil",
+     "Utility pass. Serializes the current SILModule")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 PASS_RANGE(AllPasses, AADumper, BugReducerTester)

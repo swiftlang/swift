@@ -4,8 +4,11 @@
     "AssertCommon.swift"
   ],
   "String": [
+    "ASCII.swift",
     "CString.swift",
     "Character.swift",
+    "CharacterUnicodeScalars.swift",
+    "ICU.swift",
     "StaticString.swift",
     "String.swift",
     "StringBridge.swift",
@@ -14,10 +17,12 @@
     "StringComparable.swift",
     "StringCore.swift",
     "StringHashable.swift",
+    "StringIndex.swift",
     "StringIndexConversions.swift",
     "StringInterpolation.swift",
     "StringLegacy.swift",
     "StringRangeReplaceableCollection.swift",
+    "StringSwitch.swift",
     "StringUTF16.swift",
     "StringUTF8.swift",
     "StringUnicodeScalarView.swift",
@@ -26,11 +31,12 @@
     "UnicodeEncoding.swift",
     "UnicodeParser.swift",
     "UnicodeScalar.swift",
-    "UnicodeTrie.swift",
     "UnavailableStringAPIs.swift",
     "UTFEncoding.swift",
     "UTF8.swift",
-    "UTF16.swift"
+    "UTF16.swift",
+    "UTF32.swift",
+    "ValidUTF8Buffer.swift"
   ],
   "Bool": [
     "Bool.swift"
@@ -46,13 +52,13 @@
     "Repeat.swift",
     "Sort.swift",
     "Range.swift",
+    "SentinelCollection.swift",
     "ClosedRange.swift",
     "CollectionOfOne.swift",
     "HeapBuffer.swift",
     "Sequence.swift",
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",
-    "Index.swift",
     "Indices.swift",
     "Existential.swift",
     "WriteBackMutableSlice.swift",
@@ -86,6 +92,7 @@
         "Arrays.swift",
         "CocoaArray.swift",
         "ContiguousArrayBuffer.swift",
+        "FixedArray.swift",
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
@@ -118,9 +125,8 @@
     "BuiltinMath.swift",
     {
     "Integers": [
+      "DoubleWidth.swift",
       "Integers.swift",
-      "IntegerArithmetic.swift",
-      "FixedPoint.swift",
       "IntegerParsing.swift"],
     "Floating": [
       "FloatingPoint.swift",
@@ -158,7 +164,9 @@
     "Print.swift",
     "REPL.swift",
     "Runtime.swift",
+    "RuntimeFunctionCounters.swift",
     "Shims.swift",
+    "ThreadLocalStorage.swift",
     "Unmanaged.swift",
     "Availability.swift",
     "CommandLine.swift",

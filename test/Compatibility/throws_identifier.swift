@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %utils/split_file.py -o %t %s
 // RUN: %target-swift-frontend -parse -primary-file %t/swift3.swift -verify -swift-version 3
 // RUN: %target-swift-frontend -parse -primary-file %t/swift4.swift -verify -swift-version 4

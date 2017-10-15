@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../../Inputs/resilient_protocol.swift
 // RUN: %target-swift-frontend -typecheck -verify -enable-resilience -I %t %s
@@ -16,10 +16,10 @@ extension Point {
 
 // Size is not @_fixed_layout, so we cannot define a new designated initializer
 extension Size {
+  // FIXME: Produce a decent diagnostic here
   init(ww: Int, hh: Int) {
-  // expected-error@-1 {{initializer declared in an extension of non-'@_fixed_layout' type 'Size' must delegate to another initializer}}
     self.w = ww
-    self.h = hh
+    self.h = hh // expected-error {{cannot assign to property: 'h' is a 'let' constant}}
   }
 
   // This is OK
@@ -27,32 +27,29 @@ extension Size {
     self.init(w: www, h: hhh)
   }
 
-  // FIXME: This should be allowed, but Sema doesn't distinguish this
-  // case from memberwise initialization, and DI explodes the value type
+  // This is OK
   init(other: Size) {
-  // expected-error@-1 {{initializer declared in an extension of non-'@_fixed_layout' type 'Size' must delegate to another initializer}}
     self = other
   }
 }
 
 // Animal is not @_fixed_layout, so we cannot define an @_inlineable
 // designated initializer
+//
+// FIXME: Crap diagnostics
 public struct Animal {
-  public let name: String
+  public let name: String // expected-note 3{{change 'let' to 'var' to make it mutable}}
 
   @_inlineable public init(name: String) {
-  // expected-error@-1 {{initializer for non-'@_fixed_layout' type 'Animal' is '@_inlineable' and must delegate to another initializer}}
-    self.name = name
+    self.name = name // expected-error {{cannot assign to property: 'name' is a 'let' constant}}
   }
 
   @inline(__always) public init(dog: String) {
-  // expected-error@-1 {{initializer for non-'@_fixed_layout' type 'Animal' is '@inline(__always)' and must delegate to another initializer}}
-    self.name = dog
+    self.name = dog // expected-error {{cannot assign to property: 'name' is a 'let' constant}}
   }
 
   @_transparent public init(cat: String) {
-  // expected-error@-1 {{initializer for non-'@_fixed_layout' type 'Animal' is '@_transparent' and must delegate to another initializer}}
-    self.name = cat
+    self.name = cat // expected-error {{cannot assign to property: 'name' is a 'let' constant}}
   }
 
   // This is OK
@@ -60,10 +57,8 @@ public struct Animal {
     self.init(name: cow)
   }
 
-  // FIXME: This should be allowed, but Sema doesn't distinguish this
-  // case from memberwise initialization, and DI explodes the value type
+  // This is OK
   @_inlineable public init(other: Animal) {
-  // expected-error@-1 {{initializer for non-'@_fixed_layout' type 'Animal' is '@_inlineable' and must delegate to another initializer}}
     self = other
   }
 }

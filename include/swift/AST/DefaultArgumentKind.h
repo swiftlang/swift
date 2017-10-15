@@ -45,7 +45,7 @@ enum class DefaultArgumentKind : unsigned {
   /// The #dsohandle default argument, which is expanded at the call site.
   DSOHandle,
   /// The "nil" literal.
-  Nil,
+  NilLiteral,
   /// An empty array literal.
   EmptyArray,
   /// An empty dictionary literal.

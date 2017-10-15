@@ -483,8 +483,8 @@ static bool removeRedundantChecks(DominanceInfoNode *CurBB,
   return Changed;
 }
 
-static CondFailInst *hasCondFailUse(SILInstruction *I) {
-    for (auto *Op : I->getUses())
+static CondFailInst *hasCondFailUse(SILValue V) {
+    for (auto *Op : V->getUses())
       if (auto C = dyn_cast<CondFailInst>(Op->getUser()))
         return C;
     return nullptr;
@@ -935,7 +935,7 @@ public:
     // Get the first induction value.
     auto FirstVal = Ind->getFirstValue();
     // Clone the struct for the start index.
-    auto Start = cast<SILInstruction>(CheckToHoist.getIndex())
+    auto Start = cast<SingleValueInstruction>(CheckToHoist.getIndex())
                      ->clone(Preheader->getTerminator());
     // Set the new start index to the first value of the induction.
     Start->setOperand(0, FirstVal);
@@ -947,7 +947,7 @@ public:
     // Get the last induction value.
     auto LastVal = Ind->getLastValue(Loc, Builder);
     // Clone the struct for the end index.
-    auto End = cast<SILInstruction>(CheckToHoist.getIndex())
+    auto End = cast<SingleValueInstruction>(CheckToHoist.getIndex())
                    ->clone(Preheader->getTerminator());
     // Set the new end index to the last value of the induction.
     End->setOperand(0, LastVal);
@@ -1073,7 +1073,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
 /// A dominating cond_fail on the same value ensures that this value is false.
 static bool isValueKnownFalseAt(SILValue Val, SILInstruction *At,
                                 DominanceInfo *DT) {
-  auto *Inst = dyn_cast<SILInstruction>(Val);
+  auto *Inst = Val->getDefiningInstruction();
   if (!Inst ||
       std::next(SILBasicBlock::iterator(Inst)) == Inst->getParent()->end())
     return false;

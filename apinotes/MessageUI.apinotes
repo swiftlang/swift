@@ -1,5 +1,0 @@
----
-Name:            MessageUI
-Tags:
-- Name: MFMailComposeErrorCode
-  NSErrorDomain: MFMailComposeErrorDomain

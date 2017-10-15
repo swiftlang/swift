@@ -3,3 +3,4 @@ configure_file(Config.h.in ${CMAKE_CURRENT_BINARY_DIR}/Config.h
 
 add_subdirectory(Option)
 add_subdirectory(SwiftRemoteMirror)
+add_subdirectory(Syntax)

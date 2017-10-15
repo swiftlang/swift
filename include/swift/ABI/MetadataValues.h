@@ -92,6 +92,9 @@ enum class ClassFlags : uint32_t {
 
   /// Does this class use Swift 1.0 refcounting?
   UsesSwift1Refcounting = 0x2,
+
+  /// Has this class a custom name, specified with the @objc attribute?
+  HasCustomObjCName = 0x4
 };
 inline bool operator&(ClassFlags a, ClassFlags b) {
   return (uint32_t(a) & uint32_t(b)) != 0;
@@ -102,6 +105,62 @@ inline ClassFlags operator|(ClassFlags a, ClassFlags b) {
 inline ClassFlags &operator|=(ClassFlags &a, ClassFlags b) {
   return a = (a | b);
 }
+
+/// Flags that go in a MethodDescriptor structure.
+class MethodDescriptorFlags {
+public:
+  typedef uint32_t int_type;
+  enum class Kind {
+    Method,
+    Init,
+    Getter,
+    Setter,
+    MaterializeForSet,
+  };
+
+private:
+  enum : int_type {
+    KindMask = 0x0F,                // 16 kinds should be enough for anybody
+    IsInstanceMask = 0x10,
+    IsDynamicMask = 0x20,
+  };
+
+  int_type Value;
+
+public:
+  MethodDescriptorFlags(Kind kind) : Value(unsigned(kind)) {}
+
+  MethodDescriptorFlags withIsInstance(bool isInstance) const {
+    auto copy = *this;
+    if (isInstance) {
+      copy.Value |= IsInstanceMask;
+    } else {
+      copy.Value &= ~IsInstanceMask;
+    }
+    return copy;
+  }
+
+  MethodDescriptorFlags withIsDynamic(bool isDynamic) const {
+    auto copy = *this;
+    if (isDynamic)
+      copy.Value |= IsDynamicMask;
+    else
+      copy.Value &= ~IsDynamicMask;
+    return copy;
+  }
+
+  Kind getKind() const { return Kind(Value & KindMask); }
+
+  /// Is the method marked 'dynamic'?
+  bool isDynamic() const { return Value & IsDynamicMask; }
+
+  /// Is the method an instance member?
+  ///
+  /// Note that 'init' is not considered an instance member.
+  bool isInstance() const { return Value & IsInstanceMask; }
+
+  int_type getIntValue() const { return Value; }
+};
 
 enum : unsigned {
   /// Number of words reserved in generic metadata patterns.
@@ -246,10 +305,9 @@ enum class ProtocolDispatchStrategy: uint8_t {
 
 /// Flags in a generic nominal type descriptor.
 class GenericParameterDescriptorFlags {
-  typedef uint32_t int_type;
+  typedef uint16_t int_type;
   enum : int_type {
-    HasParent        = 0x01,
-    HasGenericParent = 0x02,
+    HasVTable        = 0x0004,
   };
   int_type Data;
   
@@ -257,31 +315,16 @@ class GenericParameterDescriptorFlags {
 public:
   constexpr GenericParameterDescriptorFlags() : Data(0) {}
 
-  constexpr GenericParameterDescriptorFlags withHasParent(bool b) const {
-    return GenericParameterDescriptorFlags(b ? (Data | HasParent)
-                                             : (Data & ~HasParent));
+  constexpr GenericParameterDescriptorFlags withHasVTable(bool b) const {
+    return GenericParameterDescriptorFlags(b ? (Data | HasVTable)
+                                             : (Data & ~HasVTable));
   }
 
-  constexpr GenericParameterDescriptorFlags withHasGenericParent(bool b) const {
-    return GenericParameterDescriptorFlags(b ? (Data | HasGenericParent)
-                                             : (Data & ~HasGenericParent));
-  }
-
-  /// Does this type have a lexical parent type?
-  ///
-  /// For class metadata, if this is true, the storage for the parent type
-  /// appears immediately prior to the first generic argument.  Other
-  /// metadata always have a slot for their parent type.
-  bool hasParent() const {
-    return Data & HasParent;
-  }
-
-  /// Given that this type has a parent type, is that type generic?  If so,
-  /// it forms part of the key distinguishing this metadata from other
-  /// metadata, and the parent metadata will be the first argument to
-  /// the generic metadata access function.
-  bool hasGenericParent() const {
-    return Data & HasGenericParent;
+  /// If this type is a class, does it have a vtable?  If so, the number
+  /// of vtable entries immediately follows the generic requirement
+  /// descriptor.
+  bool hasVTable() const {
+    return Data & HasVTable;
   }
 
   int_type getIntValue() const {
@@ -389,6 +432,52 @@ public:
   int_type getIntValue() const {
     return Data;
   }
+};
+
+/// Flags that go in a ProtocolRequirement structure.
+class ProtocolRequirementFlags {
+public:
+  typedef uint32_t int_type;
+  enum class Kind {
+    BaseProtocol,
+    Method,
+    Init,
+    Getter,
+    Setter,
+    MaterializeForSet,
+    AssociatedTypeAccessFunction,
+    AssociatedConformanceAccessFunction,
+  };
+
+private:
+  enum : int_type {
+    KindMask = 0x0F,                // 16 kinds should be enough for anybody
+    IsInstanceMask = 0x10,
+  };
+
+  int_type Value;
+
+public:
+  ProtocolRequirementFlags(Kind kind) : Value(unsigned(kind)) {}
+
+  ProtocolRequirementFlags withIsInstance(bool isInstance) const {
+    auto copy = *this;
+    if (isInstance) {
+      copy.Value |= IsInstanceMask;
+    } else {
+      copy.Value &= ~IsInstanceMask;
+    }
+    return copy;
+  }
+
+  Kind getKind() const { return Kind(Value & KindMask); }
+
+  /// Is the method an instance member?
+  ///
+  /// Note that 'init' is not considered an instance member.
+  bool isInstance() const { return Value & IsInstanceMask; }
+
+  int_type getIntValue() const { return Value; }
 };
 
 /// Flags in an existential type metadata record.
@@ -570,11 +659,27 @@ public:
 enum class ExclusivityFlags : uintptr_t {
   Read             = 0x0,
   Modify           = 0x1,
-  ActionMask       = 0x1
+  // Leave space for other actions.
+  // Don't rely on ActionMask in stable ABI.
+  ActionMask       = 0x1,
+
+  // Downgrade exclusivity failures to a warning.
+  WarningOnly      = 0x10
 };
+static inline ExclusivityFlags operator|(ExclusivityFlags lhs,
+                                         ExclusivityFlags rhs) {
+  return ExclusivityFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline ExclusivityFlags &operator|=(ExclusivityFlags &lhs,
+                                           ExclusivityFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
 static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
   return ExclusivityFlags(uintptr_t(flags)
                         & uintptr_t(ExclusivityFlags::ActionMask));
+}
+static inline bool isWarningOnly(ExclusivityFlags flags) {
+  return uintptr_t(flags) & uintptr_t(ExclusivityFlags::WarningOnly);
 }
 
 } // end namespace swift

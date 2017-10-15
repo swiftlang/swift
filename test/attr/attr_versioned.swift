@@ -1,10 +1,11 @@
 // RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-testing
 
 @_versioned private func privateVersioned() {}
-// expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'privateVersioned' is private}}
+// expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'privateVersioned()' is private}}
 
 @_versioned fileprivate func fileprivateVersioned() {}
-// expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'fileprivateVersioned' is fileprivate}}
+// expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'fileprivateVersioned()' is fileprivate}}
 
 @_versioned internal func internalVersioned() {}
 // OK
@@ -13,11 +14,11 @@
 // OK
 
 @_versioned public func publicVersioned() {}
-// expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'publicVersioned' is public}}
+// expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'publicVersioned()' is public}}
 
 internal class internalClass {
   @_versioned public func publicVersioned() {}
-  // expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'publicVersioned' is public}}
+  // expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'publicVersioned()' is public}}
 }
 
 fileprivate class filePrivateClass {
@@ -43,4 +44,24 @@ protocol VersionedProtocol {
 
   @_versioned func versionedRequirement() -> T
   // expected-error@-1 {{'@_versioned' attribute cannot be used in protocols}}
+}
+
+// Derived conformances had issues with @_versioned - rdar://problem/34342955
+@_versioned
+internal enum EqEnum {
+  case foo
+}
+
+@_versioned
+internal enum RawEnum : Int {
+  case foo = 0
+}
+
+@_inlineable
+public func usesEqEnum() -> Bool {
+  _ = (EqEnum.foo == .foo)
+  _ = EqEnum.foo.hashValue
+
+  _ = RawEnum.foo.rawValue
+  _ = RawEnum(rawValue: 0)
 }

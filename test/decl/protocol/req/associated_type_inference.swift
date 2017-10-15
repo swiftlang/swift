@@ -149,7 +149,7 @@ struct XSubP0b : SubscriptP0 {
 
 struct XSubP0c : SubscriptP0 {
 // expected-error@-1 {{type 'XSubP0c' does not conform to protocol 'SubscriptP0'}}
-  subscript (i: Index) -> Element { get { } }
+  subscript (i: Index) -> Element { get { } } // expected-error{{reference to invalid associated type 'Element' of type 'XSubP0c'}}
 }
 
 struct XSubP0d : SubscriptP0 {
@@ -184,7 +184,8 @@ struct XCollectionLikeP0a<T> : CollectionLikeP0 {
 struct XCollectionLikeP0b : CollectionLikeP0 {
 // expected-error@-1 {{type 'XCollectionLikeP0b' does not conform to protocol 'CollectionLikeP0'}}
   var startIndex: XCollectionLikeP0b.Index
-  // expected-error@-1 {{'startIndex' used within its own type}}
+  // There was an error @-1 ("'startIndex' used within its own type"),
+  // but it disappeared and doesn't seem like much of a loss.
   var startElement: XCollectionLikeP0b.Element
 }
 
@@ -194,9 +195,9 @@ public protocol Thenable {
     func then(_ success: (_: T) -> T) -> Self
 }
 
-public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>' does not conform to protocol 'Thenable'}}
-    public func then(_ success: @escaping (_ t: T, _: CorePromise<T>) -> T) -> Self {
-        return self.then() { (t: T) -> T in
+public class CorePromise<U> : Thenable { // expected-error{{type 'CorePromise<U>' does not conform to protocol 'Thenable'}}
+    public func then(_ success: @escaping (_ t: U, _: CorePromise<U>) -> U) -> Self {
+        return self.then() { (t: U) -> U in // expected-error{{contextual closure type '(U, CorePromise<U>) -> U' expects 2 arguments, but 1 was used in closure body}}
             return success(t: t, self)
         }
     }
@@ -379,3 +380,23 @@ protocol Vector {
 struct Int8Vector : Vector {
   func process(elements: [Int8]) { }
 }
+
+// SR-4486
+protocol P13 {
+  associatedtype Arg // expected-note{{protocol requires nested type 'Arg'; do you want to add it?}}
+  func foo(arg: Arg)
+}
+
+struct S13 : P13 { // expected-error{{type 'S13' does not conform to protocol 'P13'}}
+  func foo(arg: inout Int) {}
+}
+
+// "Infer" associated type from generic parameter.
+protocol P14 {
+  associatedtype Value
+}
+
+struct P14a<Value>: P14 { }
+
+struct P14b<Value> { }
+extension P14b: P14 { }

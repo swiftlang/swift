@@ -21,11 +21,22 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Token.h"
-#include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/References.h"
+#include "swift/Syntax/Trivia.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 namespace swift {
+
+namespace syntax {
+  struct RawTokenSyntax;
+}
+
+  /// Given a pointer to the starting byte of a UTF8 character, validate it and
+  /// advance the lexer past it.  This returns the encoded character or ~0U if
+  /// the encoding is invalid.
+  uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr, const char *End);
+
   class DiagnosticEngine;
   class InFlightDiagnostic;
   class LangOptions;
@@ -234,7 +245,7 @@ public:
   }
 
   /// Lex a full token including leading and trailing trivia.
-  RC<syntax::TokenSyntax> fullLex();
+  RC<syntax::RawTokenSyntax> fullLex();
 
   bool isKeepingComments() const {
     return RetainComments == CommentRetentionMode::ReturnAsTokens;
@@ -400,6 +411,10 @@ public:
       Result.IndentToStrip = 0;
       return Result;
     }
+
+    SourceLoc getEndLoc() {
+      return Loc.getAdvancedLoc(Length);
+    }
   };
   
   /// \brief Compute the bytes that the actual string literal should codegen to.
@@ -521,6 +536,21 @@ private:
   bool tryLexConflictMarker();
 };
   
+/// Given an ordered token \param Array , get the iterator pointing to the first
+/// token that is not before \param Loc .
+template<typename ArrayTy, typename Iterator = typename ArrayTy::iterator>
+Iterator token_lower_bound(ArrayTy &Array, SourceLoc Loc) {
+  return std::lower_bound(Array.begin(), Array.end(), Loc,
+    [](const Token &T, SourceLoc L) {
+      return T.getLoc().getOpaquePointerValue() < L.getOpaquePointerValue();
+  });
+}
+
+/// Given an ordered token array \param AllTokens , get the slice of the array
+/// where front() locates at \param StartLoc and back() locates at \param EndLoc .
+ArrayRef<Token> slice_token_array(ArrayRef<Token> AllTokens, SourceLoc StartLoc,
+                                  SourceLoc EndLoc);
+
 } // end namespace swift
 
 #endif

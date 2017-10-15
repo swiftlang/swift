@@ -71,14 +71,14 @@ struct Y1 {
 }
 
 struct Y2 {
-  subscript(idx: Int) -> TypoType { // expected-error 3{{use of undeclared type 'TypoType'}}
+  subscript(idx: Int) -> TypoType { // expected-error {{use of undeclared type 'TypoType'}}
     get { repeat {} while true }
     set {}
   }
 }
 
 class Y3 {
-  subscript(idx: Int) -> TypoType { // expected-error 3{{use of undeclared type 'TypoType'}}
+  subscript(idx: Int) -> TypoType { // expected-error {{use of undeclared type 'TypoType'}}
     get { repeat {} while true }
     set {}
   }
@@ -310,3 +310,12 @@ struct S4 {
     }
   }
 }
+
+// SR-2575
+struct SR2575 {
+  subscript() -> Int {
+    return 1
+  }
+}
+
+SR2575().subscript() // expected-error{{type 'SR2575' has no member 'subscript'}}

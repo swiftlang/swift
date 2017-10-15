@@ -18,7 +18,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#if defined(__ELF__) || defined(__ANDROID__)
+#if (defined(__ELF__) || defined(__ANDROID__)) && !defined(__HAIKU__)
 
 #include "ImageInspection.h"
 #include "swift/Runtime/Debug.h"
@@ -27,8 +27,8 @@
 #include <link.h>
 #include <string.h>
 
-#ifndef SWIFT_RUNTIME_DLADDR_ALLOW
-#error "SWIFT_RUNTIME_DLADDR_ALLOW must be defined!"
+#if defined(__ANDROID__)
+#include "llvm/ADT/StringRef.h"
 #endif
 
 using namespace swift;
@@ -72,6 +72,13 @@ static SectionInfo getSectionInfo(const char *imageName,
   SectionInfo sectionInfo = { 0, nullptr };
   void *handle = dlopen(imageName, RTLD_LAZY | RTLD_NOLOAD);
   if (!handle) {
+#ifdef __ANDROID__
+    llvm::StringRef imagePath = llvm::StringRef(imageName);
+    if (imagePath.startswith("/system/lib") ||
+        (imageName && !imagePath.endswith(".so"))) {
+      return sectionInfo;
+    }
+#endif
     fatalError(/* flags = */ 0, "dlopen() failed on `%s': %s", imageName,
                dlerror());
   }
@@ -162,7 +169,6 @@ void swift_addNewDSOImage(const void *addr) {
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
-#if SWIFT_RUNTIME_DLADDR_ALLOW
   Dl_info dlinfo;
   if (dladdr(address, &dlinfo) == 0) {
     return 0;
@@ -173,9 +179,6 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   info->symbolName = dlinfo.dli_sname;
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
-#else
-  return 0;
-#endif
 }
 
 #endif // defined(__ELF__) || defined(__ANDROID__)

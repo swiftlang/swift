@@ -88,11 +88,11 @@ bb0(%0 : $Builtin.Int1, %1 : $B):
   cond_br %0, bb1, bb2
 
 bb1:
-  %2 = strong_retain %1 : $B
+  strong_retain %1 : $B
   br bb3
 
 bb2:
-  %3 = strong_retain %1 : $B
+  strong_retain %1 : $B
   br bb3
 
 bb3:
@@ -133,12 +133,12 @@ bb0(%0 : $Builtin.Int1, %1 : $B):
   cond_br %0, bb1, bb2
 
 bb1:
-  %2 = strong_retain %1 : $B
+  strong_retain %1 : $B
   %3 = integer_literal $Builtin.Int32, 9
   br bb3(%3 : $Builtin.Int32)
 
 bb2:
-  %4 = strong_retain %1 : $B
+  strong_retain %1 : $B
   %5 = integer_literal $Builtin.Int32, 7
   br bb3(%5 : $Builtin.Int32)
 
@@ -160,12 +160,12 @@ bb0(%0 : $Builtin.Int1, %1 : $B):
   cond_br %0, bb1, bb2
 
 bb1:
-  %2 = strong_retain %1 : $B
+  strong_retain %1 : $B
   %3 = integer_literal $Builtin.Int32, 7
   br bb3(%3 : $Builtin.Int32)
 
 bb2:
-  %4 = strong_retain %1 : $B
+  strong_retain %1 : $B
   %5 = integer_literal $Builtin.Int32, 7
   br bb3(%5 : $Builtin.Int32)
 
@@ -295,7 +295,7 @@ bb4:
 
 // This test makes sure that we do move ref counts over instructions that cannot reference it.
 // CHECK-LABEL: sil @sink_ref_count_ops_enum_over_switch_enum_4 :
-// CHECK: bb0({{%[0-9]+}} : $Optional<Builtin.Int32>, [[ARG1:%[0-9]+]] : $Optional<Builtin.NativeObject>):
+// CHECK: bb0({{%[0-9]+}} : $Optional<Builtin.NativeObject>, [[ARG1:%[0-9]+]] : $Optional<Builtin.NativeObject>):
 // CHECK-NOT: retain_value [[ARG1]]
 // CHECK: switch_enum
 // CHECK: bb1:
@@ -308,12 +308,12 @@ bb4:
 // CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value [[ARG1]]
 // CHECK-NOT: strong_retain
-sil @sink_ref_count_ops_enum_over_switch_enum_4 : $@convention(thin) (Optional<Builtin.Int32>, Optional<Builtin.NativeObject>) -> Optional<Builtin.NativeObject> {
-bb0(%0 : $Optional<Builtin.Int32>, %1 : $Optional<Builtin.NativeObject>):
+sil @sink_ref_count_ops_enum_over_switch_enum_4 : $@convention(thin) (Optional<Builtin.NativeObject>, Optional<Builtin.NativeObject>) -> Optional<Builtin.NativeObject> {
+bb0(%0 : $Optional<Builtin.NativeObject>, %1 : $Optional<Builtin.NativeObject>):
   %2 = function_ref @blocker : $@convention(thin) () -> ()
   retain_value %1 : $Optional<Builtin.NativeObject>
   %3 = alloc_stack $Optional<Builtin.Int32>
-  retain_value %0 : $Optional<Builtin.Int32>
+  retain_value %0 : $Optional<Builtin.NativeObject>
   switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1:
@@ -501,8 +501,8 @@ bb4:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_select_enum_4 : $@convention(thin) (Optional<Builtin.Int32>, Optional<Builtin.NativeObject>) -> Optional<Builtin.NativeObject> {
-// CHECK: bb0({{%[0-9]+}} : $Optional<Builtin.Int32>, [[ARG1:%[0-9]+]] : $Optional<Builtin.NativeObject>):
+// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_select_enum_4 : $@convention(thin) (Optional<Builtin.NativeObject>, Optional<Builtin.NativeObject>) -> Optional<Builtin.NativeObject> {
+// CHECK: bb0({{%[0-9]+}} : $Optional<Builtin.NativeObject>, [[ARG1:%[0-9]+]] : $Optional<Builtin.NativeObject>):
 // CHECK-NOT: retain_value [[ARG1]]
 // CHECK: select_enum
 // CHECK: cond_br
@@ -514,13 +514,13 @@ bb4:
 // CHECK: bb3:
 // CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value [[ARG1]]
-sil @sink_ref_count_ops_enum_over_select_enum_4 : $@convention(thin) (Optional<Builtin.Int32>, Optional<Builtin.NativeObject>) -> Optional<Builtin.NativeObject> {
-bb0(%0 : $Optional<Builtin.Int32>, %1 : $Optional<Builtin.NativeObject>):
+sil @sink_ref_count_ops_enum_over_select_enum_4 : $@convention(thin) (Optional<Builtin.NativeObject>, Optional<Builtin.NativeObject>) -> Optional<Builtin.NativeObject> {
+bb0(%0 : $Optional<Builtin.NativeObject>, %1 : $Optional<Builtin.NativeObject>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
   %2 = function_ref @blocker : $@convention(thin) () -> ()
   retain_value %1 : $Optional<Builtin.NativeObject>
-  retain_value %0 : $Optional<Builtin.Int32>
+  retain_value %0 : $Optional<Builtin.NativeObject>
   %100 = select_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
   cond_br %100, bb1, bb2
 
@@ -1250,7 +1250,7 @@ bb0(%0 : $F):
   %1 = alloc_stack $F
   store %0 to %1 : $*F
   strong_retain %0 : $F
-  unconditional_checked_cast_addr take_always F in %1 : $*F to G in %1 : $*F
+  unconditional_checked_cast_addr F in %1 : $*F to G in %1 : $*F
   strong_release %0 : $F
   dealloc_stack %1 : $*F
   %2 = tuple ()
@@ -1341,7 +1341,7 @@ bb1:                                              // Preds: bb0
 // Make sure we were able to sink the release.
 // CHECK: strong_release
 // CHECK-NEXT: tuple ()
-// CHECK-NEXT return
+// CHECK-NEXT: return
 
 bb2:                                              // Preds: bb4 bb5
   %5 = tuple ()                                   // user: %6

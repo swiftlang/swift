@@ -27,11 +27,13 @@ import SwiftShims
 ///   * an unspecified value less than zero if `lhs < rhs`,
 ///   * zero if `lhs == rhs`,
 ///   * an unspecified value greater than zero if `lhs > rhs`.
+@_inlineable // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollation")
 public func _stdlib_compareNSStringDeterministicUnicodeCollation(
   _ lhs: AnyObject, _ rhs: AnyObject
 ) -> Int32
 
+@_inlineable // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr")
 public func _stdlib_compareNSStringDeterministicUnicodeCollationPointer(
   _ lhs: OpaquePointer, _ rhs: OpaquePointer
@@ -51,11 +53,20 @@ extension String {
   ///   0027  ; [*02F8.0020.0002] # APOSTROPHE
   ///
   /// - Precondition: Both `self` and `rhs` are ASCII strings.
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   func _compareASCII(_ rhs: String) -> Int {
-    var compare = Int(extendingOrTruncating: _swift_stdlib_memcmp(
-      self._core.startASCII, rhs._core.startASCII,
-      Swift.min(self._core.count, rhs._core.count)))
+    var compare: Int
+    
+    if self._core.startASCII == rhs._core.startASCII  { 
+      compare = 0 
+    }
+    else {
+      compare = Int(truncatingIfNeeded: _swift_stdlib_memcmp(
+        self._core.startASCII, rhs._core.startASCII,
+        Swift.min(self._core.count, rhs._core.count)))      
+    }
+
     if compare == 0 {
       compare = self._core.count - rhs._core.count
     }
@@ -66,8 +77,7 @@ extension String {
 #endif
 
   /// Compares two strings with the Unicode Collation Algorithm.
-  @inline(never)
-  @_semantics("stdlib_binary_only") // Hide the CF/ICU dependency
+  @inline(never) // Hide the CF/ICU dependency
   public  // @testable
   func _compareDeterministicUnicodeCollation(_ rhs: String) -> Int {
     // Note: this operation should be consistent with equality comparison of
@@ -105,6 +115,7 @@ extension String {
 #endif
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public  // @testable
   func _compareString(_ rhs: String) -> Int {
 #if _runtime(_ObjC)
@@ -120,6 +131,7 @@ extension String {
 }
 
 extension String : Equatable {
+  @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public static func == (lhs: String, rhs: String) -> Bool {
 #if _runtime(_ObjC)
@@ -129,6 +141,9 @@ extension String : Equatable {
     if lhs._core.isASCII && rhs._core.isASCII {
       if lhs._core.count != rhs._core.count {
         return false
+      }
+      if lhs._core.startASCII == rhs._core.startASCII {
+        return true
       }
       return _swift_stdlib_memcmp(
         lhs._core.startASCII, rhs._core.startASCII,
@@ -140,6 +155,7 @@ extension String : Equatable {
 }
 
 extension String : Comparable {
+  @_inlineable // FIXME(sil-serialize-all)
   public static func < (lhs: String, rhs: String) -> Bool {
     return lhs._compareString(rhs) < 0
   }

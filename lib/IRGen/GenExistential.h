@@ -71,28 +71,12 @@ namespace irgen {
                                   CanType formalSrcType,
                                  ArrayRef<ProtocolConformanceRef> conformances);
   
-  /// "Deinitialize" an existential container whose contained value is allocated
-  /// but uninitialized, by deallocating the buffer owned by the container if any.
-  void emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
-                                            Address container,
-                                            SILType type);
-  
   /// Deallocate a boxed existential container with uninitialized space to hold
   /// a value of a given type.
   void emitBoxedExistentialContainerDeallocation(IRGenFunction &IGF,
                                                  Explosion &container,
                                                  SILType containerType,
                                                  CanType valueType);
-  
-  /// Emit a projection from an existential container address to the address
-  /// of its concrete value buffer.
-  ///
-  /// \param openedArchetype If non-null, the archetype that will capture the
-  /// metadata and witness tables produced by projecting the archetype.
-  Address emitOpaqueExistentialProjection(IRGenFunction &IGF,
-                                          Address base,
-                                          SILType baseTy,
-                                          CanArchetypeType openedArchetype);
 
   /// Allocate the storage for an opaque existential in the existential
   /// container.
@@ -162,12 +146,6 @@ namespace irgen {
   void emitMetatypeOfMetatype(IRGenFunction &IGF, Explosion &value,
                               SILType existentialType, Explosion &out);
 
-  std::pair<Address, llvm::Value*>
-  emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,
-                                                Address base,
-                                                SILType baseTy,
-                                                CanType openedArchetype);
-  
 } // end namespace irgen
 } // end namespace swift
 

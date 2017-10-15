@@ -93,7 +93,7 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance {
   /// \brief The type that conforms to the protocol, in the context of the
   /// conformance definition.
   Type ConformingType;
-  
+
 protected:
   ProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
     : Kind(kind), ConformingType(conformingType) { }
@@ -189,11 +189,46 @@ public:
   ValueDecl *getWitnessDecl(ValueDecl *requirement,
                             LazyResolver *resolver) const;
 
+  /// Retrieve the witness corresponding to the given value requirement.
+  /// TODO: maybe this should return a Witness?
+  ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement,
+                                    LazyResolver *resolver) const;
+
 private:
   /// Determine whether we have a witness for the given requirement.
   bool hasWitness(ValueDecl *requirement) const;
 
 public:
+  /// Apply the given function object to each requirement, either type or value,
+  /// that is not witnessed.
+  ///
+  /// The function object should accept a \c ValueDecl* for the requirement.
+  template<typename F>
+  void forEachNonWitnessedRequirement(LazyResolver *Resolver, F f) const {
+    const ProtocolDecl *protocol = getProtocol();
+    for (auto req : protocol->getMembers()) {
+      auto valueReq = dyn_cast<ValueDecl>(req);
+      if (!valueReq || valueReq->isInvalid())
+        continue;
+
+      if (auto assocTypeReq = dyn_cast<AssociatedTypeDecl>(req)) {
+        // If we don't have witness for the associated type, apply the function.
+        if (getTypeWitness(assocTypeReq, Resolver)->hasError()) {
+          f(valueReq);
+        }
+        continue;
+      }
+
+      if (!valueReq->isProtocolRequirement())
+        continue;
+
+      // If we don't have witness for the value, apply the function.
+      if (!hasWitness(valueReq)) {
+        f(valueReq);
+      }
+    }
+  }
+
   /// Retrieve the protocol conformance for the inherited protocol.
   ProtocolConformance *getInheritedConformance(ProtocolDecl *protocol) const;
 
@@ -208,7 +243,7 @@ public:
   ProtocolConformanceRef
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol,
                            LazyResolver *resolver = nullptr) const;
- 
+
   /// Get the generic parameters open on the conforming type.
   GenericEnvironment *getGenericEnvironment() const;
 
@@ -234,10 +269,6 @@ public:
   /// is either the default definition or was otherwise deduced.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const;
 
-  /// Returns true if this conformance has a layout that is known to all
-  /// consumers, based on the type/protocol involved in it.
-  bool hasFixedLayout() const;
-
   // Make vanilla new/delete illegal for protocol conformances.
   void *operator new(size_t bytes) = delete;
   void operator delete(void *data) SWIFT_DELETE_OPERATOR_DELETED;
@@ -251,24 +282,28 @@ public:
     assert(mem);
     return mem;
   }
-  
+
   /// Print a parseable and human-readable description of the identifying
   /// information of the protocol conformance.
   void printName(raw_ostream &os,
                  const PrintOptions &PO = PrintOptions()) const;
-  
+
   /// True if the conformance is for a property behavior instantiation.
   bool isBehaviorConformance() const;
-  
+
   /// Get the property declaration for a behavior conformance, if this is one.
   AbstractStorageDecl *getBehaviorDecl() const;
+
+  /// Get any additional requirements that are required for this conformance to
+  /// be satisfied.
+  ArrayRef<Requirement> getConditionalRequirements() const;
 
   /// Substitute the conforming type and produce a ProtocolConformance that
   /// applies to the substituted type.
   ProtocolConformance *subst(Type substType,
                              TypeSubstitutionFn subs,
                              LookupConformanceFn conformances) const;
-  
+
   void dump() const;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 };
@@ -318,8 +353,17 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// requirement signature of the protocol.
   ArrayRef<ProtocolConformanceRef> SignatureConformances;
 
-  LazyMemberLoader *Resolver = nullptr;
-  uint64_t ResolverContextData;
+  /// Any additional requirements that are required for this conformance to
+  /// apply, e.g. 'Something: Baz' in 'extension Foo: Bar where Something: Baz'.
+  ArrayRef<Requirement> ConditionalRequirements;
+
+  /// The lazy member loader provides callbacks for populating imported and
+  /// deserialized conformances.
+  ///
+  /// This is not use for parsed conformances -- those are lazily populated
+  /// by the ASTContext's LazyResolver, which is really a Sema instance.
+  LazyConformanceLoader *Loader = nullptr;
+  uint64_t LoaderContextData;
 
   friend class ASTContext;
 
@@ -329,6 +373,7 @@ class NormalProtocolConformance : public ProtocolConformance,
     : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
       ProtocolAndState(protocol, state), Loc(loc), ContextAndInvalid(dc, false)
   {
+    differenceAndStoreConditionalRequirements();
   }
 
   NormalProtocolConformance(Type conformingType,
@@ -339,15 +384,18 @@ class NormalProtocolConformance : public ProtocolConformance,
       ProtocolAndState(protocol, state), Loc(loc),
       ContextAndInvalid(behaviorStorage, false)
   {
+    differenceAndStoreConditionalRequirements();
   }
 
   void resolveLazyInfo() const;
+
+  void differenceAndStoreConditionalRequirements();
 
 public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const { return ProtocolAndState.getPointer(); }
 
-  /// Retrieve the location of this 
+  /// Retrieve the location of this
   SourceLoc getLoc() const { return Loc; }
 
   /// Get the declaration context that contains the conforming extension or
@@ -359,6 +407,13 @@ public:
     } else {
       return context.get<AbstractStorageDecl *>()->getDeclContext();
     }
+  }
+
+  /// Get any additional requirements that are required for this conformance to
+  /// be satisfied, e.g. for Array<T>: Equatable, T: Equatable also needs
+  /// to be satisfied.
+  ArrayRef<Requirement> getConditionalRequirements() const {
+    return ConditionalRequirements;
   }
 
   /// Retrieve the state of this conformance.
@@ -375,28 +430,29 @@ public:
   bool isInvalid() const {
     return ContextAndInvalid.getInt();
   }
-  
+
   /// Mark this conformance as invalid.
   void setInvalid() {
     ContextAndInvalid.setInt(true);
+    SignatureConformances = {};
   }
 
-  /// Determine whether this conformance is lazily resolved.
+  /// Determine whether this conformance is lazily loaded.
   ///
   /// This only matters to the AST verifier.
-  bool isLazilyResolved() const { return Resolver != nullptr; }
+  bool isLazilyLoaded() const { return Loader != nullptr; }
 
   /// True if the conformance describes a property behavior.
   bool isBehaviorConformance() const {
     return ContextAndInvalid.getPointer().is<AbstractStorageDecl *>();
   }
-  
+
   /// Return the declaration using the behavior for this conformance, or null
   /// if this isn't a behavior conformance.
   AbstractStorageDecl *getBehaviorDecl() const {
     return ContextAndInvalid.getPointer().dyn_cast<AbstractStorageDecl *>();
   }
-  
+
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
@@ -423,11 +479,13 @@ public:
 
   /// Retrieve the value witness corresponding to the given requirement.
   Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
+  ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement,
+                                    LazyResolver *resolver) const;
 
   /// Determine whether the protocol conformance has a witness for the given
   /// requirement.
   bool hasWitness(ValueDecl *requirement) const {
-    if (Resolver)
+    if (Loader)
       resolveLazyInfo();
     return Mapping.count(requirement) > 0;
   }
@@ -466,12 +524,24 @@ public:
   /// protocol, which line up with the conformance constraints in the
   /// protocol's requirement signature.
   ArrayRef<ProtocolConformanceRef> getSignatureConformances() const {
+    if (Loader)
+      resolveLazyInfo();
     return SignatureConformances;
   }
 
   /// Copy the given protocol conformances for the requirement signature into
   /// the normal conformance.
   void setSignatureConformances(ArrayRef<ProtocolConformanceRef> conformances);
+
+  /// Retrieves a function object that should be called with each of the
+  /// conformances required by the requirement signature.
+  ///
+  /// This can be used to iteratively build up the signature conformances in
+  /// the type checker (rather than emitting them in a batch via
+  /// \c setSignatureConformances). The callee is responsible for calling
+  /// the returned function object with protocol conformances that line up
+  /// with the conformance requirements in the requirement signature (in order).
+  std::function<void(ProtocolConformanceRef)> populateSignatureConformances();
 
   /// Determine whether the witness for the given type requirement
   /// is the default definition.
@@ -483,7 +553,7 @@ public:
     return false;
   }
 
-  void setLazyLoader(LazyMemberLoader *resolver, uint64_t contextData);
+  void setLazyLoader(LazyConformanceLoader *resolver, uint64_t contextData);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getProtocol(), getDeclContext());
@@ -529,6 +599,10 @@ class SpecializedProtocolConformance : public ProtocolConformance,
   /// generic conformance.
   mutable TypeWitnessMap TypeWitnesses;
 
+  /// Any conditional requirements, in substituted form. (E.g. given Foo<T>: Bar
+  /// where T: Bar, Foo<Baz<U>> will include Baz<U>: Bar.)
+  ArrayRef<Requirement> ConditionalRequirements;
+
   friend class ASTContext;
 
   SpecializedProtocolConformance(Type conformingType,
@@ -546,6 +620,15 @@ public:
   /// the generic conformance.
   SubstitutionList getGenericSubstitutions() const {
     return GenericSubstitutions;
+  }
+
+  /// Get the substitution map representing the substitutions used to produce
+  /// this specialized conformance.
+  SubstitutionMap getSubstitutionMap() const;
+
+  /// Get any requirements that must be satisfied for this conformance to apply.
+  ArrayRef<Requirement> getConditionalRequirements() const {
+    return ConditionalRequirements;
   }
 
   /// Get the protocol being conformed to.
@@ -580,6 +663,10 @@ public:
   ProtocolConformanceRef
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol,
                            LazyResolver *resolver = nullptr) const;
+
+  /// Retrieve the witness corresponding to the given value requirement.
+  ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement,
+                                    LazyResolver *resolver) const;
 
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
@@ -642,6 +729,11 @@ public:
     return InheritedConformance->getProtocol();
   }
 
+  /// Get any requirements that must be satisfied for this conformance to apply.
+  ArrayRef<Requirement> getConditionalRequirements() const {
+    return InheritedConformance->getConditionalRequirements();
+  }
+
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
   DeclContext *getDeclContext() const {
@@ -678,6 +770,10 @@ public:
   ProtocolConformanceRef
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol,
                            LazyResolver *resolver = nullptr) const;
+
+  /// Retrieve the witness corresponding to the given value requirement.
+  ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement,
+                                    LazyResolver *resolver) const;
 
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.

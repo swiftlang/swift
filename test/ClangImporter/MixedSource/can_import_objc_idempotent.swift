@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: cp -R %S/Inputs/mixed-target %t
 
 // FIXME: BEGIN -enable-source-import hackaround
@@ -13,7 +13,6 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/../Inputs/custom-modules -typecheck %s -verify
 
 // REQUIRES: objc_interop
-// REQUIRES: can_import
 
 // Test that 'canImport(Foo)' directives do not open symbols from 'Foo' into the
 // current module.  Only an 'import Foo' statement should do this.

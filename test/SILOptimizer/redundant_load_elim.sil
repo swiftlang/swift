@@ -306,13 +306,13 @@ sil @store_promotion : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
-  %2 = store %0 to %1a : $*B
+  store %0 to %1a : $*B
   %3 = load %1a : $*B
   %4 = load %1a : $*B
-  %5 = strong_retain %3 : $B
-  %6 = strong_retain %4 : $B
+  strong_retain %3 : $B
+  strong_retain %4 : $B
   %7 = tuple()
-  %8 = return %7 : $()
+  return %7 : $()
 }
 
 // CHECK-LABEL: sil @eliminate_duplicate_loads_over_noread_builtins
@@ -433,10 +433,10 @@ sil @store_loaded_value : $@convention(thin) (@inout Agg2, @inout Agg1) -> () {
 bb0(%0 : $*Agg2, %1 : $*Agg1):
   %2 = load %1 : $*Agg1
   %3 = load %0 : $*Agg2
-  %4 = store %2 to %1 : $*Agg1
-  %5 = store %3 to %0 : $*Agg2
+  store %2 to %1 : $*Agg1
+  store %3 to %0 : $*Agg2
   %6 = tuple()
-  %7 = return %6 : $()
+  return %6 : $()
 }
 
 // Check load forwarding across strong_release in case the stored memory does
@@ -1190,3 +1190,31 @@ bb2(%a : $*Int):
   dealloc_stack %4 : $*Int
   return %r : $Int
 } 
+
+// Make sure that the store is forwarded to the load, ie. the load is
+// eliminated. That's correct as the stored value can't be changed by the
+// callee as it's passed with @in_guaranteed.
+sil @test_rle_in_guaranteed_sink : $@convention(thin) (Int) -> ()
+sil @test_rle_in_guaranteed_callee : $@convention(thin) (@in_guaranteed Int) -> ()
+
+// CHECK-LABEL: sil @test_rle_in_guaranteed_entry
+sil @test_rle_in_guaranteed_entry : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %value_raw = integer_literal $Builtin.Int64, 42
+  // CHECK: [[VAL:%.*]] = struct $Int
+  %value = struct $Int (%value_raw : $Builtin.Int64)
+  store %value to %0 : $*Int
+
+  %f_callee = function_ref @test_rle_in_guaranteed_callee : $@convention(thin) (@in_guaranteed Int) -> ()
+  %r1 = apply %f_callee(%0) : $@convention(thin) (@in_guaranteed Int) -> ()
+
+  // CHECK-NOT: load
+  %value_again = load %0 : $*Int
+
+  %f_sink = function_ref @test_rle_in_guaranteed_sink : $@convention(thin) (Int) -> ()
+  // CHECK: ([[VAL]])
+  %r2 = apply %f_sink(%value_again) : $@convention(thin) (Int) -> ()
+
+  %3 = tuple()
+  return %3 : $()
+}

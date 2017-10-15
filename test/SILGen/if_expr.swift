@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func fizzbuzz(i: Int) -> String {
   return i % 3 == 0
@@ -31,7 +31,7 @@ func consumeAddressOnly(_: AddressOnly) {}
 
 // CHECK: sil hidden @_T07if_expr19addr_only_ternary_1{{[_0-9a-zA-Z]*}}F
 func addr_only_ternary_1(x: Bool) -> AddressOnly {
-  // CHECK: bb0([[RET:%.*]] : $*AddressOnly, {{.*}}):
+  // CHECK: bb0([[RET:%.*]] : @trivial $*AddressOnly, {{.*}}):
   // CHECK: [[a:%[0-9]+]] = alloc_box ${ var AddressOnly }, var, name "a"
   // CHECK: [[PBa:%.*]] = project_box [[a]]
   var a : AddressOnly = A()
@@ -49,4 +49,15 @@ func addr_only_ternary_1(x: Bool) -> AddressOnly {
   // CHECK:   copy_addr [[READb]] to [initialization] [[RET]]
   // CHECK:   br [[CONT]]
   return x ? a : b
+}
+
+// <rdar://problem/31595572> - crash when conditional expression is an
+// lvalue of IUO type
+
+// CHECK-LABEL: sil hidden @_T07if_expr18iuo_lvalue_ternarySiSQySbGz1x_tF : $@convention(thin) (@inout Optional<Bool>) -> Int
+// CHECK: [[IUO_BOOL_ADDR:%.*]] = begin_access [read] [unknown] %0 : $*Optional<Bool>
+// CHECK: [[IUO_BOOL:%.*]] = load [trivial] [[IUO_BOOL_ADDR]] : $*Optional<Bool>
+// CHECK: switch_enum [[IUO_BOOL]]
+func iuo_lvalue_ternary(x: inout Bool!) -> Int {
+  return x ? 1 : 0
 }

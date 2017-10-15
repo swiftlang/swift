@@ -22,6 +22,65 @@ let sequenceCount = 4096
 let prefixCount = sequenceCount - 1024
 let sumCount = prefixCount * (prefixCount - 1) / 2
 
+public let PrefixWhile = [
+  BenchmarkInfo(
+    name: "PrefixWhileCountableRange",
+    runFunction: run_PrefixWhileCountableRange,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileSequence",
+    runFunction: run_PrefixWhileSequence,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnySequence",
+    runFunction: run_PrefixWhileAnySequence,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnySeqCntRange",
+    runFunction: run_PrefixWhileAnySeqCntRange,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnySeqCRangeIter",
+    runFunction: run_PrefixWhileAnySeqCRangeIter,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnyCollection",
+    runFunction: run_PrefixWhileAnyCollection,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileArray",
+    runFunction: run_PrefixWhileArray,
+    tags: [.validation, .api, .Array]),
+  BenchmarkInfo(
+    name: "PrefixWhileCountableRangeLazy",
+    runFunction: run_PrefixWhileCountableRangeLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileSequenceLazy",
+    runFunction: run_PrefixWhileSequenceLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnySequenceLazy",
+    runFunction: run_PrefixWhileAnySequenceLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnySeqCntRangeLazy",
+    runFunction: run_PrefixWhileAnySeqCntRangeLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnySeqCRangeIterLazy",
+    runFunction: run_PrefixWhileAnySeqCRangeIterLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileAnyCollectionLazy",
+    runFunction: run_PrefixWhileAnyCollectionLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "PrefixWhileArrayLazy",
+    runFunction: run_PrefixWhileArrayLazy,
+    tags: [.validation, .api]),
+]
+
 @inline(never)
 public func run_PrefixWhileCountableRange(_ N: Int) {
   let s = 0..<sequenceCount
@@ -30,8 +89,7 @@ public func run_PrefixWhileCountableRange(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileCountableRange: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -42,8 +100,7 @@ public func run_PrefixWhileSequence(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileSequence: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -54,8 +111,7 @@ public func run_PrefixWhileAnySequence(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileAnySequence: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -66,8 +122,7 @@ public func run_PrefixWhileAnySeqCntRange(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileAnySeqCntRange: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -78,8 +133,7 @@ public func run_PrefixWhileAnySeqCRangeIter(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileAnySeqCRangeIter: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -90,8 +144,7 @@ public func run_PrefixWhileAnyCollection(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileAnyCollection: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -102,8 +155,7 @@ public func run_PrefixWhileArray(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileArray: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -114,8 +166,7 @@ public func run_PrefixWhileCountableRangeLazy(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileCountableRangeLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -126,8 +177,7 @@ public func run_PrefixWhileSequenceLazy(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileSequenceLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -138,8 +188,7 @@ public func run_PrefixWhileAnySequenceLazy(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileAnySequenceLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -150,8 +199,7 @@ public func run_PrefixWhileAnySeqCntRangeLazy(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileAnySeqCntRangeLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -162,8 +210,7 @@ public func run_PrefixWhileAnySeqCRangeIterLazy(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileAnySeqCRangeIterLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -174,8 +221,7 @@ public func run_PrefixWhileAnyCollectionLazy(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileAnyCollectionLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -186,7 +232,6 @@ public func run_PrefixWhileArrayLazy(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixWhileArrayLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }

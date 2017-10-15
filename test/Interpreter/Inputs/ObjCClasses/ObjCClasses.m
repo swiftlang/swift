@@ -10,6 +10,12 @@
 @synthesize t;
 @end
 
+@implementation HasHiddenIvars2
+@synthesize x;
+@synthesize y;
+@synthesize z;
+@end
+
 @implementation TestingNSError
 + (BOOL)throwNilError:(NSError **)error {
   return 0;
@@ -161,6 +167,27 @@ static unsigned counter = 0;
 
 - (void) shouldBeTrueCBool: (_Bool)value {
   assert(value);
+}
+
+@end
+
+@implementation OuterType
+
+- (id)init {
+  if ((self = [super init]) != nil) {
+  }
+  return self;
+}
+
+@end
+
+@implementation OuterTypeInnerType
+
+- (id)init {
+  if ((self = [super init]) != nil) {
+    self.things = [NSArray array];
+  }
+  return self;
 }
 
 @end

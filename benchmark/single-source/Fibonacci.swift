@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let Fibonacci = BenchmarkInfo(
+  name: "Fibonacci",
+  runFunction: run_Fibonacci,
+  tags: [.unstable, .algorithm])
+
 func fibonacci(_ n: Int) -> Int {
   if (n < 2) { return 1 }
   return fibonacci(n - 2) + fibonacci(n - 1)
@@ -38,6 +43,5 @@ public func run_Fibonacci(_ N: Int) {
       break
     }
   }
-  CheckResults(result == ref_result,
-               "Incorrect results in Fibonacci: \(result) != \(ref_result)")
+  CheckResults(result == ref_result)
 }

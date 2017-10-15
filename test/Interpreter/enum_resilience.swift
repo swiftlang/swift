@@ -1,13 +1,24 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c %S/../Inputs/resilient_struct.swift -o %t/resilient_struct.o
-// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c %S/../Inputs/resilient_struct.swift -o %t/resilient_struct.o
+// RUN: %target-build-swift-dylib(%t/libresilient_struct.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
+// RUN: %target-codesign %t/libresilient_struct.%target-dylib-extension
 
-// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c %S/../Inputs/resilient_enum.swift -I %t/ -o %t/resilient_enum.o
-// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c %S/../Inputs/resilient_enum.swift -I %t/ -o %t/resilient_enum.o
+// RUN: %target-build-swift-dylib(%t/libresilient_enum.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_enum.swift -emit-module -emit-module-path %t/resilient_enum.swiftmodule -module-name resilient_enum -I%t -L%t -lresilient_struct
+// RUN: %target-codesign %t/libresilient_enum.%target-dylib-extension
 
-// RUN: %target-build-swift %s -Xlinker %t/resilient_struct.o -Xlinker %t/resilient_enum.o -I %t -L %t -o %t/main
-// RUN: %target-run %t/main
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_enum -o %t/main -Xlinker -rpath -Xlinker %t
+
+// RUN: %target-run %t/main %t/libresilient_struct.%target-dylib-extension %t/libresilient_enum.%target-dylib-extension
+
+// RUN: %target-build-swift-dylib(%t/libresilient_struct_wmo.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
+// RUN: %target-codesign %t/libresilient_struct_wmo.%target-dylib-extension
+
+// RUN: %target-build-swift-dylib(%t/libresilient_enum_wmo.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_enum.swift -emit-module -emit-module-path %t/resilient_enum.swiftmodule -module-name resilient_enum -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
+// RUN: %target-codesign %t/libresilient_enum_wmo.%target-dylib-extension
+
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct_wmo -lresilient_enum_wmo -o %t/main -Xlinker -rpath -Xlinker %t
+
+// RUN: %target-run %t/main %t/libresilient_struct_wmo.%target-dylib-extension %t/libresilient_enum_wmo.%target-dylib-extension
 
 // REQUIRES: executable_test
 

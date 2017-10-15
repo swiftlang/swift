@@ -68,7 +68,7 @@
 /// -----------------
 ///
 /// To safely access the properties and methods of a wrapped instance, use the
-/// postfix optional chaining operator (`?`). The following example uses
+/// postfix optional chaining operator (postfix `?`). The following example uses
 /// optional chaining to access the `hasSuffix(_:)` method on a `String?`
 /// instance.
 ///
@@ -133,6 +133,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   case some(Wrapped)
 
   /// Creates an instance that stores the given value.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ some: Wrapped) { self = .some(some) }
 
@@ -178,11 +179,11 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///
   ///     let possibleNumber: Int? = Int("42")
   ///     let nonOverflowingSquare = possibleNumber.flatMap { x -> Int? in
-  ///         let (result, overflowed) = Int.multiplyWithOverflow(x, x)
+  ///         let (result, overflowed) = x.multipliedReportingOverflow(by: x)
   ///         return overflowed ? nil : result
   ///     }
   ///     print(nonOverflowingSquare)
-  ///     // Prints "Optional(1746)"
+  ///     // Prints "Optional(1764)"
   ///
   /// - Parameter transform: A closure that takes the unwrapped value
   ///   of the instance.  
@@ -209,6 +210,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///
   /// In this example, the assignment to the `i` variable calls this
   /// initializer behind the scenes.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(nilLiteral: ()) {
     self = .none
@@ -267,6 +269,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
 
 extension Optional : CustomDebugStringConvertible {
   /// A textual representation of this instance, suitable for debugging.
+  @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     switch self {
     case .some(let value):
@@ -281,6 +284,7 @@ extension Optional : CustomDebugStringConvertible {
 }
 
 extension Optional : CustomReflectable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     switch self {
     case .some(let value):
@@ -294,6 +298,7 @@ extension Optional : CustomReflectable {
   }
 }
 
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public // COMPILER_INTRINSIC
 func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
@@ -301,7 +306,7 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
                                     _filenameIsASCII: Builtin.Int1,
                                     _line: Builtin.Word) {
   _preconditionFailure(
-    "unexpectedly found nil while unwrapping an Optional value",
+    "Unexpectedly found nil while unwrapping an Optional value",
     file: StaticString(_start: _filenameStart,
                        utf8CodeUnitCount: _filenameLength,
                        isASCII: _filenameIsASCII),
@@ -407,6 +412,7 @@ public func != <T : Equatable>(lhs: T?, rhs: T?) -> Bool {
 @_fixed_layout
 public struct _OptionalNilComparisonType : ExpressibleByNilLiteral {
   /// Create an instance initialized with `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(nilLiteral: ()) {
   }
@@ -442,6 +448,7 @@ public struct _OptionalNilComparisonType : ExpressibleByNilLiteral {
 /// - Parameters:
 ///   - lhs: A `nil` literal.
 ///   - rhs: A value to match against `nil`.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
@@ -476,6 +483,7 @@ public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 /// - Parameters:
 ///   - lhs: A value to compare to `nil`.
 ///   - rhs: A `nil` literal.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
@@ -507,6 +515,7 @@ public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
 /// - Parameters:
 ///   - lhs: A value to compare to `nil`.
 ///   - rhs: A `nil` literal.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
@@ -538,6 +547,7 @@ public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
 /// - Parameters:
 ///   - lhs: A `nil` literal.
 ///   - rhs: A value to compare to `nil`.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
@@ -569,6 +579,7 @@ public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 /// - Parameters:
 ///   - lhs: A `nil` literal.
 ///   - rhs: A value to compare to `nil`.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
@@ -611,6 +622,7 @@ public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 ///   - optional: An optional value.
 ///   - defaultValue: A value to use as a default. `defaultValue` is the same
 ///     type as the `Wrapped` type of `optional`.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
     rethrows -> T {
@@ -664,6 +676,7 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
 ///   - optional: An optional value.
 ///   - defaultValue: A value to use as a default. `defaultValue` and
 ///     `optional` have the same type.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
     rethrows -> T? {
@@ -675,19 +688,6 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
   }
 }
 
-extension Optional {
-
-  @available(*, unavailable, renamed: "none")
-  public static var None: Optional<Wrapped> {
-    return .none
-  }
-  @available(*, unavailable, renamed: "some")
-  public static func Some(_ x: Wrapped) -> Optional<Wrapped> {
-    return .some(x)
-  }
-
-}
-
 //===----------------------------------------------------------------------===//
 // Bridging
 //===----------------------------------------------------------------------===//
@@ -695,11 +695,14 @@ extension Optional {
 #if _runtime(_ObjC)
 extension Optional : _ObjectiveCBridgeable {
   // The object that represents `none` for an Optional of this type.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static var _nilSentinel : AnyObject {
     @_silgen_name("_swift_Foundation_getOptionalNilSentinelObject")
     get
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func _bridgeToObjectiveC() -> AnyObject {
     // Bridge a wrapped value by unwrapping.
     if let value = self {
@@ -709,6 +712,7 @@ extension Optional : _ObjectiveCBridgeable {
     return type(of: self)._nilSentinel
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static func _forceBridgeFromObjectiveC(
     _ source: AnyObject,
     result: inout Optional<Wrapped>?
@@ -726,6 +730,7 @@ extension Optional : _ObjectiveCBridgeable {
     result = .some(.some(unwrappedResult))
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static func _conditionallyBridgeFromObjectiveC(
     _ source: AnyObject,
     result: inout Optional<Wrapped>?
@@ -749,6 +754,7 @@ extension Optional : _ObjectiveCBridgeable {
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public static func _unconditionallyBridgeFromObjectiveC(_ source: AnyObject?)
       -> Optional<Wrapped> {
     if let nonnullSource = source {

@@ -72,14 +72,6 @@ lookupTypeWitness(const std::string &MangledTypeName,
 }
 
 const TypeRef * TypeRefBuilder::
-lookupSuperclass(const std::string &MangledTypeName) {
-  // Superclasses are recorded as a special associated type named 'super'
-  // on the 'AnyObject' protocol.
-  return lookupTypeWitness(MangledTypeName, "super",
-                           ProtocolTypeRef::create(*this, "s9AnyObject_p"));
-}
-
-const TypeRef * TypeRefBuilder::
 lookupSuperclass(const TypeRef *TR) {
   auto *FD = getFieldTypeInfo(TR);
   if (FD == nullptr)

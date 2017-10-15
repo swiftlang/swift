@@ -14,6 +14,11 @@
 // rdar://problem/19804127
 import TestsUtils
 
+public let DictionaryRemove = [
+  BenchmarkInfo(name: "DictionaryRemove", runFunction: run_DictionaryRemove, tags: [.validation, .api, .Dictionary]),
+  BenchmarkInfo(name: "DictionaryRemoveOfObjects", runFunction: run_DictionaryRemoveOfObjects, tags: [.validation, .api, .Dictionary]),
+]
+
 @inline(never)
 public func run_DictionaryRemove(_ N: Int) {
     let size = 100
@@ -23,8 +28,7 @@ public func run_DictionaryRemove(_ N: Int) {
     for i in 1...size {
         dict[i] = i
     }
-    CheckResults(dict.count == size,
-                 "Incorrect dict count: \(dict.count) != \(size).")
+    CheckResults(dict.count == size)
 
     var tmpDict = dict
     for _ in 1...1000*N {
@@ -38,8 +42,7 @@ public func run_DictionaryRemove(_ N: Int) {
         }
     }
 
-    CheckResults(tmpDict.isEmpty,
-                 "tmpDict should be empty: \(tmpDict.count) != 0.")
+    CheckResults(tmpDict.isEmpty)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -67,8 +70,7 @@ public func run_DictionaryRemoveOfObjects(_ N: Int) {
     for i in 1...size {
         dict[Box(i)] = Box(i)
     }
-    CheckResults(dict.count == size,
-                 "Incorrect dict count: \(dict.count) != \(size).")
+    CheckResults(dict.count == size)
 
     var tmpDict = dict
     for _ in 1...1000*N {
@@ -82,6 +84,5 @@ public func run_DictionaryRemoveOfObjects(_ N: Int) {
         }
     }
 
-    CheckResults(tmpDict.isEmpty,
-                 "tmpDict should be empty: \(tmpDict.count) != 0.")
+    CheckResults(tmpDict.isEmpty)
 }

@@ -12,10 +12,10 @@ func basicTests() -> Int {
   return y
 }
 
-func mutableParameter(_ a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-error {{parameters may not have the 'var' specifier}}
-  i += 1
+func mutableParameter(_ a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-error {{'var' as a parameter attribute is not allowed}}
+  i += 1 // expected-error {{left side of mutating operator isn't mutable: 'i' is a 'let' constant}}
   var j = j
-  swap(&i, &j)
+  swap(&i, &j) // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
   return i+g
 }
 
@@ -197,7 +197,7 @@ func testFixitsInStatementsWithPatterns(_ a : Int?) {
     _ = b2
   }
   
-  for var b in [42] {   // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{7-10=let}}
+  for var b in [42] { // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{7-11=}}
     _ = b
   }
 
@@ -273,4 +273,35 @@ for i in 0..<10 { // expected-warning {{immutable value 'i' was never used; cons
 func sr2421() {
   let x: Int // expected-warning {{immutable value 'x' was never used; consider removing it}}
   x = 42
+}
+
+// Tests fix to SR-964
+func sr964() {
+  var noOpSetter: String {
+    get { return "" }
+    set { } // No warning
+  }
+  var suspiciousSetter: String {
+    get { return "" }
+    set {
+      print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{13-29=newValue}}
+    }
+  }
+  var namedSuspiciousSetter: String {
+    get { return "" }
+    set(parameter) {
+      print(namedSuspiciousSetter) // expected-warning {{setter argument 'parameter' was never used, but the property was accessed}} expected-note {{did you mean to use 'parameter' instead of accessing the property's current value?}} {{13-34=parameter}}
+    }
+  }
+  var okSetter: String {
+    get { return "" }
+    set { print(newValue) } // No warning
+  }
+  var multiTriggerSetter: String {
+    get { return "" }
+    set {
+      print(multiTriggerSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{13-31=newValue}}
+      print(multiTriggerSetter)
+    }
+  }
 }

@@ -258,8 +258,10 @@ public:
   /// True if the type, or the referenced type of an address type, is trivial.
   bool isTrivial(SILModule &M) const;
 
-  /// True if the type, or the referenced type of an address type, is a
-  /// scalar reference-counted type.
+  /// True if the type, or the referenced type of an address type, is known to
+  /// be a scalar reference-counted type. If this is false, then some part of
+  /// the type may be opaque. It may become reference counted later after
+  /// specialization.
   bool isReferenceCounted(SILModule &M) const;
 
   /// Returns true if the referenced type is a function type that never
@@ -426,6 +428,12 @@ public:
                                                         Ty.getSwiftRValueType());
   }
 
+  /// Look through reference-storage types on this type.
+  SILType getReferenceStorageReferentType() const {
+    return SILType(getSwiftRValueType().getReferenceStorageReferent(),
+                   getCategory());
+  }
+
   /// Transform the function type SILType by replacing all of its interface
   /// generic args with the appropriate item from the substitution.
   ///
@@ -496,6 +504,10 @@ public:
   bool hasAbstractionDifference(SILFunctionTypeRepresentation rep,
                                 SILType type2);
 
+  /// Returns true if this SILType could be potentially a lowering of the given
+  /// formal type. Meant for verification purposes/assertions.
+  bool isLoweringOf(SILModule &M, CanType formalType);
+
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(*this);
@@ -561,10 +573,9 @@ NON_SIL_TYPE(LValue)
 #undef NON_SIL_TYPE
 
 CanSILFunctionType getNativeSILFunctionType(SILModule &M,
-                        Lowering::AbstractionPattern orig,
-                        CanAnyFunctionType substInterface,
-                        Optional<SILDeclRef> constant = None,
-                        SILDeclRef::Kind kind = SILDeclRef::Kind::Func);
+                        Lowering::AbstractionPattern origType,
+                        CanAnyFunctionType substType,
+                        Optional<SILDeclRef> constant = None);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);

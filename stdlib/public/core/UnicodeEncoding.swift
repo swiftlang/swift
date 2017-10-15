@@ -18,18 +18,39 @@ public protocol _UnicodeEncoding {
   associatedtype EncodedScalar : BidirectionalCollection
     where EncodedScalar.Iterator.Element == CodeUnit
 
-  /// The replacement character U+FFFD as represented in this encoding
+  /// A unicode scalar value to be used when repairing
+  /// encoding/decoding errors, as represented in this encoding.
+  ///
+  /// If the Unicode replacement character U+FFFD is representable in this
+  /// encoding, `encodedReplacementCharacter` encodes that scalar value.
   static var encodedReplacementCharacter : EncodedScalar { get }
 
   /// Converts from encoded to encoding-independent representation
-  static func decode(_ content: EncodedScalar) -> UnicodeScalar
+  static func decode(_ content: EncodedScalar) -> Unicode.Scalar
 
-  /// Converts from encoding-independent to encoded representation
-  static func encode(_ content: UnicodeScalar) -> EncodedScalar
+  /// Converts from encoding-independent to encoded representation, returning
+  /// `nil` if the scalar can't be represented in this encoding.
+  static func encode(_ content: Unicode.Scalar) -> EncodedScalar?
 
-  associatedtype ForwardParser : UnicodeParser
-  associatedtype ReverseParser : UnicodeParser
+  /// Converts a scalar from another encoding's representation, returning
+  /// `nil` if the scalar can't be represented in this encoding.
+  ///
+  /// A default implementation of this method will be provided 
+  /// automatically for any conforming type that does not implement one.
+  static func transcode<FromEncoding : Unicode.Encoding>(
+    _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
+  ) -> EncodedScalar?
+
+  /// A type that can be used to parse `CodeUnits` into
+  /// `EncodedScalar`s.
+  associatedtype ForwardParser : Unicode.Parser
+    where ForwardParser.Encoding == Self
   
+  /// A type that can be used to parse a reversed sequence of
+  /// `CodeUnits` into `EncodedScalar`s.
+  associatedtype ReverseParser : Unicode.Parser
+    where ReverseParser.Encoding == Self
+
   //===--------------------------------------------------------------------===//
   // FIXME: this requirement shouldn't be here and is mitigated by the default
   // implementation below.  Compiler bugs prevent it from being expressed in an
@@ -41,9 +62,58 @@ public protocol _UnicodeEncoding {
 
 extension _UnicodeEncoding {
   // See note on declaration of requirement, above
+  @_inlineable // FIXME(sil-serialize-all)
   public static func _isScalar(_ x: CodeUnit) -> Bool { return false }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func transcode<FromEncoding : Unicode.Encoding>(
+    _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
+  ) -> EncodedScalar? {
+    return encode(FromEncoding.decode(content))
+  }
+
+  /// Converts from encoding-independent to encoded representation, returning
+  /// `encodedReplacementCharacter` if the scalar can't be represented in this
+  /// encoding.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal static func _encode(_ content: Unicode.Scalar) -> EncodedScalar {
+    return encode(content) ?? encodedReplacementCharacter
+  }
+
+  /// Converts a scalar from another encoding's representation, returning
+  /// `encodedReplacementCharacter` if the scalar can't be represented in this
+  /// encoding.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal static func _transcode<FromEncoding : Unicode.Encoding>(
+    _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
+  ) -> EncodedScalar {
+    return transcode(content, from: FromEncoding.self)
+      ?? encodedReplacementCharacter
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal static func _transcode<
+  Source: Sequence, SourceEncoding: Unicode.Encoding>(
+    _ source: Source,
+    from sourceEncoding: SourceEncoding.Type,
+    into processScalar: (EncodedScalar)->Void)
+  where Source.Element == SourceEncoding.CodeUnit {
+    var p = SourceEncoding.ForwardParser()
+    var i = source.makeIterator()
+    while true {
+      switch p.parseScalar(from: &i) {
+      case .valid(let e): processScalar(_transcode(e, from: sourceEncoding))
+      case .error(_): processScalar(encodedReplacementCharacter)
+      case .emptyInput: return
+      }
+    }
+  }
 }
 
-public protocol UnicodeEncoding : _UnicodeEncoding
-where ForwardParser.Encoding == Self, ReverseParser.Encoding == Self {}
+extension Unicode {
+  public typealias Encoding = _UnicodeEncoding
+}
 

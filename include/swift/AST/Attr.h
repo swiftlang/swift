@@ -44,6 +44,7 @@ struct PrintOptions;
 class Decl;
 class ClassDecl;
 class GenericFunctionType;
+class LazyConformanceLoader;
 class TrailingWhereClause;
 
 /// TypeAttributes - These are attributes that may be applied to types.
@@ -206,29 +207,19 @@ protected:
   enum { NumObjCAttrBits = NumDeclAttrBits + 3 };
   static_assert(NumObjCAttrBits <= 32, "fits in an unsigned");
 
-  class AccessibilityAttrBitFields {
-    friend class AbstractAccessibilityAttr;
+  class AccessControlAttrBitFields {
+    friend class AbstractAccessControlAttr;
     unsigned : NumDeclAttrBits;
 
     unsigned AccessLevel : 3;
   };
-  enum { NumAccessibilityAttrBits = NumDeclAttrBits + 3 };
-  static_assert(NumAccessibilityAttrBits <= 32, "fits in an unsigned");
-
-  class AutoClosureAttrBitFields {
-    friend class AutoClosureAttr;
-    unsigned : NumDeclAttrBits;
-
-    unsigned Escaping : 1;
-  };
-  enum { NumAutoClosureAttrBits = NumDeclAttrBits + 1 };
-  static_assert(NumAutoClosureAttrBits <= 32, "fits in an unsigned");
+  enum { NumAccessControlAttrBits = NumDeclAttrBits + 3 };
+  static_assert(NumAccessControlAttrBits <= 32, "fits in an unsigned");
 
   union {
     DeclAttrBitFields DeclAttrBits;
     ObjCAttrBitFields ObjCAttrBits;
-    AccessibilityAttrBitFields AccessibilityAttrBits;
-    AutoClosureAttrBitFields AutoClosureAttrBits;
+    AccessControlAttrBitFields AccessControlAttrBits;
   };
 
   DeclAttribute *Next = nullptr;
@@ -298,6 +289,9 @@ public:
     OnAssociatedType   = 1 << 29,
     OnParam            = 1 << 30,
     OnModule           = 1 << 31,
+
+    // Cannot have any attributes.
+    OnMissingMember = 0,
 
     // More coarse-grained aggregations for use in Attr.def.
     OnOperator = OnInfixOperator|OnPrefixOperator|OnPostfixOperator,
@@ -865,69 +859,51 @@ public:
   }
 };
 
-/// Represents any sort of accessibility modifier.
-class AbstractAccessibilityAttr : public DeclAttribute {
+/// Represents any sort of access control modifier.
+class AbstractAccessControlAttr : public DeclAttribute {
 protected:
-  AbstractAccessibilityAttr(DeclAttrKind DK, SourceLoc atLoc, SourceRange range,
-                            Accessibility access, bool implicit)
+  AbstractAccessControlAttr(DeclAttrKind DK, SourceLoc atLoc, SourceRange range,
+                            AccessLevel access, bool implicit)
       : DeclAttribute(DK, atLoc, range, implicit) {
-    AccessibilityAttrBits.AccessLevel = static_cast<unsigned>(access);
-    assert(getAccess() == access && "not enough bits for accessibility");
+    AccessControlAttrBits.AccessLevel = static_cast<unsigned>(access);
+    assert(getAccess() == access && "not enough bits for access control");
   }
 
 public:
-  Accessibility getAccess() const {
-    return static_cast<Accessibility>(AccessibilityAttrBits.AccessLevel);
+  AccessLevel getAccess() const {
+    return static_cast<AccessLevel>(AccessControlAttrBits.AccessLevel);
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Accessibility ||
-           DA->getKind() == DAK_SetterAccessibility;
+    return DA->getKind() == DAK_AccessControl ||
+           DA->getKind() == DAK_SetterAccess;
   }
 };
 
 /// Represents a 'private', 'internal', or 'public' marker on a declaration.
-class AccessibilityAttr : public AbstractAccessibilityAttr {
+class AccessControlAttr : public AbstractAccessControlAttr {
 public:
-  AccessibilityAttr(SourceLoc atLoc, SourceRange range, Accessibility access,
+  AccessControlAttr(SourceLoc atLoc, SourceRange range, AccessLevel access,
                     bool implicit = false)
-      : AbstractAccessibilityAttr(DAK_Accessibility, atLoc, range, access,
+      : AbstractAccessControlAttr(DAK_AccessControl, atLoc, range, access,
                                   implicit) {}
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Accessibility;
+    return DA->getKind() == DAK_AccessControl;
   }
 };
 
 /// Represents a 'private', 'internal', or 'public' marker for a setter on a
 /// declaration.
-class SetterAccessibilityAttr : public AbstractAccessibilityAttr {
+class SetterAccessAttr : public AbstractAccessControlAttr {
 public:
-  SetterAccessibilityAttr(SourceLoc atLoc, SourceRange range,
-                          Accessibility access, bool implicit = false)
-      : AbstractAccessibilityAttr(DAK_SetterAccessibility, atLoc, range, access,
+  SetterAccessAttr(SourceLoc atLoc, SourceRange range,
+                          AccessLevel access, bool implicit = false)
+      : AbstractAccessControlAttr(DAK_SetterAccess, atLoc, range, access,
                                   implicit) {}
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_SetterAccessibility;
-  }
-};
-
-/// Represents the autoclosure attribute.
-class AutoClosureAttr : public DeclAttribute {
-public:
-  AutoClosureAttr(SourceLoc atLoc, SourceRange range, bool escaping,
-                  bool implicit = false)
-    : DeclAttribute(DAK_AutoClosure, atLoc, range, implicit)
-  {
-    AutoClosureAttrBits.Escaping = escaping;
-  }
-
-  /// Determine whether this autoclosure is escaping.
-  bool isEscaping() const { return AutoClosureAttrBits.Escaping; }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_AutoClosure;
+    return DA->getKind() == DAK_SetterAccess;
   }
 };
 
@@ -1041,18 +1017,24 @@ public:
 /// synthesized conformances.
 class SynthesizedProtocolAttr : public DeclAttribute {
   KnownProtocolKind ProtocolKind;
+  LazyConformanceLoader *Loader;
 
 public:
-  SynthesizedProtocolAttr(KnownProtocolKind protocolKind)
+  SynthesizedProtocolAttr(KnownProtocolKind protocolKind,
+                          LazyConformanceLoader *Loader)
     : DeclAttribute(DAK_SynthesizedProtocol, SourceLoc(), SourceRange(),
                     /*Implicit=*/true),
-      ProtocolKind(protocolKind)
+      ProtocolKind(protocolKind), Loader(Loader)
   {
   }
 
   /// Retrieve the known protocol kind naming the protocol to be
   /// synthesized.
   KnownProtocolKind getProtocolKind() const { return ProtocolKind; }
+
+  /// Retrieve the lazy loader that will be used to populate the
+  /// synthesized conformance.
+  LazyConformanceLoader *getLazyLoader() const { return Loader; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SynthesizedProtocol;
@@ -1158,21 +1140,43 @@ public:
   }
 };
 
-/// Defines the @NSKeyedArchiveLegacyAttr attribute.
-class NSKeyedArchiveLegacyAttr : public DeclAttribute {
+/// A limited variant of \c @objc that's used for classes with generic ancestry.
+class ObjCRuntimeNameAttr : public DeclAttribute {
+  static StringRef getSimpleName(const ObjCAttr &Original) {
+    assert(Original.hasName());
+    return Original.getName()->getSimpleName().str();
+  }
 public:
-  NSKeyedArchiveLegacyAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
-    : DeclAttribute(DAK_NSKeyedArchiveLegacy, AtLoc, Range, Implicit),
+  ObjCRuntimeNameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range,
+                      bool Implicit)
+    : DeclAttribute(DAK_ObjCRuntimeName, AtLoc, Range, Implicit),
       Name(Name) {}
 
-  NSKeyedArchiveLegacyAttr(StringRef Name, bool Implicit)
-    : NSKeyedArchiveLegacyAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+  explicit ObjCRuntimeNameAttr(const ObjCAttr &Original)
+    : ObjCRuntimeNameAttr(getSimpleName(Original), Original.AtLoc,
+                          Original.Range, Original.isImplicit()) {}
 
-  /// The legacy mangled name.
   const StringRef Name;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_NSKeyedArchiveLegacy;
+    return DA->getKind() == DAK_ObjCRuntimeName;
+  }
+};
+
+/// Attribute that specifies a protocol conformance that has been restated
+/// (i.e., is redundant) but should still be emitted in Objective-C metadata.
+class RestatedObjCConformanceAttr : public DeclAttribute {
+public:
+  explicit RestatedObjCConformanceAttr(ProtocolDecl *proto)
+    : DeclAttribute(DAK_RestatedObjCConformance, SourceLoc(), SourceRange(),
+                    /*Implicit=*/true),
+      Proto(proto) {}
+
+  /// The protocol to which this type conforms.
+  ProtocolDecl * const Proto;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_RestatedObjCConformance;
   }
 };
 

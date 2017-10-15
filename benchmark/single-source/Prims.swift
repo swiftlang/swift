@@ -22,6 +22,11 @@
 // update the heap fast when we add a new node to the tree.
 import TestsUtils
 
+public let Prims = BenchmarkInfo(
+  name: "Prims",
+  runFunction: run_Prims,
+  tags: [.validation, .algorithm])
+
 class PriorityQueue {
   final var heap: Array<EdgeCost>
   final var graphIndexToHeapIndexMap: Array<Int?>
@@ -751,7 +756,6 @@ public func run_Prims(_ N: Int) {
     for i in 1..<treeEdges.count {
       if let n = treeEdges[i] { cost += map[Edge(start: n, end: i)]! }
     }
-    CheckResults(Int(cost) == 49324,
-                 "Incorrect results in Prims: \(Int(cost)) != 49324.")
+    CheckResults(Int(cost) == 49324)
   }
 }

@@ -174,8 +174,6 @@ public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
 /// bound by floating-point values, see the `ClosedRange` type. If you need to
 /// iterate over consecutive floating-point values, see the
 /// `stride(from:through:by:)` function.
-///
-/// - SeeAlso: `CountableRange`, `ClosedRange`, `Range`
 @_fixed_layout
 public struct CountableClosedRange<Bound> : RandomAccessCollection
   where
@@ -373,8 +371,6 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
 ///     let lowercaseA = "a"..."a"
 ///     print(lowercaseA.isEmpty)
 ///     // Prints "false"
-///
-/// - SeeAlso: `CountableRange`, `Range`, `CountableClosedRange`
 @_fixed_layout
 public struct ClosedRange<
   Bound : Comparable
@@ -438,6 +434,7 @@ public struct ClosedRange<
 /// - Parameters:
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func ... <Bound>(minimum: Bound, maximum: Bound)
   -> ClosedRange<Bound> {
@@ -468,6 +465,7 @@ public func ... <Bound>(minimum: Bound, maximum: Bound)
 /// - Parameters:
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
+@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func ... <Bound>(
   minimum: Bound, maximum: Bound
@@ -476,16 +474,4 @@ public func ... <Bound>(
   _precondition(
     minimum <= maximum, "Can't form Range with upperBound < lowerBound")
   return CountableClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
-}
-
-extension ClosedRange {
-  @available(*, unavailable, renamed: "lowerBound")
-  public var startIndex: Bound {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "upperBound")
-  public var endIndex: Bound {
-    Builtin.unreachable()
-  }
 }

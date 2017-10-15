@@ -69,4 +69,10 @@ BOOL identityOfData(NSData *data);
 - (BOOL)verifyAutoupdatingLocale:(NSLocale *)locale;
 @end
 
+#pragma mark - NSNumber verification
+
+@interface NumberBridgingTester : NSObject
+- (BOOL)verifyKeysInRange:(NSRange)range existInDictionary:(NSDictionary *)dictionary;
+@end
+
 NS_ASSUME_NONNULL_END

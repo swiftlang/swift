@@ -241,10 +241,23 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
   MemBehavior Behavior = MemBehavior::None;
 
   // We can ignore mayTrap().
-  if (ApplyEffects.mayReadRC() ||
-      (InspectionMode == RetainObserveKind::ObserveRetains &&
-       ApplyEffects.mayAllocObjects())) {
-    Behavior = MemBehavior::MayHaveSideEffects;
+  bool any_in_guaranteed_params = false;
+  for (auto op : enumerate(AI->getArgumentOperands())) {
+    if (op.value().get() == V &&
+        AI->getSubstCalleeConv().getSILArgumentConvention(op.index()) == swift::SILArgumentConvention::Indirect_In_Guaranteed) {
+      any_in_guaranteed_params = true;
+      break;
+    }
+  }
+
+  if (any_in_guaranteed_params) {
+    // one the parameters in the function call is @in_guaranteed of V, ie. the
+    // callee isn't allowed to modify it.
+    Behavior = MemBehavior::MayRead;
+  } else if (ApplyEffects.mayReadRC() ||
+        (InspectionMode == RetainObserveKind::ObserveRetains &&
+         ApplyEffects.mayAllocObjects())) {
+      Behavior = MemBehavior::MayHaveSideEffects;
   } else {
     auto &GlobalEffects = ApplyEffects.getGlobalEffects();
     Behavior = GlobalEffects.getMemBehavior(InspectionMode);
@@ -265,6 +278,7 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
       }
     }
   }
+
   if (Behavior > MemBehavior::None) {
     if (Behavior > MemBehavior::MayRead && isLetPointer(V))
       Behavior = MemBehavior::MayRead;
@@ -308,8 +322,7 @@ MemBehavior MemoryBehaviorVisitor::visitSetDeallocatingInst(SetDeallocatingInst 
 MemBehavior
 AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V,
                                      RetainObserveKind InspectionMode) {
-  MemBehaviorKeyTy Key = toMemoryBehaviorKey(SILValue(Inst), V,
-                                             InspectionMode);
+  MemBehaviorKeyTy Key = toMemoryBehaviorKey(Inst, V, InspectionMode);
   // Check if we've already computed this result.
   auto It = MemoryBehaviorCache.find(Key);
   if (It != MemoryBehaviorCache.end()) {
@@ -319,10 +332,10 @@ AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V,
   // Flush the cache if the size of the cache is too large.
   if (MemoryBehaviorCache.size() > MemoryBehaviorAnalysisMaxCacheSize) {
     MemoryBehaviorCache.clear();
-    MemoryBehaviorValueBaseToIndex.clear();
+    MemoryBehaviorNodeToIndex.clear();
 
-    // Key is no longer valid as we cleared the MemoryBehaviorValueBaseToIndex.
-    Key = toMemoryBehaviorKey(SILValue(Inst), V, InspectionMode);
+    // Key is no longer valid as we cleared the MemoryBehaviorNodeToIndex.
+    Key = toMemoryBehaviorKey(Inst, V, InspectionMode);
   }
 
   // Calculate the aliasing result and store it in the cache.
@@ -340,12 +353,15 @@ AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V,
   return MemoryBehaviorVisitor(this, SEA, EA, V, InspectionMode).visit(Inst);
 }
 
-MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILValue V1, SILValue V2,
+MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILInstruction *V1,
+                                                    SILValue V2,
                                                     RetainObserveKind M) {
-  size_t idx1 = MemoryBehaviorValueBaseToIndex.getIndex(V1);
+  size_t idx1 =
+    MemoryBehaviorNodeToIndex.getIndex(V1->getCanonicalSILNodeInObject());
   assert(idx1 != std::numeric_limits<size_t>::max() &&
          "~0 index reserved for empty/tombstone keys");
-  size_t idx2 = MemoryBehaviorValueBaseToIndex.getIndex(V2);
+  size_t idx2 =
+    MemoryBehaviorNodeToIndex.getIndex(V2->getCanonicalSILNodeInObject());
   assert(idx2 != std::numeric_limits<size_t>::max() &&
          "~0 index reserved for empty/tombstone keys");
   return {idx1, idx2, M};

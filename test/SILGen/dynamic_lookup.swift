@@ -27,7 +27,8 @@ func direct_to_class(_ obj: AnyObject) {
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[BORROWED_ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK: [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
-  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign : (X) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK: [[BORROWED_OPENED_ARG_COPY:%.*]] = begin_borrow [[OPENED_ARG_COPY]]
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[BORROWED_OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign : (X) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: apply [[METHOD]]([[OPENED_ARG_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: destroy_value [[OPENED_ARG_COPY]]
   // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -42,7 +43,8 @@ func direct_to_protocol(_ obj: AnyObject) {
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[BORROWED_ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK:   [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
-  // CHECK:   [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <Self where Self : P> (Self) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK:   [[BORROWED_OPENED_ARG_COPY:%.*]] = begin_borrow [[OPENED_ARG_COPY]]
+  // CHECK:   [[METHOD:%[0-9]+]] = objc_method [[BORROWED_OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <Self where Self : P> (Self) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK:   apply [[METHOD]]([[OPENED_ARG_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK:   destroy_value [[OPENED_ARG_COPY]]
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -62,11 +64,11 @@ func direct_to_static_method(_ obj: AnyObject) {
   // CHECK: store [[ARG_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
-  // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load_borrow [[READ]] : $*AnyObject
+  // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK: end_access [[READ]]
   // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened([[UUID:".*"]]) AnyObject).Type
-  // CHECK-NEXT: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OPENMETA]] : $@thick (@opened([[UUID]]) AnyObject).Type, #X.staticF!1.foreign : (X.Type) -> () -> (), $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
+  // CHECK-NEXT: [[METHOD:%[0-9]+]] = objc_method [[OPENMETA]] : $@thick (@opened([[UUID]]) AnyObject).Type, #X.staticF!1.foreign : (X.Type) -> () -> (), $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
   // CHECK: apply [[METHOD]]([[OPENMETA]]) : $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
   // CHECK: destroy_value [[OBJBOX]]
   // CHECK: destroy_value [[ARG]]
@@ -141,7 +143,7 @@ func opt_to_static_method(_ obj: AnyObject) {
   // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_owned () -> ()> }
   // CHECK:   [[PBO:%.*]] = project_box [[OPTBOX]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
-  // CHECK:   [[OBJCOPY:%[0-9]+]] = load_borrow [[READ]] : $*AnyObject
+  // CHECK:   [[OBJCOPY:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK:   [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened
   // CHECK:   [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]

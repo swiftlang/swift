@@ -75,3 +75,8 @@ typedef int NameInCategory;
 @interface ClassThatHasAProtocolTypedPropertyButMembersAreNeverLoaded
 @property (weak) id <ForwardProtoFromOtherFile> weakProtoProp;
 @end
+
+
+@interface GenericObjCClass<Param : id <ForwardProto>> : Base
+- (instancetype)init;
+@end

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck %s
 
@@ -120,8 +120,8 @@ func objc_enum_switch(_ x: ExportedToObjC) -> Int {
   // CHECK: define internal i64 @_T012objc_ns_enum15ObjCEnumMethodsC0C3OutAA010ExportedToD1COyFTo([[OBJC_ENUM_METHODS]]*, i8*)
   dynamic func enumOut() -> ExportedToObjC { return .Foo }
 
-  // CHECK: define internal i64 @_T012objc_ns_enum15ObjCEnumMethodsC4propAA010ExportedToD1COfgTo([[OBJC_ENUM_METHODS]]*, i8*)
-  // CHECK: define internal void @_T012objc_ns_enum15ObjCEnumMethodsC4propAA010ExportedToD1COfsTo([[OBJC_ENUM_METHODS]]*, i8*, i64)
+  // CHECK: define internal i64 @_T012objc_ns_enum15ObjCEnumMethodsC4propAA010ExportedToD1COvgTo([[OBJC_ENUM_METHODS]]*, i8*)
+  // CHECK: define internal void @_T012objc_ns_enum15ObjCEnumMethodsC4propAA010ExportedToD1COvsTo([[OBJC_ENUM_METHODS]]*, i8*, i64)
   dynamic var prop: ExportedToObjC = .Foo
 }
 

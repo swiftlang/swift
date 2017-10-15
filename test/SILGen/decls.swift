@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_T05decls11void_returnyyF
 // CHECK: = tuple
@@ -86,7 +86,7 @@ func tuple_patterns() {
 }
 
 // CHECK-LABEL: sil hidden @_T05decls16simple_arguments{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : $Int, %1 : $Int):
+// CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $Int):
 // CHECK: [[X:%[0-9]+]] = alloc_box ${ var Int }
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 // CHECK-NEXT: store %0 to [trivial] [[PBX]]
@@ -100,14 +100,14 @@ func simple_arguments(x: Int, y: Int) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_T05decls14tuple_argument{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : $Int, %1 : $Float):
+// CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $Float):
 // CHECK: [[UNIT:%[0-9]+]] = tuple ()
 // CHECK: [[TUPLE:%[0-9]+]] = tuple (%0 : $Int, %1 : $Float, [[UNIT]] : $())
 func tuple_argument(x: (Int, Float, ())) {
 }
 
 // CHECK-LABEL: sil hidden @_T05decls14inout_argument{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : $*Int, %1 : $Int):
+// CHECK: bb0(%0 : @trivial $*Int, %1 : @trivial $Int):
 // CHECK: [[X_LOCAL:%[0-9]+]] = alloc_box ${ var Int }
 // CHECK: [[PBX:%.*]] = project_box [[X_LOCAL]]
 func inout_argument(x: inout Int, y: Int) {
@@ -120,10 +120,11 @@ var global = 42
 // CHECK-LABEL: sil hidden @_T05decls16load_from_global{{[_0-9a-zA-Z]*}}F
 func load_from_global() -> Int {
   return global
-  // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_T05decls6globalSifau
+  // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_T05decls6globalSivau
   // CHECK: [[PTR:%[0-9]+]] = apply [[ACCESSOR]]()
   // CHECK: [[ADDR:%[0-9]+]] = pointer_to_address [[PTR]]
-  // CHECK: [[VALUE:%[0-9]+]] = load [trivial] [[ADDR]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*Int
+  // CHECK: [[VALUE:%[0-9]+]] = load [trivial] [[READ]]
   // CHECK: return [[VALUE]]
 }
 
@@ -133,12 +134,14 @@ func store_to_global(x: Int) {
   global = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PBX:%.*]] = project_box [[XADDR]]
-  // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_T05decls6globalSifau
+  // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_T05decls6globalSivau
   // CHECK: [[PTR:%[0-9]+]] = apply [[ACCESSOR]]()
   // CHECK: [[ADDR:%[0-9]+]] = pointer_to_address [[PTR]]
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PBX]] : $*Int
   // CHECK: [[COPY:%.*]] = load [trivial] [[READ]] : $*Int
-  // CHECK: assign [[COPY]] to [[ADDR]] : $*Int
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[ADDR]] : $*Int
+  // CHECK: assign [[COPY]] to [[WRITE]] : $*Int
+  // CHECK: end_access [[WRITE]] : $*Int
   // CHECK: return
 }
 
@@ -165,21 +168,30 @@ struct StructWithStaticVar {
   }
 }
 
-// <rdar://problem/17405715> lazy property crashes silgen of implicit memberwise initializer
-// CHECK-LABEL: // decls.StructWithLazyField.init
-// CHECK-NEXT: sil hidden @_T05decls19StructWithLazyFieldVACSiSg4once_tcfC : $@convention(method) (Optional<Int>, @thin StructWithLazyField.Type) -> @owned StructWithLazyField {
-struct StructWithLazyField {
-  lazy var once : Int = 42
-  let someProp = "Some value"
+// Make sure unbound method references on class hierarchies are
+// properly represented in the AST
+
+class Base {
+  func method1() -> Self { return self }
+  func method2() -> Self { return self }
 }
 
-// <rdar://problem/21057425> Crash while compiling attached test-app.
-// CHECK-LABEL: // decls.test21057425
-func test21057425() {
-  var x = 0, y: Int = 0
+class Derived : Base {
+  override func method2() -> Self { return self }
 }
 
-func useImplicitDecls() {
-  _ = StructWithLazyField(once: 55)
+func generic<T>(arg: T) { }
+
+func unboundMethodReferences() {
+  generic(arg: Derived.method1)
+  generic(arg: Derived.method2)
+
+  _ = type(of: Derived.method1)
+  _ = type(of: Derived.method2)
 }
 
+// CHECK-LABEL: sil_vtable EscapeKeywordsInDottedPaths
+class EscapeKeywordsInDottedPaths {
+  // CHECK: #EscapeKeywordsInDottedPaths.`switch`!getter.1
+  var `switch`: String = ""
+}

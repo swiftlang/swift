@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -enable-sil-ownership -disable-sil-linking -emit-sil -o - -verify | %FileCheck %s
+// RUN: %target-swift-frontend %s -enable-sil-ownership -disable-sil-linking -emit-sil -o - | %FileCheck %s
 
 // NOTE: We add -disable-sil-linking to the compile line to ensure that we have
 // access to declarations for standard library types, but not definitions. This

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/print_synthesized_extensions.swiftmodule -emit-module-doc -emit-module-doc-path %t/print_synthesized_extensions.swiftdoc %s
 // RUN: %target-swift-ide-test -print-module -annotate-print -synthesize-extension -print-interface -no-empty-line-between-members -module-to-print=print_synthesized_extensions -I %t -source-filename=%s > %t.syn.txt
 // RUN: %FileCheck %s -check-prefix=CHECK1 < %t.syn.txt
@@ -194,6 +194,12 @@ public extension P5 where T1 : Comparable {
   public func foo4() {}
 }
 
+public extension P5 where T1 : AnyObject {
+
+  /// This should not crash
+  public func foo5() {}
+}
+
 public extension P5 {
 
   /// This is not picked
@@ -303,6 +309,8 @@ extension S13 : P5 {
 // CHECK11-NEXT:    public func <loc>foo3()</loc></decl>
 // CHECK11-NEXT:  <decl:Func>/// This is picked
 // CHECK11-NEXT:    public func <loc>foo4()</loc></decl>
+// CHECK11-NEXT:  <decl:Func>/// This should not crash
+// CHECK11-NEXT:    public func <loc>foo5()</loc></decl>
 // CHECK11-NEXT: }</synthesized>
 
 // CHECK12:       <decl:Protocol>public protocol <loc>P6</loc> {
@@ -327,4 +335,6 @@ extension S13 : P5 {
 // CHECK14-NEXT:     public func <loc>foo3()</loc></decl>
 // CHECK14-NEXT: <decl:Func>/// This is picked
 // CHECK14-NEXT:     public func <loc>foo4()</loc></decl>
+// CHECK14-NEXT: <decl:Func>/// This should not crash
+// CHECK14-NEXT:     public func <loc>foo5()</loc></decl>
 // CHECK14-NEXT: }</synthesized>

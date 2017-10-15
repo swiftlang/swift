@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
 
 import Builtin
 import Swift
@@ -58,6 +59,8 @@ enum Optional<T> {
   case none
   case some(T)
 }
+
+sil @createS : $@convention(thin) () -> @owned S
 
 sil @use_C2 : $@convention(thin) (C2) -> ()
 sil @user : $@convention(thin) (Builtin.NativeObject) -> ()
@@ -442,4 +445,161 @@ bb3:
   strong_release %0 : $Builtin.NativeObject
   %5 = tuple()
   return %5 : $()
+}
+
+// CHECK-LABEL: sil @move_retain_over_loop
+// CHECK:      bb0({{.*}}):
+// CHECK-NEXT:   br bb1
+// CHECK:      bb1:
+// CHECK-NEXT:   cond_br
+// CHECK:      bb2:
+// CHECK:        strong_retain
+// CHECK:        apply
+// CHECK:        strong_release
+// CHECK:        return
+sil @move_retain_over_loop : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  cond_br undef, bb1, bb2
+
+bb2:
+  %2 = function_ref @blocker : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @move_release_over_loop
+// CHECK:      bb0{{.*}}:
+// CHECK:        strong_retain
+// CHECK:        apply
+// CHECK:        strong_release
+// CHECK:        br bb1
+// CHECK:      bb1:
+// CHECK-NEXT:   cond_br
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb1
+// CHECK:      bb3:
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @move_release_over_loop : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %2 = function_ref @blocker : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  br bb1
+
+bb1:
+  cond_br undef, bb1, bb2
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @handle_infinite_loop
+// CHECK:      bb0{{.*}}:
+// CHECK-NEXT:   cond_br
+// CHECK:      bb1:
+// CHECK-NOT:    {{(retain|release)}}
+// CHECK:        apply
+// CHECK-NEXT:   br bb2
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb2
+// CHECK:      bb3:
+// CHECK:        strong_retain
+// CHECK:        strong_release
+// CHECK:        return
+sil @handle_infinite_loop : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+bb0(%a : $*Builtin.NativeObject):
+  cond_br undef, bb1, bb3
+
+bb1:
+  %2 = function_ref @blocker : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  br bb2
+
+bb2:
+  br bb2
+
+bb3:
+  %0 = load %a : $*Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+/// Check that retain sinking needs multiple-passes to sink 2 retains.
+
+/// One round of retain-sinking can sink only one of retains.
+/// CHECK-LABEL: sil @checkRetainSinkingMultipleRounds
+/// CHECK:      bb9:
+/// CHECK-NEXT:   retain_value %2 : $S
+/// CHECK-NEXT:   release_value %2 : $S
+/// CHECK-NEXT:   release_value %2 : $S
+/// In the ideal world, we should see a third retain_value here.
+/// But it would require another round of retain sinking.
+/// CHECK-NEXT:   br bb5
+
+
+/// Two rounds of retain-sinking can sink only two retains.
+/// CHECK-MULTIPLE-RS-ROUNDS-LABEL: sil @checkRetainSinkingMultipleRounds
+/// CHECK-MULTIPLE-RS-ROUNDS:      bb9:
+/// CHECK-MULTIPLE-RS-ROUNDS-NEXT:   retain_value %2 : $S
+/// CHECK-MULTIPLE-RS-ROUNDS-NEXT:   retain_value %2 : $S
+/// CHECK-MULTIPLE-RS-ROUNDS-NEXT:   release_value %2 : $S
+/// CHECK-MULTIPLE-RS-ROUNDS-NEXT:   release_value %2 : $S
+/// CHECK-MULTIPLE-RS-ROUNDS-NEXT:   br bb5
+
+sil @checkRetainSinkingMultipleRounds : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = function_ref @createS : $@convention(thin) () -> @owned S
+  %2 = apply %1() : $@convention(thin) () -> @owned S
+  br bb2
+
+bb1: 
+  cond_br undef, bb10, bb11 
+
+bb2: 
+  cond_br undef, bb4, bb6
+
+bb3:
+  br bb2
+
+bb4:
+  retain_value %2 : $S
+  br bb5
+
+bb5:
+  release_value %2 : $S
+  cond_br undef, bb1, bb3
+
+bb6:
+  retain_value %2 : $S
+  retain_value %2 : $S
+  br bb7
+
+bb7:
+  cond_br undef, bb9, bb8
+
+bb8:
+  br bb7
+
+bb9:
+  release_value %2 : $S
+  br bb5
+
+bb10:
+  unreachable
+
+bb11:
+  release_value %2 : $S
+  %26 = tuple ()
+  return %26 : $()
 }

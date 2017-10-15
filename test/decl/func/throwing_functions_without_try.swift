@@ -24,6 +24,9 @@ doLazy(foo())
 var closure: () -> () = {
   _ = foo() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
   doLazy(foo()) // expected-error {{call can throw but is not marked with 'try'}}
+  // expected-note@-1 {{did you mean to use 'try'?}} {{10-10=try }}
+  // expected-note@-2 {{did you mean to handle error as optional value?}} {{10-10=try? }}
+  // expected-note@-3 {{did you mean to disable error propagation?}} {{10-10=try! }}
 }
 
 // Or any other sort of structure.
@@ -35,6 +38,9 @@ struct A {
 func baz() throws -> Int {
   var x: Int = 0
   x = foo() // expected-error{{call can throw but is not marked with 'try'}}
+  // expected-note@-1 {{did you mean to use 'try'?}} {{7-7=try }}
+  // expected-note@-2 {{did you mean to handle error as optional value?}} {{7-7=try? }}
+  // expected-note@-3 {{did you mean to disable error propagation?}} {{7-7=try! }}
   x = try foo() // no error
   return x
 }

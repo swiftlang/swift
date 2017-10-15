@@ -12,6 +12,7 @@ module SwiftShims {
   header "SwiftStdbool.h"
   header "SwiftStddef.h"
   header "SwiftStdint.h"
+  header "System.h"
   header "UnicodeShims.h"
   header "Visibility.h"
   export *
@@ -38,6 +39,10 @@ module _SwiftOSOverlayShims {
 
 module _SwiftSafariServicesOverlayShims {
   header "SafariServicesOverlayShims.h"
+}
+
+module _SwiftUIKitOverlayShims {
+  header "UIKitOverlayShims.h"
 }
 
 module _SwiftXCTestOverlayShims {

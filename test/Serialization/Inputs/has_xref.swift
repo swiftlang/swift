@@ -10,7 +10,7 @@ public func numericArray(_ x: IntSlice) {}
 
 
 public protocol ExtraIncrementable {
-  prefix func +++(base: inout Self)
+  static prefix func +++(base: inout Self)
 }
 
 extension SpecialInt : ExtraIncrementable {}

@@ -1,7 +1,12 @@
-// RUN: %target-run-simple-swift -swift-version 3
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
+
+// FIXME: rdar://problem/31311598
+// UNSUPPORTED: OS=ios
+// UNSUPPORTED: OS=tvos
+// UNSUPPORTED: OS=watchos
 
 //
 // Tests for the NSString APIs as exposed by String
@@ -18,6 +23,9 @@ import StdlibUnittestFoundationExtras
 class NonContiguousNSString : NSString {
   required init(coder aDecoder: NSCoder) {
     fatalError("don't call this initializer")
+  }
+  required init(itemProviderData data: Data, typeIdentifier: String) throws {
+    fatalError("don't call this initializer")    
   }
 
   override init() { 
@@ -1136,9 +1144,11 @@ NSStringAPIs.test("rangeOfComposedCharacterSequences(for:)") {
       for: s.index(s.startIndex, offsetBy: 8)..<s.index(s.startIndex, offsetBy: 10))])
 }
 
-func toIntRange(
-  _ string: String, _ maybeRange: Range<String.Index>?
-) -> Range<Int>? {
+func toIntRange<
+  S : StringProtocol
+>(
+  _ string: S, _ maybeRange: Range<String.Index>?
+) -> Range<Int>? where S.Index == String.Index, S.IndexDistance == Int {
   guard let range = maybeRange else { return nil }
 
   return

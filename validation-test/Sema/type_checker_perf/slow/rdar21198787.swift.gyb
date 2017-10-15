@@ -1,0 +1,13 @@
+// RUN: %scale-test --invert-result --begin 1 --end 5 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+private let _: [Any?] = [[
+%for i in range(0, N):
+  "A": [
+    "B" : "C",
+%end
+%for i in range(0, N):
+    ]
+%end
+]]

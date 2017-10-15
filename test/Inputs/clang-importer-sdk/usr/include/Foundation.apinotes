@@ -1,0 +1,248 @@
+Name: Foundation
+Classes:
+- Name: NSArray
+  SwiftBridge: Swift.Array
+  SwiftImportAsNonGeneric: true
+- Name: NSMutableArray
+  SwiftImportAsNonGeneric: true
+- Name: NSByteCountFormatter
+  SwiftName: ByteCountFormatter
+- Name: NSCalendar
+  SwiftBridge: Calendar
+- Name: NSDictionary
+  SwiftBridge: Swift.Dictionary
+  SwiftImportAsNonGeneric: true
+- Name: NSMutableDictionary
+  SwiftImportAsNonGeneric: true
+- Name: NSError
+  SwiftBridge: Swift.Error
+- Name: NSNotification
+  SwiftBridge: Notification
+- Name: NSNotificationQueue
+  SwiftName: NotificationQueue
+- Name: NSNumber
+  Methods:
+  - Selector: 'initWithChar:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedChar:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithShort:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedShort:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithInt:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedInt:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithLong:'
+    Availability: nonswift
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedLong:'
+    Availability: nonswift
+    MethodKind: Instance
+  - Selector: 'initWithLongLong:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedLongLong:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithFloat:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithDouble:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithBool:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithInteger:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedInteger:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'numberWithChar:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedChar:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithShort:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedShort:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithInt:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedInt:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithLongLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedLongLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithFloat:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithDouble:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithBool:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithInteger:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedInteger:'
+    Availability: nonswift
+    MethodKind: Class
+  Properties:
+  - Name: charValue
+    SwiftName: int8Value
+  - Name: unsignedCharValue
+    SwiftName: uint8Value
+  - Name: shortValue
+    SwiftName: int16Value
+  - Name: unsignedShortValue
+    SwiftName: uint16Value
+  - Name: intValue
+    SwiftName: int32Value
+  - Name: unsignedIntValue
+    SwiftName: uint32Value
+  - Name: longValue
+    Availability: nonswift
+  - Name: unsignedLongValue
+    Availability: nonswift
+    AvailabilityMsg: use 'uintValue'
+  - Name: longLongValue
+    SwiftName: int64Value
+  - Name: unsignedLongLongValue
+    SwiftName: uint64Value
+  - Name: integerValue
+    SwiftName: intValue
+  - Name: unsignedIntegerValue
+    SwiftName: uintValue
+- Name: NSNumberFormatter
+  SwiftName: NumberFormatter
+- Name: NSProcessInfo
+  SwiftName: ProcessInfo
+- Name: NSSet
+  SwiftBridge: Swift.Set
+  SwiftImportAsNonGeneric: true
+  Methods:
+  - Selector: 'filteredSetUsingPredicate:'
+    SwiftName: filtered(using:)
+    MethodKind: Instance
+- Name: NSMutableSet
+  SwiftImportAsNonGeneric: true
+- Name: NSOperation
+  SwiftName: Operation
+- Name: NSString
+  SwiftBridge: Swift.String
+  Properties:
+  - Name: uppercaseString
+    SwiftName: uppercased
+  - Name: lowercaseString
+    SwiftName: lowercased
+- Name: NSURL
+  SwiftBridge: URL
+- Name: NSXMLNode
+  SwiftName: XMLNode
+Enumerators:
+- Name: NSNumberFormatterBehaviorDefault
+  SwiftName: default
+- Name: NSPostWhenIdle
+  SwiftName: whenIdle
+- Name: NSPostASAP
+  SwiftName: asap
+- Name: NSPostNow
+  SwiftName: now
+- Name: NSXMLDocumentXMLKind
+  SwiftName: xml
+- Name: NSXMLDocumentXHTMLKind
+  SwiftName: xhtml
+- Name: NSXMLDocumentHTMLKind
+  SwiftName: html
+- Name: NSXMLDocumentTextKind
+  SwiftName: text
+- Name: NSXMLAttributeCDATAKind
+  SwiftName: cdataAttribute
+- Name: NSXMLAttributeIDKind
+  SwiftName: idAttribute
+- Name: NSXMLAttributeIDRefKind
+  SwiftName: idRefAttribute
+- Name: NSXMLAttributeIDRefsKind
+  SwiftName: idRefsAttribute
+- Name: NSXMLAttributeEntityKind
+  SwiftName: entityAttribute
+- Name: NSXMLAttributeEntitiesKind
+  SwiftName: entitiesAttribute
+- Name: NSXMLAttributeNMTokenKind
+  SwiftName: nmTokenAttribute
+- Name: NSXMLAttributeNMTokensKind
+  SwiftName: nmTokensAttribute
+- Name: NSXMLAttributeEnumerationKind
+  SwiftName: enumerationAttribute
+- Name: NSXMLAttributeNotationKind
+  SwiftName: notationAttribute
+- Name: NSXMLInvalidKind
+  SwiftName: invalid
+- Name: NSXMLDocumentKind
+  SwiftName: document
+- Name: NSXMLElementKind
+  SwiftName: element
+- Name: NSXMLAttributeKind
+  SwiftName: attribute
+- Name: NSXMLNamespaceKind
+  SwiftName: namespace
+- Name: NSXMLProcessingInstructionKind
+  SwiftName: processingInstruction
+- Name: NSXMLCommentKind
+  SwiftName: comment
+- Name: NSXMLTextKind
+  SwiftName: text
+- Name: NSXMLDTDKind
+  SwiftName: DTDKind
+- Name: NSXMLEntityDeclarationKind
+  SwiftName: entityDeclaration
+- Name: NSXMLAttributeDeclarationKind
+  SwiftName: attributeDeclaration
+- Name: NSXMLElementDeclarationKind
+  SwiftName: elementDeclaration
+- Name: NSXMLNotationDeclarationKind
+  SwiftName: notationDeclaration
+Protocols:
+- Name: NSProgressReporting
+  SwiftName: ProgressReporting
+Tags:
+- Name: NSByteCountFormatterCountStyle
+  SwiftName: ByteCountFormatter.CountStyle
+- Name: NSCalendarUnit
+  SwiftName: NSCalendar.Unit
+- Name: NSNumberFormatterBehavior
+  SwiftName: NumberFormatter.Behavior
+- Name: NSPostingStyle
+  SwiftName: NotificationQueue.PostingStyle
+- Name: NSXMLNodeKind
+  SwiftName: XMLNode.Kind
+Typedefs:
+- Name: NSNotificationName
+  SwiftName: NSNotification.Name
+- Name: NSTimeInterval
+  SwiftName: TimeInterval

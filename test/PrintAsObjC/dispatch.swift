@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck %s -parse-as-library -emit-objc-header-path %t/swift.h
 // RUN: %FileCheck %s < %t/swift.h
 

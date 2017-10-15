@@ -133,7 +133,7 @@ bb0:
   %r = apply %f () : $@convention(thin) () -> ()
   unowned_release [nonatomic] %1 : $@sil_unowned C
   %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 
 // CHECK-LABEL: define {{.*}}@test_bridged_nonatomic_rr
@@ -150,7 +150,7 @@ bb0:
   %r = apply %f () : $@convention(thin) () -> ()
   strong_release [nonatomic] %2 : $Builtin.BridgeObject
   %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 
 // CHECK-LABEL: define {{.*}}@test_bridged_nonatomic_rr_n
@@ -171,7 +171,7 @@ bb0:
   strong_release [nonatomic] %2 : $Builtin.BridgeObject
   strong_release [nonatomic] %2 : $Builtin.BridgeObject
   %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 
 // CHECK-LABEL: define {{.*}}@test_bridged_mixed_rr_n
@@ -192,7 +192,7 @@ bb0:
   strong_release %2 : $Builtin.BridgeObject
   strong_release [nonatomic] %2 : $Builtin.BridgeObject
   %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 
 // CHECK-LABEL: define {{.*}}@test_nonatomic_pin_unpin
@@ -208,7 +208,7 @@ bb0:
   %r = apply %f () : $@convention(thin) () -> ()
   strong_unpin [nonatomic] %2 : $Optional<Builtin.NativeObject>
   %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 
 // C.__deallocating_deinit

@@ -27,5 +27,5 @@ entry:
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T0yyXCMa()
 // --                                                                               0x3000001 -- C convention, 1 argument
-// CHECK:         call %swift.type* @swift_getFunctionTypeMetadata1([[WORD:i(32|64)]] 50331649
+// CHECK:         call %swift.type* @swift_getFunctionTypeMetadata(i8** %3)
 

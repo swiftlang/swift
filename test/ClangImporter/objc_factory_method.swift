@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -target x86_64-apple-macosx10.51 -typecheck %s -verify
@@ -89,7 +89,7 @@ func testNonsplittableFactoryMethod() {
   _ = NSObjectFactory.factoryBuildingWidgets()
 }
 
-func testFactoryMethodBlacklist() {
+func testFactoryMethodAPINotes() {
   _ = NCWidgetController.widgetController()
 }
 

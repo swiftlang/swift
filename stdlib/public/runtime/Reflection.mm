@@ -24,6 +24,7 @@
 #include "WeakReference.h"
 #include "llvm/Support/Compiler.h"
 #include <cassert>
+#include <cinttypes>
 #include <cstdio>
 #include <cstring>
 #include <new>
@@ -173,14 +174,9 @@ AnyReturn swift_MagicMirrorData_value(HeapObject *owner,
   Any result;
 
   result.Type = type;
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   auto *opaqueValueAddr = type->allocateBoxForExistentialIn(&result.Buffer);
   type->vw_initializeWithCopy(opaqueValueAddr,
                               const_cast<OpaqueValue *>(value));
-#else
-  type->vw_initializeBufferWithCopy(&result.Buffer,
-                                    const_cast<OpaqueValue*>(value));
-#endif
 
   return AnyReturn(result);
 }
@@ -387,7 +383,7 @@ void swift_TupleMirror_subscript(String *outString,
   if (!hasLabel) {
     // The name is the stringized element number '.0'.
     char buf[32];
-    snprintf(buf, sizeof(buf), ".%zd", i);
+    snprintf(buf, sizeof(buf), ".%" PRIdPTR, i);
     new (outString) String(buf, strlen(buf));
   }
 
@@ -446,14 +442,8 @@ static bool loadSpecialReferenceStorage(HeapObject *owner,
   // allocated storage.
   ValueBuffer temporaryBuffer;
 
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   auto temporaryValue = reinterpret_cast<ClassExistentialContainer *>(
       type->allocateBufferIn(&temporaryBuffer));
-#else
-  auto temporaryValue =
-    reinterpret_cast<ClassExistentialContainer *>(
-      type->vw_allocateBuffer(&temporaryBuffer));
-#endif
 
   // Now copy the entire value out of the parent, which will include the
   // witness tables.
@@ -468,11 +458,7 @@ static bool loadSpecialReferenceStorage(HeapObject *owner,
   new (outMirror) MagicMirror(reinterpret_cast<OpaqueValue *>(temporaryValue),
                               type, /*take*/ true);
 
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   type->deallocateBufferIn(&temporaryBuffer);
-#else
-  type->vw_deallocateBuffer(&temporaryBuffer);
-#endif
 
   // swift_StructMirror_subscript and swift_ClassMirror_subscript
   // requires that the owner be consumed. Since we have the new heap box as the
@@ -769,52 +755,6 @@ extern "C" const Metadata STRUCT_METADATA_SYM(s6UInt16);
 extern "C" const Metadata STRUCT_METADATA_SYM(s6UInt32);
 extern "C" const Metadata STRUCT_METADATA_SYM(s6UInt64);
 
-// Set to 1 to enable reflection of objc ivars.
-#define REFLECT_OBJC_IVARS 0
-
-/// Map an ObjC type encoding string to a Swift type metadata object.
-///
-#if REFLECT_OBJC_IVARS
-static const Metadata *getMetadataForEncoding(const char *encoding) {
-  switch (*encoding) {
-  case 'c': // char
-    return &STRUCT_METADATA_SYM(s4Int8);
-  case 's': // short
-    return &STRUCT_METADATA_SYM(s5Int16);
-  case 'i': // int
-    return &STRUCT_METADATA_SYM(s5Int32);
-  case 'l': // long
-    return &METADATA_SYM(Si);
-  case 'q': // long long
-    return &STRUCT_METADATA_SYM(s5Int64);
-
-  case 'C': // unsigned char
-    return &STRUCT_METADATA_SYM(s5UInt8);
-  case 'S': // unsigned short
-    return &STRUCT_METADATA_SYM(s6UInt16);
-  case 'I': // unsigned int
-    return &STRUCT_METADATA_SYM(s6UInt32);
-  case 'L': // unsigned long
-    return &METADATA_SYM(Su);
-  case 'Q': // unsigned long long
-    return &STRUCT_METADATA_SYM(s6UInt64);
-
-  case 'B': // _Bool
-    return &METADATA_SYM(Sb);
-
-  case '@': { // Class
-    // TODO: Better metadata?
-    const OpaqueMetadata *M = &METADATA_SYM(BO);
-    return &M->base;
-  }
-
-  default: // TODO
-    // Return 'void' as the type of fields we don't understand.
-    return &METADATA_SYM(EMPTY_TUPLE_MANGLING);
-  }
-}
-#endif
-
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -824,17 +764,6 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
   auto isa = (Class)type;
 
   unsigned count = 0;
-#if REFLECT_OBJC_IVARS
-  // Don't reflect ivars of classes that lie about their layout.
-  if (objcClassLiesAboutLayout(isa)) {
-    count = 0;
-  } else {
-    // Copying the ivar list just to free it is lame, but we have
-    // nowhere to save it.
-    Ivar *ivars = class_copyIvarList(isa, &count);
-    free(ivars);
-  }
-#else
   // ObjC makes no guarantees about the state of ivars, so we can't safely
   // introspect them in the general case.
 
@@ -844,7 +773,6 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
 
   swift_release(owner);
   return count;
-#endif
 }
 
 static Mirror ObjC_getMirrorForSuperclass(Class sup,
@@ -859,9 +787,6 @@ void swift_ObjCMirror_subscript(String *outString,
                                 HeapObject *owner,
                                 const OpaqueValue *value,
                                 const Metadata *type) {
-#if REFLECT_OBJC_IVARS
-  id object = *reinterpret_cast<const id *>(value);
-#endif
   auto isa = (Class)type;
 
   // If there's a superclass, it becomes the first child.
@@ -875,44 +800,9 @@ void swift_ObjCMirror_subscript(String *outString,
     }
     --i;
   }
-
-#if REFLECT_OBJC_IVARS
-  // Copying the ivar list just to free it is lame, but we have
-  // no room to save it.
-  unsigned count;
-  Ivar *ivars;
-  // Don't reflect ivars of classes that lie about their layout.
-  if (objcClassLiesAboutLayout(isa)) {
-    count = 0;
-    ivars = nullptr;
-  } else {
-    // Copying the ivar list just to free it is lame, but we have
-    // nowhere to save it.
-    ivars = class_copyIvarList(isa, &count);
-  }
-
-  if (i < 0 || (uintptr_t)i >= (uintptr_t)count)
-    swift::crash("Swift mirror subscript bounds check failure");
-
-  const char *name = ivar_getName(ivars[i]);
-  ptrdiff_t offset = ivar_getOffset(ivars[i]);
-  const char *typeEncoding = ivar_getTypeEncoding(ivars[i]);
-  free(ivars);
-
-  const OpaqueValue *ivar =
-    reinterpret_cast<const OpaqueValue *>(
-    reinterpret_cast<const char*>(object) + offset);
-
-  const Metadata *ivarType = getMetadataForEncoding(typeEncoding);
-
-  new (outString) String(name, strlen(name));
-  // 'owner' is consumed by this call.
-  new (outMirror) Mirror(reflect(owner, ivar, ivarType));
-#else
   // ObjC makes no guarantees about the state of ivars, so we can't safely
   // introspect them in the general case.
   abort();
-#endif
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -1225,9 +1115,8 @@ char *swift_demangle(const char *mangledName,
 
   // Check if we are dealing with Swift mangled name, otherwise, don't try
   // to demangle and send indication to the user.
-  if (mangledName[0] != '_' || mangledName[1] != 'T') {
-    return nullptr;
-  }
+  if (!Demangle::isSwiftSymbol(mangledName))
+    return nullptr; // Not a mangled name
 
   // Demangle the name.
   auto options = Demangle::DemangleOptions();

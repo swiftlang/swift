@@ -21,11 +21,12 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
+#include <algorithm>
 #include <cassert>
 #include <functional>
 #include <iterator>
+#include <numeric>
 #include <type_traits>
-#include <algorithm>
 
 namespace swift {
 
@@ -219,17 +220,33 @@ inline void set_union_for_each(const Container1 &C1, const Container2 &C2,
   set_union_for_each(C1.begin(), C1.end(), C2.begin(), C2.end(), f);
 }
 
+/// If \p it is equal to \p end, then return \p defaultIter. Otherwise, return
+/// std::next(\p it).
+template <typename Iterator>
+inline Iterator next_or_default(Iterator it, Iterator end,
+                                Iterator defaultIter) {
+  return (it == end) ? defaultIter : std::next(it);
+}
+
+/// If \p it is equal to \p begin, then return \p defaultIter. Otherwise, return
+/// std::prev(\p it).
+template <typename Iterator>
+inline Iterator prev_or_default(Iterator it, Iterator begin,
+                                Iterator defaultIter) {
+  return (it == begin) ? defaultIter : std::prev(it);
+}
+
 /// Takes an iterator and an iterator pointing to the end of the iterator range.
 /// If the iterator already points to the end of its range, simply return it,
 /// otherwise return the next element.
 template <typename Iterator>
 inline Iterator next_or_end(Iterator it, Iterator end) {
-  return (it == end) ? end : std::next(it);
+  return next_or_default(it, end, end);
 }
 
 template <typename Iterator>
 inline Iterator prev_or_begin(Iterator it, Iterator begin) {
-  return (it == begin) ? begin : std::prev(it);
+  return prev_or_default(it, begin, begin);
 }
 
 /// @}
@@ -392,7 +409,7 @@ makeFilterRange(Range range, Predicate pred) {
   return FilterRange<Range, Predicate>(range, pred);
 }
 
-/// An iterator that transforms the result of an underlying forward
+/// An iterator that transforms the result of an underlying bidirectional
 /// iterator with a given operation.
 ///
 /// \tparam Iterator the underlying iterator.
@@ -411,7 +428,7 @@ class TransformIterator {
   using OpTraits = function_traits<Operation>;
 
 public:
-  using iterator_category = std::forward_iterator_tag;
+  using iterator_category = std::bidirectional_iterator_tag;
   using value_type = typename OpTraits::result_type;
   using reference = value_type;
   using pointer = void; // FIXME: Should provide a pointer proxy.
@@ -435,6 +452,17 @@ public:
   TransformIterator operator++(int) {
     TransformIterator old = *this;
     ++*this;
+    return old;
+  }
+
+  TransformIterator &operator--() {
+    --Current;
+    return *this;
+  }
+
+  TransformIterator operator--(int) {
+    TransformIterator old = *this;
+    --*this;
     return old;
   }
 
@@ -758,6 +786,29 @@ inline OutputIterator transform(const Container &C, OutputIterator result,
                                 UnaryOperation op) {
   return std::transform(C.begin(), C.end(), result, op);
 }
+
+template <typename Container, typename T, typename BinaryOperation>
+inline T accumulate(const Container &C, T init, BinaryOperation op) {
+  return std::accumulate(C.begin(), C.end(), init, op);
+}
+
+/// Provides default implementations of !=, <=, >, and >= based on == and <.
+template <typename T>
+class RelationalOperationsBase {
+public:
+  friend bool operator>(const T &left, const T &right) {
+    return right < left;
+  }
+  friend bool operator>=(const T &left, const T &right) {
+    return !(left < right);
+  }
+  friend bool operator<=(const T &left, const T &right) {
+    return !(right < left);
+  }
+  friend bool operator!=(const T &left, const T &right) {
+    return !(left == right);
+  }
+};
 
 } // end namespace swift
 

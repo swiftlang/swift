@@ -177,7 +177,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitIfConfigDecl(IfConfigDecl *ICD) {
-    // By default, just visit the declarations that are actually
+    // By default, just visit the elements that are actually
     // injected into the enclosing context.
     return false;
   }
@@ -258,6 +258,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   bool visitSubscriptDecl(SubscriptDecl *SD) {
     visit(SD->getIndices());
     return doIt(SD->getElementTypeLoc());
+  }
+
+  bool visitMissingMemberDecl(MissingMemberDecl *MMD) {
+    return false;
   }
 
   bool visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
@@ -425,10 +429,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
-    for (auto Ty : E->getGenericArgs()) {
-      if (doIt(Ty))
-        return nullptr;
-    }
     return E;
   }
   
@@ -952,10 +952,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
             ? KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
                 component.getDeclRef(),
                 newIndex,
+                component.getSubscriptLabels(),
                 component.getComponentType(),
-                component.getLoc())
-            : KeyPathExpr::Component::forUnresolvedSubscriptWithPrebuiltIndexExpr(
-                newIndex, component.getLoc());
+                component.getLoc(),
+                component.getSubscriptIndexHashableConformances())
+            : KeyPathExpr::Component
+                         ::forUnresolvedSubscriptWithPrebuiltIndexExpr(
+                E->getType()->getASTContext(),
+                newIndex, component.getSubscriptLabels(), component.getLoc());
         }
         break;
       }
@@ -965,6 +969,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       case KeyPathExpr::Component::Kind::OptionalForce:
       case KeyPathExpr::Component::Kind::Property:
       case KeyPathExpr::Component::Kind::UnresolvedProperty:
+      case KeyPathExpr::Component::Kind::Invalid:
         // No subexpr to visit.
         break;
       }
@@ -1284,14 +1289,6 @@ Stmt *Traversal::visitGuardStmt(GuardStmt *US) {
   return US;
 }
 
-
-Stmt *Traversal::visitIfConfigStmt(IfConfigStmt *ICS) {
-  // Active members are attached to the enclosing declaration, so there's no
-  // need to walk anything within.
-  
-  return ICS;
-}
-
 Stmt *Traversal::visitDoStmt(DoStmt *DS) {
   if (Stmt *S2 = doIt(DS->getBody()))
     DS->setBody(S2);
@@ -1373,41 +1370,6 @@ Stmt *Traversal::visitRepeatWhileStmt(RepeatWhileStmt *RWS) {
   return RWS;
 }
 
-Stmt *Traversal::visitForStmt(ForStmt *FS) {
-  // Visit any var decls in the initializer.
-  for (auto D : FS->getInitializerVarDecls())
-    if (doIt(D))
-      return nullptr;
-
-  if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
-    if (Expr *E = doIt(Initializer))
-      FS->setInitializer(E);
-    else
-      return nullptr;
-  }
-
-  if (auto *Cond = FS->getCond().getPtrOrNull()) {
-    if (Expr *E2 = doIt(Cond))
-      FS->setCond(E2);
-    else
-      return nullptr;
-
-  }
-
-  if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
-    if (Expr *E = doIt(Increment))
-      FS->setIncrement(E);
-    else
-      return nullptr;
-  }
-
-  if (Stmt *S = doIt(FS->getBody()))
-    FS->setBody(S);
-  else
-    return nullptr;
-  return FS;
-}
-
 Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
   if (Pattern *P = S->getPattern()) {
     if ((P = doIt(P)))
@@ -1459,12 +1421,19 @@ Stmt *Traversal::visitSwitchStmt(SwitchStmt *S) {
   else
     return nullptr;
 
-  for (CaseStmt *aCase : S->getCases()) {
-    if (Stmt *aStmt = doIt(aCase)) {
-      assert(aCase == aStmt && "switch case remap not supported");
-      (void)aStmt;
-    } else
-      return nullptr;
+  for (auto N : S->getRawCases()) {
+    if (Stmt *aCase = N.dyn_cast<Stmt*>()) {
+      assert(isa<CaseStmt>(aCase));
+      if (Stmt *aStmt = doIt(aCase)) {
+        assert(aCase == aStmt && "switch case remap not supported");
+        (void)aStmt;
+      } else
+        return nullptr;
+    } else {
+      assert(isa<IfConfigDecl>(N.get<Decl*>()));
+      if (doIt(N.get<Decl*>()))
+        return nullptr;
+    }
   }
 
   return S;
@@ -1645,8 +1614,8 @@ bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOpti
 }
 
 bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {
-  for (auto elem : T->getElements()) {
-    if (doIt(elem))
+  for (auto &elem : T->getElements()) {
+    if (doIt(elem.Type))
       return true;
   }
   return false;
@@ -1669,6 +1638,10 @@ bool Traversal::visitProtocolTypeRepr(ProtocolTypeRepr *T) {
 }
 
 bool Traversal::visitInOutTypeRepr(InOutTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
+bool Traversal::visitSharedTypeRepr(SharedTypeRepr *T) {
   return doIt(T->getBase());
 }
 

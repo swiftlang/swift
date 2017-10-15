@@ -5,6 +5,8 @@ add_swift_library(swiftAppKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OV
   AppKit.swift
   AppKit_FoundationExtensions.swift
   NSError.swift
+  NSGraphics.swift
+  NSOpenGL.swift
 
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"

@@ -377,7 +377,14 @@ internal enum Colors {
     key.nameoffset: 115,
     key.namelength: 18,
     key.bodyoffset: 135,
-    key.bodylength: 1
+    key.bodylength: 1,
+    key.attributes: [
+      {
+        key.offset: 102,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ]
   },
   {
     key.kind: source.lang.swift.decl.class,
@@ -390,6 +397,15 @@ internal enum Colors {
     key.namelength: 19,
     key.bodyoffset: 200,
     key.bodylength: 51,
+    key.docoffset: 139,
+    key.doclength: 27,
+    key.attributes: [
+      {
+        key.offset: 166,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ],
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -398,7 +414,14 @@ internal enum Colors {
         key.offset: 213,
         key.length: 8,
         key.nameoffset: 218,
-        key.namelength: 3
+        key.namelength: 3,
+        key.attributes: [
+          {
+            key.offset: 206,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ]
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -409,7 +432,14 @@ internal enum Colors {
         key.length: 14,
         key.typename: "Int",
         key.nameoffset: 240,
-        key.namelength: 5
+        key.namelength: 5,
+        key.attributes: [
+          {
+            key.offset: 227,
+            key.length: 8,
+            key.attribute: source.decl.attribute.internal
+          }
+        ]
       }
     ]
   },
@@ -427,6 +457,13 @@ internal enum Colors {
     key.inheritedtypes: [
       {
         key.name: "FooOverlayClassBase"
+      }
+    ],
+    key.attributes: [
+      {
+        key.offset: 254,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
       }
     ],
     key.elements: [
@@ -447,6 +484,13 @@ internal enum Colors {
         key.namelength: 3,
         key.attributes: [
           {
+            key.offset: 328,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          },
+          {
+            key.offset: 319,
+            key.length: 8,
             key.attribute: source.decl.attribute.override
           }
         ]
@@ -463,7 +507,14 @@ internal enum Colors {
     key.nameoffset: 363,
     key.namelength: 20,
     key.bodyoffset: 385,
-    key.bodylength: 1
+    key.bodylength: 1,
+    key.attributes: [
+      {
+        key.offset: 348,
+        key.length: 8,
+        key.attribute: source.decl.attribute.internal
+      }
+    ]
   },
   {
     key.kind: source.lang.swift.decl.class,
@@ -475,7 +526,14 @@ internal enum Colors {
     key.nameoffset: 404,
     key.namelength: 22,
     key.bodyoffset: 428,
-    key.bodylength: 1
+    key.bodylength: 1,
+    key.attributes: [
+      {
+        key.offset: 389,
+        key.length: 8,
+        key.attribute: source.decl.attribute.internal
+      }
+    ]
   },
   {
     key.kind: source.lang.swift.decl.class,
@@ -488,6 +546,13 @@ internal enum Colors {
     key.namelength: 18,
     key.bodyoffset: 467,
     key.bodylength: 117,
+    key.attributes: [
+      {
+        key.offset: 432,
+        key.length: 8,
+        key.attribute: source.decl.attribute.internal
+      }
+    ],
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -498,7 +563,16 @@ internal enum Colors {
         key.length: 13,
         key.typename: "Int",
         key.nameoffset: 512,
-        key.namelength: 4
+        key.namelength: 4,
+        key.docoffset: 473,
+        key.doclength: 22,
+        key.attributes: [
+          {
+            key.offset: 499,
+            key.length: 8,
+            key.attribute: source.decl.attribute.internal
+          }
+        ]
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -509,7 +583,16 @@ internal enum Colors {
         key.length: 24,
         key.typename: "(Int, Int)",
         key.nameoffset: 564,
-        key.namelength: 2
+        key.namelength: 2,
+        key.docoffset: 527,
+        key.doclength: 19,
+        key.attributes: [
+          {
+            key.offset: 550,
+            key.length: 8,
+            key.attribute: source.decl.attribute.internal
+          }
+        ]
       }
     ]
   },
@@ -523,6 +606,13 @@ internal enum Colors {
     key.namelength: 6,
     key.bodyoffset: 609,
     key.bodylength: 30,
+    key.attributes: [
+      {
+        key.offset: 587,
+        key.length: 8,
+        key.attribute: source.decl.attribute.internal
+      }
+    ],
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.enumcase,

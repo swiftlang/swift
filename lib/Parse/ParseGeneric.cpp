@@ -72,11 +72,10 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
       ParserResult<TypeRepr> Ty;
       
       if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol, tok::kw_Any)) {
-        Ty = parseTypeForInheritance(diag::expected_identifier_for_type,
-                                     diag::expected_ident_type_in_inheritance);
+        Ty = parseType();
       } else if (Tok.is(tok::kw_class)) {
         diagnose(Tok, diag::unexpected_class_constraint);
-        diagnose(Tok, diag::suggest_anyobject, Name)
+        diagnose(Tok, diag::suggest_anyobject)
           .fixItReplace(Tok.getLoc(), "AnyObject");
         consumeToken();
         Invalid = true;
@@ -92,7 +91,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
         Inherited.push_back(Ty.get());
     }
 
-    // We always create generic type parameters with a depth of zero.
+    // We always create generic type parameters with an invalid depth.
     // Semantic analysis fills in the depth when it processes the generic
     // parameter list.
     auto Param = new (Context) GenericTypeParamDecl(
@@ -204,8 +203,13 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
   if (Tok.is(tok::kw_where))
     WhereClauseText << ',';
 
-  auto Diag = diagnose(WhereRangeInsideBrackets.Start,
-                       diag::where_inside_brackets);
+  // For Swift 3, keep this warning. 
+  const auto Message = Context.isSwiftVersion3() 
+                             ? diag::swift3_where_inside_brackets 
+                             : diag::where_inside_brackets;
+
+  auto Diag = diagnose(WhereRangeInsideBrackets.Start, Message);
+
   Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
                         RemoveWhereRange.getEnd());
 
@@ -245,12 +249,14 @@ ParserStatus Parser::parseGenericWhereClause(
   do {
     // Parse the leading type-identifier.
     ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
+
+    if (FirstType.hasCodeCompletion()) {
+      Status.setHasCodeCompletion();
+      FirstTypeInComplete = true;
+    }
+
     if (FirstType.isNull()) {
       Status.setIsParseError();
-      if (FirstType.hasCodeCompletion()) {
-        Status.setHasCodeCompletion();
-        FirstTypeInComplete = true;
-      }
       break;
     }
 
@@ -282,9 +288,7 @@ ParserStatus Parser::parseGenericWhereClause(
         }
       } else {
         // Parse the protocol or composition.
-        ParserResult<TypeRepr> Protocol =
-            parseTypeForInheritance(diag::expected_identifier_for_type,
-                                    diag::expected_ident_type_in_inheritance);
+        ParserResult<TypeRepr> Protocol = parseType();
 
         if (Protocol.isNull()) {
           Status.setIsParseError();
@@ -385,12 +389,7 @@ ParserStatus Parser::parseProtocolOrAssociatedTypeWhereClause(
     trailingWhere =
         TrailingWhereClause::create(Context, whereLoc, requirements);
   } else if (whereStatus.hasCodeCompletion()) {
-    // FIXME: this is completely (hah) cargo culted.
-    if (CodeCompletion && firstTypeInComplete) {
-      CodeCompletion->completeGenericParams(nullptr);
-    } else {
-      return makeParserCodeCompletionStatus();
-    }
+    return whereStatus;
   }
 
   return ParserStatus();

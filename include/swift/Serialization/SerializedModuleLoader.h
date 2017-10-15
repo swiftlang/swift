@@ -120,6 +120,10 @@ class SerializedASTFile final : public LoadedFile {
 public:
   bool isSIB() const { return IsSIB; }
 
+  /// Returns the language version that was used to compile the contents of this
+  /// file.
+  const version::Version &getLanguageVersionBuiltWith() const;
+
   virtual bool isSystemModule() const override;
 
   virtual void lookupValue(ModuleDecl::AccessPathTy accessPath,
@@ -127,6 +131,10 @@ public:
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
+
+  virtual TypeDecl *
+  lookupNestedType(Identifier name,
+                   const NominalTypeDecl *parent) const override;
 
   virtual OperatorDecl *lookupOperator(Identifier name,
                                        DeclKind fixity) const override;
@@ -185,7 +193,7 @@ public:
 
   bool hasEntryPoint() const override;
 
-  virtual const clang::Module *getUnderlyingClangModule() override;
+  virtual const clang::Module *getUnderlyingClangModule() const override;
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST;

@@ -75,6 +75,11 @@ func testProtocolNamingConflict() {
   d = c // expected-error {{cannot assign value of type 'ConflictingName2?' to type 'ConflictingName2Protocol?'}}
   _ = d
 }
+
+func testObjCGenerics() {
+  _ = GenericObjCClass<ForwardProtoAdopter>()
+  _ = GenericObjCClass<Base>() // expected-error {{type 'Base' does not conform to protocol 'ForwardProto'}}
+}
 #endif
 
 func testDeclsNestedInObjCContainers() {

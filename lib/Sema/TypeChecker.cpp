@@ -172,7 +172,7 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
   switch (expr->getLiteralKind()) {
   case ObjectLiteralExpr::colorLiteral: {
     return DeclName(Context, Context.Id_init,
-                    { Context.getIdentifier("colorLiteralRed"),
+                    { Context.getIdentifier("_colorLiteralRed"),
                       Context.getIdentifier("green"),
                       Context.getIdentifier("blue"),
                       Context.getIdentifier("alpha") });
@@ -410,97 +410,6 @@ void TypeChecker::bindExtension(ExtensionDecl *ext) {
   ::bindExtensionDecl(ext, *this);
 }
 
-static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
-                                                   ValueDecl *VD) {
-  // For enums, we only need to validate enum elements to know
-  // the layout.
-  if (isa<EnumDecl>(nominal) &&
-      isa<EnumElementDecl>(VD))
-    return true;
-
-  // For structs, we only need to validate stored properties to
-  // know the layout.
-  if (isa<StructDecl>(nominal) &&
-      (isa<VarDecl>(VD) &&
-       !cast<VarDecl>(VD)->isStatic() &&
-       (cast<VarDecl>(VD)->hasStorage() ||
-        VD->getAttrs().hasAttribute<LazyAttr>())))
-    return true;
-
-  // For classes, we need to validate properties and functions,
-  // but skipping nested types is OK.
-  if (isa<ClassDecl>(nominal) &&
-      !isa<TypeDecl>(VD))
-    return true;
-
-  // For protocols, skip nested typealiases and nominal types.
-  if (isa<ProtocolDecl>(nominal) &&
-      !isa<GenericTypeDecl>(VD))
-    return true;
-
-  return false;
-}
-
-static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
-  Optional<bool> lazyVarsAlreadyHaveImplementation;
-
-  for (auto *D : nominal->getMembers()) {
-    auto VD = dyn_cast<ValueDecl>(D);
-    if (!VD)
-      continue;
-
-    if (!shouldValidateMemberDuringFinalization(nominal, VD))
-      continue;
-
-    TC.validateDecl(VD);
-
-    // The only thing left to do is synthesize storage for lazy variables.
-    // We only have to do that if it's a type from another file, though.
-    // In NDEBUG builds, bail out as soon as we can.
-#ifdef NDEBUG
-    if (lazyVarsAlreadyHaveImplementation.hasValue() &&
-        lazyVarsAlreadyHaveImplementation.getValue())
-      continue;
-#endif
-    auto *prop = dyn_cast<VarDecl>(D);
-    if (!prop)
-      continue;
-
-    if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic()
-                                                  && prop->getGetter()) {
-      bool hasImplementation = prop->getGetter()->hasBody();
-
-      if (lazyVarsAlreadyHaveImplementation.hasValue()) {
-        assert(lazyVarsAlreadyHaveImplementation.getValue() ==
-                 hasImplementation &&
-               "only some lazy vars already have implementations");
-      } else {
-        lazyVarsAlreadyHaveImplementation = hasImplementation;
-      }
-
-      if (!hasImplementation)
-        TC.completeLazyVarImplementation(prop);
-    }
-  }
-
-  // FIXME: We need to add implicit initializers and dtors when a decl is
-  // touched, because it affects vtable layout.  If you're not defining the
-  // class, you shouldn't have to know what the vtable layout is.
-  if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
-    TC.addImplicitConstructors(CD);
-    TC.addImplicitDestructor(CD);
-  }
-
-  // validateDeclForNameLookup will not trigger an immediate full
-  // validation of protocols, but clients will assume that things
-  // like the requirement signature have been set.
-  if (auto PD = dyn_cast<ProtocolDecl>(nominal)) {
-    if (!PD->isRequirementSignatureComputed()) {
-      TC.validateDecl(PD);
-    }
-  }
-}
-
 static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
   unsigned currentFunctionIdx = 0;
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
@@ -547,16 +456,16 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       llvm_unreachable("Unhandled external definition kind");
     }
 
-    // Validate the contents of any referenced nominal types for SIL's purposes.
+    // Validate any referenced declarations for SIL's purposes.
     // Note: if we ever start putting extension members in vtables, we'll need
     // to validate those members too.
     // FIXME: If we're not planning to run SILGen, this is wasted effort.
-    while (!TC.TypesToFinalize.empty()) {
-      auto nominal = TC.TypesToFinalize.pop_back_val();
-      if (nominal->isInvalid() || TC.Context.hadError())
+    while (!TC.DeclsToFinalize.empty()) {
+      auto decl = TC.DeclsToFinalize.pop_back_val();
+      if (decl->isInvalid() || TC.Context.hadError())
         continue;
 
-      finalizeType(TC, nominal);
+      TC.finalizeDecl(decl);
     }
 
     // Complete any conformances that we used.
@@ -569,7 +478,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
-           !TC.TypesToFinalize.empty() ||
+           !TC.DeclsToFinalize.empty() ||
            !TC.UsedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
@@ -621,7 +530,9 @@ void swift::typeCheckExternalDefinitions(SourceFile &SF) {
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 OptionSet<TypeCheckingFlags> Options,
                                 unsigned StartElem,
-                                unsigned WarnLongFunctionBodies) {
+                                unsigned WarnLongFunctionBodies,
+                                unsigned WarnLongExpressionTypeChecking,
+                                unsigned ExpressionTimeoutThreshold) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
@@ -634,10 +545,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // Make sure that name binding has been completed before doing any type
   // checking.
-  {
-    SharedTimer timer("Name binding");
     performNameBinding(SF, StartElem);
-  }
 
   {
     // NOTE: The type checker is scoped to be torn down before AST
@@ -646,6 +554,10 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     if (MyTC) {
       MyTC->setWarnLongFunctionBodies(WarnLongFunctionBodies);
+      MyTC->setWarnLongExpressionTypeChecking(WarnLongExpressionTypeChecking);
+      if (ExpressionTimeoutThreshold != 0)
+        MyTC->setExpressionTimeoutThreshold(ExpressionTimeoutThreshold);
+
       if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
         MyTC->enableDebugTimeFunctionBodies();
 
@@ -756,7 +668,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   }
 }
 
-void swift::finishTypeChecking(SourceFile &SF) {
+void swift::finishTypeCheckingFile(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   TypeChecker TC(Ctx);
 
@@ -766,6 +678,7 @@ void swift::finishTypeChecking(SourceFile &SF) {
 }
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
+  SharedTimer("performWholeModuleTypeChecking");
   auto &Ctx = SF.getASTContext();
   Ctx.diagnoseAttrsRequiringFoundation(SF);
   Ctx.diagnoseObjCMethodConflicts(SF);
@@ -838,6 +751,9 @@ static Optional<Type> getTypeOfCompletionContextExpr(
                         CompletionTypeCheckKind kind,
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
+  if (TC.preCheckExpression(parsedExpr, DC))
+    return None;
+
   switch (kind) {
   case CompletionTypeCheckKind::Normal:
     // Handle below.
@@ -853,7 +769,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
 
   Type originalType = parsedExpr->getType();
   if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
-                 referencedDecl, FreeTypeVariableBinding::GenericParameters))
+                 referencedDecl, FreeTypeVariableBinding::UnresolvedType))
     return T;
 
   // Try to recover if we've made any progress.
@@ -909,12 +825,14 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
   if (ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker *>(ctx.getLazyResolver());
-    return TC->typeCheckExpression(parsedExpr, DC);
+    auto resultTy = TC->typeCheckExpression(parsedExpr, DC);
+    return !resultTy;
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine diags(ctx.SourceMgr);
     TypeChecker TC(ctx, diags);
-    return TC.typeCheckExpression(parsedExpr, DC);
+    auto resultTy = TC.typeCheckExpression(parsedExpr, DC);
+    return !resultTy;
   }
 }
 
@@ -977,14 +895,16 @@ void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
   if (!hasEnabledForbiddenTypecheckPrefix())
     return;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
-    checkForForbiddenPrefix(VD->getNameStr());
+    if (!VD->getBaseName().isSpecial())
+      checkForForbiddenPrefix(VD->getBaseName().getIdentifier().str());
   }
 }
 
 void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
   if (!hasEnabledForbiddenTypecheckPrefix())
     return;
-  checkForForbiddenPrefix(E->getName().getBaseName());
+  if (!E->getName().isSpecial())
+    checkForForbiddenPrefix(E->getName().getBaseIdentifier());
 }
 
 void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {

@@ -1,6 +1,6 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -enable-sil-ownership -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -36,38 +36,43 @@ bb0:
 }
 
 sil @_T012objc_dealloc10SwiftGizmoCfd : $@convention(thin) (@owned SwiftGizmo) -> @owned Builtin.NativeObject {
-bb0(%0 : $SwiftGizmo):
+bb0(%0 : @owned $SwiftGizmo):
   // function_ref objc_dealloc.onDestruct () -> ()
   %1 = function_ref @_T012objc_dealloc10onDestructyyF : $@convention(thin) () -> () // user: %2
   %2 = apply %1() : $@convention(thin) () -> ()
-  %3 = ref_element_addr %0 : $SwiftGizmo, #SwiftGizmo.x      // user: %4
-  destroy_addr %3 : $*X                           // id: %4
+  %3 = begin_borrow %0 : $SwiftGizmo
+  %4 = ref_element_addr %3 : $SwiftGizmo, #SwiftGizmo.x      // user: %4
+  destroy_addr %4 : $*X                           // id: %4
+  end_borrow %3 from %0 : $SwiftGizmo, $SwiftGizmo
   %5 = unchecked_ref_cast %0 : $SwiftGizmo to $Builtin.NativeObject // user: %6
   return %5 : $Builtin.NativeObject              // id: %6
 }
 
 sil @_T012objc_dealloc10SwiftGizmoC1xAA1XCfgTo : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X {
-bb0(%0 : $SwiftGizmo):
-  %1 = ref_element_addr %0 : $SwiftGizmo, #SwiftGizmo.x      // user: %2
-  %2 = load %1 : $*X                              // users: %4, %3
-  strong_retain %2 : $X                           // id: %3
-  return %2 : $X                                  // id: %4
+bb0(%0 : @unowned $SwiftGizmo):
+  %1 = begin_borrow %0 : $SwiftGizmo
+  %2 = ref_element_addr %1 : $SwiftGizmo, #SwiftGizmo.x      // user: %2
+  %3 = load [copy] %2 : $*X                              // users: %4, %3
+  end_borrow %1 from %0 : $SwiftGizmo, $SwiftGizmo
+  return %3 : $X                                  // id: %4
 }
 
 sil @_T012objc_dealloc10SwiftGizmoC1xAA1XCfsTo : $@convention(objc_method) (X, SwiftGizmo) -> () {
-bb0(%0 : $X, %1 : $SwiftGizmo):
-  strong_retain %0 : $X                           // id: %2
-  strong_retain %1 : $SwiftGizmo                  // id: %3
-  %4 = ref_element_addr %1 : $SwiftGizmo, #SwiftGizmo.x      // user: %5
-  assign %0 to %4 : $*X                           // id: %5
-  strong_release %1 : $SwiftGizmo                 // id: %6
+bb0(%0 : @unowned $X, %1 : @unowned $SwiftGizmo):
+  %2 = copy_value %0 : $X
+  %3 = copy_value %1 : $SwiftGizmo
+  %4 = begin_borrow %3 : $SwiftGizmo
+  %5 = ref_element_addr %4 : $SwiftGizmo, #SwiftGizmo.x      // user: %5
+  assign %2 to %5 : $*X                           // id: %5
+  end_borrow %4 from %3 : $SwiftGizmo, $SwiftGizmo
+  destroy_value %3 : $SwiftGizmo                 // id: %6
   %7 = tuple ()                                   // user: %8
   return %7 : $()                                 // id: %8
 }
 
 // CHECK: define internal void @_T012objc_dealloc10SwiftGizmoCfDTo([[OPAQUE:%.*]]*, i8*) unnamed_addr
 sil @_T012objc_dealloc10SwiftGizmoCfDTo : $@convention(objc_method) (SwiftGizmo) -> () {
-bb0(%0 : $SwiftGizmo):
+bb0(%0 : @unowned $SwiftGizmo):
   // CHECK-NEXT: entry
   // CHECK-NEXT: [[OBJC_SUPER:%[a-zA-Z0-9_]+]] = alloca %objc_super, align 8
   // CHECK: [[SGIZMOVAL:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE]]* %0 to [[SGIZMO]]*
@@ -81,27 +86,29 @@ bb0(%0 : $SwiftGizmo):
 
   // Destroy instance variables
   // FIXME: This should move to .cxx_destruct
-  // CHECK: [[XOFFSET:%[a-zA-Z0-9]+]] = load i64, i64* @_T012objc_dealloc10SwiftGizmoC1xAA1XCvWvd, align 8
+  // CHECK: [[XOFFSET:%[a-zA-Z0-9]+]] = load i64, i64* @_T012objc_dealloc10SwiftGizmoC1xAA1XCvpWvd, align 8
   // CHECK-NEXT: bitcast
   // CHECK-NEXT: [[IVAR_ADDR:%[a-zA-Z0-9]+]] = getelementptr inbounds i8, i8* {{.*}}, i64 [[XOFFSET]]
   // CHECK-NEXT: [[XADDR:%[.a-zA-Z0-9]+]] = bitcast i8* [[IVAR_ADDR]] to %T12objc_dealloc1XC**
   // CHECK-NEXT: [[X:%[a-zA-Z0-9]+]] = load %T12objc_dealloc1XC*, %T12objc_dealloc1XC** [[XADDR]], align 8
   // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T12objc_dealloc1XC*)*)(%T12objc_dealloc1XC* [[X]])
-  %3 = ref_element_addr %0 : $SwiftGizmo, #SwiftGizmo.x      // user: %4
-  destroy_addr %3 : $*X                           // id: %4
+  %3 = begin_borrow %0 : $SwiftGizmo
+  %4 = ref_element_addr %3 : $SwiftGizmo, #SwiftGizmo.x      // user: %4
+  destroy_addr %4 : $*X                           // id: %4
+  end_borrow %3 from %0 : $SwiftGizmo, $SwiftGizmo
 
   // Call super -dealloc.
   // CHECK: [[SUPER:%[a-zA-Z0-9]+]] = bitcast [[SGIZMO]]* [[SGIZMOVAL]] to [[GIZMO]]*
   // CHECK-NEXT: [[SUPER_OBJ:%[a-zA-Z0-9]+]] = bitcast [[GIZMO]]* [[SUPER]] to %objc_object*
   // CHECK-NEXT: [[T0:%.*]] = call %swift.type* @_T012objc_dealloc10SwiftGizmoCMa()
   // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type* [[T0]] to %objc_class*
-  // CHECK-NEXT: [[OBJC_SUPER_RECEIVER:%[a-zA-Z0-9]+]] = getelementptr %objc_super, %objc_super* [[OBJC_SUPER]], i32 0, i32 0
+  // CHECK-NEXT: [[OBJC_SUPER_RECEIVER:%[a-zA-Z0-9]+]] = getelementptr inbounds %objc_super, %objc_super* [[OBJC_SUPER]], i32 0, i32 0
   // CHECK-NEXT: store %objc_object* [[SUPER_OBJ]], %objc_object** [[OBJC_SUPER_RECEIVER]], align 8
-  // CHECK-NEXT: [[OBJC_SUPER_CLASS:%[a-zA-Z0-9]+]] = getelementptr %objc_super, %objc_super* [[OBJC_SUPER]], i32 0, i32 1
+  // CHECK-NEXT: [[OBJC_SUPER_CLASS:%[a-zA-Z0-9]+]] = getelementptr inbounds %objc_super, %objc_super* [[OBJC_SUPER]], i32 0, i32 1
   // CHECK-NEXT: store %objc_class* [[T1]], %objc_class** [[OBJC_SUPER_CLASS]], align 8
   // CHECK-NEXT: [[DEALLOC_SEL:%[a-zA-Z0-9]+]] = load i8*, i8** @"\01L_selector(dealloc)", align 8
   // CHECK-NEXT: call void bitcast (void ()* @objc_msgSendSuper2 to void (%objc_super*, i8*)*)(%objc_super* [[OBJC_SUPER]], i8* [[DEALLOC_SEL]])
-  %5 = super_method %0 : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : (Gizmo) -> () -> (), $@convention(objc_method) (Gizmo) -> () // user: %7
+  %5 = objc_super_method %0 : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : (Gizmo) -> () -> (), $@convention(objc_method) (Gizmo) -> () // user: %7
   %6 = upcast %0 : $SwiftGizmo to $Gizmo          // user: %7
   %7 = apply %5(%6) : $@convention(objc_method) (Gizmo) -> ()
 
@@ -112,17 +119,17 @@ bb0(%0 : $SwiftGizmo):
 
 // @objc ObjectiveC.SwiftGizmo.__ivar_destroyer
 sil @_T012objc_dealloc10SwiftGizmoCfETo : $@convention(objc_method) (SwiftGizmo) -> () {
-bb0(%0 : $SwiftGizmo):
+bb0(%0 : @unowned $SwiftGizmo):
   %3 = tuple ()
   return %3 : $()                                 // id: %4
 }
 
 sil @_T012objc_dealloc10SwiftGizmoCACycfcTo : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
-bb0(%0 : $SwiftGizmo):
+bb0(%0 : @owned $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
 sil @_T012objc_dealloc10SwiftGizmoCSQyACGSi7bellsOn_tcfcTo : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
-bb0(%0 : $Int, %1 : $SwiftGizmo):
+bb0(%0 : @trivial $Int, %1 : @owned $SwiftGizmo):
   unreachable
 }

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle -primary-file %s -emit-silgen | %FileCheck %s
@@ -25,7 +25,7 @@ public class Horse : NSObject {
 // CHECK: }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T025inlineable_attribute_objc5HorseC6gallopyyFTD : $@convention(method) (@guaranteed Horse) -> ()
-// CHECK: class_method [volatile]
+// CHECK: objc_method
 // CHECK: return
 // CHECK: }
 

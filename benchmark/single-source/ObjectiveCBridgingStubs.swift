@@ -16,6 +16,19 @@ import Foundation
 import ObjectiveCTests
 #endif
 
+public let ObjectiveCBridgingStubs = [
+  BenchmarkInfo(name: "ObjectiveCBridgeStubDataAppend", runFunction: run_ObjectiveCBridgeStubDataAppend, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubDateAccess", runFunction: run_ObjectiveCBridgeStubDateAccess, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubDateMutation", runFunction: run_ObjectiveCBridgeStubDateMutation, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubFromArrayOfNSString", runFunction: run_ObjectiveCBridgeStubFromArrayOfNSString, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSDate", runFunction: run_ObjectiveCBridgeStubFromNSDate, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSString", runFunction: run_ObjectiveCBridgeStubFromNSString, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubToArrayOfNSString", runFunction: run_ObjectiveCBridgeStubToArrayOfNSString, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubToNSDate", runFunction: run_ObjectiveCBridgeStubToNSDate, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubToNSString", runFunction: run_ObjectiveCBridgeStubToNSString, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubURLAppendPath", runFunction: run_ObjectiveCBridgeStubURLAppendPath, tags: [.validation, .bridging]),
+]
+
 #if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubFromNSString() {
@@ -24,7 +37,7 @@ func testObjectiveCBridgeStubFromNSString() {
    for _ in 0 ..< 10_000 {
      str = b.testToString()
    }
-   CheckResults(str != "" && str == "Default string value no tagged pointer", "Wrong value returned")
+   CheckResults(str != "" && str == "Default string value no tagged pointer")
 }
 #endif
 
@@ -71,7 +84,7 @@ func testObjectiveCBridgeStubFromArrayOfNSString() {
      arr = b.testToArrayOfStrings()
      str = arr[0]
    }
-   CheckResults(str != "" && str == "Default string value no tagged pointer", "Wrong value returned")
+   CheckResults(str != "" && str == "Default string value no tagged pointer")
 }
 #endif
 

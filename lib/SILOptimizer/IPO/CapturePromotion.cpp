@@ -193,7 +193,7 @@ namespace {
 /// one or more captures from 'inout' (by-reference) to by-value.
 class ClosureCloner : public SILClonerWithScopes<ClosureCloner> {
 public:
-  friend class SILVisitor<ClosureCloner>;
+  friend class SILInstructionVisitor<ClosureCloner>;
   friend class SILCloner<ClosureCloner>;
 
   ClosureCloner(SILFunction *Orig, IsSerialized_t Serialized,
@@ -428,8 +428,9 @@ ClosureCloner::initCloned(SILFunction *Orig, IsSerialized_t Serialized,
   auto *Fn = M.createFunction(
       Orig->getLinkage(), ClonedName, ClonedTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
-      Orig->isThunk(), Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
-      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
+      Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
+      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
+      Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs())
     Fn->addSemanticsAttr(Attr);
   if (Orig->hasUnqualifiedOwnership()) {
@@ -636,8 +637,8 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *LI) {
     // the loads get mapped to uses of the new object type argument.
     //
     // We assume that the value is already guaranteed.
-    assert(Val.getOwnershipKind() == ValueOwnershipKind::Guaranteed
-           && "Expected argument value to be guaranteed");
+    assert(Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed) &&
+           "Expected argument value to be guaranteed");
     ValueMap.insert(std::make_pair(LI, Val));
     return;
   }
@@ -676,13 +677,20 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
   if (SILValue Val = getProjectBoxMappedVal(SEAI->getOperand())) {
     // Loads of a struct_element_addr of an argument get replaced with a
     // struct_extract of the new passed in value. The value should be borrowed
-    // already.
-    SILBuilderWithPostProcess<ClosureCloner, 1> B(this, LI);
-    assert(B.getFunction().hasUnqualifiedOwnership()
-           || Val.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
-    SILValue V =
-        B.emitStructExtract(LI->getLoc(), Val, SEAI->getField(), LI->getType());
-    ValueMap.insert(std::make_pair(LI, V));
+    // already, so we can just extract the value.
+    assert(getBuilder().getFunction().hasUnqualifiedOwnership() ||
+           Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed));
+    Val = getBuilder().emitStructExtract(LI->getLoc(), Val, SEAI->getField(),
+                                         LI->getType());
+
+    // If we were performing a load [copy], then we need to a perform a copy
+    // here since when cloning, we do not eliminate the destroy on the copied
+    // value.
+    if (LI->getFunction()->hasQualifiedOwnership()
+        && LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+      Val = getBuilder().createCopyValue(LI->getLoc(), Val);
+    }
+    ValueMap.insert(std::make_pair(LI, Val));
     return;
   }
   SILCloner<ClosureCloner>::visitLoadInst(LI);
@@ -694,6 +702,13 @@ static SILArgument *getBoxFromIndex(SILFunction *F, unsigned Index) {
   return Entry.getArgument(Index);
 }
 
+static bool isNonMutatingLoad(SILInstruction *I) {
+  auto *LI = dyn_cast<LoadInst>(I);
+  if (!LI)
+    return false;
+  return LI->getOwnershipQualifier() != LoadOwnershipQualifier::Take;
+}
+
 /// \brief Given a partial_apply instruction and the argument index into its
 /// callee's argument list of a box argument (which is followed by an argument
 /// for the address of the box's contents), return true if the closure is known
@@ -701,7 +716,7 @@ static SILArgument *getBoxFromIndex(SILFunction *F, unsigned Index) {
 static bool
 isNonMutatingCapture(SILArgument *BoxArg) {
   SmallVector<ProjectBoxInst*, 2> Projections;
-  
+
   // Conservatively do not allow any use of the box argument other than a
   // strong_release or projection, since this is the pattern expected from
   // SILGen.
@@ -724,27 +739,30 @@ isNonMutatingCapture(SILArgument *BoxArg) {
   // TODO: This seems overly limited.  Why not projections of tuples and other
   // stuff?  Also, why not recursive struct elements?  This should be a helper
   // function that mirrors isNonEscapingUse.
-  auto checkAddrUse = [](SILInstruction *AddrInst) {
+  auto isAddrUseMutating = [](SILInstruction *AddrInst) {
     if (auto *SEAI = dyn_cast<StructElementAddrInst>(AddrInst)) {
-      for (auto *UseOper : SEAI->getUses()) {
-        if (isa<LoadInst>(UseOper->getUser()))
-          return true;
-      }
-    } else if (isa<LoadInst>(AddrInst) || isa<DebugValueAddrInst>(AddrInst)
-               || isa<MarkFunctionEscapeInst>(AddrInst)
-               || isa<EndAccessInst>(AddrInst)) {
-      return true;
+      return all_of(SEAI->getUses(),
+                    [](Operand *Op) -> bool {
+                      return isNonMutatingLoad(Op->getUser());
+                    });
     }
-    return false;
+
+    return isNonMutatingLoad(AddrInst) || isa<DebugValueAddrInst>(AddrInst)
+           || isa<MarkFunctionEscapeInst>(AddrInst)
+           || isa<EndAccessInst>(AddrInst);
   };
+
   for (auto *Projection : Projections) {
     for (auto *UseOper : Projection->getUses()) {
       if (auto *Access = dyn_cast<BeginAccessInst>(UseOper->getUser())) {
         for (auto *AccessUseOper : Access->getUses()) {
-          if (!checkAddrUse(AccessUseOper->getUser()))
+          if (!isAddrUseMutating(AccessUseOper->getUser()))
             return false;
         }
-      } else if (!checkAddrUse(UseOper->getUser()))
+        continue;
+      }
+
+      if (!isAddrUseMutating(UseOper->getUser()))
         return false;
     }
   }
@@ -796,8 +814,8 @@ public:
   /// Visit a random value base.
   ///
   /// These are considered to be escapes.
-  bool visitValueBase(ValueBase *V) {
-    DEBUG(llvm::dbgs() << "    FAIL! Have unknown escaping user: " << *V);
+  bool visitSILInstruction(SILInstruction *I) {
+    DEBUG(llvm::dbgs() << "    FAIL! Have unknown escaping user: " << *I);
     return false;
   }
 
@@ -832,7 +850,7 @@ public:
   }
 
   /// Add the Operands of a transitive use instruction to the worklist.
-  void addUserOperandsToWorklist(SILInstruction *I) {
+  void addUserOperandsToWorklist(SingleValueInstruction *I) {
     for (auto *User : I->getUses()) {
       Worklist.push_back(User);
     }
@@ -1028,7 +1046,8 @@ static bool scanUsesForEscapesAndMutations(Operand *Op,
   // derived from a projection like instruction). In fact such a thing may not
   // even make any sense!
   if (isa<CopyValueInst>(User) || isa<MarkUninitializedInst>(User)) {
-    return all_of(User->getUses(), [&State](Operand *UserOp) -> bool {
+    return all_of(cast<SingleValueInstruction>(User)->getUses(),
+                  [&State](Operand *UserOp) -> bool {
       return scanUsesForEscapesAndMutations(UserOp, State);
     });
   }
@@ -1160,7 +1179,7 @@ static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
 
   // Otherwise, handle the alloc_box case. If we have a mark_uninitialized on
   // the box, we create the project value through that.
-  SILInstruction *Box = cast<AllocBoxInst>(PartialOperand);
+  SingleValueInstruction *Box = cast<AllocBoxInst>(PartialOperand);
   if (auto *Op = Box->getSingleUse()) {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(Op->getUser())) {
       Box = MUI;
@@ -1191,8 +1210,8 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // Initialize a SILBuilder and create a function_ref referencing the cloned
   // closure.
   SILBuilderWithScope B(PAI);
+  B.addOpenedArchetypeOperands(PAI);
   SILValue FnVal = B.createFunctionRef(PAI->getLoc(), ClonedFn);
-  SILType FnTy = FnVal->getType();
 
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.
@@ -1205,7 +1224,8 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   auto CalleePInfo = SubstCalleeFunctionTy->getParameters();
   SILFunctionConventions paConv(PAI->getType().castTo<SILFunctionType>(), M);
   unsigned FirstIndex = paConv.getNumSILArguments();
-  unsigned OpNo = 1, OpCount = PAI->getNumOperands();
+  unsigned OpNo = 1;
+  unsigned OpCount = PAI->getNumOperands() - PAI->getNumTypeDependentOperands();
   SmallVector<SILValue, 16> Args;
   auto NumIndirectResults = calleeConv.getNumIndirectSILResults();
   for (; OpNo != OpCount; ++OpNo) {
@@ -1237,12 +1257,10 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
     ++NumCapturesPromoted;
   }
 
-  auto SubstFnTy = FnTy.substGenericArgs(M, PAI->getSubstitutions());
-
   // Create a new partial apply with the new arguments.
-  auto *NewPAI = B.createPartialApply(PAI->getLoc(), FnVal, SubstFnTy,
-                                      PAI->getSubstitutions(), Args,
-                                      PAI->getType());
+  auto *NewPAI = B.createPartialApply(
+      PAI->getLoc(), FnVal, PAI->getSubstitutions(), Args,
+      PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
   PAI->replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();
   if (FRI->use_empty()) {

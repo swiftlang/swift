@@ -15,6 +15,11 @@ import TestsUtils
 // A micro-benchmark for recursive divide and conquer problems.
 // The program performs integration via Gaussian Quadrature
 
+public let IntegrateTest = BenchmarkInfo(
+  name: "Integrate",
+  runFunction: run_Integrate,
+  tags: [.validation, .algorithm])
+
 class Integrate {
   static let epsilon = 1.0e-9
 
@@ -63,6 +68,5 @@ public func run_Integrate(_ N: Int) {
     }
   }
 
-  CheckResults(abs(result - ref_result) < bound,
-               "Incorrect results in Integrate: abs(\(result) - \(ref_result)) > \(bound)")
+  CheckResults(abs(result - ref_result) < bound)
 }

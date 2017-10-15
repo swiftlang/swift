@@ -10,8 +10,8 @@
   1.#^LITERAL1^#
 }
 // LITERAL1:          Begin completions
-// LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      bigEndian[#Int#]; name=bigEndian{{$}}
-// LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      littleEndian[#Int#]; name=littleEndian{{$}}
+// LITERAL1-DAG:      Decl[InstanceVar]/Super:            bigEndian[#Int#]; name=bigEndian{{$}}
+// LITERAL1-DAG:      Decl[InstanceVar]/Super:            littleEndian[#Int#]; name=littleEndian{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      byteSwapped[#Int#]; name=byteSwapped{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      nonzeroBitCount[#Int#]; name=nonzeroBitCount{{$}}
 
@@ -55,14 +55,13 @@ func giveMeAString() -> Int {
   return "Here's a string".#^LITERAL5^# // try .characters.count here
 }
 
-// LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#String.Index#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: reserveCapacity({#(n): Int#})[#Void#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#contentsOf: Sequence#})[#Void#]{{; name=.+$}}
 
 struct MyColor: _ExpressibleByColorLiteral {
-  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) { red = colorLiteralRed }
+  init(_colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) { red = colorLiteralRed }
   var red: Float
 }
 public typealias _ColorLiteralType = MyColor

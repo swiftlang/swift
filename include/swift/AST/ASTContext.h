@@ -170,13 +170,23 @@ public:
 };
 
 class SILLayout; // From SIL
-
 /// \brief Describes either a nominal type declaration or an extension
 /// declaration.
 typedef llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *>
   TypeOrExtensionDecl;
 
 /// ASTContext - This object creates and owns the AST objects.
+/// However, this class does more than just maintain context within an AST.
+/// It is the closest thing to thread-local or compile-local storage in this
+/// code base. Why? SourceKit uses this code with multiple threads per Unix
+/// process. Each thread processes a different source file. Each thread has its
+/// own instance of ASTContext, and that instance persists for the duration of
+/// the thread, throughout all phases of the compilation. (The name "ASTContext"
+/// is a bit of a misnomer here.) Why not use thread-local storage? This code
+/// may use DispatchQueues and pthread-style TLS won't work with code that uses
+/// DispatchQueues. Summary: if you think you need a global or static variable,
+/// you probably need to put it here instead.
+
 class ASTContext {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;
@@ -262,6 +272,9 @@ private:
   llvm::DenseMap<const Pattern *, DeclContext *>
     DelayedPatternContexts;
 
+  /// Cache of module names that fail the 'canImport' test in this context.
+  llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
+  
 public:
   /// \brief Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
@@ -425,11 +438,21 @@ public:
 
   /// Retrieve the declaration of Foundation.NSError.
   ClassDecl *getNSErrorDecl() const;
+  /// Retrieve the declaration of Foundation.NSNumber.
+  ClassDecl *getNSNumberDecl() const;
+  /// Retrieve the declaration of Foundation.NSValue.
+  ClassDecl *getNSValueDecl() const;
 
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \
   FuncDecl *get##Name(LazyResolver *resolver) const;
 #include "swift/AST/KnownDecls.def"
+
+  /// Get the '+' function on two RangeReplaceableCollection.
+  FuncDecl *getPlusFunctionOnRangeReplaceableCollection() const;
+
+  /// Get the '+' function on two String.
+  FuncDecl *getPlusFunctionOnString() const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
@@ -457,6 +480,13 @@ public:
 
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
+
+  /// Retrieve the declaration of
+  /// Swift._mixForSynthesizedHashValue (Int, Int) -> Int.
+  FuncDecl *getMixForSynthesizedHashValueDecl() const;
+
+  /// Retrieve the declaration of Swift._mixInt(Int) -> Int.
+  FuncDecl *getMixIntDecl() const;
 
   /// Retrieve the declaration of Array.append(element:)
   FuncDecl *getArrayAppendElementDecl() const;
@@ -486,6 +516,11 @@ public:
   /// library or Cocoa framework types that is known to be bridged by another
   /// module's overlay, for layering or implementation detail reasons.
   bool isTypeBridgedInExternalModule(NominalTypeDecl *nominal) const;
+
+  /// True if the given type is an Objective-C class that serves as the bridged
+  /// object type for many Swift value types, meaning that the conversion from
+  /// an object to a value is a conditional cast.
+  bool isObjCClassWithMultipleSwiftBridgedTypes(Type t);
 
   /// Get the Objective-C type that a Swift type bridges to, if any.
   /// 
@@ -829,16 +864,25 @@ public:
   /// not necessarily loaded.
   void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
 
+private:
+  /// Register the given generic signature builder to be used as the canonical
+  /// generic signature builder for the given signature, if we don't already
+  /// have one.
+  void registerGenericSignatureBuilder(GenericSignature *sig,
+                                       GenericSignatureBuilder &&builder);
+  friend class GenericSignatureBuilder;
+
+public:
   /// Retrieve or create the stored generic signature builder for the given
   /// canonical generic signature and module.
-  GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(CanGenericSignature sig,
-                                                ModuleDecl *mod);
+  GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(
+                                                     CanGenericSignature sig);
 
   /// Retrieve or create the canonical generic environment of a canonical
   /// generic signature builder.
   GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
-                                                     GenericSignatureBuilder *builder,
-                                                     ModuleDecl &module);
+                                       GenericSignatureBuilder *builder,
+                                       GenericSignature *sig);
 
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,
@@ -852,9 +896,23 @@ public:
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
-  
-  /// Whether our effective Swift version is in the Swift 3 family
+
+  /// Retrieve a generic signature with a single type parameter conforming
+  /// to the given existential type.
+  CanGenericSignature getExistentialSignature(CanType existential,
+                                              ModuleDecl *mod);
+
+  /// Whether our effective Swift version is in the Swift 3 family.
   bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
+
+  /// Whether our effective Swift version is at least 'major'.
+  ///
+  /// This is usually the check you want; for example, when introducing
+  /// a new language feature which is only visible in Swift 5, you would
+  /// check for isSwiftVersionAtLeast(5).
+  bool isSwiftVersionAtLeast(unsigned major) const {
+    return LangOpts.isSwiftVersionAtLeast(major);
+  }
 
 private:
   friend Decl;

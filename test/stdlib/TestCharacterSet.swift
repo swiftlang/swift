@@ -301,6 +301,10 @@ class TestCharacterSet : TestCharacterSetSuper {
         #endif
         */
     }
+
+    func test_unconditionallyBridgeFromObjectiveC() {
+        expectEqual(CharacterSet(), CharacterSet._unconditionallyBridgeFromObjectiveC(nil))
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -325,6 +329,7 @@ CharacterSetTests.test("test_hasMember") { TestCharacterSet().test_hasMember() }
 CharacterSetTests.test("test_bitmap") { TestCharacterSet().test_bitmap() }
 CharacterSetTests.test("test_setOperationsOfEmptySet") { TestCharacterSet().test_setOperationsOfEmptySet() }
 CharacterSetTests.test("test_moreSetOperations") { TestCharacterSet().test_moreSetOperations() }
+CharacterSetTests.test("test_unconditionallyBridgeFromObjectiveC") { TestCharacterSet().test_unconditionallyBridgeFromObjectiveC() }
 runAllTests()
 #endif
 

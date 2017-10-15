@@ -43,8 +43,9 @@ namespace swift {
     Endianness,
     /// Runtime support (_ObjC or _Native)
     Runtime,
+    /// Conditional import of module
+    CanImport,
   };
-  enum { NumPlatformConditionKind = 4 };
 
   /// Describes which Swift 3 Objective-C inference warnings should be
   /// emitted.
@@ -79,8 +80,8 @@ namespace swift {
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
-    /// \brief Disable typo correction.
-    bool DisableTypoCorrection = false;
+    /// \brief Maximum number of typo corrections we are allowed to perform.
+    unsigned TypoCorrectionLimit = 10;
     
     /// Should access control be respected?
     bool EnableAccessControl = true;
@@ -171,6 +172,10 @@ namespace swift {
 
     unsigned SolverBindingThreshold = 1024 * 1024;
 
+    /// \brief The upper bound to number of sub-expressions unsolved
+    /// before termination of the shrink phrase of the constraint solver.
+    unsigned SolverShrinkUnsolvedThreshold = 10;
+
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
 
@@ -197,8 +202,8 @@ namespace swift {
     /// Whether to attempt to recover from missing cross-references and other
     /// errors when deserializing from a Swift module.
     ///
-    /// This is a staging flag; eventually it will be on by default.
-    bool EnableDeserializationRecovery = false;
+    /// This is a staging flag; eventually it will be removed.
+    bool EnableDeserializationRecovery = true;
 
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
     bool EnableASTScopeLookup = false;
@@ -227,15 +232,20 @@ namespace swift {
     /// of Swift do not.
     Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
       Swift3ObjCInferenceWarnings::None;
-    
-    /// Enable keypaths.
-    bool EnableExperimentalKeyPaths = true;
 
+    /// Diagnose uses of NSCoding with classes that have unstable mangled names.
+    bool EnableNSKeyedArchiverDiagnostics = true;
+    
     /// When a conversion from String to Substring fails, emit a fix-it to append
     /// the void subscript '[]'.
     /// FIXME: Remove this flag when void subscripts are implemented.
     /// This is used to guard preemptive testing for the fix-it.
     bool FixStringToSubstringConversions = false;
+
+    /// Whether to keep track of a refined token stream in SourceFile while
+    /// parsing. This is set true usually for tooling purposes like semantic
+    /// coloring.
+    bool KeepTokensInSourceFile = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -258,7 +268,8 @@ namespace swift {
         Target.getOSVersion(major, minor, revision);
       } else if (Target.isOSLinux() || Target.isOSFreeBSD() ||
                  Target.isAndroid() || Target.isOSWindows() ||
-                 Target.isPS4() || Target.getTriple().empty()) {
+                 Target.isPS4() || Target.isOSHaiku() ||
+                 Target.getTriple().empty()) {
         major = minor = revision = 0;
       } else {
         llvm_unreachable("Unsupported target OS");
@@ -279,6 +290,9 @@ namespace swift {
     
     /// Returns the value for the given platform condition or an empty string.
     StringRef getPlatformConditionValue(PlatformConditionKind Kind) const;
+
+    /// Check whether the given platform condition matches the given value.
+    bool checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const;
 
     /// Explicit conditional compilation flags, initialized via the '-D'
     /// compiler flag.
@@ -304,6 +318,15 @@ namespace swift {
       return EffectiveLanguageVersion.isVersion3();
     }
 
+    /// Whether our effective Swift version is at least 'major'.
+    ///
+    /// This is usually the check you want; for example, when introducing
+    /// a new language feature which is only visible in Swift 5, you would
+    /// check for isSwiftVersionAtLeast(5).
+    bool isSwiftVersionAtLeast(unsigned major) const {
+      return EffectiveLanguageVersion.isVersionAtLeast(major);
+    }
+
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
@@ -325,8 +348,7 @@ namespace swift {
     }
 
   private:
-    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>,
-                      NumPlatformConditionKind>
+    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 4>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };

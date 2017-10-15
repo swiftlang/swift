@@ -94,18 +94,16 @@ public:
                             unsigned(reference.isIndirect()));
   }
 
-  void addFarRelativeAddress(llvm::Constant *target) {
-    addRelativeOffset(IGM().FarRelativeAddressTy, target);
-  }
-
-  void addFarRelativeAddress(ConstantReference reference) {
-    addTaggedRelativeOffset(IGM().FarRelativeAddressTy,
-                            reference.getValue(),
-                            unsigned(reference.isIndirect()));
-  }
-
   Size getNextOffsetFromGlobal() const {
     return Size(super::getNextOffsetFromGlobal().getQuantity());
+  }
+  
+  void addAlignmentPadding(Alignment align) {
+    auto misalignment = getNextOffsetFromGlobal() % IGM().getPointerAlignment();
+    if (misalignment != Size(0))
+      add(llvm::ConstantAggregateZero::get(
+            llvm::ArrayType::get(IGM().Int8Ty,
+                                 align.getValue() - misalignment.getValue())));
   }
 };
 

@@ -59,8 +59,7 @@ struct X4 {
 
 struct Y1 {
   var stored: Int
-  // FIXME: Duplicate diagnostics
-  subscript(_: i, j: Int) -> Int { // expected-error 3{{use of undeclared type 'i'}}
+  subscript(_: i, j: Int) -> Int { // expected-error {{use of undeclared type 'i'}}
     get {
       return stored + j
     }

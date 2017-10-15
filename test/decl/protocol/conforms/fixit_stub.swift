@@ -192,3 +192,9 @@ class Adopter17: ProtocolParallel3, ProtocolParallel4 { // expected-error {{type
   func bar2() {}
 }
 
+protocol ProtocolHasSubscriptFunction {
+  func `subscript`() // expected-note{{protocol requires function 'subscript()' with type '() -> ()'; do you want to add a stub?}} {{74-74=\n    func `subscript`() {\n        <#code#>\n    \}\n}}
+}
+class ProtocolHasSubscriptFunctionAdopter: ProtocolHasSubscriptFunction { // expected-error{{type 'ProtocolHasSubscriptFunctionAdopter' does not conform to protocol 'ProtocolHasSubscriptFunction'}}
+
+}

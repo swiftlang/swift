@@ -21,7 +21,9 @@
 
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallString.h"
 
@@ -154,4 +156,24 @@ void SILWitnessTable::convertToDefinition(ArrayRef<Entry> entries,
 
 Identifier SILWitnessTable::getIdentifier() const {
   return Mod.getASTContext().getIdentifier(Name);
+}
+
+bool SILWitnessTable::conformanceIsSerialized(ProtocolConformance *conformance,
+                                              ResilienceStrategy strategy,
+                                              bool silSerializeWitnessTables) {
+  // Serialize witness tables for conformances synthesized by
+  // the ClangImporter.
+  if (isa<ClangModuleUnit>(conformance->getDeclContext()->getModuleScopeContext()))
+    return true;
+
+  auto *nominal = conformance->getType()->getAnyNominal();
+  // Only serialize if the witness table is sufficiently static, and resilience
+  // is explicitly enabled for this compilation or if we serialize all eligible
+  // witness tables.
+  auto moduleIsResilient = strategy == ResilienceStrategy::Resilient;
+  auto protocolIsPublic =
+      conformance->getProtocol()->getEffectiveAccess() >= AccessLevel::Public;
+  auto typeIsPublic = nominal->getEffectiveAccess() >= AccessLevel::Public;
+  return (moduleIsResilient || silSerializeWitnessTables) &&
+         nominal->hasFixedLayout() && protocolIsPublic && typeIsPublic;
 }

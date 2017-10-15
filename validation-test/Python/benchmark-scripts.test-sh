@@ -1,0 +1,2 @@
+// RUN: %{python} -m unittest discover -s %swift_src_root/benchmark/scripts/
+// REQUIRES: OS=macosx 

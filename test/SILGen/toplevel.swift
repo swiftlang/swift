@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -8,11 +8,11 @@ func trap() -> Never {
 
 
 // CHECK-LABEL: sil @main
-// CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+// CHECK: bb0({{%.*}} : @trivial $Int32, {{%.*}} : @trivial $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
 
 // -- initialize x
 // CHECK: alloc_global @_T08toplevel1xSiv
-// CHECK: [[X:%[0-9]+]] = global_addr @_T08toplevel1xSiv : $*Int
+// CHECK: [[X:%[0-9]+]] = global_addr @_T08toplevel1xSivp : $*Int
 // CHECK: integer_literal $Builtin.Int2048, 999
 // CHECK: store {{.*}} to [trivial] [[X]]
 
@@ -24,7 +24,8 @@ func print_x() {
 
 // -- assign x
 // CHECK: integer_literal $Builtin.Int2048, 0
-// CHECK: assign {{.*}} to [[X]]
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[X]] : $*Int
+// CHECK: assign {{.*}} to [[WRITE]]
 // CHECK: [[PRINT_X:%[0-9]+]] = function_ref @_T08toplevel7print_xyyF :
 // CHECK: apply [[PRINT_X]]
 
@@ -34,7 +35,7 @@ print_x()
 
 // <rdar://problem/19770775> Deferred initialization of let bindings rejected at top level in playground
 // CHECK: alloc_global @_T08toplevel5countSiv
-// CHECK: [[COUNTADDR:%[0-9]+]] = global_addr @_T08toplevel5countSiv : $*Int
+// CHECK: [[COUNTADDR:%[0-9]+]] = global_addr @_T08toplevel5countSivp : $*Int
 // CHECK-NEXT: [[COUNTMUI:%[0-9]+]] = mark_uninitialized [var] [[COUNTADDR]] : $*Int
 let count: Int
 // CHECK: cond_br
@@ -63,9 +64,10 @@ func print_y() {
 
 // -- assign y
 // CHECK: alloc_global @_T08toplevel1ySiv
-// CHECK: [[Y1:%[0-9]+]] = global_addr @_T08toplevel1ySiv : $*Int
+// CHECK: [[Y1:%[0-9]+]] = global_addr @_T08toplevel1ySivp : $*Int
 // CHECK: [[Y:%[0-9]+]] = mark_uninitialized [var] [[Y1]]
-// CHECK: assign {{.*}} to [[Y]]
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[Y]]
+ // CHECK: assign {{.*}} to [[WRITE]]
 // CHECK: [[PRINT_Y:%[0-9]+]] = function_ref @_T08toplevel7print_yyyF
 y = 1
 print_y()
@@ -73,7 +75,7 @@ print_y()
 // -- treat 'guard' vars as locals
 // CHECK-LABEL: function_ref toplevel.A.__allocating_init
 // CHECK: switch_enum {{%.+}} : $Optional<A>, case #Optional.some!enumelt.1: [[SOME_CASE:.+]], case #Optional.none!
-// CHECK: [[SOME_CASE]]([[VALUE:%.+]] : $A):
+// CHECK: [[SOME_CASE]]([[VALUE:%.+]] : @owned $A):
 // CHECK: store [[VALUE]] to [init] [[BOX:%.+]] : $*A
 // CHECK-NOT: destroy_value
 // CHECK: [[SINK:%.+]] = function_ref @_T08toplevel8markUsedyxlF
@@ -115,7 +117,7 @@ fooUsesUninitializedValue()
 
 // CHECK: sil hidden @_T08toplevel13testGlobalCSESiyF
 // CHECK-NOT: global_addr
-// CHECK: %0 = global_addr @_T08toplevel1xSiv : $*Int
+// CHECK: %0 = global_addr @_T08toplevel1xSivp : $*Int
 // CHECK-NOT: global_addr
 // CHECK: return
 func testGlobalCSE() -> Int {

@@ -1,0 +1,9 @@
+module NestedClangTypes {
+  header "NestedClangTypes.h"
+  export *
+}
+
+module NestedClangTypesHelper {
+  header "NestedClangTypesHelper.h"
+  export *
+}

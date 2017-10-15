@@ -110,12 +110,16 @@ void Mangle::printManglingStats() {
 #endif
 }
 
-void Mangler::beginMangling() {
+void Mangler::beginManglingWithoutPrefix() {
   Storage.clear();
   Substitutions.clear();
   StringSubstitutions.clear();
   Words.clear();
   SubstMerging.clear();
+}
+
+void Mangler::beginMangling() {
+  beginManglingWithoutPrefix();
   Buffer << MANGLING_PREFIX_STR;
 }
 
@@ -189,6 +193,35 @@ void Mangler::verify(StringRef nameStr) {
                   "original     = " << nameStr << "\n"
                   "remangled    = " << Remangled << "\n"
                   "re-demangled = " << ReDemangled << '\n';
+  abort();
+#endif
+}
+
+void Mangler::verifyOld(StringRef nameStr) {
+#ifndef NDEBUG
+  Demangler Dem;
+  NodePointer Root = demangleOldSymbolAsNode(nameStr, Dem);
+  if (!Root || treeContains(Root, Node::Kind::Suffix)) {
+    llvm::errs() << "Can't demangle: " << nameStr << '\n';
+    abort();
+  }
+  std::string Remangled = mangleNodeOld(Root);
+  if (Remangled == nameStr)
+    return;
+
+  // There are cases (e.g. with dependent associated types) which results in
+  // different remangled names. See ASTMangler::appendAssociatedTypeName.
+  // This is no problem for the compiler, but we have to be more tolerant for
+  // those cases. Instead we try to re-de-mangle the remangled name.
+  NodePointer RootOfRemangled = Dem.demangleSymbol(Remangled);
+  std::string ReDemangled = mangleNode(RootOfRemangled);
+  if (Remangled == ReDemangled)
+    return;
+
+  llvm::errs() << "Remangling failed:\n"
+  "original     = " << nameStr << "\n"
+  "remangled    = " << Remangled << "\n"
+  "re-demangled = " << ReDemangled << '\n';
   abort();
 #endif
 }

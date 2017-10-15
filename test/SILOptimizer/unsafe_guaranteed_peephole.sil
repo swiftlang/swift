@@ -14,7 +14,7 @@ public class Foo : Base {
 
 sil @beep : $@convention(thin) () -> ()
 sil @beep2 : $@convention(thin) (@owned Foo) -> ()
-sil @beep_or_throw : $@convention(thin) () -> @error ErrorProtocol
+sil @beep_or_throw : $@convention(thin) () -> @error Error
 
 // CHECK-LABEL: sil @testUnsafeGuaranteed_simple
 // CHECK: bb0([[P:%.*]] : $Foo):
@@ -530,7 +530,7 @@ bb0(%0 : $Foo):
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
   %7 = function_ref @beep_or_throw : $@convention(thin) () -> @error Error
-  %8 = try_apply %7() : $@convention(thin) () -> @error Error, normal bb1, error bb2
+  try_apply %7() : $@convention(thin) () -> @error Error, normal bb1, error bb2
 
 bb1(%15: $()):
   strong_release %5 : $Foo

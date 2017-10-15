@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library %s -typecheck -emit-objc-header-path %t/accessibility.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PUBLIC %s < %t/accessibility.h
 // RUN: %check-in-clang %t/accessibility.h

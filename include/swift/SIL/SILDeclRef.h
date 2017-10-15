@@ -66,6 +66,8 @@ bool requiresForeignEntryPoint(ValueDecl *vd);
 /// True if the entry point is natively foreign.
 bool requiresForeignToNativeThunk(ValueDecl *vd);
 
+unsigned getNaturalUncurryLevel(ValueDecl *vd);
+
 enum ForDefinition_t : bool {
   NotForDefinition = false,
   ForDefinition = true
@@ -144,8 +146,6 @@ struct SILDeclRef {
   Loc loc;
   /// The Kind of this SILDeclRef.
   Kind kind : 4;
-  /// The uncurry level of this SILDeclRef.
-  unsigned uncurryLevel : 8;
   /// The required resilience expansion of the declaration.
   unsigned Expansion : 1;
   /// True if the SILDeclRef is a curry thunk.
@@ -158,17 +158,8 @@ struct SILDeclRef {
   /// The default argument index for a default argument getter.
   unsigned defaultArgIndex : 10;
   
-  /// A magic value for SILDeclRef constructors to ask for the natural uncurry
-  /// level of the constant.
-  enum : unsigned { ConstructAtNaturalUncurryLevel = ~0U };
-
-  /// A magic value for SILDeclRef constructors to ask for the best
-  /// available resilience expansion of the constant.
-  static constexpr ResilienceExpansion ConstructAtBestResilienceExpansion
-    = /*TODO*/ ResilienceExpansion::Minimal;
-  
   /// Produces a null SILDeclRef.
-  SILDeclRef() : loc(), kind(Kind::Func), uncurryLevel(0), Expansion(0),
+  SILDeclRef() : loc(), kind(Kind::Func), Expansion(0),
                  isCurried(0), isForeign(0), isDirectReference(0),
                  defaultArgIndex(0) {}
   
@@ -176,10 +167,10 @@ struct SILDeclRef {
   explicit SILDeclRef(ValueDecl *decl, Kind kind,
                       ResilienceExpansion expansion
                         = ResilienceExpansion::Minimal,
-                      unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
+                      bool isCurried = false,
                       bool isForeign = false);
   
-  /// Produces the 'natural' SILDeclRef for the given ValueDecl or
+  /// Produces a SILDeclRef for the given ValueDecl or
   /// AbstractClosureExpr:
   /// - If 'loc' is a func or closure, this returns a Func SILDeclRef.
   /// - If 'loc' is a ConstructorDecl, this returns the Allocator SILDeclRef
@@ -190,13 +181,15 @@ struct SILDeclRef {
   ///   for the containing ClassDecl.
   /// - If 'loc' is a global VarDecl, this returns its GlobalAccessor
   ///   SILDeclRef.
-  /// If the uncurry level is unspecified or specified as NaturalUncurryLevel,
-  /// then the SILDeclRef for the natural uncurry level of the definition is
-  /// used.
+  ///
+  /// If 'isCurried' is true, the loc must be a method or enum element;
+  /// the SILDeclRef will then refer to a curry thunk with type
+  /// (Self) -> (Args...) -> Result, rather than a direct reference to
+  /// the actual method whose lowered type is (Args..., Self) -> Result.
   explicit SILDeclRef(Loc loc,
                       ResilienceExpansion expansion
                         = ResilienceExpansion::Minimal,
-                      unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
+                      bool isCurried = false,
                       bool isForeign = false);
 
   /// Produce a SIL constant for a default argument generator.
@@ -261,7 +254,13 @@ struct SILDeclRef {
   bool isStoredPropertyInitializer() const {
     return kind == Kind::StoredPropertyInitializer;
   }
-  
+
+  /// True if the SILDeclRef references the ivar initializer or deinitializer of
+  /// a class.
+  bool isIVarInitializerOrDestroyer() const {
+    return kind == Kind::IVarInitializer || kind == Kind::IVarDestroyer;
+  }
+
   /// \brief True if the function should be treated as transparent.
   bool isTransparent() const;
   /// \brief True if the function should have its body serialized.
@@ -284,7 +283,7 @@ struct SILDeclRef {
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(loc.getOpaqueValue(),
                               static_cast<int>(kind),
-                              Expansion, uncurryLevel,
+                              Expansion, isCurried,
                               isForeign, isDirectReference,
                               defaultArgIndex);
   }
@@ -293,7 +292,7 @@ struct SILDeclRef {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
       && kind == rhs.kind
       && Expansion == rhs.Expansion
-      && uncurryLevel == rhs.uncurryLevel
+      && isCurried == rhs.isCurried
       && isForeign == rhs.isForeign
       && isDirectReference == rhs.isDirectReference
       && defaultArgIndex == rhs.defaultArgIndex;
@@ -305,26 +304,28 @@ struct SILDeclRef {
   void print(llvm::raw_ostream &os) const;
   void dump() const;
 
+  unsigned getUncurryLevel() const;
+
   ResilienceExpansion getResilienceExpansion() const {
     return ResilienceExpansion(Expansion);
   }
   
   // Returns the SILDeclRef for an entity at a shallower uncurry level.
-  SILDeclRef atUncurryLevel(unsigned level) const {
-    assert(level <= uncurryLevel && "can't safely go to deeper uncurry level");
-    bool willBeCurried = isCurried || level < uncurryLevel;
+  SILDeclRef asCurried(bool curried = true) const {
+    assert(!isCurried && "can't safely go to deeper uncurry level");
     // Curry thunks are never foreign.
-    bool willBeForeign = isForeign && !willBeCurried;
+    bool willBeForeign = isForeign && !curried;
     bool willBeDirect = isDirectReference;
-    return SILDeclRef(loc.getOpaqueValue(), kind, Expansion, level,
-                      willBeCurried, willBeDirect, willBeForeign,
+    return SILDeclRef(loc.getOpaqueValue(), kind, Expansion,
+                      curried, willBeDirect, willBeForeign,
                       defaultArgIndex);
   }
   
   /// Returns the foreign (or native) entry point corresponding to the same
   /// decl.
   SILDeclRef asForeign(bool foreign = true) const {
-    return SILDeclRef(loc.getOpaqueValue(), kind, Expansion, uncurryLevel,
+    assert(!isCurried);
+    return SILDeclRef(loc.getOpaqueValue(), kind, Expansion,
                       isCurried, isDirectReference, foreign, defaultArgIndex);
   }
   
@@ -379,13 +380,13 @@ private:
   explicit SILDeclRef(void *opaqueLoc,
                       Kind kind,
                       unsigned rawExpansion,
-                      unsigned uncurryLevel,
                       bool isCurried,
                       bool isDirectReference,
                       bool isForeign,
                       unsigned defaultArgIndex)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)),
-      kind(kind), uncurryLevel(uncurryLevel), Expansion(rawExpansion),
+      kind(kind),
+      Expansion(rawExpansion),
       isCurried(isCurried),
       isForeign(isForeign), isDirectReference(isDirectReference),
       defaultArgIndex(defaultArgIndex)
@@ -413,18 +414,18 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
 
   static SILDeclRef getEmptyKey() {
     return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func,
-                      0, 0, false, false, false, 0);
+                      0, false, false, false, 0);
   }
   static SILDeclRef getTombstoneKey() {
     return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func,
-                      0, 0, false, false, false, 0);
+                      0, false, false, false, 0);
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
     unsigned h2 = UnsignedInfo::getHashValue(unsigned(Val.kind));
     unsigned h3 = (Val.kind == Kind::DefaultArgGenerator)
                     ? UnsignedInfo::getHashValue(Val.defaultArgIndex)
-                    : UnsignedInfo::getHashValue(Val.uncurryLevel);
+                    : UnsignedInfo::getHashValue(Val.isCurried);
     unsigned h4 = UnsignedInfo::getHashValue(Val.isForeign);
     unsigned h5 = UnsignedInfo::getHashValue(Val.isDirectReference);
     return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7) ^ (h5 << 11);

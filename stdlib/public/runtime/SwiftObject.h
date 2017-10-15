@@ -58,6 +58,9 @@ SWIFT_RUNTIME_EXPORT @interface SwiftObject<NSObject> {
 - (BOOL)conformsToProtocol:(Protocol *)aProtocol;
 
 - (BOOL)respondsToSelector:(SEL)aSelector;
++ (BOOL)instancesRespondToSelector:(SEL)aSelector;
+- (IMP)methodForSelector:(SEL)aSelector;
++ (IMP)instanceMethodForSelector:(SEL)aSelector;
 
 - (instancetype)retain;
 - (oneway void)release;

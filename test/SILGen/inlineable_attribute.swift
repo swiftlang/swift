@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
 
 // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute15fragileFunctionyyF : $@convention(thin) () -> ()
 @_inlineable public func fragileFunction() {
@@ -9,12 +9,12 @@ public struct MySt {
   // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute4MyStV6methodyyF : $@convention(method) (MySt) -> ()
   @_inlineable public func method() {}
 
-  // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute4MyStV8propertySifg : $@convention(method) (MySt) -> Int
+  // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute4MyStV8propertySivg : $@convention(method) (MySt) -> Int
   @_inlineable public var property: Int {
     return 5
   }
 
-  // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute4MyStV9subscriptS2icfg : $@convention(method) (Int, MySt) -> Int
+  // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute4MyStVS2icig : $@convention(method) (Int, MySt) -> Int
   @_inlineable public subscript(x: Int) -> Int {
     return x
   }
@@ -49,7 +49,7 @@ public class MyCls {
   _ = MyEnum.c
 }
 
-// CHECK-LABEL: sil [transparent] @_T020inlineable_attribute15HasInitializersV1xSivfi : $@convention(thin) () -> Int
+// CHECK-LABEL: sil [transparent] @_T020inlineable_attribute15HasInitializersV1xSivpfi : $@convention(thin) () -> Int
 
 public struct HasInitializers {
   public let x = 1234
@@ -73,4 +73,21 @@ public class Horse {
 
 @_inlineable public func talkAboutAHorse(h: Horse) {
   _ = h.gallop
+}
+
+@_versioned class Base {
+  @_versioned
+  @_inlineable
+  init(horse: Horse) {}
+}
+
+// CHECK-LABEL: sil [serialized] @_T020inlineable_attribute7DerivedCfd : $@convention(method) (@guaranteed Derived) -> @owned Builtin.NativeObject
+// CHECK-LABEL: sil [serialized] @_T020inlineable_attribute7DerivedCfD : $@convention(method) (@owned Derived) -> ()
+
+// Make sure the synthesized delegating initializer is inlineable also
+
+// CHECK-LABEL: sil [serialized] @_T020inlineable_attribute7DerivedCAcA5HorseC5horse_tcfc : $@convention(method) (@owned Horse, @owned Derived) -> @owned Derived
+@_versioned class Derived : Base {
+  // Allow @_inlineable deinits
+  @_inlineable deinit {}
 }

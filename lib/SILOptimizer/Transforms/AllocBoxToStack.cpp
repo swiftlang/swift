@@ -141,7 +141,8 @@ getFinalReleases(SILValue Box,
     // If we have a copy value or a mark_uninitialized, add its uses to the work
     // list and continue.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
-      copy(User->getUses(), std::back_inserter(Worklist));
+      copy(cast<SingleValueInstruction>(User)->getUses(),
+           std::back_inserter(Worklist));
       continue;
     }
 
@@ -212,8 +213,8 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
     // If we have a copy_value, the copy value does not cause an escape, but its
     // uses might do so... so add the copy_value's uses to the worklist and
     // continue.
-    if (isa<CopyValueInst>(User)) {
-      copy(User->getUses(), std::back_inserter(Worklist));
+    if (auto CVI = dyn_cast<CopyValueInst>(User)) {
+      copy(CVI->getUses(), std::back_inserter(Worklist));
       continue;
     }
 
@@ -385,7 +386,8 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
     // If our user instruction is a copy_value or a marked_uninitialized, visit
     // the users recursively.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
-      copy(User->getUses(), std::back_inserter(Worklist));
+      copy(cast<SingleValueInstruction>(User)->getUses(),
+           std::back_inserter(Worklist));
       continue;
     }
 
@@ -435,7 +437,7 @@ static void replaceProjectBoxUsers(SILValue HeapBox, SILValue StackBox) {
   while (!Worklist.empty()) {
     auto *Op = Worklist.pop_back_val();
     if (auto *PBI = dyn_cast<ProjectBoxInst>(Op->getUser())) {
-      // This may result in an alloc_stack being used by begin_access [dymaic].
+      // This may result in an alloc_stack being used by begin_access [dynamic].
       PBI->replaceAllUsesWith(StackBox);
       continue;
     }
@@ -514,11 +516,11 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
 
     // Look through any mark_uninitialized, copy_values.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
-      transform(User->getUses(), std::back_inserter(Worklist),
+      auto Inst = cast<SingleValueInstruction>(User);
+      transform(Inst->getUses(), std::back_inserter(Worklist),
                 [](Operand *Op) -> SILInstruction * { return Op->getUser(); });
-      User->replaceAllUsesWith(
-          SILUndef::get(User->getType(), User->getModule()));
-      User->eraseFromParent();
+      Inst->replaceAllUsesWithUndef();
+      Inst->eraseFromParent();
       continue;
     }
 
@@ -538,7 +540,7 @@ namespace {
 /// promoting some of its box parameters to stack addresses.
 class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
 public:
-  friend class SILVisitor<PromotedParamCloner>;
+  friend class SILInstructionVisitor<PromotedParamCloner>;
   friend class SILCloner<PromotedParamCloner>;
 
   PromotedParamCloner(SILFunction *Orig, IsSerialized_t Serialized,
@@ -639,8 +641,9 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
   auto *Fn = M.createFunction(
       SILLinkage::Shared, ClonedName, ClonedTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
-      Orig->isThunk(), Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
-      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
+      Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
+      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
+      Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
@@ -811,7 +814,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
     // address because we've proven we can keep this value on the stack. The
     // partial_apply had ownership of this box so we must now release it
     // explicitly when the partial_apply is released.
-    SILInstruction *Box = cast<SILInstruction>(O.get());
+    auto *Box = cast<SingleValueInstruction>(O.get());
     assert((isa<AllocBoxInst>(Box) || isa<CopyValueInst>(Box)) &&
            "Expected either an alloc box or a copy of an alloc box");
     SILBuilder B(Box);
@@ -838,13 +841,10 @@ specializePartialApply(PartialApplyInst *PartialApply,
   // Build the function_ref and partial_apply.
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
                                                    ClonedFn);
-  CanSILFunctionType CanFnTy = ClonedFn->getLoweredFunctionType();
-  auto const &Subs = PartialApply->getSubstitutions();
-  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M, Subs);
-  return Builder.createPartialApply(PartialApply->getLoc(), FunctionRef,
-                                 SILType::getPrimitiveObjectType(SubstCalleeTy),
-                                    PartialApply->getSubstitutions(), Args,
-                                    PartialApply->getType());
+  return Builder.createPartialApply(
+      PartialApply->getLoc(), FunctionRef, PartialApply->getSubstitutions(),
+      Args,
+      PartialApply->getType().getAs<SILFunctionType>()->getCalleeConvention());
 }
 
 static void

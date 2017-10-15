@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
@@ -257,110 +258,261 @@ void mergeSplitRanges(unsigned Off1, unsigned Len1, unsigned Off2, unsigned Len2
   }
 }
 
-
 struct SwiftSyntaxToken {
-  unsigned Column;
+  unsigned Offset;
   unsigned Length:24;
   SyntaxNodeKind Kind:8;
 
-  SwiftSyntaxToken(unsigned Column, unsigned Length,
-                   SyntaxNodeKind Kind)
-    :Column(Column), Length(Length), Kind(Kind) { }
+  static SwiftSyntaxToken createInvalid() {
+    return {0, 0, SyntaxNodeKind::AttributeBuiltin};
+  }
+
+  SwiftSyntaxToken(unsigned Offset, unsigned Length, SyntaxNodeKind Kind)
+    : Offset(Offset), Length(Length), Kind(Kind) {}
+
+  unsigned endOffset() const { return Offset + Length; }
+
+  bool isInvalid() const { return Length == 0; }
+
+  bool operator==(const SwiftSyntaxToken &Other) const {
+    return Offset == Other.Offset && Length == Other.Length &&
+      Kind == Other.Kind;
+  }
+
+  bool operator!=(const SwiftSyntaxToken &Other) const {
+    return Offset != Other.Offset || Length != Other.Length ||
+      Kind != Other.Kind;
+  }
 };
 
-class SwiftSyntaxMap {
-  typedef std::vector<SwiftSyntaxToken> SwiftSyntaxLineMap;
-  std::vector<SwiftSyntaxLineMap> Lines;
+struct SwiftEditorCharRange {
+  unsigned Offset;
+  unsigned EndOffset;
 
-public:
-  bool matchesFirstTokenOnLine(unsigned Line,
-                               const SwiftSyntaxToken &Token) const {
-    assert(Line > 0);
-    if (Lines.size() < Line)
+  SwiftEditorCharRange(unsigned Offset, unsigned EndOffset) :
+    Offset(Offset), EndOffset(EndOffset) {}
+
+  SwiftEditorCharRange(SwiftSyntaxToken Token) :
+    Offset(Token.Offset), EndOffset(Token.endOffset()) {}
+
+  size_t length() const { return EndOffset - Offset; }
+  bool isEmpty() const { return Offset == EndOffset; }
+  bool intersects(const SwiftSyntaxToken &Token) const {
+    return this->Offset < (Token.endOffset()) && this->EndOffset > Token.Offset;
+  }
+  void extendToInclude(const SwiftEditorCharRange &Range) {
+    if (Range.Offset < Offset)
+      Offset = Range.Offset;
+    if (Range.EndOffset > EndOffset)
+      EndOffset = Range.EndOffset;
+  }
+  void extendToInclude(unsigned OtherOffset) {
+    extendToInclude({OtherOffset, OtherOffset});
+  }
+};
+
+/// Finds and represents the first mismatching tokens in two syntax maps,
+/// ignoring invalidated tokens.
+template <class Iter>
+struct TokenMismatch {
+  /// The begin and end iterators of the previous syntax map
+  Iter PrevTok, PrevEnd;
+  /// The begin and end iterators of the current syntax map
+  Iter CurrTok, CurrEnd;
+
+  TokenMismatch(Iter CurrTok, Iter CurrEnd, Iter PrevTok, Iter PrevEnd) :
+  PrevTok(PrevTok), PrevEnd(PrevEnd), CurrTok(CurrTok), CurrEnd(CurrEnd) {
+    skipInvalid();
+    while(advance());
+  }
+
+  /// Returns true if a mismatch was found
+  bool foundMismatch() const {
+    return CurrTok != CurrEnd || PrevTok != PrevEnd;
+  }
+
+  /// Returns the smallest start offset of the mismatched token ranges
+  unsigned mismatchStart() const {
+    assert(foundMismatch());
+    if (CurrTok != CurrEnd) {
+      if (PrevTok != PrevEnd)
+        return std::min(CurrTok->Offset, PrevTok->Offset);
+      return CurrTok->Offset;
+    }
+    return PrevTok->Offset;
+  }
+
+  /// Returns the largest end offset of the mismatched token ranges
+  unsigned mismatchEnd() const {
+    assert(foundMismatch());
+    if (CurrTok != CurrEnd) {
+      if (PrevTok != PrevEnd)
+        return std::max(CurrTok->endOffset(), PrevTok->endOffset());
+      return CurrTok->endOffset();
+    }
+    return PrevTok->endOffset();
+  }
+
+private:
+  void skipInvalid() {
+    while (PrevTok != PrevEnd && PrevTok->isInvalid())
+      ++PrevTok;
+  }
+
+  bool advance() {
+    if (CurrTok == CurrEnd || PrevTok == PrevEnd || *CurrTok != *PrevTok)
       return false;
+    ++CurrTok;
+    ++PrevTok;
+    skipInvalid();
+    return true;
+  }
+};
 
-    unsigned LineOffset = Line - 1;
-    const SwiftSyntaxLineMap &LineMap = Lines[LineOffset];
-    if (LineMap.empty())
-      return false;
+/// Represents a the syntax highlighted token ranges in a source file
+struct SwiftSyntaxMap {
+  std::vector<SwiftSyntaxToken> Tokens;
 
-    const SwiftSyntaxToken &Tok = LineMap.front();
-    if (Tok.Column == Token.Column && Tok.Length == Token.Length
-        && Tok.Kind == Token.Kind) {
-      return true;
-    }
-
-    return false;
+  explicit SwiftSyntaxMap(unsigned Capacity = 0) {
+    if (Capacity)
+      Tokens.reserve(Capacity);
   }
 
-  void addTokenForLine(unsigned Line, const SwiftSyntaxToken &Token) {
-    assert(Line > 0);
-    if (Lines.size() < Line) {
-      Lines.resize(Line);
-    }
-    unsigned LineOffset = Line - 1;
-    SwiftSyntaxLineMap &LineMap = Lines[LineOffset];
-    // FIXME: Assert this token is after the last one
-    LineMap.push_back(Token);
+  void addToken(const SwiftSyntaxToken &Token) {
+    assert(Tokens.empty() || Token.Offset >= Tokens.back().Offset);
+    Tokens.push_back(Token);
   }
 
-  void mergeTokenForLine(unsigned Line, const SwiftSyntaxToken &Token) {
-    assert(Line > 0);
-    if (Lines.size() < Line) {
-      Lines.resize(Line);
+  /// Merge this nested token into the last token that was added
+  void mergeToken(const SwiftSyntaxToken &Token) {
+    if (Tokens.empty()) {
+      Tokens.push_back(Token);
+      return;
     }
-    unsigned LineOffset = Line - 1;
-    SwiftSyntaxLineMap &LineMap = Lines[LineOffset];
-    if (!LineMap.empty()) {
-      auto &LastTok = LineMap.back();
-      mergeSplitRanges(LastTok.Column, LastTok.Length,
-                       Token.Column, Token.Length,
-                       [&](unsigned BeforeOff, unsigned BeforeLen,
-                           unsigned AfterOff, unsigned AfterLen) {
-        auto LastKind = LastTok.Kind;
-        LineMap.pop_back();
-        if (BeforeLen)
-          LineMap.emplace_back(BeforeOff, BeforeLen, LastKind);
-        LineMap.push_back(Token);
-        if (AfterLen)
-          LineMap.emplace_back(AfterOff, AfterLen, LastKind);
-      });
+    auto &LastTok = Tokens.back();
+    assert(LastTok.Offset <= Token.Offset);
+    mergeSplitRanges(LastTok.Offset, LastTok.Length, Token.Offset, Token.Length,
+                     [&](unsigned BeforeOff, unsigned BeforeLen,
+                         unsigned AfterOff, unsigned AfterLen) {
+                       auto LastKind = LastTok.Kind;
+                       Tokens.pop_back();
+                       if (BeforeLen)
+                         Tokens.emplace_back(BeforeOff, BeforeLen, LastKind);
+                       Tokens.push_back(Token);
+                       if (AfterLen)
+                         Tokens.emplace_back(AfterOff, AfterLen, LastKind);
+                     });
+  }
+
+  /// Adjusts the token offsets and lengths in this syntax map to account for
+  /// replacing \p Len bytes at the given \p Offset with \p NewLen bytes. Tokens
+  /// before the replacement stay the same, tokens after it are shifted, and
+  /// tokens that intersect it are 'removed' (really just marked invalid).
+  /// Clients are expected to match this behavior.
+  ///
+  /// Returns the union of the replaced range and the token ranges it
+  /// intersected, or nothing if no tokens were intersected.
+  llvm::Optional<SwiftEditorCharRange>
+  adjustForReplacement(unsigned Offset, unsigned Len, unsigned NewLen) {
+    unsigned ReplacedStart = Offset;
+    unsigned ReplacedEnd = Offset + Len;
+    bool TokenIntersected = false;
+    SwiftEditorCharRange Affected = { /*Offset=*/ReplacedStart,
+                                      /*EndOffset=*/ReplacedEnd};
+    // Adjust the tokens
+    auto Token = Tokens.begin();
+    while (Token != Tokens.end() && Token->endOffset() <= ReplacedStart) {
+      // Completely before the replaced range – no change needed
+      ++Token;
     }
-    else {
-      // Not overlapping, just add the new token to the end
-      LineMap.push_back(Token);
+
+    while (Token != Tokens.end() && Token->Offset < ReplacedEnd) {
+      // Intersecting the replaced range – extend Affected and invalidate
+      TokenIntersected = true;
+      Affected.extendToInclude(*Token);
+      *Token = SwiftSyntaxToken::createInvalid();
+      ++Token;
+    }
+
+    while (Token != Tokens.end()) {
+      // Completely after the replaced range - shift to account for NewLen
+      if (NewLen >= Len)
+        Token->Offset += NewLen - Len;
+      else
+        Token->Offset -= Len - NewLen;
+      ++Token;
+    }
+
+    // If the replaced range didn't intersect with any existing tokens, there's
+    // no need to report an affected range
+    if (!TokenIntersected)
+      return None;
+
+    // Update the end of the affected range to account for NewLen
+    if (NewLen >= Len) {
+      Affected.EndOffset += NewLen - Len;
+    } else {
+      Affected.EndOffset -= Len - NewLen;
+    }
+
+    return Affected;
+  }
+
+  /// Passes each token in this SwiftSyntaxMap to the given \p Consumer
+  void forEach(EditorConsumer &Consumer) {
+    for (auto &Token: Tokens) {
+      auto Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(Token.Kind);
+      Consumer.handleSyntaxMap(Token.Offset, Token.Length, Kind);
     }
   }
 
-  void clearLineRange(unsigned StartLine, unsigned Length) {
-    assert(StartLine > 0);
-    unsigned LineOffset = StartLine - 1;
-    for (unsigned Line = LineOffset; Line < LineOffset + Length
-                                    && Line < Lines.size(); ++Line) {
-      Lines[Line].clear();
+  /// Finds the delta between the given SwiftSyntaxMap, \p Prev, and this one.
+  /// It passes each token not in \p Prev to the given \p Consumer and, if
+  /// needed, also expands or sets the given \p Affected range to cover all
+  /// non-matching tokens in the two lists.
+  ///
+  /// Returns true if this SwiftSyntaxMap is different to \p Prev.
+  bool forEachChanged(const SwiftSyntaxMap &Prev,
+                      llvm::Optional<SwiftEditorCharRange> &Affected,
+                      EditorConsumer &Consumer) const {
+    typedef std::vector<SwiftSyntaxToken>::const_iterator ForwardIt;
+    typedef std::vector<SwiftSyntaxToken>::const_reverse_iterator ReverseIt;
+
+    // Find the first pair of tokens that don't match
+    TokenMismatch<ForwardIt>
+    Forward(Tokens.begin(), Tokens.end(), Prev.Tokens.begin(), Prev.Tokens.end());
+
+    // Exit early if there was no mismatch
+    if (!Forward.foundMismatch())
+      return Affected && !Affected->isEmpty();
+
+    // Find the last pair of tokens that don't match
+    TokenMismatch<ReverseIt>
+    Backward(Tokens.rbegin(), Tokens.rend(), Prev.Tokens.rbegin(), Prev.Tokens.rend());
+    assert(Backward.foundMismatch());
+
+    // Set or extend the affected range to include the  mismatched range
+    SwiftEditorCharRange
+    MismatchRange = {Forward.mismatchStart(),Backward.mismatchEnd()};
+    if (!Affected) {
+      Affected = MismatchRange;
+    } else {
+      Affected->extendToInclude(MismatchRange);
     }
-  }
 
-  void removeLineRange(unsigned StartLine, unsigned Length) {
-    assert(StartLine > 0 && Length > 0);
-
-    if (StartLine < Lines.size()) {
-      unsigned EndLine = StartLine + Length - 1;
-      // Delete all syntax map data from start line through end line
-      Lines.erase(Lines.begin() + StartLine - 1,
-                  EndLine >= Lines.size() ? Lines.end()
-                                          : Lines.begin() + EndLine);
+    // Report all tokens in the affected range to the EditorConsumer
+    auto From = Forward.CurrTok;
+    auto To = Backward.CurrTok;
+    while (From != Tokens.begin() && (From-1)->Offset >= Affected->Offset)
+      --From;
+    while (To != Tokens.rbegin() && (To-1)->endOffset() <= Affected->EndOffset)
+      --To;
+    for (; From < To.base(); ++From) {
+      auto Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(From->Kind);
+      Consumer.handleSyntaxMap(From->Offset, From->Length, Kind);
     }
-  }
 
-  void insertLineRange(unsigned StartLine, unsigned Length) {
-    Lines.insert(StartLine <= Lines.size() ? Lines.begin() + StartLine - 1
-                                           : Lines.end(),
-                 Length, SwiftSyntaxLineMap());
-  }
-
-  void reset() {
-    Lines.clear();
+    return true;
   }
 };
 
@@ -371,8 +523,6 @@ struct EditorConsumerSyntaxMapEntry {
   EditorConsumerSyntaxMapEntry(unsigned Offset, unsigned Length, UIdent Kind)
     :Offset(Offset), Length(Length), Kind(Kind) { }
 };
-
-typedef std::pair<unsigned, unsigned> SwiftEditorCharRange;
 
 struct SwiftSemanticToken {
   unsigned ByteOffset;
@@ -435,7 +585,7 @@ public:
 
   void readSemanticInfo(ImmutableTextSnapshotRef NewSnapshot,
                         std::vector<SwiftSemanticToken> &Tokens,
-                        std::vector<DiagnosticEntryInfo> &Diags,
+                        Optional<std::vector<DiagnosticEntryInfo>> &Diags,
                         ArrayRef<DiagnosticEntryInfo> ParserDiags);
 
   void processLatestSnapshotAsync(EditableTextBufferRef EditableBuffer);
@@ -453,7 +603,7 @@ private:
   std::vector<SwiftSemanticToken> takeSemanticTokens(
       ImmutableTextSnapshotRef NewSnapshot);
 
-  std::vector<DiagnosticEntryInfo> getSemanticDiagnostics(
+  Optional<std::vector<DiagnosticEntryInfo>> getSemanticDiagnostics(
       ImmutableTextSnapshotRef NewSnapshot,
       ArrayRef<DiagnosticEntryInfo> ParserDiags);
 };
@@ -545,7 +695,7 @@ uint64_t SwiftDocumentSemanticInfo::getASTGeneration() const {
 void SwiftDocumentSemanticInfo::readSemanticInfo(
     ImmutableTextSnapshotRef NewSnapshot,
     std::vector<SwiftSemanticToken> &Tokens,
-    std::vector<DiagnosticEntryInfo> &Diags,
+    Optional<std::vector<DiagnosticEntryInfo>> &Diags,
     ArrayRef<DiagnosticEntryInfo> ParserDiags) {
 
   llvm::sys::ScopedLock L(Mtx);
@@ -600,155 +750,73 @@ SwiftDocumentSemanticInfo::takeSemanticTokens(
   return std::move(SemaToks);
 }
 
-static bool
-adjustDiagnosticRanges(SmallVectorImpl<std::pair<unsigned, unsigned>> &Ranges,
-                       unsigned ByteOffset, unsigned RemoveLen, int Delta) {
-  for (auto &Range : Ranges) {
-    unsigned RangeBegin = Range.first;
-    unsigned RangeEnd = Range.first +  Range.second;
-    unsigned RemoveEnd = ByteOffset + RemoveLen;
-    // If it intersects with the remove range, ignore the whole diagnostic.
-    if (!(RangeEnd < ByteOffset || RangeBegin > RemoveEnd))
-      return true; // Ignore.
-    if (RangeBegin > RemoveEnd)
-      Range.first += Delta;
-  }
-  return false;
-}
-
-static bool
-adjustDiagnosticFixits(SmallVectorImpl<DiagnosticEntryInfo::Fixit> &Fixits,
-                       unsigned ByteOffset, unsigned RemoveLen, int Delta) {
-  for (auto &Fixit : Fixits) {
-    unsigned FixitBegin = Fixit.Offset;
-    unsigned FixitEnd = Fixit.Offset +  Fixit.Length;
-    unsigned RemoveEnd = ByteOffset + RemoveLen;
-    // If it intersects with the remove range, ignore the whole diagnostic.
-    if (!(FixitEnd < ByteOffset || FixitBegin > RemoveEnd))
-      return true; // Ignore.
-    if (FixitBegin > RemoveEnd)
-      Fixit.Offset += Delta;
-  }
-  return false;
-}
-
-static bool
-adjustDiagnosticBase(DiagnosticEntryInfoBase &Diag,
-                     unsigned ByteOffset, unsigned RemoveLen, int Delta) {
-  if (Diag.Offset >= ByteOffset && Diag.Offset < ByteOffset+RemoveLen)
-    return true; // Ignore.
-  bool Ignore = adjustDiagnosticRanges(Diag.Ranges, ByteOffset, RemoveLen, Delta);
-  if (Ignore)
-    return true;
-  Ignore = adjustDiagnosticFixits(Diag.Fixits, ByteOffset, RemoveLen, Delta);
-  if (Ignore)
-    return true;
-  if (Diag.Offset > ByteOffset)
-    Diag.Offset += Delta;
-  return false;
-}
-
-static bool
-adjustDiagnostic(DiagnosticEntryInfo &Diag, StringRef Filename,
-                 unsigned ByteOffset, unsigned RemoveLen, int Delta) {
-  for (auto &Note : Diag.Notes) {
-    if (Filename != Note.Filename)
-      continue;
-    bool Ignore = adjustDiagnosticBase(Note, ByteOffset, RemoveLen, Delta);
-    if (Ignore)
-      return true;
-  }
-  return adjustDiagnosticBase(Diag, ByteOffset, RemoveLen, Delta);
-}
-
-static std::vector<DiagnosticEntryInfo>
-adjustDiagnostics(std::vector<DiagnosticEntryInfo> Diags, StringRef Filename,
-                  unsigned ByteOffset, unsigned RemoveLen, int Delta) {
-  std::vector<DiagnosticEntryInfo> NewDiags;
-  NewDiags.reserve(Diags.size());
-
-  for (auto &Diag : Diags) {
-    bool Ignore = adjustDiagnostic(Diag, Filename, ByteOffset, RemoveLen, Delta);
-    if (!Ignore) {
-      NewDiags.push_back(std::move(Diag));
-    }
-  }
-
-  return NewDiags;
-}
-
-std::vector<DiagnosticEntryInfo>
+Optional<std::vector<DiagnosticEntryInfo>>
 SwiftDocumentSemanticInfo::getSemanticDiagnostics(
     ImmutableTextSnapshotRef NewSnapshot,
     ArrayRef<DiagnosticEntryInfo> ParserDiags) {
 
-  llvm::sys::ScopedLock L(Mtx);
+  std::vector<DiagnosticEntryInfo> curSemaDiags;
+  {
+    llvm::sys::ScopedLock L(Mtx);
 
-  if (SemaDiags.empty())
-    return SemaDiags;
-
-  assert(DiagSnapshot && "If we have diagnostics, we must have snapshot!");
-
-  if (!DiagSnapshot->precedesOrSame(NewSnapshot)) {
-    // It may happen that other thread has already updated the diagnostics to
-    // the version *after* NewSnapshot. This can happen in at least two cases:
-    //   (a) two or more editor.open or editor.replacetext queries are being
-    //       processed concurrently (not valid, but possible call pattern)
-    //   (b) while editor.replacetext processing is running, a concurrent
-    //       thread executes getBuffer()/getBufferForSnapshot() on the same
-    //       Snapshot/EditableBuffer (thus creating a new ImmutableTextBuffer)
-    //       and updates DiagSnapshot/SemaDiags
-    assert(NewSnapshot->precedesOrSame(DiagSnapshot));
-
-    // Since we cannot "adjust back" diagnostics, we just return an empty set.
-    // FIXME: add handling of the case#b above
-    return {};
-  }
-
-  SmallVector<unsigned, 16> ParserDiagLines;
-  for (auto Diag : ParserDiags)
-    ParserDiagLines.push_back(Diag.Line);
-  std::sort(ParserDiagLines.begin(), ParserDiagLines.end());
-
-  auto hasParserDiagAtLine = [&](unsigned Line) {
-    return std::binary_search(ParserDiagLines.begin(), ParserDiagLines.end(),
-                              Line);
-  };
-
-  // Adjust the position of the diagnostics.
-  DiagSnapshot->foreachReplaceUntil(NewSnapshot,
-    [&](ReplaceImmutableTextUpdateRef Upd) -> bool {
-      if (SemaDiags.empty())
-        return false;
-
-      unsigned ByteOffset = Upd->getByteOffset();
-      unsigned RemoveLen = Upd->getLength();
-      unsigned InsertLen = Upd->getText().size();
-      int Delta = InsertLen - RemoveLen;
-      SemaDiags = adjustDiagnostics(std::move(SemaDiags), Filename,
-                                    ByteOffset, RemoveLen, Delta);
-      return true;
-    });
-
-  if (!SemaDiags.empty()) {
-    auto ImmBuf = NewSnapshot->getBuffer();
-    for (auto &Diag : SemaDiags) {
-      std::tie(Diag.Line, Diag.Column) = ImmBuf->getLineAndColumn(Diag.Offset);
+    if (!DiagSnapshot || DiagSnapshot->getStamp() != NewSnapshot->getStamp()) {
+      // The semantic diagnostics are out-of-date, ignore them.
+      return llvm::None;
     }
 
-    // If there is a parser diagnostic in a line, ignore diagnostics in the same
-    // line that we got from the semantic pass.
-    // Note that the semantic pass also includes parser diagnostics so this
-    // avoids duplicates.
-    SemaDiags.erase(std::remove_if(SemaDiags.begin(), SemaDiags.end(),
-                                   [&](const DiagnosticEntryInfo &Diag) -> bool {
-                                     return hasParserDiagAtLine(Diag.Line);
-                                   }),
-                    SemaDiags.end());
+    curSemaDiags = SemaDiags;
   }
 
-  DiagSnapshot = NewSnapshot;
-  return SemaDiags;
+  // Diagnostics from the AST and diagnostics from the parser are based on the
+  // same source text snapshot. But diagnostics from the AST may have excluded
+  // the parser diagnostics due to a fatal error, e.g. if the source has a
+  // 'so such module' error, which will suppress other diagnostics.
+  // We don't want to turn off the suppression to avoid a flood of diagnostics
+  // when a module import fails, but we also don't want to lose the parser
+  // diagnostics in such a case, so merge the parser diagnostics with the sema
+  // ones.
+
+  auto orderDiagnosticEntryInfos = [](const DiagnosticEntryInfo &LHS,
+                                      const DiagnosticEntryInfo &RHS) -> bool {
+    if (LHS.Filename != RHS.Filename)
+      return LHS.Filename < RHS.Filename;
+    if (LHS.Offset != RHS.Offset)
+      return LHS.Offset < RHS.Offset;
+    return LHS.Description < RHS.Description;
+  };
+
+  std::vector<DiagnosticEntryInfo> sortedParserDiags;
+  sortedParserDiags.reserve(ParserDiags.size());
+  sortedParserDiags.insert(sortedParserDiags.end(), ParserDiags.begin(),
+                           ParserDiags.end());
+  std::stable_sort(sortedParserDiags.begin(), sortedParserDiags.end(),
+                   orderDiagnosticEntryInfos);
+
+  std::vector<DiagnosticEntryInfo> finalDiags;
+  finalDiags.reserve(sortedParserDiags.size()+curSemaDiags.size());
+
+  // Add sema diagnostics unless it is an existing parser diagnostic.
+  // Note that we want to merge and eliminate diagnostics from the 'sema' set
+  // that also show up in the 'parser' set, but we don't want to remove
+  // duplicate diagnostics from within the same set (e.g. duplicates existing in
+  // the 'sema' set). We want to report the diagnostics as the compiler reported
+  // them, even if there's some duplicate one. This is why we don't just do a
+  // simple append/sort/keep-uniques step.
+  for (const auto &curDE : curSemaDiags) {
+    bool existsAsParserDiag = std::binary_search(sortedParserDiags.begin(),
+                                                 sortedParserDiags.end(),
+                                             curDE, orderDiagnosticEntryInfos);
+    if (!existsAsParserDiag) {
+      finalDiags.push_back(curDE);
+    }
+  }
+
+  finalDiags.insert(finalDiags.end(),
+                    sortedParserDiags.begin(), sortedParserDiags.end());
+  std::stable_sort(finalDiags.begin(), finalDiags.end(),
+                   orderDiagnosticEntryInfos);
+
+  return finalDiags;
 }
 
 void SwiftDocumentSemanticInfo::updateSemanticInfo(
@@ -786,7 +854,8 @@ public:
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
-    if (isa<VarDecl>(D) && D->hasName() && D->getName().str() == "self")
+      if (isa<VarDecl>(D) && D->hasName() &&
+          D->getFullName() == D->getASTContext().Id_self)
       return true;
 
     // Do not annotate references to unavailable decls.
@@ -929,9 +998,12 @@ struct SwiftEditorDocument::Implementation {
   const std::string FilePath;
   EditableTextBufferRef EditableBuffer;
 
+  /// The list of syntax highlighted token offsets and ranges in the document
   SwiftSyntaxMap SyntaxMap;
-  LineRange EditedLineRange;
-  SwiftEditorCharRange AffectedRange;
+  /// The minimal range of syntax highlighted tokens affected by the last edit
+  llvm::Optional<SwiftEditorCharRange> AffectedRange;
+  /// Whether the last operation was an edit rather than a document open
+  bool Edited;
 
   std::vector<DiagnosticEntryInfo> ParserDiagnostics;
   RefPtr<SwiftDocumentSemanticInfo> SemanticInfo;
@@ -970,7 +1042,7 @@ void SwiftEditorDocument::Implementation::buildSwiftInv(
 
 namespace  {
 
-static UIdent getAccessibilityUID(Accessibility Access) {
+static UIdent getAccessLevelUID(AccessLevel Access) {
   static UIdent AccessOpen("source.lang.swift.accessibility.open");
   static UIdent AccessPublic("source.lang.swift.accessibility.public");
   static UIdent AccessInternal("source.lang.swift.accessibility.internal");
@@ -978,42 +1050,50 @@ static UIdent getAccessibilityUID(Accessibility Access) {
   static UIdent AccessPrivate("source.lang.swift.accessibility.private");
 
   switch (Access) {
-  case Accessibility::Private:
+  case AccessLevel::Private:
     return AccessPrivate;
-  case Accessibility::FilePrivate:
+  case AccessLevel::FilePrivate:
     return AccessFilePrivate;
-  case Accessibility::Internal:
+  case AccessLevel::Internal:
     return AccessInternal;
-  case Accessibility::Public:
+  case AccessLevel::Public:
     return AccessPublic;
-  case Accessibility::Open:
+  case AccessLevel::Open:
     return AccessOpen;
   }
 
-  llvm_unreachable("Unhandled Accessibility in switch.");
+  llvm_unreachable("Unhandled access level in switch.");
 }
 
-static Accessibility inferDefaultAccessibility(const ExtensionDecl *ED) {
-  if (ED->hasDefaultAccessibility())
-    return ED->getDefaultAccessibility();
+static Optional<AccessLevel> getAccessLevelStrictly(const ExtensionDecl *ED) {
+  if (ED->hasDefaultAccessLevel())
+    return ED->getDefaultAccessLevel();
 
-  if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
+  // Check if the decl has an explicit access control attribute.
+  if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>())
     return AA->getAccess();
 
-  // Assume "internal", which is the most common thing anyway.
-  return Accessibility::Internal;
+  return None;
 }
 
-/// If typechecking was performed we use the computed accessibility, otherwise
-/// we fallback to inferring accessibility syntactically. This may not be as
+static AccessLevel inferDefaultAccessLevel(const ExtensionDecl *ED) {
+  if (auto StrictAccess = getAccessLevelStrictly(ED))
+    return StrictAccess.getValue();
+
+  // Assume "internal", which is the most common thing anyway.
+  return AccessLevel::Internal;
+}
+
+/// If typechecking was performed we use the computed access level, otherwise
+/// we fallback to inferring access syntactically. This may not be as
 /// accurate but it's only until we have typechecked the AST.
-static Accessibility inferAccessibility(const ValueDecl *D) {
+static AccessLevel inferAccessLevel(const ValueDecl *D) {
   assert(D);
-  if (D->hasAccessibility())
+  if (D->hasAccess())
     return D->getFormalAccess();
 
-  // Check if the decl has an explicit accessibility attribute.
-  if (auto *AA = D->getAttrs().getAttribute<AccessibilityAttr>())
+  // Check if the decl has an explicit access control attribute.
+  if (auto *AA = D->getAttrs().getAttribute<AccessControlAttr>())
     return AA->getAccess();
 
   DeclContext *DC = D->getDeclContext();
@@ -1024,26 +1104,26 @@ static Accessibility inferAccessibility(const ValueDecl *D) {
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
-    return Accessibility::Private;
+    return AccessLevel::Private;
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
-    return Accessibility::Internal;
+    return AccessLevel::Internal;
   case DeclContextKind::GenericTypeDecl: {
     auto Nominal = cast<GenericTypeDecl>(DC);
-    Accessibility Access = inferAccessibility(Nominal);
+    AccessLevel Access = inferAccessLevel(Nominal);
     if (!isa<ProtocolDecl>(Nominal))
-      Access = std::min(Access, Accessibility::Internal);
+      Access = std::min(Access, AccessLevel::Internal);
     return Access;
   }
   case DeclContextKind::ExtensionDecl:
-    return inferDefaultAccessibility(cast<ExtensionDecl>(DC));
+    return inferDefaultAccessLevel(cast<ExtensionDecl>(DC));
   }
 
   llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
-static Optional<Accessibility>
-inferSetterAccessibility(const AbstractStorageDecl *D) {
+static Optional<AccessLevel>
+inferSetterAccessLevel(const AbstractStorageDecl *D) {
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (VD->isLet())
       return None;
@@ -1054,10 +1134,10 @@ inferSetterAccessibility(const AbstractStorageDecl *D) {
   // FIXME: Have the parser detect as read-only the syntactic form of generated
   // interfaces, which is "var foo : Int { get }"
 
-  if (auto *AA = D->getAttrs().getAttribute<SetterAccessibilityAttr>())
+  if (auto *AA = D->getAttrs().getAttribute<SetterAccessAttr>())
     return AA->getAccess();
   else
-    return inferAccessibility(D);
+    return inferAccessLevel(D);
 }
 
 class SwiftDocumentStructureWalker: public ide::SyntaxModelWalker {
@@ -1100,17 +1180,30 @@ public:
       BodyOffset = BodyEnd = 0;
     }
 
+    unsigned DocOffset = 0;
+    unsigned DocEnd = 0;
+    if (Node.DocRange.isValid()) {
+      DocOffset = SrcManager.getLocOffsetInBuffer(Node.DocRange.getStart(),
+                                                  BufferID);
+      DocEnd = SrcManager.getLocOffsetInBuffer(Node.DocRange.getEnd(),
+                                               BufferID);
+    }
+
     UIdent Kind = SwiftLangSupport::getUIDForSyntaxStructureKind(Node.Kind);
     UIdent AccessLevel;
     UIdent SetterAccessLevel;
-    if (Node.Kind != SyntaxStructureKind::Parameter) {
+    if (Node.Kind != SyntaxStructureKind::Parameter &&
+        Node.Kind != SyntaxStructureKind::LocalVariable) {
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
-        AccessLevel = getAccessibilityUID(inferAccessibility(VD));
+        AccessLevel = getAccessLevelUID(inferAccessLevel(VD));
+      } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
+        if (auto StrictAccess = getAccessLevelStrictly(ED))
+          AccessLevel = getAccessLevelUID(StrictAccess.getValue());
       }
       if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(Node.Dcl)) {
-        Optional<Accessibility> SetAccess = inferSetterAccessibility(ASD);
+        Optional<swift::AccessLevel> SetAccess = inferSetterAccessLevel(ASD);
         if (SetAccess.hasValue()) {
-          SetterAccessLevel = getAccessibilityUID(SetAccess.getValue());
+          SetterAccessLevel = getAccessLevelUID(SetAccess.getValue());
         }
       }
     }
@@ -1144,12 +1237,33 @@ public:
     SmallString<64> SelectorNameBuf;
     StringRef SelectorName = getObjCSelectorName(Node.Dcl, SelectorNameBuf);
 
-    std::vector<UIdent> Attrs = SwiftLangSupport::UIDsFromDeclAttributes(Node.Attrs);
+    std::vector<std::tuple<UIdent, unsigned, unsigned>> Attrs;
+
+    for (auto Attr : Node.Attrs) {
+      if (auto AttrUID = SwiftLangSupport::getUIDForDeclAttribute(Attr)) {
+        unsigned AttrOffset = 0;
+        unsigned AttrEnd = 0;
+        auto AttrRange = Attr->getRangeWithAt();
+        if (AttrRange.isValid()) {
+          auto CharRange = Lexer::getCharSourceRangeFromSourceRange(SrcManager,
+                                                                    AttrRange);
+          AttrOffset = SrcManager.getLocOffsetInBuffer(CharRange.getStart(),
+                                                       BufferID);
+          AttrEnd = SrcManager.getLocOffsetInBuffer(CharRange.getEnd(),
+                                                    BufferID);
+        }
+
+        auto AttrTuple = std::make_tuple(AttrUID.getValue(), AttrOffset,
+                                         AttrEnd - AttrOffset);
+        Attrs.push_back(AttrTuple);
+      }
+    }
 
     Consumer.beginDocumentSubStructure(StartOffset, EndOffset - StartOffset,
                                        Kind, AccessLevel, SetterAccessLevel,
                                        NameStart, NameEnd - NameStart,
                                        BodyOffset, BodyEnd - BodyOffset,
+                                       DocOffset, DocEnd - DocOffset,
                                        DisplayName,
                                        TypeName, RuntimeName,
                                        SelectorName,
@@ -1170,10 +1284,17 @@ public:
   }
 
   StringRef getObjCRuntimeName(const Decl *D, SmallString<64> &Buf) {
-    if (!D)
+    if (!D || D->isInvalid())
       return StringRef();
     if (!isa<ClassDecl>(D) && !isa<ProtocolDecl>(D))
       return StringRef();
+    auto *VD = cast<ValueDecl>(D);
+    if (!VD->hasName())
+      return StringRef();
+    auto ident = VD->getBaseName().getIdentifier().str();
+    if (ident.empty() || Mangle::isDigit(ident.front()))
+      return StringRef();
+
     // We don't support getting the runtime name for nested classes.
     // This would require typechecking or at least name lookup, if the nested
     // class is in an extension.
@@ -1214,7 +1335,7 @@ public:
     UIdent Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(Node.Kind);
     Consumer.beginDocumentSubStructure(StartOffset, EndOffset - StartOffset,
                                        Kind, UIdent(), UIdent(), 0, 0,
-                                       0, 0,
+                                       0, 0, 0, 0,
                                        StringRef(),
                                        StringRef(), StringRef(),
                                        StringRef(),
@@ -1231,121 +1352,39 @@ public:
   }
 };
 
+/// Walks the syntax model to populate a given SwiftSyntaxMap with the token
+/// ranges to highlight and pass document structure information to the given
+/// EditorConsumer.
 class SwiftEditorSyntaxWalker: public ide::SyntaxModelWalker {
+  /// The syntax map to populate
   SwiftSyntaxMap &SyntaxMap;
-  LineRange EditedLineRange;
-  SwiftEditorCharRange &AffectedRange;
   SourceManager &SrcManager;
-  EditorConsumer &Consumer;
   unsigned BufferID;
   SwiftDocumentStructureWalker DocStructureWalker;
-  std::vector<EditorConsumerSyntaxMapEntry> ConsumerSyntaxMap;
+  /// The current token nesting level (e.g. for a field in a doc comment)
   unsigned NestingLevel = 0;
 public:
   SwiftEditorSyntaxWalker(SwiftSyntaxMap &SyntaxMap,
-                          LineRange EditedLineRange,
-                          SwiftEditorCharRange &AffectedRange,
                           SourceManager &SrcManager, EditorConsumer &Consumer,
                           unsigned BufferID)
-    : SyntaxMap(SyntaxMap), EditedLineRange(EditedLineRange),
-      AffectedRange(AffectedRange), SrcManager(SrcManager), Consumer(Consumer),
-      BufferID(BufferID),
+    : SyntaxMap(SyntaxMap), SrcManager(SrcManager), BufferID(BufferID),
       DocStructureWalker(SrcManager, BufferID, Consumer) { }
 
   bool walkToNodePre(SyntaxNode Node) override {
     if (Node.Kind == SyntaxNodeKind::CommentMarker)
       return DocStructureWalker.walkToNodePre(Node);
-
     ++NestingLevel;
-    SourceLoc StartLoc = Node.Range.getStart();
-    auto StartLineAndColumn = SrcManager.getLineAndColumn(StartLoc);
-    auto EndLineAndColumn = SrcManager.getLineAndColumn(Node.Range.getEnd());
-    unsigned StartLine = StartLineAndColumn.first;
-    unsigned EndLine = EndLineAndColumn.second > 1 ? EndLineAndColumn.first
-                                                   : EndLineAndColumn.first - 1;
-    unsigned Offset = SrcManager.getByteDistance(
-                           SrcManager.getLocForBufferStart(BufferID), StartLoc);
-    // Note that the length can span multiple lines.
-    unsigned Length = Node.Range.getByteLength();
 
-    SwiftSyntaxToken Token(StartLineAndColumn.second, Length,
-                           Node.Kind);
-    if (EditedLineRange.isValid()) {
-      if (StartLine < EditedLineRange.startLine()) {
-        if (EndLine < EditedLineRange.startLine()) {
-          // We're entirely before the edited range, no update needed.
-          return true;
-        }
+    auto End = SrcManager.getLocOffsetInBuffer(Node.Range.getEnd(), BufferID),
+      Start = SrcManager.getLocOffsetInBuffer(Node.Range.getStart(), BufferID);
 
-        // This token starts before the edited range, but doesn't end before it,
-        // we need to adjust edited line range and clear the affected syntax map
-        // line range.
-        unsigned AdjLineCount = EditedLineRange.startLine() - StartLine;
-        EditedLineRange.setRange(StartLine, AdjLineCount
-                                            + EditedLineRange.lineCount());
-        SyntaxMap.clearLineRange(StartLine, AdjLineCount);
-
-        // Also adjust the affected char range accordingly.
-        unsigned AdjCharCount = AffectedRange.first - Offset;
-        AffectedRange.first -= AdjCharCount;
-        AffectedRange.second += AdjCharCount;
-      }
-      else if (Offset > AffectedRange.first + AffectedRange.second) {
-        // We're passed the affected range and already synced up, just return.
-        return true;
-      }
-      else if (StartLine > EditedLineRange.endLine()) {
-        // We're after the edited line range, let's test if we're synced up.
-        if (SyntaxMap.matchesFirstTokenOnLine(StartLine, Token)) {
-          // We're synced up, mark the affected range and return.
-          AffectedRange.second =
-                 Offset - (StartLineAndColumn.second - 1) - AffectedRange.first;
-          return true;
-        }
-
-        // We're not synced up, continue replacing syntax map data on this line.
-        SyntaxMap.clearLineRange(StartLine, 1);
-        EditedLineRange.extendToIncludeLine(StartLine);
-      }
-
-      if (EndLine > StartLine) {
-        // The token spans multiple lines, make sure to replace syntax map data
-        // for affected lines.
-        EditedLineRange.extendToIncludeLine(EndLine);
-
-        unsigned LineCount = EndLine - StartLine + 1;
-        SyntaxMap.clearLineRange(StartLine, LineCount);
-      }
-
-    }
-
-    // Add the syntax map token.
-    if (NestingLevel > 1)
-      SyntaxMap.mergeTokenForLine(StartLine, Token);
-    else
-      SyntaxMap.addTokenForLine(StartLine, Token);
-
-    // Add consumer entry.
-    unsigned ByteOffset = SrcManager.getLocOffsetInBuffer(Node.Range.getStart(),
-                                                          BufferID);
-    UIdent Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(Node.Kind);
     if (NestingLevel > 1) {
-      assert(!ConsumerSyntaxMap.empty());
-      auto &Last = ConsumerSyntaxMap.back();
-      mergeSplitRanges(Last.Offset, Last.Length, ByteOffset, Length,
-                       [&](unsigned BeforeOff, unsigned BeforeLen,
-                           unsigned AfterOff, unsigned AfterLen) {
-        auto LastKind = Last.Kind;
-        ConsumerSyntaxMap.pop_back();
-        if (BeforeLen)
-          ConsumerSyntaxMap.emplace_back(BeforeOff, BeforeLen, LastKind);
-        ConsumerSyntaxMap.emplace_back(ByteOffset, Length, Kind);
-        if (AfterLen)
-          ConsumerSyntaxMap.emplace_back(AfterOff, AfterLen, LastKind);
-      });
+      // We're nested inside the previously reported token - merge
+      SyntaxMap.mergeToken({Start, End - Start, Node.Kind});
+    } else {
+      // We're a top-level token, add it after the previous one
+      SyntaxMap.addToken({Start, End - Start, Node.Kind});
     }
-    else
-      ConsumerSyntaxMap.emplace_back(ByteOffset, Length, Kind);
 
     return true;
   }
@@ -1353,14 +1392,7 @@ public:
   bool walkToNodePost(SyntaxNode Node) override {
     if (Node.Kind == SyntaxNodeKind::CommentMarker)
       return DocStructureWalker.walkToNodePost(Node);
-
-    if (--NestingLevel == 0) {
-      // We've unwound to the top level, so inform the consumer and drain
-      // the consumer syntax map queue.
-      for (auto &Entry: ConsumerSyntaxMap)
-        Consumer.handleSyntaxMap(Entry.Offset, Entry.Length, Entry.Kind);
-      ConsumerSyntaxMap.clear();
-    }
+    --NestingLevel;
 
     return true;
   }
@@ -1427,18 +1459,17 @@ private:
       if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
         FoundFunctionTypeRepr = true;
         if (auto *TTR = dyn_cast_or_null<TupleTypeRepr>(FTR->getArgsTypeRepr())) {
-          for (unsigned i = 0, end = TTR->getNumElements(); i != end; ++i) {
-            auto *ArgTR = TTR->getElement(i);
+          for (auto &ArgElt : TTR->getElements()) {
             CharSourceRange NR;
             CharSourceRange TR;
-            auto name = TTR->getElementName(i);
+            auto name = ArgElt.Name;
             if (!name.empty()) {
-              NR = CharSourceRange(TTR->getElementNameLoc(i),
+              NR = CharSourceRange(ArgElt.NameLoc,
                                    name.getLength());
             }
             SourceLoc SRE = Lexer::getLocForEndOfToken(SM,
-                                                       ArgTR->getEndLoc());
-            TR = CharSourceRange(SM, ArgTR->getStartLoc(), SRE);
+                                                    ArgElt.Type->getEndLoc());
+            TR = CharSourceRange(SM, ArgElt.Type->getStartLoc(), SRE);
             Info.Params.emplace_back(NR, TR);
           }
         } else if (FTR->getArgsTypeRepr()) {
@@ -1533,8 +1564,13 @@ private:
       bool walkToStmtPre(Stmt *S) override {
         auto SR = S->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if (!EnclosingCall && !isa<BraceStmt>(S))
-            OuterStmt = S;
+          if (!EnclosingCall) {
+            if (isa<BraceStmt>(S))
+              // In case OuterStmt is already set, we should clear it to nullptr.
+              OuterStmt = nullptr;
+            else
+              OuterStmt = S;
+          }
         }
         return true;
       }
@@ -1637,11 +1673,14 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
+  Impl.Edited = false;
   Impl.EditableBuffer =
       new EditableTextBuffer(Impl.FilePath, Buf->getBuffer());
-  Impl.SyntaxMap.reset();
-  Impl.EditedLineRange.setRange(0,0);
-  Impl.AffectedRange = std::make_pair(0, Buf->getBufferSize());
+
+  // Reset the syntax map data and affected range
+  Impl.SyntaxMap.Tokens.clear();
+  Impl.AffectedRange = {0, static_cast<unsigned>(Buf->getBufferSize())};
+
   Impl.SemanticInfo =
       new SwiftDocumentSemanticInfo(Impl.FilePath, Impl.LangSupport);
   Impl.SemanticInfo->setCompilerArgs(Args);
@@ -1654,7 +1693,10 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
+  Impl.Edited = true;
   llvm::StringRef Str = Buf->getBuffer();
+
+  // Update the buffer itself
   ImmutableTextSnapshotRef Snapshot =
       Impl.EditableBuffer->replace(Offset, Length, Str);
 
@@ -1663,54 +1705,19 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
     if (Length != 0 || Buf->getBufferSize() != 0) {
       updateSemaInfo();
 
-      if (auto Invok = Impl.SemanticInfo->getInvocation()) {
-        // Update semantic info for open editor documents of the same module.
-        // FIXME: Detect edits that don't affect other files, e.g. whitespace,
-        // comments, inside a function body, etc.
-        CompilerInvocation CI;
-        Invok->applyTo(CI);
-        auto &EditorDocs = Impl.LangSupport.getEditorDocuments();
-        for (auto &Input : CI.getInputFilenames()) {
-          if (auto EditorDoc = EditorDocs.findByPath(Input)) {
-            if (EditorDoc.get() != this)
-              EditorDoc->updateSemaInfo();
-          }
-        }
-      }
+      // FIXME: we should also update any "interesting" ASTs that depend on this
+      // document here, e.g. any ASTs for files visible in an editor. However,
+      // because our API conflates this with any file with unsaved changes we do
+      // not update all open documents, since there could be too many of them.
     }
   }
 
-  SourceManager &SrcManager = Impl.SyntaxInfo->getSourceManager();
-  unsigned BufID = Impl.SyntaxInfo->getBufferID();
-  SourceLoc StartLoc = SrcManager.getLocForBufferStart(BufID).getAdvancedLoc(
-                                                                        Offset);
-  unsigned StartLine = SrcManager.getLineAndColumn(StartLoc).first;
-  unsigned EndLine = SrcManager.getLineAndColumn(
-                                         StartLoc.getAdvancedLoc(Length)).first;
-
-  // Delete all syntax map data from start line through end line.
-  unsigned OldLineCount = EndLine - StartLine + 1;
-  Impl.SyntaxMap.removeLineRange(StartLine, OldLineCount);
-
-  // Insert empty syntax map data for replaced lines.
-  unsigned NewLineCount = Str.count('\n') + 1;
-  Impl.SyntaxMap.insertLineRange(StartLine, NewLineCount);
-
-  // Update the edited line range.
-  Impl.EditedLineRange.setRange(StartLine, NewLineCount);
-
-  ImmutableTextBufferRef ImmBuf = Snapshot->getBuffer();
-
-  // The affected range starts from the previous newline.
-  if (Offset > 0) {
-    auto AffectedRangeOffset = ImmBuf->getText().rfind('\n', Offset);
-    Impl.AffectedRange.first =
-      AffectedRangeOffset != StringRef::npos ? AffectedRangeOffset + 1 : 0;
-  }
-  else
-    Impl.AffectedRange.first = 0;
-
-  Impl.AffectedRange.second = ImmBuf->getText().size() - Impl.AffectedRange.first;
+  // Update the old syntax map offsets to account for the replaced range.
+  // Also set the initial AffectedRange to cover any tokens that
+  // the replaced range intersected. This allows for clients that split
+  // multi-line tokens at line boundaries, and ensure all parts of these tokens
+  // will be cleared.
+  Impl.AffectedRange = Impl.SyntaxMap.adjustForReplacement(Offset, Length, Str.size());
 
   return Snapshot;
 }
@@ -1763,17 +1770,34 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
 
   ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
 
-  SwiftEditorSyntaxWalker SyntaxWalker(Impl.SyntaxMap,
-                                       Impl.EditedLineRange,
-                                       Impl.AffectedRange,
+  SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
+
+  SwiftEditorSyntaxWalker SyntaxWalker(NewMap,
                                        Impl.SyntaxInfo->getSourceManager(),
                                        Consumer,
                                        Impl.SyntaxInfo->getBufferID());
-
   ModelContext.walk(SyntaxWalker);
 
-  Consumer.recordAffectedRange(Impl.AffectedRange.first,
-                               Impl.AffectedRange.second);
+  bool SawChanges = true;
+  if (Impl.Edited) {
+    // We're ansering an edit request. Report all highlighted token ranges not
+    // in the previous syntax map to the Consumer and extend the AffectedRange
+    // to contain all added/removed token ranges.
+    SawChanges = NewMap.forEachChanged(Impl.SyntaxMap, Impl.AffectedRange,
+                                       Consumer);
+  } else {
+    // The is an open/initialise. Report all highlighted token ranges to the
+    // Consumer.
+    NewMap.forEach(Consumer);
+  }
+  Impl.SyntaxMap = std::move(NewMap);
+
+  // Recording an affected length of 0 still results in the client updating its
+  // copy of the syntax map (by clearning all tokens on the line of the affected
+  // offset). We need to not record it at all to signal a no-op.
+  if (SawChanges)
+    Consumer.recordAffectedRange(Impl.AffectedRange->Offset,
+                                 Impl.AffectedRange->length());
 }
 
 void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
@@ -1786,10 +1810,7 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
   }
 
   std::vector<SwiftSemanticToken> SemaToks;
-  std::vector<DiagnosticEntryInfo> SemaDiags;
-
-  // FIXME: Parser diagnostics should be filtered out of the semantic ones,
-  // Then just merge the semantic ones with the current parse ones.
+  Optional<std::vector<DiagnosticEntryInfo>> SemaDiags;
   Impl.SemanticInfo->readSemanticInfo(Snapshot, SemaToks, SemaDiags,
                                       Impl.ParserDiagnostics);
 
@@ -1806,16 +1827,17 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
   static UIdent SemaDiagStage("source.diagnostic.stage.swift.sema");
   static UIdent ParseDiagStage("source.diagnostic.stage.swift.parse");
 
-  if (!SemaDiags.empty() || !SemaToks.empty()) {
+  // If there's no value returned for diagnostics it means they are out-of-date
+  // (based on a different snapshot).
+  if (SemaDiags.hasValue()) {
     Consumer.setDiagnosticStage(SemaDiagStage);
+    for (auto &Diag : SemaDiags.getValue())
+      Consumer.handleDiagnostic(Diag, SemaDiagStage);
   } else {
     Consumer.setDiagnosticStage(ParseDiagStage);
+    for (auto &Diag : Impl.ParserDiagnostics)
+      Consumer.handleDiagnostic(Diag, ParseDiagStage);
   }
-
-  for (auto &Diag : Impl.ParserDiagnostics)
-    Consumer.handleDiagnostic(Diag, ParseDiagStage);
-  for (auto &Diag : SemaDiags)
-    Consumer.handleDiagnostic(Diag, SemaDiagStage);
 }
 
 void SwiftEditorDocument::removeCachedAST() {
@@ -2051,6 +2073,8 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
       LOG_WARN_FUNC("Document already exists in editorOpen(..): " << Name);
       Snapshot = nullptr;
     }
+    auto numOpen = ++Stats.numOpenDocs;
+    Stats.maxOpenDocs.updateMax(numOpen);
   }
 
   if (!Snapshot) {
@@ -2073,8 +2097,12 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 
 void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
   auto Removed = EditorDocuments.remove(Name);
-  if (!Removed)
+  if (Removed) {
+    --Stats.numOpenDocs;
+  } else {
     IFaceGenContexts.remove(Name);
+  }
+
   if (Removed && RemoveCache)
     Removed->removeCachedAST();
   // FIXME: Report error if Name did not apply to anything ?

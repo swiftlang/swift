@@ -130,6 +130,9 @@ struct A {
 
 func fi1() throws {
     A(doomed: ()) // expected-error {{call can throw but is not marked with 'try'}} // expected-warning{{unused}}
+    // expected-note@-1 {{did you mean to use 'try'?}} {{5-5=try }}
+    // expected-note@-2 {{did you mean to handle error as optional value?}} {{5-5=try? }}
+    // expected-note@-3 {{did you mean to disable error propagation?}} {{5-5=try! }}
 }
 
 struct B {
@@ -138,3 +141,15 @@ struct B {
 }
 
 B(foo: 0) // expected-warning{{unused}}
+
+// rdar://problem/33040113 - Provide fix-it for missing "try" when calling throwing Swift function
+
+class E_33040113 : Error {}
+func rdar33040113() throws -> Int {
+    throw E_33040113()
+}
+
+let _ = rdar33040113() // expected-error {{call can throw but is not marked with 'try'}}
+// expected-note@-1 {{did you mean to use 'try'?}} {{9-9=try }}
+// expected-note@-2 {{did you mean to handle error as optional value?}} {{9-9=try? }}
+// expected-note@-3 {{did you mean to disable error propagation?}} {{9-9=try! }}

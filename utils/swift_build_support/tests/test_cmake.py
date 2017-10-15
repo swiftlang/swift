@@ -33,6 +33,7 @@ class CMakeTestCase(unittest.TestCase):
                          enable_asan=False,
                          enable_ubsan=False,
                          enable_tsan=False,
+                         enable_lsan=False,
                          export_compile_commands=False,
                          distcc=False,
                          cmake_generator="Ninja",
@@ -144,6 +145,18 @@ class CMakeTestCase(unittest.TestCase):
             list(cmake.common_options()),
             ["-G", "Ninja",
              "-DLLVM_USE_SANITIZER=Address;Undefined;Thread",
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
+
+    def test_common_options_lsan(self):
+        args = self.default_args()
+        args.enable_lsan = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.common_options()),
+            ["-G", "Ninja",
+             "-DLLVM_USE_SANITIZER=Leaks",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])

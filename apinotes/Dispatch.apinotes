@@ -91,6 +91,8 @@ Protocols:
   SwiftName: DispatchSourceUserDataOr
 - Name: OS_dispatch_source_data_add
   SwiftName: DispatchSourceUserDataAdd
+- Name: OS_dispatch_source_data_replace
+  SwiftName: DispatchSourceUserDataReplace
 - Name: OS_dispatch_source_vnode
   SwiftName: DispatchSourceFileSystemObject
 - Name: OS_dispatch_source_write

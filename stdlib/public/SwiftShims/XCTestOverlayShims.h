@@ -17,10 +17,22 @@
 
 @class XCTestCase;
 
-XCTestCase * _Nonnull _XCTCurrentTestCase(void);
+NS_ASSUME_NONNULL_BEGIN
+
+XCTestCase *_XCTCurrentTestCase(void);
 
 NSDictionary<NSString *, NSString *> * _Nullable
 _XCTRunThrowableBlockBridge(void (^ _Nonnull NS_NOESCAPE block)());
+
+extern NSString * XCTActivityTypeUserCreated;
+@protocol XCTActivity;
+@class XCTContext;
+XCTContext *_XCTContextCurrent(void);
+BOOL _XCTContextShouldStartActivity(XCTContext *context, NSString *activityType);
+id<XCTActivity> _XCTContextWillStartActivity(XCTContext *context, NSString *name, NSString *activityType);
+void _XCTContextDidFinishActivity(XCTContext *context, id<XCTActivity> activity);
+
+NS_ASSUME_NONNULL_END
 
 #endif // SWIFT_STDLIB_SHIMS_XCTEST_OVERLAY_H
 

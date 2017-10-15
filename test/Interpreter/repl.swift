@@ -148,7 +148,7 @@ for c in "foobar".unicodeScalars { print(c) }
 // CHECK-NEXT: r
 
 var vec = Array<String>()
-// CHECK: vec : Array<String> = []
+// CHECK: vec : [String] = []
 
 // Error recovery
 var a : [int]

@@ -134,9 +134,21 @@ bool TypeBase::hasReferenceSemantics() {
 }
 
 bool TypeBase::isUninhabited() {
+  // Empty enum declarations are uninhabited
   if (auto nominalDecl = getAnyNominal())
     if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
       if (enumDecl->getAllElements().empty())
+        return true;
+  return false;
+}
+
+bool TypeBase::isStructurallyUninhabited() {
+  if (isUninhabited()) return true;
+  
+  // Tuples of uninhabited types are uninhabited
+  if (auto *TTy = getAs<TupleType>())
+    for (auto eltTy : TTy->getElementTypes())
+      if (eltTy->isStructurallyUninhabited())
         return true;
   return false;
 }
@@ -467,7 +479,7 @@ bool TypeBase::isBool() {
 
 
 bool TypeBase::isAssignableType() {
-  if (isLValueType()) return true;
+  if (hasLValueType()) return true;
   if (auto tuple = getAs<TupleType>()) {
     for (auto eltType : tuple->getElementTypes()) {
       if (!eltType->isAssignableType())
@@ -480,7 +492,7 @@ bool TypeBase::isAssignableType() {
 
 Type TypeBase::getRValueType() {
   // If the type is not an lvalue, this is a no-op.
-  if (!isLValueType())
+  if (!hasLValueType())
     return this;
 
   return Type(this).transform([](Type t) -> Type {
@@ -630,9 +642,9 @@ static Type getStrippedType(const ASTContext &context, Type type,
     bool anyChanged = false;
     unsigned idx = 0;
     for (const auto &elt : tuple->getElements()) {
-      Type eltTy = getStrippedType(context, elt.getType(),
+      Type eltTy = getStrippedType(context, elt.getRawType(),
                                    stripLabels);
-      if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
+      if (anyChanged || eltTy.getPointer() != elt.getRawType().getPointer() ||
           (elt.hasName() && stripLabels)) {
         if (!anyChanged) {
           elements.reserve(tuple->getNumElements());
@@ -694,7 +706,7 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
 
   // Determine the input and result types of this function.
   auto fnType = this->castTo<AnyFunctionType>();
-  Type inputType = fnType->getInput();
+  auto inputType = fnType->getParams();
   Type resultType =
     fnType->getResult()->replaceCovariantResultType(newResultType,
                                                     uncurryLevel - 1);
@@ -709,13 +721,13 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
-SmallVector<CallArgParam, 4>
+SmallVector<AnyFunctionType::Param, 4>
 swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
-  SmallVector<CallArgParam, 4> result;
+  SmallVector<AnyFunctionType::Param, 4> result;
   switch (type->getKind()) {
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
-
+    
     // If we have one argument label but a tuple argument with > 1 element,
     // put the whole tuple into the argument.
     // FIXME: This horribleness is due to the mis-modeling of arguments as
@@ -724,45 +736,41 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
       // Break out to do the default thing below.
       break;
     }
-
+    
     for (auto i : range(0, tupleTy->getNumElements())) {
       const auto &elt = tupleTy->getElement(i);
-      assert(elt.getParameterFlags().isNone() &&
-             "Vararg, autoclosure, or escaping argument tuple"
-             "doesn't make sense");
-      CallArgParam argParam;
-      argParam.Ty = elt.getType();
-      argParam.Label = argumentLabels[i];
-      result.push_back(argParam);
+      assert(!(elt.getParameterFlags().isAutoClosure() ||
+              elt.getParameterFlags().isVariadic()) &&
+             "Vararg or autoclosure argument tuple doesn't make sense");
+      result.push_back(AnyFunctionType::Param(elt.getRawType(),
+                                              argumentLabels[i],
+                                              elt.getParameterFlags()));
     }
     return result;
   }
-
+    
   case TypeKind::Paren: {
-    CallArgParam argParam;
-    argParam.Ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
-    result.push_back(argParam);
+    auto parenTy = cast<ParenType>(type.getPointer());
+    result.push_back(AnyFunctionType::Param(parenTy->getUnderlyingType()->getInOutObjectType(),
+                                            Identifier(),
+                                            parenTy->getParameterFlags()));
     return result;
   }
-
+    
   default:
     // Default behavior below; inject the argument as the sole parameter.
     break;
   }
-
+  
   // Just inject this parameter.
-  assert(result.empty());
-  CallArgParam argParam;
-  argParam.Ty = type;
-  assert(argumentLabels.size() == 1);
-  argParam.Label = argumentLabels[0];
-  result.push_back(argParam);
+  assert(result.empty() && (argumentLabels.size() == 1));
+  result.push_back(AnyFunctionType::Param(type->getInOutObjectType(), argumentLabels[0],
+                                          ParameterTypeFlags().withInOut(type->is<InOutType>())));
   return result;
 }
 
-SmallVector<CallArgParam, 4>
-swift::decomposeParamType(Type type, const ValueDecl *paramOwner,
-                          unsigned level) {
+void swift::computeDefaultMap(Type type, const ValueDecl *paramOwner,
+                              unsigned level, SmallVectorImpl<bool> &outDefaultMap) {
   // Find the corresponding parameter list.
   const ParameterList *paramList = nullptr;
   if (paramOwner) {
@@ -774,61 +782,46 @@ swift::decomposeParamType(Type type, const ValueDecl *paramOwner,
         paramList = subscript->getIndices();
     }
   }
-
-  SmallVector<CallArgParam, 4> result;
+  
   switch (type->getKind()) {
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
 
-    // FIXME: In the weird case where we have a tuple type that should
-    // be wrapped in a ParenType but isn't, just... forget it happened.
-    if (paramList && tupleTy->getNumElements() != paramList->size() &&
-        paramList->size() == 1)
+    // Arguments and parameters are not guaranteed to always line-up
+    // perfectly, e.g. failure diagnostics tries to match argument type
+    // to different "candidate" parameters.
+    if (paramList && tupleTy->getNumElements() != paramList->size())
       paramList = nullptr;
 
     for (auto i : range(0, tupleTy->getNumElements())) {
-      const auto &elt = tupleTy->getElement(i);
-
-      CallArgParam argParam;
-      argParam.Ty = elt.isVararg() ? elt.getVarargBaseTy() : elt.getType();
-      argParam.Label = elt.getName();
-      argParam.HasDefaultArgument =
-          paramList && paramList->get(i)->isDefaultArgument();
-      argParam.parameterFlags = elt.getParameterFlags();
-      result.push_back(argParam);
+      outDefaultMap.push_back(paramList &&
+                              paramList->get(i)->isDefaultArgument());
     }
     break;
   }
-
+      
   case TypeKind::Paren: {
-    CallArgParam argParam;
-    argParam.Ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
-    argParam.HasDefaultArgument =
-        paramList && paramList->get(0)->isDefaultArgument();
-    result.push_back(argParam);
+    outDefaultMap.push_back(paramList && paramList->size() == 1 &&
+                            paramList->get(0)->isDefaultArgument());
     break;
   }
-
+      
   default: {
-    CallArgParam argParam;
-    argParam.Ty = type;
-    result.push_back(argParam);
+    outDefaultMap.push_back(false);
     break;
   }
   }
-
-  return result;
 }
 
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (_:, b:, c:)
-std::string swift::getParamListAsString(ArrayRef<CallArgParam> params) {
+std::string swift::getParamListAsString(ArrayRef<AnyFunctionType::Param> params) {
   std::string result = "(";
 
   interleave(params,
-             [&](const CallArgParam &param) {
-               if (param.hasLabel())
-                 result += param.Label.str();
+             [&](const AnyFunctionType::Param &param) {
+               if (!param.getLabel().empty())
+                 result += param.getLabel().str();
                else
                  result += "_";
                result += ":";
@@ -948,17 +941,7 @@ static void addMinimumProtocols(Type T,
 /// \brief Compare two protocols to establish an ordering between them.
 int ProtocolType::compareProtocols(ProtocolDecl * const* PP1,
                                    ProtocolDecl * const* PP2) {
-  auto *P1 = *PP1;
-  auto *P2 = *PP2;
-  ModuleDecl *M1 = P1->getParentModule();
-  ModuleDecl *M2 = P2->getParentModule();
-
-  // Try ordering based on module name, first.
-  if (int result = M1->getName().str().compare(M2->getName().str()))
-    return result;
-
-  // Order based on protocol name.
-  return P1->getName().str().compare(P2->getName().str());
+  return TypeDecl::compare(*PP1, *PP2);
 }
 
 bool ProtocolType::visitAllProtocols(
@@ -1037,6 +1020,27 @@ void ProtocolType::canonicalizeProtocols(
   // Sort the set of protocols by module + name, to give a stable
   // ordering.
   llvm::array_pod_sort(protocols.begin(), protocols.end(), compareProtocols);
+}
+
+static Type
+getCanonicalInputType(AnyFunctionType *funcType,
+                      llvm::function_ref<CanType(Type)> getCanonicalType) {
+  auto origInputType = funcType->getInput();
+  bool isParen = isa<ParenType>(origInputType.getPointer());
+  Type inputType = getCanonicalType(origInputType);
+
+  if (!isParen && AnyFunctionType::isCanonicalFunctionInputType(inputType))
+    return inputType;
+
+  auto flags = ParameterTypeFlags().withInOut(inputType->is<InOutType>());
+  if (auto *parenTy = dyn_cast<ParenType>(origInputType.getPointer()))
+    flags = flags.withShared(parenTy->getParameterFlags().isShared());
+
+  inputType = ParenType::get(inputType->getASTContext(),
+                             inputType->getInOutObjectType(), flags);
+  assert(AnyFunctionType::isCanonicalFunctionInputType(inputType));
+
+  return inputType;
 }
 
 /// getCanonicalType - Return the canonical version of this type, which has
@@ -1139,11 +1143,10 @@ CanType TypeBase::getCanonicalType() {
       ->getCanonicalSignature();
     
     // Transform the input and result types.
-    auto &ctx = function->getInput()->getASTContext();
-    auto &mod = *ctx.TheBuiltinModule;
-    auto inputTy = function->getInput()->getCanonicalType(sig, mod);
-    auto resultTy = function->getResult()->getCanonicalType(sig, mod);
-
+    auto inputTy = getCanonicalInputType(function, [&](Type type) -> CanType {
+      return type->getCanonicalType(sig);
+    });
+    auto resultTy = function->getResult()->getCanonicalType(sig);
     Result = GenericFunctionType::get(sig, inputTy, resultTy,
                                       function->getExtInfo());
     assert(Result->isCanonical());
@@ -1157,7 +1160,8 @@ CanType TypeBase::getCanonicalType() {
 
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(this);
-    Type In = FT->getInput()->getCanonicalType();
+    auto In = getCanonicalInputType(
+        FT, [](Type type) -> CanType { return type->getCanonicalType(); });
     Type Out = FT->getResult()->getCanonicalType();
     Result = FunctionType::get(In, Out, FT->getExtInfo());
     break;
@@ -1228,12 +1232,11 @@ CanType TypeBase::getCanonicalType() {
   return CanType(Result);
 }
 
-CanType TypeBase::getCanonicalType(GenericSignature *sig,
-                                   ModuleDecl &mod) {
+CanType TypeBase::getCanonicalType(GenericSignature *sig) {
   if (!sig)
     return getCanonicalType();
 
-  return sig->getCanonicalTypeInContext(this, mod);
+  return sig->getCanonicalTypeInContext(this);
 }
 
 TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
@@ -1301,6 +1304,20 @@ TypeBase *TypeBase::getDesugaredType() {
 
   llvm_unreachable("Unknown type kind");
 }
+
+ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
+                     ParameterTypeFlags flags)
+  : TypeBase(TypeKind::Paren, nullptr, properties),
+    UnderlyingType(flags.isInOut()
+                     ? InOutType::get(baseType)
+                     : baseType),
+    parameterFlags(flags) {
+  if (flags.isInOut())
+    assert(!baseType->is<InOutType>() && "caller did not pass a base type");
+  if (baseType->is<InOutType>())
+    assert(flags.isInOut() && "caller did not set flags correctly");
+}
+
 
 TypeBase *ParenType::getSinglyDesugaredType() {
   return getUnderlyingType().getPointer();
@@ -2347,23 +2364,31 @@ namespace {
     Parameter,
     ParameterTupleElement
   };
+
+  enum class OptionalUnwrapping {
+    None,
+    OptionalToOptional,
+    ValueToOptional,
+    OptionalToValue
+  };
 } // end anonymous namespace
 
 static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
-                    ParameterPosition paramPosition, bool insideOptional,
+                    ParameterPosition paramPosition,
+                    OptionalUnwrapping insideOptional,
                     LazyResolver *resolver) {
   if (t1 == t2) return true;
 
   // First try unwrapping optionals.
   // Make sure we only unwrap at most one layer of optional.
-  if (!insideOptional) {
+  if (insideOptional == OptionalUnwrapping::None) {
     // Value-to-optional and optional-to-optional.
     if (auto obj2 = t2.getAnyOptionalObjectType()) {
       // Optional-to-optional.
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
         // Allow T? and T! to freely match one another.
         return matches(obj1, obj2, matchMode, ParameterPosition::NotParameter,
-                       /*insideOptional=*/true, resolver);
+                       OptionalUnwrapping::OptionalToOptional, resolver);
       }
 
       // Value-to-optional.
@@ -2374,7 +2399,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       if (matchMode.contains(TypeMatchFlags::AllowOverride) ||
           matchMode.contains(TypeMatchFlags::AllowTopLevelOptionalMismatch)) {
         return matches(t1, obj2, matchMode, ParameterPosition::NotParameter,
-                       /*insideOptional=*/true, resolver);
+                       OptionalUnwrapping::ValueToOptional, resolver);
       }
 
     } else if (matchMode.contains(
@@ -2382,7 +2407,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       // Optional-to-value, normally disallowed.
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
         return matches(obj1, t2, matchMode, ParameterPosition::NotParameter,
-                       /*insideOptional=*/true, resolver);
+                       OptionalUnwrapping::OptionalToValue, resolver);
       }
     }
   }
@@ -2406,14 +2431,14 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (!tuple1 || tuple1->getNumElements() != tuple2->getNumElements()) {
       if (tuple2->getNumElements() == 1) {
         return matches(t1, tuple2.getElementType(0), matchMode, elementPosition,
-                       /*insideOptional=*/false, resolver);
+                       OptionalUnwrapping::None, resolver);
       }
       return false;
     }
 
     for (auto i : indices(tuple1.getElementTypes())) {
       if (!matches(tuple1.getElementType(i), tuple2.getElementType(i),
-                   matchMode, elementPosition, /*insideOptional=*/false,
+                   matchMode, elementPosition, OptionalUnwrapping::None,
                    resolver)){
         return false;
       }
@@ -2442,22 +2467,32 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
         ext1 = ext1.withThrows(true);
       }
     }
+    // If specified, allow an escaping function parameter to override a
+    // non-escaping function parameter when the parameter is optional.
+    // Note that this is checking 'ext2' rather than 'ext1' because parameters
+    // must be contravariant for the containing function to be covariant.
+    if (matchMode.contains(
+          TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam) &&
+        insideOptional == OptionalUnwrapping::OptionalToOptional) {
+      if (!ext2.isNoEscape())
+        ext1 = ext1.withNoEscape(false);
+    }
     if (ext1 != ext2)
       return false;
 
     // Inputs are contravariant, results are covariant.
     return (matches(fn2.getInput(), fn1.getInput(), matchMode,
-                    ParameterPosition::Parameter, /*insideOptional=*/false,
+                    ParameterPosition::Parameter, OptionalUnwrapping::None,
                     resolver) &&
             matches(fn1.getResult(), fn2.getResult(), matchMode,
-                    ParameterPosition::NotParameter, /*insideOptional=*/false,
+                    ParameterPosition::NotParameter, OptionalUnwrapping::None,
                     resolver));
   }
 
   if (matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam) &&
       (paramPosition == ParameterPosition::Parameter ||
        paramPosition == ParameterPosition::ParameterTupleElement) &&
-      !insideOptional) {
+      insideOptional == OptionalUnwrapping::None) {
     // Allow T to override T! in certain cases.
     if (auto obj1 = t1->getImplicitlyUnwrappedOptionalObjectType()) {
       t1 = obj1->getCanonicalType();
@@ -2480,7 +2515,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
 bool TypeBase::matches(Type other, TypeMatchOptions matchMode,
                        LazyResolver *resolver) {
   return ::matches(getCanonicalType(), other->getCanonicalType(), matchMode,
-                   ParameterPosition::NotParameter, /*insideOptional=*/false,
+                   ParameterPosition::NotParameter, OptionalUnwrapping::None,
                    resolver);
 }
 
@@ -2539,12 +2574,12 @@ Type TupleType::getVarArgsBaseType() const {
 ArchetypeType::ArchetypeType(
   const ASTContext &Ctx,
   llvm::PointerUnion<ArchetypeType *, GenericEnvironment *> ParentOrGenericEnv,
-  llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
+  Type InterfaceType,
   ArrayRef<ProtocolDecl *> ConformsTo,
   Type Superclass, LayoutConstraint Layout)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties::HasArchetype),
-      AssocTypeOrName(AssocTypeOrName) {
+      InterfaceType(InterfaceType) {
   // Record the parent/generic environment.
   if (auto parent = ParentOrGenericEnv.dyn_cast<ArchetypeType *>()) {
     ParentOrOpenedOrEnvironment = parent;
@@ -2606,7 +2641,7 @@ ArchetypeType::ArchetypeType(const ASTContext &Ctx, Type Existential,
 CanArchetypeType ArchetypeType::getNew(
                                    const ASTContext &Ctx,
                                    ArchetypeType *Parent,
-                                   AssociatedTypeDecl *AssocType,
+                                   DependentMemberType *InterfaceType,
                                    SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                    Type Superclass,
                                    LayoutConstraint Layout) {
@@ -2622,18 +2657,18 @@ CanArchetypeType ArchetypeType::getNew(
       alignof(ArchetypeType), arena);
 
   return CanArchetypeType(new (mem) ArchetypeType(
-      Ctx, Parent, AssocType, ConformsTo, Superclass, Layout));
+      Ctx, Parent, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
 CanArchetypeType
 ArchetypeType::getNew(const ASTContext &Ctx,
-                      GenericEnvironment *genericEnvironment,
-                      Identifier Name,
+                      GenericEnvironment *GenericEnv,
+                      GenericTypeParamType *InterfaceType,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass,
                       LayoutConstraint Layout) {
   assert(!Superclass || Superclass->getClassOrBoundGenericClass());
-  assert(genericEnvironment && "missing generic environment for archetype");
+  assert(GenericEnv && "missing generic environment for archetype");
 
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
@@ -2645,7 +2680,7 @@ ArchetypeType::getNew(const ASTContext &Ctx,
       alignof(ArchetypeType), arena);
 
   return CanArchetypeType(new (mem) ArchetypeType(
-      Ctx, genericEnvironment, Name, ConformsTo, Superclass, Layout));
+      Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
 bool ArchetypeType::requiresClass() const {
@@ -2692,9 +2727,6 @@ void ArchetypeType::populateNestedTypes() const {
   llvm::SmallPtrSet<Identifier, 4> knownNestedTypes;
   ProtocolType::visitAllProtocols(getConformsTo(),
                                   [&](ProtocolDecl *proto) -> bool {
-    // Objective-C protocols don't have type members.
-    if (proto->isObjC()) return false;
-
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         if (knownNestedTypes.insert(assocType->getName()).second)
@@ -2792,11 +2824,17 @@ static void collectFullName(const ArchetypeType *Archetype,
                 Archetype->getName().str().end());
 }
 
+AssociatedTypeDecl *ArchetypeType::getAssocType() const {
+  if (auto *depMemTy = InterfaceType->getAs<DependentMemberType>())
+    return depMemTy->getAssocType();
+  return nullptr;
+}
+
 Identifier ArchetypeType::getName() const {
   if (auto assocType = getAssocType())
     return assocType->getName();
 
-  return AssocTypeOrName.get<Identifier>();
+  return InterfaceType->castTo<GenericTypeParamType>()->getName();
 }
 
 std::string ArchetypeType::getFullName() const {
@@ -2870,6 +2908,17 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanTypes, HasExplicitAnyObject);
 }
 
+bool AnyFunctionType::isCanonicalFunctionInputType(Type input) {
+  // Canonically, we should have a tuple type or parenthesized type.
+  if (auto tupleTy = dyn_cast<TupleType>(input.getPointer()))
+    return tupleTy->isCanonical();
+  if (auto parenTy = dyn_cast<ParenType>(input.getPointer()))
+    return parenTy->getUnderlyingType()->isCanonical();
+
+  // FIXME: Still required for the constraint solver.
+  return isa<TypeVariableType>(input.getPointer());
+}
+
 FunctionType *
 GenericFunctionType::substGenericArgs(SubstitutionList args) {
   return substGenericArgs(getGenericSignature()->getSubstitutionMap(args));
@@ -2921,7 +2970,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   // Error recovery path.
   // FIXME: Generalized existentials will look here.
   if (substBase->isOpenedExistential())
-    return getDependentMemberType(ErrorType::get(substBase));
+    return failed();
 
   // If the parent is an archetype, extract the child archetype with the
   // given name.
@@ -2932,7 +2981,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     // If looking for an associated type and the archetype is constrained to a
     // class, continue to the default associated type lookup
     if (!assocType || !archetypeParent->getSuperclass())
-      return getDependentMemberType(ErrorType::get(substBase));
+      return failed();
   }
 
   // If the parent is a type variable or a member rooted in a type variable,
@@ -2961,6 +3010,8 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     if (!conformance) return failed();
     if (!conformance->isConcrete()) return failed();
+    assert(conformance->getConditionalRequirements().empty() &&
+           "unhandled conditional requirements");
 
     // Retrieve the type witness.
     auto witness =
@@ -2992,8 +3043,7 @@ LookUpConformanceInModule::operator()(CanType dependentType,
     return ProtocolConformanceRef(conformedProtocol->getDecl());
 
   return M->lookupConformance(conformingReplacementType,
-                              conformedProtocol->getDecl(),
-                              M->getASTContext().getLazyResolver());
+                              conformedProtocol->getDecl());
 }
 
 Optional<ProtocolConformanceRef>
@@ -3166,6 +3216,24 @@ Type Type::substDependentTypesWithErrorTypes() const {
                     SubstFlags::UseErrorType));
 }
 
+const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
+  if (!hasTypeParameter()) return nullptr;
+
+  const DependentMemberType *unresolvedDepMemTy = nullptr;
+  Type(this).findIf([&](Type type) -> bool {
+    if (auto depMemTy = type->getAs<DependentMemberType>()) {
+      if (depMemTy->getAssocType() == nullptr) {
+        unresolvedDepMemTy = depMemTy;
+        return true;
+      }
+    }
+    return false;
+  });
+
+  return unresolvedDepMemTy;
+}
+
+
 Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
   Type t(this);
   while (t) {
@@ -3195,7 +3263,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   assert(dc->isTypeContext());
   Type baseTy(this);
 
-  assert(!baseTy->isLValueType() && !baseTy->is<AnyMetatypeType>());
+  assert(!baseTy->hasLValueType() && !baseTy->is<AnyMetatypeType>());
 
   // The resulting set of substitutions. Always use this to ensure we
   // don't miss out on NRVO anywhere.
@@ -3633,6 +3701,9 @@ case TypeKind::Id:
   case TypeKind::NameAlias: {
     auto alias = cast<NameAliasType>(base);
     auto underlyingTy = Type(alias->getSinglyDesugaredType());
+    if (!underlyingTy)
+      return Type();
+
     auto transformedTy = underlyingTy.transformRec(fn);
     if (!transformedTy)
       return Type();
@@ -3652,7 +3723,8 @@ case TypeKind::Id:
     if (underlying.getPointer() == paren->getUnderlyingType().getPointer())
       return *this;
 
-    return ParenType::get(Ptr->getASTContext(), underlying);
+    auto otherFlags = paren->getParameterFlags().withInOut(underlying->is<InOutType>());
+    return ParenType::get(Ptr->getASTContext(), underlying->getInOutObjectType(), otherFlags);
   }
 
   case TypeKind::Tuple: {
@@ -3916,24 +3988,25 @@ case TypeKind::Id:
 
   case TypeKind::ProtocolComposition: {
     auto pc = cast<ProtocolCompositionType>(base);
-    SmallVector<Type, 4> members;
+    SmallVector<Type, 4> substMembers;
+    auto members = pc->getMembers();
     bool anyChanged = false;
     unsigned index = 0;
-    for (auto member : pc->getMembers()) {
+    for (auto member : members) {
       auto substMember = member.transformRec(fn);
       if (!substMember)
         return Type();
       
       if (anyChanged) {
-        members.push_back(substMember);
+        substMembers.push_back(substMember);
         ++index;
         continue;
       }
       
       if (substMember.getPointer() != member.getPointer()) {
         anyChanged = true;
-        members.append(members.begin(), members.begin() + index);
-        members.push_back(substMember);
+        substMembers.append(members.begin(), members.begin() + index);
+        substMembers.push_back(substMember);
       }
       
       ++index;
@@ -3942,7 +4015,8 @@ case TypeKind::Id:
     if (!anyChanged)
       return *this;
     
-    return ProtocolCompositionType::get(Ptr->getASTContext(), members,
+    return ProtocolCompositionType::get(Ptr->getASTContext(),
+                                        substMembers,
                                         pc->hasExplicitAnyObject());
   }
   }
@@ -3974,6 +4048,17 @@ TypeTraitResult TypeBase::canBeClass() {
 
   CanType self = getCanonicalType();
 
+  // Archetypes with a trivial layout constraint can never
+  // represent a class.
+  if (auto Archetype = dyn_cast<ArchetypeType>(self)) {
+    if (auto Layout = Archetype->getLayoutConstraint()) {
+      if (Layout->isTrivial())
+        return TypeTraitResult::IsNot;
+      if (Layout->isClass())
+        return TypeTraitResult::Is;
+    }
+  }
+
   // Dependent types might be bound to classes.
   if (isa<SubstitutableType>(self))
     return TypeTraitResult::CanBe;
@@ -3983,23 +4068,27 @@ TypeTraitResult TypeBase::canBeClass() {
   return TypeTraitResult::IsNot;
 }
 
-bool Type::isPrivateStdlibType(bool whitelistProtocols) const {
+bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
   Type Ty = *this;
   if (!Ty)
     return false;
 
   // A 'public' typealias can have an 'internal' type.
-  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
-    return NAT->getDecl()->isPrivateStdlibDecl(whitelistProtocols);
+  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
+    auto *AliasDecl = NAT->getDecl();
+    return AliasDecl->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic);
+  }
 
-  if (auto Paren = dyn_cast<ParenType>(Ty.getPointer()))
-    return Paren->getUnderlyingType().isPrivateStdlibType(whitelistProtocols);
+  if (auto Paren = dyn_cast<ParenType>(Ty.getPointer())) {
+    Type Underlying = Paren->getUnderlyingType();
+    return Underlying.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
+  }
 
   if (Type Unwrapped = Ty->getAnyOptionalObjectType())
-    return Unwrapped.isPrivateStdlibType(whitelistProtocols);
+    return Unwrapped.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
 
   if (auto TyD = Ty->getAnyNominal())
-    if (TyD->isPrivateStdlibDecl(whitelistProtocols))
+    if (TyD->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic))
       return true;
 
   return false;
@@ -4145,4 +4234,17 @@ getRecursivePropertiesFromSubstitutions(SubstitutionList Params) {
     props |= param.getReplacement()->getRecursiveProperties();
   }
   return props;
+}
+
+Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
+  assert(isAnyExistentialType());
+  if (auto metaty = getAs<ExistentialMetatypeType>()) {
+    opened = ArchetypeType::getOpened(metaty->getInstanceType());
+    if (metaty->hasRepresentation())
+      return MetatypeType::get(opened, metaty->getRepresentation());
+    else
+      return MetatypeType::get(opened);
+  }
+  opened = ArchetypeType::getOpened(this);
+  return opened;
 }

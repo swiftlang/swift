@@ -57,4 +57,12 @@ extern void IAMStruct1SelfComesLast(double x, struct IAMStruct1 s)
 extern void IAMStruct1SelfComesThird(int a, float b, struct IAMStruct1 s, double x)
     __attribute__((swift_name("Struct1.selfComesThird(a:b:self:x:)")));
 
+
+struct IAMMultipleNested {
+  int value;
+};
+
+typedef int MNInnerInt __attribute__((swift_name("IAMMultipleNested.Inner")));
+typedef float MNInnerFloat __attribute__((swift_name("IAMMultipleNested.Inner")));
+
 #endif // IMPORT_AS_MEMBER_H

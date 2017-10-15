@@ -35,7 +35,7 @@ bb0(%0 : @trivial $Builtin.Int32):
   %91 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
   %91a = project_box %91 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %1 = mark_uninitialized [var] %91a : $*Builtin.Int32
-  %2 = store %0 to [trivial] %1 : $*Builtin.Int32
+  store %0 to [trivial] %1 : $*Builtin.Int32
   %3 = load [trivial] %1 : $*Builtin.Int32
   %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Builtin.Int32) -> ()
   %6 = apply %5(%1) : $@convention(thin) (@inout Builtin.Int32) -> ()

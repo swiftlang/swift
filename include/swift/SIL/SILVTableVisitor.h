@@ -56,7 +56,7 @@ template <class T> class SILVTableVisitor {
       bool needsAllocatingEntry = cd->needsNewVTableEntry();
       if (!needsAllocatingEntry)
         if (auto *baseCD = cd->getOverriddenDecl())
-          needsAllocatingEntry = !baseCD->isRequired();
+          needsAllocatingEntry = !baseCD->isRequired() || baseCD->hasClangNode();
       maybeAddEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator),
                     needsAllocatingEntry);
     }
@@ -94,6 +94,8 @@ protected:
         maybeAddMethod(fd);
       else if (auto *cd = dyn_cast<ConstructorDecl>(member))
         maybeAddConstructor(cd);
+      else if (auto *placeholder = dyn_cast<MissingMemberDecl>(member))
+        asDerived().addPlaceholder(placeholder);
     }
   }
 };

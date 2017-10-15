@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class B { }
 class D : B { }
@@ -16,17 +16,17 @@ func downcast(b: B) -> D {
 
 // CHECK-LABEL: sil hidden @_T05casts3isa{{[_0-9a-zA-Z]*}}F
 func isa(b: B) -> Bool {
-  // CHECK: bb0([[ARG:%.*]] : $B):
+  // CHECK: bb0([[ARG:%.*]] : @owned $B):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[COPIED_BORROWED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   checked_cast_br [[COPIED_BORROWED_ARG]] : $B to $D, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   //
-  // CHECK: [[YES]]([[CASTED_VALUE:%.*]] : $D):
+  // CHECK: [[YES]]([[CASTED_VALUE:%.*]] : @owned $D):
   // CHECK:   integer_literal {{.*}} -1
   // CHECK:   destroy_value [[CASTED_VALUE]]
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   //
-  // CHECK: [[NO]]([[ORIGINAL_VALUE:%.*]] : $B):
+  // CHECK: [[NO]]([[ORIGINAL_VALUE:%.*]] : @owned $B):
   // CHECK:   destroy_value [[ORIGINAL_VALUE]]
   // CHECK:   integer_literal {{.*}} 0
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -56,12 +56,12 @@ func downcast_archetype<T : B>(b: B) -> T {
 //
 // CHECK-LABEL: sil hidden @_T05casts12is_archetype{{[_0-9a-zA-Z]*}}F
 func is_archetype<T : B>(b: B, _: T) -> Bool {
-  // CHECK: bb0([[ARG1:%.*]] : $B, [[ARG2:%.*]] : $T):
+  // CHECK: bb0([[ARG1:%.*]] : @owned $B, [[ARG2:%.*]] : @owned $T):
   // CHECK:   checked_cast_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
-  // CHECK: [[YES]]([[CASTED_ARG:%.*]] : $T):
+  // CHECK: [[YES]]([[CASTED_ARG:%.*]] : @owned $T):
   // CHECK:   integer_literal {{.*}} -1
   // CHECK:   destroy_value [[CASTED_ARG]]
-  // CHECK: [[NO]]([[ORIGINAL_VALUE:%.*]] : $B):
+  // CHECK: [[NO]]([[ORIGINAL_VALUE:%.*]] : @owned $B):
   // CHCEK:   destroy_value [[CASTED_ARG]]
   // CHECK:   integer_literal {{.*}} 0
   return b is T
@@ -79,7 +79,7 @@ protocol P {}
 struct S : P {}
 
 // CHECK: sil hidden @_T05casts32downcast_existential_conditional{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[IN:%.*]] : $*P):
+// CHECK: bb0([[IN:%.*]] : @trivial $*P):
 // CHECK:   [[COPY:%.*]] = alloc_stack $P
 // CHECK:   copy_addr [[IN]] to [initialization] [[COPY]]
 // CHECK:   [[TMP:%.*]] = alloc_stack $S
@@ -96,7 +96,7 @@ struct S : P {}
 // CHECK:   dealloc_stack [[TMP]]
 // CHECK:   br bb3([[T0]] : $Optional<S>)
 //   Continuation block.
-// CHECK: bb3([[RESULT:%.*]] : $Optional<S>):
+// CHECK: bb3([[RESULT:%.*]] : @trivial $Optional<S>):
 // CHECK:   dealloc_stack [[COPY]]
 // CHECK:   destroy_addr [[IN]] : $*P
 // CHECK:   return [[RESULT]]

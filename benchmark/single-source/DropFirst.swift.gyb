@@ -42,6 +42,16 @@ def lazy ((Name, Expr)) : return (Name + 'Lazy', '(' + Expr + ').lazy')
 Sequences = Sequences + map(lazy, Sequences)
 }%
 
+
+public let DropFirst = [
+% for (Name, Expr) in Sequences:
+  BenchmarkInfo(
+    name: "DropFirst${Name}",
+    runFunction: run_DropFirst${Name},
+    tags: [.validation, .api${', .Array' if Name == 'Array' else ''}]),
+% end
+]
+
 % for (Name, Expr) in Sequences:
 @inline(never)
 public func run_DropFirst${Name}(_ N: Int) {
@@ -51,8 +61,7 @@ public func run_DropFirst${Name}(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropFirst${Name}: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 % end

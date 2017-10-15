@@ -7,7 +7,7 @@ protocol MySequenceType {}
 protocol MyIndexableType {}
 
 protocol MyCollectionType : MySequenceType, MyIndexableType {
-  typealias SubSequence = MySlice<Self>
+  associatedtype SubSequence = MySlice<Self>
   func makeSubSequence() -> SubSequence
 }
 extension MyCollectionType {
@@ -18,7 +18,7 @@ extension MyCollectionType {
 }
 
 protocol MyMutableCollectionType : MyCollectionType {
-  typealias SubSequence = MyMutableSlice<Self>
+  associatedtype SubSequence = MyMutableSlice<Self>
 }
 extension MyMutableCollectionType {
   func makeSubSequence() -> MyMutableSlice<Self> {

@@ -232,7 +232,7 @@ FileUnit *SerializedModuleLoader::loadAST(
 
     SmallString<32> versionBuf;
     llvm::raw_svector_ostream versionString(versionBuf);
-    versionString << version::Version::getCurrentLanguageVersion();
+    versionString << Ctx.LangOpts.EffectiveLanguageVersion;
     if (versionString.str() == shortVersion)
       return false;
 
@@ -497,10 +497,6 @@ void SerializedASTFile::collectLinkLibraries(
   if (isSIB()) {
     collectLinkLibrariesFromImports(callback);
   } else {
-    if (File.getAssociatedModule()->getResilienceStrategy()
-        == ResilienceStrategy::Fragile) {
-      collectLinkLibrariesFromImports(callback);
-    }
     File.collectLinkLibraries(callback);
   }
 }
@@ -523,6 +519,12 @@ void SerializedASTFile::lookupValue(ModuleDecl::AccessPathTy accessPath,
 
 TypeDecl *SerializedASTFile::lookupLocalType(llvm::StringRef MangledName) const{
   return File.lookupLocalType(MangledName);
+}
+
+TypeDecl *
+SerializedASTFile::lookupNestedType(Identifier name,
+                                    const NominalTypeDecl *parent) const {
+  return File.lookupNestedType(name, parent);
 }
 
 OperatorDecl *SerializedASTFile::lookupOperator(Identifier name,
@@ -608,7 +610,7 @@ StringRef SerializedASTFile::getFilename() const {
   return File.getModuleFilename();
 }
 
-const clang::Module *SerializedASTFile::getUnderlyingClangModule() {
+const clang::Module *SerializedASTFile::getUnderlyingClangModule() const {
   if (auto *ShadowedModule = File.getShadowedModule())
     return ShadowedModule->findUnderlyingClangModule();
   return nullptr;

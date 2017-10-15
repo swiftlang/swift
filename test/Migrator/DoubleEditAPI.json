@@ -1,0 +1,38 @@
+[
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@FooComparisonResult@FooOrderedAscending",
+    "OldPrintedName": "FooOrderedAscending",
+    "NewPrintedName": "orderedAscending",
+    "NewTypeName": "FooComparisonResult"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@SA@SomeItemSet",
+    "OldPrintedName": "SomeItemSet",
+    "NewPrintedName": "some",
+    "NewTypeName": "ItemSet"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)WillOverrideWithTypeChange(im)doThing:",
+    "LeftComment": "SomeItemSet",
+    "RightUsr": "",
+    "RightComment": "ItemSet.some",
+    "ModuleName": "bar"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)WillOverrideWithTypeChange(im)doThing:",
+    "LeftComment": "SomeItemSet",
+    "RightUsr": "",
+    "RightComment": "ItemSet.some",
+    "ModuleName": "bar"
+  }
+]

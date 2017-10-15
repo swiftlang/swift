@@ -270,8 +270,6 @@ public:
   
   const VersionRange &getAvailableRange() const { return AvailableRange; }
   void setAvailableRange(const VersionRange &Range) { AvailableRange = Range; }
-  
-  void getPlatformKeywordLocs(SmallVectorImpl<SourceLoc> &PlatformLocs);
 };
 
 
@@ -655,46 +653,6 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Guard; }
 };
 
-/// IfConfigStmt - This class models the statement-side representation of
-/// #if/#else/#endif blocks.
-class IfConfigStmt : public Stmt {
-  /// An array of clauses controlling each of the #if/#elseif/#else conditions.
-  /// The array is ASTContext allocated.
-  ArrayRef<IfConfigClause<ASTNode>> Clauses;
-  SourceLoc EndLoc;
-  bool HadMissingEnd;
-
-public:
-  IfConfigStmt(ArrayRef<IfConfigClause<ASTNode>> Clauses, SourceLoc EndLoc,
-               bool HadMissingEnd)
-  : Stmt(StmtKind::IfConfig, /*implicit=*/false),
-    Clauses(Clauses), EndLoc(EndLoc), HadMissingEnd(HadMissingEnd) {}
-  
-  SourceLoc getIfLoc() const { return Clauses[0].Loc; }
-
-  SourceLoc getStartLoc() const { return getIfLoc(); }
-  SourceLoc getEndLoc() const { return EndLoc; }
-
-  bool hadMissingEnd() const { return HadMissingEnd; }
-  
-  const ArrayRef<IfConfigClause<ASTNode>> &getClauses() const {
-    return Clauses;
-  }
-
-  ArrayRef<ASTNode> getActiveClauseElements() const {
-    for (auto &Clause : Clauses)
-      if (Clause.isActive)
-        return Clause.Elements;
-    return ArrayRef<ASTNode>();
-  }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Stmt *S) {
-    return S->getKind() == StmtKind::IfConfig;
-  }
-};
-
-  
 /// WhileStmt - while statement. After type-checking, the condition is of
 /// type Builtin.Int1.
 class WhileStmt : public LabeledConditionalStmt {
@@ -744,58 +702,6 @@ public:
   void setCond(Expr *e) { Cond = e; }
   
   static bool classof(const Stmt *S) {return S->getKind() == StmtKind::RepeatWhile;}
-};
-
-/// ForStmt - for statement.  After type-checking, the condition is of
-/// type Builtin.Int1.  Note that the condition is optional.  If not present,
-/// it always evaluates to true.  The Initializer and Increment are also
-/// optional.
-class ForStmt : public LabeledStmt {
-  SourceLoc ForLoc, Semi1Loc, Semi2Loc;
-  NullablePtr<Expr> Initializer;
-  ArrayRef<Decl*> InitializerVarDecls;
-  NullablePtr<Expr> Cond;
-  NullablePtr<Expr> Increment;
-  Stmt *Body;
-  
-public:
-  ForStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc,
-          NullablePtr<Expr> Initializer,
-          ArrayRef<Decl*> InitializerVarDecls,
-          SourceLoc Semi1Loc, NullablePtr<Expr> Cond, SourceLoc Semi2Loc,
-          NullablePtr<Expr> Increment,
-          Stmt *Body,
-          Optional<bool> implicit = None)
-  : LabeledStmt(StmtKind::For, getDefaultImplicitFlag(implicit, ForLoc),
-                LabelInfo),
-    ForLoc(ForLoc), Semi1Loc(Semi1Loc),
-    Semi2Loc(Semi2Loc), Initializer(Initializer),
-    InitializerVarDecls(InitializerVarDecls),
-    Cond(Cond), Increment(Increment), Body(Body) {
-  }
-  
-  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(ForLoc); }
-  SourceLoc getEndLoc() const { return Body->getEndLoc(); }
-
-  SourceLoc getFirstSemicolonLoc() const { return Semi1Loc; }
-  SourceLoc getSecondSemicolonLoc() const { return Semi2Loc; }
-  
-  NullablePtr<Expr> getInitializer() const { return Initializer; }
-  void setInitializer(Expr *V) { Initializer = V; }
-  
-  ArrayRef<Decl*> getInitializerVarDecls() const { return InitializerVarDecls; }
-  void setInitializerVarDecls(ArrayRef<Decl*> D) { InitializerVarDecls = D; }
-
-  NullablePtr<Expr> getCond() const { return Cond; }
-  void setCond(NullablePtr<Expr> C) { Cond = C; }
-
-  NullablePtr<Expr> getIncrement() const { return Increment; }
-  void setIncrement(Expr *V) { Increment = V; }
-
-  Stmt *getBody() const { return Body; }
-  void setBody(Stmt *s) { Body = s; }
-  
-  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::For; }
 };
 
 /// ForEachStmt - foreach statement that iterates over the elements in a
@@ -972,7 +878,7 @@ public:
 
 /// Switch statement.
 class SwitchStmt final : public LabeledStmt,
-    private llvm::TrailingObjects<SwitchStmt, CaseStmt *> {
+    private llvm::TrailingObjects<SwitchStmt, ASTNode> {
   friend TrailingObjects;
 
   SourceLoc SwitchLoc, LBraceLoc, RBraceLoc;
@@ -993,7 +899,7 @@ public:
   static SwitchStmt *create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                             Expr *SubjectExpr,
                             SourceLoc LBraceLoc,
-                            ArrayRef<CaseStmt*> Cases,
+                            ArrayRef<ASTNode> Cases,
                             SourceLoc RBraceLoc,
                             ASTContext &C);
   
@@ -1012,10 +918,28 @@ public:
   /// Get the subject expression of the switch.
   Expr *getSubjectExpr() const { return SubjectExpr; }
   void setSubjectExpr(Expr *e) { SubjectExpr = e; }
+
+  ArrayRef<ASTNode> getRawCases() const {
+    return {getTrailingObjects<ASTNode>(), CaseCount};
+  }
+
+private:
+  struct AsCaseStmtWithSkippingIfConfig {
+    AsCaseStmtWithSkippingIfConfig() {}
+    Optional<CaseStmt*> operator()(const ASTNode &N) const {
+      if (auto *CS = llvm::dyn_cast_or_null<CaseStmt>(N.dyn_cast<Stmt*>()))
+        return CS;
+      return None;
+    }
+  };
+
+public:
+  using AsCaseStmtRange = OptionalTransformRange<ArrayRef<ASTNode>,
+                                                AsCaseStmtWithSkippingIfConfig>;
   
   /// Get the list of case clauses.
-  ArrayRef<CaseStmt*> getCases() const {
-    return {getTrailingObjects<CaseStmt*>(), CaseCount};
+  AsCaseStmtRange getCases() const {
+    return AsCaseStmtRange(getRawCases(), AsCaseStmtWithSkippingIfConfig());
   }
   
   static bool classof(const Stmt *S) {

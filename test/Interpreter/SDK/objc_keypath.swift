@@ -36,10 +36,10 @@ band.members = [Person(firstName: "John", lastName: "Lennon"),
 // CHECK: ===Members===
 // CHECK-NEXT: (
 // CHECK-NEXT:    Lennon, John
-// CHECK-NEXT     McCartney, Paul,
-// CHECK-NEXT     Harrison, George,
-// CHECK-NEXT     Star, Ringo
-// CHECK-NEXT)
+// CHECK-NEXT:    McCartney, Paul
+// CHECK-NEXT:    Harrison, George
+// CHECK-NEXT:    Star, Ringo
+// CHECK-NEXT: )
 print("===Members===")
 print((band.value(forKeyPath: #keyPath(Band.members))! as AnyObject).description)
 

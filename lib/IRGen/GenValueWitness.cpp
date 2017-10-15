@@ -49,23 +49,13 @@ using namespace irgen;
 const char *irgen::getValueWitnessName(ValueWitness witness) {
   switch (witness) {
 #define CASE(NAME) case ValueWitness::NAME: return #NAME;
-  CASE(AllocateBuffer)
   CASE(AssignWithCopy)
   CASE(AssignWithTake)
-  CASE(DeallocateBuffer)
   CASE(Destroy)
-  CASE(DestroyBuffer)
-  CASE(DestroyArray)
   CASE(InitializeBufferWithCopyOfBuffer)
-  CASE(InitializeBufferWithCopy)
   CASE(InitializeWithCopy)
-  CASE(InitializeBufferWithTake)
   CASE(InitializeWithTake)
-  CASE(ProjectBuffer)
   CASE(InitializeBufferWithTakeOfBuffer)
-  CASE(InitializeArrayWithCopy)
-  CASE(InitializeArrayWithTakeFrontToBack)
-  CASE(InitializeArrayWithTakeBackToFront)
   CASE(StoreExtraInhabitant)
   CASE(GetExtraInhabitantIndex)
   CASE(GetEnumTag)
@@ -78,15 +68,6 @@ const char *irgen::getValueWitnessName(ValueWitness witness) {
 #undef CASE
   }
   llvm_unreachable("bad value witness kind");
-}
-
-static bool isNeverAllocated(FixedPacking packing) {
-  switch (packing) {
-  case FixedPacking::OffsetZero: return true;
-  case FixedPacking::Allocate: return false;
-  case FixedPacking::Dynamic: return false;
-  }
-  llvm_unreachable("bad FixedPacking value");
 }
 
 namespace {
@@ -253,29 +234,22 @@ static Address emitDefaultProjectBuffer(IRGenFunction &IGF, Address buffer,
     // Use copy-on-write existentials?
     auto &IGM = IGF.IGM;
     auto &Builder = IGF.Builder;
-    if (IGM.getSILModule().getOptions().UseCOWExistentials) {
-      Address boxAddress(
-          Builder.CreateBitCast(buffer.getAddress(),
-                                IGM.RefCountedPtrTy->getPointerTo()),
-          buffer.getAlignment());
-      auto *boxStart = IGF.Builder.CreateLoad(boxAddress);
-      auto *alignmentMask = type.getAlignmentMask(IGF, T);
-      auto *heapHeaderSize =
-          llvm::ConstantInt::get(IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
-      auto *startOffset =
+    Address boxAddress(
+        Builder.CreateBitCast(buffer.getAddress(),
+                              IGM.RefCountedPtrTy->getPointerTo()),
+        buffer.getAlignment());
+    auto *boxStart = IGF.Builder.CreateLoad(boxAddress);
+    auto *alignmentMask = type.getAlignmentMask(IGF, T);
+    auto *heapHeaderSize =
+        llvm::ConstantInt::get(IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
+    auto *startOffset =
         Builder.CreateAnd(Builder.CreateAdd(heapHeaderSize, alignmentMask),
-                              Builder.CreateNot(alignmentMask));
-      auto *addressInBox =
-          IGF.emitByteOffsetGEP(boxStart, startOffset, IGM.OpaqueTy);
+                          Builder.CreateNot(alignmentMask));
+    auto *addressInBox =
+        IGF.emitByteOffsetGEP(boxStart, startOffset, IGM.OpaqueTy);
 
-      addressInBox = Builder.CreateBitCast(addressInBox, resultTy);
-      return type.getAddressForPointer(addressInBox);
-    }
-
-    Address slot =
-        Builder.CreateBitCast(buffer, resultTy->getPointerTo(), "storage-slot");
-    llvm::Value *address = Builder.CreateLoad(slot);
-    return type.getAddressForPointer(address);
+    addressInBox = Builder.CreateBitCast(addressInBox, resultTy);
+    return type.getAddressForPointer(addressInBox);
   }
 
   case FixedPacking::OffsetZero: {
@@ -297,44 +271,17 @@ static Address emitDefaultAllocateBuffer(IRGenFunction &IGF, Address buffer,
                                          FixedPacking packing) {
   switch (packing) {
   case FixedPacking::Allocate: {
+    llvm::Value *box, *address;
+    auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
+    IGF.emitAllocBoxCall(metadata, box, address);
+    IGF.Builder.CreateStore(
+        box, Address(IGF.Builder.CreateBitCast(buffer.getAddress(),
+                                               box->getType()->getPointerTo()),
+                     buffer.getAlignment()));
 
-    // Use copy-on-write existentials?
-    auto &IGM = IGF.IGM;
-    if (IGM.getSILModule().getOptions().UseCOWExistentials) {
-      // This would be faster but what do we pass as genericEnv?
-#if 0
-      if (isa<FixedTypeInfo>(T)) {
-        assert(T->getFixedPacking() == FixedPacking::Allocate);
-        auto *genericEnv = nullptr; //???;
-          // Otherwise, allocate a box with enough storage.
-        Address addr = emitAllocateExistentialBoxInBuffer(
-          IGF, valueType, buffer, genericEnv, "exist.box.addr");
-        return type.getAddressForPointer(addr);
-      }
-#endif
-
-      llvm::Value *box, *address;
-      auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-      IGF.emitAllocBoxCall(metadata, box, address);
-      IGF.Builder.CreateStore(
-          box, Address(IGF.Builder.CreateBitCast(
-                           buffer.getAddress(), box->getType()->getPointerTo()),
-                       buffer.getAlignment()));
-
-      llvm::PointerType *resultTy = type.getStorageType()->getPointerTo();
-      address = IGF.Builder.CreateBitCast(address, resultTy);
-      return type.getAddressForPointer(address);
-    }
-
-    auto sizeAndAlign = type.getSizeAndAlignmentMask(IGF, T);
-    llvm::Value *addr =
-      IGF.emitAllocRawCall(sizeAndAlign.first, sizeAndAlign.second);
-    buffer = IGF.Builder.CreateBitCast(buffer, IGM.Int8PtrPtrTy);
-    IGF.Builder.CreateStore(addr, buffer);
-
-    addr = IGF.Builder.CreateBitCast(addr,
-                                     type.getStorageType()->getPointerTo());
-    return type.getAddressForPointer(addr);
+    llvm::PointerType *resultTy = type.getStorageType()->getPointerTo();
+    address = IGF.Builder.CreateBitCast(address, resultTy);
+    return type.getAddressForPointer(address);
   }
 
   case FixedPacking::OffsetZero:
@@ -347,92 +294,37 @@ static Address emitDefaultAllocateBuffer(IRGenFunction &IGF, Address buffer,
   llvm_unreachable("bad packing!");
 }
 
-/// Emit a 'deallocateBuffer' operation.
-static void emitDefaultDeallocateBuffer(IRGenFunction &IGF,
-                                        Address buffer,
-                                        SILType T,
-                                        const TypeInfo &type,
-                                        FixedPacking packing) {
-  switch (packing) {
-  case FixedPacking::Allocate: {
-    Address slot =
-      IGF.Builder.CreateBitCast(buffer, IGF.IGM.Int8PtrPtrTy);
-    llvm::Value *addr = IGF.Builder.CreateLoad(slot, "storage");
-    auto sizeAndAlignMask = type.getSizeAndAlignmentMask(IGF, T);
-    IGF.emitDeallocRawCall(addr, sizeAndAlignMask.first,
-                           sizeAndAlignMask.second);
-    return;
-  }
-
-  case FixedPacking::OffsetZero:
-    return;
-
-  case FixedPacking::Dynamic:
-    return emitForDynamicPacking(IGF, &emitDefaultDeallocateBuffer,
-                                 T, type, buffer);
-  }
-  llvm_unreachable("bad packing!");
-}
-
-/// Emit a 'destroyBuffer' operation.
-static void emitDefaultDestroyBuffer(IRGenFunction &IGF, Address buffer,
-                                     SILType T, const TypeInfo &type,
-                                     FixedPacking packing) {
-  // Special-case dynamic packing in order to thread the jumps.
-  if (packing == FixedPacking::Dynamic)
-    return emitForDynamicPacking(IGF, &emitDefaultDestroyBuffer,
-                                 T, type, buffer);
-
-  Address object = emitDefaultProjectBuffer(IGF, buffer, T, type, packing);
-  type.destroy(IGF, object, T);
-  emitDefaultDeallocateBuffer(IGF, buffer, T, type, packing);
-}
-
 /// Emit an 'initializeBufferWithCopyOfBuffer' operation.
 /// Returns the address of the destination object.
-static Address
-emitDefaultInitializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
-                                            Address destBuffer,
-                                            Address srcBuffer,
-                                            SILType T,
-                                            const TypeInfo &type,
-                                            FixedPacking packing) {
+static Address emitDefaultInitializeBufferWithCopyOfBuffer(
+    IRGenFunction &IGF, Address destBuffer, Address srcBuffer, SILType T,
+    const TypeInfo &type, FixedPacking packing) {
   // Special-case dynamic packing in order to thread the jumps.
   if (packing == FixedPacking::Dynamic)
     return emitForDynamicPacking(IGF,
                                  &emitDefaultInitializeBufferWithCopyOfBuffer,
                                  T, type, destBuffer, srcBuffer);
 
-  if (IGF.IGM.getSILModule().getOptions().UseCOWExistentials) {
-    if (packing == FixedPacking::OffsetZero) {
-      Address destObject =
+  if (packing == FixedPacking::OffsetZero) {
+    Address destObject =
         emitDefaultAllocateBuffer(IGF, destBuffer, T, type, packing);
-      Address srcObject =
+    Address srcObject =
         emitDefaultProjectBuffer(IGF, srcBuffer, T, type, packing);
-      type.initializeWithCopy(IGF, destObject, srcObject, T);
-      return destObject;
-    } else {
-      assert(packing == FixedPacking::Allocate);
-      auto *destReferenceAddr = IGF.Builder.CreateBitCast(
-          destBuffer.getAddress(), IGF.IGM.RefCountedPtrTy->getPointerTo());
-      auto *srcReferenceAddr = IGF.Builder.CreateBitCast(
-          srcBuffer.getAddress(), IGF.IGM.RefCountedPtrTy->getPointerTo());
-      auto *srcReference =
+    type.initializeWithCopy(IGF, destObject, srcObject, T);
+    return destObject;
+  } else {
+    assert(packing == FixedPacking::Allocate);
+    auto *destReferenceAddr = IGF.Builder.CreateBitCast(
+        destBuffer.getAddress(), IGF.IGM.RefCountedPtrTy->getPointerTo());
+    auto *srcReferenceAddr = IGF.Builder.CreateBitCast(
+        srcBuffer.getAddress(), IGF.IGM.RefCountedPtrTy->getPointerTo());
+    auto *srcReference =
         IGF.Builder.CreateLoad(srcReferenceAddr, srcBuffer.getAlignment());
-      IGF.emitNativeStrongRetain(srcReference, IGF.getDefaultAtomicity());
-      IGF.Builder.CreateStore(
-        srcReference,
-        Address(destReferenceAddr, destBuffer.getAlignment()));
-      return emitDefaultProjectBuffer(IGF, destBuffer, T, type, packing);
-    }
+    IGF.emitNativeStrongRetain(srcReference, IGF.getDefaultAtomicity());
+    IGF.Builder.CreateStore(
+        srcReference, Address(destReferenceAddr, destBuffer.getAlignment()));
+    return emitDefaultProjectBuffer(IGF, destBuffer, T, type, packing);
   }
-
-  Address destObject =
-    emitDefaultAllocateBuffer(IGF, destBuffer, T, type, packing);
-  Address srcObject =
-    emitDefaultProjectBuffer(IGF, srcBuffer, T, type, packing);
-  type.initializeWithCopy(IGF, destObject, srcObject, T);
-  return destObject;
 }
 
 /// Emit an 'initializeBufferWithTakeOfBuffer' operation.
@@ -476,30 +368,6 @@ emitDefaultInitializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
   llvm_unreachable("bad fixed packing");
 }
 
-static Address emitDefaultInitializeBufferWithCopy(IRGenFunction &IGF,
-                                                   Address destBuffer,
-                                                   Address srcObject,
-                                                   SILType T,
-                                                   const TypeInfo &type,
-                                                   FixedPacking packing) {
-  Address destObject =
-    emitDefaultAllocateBuffer(IGF, destBuffer, T, type, packing);
-  type.initializeWithCopy(IGF, destObject, srcObject, T);
-  return destObject;
-}
-
-static Address emitDefaultInitializeBufferWithTake(IRGenFunction &IGF,
-                                                   Address destBuffer,
-                                                   Address srcObject,
-                                                   SILType T,
-                                                   const TypeInfo &type,
-                                                   FixedPacking packing) {
-  Address destObject =
-    emitDefaultAllocateBuffer(IGF, destBuffer, T, type, packing);
-  type.initializeWithTake(IGF, destObject, srcObject, T);
-  return destObject;
-}
-
 // Metaprogram some of the common boilerplate here:
 //   - the default implementation in TypeInfo
 //   - the value-witness emitter which tries to avoid some dynamic
@@ -518,31 +386,12 @@ static Address emit##TITLE(IRGenFunction &IGF, Address dest, Address src, \
     return type.LOWER(IGF, dest, src, T);                                 \
   return emitDefault##TITLE(IGF, dest, src, T, type, packing);            \
 }
-DEFINE_BINARY_BUFFER_OP(initializeBufferWithCopy,
-                        InitializeBufferWithCopy)
-DEFINE_BINARY_BUFFER_OP(initializeBufferWithTake,
-                        InitializeBufferWithTake)
 DEFINE_BINARY_BUFFER_OP(initializeBufferWithCopyOfBuffer,
                         InitializeBufferWithCopyOfBuffer)
 DEFINE_BINARY_BUFFER_OP(initializeBufferWithTakeOfBuffer,
                         InitializeBufferWithTakeOfBuffer)
 #undef DEFINE_BINARY_BUFFER_OP
 
-#define DEFINE_UNARY_BUFFER_OP(RESULT, LOWER, TITLE)                          \
-RESULT TypeInfo::LOWER(IRGenFunction &IGF, Address buffer, SILType T) const { \
-  return emitDefault##TITLE(IGF, buffer, T, *this, getFixedPacking(IGF.IGM)); \
-}                                                                             \
-static RESULT emit##TITLE(IRGenFunction &IGF, Address buffer, SILType T,      \
-                          const TypeInfo &type, FixedPacking packing) {       \
-  if (packing == FixedPacking::Dynamic)                                       \
-    return type.LOWER(IGF, buffer, T);                                        \
-  return emitDefault##TITLE(IGF, buffer, T, type, packing);                   \
-}
-DEFINE_UNARY_BUFFER_OP(Address, allocateBuffer, AllocateBuffer)
-DEFINE_UNARY_BUFFER_OP(Address, projectBuffer, ProjectBuffer)
-DEFINE_UNARY_BUFFER_OP(void, destroyBuffer, DestroyBuffer)
-DEFINE_UNARY_BUFFER_OP(void, deallocateBuffer, DeallocateBuffer)
-#undef DEFINE_UNARY_BUFFER_OP
 
 static llvm::Value *getArg(llvm::Function::arg_iterator &it,
                            StringRef name) {
@@ -609,43 +458,6 @@ static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
   IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, arg);
 }
 
-/// Build a value witness that initializes an array front-to-back.
-static void emitInitializeArrayFrontToBackWitness(IRGenFunction &IGF,
-                                           llvm::Function::arg_iterator argv,
-                                           CanType abstractType,
-                                           SILType concreteType,
-                                           const TypeInfo &type,
-                                           IsTake_t take) {
-  Address destArray = getArgAs(IGF, argv, type, "dest");
-  Address srcArray = getArgAs(IGF, argv, type, "src");
-  llvm::Value *count = getArg(argv, "count");
-  getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-
-  emitInitializeArrayFrontToBack(IGF, type, destArray, srcArray, count,
-                                 concreteType, take);
-
-  destArray = IGF.Builder.CreateBitCast(destArray, IGF.IGM.OpaquePtrTy);
-  IGF.Builder.CreateRet(destArray.getAddress());
-}
-
-/// Build a value witness that initializes an array back-to-front.
-static void emitInitializeArrayBackToFrontWitness(IRGenFunction &IGF,
-                                           llvm::Function::arg_iterator argv,
-                                           CanType abstractType,
-                                           SILType concreteType,
-                                           const TypeInfo &type,
-                                           IsTake_t take) {
-  Address destArray = getArgAs(IGF, argv, type, "dest");
-  Address srcArray = getArgAs(IGF, argv, type, "src");
-  llvm::Value *count = getArg(argv, "count");
-  getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-
-  emitInitializeArrayBackToFront(IGF, type, destArray, srcArray, count,
-                                 concreteType, take);
-
-  destArray = IGF.Builder.CreateBitCast(destArray, IGF.IGM.OpaquePtrTy);
-  IGF.Builder.CreateRet(destArray.getAddress());
-}
 
 /// Build a specific value-witness function.
 static void buildValueWitnessFunction(IRGenModule &IGM,
@@ -663,16 +475,6 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
   auto argv = fn->arg_begin();
   switch (index) {
-  case ValueWitness::AllocateBuffer: {
-    Address buffer = getArgAsBuffer(IGF, argv, "buffer");
-    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    Address result =
-      emitAllocateBuffer(IGF, buffer, concreteType, type, packing);
-    result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
-    IGF.Builder.CreateRet(result.getAddress());
-    return;
-  }
-
   case ValueWitness::AssignWithCopy: {
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
@@ -693,67 +495,10 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     return;
   }
 
-  case ValueWitness::DeallocateBuffer: {
-    Address buffer = getArgAsBuffer(IGF, argv, "buffer");
-    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    emitDeallocateBuffer(IGF, buffer, concreteType, type, packing);
-    IGF.Builder.CreateRetVoid();
-    return;
-  }
-
   case ValueWitness::Destroy: {
     Address object = getArgAs(IGF, argv, type, "object");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     type.destroy(IGF, object, concreteType);
-    IGF.Builder.CreateRetVoid();
-    return;
-  }
-
-  case ValueWitness::DestroyArray: {
-    Address array = getArgAs(IGF, argv, type, "array");
-    llvm::Value *count = getArg(argv, "count");
-    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-
-    auto entry = IGF.Builder.GetInsertBlock();
-    auto iter = IGF.createBasicBlock("iter");
-    auto loop = IGF.createBasicBlock("loop");
-    auto exit = IGF.createBasicBlock("exit");
-    IGF.Builder.CreateBr(iter);
-    IGF.Builder.emitBlock(iter);
-
-    auto counter = IGF.Builder.CreatePHI(IGM.SizeTy, 2);
-    counter->addIncoming(count, entry);
-    auto elementVal = IGF.Builder.CreatePHI(array.getType(), 2);
-    elementVal->addIncoming(array.getAddress(), entry);
-    Address element(elementVal, array.getAlignment());
-
-    auto done = IGF.Builder.CreateICmpEQ(counter,
-                                         llvm::ConstantInt::get(IGM.SizeTy, 0));
-    IGF.Builder.CreateCondBr(done, exit, loop);
-
-    IGF.Builder.emitBlock(loop);
-    ConditionalDominanceScope condition(IGF);
-    type.destroy(IGF, element, concreteType);
-    auto nextCounter = IGF.Builder.CreateSub(counter,
-                                     llvm::ConstantInt::get(IGM.SizeTy, 1));
-    auto nextElement = type.indexArray(IGF, element,
-                                       llvm::ConstantInt::get(IGM.SizeTy, 1),
-                                       concreteType);
-    auto loopEnd = IGF.Builder.GetInsertBlock();
-    counter->addIncoming(nextCounter, loopEnd);
-    elementVal->addIncoming(nextElement.getAddress(), loopEnd);
-    IGF.Builder.CreateBr(iter);
-
-    IGF.Builder.emitBlock(exit);
-    IGF.Builder.CreateRetVoid();
-
-    return;
-  }
-
-  case ValueWitness::DestroyBuffer: {
-    Address buffer = getArgAsBuffer(IGF, argv, "buffer");
-    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    emitDestroyBuffer(IGF, buffer, concreteType, type, packing);
     IGF.Builder.CreateRetVoid();
     return;
   }
@@ -784,30 +529,6 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     return;
   }
 
-  case ValueWitness::InitializeBufferWithCopy: {
-    Address dest = getArgAsBuffer(IGF, argv, "dest");
-    Address src = getArgAs(IGF, argv, type, "src");
-    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-
-    Address result =
-      emitInitializeBufferWithCopy(IGF, dest, src, concreteType, type, packing);
-    result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
-    IGF.Builder.CreateRet(result.getAddress());
-    return;
-  }
-
-  case ValueWitness::InitializeBufferWithTake: {
-    Address dest = getArgAsBuffer(IGF, argv, "dest");
-    Address src = getArgAs(IGF, argv, type, "src");
-    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-
-    Address result =
-      emitInitializeBufferWithTake(IGF, dest, src, concreteType, type, packing);
-    result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
-    IGF.Builder.CreateRet(result.getAddress());
-    return;
-  }
-
   case ValueWitness::InitializeWithCopy: {
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
@@ -819,12 +540,6 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     return;
   }
 
-  case ValueWitness::InitializeArrayWithCopy: {
-    emitInitializeArrayFrontToBackWitness(IGF, argv, abstractType, concreteType,
-                                          type, IsNotTake);
-    return;
-  }
-
   case ValueWitness::InitializeWithTake: {
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
@@ -833,28 +548,6 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     type.initializeWithTake(IGF, dest, src, concreteType);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
-    return;
-  }
-
-  case ValueWitness::InitializeArrayWithTakeFrontToBack: {
-    emitInitializeArrayFrontToBackWitness(IGF, argv, abstractType, concreteType,
-                                          type, IsTake);
-    return;
-  }
-
-  case ValueWitness::InitializeArrayWithTakeBackToFront: {
-    emitInitializeArrayBackToFrontWitness(IGF, argv, abstractType, concreteType,
-                                          type, IsTake);
-    return;
-  }
-
-  case ValueWitness::ProjectBuffer: {
-    Address buffer = getArgAsBuffer(IGF, argv, "buffer");
-    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-
-    Address result = emitProjectBuffer(IGF, buffer, concreteType, type, packing);
-    result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
-    IGF.Builder.CreateRet(result.getAddress());
     return;
   }
 
@@ -946,17 +639,6 @@ static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
                                        [&](IRGenFunction &IGF) {
     IGF.Builder.CreateRetVoid();
   });
-}
-
-/// Return a function which takes two pointer arguments and returns
-/// the first one immediately.
-static llvm::Constant *getReturnSelfFunction(IRGenModule &IGM) {
-  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.TypeMetadataPtrTy };
-  return IGM.getOrCreateHelperFunction(
-      "__swift_noop_self_return", IGM.Int8PtrTy, argTys,
-      [&](IRGenFunction &IGF) {
-        IGF.Builder.CreateRet(&*IGF.CurFn->arg_begin());
-      });
 }
 
 /// Return a function which takes three pointer arguments and does a
@@ -1076,23 +758,6 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
 
 /// Return a function which takes two buffer arguments, copies
 /// a pointer from the second to the first, and returns the pointer.
-static llvm::Constant *getCopyOutOfLinePointerFunction(IRGenModule &IGM) {
-  llvm::Type *argTys[] = { IGM.Int8PtrPtrTy, IGM.Int8PtrPtrTy,
-                           IGM.TypeMetadataPtrTy };
-
-  return IGM.getOrCreateHelperFunction("__swift_copy_outline_pointer",
-                                       IGM.Int8PtrTy, argTys,
-                                       [&](IRGenFunction &IGF) {
-    auto it = IGF.CurFn->arg_begin();
-    Address dest(&*it++, IGM.getPointerAlignment());
-    Address src(&*it++, IGM.getPointerAlignment());
-    auto ptr = IGF.Builder.CreateLoad(src);
-    IGF.Builder.CreateStore(ptr, dest);
-    IGF.Builder.CreateRet(ptr);
-  });
-}
-/// Return a function which takes two buffer arguments, copies
-/// a pointer from the second to the first, and returns the pointer.
 static llvm::Constant *
 getCopyOutOfLineBoxPointerFunction(IRGenModule &IGM,
                                    const FixedTypeInfo &fixedTI) {
@@ -1123,76 +788,6 @@ getCopyOutOfLineBoxPointerFunction(IRGenModule &IGM,
       });
 }
 
-namespace {
-  enum class MemMoveOrCpy { MemMove, MemCpy };
-} // end anonymous namespace
-
-/// Return a function which takes two pointer arguments and a count, memmoves
-/// or memcpys from the second to the first, and returns the first argument.
-static llvm::Constant *getMemOpArrayFunction(IRGenModule &IGM,
-                                             const TypeInfo &objectTI,
-                                             MemMoveOrCpy kind) {
-  llvm::Type *argTys[] = {
-    IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.SizeTy,
-    IGM.TypeMetadataPtrTy
-  };
-
-  // TODO: Add a copyPODArray runtime entry point for bitwise-takable but non-
-  // fixed-size types. Currently only fixed-layout types should be known
-  // bitwise-takable.
-  auto &fixedTI = cast<FixedTypeInfo>(objectTI);
-
-  // We need to unique by both size and alignment.  Note that we're
-  // assuming that it's safe to call a function that returns a pointer
-  // at a site that assumes the function returns void.
-  llvm::SmallString<40> name;
-  {
-    llvm::raw_svector_ostream nameStream(name);
-    switch (kind) {
-    case MemMoveOrCpy::MemCpy:
-      nameStream << "__swift_memcpy_array";
-      break;
-    case MemMoveOrCpy::MemMove:
-      nameStream << "__swift_memmove_array";
-      break;
-    }
-    nameStream << fixedTI.getFixedStride().getValue();
-    nameStream << '_';
-    nameStream << fixedTI.getFixedAlignment().getValue();
-  }
-
-  return IGM.getOrCreateHelperFunction(name, IGM.Int8PtrTy, argTys,
-                                       [&](IRGenFunction &IGF) {
-    auto it = IGF.CurFn->arg_begin();
-    Address dest(&*it++, fixedTI.getFixedAlignment());
-    Address src(&*it++, fixedTI.getFixedAlignment());
-    llvm::Value *count = &*(it++);
-    llvm::Value *stride
-      = llvm::ConstantInt::get(IGM.SizeTy, fixedTI.getFixedStride().getValue());
-    llvm::Value *totalCount = IGF.Builder.CreateNUWMul(count, stride);
-    switch (kind) {
-    case MemMoveOrCpy::MemMove:
-      IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(), totalCount,
-                                fixedTI.getFixedAlignment().getValue());
-      break;
-    case MemMoveOrCpy::MemCpy:
-      IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(), totalCount,
-                               fixedTI.getFixedAlignment().getValue());
-      break;
-    }
-    IGF.Builder.CreateRet(dest.getAddress());
-  });
-}
-
-static llvm::Constant *getMemMoveArrayFunction(IRGenModule &IGM,
-                                               const TypeInfo &objectTI) {
-  return getMemOpArrayFunction(IGM, objectTI, MemMoveOrCpy::MemMove);
-}
-static llvm::Constant *getMemCpyArrayFunction(IRGenModule &IGM,
-                                               const TypeInfo &objectTI) {
-  return getMemOpArrayFunction(IGM, objectTI, MemMoveOrCpy::MemCpy);
-}
-
 /// Find a witness to the fact that a type is a value type.
 /// Always adds an i8*.
 static void addValueWitness(IRGenModule &IGM,
@@ -1208,21 +803,6 @@ static void addValueWitness(IRGenModule &IGM,
 
   // Try to use a standard function.
   switch (index) {
-  case ValueWitness::DeallocateBuffer:
-    if (isNeverAllocated(packing))
-      return addFunction(getNoOpVoidFunction(IGM));
-    goto standard;
-
-  case ValueWitness::DestroyBuffer:
-    if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
-      if (isNeverAllocated(packing))
-        return addFunction(getNoOpVoidFunction(IGM));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-      assert(isNeverAllocated(packing));
-      return addFunction(getDestroyStrongFunction(IGM));
-    }
-    goto standard;
-
   case ValueWitness::Destroy:
     if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
       return addFunction(getNoOpVoidFunction(IGM));
@@ -1231,16 +811,7 @@ static void addValueWitness(IRGenModule &IGM,
     }
     goto standard;
 
-  case ValueWitness::DestroyArray:
-    if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
-      return addFunction(getNoOpVoidFunction(IGM));
-    }
-    // TODO: A standard "destroy strong array" entrypoint for arrays of single
-    // refcounted pointer types.
-    goto standard;
-
   case ValueWitness::InitializeBufferWithCopyOfBuffer:
-  case ValueWitness::InitializeBufferWithCopy:
     if (packing == FixedPacking::OffsetZero) {
       if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
         return addFunction(getMemCpyFunction(IGM, concreteTI));
@@ -1252,13 +823,8 @@ static void addValueWitness(IRGenModule &IGM,
 
   case ValueWitness::InitializeBufferWithTakeOfBuffer:
     if (packing == FixedPacking::Allocate) {
-      if (IGM.getSILModule().getOptions().UseCOWExistentials) {
-        return addFunction(getCopyOutOfLineBoxPointerFunction(
-            IGM, cast<FixedTypeInfo>(concreteTI)));
-      }
-      // Copy-on-write existentials would have to do a projection in the buffer
-      // to get the values starting address.
-      return addFunction(getCopyOutOfLinePointerFunction(IGM));
+      return addFunction(getCopyOutOfLineBoxPointerFunction(
+          IGM, cast<FixedTypeInfo>(concreteTI)));
     } else
       if (packing == FixedPacking::OffsetZero &&
                concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
@@ -1266,27 +832,9 @@ static void addValueWitness(IRGenModule &IGM,
     }
     goto standard;
 
-  case ValueWitness::InitializeBufferWithTake:
-    if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)
-        && packing == FixedPacking::OffsetZero)
-      return addFunction(getMemCpyFunction(IGM, concreteTI));
-    goto standard;
-
   case ValueWitness::InitializeWithTake:
     if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
-    }
-    goto standard;
-
-  case ValueWitness::InitializeArrayWithTakeFrontToBack:
-    if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
-      return addFunction(getMemMoveArrayFunction(IGM, concreteTI));
-    }
-    goto standard;
-
-  case ValueWitness::InitializeArrayWithTakeBackToFront:
-    if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
-      return addFunction(getMemMoveArrayFunction(IGM, concreteTI));
     }
     goto standard;
 
@@ -1312,20 +860,6 @@ static void addValueWitness(IRGenModule &IGM,
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getInitWithCopyStrongFunction(IGM));
     }
-    goto standard;
-
-  case ValueWitness::InitializeArrayWithCopy:
-    if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
-      return addFunction(getMemCpyArrayFunction(IGM, concreteTI));
-    }
-    // TODO: A standard "copy strong array" entrypoint for arrays of single
-    // refcounted pointer types.
-    goto standard;
-
-  case ValueWitness::AllocateBuffer:
-  case ValueWitness::ProjectBuffer:
-    if (packing == FixedPacking::OffsetZero)
-      return addFunction(getReturnSelfFunction(IGM));
     goto standard;
 
   case ValueWitness::Size: {
@@ -1689,139 +1223,7 @@ void TypeInfo::destroyArray(IRGenFunction &IGF, Address array,
   if (isPOD(ResilienceExpansion::Maximal))
     return;
 
-  auto entry = IGF.Builder.GetInsertBlock();
-  auto iter = IGF.createBasicBlock("iter");
-  auto loop = IGF.createBasicBlock("loop");
-  auto exit = IGF.createBasicBlock("exit");
-  IGF.Builder.CreateBr(iter);
-  IGF.Builder.emitBlock(iter);
-
-  auto counter = IGF.Builder.CreatePHI(IGF.IGM.SizeTy, 2);
-  counter->addIncoming(count, entry);
-  auto elementVal = IGF.Builder.CreatePHI(array.getType(), 2);
-  elementVal->addIncoming(array.getAddress(), entry);
-  Address element(elementVal, array.getAlignment());
-
-  auto done = IGF.Builder.CreateICmpEQ(counter,
-                                     llvm::ConstantInt::get(IGF.IGM.SizeTy, 0));
-  IGF.Builder.CreateCondBr(done, exit, loop);
-
-  IGF.Builder.emitBlock(loop);
-  ConditionalDominanceScope condition(IGF);
-
-  destroy(IGF, element, T);
-  auto nextCounter = IGF.Builder.CreateSub(counter,
-                                   llvm::ConstantInt::get(IGF.IGM.SizeTy, 1));
-  auto nextElement = indexArray(IGF, element,
-                                llvm::ConstantInt::get(IGF.IGM.SizeTy, 1), T);
-  auto loopEnd = IGF.Builder.GetInsertBlock();
-  counter->addIncoming(nextCounter, loopEnd);
-  elementVal->addIncoming(nextElement.getAddress(), loopEnd);
-  IGF.Builder.CreateBr(iter);
-
-  IGF.Builder.emitBlock(exit);
-}
-
-/// Build a value witness that initializes an array front-to-back.
-void irgen::emitInitializeArrayFrontToBack(IRGenFunction &IGF,
-                                           const TypeInfo &type,
-                                           Address destArray,
-                                           Address srcArray,
-                                           llvm::Value *count,
-                                           SILType T,
-                                           IsTake_t take) {
-  auto &IGM = IGF.IGM;
-
-  auto entry = IGF.Builder.GetInsertBlock();
-  auto iter = IGF.createBasicBlock("iter");
-  auto loop = IGF.createBasicBlock("loop");
-  auto exit = IGF.createBasicBlock("exit");
-  IGF.Builder.CreateBr(iter);
-  IGF.Builder.emitBlock(iter);
-
-  auto counter = IGF.Builder.CreatePHI(IGM.SizeTy, 2);
-  counter->addIncoming(count, entry);
-  auto destVal = IGF.Builder.CreatePHI(destArray.getType(), 2);
-  destVal->addIncoming(destArray.getAddress(), entry);
-  auto srcVal = IGF.Builder.CreatePHI(srcArray.getType(), 2);
-  srcVal->addIncoming(srcArray.getAddress(), entry);
-  Address dest(destVal, destArray.getAlignment());
-  Address src(srcVal, srcArray.getAlignment());
-
-  auto done = IGF.Builder.CreateICmpEQ(counter,
-                                       llvm::ConstantInt::get(IGM.SizeTy, 0));
-  IGF.Builder.CreateCondBr(done, exit, loop);
-
-  IGF.Builder.emitBlock(loop);
-  ConditionalDominanceScope condition(IGF);
-  type.initialize(IGF, dest, src, take, T);
-
-  auto nextCounter = IGF.Builder.CreateSub(counter,
-                                   llvm::ConstantInt::get(IGM.SizeTy, 1));
-  auto nextDest = type.indexArray(IGF, dest,
-                                  llvm::ConstantInt::get(IGM.SizeTy, 1), T);
-  auto nextSrc = type.indexArray(IGF, src,
-                                 llvm::ConstantInt::get(IGM.SizeTy, 1), T);
-  auto loopEnd = IGF.Builder.GetInsertBlock();
-  counter->addIncoming(nextCounter, loopEnd);
-  destVal->addIncoming(nextDest.getAddress(), loopEnd);
-  srcVal->addIncoming(nextSrc.getAddress(), loopEnd);
-  IGF.Builder.CreateBr(iter);
-
-  IGF.Builder.emitBlock(exit);
-}
-
-/// Build a value witness that initializes an array back-to-front.
-void irgen::emitInitializeArrayBackToFront(IRGenFunction &IGF,
-                                           const TypeInfo &type,
-                                           Address destArray,
-                                           Address srcArray,
-                                           llvm::Value *count,
-                                           SILType T,
-                                           IsTake_t take) {
-  auto &IGM = IGF.IGM;
-
-  auto destEnd = type.indexArray(IGF, destArray, count, T);
-  auto srcEnd = type.indexArray(IGF, srcArray, count, T);
-
-  auto entry = IGF.Builder.GetInsertBlock();
-  auto iter = IGF.createBasicBlock("iter");
-  auto loop = IGF.createBasicBlock("loop");
-  auto exit = IGF.createBasicBlock("exit");
-  IGF.Builder.CreateBr(iter);
-  IGF.Builder.emitBlock(iter);
-
-  auto counter = IGF.Builder.CreatePHI(IGM.SizeTy, 2);
-  counter->addIncoming(count, entry);
-  auto destVal = IGF.Builder.CreatePHI(destEnd.getType(), 2);
-  destVal->addIncoming(destEnd.getAddress(), entry);
-  auto srcVal = IGF.Builder.CreatePHI(srcEnd.getType(), 2);
-  srcVal->addIncoming(srcEnd.getAddress(), entry);
-  Address dest(destVal, destArray.getAlignment());
-  Address src(srcVal, srcArray.getAlignment());
-
-  auto done = IGF.Builder.CreateICmpEQ(counter,
-                                       llvm::ConstantInt::get(IGM.SizeTy, 0));
-  IGF.Builder.CreateCondBr(done, exit, loop);
-
-  IGF.Builder.emitBlock(loop);
-  ConditionalDominanceScope condition(IGF);
-  auto prevDest = type.indexArray(IGF, dest,
-                              llvm::ConstantInt::getSigned(IGM.SizeTy, -1), T);
-  auto prevSrc = type.indexArray(IGF, src,
-                              llvm::ConstantInt::getSigned(IGM.SizeTy, -1), T);
-
-  type.initialize(IGF, prevDest, prevSrc, take, T);
-
-  auto nextCounter = IGF.Builder.CreateSub(counter,
-                                   llvm::ConstantInt::get(IGM.SizeTy, 1));
-  auto loopEnd = IGF.Builder.GetInsertBlock();
-  counter->addIncoming(nextCounter, loopEnd);
-  destVal->addIncoming(prevDest.getAddress(), loopEnd);
-  srcVal->addIncoming(prevSrc.getAddress(), loopEnd);
-  IGF.Builder.CreateBr(iter);
-
-  IGF.Builder.emitBlock(exit);
+ emitDestroyArrayCall(IGF, T, array, count);
 }
 
 void TypeInfo::initializeArrayWithCopy(IRGenFunction &IGF,
@@ -1835,7 +1237,21 @@ void TypeInfo::initializeArrayWithCopy(IRGenFunction &IGF,
     return;
   }
 
-  emitInitializeArrayFrontToBack(IGF, *this, dest, src, count, T, IsNotTake);
+  emitInitializeArrayWithCopyCall(IGF, T, dest, src, count);
+}
+
+void TypeInfo::initializeArrayWithTakeNoAlias(IRGenFunction &IGF, Address dest,
+                                              Address src, llvm::Value *count,
+                                              SILType T) const {
+  if (isBitwiseTakable(ResilienceExpansion::Maximal)) {
+    llvm::Value *stride = getStride(IGF, T);
+    llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
+    IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(), byteCount,
+                             dest.getAlignment().getValue());
+    return;
+  }
+
+  emitInitializeArrayWithTakeNoAliasCall(IGF, T, dest, src, count);
 }
 
 void TypeInfo::initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
@@ -1850,7 +1266,7 @@ const {
     return;
   }
 
-  emitInitializeArrayFrontToBack(IGF, *this, dest, src, count, T, IsTake);
+  emitInitializeArrayWithTakeFrontToBackCall(IGF, T, dest, src, count);
 }
 
 void TypeInfo::initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
@@ -1865,5 +1281,61 @@ const {
     return;
   }
 
-  emitInitializeArrayBackToFront(IGF, *this, dest, src, count, T, IsTake);
+  emitInitializeArrayWithTakeBackToFrontCall(IGF, T, dest, src, count);
+}
+
+void TypeInfo::assignArrayWithCopyNoAlias(IRGenFunction &IGF, Address dest,
+                                          Address src, llvm::Value *count,
+                                          SILType T) const {
+  if (isPOD(ResilienceExpansion::Maximal)) {
+    llvm::Value *stride = getStride(IGF, T);
+    llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
+    IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(), byteCount,
+                             dest.getAlignment().getValue());
+    return;
+  }
+
+  emitAssignArrayWithCopyNoAliasCall(IGF, T, dest, src, count);
+}
+
+void TypeInfo::assignArrayWithCopyFrontToBack(IRGenFunction &IGF, Address dest,
+                                              Address src, llvm::Value *count,
+                                              SILType T) const {
+  if (isPOD(ResilienceExpansion::Maximal)) {
+    llvm::Value *stride = getStride(IGF, T);
+    llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
+    IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(),
+                              byteCount, dest.getAlignment().getValue());
+    return;
+  }
+
+  emitAssignArrayWithCopyFrontToBackCall(IGF, T, dest, src, count);
+}
+
+void TypeInfo::assignArrayWithCopyBackToFront(IRGenFunction &IGF, Address dest,
+                                              Address src, llvm::Value *count,
+                                              SILType T) const {
+  if (isPOD(ResilienceExpansion::Maximal)) {
+    llvm::Value *stride = getStride(IGF, T);
+    llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
+    IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(),
+                              byteCount, dest.getAlignment().getValue());
+    return;
+  }
+
+  emitAssignArrayWithCopyBackToFrontCall(IGF, T, dest, src, count);
+}
+
+void TypeInfo::assignArrayWithTake(IRGenFunction &IGF, Address dest,
+                                              Address src, llvm::Value *count,
+                                              SILType T) const {
+  if (isPOD(ResilienceExpansion::Maximal)) {
+    llvm::Value *stride = getStride(IGF, T);
+    llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
+    IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(), byteCount,
+                             dest.getAlignment().getValue());
+    return;
+  }
+
+  emitAssignArrayWithTakeCall(IGF, T, dest, src, count);
 }

@@ -196,3 +196,20 @@ bb0(%0 : $*Int32, %1 : $*Int32):
   %r = tuple()
   return %r : $()
 }
+
+// CHECK-LABEL: @test_in_guaranteed_only_fun_is_ro_entry
+// CHECK:      PAIR #0.
+// CHECK-NEXT:    %2 = apply %1(%0) : $@convention(thin) (@in_guaranteed Int) -> ()
+// CHECK-NEXT:    %0 = argument of bb0 : $*Int
+// CHECK-NEXT:  r=1,w=0,se=0
+sil @test_in_guaranteed_only_fun_is_ro_sink : $@convention(thin) (Int) -> ()
+sil @test_in_guaranteed_only_fun_is_ro_callee : $@convention(thin) (@in_guaranteed Int) -> ()
+
+sil @test_in_guaranteed_only_fun_is_ro_entry : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %f_callee = function_ref @test_in_guaranteed_only_fun_is_ro_callee : $@convention(thin) (@in_guaranteed Int) -> ()
+  %r1 = apply %f_callee(%0) : $@convention(thin) (@in_guaranteed Int) -> ()
+
+  %3 = tuple()
+  return %3 : $()
+}

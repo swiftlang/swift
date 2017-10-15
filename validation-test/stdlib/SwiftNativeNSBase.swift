@@ -10,19 +10,74 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: rm -rf %t  &&  mkdir -p %t
+// RUN: %empty-directory(%t)
 // 
 // RUN: %target-clang %S/Inputs/SwiftNativeNSBase/SwiftNativeNSBase.m -c -o %t/SwiftNativeNSBase.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/SwiftNativeNSBase/ -Xlinker %t/SwiftNativeNSBase.o -o %t/SwiftNativeNSBase
+// RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
+// RUN: echo '#sourceLocation(file: "%s", line: 1)' > "%t/main.swift" && cat "%s" >> "%t/main.swift" && chmod -w "%t/main.swift"
+// RUN: %target-build-swift -Xfrontend -disable-access-control  %t/main.swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift -I %S/Inputs/SwiftNativeNSBase/ -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -Xlinker %t/SwiftNativeNSBase.o -o %t/SwiftNativeNSBase
 // RUN: %target-run %t/SwiftNativeNSBase
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
 
 import Foundation
+import StdlibUnittest
 
-@_silgen_name("TestSwiftNativeNSBase") 
-func TestSwiftNativeNSBase()
+@_silgen_name("TestSwiftNativeNSBase_UnwantedCdtors") 
+func TestSwiftNativeNSBase_UnwantedCdtors() -> Bool
+@_silgen_name("TestSwiftNativeNSBase_RetainCount") 
+func TestSwiftNativeNSBase_RetainCount(_: UnsafeMutableRawPointer) -> Bool
 
-TestSwiftNativeNSBase()
-// does not return
+func classChain(of cls: AnyClass) -> [String] {
+  var chain: [String] = []
+  var cls: AnyClass? = cls
+  while cls != nil {
+    chain.append(NSStringFromClass(cls!))
+    cls = class_getSuperclass(cls)
+  }
+  return chain
+}
+
+var SwiftNativeNSBaseTestSuite = TestSuite("SwiftNativeNSBase")
+
+SwiftNativeNSBaseTestSuite.test("UnwantedCdtors") {
+  expectTrue(TestSwiftNativeNSBase_UnwantedCdtors())
+}
+
+SwiftNativeNSBaseTestSuite.test("_SwiftNativeNSArrayBase.retainCount") {
+  let bridged = getBridgedNSArrayOfRefTypeVerbatimBridged()
+  assert(classChain(of: type(of: bridged)).contains("_SwiftNativeNSArrayBase"))
+  expectTrue(TestSwiftNativeNSBase_RetainCount(
+      Unmanaged.passUnretained(bridged).toOpaque()))
+  _fixLifetime(bridged)
+}
+
+SwiftNativeNSBaseTestSuite.test("_SwiftNativeNSDictionaryBase.retainCount") {
+  let bridged = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
+  assert(classChain(of: type(of: bridged))
+    .contains("_SwiftNativeNSDictionaryBase"))
+  expectTrue(TestSwiftNativeNSBase_RetainCount(
+      Unmanaged.passUnretained(bridged).toOpaque()))
+  _fixLifetime(bridged)
+}
+
+SwiftNativeNSBaseTestSuite.test("_SwiftNativeNSSetBase.retainCount") {
+  let bridged = Set([10, 20, 30].map{ TestObjCKeyTy($0) })._bridgeToObjectiveC()
+  assert(classChain(of: type(of: bridged)).contains("_SwiftNativeNSSetBase"))
+  expectTrue(TestSwiftNativeNSBase_RetainCount(
+      Unmanaged.passUnretained(bridged).toOpaque()))
+  _fixLifetime(bridged)
+}
+
+SwiftNativeNSBaseTestSuite.setUp {
+  resetLeaksOfDictionaryKeysValues()
+  resetLeaksOfObjCDictionaryKeysValues()
+}
+
+SwiftNativeNSBaseTestSuite.tearDown {
+  expectNoLeaksOfDictionaryKeysValues()
+  expectNoLeaksOfObjCDictionaryKeysValues()
+}
+
+runAllTests()

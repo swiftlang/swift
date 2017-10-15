@@ -3,7 +3,7 @@
 // -----
 
 protocol Foo {
-  associatedtype Bar : Foo // expected-error{{type may not reference itself as a requirement}}
+  associatedtype Bar : Foo
 }
 
 struct Oroborous : Foo {
@@ -13,7 +13,7 @@ struct Oroborous : Foo {
 // -----
 
 protocol P {
- associatedtype A : P // expected-error{{type may not reference itself as a requirement}}
+ associatedtype A : P
 }
 
 struct X<T: P> {
@@ -26,7 +26,7 @@ func f<T : P>(_ z: T) {
 // -----
 
 protocol PP2 {
-  associatedtype A : P2 = Self // expected-error{{type may not reference itself as a requirement}}
+  associatedtype A : P2 = Self
 }
 
 protocol P2 : PP2 {
@@ -41,13 +41,13 @@ struct Y2 : P2 {
 }
 
 func f<T : P2>(_ z: T) {
- _ = X2<T.A>() // expected-error{{type 'T.A' does not conform to protocol 'P2'}}
+ _ = X2<T.A>()
 }
 
 // -----
 
 protocol P3 {
- associatedtype A: P4 = Self // expected-error{{type may not reference itself as a requirement}}
+ associatedtype A: P4 = Self
 }
 
 protocol P4 : P3 {}
@@ -76,13 +76,14 @@ protocol Gamma {
   associatedtype Delta: Alpha
 }
 
-// FIXME: Redundancy diagnostics are odd here.
+// FIXME: Redundancy diagnostics are an indication that we're getting
+// the minimization wrong. The errors prove it :D
 struct Epsilon<T: Alpha, // expected-note{{conformance constraint 'U': 'Gamma' implied here}}
 // expected-warning@-1{{redundant conformance constraint 'T': 'Alpha'}}
                U: Gamma> // expected-warning{{redundant conformance constraint 'U': 'Gamma'}}
 // expected-note@-1{{conformance constraint 'T': 'Alpha' implied here}}
-  where T.Beta == U,
-        U.Delta == T {}
+  where T.Beta == U, // expected-error{{'Beta' is not a member type of 'T'}}
+        U.Delta == T {} // expected-error{{'Delta' is not a member type of 'U'}}
 
 // -----
 

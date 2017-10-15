@@ -12,6 +12,7 @@
 
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILGlobalVariable.h"
 
 using namespace swift;
 
@@ -19,12 +20,20 @@ using namespace swift;
 // SILBuilder Implementation
 //===----------------------------------------------------------------------===//
 
+SILBuilder::SILBuilder(SILGlobalVariable *GlobVar,
+                       SmallVectorImpl<SILInstruction *> *InsertedInstrs)
+    : F(nullptr), Mod(GlobVar->getModule()), InsertedInstrs(InsertedInstrs) {
+  setInsertionPoint(&GlobVar->StaticInitializerBlock);
+}
+
 IntegerLiteralInst *SILBuilder::createIntegerLiteral(IntegerLiteralExpr *E) {
-  return insert(IntegerLiteralInst::create(E, getSILDebugLocation(E), F));
+  return insert(IntegerLiteralInst::create(E, getSILDebugLocation(E),
+                                           getModule()));
 }
 
 FloatLiteralInst *SILBuilder::createFloatLiteral(FloatLiteralExpr *E) {
-  return insert(FloatLiteralInst::create(E, getSILDebugLocation(E), F));
+  return insert(FloatLiteralInst::create(E, getSILDebugLocation(E),
+                                         getModule()));
 }
 
 TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
@@ -33,7 +42,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
   for (auto elt : elts)
     eltTypes.push_back(elt->getType().getSwiftRValueType());
   auto tupleType = SILType::getPrimitiveObjectType(
-      CanType(TupleType::get(eltTypes, F.getASTContext())));
+      CanType(TupleType::get(eltTypes, getASTContext())));
 
   return createTuple(loc, tupleType, elts);
 }
@@ -81,25 +90,22 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
 
 // If legal, create an unchecked_ref_cast from the given operand and result
 // type, otherwise return null.
-SILInstruction *SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc,
-                                                      SILValue Op,
-                                                      SILType ResultTy) {
-  auto &M = F.getModule();
-  if (!SILType::canRefCast(Op->getType(), ResultTy, M))
+SingleValueInstruction *
+SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc, SILValue Op,
+                                      SILType ResultTy) {
+  if (!SILType::canRefCast(Op->getType(), ResultTy, getModule()))
     return nullptr;
 
   return insert(UncheckedRefCastInst::create(getSILDebugLocation(Loc), Op,
-                                             ResultTy, F, OpenedArchetypes));
+                                   ResultTy, getFunction(), OpenedArchetypes));
 }
 
 // Create the appropriate cast instruction based on result type.
-SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
-                                                   SILValue Op,
-                                                   SILType Ty) {
-  auto &M = F.getModule();
-  if (Ty.isTrivial(M))
+SingleValueInstruction *
+SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
+  if (Ty.isTrivial(getModule()))
     return insert(UncheckedTrivialBitCastInst::create(
-        getSILDebugLocation(Loc), Op, Ty, F, OpenedArchetypes));
+        getSILDebugLocation(Loc), Op, Ty, getFunction(), OpenedArchetypes));
 
   if (auto refCast = tryCreateUncheckedRefCast(Loc, Op, Ty))
     return refCast;
@@ -107,7 +113,7 @@ SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
   return insert(UncheckedBitwiseCastInst::create(getSILDebugLocation(Loc), Op,
-                                                 Ty, F, OpenedArchetypes));
+                                         Ty, getFunction(), OpenedArchetypes));
 }
 
 BranchInst *SILBuilder::createBranch(SILLocation Loc,
@@ -148,7 +154,7 @@ void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
 SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   // If we are concatenating, just create and return a new block.
   if (insertingAtEndOfBlock()) {
-    return F.createBasicBlock(BB);
+    return getFunction().createBasicBlock(BB);
   }
 
   // Otherwise we need to split the current block at the insertion point.
@@ -160,7 +166,7 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
 static bool setAccessToDeinit(BeginAccessInst *beginAccess) {
   // It's possible that AllocBoxToStack could catch some cases that
   // AccessEnforcementSelection does not promote to [static]. Ultimately, this
-  // should be an assert, but only after we the two passes can be fixes to share
+  // should be an assert, but only after we the two passes can be fixed to share
   // a common analysis.
   if (beginAccess->getEnforcement() == SILAccessEnforcement::Dynamic)
     return false;
@@ -175,6 +181,7 @@ SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
   // copy_addr from the specified operand.  If so, we can fold this into the
   // copy_addr as a take.
   BeginAccessInst *beginAccess = nullptr;
+  CopyAddrInst *copyAddrTake = nullptr;
   auto I = getInsertionPoint(), BBStart = getInsertionBB()->begin();
   while (I != BBStart) {
     auto *Inst = &*--I;
@@ -185,10 +192,27 @@ SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
           CA->setIsTakeOfSrc(IsTake);
           return CA;
         }
-        if (CA->getSrc() == beginAccess && setAccessToDeinit(beginAccess)) {
-          CA->setIsTakeOfSrc(IsTake);
-          return CA;
+        // If this copy_addr is accessing the same source, continue searching
+        // backward until we see the begin_access. If any side effects occur
+        // between the `%adr = begin_access %src` and `copy_addr %adr` then we
+        // cannot promote the access to a deinit. `[deinit]` requires exclusive
+        // access, but an instruction with side effects may require shared
+        // access.
+        if (CA->getSrc() == beginAccess) {
+          copyAddrTake = CA;
+          continue;
         }
+      }
+    }
+
+    // If we've already seen a copy_addr that can be convert to `take`, then
+    // stop at the begin_access for the copy's source.
+    if (copyAddrTake && beginAccess == Inst) {
+      // If `setAccessToDeinit()` returns `true` it has modified the access
+      // instruction, so we are committed to the transformation on that path.
+      if (setAccessToDeinit(beginAccess)) {
+        copyAddrTake->setIsTakeOfSrc(IsTake);
+        return copyAddrTake;
       }
     }
 
@@ -346,7 +370,7 @@ SILValue SILBuilder::emitThickToObjCMetatype(SILLocation Loc, SILValue Op,
     if (metatypeInst->use_empty() &&
         metatypeInst->getParent() == getInsertionBB()) {
       auto origLoc = metatypeInst->getLoc();
-      metatypeInst->removeFromParent();
+      metatypeInst->eraseFromParent();
       return createMetatype(origLoc, Ty);
     }
   }
@@ -364,7 +388,7 @@ SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
     if (metatypeInst->use_empty() &&
         metatypeInst->getParent() == getInsertionBB()) {
       auto origLoc = metatypeInst->getLoc();
-      metatypeInst->removeFromParent();
+      metatypeInst->eraseFromParent();
       return createMetatype(origLoc, Ty);
     }
   }
@@ -385,27 +409,51 @@ void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
   if (I && I->getNumTypeDependentOperands() > 0)
     return;
 
+  // Keep track of already visited instructions to avoid infinite loops.
+  SmallPtrSet<SILInstruction *, 8> Visited;
+
   while (I && I->getNumOperands() == 1 &&
          I->getNumTypeDependentOperands() == 0) {
-    I = dyn_cast<SILInstruction>(I->getOperand(0));
-    if (!I)
+    // All the open instructions are single-value instructions.
+    auto SVI = dyn_cast<SingleValueInstruction>(I->getOperand(0));
+    // Within SimplifyCFG this function may be called for an instruction
+    // within unreachable code. And within an unreachable block it can happen
+    // that defs do not dominate uses (because there is no dominance defined).
+    // To avoid the infinite loop when following the chain of instructions via
+    // their operands, bail if the operand is not an instruction or this
+    // instruction was seen already.
+    if (!SVI || !Visited.insert(SVI).second)
       return;
     // If it is a definition of an opened archetype,
     // register it and exit.
-    auto Archetype = getOpenedArchetypeOf(I);
-    if (!Archetype)
+    auto Archetype = getOpenedArchetypeOf(SVI);
+    if (!Archetype) {
+      I = SVI;
       continue;
+    }
     auto Def = OpenedArchetypes.getOpenedArchetypeDef(Archetype);
     // Return if it is a known open archetype.
     if (Def)
       return;
     // Otherwise register it and return.
     if (OpenedArchetypesTracker)
-      OpenedArchetypesTracker->addOpenedArchetypeDef(Archetype, I);
+      OpenedArchetypesTracker->addOpenedArchetypeDef(Archetype, SVI);
     return;
   }
 
   if (I && I->getNumTypeDependentOperands() > 0) {
     OpenedArchetypes.addOpenedArchetypeOperands(I->getTypeDependentOperands());
   }
+}
+
+ValueMetatypeInst *SILBuilder::createValueMetatype(SILLocation Loc,
+                                                   SILType MetatypeTy,
+                                                   SILValue Base) {
+  assert(
+      Base->getType().isLoweringOf(
+          getModule(), MetatypeTy.castTo<MetatypeType>().getInstanceType()) &&
+      "value_metatype result must be formal metatype of the lowered operand "
+      "type");
+  return insert(new (getModule()) ValueMetatypeInst(getSILDebugLocation(Loc),
+                                                      MetatypeTy, Base));
 }

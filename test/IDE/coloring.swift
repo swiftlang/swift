@@ -226,6 +226,42 @@ func f(x: Int) -> Int {
   // string interpolation is the best
   // CHECK: <str>"This is string </str>\<anchor>(</anchor>genFn({(a:<type>Int</type> -> <type>Int</type>) <kw>in</kw> a})<anchor>)</anchor><str> interpolation"</str>
   "This is string \(genFn({(a:Int -> Int) in a})) interpolation"
+
+  // CHECK: <str>"This is unterminated</str>
+  "This is unterminated
+
+  // CHECK: <str>"This is unterminated with ignored \(interpolation) in it</str>
+  "This is unterminated with ignored \(interpolation) in it
+
+  // CHECK: <str>"This is terminated with invalid \(interpolation" + "in it"</str>
+  "This is terminated with invalid \(interpolation" + "in it"
+
+  // CHECK: <str>"""
+  // CHECK-NEXT: This is a multiline string.
+  // CHECK-NEXT: """</str>
+  """
+  This is a multiline string.
+"""
+
+  // CHECK: <str>"""
+  // CHECK-NEXT: This is a multiline</str>\<anchor>(</anchor> <str>"interpolated"</str> <anchor>)</anchor><str>string
+  // CHECK-NEXT: </str>\<anchor>(</anchor>
+  // CHECK-NEXT: <str>"""
+  // CHECK-NEXT: inner
+  // CHECK-NEXT: """</str>
+  // CHECK-NEXT: <anchor>)</anchor><str>
+  // CHECK-NEXT: """</str>
+  """
+      This is a multiline\( "interpolated" )string
+   \(
+   """
+    inner
+   """
+   )
+   """
+
+  // CHECK: <str>"</str>\<anchor>(</anchor><int>1</int><anchor>)</anchor>\<anchor>(</anchor><int>1</int><anchor>)</anchor><str>"</str>
+  "\(1)\(1)"
 }
 
 // CHECK: <kw>func</kw> bar(x: <type>Int</type>) -> (<type>Int</type>, <type>Float</type>) {
@@ -590,6 +626,10 @@ func keywordInCaseAndLocalArgLabel(_ for: Int, for in: Int, class _: Int) {
     print(x, y)
   }
 }
+
+#if os(macOS)
+#endif
+// CHECK: <#kw>#if</#kw> <#id>os</#id>(<#id>macOS</#id>)
 
 // Keep this as the last test
 /**

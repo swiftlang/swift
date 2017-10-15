@@ -15,6 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/IDE/Utils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -38,6 +39,13 @@ enum class NodeAnnotation: uint8_t{
 };
 
 NodeAnnotation parseSDKNodeAnnotation(StringRef Content);
+
+enum class SpecialCaseId: uint8_t{
+#define SPECIAL_CASE_ID(NAME) NAME,
+#include "DigesterEnums.def"
+};
+
+SpecialCaseId parseSpecialCaseId(StringRef Content);
 
 enum class APIDiffItemKind: uint8_t{
 #define DIFF_ITEM_KIND(NAME) ADK_##NAME,
@@ -110,6 +118,17 @@ public:
       return false;
     }
   }
+
+  bool isToPropertyChange() const {
+    switch (DiffKind) {
+    case NodeAnnotation::GetterToProperty:
+    case NodeAnnotation::SetterToProperty:
+      return true;
+    default:
+      return false;
+    }
+  }
+
   StringRef getNewName() const { assert(isRename()); return RightComment; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_CommonDiffItem;
@@ -198,18 +217,40 @@ public:
 //  myColor.components
 //
 //
+enum class TypeMemberDiffItemSubKind {
+  SimpleReplacement,
+  QualifiedReplacement,
+  GlobalFuncToStaticProperty,
+  HoistSelfOnly,
+  HoistSelfAndRemoveParam,
+  HoistSelfAndUseProperty,
+};
+
 struct TypeMemberDiffItem: public APIDiffItem {
   StringRef usr;
   StringRef newTypeName;
   StringRef newPrintedName;
   Optional<uint8_t> selfIndex;
+  Optional<uint8_t> removedIndex;
+  StringRef oldTypeName;
   StringRef oldPrintedName;
 
+private:
+  DeclNameViewer OldNameViewer;
+  DeclNameViewer NewNameViewer;
+
+public:
+  TypeMemberDiffItemSubKind Subkind;
+
+public:
   TypeMemberDiffItem(StringRef usr, StringRef newTypeName,
                      StringRef newPrintedName, Optional<uint8_t> selfIndex,
+                     Optional<uint8_t> removedIndex, StringRef oldTypeName,
                      StringRef oldPrintedName) : usr(usr),
     newTypeName(newTypeName), newPrintedName(newPrintedName),
-    selfIndex(selfIndex), oldPrintedName(oldPrintedName) {}
+    selfIndex(selfIndex), removedIndex(removedIndex), oldTypeName(oldTypeName),
+    oldPrintedName(oldPrintedName), OldNameViewer(oldPrintedName),
+    NewNameViewer(newPrintedName), Subkind(getSubKind()) {}
   static StringRef head();
   static void describe(llvm::raw_ostream &os);
   static void undef(llvm::raw_ostream &os);
@@ -217,8 +258,29 @@ struct TypeMemberDiffItem: public APIDiffItem {
   bool operator<(TypeMemberDiffItem Other) const;
   static bool classof(const APIDiffItem *D);
   StringRef getKey() const override { return usr; }
+  const DeclNameViewer &getOldName() const { return OldNameViewer; }
+  const DeclNameViewer &getNewName() const { return NewNameViewer; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_TypeMemberDiffItem;
+  }
+private:
+  TypeMemberDiffItemSubKind getSubKind() const;
+};
+
+/// This is an authored item to associate a USR with a specially handled case.
+/// It is up to the migrator to interpret the special case Id and apply proper
+/// transformation on an entity.
+struct SpecialCaseDiffItem: public APIDiffItem {
+  StringRef usr;
+  SpecialCaseId caseId;
+public:
+  SpecialCaseDiffItem(StringRef usr, StringRef caseId): usr(usr),
+    caseId(parseSpecialCaseId(caseId)) {}
+  StringRef getKey() const override { return usr; }
+  void streamDef(llvm::raw_ostream &S) const override {};
+  static bool classof(const APIDiffItem *D);
+  APIDiffItemKind getKind() const override {
+    return APIDiffItemKind::ADK_SpecialCaseDiffItem;
   }
 };
 

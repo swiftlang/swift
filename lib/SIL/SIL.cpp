@@ -44,30 +44,25 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   if (isa<ClangModuleUnit>(fileContext))
     return FormalLinkage::PublicNonUnique;
 
-  if (!D->hasAccessibility()) {
+  if (!D->hasAccess()) {
     assert(D->getDeclContext()->isLocalContext());
     return FormalLinkage::Private;
   }
 
   switch (D->getEffectiveAccess()) {
-  case Accessibility::Public:
-  case Accessibility::Open:
+  case AccessLevel::Public:
+  case AccessLevel::Open:
     return FormalLinkage::PublicUnique;
-  case Accessibility::Internal:
-    // If we're serializing all function bodies, type metadata for internal
-    // types needs to be public too.
-    if (D->getDeclContext()->getParentModule()->getResilienceStrategy()
-        == ResilienceStrategy::Fragile)
-      return FormalLinkage::PublicUnique;
+  case AccessLevel::Internal:
     return FormalLinkage::HiddenUnique;
-  case Accessibility::FilePrivate:
-  case Accessibility::Private:
+  case AccessLevel::FilePrivate:
+  case AccessLevel::Private:
     // Why "hidden" instead of "private"? Because the debugger may need to
     // access these symbols.
     return FormalLinkage::HiddenUnique;
   }
 
-  llvm_unreachable("Unhandled Accessibility in switch.");
+  llvm_unreachable("Unhandled access level in switch.");
 }
 
 FormalLinkage swift::getTypeLinkage(CanType type) {
@@ -117,24 +112,20 @@ swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
   if (C->isBehaviorConformance())
     return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
 
-  ModuleDecl *conformanceModule = C->getDeclContext()->getParentModule();
-
   // If the conformance was synthesized by the ClangImporter, give it
   // shared linkage.
-  auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
-  auto typeUnit = typeDecl->getModuleScopeContext();
-  if (isa<ClangModuleUnit>(typeUnit)
-      && conformanceModule == typeUnit->getParentModule())
+  if (isa<ClangModuleUnit>(C->getDeclContext()->getModuleScopeContext()))
     return SILLinkage::Shared;
 
-  Accessibility accessibility = std::min(C->getProtocol()->getEffectiveAccess(),
-                                         typeDecl->getEffectiveAccess());
-  switch (accessibility) {
-    case Accessibility::Private:
-    case Accessibility::FilePrivate:
+  auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
+  AccessLevel access = std::min(C->getProtocol()->getEffectiveAccess(),
+                                typeDecl->getEffectiveAccess());
+  switch (access) {
+    case AccessLevel::Private:
+    case AccessLevel::FilePrivate:
       return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
 
-    case Accessibility::Internal:
+    case AccessLevel::Internal:
       return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
 
     default:

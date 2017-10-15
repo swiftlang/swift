@@ -29,8 +29,10 @@ class SILValue;
 
 namespace Lowering {
 
+class RValue;
 class JumpDest;
 class SILGenFunction;
+class SILGenBuilder;
 class ManagedValue;
 class SharedBorrowFormalAccess;
 class FormalEvaluationScope;
@@ -238,6 +240,20 @@ public:
 
 private:
   void popImpl();
+};
+
+class CleanupCloner {
+  SILGenFunction &SGF;
+  bool hasCleanup;
+  bool isLValue;
+
+public:
+  CleanupCloner(SILGenFunction &SGF, const ManagedValue &mv);
+  CleanupCloner(SILGenBuilder &builder, const ManagedValue &mv);
+  CleanupCloner(SILGenFunction &SGF, const RValue &rv);
+  CleanupCloner(SILGenBuilder &builder, const RValue &rv);
+
+  ManagedValue clone(SILValue value) const;
 };
 
 } // end namespace Lowering

@@ -22,11 +22,11 @@
 namespace swift {
   class Expr;
   class SourceLoc;
+  struct ASTNode;
 
 /// This represents one part of a #if block.  If the condition field is
 /// non-null, then this represents a #if or a #elseif, otherwise it represents
 /// an #else block.
-template <typename ElemTy>
 struct IfConfigClause {
   /// The location of the #if, #elseif, or #else keyword.
   SourceLoc Loc;
@@ -36,13 +36,13 @@ struct IfConfigClause {
   Expr *Cond;
   
   /// Elements inside the clause
-  ArrayRef<ElemTy> Elements;
+  ArrayRef<ASTNode> Elements;
 
   /// True if this is the active clause of the #if block.
   bool isActive;
 
-  IfConfigClause<ElemTy>(SourceLoc Loc, Expr *Cond,
-                         ArrayRef<ElemTy> Elements, bool isActive)
+  IfConfigClause(SourceLoc Loc, Expr *Cond,
+                 ArrayRef<ASTNode> Elements, bool isActive)
     : Loc(Loc), Cond(Cond), Elements(Elements), isActive(isActive) {
   }
 };

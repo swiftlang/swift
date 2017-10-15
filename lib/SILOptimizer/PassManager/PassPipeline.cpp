@@ -83,13 +83,12 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   // Select access kind after capture promotion and before stack promotion.
   // This guarantees that stack-promotable boxes have [static] enforcement.
   P.addAccessEnforcementSelection();
-  P.addInactiveAccessMarkerElimination();
 
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
-  P.addOwnershipModelEliminator();
   P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
+  P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
   P.addPredictableMemoryOptimizations();
   P.addDiagnosticConstantPropagation();
@@ -234,6 +233,9 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // current function (after optimizing any new callees).
   P.addDevirtualizer();
   P.addGenericSpecializer();
+  // Run devirtualizer after the specializer, because many
+  // class_method/witness_method instructions may use concrete types now.
+  P.addDevirtualizer();
 
   switch (OpLevel) {
   case OptimizationLevelKind::HighLevel:
@@ -241,10 +243,16 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
     P.addEarlyInliner();
     break;
   case OptimizationLevelKind::MidLevel:
-    // Does inline semantics-functions (except "availability"), but not
-    // global-init functions.
     P.addGlobalOpt();
     P.addLetPropertiesOpt();
+    // It is important to serialize before any of the @_semantics
+    // functions are inlined, because otherwise the information about
+    // uses of such functions inside the module is lost,
+    // which reduces the ability of the compiler to optimize clients
+    // importing this module.
+    P.addSerializeSILPass();
+    // Does inline semantics-functions (except "availability"), but not
+    // global-init functions.
     P.addPerfInliner();
     break;
   case OptimizationLevelKind::LowLevel:
@@ -270,10 +278,11 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   P.addCSE();
   P.addRedundantLoadElimination();
 
-  // Perform retain/release code motion and run the first ARC optimizer.
+  P.addPerformanceConstantPropagation();
   P.addCSE();
   P.addDCE();
 
+  // Perform retain/release code motion and run the first ARC optimizer.
   P.addEarlyCodeMotion();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
@@ -287,6 +296,11 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   } else
     P.addEarlyCodeMotion();
 
+  P.addRetainSinking();
+  // Retain sinking does not sink all retains in one round.
+  // Let it run one more time time, because it can be beneficial.
+  // FIXME: Improve the RetainSinking pass to sink more/all
+  // retains in one go.
   P.addRetainSinking();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
@@ -306,6 +320,12 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addDeadFunctionElimination();
   // Start by cloning functions from stdlib.
   P.addSILLinker();
+
+  // Cleanup after SILGen: remove trivial copies to temporaries.
+  P.addTempRValueOpt();
+
+  // Add the outliner pass (Osize).
+  P.addOutliner();
 }
 
 static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
@@ -334,6 +354,10 @@ static void addMidLevelPassPipeline(SILPassPipelinePlan &P) {
   // Specialize partially applied functions with dead arguments as a preparation
   // for CapturePropagation.
   P.addDeadArgSignatureOpt();
+
+  // Run loop unrolling after inlining and constant propagation, because loop
+  // trip counts may have became constant.
+  P.addLoopUnroll();
 }
 
 static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
@@ -390,7 +414,6 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("LateLoopOpt");
 
   // Delete dead code and drop the bodies of shared functions.
-  P.addExternalFunctionDefinitionsElimination();
   P.addDeadFunctionElimination();
 
   // Perform the final lowering transformations.
@@ -403,6 +426,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
 
   // Remove dead code.
   P.addDCE();
+  P.addSILCombine();
   P.addSimplifyCFG();
 
   // Try to hoist all releases, including epilogue releases. This should be
@@ -430,19 +454,17 @@ SILPassPipelinePlan::getLoweringPassPipeline() {
   return P;
 }
 
-/// Non-mandatory passes that should run as preparation for IRGen.
-static void addIRGenPreparePipeline(SILPassPipelinePlan &P) {
+SILPassPipelinePlan
+SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P;
   P.startPipeline("IRGen Preparation");
   // Insert SIL passes to run during IRGen.
   // Hoist generic alloc_stack instructions to the entry block to enable better
   // llvm-ir generation for dynamic alloca instructions.
   P.addAllocStackHoisting();
-  P.addLoadableByAddress();
-}
-
-SILPassPipelinePlan SILPassPipelinePlan::getIRGenPreparePassPipeline() {
-  SILPassPipelinePlan P;
-  addIRGenPreparePipeline(P);
+  if (Options.EnableLargeLoadableTypes) {
+    P.addLoadableByAddress();
+  }
   return P;
 }
 
@@ -456,7 +478,7 @@ SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
   }
 
   P.startPipeline("SILOpt Prepare Passes");
-  P.addFullAccessMarkerElimination();
+  P.addAccessMarkerElimination();
 
   return P;
 }
@@ -514,12 +536,6 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
   P.addUsePrespecialized();
 
   P.startPipeline("Rest of Onone");
-  // Don't keep external functions from stdlib and other modules.
-  // We don't want that our unoptimized version will be linked instead
-  // of the optimized version from the stdlib.
-  // Here we just convert external definitions to declarations. LLVM will
-  // eventually remove unused declarations.
-  P.addExternalDefsToDecls();
 
   // Has only an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
@@ -593,7 +609,7 @@ void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
                os << "        \"" << Pipeline.Name << "\"";
                for (PassKind Kind : getPipelinePasses(Pipeline)) {
                  os << ",\n        [\"" << PassKindID(Kind) << "\","
-                    << PassKindTag(Kind) << ']';
+                    << "\"" << PassKindTag(Kind) << "\"]";
                }
              },
              [&] { os << "\n    ],\n"; });

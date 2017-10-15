@@ -100,12 +100,12 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
     if (NewRetVal->getType().isVoid()) {
       // Canonicalize Void return type into something that isTrivialReturnBlock
       // expects.
-      auto *TupleI = cast<SILInstruction>(RetInst->getOperand(0));
-      if (TupleI->hasOneUse()) {
-        TupleI->removeFromParent();
-        RetBB->insert(RetInst, TupleI);
+      auto *TupleI = dyn_cast<TupleInst>(RetInst->getOperand(0));
+      if (TupleI && TupleI->hasOneUse()) {
+        TupleI->moveBefore(RetInst);
       } else {
-        TupleI = TupleI->clone(RetInst);
+        Builder.setInsertionPoint(RetInst);
+        TupleI = Builder.createTuple(RetInst->getLoc(), {});
         RetInst->setOperand(0, TupleI);
       }
       MergedBB = RetBB->split(TupleI->getIterator());
@@ -163,13 +163,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
   SILBasicBlock *ErrorBB = F.createBasicBlock();
   SILBasicBlock *NormalBB = F.createBasicBlock();
 
-  Builder.createTryApply(Loc,
-                         FuncRef,
-                         SILType::getPrimitiveObjectType(CanSILFuncTy),
-                         Subs,
-                         CallArgs,
-                         NormalBB,
-                         ErrorBB);
+  Builder.createTryApply(Loc, FuncRef, Subs, CallArgs, NormalBB, ErrorBB);
 
   {
     // Emit the rethrow logic.
@@ -261,7 +255,6 @@ emitInvocation(SILBuilder &Builder,
   if (!CanSILFuncTy->hasErrorResult() ||
       CalleeFunc->findThrowBB() == CalleeFunc->end()) {
     return Builder.createApply(CalleeFunc->getLocation(), FuncRefInst,
-                               CalleeSILSubstFnTy, fnConv.getSILResultType(),
                                Subs, CallArgs, isNonThrowing);
   }
 
@@ -570,14 +563,8 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
   Builder.emitBlock(IsClassCheckBB);
 
   auto *FRI = Builder.createFunctionRef(Loc, IsClassF);
-  auto CanFnTy = IsClassF->getLoweredFunctionType()->substGenericArgs(
-      Builder.getModule(), {Sub});
-  auto SILFnTy = SILType::getPrimitiveObjectType(CanFnTy);
-  SILFunctionConventions fnConv(CanFnTy, Builder.getModule());
-  auto SILResultTy = fnConv.getSILResultType();
-  auto IsClassRuntimeCheck =
-      Builder.createApply(Loc, FRI, SILFnTy, SILResultTy, {Sub}, {GenericMT},
-                          /* isNonThrowing */ false);
+  auto IsClassRuntimeCheck = Builder.createApply(Loc, FRI, {Sub}, {GenericMT},
+                                                 /* isNonThrowing */ false);
   // Extract the i1 from the Bool struct.
   StructDecl *BoolStruct = cast<StructDecl>(Ctx.getBoolDecl());
   auto Members = BoolStruct->lookupDirect(Ctx.Id_value_);
@@ -640,7 +627,9 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
         ReInfo.createSpecializedType(SubstitutedType, Builder.getModule());
   }
 
-  assert(OrigArgs.size() == ReInfo.getNumArguments() && "signature mismatch");
+  assert(!substConv.useLoweredAddresses()
+         || OrigArgs.size() == ReInfo.getNumArguments() &&
+         "signature mismatch");
 
   CallArgs.reserve(OrigArgs.size());
   SILValue StoreResultTo;
@@ -717,9 +706,13 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
         dbgs() << "  Specialize Attr:";
         SA.print(dbgs()); dbgs() << "\n");
 
+  IsSerialized_t Serialized = IsNotSerialized;
+  if (GenericFunc->isSerialized())
+    Serialized = IsSerializable;
+
   GenericFuncSpecializer
         FuncSpecializer(GenericFunc, ReInfo.getClonerParamSubstitutions(),
-                        GenericFunc->isSerialized(), ReInfo);
+                        Serialized, ReInfo);
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)

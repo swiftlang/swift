@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -D LIB %s -o %t/Lib.swiftmodule
 // RUN: %target-swift-frontend -I %t -typecheck %s -verify
 // REQUIRES: objc_interop

@@ -52,31 +52,32 @@ public:
     emitAssignWithCopyCall(IGF, T, dest, src);
   }
 
+  void assignArrayWithCopyNoAlias(IRGenFunction &IGF, Address dest, Address src,
+                                  llvm::Value *count,
+                                  SILType T) const override {
+    emitAssignArrayWithCopyNoAliasCall(IGF, T, dest, src, count);
+  }
+
+  void assignArrayWithCopyFrontToBack(IRGenFunction &IGF, Address dest,
+                                      Address src, llvm::Value *count,
+                                      SILType T) const override {
+    emitAssignArrayWithCopyFrontToBackCall(IGF, T, dest, src, count);
+  }
+
+  void assignArrayWithCopyBackToFront(IRGenFunction &IGF, Address dest,
+                                      Address src, llvm::Value *count,
+                                      SILType T) const override {
+    emitAssignArrayWithCopyBackToFrontCall(IGF, T, dest, src, count);
+  }
+
   void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                       SILType T) const override {
     emitAssignWithTakeCall(IGF, T, dest, src);
   }
 
-  Address allocateBuffer(IRGenFunction &IGF, Address buffer,
-                         SILType T) const override {
-    auto addr = emitAllocateBufferCall(IGF, T, buffer);
-    return this->getAddressForPointer(addr);
-  }
-
-  Address projectBuffer(IRGenFunction &IGF, Address buffer,
-                        SILType T) const override {
-    auto addr = emitProjectBufferCall(IGF, T, buffer);
-    return this->getAddressForPointer(addr);
-  }
-
-  void destroyBuffer(IRGenFunction &IGF, Address buffer,
-                     SILType T) const override {
-    emitDestroyBufferCall(IGF, T, buffer);
-  }
-
-  void deallocateBuffer(IRGenFunction &IGF, Address buffer,
-                        SILType T) const override {
-    emitDeallocateBufferCall(IGF, T, buffer);
+  void assignArrayWithTake(IRGenFunction &IGF, Address dest, Address src,
+                           llvm::Value *count, SILType T) const override {
+    emitAssignArrayWithTakeCall(IGF, T, dest, src, count);
   }
 
   Address initializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
@@ -90,20 +91,6 @@ public:
                                    Address dest, Address src,
                                    SILType T) const override {
     auto addr = emitInitializeBufferWithTakeOfBufferCall(IGF, T, dest, src);
-    return this->getAddressForPointer(addr);
-  }
-
-  Address initializeBufferWithCopy(IRGenFunction &IGF,
-                                   Address dest, Address src,
-                                   SILType T) const override {
-    auto addr = emitInitializeBufferWithCopyCall(IGF, T, dest, src);
-    return this->getAddressForPointer(addr);
-  }
-
-  Address initializeBufferWithTake(IRGenFunction &IGF,
-                                   Address dest, Address src,
-                                   SILType T) const override {
-    auto addr = emitInitializeBufferWithTakeCall(IGF, T, dest, src);
     return this->getAddressForPointer(addr);
   }
 
@@ -121,6 +108,12 @@ public:
   void initializeWithTake(IRGenFunction &IGF,
                         Address dest, Address src, SILType T) const override {
     emitInitializeWithTakeCall(IGF, T, dest, src);
+  }
+
+  void initializeArrayWithTakeNoAlias(IRGenFunction &IGF, Address dest,
+                                      Address src, llvm::Value *count,
+                                      SILType T) const override {
+    emitInitializeArrayWithTakeNoAliasCall(IGF, T, dest, src, count);
   }
 
   void initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,

@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that presents a mathematical set interface to a bit mask.
+/// A type that presents a mathematical set interface to a bit set.
 ///
-/// You use the `OptionSet` protocol to represent bit mask types, where
-/// individual bits represent members of the set. Adopting this protocol in
+/// You use the `OptionSet` protocol to represent bitset types, where
+/// individual bits represent members of a set. Adopting this protocol in
 /// your custom types lets you perform set-related operations such as
 /// membership tests, unions, and intersections on those types. What's more,
 /// when implemented using specific criteria, adoption of this protocol
@@ -30,8 +30,8 @@
 /// For example, consider a custom type called `ShippingOptions` that is an
 /// option set of the possible ways to ship a customer's purchase.
 /// `ShippingOptions` includes a `rawValue` property of type `Int` that stores
-/// the bit mask of available shipping options. The static members `NextDay`,
-/// `SecondDay`, `Priority`, and `Standard` are unique, individual options.
+/// the bit mask of available shipping options. The static members `nextDay`,
+/// `secondDay`, `priority`, and `standard` are unique, individual options.
 ///
 ///     struct ShippingOptions: OptionSet {
 ///         let rawValue: Int
@@ -82,8 +82,6 @@
 ///         print("Add more to your cart for free priority shipping!")
 ///     }
 ///     // Prints "You've earned free priority shipping!"
-///
-/// - SeeAlso: `FixedWidthInteger`, `SetAlgebra`
 public protocol OptionSet : SetAlgebra, RawRepresentable {
   // We can't constrain the associated Element type to be the same as
   // Self, but we can do almost as well with a default and a
@@ -143,6 +141,7 @@ extension OptionSet {
   /// - Parameter other: An option set.
   /// - Returns: A new option set made up of the elements contained in this
   ///   set, in `other`, or in both.
+  @_inlineable // FIXME(sil-serialize-all)
   public func union(_ other: Self) -> Self {
     var r: Self = Self(rawValue: self.rawValue)
     r.formUnion(other)
@@ -169,6 +168,7 @@ extension OptionSet {
   /// - Parameter other: An option set.
   /// - Returns: A new option set with only the elements contained in both this
   ///   set and `other`.
+  @_inlineable // FIXME(sil-serialize-all)
   public func intersection(_ other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
     r.formIntersection(other)
@@ -181,6 +181,7 @@ extension OptionSet {
   /// - Parameter other: An option set.
   /// - Returns: A new option set with only the elements contained in either
   ///   this set or `other`, but not in both.
+  @_inlineable // FIXME(sil-serialize-all)
   public func symmetricDifference(_ other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
     r.formSymmetricDifference(other)
@@ -210,6 +211,7 @@ extension OptionSet where Element == Self {
   /// - Parameter member: The element to look for in the option set.
   /// - Returns: `true` if the option set contains `member`; otherwise,
   ///   `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   public func contains(_ member: Self) -> Bool {
     return self.isSuperset(of: member)
   }
@@ -234,6 +236,7 @@ extension OptionSet where Element == Self {
   /// - Returns: `(true, newMember)` if `newMember` was not contained in
   ///   `self`. Otherwise, returns `(false, oldMember)`, where `oldMember` is
   ///   the member of the set equal to `newMember`.
+  @_inlineable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func insert(
     _ newMember: Element
@@ -279,6 +282,7 @@ extension OptionSet where Element == Self {
   /// - Parameter member: The element of the set to remove.
   /// - Returns: The intersection of `[member]` and the set, if the
   ///   intersection was nonempty; otherwise, `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
     let r = isSuperset(of: member) ? Optional(member) : nil
@@ -298,6 +302,7 @@ extension OptionSet where Element == Self {
   ///
   /// - Returns: The intersection of `[newMember]` and the set if the
   ///   intersection was nonempty; otherwise, `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func update(with newMember: Element) -> Element? {
     let r = self.intersection(newMember)
@@ -324,6 +329,7 @@ extension OptionSet where RawValue : FixedWidthInteger {
   /// Creates an empty option set.
   ///
   /// This initializer creates an option set with a raw value of zero.
+  @_inlineable // FIXME(sil-serialize-all)
   public init() {
     self.init(rawValue: 0)
   }
@@ -334,6 +340,7 @@ extension OptionSet where RawValue : FixedWidthInteger {
   /// two sets' raw values.
   ///
   /// - Parameter other: An option set.
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func formUnion(_ other: Self) {
     self = Self(rawValue: self.rawValue | other.rawValue)
   }
@@ -345,6 +352,7 @@ extension OptionSet where RawValue : FixedWidthInteger {
   /// two sets' raw values.
   ///
   /// - Parameter other: An option set.
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func formIntersection(_ other: Self) {
     self = Self(rawValue: self.rawValue & other.rawValue)
   }
@@ -356,11 +364,8 @@ extension OptionSet where RawValue : FixedWidthInteger {
   /// sets' raw values.
   ///
   /// - Parameter other: An option set.
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func formSymmetricDifference(_ other: Self) {
     self = Self(rawValue: self.rawValue ^ other.rawValue)
   }
 }
-
-@available(*, unavailable, renamed: "OptionSet")
-public typealias OptionSetType = OptionSet
-

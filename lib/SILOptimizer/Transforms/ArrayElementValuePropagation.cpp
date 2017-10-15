@@ -190,7 +190,9 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
   for (auto *Opd : Def->getUses()) {
     auto *User = Opd->getUser();
     // Ignore reference counting and debug instructions.
-    if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User))
+    if (isa<RefCountingInst>(User) ||
+        isa<StrongPinInst>(User) ||
+        isa<DebugValueInst>(User))
       continue;
 
     // Array value projection.
@@ -320,7 +322,14 @@ public:
     for (const ArrayAllocation::AppendContentOfReplacement &Repl : Repls) {
       ArraySemanticsCall AppendContentsOf(Repl.AppendContentOfCall);
       assert(AppendContentsOf && "Must be AppendContentsOf call");
-      
+
+      NominalTypeDecl *AppendSelfArray = AppendContentsOf.getSelf()->getType().
+        getSwiftRValueType()->getAnyNominal();
+
+      // In case if it's not an Array, but e.g. an ContiguousArray
+      if (AppendSelfArray != Ctx.getArrayDecl())
+        continue;
+
       SILType ArrayType = Repl.Array->getType();
       auto *NTD = ArrayType.getSwiftRValueType()->getAnyNominal();
       SubstitutionMap ArraySubMap = ArrayType.getSwiftRValueType()

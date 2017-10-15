@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-inliner"
+#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
@@ -30,7 +31,7 @@ llvm::cl::opt<bool> PrintShortestPathInfo(
     llvm::cl::desc("Print shortest-path information for inlining"));
 
 llvm::cl::opt<bool> EnableSILInliningOfGenerics(
-  "sil-inline-generics", llvm::cl::init(true),
+  "sil-inline-generics", llvm::cl::init(false),
   llvm::cl::desc("Enable inlining of generics"));
 
 //===----------------------------------------------------------------------===//
@@ -38,14 +39,6 @@ llvm::cl::opt<bool> EnableSILInliningOfGenerics(
 //===----------------------------------------------------------------------===//
 
 namespace {
-
-// Controls the decision to inline functions with @_semantics, @effect and
-// global_init attributes.
-enum class InlineSelection {
-  Everything,
-  NoGlobalInit, // and no availability semantics calls
-  NoSemanticsAndGlobalInit
-};
 
 using Weight = ShortestPathAnalysis::Weight;
 
@@ -56,6 +49,7 @@ class SILPerformanceInliner {
 
   DominanceAnalysis *DA;
   SILLoopAnalysis *LA;
+  SideEffectAnalysis *SEA;
 
   // For keys of SILFunction and SILLoop.
   llvm::DenseMap<SILFunction *, ShortestPathAnalysis *> SPAs;
@@ -114,6 +108,8 @@ class SILPerformanceInliner {
     DefaultApplyLength = 10
   };
 
+  SILOptions::SILOptMode OptMode;
+
 #ifndef NDEBUG
   SILFunction *LastPrintedCaller = nullptr;
   void dumpCaller(SILFunction *Caller) {
@@ -132,17 +128,24 @@ class SILPerformanceInliner {
     return SPA;
   }
 
-  SILFunction *getEligibleFunction(FullApplySite AI);
+  bool profileBasedDecision(
+      const FullApplySite &AI, int Benefit, SILFunction *Callee, int CalleeCost,
+      int &NumCallerBlocks,
+      const llvm::DenseMapIterator<
+          swift::SILBasicBlock *, uint64_t,
+          llvm::DenseMapInfo<swift::SILBasicBlock *>,
+          llvm::detail::DenseMapPair<swift::SILBasicBlock *, uint64_t>, true>
+          &bbIt);
 
-  bool isProfitableToInline(FullApplySite AI,
-                            Weight CallerWeight,
-                            ConstantTracker &callerTracker,
-                            int &NumCallerBlocks);
+  bool isProfitableToInline(
+      FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
+      int &NumCallerBlocks,
+      const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap);
 
-  bool decideInWarmBlock(FullApplySite AI,
-                         Weight CallerWeight,
-                         ConstantTracker &callerTracker,
-                         int &NumCallerBlocks);
+  bool decideInWarmBlock(
+      FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
+      int &NumCallerBlocks,
+      const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap);
 
   bool decideInColdBlock(FullApplySite AI, SILFunction *Callee);
 
@@ -154,167 +157,15 @@ class SILPerformanceInliner {
 
 public:
   SILPerformanceInliner(InlineSelection WhatToInline, DominanceAnalysis *DA,
-                        SILLoopAnalysis *LA)
-      : WhatToInline(WhatToInline), DA(DA), LA(LA), CBI(DA) {}
+                        SILLoopAnalysis *LA, SideEffectAnalysis *SEA,
+                        SILOptions::SILOptMode OptMode)
+      : WhatToInline(WhatToInline), DA(DA), LA(LA), SEA(SEA), CBI(DA),
+        OptMode(OptMode) {}
 
   bool inlineCallsIntoFunction(SILFunction *F);
 };
 
 } // end anonymous namespace
-
-// Return true if the callee has self-recursive calls.
-static bool calleeIsSelfRecursive(SILFunction *Callee) {
-  for (auto &BB : *Callee)
-    for (auto &I : BB)
-      if (auto Apply = FullApplySite::isa(&I))
-        if (Apply.getReferencedFunction() == Callee)
-          return true;
-  return false;
-}
-
-// Returns true if the callee contains a partial apply instruction,
-// whose substitutions list would contain opened existentials after
-// inlining.
-static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
-  if (!AI.hasSubstitutions())
-    return false;
-
-  SILFunction *Callee = AI.getReferencedFunction();
-  auto Subs = AI.getSubstitutions();
-
-  // Bail if there are no open existentials in the list of substitutions.
-  bool HasNoOpenedExistentials = true;
-  for (auto Sub : Subs) {
-    if (Sub.getReplacement()->hasOpenedExistential()) {
-      HasNoOpenedExistentials = false;
-      break;
-    }
-  }
-
-  if (HasNoOpenedExistentials)
-    return false;
-
-  auto SubsMap = Callee->getLoweredFunctionType()
-    ->getGenericSignature()->getSubstitutionMap(Subs);
-
-  for (auto &BB : *Callee) {
-    for (auto &I : BB) {
-      if (auto PAI = dyn_cast<PartialApplyInst>(&I)) {
-        auto PAISubs = PAI->getSubstitutions();
-        if (PAISubs.empty())
-          continue;
-
-        // Check if any of substitutions would contain open existentials
-        // after inlining.
-        auto PAISubMap = PAI->getOrigCalleeType()
-          ->getGenericSignature()->getSubstitutionMap(PAISubs);
-        PAISubMap = PAISubMap.subst(SubsMap);
-        if (PAISubMap.hasOpenedExistential())
-          return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-// Returns the callee of an apply_inst if it is basically inlineable.
-SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
-
-  SILFunction *Callee = AI.getReferencedFunction();
-
-  if (!Callee) {
-    return nullptr;
-  }
-
-  // Don't inline functions that are marked with the @_semantics or @effects
-  // attribute if the inliner is asked not to inline them.
-  if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
-    if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
-      ArraySemanticsCall ASC(AI.getInstruction());
-      if (!ASC.canInlineEarly())
-        return nullptr;
-    }
-    // The "availability" semantics attribute is treated like global-init.
-    if (Callee->hasSemanticsAttrs() &&
-        WhatToInline != InlineSelection::Everything &&
-        Callee->hasSemanticsAttrThatStartsWith("availability")) {
-      return nullptr;
-    }
-  } else if (Callee->isGlobalInit()) {
-    if (WhatToInline != InlineSelection::Everything) {
-      return nullptr;
-    }
-  }
-
-  // We can't inline external declarations.
-  if (Callee->empty() || Callee->isExternalDeclaration()) {
-    return nullptr;
-  }
-
-  // Explicitly disabled inlining.
-  if (Callee->getInlineStrategy() == NoInline) {
-    return nullptr;
-  }
-  
-  if (!Callee->shouldOptimize()) {
-    return nullptr;
-  }
-
-  SILFunction *Caller = AI.getFunction();
-
-  // We don't support inlining a function that binds dynamic self because we
-  // have no mechanism to preserve the original function's local self metadata.
-  if (mayBindDynamicSelf(Callee)) {
-    // Check if passed Self is the same as the Self of the caller.
-    // In this case, it is safe to inline because both functions
-    // use the same Self.
-    if (AI.hasSelfArgument() && Caller->hasSelfParam()) {
-      auto CalleeSelf = stripCasts(AI.getSelfArgument());
-      auto CallerSelf = Caller->getSelfArgument();
-      if (CalleeSelf != SILValue(CallerSelf))
-        return nullptr;
-    } else
-      return nullptr;
-  }
-
-  // Detect self-recursive calls.
-  if (Caller == Callee) {
-    return nullptr;
-  }
-
-  // A non-fragile function may not be inlined into a fragile function.
-  if (Caller->isSerialized() &&
-      !Callee->hasValidLinkageForFragileInline()) {
-    if (!Callee->hasValidLinkageForFragileRef()) {
-      llvm::errs() << "caller: " << Caller->getName() << "\n";
-      llvm::errs() << "callee: " << Callee->getName() << "\n";
-      llvm_unreachable("Should never be inlining a resilient function into "
-                       "a fragile function");
-    }
-    return nullptr;
-  }
-
-  // Inlining self-recursive functions into other functions can result
-  // in excessive code duplication since we run the inliner multiple
-  // times in our pipeline
-  if (calleeIsSelfRecursive(Callee)) {
-    return nullptr;
-  }
-
-  if (!EnableSILInliningOfGenerics && AI.hasSubstitutions()) {
-    // Inlining of generics is not allowed.
-    return nullptr;
-  }
-
-  // IRGen cannot handle partial_applies containing opened_existentials
-  // in its substitutions list.
-  if (calleeHasPartialApplyWithOpenedExistentials(AI)) {
-    return nullptr;
-  }
-
-  return Callee;
-}
 
 // Returns true if it is possible to perform a generic
 // specialization for a given call.
@@ -323,20 +174,99 @@ static bool canSpecializeGeneric(ApplySite AI, SILFunction *F,
   return ReabstractionInfo::canBeSpecialized(AI, F, Subs);
 }
 
-bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
-                                                 Weight CallerWeight,
-                                                 ConstantTracker &callerTracker,
-                                                 int &NumCallerBlocks) {
+bool SILPerformanceInliner::profileBasedDecision(
+    const FullApplySite &AI, int Benefit, SILFunction *Callee, int CalleeCost,
+    int &NumCallerBlocks,
+    const llvm::DenseMapIterator<
+        swift::SILBasicBlock *, uint64_t,
+        llvm::DenseMapInfo<swift::SILBasicBlock *>,
+        llvm::detail::DenseMapPair<swift::SILBasicBlock *, uint64_t>, true>
+        &bbIt) {
+  if (CalleeCost < TrivialFunctionThreshold) {
+    // We do not increase code size below this threshold
+    return true;
+  }
+  auto callerCount = bbIt->getSecond();
+  if (callerCount < 1) {
+    // Never called - do not inline
+    DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs()
+                                        << "profiled decision: NO"
+                                        << ", reason= Never Called." << '\n';);
+    return false;
+  }
+  auto calleeCount = Callee->getEntryCount();
+  if (calleeCount) {
+    // If we have Callee count - use SI heuristic:
+    auto calleCountVal = calleeCount.getValue();
+    auto percent = (long double)callerCount / (long double)calleCountVal;
+    if (percent < 0.8) {
+      DEBUG(dumpCaller(AI.getFunction());
+            llvm::dbgs() << "profiled decision: NO"
+                         << ", reason=SI " << std::to_string(percent) << "%"
+                         << '\n';);
+      return false;
+    }
+    DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs() << "profiled decision: YES"
+                                                     << ", reason=SI "
+                                                     << std::to_string(percent)
+                                                     << "%" << '\n';);
+  } else {
+    // No callee count - use a "modified" aggressive IHF for now
+    if (CalleeCost > Benefit && callerCount < 100) {
+      DEBUG(dumpCaller(AI.getFunction());
+            llvm::dbgs() << "profiled decision: NO"
+                         << ", reason=IHF " << callerCount << '\n';);
+      return false;
+    }
+    DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs() << "profiled decision: YES"
+                                                     << ", reason=IHF "
+                                                     << callerCount << '\n';);
+  }
+  // We're gonna inline!
+  NumCallerBlocks += Callee->size();
+  return true;
+}
+
+bool SILPerformanceInliner::isProfitableToInline(
+    FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
+    int &NumCallerBlocks,
+    const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
   SILFunction *Callee = AI.getReferencedFunction();
   bool IsGeneric = !AI.getSubstitutions().empty();
 
   assert(EnableSILInliningOfGenerics || !IsGeneric);
 
+  // Start with a base benefit.
+  int BaseBenefit = RemovedCallBenefit;
+
+  // Osize heuristic.
+  if (OptMode == SILOptions::SILOptMode::OptimizeForSize) {
+    // Don't inline into thunks.
+    if (AI.getFunction()->isThunk())
+      return false;
+
+    // Don't inline class methods.
+    if (Callee->hasSelfParam()) {
+      auto SelfTy = Callee->getLoweredFunctionType()->getSelfInstanceType();
+      if (SelfTy->mayHaveSuperclass() &&
+          Callee->getRepresentation() == SILFunctionTypeRepresentation::Method)
+        return false;
+    }
+
+    BaseBenefit = BaseBenefit / 2;
+  }
+
+  // It is always OK to inline a simple call.
+  // TODO: May be consider also the size of the callee?
+  if (isPureCall(AI, SEA))
+    return true;
+
   // Bail out if this generic call can be optimized by means of
   // the generic specialization, because we prefer generic specialization
   // to inlining of generics.
-  if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutions()))
+  if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutions())) {
     return false;
+  }
 
   SILLoopInfo *LI = LA->get(Callee);
   ShortestPathAnalysis *SPA = getSPA(Callee, LI);
@@ -351,9 +281,6 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
   int CalleeCost = 0;
   int Benefit = 0;
 
-  // Start with a base benefit.
-  int BaseBenefit = RemovedCallBenefit;
-
   SubstitutionMap CalleeSubstMap;
   if (IsGeneric) {
     CalleeSubstMap = Callee->getLoweredFunctionType()
@@ -361,11 +288,9 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
       ->getSubstitutionMap(AI.getSubstitutions());
   }
 
-  const SILOptions &Opts = Callee->getModule().getOptions();
-
   // For some reason -Ounchecked can accept a higher base benefit without
   // increasing the code size too much.
-  if (Opts.Optimization == SILOptions::SILOptMode::OptimizeUnchecked)
+  if (OptMode == SILOptions::SILOptMode::OptimizeUnchecked)
     BaseBenefit *= 2;
 
   CallerWeight.updateBenefit(Benefit, BaseBenefit);
@@ -390,7 +315,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
         // Check if inlining the callee would allow for further
         // optimizations like devirtualization or generic specialization. 
         if (!def)
-          def = dyn_cast_or_null<SILInstruction>(FAI.getCallee());
+          def = dyn_cast_or_null<SingleValueInstruction>(FAI.getCallee());
 
         if (!def)
           continue;
@@ -479,8 +404,9 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
   if (AI.getFunction()->isThunk()) {
     // Only inline trivial functions into thunks (which will not increase the
     // code size).
-    if (CalleeCost > TrivialFunctionThreshold)
+    if (CalleeCost > TrivialFunctionThreshold) {
       return false;
+    }
 
     DEBUG(
       dumpCaller(AI.getFunction());
@@ -497,6 +423,14 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     (NumCallerBlocks * NumCallerBlocks) / BlockLimitDenominator *
                         NumCallerBlocks / BlockLimitDenominator;
   Benefit -= blockMinus;
+
+  // If we have profile info - use it for final inlining decision.
+  auto *bb = AI.getInstruction()->getParent();
+  auto bbIt = BBToWeightMap.find(bb);
+  if (bbIt != BBToWeightMap.end()) {
+    return profileBasedDecision(AI, Benefit, Callee, CalleeCost,
+                                NumCallerBlocks, bbIt);
+  }
 
   // This is the final inlining decision.
   if (CalleeCost > Benefit) {
@@ -525,15 +459,6 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   assert(!AI.getSubstitutions().empty() &&
          "Expected a generic apply");
 
-  if (!EnableSILInliningOfGenerics)
-    return false;
-
-  // If all substitutions are concrete, then there is no need to perform the
-  // generic inlining. Let the generic specializer create a specialized
-  // function and then decide if it is beneficial to inline it.
-  if (!hasArchetypes(AI.getSubstitutions()))
-    return false;
-
   SILFunction *Callee = AI.getReferencedFunction();
 
   // Do not inline @_semantics functions when compiling the stdlib,
@@ -553,15 +478,25 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent())
     return true;
 
+  // All other generic functions should not be inlined if this kind of inlining
+  // is disabled.
+  if (!EnableSILInliningOfGenerics)
+    return false;
+
+  // If all substitutions are concrete, then there is no need to perform the
+  // generic inlining. Let the generic specializer create a specialized
+  // function and then decide if it is beneficial to inline it.
+  if (!hasArchetypes(AI.getSubstitutions()))
+    return false;
+
   // It is not clear yet if this function should be decided or not.
   return None;
 }
 
-bool SILPerformanceInliner::
-decideInWarmBlock(FullApplySite AI,
-                  Weight CallerWeight,
-                  ConstantTracker &callerTracker,
-                  int &NumCallerBlocks) {
+bool SILPerformanceInliner::decideInWarmBlock(
+    FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
+    int &NumCallerBlocks,
+    const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
   if (!AI.getSubstitutions().empty()) {
     // Only inline generics if definitively clear that it should be done.
     auto ShouldInlineGeneric = shouldInlineGeneric(AI);
@@ -571,15 +506,16 @@ decideInWarmBlock(FullApplySite AI,
 
   SILFunction *Callee = AI.getReferencedFunction();
 
-  if (Callee->getInlineStrategy() == AlwaysInline) {
+  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
     DEBUG(
       dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    always-inline decision " <<Callee->getName() << '\n';
+      llvm::dbgs() << "    always-inline decision " << Callee->getName() << '\n';
     );
     return true;
   }
 
-  return isProfitableToInline(AI, CallerWeight, callerTracker, NumCallerBlocks);
+  return isProfitableToInline(AI, CallerWeight, callerTracker, NumCallerBlocks,
+                              BBToWeightMap);
 }
 
 /// Return true if inlining this call site into a cold block is profitable.
@@ -594,8 +530,13 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
     return false;
   }
 
-  if (Callee->getInlineStrategy() == AlwaysInline)
+  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
+    DEBUG(
+      dumpCaller(AI.getFunction());
+      llvm::dbgs() << "    always-inline decision " << Callee->getName() << '\n';
+      );
     return true;
+  }
 
   int CalleeCost = 0;
 
@@ -634,6 +575,94 @@ static void addWeightCorrection(FullApplySite FAS,
   }
 }
 
+static bool containsWeight(TermInst *inst) {
+  for (auto &succ : inst->getSuccessors()) {
+    if (succ.getCount()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void
+addToBBCounts(llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap,
+              uint64_t numToAdd, swift::TermInst *termInst) {
+  for (auto &succ : termInst->getSuccessors()) {
+    auto *currBB = succ.getBB();
+    assert(BBToWeightMap.find(currBB) != BBToWeightMap.end() &&
+           "Expected to find block in map");
+    BBToWeightMap[currBB] += numToAdd;
+  }
+}
+
+static void
+calculateBBWeights(SILFunction *Caller, DominanceInfo *DT,
+                   llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
+  auto entryCount = Caller->getEntryCount();
+  if (!entryCount) {
+    // No profile for function - return
+    return;
+  }
+  // Add all blocks to BBToWeightMap without count 0
+  for (auto &block : Caller->getBlocks()) {
+    BBToWeightMap[&block] = 0;
+  }
+  BBToWeightMap[Caller->getEntryBlock()] = entryCount.getValue();
+  DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
+  while (SILBasicBlock *block = domOrder.getNext()) {
+    auto bbIt = BBToWeightMap.find(block);
+    assert(bbIt != BBToWeightMap.end() && "Expected to find block in map");
+    auto bbCount = bbIt->getSecond();
+    auto *termInst = block->getTerminator();
+    if (containsWeight(termInst)) {
+      // Instruction already contains accurate counters - use them as-is
+      uint64_t countSum = 0;
+      uint64_t blocksWithoutCount = 0;
+      for (auto &succ : termInst->getSuccessors()) {
+        auto *currBB = succ.getBB();
+        assert(BBToWeightMap.find(currBB) != BBToWeightMap.end() &&
+               "Expected to find block in map");
+        auto currCount = succ.getCount();
+        if (!currCount) {
+          ++blocksWithoutCount;
+          continue;
+        }
+        auto currCountVal = currCount.getValue();
+        countSum += currCountVal;
+        BBToWeightMap[currBB] += currCountVal;
+      }
+      if (countSum < bbCount) {
+        // inaccurate profile - fill in the gaps for BBs without a count:
+        if (blocksWithoutCount > 0) {
+          auto numToAdd = (bbCount - countSum) / blocksWithoutCount;
+          for (auto &succ : termInst->getSuccessors()) {
+            auto *currBB = succ.getBB();
+            auto currCount = succ.getCount();
+            if (!currCount) {
+              BBToWeightMap[currBB] += numToAdd;
+            }
+          }
+        }
+      } else {
+        auto numOfSucc = termInst->getSuccessors().size();
+        assert(numOfSucc > 0 && "Expected successors > 0");
+        auto numToAdd = (countSum - bbCount) / numOfSucc;
+        addToBBCounts(BBToWeightMap, numToAdd, termInst);
+      }
+    } else {
+      // Fill counters speculatively
+      auto numOfSucc = termInst->getSuccessors().size();
+      if (numOfSucc == 0) {
+        // No successors to fill
+        continue;
+      }
+      auto numToAdd = bbCount / numOfSucc;
+      addToBBCounts(BBToWeightMap, numToAdd, termInst);
+    }
+    domOrder.pushChildrenIf(block, [&](SILBasicBlock *child) { return true; });
+  }
+}
+
 void SILPerformanceInliner::collectAppliesToInline(
     SILFunction *Caller, SmallVectorImpl<FullApplySite> &Applies) {
   DominanceInfo *DT = DA->get(Caller);
@@ -650,7 +679,7 @@ void SILPerformanceInliner::collectAppliesToInline(
     // At this occasion we record additional weight increases.
     addWeightCorrection(FAS, WeightCorrections);
 
-    if (SILFunction *Callee = getEligibleFunction(FAS)) {
+    if (SILFunction *Callee = getEligibleFunction(FAS, WhatToInline)) {
       // Compute the shortest-path analysis for the callee.
       SILLoopInfo *CalleeLI = LA->get(Callee);
       ShortestPathAnalysis *CalleeSPA = getSPA(Callee, CalleeLI);
@@ -681,6 +710,9 @@ void SILPerformanceInliner::collectAppliesToInline(
   DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
   int NumCallerBlocks = (int)Caller->size();
 
+  llvm::DenseMap<SILBasicBlock *, uint64_t> BBToWeightMap;
+  calculateBBWeights(Caller, DT, BBToWeightMap);
+
   // Go through all instructions and find candidates for inlining.
   // We do this in dominance order for the constTracker.
   SmallVector<FullApplySite, 8> InitialCandidates;
@@ -696,7 +728,7 @@ void SILPerformanceInliner::collectAppliesToInline(
 
       FullApplySite AI = FullApplySite(&*I);
 
-      auto *Callee = getEligibleFunction(AI);
+      auto *Callee = getEligibleFunction(AI, WhatToInline);
       if (Callee) {
         if (!BlockWeight.isValid())
           BlockWeight = SPA->getWeight(block, Weight(0, 0));
@@ -704,7 +736,8 @@ void SILPerformanceInliner::collectAppliesToInline(
         // The actual weight including a possible weight correction.
         Weight W(BlockWeight, WeightCorrections.lookup(AI));
 
-        if (decideInWarmBlock(AI, W, constTracker, NumCallerBlocks))
+        if (decideInWarmBlock(AI, W, constTracker, NumCallerBlocks,
+                              BBToWeightMap))
           InitialCandidates.push_back(AI);
       }
     }
@@ -736,8 +769,9 @@ void SILPerformanceInliner::collectAppliesToInline(
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
     const unsigned CallsToCalleeThreshold = 1024;
-    if (CalleeCount[Callee] <= CallsToCalleeThreshold)
+    if (CalleeCount[Callee] <= CallsToCalleeThreshold) {
       Applies.push_back(AI);
+    }
   }
 }
 
@@ -776,7 +810,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
           Caller->size() << "] " << Callee->getName() << "\n";
     );
 
-    SILOpenedArchetypesTracker OpenedArchetypesTracker(*Caller);
+    SILOpenedArchetypesTracker OpenedArchetypesTracker(Caller);
     Caller->getModule().registerDeleteNotificationHandler(&OpenedArchetypesTracker);
     // The callee only needs to know about opened archetypes used in
     // the substitution list.
@@ -787,12 +821,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
                        AI.getSubstitutions(),
                        OpenedArchetypesTracker);
 
-    auto Success = Inliner.inlineFunction(AI, Args);
-    (void) Success;
     // We've already determined we should be able to inline this, so
-    // we expect it to have happened.
-    assert(Success && "Expected inliner to inline this function!");
-
+    // unconditionally inline the function.
+    //
+    // If for whatever reason we can not inline this function, inlineFunction
+    // will assert, so we are safe making this assumption.
+    Inliner.inlineFunction(AI, Args);
     recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
 
     NumFunctionsInlined++;
@@ -813,7 +847,7 @@ void SILPerformanceInliner::visitColdBlocks(
       if (!AI)
         continue;
 
-      auto *Callee = getEligibleFunction(AI);
+      auto *Callee = getEligibleFunction(AI, WhatToInline);
       if (Callee && decideInColdBlock(AI, Callee)) {
         AppliesToInline.push_back(AI);
       }
@@ -843,12 +877,15 @@ public:
   void run() override {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
+    SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
 
     if (getOptions().InlineThreshold == 0) {
       return;
     }
 
-    SILPerformanceInliner Inliner(WhatToInline, DA, LA);
+    auto OptMode = getFunction()->getModule().getOptions().Optimization;
+
+    SILPerformanceInliner Inliner(WhatToInline, DA, LA, SEA, OptMode);
 
     assert(getFunction()->isDefinition() &&
            "Expected only functions with bodies!");

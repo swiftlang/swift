@@ -23,27 +23,32 @@ func refinementErasure(_ p: Pub) {
 typealias Compo = HasSelfRequirements & Bar
 
 struct CompoAssocType {
-  typealias Compo = HasSelfRequirements & Bar // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
+  typealias Compo = HasSelfRequirements & Bar
 }
 
 func useAsRequirement<T: HasSelfRequirements>(_ x: T) { }
 func useCompoAsRequirement<T: HasSelfRequirements & Bar>(_ x: T) { }
 func useCompoAliasAsRequirement<T: Compo>(_ x: T) { }
+func useNestedCompoAliasAsRequirement<T: CompoAssocType.Compo>(_ x: T) { }
 
 func useAsWhereRequirement<T>(_ x: T) where T: HasSelfRequirements {}
 func useCompoAsWhereRequirement<T>(_ x: T) where T: HasSelfRequirements & Bar {}
 func useCompoAliasAsWhereRequirement<T>(_ x: T) where T: Compo {}
+func useNestedCompoAliasAsWhereRequirement<T>(_ x: T) where T: CompoAssocType.Compo {}
 
 func useAsType(_ x: HasSelfRequirements) { } // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
 func useCompoAsType(_ x: HasSelfRequirements & Bar) { } // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
 func useCompoAliasAsType(_ x: Compo) { } // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
+func useNestedCompoAliasAsType(_ x: CompoAssocType.Compo) { } // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
 
 struct TypeRequirement<T: HasSelfRequirements> {}
 struct CompoTypeRequirement<T: HasSelfRequirements & Bar> {}
 struct CompoAliasTypeRequirement<T: Compo> {}
+struct NestedCompoAliasTypeRequirement<T: CompoAssocType.Compo> {}
 
 struct CompoTypeWhereRequirement<T> where T: HasSelfRequirements & Bar {}
 struct CompoAliasTypeWhereRequirement<T> where T: Compo {}
+struct NestedCompoAliasTypeWhereRequirement<T> where T: CompoAssocType.Compo {}
 
 struct Struct1<T> { }
 struct Struct2<T : Pub & Bar> { }

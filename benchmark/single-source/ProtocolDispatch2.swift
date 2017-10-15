@@ -17,6 +17,11 @@
 import TestsUtils
 import Foundation
 
+public let ProtocolDispatch2 = BenchmarkInfo(
+  name: "ProtocolDispatch2",
+  runFunction: run_ProtocolDispatch2,
+  tags: [.validation, .abstraction])
+
 protocol Pingable { func ping() -> Int;  func pong() -> Int}
 
 struct Game : Pingable {
@@ -59,6 +64,6 @@ public func run_ProtocolDispatch2(_ N: Int) {
       c += wrapper(i, g1, g2)
     }
   }
-  CheckResults(c == 75000, "IncorrectResults in ProtoDispatch")
+  CheckResults(c == 75000)
 }
 

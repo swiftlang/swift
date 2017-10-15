@@ -10,14 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
-struct _StringBufferIVars {
+internal struct _StringBufferIVars {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(_elementWidth: Int) {
     _sanityCheck(_elementWidth == 1 || _elementWidth == 2)
     usedEnd = nil
     capacityAndElementShift = _elementWidth - 1
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(
     _usedEnd: UnsafeMutableRawPointer,
     byteCapacity: Int,
@@ -31,12 +36,18 @@ struct _StringBufferIVars {
 
   // This stored property should be stored at offset zero.  We perform atomic
   // operations on it using _HeapBuffer's pointer.
+  @_versioned // FIXME(sil-serialize-all)
   var usedEnd: UnsafeMutableRawPointer?
 
+  @_versioned // FIXME(sil-serialize-all)
   var capacityAndElementShift: Int
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var byteCapacity: Int {
     return capacityAndElementShift & ~0x1
   }
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var elementShift: Int {
     return capacityAndElementShift & 0x1
   }
@@ -46,6 +57,7 @@ struct _StringBufferIVars {
 // _HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>, but
 // <rdar://problem/15520519> (Can't call static method of derived
 // class of generic class with dependent argument type) prevents it.
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct _StringBuffer {
 
   // Make this a buffer of UTF-16 code units so that it's properly
@@ -54,10 +66,13 @@ public struct _StringBuffer {
   typealias HeapBufferStorage
     = _HeapBufferStorage<_StringBufferIVars, UTF16.CodeUnit>
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   init(_ storage: _Storage) {
     _storage = storage
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public init(capacity: Int, initialSize: Int, elementWidth: Int) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
     _sanityCheck(initialSize <= capacity)
@@ -88,17 +103,16 @@ public struct _StringBuffer {
 
     self.usedEnd = start + (initialSize &<< elementShift)
     _storage.value.capacityAndElementShift
-      = ((_storage._capacity() - capacityBump) &<< 1) + elementShift
+      = ((_storage.capacity - capacityBump) &<< 1) + elementShift
   }
 
-  static func fromCodeUnits<Input, Encoding>(
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  static func fromCodeUnits<Input : Sequence, Encoding : _UnicodeEncoding>(
     _ input: Input, encoding: Encoding.Type, repairIllFormedSequences: Bool,
     minimumCapacity: Int = 0
   ) -> (_StringBuffer?, hadError: Bool)
-    where
-    Input : Collection, // Sequence?
-    Encoding : UnicodeCodec,
-    Input.Iterator.Element == Encoding.CodeUnit {
+    where Input.Element == Encoding.CodeUnit {
     // Determine how many UTF-16 code units we'll need
     let inputStream = input.makeIterator()
     guard let (utf16Count, isAscii) = UTF16.transcodedLength(
@@ -144,12 +158,15 @@ public struct _StringBuffer {
   }
 
   /// A pointer to the start of this buffer's data area.
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   var start: UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(_storage.baseAddress)
   }
 
   /// A past-the-end pointer for this buffer's stored data.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var usedEnd: UnsafeMutableRawPointer {
     get {
       return _storage.value.usedEnd!
@@ -159,26 +176,35 @@ public struct _StringBuffer {
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var usedCount: Int {
     return (usedEnd - start) &>> elementShift
   }
 
   /// A past-the-end pointer for this buffer's available storage.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var capacityEnd: UnsafeMutableRawPointer {
     return start + _storage.value.byteCapacity
   }
 
   /// The number of elements that can be stored in this buffer.
+  @_inlineable // FIXME(sil-serialize-all)
   public var capacity: Int {
     return _storage.value.byteCapacity &>> elementShift
   }
 
   /// 1 if the buffer stores UTF-16; 0 otherwise.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var elementShift: Int {
     return _storage.value.elementShift
   }
 
   /// The number of bytes per element.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var elementWidth: Int {
     return elementShift + 1
   }
@@ -188,6 +214,8 @@ public struct _StringBuffer {
   // reserveCapacity on String and subsequently use that capacity, in
   // two separate phases.  Operations with one-phase growth should use
   // "grow()," below.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   func hasCapacity(
     _ cap: Int, forSubRange r: Range<UnsafeRawPointer>
   ) -> Bool {
@@ -197,66 +225,12 @@ public struct _StringBuffer {
     return cap + offset <= capacity
   }
 
-
-  /// Attempt to claim unused capacity in the buffer.
-  ///
-  /// Operation succeeds if there is sufficient capacity, and either:
-  /// - the buffer is uniquely-referenced, or
-  /// - `oldUsedEnd` points to the end of the currently used capacity.
-  ///
-  /// - parameter bounds: Range of the substring that the caller tries
-  ///   to extend.
-  /// - parameter newUsedCount: The desired size of the substring.
-  @inline(__always)
-  @discardableResult
-  mutating func grow(
-    oldBounds bounds: Range<UnsafeRawPointer>, newUsedCount: Int
-  ) -> Bool {
-    var newUsedCount = newUsedCount
-    // The substring to be grown could be pointing in the middle of this
-    // _StringBuffer.  Adjust the size so that it covers the imaginary
-    // substring from the start of the buffer to `oldUsedEnd`.
-    newUsedCount
-      += (bounds.lowerBound - UnsafeRawPointer(start)) &>> elementShift
-
-    if _slowPath(newUsedCount > capacity) {
-      return false
-    }
-
-    let newUsedEnd = start + (newUsedCount &<< elementShift)
-
-    if _fastPath(self._storage.isUniquelyReferenced()) {
-      usedEnd = newUsedEnd
-      return true
-    }
-
-    // Optimization: even if the buffer is shared, but the substring we are
-    // trying to grow is located at the end of the buffer, it can be grown in
-    // place.  The operation should be implemented in a thread-safe way,
-    // though.
-    //
-    // if usedEnd == bounds.upperBound {
-    //  usedEnd = newUsedEnd
-    //  return true
-    // }
-
-    // &StringBufferIVars.usedEnd
-    let usedEndPhysicalPtr = UnsafeMutableRawPointer(_storage._value)
-      .assumingMemoryBound(to: Optional<UnsafeRawPointer>.self)
-    // Create a temp var to hold the exchanged `expected` value.
-    var expected : UnsafeRawPointer? = bounds.upperBound
-    if _stdlib_atomicCompareExchangeStrongPtr(
-      object: usedEndPhysicalPtr, expected: &expected,
-      desired: UnsafeRawPointer(newUsedEnd)) {
-      return true
-    }
-
-    return false
-  }
-
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   var _anyObject: AnyObject? {
-    return _storage.storage != nil ? _storage.storage! : nil
+    return _storage.storage
   }
 
+  @_versioned // FIXME(sil-serialize-all)
   var _storage: _Storage
 }

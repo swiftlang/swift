@@ -190,6 +190,10 @@ class TestDate : TestDateSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_dateComponents_unconditionallyBridgeFromObjectiveC() {
+        expectEqual(DateComponents(), DateComponents._unconditionallyBridgeFromObjectiveC(nil))
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -206,5 +210,6 @@ DateTests.test("test_AnyHashableContainingDate") { TestDate().test_AnyHashableCo
 DateTests.test("test_AnyHashableCreatedFromNSDate") { TestDate().test_AnyHashableCreatedFromNSDate() }
 DateTests.test("test_AnyHashableContainingDateComponents") { TestDate().test_AnyHashableContainingDateComponents() }
 DateTests.test("test_AnyHashableCreatedFromNSDateComponents") { TestDate().test_AnyHashableCreatedFromNSDateComponents() }
+DateTests.test("test_dateComponents_unconditionallyBridgeFromObjectiveC") { TestDate().test_dateComponents_unconditionallyBridgeFromObjectiveC() }
 runAllTests()
 #endif

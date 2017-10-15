@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func modify<T>(_ x: inout T) {}
 
@@ -8,7 +8,7 @@ public struct S {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_T017access_marker_gen5initSAA1SVyXlSgF : $@convention(thin) (@owned Optional<AnyObject>) -> @owned S {
-// CHECK: bb0(%0 : $Optional<AnyObject>):
+// CHECK: bb0(%0 : @owned $Optional<AnyObject>):
 // CHECK: [[BOX:%.*]] = alloc_box ${ var S }, var, name "s"
 // CHECK: [[MARKED_BOX:%.*]] = mark_uninitialized [var] [[BOX]] : ${ var S }
 // CHECK: [[ADDR:%.*]] = project_box [[MARKED_BOX]] : ${ var S }, 0
@@ -66,7 +66,7 @@ func readGlobal() -> AnyObject? {
 }
 
 // CHECK-LABEL: sil hidden @_T017access_marker_gen10readGlobalyXlSgyF
-// CHECK:         [[ADDRESSOR:%.*]] = function_ref @_T017access_marker_gen6globalAA1SVfau :
+// CHECK:         [[ADDRESSOR:%.*]] = function_ref @_T017access_marker_gen6globalAA1SVvau :
 // CHECK-NEXT:    [[T0:%.*]] = apply [[ADDRESSOR]]()
 // CHECK-NEXT:    [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*S
 // CHECK-NEXT:    [[T2:%.*]] = begin_access [read] [dynamic] [[T1]]
@@ -118,11 +118,11 @@ class D {
   var x: Int = 0
 }
 //   materializeForSet callback
-// CHECK-LABEL: sil hidden [transparent] @_T017access_marker_gen1DC1xSifmytfU_
+// CHECK-LABEL: sil private [transparent] @_T017access_marker_gen1DC1xSivmytfU_
 // CHECK:       end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
 
 //   materializeForSet
-// CHECK-LABEL: sil hidden [transparent] @_T017access_marker_gen1DC1xSifm
+// CHECK-LABEL: sil hidden [transparent] @_T017access_marker_gen1DC1xSivm
 // CHECK:       [[T0:%.*]] = ref_element_addr %2 : $D, #D.x
 // CHECK-NEXT:  begin_unpaired_access [modify] [dynamic] [[T0]] : $*Int
 

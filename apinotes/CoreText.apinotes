@@ -1,5 +1,0 @@
----
-Name: CoreText
-Enumerators:
-- Name: kCTUnderlinePatternSolid
-  SwiftName: patternSolid

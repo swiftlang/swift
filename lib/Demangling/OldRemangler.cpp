@@ -257,6 +257,8 @@ namespace {
 
     void mangleIndex(Node::IndexType index);
     void mangleIdentifier(StringRef name, OperatorKind operatorKind);
+    void mangleAccessor(Node *storageNode, StringRef accessorCode,
+                        EntityContext &ctx);
 
     void mangleChildNodes(Node *node) { mangleNodes(node->begin(), node->end()); }
     void mangleNodes(Node::iterator i, Node::iterator e) {
@@ -285,7 +287,8 @@ namespace {
     void mangleNominalType(Node *node, char basicKind, EntityContext &ctx);
 
     void mangleProtocolWithoutPrefix(Node *node);
-    void mangleProtocolListWithoutPrefix(Node *node);
+    void mangleProtocolListWithoutPrefix(Node *node,
+                                         Node *additionalProto = nullptr);
 
     void mangleEntityContext(Node *node, EntityContext &ctx);
     void mangleEntityType(Node *node, EntityContext &ctx);
@@ -652,6 +655,10 @@ void Remangler::manglePartialApplyObjCForwarder(Node *node) {
   mangleSingleChildNode(node); // global
 }
 
+void Remangler::mangleMergedFunction(Node *node) {
+  Out << "Tm";
+}
+
 void Remangler::mangleDirectness(Node *node) {
   auto getChar = [](Directness d) -> char {
     switch (d) {
@@ -761,6 +768,29 @@ void Remangler::mangleSubscript(Node *node, EntityContext &ctx) {
   mangleNamedAndTypedEntity(node, 'i', "", ctx);
 }
 
+void Remangler::mangleAccessor(Node *storageNode, StringRef accessorCode,
+                               EntityContext &ctx) {
+  Out << 'F';
+  mangleEntityContext(storageNode->getChild(0), ctx);
+  Out << accessorCode;
+  switch (storageNode->getKind()) {
+  case Demangle::Node::Kind::Variable:
+    mangleChildNode(storageNode, 1);
+    mangleEntityType(storageNode->getChild(2), ctx);
+    break;
+  case Demangle::Node::Kind::Subscript:
+    if (storageNode->getNumChildren() > 2 &&
+        storageNode->getChild(2)->getKind() == Node::Kind::PrivateDeclName) {
+      mangleChildNode(storageNode, 2);
+    }
+    mangleIdentifier("subscript", OperatorKind::NotOperator);
+    mangleEntityType(storageNode->getChild(1), ctx);
+    break;
+  default:
+      unreachable("Not a storage node");
+  }
+}
+
 void Remangler::mangleInitializer(Node *node, EntityContext &ctx) {
   mangleSimpleEntity(node, 'I', "i", ctx);
 }
@@ -795,61 +825,61 @@ void Remangler::mangleIVarDestroyer(Node *node, EntityContext &ctx) {
 }
 
 void Remangler::mangleGetter(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "g", ctx);
+  mangleAccessor(node->getFirstChild(), "g", ctx);
 }
 
 void Remangler::mangleGlobalGetter(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "G", ctx);
+  mangleAccessor(node->getFirstChild(), "G", ctx);
 }
 
 void Remangler::mangleSetter(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "s", ctx);
+  mangleAccessor(node->getFirstChild(), "s", ctx);
 }
 
 void Remangler::mangleMaterializeForSet(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "m", ctx);
+  mangleAccessor(node->getFirstChild(), "m", ctx);
 }
 
 void Remangler::mangleWillSet(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "w", ctx);
+  mangleAccessor(node->getFirstChild(), "w", ctx);
 }
 
 void Remangler::mangleDidSet(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "W", ctx);
+  mangleAccessor(node->getFirstChild(), "W", ctx);
 }
 
 void Remangler::mangleOwningMutableAddressor(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "aO", ctx);
+  mangleAccessor(node->getFirstChild(), "aO", ctx);
 }
 
 void Remangler::mangleNativeOwningMutableAddressor(Node *node,
                                                    EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "ao", ctx);
+  mangleAccessor(node->getFirstChild(), "ao", ctx);
 }
 
 void Remangler::mangleNativePinningMutableAddressor(Node *node,
                                                     EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "ap", ctx);
+  mangleAccessor(node->getFirstChild(), "ap", ctx);
 }
 
 void Remangler::mangleUnsafeMutableAddressor(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "au", ctx);
+  mangleAccessor(node->getFirstChild(), "au", ctx);
 }
 
 void Remangler::mangleOwningAddressor(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "lO", ctx);
+  mangleAccessor(node->getFirstChild(), "lO", ctx);
 }
 
 void Remangler::mangleNativeOwningAddressor(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "lo", ctx);
+  mangleAccessor(node->getFirstChild(), "lo", ctx);
 }
 
 void Remangler::mangleNativePinningAddressor(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "lp", ctx);
+  mangleAccessor(node->getFirstChild(), "lp", ctx);
 }
 
 void Remangler::mangleUnsafeAddressor(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "lu", ctx);
+  mangleAccessor(node->getFirstChild(), "lu", ctx);
 }
 
 void Remangler::mangleExplicitClosure(Node *node, EntityContext &ctx) {
@@ -1215,13 +1245,17 @@ void Remangler::mangleProtocolList(Node *node) {
   mangleProtocolListWithoutPrefix(node);
 }
 
-void Remangler::mangleProtocolListWithoutPrefix(Node *node) {
+void Remangler::mangleProtocolListWithoutPrefix(Node *node,
+                                                Node *additionalProto) {
   assert(node->getKind() == Node::Kind::ProtocolList);
   assert(node->getNumChildren() == 1);
   auto typeList = node->begin()[0];
   assert(typeList->getKind() == Node::Kind::TypeList);
   for (auto &child : *typeList) {
     mangleProtocolWithoutPrefix(child);
+  }
+  if (additionalProto) {
+    mangleProtocolWithoutPrefix(additionalProto);
   }
   Out << '_';
 }
@@ -1238,6 +1272,11 @@ void Remangler::mangleUnmanaged(Node *node) {
 
 void Remangler::mangleWeak(Node *node) {
   Out << "Xw";
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleShared(Node *node) {
+  Out << 'h';
   mangleSingleChildNode(node); // type
 }
 
@@ -1657,6 +1696,16 @@ void Remangler::mangleOutlinedRelease(Node *node) {
   mangleSingleChildNode(node);
 }
 
+void Remangler::mangleOutlinedVariable(Node *node) {
+  Out << "Tv" << node->getIndex();
+  mangleSingleChildNode(node);
+}
+
+void Remangler::mangleOutlinedBridgedMethod(Node *node) {
+  Out << "Te" << node->getText();
+  mangleSingleChildNode(node);
+}
+
 void Remangler::mangleKeyPathGetterThunkHelper(Node *node) {
   Out << "TK";
   mangleChildNodes(node);
@@ -1667,12 +1716,28 @@ void Remangler::mangleKeyPathSetterThunkHelper(Node *node) {
   mangleChildNodes(node);
 }
 
+void Remangler::mangleKeyPathEqualsThunkHelper(Node *node) {
+  Out << "TH";
+  mangleChildNodes(node);
+}
+
+void Remangler::mangleKeyPathHashThunkHelper(Node *node) {
+  Out << "Th";
+  mangleChildNodes(node);
+}
+
 void Remangler::mangleProtocolListWithClass(Node *node) {
-  Out << "<procotol-list-with-class>";
+  Out << "Xc";
+  mangleChildNode(node, 1);
+  mangleProtocolListWithoutPrefix(node->getChild(0));
 }
 
 void Remangler::mangleProtocolListWithAnyObject(Node *node) {
-  Out << "<procotol-list-with-any-object>";
+  Node *P = Factory.createNode(Node::Kind::Protocol);
+  P->addChild(Factory.createNode(Node::Kind::Module, "Swift"), Factory);
+  P->addChild(Factory.createNode(Node::Kind::Identifier, "AnyObject"), Factory);
+  Out << "P";
+  mangleProtocolListWithoutPrefix(node->getChild(0), /*additionalProto*/ P);
 }
 
 void Remangler::mangleVTableThunk(Node *node) {

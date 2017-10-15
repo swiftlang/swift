@@ -15,6 +15,7 @@
 from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
+    defaultIndicesForTraversal,
     sliceTypeName,
     protocolsForCollectionFeatures
 )
@@ -96,13 +97,9 @@ def get_slice_doc_comment(Self):
 %   for Mutable in [ False, True ]:
 %     for RangeReplaceable in [ False, True ]:
 %       Self = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
-%       BaseRequirements = ['_' + collectionForTraversal(Traversal).replace('Collection', 'Indexable')]
-%       if Mutable:
-%         BaseRequirements.append('_MutableIndexable')
-%       if RangeReplaceable:
-%         BaseRequirements.append('_RangeReplaceableIndexable')
-%       BaseRequirements = ' & '.join(BaseRequirements)
+%       BaseRequirements = ' & '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 %       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
+%       Indices = defaultIndicesForTraversal(Traversal)
 
 ${get_slice_doc_comment(Self)}
 %     if Mutable:
@@ -114,24 +111,28 @@ ${get_slice_doc_comment(Self)}
 ///   subsequence type that takes your index invalidation requirements into
 ///   account.
 %     end
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct ${Self}<Base : ${BaseRequirements}>
   : ${SelfProtocols} {
 
   public typealias Index = Base.Index
-  public typealias IndexDistance = Base.IndexDistance
+  public typealias IndexDistance = Base.IndexDistance  
 
   public var _startIndex: Index
   public var _endIndex: Index
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var startIndex: Index {
     return _startIndex
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public var endIndex: Index {
     return _endIndex
   }
 
-  public subscript(index: Index) -> Base._Element {
+  @_inlineable // FIXME(sil-serialize-all)
+  public subscript(index: Index) -> Base.Element {
     get {
       _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
       return _base[index]
@@ -149,6 +150,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
 
   public typealias SubSequence = ${Self}<Base>
 
+  @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> ${Self}<Base> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
@@ -161,41 +163,44 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
-  // FIXME(ABI)#67 (Associated Types with where clauses):
-  //
-  //   public typealias Indices = Base.Indices
-  //   public var indices: Indices { ... }
-  //
-  // We can't do it right now because we don't have enough
-  // constraints on the Base.Indices type in this context.
+  public typealias Indices = Base.Indices
+  public var indices: Indices { 
+    return _base.indices[_startIndex..<_endIndex]
+  }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(after: i)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func formIndex(after i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _base.formIndex(after: &i)
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
+  @_inlineable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(before: i)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func formIndex(before i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _base.formIndex(before: &i)
   }
 %     end
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(i, offsetBy: n)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -203,47 +208,54 @@ public struct ${Self}<Base : ${BaseRequirements}>
     return _base.index(i, offsetBy: n, limitedBy: limit)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     // FIXME: swift-3-indexing-model: range check.
     return _base.distance(from: start, to: end)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     _base._failEarlyRangeCheck(index, bounds: bounds)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     _base._failEarlyRangeCheck(range, bounds: bounds)
   }
 
 %     if RangeReplaceable:
+  @_inlineable // FIXME(sil-serialize-all)
   public init() {
     self._base = Base()
     self._startIndex = _base.startIndex
     self._endIndex = _base.endIndex
   }
 
-  public init(repeating repeatedValue: Base._Element, count: Int) {
+  @_inlineable // FIXME(sil-serialize-all)
+  public init(repeating repeatedValue: Base.Element, count: Int) {
     self._base = Base(repeating: repeatedValue, count: count)
     self._startIndex = _base.startIndex
     self._endIndex = _base.endIndex
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public init<S>(_ elements: S)
     where
     S : Sequence,
-    S.Iterator.Element == Base._Element {
+    S.Element == Base.Element {
 
     self._base = Base(elements)
     self._startIndex = _base.startIndex
     self._endIndex = _base.endIndex
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func replaceSubrange<C>(
     _ subRange: Range<Index>, with newElements: C
   ) where
     C : Collection,
-    C.Iterator.Element == Base._Element {
+    C.Element == Base.Element {
 
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
@@ -280,7 +292,8 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
-  public mutating func insert(_ newElement: Base._Element, at i: Index) {
+  @_inlineable // FIXME(sil-serialize-all)
+  public mutating func insert(_ newElement: Base.Element, at i: Index) {
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
     let sliceOffset: IndexDistance =
@@ -308,10 +321,11 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func insert<S>(contentsOf newElements: S, at i: Index)
     where
     S : Collection,
-    S.Iterator.Element == Base._Element {
+    S.Element == Base.Element {
 
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
@@ -344,7 +358,8 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
-  public mutating func remove(at i: Index) -> Base._Element {
+  @_inlineable // FIXME(sil-serialize-all)
+  public mutating func remove(at i: Index) -> Base.Element {
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
     let sliceOffset: IndexDistance =
@@ -375,6 +390,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func removeSubrange(_ bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
@@ -429,12 +445,14 @@ public struct ${Self}<Base : ${BaseRequirements}>
   /// - Parameters:
   ///   - base: The collection to create a view into.
   ///   - bounds: The range of indices to allow access to in the new slice.
+  @_inlineable // FIXME(sil-serialize-all)
   public init(base: Base, bounds: Range<Index>) {
     self._base = base
     self._startIndex = bounds.lowerBound
     self._endIndex = bounds.upperBound
   }
 
+  @_versioned // FIXME(sil-serialize-all)
 %     if Mutable or RangeReplaceable:
   internal var _base: Base
 %     else:
@@ -459,6 +477,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
   ///     // Prints "10"
   ///     print(singleDigits == singleNonZeroDigits.base)
   ///     // Prints "true"
+  @_inlineable // FIXME(sil-serialize-all)
   public var base: Base {
     return _base
   }

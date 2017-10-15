@@ -43,7 +43,6 @@ public:
                                      SILLocation,
                                      SubstitutionList,
                                      Expr *argument,
-                                     CanFunctionType formalApplyType,
                                      SGFContext);
 
   /// A special function for emitting a call after the arguments
@@ -52,7 +51,6 @@ public:
                                     SILLocation,
                                     SubstitutionList,
                                     ArrayRef<ManagedValue>,
-                                    CanFunctionType formalApplyType,
                                     SGFContext);
 
   enum class Kind {

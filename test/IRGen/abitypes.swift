@@ -107,7 +107,7 @@ class Foo {
   }
 
   // Ensure that MyRect is passed as an indirect-byval on x86_64 because we run out of registers for direct arguments
-  // x86_64-macosx: define hidden float @_T08abitypes3FooC25getXFromRectIndirectByVal{{[_0-9a-zA-Z]*}}FTo(i8*, i8*, float, float, float, float, float, float, float, %TSC6MyRectV* byval align 4) unnamed_addr {{.*}} {
+  // x86_64-macosx: define hidden float @_T08abitypes3FooC25getXFromRectIndirectByVal{{[_0-9a-zA-Z]*}}FTo(i8*, i8*, float, float, float, float, float, float, float, %TSC6MyRectV* byval align 8) unnamed_addr {{.*}} {
   dynamic func getXFromRectIndirectByVal(_: Float, second _: Float, 
                                        third _: Float, fourth _: Float,
                                        fifth _: Float, sixth _: Float,
@@ -120,8 +120,8 @@ class Foo {
   // x86_64-macosx: define hidden swiftcc float @_T08abitypes3FooC25getXFromRectIndirectSwift{{[_0-9a-zA-Z]*}}F(i64, i64, %T8abitypes3FooC* swiftself) {{.*}} {
   func getXFromRectIndirectSwift(_ r: MyRect) -> Float {
     let f : Float = 1.0
-    // x86_64-macosx: [[TEMP:%.*]] = alloca [[TEMPTYPE:%.*]], align 4
-    // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, float, float, float, float, float, float, float, [[TEMPTYPE]]*)*)(i8* %{{.*}}, i8* %{{.*}}, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, [[TEMPTYPE]]* byval align 4 [[TEMP]])
+    // x86_64-macosx: [[TEMP:%.*]] = alloca [[TEMPTYPE:%.*]], align 8
+    // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, float, float, float, float, float, float, float, [[TEMPTYPE]]*)*)(i8* %{{.*}}, i8* %{{.*}}, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, [[TEMPTYPE]]* byval align 8 [[TEMP]])
     // x86_64-macosx: ret float [[RESULT]]
     return getXFromRectIndirectByVal(f, second: f, third: f, fourth: f, fifth: f, sixth: f, seventh: f, withRect: r);
   }

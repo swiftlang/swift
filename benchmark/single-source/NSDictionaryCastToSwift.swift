@@ -18,6 +18,11 @@
 import Foundation
 import TestsUtils
 
+public let NSDictionaryCastToSwift = BenchmarkInfo(
+  name: "NSDictionaryCastToSwift",
+  runFunction: run_NSDictionaryCastToSwift,
+  tags: [.validation, .api, .Dictionary, .bridging])
+
 @inline(never)
 public func run_NSDictionaryCastToSwift(_ N: Int) {
 #if _runtime(_ObjC)
@@ -29,8 +34,6 @@ public func run_NSDictionaryCastToSwift(_ N: Int) {
             break
         }
     }
-    CheckResults(swiftDict.isEmpty,
-            "Incorrect result in swiftDict.isEmpty: " +
-            "\(swiftDict.isEmpty) != true\n")
+    CheckResults(swiftDict.isEmpty)
 #endif
 }

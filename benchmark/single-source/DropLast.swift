@@ -23,6 +23,65 @@ let prefixCount = 1024
 let dropCount = sequenceCount - prefixCount
 let sumCount = prefixCount * (prefixCount - 1) / 2
 
+public let DropLast = [
+  BenchmarkInfo(
+    name: "DropLastCountableRange",
+    runFunction: run_DropLastCountableRange,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastSequence",
+    runFunction: run_DropLastSequence,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnySequence",
+    runFunction: run_DropLastAnySequence,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnySeqCntRange",
+    runFunction: run_DropLastAnySeqCntRange,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnySeqCRangeIter",
+    runFunction: run_DropLastAnySeqCRangeIter,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnyCollection",
+    runFunction: run_DropLastAnyCollection,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastArray",
+    runFunction: run_DropLastArray,
+    tags: [.validation, .api, .Array]),
+  BenchmarkInfo(
+    name: "DropLastCountableRangeLazy",
+    runFunction: run_DropLastCountableRangeLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastSequenceLazy",
+    runFunction: run_DropLastSequenceLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnySequenceLazy",
+    runFunction: run_DropLastAnySequenceLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnySeqCntRangeLazy",
+    runFunction: run_DropLastAnySeqCntRangeLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnySeqCRangeIterLazy",
+    runFunction: run_DropLastAnySeqCRangeIterLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastAnyCollectionLazy",
+    runFunction: run_DropLastAnyCollectionLazy,
+    tags: [.validation, .api]),
+  BenchmarkInfo(
+    name: "DropLastArrayLazy",
+    runFunction: run_DropLastArrayLazy,
+    tags: [.validation, .api]),
+]
+
 @inline(never)
 public func run_DropLastCountableRange(_ N: Int) {
   let s = 0..<sequenceCount
@@ -31,8 +90,7 @@ public func run_DropLastCountableRange(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastCountableRange: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -43,8 +101,7 @@ public func run_DropLastSequence(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastSequence: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -55,8 +112,7 @@ public func run_DropLastAnySequence(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnySequence: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -67,8 +123,7 @@ public func run_DropLastAnySeqCntRange(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnySeqCntRange: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -79,8 +134,7 @@ public func run_DropLastAnySeqCRangeIter(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnySeqCRangeIter: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -91,8 +145,7 @@ public func run_DropLastAnyCollection(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnyCollection: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -103,8 +156,7 @@ public func run_DropLastArray(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastArray: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -115,8 +167,7 @@ public func run_DropLastCountableRangeLazy(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastCountableRangeLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -127,8 +178,7 @@ public func run_DropLastSequenceLazy(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastSequenceLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -139,8 +189,7 @@ public func run_DropLastAnySequenceLazy(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnySequenceLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -151,8 +200,7 @@ public func run_DropLastAnySeqCntRangeLazy(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnySeqCntRangeLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -163,8 +211,7 @@ public func run_DropLastAnySeqCRangeIterLazy(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnySeqCRangeIterLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -175,8 +222,7 @@ public func run_DropLastAnyCollectionLazy(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnyCollectionLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -187,7 +233,6 @@ public func run_DropLastArrayLazy(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropLastArrayLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }

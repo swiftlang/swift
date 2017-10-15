@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_intFunctions.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_boolFunctions.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_vars.swift

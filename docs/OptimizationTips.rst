@@ -343,49 +343,6 @@ used. *NOTE* The standard library is a special case. Definitions in
 the standard library are visible in all modules and available for
 specialization.
 
-Advice: Use @_specialize to direct the compiler to specialize generics
-----------------------------------------------------------------------
-
-The compiler only automatically specializes generic code if the call
-site and the callee function are located in the same module. However,
-the programmer can provide hints to the compiler in the form of
-@_specialize attributes. For details see
-:ref:`generics-specialization`.
-
-This attribute instructs the compiler to specialize on the specified
-concrete type list. The compiler inserts type checks and dispatches
-from the generic function to the specialized variant. In the following
-example, injecting the @_specialize attribute speeds up the code by
-about 10 times.
-
-::
-
-  /// ---------------
-  /// Framework.swift
-
-  public protocol Pingable { func ping() -> Self }
-  public protocol Playable { func play() }
-
-  extension Int : Pingable {
-    public func ping() -> Int { return self + 1 }
-  }
-
-  public class Game<T : Pingable> : Playable {
-    var t : T
-
-    public init (_ v : T) {t = v}
-
-    @_specialize(Int)
-    public func play() {
-      for _ in 0...100_000_000 { t = t.ping() }
-    }
-  }
-
-  /// -----------------
-  /// Application.swift
-
-  Game(10).play
-
 The cost of large Swift values
 ==============================
 
@@ -586,6 +543,15 @@ protocols as class-only protocols to get better runtime performance.
 .. https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/Protocols.html
 
 
+Unsupported Optimization Attributes
+===================================
+
+Some underscored type attributes function as optimizer directives. Developers
+are welcome to experiment with these attributes and send back bug reports and
+other feedback, including meta bug reports on the following incomplete
+documentation: :ref:`UnsupportedOptimizationAttributes`. These attributes are
+not supported language features. They have not been reviewed by Swift Evolution
+and are likely to change between compiler releases.
 
 Footnotes
 =========

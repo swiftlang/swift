@@ -37,6 +37,8 @@ sil [global_init] @global_init_fun : $@convention(thin) () -> Builtin.RawPointer
 
 sil @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 
+sil @unknown : $@convention(thin) () -> ()
+
 //////////////////////
 // Simple DCE Tests //
 //////////////////////
@@ -144,12 +146,12 @@ sil @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
-  %2 = store %0 to %1a : $*B
+  store %0 to %1a : $*B
   %3 = load %1a : $*B
-  %4 = strong_retain %3 : $B
+  strong_retain %3 : $B
   %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject
-  %7 = strong_release %3 : $B
-  %8 = strong_release %1 : $<τ_0_0> { var τ_0_0 } <B>
+  strong_release %3 : $B
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <B>
   %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
   %10 = apply %9() : $@convention(thin) () -> Never
   unreachable
@@ -163,9 +165,9 @@ bb0(%0 : $B):
 sil @removeTriviallyDeadCrossBasicBlocks : $@convention(thin) (@owned B, Builtin.Int1) -> () {
 bb0(%0: $B, %1: $Builtin.Int1):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
-  %13 = cond_br %1, bb1, bb2
+  cond_br %1, bb1, bb2
 bb1:
-  %22 = br bb2
+  br bb2
 bb2:
   %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
   %10 = apply %9() : $@convention(thin) () -> Never
@@ -286,7 +288,7 @@ bb0(%0 : $*UInt8):
   %1 = load %0 : $*UInt8
   %2 = integer_literal $Builtin.Int8, 1
   %3 = struct_element_addr %0 : $*UInt8, #UInt8._value
-  %4 = store %2 to %3 : $*Builtin.Int8
+  store %2 to %3 : $*Builtin.Int8
   %5 = struct_extract %1 : $UInt8, #UInt8._value
   return %5 : $Builtin.Int8
 }
@@ -304,7 +306,7 @@ bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
   %1 = load %0 : $*(Builtin.Int8, Builtin.Int8)
   %2 = integer_literal $Builtin.Int8, 1
   %3 = tuple_element_addr %0 : $*(Builtin.Int8, Builtin.Int8), 0
-  %4 = store %2 to %3 : $*Builtin.Int8
+  store %2 to %3 : $*Builtin.Int8
   %5 = tuple_extract %1 : $(Builtin.Int8, Builtin.Int8), 0
   return %5 : $Builtin.Int8
 }
@@ -325,7 +327,7 @@ bb0(%0 : $*UInt8):
   %1 = load %0 : $*UInt8
   %2 = integer_literal $Builtin.Int8, 1
   %3 = struct_element_addr %0 : $*UInt8, #UInt8._value
-  %4 = store %2 to %3 : $*Builtin.Int8
+  store %2 to %3 : $*Builtin.Int8
   %5 = struct_extract %1 : $UInt8, #UInt8._value
   %6 = tuple (%1 : $UInt8, %5 : $Builtin.Int8)
   return %6 : $(UInt8, Builtin.Int8)
@@ -347,7 +349,7 @@ bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
   %1 = load %0 : $*(Builtin.Int8, Builtin.Int8)
   %2 = integer_literal $Builtin.Int8, 1
   %3 = tuple_element_addr %0 : $*(Builtin.Int8, Builtin.Int8), 0
-  %4 = store %2 to %3 : $*Builtin.Int8
+  store %2 to %3 : $*Builtin.Int8
   %5 = tuple_extract %1 : $(Builtin.Int8, Builtin.Int8), 0
   %6 = tuple (%1 : $(Builtin.Int8, Builtin.Int8), %5 : $Builtin.Int8)
   return %6 : $((Builtin.Int8, Builtin.Int8), Builtin.Int8)
@@ -857,6 +859,51 @@ bb0(%0 : $Int):
   return %4 : $Int8                               // id: %5
 }
 
+// An archetype with a trivial layout constraint can never be a class.
+// CHECK-LABEL: sil @is_trivial_layout_constraint_class
+sil @is_trivial_layout_constraint_class : $@convention(thin) <T where T: _Trivial> (@in T) -> Int8 {
+bb0(%0 : $*T):
+  %1 = metatype $@thick T.Type
+// CHECK-NOT: builtin "canBeClass"
+// CHECK-NOT: apply
+  %3 = builtin "canBeClass"<T>(%1 : $@thick T.Type) : $Builtin.Int8
+// CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int8, 0
+// CHECK: [[RESULT:%[a-zA-Z0-9]+]] = struct $Int8 ([[LITERAL]] : $Builtin.Int8)
+  %4 = struct $Int8 (%3 : $Builtin.Int8)
+// CHECK: return [[RESULT]] : $Int8
+  return %4 : $Int8
+}
+
+// An archetype with a _Class layout constraint is always a class.
+// CHECK-LABEL: sil @is_class_layout_constraint_class
+sil @is_class_layout_constraint_class : $@convention(thin) <T where T: _Class> (@in T) -> Int8 {
+bb0(%0 : $*T):
+  %1 = metatype $@thick T.Type
+// CHECK-NOT: builtin "canBeClass"
+// CHECK-NOT: apply
+  %3 = builtin "canBeClass"<T>(%1 : $@thick T.Type) : $Builtin.Int8
+// CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECK: [[RESULT:%[a-zA-Z0-9]+]] = struct $Int8 ([[LITERAL]] : $Builtin.Int8)
+  %4 = struct $Int8 (%3 : $Builtin.Int8)
+// CHECK: return [[RESULT]] : $Int8
+  return %4 : $Int8
+}
+
+// An archetype with a _NativeClass layout constraint is always a class.
+// CHECK-LABEL: sil @is_native_class_layout_constraint_class
+sil @is_native_class_layout_constraint_class : $@convention(thin) <T where T: _NativeClass> (@in T) -> Int8 {
+bb0(%0 : $*T):
+  %1 = metatype $@thick T.Type
+// CHECK-NOT: builtin "canBeClass"
+// CHECK-NOT: apply
+  %3 = builtin "canBeClass"<T>(%1 : $@thick T.Type) : $Builtin.Int8
+// CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECK: [[RESULT:%[a-zA-Z0-9]+]] = struct $Int8 ([[LITERAL]] : $Builtin.Int8)
+  %4 = struct $Int8 (%3 : $Builtin.Int8)
+// CHECK: return [[RESULT]] : $Int8
+  return %4 : $Int8
+}
+
 @objc class MyClass {
 }
 
@@ -1181,7 +1228,7 @@ bb0(%0 : $E):
 // CHECK-NEXT: return
 sil @unchecked_take_enum_data_addr_promotion : $@convention(thin) (@inout FakeOptional<B>) -> B {
 bb0(%0 : $*FakeOptional<B>):
-  %1 = switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+  switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
   %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
@@ -1212,6 +1259,52 @@ bb0(%0 : $*B, %1 : $B, %2 : $Builtin.Int1):
   %6 = tuple()
   return %6 : $()
 }
+
+// Check that convert_function simplifications are not applied in certain cases.
+@objc class MyNSObj { }
+
+class AnotherClass : MyNSObj { }
+
+sil @MyNSObj_self : $@convention(method) (@guaranteed MyNSObj) -> @owned MyNSObj
+
+sil shared [transparent] [serializable] [reabstraction_thunk] @reabstraction_thunk1 : $@convention(thin) (@in (), @owned @callee_owned () -> @owned AnotherClass) -> @out AnotherClass {
+bb0(%0 : $*AnotherClass, %1 : $*(), %2 : $@callee_owned () -> @owned AnotherClass):
+  %3 = apply %2() : $@callee_owned () -> @owned AnotherClass
+  store %3 to %0 : $*AnotherClass
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// @nonobjc curry thunk of MyNSObj.self()
+sil shared [serializable] [thunk] @curry_thunk_for_MyNSObj_self : $@convention(thin) (@owned MyNSObj) -> @owned @callee_owned () -> @owned MyNSObj {
+bb0(%0 : $MyNSObj):
+  // function_ref @nonobjc MyNSObj.self()
+  %1 = function_ref @MyNSObj_self : $@convention(method) (@guaranteed MyNSObj) -> @owned MyNSObj
+  %2 = partial_apply %1(%0) : $@convention(method) (@guaranteed MyNSObj) -> @owned MyNSObj
+  return %2 : $@callee_owned () -> @owned MyNSObj
+}
+
+// Check that convert_function is not eliminated if the result type of the converted function is different from the apply result type.
+// CHECK-LABEL: sil {{.*}} @do_not_peephole_convert_function : $@convention(thin) (@in AnotherClass) -> @out @callee_owned (@in ()) -> @out AnotherClass {
+// CHECK: [[CF:%[0-9]+]] = convert_function
+// CHECK: [[APPLY:%[0-9]+]] = apply
+// CHECK: [[FUN:%[0-9]+]] = function_ref
+// CHECK: [[CF:%[0-9]+]] = partial_apply [[FUN]]([[APPLY]])
+// CHECK: // end sil function 'do_not_peephole_convert_function'
+sil shared [transparent] [reabstraction_thunk] @do_not_peephole_convert_function : $@convention(thin) (@in AnotherClass) -> @out @callee_owned (@in ()) -> @out AnotherClass {
+bb0(%0 : $*@callee_owned (@in ()) -> @out AnotherClass, %1 : $*AnotherClass):
+  // function_ref @nonobjc curry thunk of MyNSObj.self()
+  %2 = function_ref @curry_thunk_for_MyNSObj_self : $@convention(thin) (@owned MyNSObj) -> @owned @callee_owned () -> @owned MyNSObj
+  %3 = convert_function %2 : $@convention(thin) (@owned MyNSObj) -> @owned @callee_owned () -> @owned MyNSObj to $@convention(thin) (@owned AnotherClass) -> @owned @callee_owned () -> @owned AnotherClass
+  %5 = load %1 : $*AnotherClass
+  %6 = apply %3(%5) : $@convention(thin) (@owned AnotherClass) -> @owned @callee_owned () -> @owned AnotherClass
+  // function_ref thunk for @callee_owned () -> (@owned AnotherClass)
+  %7 = function_ref @reabstraction_thunk1 : $@convention(thin) (@in (), @owned @callee_owned () -> @owned AnotherClass) -> @out AnotherClass
+  %8 = partial_apply %7(%6) : $@convention(thin) (@in (), @owned @callee_owned () -> @owned AnotherClass) -> @out AnotherClass
+  store %8 to %0 : $*@callee_owned (@in ()) -> @out AnotherClass
+  %10 = tuple ()
+  return %10 : $()
+} // end sil function 'do_not_peephole_convert_function'
 
 // CHECK-LABEL: sil @upcast_formation : $@convention(thin) (@inout E, E, @inout B) -> B {
 // CHECK: bb0
@@ -1755,7 +1848,6 @@ sil [readonly] @read_only_in : $@convention(thin) (@in SSS) -> ()
 struct MyError : Error {
 }
 
-sil @unknown : $@convention(thin) () -> ()
 sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error)
 
 sil [readonly] @readonly_owned : $@convention(thin) (@owned B) -> @owned B
@@ -2266,36 +2358,6 @@ bb0(%0 : $Builtin.Int64, %1 : $Builtin.RawPointer, %2 : $Builtin.RawPointer):
   return %13 : $()
 }
 
-// Make sure that we handle partial_apply captured arguments correctly.
-sil @sil_combine_partial_apply_callee : $@convention(thin) (@in Builtin.NativeObject, @inout Builtin.NativeObject, Builtin.NativeObject, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
-
-// CHECK-LABEL: sil @sil_combine_partial_apply_caller : $@convention(thin) (@in Builtin.NativeObject, @inout Builtin.NativeObject, Builtin.NativeObject, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
-// CHECK: bb0([[ARG1:%.*]] : $*Builtin.NativeObject, [[ARG2:%.*]] : $*Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject, [[ARG4:%.*]] : $Builtin.NativeObject, [[ARG5:%.*]] : $Builtin.NativeObject):
-// CHECK-NEXT: strong_retain [[ARG3]]
-// CHECK-NEXT: strong_retain [[ARG4]]
-// CHECK-NEXT: strong_retain [[ARG5]]
-// CHECK-NEXT: strong_release [[ARG3]]
-// CHECK-NEXT: strong_release [[ARG4]]
-// CHECK-NEXT: strong_release [[ARG5]]
-// CHECK-NEXT: strong_release [[ARG4]]
-// CHECK-NEXT: destroy_addr [[ARG1]]
-sil @sil_combine_partial_apply_caller : $@convention(thin) (@in Builtin.NativeObject, @inout Builtin.NativeObject, Builtin.NativeObject, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject, %2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject, %4 : $Builtin.NativeObject):
-  %100 = function_ref @sil_combine_partial_apply_callee : $@convention(thin) (@in Builtin.NativeObject, @inout Builtin.NativeObject, Builtin.NativeObject, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
-  %101 = alloc_stack $Builtin.NativeObject
-  copy_addr %0 to [initialization] %101 : $*Builtin.NativeObject
-  strong_retain %2 : $Builtin.NativeObject
-  strong_retain %3 : $Builtin.NativeObject
-  strong_retain %4 : $Builtin.NativeObject
-  %102 = partial_apply %100(%101, %1, %2, %3, %4) : $@convention(thin) (@in Builtin.NativeObject, @inout Builtin.NativeObject, Builtin.NativeObject, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
-  strong_release %102 : $@callee_owned () -> ()
-  strong_release %3 : $Builtin.NativeObject
-  destroy_addr %0 : $*Builtin.NativeObject
-  dealloc_stack %101 : $*Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 // CHECK-LABEL: sil @cmp_zext_peephole
 // CHECK: bb0([[Arg1:%.*]] : $Builtin.Word, [[Arg2:%.*]] : $Builtin.Word):
 // CHECK:   [[ZA1:%.*]] = builtin "zextOrBitCast_Word_Int64"([[Arg1]] : $Builtin.Word) : $Builtin.Int64
@@ -2438,6 +2500,20 @@ bb0(%0 : $*B):
   copy_addr %0 to [initialization] %1 : $*B
   destroy_addr %1 : $*B
   dealloc_stack %1 : $*B
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @delete_dead_alloc_ref
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @delete_dead_alloc_ref : $() -> () {
+bb0:
+  %1 = alloc_ref $B
+  set_deallocating %1 : $B
+  fix_lifetime %1 : $B
+  dealloc_ref %1 : $B
   %2 = tuple()
   return %2 : $()
 }
@@ -2693,8 +2769,8 @@ sil @remove_unused_convert_function : $@convention(thin) (@inout B, B, Builtin.I
 bb0(%0 : $*B, %1 : $B, %2 : $Builtin.Int1):
   %3 = function_ref @weird_function : $@convention(thin) (@inout E, E, Builtin.Int1) -> ()
   %4 = convert_function %3 : $@convention(thin) (@inout E, E, Builtin.Int1) -> () to $@convention(thin) (@inout B, B, Builtin.Int1) -> ()
-  %5 = retain_value %4: $@convention(thin) (@inout B, B, Builtin.Int1) -> ()
-  %6 = release_value %4: $@convention(thin) (@inout B, B, Builtin.Int1) -> ()
+  retain_value %4: $@convention(thin) (@inout B, B, Builtin.Int1) -> ()
+  release_value %4: $@convention(thin) (@inout B, B, Builtin.Int1) -> ()
   %7 = tuple()
   return %7 : $()
 }
@@ -2907,8 +2983,8 @@ bb2:
 // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $T
 // CHECK: [[FN:%.*]] = function_ref @generic_callee
 // CHECK-NEXT: copy_addr [[ARG1]] to [initialization] [[TMP]] : $*T
-// CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[TMP]])
 // CHECK-NEXT: destroy_addr [[ARG1]]
+// CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[TMP]])
 // CHECK-NEXT: destroy_addr [[TMP]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: dealloc_stack [[TMP]]

@@ -1,0 +1,50 @@
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// REQUIRES: objc_interop
+
+import Swift
+import Foundation
+
+class C: NSObject {
+  dynamic var x: NSString { get }
+  @sil_stored final var stored: Int
+  override init()
+}
+
+sil_vtable C {}
+
+sil @x_get : $@convention(thin) (@in C) -> @out NSString
+
+// CHECK: [[KEYPATH_A:@keypath.*]] = private global
+// --             0x2000_0002: computed, get-only, indirect identifier
+// CHECK-SAME: i32 536870914
+// CHECK-SAME: i8** @"\01L_selector(x)"
+
+// CHECK: [[KEYPATH_B:@keypath.*]] = private global
+// --             0x5ffffffd: class stored property with indirect offset
+// CHECK-SAME: i32 1610612733,
+// CHECK-SAME: @_T013keypaths_objc1CC6storedSivpWvd
+
+// CHECK-LABEL: define swiftcc void @objc_only_property()
+sil @objc_only_property : $@convention(thin) () -> () {
+entry:
+  // CHECK: call %swift.refcounted* @swift_getKeyPath({{.*}} [[KEYPATH_A]]
+  %a = keypath $KeyPath<C, NSString>, (objc "x"; root $C; gettable_property $NSString, id #C.x!getter.1.foreign, getter @x_get : $@convention(thin) (@in C) -> @out NSString)
+  unreachable
+}
+
+sil hidden @_T013keypaths_objc1CC1xSo8NSStringCvgTo : $@convention(objc_method) (@guaranteed C) -> NSString {
+entry(%0 : $C):
+  unreachable
+}
+
+sil hidden @_T013keypaths_objc1CCACycfcTo : $@convention(objc_method) (@objc_metatype C.Type) -> @owned C {
+entry(%0 : $@objc_metatype C.Type):
+  unreachable
+}
+
+sil @objc_stored_property : $@convention(thin) () -> () {
+entry:
+  // CHECK: call %swift.refcounted* @swift_getKeyPath({{.*}} [[KEYPATH_B]]
+  %b = keypath $KeyPath<C, Int>, (objc "stored"; root $C; stored_property #C.stored : $Int)
+  unreachable
+}

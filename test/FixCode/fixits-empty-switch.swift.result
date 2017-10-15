@@ -9,14 +9,18 @@ enum E1 {
 
 func foo1(_ e: E1) {
   switch e {
-  case .e1: <#code#>
-case .e2: <#code#>
-case .e3: <#code#>
+  case .e1:
+<#code#>
+case .e2:
+<#code#>
+case .e3:
+<#code#>
 }
 }
 
 func foo1 (_ i : Int) {
   switch i {
-  default: <#code#>
+  default:
+<#code#>
 }
 }

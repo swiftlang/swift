@@ -57,7 +57,8 @@ SILFunction *SILFunction::create(
     SILModule &M, SILLinkage linkage, StringRef name,
     CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
     Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-    IsTransparent_t isTrans, IsSerialized_t isSerialized, IsThunk_t isThunk,
+    IsTransparent_t isTrans, IsSerialized_t isSerialized,
+    ProfileCounter entryCount, IsThunk_t isThunk,
     SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
     SILFunction *insertBefore, const SILDebugScope *debugScope) {
   // Get a StringMapEntry for the function.  As a sop to error cases,
@@ -72,8 +73,8 @@ SILFunction *SILFunction::create(
 
   auto fn = new (M) SILFunction(M, linkage, name, loweredType, genericEnv, loc,
                                 isBareSILFunction, isTrans, isSerialized,
-                                isThunk, classSubclassScope, inlineStrategy, E,
-                                insertBefore, debugScope);
+                                entryCount, isThunk, classSubclassScope,
+                                inlineStrategy, E, insertBefore, debugScope);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -84,17 +85,18 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          GenericEnvironment *genericEnv,
                          Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
                          IsTransparent_t isTrans, IsSerialized_t isSerialized,
-                         IsThunk_t isThunk, SubclassScope classSubclassScope,
+                         ProfileCounter entryCount, IsThunk_t isThunk,
+                         SubclassScope classSubclassScope,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
                          const SILDebugScope *DebugScope)
     : Module(Module), Name(Name), LoweredType(LoweredType),
-      GenericEnv(genericEnv), DebugScope(DebugScope), Bare(isBareSILFunction),
-      Transparent(isTrans), Serialized(isSerialized), Thunk(isThunk),
+      GenericEnv(genericEnv), SpecializationInfo(nullptr),
+      DebugScope(DebugScope), Bare(isBareSILFunction), Transparent(isTrans),
+      Serialized(isSerialized), Thunk(isThunk),
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
-      KeepAsPublic(false), EffectsKindAttr(E) {
-
+      KeepAsPublic(false), EffectsKindAttr(E), EntryCount(entryCount) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -138,15 +140,25 @@ bool SILFunction::hasForeignBody() const {
   return SILDeclRef::isClangGenerated(getClangNode());
 }
 
-void SILFunction::numberValues(llvm::DenseMap<const ValueBase*,
-                               unsigned> &ValueToNumberMap) const {
+void SILFunction::numberValues(llvm::DenseMap<const SILNode*, unsigned> &
+                                 ValueToNumberMap) const {
   unsigned idx = 0;
   for (auto &BB : *this) {
     for (auto I = BB.args_begin(), E = BB.args_end(); I != E; ++I)
       ValueToNumberMap[*I] = idx++;
     
-    for (auto &I : BB)
-      ValueToNumberMap[&I] = idx++;
+    for (auto &I : BB) {
+      auto results = I.getResults();
+      if (results.empty()) {
+        ValueToNumberMap[&I] = idx++;
+      } else {
+        // Assign the instruction node the first result ID.
+        ValueToNumberMap[&I] = idx;
+        for (auto result : results) {
+          ValueToNumberMap[result] = idx++;
+        }
+      }
+    }
   }
 }
 
@@ -463,4 +475,8 @@ SubstitutionList SILFunction::getForwardingSubstitutions() {
 
   ForwardingSubs = env->getForwardingSubstitutions();
   return *ForwardingSubs;
+}
+
+bool SILFunction::shouldVerifyOwnership() const {
+  return !hasSemanticsAttr("verify.ownership.sil.never");
 }

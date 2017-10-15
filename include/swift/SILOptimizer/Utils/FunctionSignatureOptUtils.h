@@ -127,6 +127,11 @@ struct ArgumentDescriptor {
     if (ProjTree.isSingleton())
       return false;
 
+    auto Ty = Arg->getType().getObjectType();
+    if (!shouldExpand(Arg->getModule(), Ty)) {
+      return false;
+    }
+
     // If this argument is @owned and we can not find all the releases for it
     // try to explode it, maybe we can find some of the releases and O2G some
     // of its components.

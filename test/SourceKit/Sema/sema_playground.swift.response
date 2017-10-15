@@ -12,6 +12,6 @@
     key.filepath: sema_playground.swift,
     key.severity: source.diagnostic.severity.error,
     key.description: "expected numeric value following '$'",
-    key.diagnostic_stage: source.diagnostic.stage.swift.parse
+    key.diagnostic_stage: source.diagnostic.stage.swift.sema
   }
 ]

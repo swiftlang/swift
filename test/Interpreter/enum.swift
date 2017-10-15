@@ -1,4 +1,4 @@
-// RUN: rm -rf %t  &&  mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
@@ -425,8 +425,8 @@ test_spare_bit_aggregate(.x(22, 44))
 // CHECK: X(222)
 // CHECK: X(444)
 // CHECK: .y(222, 444)
-// CHECK-DAG-64: ~X(222)
-// CHECK-DAG-64: ~X(444)
+// CHECK-DAG: ~X(222)
+// CHECK-DAG: ~X(444)
 test_spare_bit_aggregate(.y(Rdar15383966(222), Rdar15383966(444)))
 // CHECK: .z(S(a: 333, b: 666))
 test_spare_bit_aggregate(.z(S(333, 666)))
@@ -553,5 +553,50 @@ presentEitherOr(EitherOr<(), String>.Right("foo")) // CHECK-NEXT: Right(foo)
 // CHECK-NEXT: Right(foo)
 presentEitherOrsOf(t: (), u: "foo")
 
+// SR-5148
+enum Payload {
+    case email
+}
+enum Test {
+    case a
+    indirect case b(Payload)
+}
+
+@inline(never)
+func printA() {
+    print("an a")
+}
+
+@inline(never)
+func printB() {
+    print("an b")
+}
+
+@inline(never)
+func testCase(_ testEmail: Test) {
+  switch testEmail {
+    case .a:
+      printA()
+    case .b:
+      printB()
+  }
+}
+
+@inline(never)
+func createTestB() -> Test  {
+  return Test.b(.email)
+}
+
+@inline(never)
+func createTestA() -> Test  {
+  return Test.a
+}
+
+// CHECK-NEXT: an b
+testCase(createTestB())
+// CHECK-NEXT: b(a.Payload.email)
+print(createTestB())
+// CHECK-NEXT: a
+print(createTestA())
 // CHECK-NEXT: done
 print("done")

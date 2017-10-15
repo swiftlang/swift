@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/main.swift
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/main.swift
 // RUN: %line-directive %t/main.swift -- %target-build-swift -typecheck -Xfrontend -verify %t/main.swift
 // REQUIRES: executable_test
 // FIXME(integers): this test needs serious refactoring as there is now a lot

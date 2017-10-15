@@ -14,6 +14,7 @@
 #define SWIFT_IRGEN_LINKING_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/ValueWitness.h"
@@ -312,8 +313,8 @@ class LinkEntity {
                                                 CanType associatedType,
                                                 ProtocolDecl *requirement) {
     unsigned index = 0;
-    for (auto &reqt : conformance->getProtocol()->getRequirementSignature()
-                                                ->getRequirements()) {
+    for (const auto &reqt :
+           conformance->getProtocol()->getRequirementSignature()) {
       if (reqt.getKind() == RequirementKind::Conformance &&
           reqt.getFirstType()->getCanonicalType() == associatedType &&
           reqt.getSecondType()->castTo<ProtocolType>()->getDecl() ==
@@ -328,9 +329,7 @@ class LinkEntity {
   static std::pair<CanType, ProtocolDecl*>
   getAssociatedConformanceByIndex(const ProtocolConformance *conformance,
                                   unsigned index) {
-    auto &reqt =
-      conformance->getProtocol()->getRequirementSignature()
-                                ->getRequirements()[index];
+    auto &reqt = conformance->getProtocol()->getRequirementSignature()[index];
     assert(reqt.getKind() == RequirementKind::Conformance);
     return { reqt.getFirstType()->getCanonicalType(),
              reqt.getSecondType()->castTo<ProtocolType>()->getDecl() };
@@ -511,21 +510,22 @@ public:
 
   static LinkEntity
   forAssociatedTypeMetadataAccessFunction(const ProtocolConformance *C,
-                                          AssociatedTypeDecl *associate) {
+                                          AssociatedType association) {
     LinkEntity entity;
     entity.setForProtocolConformanceAndAssociatedType(
-                     Kind::AssociatedTypeMetadataAccessFunction, C, associate);
+                     Kind::AssociatedTypeMetadataAccessFunction, C,
+                     association.getAssociation());
     return entity;
   }
 
   static LinkEntity
   forAssociatedTypeWitnessTableAccessFunction(const ProtocolConformance *C,
-                                              CanType associatedType,
-                                              ProtocolDecl *associatedProtocol){
+                                     const AssociatedConformance &association) {
     LinkEntity entity;
     entity.setForProtocolConformanceAndAssociatedConformance(
                      Kind::AssociatedTypeWitnessTableAccessFunction, C,
-                     associatedType, associatedProtocol);
+                     association.getAssociation(),
+                     association.getAssociatedRequirement());
     return entity;
   }
 
@@ -566,11 +566,6 @@ public:
   /// in a different module.
   ///
   bool isAvailableExternally(IRGenModule &IGM) const;
-
-  /// Returns true if this function or global variable may be inlined into
-  /// another module.
-  ///
-  bool isFragile(ForDefinition_t isDefinition) const;
 
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
@@ -682,6 +677,13 @@ public:
 
   static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
                       ForDefinition_t forDefinition);
+  
+  static LinkInfo get(const UniversalLinkageInfo &linkInfo,
+                      StringRef name,
+                      SILLinkage linkage,
+                      bool isSILOnly,
+                      ForDefinition_t isDefinition,
+                      bool isWeakImported);
 
   StringRef getName() const {
     return Name.str();

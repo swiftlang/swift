@@ -635,6 +635,10 @@ To gather documentation, SourceKit must be given either the name of a module (ke
     [opt] <key.compilerargs>: [string*] // Array of zero or more strings for the compiler arguments,
                                         // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
                                         // these must include the path to that file.
+    [opt] <key.cancel_on_subsequent_request>: (int64) // Whether this request should be canceled if a
+                                        // new cursor-info request is made that uses the same AST.
+                                        // This behavior is a workaround for not having first-class
+                                        // cancelation. For backwards compatibility, the default is 1.
 }
 ```
 

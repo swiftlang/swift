@@ -1,7 +1,6 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/ArrayTraps.swift
-// RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug
+// RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug -Onone
 // RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Release -O
 //
 // RUN: %line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Debug
@@ -80,7 +79,7 @@ ArrayTraps.test("bounds_with_downcast")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "fatal error: Index out of range" : "")
+    "Fatal error: Index out of range" : "")
   .code {
   let ba: [Base] = [ Derived(), Base() ]
   let da = ba as! [Derived]
@@ -137,7 +136,7 @@ ArraySemanticOptzns.test("inout_rule_violated_isNativeBuffer")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "fatal error: inout rules were violated: the array was overwritten" : "")
+    "Fatal error: inout rules were violated: the array was overwritten" : "")
   .code {
   let v = ViolateInoutSafetySwitchToObjcBuffer()
   expectCrashLater()
@@ -180,7 +179,7 @@ ArraySemanticOptzns.test("inout_rule_violated_needsElementTypeCheck")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "fatal error: inout rules were violated: the array was overwritten" : "")
+    "Fatal error: inout rules were violated: the array was overwritten" : "")
   .code {
   let v = ViolateInoutSafetyNeedElementTypeCheck()
   expectCrashLater()

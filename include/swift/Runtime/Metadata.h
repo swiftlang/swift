@@ -35,8 +35,42 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Runtime/Unreachable.h"
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
+#if SWIFT_OBJC_INTEROP
+#include <objc/runtime.h>
+#endif
 
 namespace swift {
+
+#if SWIFT_OBJC_INTEROP
+
+  // Const cast shorthands for ObjC types.
+
+  /// Cast to id, discarding const if necessary.
+  template <typename T>
+  static inline id id_const_cast(const T* value) {
+    return reinterpret_cast<id>(const_cast<T*>(value));
+  }
+
+  /// Cast to Class, discarding const if necessary.
+  template <typename T>
+  static inline Class class_const_cast(const T* value) {
+    return reinterpret_cast<Class>(const_cast<T*>(value));
+  }
+
+  /// Cast to Protocol*, discarding const if necessary.
+  template <typename T>
+  static inline Protocol* protocol_const_cast(const T* value) {
+    return reinterpret_cast<Protocol *>(const_cast<T*>(value));
+  }
+
+  /// Cast from a CF type, discarding const if necessary.
+  template <typename T>
+  static inline T cf_const_cast(const void* value) {
+    return reinterpret_cast<T>(const_cast<void *>(value));
+  }
+
+#endif
+
 
 template <unsigned PointerSize>
 struct RuntimeTarget;
@@ -311,330 +345,27 @@ public:
 
 namespace value_witness_types {
 
-/// Given an initialized buffer, destroy its value and deallocate
-/// the buffer.  This can be decomposed as:
-///
-///   self->destroy(self->projectBuffer(buffer), self);
-///   self->deallocateBuffer(buffer), self);
-///
-/// Preconditions:
-///   'buffer' is an initialized buffer
-/// Postconditions:
-///   'buffer' is an unallocated buffer
-typedef void destroyBuffer(ValueBuffer *buffer, const Metadata *self);
+// Note that, for now, we aren't strict about 'const'.
+#define WANT_ALL_VALUE_WITNESSES
+#define DATA_VALUE_WITNESS(lowerId, upperId, type)
+#define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes) \
+  typedef returnType (*lowerId) paramTypes;
+#define MUTABLE_VALUE_TYPE OpaqueValue *
+#define IMMUTABLE_VALUE_TYPE const OpaqueValue *
+#define MUTABLE_BUFFER_TYPE ValueBuffer *
+#define IMMUTABLE_BUFFER_TYPE const ValueBuffer *
+#define TYPE_TYPE const Metadata *
+#define SIZE_TYPE size_t
+#define INT_TYPE int
+#define VOID_TYPE void
+#include "swift/ABI/ValueWitness.def"
 
-/// Given an unallocated buffer, initialize it as a copy of the
-/// object in the source buffer.  This can be decomposed as:
-///
-///   self->initializeBufferWithCopy(dest, self->projectBuffer(src), self)
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
-/// Preconditions:
-///   'dest' is an unallocated buffer
-/// Postconditions:
-///   'dest' is an initialized buffer
-/// Invariants:
-///   'src' is an initialized buffer
-typedef OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
-                                                      ValueBuffer *src,
-                                                      const Metadata *self);
-
-/// Given an allocated or initialized buffer, derive a pointer to
-/// the object.
-/// 
-/// Invariants:
-///   'buffer' is an allocated or initialized buffer
-typedef OpaqueValue *projectBuffer(ValueBuffer *buffer,
-                                   const Metadata *self);
-
-/// Given an allocated buffer, deallocate the object.
-///
-/// Preconditions:
-///   'buffer' is an allocated buffer
-/// Postconditions:
-///   'buffer' is an unallocated buffer
-typedef void deallocateBuffer(ValueBuffer *buffer,
-                              const Metadata *self);
-
-/// Given an initialized object, destroy it.
-///
-/// Preconditions:
-///   'object' is an initialized object
-/// Postconditions:
-///   'object' is an uninitialized object
-typedef void destroy(OpaqueValue *object,
-                     const Metadata *self);
-
-/// Given an uninitialized buffer and an initialized object, allocate
-/// storage in the buffer and copy the value there.
-///
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized buffer
-/// Postconditions:
-///   'dest' is an initialized buffer
-/// Invariants:
-///   'src' is an initialized object
-typedef OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
-                                              OpaqueValue *src,
-                                              const Metadata *self);
-
-/// Given an uninitialized object and an initialized object, copy
-/// the value.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized object
-/// Postconditions:
-///   'dest' is an initialized object
-/// Invariants:
-///   'src' is an initialized object
-typedef OpaqueValue *initializeWithCopy(OpaqueValue *dest,
-                                        OpaqueValue *src,
-                                        const Metadata *self);
-
-/// Given two initialized objects, copy the value from one to the
-/// other.
-///
-/// This operation must be safe against 'dest' and 'src' aliasing.
-/// 
-/// Returns the dest object.
-///
-/// Invariants:
-///   'dest' is an initialized object
-///   'src' is an initialized object
-typedef OpaqueValue *assignWithCopy(OpaqueValue *dest,
-                                    OpaqueValue *src,
-                                    const Metadata *self);
-
-/// Given an uninitialized buffer and an initialized object, move
-/// the value from the object to the buffer, leaving the source object
-/// uninitialized.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized buffer
-///   'src' is an initialized object
-/// Postconditions:
-///   'dest' is an initialized buffer
-///   'src' is an uninitialized object
-typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
-                                              OpaqueValue *src,
-                                              const Metadata *self);
-
-/// Given an uninitialized object and an initialized object, move
-/// the value from one to the other, leaving the source object
-/// uninitialized.
-///
-/// There is no need for an initializeBufferWithTakeOfBuffer, because that
-/// can simply be a pointer-aligned memcpy of sizeof(ValueBuffer)
-/// bytes.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized object
-///   'src' is an initialized object
-/// Postconditions:
-///   'dest' is an initialized object
-///   'src' is an uninitialized object
-typedef OpaqueValue *initializeWithTake(OpaqueValue *dest,
-                                        OpaqueValue *src,
-                                        const Metadata *self);
-
-/// Given an initialized object and an initialized object, move
-/// the value from one to the other, leaving the source object
-/// uninitialized.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// Therefore this can be decomposed as:
-///
-///   self->destroy(dest, self);
-///   self->initializeWithTake(dest, src, self);
-///
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'src' is an initialized object
-/// Postconditions:
-///   'src' is an uninitialized object
-/// Invariants:
-///   'dest' is an initialized object
-typedef OpaqueValue *assignWithTake(OpaqueValue *dest,
-                                    OpaqueValue *src,
-                                    const Metadata *self);
-
-/// Given an uninitialized buffer, allocate an object.
-///
-/// Returns the uninitialized object.
-///
-/// Preconditions:
-///   'buffer' is an uninitialized buffer
-/// Postconditions:
-///   'buffer' is an allocated buffer
-typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
-                                    const Metadata *self);
-
-  
-/// Given an unallocated buffer and an initialized buffer, move the
-/// value from one buffer to the other, leaving the source buffer
-/// unallocated.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// Therefore this can be decomposed as:
-///
-///   self->initializeBufferWithTake(dest, self->projectBuffer(src), self)
-///   self->deallocateBuffer(src, self)
-///
-/// However, it may be more efficient because values stored out-of-line
-/// may be moved by simply moving the buffer.
-///
-/// If the value is bitwise-takable or stored out of line, this is
-/// equivalent to a memcpy of the buffers.
-///
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an unallocated buffer
-///   'src' is an initialized buffer
-/// Postconditions:
-///   'dest' is an initialized buffer
-///   'src' is an unallocated buffer
-typedef OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
-                                                      ValueBuffer *src,
-                                                      const Metadata *self);
-  
-/// Given an initialized array of objects, destroy it.
-///
-/// Preconditions:
-///   'object' is an initialized array of n objects
-/// Postconditions:
-///   'object' is an uninitialized array of n objects
-typedef void destroyArray(OpaqueValue *array, size_t n,
-                          const Metadata *self);
-  
-/// Given an uninitialized array and an initialized array, copy
-/// the value.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized array of n objects
-/// Postconditions:
-///   'dest' is an initialized array of n objects
-/// Invariants:
-///   'src' is an initialized array of n objects
-typedef OpaqueValue *initializeArrayWithCopy(OpaqueValue *dest,
-                                             OpaqueValue *src,
-                                             size_t n,
-                                             const Metadata *self);
-  
-/// Given an uninitialized array and an initialized array, move
-/// the values from one to the other, leaving the source array
-/// uninitialized.
-///
-/// This operation does not need to be safe against 'dest' and 'src' fully
-/// overlapping. 'dest' may partially overlap the head of 'src', because the
-/// values are taken as if in front-to-back order.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized array of n objects
-///   'src' is an initialized array of n objects
-/// Postconditions:
-///   'dest' is an initialized array of n objects
-///   'src' is an uninitialized array of n objects
-typedef OpaqueValue *initializeArrayWithTakeFrontToBack(OpaqueValue *dest,
-                                                        OpaqueValue *src,
-                                                        size_t n,
-                                                        const Metadata *self);
-  
-/// Given an uninitialized array and an initialized array, move
-/// the values from one to the other, leaving the source array
-/// uninitialized.
-///
-/// This operation does not need to be safe against 'dest' and 'src' fully
-/// overlapping. 'dest' may partially overlap the tail of 'src', because the
-/// values are taken as if in back-to-front order.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized array of n objects
-///   'src' is an initialized array of n objects
-/// Postconditions:
-///   'dest' is an initialized array of n objects
-///   'src' is an uninitialized array of n objects
-typedef OpaqueValue *initializeArrayWithTakeBackToFront(OpaqueValue *dest,
-                                                        OpaqueValue *src,
-                                                        size_t n,
-                                                        const Metadata *self);
-  
-/// The number of bytes required to store an object of this type.
-/// This value may be zero.  This value is not necessarily a
-/// multiple of the alignment.
-typedef size_t size;
-
-/// Flags which apply to the type here.
-typedef ValueWitnessFlags flags;
-
-/// When allocating an array of objects of this type, the number of bytes
-/// between array elements.  This value may be zero.  This value is always
-/// a multiple of the alignment.
-typedef size_t stride;
-
-/// Flags which describe extra inhabitants.
-typedef ExtraInhabitantFlags extraInhabitantFlags;
-  
-/// Store an extra inhabitant, named by a unique positive or zero index,
-/// into the given uninitialized storage for the type.
-typedef void storeExtraInhabitant(OpaqueValue *dest,
-                                  int index,
-                                  const Metadata *self);
-  
-/// Get the extra inhabitant index for the bit pattern stored at the given
-/// address, or return -1 if there is a valid value at the address.
-typedef int getExtraInhabitantIndex(const OpaqueValue *src,
-                                    const Metadata *self);
-
-/// Given a valid object of this enum type, extracts the tag value indicating
-/// which case of the enum is inhabited. Returned values are in the range
-/// [-ElementsWithPayload..ElementsWithNoPayload-1].
-///
-/// The tag value can be used to index into the array returned by the
-/// NominalTypeDescriptor's GetCaseTypes function to get the payload type
-/// and check if the payload is indirect.
-typedef int getEnumTag(const OpaqueValue *src,
-                       const Metadata *self);
-
-/// Given a valid object of this enum type, destructively strips the tag
-/// bits, leaving behind a value of the inhabited case payload type.
-/// If the case is indirect, the payload can then be projected from the box
-/// with swift_projectBox().
-typedef void destructiveProjectEnumData(OpaqueValue *src,
-                                        const Metadata *self);
-
-/// Given a valid object of an enum case payload's type, destructively add
-/// the tag bits for the given case, leaving behind a fully-formed value of
-/// the enum type. If the enum case does not have a payload, the initial
-/// state of the value can be undefined. The given tag value must be in
-/// the range [-ElementsWithPayload..ElementsWithNoPayload-1].
-typedef void destructiveInjectEnumTag(OpaqueValue *src,
-                                      int tag,
-                                      const Metadata *self);
+  // Handle the data witnesses explicitly so we can use more specific
+  // types for the flags enums.
+  typedef size_t size;
+  typedef ValueWitnessFlags flags;
+  typedef size_t stride;
+  typedef ExtraInhabitantFlags extraInhabitantFlags;
 
 } // end namespace value_witness_types
 
@@ -644,25 +375,6 @@ SWIFT_RUNTIME_EXPORT
 OpaqueValue *swift_copyPOD(OpaqueValue *dest,
                            OpaqueValue *src,
                            const Metadata *self);
-
-#define FOR_ALL_FUNCTION_VALUE_WITNESSES(MACRO) \
-  MACRO(destroyBuffer) \
-  MACRO(initializeBufferWithCopyOfBuffer) \
-  MACRO(projectBuffer) \
-  MACRO(deallocateBuffer) \
-  MACRO(destroy) \
-  MACRO(initializeBufferWithCopy) \
-  MACRO(initializeWithCopy) \
-  MACRO(assignWithCopy) \
-  MACRO(initializeBufferWithTake) \
-  MACRO(initializeWithTake) \
-  MACRO(assignWithTake) \
-  MACRO(allocateBuffer) \
-  MACRO(initializeBufferWithTakeOfBuffer) \
-  MACRO(destroyArray) \
-  MACRO(initializeArrayWithCopy) \
-  MACRO(initializeArrayWithTakeFrontToBack) \
-  MACRO(initializeArrayWithTakeBackToFront)
 
 struct TypeLayout;
 
@@ -674,14 +386,10 @@ struct ValueWitnessTable {
   // For the meaning of all of these witnesses, consult the comments
   // on their associated typedefs, above.
 
-#define DECLARE_WITNESS(NAME) \
-  value_witness_types::NAME *NAME;
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(DECLARE_WITNESS)
-#undef DECLARE_WITNESS
-
-  value_witness_types::size size;
-  value_witness_types::flags flags;
-  value_witness_types::stride stride;
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+  value_witness_types::LOWER_ID LOWER_ID;
+#include "swift/ABI/ValueWitness.def"
 
   /// Would values of a type with the given layout requirements be
   /// allocated inline?
@@ -765,9 +473,10 @@ struct ValueWitnessTable {
 /// These entry points are available only if the HasExtraInhabitants flag bit is
 /// set in the 'flags' field.
 struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
-  value_witness_types::extraInhabitantFlags extraInhabitantFlags;
-  value_witness_types::storeExtraInhabitant *storeExtraInhabitant;
-  value_witness_types::getExtraInhabitantIndex *getExtraInhabitantIndex;
+#define WANT_ONLY_EXTRA_INHABITANT_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+  value_witness_types::LOWER_ID LOWER_ID;
+#include "swift/ABI/ValueWitness.def"
 
 #define SET_WITNESS(NAME) base.NAME,
 
@@ -778,17 +487,12 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
   constexpr ExtraInhabitantsValueWitnessTable(
                             const ValueWitnessTable &base,
                             value_witness_types::extraInhabitantFlags eif,
-                            value_witness_types::storeExtraInhabitant *sei,
-                            value_witness_types::getExtraInhabitantIndex *geii)
-    : ValueWitnessTable{
-      FOR_ALL_FUNCTION_VALUE_WITNESSES(SET_WITNESS)
-      base.size,
-      base.flags,
-      base.stride
-    }, extraInhabitantFlags(eif),
+                            value_witness_types::storeExtraInhabitant sei,
+                            value_witness_types::getExtraInhabitantIndex geii)
+    : ValueWitnessTable(base),
+      extraInhabitantFlags(eif),
       storeExtraInhabitant(sei),
       getExtraInhabitantIndex(geii) {}
-#undef SET_WITNESS
 
   static bool classof(const ValueWitnessTable *table) {
     return table->flags.hasExtraInhabitants();
@@ -799,9 +503,10 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
 /// These entry points are available only if the HasEnumWitnesses flag bit is
 /// set in the 'flags' field.
 struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
-  value_witness_types::getEnumTag *getEnumTag;
-  value_witness_types::destructiveProjectEnumData *destructiveProjectEnumData;
-  value_witness_types::destructiveInjectEnumTag *destructiveInjectEnumTag;
+#define WANT_ONLY_ENUM_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+  value_witness_types::LOWER_ID LOWER_ID;
+#include "swift/ABI/ValueWitness.def"
 
   constexpr EnumValueWitnessTable()
     : ExtraInhabitantsValueWitnessTable(),
@@ -810,9 +515,9 @@ struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
       destructiveInjectEnumTag(nullptr) {}
   constexpr EnumValueWitnessTable(
           const ExtraInhabitantsValueWitnessTable &base,
-          value_witness_types::getEnumTag *getEnumTag,
-          value_witness_types::destructiveProjectEnumData *destructiveProjectEnumData,
-          value_witness_types::destructiveInjectEnumTag *destructiveInjectEnumTag)
+          value_witness_types::getEnumTag getEnumTag,
+          value_witness_types::destructiveProjectEnumData destructiveProjectEnumData,
+          value_witness_types::destructiveInjectEnumTag destructiveInjectEnumTag)
     : ExtraInhabitantsValueWitnessTable(base),
       getEnumTag(getEnumTag),
       destructiveProjectEnumData(destructiveProjectEnumData),
@@ -955,7 +660,7 @@ const ExtraInhabitantsValueWitnessTable METATYPE_VALUE_WITNESS_SYM(Bo); // Built
 
 /// Return the value witnesses for unmanaged pointers.
 static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
-#ifdef __LP64__
+#if __POINTER_WIDTH__ == 64
   return VALUE_WITNESS_SYM(Bi64_);
 #else
   return VALUE_WITNESS_SYM(Bi32_);
@@ -1010,91 +715,11 @@ namespace {
   template<typename T> struct _ResultOf;
   
   template<typename R, typename...A>
-  struct _ResultOf<R(A...)> {
+  struct _ResultOf<R(*)(A...)> {
     using type = R;
   };
 }
-  
-namespace heap_object_abi {
-  
-// The extra inhabitants and spare bits of heap object pointers.
-// These must align with the values in IRGen's SwiftTargetInfo.cpp.
-#if defined(__x86_64__)
 
-# ifdef __APPLE__
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER;
-# else
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
-# endif
-static const uintptr_t SwiftSpareBitsMask =
-  SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK;
-static const uintptr_t ObjCReservedBitsMask =
-  SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK;
-static const unsigned ObjCReservedLowBits =
-  SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS;
-
-#elif defined(__arm64__)
-
-# ifdef __APPLE__
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER;
-# else
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
-# endif
-static const uintptr_t SwiftSpareBitsMask =
-  SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK;
-static const uintptr_t ObjCReservedBitsMask =
-  SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK;
-static const unsigned ObjCReservedLowBits =
-  SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS;
-
-#elif defined(__powerpc64__)
-
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
-static const uintptr_t SwiftSpareBitsMask =
-  SWIFT_ABI_POWERPC64_SWIFT_SPARE_BITS_MASK;
-static const uintptr_t ObjCReservedBitsMask =
-  SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK;
-static const unsigned ObjCReservedLowBits =
-  SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS;
-
-#elif defined(__s390x__)
-
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
-static const uintptr_t SwiftSpareBitsMask =
-  SWIFT_ABI_S390X_SWIFT_SPARE_BITS_MASK;
-static const uintptr_t ObjCReservedBitsMask =
-  SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK;
-static const unsigned ObjCReservedLowBits =
-  SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS;
-
-#else
-
-static const uintptr_t LeastValidPointerValue =
-  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
-static const uintptr_t SwiftSpareBitsMask =
-# if __i386__
-  SWIFT_ABI_I386_SWIFT_SPARE_BITS_MASK
-# elif __arm__
-  SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK
-# else
-  SWIFT_ABI_DEFAULT_SWIFT_SPARE_BITS_MASK
-# endif
-  ;
-static const uintptr_t ObjCReservedBitsMask =
-  SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK;
-static const unsigned ObjCReservedLowBits =
-  SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS;
-
-#endif
-
-}
-  
 template <typename Runtime> struct TargetNominalTypeDescriptor;
 template <typename Runtime> struct TargetGenericMetadata;
 template <typename Runtime> struct TargetClassMetadata;
@@ -1218,14 +843,15 @@ public:
   
   // Define forwarders for value witnesses. These invoke this metadata's value
   // witness table with itself as the 'self' parameter.
-  #define FORWARD_WITNESS(WITNESS)                                         \
+  #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+  #define FUNCTION_VALUE_WITNESS(WITNESS, UPPER, RET_TYPE, PARAM_TYPES)    \
     template<typename...A>                                                 \
     _ResultOf<value_witness_types::WITNESS>::type                          \
     vw_##WITNESS(A &&...args) const {                                      \
       return getValueWitnesses()->WITNESS(std::forward<A>(args)..., this); \
     }
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(FORWARD_WITNESS)
-  #undef FORWARD_WITNESS
+  #define DATA_VALUE_WITNESS(LOWER, UPPER, TYPE)
+  #include "swift/ABI/ValueWitness.def"
 
   int vw_getExtraInhabitantIndex(const OpaqueValue *value) const  {
     return getValueWitnesses()->_asXIVWT()->getExtraInhabitantIndex(value, this);
@@ -1235,7 +861,7 @@ public:
   }
 
   int vw_getEnumTag(const OpaqueValue *value) const {
-    return getValueWitnesses()->_asEVWT()->getEnumTag(value, this);
+    return getValueWitnesses()->_asEVWT()->getEnumTag(const_cast<OpaqueValue*>(value), this);
   }
   void vw_destructiveProjectEnumData(OpaqueValue *value) const {
     getValueWitnesses()->_asEVWT()->destructiveProjectEnumData(value, this);
@@ -1260,9 +886,7 @@ public:
 
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
-  const ConstTargetFarRelativeDirectPointer<Runtime,
-                                            TargetNominalTypeDescriptor,
-                                            /*nullable*/ true> &
+  ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
   getNominalTypeDescriptor() const {
     switch (getKind()) {
     case MetadataKind::Class: {
@@ -1276,7 +900,8 @@ public:
     case MetadataKind::Struct:
     case MetadataKind::Enum:
     case MetadataKind::Optional:
-      return static_cast<const TargetStructMetadata<Runtime> *>(this)->Description;
+      return static_cast<const TargetStructMetadata<Runtime> *>(this)
+          ->Description;
     case MetadataKind::ForeignClass:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
@@ -1293,15 +918,24 @@ public:
 
     swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
-  
-  /// Get the generic metadata pattern from which this generic type instance was
-  /// instantiated, or null if the type is not generic.
-  const TargetGenericMetadata<Runtime> *getGenericPattern() const;
-  
+
   /// Get the class object for this type if it has one, or return null if the
   /// type is not a class (or not a class with a class object).
   const TargetClassMetadata<Runtime> *getClassObject() const;
-  
+
+#if SWIFT_OBJC_INTEROP
+  /// Get the ObjC class object for this type if it has one, or return null if
+  /// the type is not a class (or not a class with a class object).
+  /// This is allowed for InProcess values only.
+  template <typename R = Runtime>
+  typename std::enable_if<std::is_same<R, InProcess>::value, Class>::type
+  getObjCClassObject() const {
+    return reinterpret_cast<Class>(
+      const_cast<TargetClassMetadata<InProcess>*>(
+        getClassObject()));
+  }
+#endif
+
 protected:
   friend struct TargetOpaqueMetadata<Runtime>;
   
@@ -1383,6 +1017,13 @@ struct TargetHeapMetadata : TargetMetadata<Runtime> {
 };
 using HeapMetadata = TargetHeapMetadata<InProcess>;
 
+struct GenericContextDescriptor {
+  /// The number of primary type parameters. This is always less than or equal
+  /// to NumGenericRequirements; it counts only the type parameters
+  /// and not any required witness tables.
+  uint32_t NumPrimaryParams;
+};
+
 /// Header for a generic parameter descriptor. This is a variable-sized
 /// structure that describes how to find and parse a generic parameter vector
 /// within the type metadata for an instance of a nominal type.
@@ -1390,8 +1031,7 @@ struct GenericParameterDescriptor {
   /// The offset to the first generic argument from the start of
   /// metadata record.
   ///
-  /// This is meaningful if either NumGenericRequirements is nonzero or
-  /// (for classes) if Flags.hasParent() is true.
+  /// This is meaningful if NumGenericRequirements is nonzero.
   uint32_t Offset;
 
   /// The amount of generic requirement data in the metadata record, in
@@ -1407,6 +1047,10 @@ struct GenericParameterDescriptor {
   /// and not any required witness tables.
   uint32_t NumPrimaryParams;
 
+  /// The number of types that this type is nested inside of, including itself
+  /// (so this value is at least 1).
+  uint16_t NestingDepth;
+
   /// Flags for this generic parameter descriptor.
   GenericParameterDescriptorFlags Flags;
 
@@ -1416,15 +1060,46 @@ struct GenericParameterDescriptor {
 
   /// True if the nominal type is generic in any way.
   bool isGeneric() const {
-    return hasGenericRequirements() || Flags.hasGenericParent();
+    return hasGenericRequirements();
+  }
+
+  GenericContextDescriptor getContext(unsigned depth) const {
+    assert(depth < NestingDepth);
+    return ((const GenericContextDescriptor *)(this + 1))[depth];
   }
 
   // TODO: add meaningful descriptions of the generic requirements.
 };
-  
-struct ClassTypeDescriptor;
-struct StructTypeDescriptor;
-struct EnumTypeDescriptor;
+
+template <typename Runtime>
+struct TargetMethodDescriptor {
+  /// The method implementation.
+  TargetRelativeDirectPointer<Runtime, void> Impl;
+
+  /// Flags describing the method.
+  MethodDescriptorFlags Flags;
+
+  // TODO: add method types or anything else needed for reflection.
+};
+
+/// Header for a class vtable descriptor. This is a variable-sized
+/// structure that describes how to find and parse a vtable
+/// within the type metadata for a class.
+template <typename Runtime>
+struct TargetVTableDescriptor {
+  /// The offset of the vtable for this class in its metadata, if any.
+  uint32_t VTableOffset;
+  /// The number of vtable entries, in words.
+  uint32_t VTableSize;
+
+  using MethodDescriptor = TargetMethodDescriptor<Runtime>;
+
+  MethodDescriptor VTable[];
+
+  void *getMethod(unsigned index) const {
+    return VTable[index].Impl.get();
+  }
+};
 
 /// Common information about all nominal types. For generic types, this
 /// descriptor is shared for all instantiations of the generic type.
@@ -1528,9 +1203,7 @@ struct TargetNominalTypeDescriptor {
     } Enum;
   };
   
-  RelativeDirectPointerIntPair<TargetGenericMetadata<Runtime>,
-                               NominalTypeKind, /*Nullable*/ true>
-    GenericMetadataPatternAndKind;
+  NominalTypeKind Kind;
 
   using NonGenericMetadataAccessFunction = const Metadata *();
 
@@ -1543,25 +1216,34 @@ struct TargetNominalTypeDescriptor {
   ///
   /// Not all type metadata have access functions.
   TargetRelativeDirectPointer<Runtime, NonGenericMetadataAccessFunction,
-                              /*nullable*/ true> AccessFunction;
-
-  /// A pointer to the generic metadata pattern that is used to instantiate
-  /// instances of this type. Zero if the type is not generic.
-  TargetGenericMetadata<Runtime> *getGenericMetadataPattern() const {
-    return const_cast<TargetGenericMetadata<Runtime>*>(
-                                    GenericMetadataPatternAndKind.getPointer());
-  }
+                              /*Nullable*/ true> AccessFunction;
 
   NonGenericMetadataAccessFunction *getAccessFunction() const {
     return AccessFunction.get();
   }
 
   NominalTypeKind getKind() const {
-    return GenericMetadataPatternAndKind.getInt();
+    return Kind;
   }
 
   int32_t offsetToNameOffset() const {
     return offsetof(TargetNominalTypeDescriptor<Runtime>, Name);
+  }
+
+  using VTableDescriptor = TargetVTableDescriptor<Runtime>;
+
+  const VTableDescriptor *getVTableDescriptor() const {
+    if (getKind() != NominalTypeKind::Class ||
+        !GenericParams.Flags.hasVTable())
+      return nullptr;
+
+    auto asWords = reinterpret_cast<const uint32_t *>(this + 1);
+
+    // TODO: Once we emit reflective descriptions of generic requirements,
+    // skip the right number of words here.
+
+    return reinterpret_cast<const VTableDescriptor *>(asWords
+        + GenericParams.NestingDepth);
   }
 
   /// The generic parameter descriptor header. This describes how to find and
@@ -1604,20 +1286,16 @@ struct TargetClassMetadata : public TargetHeapMetadata<Runtime> {
       Description(nullptr), IVarDestroyer(ivarDestroyer) {}
 
   // Description's copy ctor is deleted so we have to do this the hard way.
-  TargetClassMetadata(const TargetClassMetadata& other)
-    : TargetHeapMetadata<Runtime>(other),
-      SuperClass(other.SuperClass),
-      CacheData{other.CacheData[0], other.CacheData[1]},
-      Data(other.Data),
-      Flags(other.Flags),
-      InstanceAddressPoint(other.InstanceAddressPoint),
-      InstanceSize(other.InstanceSize),
-      InstanceAlignMask(other.InstanceAlignMask),
-      Reserved(other.Reserved),
-      ClassSize(other.ClassSize),
-      ClassAddressPoint(other.ClassAddressPoint),
-      Description(other.Description.get()),
-      IVarDestroyer(other.IVarDestroyer) {}
+  TargetClassMetadata(const TargetClassMetadata &other)
+      : TargetHeapMetadata<Runtime>(other),
+        SuperClass(other.SuperClass),
+        CacheData{other.CacheData[0], other.CacheData[1]},
+        Data(other.Data), Flags(other.Flags),
+        InstanceAddressPoint(other.InstanceAddressPoint),
+        InstanceSize(other.InstanceSize),
+        InstanceAlignMask(other.InstanceAlignMask), Reserved(other.Reserved),
+        ClassSize(other.ClassSize), ClassAddressPoint(other.ClassAddressPoint),
+        Description(other.Description), IVarDestroyer(other.IVarDestroyer) {}
 
   /// The metadata for the superclass.  This is null for the root class.
   ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> SuperClass;
@@ -1679,8 +1357,7 @@ private:
   /// if this is an artificial subclass.  We currently provide no
   /// supported mechanism for making a non-artificial subclass
   /// dynamically.
-  ConstTargetFarRelativeDirectPointer<Runtime, TargetNominalTypeDescriptor,
-                                      /*nullable*/ true> Description;
+  ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor> Description;
 
   /// A function for destroying instance variables, used to clean up
   /// after an early return from a constructor.
@@ -1694,15 +1371,12 @@ private:
   //   - "tabulated" virtual methods
 
 public:
-  const ConstTargetFarRelativeDirectPointer<Runtime,
-                                            TargetNominalTypeDescriptor,
-                                            /*nullable*/ true> &
+  ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
   getDescription() const {
     assert(isTypeMetadata());
-    assert(!isArtificialSubclass());
     return Description;
   }
-  
+
   void setDescription(const TargetNominalTypeDescriptor<Runtime> *
                       description) {
     Description = description;
@@ -1807,21 +1481,6 @@ public:
     return getter(this);
   }
 
-  /// Return the parent type for a given level in the class hierarchy, or
-  /// null if that level does not have a parent type.
-  const TargetMetadata<Runtime> *
-  getParentType(const TargetNominalTypeDescriptor<Runtime> *theClass) const {
-    if (!theClass->GenericParams.Flags.hasParent())
-      return nullptr;
-
-    auto metadataAsWords = reinterpret_cast<const Metadata * const *>(this);
-    return metadataAsWords[theClass->GenericParams.Offset - 1];
-  }
-
-  StoredPointer offsetToDescriptorOffset() const {
-    return offsetof(TargetClassMetadata<Runtime>, Description);
-  }
-
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Class;
   }
@@ -1840,6 +1499,9 @@ struct TargetHeapLocalVariableMetadata
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::HeapLocalVariable;
   }
+  constexpr TargetHeapLocalVariableMetadata()
+      : TargetHeapMetadata<Runtime>(MetadataKind::HeapLocalVariable),
+        OffsetToFirstCapture(0), CaptureDescription(nullptr) {}
 };
 using HeapLocalVariableMetadata
   = TargetHeapLocalVariableMetadata<InProcess>;
@@ -1981,22 +1643,11 @@ template <typename Runtime>
 struct TargetValueMetadata : public TargetMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   TargetValueMetadata(MetadataKind Kind,
-    ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
-                      description,
-    ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> parent)
-    : TargetMetadata<Runtime>(Kind),
-      Description(description),
-      Parent(parent)
-  {}
+                      const TargetNominalTypeDescriptor<Runtime> *description)
+      : TargetMetadata<Runtime>(Kind), Description(description) {}
 
   /// An out-of-line description of the type.
-  ConstTargetFarRelativeDirectPointer<Runtime, TargetNominalTypeDescriptor>
-  Description;
-
-  /// The parent type of this member type, or null if this is not a
-  /// member type.  It's acceptable to make this a direct pointer because
-  /// parent types are relatively uncommon.
-  TargetPointer<Runtime, const TargetMetadata<Runtime>> Parent;
+  const TargetNominalTypeDescriptor<Runtime> *Description;
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Struct
@@ -2016,17 +1667,8 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
   }
 
   const TargetNominalTypeDescriptor<Runtime> *getDescription() const {
-    return Description.get();
+    return Description;
   }
-
-  StoredPointer offsetToDescriptorOffset() const {
-    return offsetof(TargetValueMetadata<Runtime>, Description);
-  }
-
-  StoredPointer offsetToParentOffset() const {
-    return offsetof(TargetValueMetadata<Runtime>, Parent);
-  }
-  
 };
 using ValueMetadata = TargetValueMetadata<InProcess>;
 
@@ -2259,7 +1901,18 @@ struct TargetLiteralProtocolDescriptorList
   {}
 };
 using LiteralProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
-  
+
+template <typename Runtime>
+struct TargetProtocolRequirement {
+  ProtocolRequirementFlags Flags;
+  // TODO: name, type
+
+  /// The optional default implementation of the protocol.
+  RelativeDirectPointer<void, /*nullable*/ true> DefaultImplementation;
+};
+
+using ProtocolRequirement = TargetProtocolRequirement<InProcess>;
+
 /// A protocol descriptor. This is not type metadata, but is referenced by
 /// existential type metadata records to describe a protocol constraint.
 /// Its layout is compatible with the Objective-C runtime's 'protocol_t' record
@@ -2291,34 +1944,26 @@ struct TargetProtocolDescriptor {
   /// Additional flags.
   ProtocolDescriptorFlags Flags;
 
-  /// The minimum size of any conforming witness table, in words.
-  ///
-  /// When a conformance is ultimately instantiated from a GenericWitnessTable,
-  /// this value must be greater than or equal to the GenericWitnessTable's
-  /// WitnessTableSizeInWords.
-  ///
-  /// Only meaningful if ProtocolDescriptorFlags::IsResilient is set.
-  uint16_t MinimumWitnessTableSizeInWords;
+  /// The number of non-defaultable requirements in the protocol.
+  uint16_t NumMandatoryRequirements;
 
-  /// The maximum amount to copy from the default requirements in words.
+  /// The number of requirements described by the Requirements array.
   /// If any requirements beyond MinimumWitnessTableSizeInWords are present
   /// in the witness table template, they will be not be overwritten with
   /// defaults.
-  ///
-  /// Only meaningful if ProtocolDescriptorFlags::IsResilient is set.
-  uint16_t DefaultWitnessTableSizeInWords;
+  uint16_t NumRequirements;
 
-  /// Reserved. Really just here to zero-pad the structure on 64-bit.
-  uint32_t Reserved;
+  /// Requirement descriptions.
+  RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
 
-  /// Default requirements are tail-allocated here.
-  void **getDefaultWitnesses() const {
-    return (void **) (this + 1);
+  void *getDefaultWitness(unsigned index) const {
+    return Requirements.get()[index].DefaultImplementation.get();
   }
 
+  // This is only used in unittests/Metadata.cpp.
   constexpr TargetProtocolDescriptor<Runtime>(const char *Name,
-                        const TargetProtocolDescriptorList<Runtime> *Inherited,
-                        ProtocolDescriptorFlags Flags)
+                      const TargetProtocolDescriptorList<Runtime> *Inherited,
+                      ProtocolDescriptorFlags Flags)
     : _ObjC_Isa(nullptr), Name(Name), InheritedProtocols(Inherited),
       _ObjC_InstanceMethods(nullptr), _ObjC_ClassMethods(nullptr),
       _ObjC_OptionalInstanceMethods(nullptr),
@@ -2326,8 +1971,9 @@ struct TargetProtocolDescriptor {
       _ObjC_InstanceProperties(nullptr),
       DescriptorSize(sizeof(TargetProtocolDescriptor<Runtime>)),
       Flags(Flags),
-      MinimumWitnessTableSizeInWords(0),
-      DefaultWitnessTableSizeInWords(0)
+      NumMandatoryRequirements(0),
+      NumRequirements(0),
+      Requirements(nullptr)
   {}
 };
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
@@ -2668,7 +2314,11 @@ struct TargetGenericWitnessTable {
                              void * const *instantiationArgs),
                         /*nullable*/ true> Instantiator;
 
-  void *PrivateData[swift::NumGenericMetadataPrivateDataWords];
+  using PrivateDataType = void *[swift::NumGenericMetadataPrivateDataWords];
+
+  /// Private data for the instantiator.  Out-of-line so that the rest
+  /// of this structure can be constant.
+  RelativeDirectPointer<PrivateDataType> PrivateData;
 };
 using GenericWitnessTable = TargetGenericWitnessTable<InProcess>;
 
@@ -3160,11 +2810,6 @@ void swift_initStructMetadata_UniversalStrategy(size_t numFields,
                                          size_t *fieldOffsets,
                                          ValueWitnessTable *vwtable);
 
-struct ClassFieldLayout {
-  size_t Size;
-  size_t AlignMask;
-};
-
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 ///
@@ -3175,7 +2820,7 @@ SWIFT_RUNTIME_EXPORT
 ClassMetadata *
 swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
                                           size_t numFields,
-                                          const ClassFieldLayout *fieldLayouts,
+                                          const TypeLayout * const *fieldTypes,
                                           size_t *fieldOffsets);
 
 /// \brief Fetch a uniqued metadata for a metatype type.

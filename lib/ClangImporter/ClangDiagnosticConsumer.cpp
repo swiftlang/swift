@@ -29,46 +29,43 @@ namespace {
                                   StringRef)> callback;
 
   public:
-    ClangDiagRenderer(const clang::ASTContext &ctx, decltype(callback) fn)
-       : DiagnosticNoteRenderer(ctx.getLangOpts(),
-                                &ctx.getDiagnostics().getDiagnosticOptions()),
+    ClangDiagRenderer(const clang::LangOptions &langOpts,
+                      clang::DiagnosticOptions *diagOpts,
+                      decltype(callback) fn)
+       : DiagnosticNoteRenderer(langOpts, diagOpts),
          callback(fn) {}
 
   private:
-    void emitDiagnosticMessage(clang::SourceLocation Loc,
+    void emitDiagnosticMessage(clang::FullSourceLoc Loc,
                                clang::PresumedLoc PLoc,
                                clang::DiagnosticsEngine::Level Level,
                                StringRef Message,
                                ArrayRef<clang::CharSourceRange> Ranges,
-                               const clang::SourceManager *SM,
                                clang::DiagOrStoredDiag Info) override {
-      StringRef bufName = StringRef(SM->getBufferName(Loc));
+      StringRef bufName = StringRef(Loc.getManager().getBufferName(Loc));
       if (bufName == ClangImporter::Implementation::moduleImportBufferName ||
           bufName == ClangImporter::Implementation::bridgingHeaderBufferName) {
         return;
       }
-      callback(clang::FullSourceLoc(Loc, *SM), Level, Message);
+      callback(Loc, Level, Message);
     }
 
-    void emitDiagnosticLoc(clang::SourceLocation Loc, clang::PresumedLoc PLoc,
+    void emitDiagnosticLoc(clang::FullSourceLoc Loc, clang::PresumedLoc PLoc,
                            clang::DiagnosticsEngine::Level Level,
-                           ArrayRef<clang::CharSourceRange> Ranges,
-                           const clang::SourceManager &SM) override {}
+                           ArrayRef<clang::CharSourceRange> Ranges) override {}
 
-    void emitCodeContext(clang::SourceLocation Loc,
+    void emitCodeContext(clang::FullSourceLoc Loc,
                          clang::DiagnosticsEngine::Level Level,
                          SmallVectorImpl<clang::CharSourceRange>& Ranges,
-                         ArrayRef<clang::FixItHint> Hints,
-                         const clang::SourceManager &SM) override {}
+                         ArrayRef<clang::FixItHint> Hints) override {}
 
-    void emitNote(clang::SourceLocation Loc, StringRef Message,
-                  const clang::SourceManager *SM) override {
+    void emitNote(clang::FullSourceLoc Loc, StringRef Message) override {
       // We get invalid note locations when trying to describe where a module
       // is imported and the actual location is in Swift.
       if (Loc.isInvalid())
         return;
       emitDiagnosticMessage(Loc, {}, clang::DiagnosticsEngine::Note, Message,
-                            {}, SM, {});
+                            {}, {});
     }
   };
 } // end anonymous namespace
@@ -224,9 +221,12 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
 
   } else {
     assert(clangDiag.hasSourceManager());
-    ClangDiagRenderer renderer(ImporterImpl.getClangASTContext(), emitDiag);
-    renderer.emitDiagnostic(clangDiag.getLocation(), clangDiagLevel, message,
-                            clangDiag.getRanges(), clangDiag.getFixItHints(),
-                            &clangDiag.getSourceManager());
+    auto clangCI = ImporterImpl.getClangInstance();
+    ClangDiagRenderer renderer(clangCI->getLangOpts(),
+                               &clangCI->getDiagnosticOpts(), emitDiag);
+    clang::FullSourceLoc clangDiagLoc(clangDiag.getLocation(),
+                                      clangDiag.getSourceManager());
+    renderer.emitDiagnostic(clangDiagLoc, clangDiagLevel, message,
+                            clangDiag.getRanges(), clangDiag.getFixItHints());
   }
 }

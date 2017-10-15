@@ -339,9 +339,8 @@ extension DateComponents : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSDateComponents?) -> DateComponents {
-        var result: DateComponents?
-        _forceBridgeFromObjectiveC(source!, result: &result)
-        return result!
+        guard let src = source else { return DateComponents() }
+        return DateComponents(reference: src)
     }
 }
 
@@ -353,3 +352,81 @@ extension NSDateComponents : _HasCustomAnyHashableRepresentation {
     }
 }
 
+extension DateComponents : Codable {
+    private enum CodingKeys : Int, CodingKey {
+        case calendar
+        case timeZone
+        case era
+        case year
+        case month
+        case day
+        case hour
+        case minute
+        case second
+        case nanosecond
+        case weekday
+        case weekdayOrdinal
+        case quarter
+        case weekOfMonth
+        case weekOfYear
+        case yearForWeekOfYear
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container  = try decoder.container(keyedBy: CodingKeys.self)
+        let calendar   = try container.decodeIfPresent(Calendar.self, forKey: .calendar)
+        let timeZone   = try container.decodeIfPresent(TimeZone.self, forKey: .timeZone)
+        let era        = try container.decodeIfPresent(Int.self, forKey: .era)
+        let year       = try container.decodeIfPresent(Int.self, forKey: .year)
+        let month      = try container.decodeIfPresent(Int.self, forKey: .month)
+        let day        = try container.decodeIfPresent(Int.self, forKey: .day)
+        let hour       = try container.decodeIfPresent(Int.self, forKey: .hour)
+        let minute     = try container.decodeIfPresent(Int.self, forKey: .minute)
+        let second     = try container.decodeIfPresent(Int.self, forKey: .second)
+        let nanosecond = try container.decodeIfPresent(Int.self, forKey: .nanosecond)
+
+        let weekday           = try container.decodeIfPresent(Int.self, forKey: .weekday)
+        let weekdayOrdinal    = try container.decodeIfPresent(Int.self, forKey: .weekdayOrdinal)
+        let quarter           = try container.decodeIfPresent(Int.self, forKey: .quarter)
+        let weekOfMonth       = try container.decodeIfPresent(Int.self, forKey: .weekOfMonth)
+        let weekOfYear        = try container.decodeIfPresent(Int.self, forKey: .weekOfYear)
+        let yearForWeekOfYear = try container.decodeIfPresent(Int.self, forKey: .yearForWeekOfYear)
+
+        self.init(calendar: calendar,
+                  timeZone: timeZone,
+                  era: era,
+                  year: year,
+                  month: month,
+                  day: day,
+                  hour: hour,
+                  minute: minute,
+                  second: second,
+                  nanosecond: nanosecond,
+                  weekday: weekday,
+                  weekdayOrdinal: weekdayOrdinal,
+                  quarter: quarter,
+                  weekOfMonth: weekOfMonth,
+                  weekOfYear: weekOfYear,
+                  yearForWeekOfYear: yearForWeekOfYear)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(self.calendar, forKey: .calendar)
+        try container.encodeIfPresent(self.timeZone, forKey: .timeZone)
+        try container.encodeIfPresent(self.era, forKey: .era)
+        try container.encodeIfPresent(self.year, forKey: .year)
+        try container.encodeIfPresent(self.month, forKey: .month)
+        try container.encodeIfPresent(self.day, forKey: .day)
+        try container.encodeIfPresent(self.hour, forKey: .hour)
+        try container.encodeIfPresent(self.minute, forKey: .minute)
+        try container.encodeIfPresent(self.second, forKey: .second)
+        try container.encodeIfPresent(self.nanosecond, forKey: .nanosecond)
+        try container.encodeIfPresent(self.weekday, forKey: .weekday)
+        try container.encodeIfPresent(self.weekdayOrdinal, forKey: .weekdayOrdinal)
+        try container.encodeIfPresent(self.quarter, forKey: .quarter)
+        try container.encodeIfPresent(self.weekOfMonth, forKey: .weekOfMonth)
+        try container.encodeIfPresent(self.weekOfYear, forKey: .weekOfYear)
+        try container.encodeIfPresent(self.yearForWeekOfYear, forKey: .yearForWeekOfYear)
+    }
+}

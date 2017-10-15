@@ -16,7 +16,7 @@ func hexAddrVal<T>(_ x: T) -> String {
 
 func hexAddr(_ x: AnyObject?) -> String {
   if let owner = x {
-    if let y = owner as? _StringBuffer._Storage.Storage {
+    if let y = owner as? _HeapBufferStorage<_StringBufferIVars, UInt16> {
       return ".native\(hexAddrVal(y))"
     }
     if let y = owner as? NSString {
@@ -129,6 +129,8 @@ func ascii() {
   var nsASCII = NSString(utf8String: "foobar")!
   // CHECK-NEXT: has UTF-16: false
   print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsASCII, to: CFString.self)) != nil)")
+  print("has ASCII pointer: \(CFStringGetCStringPtr(unsafeBitCast(nsASCII, to: CFString.self), 0x0600) != nil)")
+  print("has ASCII pointer: \(CFStringGetCStringPtr(unsafeBitCast(nsASCII, to: CFString.self), 0x08000100) != nil)")
 
   // CHECK: --- ASCII basic round-tripping ---
   print("--- ASCII basic round-tripping ---")

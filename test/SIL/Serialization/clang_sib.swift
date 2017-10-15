@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sib -o %t -primary-file %s -module-name main
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -o /dev/null -primary-file %t/clang_sib.sib -module-name main
 

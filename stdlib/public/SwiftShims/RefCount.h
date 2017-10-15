@@ -564,10 +564,12 @@ class RefCountBitsT {
     else
       return doDecrementStrongExtraRefCount<DontClearPinnedFlag>(dec);
   }
-
+  // Returns the old reference count before the increment.
   LLVM_ATTRIBUTE_ALWAYS_INLINE
-  void incrementUnownedRefCount(uint32_t inc) {
-    setUnownedRefCount(getUnownedRefCount() + inc);
+  uint32_t incrementUnownedRefCount(uint32_t inc) {
+    uint32_t old = getUnownedRefCount();
+    setUnownedRefCount(old + inc);
+    return old;
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -731,16 +733,16 @@ class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
 template <typename RefCountBits>
 class RefCounts {
   std::atomic<RefCountBits> refCounts;
-#if !__LP64__
+#if __POINTER_WIDTH__ == 32
   // FIXME: hack - something somewhere is assuming a 3-word header on 32-bit
   // See also other fixmes marked "small header for 32-bit"
   uintptr_t unused SWIFT_ATTRIBUTE_UNAVAILABLE;
 #endif
 
   // Out-of-line slow paths.
-  
+
   LLVM_ATTRIBUTE_NOINLINE
-  void incrementSlow(RefCountBits oldbits, uint32_t inc);
+  void incrementSlow(RefCountBits oldbits, uint32_t inc) SWIFT_CC(PreserveMost);
 
   LLVM_ATTRIBUTE_NOINLINE
   void incrementNonAtomicSlow(RefCountBits oldbits, uint32_t inc);
@@ -757,6 +759,9 @@ class RefCounts {
   LLVM_ATTRIBUTE_NOINLINE
   bool tryIncrementNonAtomicSlow(RefCountBits oldbits);
 
+  LLVM_ATTRIBUTE_NOINLINE
+  void incrementUnownedSlow(uint32_t inc);
+
   public:
   enum Initialized_t { Initialized };
 
@@ -768,7 +773,7 @@ class RefCounts {
   // Refcount of a new object is 1.
   constexpr RefCounts(Initialized_t)
     : refCounts(RefCountBits(0, 1))
-#if !__LP64__ && !__has_attribute(unavailable)
+#if __POINTER_WIDTH__ == 32 && !__has_attribute(unavailable)
       , unused(0)
 #endif
   { }
@@ -956,7 +961,7 @@ class RefCounts {
   bool isUniquelyReferenced() const {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable())
-      return false;  // FIXME: implement side table path if useful
+      return bits.getSideTable()->isUniquelyReferenced();
     
     assert(!bits.getIsDeiniting());
     return bits.isUniquelyReferenced();
@@ -1139,8 +1144,12 @@ class RefCounts {
 
       newbits = oldbits;
       assert(newbits.getUnownedRefCount() != 0);
-      newbits.incrementUnownedRefCount(inc);
-      // FIXME: overflow check?
+      uint32_t oldValue = newbits.incrementUnownedRefCount(inc);
+
+      // Check overflow and use the side table on overflow.
+      if (newbits.getUnownedRefCount() != oldValue + inc)
+        return incrementUnownedSlow(inc);
+
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
   }
@@ -1152,8 +1161,12 @@ class RefCounts {
 
     auto newbits = oldbits;
     assert(newbits.getUnownedRefCount() != 0);
-    newbits.incrementUnownedRefCount(inc);
-    // FIXME: overflow check?
+    uint32_t oldValue = newbits.incrementUnownedRefCount(inc);
+
+    // Check overflow and use the side table on overflow.
+    if (newbits.getUnownedRefCount() != oldValue + inc)
+      return incrementUnownedSlow(inc);
+
     refCounts.store(newbits, std::memory_order_relaxed);
   }
 
@@ -1280,7 +1293,7 @@ class RefCounts {
 
 
   private:
-  HeapObject *getHeapObject() const;
+  HeapObject *getHeapObject();
   
   HeapObjectSideTableEntry* allocateSideTable();
 };
@@ -1369,6 +1382,10 @@ class HeapObjectSideTableEntry {
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getCount() const {
     return refCounts.getCount();
+  }
+
+  bool isUniquelyReferenced() const {
+    return refCounts.isUniquelyReferenced();
   }
 
   bool isUniquelyReferencedOrPinned() const {
@@ -1535,14 +1552,14 @@ doDecrementNonAtomicSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
 
 
 template <> inline
-HeapObject* RefCounts<InlineRefCountBits>::getHeapObject() const {
+HeapObject* RefCounts<InlineRefCountBits>::getHeapObject() {
   auto offset = sizeof(void *);
   auto prefix = ((char *)this - offset);
   return (HeapObject *)prefix;
 }
 
 template <> inline
-HeapObject* RefCounts<SideTableRefCountBits>::getHeapObject() const {
+HeapObject* RefCounts<SideTableRefCountBits>::getHeapObject() {
   auto offset = HeapObjectSideTableEntry::refCountsOffset();
   auto prefix = ((char *)this - offset);
   return *(HeapObject **)prefix;

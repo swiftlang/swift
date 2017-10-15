@@ -69,9 +69,9 @@ class C : P1 {
 }
 
 //   (materializeForSet test from above)
-// CHECK-LABEL: sil private [transparent] [thunk] @_T019protocol_extensions1CCAA2P1A2aDP9subscriptS2icfmTW
-// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*C):
-// CHECK: function_ref @_T019protocol_extensions2P1PAAE9subscriptS2icfg
+// CHECK-LABEL: sil private [transparent] [thunk] @_T019protocol_extensions1CCAA2P1A2aDPS2icimTW
+// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*τ_0_0):
+// CHECK: function_ref @_T019protocol_extensions2P1PAAES2icig
 // CHECK: return
 
 class D : C { }
@@ -110,110 +110,110 @@ func testD(_ m: MetaHolder, dd: D.Type, d: D) {
   var d2: D = d.returnsSelf()
 
   // CHECK: metatype $@thick D.Type
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySivgZ
   let _ = D.staticReadOnlyProperty
 
   // CHECK: metatype $@thick D.Type
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   D.staticReadWrite1 = 1
 
   // CHECK: metatype $@thick D.Type
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivgZ
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: dealloc_stack
   D.staticReadWrite1 += 1
 
   // CHECK: metatype $@thick D.Type
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   D.staticReadWrite2 = Box(number: 2)
 
   // CHECK: metatype $@thick D.Type
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   D.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_T019protocol_extensions10inout_funcySizF
   // CHECK: metatype $@thick D.Type
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   inout_func(&D.staticReadWrite2.number)
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySivgZ
   let _ = dd.staticReadOnlyProperty
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   dd.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivgZ
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: dealloc_stack
   dd.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   dd.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   dd.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_T019protocol_extensions10inout_funcySizF
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   inout_func(&dd.staticReadWrite2.number)
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySivgZ
   let _ = m.d.staticReadOnlyProperty
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   m.d.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivgZ
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: dealloc_stack
   m.d.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   m.d.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   m.d.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_T019protocol_extensions10inout_funcySizF
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   inout_func(&m.d.staticReadWrite2.number)
 
@@ -222,123 +222,123 @@ func testD(_ m: MetaHolder, dd: D.Type, d: D) {
 
 // CHECK-LABEL: sil hidden @_T019protocol_extensions5testSyAA10MetaHolderV_AA1SVm2sstF
 func testS(_ m: MetaHolder, ss: S.Type) {
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySivgZ
   // CHECK: metatype $@thick S.Type
   let _ = S.staticReadOnlyProperty
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: metatype $@thick S.Type
   S.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivgZ
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: dealloc_stack
   S.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: metatype $@thick S.Type
   S.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   S.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_T019protocol_extensions10inout_funcySizF
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   inout_func(&S.staticReadWrite2.number)
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySivgZ
   // CHECK: metatype $@thick S.Type
   let _ = ss.staticReadOnlyProperty
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: metatype $@thick S.Type
   ss.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivgZ
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: dealloc_stack
   ss.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: metatype $@thick S.Type
   ss.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   ss.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_T019protocol_extensions10inout_funcySizF
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   inout_func(&ss.staticReadWrite2.number)
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySivgZ
   // CHECK: metatype $@thick S.Type
   let _ = m.s.staticReadOnlyProperty
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: metatype $@thick S.Type
   m.s.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivgZ
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: dealloc_stack
   m.s.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: metatype $@thick S.Type
   m.s.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   m.s.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_T019protocol_extensions10inout_funcySizF
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   inout_func(&m.s.staticReadWrite2.number)
 
@@ -347,123 +347,123 @@ func testS(_ m: MetaHolder, ss: S.Type) {
 
 // CHECK-LABEL: sil hidden @_T019protocol_extensions5testG{{[_0-9a-zA-Z]*}}F
 func testG<T>(_ m: GenericMetaHolder<T>, gg: G<T>.Type) {
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySivgZ
   // CHECK: metatype $@thick G<T>.Type
   let _ = G<T>.staticReadOnlyProperty
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: metatype $@thick G<T>.Type
   G<T>.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivgZ
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: dealloc_stack
   G<T>.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: metatype $@thick G<T>.Type
   G<T>.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   G<T>.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_T019protocol_extensions10inout_funcySizF
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   inout_func(&G<T>.staticReadWrite2.number)
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySivgZ
   // CHECK: metatype $@thick G<T>.Type
   let _ = gg.staticReadOnlyProperty
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: metatype $@thick G<T>.Type
   gg.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivgZ
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: dealloc_stack
   gg.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: metatype $@thick G<T>.Type
   gg.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   gg.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_T019protocol_extensions10inout_funcySizF
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   inout_func(&gg.staticReadWrite2.number)
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE22staticReadOnlyPropertySivgZ
   // CHECK: metatype $@thick G<T>.Type
   let _ = m.g.staticReadOnlyProperty
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: metatype $@thick G<T>.Type
   m.g.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivgZ
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SifsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite1SivsZ
   // CHECK: dealloc_stack
   m.g.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: metatype $@thick G<T>.Type
   m.g.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   m.g.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_T019protocol_extensions10inout_funcySizF
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfgZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvgZ
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVfsZ
+  // CHECK: function_ref @_T019protocol_extensions2P1PAAE16staticReadWrite2AA3BoxVvsZ
   // CHECK: dealloc_stack
   inout_func(&m.g.staticReadWrite2.number)
 
@@ -507,7 +507,7 @@ func testExistentials1(_ p1: P1, b: Bool, i: Int64) {
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]] :
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE9subscriptSbs5Int64Vcfg
+  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAESbs5Int64Vcig
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[I]], [[POPENED_COPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Int64, @in_guaranteed τ_0_0) -> Bool
   // CHECK: destroy_addr [[POPENED_COPY]]
   // CHECK: store{{.*}} : $*Bool
@@ -516,7 +516,7 @@ func testExistentials1(_ p1: P1, b: Bool, i: Int64) {
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]] :
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE4propSbfg
+  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE4propSbvg
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[POPENED_COPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> Bool
   // CHECK: store{{.*}} : $*Bool
   // CHECK: dealloc_stack [[POPENED_COPY]]
@@ -540,13 +540,13 @@ func testExistentials2(_ p1: P1) {
 func testExistentialsGetters(_ p1: P1) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]] :
-  // CHECK: [[FN:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE5prop2Sbfg
+  // CHECK: [[FN:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE5prop2Sbvg
   // CHECK: [[B:%[0-9]+]] = apply [[FN]]<@opened([[UUID]]) P1>([[POPENED_COPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> Bool
   let b: Bool = p1.prop2
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]] :
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE9subscriptS2bcfg
+  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAES2bcig
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED_COPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @in_guaranteed τ_0_0) -> Bool
   let b2: Bool = p1[b]
 }
@@ -560,14 +560,14 @@ func testExistentialSetters(_ p1: P1, b: Bool) {
   // CHECK-NEXT: copy_addr [[P]] to [initialization] [[PBP]] : $*P1
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBP]]
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr mutable_access [[WRITE]] : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE5prop2Sbfs
+  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE5prop2Sbvs
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK-NOT: deinit_existential_addr
   p1.prop2 = b
 
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBP]]
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr mutable_access [[WRITE]] : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[SUBSETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE9subscriptS2bcfs
+  // CHECK: [[SUBSETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAES2bcis
   // CHECK: apply [[SUBSETTER]]<@opened([[UUID]]) P1>([[B]], [[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, Bool, @inout τ_0_0) -> ()
   // CHECK-NOT: deinit_existential_addr [[PB]] : $*P1
   p1[b] = b
@@ -595,12 +595,12 @@ func testLogicalExistentialSetters(_ hasAP1: HasAP1, _ b: Bool) {
   // CHECK: [[P1_COPY:%[0-9]+]] = alloc_stack $P1
   // CHECK-NEXT: [[HASP1_COPY:%[0-9]+]] = alloc_stack $HasAP1
   // CHECK-NEXT: copy_addr [[WRITE]] to [initialization] [[HASP1_COPY]] : $*HasAP1
-  // CHECK: [[SOMEP1_GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions6HasAP1V6someP1AA0F0_pfg : $@convention(method) (@in_guaranteed HasAP1) -> @out P1
+  // CHECK: [[SOMEP1_GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions6HasAP1V6someP1AA0F0_pvg : $@convention(method) (@in_guaranteed HasAP1) -> @out P1
   // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]], [[HASP1_COPY]]) : $@convention(method) (@in_guaranteed HasAP1) -> @out P1
   // CHECK: [[P1_OPENED:%[0-9]+]] = open_existential_addr mutable_access [[P1_COPY]] : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[PROP2_SETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE5prop2Sbfs : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
+  // CHECK: [[PROP2_SETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE5prop2Sbvs : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK: apply [[PROP2_SETTER]]<@opened([[UUID]]) P1>([[B]], [[P1_OPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
-  // CHECK: [[SOMEP1_SETTER:%[0-9]+]] = function_ref @_T019protocol_extensions6HasAP1V6someP1AA0F0_pfs : $@convention(method) (@in P1, @inout HasAP1) -> ()
+  // CHECK: [[SOMEP1_SETTER:%[0-9]+]] = function_ref @_T019protocol_extensions6HasAP1V6someP1AA0F0_pvs : $@convention(method) (@in P1, @inout HasAP1) -> ()
   // CHECK: apply [[SOMEP1_SETTER]]([[P1_COPY]], [[WRITE]]) : $@convention(method) (@in P1, @inout HasAP1) -> ()
   // CHECK-NOT: deinit_existential_addr
   hasAP1.someP1.prop2 = b
@@ -692,24 +692,71 @@ protocol InitRequirement {
 }
 
 extension InitRequirement {
-  // CHECK-LABEL: sil hidden @_T019protocol_extensions15InitRequirementPAAE{{[_0-9a-zA-Z]*}}fC : $@convention(method) <Self where Self : InitRequirement> (@owned D, @thick Self.Type) -> @out Self
+  // CHECK-LABEL: sil hidden @_T019protocol_extensions15InitRequirementPAAExAA1DC1d_tcfC : $@convention(method) <Self where Self : InitRequirement> (@owned D, @thick Self.Type) -> @out Self
   // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   init(d: D) {
-    // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@owned C, @thick τ_0_0.Type) -> @out τ_0_0
-  // CHECK:           [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:           [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-  // CHECK:           [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
-  // CHECK:           apply [[DELEGATEE]]<Self>({{%.*}}, [[ARG_COPY_CAST]], [[SELF_TYPE]])
-  // CHECK:           end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK:      [[SELF_BOX:%.*]] = alloc_box
+    // CHECK-NEXT: [[UNINIT_SELF:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
+    // CHECK-NEXT: [[SELF_BOX_ADDR:%.*]] = project_box [[UNINIT_SELF]]
+    // CHECK:      [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@owned C, @thick τ_0_0.Type) -> @out τ_0_0
+    // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $Self
+    // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+    // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+    // CHECK-NEXT: [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
+    // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY_CAST]], [[SELF_TYPE]])
+    // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
+    // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
+    // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [initialization] [[OUT]]
+    // CHECK-NEXT: destroy_value [[ARG]]
+    // CHECK-NEXT: destroy_value [[UNINIT_SELF]]
+    // CHECK:      return
     self.init(c: d)
   }
-  // CHECK: } // end sil function '_T019protocol_extensions15InitRequirementPAAE{{[_0-9a-zA-Z]*}}fC'
 
-  // CHECK-LABEL: sil hidden @_T019protocol_extensions15InitRequirementPAAE{{[_0-9a-zA-Z]*}}fC : $@convention(method)
-  // CHECK:         function_ref @_T019protocol_extensions15InitRequirementPAAE{{[_0-9a-zA-Z]*}}fC
-  // CHECK: } // end sil function '_T019protocol_extensions15InitRequirementPAAE{{[_0-9a-zA-Z]*}}fC'
+  // CHECK-LABEL: sil hidden @_T019protocol_extensions15InitRequirementPAAExAA1DC2d2_tcfC : $@convention(method)
+  // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   init(d2: D) {
+    // CHECK:      [[SELF_BOX:%.*]] = alloc_box
+    // CHECK-NEXT: [[UNINIT_SELF:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
+    // CHECK-NEXT: [[SELF_BOX_ADDR:%.*]] = project_box [[UNINIT_SELF]]
+    // CHECK:      [[DELEGATEE:%.*]] = function_ref @_T019protocol_extensions15InitRequirementPAAExAA1DC1d_tcfC
+    // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $Self
+    // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+    // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+    // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY]], [[SELF_TYPE]])
+    // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
+    // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
+    // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [initialization] [[OUT]]
+    // CHECK-NEXT: destroy_value [[ARG]]
+    // CHECK-NEXT: destroy_value [[UNINIT_SELF]]
+    // CHECK:      return
     self.init(d: d2)
+  }
+
+  // CHECK-LABEL: sil hidden @_T019protocol_extensions15InitRequirementPAAExAA1CC2c2_tcfC  : $@convention(method)
+  // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $C, [[SELF_TYPE:%.*]] : $@thick Self.Type):
+  init(c2: C) {
+    // CHECK:      [[SELF_BOX:%.*]] = alloc_box
+    // CHECK-NEXT: [[UNINIT_SELF:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
+    // CHECK-NEXT: [[SELF_BOX_ADDR:%.*]] = project_box [[UNINIT_SELF]]
+    // CHECK:      [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1
+    // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $Self
+    // CHECK-NEXT: [[SELF_TYPE:%.*]] = metatype $@thick Self.Type
+    // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+    // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+    // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY]], [[SELF_TYPE]])
+    // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF_BOX_ADDR]]
+    // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[ACCESS]]
+    // CHECK-NEXT: end_access [[ACCESS]]
+    // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
+    // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [initialization] [[OUT]]
+    // CHECK-NEXT: destroy_value [[ARG]]
+    // CHECK-NEXT: destroy_value [[UNINIT_SELF]]
+    // CHECK:      return
+    self = Self(c: c2)
   }
 }
 
@@ -751,12 +798,10 @@ extension ObjCInitRequirement {
   // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic [objc] [[OBJC_SELF_TYPE]] : $@objc_metatype Self.Type, $Self
   // CHECK:         [[WITNESS:%.*]] = witness_method [volatile] $Self, #ObjCInitRequirement.init!initializer.1.foreign : {{.*}} : $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjCInitRequirement> (OC, OC, @owned τ_0_0) -> @owned τ_0_0
   // CHECK:         [[BORROWED_ARG_1:%.*]] = begin_borrow [[ARG]]
-  // CHECK:         [[ARG_COPY_1:%.*]] = copy_value [[BORROWED_ARG_1]]
-  // CHECK:         [[ARG_COPY_1_UPCAST:%.*]] = upcast [[ARG_COPY_1]]
+  // CHECK:         [[BORROWED_ARG_1_UPCAST:%.*]] = upcast [[BORROWED_ARG_1]]
   // CHECK:         [[BORROWED_ARG_2:%.*]] = begin_borrow [[ARG]]
-  // CHECK:         [[ARG_COPY_2:%.*]] = copy_value [[BORROWED_ARG_2]]
-  // CHECK:         [[ARG_COPY_2_UPCAST:%.*]] = upcast [[ARG_COPY_2]]
-  // CHECK:         apply [[WITNESS]]<Self>([[ARG_COPY_1_UPCAST]], [[ARG_COPY_2_UPCAST]], [[SELF]])
+  // CHECK:         [[BORROWED_ARG_2_UPCAST:%.*]] = upcast [[BORROWED_ARG_2]]
+  // CHECK:         apply [[WITNESS]]<Self>([[BORROWED_ARG_1_UPCAST]], [[BORROWED_ARG_2_UPCAST]], [[SELF]])
   // CHECK:         end_borrow [[BORROWED_ARG_2]] from [[ARG]]
   // CHECK:         end_borrow [[BORROWED_ARG_1]] from [[ARG]]
   // CHECK: } // end sil function '_T019protocol_extensions19ObjCInitRequirementPAAE{{[_0-9a-zA-Z]*}}fC'
@@ -783,7 +828,8 @@ extension ProtoDelegatesToObjC where Self : ObjCInitClass {
     // CHECK:   [[SELF_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[SELF_META]] : $@thick Self.Type to $@objc_metatype Self.Type
     // CHECK:   [[SELF_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[SELF_META_OBJC]] : $@objc_metatype Self.Type, $Self
     // CHECK:   [[SELF_ALLOC_C:%[0-9]+]] = upcast [[SELF_ALLOC]] : $Self to $ObjCInitClass
-    // CHECK:   [[OBJC_INIT:%[0-9]+]] = class_method [[SELF_ALLOC_C]] : $ObjCInitClass, #ObjCInitClass.init!initializer.1 : (ObjCInitClass.Type) -> () -> ObjCInitClass, $@convention(method) (@owned ObjCInitClass) -> @owned ObjCInitClass
+    // CHECK:   [[BORROWED_SELF_ALLOC_C:%.*]] = begin_borrow [[SELF_ALLOC_C]]
+    // CHECK:   [[OBJC_INIT:%[0-9]+]] = class_method [[BORROWED_SELF_ALLOC_C]] : $ObjCInitClass, #ObjCInitClass.init!initializer.1 : (ObjCInitClass.Type) -> () -> ObjCInitClass, $@convention(method) (@owned ObjCInitClass) -> @owned ObjCInitClass
     // CHECK:   [[SELF_RESULT:%[0-9]+]] = apply [[OBJC_INIT]]([[SELF_ALLOC_C]]) : $@convention(method) (@owned ObjCInitClass) -> @owned ObjCInitClass
     // CHECK:   [[SELF_RESULT_AS_SELF:%[0-9]+]] = unchecked_ref_cast [[SELF_RESULT]] : $ObjCInitClass to $Self
     // CHECK:   assign [[SELF_RESULT_AS_SELF]] to [[PB_SELF_BOX]] : $*Self

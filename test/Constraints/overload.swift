@@ -222,3 +222,4 @@ func curry<F, S, T, R>(_ f: @escaping (F, S, T) -> R) -> (F) -> (S) -> (T) -> R 
 // Ensure that we consider these unambiguous
 let _ = curry(+)(1)
 let _ = [0].reduce(0, +)
+let _ = curry(+)("string vs. pointer")

@@ -328,7 +328,7 @@ public:
   /// Replace references to substitutable types with error types.
   Type substDependentTypesWithErrorTypes() const;
 
-  bool isPrivateStdlibType(bool whitelistProtocols=true) const;
+  bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   void dump() const;
   void dump(raw_ostream &os, unsigned indent = 0) const;
@@ -356,11 +356,11 @@ public:
   /// join of D and A (or D and B, or D and C) because there is no common
   /// superclass. One would have to jump to an existential (e.g., \c AnyObject)
   /// to find a common type.
-  /// 
-  /// \returns the join of the two types, if there is a concrete type that can
-  /// express the join, or a null type if the only join would be a more-general
-  /// existential type (e.g., \c Any).
-  static Type join(Type type1, Type type2);
+  ///
+  /// \returns the join of the two types, if there is a concrete type
+  /// that can express the join, or Any if the only join would be a
+  /// more-general existential type
+  static Type join(Type first, Type second);
 
 private:
   // Direct comparison is disabled for types, because they may not be canonical.
@@ -381,7 +381,7 @@ class CanType : public Type {
   static CanType getAnyOptionalObjectTypeImpl(CanType type,
                                               OptionalTypeKind &kind);
   static CanType getReferenceStorageReferentImpl(CanType type);
-  static CanType getLValueOrInOutObjectTypeImpl(CanType type);
+  static CanType getWithoutSpecifierTypeImpl(CanType type);
 
 public:
   explicit CanType(TypeBase *P = 0) : Type(P) {
@@ -459,8 +459,8 @@ public:
     return getReferenceStorageReferentImpl(*this);
   }
   
-  CanType getLValueOrInOutObjectType() const {
-    return getLValueOrInOutObjectTypeImpl(*this);
+  CanType getWithoutSpecifierType() const {
+    return getWithoutSpecifierTypeImpl(*this);
   }
 
   // Direct comparison is allowed for CanTypes - they are known canonical.
@@ -577,7 +577,7 @@ public:
 
   /// Retrieve the canonical generic environment associated with this
   /// generic signature.
-  GenericEnvironment *getGenericEnvironment(ModuleDecl &module) const;
+  GenericEnvironment *getGenericEnvironment() const;
 
   GenericSignature *operator->() const {
     return Signature;

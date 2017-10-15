@@ -28,9 +28,16 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
+
+/// This flag is used to disable alloc stack optimizations to ease testing of
+/// other SILCombine optimizations.
+static llvm::cl::opt<bool>
+    DisableAllocStackOpts("sil-combine-disable-alloc-stack-opts",
+                          llvm::cl::init(false));
 
 SILInstruction*
 SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
@@ -334,6 +341,11 @@ public:
 } // end anonymous namespace
 
 SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
+  // If we are testing SILCombine and we are asked not to eliminate
+  // alloc_stacks, just return.
+  if (DisableAllocStackOpts)
+    return nullptr;
+
   AllocStackAnalyzer Analyzer(AS);
   Analyzer.analyze();
 
@@ -419,7 +431,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 
   // Erase the 'live-range'
   for (auto *Inst : ToDelete) {
-    Inst->replaceAllUsesWithUndef();
+    Inst->replaceAllUsesOfAllResultsWithUndef();
     eraseInstFromFunction(*Inst);
   }
   return eraseInstFromFunction(*AS);
@@ -435,7 +447,8 @@ SILInstruction *SILCombiner::visitAllocRefInst(AllocRefInst *AR) {
     auto *Op = *UI;
     ++UI;
     auto *User = Op->getUser();
-    if (!isa<DeallocRefInst>(User) && !isa<SetDeallocatingInst>(User)) {
+    if (!isa<DeallocRefInst>(User) && !isa<SetDeallocatingInst>(User) &&
+        !isa<FixLifetimeInst>(User)) {
       HasNonRemovableUses = true;
       break;
     }
@@ -464,7 +477,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // Given a load with multiple struct_extracts/tuple_extracts and no other
   // uses, canonicalize the load into several (struct_element_addr (load))
   // pairs.
-  using ProjInstPairTy = std::pair<Projection, SILInstruction *>;
+  using ProjInstPairTy = std::pair<Projection, SingleValueInstruction *>;
 
   // Go through the loads uses and add any users that are projections to the
   // projection list.
@@ -476,7 +489,8 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     if (!isa<StructExtractInst>(User) && !isa<TupleExtractInst>(User))
       return nullptr;
 
-    Projections.push_back({Projection(User), User});
+    auto extract = cast<SingleValueInstruction>(User);
+    Projections.push_back({Projection(extract), extract});
   }
 
   // The reason why we sort the list is so that we will process projections with
@@ -654,7 +668,7 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
 
   for (auto *Inst : ToRemove) {
     // Replace any still-remaining uses with undef and erase.
-    Inst->replaceAllUsesWithUndef();
+    Inst->replaceAllUsesOfAllResultsWithUndef();
     eraseInstFromFunction(*Inst);
   }
 
@@ -848,7 +862,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
   // If the enum does not have a payload create the enum/store since we don't
   // need to worry about payloads.
-  if (!IEAI->getElement()->getArgumentInterfaceType()) {
+  if (!IEAI->getElement()->hasAssociatedValues()) {
     EnumInst *E =
       Builder.createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
                           IEAI->getOperand()->getType().getObjectType());
@@ -1042,7 +1056,7 @@ visitUnreachableInst(UnreachableInst *UI) {
 
   for (auto *Inst : ToRemove) {
     // Replace any still-remaining uses with undef values and erase.
-    Inst->replaceAllUsesWithUndef();
+    Inst->replaceAllUsesOfAllResultsWithUndef();
     eraseInstFromFunction(*Inst);
   }
 
@@ -1345,7 +1359,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
   if (auto *UC = dyn_cast<UpcastInst>(MDVal))
     MDVal = UC->getOperand();
 
-  SILInstruction *NewInst = nullptr;
+  SingleValueInstruction *NewInst = nullptr;
   if (auto *MI = dyn_cast<MetatypeInst>(MDVal)) {
     auto &Mod = ARDI->getModule();
     auto SILInstanceTy = MI->getType().getMetatypeInstanceType(Mod);

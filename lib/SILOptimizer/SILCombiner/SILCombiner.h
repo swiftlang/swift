@@ -51,10 +51,8 @@ public:
 
   /// If the given ValueBase is a SILInstruction add it to the worklist.
   void addValue(ValueBase *V) {
-    auto *I = dyn_cast<SILInstruction>(V);
-    if (!I)
-      return;
-    add(I);
+    if (auto *I = V->getDefiningInstruction())
+      add(I);
   }
 
   /// Add the given list of instructions in reverse order to the worklist. This
@@ -82,11 +80,20 @@ public:
   }
 
   /// When an instruction has been simplified, add all of its users to the
-  /// worklist since additional simplifications of its users may have been
+  /// worklist, since additional simplifications of its users may have been
   /// exposed.
   void addUsersToWorklist(ValueBase *I) {
     for (auto UI : I->getUses())
       add(UI->getUser());
+  }
+
+  /// When an instruction has been simplified, add all of its users to the
+  /// worklist, since additional simplifications of its users may have been
+  /// exposed.
+  void addUsersOfAllResultsToWorklist(SILInstruction *I) {
+    for (auto result : I->getResults()) {
+      addUsersToWorklist(result);
+    }
   }
 
   /// Check that the worklist is empty and nuke the backing store for the map if
@@ -107,6 +114,8 @@ class SILCombiner :
 
   AliasAnalysis *AA;
 
+  DominanceAnalysis *DA;
+
   /// Worklist containing all of the instructions primed for simplification.
   SILCombineWorklist Worklist;
 
@@ -126,11 +135,12 @@ class SILCombiner :
   CastOptimizer CastOpt;
 
 public:
-  SILCombiner(SILBuilder &B, AliasAnalysis *AA, bool removeCondFails)
-      : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
-        Iteration(0), Builder(B),
+  SILCombiner(SILBuilder &B, AliasAnalysis *AA, DominanceAnalysis *DA,
+              bool removeCondFails)
+      : AA(AA), DA(DA), Worklist(), MadeChange(false),
+        RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
         CastOpt(/* ReplaceInstUsesAction */
-                [&](SILInstruction *I, ValueBase * V) {
+                [&](SingleValueInstruction *I, ValueBase *V) {
                   replaceInstUsesWith(*I, V);
                 },
                 /* EraseAction */
@@ -152,7 +162,9 @@ public:
   // replaceable with another preexisting expression. Here we add all uses of I
   // to the worklist, replace all uses of I with the new value, then return I,
   // so that the combiner will know that I was modified.
-  SILInstruction *replaceInstUsesWith(SILInstruction &I, ValueBase *V);
+  void replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V);
+
+  void replaceInstUsesPairwiseWith(SILInstruction *oldI, SILInstruction *newI);
 
   // Some instructions can never be "trivially dead" due to side effects or
   // producing a void value. In those cases, since we cannot rely on
@@ -175,7 +187,7 @@ public:
   }
 
   /// Base visitor that does not do anything.
-  SILInstruction *visitValueBase(ValueBase *V) { return nullptr; }
+  SILInstruction *visitSILInstruction(SILInstruction *I) { return nullptr; }
 
   /// Instruction visitors.
   SILInstruction *visitReleaseValueInst(ReleaseValueInst *DI);

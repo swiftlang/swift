@@ -1,6 +1,6 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -8,7 +8,7 @@ import Foundation
 
 @objc class Foo {
 // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3fooS3ic_Si1xtFTo :
-  // CHECK: bb0([[ARG1:%.*]] : $@convention(block) (Int) -> Int, {{.*}}, [[SELF:%.*]] : $Foo):
+  // CHECK: bb0([[ARG1:%.*]] : @unowned $@convention(block) (Int) -> Int, {{.*}}, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[ARG1_COPY:%.*]] = copy_block [[ARG1]]
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[THUNK:%.*]] = function_ref @_T0S2iIyByd_S2iIxyd_TR
@@ -23,7 +23,7 @@ import Foundation
   }
 
   // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3barS3Sc_SS1xtFTo : $@convention(objc_method) (@convention(block) (NSString) -> @autoreleased NSString, NSString, Foo) -> @autoreleased NSString {
-  // CHECK:       bb0([[BLOCK:%.*]] : $@convention(block) (NSString) -> @autoreleased NSString, [[NSSTRING:%.*]] : $NSString, [[SELF:%.*]] : $Foo):
+  // CHECK:       bb0([[BLOCK:%.*]] : @unowned $@convention(block) (NSString) -> @autoreleased NSString, [[NSSTRING:%.*]] : @unowned $NSString, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:         [[NSSTRING_COPY:%.*]] = copy_value [[NSSTRING]]
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -39,7 +39,7 @@ import Foundation
   }
 
   // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3basSSSgA2Ec_AE1xtFTo : $@convention(objc_method) (@convention(block) (Optional<NSString>) -> @autoreleased Optional<NSString>, Optional<NSString>, Foo) -> @autoreleased Optional<NSString> {
-  // CHECK:       bb0([[BLOCK:%.*]] : $@convention(block) (Optional<NSString>) -> @autoreleased Optional<NSString>, [[OPT_STRING:%.*]] : $Optional<NSString>, [[SELF:%.*]] : $Foo):
+  // CHECK:       bb0([[BLOCK:%.*]] : @unowned $@convention(block) (Optional<NSString>) -> @autoreleased Optional<NSString>, [[OPT_STRING:%.*]] : @unowned $Optional<NSString>, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:         [[OPT_STRING_COPY:%.*]] = copy_value [[OPT_STRING]]
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -54,7 +54,7 @@ import Foundation
   }
 
   // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC16cFunctionPointer{{[_0-9a-zA-Z]*}}FTo
-  // CHECK:       bb0([[F:%.*]] : $@convention(c) (Int) -> Int, [[X:%.*]] : $Int, [[SELF:%.*]] : $Foo):
+  // CHECK:       bb0([[F:%.*]] : @trivial $@convention(c) (Int) -> Int, [[X:%.*]] : @trivial $Int, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @_T020objc_blocks_bridging3FooC16cFunctionPointer{{[_0-9a-zA-Z]*}}F
@@ -67,10 +67,10 @@ import Foundation
 
   // Blocks and C function pointers must not be reabstracted when placed in optionals.
   // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC7optFunc{{[_0-9a-zA-Z]*}}FTo
-  // CHECK: bb0([[ARG0:%.*]] : $Optional<@convention(block) (NSString) -> @autoreleased NSString>,
+  // CHECK: bb0([[ARG0:%.*]] : @unowned $Optional<@convention(block) (NSString) -> @autoreleased NSString>,
   // CHECK:         [[COPY:%.*]] = copy_block [[ARG0]]
   // CHECK:         switch_enum [[COPY]] : $Optional<@convention(block) (NSString) -> @autoreleased NSString>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
-  // CHECK: [[SOME_BB]]([[BLOCK:%.*]] : $@convention(block) (NSString) -> @autoreleased NSString):
+  // CHECK: [[SOME_BB]]([[BLOCK:%.*]] : @owned $@convention(block) (NSString) -> @autoreleased NSString):
   // TODO: redundant reabstractions here
   // CHECK:         [[BLOCK_THUNK:%.*]] = function_ref @_T0So8NSStringCABIyBya_S2SIxxo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[BLOCK_THUNK]]([[BLOCK]])
@@ -96,9 +96,9 @@ func callBlocks(_ x: Foo,
   g: @escaping (String) -> String,
   h: @escaping (String?) -> String?
 ) -> (Int, String, String?, String?) {
-  // CHECK: bb0([[ARG0:%.*]] : $Foo, [[ARG1:%.*]] : $@callee_owned (Int) -> Int, [[ARG2:%.*]] : $@callee_owned (@owned String) -> @owned String, [[ARG3:%.*]] : $@callee_owned (@owned Optional<String>) -> @owned Optional<String>):
+  // CHECK: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @owned $@callee_owned (Int) -> Int, [[ARG2:%.*]] : @owned $@callee_owned (@owned String) -> @owned String, [[ARG3:%.*]] : @owned $@callee_owned (@owned Optional<String>) -> @owned Optional<String>):
   // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-  // CHECK: [[FOO:%.*]] =  class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.foo!1.foreign
+  // CHECK: [[FOO:%.*]] =  objc_method [[BORROWED_ARG0]] : $Foo, #Foo.foo!1.foreign
   // CHECK: [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
   // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
   // CHECK: [[F_BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage
@@ -110,14 +110,14 @@ func callBlocks(_ x: Foo,
   // CHECK: apply [[FOO]]([[F_BLOCK]]
 
   // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-  // CHECK: [[BAR:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.bar!1.foreign
+  // CHECK: [[BAR:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.bar!1.foreign
   // CHECK: [[G_BLOCK_INVOKE:%.*]] = function_ref @_T0S2SIxxo_So8NSStringCABIyBya_TR
   // CHECK: [[G_STACK_BLOCK:%.*]] = init_block_storage_header {{.*}}, invoke [[G_BLOCK_INVOKE]]
   // CHECK: [[G_BLOCK:%.*]] = copy_block [[G_STACK_BLOCK]]
   // CHECK: apply [[BAR]]([[G_BLOCK]]
 
   // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-  // CHECK: [[BAS:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.bas!1.foreign
+  // CHECK: [[BAS:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.bas!1.foreign
   // CHECK: [[H_BLOCK_INVOKE:%.*]] = function_ref @_T0SSSgAAIxxo_So8NSStringCSgADIyBya_TR
   // CHECK: [[H_STACK_BLOCK:%.*]] = init_block_storage_header {{.*}}, invoke [[H_BLOCK_INVOKE]]
   // CHECK: [[H_BLOCK:%.*]] = copy_block [[H_STACK_BLOCK]]

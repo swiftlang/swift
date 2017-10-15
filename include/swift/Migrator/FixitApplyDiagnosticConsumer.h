@@ -19,7 +19,10 @@
 
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Migrator/FixitFilter.h"
+#include "swift/Migrator/Migrator.h"
+#include "swift/Migrator/Replacement.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/ADT/DenseSet.h"
 
 namespace swift {
 
@@ -29,6 +32,8 @@ struct MigratorOptions;
 class SourceManager;
 
 namespace migrator {
+
+struct Replacement;
 
 class FixitApplyDiagnosticConsumer final
   : public DiagnosticConsumer, public FixitFilter {
@@ -44,6 +49,10 @@ class FixitApplyDiagnosticConsumer final
   /// The number of fix-its pushed into the rewrite buffer. Use this to
   /// determine whether to call `printResult`.
   unsigned NumFixitsApplied;
+
+  /// Tracks previous replacements so we don't pump the rewrite buffer with
+  /// multiple equivalent replacements, which can result in weird behavior.
+  llvm::SmallSet<Replacement, 32> Replacements;
 
 public:
   FixitApplyDiagnosticConsumer(const StringRef Text,

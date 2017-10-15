@@ -52,12 +52,14 @@ class NullEditorConsumer : public EditorConsumer {
                                  unsigned NameLength,
                                  unsigned BodyOffset,
                                  unsigned BodyLength,
+                                 unsigned DocOffset,
+                                 unsigned DocLength,
                                  StringRef DisplayName,
                                  StringRef TypeName,
                                  StringRef RuntimeName,
                                  StringRef SelectorName,
                                  ArrayRef<StringRef> InheritedTypes,
-                                 ArrayRef<UIdent> Attrs) override {
+                                 ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override {
     return false;
   }
 
@@ -134,8 +136,8 @@ public:
     Semaphore sema(0);
 
     TestCursorInfo TestInfo;
-    getLang().getCursorInfo(DocName, Offset, 0, false, Args,
-      [&](const CursorInfo &Info) {
+    getLang().getCursorInfo(DocName, Offset, 0, false, false, Args,
+      [&](const CursorInfoData &Info) {
         TestInfo.Name = Info.Name;
         TestInfo.Typename = Info.TypeName;
         TestInfo.Filename = Info.Filename;

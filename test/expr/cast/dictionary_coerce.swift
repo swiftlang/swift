@@ -24,11 +24,11 @@ dictCC = dictDC
 dictCC = dictDD
 
 dictCD = dictDD
-dictCD = dictCC // expected-error{{cannot assign value of type 'Dictionary<C, C>' to type 'Dictionary<C, D>'}}
+dictCD = dictCC // expected-error{{cannot assign value of type '[C : C]' to type '[C : D]'}}
 
 
 dictDC = dictDD
-dictDC = dictCD // expected-error{{cannot assign value of type 'Dictionary<C, D>' to type 'Dictionary<D, C>'}}
+dictDC = dictCD // expected-error{{cannot assign value of type '[C : D]' to type '[D : C]'}}
 
-dictDD = dictCC // expected-error{{cannot assign value of type 'Dictionary<C, C>' to type 'Dictionary<D, D>'}}
+dictDD = dictCC // expected-error{{cannot assign value of type '[C : C]' to type '[D : D]'}}
 

@@ -54,6 +54,8 @@ private:
 
 public:
   FormatterDocument(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
+    // Formatting logic requires tokens on source file.
+    CompInv.getLangOptions().KeepTokensInSourceFile = true;
     updateCode(std::move(Buffer));
   }
 
@@ -94,9 +96,8 @@ private:
   }
 
 public:
-  void setMainExecutablePath(const std::string &Path) {
-    MainExecutablePath = Path;
-  }
+  SwiftFormatInvocation(const std::string &ExecPath)
+      : MainExecutablePath(ExecPath) {}
 
   const std::string &getOutputFilename() { return OutputFilename; }
 
@@ -137,13 +138,11 @@ public:
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        A->getAsString(ParsedArgs), A->getValue());
 
-    for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_line_range),
-                                   ParsedArgs.filtered_end()))
+    for (const Arg *A : ParsedArgs.filtered(OPT_line_range))
       LineRanges.push_back(A->getValue());
 
     if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
-      for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_UNKNOWN),
-                                     ParsedArgs.filtered_end())) {
+      for (const Arg *A : ParsedArgs.filtered(OPT_UNKNOWN)) {
         Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
                        A->getAsString(ParsedArgs));
       }
@@ -157,14 +156,8 @@ public:
       return 1;
     }
 
-    for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_INPUT),
-                                   ParsedArgs.filtered_end())) {
+    for (const Arg *A : ParsedArgs.filtered(OPT_INPUT)) {
       InputFilenames.push_back(A->getValue());
-    }
-
-    if (InputFilenames.empty()) {
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
-      return 1;
     }
 
     if (const Arg *A = ParsedArgs.getLastArg(OPT_o)) {
@@ -247,14 +240,12 @@ int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
   PrintingDiagnosticConsumer PDC;
   Instance.addDiagnosticConsumer(&PDC);
 
-  SwiftFormatInvocation Invocation;
-  std::string MainExecutablePath =
-      llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
-  Invocation.setMainExecutablePath(MainExecutablePath);
+  SwiftFormatInvocation Invocation(
+      llvm::sys::fs::getMainExecutable(Argv0, MainAddr));
 
   DiagnosticEngine &Diags = Instance.getDiags();
   if (Invocation.parseArgs(Args, Diags) != 0)
-    return 1;
+    return EXIT_FAILURE;
 
   std::vector<std::string> InputFiles = Invocation.getInputFilenames();
   unsigned NumInputFiles = InputFiles.size();
@@ -268,10 +259,11 @@ int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
       // We don't support formatting file ranges for multiple files.
       Instance.getDiags().diagnose(SourceLoc(),
                                    diag::error_formatting_multiple_file_ranges);
-      return 1;
+      return EXIT_FAILURE;
     }
     for (unsigned i = 0; i < NumInputFiles; ++i)
       Invocation.format(InputFiles[i], Diags);
   }
-  return 0;
+
+  return EXIT_SUCCESS;
 }

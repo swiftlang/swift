@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
@@ -176,20 +177,20 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
   if (!CD->isChildContextOf(DC))
     return false;
 
-  if (!CD->hasAccessibility())
+  if (!CD->hasAccess())
     return false;
 
   // Only consider 'private' members, unless we are in whole-module compilation.
   switch (CD->getEffectiveAccess()) {
-  case Accessibility::Open:
+  case AccessLevel::Open:
     return false;
-  case Accessibility::Public:
-  case Accessibility::Internal:
+  case AccessLevel::Public:
+  case AccessLevel::Internal:
     if (!M.isWholeModule())
       return false;
     break;
-  case Accessibility::FilePrivate:
-  case Accessibility::Private:
+  case AccessLevel::FilePrivate:
+  case AccessLevel::Private:
     break;
   }
 
@@ -202,15 +203,15 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
   if (CHA) {
     if (!CHA->hasKnownDirectSubclasses(CD)) {
       switch (CD->getEffectiveAccess()) {
-      case Accessibility::Open:
+      case AccessLevel::Open:
         return false;
-      case Accessibility::Public:
-      case Accessibility::Internal:
+      case AccessLevel::Public:
+      case AccessLevel::Internal:
         if (!M.isWholeModule())
           return false;
         break;
-      case Accessibility::FilePrivate:
-      case Accessibility::Private:
+      case AccessLevel::FilePrivate:
+      case AccessLevel::Private:
         break;
       }
 
@@ -329,8 +330,8 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
         continue;
       }
       // Look through strong_pin instructions.
-      if (isa<StrongPinInst>(V)) {
-        WorkList.push_back(cast<SILInstruction>(V)->getOperand(0));
+      if (auto pin = dyn_cast<StrongPinInst>(V)) {
+        WorkList.push_back(pin->getOperand());
         continue;
       }
     }
@@ -484,9 +485,8 @@ getSubstitutionsForCallee(SILModule &M,
 SILFunction *swift::getTargetClassMethod(SILModule &M,
                                          SILType ClassOrMetatypeType,
                                          MethodInst *MI) {
-  assert((isa<ClassMethodInst>(MI) || isa<WitnessMethodInst>(MI) ||
-          isa<SuperMethodInst>(MI)) &&
-         "Only class_method and witness_method instructions are supported");
+  assert((isa<ClassMethodInst>(MI) || isa<SuperMethodInst>(MI)) &&
+         "Only class_method and super_method instructions are supported");
 
   SILDeclRef Member = MI->getMember();
   if (ClassOrMetatypeType.is<MetatypeType>())
@@ -541,11 +541,6 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
     // hidden symbol.
     if (!F->hasValidLinkageForFragileRef())
       return false;
-  }
-
-  if (MI->isVolatile()) {
-    // dynamic dispatch is semantically required, can't devirtualize
-    return false;
   }
 
   return true;
@@ -613,8 +608,6 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
   SILType ResultTy = substConv.getSILResultType();
 
-  SILType SubstCalleeSILType =
-    SILType::getPrimitiveObjectType(SubstCalleeType);
   FullApplySite NewAI;
 
   SILBasicBlock *ResultBB = nullptr;
@@ -624,9 +617,10 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   SmallVector<Operand *, 4> OriginalResultUses;
 
   if (!isa<TryApplyInst>(AI)) {
-    NewAI = B.createApply(AI.getLoc(), FRI, SubstCalleeSILType, ResultTy,
-                          Subs, NewArgs, cast<ApplyInst>(AI)->isNonThrowing());
-    ResultValue = NewAI.getInstruction();
+    auto apply = B.createApply(AI.getLoc(), FRI, Subs, NewArgs,
+                               cast<ApplyInst>(AI)->isNonThrowing());
+    NewAI = apply;
+    ResultValue = apply;
   } else {
     auto *TAI = cast<TryApplyInst>(AI);
     // Create new normal and error BBs only if:
@@ -651,9 +645,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
                                  ValueOwnershipKind::Owned);
     }
 
-    NewAI = B.createTryApply(AI.getLoc(), FRI, SubstCalleeSILType,
-                             Subs, NewArgs,
-                             ResultBB, ErrorBB);
+    NewAI = B.createTryApply(AI.getLoc(), FRI, Subs, NewArgs, ResultBB, ErrorBB);
     if (ErrorBB != TAI->getErrorBB()) {
       B.setInsertionPoint(ErrorBB);
       B.createBranch(TAI->getLoc(), TAI->getErrorBB(),
@@ -698,7 +690,6 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
         Use->set(ResultValue);
       }
     }
-    return std::make_pair(NewAI.getInstruction(), NewAI);
   }
 
   // We need to return a pair of values here:
@@ -722,7 +713,8 @@ DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
 //===----------------------------------------------------------------------===//
 
 static SubstitutionMap
-getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
+getSubstitutionsForProtocolConformance(ModuleDecl *M,
+                                       ProtocolConformanceRef CRef) {
   auto C = CRef.getConcrete();
 
   // Walk down to the base NormalProtocolConformance.
@@ -756,8 +748,7 @@ getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
 
   if (Subs.empty()) {
     auto *DC = NormalC->getDeclContext();
-    return NormalC->getType()
-      ->getContextSubstitutionMap(DC->getParentModule(), DC);
+    return NormalC->getType()->getContextSubstitutionMap(M, DC);
   }
 
   return NormalC->getGenericSignature()->getSubstitutionMap(Subs);
@@ -774,17 +765,50 @@ getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
 /// are written in terms of the requirement's generic signature need
 /// to be remapped to substitutions suitable for the witness signature.
 ///
+/// Supported remappings are:
+///
+/// - (Concrete witness thunk) Original substitutions:
+///   [Self := ConcreteType, R0 := X0, R1 := X1, ...]
+/// - Requirement generic signature:
+///   <Self : P, R0, R1, ...>
+/// - Witness thunk generic signature:
+///   <W0, W1, ...>
+/// - Remapped substitutions:
+///   [W0 := X0, W1 := X1, ...]
+///
+/// - (Class witness thunk) Original substitutions:
+///   [Self := C<A0, A1>, T0 := X0, T1 := X1, ...]
+/// - Requirement generic signature:
+///   <Self : P, R0, R1, ...>
+/// - Witness thunk generic signature:
+///   <Self : C<B0, B1>, B0, B1, W0, W1, ...>
+/// - Remapped substitutions:
+///   [Self := C<B0, B1>, B0 := A0, B1 := A1, W0 := X0, W1 := X1]
+///
+/// - (Default witness thunk) Original substitutions:
+///   [Self := ConcreteType, R0 := X0, R1 := X1, ...]
+/// - Requirement generic signature:
+///   <Self : P, R0, R1, ...>
+/// - Witness thunk generic signature:
+///   <Self : P, W0, W1, ...>
+/// - Remapped substitutions:
+///   [Self := ConcreteType, W0 := X0, W1 := X1, ...]
+///
 /// \param conformanceRef The (possibly-specialized) conformance
 /// \param requirementSig The generic signature of the requirement
 /// \param witnessThunkSig The generic signature of the witness method
 /// \param origSubs The substitutions from the call instruction
+/// \param isDefaultWitness True if this is a default witness method
+/// \param classWitness The ClassDecl if this is a class witness method
 static SubstitutionMap
 getWitnessMethodSubstitutions(
+    ModuleDecl *mod,
     ProtocolConformanceRef conformanceRef,
     GenericSignature *requirementSig,
     GenericSignature *witnessThunkSig,
     SubstitutionList origSubs,
-    bool isDefaultWitness) {
+    bool isDefaultWitness,
+    ClassDecl *classWitness) {
 
   if (witnessThunkSig == nullptr)
     return SubstitutionMap();
@@ -799,42 +823,67 @@ getWitnessMethodSubstitutions(
 
   // If `Self` maps to a bound generic type, this gives us the
   // substitutions for the concrete type's generic parameters.
-  auto baseSubMap = getSubstitutionsForProtocolConformance(conformanceRef);
+  auto baseSubMap = getSubstitutionsForProtocolConformance(mod, conformanceRef);
 
   unsigned baseDepth = 0;
   auto *rootConformance = conformance->getRootNormalConformance();
   if (auto *witnessSig = rootConformance->getGenericSignature())
     baseDepth = witnessSig->getGenericParams().back()->getDepth() + 1;
 
-  auto origDepth = 1;
+  // If the witness has a class-constrained 'Self' generic parameter,
+  // we have to build a new substitution map that shifts all generic
+  // parameters down by one.
+  if (classWitness != nullptr) {
+    auto *proto = conformance->getProtocol();
+    auto selfType = proto->getSelfInterfaceType();
+
+    auto selfSubMap = SubstitutionMap::getProtocolSubstitutions(
+        proto, selfType.subst(origSubMap), conformanceRef);
+    if (baseSubMap.empty()) {
+      assert(baseDepth == 0);
+      baseSubMap = selfSubMap;
+    } else {
+      baseSubMap = SubstitutionMap::combineSubstitutionMaps(
+          selfSubMap,
+          baseSubMap,
+          CombineSubstitutionMaps::AtDepth,
+          /*firstDepth=*/1,
+          /*secondDepth=*/0,
+          witnessThunkSig);
+    }
+    baseDepth += 1;
+  }
 
   return SubstitutionMap::combineSubstitutionMaps(
       baseSubMap,
       origSubMap,
       CombineSubstitutionMaps::AtDepth,
-      baseDepth,
-      origDepth,
+      /*firstDepth=*/baseDepth,
+      /*secondDepth=*/1,
       witnessThunkSig);
 }
 
 static SubstitutionMap
 getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
                               ProtocolConformanceRef CRef) {
+  auto witnessFnTy = F->getLoweredFunctionType();
+  assert(witnessFnTy->getRepresentation() ==
+         SILFunctionTypeRepresentation::WitnessMethod);
+
   auto requirementSig = AI.getOrigCalleeType()->getGenericSignature();
-  auto witnessThunkSig = F->getLoweredFunctionType()->getGenericSignature();
+  auto witnessThunkSig = witnessFnTy->getGenericSignature();
 
   SubstitutionList origSubs = AI.getSubstitutions();
 
+  auto *mod = Module.getSwiftModule();
   bool isDefaultWitness =
-    F->getLoweredFunctionType()->getRepresentation()
-      == SILFunctionTypeRepresentation::WitnessMethod &&
-    F->getLoweredFunctionType()->getDefaultWitnessMethodProtocol(
-                                                     *Module.getSwiftModule())
-      == CRef.getRequirement();
+    (witnessFnTy->getDefaultWitnessMethodProtocol()
+      == CRef.getRequirement());
+  auto *classWitness = witnessFnTy->getWitnessMethodClass(*mod);
 
   return getWitnessMethodSubstitutions(
-      CRef, requirementSig, witnessThunkSig,
-      origSubs, isDefaultWitness);
+      mod, CRef, requirementSig, witnessThunkSig,
+      origSubs, isDefaultWitness, classWitness);
 }
 
 /// Generate a new apply of a function_ref to replace an apply of a
@@ -882,8 +931,6 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   SILLocation Loc = AI.getLoc();
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
 
-  auto SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeCanType);
-  auto ResultSILType = substConv.getSILResultType();
   ApplySite SAI;
 
   SmallVector<Substitution, 4> NewSubs;
@@ -892,32 +939,27 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
 
   SILValue ResultValue;
   if (auto *A = dyn_cast<ApplyInst>(AI)) {
-    auto *NewAI =
-        Builder.createApply(Loc, FRI, SubstCalleeSILType, ResultSILType,
-                            NewSubs, Arguments, A->isNonThrowing());
+    auto *NewAI = Builder.createApply(Loc, FRI, NewSubs, Arguments,
+                                      A->isNonThrowing());
     // Check if any casting is required for the return value.
     ResultValue = castValueToABICompatibleType(&Builder, Loc, NewAI,
                                                NewAI->getType(), AI.getType());
-    SAI = ApplySite::isa(NewAI);
+    SAI = NewAI;
   }
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    SAI = Builder.createTryApply(Loc, FRI, SubstCalleeSILType,
-                                 NewSubs, Arguments,
+    SAI = Builder.createTryApply(Loc, FRI, NewSubs, Arguments,
                                  TAI->getNormalBB(), TAI->getErrorBB());
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
     auto PartialApplyConvention = PAI->getType()
                                       .getSwiftRValueType()
                                       ->getAs<SILFunctionType>()
                                       ->getCalleeConvention();
-    auto PAIResultType = SILBuilder::getPartialApplyResultType(
-        SubstCalleeSILType, Arguments.size(), Module, {},
-        PartialApplyConvention);
     auto *NewPAI = Builder.createPartialApply(
-        Loc, FRI, SubstCalleeSILType, NewSubs, Arguments, PAIResultType);
+        Loc, FRI, NewSubs, Arguments, PartialApplyConvention);
     // Check if any casting is required for the return value.
     ResultValue = castValueToABICompatibleType(
         &Builder, Loc, NewPAI, NewPAI->getType(), PAI->getType());
-    SAI = ApplySite::isa(NewPAI);
+    SAI = NewPAI;
   }
 
   NumWitnessDevirt++;

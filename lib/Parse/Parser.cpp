@@ -24,6 +24,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
+#include "swift/Parse/ParseSILSupport.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -35,21 +36,9 @@
 using namespace swift;
 
 void DelayedParsingCallbacks::anchor() { }
+void SILParserTUStateBase::anchor() { }
 
 namespace {
-  /// To assist debugging parser crashes, tell us the location of the
-  /// current token.
-  class PrettyStackTraceParser : public llvm::PrettyStackTraceEntry {
-    Parser &P;
-  public:
-    PrettyStackTraceParser(Parser &P) : P(P) {}
-    void print(llvm::raw_ostream &out) const override {
-      out << "With parser at source location: ";
-      P.Tok.getLoc().print(out, P.Context.SourceMgr);
-      out << '\n';
-    }
-  };
-
 /// A visitor that does delayed parsing of function bodies.
 class ParseDelayedFunctionBodies : public ASTWalker {
   PersistentParserState &ParserState;
@@ -134,27 +123,6 @@ static void parseDelayedDecl(
 }
 } // unnamed namespace
 
-bool swift::parseIntoSourceFile(SourceFile &SF,
-                                unsigned BufferID,
-                                bool *Done,
-                                SILParserState *SIL,
-                                PersistentParserState *PersistentState,
-                                DelayedParsingCallbacks *DelayedParseCB) {
-  SharedTimer timer("Parsing");
-  Parser P(BufferID, SF, SIL, PersistentState);
-  PrettyStackTraceParser StackTrace(P);
-
-  llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens, true);
-
-  if (DelayedParseCB)
-    P.setDelayedParsingCallbacks(DelayedParseCB);
-
-  bool FoundSideEffects = P.parseTopLevel();
-  *Done = P.Tok.is(tok::eof);
-
-  return FoundSideEffects;
-}
-
 void swift::performDelayedParsing(
     DeclContext *DC, PersistentParserState &PersistentState,
     CodeCompletionCallbacksFactory *CodeCompletionFactory) {
@@ -172,6 +140,8 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
                                 const SourceManager &SM,
                                 int BufID, std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
+  bool IsMultiline = Tok.IsMultilineString();
+  unsigned QuoteLen = IsMultiline ? 3 : 1;
   SmallVector<Lexer::StringSegment, 4> Segments;
   Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/nullptr);
   for (unsigned i = 0, e = Segments.size(); i != e; ++i) {
@@ -183,17 +153,17 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
       unsigned Len = Seg.Length;
       if (isFirst) {
         // Include the quote.
-        Loc = Loc.getAdvancedLoc(-1);
-        ++Len;
+        Loc = Loc.getAdvancedLoc(-QuoteLen);
+        Len += QuoteLen;
       }
       if (isLast) {
         // Include the quote.
-        ++Len;
+        Len += QuoteLen;
       }
 
       StringRef Text = SM.extractText({ Loc, Len });
       Token NewTok;
-      NewTok.setToken(tok::string_literal, Text);
+      NewTok.setToken(tok::string_literal, Text, IsMultiline);
       Toks.push_back(NewTok);
 
     } else {
@@ -280,7 +250,7 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
 }
 
 // TODO: Refactor into common implementation with swift::tokenize.
-std::vector<std::pair<RC<syntax::TokenSyntax>,
+std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                                  syntax::AbsolutePosition>>
 swift::tokenizeWithTrivia(const LangOptions &LangOpts,
                           const SourceManager &SM,
@@ -294,7 +264,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts,
           CommentRetentionMode::AttachToNextToken,
           TriviaRetentionMode::WithTrivia,
           Offset, EndOffset);
-  std::vector<std::pair<RC<syntax::TokenSyntax>,
+  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
   syntax::AbsolutePosition RunningPos;
   do {
@@ -310,7 +280,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
+Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState)
   : Parser(std::unique_ptr<Lexer>(
              new Lexer(SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
@@ -318,18 +288,136 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
                    /*InSILMode=*/SIL != nullptr,
                    SF.getASTContext().LangOpts.AttachCommentsToDecls
                    ? CommentRetentionMode::AttachToNextToken
-                   : CommentRetentionMode::None)), SF, SIL, PersistentState) {
+                   : CommentRetentionMode::None)), SF, SIL, PersistentState){
 }
 
+namespace {
+
+/// This is the token receiver that helps SourceFile to keep track of its
+/// underlying corrected token stream.
+class TokenRecorder: public ConsumeTokenReceiver {
+  ASTContext &Ctx;
+  SourceManager &SM;
+
+  // Token list ordered by their appearance in the source file.
+  std::vector<Token> &Bag;
+  unsigned BufferID;
+
+  // Registered token kind change. These changes are regiestered before the
+  // token is consumed, so we need to keep track of them here.
+  llvm::DenseMap<const void*, tok> TokenKindChangeMap;
+
+  std::vector<Token>::iterator lower_bound(SourceLoc Loc) {
+    return token_lower_bound(Bag, Loc);
+  }
+
+  std::vector<Token>::iterator lower_bound(Token Tok) {
+    return lower_bound(Tok.getLoc());
+  }
+
+  void relexComment(CharSourceRange CommentRange,
+                    llvm::SmallVectorImpl<Token> &Scracth) {
+    Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
+            CommentRetentionMode::ReturnAsTokens,
+            TriviaRetentionMode::WithoutTrivia,
+            SM.getLocOffsetInBuffer(CommentRange.getStart(), BufferID),
+            SM.getLocOffsetInBuffer(CommentRange.getEnd(), BufferID));
+    while(true) {
+      Token Result;
+      L.lex(Result);
+      if (Result.is(tok::eof))
+        break;
+      assert(Result.is(tok::comment));
+      Scracth.push_back(Result);
+    }
+  }
+
+public:
+  TokenRecorder(SourceFile &SF):
+  Ctx(SF.getASTContext()),
+  SM(SF.getASTContext().SourceMgr),
+  Bag(SF.getTokenVector()),
+  BufferID(SF.getBufferID().getValue()) {};
+
+  void finalize() override {
+
+    // We should consume the comments at the end of the file that don't attach
+    // to any tokens.
+    SourceLoc TokEndLoc;
+    if (!Bag.empty()) {
+      Token Last = Bag.back();
+      TokEndLoc = Last.getLoc().getAdvancedLoc(Last.getLength());
+    } else {
+
+      // Special case: the file contains nothing but comments.
+      TokEndLoc = SM.getLocForBufferStart(BufferID);
+    }
+    llvm::SmallVector<Token, 4> Scratch;
+    relexComment(CharSourceRange(SM, TokEndLoc,
+                                 SM.getRangeForBuffer(BufferID).getEnd()),
+                 Scratch);
+    // Accept these orphaned comments.
+    Bag.insert(Bag.end(), Scratch.begin(), Scratch.end());
+  }
+
+  void registerTokenKindChange(SourceLoc Loc, tok NewKind) override {
+    // If a token with the same location is already in the bag, update its kind.
+    auto Pos = lower_bound(Loc);
+    if (Pos != Bag.end() && Pos->getLoc().getOpaquePointerValue() ==
+        Loc.getOpaquePointerValue()) {
+      Pos->setKind(NewKind);
+      return;
+    }
+
+    // Save the update for later.
+    TokenKindChangeMap[Loc.getOpaquePointerValue()] = NewKind;
+  }
+
+  void receive(Token Tok) override {
+    // We filter out all tokens without valid location
+    if(Tok.getLoc().isInvalid())
+      return;
+
+    // If a token with the same location is already in the bag, skip this token.
+    auto Pos = lower_bound(Tok);
+    if (Pos != Bag.end() && Pos->getLoc().getOpaquePointerValue() ==
+        Tok.getLoc().getOpaquePointerValue()) {
+      return;
+    }
+
+    // Update Token kind if a kind update was regiestered before.
+    auto Found = TokenKindChangeMap.find(Tok.getLoc().
+                                         getOpaquePointerValue());
+    if (Found != TokenKindChangeMap.end()) {
+      Tok.setKind(Found->getSecond());
+    }
+
+    // If the token has comment attached to it, re-lexing these comments and
+    // consume them as separate tokens.
+    llvm::SmallVector<Token, 4> TokensToConsume;
+    if (Tok.hasComment()) {
+      relexComment(Tok.getCommentRange(), TokensToConsume);
+    }
+
+    TokensToConsume.push_back(Tok);
+    Bag.insert(Pos, TokensToConsume.begin(), TokensToConsume.end());
+  }
+};
+} // End of an anonymous namespace.
+
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
-               SILParserState *SIL, PersistentParserState *PersistentState)
+               SILParserTUStateBase *SIL,
+               PersistentParserState *PersistentState)
   : SourceMgr(SF.getASTContext().SourceMgr),
     Diags(SF.getASTContext().Diags),
     SF(SF),
     L(Lex.release()),
     SIL(SIL),
     CurDeclContext(&SF),
-    Context(SF.getASTContext()) {
+    Context(SF.getASTContext()),
+    TokReceiver(SF.shouldKeepTokens() ?
+                new TokenRecorder(SF) :
+                new ConsumeTokenReceiver())  {
 
   State = PersistentState;
   if (!State) {
@@ -352,23 +440,32 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
 
 Parser::~Parser() {
   delete L;
+  delete TokReceiver;
 }
 
 const Token &Parser::peekToken() {
   return L->peekNextToken();
 }
 
-SourceLoc Parser::consumeToken() {
+SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
   SourceLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
 
   if (IsParsingInterfaceTokens && !Tok.getText().empty()) {
     SF.recordInterfaceToken(Tok.getText());
   }
-
   L->lex(Tok);
   PreviousLoc = Loc;
   return Loc;
+}
+
+void Parser::consumeExtraToken(Token Extra) {
+  TokReceiver->receive(Extra);
+}
+
+SourceLoc Parser::consumeToken() {
+  TokReceiver->receive(Tok);
+  return consumeTokenWithoutFeedingReceiver();
 }
 
 SourceLoc Parser::getEndOfPreviousLoc() {
@@ -384,7 +481,7 @@ Parser::ParserPosition Parser::getParserPositionAfterFirstCharacter(Token T) {
 
 SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
   // Consumes one-character token (like '?', '<', '>' or '!') and returns
-  // it's location.
+  // its location.
 
   // Current token can be either one-character token we want to consume...
   if (Tok.getLength() == 1) {
@@ -519,6 +616,14 @@ void Parser::skipUntilDeclRBrace() {
 
 void Parser::skipUntilDeclStmtRBrace(tok T1) {
   while (Tok.isNot(T1, tok::eof, tok::r_brace, tok::pound_endif,
+                   tok::code_complete) &&
+         !isStartOfStmt() && !isStartOfDecl()) {
+    skipSingle();
+  }
+}
+
+void Parser::skipUntilDeclStmtRBrace(tok T1, tok T2) {
+  while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
                    tok::code_complete) &&
          !isStartOfStmt() && !isStartOfDecl()) {
     skipSingle();
@@ -768,7 +873,7 @@ void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
   assert(New != Prev && "Cannot conflict with self");
   diagnose(New->getLoc(), diag::decl_redefinition, New->isDefinition());
   diagnose(Prev->getLoc(), diag::previous_decldef, Prev->isDefinition(),
-             Prev->getName());
+           Prev->getBaseName());
 }
 
 struct ParserUnit::Implementation {
@@ -787,7 +892,8 @@ struct ParserUnit::Implementation {
       SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SourceFileKind::Main, BufferID,
-            SourceFile::ImplicitModuleImportKind::None)) {
+            SourceFile::ImplicitModuleImportKind::None,
+            Opts.KeepTokensInSourceFile)) {
   }
 };
 
@@ -834,25 +940,6 @@ const LangOptions &ParserUnit::getLangOptions() const {
 
 SourceFile &ParserUnit::getSourceFile() {
   return *Impl.SF;
-}
-
-ConditionalCompilationExprState
-swift::operator&&(ConditionalCompilationExprState lhs,
-                  ConditionalCompilationExprState rhs) {
-  return {lhs.isConditionActive() && rhs.isConditionActive(),
-    ConditionalCompilationExprKind::Binary};
-}
-
-ConditionalCompilationExprState
-swift::operator||(ConditionalCompilationExprState lhs,
-                  ConditionalCompilationExprState rhs) {
-  return {lhs.isConditionActive() || rhs.isConditionActive(),
-    ConditionalCompilationExprKind::Binary};
-}
-
-ConditionalCompilationExprState
-swift::operator!(ConditionalCompilationExprState state) {
-  return {!state.isConditionActive(), state.getKind()};
 }
 
 ParsedDeclName swift::parseDeclName(StringRef name) {

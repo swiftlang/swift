@@ -144,7 +144,7 @@ class C4_5a : P4, P5 {
 }
 
 class C6a : P6 {
-  func doSomething(sender: AnyObject?) { } // expected-error{{method 'doSomething(sender:)' has different argument names from those required by protocol 'P6' ('doSomething')}}{{20-20=_ }}{{none}}
+  func doSomething(sender: AnyObject?) { } // expected-error{{method 'doSomething(sender:)' has different argument labels from those required by protocol 'P6' ('doSomething')}}{{20-20=_ }}{{none}}
 }
 
 
@@ -245,4 +245,16 @@ class C8SubB: C8Base {
   }
 
   @objc(getTheProp) func collision() {} // okay
+}
+
+// These used to crash because the requirement is get-only.
+class C8SubRW: C8Base {
+  var prop: Int {
+    get { return 0 }
+    set {}
+  }
+}
+
+class C8SubRW2: C8Base {
+  var prop: Int = 0
 }

@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-@noescape var fn : () -> Int = { 4 }  // expected-error {{@noescape may only be used on 'parameter' declarations}} {{1-11=}}
+@noescape var fn : () -> Int = { 4 }  // expected-error {{attribute can only be applied to types, not declarations}}
 
 func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{@escaping conflicts with @noescape}}
  // expected-warning@-1{{@noescape is the default and is deprecated}} {{29-39=}}
@@ -170,7 +170,7 @@ func takeNoEscapeTest2(_ fn : @noescape () -> ()) {  // expected-warning{{@noesc
 
 // Autoclosure implies noescape, but produce nice diagnostics so people know
 // why noescape problems happen.
-func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly non-escaping because it was declared @autoclosure}}
+func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly non-escaping}}
   doesEscape { a() }  // expected-error {{closure use of non-escaping parameter 'a' may allow it to escape}}
 }
 
@@ -304,6 +304,7 @@ func apply<T, U>(_ f: @noescape (T) -> U, g: @noescape (@noescape (T) -> U) -> U
   // expected-warning@-2{{@noescape is the default and is deprecated}} {{46-56=}}
   // expected-warning@-3{{@noescape is the default and is deprecated}} {{57-66=}}
   return g(f)
+  // expected-warning@-1{{passing a non-escaping function parameter 'f' to a call to a non-escaping function parameter}}
 }
 
 // <rdar://problem/19997577> @noescape cannot be applied to locals, leading to duplication of code
@@ -326,17 +327,17 @@ enum r19997577Type {
 }
 
 // type attribute and decl attribute
-func noescapeD(@noescape f: @escaping () -> Bool) {} // expected-error {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-25=}} {{29-29=@noescape }}
+func noescapeD(@noescape f: @escaping () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
 func noescapeT(f: @noescape () -> Bool) {} // expected-warning{{@noescape is the default and is deprecated}} {{19-29=}}
-func noescapeG<T>(@noescape f: () -> T) {} // expected-error{{@noescape is now an attribute on a parameter type, instead of on the parameter itself}}
+func noescapeG<T>(@noescape f: () -> T) {} // expected-error{{attribute can only be applied to types, not declarations}}
 
-func autoclosureD(@autoclosure f: () -> Bool) {} // expected-error {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-31=}} {{35-35=@autoclosure }}
+func autoclosureD(@autoclosure f: () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
 func autoclosureT(f: @autoclosure () -> Bool) {}  // ok
-func autoclosureG<T>(@autoclosure f: () -> T) {} // expected-error{{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}}
+func autoclosureG<T>(@autoclosure f: () -> T) {} // expected-error{{attribute can only be applied to types, not declarations}}
 
-func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // expected-error {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}}
+func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
  // expected-warning@-1{{@noescape is the default and is deprecated}} {{39-49=}}
 
-func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-error {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-41=}} {{45-45=@autoclosure }}
+func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
  // expected-warning@-1{{@noescape is the default and is deprecated}} {{45-55=}}
 

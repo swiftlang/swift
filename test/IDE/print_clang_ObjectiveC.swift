@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=ObjectiveC.NSObject -function-definitions=false > %t/ObjectiveC.NSObject.printed.txt
 // RUN: %FileCheck -input-file %t/ObjectiveC.NSObject.printed.txt %s

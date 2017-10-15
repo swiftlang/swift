@@ -300,6 +300,19 @@ public struct URLResourceValues {
     /// Total free space in bytes.
     public var volumeAvailableCapacity : Int? { return _get(.volumeAvailableCapacityKey) }
     
+#if os(OSX) || os(iOS)
+    /// Total available capacity in bytes for "Important" resources, including space expected to be cleared by purging non-essential and cached resources. "Important" means something that the user or application clearly expects to be present on the local system, but is ultimately replaceable. This would include items that the user has explicitly requested via the UI, and resources that an application requires in order to provide functionality.
+    /// Examples: A video that the user has explicitly requested to watch but has not yet finished watching or an audio file that the user has requested to download.
+    /// This value should not be used in determining if there is room for an irreplaceable resource. In the case of irreplaceable resources, always attempt to save the resource regardless of available capacity and handle failure as gracefully as possible.
+    @available(OSX 10.13, iOS 11.0, *) @available(tvOS, unavailable) @available(watchOS, unavailable)
+    public var volumeAvailableCapacityForImportantUsage: Int64? { return _get(.volumeAvailableCapacityForImportantUsageKey) }
+    
+    /// Total available capacity in bytes for "Opportunistic" resources, including space expected to be cleared by purging non-essential and cached resources. "Opportunistic" means something that the user is likely to want but does not expect to be present on the local system, but is ultimately non-essential and replaceable. This would include items that will be created or downloaded without an explicit request from the user on the current device.
+    /// Examples: A background download of a newly available episode of a TV series that a user has been recently watching, a piece of content explicitly requested on another device, and a new document saved to a network server by the current user from another device.
+    @available(OSX 10.13, iOS 11.0, *) @available(tvOS, unavailable) @available(watchOS, unavailable)
+    public var volumeAvailableCapacityForOpportunisticUsage: Int64? { return _get(.volumeAvailableCapacityForOpportunisticUsageKey) }
+#endif
+    
     /// Total number of resources on the volume.
     public var volumeResourceCount : Int? { return _get(.volumeResourceCountKey) }
     
@@ -430,6 +443,28 @@ public struct URLResourceValues {
     /// returns the name of this item's container as displayed to users.
     @available(OSX 10.10, iOS 8.0, *)
     public var ubiquitousItemContainerDisplayName : String? { return _get(.ubiquitousItemContainerDisplayNameKey) }
+    
+#if os(OSX) || os(iOS)
+    // true if ubiquitous item is shared.
+    @available(OSX 10.13, iOS 11.0, *) @available(tvOS, unavailable) @available(watchOS, unavailable)
+    public var ubiquitousItemIsShared: Bool? { return _get(.ubiquitousItemIsSharedKey) }
+    
+    // The current user's role for this shared item, or nil if not shared
+    @available(OSX 10.13, iOS 11.0, *) @available(tvOS, unavailable) @available(watchOS, unavailable)
+    public var ubiquitousSharedItemCurrentUserRole: URLUbiquitousSharedItemRole? { return _get(.ubiquitousSharedItemCurrentUserRoleKey) }
+    
+    // The permissions for the current user, or nil if not shared.
+    @available(OSX 10.13, iOS 11.0, *) @available(tvOS, unavailable) @available(watchOS, unavailable)
+    public var ubiquitousSharedItemCurrentUserPermissions: URLUbiquitousSharedItemPermissions? { return _get(.ubiquitousSharedItemCurrentUserPermissionsKey) }
+    
+    // The name components for the owner, or nil if not shared.
+    @available(OSX 10.13, iOS 11.0, *) @available(tvOS, unavailable) @available(watchOS, unavailable)
+    public var ubiquitousSharedItemOwnerNameComponents: PersonNameComponents? { return _get(.ubiquitousSharedItemOwnerNameComponentsKey) }
+    
+    // The name components for the most recent editor, or nil if not shared.
+    @available(OSX 10.13, iOS 11.0, *) @available(tvOS, unavailable) @available(watchOS, unavailable)
+    public var ubiquitousSharedItemMostRecentEditorNameComponents: PersonNameComponents? { return _get(.ubiquitousSharedItemMostRecentEditorNameComponentsKey) }
+#endif
     
 #if !os(OSX)
     /// The protection level for this file
@@ -1169,6 +1204,34 @@ extension NSURL : _HasCustomAnyHashableRepresentation {
 extension URL : CustomPlaygroundQuickLookable {
     public var customPlaygroundQuickLook: PlaygroundQuickLook {
         return .url(absoluteString)
+    }
+}
+
+extension URL : Codable {
+    private enum CodingKeys : Int, CodingKey {
+        case base
+        case relative
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let relative = try container.decode(String.self, forKey: .relative)
+        let base = try container.decodeIfPresent(URL.self, forKey: .base)
+
+        guard let url = URL(string: relative, relativeTo: base) else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath,
+                                                                    debugDescription: "Invalid URL string."))
+        }
+
+        self = url
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.relativeString, forKey: .relative)
+        if let base = self.baseURL {
+            try container.encode(base, forKey: .base)
+        }
     }
 }
 

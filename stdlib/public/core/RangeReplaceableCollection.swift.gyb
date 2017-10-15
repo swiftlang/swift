@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME: swift-3-indexing-model: synchronize _Indexable with the actual
-// protocol.
 /// A type that supports replacement of an arbitrary subrange of elements with
 /// the elements of another collection.
 ///
@@ -23,176 +21,7 @@
 /// `RangeReplaceableCollection` protocol instead, because it has a more
 /// complete interface.
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
-public typealias RangeReplaceableIndexable = _RangeReplaceableIndexable
-public protocol _RangeReplaceableIndexable : _Indexable {
-  // FIXME(ABI)#58 (Recursive Protocol Constraints): there is no reason for this protocol
-  // to exist apart from missing compiler features that we emulate with it.
-  // rdar://problem/20531108
-  //
-  // This protocol is almost an implementation detail of the standard
-  // library.
-
-  /// Creates an empty instance.
-  init()
-
-  /// Creates a new collection containing the specified number of a single,
-  /// repeated value.
-  ///
-  /// Here's an example of creating an array initialized with five strings
-  /// containing the letter *Z*.
-  ///
-  ///     let fiveZs = Array(repeating: "Z", count: 5)
-  ///     print(fiveZs)
-  ///     // Prints "["Z", "Z", "Z", "Z", "Z"]"
-  ///
-  /// - Parameters:
-  ///   - repeatedValue: The element to repeat.
-  ///   - count: The number of times to repeat the value passed in the
-  ///     `repeating` parameter. `count` must be zero or greater.
-  init(repeating repeatedValue: _Element, count: Int)
-
-  /// Creates a new instance of a collection containing the elements of a
-  /// sequence.
-  ///
-  /// - Parameter elements: The sequence of elements for the new collection.
-  ///   `elements` must be finite.
-  init<S : Sequence>(_ elements: S) where S.Iterator.Element == _Element
-
-  /// Replaces the specified subrange of elements with the given collection.
-  ///
-  /// This method has the effect of removing the specified range of elements
-  /// from the collection and inserting the new elements at the same location.
-  /// The number of new elements need not match the number of elements being
-  /// removed.
-  ///
-  /// In this example, three elements in the middle of an array of integers are
-  /// replaced by the five elements of a `Repeated<Int>` instance.
-  ///
-  ///      var nums = [10, 20, 30, 40, 50]
-  ///      nums.replaceSubrange(1...3, with: repeatElement(1, count: 5))
-  ///      print(nums)
-  ///      // Prints "[10, 1, 1, 1, 1, 1, 50]"
-  ///
-  /// If you pass a zero-length range as the `subrange` parameter, this method
-  /// inserts the elements of `newElements` at `subrange.startIndex`. Calling
-  /// the `insert(contentsOf:at:)` method instead is preferred.
-  ///
-  /// Likewise, if you pass a zero-length collection as the `newElements`
-  /// parameter, this method removes the elements in the given subrange
-  /// without replacement. Calling the `removeSubrange(_:)` method instead is
-  /// preferred.
-  ///
-  /// Calling this method may invalidate any existing indices for use with this
-  /// collection.
-  ///
-  /// - Parameters:
-  ///   - subrange: The subrange of the collection to replace. The bounds of
-  ///     the range must be valid indices of the collection.
-  ///   - newElements: The new elements to add to the collection.
-  ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the collection
-  ///   and `newElements`. If the call to `replaceSubrange` simply appends the
-  ///   contents of `newElements` to the collection, the complexity is O(*n*),
-  ///   where *n* is the length of `newElements`.
-  mutating func replaceSubrange<C>(
-    _ subrange: Range<Index>,
-    with newElements: C
-  ) where C : Collection, C.Iterator.Element == _Element
-
-  /// Inserts a new element into the collection at the specified position.
-  ///
-  /// The new element is inserted before the element currently at the specified
-  /// index. If you pass the collection's `endIndex` property as the `index`
-  /// parameter, the new element is appended to the collection.
-  ///
-  ///     var numbers = [1, 2, 3, 4, 5]
-  ///     numbers.insert(100, at: 3)
-  ///     numbers.insert(200, at: numbers.endIndex)
-  ///
-  ///     print(numbers)
-  ///     // Prints "[1, 2, 3, 100, 4, 5, 200]"
-  ///
-  /// Calling this method may invalidate any existing indices for use with this
-  /// collection.
-  ///
-  /// - Parameters:
-  ///   - newElement: The new element to insert into the collection.
-  ///   - i: The position at which to insert the new element. `index` must be a
-  ///     valid index into the collection.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func insert(_ newElement: _Element, at i: Index)
-
-  /// Inserts the elements of a sequence into the collection at the specified
-  /// position.
-  ///
-  /// The new elements are inserted before the element currently at the
-  /// specified index. If you pass the collection's `endIndex` property as the
-  /// `index` parameter, the new elements are appended to the collection.
-  ///
-  /// Here's an example of inserting a range of integers into an array of the
-  /// same type:
-  ///
-  ///     var numbers = [1, 2, 3, 4, 5]
-  ///     numbers.insert(contentsOf: 100...103, at: 3)
-  ///     print(numbers)
-  ///     // Prints "[1, 2, 3, 100, 101, 102, 103, 4, 5]"
-  ///
-  /// Calling this method may invalidate any existing indices for use with this
-  /// collection.
-  ///
-  /// - Parameters:
-  ///   - newElements: The new elements to insert into the collection.
-  ///   - i: The position at which to insert the new elements. `index` must be
-  ///     a valid index of the collection.
-  ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the collection
-  ///   and `newElements`. If `i` is equal to the collection's `endIndex`
-  ///   property, the complexity is O(*n*), where *n* is the length of
-  ///   `newElements`.
-  mutating func insert<S : Collection>(
-    contentsOf newElements: S, at i: Index
-  ) where S.Iterator.Element == _Element
-
-  /// Removes and returns the element at the specified position.
-  ///
-  /// All the elements following the specified position are moved to close the
-  /// gap. This example removes the middle element from an array of
-  /// measurements.
-  ///
-  ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.6]
-  ///     let removed = measurements.remove(at: 2)
-  ///     print(measurements)
-  ///     // Prints "[1.2, 1.5, 1.2, 1.6]"
-  ///
-  /// Calling this method may invalidate any existing indices for use with this
-  /// collection.
-  ///
-  /// - Parameter i: The position of the element to remove. `index` must be
-  ///   a valid index of the collection that is not equal to the collection's
-  ///   end index.
-  /// - Returns: The removed element.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @discardableResult
-  mutating func remove(at i: Index) -> _Element
-
-  /// Removes the specified subrange of elements from the collection.
-  ///
-  ///     var bugs = ["Aphid", "Bumblebee", "Cicada", "Damselfly", "Earwig"]
-  ///     bugs.removeSubrange(1...3)
-  ///     print(bugs)
-  ///     // Prints "["Aphid", "Earwig"]"
-  ///
-  /// Calling this method may invalidate any existing indices for use with this
-  /// collection.
-  ///
-  /// - Parameter bounds: The subrange of the collection to remove. The bounds
-  ///   of the range must be valid indices of the collection.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func removeSubrange(_ bounds: Range<Index>)
-}
+public typealias RangeReplaceableIndexable = RangeReplaceableCollection
 
 /// A collection that supports replacement of an arbitrary subrange of elements
 /// with the elements of another collection.
@@ -241,11 +70,9 @@ public protocol _RangeReplaceableIndexable : _Indexable {
 /// `replaceSubrange(_:with:)` with an empty collection for the `newElements` 
 /// parameter. You can override any of the protocol's required methods to 
 /// provide your own custom implementation.
-public protocol RangeReplaceableCollection
-  : _RangeReplaceableIndexable, Collection
+public protocol RangeReplaceableCollection : Collection
 {
-  // FIXME(ABI)#165 (Recursive Protocol Constraints): should require `RangeReplaceableCollection`.
-  associatedtype SubSequence : _RangeReplaceableIndexable /*: RangeReplaceableCollection*/
+  associatedtype SubSequence : RangeReplaceableCollection
     = RangeReplaceableSlice<Self>
 
   //===--- Fundamental Requirements ---------------------------------------===//
@@ -292,7 +119,7 @@ public protocol RangeReplaceableCollection
   mutating func replaceSubrange<C>(
     _ subrange: Range<Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Iterator.Element
+  ) where C : Collection, C.Element == Element
 
   /// Prepares the collection to store the specified number of elements, when
   /// doing so is appropriate for the underlying type.
@@ -322,7 +149,7 @@ public protocol RangeReplaceableCollection
   ///   - repeatedValue: The element to repeat.
   ///   - count: The number of times to repeat the value passed in the
   ///     `repeating` parameter. `count` must be zero or greater.
-  init(repeating repeatedValue: Iterator.Element, count: Int)
+  init(repeating repeatedValue: Element, count: Int)
 
   /// Creates a new instance of a collection containing the elements of a
   /// sequence.
@@ -330,7 +157,7 @@ public protocol RangeReplaceableCollection
   /// - Parameter elements: The sequence of elements for the new collection.
   ///   `elements` must be finite.
   init<S : Sequence>(_ elements: S)
-    where S.Iterator.Element == Iterator.Element
+    where S.Element == Element
 
   /// Adds an element to the end of the collection.
   ///
@@ -348,7 +175,7 @@ public protocol RangeReplaceableCollection
   ///
   /// - Complexity: O(1) on average, over many additions to the same
   ///   collection.
-  mutating func append(_ newElement: Iterator.Element)
+  mutating func append(_ newElement: Element)
 
   /// Adds the elements of a sequence or collection to the end of this
   /// collection.
@@ -371,7 +198,7 @@ public protocol RangeReplaceableCollection
   // FIXME(ABI)#166 (Evolution): Consider replacing .append(contentsOf) with +=
   // suggestion in SE-91
   mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == Iterator.Element
+    where S.Element == Element
 
   /// Inserts a new element into the collection at the specified position.
   ///
@@ -395,7 +222,7 @@ public protocol RangeReplaceableCollection
   ///   `index` must be a valid index into the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func insert(_ newElement: Iterator.Element, at i: Index)
+  mutating func insert(_ newElement: Element, at i: Index)
 
   /// Inserts the elements of a sequence into the collection at the specified
   /// position.
@@ -424,7 +251,7 @@ public protocol RangeReplaceableCollection
   ///   property, the complexity is O(*n*), where *n* is the length of
   ///   `newElements`.
   mutating func insert<S : Collection>(contentsOf newElements: S, at i: Index)
-    where S.Iterator.Element == Iterator.Element
+    where S.Element == Element
 
   /// Removes and returns the element at the specified position.
   ///
@@ -447,13 +274,29 @@ public protocol RangeReplaceableCollection
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @discardableResult
-  mutating func remove(at i: Index) -> Iterator.Element
+  mutating func remove(at i: Index) -> Element
+
+  /// Removes the specified subrange of elements from the collection.
+  ///
+  ///     var bugs = ["Aphid", "Bumblebee", "Cicada", "Damselfly", "Earwig"]
+  ///     bugs.removeSubrange(1...3)
+  ///     print(bugs)
+  ///     // Prints "["Aphid", "Earwig"]"
+  ///
+  /// Calling this method may invalidate any existing indices for use with this
+  /// collection.
+  ///
+  /// - Parameter bounds: The subrange of the collection to remove. The bounds
+  ///   of the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  mutating func removeSubrange(_ bounds: Range<Index>)
 
   /// Customization point for `removeLast()`.  Implement this function if you
   /// want to replace the default implementation.
   ///
   /// - Returns: A non-nil value if the operation was performed.
-  mutating func _customRemoveLast() -> Iterator.Element?
+  mutating func _customRemoveLast() -> Element?
 
   /// Customization point for `removeLast(_:)`.  Implement this function if you
   /// want to replace the default implementation.
@@ -477,7 +320,7 @@ public protocol RangeReplaceableCollection
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @discardableResult
-  mutating func removeFirst() -> Iterator.Element
+  mutating func removeFirst() -> Element
 
   /// Removes the specified number of elements from the beginning of the
   /// collection.
@@ -509,6 +352,9 @@ public protocol RangeReplaceableCollection
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func removeAll(keepingCapacity keepCapacity: Bool /*= false*/)
+
+  // FIXME(ABI): Associated type inference requires this.
+  subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 
 //===----------------------------------------------------------------------===//
@@ -536,7 +382,7 @@ extension RangeReplaceableCollection {
   ///   - count: The number of times to repeat the value passed in the
   ///     `repeating` parameter. `count` must be zero or greater.
   @_inlineable
-  public init(repeating repeatedValue: Iterator.Element, count: Int) {
+  public init(repeating repeatedValue: Element, count: Int) {
     self.init()
     if count != 0 {
       let elements = Repeated(_repeating: repeatedValue, count: count)
@@ -550,7 +396,7 @@ extension RangeReplaceableCollection {
   /// - Parameter elements: The sequence of elements for the new collection.
   @_inlineable
   public init<S : Sequence>(_ elements: S)
-    where S.Iterator.Element == Iterator.Element {
+    where S.Element == Element {
     self.init()
     append(contentsOf: elements)
   }
@@ -572,7 +418,7 @@ extension RangeReplaceableCollection {
   /// - Complexity: O(1) on average, over many additions to the same
   ///   collection.
   @_inlineable
-  public mutating func append(_ newElement: Iterator.Element) {
+  public mutating func append(_ newElement: Element) {
     insert(newElement, at: endIndex)
   }
 
@@ -596,7 +442,7 @@ extension RangeReplaceableCollection {
   ///   collection.
   @_inlineable
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == Iterator.Element {
+    where S.Element == Element {
 
     let approximateCapacity = self.count +
       numericCast(newElements.underestimatedCount)
@@ -630,7 +476,7 @@ extension RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @_inlineable
   public mutating func insert(
-    _ newElement: Iterator.Element, at i: Index
+    _ newElement: Element, at i: Index
   ) {
     replaceSubrange(i..<i, with: CollectionOfOne(newElement))
   }
@@ -664,7 +510,7 @@ extension RangeReplaceableCollection {
   @_inlineable
   public mutating func insert<C : Collection>(
     contentsOf newElements: C, at i: Index
-  ) where C.Iterator.Element == Iterator.Element {
+  ) where C.Element == Element {
     replaceSubrange(i..<i, with: newElements)
   }
 
@@ -690,9 +536,9 @@ extension RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @_inlineable
   @discardableResult
-  public mutating func remove(at position: Index) -> Iterator.Element {
-    _precondition(!isEmpty, "can't remove from an empty collection")
-    let result: Iterator.Element = self[position]
+  public mutating func remove(at position: Index) -> Element {
+    _precondition(!isEmpty, "Can't remove from an empty collection")
+    let result: Element = self[position]
     replaceSubrange(position..<index(after: position), with: EmptyCollection())
     return result
   }
@@ -739,9 +585,9 @@ extension RangeReplaceableCollection {
   @_inlineable
   public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
-    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
-      "can't remove more items from a collection than it has")
+      "Can't remove more items from a collection than it has")
     let end = index(startIndex, offsetBy: numericCast(n))
     removeSubrange(startIndex..<end)
   }
@@ -763,9 +609,9 @@ extension RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @_inlineable
   @discardableResult
-  public mutating func removeFirst() -> Iterator.Element {
+  public mutating func removeFirst() -> Element {
     _precondition(!isEmpty,
-      "can't remove first element from an empty collection")
+      "Can't remove first element from an empty collection")
     let firstElement = first!
     removeFirst(1)
     return firstElement
@@ -813,8 +659,8 @@ extension RangeReplaceableCollection {
 % for capability in ['', 'Bidirectional', 'RandomAccess']:
 %   if capability:
 extension RangeReplaceableCollection where
-    Self: ${capability}Collection,
     Self.SubSequence == RangeReplaceable${capability}Slice<Self> {
+  @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>)
       -> RangeReplaceable${capability}Slice<Self> {
     return RangeReplaceable${capability}Slice(base: self, bounds: bounds)
@@ -823,12 +669,9 @@ extension RangeReplaceableCollection where
 %   end
 
 extension RangeReplaceableCollection where
-  Self: MutableCollection,
-%   if capability:
-  Self: ${capability}Collection,
-%   end
   Self.SubSequence == MutableRangeReplaceable${capability}Slice<Self>
 {
+  @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>)
       -> MutableRangeReplaceable${capability}Slice<Self> {
     get {
@@ -858,8 +701,8 @@ extension RangeReplaceableCollection where SubSequence == Self {
   /// - Precondition: `!self.isEmpty`.
   @_inlineable
   @discardableResult
-  public mutating func removeFirst() -> Iterator.Element {
-    _precondition(!isEmpty, "can't remove items from an empty collection")
+  public mutating func removeFirst() -> Element {
+    _precondition(!isEmpty, "Can't remove items from an empty collection")
     let element = first!
     self = self[index(after: startIndex)..<endIndex]
     return element
@@ -883,9 +726,9 @@ extension RangeReplaceableCollection where SubSequence == Self {
   @_inlineable
   public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
-    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
-      "can't remove more items from a collection than it contains")
+      "Can't remove more items from a collection than it contains")
     self = self[index(startIndex, offsetBy: numericCast(n))..<endIndex]
   }
 }
@@ -931,7 +774,7 @@ extension RangeReplaceableCollection {
   public mutating func replaceSubrange<C: Collection, R: RangeExpression>(
     _ subrange: R,
     with newElements: C
-  ) where C.Iterator.Element == Iterator.Element, R.Bound == Index {
+  ) where C.Element == Element, R.Bound == Index {
     self.replaceSubrange(subrange.relative(to: self), with: newElements)
   }
 
@@ -963,7 +806,7 @@ extension RangeReplaceableCollection {
 
 extension RangeReplaceableCollection {
   @_inlineable
-  public mutating func _customRemoveLast() -> Iterator.Element? {
+  public mutating func _customRemoveLast() -> Element? {
     return nil
   }
 
@@ -979,7 +822,7 @@ extension RangeReplaceableCollection
   SubSequence == Self {
 
   @_inlineable
-  public mutating func _customRemoveLast() -> Iterator.Element? {
+  public mutating func _customRemoveLast() -> Element? {
     let element = last!
     self = self[startIndex..<index(before: endIndex)]
     return element
@@ -1006,8 +849,8 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
   /// - Complexity: O(1)
   @_inlineable
   @discardableResult
-  public mutating func removeLast() -> Iterator.Element {
-    _precondition(!isEmpty, "can't remove last element from an empty collection")
+  public mutating func removeLast() -> Element {
+    _precondition(!isEmpty, "Can't remove last element from an empty collection")
     if let result = _customRemoveLast() {
       return result
     }
@@ -1032,9 +875,9 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
   @_inlineable
   public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
-    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
-      "can't remove more items from a collection than it contains")
+      "Can't remove more items from a collection than it contains")
     if _customRemoveLast(n) {
       return
     }
@@ -1063,8 +906,8 @@ extension RangeReplaceableCollection
   /// - Complexity: O(1)
   @_inlineable
   @discardableResult
-  public mutating func removeLast() -> Iterator.Element {
-    _precondition(!isEmpty, "can't remove last element from an empty collection")
+  public mutating func removeLast() -> Element {
+    _precondition(!isEmpty, "Can't remove last element from an empty collection")
     if let result = _customRemoveLast() {
       return result
     }
@@ -1089,9 +932,9 @@ extension RangeReplaceableCollection
   @_inlineable
   public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
-    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
-      "can't remove more items from a collection than it contains")
+      "Can't remove more items from a collection than it contains")
     if _customRemoveLast(n) {
       return
     }
@@ -1120,7 +963,7 @@ extension RangeReplaceableCollection
 ///   - rhs: A collection or finite sequence.
 @_inlineable
 public func + <C : RangeReplaceableCollection, S : Sequence>(lhs: C, rhs: S) -> C
-  where S.Iterator.Element == C.Iterator.Element {
+  where S.Element == C.Element {
 
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
@@ -1148,7 +991,7 @@ public func + <C : RangeReplaceableCollection, S : Sequence>(lhs: C, rhs: S) -> 
 ///   - rhs: A range-replaceable collection.
 @_inlineable
 public func + <C : RangeReplaceableCollection, S : Sequence>(lhs: S, rhs: C) -> C
-  where S.Iterator.Element == C.Iterator.Element {
+  where S.Element == C.Element {
 
   var result = C()
   result.reserveCapacity(rhs.count + numericCast(lhs.underestimatedCount))
@@ -1180,7 +1023,7 @@ public func +<
   RRC1 : RangeReplaceableCollection,
   RRC2 : RangeReplaceableCollection
 >(lhs: RRC1, rhs: RRC2) -> RRC1
-  where RRC1.Iterator.Element == RRC2.Iterator.Element {
+  where RRC1.Element == RRC2.Element {
 
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
@@ -1208,42 +1051,31 @@ public func +<
 public func += <
   R : RangeReplaceableCollection, S : Sequence
 >(lhs: inout R, rhs: S) 
- where R.Iterator.Element == S.Iterator.Element {
+ where R.Element == S.Element {
   lhs.append(contentsOf: rhs)
 }
 
-@available(*, unavailable, renamed: "RangeReplaceableCollection")
-public typealias RangeReplaceableCollectionType = RangeReplaceableCollection
-
 extension RangeReplaceableCollection {
-  @available(*, unavailable, renamed: "replaceSubrange(_:with:)")
-  public mutating func replaceRange<C>(
-    _ subrange: Range<Index>,
-    with newElements: C
-  ) where C : Collection, C.Iterator.Element == Iterator.Element {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "remove(at:)")
-  public mutating func removeAtIndex(_ i: Index) -> Iterator.Element {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "removeSubrange")
-  public mutating func removeRange(_ subrange: Range<Index>) {
-  }
-
-  @available(*, unavailable, renamed: "append(contentsOf:)")
-  public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
-    where S.Iterator.Element == Iterator.Element {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "insert(contentsOf:at:)")
-  public mutating func insertContentsOf<C : Collection>(
-    _ newElements: C, at i: Index
-  ) where C.Iterator.Element == Iterator.Element {
-    Builtin.unreachable()
+  /// Returns a new collection of the same type containing, in order, the
+  /// elements of the original collection that satisfy the given predicate.
+  ///
+  /// In this example, `filter(_:)` is used to include only names shorter than
+  /// five characters.
+  ///
+  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
+  ///     let shortNames = cast.filter { $0.count < 5 }
+  ///     print(shortNames)
+  ///     // Prints "["Kim", "Karl"]"
+  ///
+  /// - Parameter isIncluded: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be included in the returned array.
+  /// - Returns: An array of the elements that `isIncluded` allowed.
+  @_inlineable
+  @available(swift, introduced: 4.0)
+  public func filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> Self {
+    return try Self(self.lazy.filter(isIncluded))
   }
 }
-

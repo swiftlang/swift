@@ -231,13 +231,13 @@ struct FilterRules {
   // FIXME: hide individual custom completions
 
   llvm::StringMap<bool> hideModule;
-  llvm::StringMap<bool> hideByName;
+  llvm::StringMap<bool> hideByFilterName;
+  llvm::StringMap<bool> hideByDescription;
 
   bool hideCompletion(Completion *completion) const;
-  bool hideCompletion(SwiftResult *completion,
-                      StringRef name,
-                      void *customKind = nullptr) const;
-  bool hideName(StringRef name) const;
+  bool hideCompletion(SwiftResult *completion, StringRef name,
+                      StringRef description, void *customKind = nullptr) const;
+  bool hideFilterName(StringRef name) const;
 };
 
 } // end namespace CodeCompletion

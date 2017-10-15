@@ -15,6 +15,7 @@
 
 #include "swift/Markup/LineList.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -38,7 +39,7 @@ struct CommentParts {
   ArrayRef<ParamField *> ParamFields;
   Optional<const ReturnsField *> ReturnsField;
   Optional<const ThrowsField *> ThrowsField;
-  ArrayRef<StringRef> Tags;
+  llvm::SmallSetVector<StringRef, 8> Tags;
   Optional<const LocalizationKeyField *> LocalizationKeyField;
 
   bool isEmpty() const {

@@ -80,3 +80,25 @@ func testCFConvWithIUO(_ x: CFString!, y: NSString!) {
   acceptNSString(x)
   acceptCFString(y)
 }
+
+func testBridgedCFDowncast(array: [Any], dictionary: [AnyHashable : Any], set: Set<AnyHashable>) {
+  let cfArray = array as CFArray
+  let cfDictionary = dictionary as CFDictionary
+  let cfSet = set as CFSet
+
+  _ = array as? CFArray // expected-warning {{conditional cast from '[Any]' to 'CFArray' always succeeds}}
+  _ = dictionary as? CFDictionary // expected-warning {{conditional cast from '[AnyHashable : Any]' to 'CFDictionary' always succeeds}}
+  _ = set as? CFSet // expected-warning {{conditional cast from 'Set<AnyHashable>' to 'CFSet' always succeeds}}
+
+  _ = array as! CFArray // expected-warning {{forced cast from '[Any]' to 'CFArray' always succeeds}}
+  _ = dictionary as! CFDictionary // expected-warning {{forced cast from '[AnyHashable : Any]' to 'CFDictionary' always succeeds}}
+  _ = set as! CFSet // expected-warning {{forced cast from 'Set<AnyHashable>' to 'CFSet' always succeeds}}
+
+  _ = cfArray as! [Any]
+  _ = cfDictionary as! [AnyHashable : Any]
+  _ = cfSet as! Set<AnyHashable>
+
+  _ = cfArray as? [Any]
+  _ = cfDictionary as? [AnyHashable : Any]
+  _ = cfSet as? Set<AnyHashable>
+}

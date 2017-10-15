@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-typecheck-verify-swift
-// XFAIL: linux
 
 import StdlibUnittest
 
@@ -283,7 +282,7 @@ func disallowSubscriptingOnIntegers() {
     r3[0]       // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'Int'}}
     // expected-note@-1 {{overloads for 'subscript'}}
 
-    r0[UInt(0)] // expected-error {{ambiguous reference to member 'subscript'}}
+    r0[UInt(0)] // expected-error {{cannot subscript a value of type 'CountableRange<Int>' with an index of type 'UInt'}}
     r1[UInt(0)] // expected-error {{ambiguous use of 'subscript'}}
     r2[UInt(0)] // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'UInt'}}
     // expected-note@-1 {{overloads for 'subscript' exist}}
@@ -292,18 +291,18 @@ func disallowSubscriptingOnIntegers() {
 
     r0[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
     r1[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
-    r2[0..<4]   // expected-error {{ambiguous reference to member 'subscript'}}
-    r3[0..<4]   // expected-error {{ambiguous reference to member 'subscript'}}
+    r2[0..<4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableRange<Int>'}}
+    r3[0..<4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<Int>'}}
     (10..<100)[0]           // expected-error {{ambiguous use of 'subscript'}}
-    (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<_>' with an index of type 'CountableRange<_>'}}
-    // expected-note@-1 {{overloads for 'subscript'}}
+    (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<Int>'}}
 
     r0[0...4]   // expected-error {{ambiguous use of 'subscript'}}
     r1[0...4]   // expected-error {{ambiguous use of 'subscript'}}
-    r2[0...4]   // expected-error {{ambiguous reference to member 'subscript'}}
-    r3[0...4]   // expected-error {{ambiguous reference to member 'subscript'}} 
-    (10...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<_>' with an index of type 'CountableClosedRange<_>'}} expected-note {{overloads for 'subscript' exist with these partially matching parameter lists: (ClosedRangeIndex<Bound>), (Range<ClosedRangeIndex<Bound>>), (Range<Self.Index>), (R), (ClosedRange<Self.Index>), (CountableRange<Self.Index>), (CountableClosedRange<Self.Index>)}}
-    (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<_>' with an index of type 'CountableClosedRange<_>'}} expected-note {{overloads for 'subscript' exist with these partially matching parameter lists: (ClosedRangeIndex<Bound>), (Range<ClosedRangeIndex<Bound>>), (Range<Self.Index>), (R), (ClosedRange<Self.Index>), (CountableRange<Self.Index>), (CountableClosedRange<Self.Index>)}}
+
+    r2[0...4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<Int>'}}
+    r3[0...4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<Int>'}}
+    (10...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<Int>'}}
+    (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<Int>'}}
 
     r0[r0]      // expected-error {{ambiguous use of 'subscript'}}
     r0[r1]      // expected-error {{ambiguous subscript with base type 'CountableRange<Int>' and index type 'CountableRange<UInt>'}}
@@ -315,15 +314,15 @@ func disallowSubscriptingOnIntegers() {
     r1[r2]      // expected-error {{ambiguous subscript with base type 'CountableRange<UInt>' and index type 'CountableClosedRange<Int>'}}
     r1[r3]      // expected-error {{ambiguous use of 'subscript'}}
 
-    r2[r0]      // expected-error {{ambiguous reference to member 'subscript'}}
-    r2[r1]      // expected-error {{ambiguous reference to member 'subscript'}}
-    r2[r2]      // expected-error {{ambiguous reference to member 'subscript'}}
-    r2[r3]      // expected-error {{ambiguous reference to member 'subscript'}}
+    r2[r0]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableRange<Int>'}}
+    r2[r1]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableRange<UInt>'}}
+    r2[r2]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<Int>'}}
+    r2[r3]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<UInt>'}}
 
-    r3[r0]      // expected-error {{ambiguous reference to member 'subscript'}}
-    r3[r1]      // expected-error {{ambiguous reference to member 'subscript'}}
-    r3[r2]      // expected-error {{ambiguous reference to member 'subscript'}}
-    r3[r3]      // expected-error {{ambiguous reference to member 'subscript'}}
+    r3[r0]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<Int>'}}
+    r3[r1]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<UInt>'}}
+    r3[r2]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<Int>'}}
+    r3[r3]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<UInt>'}}
   }
 
   do {
@@ -346,17 +345,14 @@ func disallowSubscriptingOnIntegers() {
     r2[0..<4]   // expected-error {{type 'ClosedRange<Int>' has no subscript members}}
     r3[0..<4]   // expected-error {{type 'ClosedRange<UInt>' has no subscript members}}
     (10..<100)[0]           // expected-error {{ambiguous use of 'subscript'}}
-    (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<_>' with an index of type 'CountableRange<_>'}}
-    // expected-note@-1 {{overloads for 'subscript'}}
+    (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<Int>'}}
 
     r0[0...4]   // expected-error {{type 'Range<Int>' has no subscript members}}
     r1[0...4]   // expected-error {{type 'Range<UInt>' has no subscript members}}
     r2[0...4]   // expected-error {{type 'ClosedRange<Int>' has no subscript members}}
     r3[0...4]   // expected-error {{type 'ClosedRange<UInt>' has no subscript members}}
-    (10...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<_>' with an index of type 'CountableClosedRange<_>'}}
-    // expected-note@-1 {{overloads for 'subscript'}}
-    (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<_>' with an index of type 'CountableClosedRange<_>'}}
-    // expected-note@-1 {{overloads for 'subscript'}}
+    (10...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<Int>'}}
+    (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<Int>'}}
 
     r0[r0]      // expected-error {{type 'Range<Int>' has no subscript members}}
     r0[r1]      // expected-error {{type 'Range<Int>' has no subscript members}}

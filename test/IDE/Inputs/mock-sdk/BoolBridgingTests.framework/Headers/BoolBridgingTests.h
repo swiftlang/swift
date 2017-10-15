@@ -40,8 +40,12 @@ ObjCBoolBlock testObjCBoolFnToBlockTypedef(ObjCBoolFn);
 DarwinBooleanBlock testDarwinBooleanFnToBlockTypedef(DarwinBooleanFn);
 
 typedef __typeof(testCBoolFnToBlockTypedef) CBoolFnToBlockType;
-typedef __typeof(testObjCBoolFnToBlockTypedef) ObjCCBoolFnToBlockType;
+typedef __typeof(testObjCBoolFnToBlockTypedef) ObjCBoolFnToBlockType;
 typedef __typeof(testDarwinBooleanFnToBlockTypedef) DarwinBooleanFnToBlockType;
+
+extern ObjCBoolFnToBlockType *globalObjCBoolFnToBlockFP;
+extern ObjCBoolFnToBlockType * __nonnull * __nullable globalObjCBoolFnToBlockFPP;
+extern ObjCBoolFnToBlockType ^globalObjCBoolFnToBlockBP;
 
 extern CBoolFn globalCBoolFn;
 extern ObjCBoolFn globalObjCBoolFn;

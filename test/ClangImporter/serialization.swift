@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/SerializationHelper.swiftmodule -I %S/Inputs/custom-modules %S/Inputs/SerializationHelper.swift -sdk "" -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend -typecheck -sdk "" -I %t -I %S/Inputs/custom-modules %s -verify
 

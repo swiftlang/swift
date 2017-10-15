@@ -1,16 +1,17 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -emit-sil -sil-inline-threshold 1000 -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=GlobalOpt -sil-verify-all | %FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances with covariant return types correctly. The verifier
 // should trip if we do not handle things correctly.
 //
+// TODO: this is not working right now: rdar://problem/33461095
 // As a side-test it also checks if all allocs can be promoted to the stack.
 
 // CHECK-LABEL: sil hidden @_T023devirt_covariant_return6driveryyF : $@convention(thin) () -> () {
 // CHECK: bb0
-// CHECK: alloc_ref [stack]
-// CHECK: alloc_ref [stack]
-// CHECK: alloc_ref [stack]
+// CHECK: alloc_ref
+// CHECK: alloc_ref
+// CHECK: alloc_ref
 // CHECK: function_ref @unknown1a : $@convention(thin) () -> ()
 // CHECK: apply
 // CHECK: function_ref @defenestrate : $@convention(thin) () -> ()
@@ -21,9 +22,6 @@
 // CHECK: function_ref @unknown3a : $@convention(thin) () -> ()
 // CHECK: apply
 // CHECK: apply
-// CHECK: dealloc_ref [stack]
-// CHECK: dealloc_ref [stack]
-// CHECK: dealloc_ref [stack]
 // CHECK: tuple
 // CHECK: return
 

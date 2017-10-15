@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enforce-exclusivity=checked -emit-sorted-sil -full-access-marker-elim %s | %FileCheck %s
+// RUN: %target-sil-opt -enforce-exclusivity=checked -emit-sorted-sil -access-marker-elim %s | %FileCheck %s
 
 sil_stage raw
 

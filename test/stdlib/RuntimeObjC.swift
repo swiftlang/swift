@@ -1,4 +1,4 @@
-// RUN: rm -rf %t  &&  mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o %s -o %t.out
@@ -374,6 +374,13 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a12GenericClassPSo9NSCopyingS_9ProtocolAS_9ProtocolB__",
               NSStringFromClass(GenericClass<ProtocolB & NSCopying & ProtocolA>.self))
 
+  expectEqual("_TtGC1a12GenericClassXcCS_9SomeClassS_9ProtocolA__",
+              NSStringFromClass(GenericClass<ProtocolA & SomeClass>.self))
+  expectEqual("_TtGC1a12GenericClassPS_9ProtocolAs9AnyObject__",
+              NSStringFromClass(GenericClass<ProtocolA & AnyObject>.self))
+  expectEqual("_TtGC1a12GenericClassPs9AnyObject__",
+              NSStringFromClass(GenericClass<AnyObject>.self))
+
   expectEqual("_TtGC1a17MultiGenericClassGVS_13GenericStructSi_GOS_11GenericEnumGS2_Si___",
               NSStringFromClass(MultiGenericClass<GenericStruct<Int>,
                                                   GenericEnum<GenericEnum<Int>>>.self))
@@ -444,6 +451,9 @@ var nsStringCanaryCount = 0
   }
   required init(coder: NSCoder) {
     fatalError("don't call this initializer")
+  }
+  required init(itemProviderData data: Data, typeIdentifier: String) throws {
+    fatalError("don't call this initializer")    
   }
   deinit {
     nsStringCanaryCount -= 1

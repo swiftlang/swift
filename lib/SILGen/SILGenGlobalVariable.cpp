@@ -14,6 +14,7 @@
 #include "ManagedValue.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/SIL/FormalLinkage.h"
 
 using namespace swift;
@@ -46,10 +47,7 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   SILLinkage link = getSILLinkage(getDeclLinkage(gDecl), forDef);
   SILType silTy = M.Types.getLoweredTypeOfGlobal(gDecl);
 
-  auto *silGlobal = SILGlobalVariable::create(M, link,
-                                              makeModuleFragile
-                                                ? IsSerialized
-                                                : IsNotSerialized,
+  auto *silGlobal = SILGlobalVariable::create(M, link, IsNotSerialized,
                                               mangledName, silTy,
                                               None, gDecl);
   silGlobal->setDeclaration(!forDef);
@@ -223,9 +221,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   // TODO: include the module in the onceToken's name mangling.
   // Then we can make it fragile.
   auto onceToken = SILGlobalVariable::create(M, SILLinkage::Private,
-                                             makeModuleFragile
-                                               ? IsSerialized
-                                               : IsNotSerialized,
+                                             IsNotSerialized,
                                              onceTokenBuffer, onceSILTy);
   onceToken->setDeclaration(false);
 
@@ -258,23 +254,23 @@ void SILGenFunction::emitLazyGlobalInitializer(PatternBindingDecl *binding,
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(binding), ret);
 }
 
-static void emitOnceCall(SILGenFunction &gen, VarDecl *global,
+static void emitOnceCall(SILGenFunction &SGF, VarDecl *global,
                          SILGlobalVariable *onceToken, SILFunction *onceFunc) {
   SILType rawPointerSILTy
-    = gen.getLoweredLoadableType(gen.getASTContext().TheRawPointerType);
+    = SGF.getLoweredLoadableType(SGF.getASTContext().TheRawPointerType);
 
   // Emit a reference to the global token.
-  SILValue onceTokenAddr = gen.B.createGlobalAddr(global, onceToken);
-  onceTokenAddr = gen.B.createAddressToPointer(global, onceTokenAddr,
+  SILValue onceTokenAddr = SGF.B.createGlobalAddr(global, onceToken);
+  onceTokenAddr = SGF.B.createAddressToPointer(global, onceTokenAddr,
                                                rawPointerSILTy);
 
   // Emit a reference to the function to execute.
-  SILValue onceFuncRef = gen.B.createFunctionRef(global, onceFunc);
+  SILValue onceFuncRef = SGF.B.createFunctionRef(global, onceFunc);
 
   // Call Builtin.once.
   SILValue onceArgs[] = {onceTokenAddr, onceFuncRef};
-  gen.B.createBuiltin(global, gen.getASTContext().getIdentifier("once"),
-                      gen.SGM.Types.getEmptyTupleType(), {}, onceArgs);
+  SGF.B.createBuiltin(global, SGF.getASTContext().getIdentifier("once"),
+                      SGF.SGM.Types.getEmptyTupleType(), {}, onceArgs);
 }
 
 void SILGenFunction::emitGlobalAccessor(VarDecl *global,

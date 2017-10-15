@@ -88,7 +88,7 @@ WARNING(warning_unnecessary_repl_mode,none,
         "unnecessary option '%0'; this is the default for '%1' "
         "with no input files", (StringRef, StringRef))
 ERROR(error_unsupported_option,none,
-      "unsupported option '%0' for '%1'; did you mean '%2 %0'?",
+      "option '%0' is not supported by '%1'; did you mean to use '%2'?",
       (StringRef, StringRef, StringRef))
 
 WARNING(incremental_requires_output_file_map,none,
@@ -101,6 +101,8 @@ ERROR(error_os_minimum_deployment,none,
       "Swift requires a minimum deployment target of %0", (StringRef))
 ERROR(error_sdk_too_old,none,
       "Swift does not support the SDK '%0'", (StringRef))
+ERROR(error_ios_maximum_deployment_32,none,
+      "iOS %0 does not support 32-bit programs", (unsigned))
 
 ERROR(error_two_files_same_name,none,
       "filename \"%0\" used twice: '%1' and '%2'",
@@ -130,6 +132,9 @@ WARNING(warn_ignore_embed_bitcode, none,
 
 WARNING(verify_debug_info_requires_debug_option,none,
         "ignoring '-verify-debug-info'; no debug info is being generated", ())
+
+ERROR(error_profile_missing,none,
+      "no profdata file exists at '%0'", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

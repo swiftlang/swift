@@ -14,14 +14,28 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !defined(__APPLE__)
-#include "swift/Basic/Lazy.h"
-#include "swift/Runtime/Config.h"
-#include "swift/Runtime/Debug.h"
+#include "../SwiftShims/UnicodeShims.h"
 
-#include <algorithm>
-#include <mutex>
-#include <assert.h>
+#include <stdint.h>
+
+#if defined(__APPLE__)
+
+// Declare a few external functions to avoid a dependency on ICU headers.
+extern "C" {
+typedef struct UBreakIterator UBreakIterator;
+typedef enum UBreakIteratorType {} UBreakIteratorType;
+typedef enum UErrorCode {} UErrorCode;
+typedef uint16_t UChar;
+
+void ubrk_close(UBreakIterator *);
+UBreakIterator *ubrk_open(UBreakIteratorType, const char *, const UChar *,
+                          int32_t, UErrorCode *);
+int32_t ubrk_preceding(UBreakIterator *, int32_t);
+int32_t ubrk_following(UBreakIterator *, int32_t);
+void ubrk_setText(UBreakIterator *, const UChar *, int32_t, UErrorCode *);
+}
+
+#else
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdocumentation"
@@ -30,10 +44,20 @@
 #include <unicode/ucol.h>
 #include <unicode/ucoleitr.h>
 #include <unicode/uiter.h>
+#include <unicode/ubrk.h>
 
 #pragma clang diagnostic pop
 
-#include "../SwiftShims/UnicodeShims.h"
+#endif
+
+#if !defined(__APPLE__)
+#include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Config.h"
+#include "swift/Runtime/Debug.h"
+
+#include <algorithm>
+#include <mutex>
+#include <assert.h>
 
 static const UCollator *MakeRootCollator() {
   UErrorCode ErrorCode = U_ZERO_ERROR;
@@ -86,11 +110,7 @@ private:
     for (unsigned char c = 0; c < 128; ++c) {
       UErrorCode ErrorCode = U_ZERO_ERROR;
       intptr_t NumCollationElts = 0;
-#if defined(__CYGWIN__) || defined(_MSC_VER)
       UChar Buffer[1];
-#else
-      uint16_t Buffer[1];
-#endif
       Buffer[0] = c;
 
       UCollationElements *CollationIterator =
@@ -127,18 +147,13 @@ swift::_swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
                                                  int32_t LeftLength,
                                                  const uint16_t *RightString,
                                                  int32_t RightLength) {
-#if defined(__CYGWIN__) || defined(_MSC_VER)
   // ICU UChar type is platform dependent. In Cygwin, it is defined
   // as wchar_t which size is 2. It seems that the underlying binary
   // representation is same with swift utf16 representation.
+  // On Clang 4.0 under a recent Linux, ICU uses the built-in char16_t type.
   return ucol_strcoll(GetRootCollator(),
-    reinterpret_cast<const UChar *>(LeftString), LeftLength,
-    reinterpret_cast<const UChar *>(RightString), RightLength);
-#else
-  return ucol_strcoll(GetRootCollator(),
-    LeftString, LeftLength,
-    RightString, RightLength);
-#endif
+                      reinterpret_cast<const UChar *>(LeftString), LeftLength,
+                      reinterpret_cast<const UChar *>(RightString), RightLength);
 }
 
 /// Compares the strings via the Unicode Collation Algorithm on the root locale.
@@ -156,12 +171,8 @@ swift::_swift_stdlib_unicode_compare_utf8_utf16(const unsigned char *LeftString,
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
   uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString), LeftLength);
-#if defined(__CYGWIN__) || defined(_MSC_VER)
   uiter_setString(&RightIterator, reinterpret_cast<const UChar *>(RightString),
                   RightLength);
-#else
-  uiter_setString(&RightIterator, RightString, RightLength);
-#endif
 
   uint32_t Diff = ucol_strcollIter(GetRootCollator(),
     &LeftIterator, &RightIterator, &ErrorCode);
@@ -199,14 +210,9 @@ swift::_swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *LeftString,
 void *swift::_swift_stdlib_unicodeCollationIterator_create(
     const __swift_uint16_t *Str, __swift_uint32_t Length) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
-#if defined(__CYGWIN__) || defined(_MSC_VER)
-  UCollationElements *CollationIterator = ucol_openElements(
-    GetRootCollator(), reinterpret_cast<const UChar *>(Str), Length,
-    &ErrorCode);
-#else
-  UCollationElements *CollationIterator = ucol_openElements(
-    GetRootCollator(), Str, Length, &ErrorCode);
-#endif
+  UCollationElements *CollationIterator =
+      ucol_openElements(GetRootCollator(), reinterpret_cast<const UChar *>(Str),
+                        Length, &ErrorCode);
   if (U_FAILURE(ErrorCode)) {
     swift::crash("_swift_stdlib_unicodeCollationIterator_create: ucol_openElements() failed.");
   }
@@ -244,17 +250,11 @@ swift::_swift_stdlib_unicode_strToUpper(uint16_t *Destination,
                                         const uint16_t *Source,
                                         int32_t SourceLength) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
-#if defined(__CYGWIN__) || defined(_MSC_VER)
   uint32_t OutputLength = u_strToUpper(reinterpret_cast<UChar *>(Destination),
                                        DestinationCapacity,
                                        reinterpret_cast<const UChar *>(Source),
                                        SourceLength,
                                        "", &ErrorCode);
-#else
-  uint32_t OutputLength = u_strToUpper(Destination, DestinationCapacity,
-                                       Source, SourceLength,
-                                       "", &ErrorCode);
-#endif
   if (U_FAILURE(ErrorCode) && ErrorCode != U_BUFFER_OVERFLOW_ERROR) {
     swift::crash("u_strToUpper: Unexpected error uppercasing unicode string.");
   }
@@ -271,17 +271,11 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
                                         const uint16_t *Source,
                                         int32_t SourceLength) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
-#if defined(__CYGWIN__) || defined(_MSC_VER)
   uint32_t OutputLength = u_strToLower(reinterpret_cast<UChar *>(Destination),
                                        DestinationCapacity,
                                        reinterpret_cast<const UChar *>(Source),
                                        SourceLength,
                                        "", &ErrorCode);
-#else
-  uint32_t OutputLength = u_strToLower(Destination, DestinationCapacity,
-                                       Source, SourceLength,
-                                       "", &ErrorCode);
-#endif
   if (U_FAILURE(ErrorCode) && ErrorCode != U_BUFFER_OVERFLOW_ERROR) {
     swift::crash("u_strToLower: Unexpected error lowercasing unicode string.");
   }
@@ -290,4 +284,51 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
 
 swift::Lazy<ASCIICollation> ASCIICollation::theTable;
 #endif
+
+namespace {
+template <typename T, typename U> T *ptr_cast(U *p) {
+  return static_cast<T *>(static_cast<void *>(p));
+}
+template <typename T, typename U> const T *ptr_cast(const U *p) {
+  return static_cast<const T *>(static_cast<const void *>(p));
+}
+}
+
+void swift::__swift_stdlib_ubrk_close(
+    swift::__swift_stdlib_UBreakIterator *bi) {
+  ubrk_close(ptr_cast<UBreakIterator>(bi));
+}
+
+swift::__swift_stdlib_UBreakIterator *swift::__swift_stdlib_ubrk_open(
+    swift::__swift_stdlib_UBreakIteratorType type, const char *locale,
+    const uint16_t *text, int32_t textLength, __swift_stdlib_UErrorCode *status) {
+  return ptr_cast<swift::__swift_stdlib_UBreakIterator>(
+      ubrk_open(static_cast<UBreakIteratorType>(type), locale,
+                reinterpret_cast<const UChar *>(text), textLength,
+                ptr_cast<UErrorCode>(status)));
+}
+
+int32_t
+swift::__swift_stdlib_ubrk_preceding(swift::__swift_stdlib_UBreakIterator *bi,
+                                     int32_t offset) {
+  return ubrk_preceding(ptr_cast<UBreakIterator>(bi), offset);
+}
+
+int32_t
+swift::__swift_stdlib_ubrk_following(swift::__swift_stdlib_UBreakIterator *bi,
+                                     int32_t offset) {
+  return ubrk_following(ptr_cast<UBreakIterator>(bi), offset);
+}
+
+void swift::__swift_stdlib_ubrk_setText(
+    swift::__swift_stdlib_UBreakIterator *bi, const __swift_stdlib_UChar *text,
+    __swift_int32_t textLength, __swift_stdlib_UErrorCode *status) {
+  return ubrk_setText(ptr_cast<UBreakIterator>(bi), ptr_cast<UChar>(text),
+                      textLength, ptr_cast<UErrorCode>(status));
+}
+
+// Force an autolink with ICU
+#if defined(__MACH__)
+asm(".linker_option \"-licucore\"\n");
+#endif // defined(__MACH__)
 

@@ -10,7 +10,7 @@ func test(_ b : BaseInHead) {
 
 // RUN: %sourcekitd-test -req=cursor -pos=3:7 %s -- %s %mcp_opt -module-name Mixed -import-objc-header %S/Inputs/header.h | %FileCheck %s
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %sourcekitd-test -req=cursor -pos=3:7 %s -- %s %mcp_opt -module-name Mixed -pch-output-dir %t -import-objc-header %S/Inputs/header.h | %FileCheck %s
 // RUN: stat %t/*.pch
 

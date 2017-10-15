@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/PrivateObjC.swift -o %t
 // RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
 

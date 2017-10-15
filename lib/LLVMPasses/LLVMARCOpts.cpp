@@ -649,9 +649,12 @@ static DtorKind analyzeDestructor(Value *P) {
         break;
       }
 
-      // Okay, the function has some side effects, if it doesn't capture the
-      // object argument, at least that is something.
-      return DtorFn->doesNotCapture(0) ? DtorKind::NoEscape : DtorKind::Unknown;
+      // Okay, the function has some side effects.
+      //
+      // TODO: We could in the future return more accurate information by
+      // checking if the function is able to capture the deinit parameter. We do
+      // not do that today.
+      return DtorKind::Unknown;
     }
   }
 

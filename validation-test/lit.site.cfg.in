@@ -83,11 +83,6 @@ if "@CMAKE_GENERATOR@" == "Xcode":
 
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
-if "@SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING@" == "TRUE":
-    config.available_features.add('runtime-dladdr-backtraces')
-if "@SWIFT_RUNTIME_DLADDR_ALLOWED@" == "TRUE":
-    config.available_features.add('runtime-dladdr')
-
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
 lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/validation-test/lit.cfg")

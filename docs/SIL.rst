@@ -167,7 +167,7 @@ Here is an example of a ``.sil`` file::
     %2 = struct_extract %0 : $Point, #Point.x
     %3 = struct_extract %0 : $Point, #Point.y
     %4 = apply %1(%2, %3) : $(Double, Double) -> Double
-    %5 = return %4 : Double
+    return %4 : Double
   }
 
   // Define a SIL vtable. This matches dynamically-dispatched method
@@ -549,9 +549,9 @@ the caller.  A non-autoreleased ``apply`` of a function that is defined
 with an autoreleased result has the effect of performing an
 autorelease in the callee.
 
-- The @noescape declaration attribute on Swift parameters (which is valid only
-  on parameters of function type, and is implied by the @autoclosure attribute)
-  is turned into a @noescape type attribute on SIL arguments.  @noescape
+- The ``@noescape`` declaration attribute on Swift parameters (which is valid only
+  on parameters of function type, and is implied by the ``@autoclosure`` attribute)
+  is turned into a ``@noescape`` type attribute on SIL arguments.  ``@noescape``
   indicates that the lifetime of the closure parameter will not be extended by
   the callee (e.g. the pointer will not be stored in a global variable).  It
   corresponds to the LLVM "nocapture" attribute in terms of semantics (but is
@@ -628,7 +628,7 @@ Some additional meaningful categories of type:
 
 - A *heap object reference* type is a type whose representation consists of a
   single strong-reference-counted pointer. This includes all class types,
-  the ``Builtin.NativeObject`` and ``Builtin.UnknownObject`` types, and
+  the ``Builtin.NativeObject`` and ``AnyObject`` types, and
   archetypes that conform to one or more class protocols.
 - A *reference type* is more general in that its low-level representation may
   include additional global pointers alongside a strong-reference-counted
@@ -734,7 +734,7 @@ The following types are considered layout-compatible:
   ``B`` and a derived class ``D`` inheriting from ``B``, a value of
   type ``B`` referencing an instance of type ``D`` is layout compatible with
   both ``B`` and ``D``, as well as ``Builtin.NativeObject`` and
-  ``Builtin.UnknownObject``. It is not layout compatible with an unrelated class
+  ``AnyObject``. It is not layout compatible with an unrelated class
   type ``E``.
 - For payloaded enums, the payload type of the first payloaded case is
   layout-compatible with the enum (*not* commutatively).
@@ -1034,11 +1034,13 @@ VTables
   sil-vtable-entry ::= sil-decl-ref ':' sil-linkage? sil-function-name
 
 SIL represents dynamic dispatch for class methods using the `class_method`_,
-`super_method`_, and `dynamic_method`_ instructions. The potential destinations
-for these dispatch operations are tracked in ``sil_vtable`` declarations for
-every class type. The declaration contains a mapping from every method of the
-class (including those inherited from its base class) to the SIL function that
-implements the method for that class::
+`super_method`_, `objc_method`_, and `objc_super_method`_ instructions.
+
+The potential destinations for `class_method`_ and `super_method`_ are
+tracked in ``sil_vtable`` declarations for every class type. The declaration
+contains a mapping from every method of the class (including those inherited
+from its base class) to the SIL function that implements the method for that
+class::
 
   class A {
     func foo()
@@ -1210,16 +1212,35 @@ Global Variables
 ::
 
   decl ::= sil-global-variable
+  static-initializer ::= '=' '{' sil-instruction-def* '}'
   sil-global-variable ::= 'sil_global' sil-linkage identifier ':' sil-type
+                             (static-initializer)?
 
 SIL representation of a global variable.
 
-Global variable access is performed by the ``alloc_global`` and ``global_addr``
-SIL instructions. Prior to performing any access on the global, the
-``alloc_global`` instruction must be performed to initialize the storage.
+Global variable access is performed by the ``alloc_global``, ``global_addr``
+and ``global_value`` instructions.
 
+A global can have a static initializer if its initial value can be
+composed of literals. The static initializer is represented as a list of
+literal and aggregate instructions where the last instruction is the top-level
+value of the static initializer::
+
+  sil_global hidden @_T04test3varSiv : $Int {
+    %0 = integer_literal $Builtin.Int64, 27
+    %initval = struct $Int (%0 : $Builtin.Int64)
+  }
+
+If a global does not have a static initializer, the ``alloc_global``
+instruction must be performed prior an access to initialize the storage.
 Once a global's storage has been initialized, ``global_addr`` is used to
 project the value.
+
+If the last instruction in the static initializer is an ``object`` instruction
+the global variable is a statically initialized object. In this case the
+variable cannot be used as l-value, i.e. the reference to the object cannot be
+modified. As a consequence the variable cannot be accessed with ``global_addr``
+but only with ``global_value``.
 
 Dataflow Errors
 ---------------
@@ -1573,9 +1594,9 @@ typed, so aliasing of classes is constrained by the type system as follows:
   including a Swift class instance, a box allocated by ``alloc_box``,
   or a thick function's closure context.
   It may not alias natively Objective-C class instances.
-* A ``Builtin.UnknownObject`` or ``Builtin.BridgeObject`` may alias
-  any class instance, whether Swift or Objective-C, but may not alias
-  non-class-instance heap objects.
+* An ``AnyObject`` or ``Builtin.BridgeObject`` may alias any class instance,
+  whether Swift or Objective-C, but may not alias non-class-instance
+  heap objects.
 * Two values of the same class type ``$C`` may alias. Two values of related
   class type ``$B`` and ``$D``, where there is a subclass relationship between
   ``$B`` and ``$D``, may alias. Two values of unrelated class types may not
@@ -2456,7 +2477,7 @@ index_raw_pointer
   %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Int<n>
   // %0 must be of $Builtin.RawPointer type
   // %1 must be of a builtin integer type
-  // %2 will be of type $*T
+  // %2 will be of type $Builtin.RawPointer
 
 Given a ``Builtin.RawPointer`` value ``%0``, returns a pointer value at the
 byte offset ``%1`` relative to ``%0``.
@@ -2851,7 +2872,20 @@ global_addr
 Creates a reference to the address of a global variable which has been
 previously initialized by ``alloc_global``. It is undefined behavior to
 perform this operation on a global variable which has not been
-initialized.
+initialized, except the global variable has a static initializer.
+
+global_value
+`````````````
+::
+
+  sil-instruction ::= 'global_value' sil-global-name ':' sil-type
+
+  %1 = global_value @v : $T
+
+Returns the value of a global variable which has been previously initialized
+by ``alloc_global``. It is undefined behavior to perform this operation on a
+global variable which has not been initialized, except the global variable
+has a static initializer.
 
 integer_literal
 ```````````````
@@ -2905,24 +2939,18 @@ method name segment.
 Dynamic Dispatch
 ~~~~~~~~~~~~~~~~
 
-These instructions perform dynamic lookup of class and generic methods. They
-share a common set of attributes::
+These instructions perform dynamic lookup of class and generic methods.
 
-  sil-method-attributes ::= '[' 'volatile'? ']'
+The ``class_method`` and ``super_method`` instructions must reference
+Swift native methods and always use vtable dispatch.
 
-The ``volatile`` attribute on a dynamic dispatch instruction indicates that
-the method lookup is semantically required (as, for example, in Objective-C).
-When the type of a dynamic dispatch instruction's operand is known,
-optimization passes can promote non-``volatile`` dispatch instructions
-into static ``function_ref`` instructions.
+The ``objc_method`` and ``objc_super_method`` instructions must reference
+Objective-C methods (indicated by the ``foreign`` marker on a method
+reference, as in ``#NSObject.description!1.foreign``).
 
-If a dynamic dispatch instruction references an Objective-C method
-(indicated by the ``foreign`` marker on a method reference, as in
-``#NSObject.description!1.foreign``), then the instruction
-represents an ``objc_msgSend`` invocation. ``objc_msgSend`` invocations can
-only be used as the callee of an ``apply`` instruction or ``partial_apply``
-instruction. They cannot be stored or used as ``apply`` or ``partial_apply``
-arguments.  ``objc_msgSend`` invocations must always be ``volatile``.
+Note that ``objc_msgSend`` invocations can only be used as the callee
+of an ``apply`` instruction or ``partial_apply`` instruction. They cannot
+be stored or used as ``apply`` or ``partial_apply`` arguments.
 
 class_method
 ````````````
@@ -2931,30 +2959,55 @@ class_method
   sil-instruction ::= 'class_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = class_method %0 : $T, #T.method!1 : $@convention(thin) U -> V
+  %1 = class_method %0 : $T, #T.method!1 : $@convention(class_method) U -> V
   // %0 must be of a class type or class metatype $T
-  // #T.method!1 must be a reference to a dynamically-dispatched method of T or
-  // of one of its superclasses, at uncurry level >= 1
+  // #T.method!1 must be a reference to a Swift native method of T or
+  // of one of its superclasses, at uncurry level == 1
   // %1 will be of type $U -> V
 
 Looks up a method based on the dynamic type of a class or class metatype
-instance. It is undefined behavior if the class value is null and the
-method is not an Objective-C method.
+instance. It is undefined behavior if the class value is null.
 
-If:
+If the static type of the class instance is known, or the method is known
+to be final, then the instruction is a candidate for devirtualization
+optimization. A devirtualization pass can consult the module's `VTables`_
+to find the SIL function that implements the method and promote the
+instruction to a static `function_ref`_.
 
-- the instruction is not ``[volatile]``,
-- the referenced method is not a ``foreign`` method,
-- and the static type of the class instance is known, or the method is known
-  to be final,
+objc_method
+```````````
+::
 
-then the instruction is a candidate for devirtualization optimization. A
-devirtualization pass can consult the module's `VTables`_ to find the
-SIL function that implements the method and promote the instruction to a
-static `function_ref`_.
+  sil-instruction ::= 'objc_method' sil-method-attributes?
+                        sil-operand ',' sil-decl-ref ':' sil-type
+
+  %1 = objc_method %0 : $T, #T.method!1.foreign : $@convention(objc_method) U -> V
+  // %0 must be of a class type or class metatype $T
+  // #T.method!1 must be a reference to an Objective-C method of T or
+  // of one of its superclasses, at uncurry level == 1
+  // %1 will be of type $U -> V
+
+Performs Objective-C method dispatch using ``objc_msgSend()``.
+
+Objective-C method calls are never candidates for devirtualization.
 
 super_method
 ````````````
+::
+
+  sil-instruction ::= 'super_method' sil-method-attributes?
+                        sil-operand ',' sil-decl-ref ':' sil-type
+
+  %1 = super_method %0 : $T, #Super.method!1 : $@convention(thin) U -> V
+  // %0 must be of a non-root class type or class metatype $T
+  // #Super.method!1 must be a reference to a native Swift method of T's
+  // superclass or of one of its ancestor classes, at uncurry level >= 1
+  // %1 will be of type $@convention(thin) U -> V
+
+Looks up a method in the superclass of a class or class metatype instance.
+
+objc_super_method
+`````````````````
 ::
 
   sil-instruction ::= 'super_method' sil-method-attributes?
@@ -2966,11 +3019,8 @@ super_method
   // superclass or of one of its ancestor classes, at uncurry level >= 1
   // %1 will be of type $@convention(thin) U -> V
 
-Looks up a method in the superclass of a class or class metatype instance.
-Note that for native Swift methods, ``super.method`` calls are statically
-dispatched, so this instruction is only valid for Objective-C methods.
-It is undefined behavior if the class value is null and the method is
-not an Objective-C method.
+This instruction performs an Objective-C message send using
+``objc_msgSuper()``.
 
 witness_method
 ``````````````
@@ -2993,40 +3043,6 @@ constrained by that protocol. The result will be generic on the ``Self``
 archetype of the original protocol and have the ``witness_method`` calling
 convention. If the referenced protocol is an ``@objc`` protocol, the
 resulting type has the ``objc`` calling convention.
-
-dynamic_method
-``````````````
-::
-
-  sil-instruction ::= 'dynamic_method' sil-method-attributes?
-                      sil-operand ',' sil-decl-ref ':' sil-type
-
-  %1 = dynamic_method %0 : $P, #X.method!1 : $@convention(thin) U -> V
-  // %0 must be of a protocol or protocol composition type $P,
-  // where $P contains the Swift.DynamicLookup protocol
-  // #X.method!1 must be a reference to an @objc method of any class
-  // or protocol type
-  //
-  // The "self" argument of the method type $@convention(thin) U -> V must be
-  //   Builtin.UnknownObject
-
-Looks up the implementation of an Objective-C method with the same
-selector as the named method for the dynamic type of the
-value inside an existential container. The "self" operand of the result
-function value is represented using an opaque type, the value for which must
-be projected out as a value of type ``Builtin.UnknownObject``.
-
-It is undefined behavior if the dynamic type of the operand does not
-have an implementation for the Objective-C method with the selector to
-which the ``dynamic_method`` instruction refers, or if that
-implementation has parameter or result types that are incompatible
-with the method referenced by ``dynamic_method``.
-This instruction should only be used in cases where its result will be
-immediately consumed by an operation that performs the selector check
-itself (e.g., an ``apply`` that lowers to ``objc_msgSend``).
-To query whether the operand has an implementation for the given
-method and safely handle the case where it does not, use
-`dynamic_method_br`_.
 
 Function Application
 ~~~~~~~~~~~~~~~~~~~~
@@ -3531,6 +3547,20 @@ struct_element_addr
 Given the address of a struct value in memory, derives the address of a
 physical field within the value.
 
+object
+``````
+::
+
+  sil-instruction ::= 'object' sil-type '(' (sil-operand (',' sil-operand)*)? ')'
+
+  object $T (%a : $A, %b : $B, ...)
+  // $T must be a non-generic or bound generic reference type
+  // The first operands must match the stored properties of T
+  // Optionally there may be more elements, which are tail-allocated to T
+
+Constructs a statically initialized object. This instruction can only appear
+as final instruction in a global variable static initializer list.
+  
 ref_element_addr
 ````````````````
 ::
@@ -3828,9 +3858,9 @@ container may use one of several representations:
   before IR generation.
   The following instructions manipulate "loadable" opaque existential containers:
   
-  * `init_existential_opaque`_
-  * `open_existential_opaque`_
-  * `deinit_existential_opaque`_
+  * `init_existential_value`_
+  * `open_existential_value`_
+  * `deinit_existential_value`_
 
 - **Class existential containers**: If a protocol type is constrained by one or
   more class protocols, then the existential container for that type is
@@ -3859,6 +3889,7 @@ container may use one of several representations:
   * `alloc_existential_box`_
   * `project_existential_box`_
   * `open_existential_box`_
+  * `open_existential_box_value`_
   * `dealloc_existential_box`_
 
 Some existential types may additionally support specialized representations
@@ -3904,14 +3935,14 @@ initialized existential container can be destroyed with ``destroy_addr`` as
 usual. It is undefined behavior to ``destroy_addr`` a partially-initialized
 existential container.
 
-init_existential_opaque
-```````````````````````
+init_existential_value
+``````````````````````
 ::
 
-  sil-instruction ::= 'init_existential_opaque' sil-operand ':' sil-type ','
+  sil-instruction ::= 'init_existential_value' sil-operand ':' sil-type ','
                                              sil-type
 
-  %1 = init_existential_opaque %0 : $L' : $C, $P
+  %1 = init_existential_value %0 : $L' : $C, $P
   // %0 must be of loadable type $L', lowered from AST type $L, conforming to
   //    protocol(s) $P
   // %1 will be of type $P
@@ -3935,20 +3966,20 @@ existential containers that have been partially initialized by
 ``init_existential_addr`` but haven't had their contained value initialized.
 A fully initialized existential must be destroyed with ``destroy_addr``.
 
-deinit_existential_opaque
-`````````````````````````
+deinit_existential_value
+````````````````````````
 ::
 
-  sil-instruction ::= 'deinit_existential_opaque' sil-operand
+  sil-instruction ::= 'deinit_existential_value' sil-operand
 
-  deinit_existential_opaque %0 : $P
+  deinit_existential_value %0 : $P
   // %0 must be of a $P opaque type for non-class protocol or protocol
   // composition type P
 
 Undoes the partial initialization performed by
-``init_existential_opaque``.  ``deinit_existential_opaque`` is only valid for
+``init_existential_value``.  ``deinit_existential_value`` is only valid for
 existential containers that have been partially initialized by
-``init_existential_opaque`` but haven't had their contained value initialized.
+``init_existential_value`` but haven't had their contained value initialized.
 A fully initialized existential must be destroyed with ``destroy_value``.
 
 open_existential_addr
@@ -3976,13 +4007,13 @@ access constraint: The returned address can either allow ``mutable_access`` or
 (e.g ``destroy_addr`` or ``copy_addr [take]``) or mutate the value at the
 address if they have ``mutable_access``.
 
-open_existential_opaque
-```````````````````````
+open_existential_value
+``````````````````````
 ::
 
-  sil-instruction ::= 'open_existential_opaque' sil-operand 'to' sil-type
+  sil-instruction ::= 'open_existential_value' sil-operand 'to' sil-type
 
-  %1 = open_existential_opaque %0 : $P to $@opened P
+  %1 = open_existential_value %0 : $P to $@opened P
   // %0 must be of a $P type for non-class protocol or protocol composition
   //   type P
   // $@opened P must be a unique archetype that refers to an opened
@@ -4117,6 +4148,22 @@ opened archetype ``$@opened P``. The result address is dependent on both
 the owning box and the enclosing function; in order to "open" a boxed
 existential that has directly adopted a class reference, temporary scratch
 space may need to have been allocated.
+
+open_existential_box_value
+``````````````````````````
+::
+
+  sil-instruction ::= 'open_existential_box_value' sil-operand 'to' sil-type
+
+  %1 = open_existential_box_value %0 : $P to $@opened P
+  // %0 must be a value of boxed protocol or protocol composition type $P
+  // %@opened P must be a unique archetype that refers to an opened
+  //   existential type P
+  // %1 will be of type $@opened P
+
+Projects the value inside a boxed existential container, and uses the enclosed
+type and protocol conformance metadata to bind the opened archetype ``$@opened
+P``.
 
 dealloc_existential_box
 ```````````````````````
@@ -4300,7 +4347,7 @@ ref_to_raw_pointer
   sil-instruction ::= 'ref_to_raw_pointer' sil-operand 'to' sil-type
 
   %1 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
-  // $C must be a class type, or Builtin.NativeObject, or Builtin.UnknownObject
+  // $C must be a class type, or Builtin.NativeObject, or AnyObject
   // %1 will be of type $Builtin.RawPointer
 
 Converts a heap object reference to a ``Builtin.RawPointer``. The ``RawPointer``
@@ -4315,7 +4362,7 @@ raw_pointer_to_ref
   sil-instruction ::= 'raw_pointer_to_ref' sil-operand 'to' sil-type
 
   %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
-  // $C must be a class type, or Builtin.NativeObject, or Builtin.UnknownObject
+  // $C must be a class type, or Builtin.NativeObject, or AnyObject
   // %1 will be of type $C
 
 Converts a ``Builtin.RawPointer`` back to a heap object reference. Casting
@@ -4510,24 +4557,6 @@ objc_existential_metatype_to_object
 
 TODO
 
-is_nonnull
-``````````
-::
-
-  sil-instruction ::= 'is_nonnull' sil-operand
-
-  %1 = is_nonnull %0 : $C
-  // %0 must be of reference or function type $C
-  // %1 will be of type Builtin.Int1
-
-Checks whether a reference type value is null, returning 1 if
-the value is not null, or 0 if it is null.  If the value is a function
-type, it checks the function pointer (not the data pointer) for null.
-
-This is not a sensical thing for SIL to represent given that reference
-types are non-nullable, but makes sense at the machine level.  This is
-a horrible hack that should go away someday.
-
 Checked Conversions
 ~~~~~~~~~~~~~~~~~~~
 
@@ -4551,23 +4580,21 @@ unconditional_checked_cast
   // %1 will be of type $B or $*B
 
 Performs a checked scalar conversion, causing a runtime failure if the
-conversion fails.
+conversion fails. Casts that require changing representation or ownership are
+unsupported.
 
 unconditional_checked_cast_addr
 ```````````````````````````````
 ::
 
   sil-instruction ::= 'unconditional_checked_cast_addr'
-                       sil-cast-consumption-kind
                        sil-type 'in' sil-operand 'to'
                        sil-type 'in' sil-operand
-  sil-cast-consumption-kind ::= 'take_always'
-  sil-cast-consumption-kind ::= 'take_on_success'
-  sil-cast-consumption-kind ::= 'copy_on_success'
 
-  %1 = unconditional_checked_cast_addr take_on_success $A in %0 : $*@thick A to $B in $*@thick B
+  unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in $*@thick B
   // $A and $B must be both addresses
   // %1 will be of type $*B
+  // $A is destroyed during the conversion. There is no implicit copy.
 
 Performs a checked indirect conversion, causing a runtime failure if the
 conversion fails.
@@ -4577,19 +4604,19 @@ unconditional_checked_cast_value
 ::
 
   sil-instruction ::= 'unconditional_checked_cast_value'
-                       sil-cast-consumption-kind
                        sil-operand 'to' sil-type
-  sil-cast-consumption-kind ::= 'take_always'
-  sil-cast-consumption-kind ::= 'take_on_success'
-  sil-cast-consumption-kind ::= 'copy_on_success'
 
-  %1 = unconditional_checked_cast_value take_always %0 : $A to $B
+  %1 = unconditional_checked_cast_value %0 : $A to $B
   // $A must not be an address
   // $B must not be an address
   // %1 will be of type $B
+  // $A is destroyed during the conversion. There is no implicit copy.
 
-Performs a checked conversion, causing a runtime failure if the
-conversion fails.
+Performs a checked conversion, causing a runtime failure if the conversion
+fails. Unlike `unconditional_checked_cast`, this destroys its operand and
+creates a new value. Consequently, this supports bridging objects to values, as
+well as casting to a different ownership classification such as `$AnyObject` to
+`$T.Type`.
 
 Runtime Failures
 ~~~~~~~~~~~~~~~~

@@ -58,6 +58,14 @@ TupleTestSuite.test("Tuple/equality") {
 
 TupleTestSuite.test("Tuple/equality/sanity-check") {
   // sanity check all arities
+
+  expectTrue(() == ())
+  expectFalse(() != ())
+  expectFalse(() < ())
+  expectTrue(() <= ())
+  expectFalse(() > ())
+  expectTrue(() >= ())
+
 % for arity in range(2, maxArity + 1):
 %   a = str(tuple(range(1, arity + 1)))
 %   b = "({}, 0)".format(", ".join([str(i) for i in range(1, arity)]))

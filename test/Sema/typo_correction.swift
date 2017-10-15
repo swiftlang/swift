@@ -1,5 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -typo-correction-limit 20
 // RUN: not %target-swift-frontend -typecheck -disable-typo-correction %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
+// RUN: not %target-swift-frontend -typecheck -typo-correction-limit 0 %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // RUN: not %target-swift-frontend -typecheck -DIMPORT_FAIL %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // DISABLED-NOT: did you mean
 
@@ -82,7 +83,7 @@ func test_too_many_but_some_better() {
 // type variables.
 _ = [Any]().withUnsafeBufferPointer { (buf) -> [Any] in
   guard let base = buf.baseAddress else { return [] }
-  return (base ..< base + buf.count).m // expected-error {{value of type 'CountableRange<_>' has no member 'm'}}
+  return (base ..< base + buf.count).m // expected-error {{value of type 'CountableRange<UnsafePointer<Any>>' has no member 'm'}}
 }
 
 // Typo correction with class-bound archetypes.

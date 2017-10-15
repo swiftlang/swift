@@ -9,7 +9,8 @@ enum E {
 
   static func testE(e: E) {
     switch e {
-    case A<UndefinedTy>(): // expected-error {{use of undeclared type 'UndefinedTy'}}
+    case A<UndefinedTy>(): // expected-error {{cannot specialize a non-generic definition}}
+    // expected-note@-1 {{while parsing this '<' as a type parameter bracket}}
       break
     case B<Int>(): // expected-error {{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
       break
@@ -21,13 +22,16 @@ enum E {
 
 func testE(e: E) {
   switch e {
-  case E.A<UndefinedTy>(): // expected-error {{use of undeclared type 'UndefinedTy'}}
+  case E.A<UndefinedTy>(): // expected-error {{cannot specialize a non-generic definition}}
+  // expected-note@-1 {{while parsing this '<' as a type parameter bracket}}
     break
   case E.B<Int>(): // expected-error {{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
     break
-  case .C(): // FIXME: This should be rejected as well.
+  case .C(): // expected-error {{pattern with associated values does not match enum case 'C'}}
+             // expected-note@-1 {{remove associated values to make the pattern match}} {{10-12=}} 
     break
-  case .D(let payload): // FIXME: ditto.
+  case .D(let payload): // expected-error{{pattern with associated values does not match enum case 'D'}}
+                        // expected-note@-1 {{remove associated values to make the pattern match}} {{10-23=}}
     let _: () = payload
     break
   default:
@@ -35,10 +39,10 @@ func testE(e: E) {
   }
 
   guard
-    // Currently, these will be asserted in SILGen,
-    // or in no-assert build, verify-failed in IRGen
-    case .C() = e, // FIXME: Should be rejected.
-    case .D(let payload) = e // FIXME: ditto.
+    case .C() = e, // expected-error {{pattern with associated values does not match enum case 'C'}} 
+                   // expected-note@-1 {{remove associated values to make the pattern match}} {{12-14=}}
+    case .D(let payload) = e // expected-error {{pattern with associated values does not match enum case 'D'}}
+                             // expected-note@-1 {{remove associated values to make the pattern match}} {{12-25=}}
   else { return }
 }
 
@@ -49,8 +53,10 @@ func canThrow() throws {
 
 do {
   try canThrow()
-} catch E.A() { // FIXME: Should be rejected.
+} catch E.A() { // expected-error {{pattern with associated values does not match enum case 'A'}}
+                // expected-note@-1 {{remove associated values to make the pattern match}} {{12-14=}}
   // ..
-} catch E.B(let payload) { // FIXME: ditto.
+} catch E.B(let payload) { // expected-error {{pattern with associated values does not match enum case 'B'}}
+                           // expected-note@-1 {{remove associated values to make the pattern match}} {{12-25=}} 
   let _: () = payload
 }

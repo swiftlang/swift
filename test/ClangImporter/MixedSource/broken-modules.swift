@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/broken-modules/ -enable-source-import -show-diagnostics-after-fatal 2> %t/err.txt
 // RUN: %FileCheck -check-prefix CHECK -check-prefix CLANG-CHECK %s < %t/err.txt
 
@@ -8,7 +8,6 @@
 // RUN: not %target-swift-frontend -typecheck %s -import-objc-header %S/../../Inputs/empty.swift 2>&1 | %FileCheck -check-prefix=EMPTY-HEADER %s
 
 // REQUIRES: objc_interop
-// REQUIRES: rdar30287833
 
 // EMPTY-HEADER-NOT: header
 

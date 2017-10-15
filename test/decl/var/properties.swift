@@ -264,10 +264,9 @@ var computed_prop_with_init_1: X {
   get {}
 } = X()  // expected-error {{expected expression}} expected-error {{consecutive statements on a line must be separated by ';'}} {{2-2=;}}
 
-// FIXME: Redundant error below
 var x2 { // expected-error{{computed property must have an explicit type}} {{7-7=: <# Type #>}} expected-error{{type annotation missing in pattern}}
   get {
-    return _x // expected-error{{unexpected non-void return value in void function}}
+    return _x
   }
 }
 
@@ -442,7 +441,7 @@ struct StructWithExtension1 {
   static var fooStatic = 4
 }
 extension StructWithExtension1 {
-  var fooExt: Int // expected-error {{extensions may not contain stored properties}}
+  var fooExt: Int // expected-error {{extensions must not contain stored properties}}
   static var fooExtStatic = 4
 }
 
@@ -451,16 +450,16 @@ class ClassWithExtension1 {
   class var fooStatic = 4 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
 }
 extension ClassWithExtension1 {
-  var fooExt: Int // expected-error {{extensions may not contain stored properties}}
+  var fooExt: Int // expected-error {{extensions must not contain stored properties}}
   class var fooExtStatic = 4 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
 }
 
 enum EnumWithExtension1 {
-  var foo: Int // expected-error {{enums may not contain stored properties}}
+  var foo: Int // expected-error {{enums must not contain stored properties}}
   static var fooStatic  = 4
 }
 extension EnumWithExtension1 {
-  var fooExt: Int // expected-error {{extensions may not contain stored properties}}
+  var fooExt: Int // expected-error {{extensions must not contain stored properties}}
   static var fooExtStatic = 4
 }
 
@@ -469,8 +468,20 @@ protocol ProtocolWithExtension1 {
   static var fooStatic : Int { get }
 }
 extension ProtocolWithExtension1 {
-  var fooExt: Int // expected-error{{extensions may not contain stored properties}}
-  static var fooExtStatic = 4 // expected-error{{static stored properties not supported in generic types}}
+  var fooExt: Int // expected-error{{extensions must not contain stored properties}}
+  static var fooExtStatic = 4 // expected-error{{static stored properties not supported in protocol extensions}}
+}
+
+protocol ProtocolWithExtension2 {
+  var bar: String { get }
+}
+
+struct StructureImplementingProtocolWithExtension2: ProtocolWithExtension2 {
+  let bar: String
+}
+
+extension ProtocolWithExtension2 {
+  static let baz: ProtocolWithExtension2 = StructureImplementingProtocolWithExtension2(bar: "baz") // expected-error{{static stored properties not supported in protocol extensions}}
 }
 
 func getS() -> S {
@@ -713,7 +724,7 @@ struct WillSetDidSetProperties {
     didSet {
       markUsed("woot")
     }
-    get { // expected-error {{didSet variable may not also have a get specifier}}
+    get { // expected-error {{didSet variable must not also have a get specifier}}
       return 4
     }
   }
@@ -722,7 +733,7 @@ struct WillSetDidSetProperties {
     willSet {
       markUsed("woot")
     }
-    set { // expected-error {{willSet variable may not also have a set specifier}}
+    set { // expected-error {{willSet variable must not also have a set specifier}}
       return 4
     }
   }
@@ -1027,7 +1038,7 @@ struct PropertiesWithOwnershipTypes {
 
 // <rdar://problem/16608609> Assert (and incorrect error message) when defining a constant stored property with observers
 class Test16608609 {
-   let constantStored: Int = 0 {  // expected-error {{'let' declarations cannot be observing properties}}
+   let constantStored: Int = 0 {  // expected-error {{'let' declarations cannot be observing properties}} {{4-7=var}}
       willSet {
       }
       didSet {
@@ -1114,8 +1125,8 @@ class rdar17391625 {
 }
 
 extension rdar17391625 {
-  var someStoredVar: Int       // expected-error {{extensions may not contain stored properties}}
-  var someObservedVar: Int {   // expected-error {{extensions may not contain stored properties}}
+  var someStoredVar: Int       // expected-error {{extensions must not contain stored properties}}
+  var someObservedVar: Int {   // expected-error {{extensions must not contain stored properties}}
   didSet {
   }
   }
@@ -1126,17 +1137,18 @@ class rdar17391625derived :  rdar17391625 {
 
 extension rdar17391625derived {
   // Not a stored property, computed because it is an override.
-  override var prop: Int { // expected-error {{declarations in extensions cannot override yet}}
+  override var prop: Int { // expected-error {{overriding declarations in extensions is not supported}}
   didSet {
   }
   }
 }
 
 // <rdar://problem/27671033> Crash when defining property inside an invalid extension
+// (This extension is no longer invalid.)
 public protocol rdar27671033P {}
 struct rdar27671033S<Key, Value> {}
-extension rdar27671033S : rdar27671033P where Key == String { // expected-error {{extension of type 'rdar27671033S' with constraints cannot have an inheritance clause}}
-  let d = rdar27671033S<Int, Int>() // expected-error {{extensions may not contain stored properties}}
+extension rdar27671033S : rdar27671033P where Key == String {
+  let d = rdar27671033S<Int, Int>() // expected-error {{extensions must not contain stored properties}}
 }
 
 // <rdar://problem/19874152> struct memberwise initializer violates new sanctity of previously set `let` property

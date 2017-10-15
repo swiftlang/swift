@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // Use fake mangled names here with the name of the imported module.
 // swift-ide-test isn't testing the full demangling algorithm.

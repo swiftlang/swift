@@ -18,6 +18,6 @@ define dllexport i32 @h(i32 %x, i32 %y) {
   ret i32 %sum3
 }
 
-; CHECK-NOT: define internal dllexport i32 @f_merged(i32, i32)
-; CHECK-LABEL: define internal i32 @f_merged(i32, i32)
+; CHECK-NOT: define internal dllexport i32 @fTm(i32, i32)
+; CHECK-LABEL: define internal i32 @fTm(i32, i32)
 

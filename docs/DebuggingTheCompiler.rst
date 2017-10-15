@@ -131,13 +131,21 @@ For details see the SILDebugInfoGenerator pass.
 To enable SIL debugging and profiling for the Swift standard library, use
 the build-script-impl option ``--build-sil-debugging-stdlib``.
 
-Other Utilities
-```````````````
+ViewCFG: Regex based CFG Printer
+````````````````````````````````
 
-To view the CFG of a function (or code region) in a SIL file, you can use the
-script ``swift/utils/viewcfg``. It also works for LLVM IR files.
-The script reads the SIL (or LLVM IR) code from stdin and displays the dot
-graph file. Note: .dot files should be associated with the Graphviz app.
+ViewCFG (``./utils/viewcfg``) is a script that parses a textual CFG (e.g. a llvm
+or sil function) and displays a .dot file of the CFG. Since the parsing is done
+using regular expressions (i.e. ignoring language semantics), ViewCFG can:
+
+1. Parse both SIL and LLVM IR
+2. Parse blocks and functions without needing to know contextual
+   information. Ex: types and declarations.
+
+The script assumes that the relevant text is passed in via stdin and uses open
+to display the .dot file.
+
+**NOTE** Since we use open, .dot files should be associated with the Graphviz app for this to work.
 
 Using Breakpoints
 `````````````````
@@ -291,3 +299,90 @@ function in the current frame::
     Summary: CollectionType3`ext.CollectionType3.CollectionType3.MutableCollectionType2<A where A: CollectionType3.MutableCollectionType2>.(subscript.materializeForSet : (Swift.Range<A.Index>) -> Swift.MutableSlice<A>).(closure #1)
     Module: file = "/Volumes/Files/work/solon/build/build-swift/validation-test-macosx-x86_64/stdlib/Output/CollectionType.swift.gyb.tmp/CollectionType3", arch = "x86_64"
     Symbol: id = {0x0000008c}, range = [0x0000000100004db0-0x00000001000056f0), name="ext.CollectionType3.CollectionType3.MutableCollectionType2<A where A: CollectionType3.MutableCollectionType2>.(subscript.materializeForSet : (Swift.Range<A.Index>) -> Swift.MutableSlice<A>).(closure #1)", mangled="_TFFeRq_15CollectionType322MutableCollectionType2_S_S0_m9subscriptFGVs5Rangeqq_s16MutableIndexable5Index_GVs12MutableSliceq__U_FTBpRBBRQPS0_MS4__T_"
+
+Debugging failures in LLDB
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sometimes one needs to be able to while debugging actually debug LLDB and its
+interaction with Swift itself. Some examples of problems where this can come up
+are:
+
+1. Compiler bugs when LLDB attempts to evaluate an expression. (expression
+   debugging)
+2. Swift variables being shown with no types. (type debugging)
+
+To gain further insight into these sorts of failures, we use LLDB log
+categories. LLDB log categories provide introspection by causing LLDB to dump
+verbose information relevant to the category into the log as it works. The two
+log channels that are useful for debugging Swift issues are the "types" and
+"expression" log channels.
+
+For more details about any of the information below, please run::
+
+    (lldb) help log enable
+
+"Types" Log
+```````````
+
+The "types" log reports on LLDB's process of constructing SwiftASTContexts and
+errors that may occur. The two main tasks here are:
+
+1. Constructing the SwiftASTContext for a specific single Swift module. This is
+   used to implement frame local variable dumping via the lldb ``frame
+   variable`` command, as well as the Xcode locals view. On failure, local
+   variables will not have types.
+
+2. Building a SwiftASTContext in which to run Swift expressions using the
+   "expression" command. Upon failure, one will see an error like: "Shared Swift
+   state for has developed fatal errors and is being discarded."
+
+These errors can be debugged by turning on the types log::
+
+    (lldb) log enable -f /tmp/lldb-types-log.txt lldb types
+
+That will write the types log to the file passed to the -f option.
+
+**NOTE** Module loading can happen as a side-effect of other operations in lldb
+ (e.g. the "file" command). To be sure that one has enabled logging before /any/
+ module loading has occured, place the command into either::
+
+   ~/.lldbinit
+   $PWD/.lldbinit
+
+This will ensure that the type import command is run before /any/ modules are
+imported.
+
+"Expression" Log
+````````````````
+
+The "expression" log reports on the process of wrapping, parsing, SILGen'ing,
+JITing, and inserting an expression into the current Swift module. Since this can
+only be triggered by the user manually evaluating expression, this can be turned
+on at any point before evaluating an expression. To enable expression logging,
+first run::
+
+    (lldb) log enable -f /tmp/lldb-expr-log.txt lldb expression
+
+and then evaluate the expression. The expression log dumps, in order, the
+following non-exhaustive list of state:
+
+1. The unparsed, textual expression passed to the compiler.
+2. The parsed expression.
+3. The initial SILGen.
+4. SILGen after SILLinking has occured.
+5. SILGen after SILLinking and Guaranteed Optimizations have occured.
+6. The resulting LLVM IR.
+7. The assembly code that will be used by the JIT.
+
+**NOTE** LLDB runs a handful of preparatory expressions that it uses to set up
+for running Swift expressions. These can make the expression logs hard to read
+especially if one evaluates multiple expressions with the logging enabled. In
+such a situation, run all expressions before the bad expression, turn on the
+logging, and only then run the bad expression.
+
+Multiple Logs at a Time
+```````````````````````
+
+Note, you can also turn on more than one log at a time as well, e.x.::
+
+    (lldb) log enable -f /tmp/lldb-types-log.txt lldb types expression

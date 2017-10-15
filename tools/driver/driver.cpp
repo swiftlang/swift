@@ -94,9 +94,9 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   StringRef Subcommand = Args[1];
   Args.erase(&Args[1]);
 
-  // If the subcommand is one of the "built-in" 'repl' or 'run', then use the
+  // If the subcommand is the "built-in" 'repl', then use the
   // normal driver.
-  if (Subcommand == "repl" || Subcommand == "run")
+  if (Subcommand == "repl")
     return false;
 
   // Form the subcommand name.

@@ -14,6 +14,7 @@
 #define LLVM_SOURCEKIT_CORE_NOTIFICATIONCENTER_H
 
 #include "SourceKit/Core/LLVM.h"
+#include "llvm/Support/Mutex.h"
 #include <functional>
 #include <vector>
 
@@ -23,9 +24,14 @@ typedef std::function<void(StringRef DocumentName)>
     DocumentUpdateNotificationReceiver;
 
 class NotificationCenter {
+  bool DispatchToMain;
   std::vector<DocumentUpdateNotificationReceiver> DocUpdReceivers;
+  mutable llvm::sys::Mutex Mtx;
 
 public:
+  explicit NotificationCenter(bool dispatchToMain);
+  ~NotificationCenter();
+
   void addDocumentUpdateNotificationReceiver(
       DocumentUpdateNotificationReceiver Receiver);
 

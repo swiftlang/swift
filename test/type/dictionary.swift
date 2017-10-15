@@ -33,3 +33,13 @@ var y2: [String : ] // expected-error{{expected dictionary value type}}
 struct NotHashable { }
 
 var nh1 : [NotHashable : Int] // expected-error{{'NotHashable' does not conform to protocol 'Hashable'}}
+
+struct Y<T> : Hashable {
+  var hashValue: Int { return 0 }
+
+  static func ==(this: Y<T>, other: Y<T>) -> Bool { return true }
+}
+
+let _ = [Y<Int>: Int]()
+let _ = [Y<Int> : Int]()
+let _ = [Y<Int> :Int]()

@@ -22,7 +22,14 @@ struct L {
 }
 
 sil @plus : $@convention(thin) (Int64, Int64) -> Int64
+sil @nativeobject_plus : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+sil @partial_apply_user : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
 sil @fromLiteral : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
+sil @use_nativeobject : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+//////////////////////////////////////
+// Multiple Inline in a Block Tests //
+//////////////////////////////////////
 
 // CHECK-LABEL: sil [transparent] @test_add : $@convention(thin) (Int64) -> Int64 {
 sil [transparent] @test_add : $@convention(thin) (Int64) -> Int64 {
@@ -166,6 +173,10 @@ bb0(%0 : $Int64):
   return %19 : $Int64
 }
 
+///////////////////////
+// Existential Tests //
+///////////////////////
+
 protocol SomeProtocol {
 }
 
@@ -201,14 +212,12 @@ sil @inline_test_existential_metatype : $@convention(thin) (@in SomeProtocol) ->
 bb0(%0 : $*SomeProtocol):
   %1 = function_ref @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
   %2 = apply %1(%0) : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
-  %3 = return %2 : $@thick SomeProtocol.Type
+  return %2 : $@thick SomeProtocol.Type
 }
 
-sil private @top_level_code : $() -> () {
-bb0:
-  %0 = tuple ()
-  return %0 : $()
-}
+////////////////////////
+// Control Flow Tests //
+////////////////////////
 
 sil @get_logic_value : $@convention(method) (@inout Bool) -> Builtin.Int1
 sil @add_floats : $@convention(thin) (Float32, Float32) -> Float32
@@ -387,6 +396,10 @@ bb0(%0 : $Float):
   return %21 : $Float
 }
 
+///////////////////////////////////////
+// Recursion and Partial Apply Tests //
+///////////////////////////////////////
+
 // CHECK-LABEL: [transparent] @test_recursive_foo : $@convention(thin) (Float) -> Float
 sil [transparent] @test_recursive_foo : $@convention(thin) (Float) -> Float {
   // CHECK-NOT: function_ref
@@ -449,6 +462,109 @@ bb0(%0 : $@callee_owned (Int64) -> Int64, %1 : $Int64):
   return %7 : $Int64
 }
 
+
+// CHECK-LABEL: [transparent] @test_recursive_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+sil [transparent] @test_recursive_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+  // CHECK-NOT: function_ref
+  // CHECK-NOT: apply
+  // CHECK: return
+
+bb0(%0 : $Builtin.NativeObject):
+  %3 = function_ref @test_recursive_nativeobject_bar : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %5 = apply %3(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %5 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [transparent] @test_recursive_nativeobject_bar : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+sil [transparent] @test_recursive_nativeobject_bar : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+  // CHECK-NOT: function_ref
+  // CHECK-NOT: apply
+  // CHECK: return
+
+bb0(%0 : $Builtin.NativeObject):
+  %3 = function_ref @test_recursive_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %5 = apply %3(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %5 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [transparent] @test_recursive_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'test_recursive_nativeobject_baz'
+sil [transparent] @test_recursive_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject):
+  return %0 : $Builtin.NativeObject
+}
+
+sil [transparent] @test_partial_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %6 = function_ref @nativeobject_plus : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %7 = apply %6(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %7 : $Builtin.NativeObject
+}
+
+sil [transparent] @test_partial_nativeobject_bar : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %7 = apply %0(%1) : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %7 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [transparent] @test_partial_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject):
+// CHECK:   [[FN:%.*]] = function_ref @test_partial_nativeobject_baz :
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   strong_retain [[ARG]]
+// CHECK:   [[PAI:%.*]] = partial_apply [[FN]]([[ARG]])
+// CHECK:   br bb2
+//
+// CHECK: bb2:
+// CHECK:   strong_retain [[ARG]]
+// CHECK:   strong_retain [[PAI]]
+// CHECK:   strong_retain [[ARG]]
+// CHECK:   strong_release [[PAI]]
+// CHECK:   [[FN2:%.*]] = function_ref @nativeobject_plus :
+// CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[ARG]], [[ARG]])
+//
+// CHECK: bb3:
+// CHECK:   strong_retain [[PAI]]
+// CHECK:   [[OPAQUE_FN:%.*]] = function_ref @partial_apply_user
+// CHECK:   apply [[OPAQUE_FN]]([[PAI]])
+// CHECK:   strong_release [[PAI]]
+// CHECK:   strong_release [[ARG]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'test_partial_nativeobject_foo'
+sil [transparent] @test_partial_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject):
+  %2 = function_ref @test_partial_nativeobject_bar : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %3 = function_ref @test_partial_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  %5 = partial_apply %3(%0) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb2
+
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %5 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %13 = apply %2(%5, %0) : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_retain %5 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %15 = function_ref @partial_apply_user : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+  apply %15(%5) : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+  strong_release %5 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  return %13 : $Builtin.NativeObject
+}
+
+///////////////////////
+// Autoclosure Tests //
+///////////////////////
+
 sil @true_getter : $@convention(thin) () -> Bool
 
 sil [transparent] @short_circuit_or : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool {
@@ -470,8 +586,10 @@ bb1:
   br bb3(%10 : $Bool)
 
 bb2:
+  %m2 = integer_literal $Builtin.Int32, 2 // Marker
   %12 = load %3a : $*@callee_owned () -> Bool
   strong_retain %12 : $@callee_owned () -> Bool
+  %m3 = integer_literal $Builtin.Int32, 3 // Marker
   %14 = apply %12() : $@callee_owned () -> Bool
   br bb3(%14 : $Bool)
 
@@ -500,20 +618,22 @@ sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
   // CHECK: br [[BB2:.*]](
 
 // CHECK: [[BB2]](
-  // CHECK: br [[BB5:.*]](
+  // CHECK: br [[BB4:.*]](
 
 // CHECK: bb3:
-  // CHECK: br bb4
-
-// CHECK: [[BB4]]:
+  // CHECK: [[OLD_CALLEE:%.*]] = load {{%[0-9]+}} :
+  // CHECK: strong_retain [[OLD_CALLEE]]
+  // Separation marker
+  // CHECK: integer_literal $Builtin.Int32, 3
   // CHECK: strong_retain [[VAL4:%[0-9]*]]
+  // CHECK: strong_release [[OLD_CALLEE]]
   // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[ADDR4]]
   // CHECK: strong_release [[VAL4]]
   // CHECK: br [[BB2]](
 
-// CHECK: [[BB5]](
+// CHECK: [[BB4]](
   // CHECK: strong_release [[VAL4]]
   // CHECK: return {{.*}}
 
@@ -529,6 +649,7 @@ bb0(%0 : $Bool, %1 : $Bool):
   %8 = function_ref @closure0 : $@convention(thin) (@owned { var Bool }) -> Bool
   strong_retain %3 : ${ var Bool }
   %10 = partial_apply %8(%3) : $@convention(thin) (@owned { var Bool }) -> Bool
+  %12 = integer_literal $Builtin.Int32, 1 // Marker
   %11 = apply %6(%7, %10) : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
   strong_release %3 : ${ var Bool }
   strong_release %2 : ${ var Bool }
@@ -547,11 +668,15 @@ sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: [[BB2]](
   // CHECK: br [[BB5:.*]](
 
-// CHECK: bb3:
-  // CHECK: br bb4
-
-// CHECK: [[BB4]]:
+// CHECK: [[BB3]]:
+  // Marker -
+  // CHECK: integer_literal $Builtin.Int32, 2
+  // CHECK: [[OLD_CALLEE:%.*]] = load {{%.*}}
+  // CHECK: strong_retain [[OLD_CALLEE]]
+  // Marker -
+  // CHECK: integer_literal $Builtin.Int32, 3
   // CHECK: strong_retain [[VAL4:%[0-9]*]]
+  // CHECK: strong_release [[OLD_CALLEE]]
   // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[ADDR4]]
@@ -849,8 +974,6 @@ bb0(%0 : $@callee_owned () -> Builtin.Int8):
 // CHECK-LABEL: sil @testouter_transparent
 sil @testouter_transparent : $@convention(thin) (Builtin.Int8) -> Builtin.Int8 {
 // CHECK: bb0
-// CHECK-NEXT: br bb1
-// CHECK: bb1
 // CHECK-NEXT: return
 bb0(%0 : $Builtin.Int8):
   %2 = function_ref @outer_transparent : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8

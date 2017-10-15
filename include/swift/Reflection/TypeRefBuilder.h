@@ -62,7 +62,7 @@ public:
   }
 
   size_t size() const {
-    return (char *)End - (char *)Begin;
+    return (const char *)End - (const char *)Begin;
   }
 };
 
@@ -178,9 +178,20 @@ public:
   }
 
   const NominalTypeRef *createNominalType(
+                                    const Optional<std::string> &mangledName) {
+    return NominalTypeRef::create(*this, *mangledName, nullptr);
+  }
+
+  const NominalTypeRef *createNominalType(
                                     const Optional<std::string> &mangledName,
                                     const TypeRef *parent) {
     return NominalTypeRef::create(*this, *mangledName, parent);
+  }
+
+  const BoundGenericTypeRef *
+  createBoundGenericType(const Optional<std::string> &mangledName,
+                         const std::vector<const TypeRef *> &args) {
+    return BoundGenericTypeRef::create(*this, *mangledName, args, nullptr);
   }
 
   const BoundGenericTypeRef *
@@ -310,9 +321,6 @@ public:
   lookupTypeWitness(const std::string &MangledTypeName,
                     const std::string &Member,
                     const TypeRef *Protocol);
-
-  const TypeRef *
-  lookupSuperclass(const std::string &MangledTypeName);
 
   const TypeRef *
   lookupSuperclass(const TypeRef *TR);

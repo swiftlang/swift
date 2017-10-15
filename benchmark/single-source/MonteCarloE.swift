@@ -19,6 +19,11 @@
 // Thus, e = N / Nempty.
 import TestsUtils
 
+public let MonteCarloE = BenchmarkInfo(
+  name: "MonteCarloE",
+  runFunction: run_MonteCarloE,
+  tags: [.validation, .algorithm])
+
 public func run_MonteCarloE(scale: Int) {
   let N = 200000*scale
   var intervals = [Bool](repeating: false, count: N)
@@ -29,10 +34,8 @@ public func run_MonteCarloE(scale: Int) {
   let numEmptyIntervals = intervals.filter{!$0}.count
   // If there are no empty intervals, then obviously the random generator is
   // not 'random' enough.
-  CheckResults(numEmptyIntervals != N,
-               "Incorrect results in MonteCarloE: no empty intervals.")
+  CheckResults(numEmptyIntervals != N)
   let e_estimate = Double(N)/Double(numEmptyIntervals)
   let e = 2.71828
-  CheckResults(abs(e_estimate - e) < 0.1,
-               "Incorrect results in MonteCarloE: e_estimate == \(e_estimate)")
+  CheckResults(abs(e_estimate - e) < 0.1)
 }

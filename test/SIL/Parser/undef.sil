@@ -105,8 +105,8 @@ bb0:
   class_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
   // CHECK: super_method undef : $D, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
   super_method undef : $D, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
-  // CHECK: dynamic_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
-  dynamic_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  // CHECK: objc_method undef : $C, #C.fn!1.foreign : (C) -> () -> (), $@convention(objc_method) (C) -> ()
+  objc_method undef : $C, #C.fn!1.foreign : (C) -> () -> (), $@convention(objc_method) (C) -> ()
 
   // Function Application
 
@@ -244,15 +244,13 @@ bb0:
   bridge_object_to_word undef : $Builtin.BridgeObject to $Builtin.Word
   // CHECK: thin_to_thick_function undef : $@convention(thin) () -> () to $() -> ()
   thin_to_thick_function undef : $@convention(thin) () -> () to $() -> ()
-  // CHECK: is_nonnull undef : $C
-  is_nonnull undef : $C
 
   // Checked Conversions
 
   // CHECK: unconditional_checked_cast undef : $C to $C
   unconditional_checked_cast undef : $C to $C
-  // CHECK: unconditional_checked_cast_addr take_always C in undef : $*C to C in undef : $*C
-  unconditional_checked_cast_addr take_always C in undef : $*C to C in undef : $*C
+  // CHECK: unconditional_checked_cast_addr C in undef : $*C to C in undef : $*C
+  unconditional_checked_cast_addr C in undef : $*C to C in undef : $*C
 
   // Runtime Failures
 

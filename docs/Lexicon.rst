@@ -65,6 +65,9 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
   bitcode
     Serialized LLVM `IR`.
 
+  build czar
+    Apple term for "the person assigned to watch CI this week".
+
   canonical SIL
     SIL after the
     `mandatory passes <mandatory passes / mandatory optimizations>` have run.
@@ -340,12 +343,6 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
   SIL
     "Swift Intermediate Language". A high-level IR used by the Swift compiler
     for flow-sensitive diagnostics, optimization, and LLVM IR generation.
-
-  -sil-serialize-all
-    A mode where all functions in a library are made available for inlining by
-    any client, regardless of access control. Also called "magic performance
-    mode" as a reminder of how this drastically changes compilation. Not
-    guaranteed to work on arbitrary code.
 
   SR
     An issue reported on `bugs.swift.org <https://bugs.swift.org>`_. A

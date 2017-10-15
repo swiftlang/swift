@@ -17,8 +17,13 @@
 #include "swift/AST/Module.h"
 #include "swift/Serialization/ModuleFormat.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/PrettyStackTrace.h"
 
 namespace swift {
+class ModuleFile;
+
+StringRef getNameOfModule(const ModuleFile *);
+
 namespace serialization {
 
 class XRefTracePath {
@@ -49,6 +54,21 @@ class XRefTracePath {
     PathPiece(Kind K, T value)
       : kind(K),
         data(llvm::PointerLikeTypeTraits<T>::getAsVoidPointer(value)) {}
+
+    Identifier getAsIdentifier() const {
+      switch (kind) {
+      case Kind::Value:
+      case Kind::Operator:
+        return getDataAs<Identifier>();
+      case Kind::Type:
+      case Kind::OperatorFilter:
+      case Kind::Accessor:
+      case Kind::Extension:
+      case Kind::GenericParam:
+      case Kind::Unknown:
+        return Identifier();
+      }
+    }
 
     void print(raw_ostream &os) const {
       switch (kind) {
@@ -130,7 +150,7 @@ class XRefTracePath {
 public:
   explicit XRefTracePath(ModuleDecl &M) : baseM(M) {}
 
-  void addValue(Identifier name) {
+  void addValue(DeclBaseName name) {
     path.push_back({ PathPiece::Kind::Value, name });
   }
 
@@ -164,6 +184,15 @@ public:
     path.push_back({ PathPiece::Kind::Unknown, kind });
   }
 
+  Identifier getLastName() const {
+    for (auto &piece : reversed(path)) {
+      Identifier result = piece.getAsIdentifier();
+      if (!result.empty())
+        return result;
+    }
+    return Identifier();
+  }
+
   void removeLast() {
     path.pop_back();
   }
@@ -183,17 +212,30 @@ class DeclDeserializationError : public llvm::ErrorInfoBase {
   void anchor() override;
 
 public:
-  enum Kind {
-    Normal,
-    DesignatedInitializer
+  enum Flag : unsigned {
+    DesignatedInitializer = 1 << 0,
+    NeedsVTableEntry = 1 << 1,
+    NeedsAllocatingVTableEntry = 1 << 2,
   };
+  using Flags = OptionSet<Flag>;
 
 protected:
-  Kind kind = Normal;
+  DeclName name;
+  Flags flags;
 
 public:
-  Kind getKind() const {
-    return kind;
+  DeclName getName() const {
+    return name;
+  }
+
+  bool isDesignatedInitializer() const {
+    return flags.contains(Flag::DesignatedInitializer);
+  }
+  bool needsVTableEntry() const {
+    return flags.contains(Flag::NeedsVTableEntry);
+  }
+  bool needsAllocatingVTableEntry() const {
+    return flags.contains(Flag::NeedsAllocatingVTableEntry);
   }
 
   bool isA(const void *const ClassID) const override {
@@ -212,8 +254,10 @@ class XRefError : public llvm::ErrorInfo<XRefError, DeclDeserializationError> {
   const char *message;
 public:
   template <size_t N>
-  XRefError(const char (&message)[N], XRefTracePath path)
-      : path(path), message(message) {}
+  XRefError(const char (&message)[N], XRefTracePath path, DeclName name)
+      : path(path), message(message) {
+    this->name = name;
+  }
 
   void log(raw_ostream &OS) const override {
     OS << message << "\n";
@@ -232,11 +276,10 @@ private:
   static const char ID;
   void anchor() override;
 
-  DeclName name;
-
 public:
-  explicit OverrideError(DeclName name, Kind kind = Normal) : name(name) {
-    this->kind = kind;
+  explicit OverrideError(DeclName name, Flags flags = {}) {
+    this->name = name;
+    this->flags = flags;
   }
 
   void log(raw_ostream &OS) const override {
@@ -253,13 +296,13 @@ class TypeError : public llvm::ErrorInfo<TypeError, DeclDeserializationError> {
   static const char ID;
   void anchor() override;
 
-  DeclName name;
   std::unique_ptr<ErrorInfoBase> underlyingReason;
 public:
   explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason,
-                     Kind kind = Normal)
-      : name(name), underlyingReason(std::move(reason)) {
-    this->kind = kind;
+                     Flags flags = {})
+      : underlyingReason(std::move(reason)) {
+    this->name = name;
+    this->flags = flags;
   }
 
   void log(raw_ostream &OS) const override {
@@ -272,6 +315,44 @@ public:
 
   std::error_code convertToErrorCode() const override {
     return llvm::inconvertibleErrorCode();
+  }
+};
+
+class ExtensionError : public llvm::ErrorInfo<ExtensionError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  std::unique_ptr<ErrorInfoBase> underlyingReason;
+
+public:
+  explicit ExtensionError(std::unique_ptr<ErrorInfoBase> reason)
+      : underlyingReason(std::move(reason)) {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "could not deserialize extension";
+    if (underlyingReason) {
+      OS << ": ";
+      underlyingReason->log(OS);
+    }
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
+class PrettyStackTraceModuleFile : public llvm::PrettyStackTraceEntry {
+  const char *Action;
+  const ModuleFile &MF;
+public:
+  explicit PrettyStackTraceModuleFile(const char *action, ModuleFile &module)
+      : Action(action), MF(module) {}
+  explicit PrettyStackTraceModuleFile(ModuleFile &module)
+      : PrettyStackTraceModuleFile("While reading from", module) {}
+
+  void print(raw_ostream &os) const override {
+    os << Action << " \'" << getNameOfModule(&MF) << "'\n";
   }
 };
 
