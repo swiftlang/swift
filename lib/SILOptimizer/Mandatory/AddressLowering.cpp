@@ -474,21 +474,6 @@ unsigned OpaqueStorageAllocation::insertIndirectReturnArgs() {
   return argIdx;
 }
 
-/// Utility to derive SILLocation.
-/// 
-/// TODO: This should be a common utility.
-static SILLocation getLocForValue(SILValue value) {
-  if (auto *instr = value->getDefiningInstruction()) {
-    return instr->getLoc();
-  }
-  if (auto *arg = dyn_cast<SILArgument>(value)) {
-    if (arg->getDecl())
-      return RegularLocation(const_cast<ValueDecl *>(arg->getDecl()));
-  }
-  // TODO: bbargs should probably use one of their operand locations.
-  return value->getFunction()->getLocation();
-}
-
 /// Is this operand composing an aggregate from a subobject, or simply
 /// forwarding the operand's value to storage defined elsewhere?
 ///
@@ -587,7 +572,7 @@ void OpaqueStorageAllocation::allocateForValue(SILValue value,
   allocBuilder.setSILConventions(
       SILModuleConventions::getLoweredAddressConventions());
   AllocStackInst *allocInstr =
-      allocBuilder.createAllocStack(getLocForValue(value), value->getType());
+      allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
   storage.storageAddress = allocInstr;
 
