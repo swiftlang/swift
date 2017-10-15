@@ -51,8 +51,14 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-use-filelists -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | %FileCheck -check-prefix INFERRED_NAME %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_LINUX %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
+
+// Here we specify an output file name using '-o'. For ease of writing these
+// tests, we happen to specify the same file name as is inferred in the
+// INFERRED_NAMED_DARWIN tests above: 'libLINKER.dylib'.
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 
 // There are more RUN lines further down in the file.
 
@@ -285,10 +291,12 @@
 // FILELIST: -o linker
 
 
-// INFERRED_NAME: bin/swift
-// INFERRED_NAME: -module-name LINKER
-// INFERRED_NAME: bin/ld{{"? }}
-// INFERRED_NAME: -o libLINKER.{{dylib|so}}
+// INFERRED_NAME_DARWIN: bin/swift
+// INFERRED_NAME_DARWIN: -module-name LINKER
+// INFERRED_NAME_DARWIN: bin/ld{{"? }}
+// INFERRED_NAME_DARWIN:  -o libLINKER.dylib
+// INFERRED_NAME_LINUX:   -o libLINKER.so
+// INFERRED_NAME_WINDOWS: -o LINKER.dll
 
 
 // Test ld detection. We use hard links to make sure

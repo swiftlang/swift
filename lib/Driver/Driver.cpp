@@ -1726,6 +1726,7 @@ static StringRef getOutputFilename(Compilation &C,
                                    const JobAction *JA,
                                    const OutputInfo &OI,
                                    const TypeToPathMap *OutputMap,
+                                   const llvm::Triple &Triple,
                                    const llvm::opt::DerivedArgList &Args,
                                    bool AtTopLevel,
                                    StringRef BaseInput,
@@ -1814,10 +1815,17 @@ static StringRef getOutputFilename(Compilation &C,
       BaseName = llvm::sys::path::stem(BaseInput);
     if (auto link = dyn_cast<LinkJobAction>(JA)) {
       if (link->getKind() == LinkKind::DynamicLibrary) {
-        // FIXME: This should be target-specific.
-        Buffer = "lib";
+        if (Triple.isOSWindows())
+          Buffer = "";
+        else
+          Buffer = "lib";
         Buffer.append(BaseName);
-        Buffer.append(LTDL_SHLIB_EXT);
+        if (Triple.isOSDarwin())
+          Buffer.append(".dylib");
+        else if (Triple.isOSWindows())
+          Buffer.append(".dll");
+        else
+          Buffer.append(".so");
         return Buffer.str();
       }
     }
@@ -2030,9 +2038,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       const TypeToPathMap *OMForInput = nullptr;
       if (OFM)
         OMForInput = OFM->getOutputMapForInput(Input);
-      
-      OutputFile = getOutputFilename(C, JA, OI, OMForInput, C.getArgs(),
-                                     AtTopLevel, Input, InputJobs,
+
+      OutputFile = getOutputFilename(C, JA, OI, OMForInput, TC.getTriple(),
+                                     C.getArgs(), AtTopLevel, Input, InputJobs,
                                      Diags, Buf);
       Output->addPrimaryOutput(OutputFile, Input);
     };
@@ -2048,9 +2056,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     }
   } else {
     // The common case: there is a single output file.
-    OutputFile = getOutputFilename(C, JA, OI, OutputMap, C.getArgs(),
-                                   AtTopLevel, BaseInput, InputJobs,
-                                   Diags, Buf);
+    OutputFile = getOutputFilename(C, JA, OI, OutputMap, TC.getTriple(),
+                                   C.getArgs(), AtTopLevel, BaseInput,
+                                   InputJobs, Diags, Buf);
     Output->addPrimaryOutput(OutputFile, BaseInput);
   }
 
