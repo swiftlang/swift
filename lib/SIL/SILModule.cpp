@@ -87,7 +87,8 @@ SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
                      const DeclContext *associatedDC, bool wholeModule)
     : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
       Stage(SILStage::Raw), Callback(new SILModule::SerializationCallback()),
-      wholeModule(wholeModule), Options(Options), Types(*this) {}
+      wholeModule(wholeModule), Options(Options), serialized(false),
+      SerializeSILAction(), Types(*this) {}
 
 SILModule::~SILModule() {
   // Decrement ref count for each SILGlobalVariable with static initializers.
@@ -762,3 +763,20 @@ bool SILModule::isOptimizedOnoneSupportModule() const {
   return getOptions().Optimization >= SILOptions::SILOptMode::Optimize &&
          isOnoneSupportModule();
 }
+
+void SILModule::setSerializeSILAction(SILModule::ActionCallback Action) {
+  assert(!SerializeSILAction && "Serialization action can be set only once");
+  SerializeSILAction = Action;
+}
+
+SILModule::ActionCallback SILModule::getSerializeSILAction() const {
+  return SerializeSILAction;
+}
+
+void SILModule::serialize() {
+  assert(SerializeSILAction && "Serialization action should be set");
+  assert(!isSerialized() && "The module was serialized already");
+  SerializeSILAction();
+  setSerialized();
+}
+

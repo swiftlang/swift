@@ -854,6 +854,46 @@ static bool performCompile(CompilerInstance &Instance,
     SM->verify();
   }
 
+  // This is the action to be used to serialize SILModule.
+  // It may be invoked multiple times, but it will perform
+  // serialization only once. The serialization may either happen
+  // after high-level optimizations or after all optimizations are
+  // done, depending on the compiler setting.
+
+  auto SerializeSILModuleAction = [&]() {
+    if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
+      auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile)
+                                  : Instance.getMainModule();
+      if (!opts.ModuleOutputPath.empty()) {
+        SerializationOptions serializationOpts;
+        serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
+        serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
+        serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
+        if (opts.SerializeBridgingHeader)
+          serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
+        serializationOpts.ModuleLinkName = opts.ModuleLinkName;
+        serializationOpts.ExtraClangOptions =
+            Invocation.getClangImporterOptions().ExtraArgs;
+        serializationOpts.EnableNestedTypeLookupTable =
+            opts.EnableSerializationNestedTypeLookupTable;
+        if (!IRGenOpts.ForceLoadSymbolName.empty())
+          serializationOpts.AutolinkForceLoad = true;
+
+        // Options contain information about the developer's computer,
+        // so only serialize them if the module isn't going to be shipped to
+        // the public.
+        serializationOpts.SerializeOptionsForDebugging =
+            !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
+
+        serialize(DC, serializationOpts, SM.get());
+      }
+    }
+  };
+
+  // Set the serialization action, so that the SIL module
+  // can be serialized at any moment, e.g. during the optimization pipeline.
+  SM->setSerializeSILAction(SerializeSILModuleAction);
+
   // Perform SIL optimization passes if optimizations haven't been disabled.
   // These may change across compiler versions.
   {
@@ -921,32 +961,9 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
-    auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
-                                  Instance.getMainModule();
-    if (!opts.ModuleOutputPath.empty()) {
-      SerializationOptions serializationOpts;
-      serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
-      serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
-      serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-      if (opts.SerializeBridgingHeader)
-        serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
-      serializationOpts.ModuleLinkName = opts.ModuleLinkName;
-      serializationOpts.ExtraClangOptions =
-          Invocation.getClangImporterOptions().ExtraArgs;
-      serializationOpts.EnableNestedTypeLookupTable =
-          opts.EnableSerializationNestedTypeLookupTable;
-      if (!IRGenOpts.ForceLoadSymbolName.empty())
-        serializationOpts.AutolinkForceLoad = true;
-
-      // Options contain information about the developer's computer,
-      // so only serialize them if the module isn't going to be shipped to
-      // the public.
-      serializationOpts.SerializeOptionsForDebugging =
-          !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
-
-      serialize(DC, serializationOpts, SM.get());
-    }
-
+    // Serialize the SILModule if it was not serialized yet.
+    if (!SM.get()->isSerialized())
+      SM.get()->serialize();
     if (Action == FrontendOptions::MergeModules ||
         Action == FrontendOptions::EmitModuleOnly) {
       if (shouldIndex) {

@@ -383,6 +383,9 @@ int main(int argc, char **argv) {
   if (VerifyMode)
     enableDiagnosticVerifier(CI.getSourceMgr());
 
+  if (CI.getSILModule())
+    CI.getSILModule()->setSerializeSILAction([]{});
+
   if (OptimizationGroup == OptGroup::Diagnostics) {
     runSILDiagnosticPasses(*CI.getSILModule());
   } else if (OptimizationGroup == OptGroup::Performance) {
