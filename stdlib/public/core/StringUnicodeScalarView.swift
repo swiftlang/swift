@@ -65,24 +65,39 @@ extension String {
   {
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal init(_ _core: _LegacyStringCore, coreOffset: Int = 0) {
-      self._core = _core
+    internal init(_ _guts: _StringGuts, coreOffset: Int = 0) {
+      self._guts = _guts
       self._coreOffset = coreOffset
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    internal init(_ _core: _LegacyStringCore, coreOffset: Int = 0) {
+      self.init(_StringGuts(_core), coreOffset: coreOffset)
     }
 
     @_fixed_layout // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
     internal struct _ScratchIterator : IteratorProtocol {
       @_versioned
-      internal var core: _LegacyStringCore
+      internal var _guts: _StringGuts
+
+      @_versioned
+      internal var core: _LegacyStringCore {
+        get { return _guts._legacyCore }
+        set { self._guts = _StringGuts(newValue) }
+      }
+
       @_versioned // FIXME(sil-serialize-all)
       internal var idx: Int
+
       @_inlineable // FIXME(sil-serialize-all)
       @_versioned // FIXME(sil-serialize-all)
       internal init(_ core: _LegacyStringCore, _ pos: Int) {
         self.idx = pos
-        self.core = core
+        self._guts = _StringGuts(core)
       }
+
       @_inlineable // FIXME(sil-serialize-all)
       @_versioned // FIXME(sil-serialize-all)
       @inline(__always)
@@ -260,6 +275,9 @@ extension String {
       internal var _asciiBase: UnsafeBufferPointer<UInt8>.Iterator!
       @_versioned // FIXME(sil-serialize-all)
       internal var _base: UnsafeBufferPointer<UInt16>.Iterator!
+
+      // TODO(StringGuts): Get iterator off of _LegacyStringCore
+      //
       @_versioned // FIXME(sil-serialize-all)
       internal var _iterator: IndexingIterator<_LegacyStringCore>
     }
@@ -282,9 +300,15 @@ extension String {
       return "StringUnicodeScalarView(\(self.description.debugDescription))"
     }
 
-    @_versioned // FIXME(sil-serialize-all)
-    internal var _core: _LegacyStringCore
-    
+    @_versioned
+    internal var _guts: _StringGuts
+
+    @_versioned
+    internal var _core: _LegacyStringCore {
+      get { return _guts._legacyCore }
+      set { self._guts = _StringGuts(newValue) }
+    }
+
     /// The offset of this view's `_core` from an original core. This works
     /// around the fact that `_LegacyStringCore` is always zero-indexed.
     /// `_coreOffset` should be subtracted from `UnicodeScalarIndex.encodedOffset`
@@ -312,7 +336,7 @@ extension String {
   /// - Parameter unicodeScalars: A collection of Unicode scalar values.
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ unicodeScalars: UnicodeScalarView) {
-    self.init(unicodeScalars._core)
+    self.init(unicodeScalars._guts)
   }
 
   /// The index type for a string's `unicodeScalars` view.

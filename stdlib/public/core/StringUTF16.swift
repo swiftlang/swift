@@ -258,16 +258,28 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
+    internal init(_ _guts: _StringGuts) {
+      self.init(_guts, offset: 0, length: _guts.count)
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
     internal init(_ _core: _LegacyStringCore) {
       self.init(_core, offset: 0, length: _core.count)
     }
 
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal init(_ _core: _LegacyStringCore, offset: Int, length: Int) {
+    internal init(_ _guts: _StringGuts, offset: Int, length: Int) {
       self._offset = offset
       self._length = length
-      self._core = _core
+      self._guts = _guts
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    internal init(_ _core: _LegacyStringCore, offset: Int, length: Int) {
+      self.init(_StringGuts(_core), offset: offset, length: length)
     }
 
     @_inlineable // FIXME(sil-serialize-all)
@@ -286,15 +298,22 @@ extension String {
     internal var _offset: Int
     @_versioned // FIXME(sil-serialize-all)
     internal var _length: Int
-    @_versioned // FIXME(sil-serialize-all)
-    internal let _core: _LegacyStringCore
+
+    @_versioned
+    internal var _guts: _StringGuts
+
+    @_versioned
+    internal var _core: _LegacyStringCore {
+      get { return _guts._legacyCore }
+      set { self._guts = _StringGuts(newValue) }
+    }
   }
 
   /// A UTF-16 encoding of `self`.
   @_inlineable // FIXME(sil-serialize-all)
   public var utf16: UTF16View {
     get {
-      return UTF16View(_core)
+      return UTF16View(_guts)
     }
     set {
       self = String(describing: newValue)

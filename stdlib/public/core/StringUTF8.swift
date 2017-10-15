@@ -99,7 +99,13 @@ extension String {
 
     /// Underlying UTF-16-compatible representation 
     @_versioned
-    internal let _core: _LegacyStringCore
+    internal var _guts: _StringGuts
+
+    @_versioned
+    internal var _core: _LegacyStringCore {
+      get { return _guts._legacyCore }
+      set { self._guts = _StringGuts(newValue) }
+    }
 
     /// Distances to `(startIndex, endIndex)` from the endpoints of _core,
     /// measured in UTF-8 code units.
@@ -112,11 +118,19 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
+    internal init(_ _guts: _StringGuts,
+      legacyOffsets: (Int, Int) = (0, 0)
+    ) {
+      self._guts = _guts
+      self._legacyOffsets = (Int8(legacyOffsets.0), Int8(legacyOffsets.1))
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
     internal init(_ _core: _LegacyStringCore,
       legacyOffsets: (Int, Int) = (0, 0)
     ) {
-      self._core = _core
-      self._legacyOffsets = (Int8(legacyOffsets.0), Int8(legacyOffsets.1))
+      self.init(_StringGuts(_core), legacyOffsets: legacyOffsets)
     }
 
     public typealias Index = String.Index
