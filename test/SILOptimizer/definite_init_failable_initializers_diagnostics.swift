@@ -59,7 +59,7 @@ class ErrantClass : ErrantBaseClass {
     } catch {
       try super.init() // expected-error {{'self' used inside 'catch' block reachable from super.init call}}
     }
-  } // expected-error {{'self' used inside 'catch' block reachable from super.init call}}
+  }
 
   init(invalidEscapeDesignated3: ()) {
     x = 10
@@ -95,7 +95,7 @@ class ErrantClass : ErrantBaseClass {
     } catch {
       try self.init() // expected-error {{'self' used inside 'catch' block reachable from self.init call}}
     }
-  } // expected-error {{'self' used inside 'catch' block reachable from self.init call}}
+  }
 
   convenience init(invalidEscapeConvenience3: ()) throws {
     do {

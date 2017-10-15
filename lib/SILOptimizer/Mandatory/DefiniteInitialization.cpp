@@ -2720,15 +2720,6 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
   if (FailedSelfUse) *FailedSelfUse = false;
   if (SuperInitDone) *SuperInitDone = true;
 
-  if (TheMemory.isAnyInitSelf()) {
-    // If the self.init() or super.init() call threw an error and
-    // we caught it, self is no longer available.
-    if (getSelfConsumedAtInst(Use.Inst) != DIKind::No) {
-      if (FailedSelfUse) *FailedSelfUse = true;
-      return false;
-    }
-  }
-
   // Determine the liveness states of the elements that we care about.
   AvailabilitySet Liveness =
     getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
@@ -2743,9 +2734,23 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
 
   // Check all the results.
   for (unsigned i = Use.FirstElement, e = i+Use.NumElements;
-       i != e; ++i)
+       i != e; ++i) {
     if (Liveness.get(i) != DIKind::Yes)
       return false;
+  }
+
+  // If the self.init() or super.init() call threw an error and
+  // we caught it, self is no longer available.
+  if (TheMemory.isNonRootClassSelf()) {
+    if (getSelfInitializedAtInst(Use.Inst) != DIKind::Yes) {
+      auto SelfLiveness = getLivenessAtInst(Use.Inst,
+                                            0, TheMemory.NumElements);
+      if (SelfLiveness.isAllYes()) {
+        if (FailedSelfUse) *FailedSelfUse = true;
+        return false;
+      }
+    }
+  }
 
   return true;
 }
