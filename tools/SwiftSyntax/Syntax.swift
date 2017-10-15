@@ -16,6 +16,10 @@ import Foundation
 /// Each node has accessors for its known children, and allows efficient
 /// iteration over the children through its `children` property.
 public class Syntax: CustomStringConvertible {
+  /// The type of sequence containing the indices of present children.
+  internal typealias PresentChildIndicesSequence =
+    LazyFilterSequence<CountableRange<Int>>
+
   /// The root of the tree this node is currently in.
   internal let _root: SyntaxData
   
@@ -102,6 +106,14 @@ public class Syntax: CustomStringConvertible {
     return Syntax.make(root: _root,  data: _root)
   }
   
+  /// The sequence of indices that correspond to child nodes that are not
+  /// missing.
+  ///
+  /// This property is an implementation detail of `SyntaxChildren`.
+  internal var presentChildIndices: PresentChildIndicesSequence {
+    return raw.layout.indices.lazy.filter { self.raw.layout[$0].isPresent }
+  }
+
   /// Gets the child at the provided index in this node's children.
   /// - Parameter index: The index of the child node you're looking for.
   /// - Returns: A Syntax node for the provided child, or `nil` if there
