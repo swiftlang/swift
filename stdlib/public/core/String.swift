@@ -681,17 +681,28 @@ public struct String {
   ///     let alsoEmpty = String()
   @_inlineable // FIXME(sil-serialize-all)
   public init() {
-    _core = _LegacyStringCore()
+    self._guts = _StringGuts(_LegacyStringCore())
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public // @testable
+  init(_ _guts: _StringGuts) {
+    self._guts = _guts
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   init(_ _core: _LegacyStringCore) {
-    self._core = _core
+    self.init(_StringGuts(_core))
   }
 
+  public var _guts: _StringGuts
+
   public // @testable
-  var _core: _LegacyStringCore
+  var _core: _LegacyStringCore {
+    get { return _guts._legacyCore }
+    set { self._guts = _StringGuts(newValue) }
+  }
 }
 
 extension String {
@@ -885,7 +896,7 @@ extension String {
   /// - Parameter other: Another string.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append(_ other: String) {
-    _core.append(other._core)
+    _guts.append(other._guts)
   }
 
   /// Appends the given Unicode scalar to the string.
@@ -902,7 +913,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public // SPI(Foundation)
   init(_storage: _StringBuffer) {
-    _core = _LegacyStringCore(_storage)
+    _guts = _StringGuts(_LegacyStringCore(_storage))
   }
 }
 

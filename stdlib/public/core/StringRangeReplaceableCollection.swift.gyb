@@ -55,7 +55,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence & LosslessStringConvertible>(_ other: S)
   where S.Element == Character {
-    self._core = _CharacterView(other)._core
+    self._guts = _StringGuts(_CharacterView(other)._core)
   }
   
   // The defaulted argument prevents this initializer from satisfies the
@@ -225,7 +225,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence>(_ characters: S)
     where S.Iterator.Element == Character {
-    self._core = _CharacterView(characters)._core
+    self._guts = _StringGuts(_CharacterView(characters)._core)
   }
 
   /// Reserves enough space in the string's underlying storage to store the

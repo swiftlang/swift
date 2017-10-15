@@ -68,7 +68,13 @@ extension String {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct _CharacterView {
     @_versioned
-    internal var _core: _LegacyStringCore
+    internal var _guts: _StringGuts
+
+    @_versioned
+    internal var _core: _LegacyStringCore {
+      get { return _guts._legacyCore }
+      set { self._guts = _StringGuts(newValue) }
+    }
 
     /// The offset of this view's `_core` from an original core. This works
     /// around the fact that `_LegacyStringCore` is always zero-indexed.
@@ -80,15 +86,21 @@ extension String {
     /// Creates a view of the given string.
     @_inlineable // FIXME(sil-serialize-all)
     public init(_ text: String) {
-      self._core = text._core
+      self._guts = text._guts
       self._coreOffset = 0
     }
     
     @_inlineable // FIXME(sil-serialize-all)
     public // @testable
-    init(_ _core: _LegacyStringCore, coreOffset: Int = 0) {
-      self._core = _core
+    init(_ _guts: _StringGuts, coreOffset: Int = 0) {
+      self._guts = _guts
       self._coreOffset = coreOffset
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    public // @testable
+    init(_ _core: _LegacyStringCore, coreOffset: Int = 0) {
+      self.init(_StringGuts(_core), coreOffset: coreOffset)
     }
   }
   
@@ -181,7 +193,7 @@ extension String {
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
   public init(_ characters: CharacterView) {
-    self.init(characters._core)
+    self.init(characters._guts)
   }
 }
 
