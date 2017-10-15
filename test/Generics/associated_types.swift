@@ -220,4 +220,8 @@ class C3 : sr6097_b {
   weak var aProperty: C1? // and same here, despite 'weak'
   init() { fatalError() }
 }
+class G<T> : sr6097_b where T : AnyObject {
+  weak var aProperty: T?
+}
+
 
