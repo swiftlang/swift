@@ -323,4 +323,17 @@ ThrowingInitTestSuite.test("ConvenienceInitFailure_Derived") {
   expectEqual(NSLifetimeTracked.count(), 0)
 }
 
+// Specific regression tests:
+
+// <rdar://problem/28687665> - "overreleased while already deallocating", for "throws" convenience init in extension
+extension NSRegularExpression {
+  convenience init(foo: String, options: NSRegularExpression.Options) throws {
+    try self.init(pattern: foo, options: options)
+  }
+}
+
+ThrowingInitTestSuite.test("ConvenienceInitFailure_Dynamic") {
+  mustThrow { try NSRegularExpression(foo: "(", options: []) }
+}
+
 runAllTests()
