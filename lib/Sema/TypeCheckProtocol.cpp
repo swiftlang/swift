@@ -3991,7 +3991,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   Type model = conformance->getType();
   TypeSubstitutionMap substitutions = model->getMemberSubstitutions(witness);
   if (substitutions.empty())
-    return witness->getInterfaceType();
+    return witness->getInterfaceType()->getReferenceStorageReferent();
 
   Type type = witness->getInterfaceType();
   
