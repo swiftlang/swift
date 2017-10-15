@@ -681,17 +681,22 @@ public struct String {
   ///     let alsoEmpty = String()
   @_inlineable // FIXME(sil-serialize-all)
   public init() {
-    _core = _LegacyStringCore()
+    self._guts = _StringGuts(_LegacyStringCore())
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   init(_ _core: _LegacyStringCore) {
-    self._core = _core
+    self._guts = _StringGuts(_core)
   }
 
+  public var _guts: _StringGuts
+
   public // @testable
-  var _core: _LegacyStringCore
+  var _core: _LegacyStringCore {
+    get { return _guts._legacyCore }
+    set { self._guts = _StringGuts(newValue) }
+  }
 }
 
 extension String {
@@ -902,7 +907,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public // SPI(Foundation)
   init(_storage: _StringBuffer) {
-    _core = _LegacyStringCore(_storage)
+    _guts = _StringGuts(_LegacyStringCore(_storage))
   }
 }
 

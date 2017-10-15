@@ -145,47 +145,60 @@ internal var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
   return 0x0600
 }
 
+@inline(never) // Hide the CF dependency
+internal
+func makeCocoaLegacyStringCore(_cocoaString: AnyObject) -> _LegacyStringCore {
+  if let wrapped = _cocoaString as? _NSContiguousString {
+    return wrapped._core
+  }
+
+  // "copy" it into a value to be sure nobody will modify behind
+  // our backs.  In practice, when value is already immutable, this
+  // just does a retain.
+  let cfImmutableValue
+    = _stdlib_binary_CFStringCreateCopy(_cocoaString) as AnyObject
+
+  let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
+
+  // Look first for null-terminated ASCII
+  // Note: the code in clownfish appears to guarantee
+  // nul-termination, but I'm waiting for an answer from Chris Kane
+  // about whether we can count on it for all time or not.
+  let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
+    cfImmutableValue, kCFStringEncodingASCII)
+
+  // start will hold the base pointer of contiguous storage, if it
+  // is found.
+  var start: UnsafeMutableRawPointer?
+  let isUTF16 = (nulTerminatedASCII == nil)
+  if isUTF16 {
+    let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
+    start = UnsafeMutableRawPointer(mutating: utf16Buf)
+  } else {
+    start = UnsafeMutableRawPointer(mutating: nulTerminatedASCII)
+  }
+  
+  // // FIXME: Just some debugging helpers; remove
+  // internalDumpHex(0x42)
+  // internalDumpHex(start)
+  // internalDumpHex(UInt(length))
+  // internalDumpHex(isUTF16)
+  // internalDumpHex(cfImmutableValue)
+  // internalDumpHex(0x43)
+
+  return _LegacyStringCore(
+    baseAddress: start,
+    count: length,
+    elementShift: isUTF16 ? 1 : 0,
+    hasCocoaBuffer: true,
+    owner: cfImmutableValue)
+}
+
 extension String {
-  @inline(never) // Hide the CF dependency
   public // SPI(Foundation)
   init(_cocoaString: AnyObject) {
-    if let wrapped = _cocoaString as? _NSContiguousString {
-      self._core = wrapped._core
-      return
-    }
-
-    // "copy" it into a value to be sure nobody will modify behind
-    // our backs.  In practice, when value is already immutable, this
-    // just does a retain.
-    let cfImmutableValue
-      = _stdlib_binary_CFStringCreateCopy(_cocoaString) as AnyObject
-
-    let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
-
-    // Look first for null-terminated ASCII
-    // Note: the code in clownfish appears to guarantee
-    // nul-termination, but I'm waiting for an answer from Chris Kane
-    // about whether we can count on it for all time or not.
-    let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
-      cfImmutableValue, kCFStringEncodingASCII)
-
-    // start will hold the base pointer of contiguous storage, if it
-    // is found.
-    var start: UnsafeMutableRawPointer?
-    let isUTF16 = (nulTerminatedASCII == nil)
-    if isUTF16 {
-      let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
-      start = UnsafeMutableRawPointer(mutating: utf16Buf)
-    } else {
-      start = UnsafeMutableRawPointer(mutating: nulTerminatedASCII)
-    }
-
-    self._core = _LegacyStringCore(
-      baseAddress: start,
-      count: length,
-      elementShift: isUTF16 ? 1 : 0,
-      hasCocoaBuffer: true,
-      owner: cfImmutableValue)
+    self._guts = _StringGuts(
+      makeCocoaLegacyStringCore(_cocoaString: _cocoaString))
   }
 }
 
