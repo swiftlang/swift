@@ -92,7 +92,7 @@ class ArgsToFrontendInputsConverter {
   const llvm::opt::Arg *pathOrNull;
   FrontendInputs &Inputs;
   const llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBuffer;
-  llvm::SmallVector<StringRef, 8> inputFilesAndPrimariesFromCommandLinePlusInputFilesFromFilelist;   // FIXME: 8?
+  llvm::SmallVector<StringRef, 8> inputFilesFromCommandLinePlusInputFilesFromFilelist;   // FIXME: 8?
   llvm::SmallVector<StringRef, 8> primaryFilesFromCommandLine; // FIXME: 8?
 
   static void splitIntoLines(const llvm::MemoryBuffer &buffer,
@@ -105,9 +105,8 @@ class ArgsToFrontendInputsConverter {
     for (const Arg *A :
          Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
       if (A->getOption().matches(options::OPT_INPUT)) {
-        inputFilesAndPrimariesFromCommandLinePlusInputFilesFromFilelist.push_back(A->getValue());
+        inputFilesFromCommandLinePlusInputFilesFromFilelist.push_back(A->getValue());
       } else if (A->getOption().matches(options::OPT_primary_file)) {
-        inputFilesAndPrimariesFromCommandLinePlusInputFilesFromFilelist.push_back(A->getValue());
         primaryFilesFromCommandLine.push_back(A->getValue());
       } else {
         llvm_unreachable("Unknown input-related argument!");
@@ -142,10 +141,10 @@ public:
       return true;
     
     getFilesDirectlyFromArgs();
-    splitIntoLines(*filelistBuffer->get(), inputFilesAndPrimariesFromCommandLinePlusInputFilesFromFilelist);
+    splitIntoLines(*filelistBuffer->get(), inputFilesFromCommandLinePlusInputFilesFromFilelist);
  
     llvm::StringMap<unsigned> indexOfInputFile(primaryFilesFromCommandLine.size());
-    for (auto f: inputFilesAndPrimariesFromCommandLinePlusInputFilesFromFilelist) {
+    for (auto f: inputFilesFromCommandLinePlusInputFilesFromFilelist) {
       auto entry = llvm::StringMapEntry<unsigned>::Create(f, Inputs.inputFilenameCount());
       indexOfInputFile.insert(entry);
       Inputs.addInputFilename(f);
