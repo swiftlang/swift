@@ -243,10 +243,16 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
     P.addEarlyInliner();
     break;
   case OptimizationLevelKind::MidLevel:
-    // Does inline semantics-functions (except "availability"), but not
-    // global-init functions.
     P.addGlobalOpt();
     P.addLetPropertiesOpt();
+    // It is important to serialize before any of the @_semantics
+    // functions are inlined, because otherwise the information about
+    // uses of such functions inside the module is lost,
+    // which reduces the ability of the compiler to optimize clients
+    // importing this module.
+    P.addSerializeSILPass();
+    // Does inline semantics-functions (except "availability"), but not
+    // global-init functions.
     P.addPerfInliner();
     break;
   case OptimizationLevelKind::LowLevel:

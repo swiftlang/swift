@@ -30,6 +30,20 @@ STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 
 namespace {
 
+/// Returns true if a function should be SIL serialized or emitted by IRGen.
+static bool shouldBeSerializedOrEmitted(SILFunction *F) {
+  // public_external functions are never SIL serialized or emitted by IRGen.
+  if (F->isAvailableExternally() && hasPublicVisibility(F->getLinkage()) &&
+      !F->isTransparent())
+    return false;
+
+  // [serialized] functions should always be SIL serialized.
+  if (F->isSerialized())
+    return true;
+
+  return false;
+}
+
 /// This is a base class for passes that are based on function liveness
 /// computations like e.g. dead function elimination.
 /// It provides a common logic for computing live (i.e. reachable) functions.
@@ -116,6 +130,11 @@ protected:
                          << F->getName() << '\n');
       return true;
     }
+
+    // Do not consider public_external functions that do not need to be emitted
+    // into the client as anchors.
+    if (shouldBeSerializedOrEmitted(F))
+      return true;
 
     return false;
   }
