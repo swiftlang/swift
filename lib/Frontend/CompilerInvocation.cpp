@@ -1315,6 +1315,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     parseExclusivityEnforcementOptions(A, Opts, Diags);
   }
 
+  Opts.SILSerializeAfterHighLevelOptz |= Args.hasArg(OPT_sil_serialize_early);
+
   return false;
 }
 

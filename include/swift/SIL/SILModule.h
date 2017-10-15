@@ -100,6 +100,7 @@ public:
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
   using CoverageMapListType = llvm::ilist<SILCoverageMap>;
   using LinkingMode = SILOptions::LinkingMode;
+  using ActionCallback = llvm::function_ref<void()>;
 
 private:
   friend KeyPathPattern;
@@ -213,6 +214,13 @@ private:
   /// The options passed into this SILModule.
   SILOptions &Options;
 
+  /// Set if the SILModule was serialized already. It is used
+  /// to ensure that the module is serialized only once.
+  bool serialized;
+
+  /// Action to be executed for serializing the SILModule.
+  ActionCallback SerializeSILAction;
+
   /// A list of clients that need to be notified when an instruction
   /// invalidation message is sent.
   llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
@@ -232,6 +240,10 @@ private:
   /// Folding set for key path patterns.
   llvm::FoldingSet<KeyPathPattern> KeyPathPatterns;
 
+  /// Set a flag indicating that this module is serialized already.
+  void setSerialized() { serialized = true; }
+  bool isSerialized() const { return serialized; }
+
 public:
   ~SILModule();
 
@@ -250,6 +262,13 @@ public:
   /// Send the invalidation message that \p V is being deleted to all
   /// registered handlers. The order of handlers is deterministic but arbitrary.
   void notifyDeleteHandlers(SILNode *node);
+
+  /// Set a serialization action.
+  void setSerializeSILAction(ActionCallback SerializeSILAction);
+  ActionCallback getSerializeSILAction() const;
+
+  /// Serialize a SIL module using the configured SerializeSILAction.
+  void serialize();
 
   /// \brief This converts Swift types to SILTypes.
   mutable Lowering::TypeConverter Types;

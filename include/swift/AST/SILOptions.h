@@ -162,6 +162,10 @@ public:
   /// User code should never be compiled with this flag set.
   bool SILSerializeVTables = false;
 
+  /// If set, perform SIL serialization of a module after
+  /// high-level optimizations.
+  bool SILSerializeAfterHighLevelOptz = false;
+
   SILOptions() {}
 
   /// Return a hash code of any components from these options that should
