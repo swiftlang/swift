@@ -363,15 +363,6 @@ namespace {
     /// plus the information merged-in from the predecessor blocks.
     AvailabilitySet OutAvailability;
 
-    /// Keep track of blocks where the contents of the self box are not valid
-    /// because we're in an error path dominated by a self.init or super.init
-    /// delegation.
-    Optional<DIKind> LocalSelfConsumed;
-
-    /// The live out information of the block. This is the LocalSelfConsumed
-    /// plus the information merged-in from the predecessor blocks.
-    Optional<DIKind> OutSelfConsumed;
-
     /// Keep track of blocks where the contents of the self box are stored to
     /// as a result of a successful self.init or super.init call.
     Optional<DIKind> LocalSelfInitialized;
@@ -391,10 +382,6 @@ namespace {
     void setUnknownToNotAvailable() {
       LocalAvailability.changeUnsetElementsTo(DIKind::No);
       OutAvailability.changeUnsetElementsTo(DIKind::No);
-      if (!LocalSelfConsumed.hasValue())
-        LocalSelfConsumed = DIKind::No;
-      if (!OutSelfConsumed.hasValue())
-        OutSelfConsumed = DIKind::No;
       if (!LocalSelfInitialized.hasValue())
         LocalSelfInitialized = DIKind::No;
       if (!OutSelfInitialized.hasValue())
@@ -441,15 +428,6 @@ namespace {
         }
       }
 
-      Optional<DIKind> temp;
-      if (transferAvailability(Pred.OutSelfConsumed,
-                               OutSelfConsumed,
-                               LocalSelfConsumed,
-                               temp)) {
-        changed = true;
-        OutSelfConsumed = temp;
-      }
-
       Optional<DIKind> result;
       if (transferAvailability(Pred.OutSelfInitialized,
                                OutSelfInitialized,
@@ -474,13 +452,6 @@ namespace {
       }
     }
 
-    /// Mark the block as a failure path, indicating the self value has been
-    /// consumed.
-    void markFailure(bool partial) {
-      LocalSelfConsumed = (partial ? DIKind::Partial : DIKind::Yes);
-      OutSelfConsumed = LocalSelfConsumed;
-    }
-
     /// Mark the block as storing to self, indicating the self box has been
     /// initialized.
     void markStoreToSelf() {
@@ -490,8 +461,7 @@ namespace {
 
     /// If true, we're not done with our dataflow analysis yet.
     bool containsUndefinedValues() {
-      return (!OutSelfConsumed.hasValue() ||
-              !OutSelfInitialized.hasValue() ||
+      return (!OutSelfInitialized.hasValue() ||
               OutAvailability.containsUnknownElements());
     }
   };
@@ -515,7 +485,6 @@ namespace {
     DIMemoryObjectInfo TheMemory;
 
     SmallVectorImpl<DIMemoryUse> &Uses;
-    TinyPtrVector<TermInst *> &FailableInits;
     TinyPtrVector<SILInstruction *> &StoresToSelf;
     SmallVectorImpl<SILInstruction *> &Destroys;
     std::vector<ConditionalDestroy> ConditionalDestroys;
@@ -566,7 +535,6 @@ namespace {
     int getAnyUninitializedMemberAtInst(SILInstruction *Inst, unsigned FirstElt,
                                         unsigned NumElts);
 
-    DIKind getSelfConsumedAtInst(SILInstruction *Inst);
     DIKind getSelfInitializedAtInst(SILInstruction *Inst);
 
     bool isInitializedAtUse(const DIMemoryUse &Use,
@@ -601,7 +569,6 @@ namespace {
     void putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList);
     void computePredsLiveOut(SILBasicBlock *BB);
     void getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result);
-    void getOutSelfConsumed(SILBasicBlock *BB, Optional<DIKind> &Result);
     void getOutSelfInitialized(SILBasicBlock *BB, Optional<DIKind> &Result);
 
     bool shouldEmitError(SILInstruction *Inst);
@@ -620,8 +587,8 @@ namespace {
 LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                                  DIElementUseInfo &UseInfo)
     : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
-      Uses(UseInfo.Uses), FailableInits(UseInfo.FailableInits),
-      StoresToSelf(UseInfo.StoresToSelf), Destroys(UseInfo.Releases) {
+      Uses(UseInfo.Uses), StoresToSelf(UseInfo.StoresToSelf),
+      Destroys(UseInfo.Releases) {
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -651,16 +618,6 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     // FIXME: critical edges?
     auto *bb = I->getParent();
     getBlockInfo(bb).markStoreToSelf();
-  }
-
-  // Mark blocks where the self value has been consumed.
-  for (auto *I : FailableInits) {
-    auto *bb = I->getSuccessors()[1].getBB();
-
-    // Horrible hack. Failing inits create critical edges, where all
-    // 'return nil's end up. We'll split the edge later.
-    bool criticalEdge = isCriticalEdge(I, 1);
-    getBlockInfo(bb).markFailure(criticalEdge);
   }
 
   // If isn't really a use, but we account for the alloc_box/mark_uninitialized
@@ -2536,14 +2493,6 @@ getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result) {
 }
 
 void LifetimeChecker::
-getOutSelfConsumed(SILBasicBlock *BB, Optional<DIKind> &Result) {
-  computePredsLiveOut(BB);
-
-  for (auto *Pred : BB->getPredecessorBlocks())
-    Result = mergeKinds(Result, getBlockInfo(Pred).OutSelfConsumed);
-}
-
-void LifetimeChecker::
 getOutSelfInitialized(SILBasicBlock *BB, Optional<DIKind> &Result) {
   computePredsLiveOut(BB);
 
@@ -2683,32 +2632,6 @@ int LifetimeChecker::getAnyUninitializedMemberAtInst(SILInstruction *Inst,
       return i;
   
   return -1;
-}
-
-/// getSelfConsumedAtInst - Compute the liveness state for any number of tuple
-/// elements at the specified instruction.  The elements are returned as an
-/// AvailabilitySet.  Elements outside of the range specified may not be
-/// computed correctly.
-DIKind LifetimeChecker::
-getSelfConsumedAtInst(SILInstruction *Inst) {
-  DEBUG(llvm::dbgs() << "Get self consumed at " << *Inst);
-
-  SILBasicBlock *InstBB = Inst->getParent();
-  auto &BlockInfo = getBlockInfo(InstBB);
-
-  if (BlockInfo.LocalSelfConsumed.hasValue())
-    return *BlockInfo.LocalSelfConsumed;
-
-  Optional<DIKind> Result;
-  getOutSelfConsumed(InstBB, Result);
-
-  // If the result wasn't computed, we must be analyzing code within
-  // an unreachable cycle that is not dominated by "TheMemory".  Just force
-  // the result to unconsumed so that clients don't have to handle this.
-  if (!Result.hasValue())
-    Result = DIKind::No;
-
-  return *Result;
 }
 
 /// getSelfInitializedAtInst - Check if the self box in an initializer has
