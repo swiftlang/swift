@@ -271,6 +271,9 @@ public:
   /// false otherwise.
   explicit operator bool() const { return Value != nullptr; }
 
+  /// Get a location for this value.
+  SILLocation getLoc() const;
+
   /// Convert this SILValue into an opaque pointer like type. For use with
   /// PointerLikeTypeTraits.
   void *getOpaqueValue() const {
