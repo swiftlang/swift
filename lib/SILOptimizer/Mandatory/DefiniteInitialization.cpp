@@ -923,15 +923,17 @@ void LifetimeChecker::handleLoadUse(unsigned UseID) {
 void LifetimeChecker::handleStoreUse(unsigned UseID) {
   DIMemoryUse &InstInfo = Uses[UseID];
 
-  if (getSelfConsumedAtInst(InstInfo.Inst) != DIKind::No) {
-    // FIXME: more specific diagnostics here, handle this case gracefully below.
-    if (!shouldEmitError(InstInfo.Inst))
-      return;
+  if (TheMemory.isAnyInitSelf()) {
+    if (getSelfConsumedAtInst(InstInfo.Inst) != DIKind::No) {
+      // FIXME: more specific diagnostics here, handle this case gracefully below.
+      if (!shouldEmitError(InstInfo.Inst))
+        return;
 
-    diagnose(Module, InstInfo.Inst->getLoc(),
-             diag::self_inside_catch_superselfinit,
-             (unsigned)TheMemory.isDelegatingInit());
-    return;
+      diagnose(Module, InstInfo.Inst->getLoc(),
+               diag::self_inside_catch_superselfinit,
+               (unsigned)TheMemory.isDelegatingInit());
+      return;
+    }
   }
 
   // Determine the liveness state of the element that we care about.
@@ -1664,6 +1666,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
 void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
   auto *Inst = InstInfo.Inst;
 
+  assert(TheMemory.isAnyInitSelf());
   assert(TheMemory.getType()->hasReferenceSemantics());
 
   if (getSelfConsumedAtInst(Inst) != DIKind::No) {
@@ -1899,8 +1902,10 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
          isa<DestroyAddrInst>(Release));
 
   auto Availability = getLivenessAtInst(Release, 0, TheMemory.NumElements);
-  DIKind SelfConsumed =
-    getSelfConsumedAtInst(Release);
+  DIKind SelfConsumed = DIKind::No;
+
+  if (TheMemory.isAnyInitSelf())
+    SelfConsumed = getSelfConsumedAtInst(Release);
 
   if (SelfConsumed == DIKind::Yes) {
     // We're in an error path after performing a self.init or super.init
@@ -2643,12 +2648,14 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
                                          bool *FailedSelfUse) {
   if (FailedSelfUse) *FailedSelfUse = false;
   if (SuperInitDone) *SuperInitDone = true;
-  
-  // If the self.init() or super.init() call threw an error and
-  // we caught it, self is no longer available.
-  if (getSelfConsumedAtInst(Use.Inst) != DIKind::No) {
-    if (FailedSelfUse) *FailedSelfUse = true;
-    return false;
+
+  if (TheMemory.isAnyInitSelf()) {
+    // If the self.init() or super.init() call threw an error and
+    // we caught it, self is no longer available.
+    if (getSelfConsumedAtInst(Use.Inst) != DIKind::No) {
+      if (FailedSelfUse) *FailedSelfUse = true;
+      return false;
+    }
   }
 
   // Determine the liveness states of the elements that we care about.
