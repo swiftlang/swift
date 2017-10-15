@@ -213,3 +213,9 @@ swift::_swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
   std::uniform_int_distribution<__swift_uint32_t> RandomUniform(0, upper_bound);
   return RandomUniform(getGlobalMT19937());
 }
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void swift::_swift_stdlib_print_hex(__swift_uintptr_t value) {
+  printf("%tX\n", value);
+}
+
