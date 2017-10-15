@@ -67,6 +67,7 @@ static std::string getDiagKindString(llvm::SourceMgr::DiagKind Kind) {
   case llvm::SourceMgr::DK_Error: return "error";
   case llvm::SourceMgr::DK_Warning: return "warning";
   case llvm::SourceMgr::DK_Note: return "note";
+    default: return "remark; hack";
   }
 
   llvm_unreachable("Unhandled DiagKind in switch.");
