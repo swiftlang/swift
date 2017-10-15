@@ -430,54 +430,6 @@ void DIElementUseInfo::trackStoreToSelf(SILInstruction *I) {
   StoresToSelf.push_back(I);
 }
 
-void DIElementUseInfo::trackFailableInitCall(
-    const DIMemoryObjectInfo &MemoryInfo, SILInstruction *I) {
-  // If we have a store to self inside the normal BB, we have a 'real'
-  // try_apply. Otherwise, this is a 'try? self.init()' or similar,
-  // and there is a store after.
-  if (auto *TAI = dyn_cast<TryApplyInst>(I)) {
-    trackFailureBlock(MemoryInfo, TAI, TAI->getNormalBB());
-    return;
-  }
-
-  if (auto *AI = dyn_cast<ApplyInst>(I)) {
-    // See if this is an optional initializer.
-    for (auto Op : AI->getUses()) {
-      SILInstruction *User = Op->getUser();
-
-      if (!isa<SelectEnumInst>(User) && !isa<SelectEnumAddrInst>(User))
-        continue;
-
-      auto value = cast<SingleValueInstruction>(User);
-
-      if (!value->hasOneUse())
-        continue;
-
-      User = value->use_begin()->getUser();
-      if (auto *CBI = dyn_cast<CondBranchInst>(User)) {
-        trackFailureBlock(MemoryInfo, CBI, CBI->getTrueBB());
-        return;
-      }
-    }
-  }
-}
-
-/// We have to detect if the self box contents were consumed. Do this by
-/// checking for a store into the self box in the success branch.  Once we rip
-/// this out of SILGen, DI will be able to figure this out in a more logical
-/// manner.
-void DIElementUseInfo::trackFailureBlock(const DIMemoryObjectInfo &TheMemory,
-                                         TermInst *TI, SILBasicBlock *BB) {
-  for (auto &II : *BB) {
-    if (auto *SI = dyn_cast<StoreInst>(&II)) {
-      if (SI->getDest() == TheMemory.MemoryInst) {
-        FailableInits.push_back(TI);
-        return;
-      }
-    }
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                          Scalarization Logic
 //===----------------------------------------------------------------------===//
@@ -1426,7 +1378,6 @@ void ElementUseCollector::collectClassSelfUses(
         (isSelfInitUse(User) || isSuperInitUse(User))) {
       if (isSelfOperand(Op, User)) {
         Kind = DIUseKind::SelfInit;
-        UseInfo.trackFailableInitCall(TheMemory, User);
       }
     }
     
@@ -1708,7 +1659,6 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
         (isSelfInitUse(User) || isSuperInitUse(User))) {
       if (isSelfOperand(Op, User)) {
         Kind = DIUseKind::SelfInit;
-        UseInfo.trackFailableInitCall(TheMemory, User);
       }
     }
 

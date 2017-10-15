@@ -278,7 +278,6 @@ struct DIMemoryUse {
 struct DIElementUseInfo {
   SmallVector<DIMemoryUse, 16> Uses;
   SmallVector<SILInstruction *, 4> Releases;
-  TinyPtrVector<TermInst *> FailableInits;
   TinyPtrVector<SILInstruction *> StoresToSelf;
 
   void trackUse(DIMemoryUse Use) { Uses.push_back(Use); }
@@ -286,13 +285,6 @@ struct DIElementUseInfo {
   void trackDestroy(SILInstruction *Destroy) { Releases.push_back(Destroy); }
 
   void trackStoreToSelf(SILInstruction *I);
-
-  void trackFailableInitCall(const DIMemoryObjectInfo &TheMemory,
-                             SILInstruction *I);
-
-private:
-  void trackFailureBlock(const DIMemoryObjectInfo &TheMemory, TermInst *TI,
-                         SILBasicBlock *BB);
 };
 
 /// collectDIElementUsesFrom - Analyze all uses of the specified allocation
