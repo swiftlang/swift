@@ -521,6 +521,8 @@ namespace {
 
   private:
 
+    void emitSelfConsumedDiagnostic(SILInstruction *Inst);
+
     LiveOutBlockState &getBlockInfo(SILBasicBlock *BB) {
       return PerBlockInfo.insert({BB,
                      LiveOutBlockState(TheMemory.NumElements)}).first->second;
@@ -920,18 +922,21 @@ void LifetimeChecker::handleLoadUse(unsigned UseID) {
   }
 }
 
+void LifetimeChecker::emitSelfConsumedDiagnostic(SILInstruction *Inst) {
+  if (!shouldEmitError(Inst))
+    return;
+
+  diagnose(Module, Inst->getLoc(),
+           diag::self_inside_catch_superselfinit,
+           (unsigned)TheMemory.isDelegatingInit());
+}
+
 void LifetimeChecker::handleStoreUse(unsigned UseID) {
   DIMemoryUse &InstInfo = Uses[UseID];
 
   if (TheMemory.isAnyInitSelf()) {
     if (getSelfConsumedAtInst(InstInfo.Inst) != DIKind::No) {
-      // FIXME: more specific diagnostics here, handle this case gracefully below.
-      if (!shouldEmitError(InstInfo.Inst))
-        return;
-
-      diagnose(Module, InstInfo.Inst->getLoc(),
-               diag::self_inside_catch_superselfinit,
-               (unsigned)TheMemory.isDelegatingInit());
+      emitSelfConsumedDiagnostic(InstInfo.Inst);
       return;
     }
   }
@@ -1027,13 +1032,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
   // before the "address" is passed as an l-value.
   if (!isInitializedAtUse(Use, &IsSuperInitDone, &FailedSelfUse)) {
     if (FailedSelfUse) {
-      // FIXME: more specific diagnostics here, handle this case gracefully below.
-      if (!shouldEmitError(Use.Inst))
-        return;
-      
-      diagnose(Module, Use.Inst->getLoc(),
-               diag::self_inside_catch_superselfinit,
-               (unsigned)TheMemory.isDelegatingInit());
+      emitSelfConsumedDiagnostic(Use.Inst);
       return;
     }
 
@@ -1135,13 +1134,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
   auto Inst = Use.Inst;
 
   if (FailedSelfUse) {
-    // FIXME: more specific diagnostics here, handle this case gracefully below.
-    if (!shouldEmitError(Inst))
-      return;
-    
-    diagnose(Module, Inst->getLoc(),
-             diag::self_inside_catch_superselfinit,
-             (unsigned)TheMemory.isDelegatingInit());
+    emitSelfConsumedDiagnostic(Inst);
     return;
   }
 
@@ -1502,13 +1495,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   SILInstruction *Inst = Use.Inst;
   
   if (FailedSelfUse) {
-    // FIXME: more specific diagnostics here, handle this case gracefully below.
-    if (!shouldEmitError(Inst))
-      return;
-    
-    diagnose(Module, Inst->getLoc(),
-             diag::self_inside_catch_superselfinit,
-             (unsigned)TheMemory.isDelegatingInit());
+    emitSelfConsumedDiagnostic(Inst);
     return;
   }
   
@@ -1670,13 +1657,7 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
   assert(TheMemory.getType()->hasReferenceSemantics());
 
   if (getSelfConsumedAtInst(Inst) != DIKind::No) {
-    // FIXME: more specific diagnostics here, handle this case gracefully below.
-    if (!shouldEmitError(Inst))
-      return;
-    
-    diagnose(Module, Inst->getLoc(),
-             diag::self_inside_catch_superselfinit,
-             (unsigned)TheMemory.isDelegatingInit());
+    emitSelfConsumedDiagnostic(Inst);
     return;
   }
 
