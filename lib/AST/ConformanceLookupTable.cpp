@@ -448,14 +448,23 @@ bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
         return false;
 
       case ConformanceEntryKind::Implied:
-        // An implied conformance is better than a synthesized one.
         // Ignore implied circular protocol inheritance
-        if (kind == ConformanceEntryKind::Synthesized ||
-            existingEntry->getProtocol() == protocol)
+        if (existingEntry->getProtocol() == protocol)
           return false;
+
+        // An implied conformance is better than a synthesized one, unless
+        // the implied conformance was deserialized.
+        if (kind == ConformanceEntryKind::Synthesized &&
+            existingEntry->getDeclContext()->getParentSourceFile() == nullptr)
+          return false;
+
         break;
 
       case ConformanceEntryKind::Synthesized:
+        // An implied conformance is better unless it was deserialized.
+        if (dc->getParentSourceFile() == nullptr)
+          return false;
+
         break;
       }
     }
