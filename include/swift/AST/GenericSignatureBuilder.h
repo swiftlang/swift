@@ -758,6 +758,13 @@ public:
   resolvePotentialArchetype(Type type,
                             ArchetypeResolutionKind resolutionKind);
 
+private:
+  /// \brief Try to resolvew the equivalence class of the given type.
+  ResolveResult maybeResolveEquivalenceClass(
+                                      Type type,
+                                      ArchetypeResolutionKind resolutionKind);
+
+public:
   /// \brief Resolve the equivalence class for the given type parameter,
   /// which provides information about that type.
   ///
