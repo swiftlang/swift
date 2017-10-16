@@ -198,3 +198,8 @@ typedef SomeCell <NSCopying> *CopyableSomeCell;
 // Note the custom setter name here; this is important.
 @property (setter=takeFooForBar:) BOOL fooForBar;
 @end
+
+@interface InstancetypeAccessor : NSObject
+@property (class, readonly) InstancetypeAccessor *prop;
++ (instancetype)prop;
+@end
