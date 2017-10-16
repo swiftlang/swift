@@ -758,6 +758,7 @@ namespace {
                 base.getType().getObjectType(),
                 SGF.getASTContext().AllocateCopy(conformances));
       } else {
+        assert(getSubstFormalType()->isBridgeableObjectType());
         ref = SGF.B.createInitExistentialRef(
                 loc,
                 base.getType().getObjectType(),
