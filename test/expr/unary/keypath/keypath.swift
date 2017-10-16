@@ -434,6 +434,20 @@ func testImplicitConversionInSubscriptIndex() {
   _ = \BassSubscript.["hello"] // expected-error{{must be Hashable}}
 }
 
+// SR-6106
+func sr6106() {
+  class B {}
+  class A {
+    var b: B? = nil
+  }
+  class C {
+    var a: A?
+    func myFunc() {
+      let _ = \C.a?.b
+    }
+  }
+}
+
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}
   _ = \.a ;
