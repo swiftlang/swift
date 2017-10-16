@@ -121,10 +121,16 @@ private:
   }
 
   void checkStmtCondition(const StmtCondition &Cond) {
-    for (auto entry : Cond)
-      if (auto *P = entry.getPatternOrNull())
-        if (!isReferencePointInRange(entry.getSourceRange()))
+    SourceLoc start = SourceLoc();
+    for (auto entry : Cond) {
+      if (start.isInvalid())
+        start = entry.getStartLoc();
+      if (auto *P = entry.getPatternOrNull()) {
+        SourceRange previousConditionsToHere = SourceRange(start, entry.getEndLoc());
+        if (!isReferencePointInRange(previousConditionsToHere))
           checkPattern(P, DeclVisibilityKind::LocalVariable);
+      }
+    }
   }
 
   void visitIfStmt(IfStmt *S) {
