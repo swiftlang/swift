@@ -157,12 +157,12 @@ enum class CursorInfoKind {
 
 struct ResolvedCursorInfo {
   CursorInfoKind Kind = CursorInfoKind::Invalid;
+  SourceFile *SF;
+  SourceLoc Loc;
   ValueDecl *ValueD = nullptr;
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtTyRef = nullptr;
-  SourceFile *SF = nullptr;
   ModuleEntity Mod;
-  SourceLoc Loc;
   bool IsRef = true;
   bool IsKeywordArgument = false;
   Type Ty;
@@ -172,39 +172,36 @@ struct ResolvedCursorInfo {
   Expr *TrailingExpr = nullptr;
 
   ResolvedCursorInfo() = default;
-  ResolvedCursorInfo(ValueDecl *ValueD,
-                     TypeDecl *CtorTyRef,
-                     ExtensionDecl *ExtTyRef,
-                     SourceFile *SF,
-                     SourceLoc Loc,
-                     bool IsRef,
-                     Type Ty,
-                     Type ContainerType) :
-                        Kind(CursorInfoKind::ValueRef),
-                        ValueD(ValueD),
-                        CtorTyRef(CtorTyRef),
-                        ExtTyRef(ExtTyRef),
-                        SF(SF),
-                        Loc(Loc),
-                        IsRef(IsRef),
-                        Ty(Ty),
-                        DC(ValueD->getDeclContext()),
-                        ContainerType(ContainerType) {}
-  ResolvedCursorInfo(ModuleEntity Mod,
-                     SourceFile *SF,
-                     SourceLoc Loc) :
-                        Kind(CursorInfoKind::ModuleRef),
-                        SF(SF),
-                        Mod(Mod),
-                        Loc(Loc) {}
-  ResolvedCursorInfo(Stmt *TrailingStmt, SourceFile *SF) :
-                        Kind(CursorInfoKind::StmtStart),
-                        SF(SF),
-                        TrailingStmt(TrailingStmt) {}
-  ResolvedCursorInfo(Expr* TrailingExpr, SourceFile *SF) :
-                        Kind(CursorInfoKind::ExprStart),
-                        SF(SF),
-                        TrailingExpr(TrailingExpr) {}
+  ResolvedCursorInfo(SourceFile *SF) : SF(SF) {}
+  
+  void setValueRef(ValueDecl *ValueD,
+                   TypeDecl *CtorTyRef,
+                   ExtensionDecl *ExtTyRef,
+                   bool IsRef,
+                   Type Ty,
+                   Type ContainerType) {
+    Kind = CursorInfoKind::ValueRef;
+    this->ValueD = ValueD;
+    this->CtorTyRef = CtorTyRef;
+    this->ExtTyRef = ExtTyRef;
+    this->IsRef = IsRef;
+    this->Ty = Ty;
+    this->DC = ValueD->getDeclContext();
+    this->ContainerType = ContainerType;
+  }
+  void setModuleRef(ModuleEntity Mod) {
+    Kind = CursorInfoKind::ModuleRef;
+    this->Mod = Mod;
+  }
+  void setTrailingStmt(Stmt *TrailingStmt) {
+    Kind = CursorInfoKind::StmtStart;
+    this->TrailingStmt = TrailingStmt;
+  }
+  void setTrailingExpr(Expr* TrailingExpr) {
+    Kind = CursorInfoKind::ExprStart;
+    this->TrailingExpr = TrailingExpr;
+  }
+
   bool isValid() const { return !isInvalid(); }
   bool isInvalid() const { return Kind == CursorInfoKind::Invalid; }
 };
@@ -217,7 +214,8 @@ class CursorInfoResolver : public SourceEntityWalker {
   llvm::SmallVector<Expr*, 4> TrailingExprStack;
 
 public:
-  explicit CursorInfoResolver(SourceFile &SrcFile) : SrcFile(SrcFile) { }
+  explicit CursorInfoResolver(SourceFile &SrcFile) :
+    SrcFile(SrcFile), CursorInfo(&SrcFile) {}
   ResolvedCursorInfo resolve(SourceLoc Loc);
   SourceManager &getSourceMgr() const;
 private:
