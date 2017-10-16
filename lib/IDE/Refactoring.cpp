@@ -40,22 +40,28 @@ class ContextFinder : public SourceEntityWalker {
   SourceFile &SF;
   ASTContext &Ctx;
   SourceManager &SM;
-  ASTNode Target;
+  SourceRange Target;
   llvm::function_ref<bool(ASTNode)> IsContext;
   SmallVector<ASTNode, 4> AllContexts;
   bool contains(ASTNode Enclosing) {
-    auto Result = SM.rangeContains(Enclosing.getSourceRange(),
-                                   Target.getSourceRange());
+    auto Result = SM.rangeContains(Enclosing.getSourceRange(), Target);
     if (Result && IsContext(Enclosing))
       AllContexts.push_back(Enclosing);
     return Result;
   }
 public:
-  ContextFinder(SourceFile &SF, ASTNode Target,
+  ContextFinder(SourceFile &SF, ASTNode TargetNode,
                 llvm::function_ref<bool(ASTNode)> IsContext =
-                  [](ASTNode N) { return true; }) : SF(SF),
-                  Ctx(SF.getASTContext()), SM(Ctx.SourceMgr), Target(Target),
-                  IsContext(IsContext) {}
+                  [](ASTNode N) { return true; }) :
+                  SF(SF), Ctx(SF.getASTContext()), SM(Ctx.SourceMgr),
+                  Target(TargetNode.getSourceRange()), IsContext(IsContext) {}
+  ContextFinder(SourceFile &SF, SourceLoc TargetLoc,
+                llvm::function_ref<bool(ASTNode)> IsContext =
+                  [](ASTNode N) { return true; }) :
+                  SF(SF), Ctx(SF.getASTContext()), SM(Ctx.SourceMgr),
+                  Target(TargetLoc), IsContext(IsContext) {
+                    assert(TargetLoc.isValid() && "Invalid loc to find");
+                  }
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override { return contains(D); }
   bool walkToStmtPre(Stmt *S) override { return contains(S); }
   bool walkToExprPre(Expr *E) override { return contains(E); }
@@ -1722,7 +1728,8 @@ public:
 
 FillProtocolStubContext FillProtocolStubContext::
 getContextFromCursorInfo(ResolvedCursorInfo CursorInfo) {
-  assert(CursorInfo.isValid());
+  if(!CursorInfo.isValid())
+    return FillProtocolStubContext();
   if (!CursorInfo.IsRef) {
     // If the type name is on the declared nominal, e.g. "class A {}"
     if (auto ND = dyn_cast<NominalTypeDecl>(CursorInfo.ValueD)) {
@@ -2125,6 +2132,110 @@ bool RefactoringActionSimplifyNumberLiteral::performChange() {
     return false;
   }
   return true;
+}
+
+static CallExpr *findTrailingClosureTarget(SourceManager &SM,
+                                           ResolvedCursorInfo CursorInfo) {
+  if (CursorInfo.Kind == CursorInfoKind::StmtStart)
+    // StmtStart postion can't be a part of CallExpr.
+    return nullptr;
+
+  // Find inner most CallExpr
+  ContextFinder
+  Finder(*CursorInfo.SF, CursorInfo.Loc,
+         [](ASTNode N) {
+           return N.isStmt(StmtKind::Brace) || N.isExpr(ExprKind::Call);
+         });
+  Finder.resolve();
+  if (Finder.getContexts().empty()
+      || !Finder.getContexts().back().is<Expr*>())
+    return nullptr;
+  CallExpr *CE = cast<CallExpr>(Finder.getContexts().back().get<Expr*>());
+
+  // The last arugment is a closure?
+  Expr *Args = CE->getArg();
+  if (!Args)
+    return nullptr;
+  Expr *LastArg;
+  if (auto *TSE = dyn_cast<TupleShuffleExpr>(Args))
+    Args = TSE->getSubExpr();
+  if (auto *PE = dyn_cast<ParenExpr>(Args)) {
+    LastArg = PE->getSubExpr();
+  } else {
+    auto *TE = cast<TupleExpr>(Args);
+    if (TE->getNumElements() == 0)
+      return nullptr;
+    LastArg = TE->getElements().back();
+  }
+
+  if (auto *ICE = dyn_cast<ImplicitConversionExpr>(LastArg))
+    LastArg = ICE->getSyntacticSubExpr();
+
+  if (isa<ClosureExpr>(LastArg) || isa<CaptureListExpr>(LastArg))
+    return CE;
+  return nullptr;
+}
+
+bool RefactoringActionTrailingClosure::
+isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
+  SourceManager &SM = CursorInfo.SF->getASTContext().SourceMgr;
+  return findTrailingClosureTarget(SM, CursorInfo);
+}
+
+bool RefactoringActionTrailingClosure::performChange() {
+  auto *CE = findTrailingClosureTarget(SM, CursorInfo);
+  if (!CE)
+    return true;
+  Expr *Args = CE->getArg();
+  if (auto *TSE = dyn_cast<TupleShuffleExpr>(Args))
+    Args = TSE;
+
+  Expr *ClosureArg = nullptr;
+  Expr *PrevArg = nullptr;
+  SourceLoc LPLoc, RPLoc;
+
+  if (auto *PE = dyn_cast<ParenExpr>(Args)) {
+    ClosureArg = PE->getSubExpr();
+    LPLoc = PE->getLParenLoc();
+    RPLoc = PE->getRParenLoc();
+  } else {
+    auto *TE = cast<TupleExpr>(Args);
+    auto NumArgs = TE->getNumElements();
+    if (NumArgs == 0)
+      return true;
+    LPLoc = TE->getLParenLoc();
+    RPLoc = TE->getRParenLoc();
+    ClosureArg = TE->getElement(NumArgs - 1);
+    if (NumArgs > 1)
+      PrevArg = TE->getElement(NumArgs - 2);
+  }
+  if (auto *ICE = dyn_cast<ImplicitConversionExpr>(ClosureArg))
+    ClosureArg = ICE->getSyntacticSubExpr();
+
+  if (LPLoc.isInvalid() || RPLoc.isInvalid())
+    return true;
+
+  // Replace:
+  //   * Open paren with ' ' if the closure is sole argument.
+  //   * Comma with ') ' otherwise.
+  if (PrevArg) {
+    CharSourceRange PreRange(
+        SM,
+        Lexer::getLocForEndOfToken(SM, PrevArg->getEndLoc()),
+        ClosureArg->getStartLoc());
+    EditConsumer.accept(SM, PreRange, ") ");
+  } else {
+    CharSourceRange PreRange(
+        SM, LPLoc, ClosureArg->getStartLoc());
+    EditConsumer.accept(SM, PreRange, " ");
+  }
+  // Remove original closing paren.
+  CharSourceRange PostRange(
+      SM,
+      Lexer::getLocForEndOfToken(SM, ClosureArg->getEndLoc()),
+      Lexer::getLocForEndOfToken(SM, RPLoc));
+  EditConsumer.remove(SM, PostRange);
+  return false;
 }
 
 static bool rangeStartMayNeedRename(ResolvedRangeInfo Info) {
