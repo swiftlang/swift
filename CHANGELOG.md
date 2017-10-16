@@ -6,6 +6,7 @@ CHANGELOG
 
 | Contents               |
 | :--------------------- |
+| [Swift 4.1](#swift-41) |
 | [Swift 4.0](#swift-40) |
 | [Swift 3.1](#swift-31) |
 | [Swift 3.0](#swift-30) |
@@ -17,6 +18,41 @@ CHANGELOG
 | [Swift 1.0](#swift-10) |
 
 </details>
+
+Swift 4.1
+---------
+
+* [SE-0185][]
+
+  Structs and enums that declare a conformance to `Equatable`/`Hashable` now get an automatically synthesized implementation of `==`/`hashValue`. For structs, all stored properties must be `Equatable`/`Hashable`. For enums, all enum cases with associated values must be `Equatable`/`Hashable`.
+
+  ```swift
+  public struct Point: Hashable {
+    public let x: Int
+    public let y: Int
+
+    public init(x: Int, y: Int) {
+      self.x = x
+      self.y = y
+    }
+  }
+
+  Point(3, 0) == Point(0, 3)  // false
+  Point(3, 0) == Point(3, 0)  // true
+  Point(3, 0).hashValue       // -2942920663782199421
+
+  public enum Token: Hashable {
+    case comma
+    case identifier(String)
+    case number(Int)
+  }
+
+  Token.identifier("x") == .number(5)        // false
+  Token.identifier("x") == .identifier("x")  // true
+  Token.number(50).hashValue                 // -2002318238093721609
+  ```
+
+  If you wish to provide your own implementation of `==`/`hashValue`, you still can; a custom implementation will replace the one synthesized by the compiler.
 
 Swift 4.0
 ---------
