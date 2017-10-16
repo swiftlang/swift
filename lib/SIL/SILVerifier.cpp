@@ -2388,9 +2388,39 @@ public:
             break;
         case ValueKind::DestroyAddrInst:
           return true;
-        case ValueKind::UncheckedAddrCastInst:
-          // Escaping use lets be conservative here.
+        case ValueKind::UncheckedAddrCastInst: {
+          // Don't be too conservative here, we have a new case:
+          // sil-combine producing a new code pattern for devirtualizer
+          // open_existential_addr immutable_access -> witness_method
+          // witness_method gets transformed into unchecked_addr_cast
+          // we are "OK" If one of the new users is an non-consuming apply
+          // we are also "OK" if we have a single non-consuming user
+          auto isCastToNonConsuming = [=](UncheckedAddrCastInst *I) -> bool {
+            for (auto *use : I->getUses()) {
+              auto *inst = use->getUser();
+              switch (inst->getKind()) {
+              case ValueKind::ApplyInst:
+              case ValueKind::TryApplyInst:
+              case ValueKind::PartialApplyInst:
+                if (!isConsumingOrMutatingApplyUse(use))
+                  return true;
+                break;
+              case ValueKind::LoadInst:
+              case ValueKind::DebugValueAddrInst:
+                if (I->hasOneUse())
+                  return true;
+                break;
+              default:
+                break;
+              }
+            }
+            return false;
+          };
+          if (isCastToNonConsuming(dyn_cast<UncheckedAddrCastInst>(inst))) {
+            break;
+          }
           return true;
+        }
         case ValueKind::CheckedCastAddrBranchInst:
           if (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind() !=
               CastConsumptionKind::CopyOnSuccess)

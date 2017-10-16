@@ -837,6 +837,23 @@ getConformanceAndConcreteType(FullApplySite AI,
   llvm_unreachable("couldn't find matching conformance in substitution?");
 }
 
+static bool isUseAfterFree(SILValue val, SILInstruction *Apply,
+                           DominanceInfo *DT) {
+  for (auto Use : val->getUses()) {
+    auto *User = Use->getUser();
+    if (!isa<DeallocStackInst>(User) && !isa<DestroyAddrInst>(User) &&
+        !isa<DeinitExistentialAddrInst>(User)) {
+      continue;
+    }
+    if (!DT->properlyDominates(Apply, User)) {
+      // we have use-after-free - Conservative heuristic
+      // Non conservative solution would require data flow analysis
+      return true;
+    }
+  }
+  return false;
+}
+
 /// Propagate information about a concrete type from init_existential_addr
 /// or init_existential_ref into witness_method conformances and into
 /// apply instructions.
@@ -910,6 +927,16 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
         return nullptr;
       default:
         break;
+    }
+    // check if using the value in the apply would cause use-after-free
+    auto *DT = DA->get(AI.getFunction());
+    auto *apply = AI.getInstruction();
+    auto op = InitExistential->getOperand(0);
+    if (isUseAfterFree(op, apply, DT)) {
+      return nullptr;
+    }
+    if (isUseAfterFree(NewSelf, apply, DT)) {
+      return nullptr;
     }
   }
   // Create a new apply instruction that uses the concrete type instead
