@@ -53,17 +53,26 @@ public struct DispatchTime : Comparable {
 	///               system sleep time), not zero nanoseconds since boot.
 	public init(uptimeNanoseconds: UInt64) {
 		var rawValue = uptimeNanoseconds
-		if (DispatchTime.timebaseInfo.numer != DispatchTime.timebaseInfo.denom) {
-			rawValue = (rawValue * UInt64(DispatchTime.timebaseInfo.denom) 
-				+ UInt64(DispatchTime.timebaseInfo.numer - 1)) / UInt64(DispatchTime.timebaseInfo.numer)
+
+		// UInt64.max means distantFuture. Do not try to scale it.
+		if rawValue != UInt64.max && DispatchTime.timebaseInfo.numer != DispatchTime.timebaseInfo.denom {
+			var (result, overflow) = rawValue.multipliedReportingOverflow(by: UInt64(DispatchTime.timebaseInfo.denom))
+			if !overflow {
+				(result, overflow) = result.addingReportingOverflow(UInt64(DispatchTime.timebaseInfo.numer - 1))
+			}
+			rawValue = overflow ? UInt64.max : result / UInt64(DispatchTime.timebaseInfo.numer)
 		}
 		self.rawValue = dispatch_time_t(rawValue)
 	}
 
 	public var uptimeNanoseconds: UInt64 {
 		var result = self.rawValue
-		if (DispatchTime.timebaseInfo.numer != DispatchTime.timebaseInfo.denom) {
-			result = result * UInt64(DispatchTime.timebaseInfo.numer) / UInt64(DispatchTime.timebaseInfo.denom)
+		var overflow: Bool
+
+		// UInt64.max means distantFuture. Do not try to scale it.
+		if rawValue != UInt64.max && DispatchTime.timebaseInfo.numer != DispatchTime.timebaseInfo.denom {
+			(result, overflow) = result.multipliedReportingOverflow(by: UInt64(DispatchTime.timebaseInfo.numer))
+			result = overflow ? UInt64.max : result / UInt64(DispatchTime.timebaseInfo.denom)
 		}
 		return result
 	}
