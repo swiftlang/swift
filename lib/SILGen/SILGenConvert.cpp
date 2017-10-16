@@ -695,6 +695,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     assert(existentialTL.isLoadable());
 
     ManagedValue sub = F(SGFContext());
+    assert(concreteFormalType->isBridgeableObjectType());
     return B.createInitExistentialRef(loc, existentialTL.getLoweredType(),
                                       concreteFormalType, sub, conformances);
   }
@@ -726,6 +727,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     auto eraseToAnyObject =
     [&, concreteFormalType, F](SGFContext C) -> ManagedValue {
       auto concreteValue = F(SGFContext());
+      assert(concreteFormalType->isBridgeableObjectType());
       return B.createInitExistentialRef(
           loc, SILType::getPrimitiveObjectType(anyObjectTy), concreteFormalType,
           concreteValue, {});
@@ -1231,8 +1233,11 @@ static bool areRelatedTypesForBridgingPeephole(CanType sourceType,
 
   // If the result type is AnyObject, then we can always apply the bridge
   // via Any.
-  if (resultType->isAnyObject())
-    return true;
+  if (resultType->isAnyObject()) {
+    // ... as long as the source type is not an Optional.
+    if (sourceType->isBridgeableObjectType())
+      return true;
+  }
 
   // TODO: maybe other class existentials? Existential conversions?
   // They probably aren't important here.
