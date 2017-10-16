@@ -911,11 +911,10 @@ void SILGenProfiling::assignRegionCounters(Decl *Root) {
     auto LoadedCounts =
         SGM.PGOReader->getInstrProfRecord(PGOFuncName, FunctionHash);
     if (auto E = LoadedCounts.takeError()) {
-      llvm::handleAllErrors(std::move(E),
-                            [&E](const llvm::InstrProfError &Err) {
-                              Err.log(llvm::dbgs());
-                              return;
-                            });
+      llvm::handleAllErrors(std::move(E), [](const llvm::InstrProfError &Err) {
+        Err.log(llvm::dbgs());
+        return;
+      });
       llvm::dbgs() << PGOFuncName << "\n";
       return;
     }
