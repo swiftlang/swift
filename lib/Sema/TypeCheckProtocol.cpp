@@ -3990,10 +3990,10 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   // Retrieve the set of substitutions to be applied to the witness.
   Type model = conformance->getType();
   TypeSubstitutionMap substitutions = model->getMemberSubstitutions(witness);
+  Type type = witness->getInterfaceType()->getReferenceStorageReferent();
+  
   if (substitutions.empty())
-    return witness->getInterfaceType()->getReferenceStorageReferent();
-
-  Type type = witness->getInterfaceType();
+    return type;
   
   // Strip off the requirements of a generic function type.
   // FIXME: This doesn't actually break recursion when substitution
