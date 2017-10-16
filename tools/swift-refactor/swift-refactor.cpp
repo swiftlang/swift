@@ -55,7 +55,9 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::FindGlobalRenameRanges,
                       "find-rename-ranges", "Find detailed ranges for syntactic rename"),
            clEnumValN(RefactoringKind::FindLocalRenameRanges,
-                      "find-local-rename-ranges", "Find detailed ranges for local rename")));
+                      "find-local-rename-ranges", "Find detailed ranges for local rename"),
+           clEnumValN(RefactoringKind::TrailingClosure,
+                      "trailingclosure", "Perform trailing closure refactoring")));
 
 
 static llvm::cl::opt<std::string>

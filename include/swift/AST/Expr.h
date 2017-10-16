@@ -2712,6 +2712,12 @@ public:
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
 
+  Expr *getSyntacticSubExpr() const {
+    if (auto *ICE = dyn_cast<ImplicitConversionExpr>(SubExpr))
+      return ICE->getSyntacticSubExpr();
+    return SubExpr;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ImplicitConversionExpr &&
            E->getKind() <= ExprKind::Last_ImplicitConversionExpr;
