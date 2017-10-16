@@ -168,6 +168,11 @@ def update_single_repository(args):
                       "to rebase.\n")
 
             shell.run(["git", "submodule", "update", "--recursive"], echo=True)
+
+            # We also want to update all the tags with remote. By default git doesn't 
+            # do it and so we need to fetch it
+            # https://stackoverflow.com/questions/1204190/does-git-fetch-tags-include-git-fetch
+            shell.run(["git", "fetch", "--tags"], echo=True)
     except Exception:
         (type, value, tb) = sys.exc_info()
         print('Error on repo "%s": %s' % (repo_path, traceback.format_exc()))
