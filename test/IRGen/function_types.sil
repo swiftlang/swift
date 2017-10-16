@@ -12,6 +12,9 @@ import Builtin
 
 sil_stage canonical
 
+public protocol Protocol {}
+struct S : Protocol {}
+
 // CHECK-LABEL: define{{( protected)?}} swiftcc i8* @thin_func_value(i8*) {{.*}} {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret i8* %0
@@ -40,9 +43,9 @@ entry(%x : $() -> ()):
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret i8* %0
 // CHECK-NEXT:  }
-sil @thin_witness_value : $@convention(thin) (@convention(witness_method) () -> ()) -> @convention(witness_method) () -> () {
-entry(%x : $@convention(witness_method) () -> ()):
-  return %x : $@convention(witness_method) () -> ()
+sil @thin_witness_value : $@convention(thin) (@convention(witness_method: Protocol) (S) -> ()) -> @convention(witness_method: Protocol) (S) -> () {
+entry(%x : $@convention(witness_method: Protocol) (S) -> ()):
+  return %x : $@convention(witness_method: Protocol) (S) -> ()
 }
 
 struct X {}

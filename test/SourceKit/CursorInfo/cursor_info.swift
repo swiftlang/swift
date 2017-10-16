@@ -204,7 +204,7 @@ func convention3(_: @convention(block) ()->()) {}
 func convention4(_: @convention(c) ()->()) {}
 func convention5(_: @convention(method) ()->()) {}
 func convention6(_: @convention(objc_method) ()->()) {}
-func convention7(_: @convention(witness_method) ()->()) {}
+func convention7(_: @convention(witness_method: P1) ()->()) {}
 
 /// Brief.
 ///

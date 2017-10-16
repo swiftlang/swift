@@ -7,12 +7,12 @@ protocol P { func foo() }
 sil @phi_witness_method : $@convention(thin) <T: P> () -> () {
 entry:
   // CHECK: [[LOAD:%.*]] = load i8*, i8** %T.P,
-  // CHECK: [[T0:%.*]] = bitcast i8* [[LOAD]] to void (%swift.type*, i8**, %T18witness_method_phi1PP*, %swift.type*, i8**)*
-  // CHECK: [[FUNC:%.*]] = bitcast void (%swift.type*, i8**, %T18witness_method_phi1PP*, %swift.type*, i8**)* [[T0]] to i8*
-  %1 = witness_method $T, #P.foo!1 : $@convention(witness_method) <T: P> (@in P) -> ()
-  br bb1(%1 : $@convention(witness_method) <T: P> (@in P) -> ())
+  // CHECK: [[T0:%.*]] = bitcast i8* [[LOAD]] to void (%swift.opaque*, %swift.type*, i8**)*
+  // CHECK: [[FUNC:%.*]] = bitcast void (%swift.opaque*, %swift.type*, i8**)* [[T0]] to i8*
+  %1 = witness_method $T, #P.foo!1 : $@convention(witness_method: P) <T: P> (@in T) -> ()
+  br bb1(%1 : $@convention(witness_method: P) <T: P> (@in T) -> ())
 
 // CHECK:         phi i8* [ [[FUNC]], %entry ]
-bb1(%2 : $@convention(witness_method) <T: P> (@in P) -> ()):
+bb1(%2 : $@convention(witness_method: P) <T: P> (@in T) -> ()):
   unreachable
 }

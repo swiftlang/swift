@@ -17,8 +17,8 @@ entry(%0: $*T, %1: $@thick T.Type):
   // CHECK-x86_64: [[WITNESS:%.*]] = load i8*, i8** %T.DefCon, align 8
   // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*, %swift.type*, i8**)*
   // CHECK: call swiftcc void [[METHOD]]
-  %m = witness_method $T, #DefCon.init!allocator.1 : $@convention(witness_method) <U: DefCon> (@thick U.Type) -> @out U
-  %z = apply %m<T>(%0, %1) : $@convention(witness_method) <V: DefCon> (@thick V.Type) -> @out V
+  %m = witness_method $T, #DefCon.init!allocator.1 : $@convention(witness_method: DefCon) <U: DefCon> (@thick U.Type) -> @out U
+  %z = apply %m<T>(%0, %1) : $@convention(witness_method: DefCon) <V: DefCon> (@thick V.Type) -> @out V
   return %z : $()
 }
 
@@ -37,8 +37,8 @@ entry(%0: $*ImplementsDerived):
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** @_T014witness_method17ImplementsDerivedVAA4BaseAAWP
   // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*, i8**)*
   // CHECK: call swiftcc void [[METHOD]]
-  %m = witness_method $ImplementsDerived, #Base.foo!1 : $@convention(witness_method) <U: Base> (@in_guaranteed U) -> ()
-  %z = apply %m<ImplementsDerived>(%0) : $@convention(witness_method) <V: Base> (@in_guaranteed V) -> ()
+  %m = witness_method $ImplementsDerived, #Base.foo!1 : $@convention(witness_method: Base) <U: Base> (@in_guaranteed U) -> ()
+  %z = apply %m<ImplementsDerived>(%0) : $@convention(witness_method: Base) <V: Base> (@in_guaranteed V) -> ()
   return %z : $()
 }
 
@@ -73,8 +73,8 @@ struct SyncUp<Deliverable> : Synergy {
 
 sil @testGenericWitnessMethod : $@convention(thin) <T> (@in SyncUp<T>) -> @out T {
 entry(%ret : $*T, %self : $*SyncUp<T>):
-  %m = witness_method $SyncUp<T>, #Synergy.actionItem!1 : $@convention(witness_method) <U: Synergy> (@in_guaranteed U) -> @out U.LowHangingFruit
-  %z = apply %m<SyncUp<T>>(%ret, %self) : $@convention(witness_method) <U: Synergy> (@in_guaranteed U) -> @out U.LowHangingFruit
+  %m = witness_method $SyncUp<T>, #Synergy.actionItem!1 : $@convention(witness_method: Synergy) <U: Synergy> (@in_guaranteed U) -> @out U.LowHangingFruit
+  %z = apply %m<SyncUp<T>>(%ret, %self) : $@convention(witness_method: Synergy) <U: Synergy> (@in_guaranteed U) -> @out U.LowHangingFruit
   return %z : $()
 }
 
@@ -96,8 +96,8 @@ protocol Strategy {
 
 sil @testArchetypeWitnessMethod : $@convention(thin) <T : Strategy> (@in T) -> @out T.GrowthHack {
 entry(%ret : $*T.GrowthHack, %self : $*T):
-  %m = witness_method $T, #Strategy.disrupt!1 : $@convention(witness_method) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
-  %z = apply %m<T>(%ret, %self) : $@convention(witness_method) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
+  %m = witness_method $T, #Strategy.disrupt!1 : $@convention(witness_method: Strategy) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
+  %z = apply %m<T>(%ret, %self) : $@convention(witness_method: Strategy) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
   return %z : $()
 }
 
@@ -112,7 +112,7 @@ class TPSReport<CoverSheet> : Strategy {
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @classArchetypeWitnessMethod(%swift.type* %CoverSheet, %T14witness_method9TPSReportC** noalias nocapture swiftself dereferenceable({{4|8}}), %swift.type* %Self, i8** %SelfWitnessTable)
 
-sil @classArchetypeWitnessMethod : $@convention(witness_method) <T><CoverSheet where T : TPSReport<CoverSheet>> (@in_guaranteed T) -> () {
+sil @classArchetypeWitnessMethod : $@convention(witness_method: Strategy) <T><CoverSheet where T : TPSReport<CoverSheet>> (@in_guaranteed T) -> () {
 entry(%self : $*T):
   %z = tuple ()
   return %z : $()
@@ -127,8 +127,8 @@ entry(%self : $*T):
 
 sil @testClassArchetypeWitnessMethod : $@convention(thin) <T><CoverSheet where T : TPSReport<CoverSheet>> (@in_guaranteed T) -> (@out T.GrowthHack) {
 entry(%ret : $*T.GrowthHack, %self : $*T):
-  %m = witness_method $T, #Strategy.disrupt!1 : $@convention(witness_method) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
-  %z = apply %m<T>(%ret, %self) : $@convention(witness_method) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
+  %m = witness_method $T, #Strategy.disrupt!1 : $@convention(witness_method: Strategy) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
+  %z = apply %m<T>(%ret, %self) : $@convention(witness_method: Strategy) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
   return %z : $()
 }
 

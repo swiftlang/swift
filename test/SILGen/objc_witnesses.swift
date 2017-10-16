@@ -62,7 +62,7 @@ protocol Subscriptable {
   subscript(x: Int) -> Any { get }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T0So7NSArrayC14objc_witnesses13SubscriptableA2cDPypSicigTW : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @out Any {
+// CHECK-LABEL: sil private [transparent] [thunk] @_T0So7NSArrayC14objc_witnesses13SubscriptableA2cDPypSicigTW : $@convention(witness_method: Subscriptable) (Int, @in_guaranteed NSArray) -> @out Any {
 // CHECK:         function_ref @_T0So7NSArrayCypSicigTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any
 // CHECK-LABEL: sil shared [serializable] [thunk] @_T0So7NSArrayCypSicigTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any {
 // CHECK:         objc_method {{%.*}} : $NSArray, #NSArray.subscript!getter.1.foreign

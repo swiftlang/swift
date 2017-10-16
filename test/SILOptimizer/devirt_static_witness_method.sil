@@ -18,13 +18,13 @@ struct S<T> : CanAdd {
 func +<T>(lhs: S<T>, rhs: S<T>) -> S<T>
 
 
-sil hidden [transparent] [thunk] @operator_plus_static_non_generic_witness_for_S : $@convention(witness_method) <T> (@in S<T>, @in S<T>, @thick S<T>.Type) -> @out S<T> {
+sil hidden [transparent] [thunk] @operator_plus_static_non_generic_witness_for_S : $@convention(witness_method: CanAdd) <T> (@in S<T>, @in S<T>, @thick S<T>.Type) -> @out S<T> {
 bb0(%0 : $*S<T>, %1 : $*S<T>, %2 : $*S<T>, %3 : $@thick S<T>.Type) :
   %17 = tuple ()
   return %17 : $()
 }
 
-sil hidden [transparent] [thunk] @operator_plus_static_non_generic_witness : $@convention(witness_method) (@in Int64, @in Int64, @thick Int64.Type) -> @out Int64 {
+sil hidden [transparent] [thunk] @operator_plus_static_non_generic_witness : $@convention(witness_method: CanAdd) (@in Int64, @in Int64, @thick Int64.Type) -> @out Int64 {
 bb0(%0 : $*Int64, %1 : $*Int64, %2 : $*Int64, %3 : $@thick Int64.Type):
   %4 = struct_element_addr %1 : $*Int64, #Int64._value
   %5 = load %4 : $*Builtin.Int64
@@ -47,8 +47,8 @@ bb0(%0 : $*Int64, %1 : $*Int64, %2 : $*Int64, %3 : $@thick Int64.Type):
 sil hidden @test_partial_apply_of_static_witness : $@convention(thin) () -> @callee_owned (@in Int64, @in Int64) -> @out Int64 {
 bb0:
   %1 = metatype $@thick Int64.Type
-  %2 = function_ref @operator_plus_static_non_generic_witness : $@convention(witness_method) (@in Int64, @in Int64, @thick Int64.Type) -> @out Int64
-  %3 = partial_apply %2(%1) : $@convention(witness_method) (@in Int64, @in Int64, @thick Int64.Type) -> @out Int64
+  %2 = function_ref @operator_plus_static_non_generic_witness : $@convention(witness_method: CanAdd) (@in Int64, @in Int64, @thick Int64.Type) -> @out Int64
+  %3 = partial_apply %2(%1) : $@convention(witness_method: CanAdd) (@in Int64, @in Int64, @thick Int64.Type) -> @out Int64
   return %3 : $@callee_owned (@in Int64, @in Int64) -> @out Int64
 }
 
@@ -61,8 +61,8 @@ bb0:
 sil hidden @test_devirt_of_partial_apply_of_witness_method : $@convention(thin) () -> @callee_owned (@in S<Int64>, @in S<Int64>) -> @out S<Int64> {
 bb0:
   %1 = metatype $@thick S<Int64>.Type
-  %2 = witness_method $S<Int64>, #CanAdd."+"!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : CanAdd> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
-  %3 = partial_apply %2<S<Int64>>(%1) : $@convention(witness_method) <τ_0_0 where τ_0_0 : CanAdd> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+  %2 = witness_method $S<Int64>, #CanAdd."+"!1 : $@convention(witness_method: CanAdd) <τ_0_0 where τ_0_0 : CanAdd> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+  %3 = partial_apply %2<S<Int64>>(%1) : $@convention(witness_method: CanAdd) <τ_0_0 where τ_0_0 : CanAdd> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
   return %3 : $@callee_owned (@in S<Int64>, @in S<Int64>) -> @out S<Int64>
 }
 
@@ -76,8 +76,8 @@ sil hidden @test_devirt_of_apply_of_witness_method : $@convention(thin) (@in S<I
 bb0(%0 : $*S<Int64>):
   %1 = alloc_stack $S<Int64>
   %5 = metatype $@thick S<Int64>.Type
-  %6 = witness_method $S<Int64>, #CanAdd."+"!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : CanAdd> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
-  %7 = apply %6<S<Int64>>(%1, %0, %0, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : CanAdd> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+  %6 = witness_method $S<Int64>, #CanAdd."+"!1 : $@convention(witness_method: CanAdd) <τ_0_0 where τ_0_0 : CanAdd> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+  %7 = apply %6<S<Int64>>(%1, %0, %0, %5) : $@convention(witness_method: CanAdd) <τ_0_0 where τ_0_0 : CanAdd> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
   %8 = load %1: $*S<Int64>
   dealloc_stack %1 : $*S<Int64>
   return %8 : $S<Int64>
