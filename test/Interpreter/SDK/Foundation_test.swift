@@ -177,6 +177,14 @@ FoundationTestSuite.test("RangeConversion") {
   let nsrFrom = NSRange(b..., in: s)
   expectEqual(nsrFrom.location,5)
   expectEqual(nsrFrom.length, 5)
+  
+  expectNil(Range(NSRange(location: 100, length: 0), in: s))
+  expectNil(Range(NSRange(location: 0, length: 100), in: s))
+  
+  let empty = ""
+  expectNil(Range(NSRange(location: 1, length: 0), in: empty))  
+  expectNil(Range(NSRange(location: 0, length: 1), in: empty))
+  expectNotNil(Range(NSRange(location: 0, length: 0), in: empty))
 
   // FIXME: enable once indices conform to RangeExpression
   // let nsrFull = NSRange(s.indices, in: s)
