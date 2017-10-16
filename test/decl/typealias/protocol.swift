@@ -189,6 +189,7 @@ struct T5 : P5 {
 // Unqualified lookup finds typealiases in protocol extensions, though
 protocol P7 {
   associatedtype A
+  typealias Z = A
 }
 
 extension P7 {
@@ -202,6 +203,9 @@ struct S7 : P7 {
 
   func inExpressionContext() {
     _ = Y.self
+    _ = Z.self
+    _ = T5.T1.self
+    _ = T5.T2.self
   }
 }
 
