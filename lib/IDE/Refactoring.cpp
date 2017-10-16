@@ -46,7 +46,7 @@ class ContextFinder : public SourceEntityWalker {
   bool contains(ASTNode Enclosing) {
     auto Result = SM.rangeContains(Enclosing.getSourceRange(),
                                    Target.getSourceRange());
-    if (Result && IsContext(Enclosing))
+    if (Result && !Enclosing.isImplicit() && IsContext(Enclosing))
       AllContexts.push_back(Enclosing);
     return Result;
   }
