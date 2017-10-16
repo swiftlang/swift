@@ -4172,7 +4172,7 @@ namespace {
       if (didOptionalChain &&
           baseTy &&
           !baseTy->hasUnresolvedType() &&
-          !baseTy->isEqual(leafTy)) {
+          !baseTy->getWithoutSpecifierType()->isEqual(leafTy)) {
         assert(leafTy->getAnyOptionalObjectType()
                      ->isEqual(baseTy->getWithoutSpecifierType()));
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
