@@ -3213,6 +3213,9 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
   // Any writebacks should be scoped to after the load.
   FormalEvaluationScope scope(*this);
 
+  // We shouldn't need to re-abstract here, but we might have to bridge.
+  // This should only happen if we have a global variable of NSString type.
+  auto origFormalType = src.getOrigFormalType();
   auto substFormalType = src.getSubstFormalType();
   auto &rvalueTL = getTypeLowering(src.getTypeOfRValue());
 
@@ -3226,6 +3229,7 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
              .offset(*this, loc, addr, AccessKind::Read);
     return RValue(*this, loc, substFormalType,
                   emitLoad(loc, addr.getValue(),
+                           origFormalType, substFormalType,
                            rvalueTL, C, IsNotTake,
                            isBaseGuaranteed));
   }
