@@ -111,6 +111,8 @@ protected:
   static void verify(StringRef mangledName);
   static void verifyOld(StringRef mangledName);
 
+  void dump();
+
   /// Appends a mangled identifier string.
   void appendIdentifier(StringRef ident);
 

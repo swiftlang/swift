@@ -1653,10 +1653,20 @@ NodePointer Demangler::demangleWitness() {
     }
     case 'T': {
       NodePointer ProtoTy = popNode(Node::Kind::Type);
-      NodePointer Name = popNode(isDeclName);
+      NodePointer AssocTypePath = createNode(Node::Kind::AssocTypePath);
+      bool firstElem = false;
+      do {
+        firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
+        NodePointer AssocTyName = popNode(isDeclName);
+        if (!AssocTyName)
+          return nullptr;
+        AssocTypePath->addChild(AssocTyName, *this);
+      } while (!firstElem);
+      AssocTypePath->reverseChildren();
+
       NodePointer Conf = popProtocolConformance();
       return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
-                                Conf, Name, ProtoTy);
+                                Conf, AssocTypePath, ProtoTy);
     }
     case 'y': {
       return createWithChild(Node::Kind::OutlinedCopy,

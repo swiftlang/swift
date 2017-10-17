@@ -113,16 +113,18 @@ public:
                                       const ProtocolDecl *Proto) {
     beginMangling();
     appendProtocolConformance(Conformance);
-    appendAssociatedTypePath(AssociatedType);
+    bool isFirstAssociatedTypeIdentifier = true;
+    appendAssociatedTypePath(AssociatedType, isFirstAssociatedTypeIdentifier);
     appendAnyGenericType(Proto);
     appendOperator("WT");
     return finalize();
   }
 
-  void appendAssociatedTypePath(CanType associatedType) {
+  void appendAssociatedTypePath(CanType associatedType, bool &isFirst) {
     if (auto memberType = dyn_cast<DependentMemberType>(associatedType)) {
-      appendAssociatedTypePath(memberType.getBase());
+      appendAssociatedTypePath(memberType.getBase(), isFirst);
       appendIdentifier(memberType->getName().str());
+      appendListSeparator(isFirst);
     } else {
       assert(isa<GenericTypeParamType>(associatedType));
     }

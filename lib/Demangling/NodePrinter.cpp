@@ -416,6 +416,7 @@ private:
     case Node::Kind::OutlinedRetain:
     case Node::Kind::OutlinedRelease:
     case Node::Kind::OutlinedVariable:
+    case Node::Kind::AssocTypePath:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1779,6 +1780,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
            && Node->getChild(0)->getKind() == Node::Kind::Type);
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::AssocTypePath:
+    printChildren(Node->begin(), Node->end(), ".");
+      return nullptr;
   }
   printer_unreachable("bad node kind!");
 }
