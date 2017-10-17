@@ -17,6 +17,7 @@
 #ifndef SWIFT_REMOTE_METADATAREADER_H
 #define SWIFT_REMOTE_METADATAREADER_H
 
+#include "swift/AST/Types.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Demangling/Demangler.h"
@@ -28,6 +29,43 @@
 
 namespace swift {
 namespace remote {
+
+template <typename BuiltType> class FunctionParam {
+  StringRef Label;
+  BuiltType Type;
+  ParameterTypeFlags Flags;
+
+  FunctionParam(StringRef label, BuiltType type, ParameterTypeFlags flags)
+      : Label(label), Type(type), Flags(flags) {}
+
+public:
+  explicit FunctionParam() {}
+
+  FunctionParam(BuiltType type) : Type(type) {}
+
+  StringRef getLabel() const { return Label; }
+  BuiltType getType() const { return Type; }
+  ParameterTypeFlags getFlags() const { return Flags; }
+
+  void setLabel(StringRef label) { Label = label; }
+  void setType(BuiltType type) { Type = type; }
+
+  void setVariadic() { Flags = Flags.withVariadic(true); }
+  void setShared() { Flags = Flags.withShared(true); }
+  void setInOut() { Flags = Flags.withInOut(true); }
+
+  FunctionParam withLabel(StringRef label) const {
+    return FunctionParam(label, Type, Flags);
+  }
+
+  FunctionParam withType(BuiltType type) const {
+    return FunctionParam(Label, type, Flags);
+  }
+
+  FunctionParam withFlags(ParameterTypeFlags flags) const {
+    return FunctionParam(Label, Type, flags);
+  }
+};
 
 /// A utility class for constructing abstract types from
 /// a textual mangling.
@@ -219,16 +257,14 @@ class TypeDecoder {
         Node->getChild(0)->getKind() == NodeKind::ThrowsAnnotation;
       flags = flags.withThrows(true);
 
-      std::vector<BuiltType> arguments;
-      std::vector<bool> argsAreInOut;
+      std::vector<FunctionParam<BuiltType>> parameters;
       if (!decodeMangledFunctionInputType(Node->getChild(isThrow ? 1 : 0),
-                                          arguments, argsAreInOut, flags))
+                                          parameters))
         return BuiltType();
 
       auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
       if (!result) return BuiltType();
-      return Builder.createFunctionType(arguments, argsAreInOut,
-                                        result, flags);
+      return Builder.createFunctionType(parameters, result, flags);
     }
     case NodeKind::ImplFunctionType: {
       // Minimal support for lowered function types. These come up in
@@ -263,15 +299,13 @@ class TypeDecoder {
       }
 
       // Completely punt on argument types and results.
-      std::vector<BuiltType> arguments;
-      std::vector<bool> argsAreInOut;
+      std::vector<FunctionParam<BuiltType>> parameters;
 
       std::vector<BuiltType> elements;
       std::string labels;
       auto result = Builder.createTupleType(elements, std::move(labels), false);
 
-      return Builder.createFunctionType(arguments, argsAreInOut,
-                                        result, flags);
+      return Builder.createFunctionType(parameters, result, flags);
     }
     case NodeKind::ArgumentTuple:
       return decodeMangledType(Node->getChild(0));
@@ -397,55 +431,92 @@ private:
     return true;
   }
 
-  bool decodeMangledFunctionInputType(const Demangle::NodePointer &node,
-                                      std::vector<BuiltType> &args,
-                                      std::vector<bool> &argsAreInOut,
-                                      FunctionTypeFlags &flags) {
+  bool decodeMangledFunctionInputType(
+      const Demangle::NodePointer &node,
+      std::vector<FunctionParam<BuiltType>> &params) {
     // Look through a couple of sugar nodes.
     if (node->getKind() == NodeKind::Type ||
         node->getKind() == NodeKind::ArgumentTuple) {
-      return decodeMangledFunctionInputType(node->getFirstChild(),
-                                            args, argsAreInOut, flags);
+      return decodeMangledFunctionInputType(node->getFirstChild(), params);
     }
 
-    auto decodeSingleHelper =
-    [&](const Demangle::NodePointer &typeNode, bool argIsInOut) -> bool {
-      BuiltType argType = decodeMangledType(typeNode);
-      if (!argType) return false;
+    auto decodeParamTypeAndFlags =
+        [&](const Demangle::NodePointer &typeNode,
+            FunctionParam<BuiltType> &param) -> bool {
+      Demangle::NodePointer node = typeNode;
+      switch (node->getKind()) {
+      case NodeKind::InOut:
+        param.setInOut();
+        node = node->getFirstChild();
+        break;
 
-      args.push_back(argType);
-      argsAreInOut.push_back(argIsInOut);
+      case NodeKind::Shared:
+        param.setShared();
+        node = node->getFirstChild();
+        break;
+
+      default:
+        break;
+      }
+
+      auto paramType = decodeMangledType(node);
+      if (!paramType)
+        return false;
+
+      param.setType(paramType);
       return true;
     };
-    auto decodeSingle =
-    [&](const Demangle::NodePointer &typeNode) -> bool {
-      if (typeNode->getKind() == NodeKind::InOut) {
-        return decodeSingleHelper(typeNode->getFirstChild(), true);
-      } else {
-        return decodeSingleHelper(typeNode, false);
+
+    auto decodeParam = [&](const Demangle::NodePointer &paramNode)
+        -> Optional<FunctionParam<BuiltType>> {
+      if (paramNode->getKind() != NodeKind::TupleElement)
+        return None;
+
+      FunctionParam<BuiltType> param;
+      for (const auto &child : *paramNode) {
+        switch (child->getKind()) {
+        case NodeKind::TupleElementName:
+          param.setLabel(child->getText());
+          break;
+
+        case NodeKind::VariadicMarker:
+          param.setVariadic();
+          break;
+
+        case NodeKind::Type:
+          if (!decodeParamTypeAndFlags(child->getFirstChild(), param))
+            return None;
+          break;
+
+        default:
+          return None;
+        }
       }
+
+      return param;
     };
 
     // Expand a single level of tuple.
     if (node->getKind() == NodeKind::Tuple) {
-      // TODO: preserve variadic somewhere?
-
       // Decode all the elements as separate arguments.
       for (const auto &elt : *node) {
-        if (elt->getKind() != NodeKind::TupleElement)
+        auto param = decodeParam(elt);
+        if (!param)
           return false;
-        auto typeNode = elt->getChild(elt->getNumChildren() - 1);
-        if (typeNode->getKind() != NodeKind::Type)
-          return false;
-        if (!decodeSingle(typeNode->getFirstChild()))
-          return false;
+
+        params.push_back(std::move(*param));
       }
 
       return true;
     }
 
     // Otherwise, handle the type as a single argument.
-    return decodeSingle(node);
+    FunctionParam<BuiltType> param;
+    if (!decodeParamTypeAndFlags(node, param))
+      return false;
+
+    params.push_back(std::move(param));
+    return true;
   }
 };
 
@@ -734,8 +805,7 @@ public:
     case MetadataKind::Function: {
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta);
 
-      std::vector<BuiltType> Arguments;
-      std::vector<bool> ArgumentIsInOut;
+      std::vector<FunctionParam<BuiltType>> Parameters;
       StoredPointer ArgumentAddress = MetadataAddress +
         sizeof(TargetFunctionTypeMetadata<Runtime>);
       for (StoredPointer i = 0; i < Function->getNumArguments(); ++i,
@@ -745,15 +815,21 @@ public:
                                  &FlaggedArgumentAddress))
           return BuiltType();
 
+        FunctionParam<BuiltType> Param;
+
         // TODO: Use target-agnostic FlaggedPointer to mask this!
         const auto InOutMask = (StoredPointer) 1;
-        ArgumentIsInOut.push_back((FlaggedArgumentAddress & InOutMask) != 0);
-        FlaggedArgumentAddress &= ~InOutMask;
+        // FIXME: Add import parameter related flags from metadata
+        if ((FlaggedArgumentAddress & InOutMask) != 0)
+          Param.setInOut();
 
-        if (auto ArgumentTypeRef = readTypeFromMetadata(FlaggedArgumentAddress))
-          Arguments.push_back(ArgumentTypeRef);
-        else
+        FlaggedArgumentAddress &= ~InOutMask;
+        if (auto ParamTypeRef = readTypeFromMetadata(FlaggedArgumentAddress)) {
+          Param.setType(ParamTypeRef);
+          Parameters.push_back(std::move(Param));
+        } else {
           return BuiltType();
+        }
       }
 
       auto Result = readTypeFromMetadata(Function->ResultType);
@@ -762,9 +838,8 @@ public:
 
       auto flags = FunctionTypeFlags().withConvention(Function->getConvention())
                                       .withThrows(Function->throws());
-      auto BuiltFunction = Builder.createFunctionType(Arguments,
-                                                      ArgumentIsInOut,
-                                                      Result, flags);
+      auto BuiltFunction =
+          Builder.createFunctionType(Parameters, Result, flags);
       TypeCache[MetadataAddress] = BuiltFunction;
       return BuiltFunction;
     }
