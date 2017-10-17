@@ -140,8 +140,8 @@ extension NSObject {
 // CHECK: bb0([[I:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, [[SELF:%[0-9]+]] : $NSObject)
   @objc func takeInt(_ i: Int) throws { }
 
-// CHECK-LABEL: sil hidden [thunk] @_T0So8NSObjectC14foreign_errorsE10takeDoubleySd_Si3intS2ic7closuretKFTo : $@convention(objc_method) (Double, Int, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @convention(block) (Int) -> Int, NSObject) -> ObjCBool
-// CHECK: bb0([[D:%[0-9]+]] : $Double, [[INT:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, [[CLOSURE:%[0-9]+]] : $@convention(block) (Int) -> Int, [[SELF:%[0-9]+]] : $NSObject):
+// CHECK-LABEL: sil hidden [thunk] @_T0So8NSObjectC14foreign_errorsE10takeDoubleySd_Si3intS2ic7closuretKFTo : $@convention(objc_method) (Double, Int, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @convention(block) @noescape (Int) -> Int, NSObject) -> ObjCBool
+// CHECK: bb0([[D:%[0-9]+]] : $Double, [[INT:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, [[CLOSURE:%[0-9]+]] : $@convention(block) @noescape (Int) -> Int, [[SELF:%[0-9]+]] : $NSObject):
   @objc func takeDouble(_ d: Double, int: Int, closure: (Int) -> Int) throws {
     throw NSError(domain: "", code: 1, userInfo: [:])
   }

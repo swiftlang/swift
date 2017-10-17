@@ -3027,7 +3027,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                             /*pseudogeneric*/ false),
+                             /*pseudogeneric*/ false,
+                             /*noescape*/ false),
     ParameterConvention::Direct_Unowned,
     params, result, None, SGF.getASTContext());
   
@@ -3146,7 +3147,8 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
   
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                             /*pseudogeneric*/ false),
+                             /*pseudogeneric*/ false,
+                             /*noescape*/ false),
     ParameterConvention::Direct_Unowned,
     params, {}, None, SGF.getASTContext());
   
@@ -3313,7 +3315,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
     
     auto signature = SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                               /*pseudogeneric*/ false),
+                               /*pseudogeneric*/ false,
+                               /*noescape*/ false),
       ParameterConvention::Direct_Unowned,
       params, results, None, C);
     
@@ -3478,7 +3481,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
     
     auto signature = SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                               /*pseudogeneric*/ false),
+                               /*pseudogeneric*/ false,
+                               /*noescape*/ false),
       ParameterConvention::Direct_Unowned,
       params, results, None, C);
     
@@ -5116,24 +5120,31 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
 RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
     MakeTemporarilyEscapableExpr *E,
     SGFContext C) {
-  // TODO: Some day we want to specialize the representation of nonescaping
-  // closures to be POD and allow an arbitrary payload in their context word.
-  // At that point, this operation would need to wrap the nonescaping closure
-  // in an escaping stub, which we could dynamically check at the end of the
-  // expression to verify it did not in fact escape at runtime. For now, to
-  // get the syntax for withoutActuallyEscaping in place, this is a no-op.
-  
-  // Emit the closure and bind it to an opaque value for use in the
-  // subexpression.
-  auto closure = visit(E->getNonescapingClosureValue());
+  // Emit the non-escaping function value.
+  auto functionValue =
+    visit(E->getNonescapingClosureValue()).getAsSingleValue(SGF, E);
+
+  // Convert it to an escaping function value.
+  auto escapingFnTy = SGF.getLoweredType(E->getOpaqueValue()->getType());
+  assert(escapingFnTy.castTo<SILFunctionType>()->getExtInfo() ==
+         functionValue.getType().castTo<SILFunctionType>()->getExtInfo()
+           .withNoEscape(false));
+
+  // TODO: maybe this should use a more explicit instruction.
+  functionValue =
+    SGF.emitManagedRValueWithCleanup(
+      SGF.B.createConvertFunction(E, functionValue.forward(SGF), escapingFnTy));
+
+  // Bind the opaque value to the escaping function.
   SILGenFunction::OpaqueValueState opaqueValue{
-    std::move(closure).getAsSingleValue(SGF, E),
+    functionValue,
     /*consumable*/ true,
     /*hasBeenConsumed*/ false,
   };
-  
   SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, E->getOpaqueValue(),
                                                   opaqueValue);
+
+  // Emit the guarded expression.
   return visit(E->getSubExpr(), C);
 }
 

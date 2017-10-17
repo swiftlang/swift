@@ -3207,11 +3207,12 @@ public:
     // you'll need to adjust both the Bits field below and
     // TypeBase::AnyFunctionTypeBits.
 
-    //   |representation|pseudogeneric|
-    //   |    0 .. 3    |      4      |
+    //   |representation|pseudogeneric| noescape |
+    //   |    0 .. 3    |      4      |     5    |
     //
     enum : uint16_t { RepresentationMask = 0x00F };
     enum : uint16_t { PseudogenericMask  = 0x010 };
+    enum : uint16_t { NoEscapeMask       = 0x020 };
 
     uint16_t Bits;
 
@@ -3224,14 +3225,18 @@ public:
     ExtInfo() : Bits(0) { }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation rep, bool isPseudogeneric) {
+    ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape) {
       Bits = ((unsigned) rep) |
-             (isPseudogeneric ? PseudogenericMask : 0);
+             (isPseudogeneric ? PseudogenericMask : 0) |
+             (isNoEscape ? NoEscapeMask : 0);
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
     /// is not permitted to dynamically depend on its type arguments.
     bool isPseudogeneric() const { return Bits & PseudogenericMask; }
+
+    // Is this function guaranteed to be no-escape by the type system?
+    bool isNoEscape() const { return Bits & NoEscapeMask; }
 
     /// What is the abstract representation of this function value?
     Representation getRepresentation() const {
@@ -3304,6 +3309,12 @@ public:
         return ExtInfo(Bits | PseudogenericMask);
       else
         return ExtInfo(Bits & ~PseudogenericMask);
+    }
+    ExtInfo withNoEscape(bool NoEscape = true) const {
+      if (NoEscape)
+        return ExtInfo(Bits | NoEscapeMask);
+      else
+        return ExtInfo(Bits & ~NoEscapeMask);
     }
 
     uint16_t getFuncAttrKey() const {
@@ -3554,6 +3565,10 @@ public:
 
   bool isPseudogeneric() const {
     return getExtInfo().isPseudogeneric();
+  }
+
+  bool isNoEscape() const {
+    return getExtInfo().isNoEscape();
   }
 
   bool isNoReturnFunction(); // Defined in SILType.cpp

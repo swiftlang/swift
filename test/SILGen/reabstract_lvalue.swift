@@ -21,19 +21,19 @@ func reabstractFunctionInOut() {
   // CHECK:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*@callee_owned (Int) -> Double
   // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_owned (@in Int) -> @out Double
   // CHECK: [[THICK_ARG:%.*]] = load [copy] [[WRITE]]
-  // CHECK: [[THUNK1:%.*]] = function_ref @_T0SiSdIxyd_SiSdIxir_TR
+  // CHECK: [[THUNK1:%.*]] = function_ref @_T0SiSdIexyd_SiSdIexir_TR
   // CHECK: [[ABSTRACTED_ARG:%.*]] = partial_apply [[THUNK1]]([[THICK_ARG]])
   // CHECK: store [[ABSTRACTED_ARG]] to [init] [[ABSTRACTED_BOX]]
   // CHECK: apply [[FUNC]]<(Int) -> Double>([[ABSTRACTED_BOX]])
   // CHECK: [[NEW_ABSTRACTED_ARG:%.*]] = load [take] [[ABSTRACTED_BOX]]
-  // CHECK: [[THUNK2:%.*]] = function_ref @_T0SiSdIxir_SiSdIxyd_TR
+  // CHECK: [[THUNK2:%.*]] = function_ref @_T0SiSdIexir_SiSdIexyd_TR
   // CHECK: [[NEW_ARG:%.*]] = partial_apply [[THUNK2]]([[NEW_ABSTRACTED_ARG]])
   var minimallyAbstracted = transform
   consumeGenericInOut(&minimallyAbstracted)
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0SiSdIxyd_SiSdIxir_TR : $@convention(thin) (@in Int, @owned @callee_owned (Int) -> Double) -> @out Double
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0SiSdIxir_SiSdIxyd_TR : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Double) -> Double
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0SiSdIexyd_SiSdIexir_TR : $@convention(thin) (@in Int, @owned @callee_owned (Int) -> Double) -> @out Double
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0SiSdIexir_SiSdIexyd_TR : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Double) -> Double
 
 // CHECK-LABEL: sil hidden @_T017reabstract_lvalue0A13MetatypeInOutyyF : $@convention(thin) () -> ()
 func reabstractMetatypeInOut() {

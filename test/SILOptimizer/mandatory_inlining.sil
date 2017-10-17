@@ -1033,3 +1033,54 @@ sil_default_witness_table hidden P2 {
   no_default
 }
 
+// Test function_ref -> convert_function -> apply.
+sil [transparent] @testMandatoryConvertedHelper : $@convention(thin) (C) -> C {
+bb0(%0 : $C):
+  return %0 : $C
+}
+
+sil [transparent] @testMandatoryConvertedHelper2 : $@convention(thin) (Optional<C>) -> C {
+bb0(%0 : $Optional<C>):
+  %o = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt.1
+  return %o : $C
+}
+
+// CHECK-LABEL: sil @testMandatoryConverted : $@convention(thin) (C) -> C {
+// CHECK: bb0(%0 : $C):
+// CHECK:   [[F1:%.*]] = function_ref @testMandatoryConvertedHelper : $@convention(thin) (C) -> C
+// CHECK:   [[CVT1:%.*]] = convert_function [[F1]] : $@convention(thin) (C) -> C to $@convention(thin) (C) -> (C, @error Error)
+// CHECK:   try_apply [[CVT1]](%0) : $@convention(thin) (C) -> (C, @error Error), normal bb1, error bb2
+// CHECK: bb1(%{{.*}} : $C):
+// CHECK:   br bb3(%{{.*}} : $C)
+// CHECK: bb2(%{{.*}} : $Error):
+// CHECK:   [[F2:%.*]] = function_ref @testMandatoryConvertedHelper2 : $@convention(thin) (Optional<C>) -> C
+// CHECK:   [[CVT2:%.*]] = convert_function [[F2]] : $@convention(thin) (Optional<C>) -> C to $@convention(thin) (C) -> C
+// CHECK:   %{{.*}} = apply [[CVT2]](%0) : $@convention(thin) (C) -> C
+// CHECK:   br bb3(%{{.*}} : $C)
+// CHECK: bb3(%{{.*}} : $C):
+// CHECK:   return %{{.*}} : $C
+// CHECK-LABEL: } // end sil function 'testMandatoryConverted'
+sil @testMandatoryConverted : $@convention(thin) (C) -> C {
+bb0(%0 : $C):
+  // Inline this one.
+  %f = function_ref @testMandatoryConvertedHelper : $@convention(thin) (C) -> C
+  %cf1 = convert_function %f : $@convention(thin) (C) -> C to $@convention(thin) @noescape (C) -> C
+  %call1 = apply %cf1(%0) : $@convention(thin) @noescape (C) -> C
+
+  // Don't (currently) inline conversion away from throws.
+  %cf2 = convert_function %f : $@convention(thin) (C) -> C to $@convention(thin) (C) -> (C, @error Error)
+  try_apply %cf2(%0) : $@convention(thin) (C) -> (C, @error Error), normal bb7, error bb11
+
+bb7(%callret : $C):
+  br bb12(%callret : $C)
+
+bb11(%128 : $Error):
+  // Don't (currently) inline conversion away from Optional.
+  %f2 = function_ref @testMandatoryConvertedHelper2 : $@convention(thin) (Optional<C>) -> C
+  %cf3 = convert_function %f2 : $@convention(thin) (Optional<C>) -> C to $@convention(thin) (C) -> C
+  %call3 = apply %cf3(%0) : $@convention(thin) (C) -> C
+  br bb12(%call3 : $C)
+
+bb12(%result : $C):
+  return %result : $C
+}

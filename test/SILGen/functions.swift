@@ -353,21 +353,23 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[HOF:%[0-9]+]] = function_ref @_T09functions21higher_order_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) {{.*}}
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_T09functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
+  // CHECK: [[CONVERT:%.*]] = convert_function [[FUNC_THICK]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
   // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
-  // CHECK: apply [[HOF]]([[FUNC_THICK]], [[I]], [[J]])
+  // CHECK: apply [[HOF]]([[CONVERT]], [[I]], [[J]])
   higher_order_function(standalone_function, i, j)
 
   // CHECK: [[HOF2:%[0-9]+]] = function_ref @_T09functions22higher_order_function2{{[_0-9a-zA-Z]*}}F : $@convention(thin) {{.*}}
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_T09functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%.*]] = thin_to_thick_function [[FUNC_THIN]]
+  // CHECK: [[CONVERT:%.*]] = convert_function [[FUNC_THICK]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
   // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
-  // CHECK: apply [[HOF2]]([[FUNC_THICK]], [[I]], [[J]])
+  // CHECK: apply [[HOF2]]([[CONVERT]], [[I]], [[J]])
   higher_order_function2(standalone_function, i, j)
 }
 
@@ -418,7 +420,7 @@ func testNoReturnAttr() -> Never {}
 // CHECK-LABEL: sil hidden @_T09functions20testNoReturnAttrPoly{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T> (@in T) -> Never
 func testNoReturnAttrPoly<T>(_ x: T) -> Never {}
 
-// CHECK-LABEL: sil hidden @_T09functions21testNoReturnAttrParam{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned @callee_owned () -> Never) -> ()
+// CHECK-LABEL: sil hidden @_T09functions21testNoReturnAttrParam{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned @noescape @callee_owned () -> Never) -> ()
 func testNoReturnAttrParam(_ fptr: () -> Never) -> () {}
 
 // CHECK-LABEL: sil hidden [transparent] @_T09functions15testTransparent{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int1) -> Builtin.Int1

@@ -681,7 +681,11 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
 
 SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
   // Retain of ThinToThickFunction is a no-op.
-  if (isa<ThinToThickFunctionInst>(SRI->getOperand()))
+  SILValue funcOper = SRI->getOperand();
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(funcOper))
+    funcOper = CFI->getOperand();
+
+  if (isa<ThinToThickFunctionInst>(funcOper))
     return eraseInstFromFunction(*SRI);
 
   if (isa<ObjCExistentialMetatypeToObjectInst>(SRI->getOperand()) ||
