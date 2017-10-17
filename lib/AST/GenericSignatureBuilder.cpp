@@ -6115,14 +6115,7 @@ void GenericSignatureBuilder::visitPotentialArchetypes(F f) {
     stack.pop_back();
     f(pa);
 
-    // Visit the archetype anchor.
-    if (auto anchor = pa->getArchetypeAnchor(*this)) {
-      if (visited.insert(anchor).second) {
-        stack.push_back(anchor);
-      }
-    }
-
-    // Visit everything else in this equivalence class.
+    // Visit everything in this equivalence class.
     for (auto equivPA : pa->getEquivalenceClassMembers()) {
       if (visited.insert(equivPA).second) {
         stack.push_back(equivPA);

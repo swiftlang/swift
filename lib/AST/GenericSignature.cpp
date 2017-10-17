@@ -1002,8 +1002,8 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
   // Canonicalize the root type.
   auto source = getBestRequirementSource(conforms->second);
   auto subjectPA = source->getRootPotentialArchetype();
-  subjectPA = subjectPA->getArchetypeAnchor(*subjectPA->getBuilder());
-  Type rootType = subjectPA->getDependentType(getGenericParams());
+  Type rootType =
+    subjectPA->getOrCreateEquivalenceClass()->getAnchor(getGenericParams());
 
   // Build the path.
   buildPath(getRequirements(), source, protocol, rootType, nullptr);
