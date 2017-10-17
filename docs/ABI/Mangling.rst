@@ -74,7 +74,7 @@ Globals
   global ::= protocol-conformance 'WP'   // protocol witness table
 
   global ::= protocol-conformance identifier 'Wt' // associated type metadata accessor
-  global ::= protocol-conformance identifier nominal-type 'WT' // associated type witness table accessor
+  global ::= protocol-conformance assoc_type_path nominal-type 'WT' // associated type witness table accessor
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
   global ::= type 'WV'                   // value witness table
   global ::= entity 'Wv' DIRECTNESS      // field offset
@@ -83,6 +83,8 @@ Globals
   global ::= type 'We' // Outlined Consume Function Type
   global ::= type 'Wr' // Outlined Retain Function Type
   global ::= type 'Ws' // Outlined Release Function Type
+
+  assoc_type_path ::= identifier '_' identifier*
 
   DIRECTNESS ::= 'd'                         // direct
   DIRECTNESS ::= 'i'                         // indirect
