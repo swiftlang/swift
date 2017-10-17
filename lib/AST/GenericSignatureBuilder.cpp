@@ -3079,7 +3079,7 @@ ResolveResult GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                                            Impl->GenericParams);
     if (index < Impl->GenericParams.size()) {
       auto pa = Impl->PotentialArchetypes[index];
-      return ResolveResult(type, pa->getOrCreateEquivalenceClass());
+      return ResolveResult(pa);
     }
 
     return ResolveResult::forUnresolved(nullptr);
@@ -3108,7 +3108,14 @@ ResolveResult GenericSignatureBuilder::maybeResolveEquivalenceClass(
     // Retrieve the "smallest" type in the equivalence class, by depth, and
     // use that to find a nested potential archetype. We used the smallest
     // type by depth to limit expansion of the type graph.
-    auto basePA = baseEquivClass->members.front();
+    PotentialArchetype *basePA;
+    if (resolutionKind == ArchetypeResolutionKind::AlreadyKnown) {
+      basePA = resolvedBase.getAsPotentialArchetype();
+      if (!basePA) return ResolveResult::forUnresolved(baseEquivClass);
+    } else {
+      basePA = baseEquivClass->members.front();
+    }
+
     auto nestedPA =
       basePA->updateNestedTypeForConformance(nestedTypeDecl, resolutionKind);
     if (!nestedPA)
@@ -3207,13 +3214,7 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
       return ResolveResult(type, nullptr);
     }
 
-    // Attempt to resolve the type parameter to a potential archetype. If this
-    // fails, it's because we weren't allowed to resolve anything now.
-    auto resolved = resolvePotentialArchetype(type, resolutionKind);
-    pa = resolved.dyn_cast<PotentialArchetype *>();
-    if (!pa) {
-      return ResolveResult::forUnresolved(resolved.get<EquivalenceClass *>());
-    }
+    return maybeResolveEquivalenceClass(type, resolutionKind);
   }
 
   return ResolveResult(pa);
