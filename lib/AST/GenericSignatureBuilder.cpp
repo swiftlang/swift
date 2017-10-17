@@ -2286,9 +2286,10 @@ ResolvedType ResolveResult::getResolvedType(
 
   // Resolve the potential archetype now.
   auto pa =
-    builder.resolvePotentialArchetype(type,
-                                      ArchetypeResolutionKind::WellFormed)
-      .get<PotentialArchetype *>();
+    builder.maybeResolveEquivalenceClass(type,
+                                         ArchetypeResolutionKind::WellFormed,
+                                         /*wantExactPotentialArchetype=*/true)
+      .getAsPotentialArchetype();
   assert(pa && "Not a resolvable type!");
   return ResolvedType::forPotentialArchetype(pa);
 }
@@ -3026,60 +3027,16 @@ LazyResolver *GenericSignatureBuilder::getLazyResolver() const {
   return Context.getLazyResolver();
 }
 
-auto GenericSignatureBuilder::resolvePotentialArchetype(
-                                     Type type,
-                                     ArchetypeResolutionKind resolutionKind)
-  -> llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
-{
-  if (auto genericParam = type->getAs<GenericTypeParamType>()) {
-    unsigned index = GenericParamKey(genericParam).findIndexIn(
-                                                           Impl->GenericParams);
-    if (index < Impl->GenericParams.size())
-      return Impl->PotentialArchetypes[index];
-
-    return (EquivalenceClass *)nullptr;
-  }
-
-  if (auto dependentMember = type->getAs<DependentMemberType>()) {
-    auto base = resolvePotentialArchetype(
-                  dependentMember->getBase(), resolutionKind);
-    auto basePA = base.dyn_cast<PotentialArchetype *>();
-    if (!basePA)
-      return base;
-
-    // If we know the associated type already, get that specific type.
-    PotentialArchetype *nestedPA;
-    if (auto assocType = dependentMember->getAssocType()) {
-      nestedPA =
-        basePA->updateNestedTypeForConformance(assocType, resolutionKind);
-    } else {
-      // Resolve based on name alone.
-      auto name = dependentMember->getName();
-      nestedPA = basePA->getNestedArchetypeAnchor(name, *this, resolutionKind);
-    }
-
-    // If we found a nested potential archetype, return it.
-    if (nestedPA)
-      return nestedPA;
-
-    // Otherwise, get/create an equivalence class for the base potential
-    // archetype.
-    return basePA->getOrCreateEquivalenceClass();
-  }
-
-  return (EquivalenceClass *)nullptr;
-}
-
 ResolveResult GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                     Type type,
-                                    ArchetypeResolutionKind resolutionKind) {
+                                    ArchetypeResolutionKind resolutionKind,
+                                    bool wantExactPotentialArchetype) {
   // The equivalence class of a generic type is known directly.
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
     unsigned index = GenericParamKey(genericParam).findIndexIn(
                                                            Impl->GenericParams);
     if (index < Impl->GenericParams.size()) {
-      auto pa = Impl->PotentialArchetypes[index];
-      return ResolveResult(pa);
+      return ResolveResult(Impl->PotentialArchetypes[index]);
     }
 
     return ResolveResult::forUnresolved(nullptr);
@@ -3089,8 +3046,10 @@ ResolveResult GenericSignatureBuilder::maybeResolveEquivalenceClass(
   // base equivalence class.
   if (auto depMemTy = type->getAs<DependentMemberType>()) {
     // Find the equivalence class of the base.
-    auto resolvedBase = maybeResolveEquivalenceClass(depMemTy->getBase(),
-                                                     resolutionKind);
+    auto resolvedBase =
+      maybeResolveEquivalenceClass(depMemTy->getBase(),
+                                   resolutionKind,
+                                   wantExactPotentialArchetype);
     if (!resolvedBase) return resolvedBase;
 
     // Find the nested type declaration for this.
@@ -3109,7 +3068,7 @@ ResolveResult GenericSignatureBuilder::maybeResolveEquivalenceClass(
     // use that to find a nested potential archetype. We used the smallest
     // type by depth to limit expansion of the type graph.
     PotentialArchetype *basePA;
-    if (resolutionKind == ArchetypeResolutionKind::AlreadyKnown) {
+    if (wantExactPotentialArchetype) {
       basePA = resolvedBase.getAsPotentialArchetype();
       if (!basePA) return ResolveResult::forUnresolved(baseEquivClass);
     } else {
@@ -3149,7 +3108,9 @@ ResolveResult GenericSignatureBuilder::maybeResolveEquivalenceClass(
 EquivalenceClass *GenericSignatureBuilder::resolveEquivalenceClass(
                                     Type type,
                                     ArchetypeResolutionKind resolutionKind) {
-  if (auto resolved = maybeResolveEquivalenceClass(type, resolutionKind))
+  if (auto resolved =
+        maybeResolveEquivalenceClass(type, resolutionKind,
+                                     /*wantExactPotentialArchetype=*/false))
     return resolved.getEquivalenceClass();
 
   return nullptr;
@@ -3214,7 +3175,8 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
       return ResolveResult(type, nullptr);
     }
 
-    return maybeResolveEquivalenceClass(type, resolutionKind);
+    return maybeResolveEquivalenceClass(type, resolutionKind,
+                                        /*wantExactPotentialArchetype=*/true);
   }
 
   return ResolveResult(pa);
@@ -5667,7 +5629,8 @@ static void collapseSameTypeComponentsThroughDelayedRequirements(
     if (auto pa =
             builder.maybeResolveEquivalenceClass(
                                      type,
-                                     ArchetypeResolutionKind::AlreadyKnown)
+                                     ArchetypeResolutionKind::AlreadyKnown,
+                                     /*wantExactPotentialArchetype=*/true)
               .getAsPotentialArchetype())
       return getPotentialArchetypeVirtualComponent(pa);
 

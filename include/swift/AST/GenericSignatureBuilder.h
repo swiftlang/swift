@@ -750,25 +750,19 @@ private:
                             PotentialArchetype *pa);
 
 public:
-  /// \brief Resolve the given type to the potential archetype it names.
+  /// \brief Try to resolve the equivalence class of the given type.
   ///
-  /// The \c resolutionKind parameter describes how resolution should be
-  /// performed. If the potential archetype named by the given dependent type
-  /// already exists, it will be always returned. If it doesn't exist yet,
-  /// the \c resolutionKind dictates whether the potential archetype will
-  /// be created or whether null will be returned.
+  /// \param type The type to resolve.
   ///
-  /// For any type that cannot refer to an archetype, this routine returns the
-  /// equivalence class that would have to change to make the potential
-  /// archetype resolvable.
-  llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
-  resolvePotentialArchetype(Type type,
-                            ArchetypeResolutionKind resolutionKind);
-
-  /// \brief Try to resolvew the equivalence class of the given type.
+  /// \param resolutionKind How to perform the resolution.
+  ///
+  /// \param wantExactPotentialArchetype Whether to return the precise
+  /// potential archetype described by the type (vs. just the equivalance
+  /// class and resolved type).
   ResolveResult maybeResolveEquivalenceClass(
                                       Type type,
-                                      ArchetypeResolutionKind resolutionKind);
+                                      ArchetypeResolutionKind resolutionKind,
+                                      bool wantExactPotentialArchetype);
 
   /// \brief Resolve the equivalence class for the given type parameter,
   /// which provides information about that type.
