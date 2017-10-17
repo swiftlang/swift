@@ -486,11 +486,8 @@ function(_add_swift_lipo_target)
         DEPENDS ${source_targets})
   else()
     # We don't know how to create fat binaries for other platforms.
-    add_custom_command_target(unused_var
-        COMMAND "${CMAKE_COMMAND}" "-E" "copy" "${source_binaries}" "${LIPO_OUTPUT}"
-        CUSTOM_TARGET_NAME "${LIPO_TARGET}"
-        OUTPUT "${LIPO_OUTPUT}"
-        DEPENDS ${source_targets})
+    add_custom_target(${LIPO_TARGET})
+    add_dependencies(${LIPO_TARGET} ${source_targets})
   endif()
 endfunction()
 
