@@ -2805,11 +2805,8 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 
     // We know something concrete about the parent PA, so we need to propagate
     // that information to this new archetype.
-    // FIXME: This feels like massive overkill. Why do we have to loop?
     if (isConcreteType()) {
-      for (auto equivT : getRepresentative()->getEquivalenceClassMembers()) {
-        concretizeNestedTypeFromConcreteParent(equivT, resultPA, builder);
-      }
+      concretizeNestedTypeFromConcreteParent(this, resultPA, builder);
     }
   }
 
