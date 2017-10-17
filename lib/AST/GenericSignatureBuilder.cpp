@@ -79,6 +79,8 @@ STATISTIC(NumConcreteTypeConstraints,
           "# of same-type-to-concrete constraints tracked");
 STATISTIC(NumSuperclassConstraints, "# of superclass constraints tracked");
 STATISTIC(NumLayoutConstraints, "# of layout constraints tracked");
+STATISTIC(NumLayoutConstraintsExtra,
+          "# of layout constraints considered that add no information");
 STATISTIC(NumSelfDerived, "# of self-derived constraints removed");
 STATISTIC(NumArchetypeAnchorCacheHits,
           "# of hits in the archetype anchor cache");
@@ -3553,25 +3555,33 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
 }
 
 ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
-                                             PotentialArchetype *PAT,
-                                             LayoutConstraint Layout,
-                                             const RequirementSource *Source) {
-  auto equivClass = PAT->getOrCreateEquivalenceClass();
-
-  // Record this layout constraint.
-  equivClass->layoutConstraints.push_back({PAT, Layout, Source});
-  equivClass->modified(*this);
-  ++NumLayoutConstraints;
+                                             ResolvedType type,
+                                             LayoutConstraint layout,
+                                             FloatingRequirementSource source) {
+  auto equivClass = type.getEquivalenceClass();
 
   // Update the layout in the equivalence class, if we didn't have one already.
-  if (!equivClass->layout)
-    equivClass->layout = Layout;
-  else {
+  bool anyChanges = false;
+  if (!equivClass->layout) {
+    equivClass->layout = layout;
+    anyChanges = true;
+  } else {
     // Try to merge layout constraints.
-    auto mergedLayout = equivClass->layout.merge(Layout);
-    if (mergedLayout->isKnownLayout() && mergedLayout != equivClass->layout)
+    auto mergedLayout = equivClass->layout.merge(layout);
+    if (mergedLayout->isKnownLayout() && mergedLayout != equivClass->layout) {
       equivClass->layout = mergedLayout;
+      anyChanges = true;
+    }
   }
+
+  // FIXME: Don't want to realize this potential archetype if we can avoid it.
+  auto pa = type.realizePotentialArchetype(*this);
+
+  // Record this layout constraint.
+  equivClass->layoutConstraints.push_back({pa, layout, source.getSource(pa)});
+  equivClass->modified(*this);
+  ++NumLayoutConstraints;
+  if (!anyChanges) ++NumLayoutConstraintsExtra;
 
   return ConstraintResult::Resolved;
 }
@@ -3610,8 +3620,7 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
     return ConstraintResult::Resolved;
   }
 
-  auto pa = resolvedSubject.realizePotentialArchetype(*this);
-  return addLayoutRequirementDirect(pa, layout, source.getSource(pa));
+  return addLayoutRequirementDirect(resolvedSubject, layout, source);
 }
 
 void GenericSignatureBuilder::updateSuperclass(

@@ -465,9 +465,9 @@ private:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  ConstraintResult addLayoutRequirementDirect(PotentialArchetype *PAT,
-                                              LayoutConstraint Layout,
-                                              const RequirementSource *Source);
+  ConstraintResult addLayoutRequirementDirect(ResolvedType type,
+                                              LayoutConstraint layout,
+                                              FloatingRequirementSource source);
 
   /// Add a new layout requirement to the subject.
   ConstraintResult addLayoutRequirement(
