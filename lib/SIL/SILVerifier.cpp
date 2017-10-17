@@ -2412,6 +2412,7 @@ public:
                 if (!isConsumingOrMutatingApplyUse(use))
                   return true;
                 break;
+              case SILInstructionKind::StructElementAddrInst:
               case SILInstructionKind::LoadInst:
               case SILInstructionKind::DebugValueAddrInst:
                 if (I->hasOneUse())
