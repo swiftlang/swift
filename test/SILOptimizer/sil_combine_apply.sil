@@ -387,20 +387,39 @@ bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int8):
   return %29 : $()
 }
 
+sil @testCombineClosureHelper : $(Builtin.Int32) -> ()
+
+// Test function_ref -> partial_apply -> convert_function -> apply.
+// Where the convert_function only affects @noescape.
+//
+// CHECK-LABEL: sil @testCombineClosureNoescape : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK: bb0(%0 : $Builtin.Int32):
+// CHECK:  [[F:%.*]] = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK:  apply [[F]](%0) : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK-LABEL: } // end sil function 'testCombineClosureNoescape'
+sil @testCombineClosureNoescape : $(Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %49 = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
+  %50 = partial_apply %49(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %51 = convert_function %50 : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+  apply %51() : $@noescape @callee_owned () -> ()
+  %empty = tuple ()
+  return %empty : $()
+}
+
 // Test function_ref -> partial_apply -> convert_function -> try_apply.
 // This is not currently combined because we don't know how to reform the
 // try_apply with a different type.
-sil @testCombineClosureHelper : $(Builtin.Int32) -> ()
-
-// CHECK-LABEL: sil @testCombineClosureResults : $@convention(thin) (Builtin.Int32) -> () {
+//
+// CHECK-LABEL: sil @testCombineClosureConvert : $@convention(thin) (Builtin.Int32) -> () {
 // CHECK: bb0(%0 : $Builtin.Int32):
 // CHECK:  [[F:%.*]] = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:  [[PA:%.*]] = partial_apply [[F]](%0) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:  [[CVT1:%.*]] = convert_function [[PA]] : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
 // CHECK:  [[CVT2:%.*]] = convert_function [[CVT1]] : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
 // CHECK:  try_apply [[CVT2]]() : $@noescape @callee_owned () -> @error Error, normal bb1, error bb2
-// CHECK-LABEL: } // end sil function 'testCombineClosureResults'
-sil @testCombineClosureResults : $(Builtin.Int32) -> () {
+// CHECK-LABEL: } // end sil function 'testCombineClosureConvert'
+sil @testCombineClosureConvert : $(Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32):
   %49 = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
   %50 = partial_apply %49(%0) : $@convention(thin) (Builtin.Int32) -> ()
