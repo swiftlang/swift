@@ -89,7 +89,7 @@ public:
   class PotentialArchetype;
 
   using UnresolvedType = llvm::PointerUnion<PotentialArchetype *, Type>;
-  class ResolveResult;
+  class ResolvedType;
 
   using RequirementRHS =
       llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
@@ -385,7 +385,7 @@ public:
   /// previous example).
   ConstraintResult
   addSameTypeRequirementDirect(
-                         ResolveResult paOrT1, ResolveResult paOrT2,
+                         ResolvedType paOrT1, ResolvedType paOrT2,
                          FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
@@ -758,7 +758,7 @@ public:
   /// \param wantExactPotentialArchetype Whether to return the precise
   /// potential archetype described by the type (vs. just the equivalance
   /// class and resolved type).
-  ResolveResult maybeResolveEquivalenceClass(
+  ResolvedType maybeResolveEquivalenceClass(
                                       Type type,
                                       ArchetypeResolutionKind resolutionKind,
                                       bool wantExactPotentialArchetype);
@@ -785,7 +785,7 @@ public:
   /// If the type cannot be resolved, e.g., because it is "too" recursive
   /// given the source, returns an unresolved result containing the equivalence
   /// class that would need to change to resolve this type.
-  ResolveResult resolve(UnresolvedType type, FloatingRequirementSource source);
+  ResolvedType resolve(UnresolvedType type, FloatingRequirementSource source);
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
