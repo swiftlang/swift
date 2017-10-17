@@ -3000,6 +3000,8 @@ ProtocolDecl::getInheritedProtocols() const {
   // We shouldn't need this, but it shows up in recursive invocations.
   if (!isRequirementSignatureComputed()) {
     SmallPtrSet<ProtocolDecl *, 4> known;
+    if (auto resolver = getASTContext().getLazyResolver())
+      resolver->resolveInheritanceClause(const_cast<ProtocolDecl *>(this));
     for (auto inherited : getInherited()) {
       if (auto type = inherited.getType()) {
         // Only protocols can appear in the inheritance clause

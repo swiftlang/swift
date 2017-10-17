@@ -214,9 +214,9 @@ public:
     ///
     /// \returns true if this conformance is new to the equivalence class,
     /// and false otherwise.
-    bool recordConformanceConstraint(PotentialArchetype *pa,
+    bool recordConformanceConstraint(ResolvedType type,
                                      ProtocolDecl *proto,
-                                     const RequirementSource *source);
+                                     FloatingRequirementSource source);
 
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
@@ -1598,13 +1598,6 @@ public:
 
     return identifier.assocTypeOrConcrete;
   }
-
-  /// Add a conformance to this potential archetype.
-  ///
-  /// \returns true if the conformance was new, false if it already existed.
-  bool addConformance(ProtocolDecl *proto,
-                      const RequirementSource *source,
-                      GenericSignatureBuilder &builder);
 
   /// Retrieve the set of nested types.
   const llvm::MapVector<Identifier, StoredNestedType> &getNestedTypes() const {
