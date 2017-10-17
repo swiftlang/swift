@@ -1636,8 +1636,11 @@ function(add_swift_library name)
           # Add dependencies on the (not-yet-created) custom lipo target.
           foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
             if (NOT "${DEP}" STREQUAL "icucore")
-              add_dependencies(${VARIANT_NAME}
-                "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+              if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "MACHO")
+                add_dependencies(${VARIANT_NAME} "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+              else()
+                add_dependencies(${VARIANT_NAME} "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+              endif()
             endif()
           endforeach()
 
@@ -1761,13 +1764,23 @@ function(add_swift_library name)
             set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
             if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND
                TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
+              if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "MACHO")
+                set(shared_lipo_target ${lipo_target})
+                set(static_lipo_target ${lipo_target_static})
+              else()
+                set(shared_lipo_target ${lipo_target}-${arch})
+                if(TARGET "${lipo_target_static}")
+                  set(static_lipo_target ${lipo_target_static}-${arch})
+                endif()
+              endif()
+
               add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
-                  ${lipo_target}
-                  ${lipo_target_static})
+                                 ${shared_lipo_target}
+                                 ${static_lipo_target})
               if(NOT "${name}" IN_LIST FILTERED_UNITTESTS)
                 add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
-                    ${lipo_target}
-                    ${lipo_target_static})
+                                   ${shared_lipo_target}
+                                   ${static_lipo_target})
               endif()
             endif()
           endforeach()
