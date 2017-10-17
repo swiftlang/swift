@@ -131,7 +131,9 @@ class E : B { }
 
 sil @exit : $@convention(thin) () -> Never {
 bb0:
-  br bb0
+  br bb1
+bb1:
+  br bb1
 }
 
 // CHECK-LABEL: sil @removeTriviallyDeadInstructions
