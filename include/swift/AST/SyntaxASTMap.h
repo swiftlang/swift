@@ -35,7 +35,6 @@ namespace syntax {
 /// a mapping from lib/AST nodes to lib/Syntax nodes while we integrate
 /// the infrastructure into the compiler.
 class SyntaxASTMap final {
-  friend class LegacyASTTransformer;
   llvm::DenseMap<RC<syntax::SyntaxData>, ASTNode> SyntaxMap;
 public:
 
