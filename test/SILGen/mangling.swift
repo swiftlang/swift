@@ -22,7 +22,7 @@ func Pročprostěnemluvíčesky() { }
 
 // CHECK-LABEL: sil hidden @_T08mangling9r13757744ySaySiG1x_tF
 func r13757744(x: [Int]) {}
-// CHECK-LABEL: sil hidden @_T08mangling9r13757744ySaySiG1xd_tF
+// CHECK-LABEL: sil hidden @_T08mangling9r13757744ySi1xd_tF
 func r13757744(x: Int...) {}
 
 // <rdar://problem/13757750> Prefix, postfix, and infix operators need
@@ -180,8 +180,11 @@ func curry3Throws() throws -> () throws -> () {
   return curry1Throws
 }
 
-// CHECK-LABEL: sil hidden @_T08mangling14varargsVsArrayySaySiG3arrd_SS1ntF : $@convention(thin) (@owned Array<Int>, @owned String) -> ()
+// CHECK-LABEL: sil hidden @_T08mangling14varargsVsArrayySi3arrd_SS1ntF : $@convention(thin) (@owned Array<Int>, @owned String) -> ()
 func varargsVsArray(arr: Int..., n: String) { }
 
 // CHECK-LABEL: sil hidden @_T08mangling14varargsVsArrayySaySiG3arr_SS1ntF : $@convention(thin) (@owned Array<Int>, @owned String) -> ()
 func varargsVsArray(arr: [Int], n: String) { }
+
+// CHECK-LABEL: sil hidden @_T08mangling14varargsVsArrayySaySiG3arrd_SS1ntF : $@convention(thin) (@owned Array<Array<Int>>, @owned String) -> ()
+func varargsVsArray(arr: [Int]..., n: String) { }

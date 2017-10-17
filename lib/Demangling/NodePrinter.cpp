@@ -970,9 +970,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       print(id);
     }
     if (isVariadic) {
-      SugarType Sugar = findSugar(type);
-      if (Sugar == SugarType::Array)
-        type = type->getFirstChild()->getChild(1)->getFirstChild();
       print(type);
       Printer << "...";
     } else {
