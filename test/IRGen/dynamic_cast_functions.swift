@@ -42,3 +42,9 @@ let cast8 = h as? (Int, Int) -> Void
 print((cast7 == nil) ? "ok" : "fail")
 // CHECK: ok
 print((cast8 != nil) ? "ok" : "fail")
+
+let t1: Any.Type = ((Int, Int) -> ()).self
+let t2: Any.Type = (((Int, Int)) -> ()).self
+
+// CHECK: ok
+print((t1 == t2) ? "fail" : "ok")
