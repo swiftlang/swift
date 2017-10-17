@@ -1480,20 +1480,6 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn) {
 
 void ASTMangler::appendFunctionInputType(
     ArrayRef<AnyFunctionType::Param> params) {
-  auto getParamType = [](const AnyFunctionType::Param &param) -> Type {
-    auto type = param.getType();
-
-    // FIXME: Change mangling for variadic parameters so
-    //        the enclosing array type is not required.
-    if (param.isVariadic()) {
-      auto *arrayDecl = type->getASTContext().getArrayDecl();
-      assert(arrayDecl);
-      return BoundGenericType::get(arrayDecl, Type(), {type});
-    }
-
-    return type;
-  };
-
   switch (params.size()) {
   case 0:
     appendOperator("y");
@@ -1520,7 +1506,7 @@ void ASTMangler::appendFunctionInputType(
   default:
     bool isFirstParam = true;
     for (auto &param : params) {
-      appendTypeListElement(param.getLabel(), getParamType(param),
+      appendTypeListElement(param.getLabel(), param.getType(),
                             param.getParameterFlags());
       appendListSeparator(isFirstParam);
     }
