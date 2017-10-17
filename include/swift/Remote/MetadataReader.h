@@ -270,6 +270,8 @@ class TypeDecoder {
       // Minimal support for lowered function types. These come up in
       // reflection as capture types. For the reflection library's
       // purposes, the only part that matters is the convention.
+      //
+      // TODO: Do we want to reflect @escaping?
       FunctionTypeFlags flags;
 
       for (unsigned i = 0; i < Node->getNumChildren(); i++) {

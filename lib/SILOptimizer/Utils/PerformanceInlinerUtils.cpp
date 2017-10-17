@@ -127,6 +127,9 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
       } else if (auto ti = dyn_cast<ThinToThickFunctionInst>(inst)) {
         val = ti->getOperand();
         continue;
+      } else if (auto cfi = dyn_cast<ConvertFunctionInst>(inst)) {
+        val = cfi->getOperand();
+        continue;
       }
       return inst;
     } else if (SILValue param = getParam(val)) {

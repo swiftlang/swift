@@ -951,11 +951,10 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   bool pseudogeneric = (constant ? isPseudogeneric(*constant) : false);
 
   // Always strip the auto-closure and no-escape bit.
-  // TODO: The noescape bit could be of interest to SIL optimizations.
-  //   We should bring it back when we have those optimizations.
   auto silExtInfo = SILFunctionType::ExtInfo()
     .withRepresentation(extInfo.getSILRepresentation())
-    .withIsPseudogeneric(pseudogeneric);
+    .withIsPseudogeneric(pseudogeneric)
+    .withNoEscape(extInfo.isNoEscape());
   
   return SILFunctionType::get(genericSig,
                               silExtInfo, calleeConvention,

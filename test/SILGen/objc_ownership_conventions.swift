@@ -187,7 +187,7 @@ func test11(_ g: Gizmo) -> AnyClass {
 // ownership conventions, where the callee, arguments, and return are all +0.
 // CHECK-LABEL: sil hidden @_T026objc_ownership_conventions10applyBlock{{[_0-9a-zA-Z]*}}F
 func applyBlock(_ f: @convention(block) (Gizmo) -> Gizmo, x: Gizmo) -> Gizmo {
-  // CHECK:     bb0([[BLOCK:%.*]] : @owned $@convention(block) (Gizmo) -> @autoreleased Gizmo, [[ARG:%.*]] : @owned $Gizmo):
+  // CHECK:     bb0([[BLOCK:%.*]] : @owned $@convention(block) @noescape (Gizmo) -> @autoreleased Gizmo, [[ARG:%.*]] : @owned $Gizmo):
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:       [[BORROWED_BLOCK_COPY:%.*]] = begin_borrow [[BLOCK_COPY]]
   // CHECK:       [[BLOCK_COPY_COPY:%.*]] = copy_value [[BORROWED_BLOCK_COPY]]

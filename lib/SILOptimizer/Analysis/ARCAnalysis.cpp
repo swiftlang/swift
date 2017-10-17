@@ -968,11 +968,10 @@ static bool successorHasLiveIn(SILBasicBlock *BB,
 static bool addLastUse(SILValue V, SILBasicBlock *BB,
                        ReleaseTracker &Tracker) {
   for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
-    for (auto &Op : I->getAllOperands())
-      if (Op.get() == V) {
-        Tracker.trackLastRelease(&*I);
-        return true;
-      }
+    if (Tracker.isUser(&*I)) {
+      Tracker.trackLastRelease(&*I);
+      return true;
+    }
   }
 
   llvm_unreachable("BB is expected to have a use of a closure");
@@ -996,12 +995,22 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
   // We'll treat this like a liveness problem where the value is the def. Each
   // block that has a use of the value has the value live-in unless it is the
   // block with the value.
-  for (auto *UI : V->getUses()) {
-    auto *User = UI->getUser();
+  SmallVector<Operand *, 8> Uses(V->getUses());
+  while (!Uses.empty()) {
+    auto *Use = Uses.pop_back_val();
+    auto *User = Use->getUser();
     auto *BB = User->getParent();
+
+    if (Tracker.isUserTransitive(User)) {
+      Tracker.trackUser(User);
+      auto *CastInst = cast<SingleValueInstruction>(User);
+      Uses.append(CastInst->getUses().begin(), CastInst->getUses().end());
+      continue;
+    }
 
     if (!Tracker.isUserAcceptable(User))
       return false;
+
     Tracker.trackUser(User);
 
     if (BB != DefBB)

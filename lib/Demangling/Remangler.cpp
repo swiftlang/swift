@@ -1123,6 +1123,10 @@ void Remangler::mangleIVarDestroyer(Node *node) {
   Buffer << "fE";
 }
 
+void Remangler::mangleImplEscaping(Node *node) {
+  Buffer << 'e';
+}
+
 void Remangler::mangleImplConvention(Node *node) {
   char ConvCh = llvm::StringSwitch<char>(node->getText())
                   .Case("@callee_unowned", 'y')
@@ -1163,6 +1167,9 @@ void Remangler::mangleImplFunctionType(Node *node) {
   Buffer << 'I' << PseudoGeneric;
   for (NodePointer Child : *node) {
     switch (Child->getKind()) {
+      case Node::Kind::ImplEscaping:
+        Buffer << 'e';
+        break;
       case Node::Kind::ImplConvention: {
         char ConvCh = llvm::StringSwitch<char>(Child->getText())
                         .Case("@callee_unowned", 'y')

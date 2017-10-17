@@ -330,6 +330,7 @@ private:
     case Node::Kind::Index:
     case Node::Kind::IVarInitializer:
     case Node::Kind::IVarDestroyer:
+    case Node::Kind::ImplEscaping:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplFunctionAttribute:
     case Node::Kind::ImplFunctionType:
@@ -1562,6 +1563,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   }
   case Node::Kind::TypeList:
     printChildren(Node);
+    return nullptr;
+  case Node::Kind::ImplEscaping:
+    Printer << "@escaping";
     return nullptr;
   case Node::Kind::ImplConvention:
     Printer << Node->getText();
