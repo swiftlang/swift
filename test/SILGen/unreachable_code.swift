@@ -131,3 +131,9 @@ class TestThrowInInit {
     throw e  // no unreachable code diagnostic for the implicit return.
   }
 }
+
+func sr6141() {
+  var bar: String? = ""
+  return;
+  bar?.append("x")  // expected-warning{{code after 'return' will never be executed}}
+}
