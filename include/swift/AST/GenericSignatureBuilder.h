@@ -341,13 +341,12 @@ private:
                                    EquivalenceClass *unresolvedEquivClass,
                                    UnresolvedHandlingKind unresolvedHandling);
 
-  /// Resolve the conformance of the given potential archetype to
-  /// the given protocol when the potential archetype is known to be equivalent
-  /// to a concrete type.
+  /// Resolve the conformance of the given type to the given protocol when the
+  /// potential archetype is known to be equivalent to a concrete type.
   ///
   /// \returns the requirement source for the resolved conformance, or nullptr
   /// if the conformance could not be resolved.
-  const RequirementSource *resolveConcreteConformance(PotentialArchetype *pa,
+  const RequirementSource *resolveConcreteConformance(ResolvedType type,
                                                       ProtocolDecl *proto);
 
   /// Retrieve the constraint source conformance for the superclass constraint

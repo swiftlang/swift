@@ -2115,49 +2115,6 @@ static void addConditionalRequirements(GenericSignatureBuilder &builder,
   }
 }
 
-const RequirementSource *
-GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
-                                                    ProtocolDecl *proto) {
-  auto equivClass = pa->getEquivalenceClassIfPresent();
-  auto concrete = equivClass ? equivClass->concreteType : Type();
-  if (!concrete) return nullptr;
-
-  // Conformance to this protocol is redundant; update the requirement source
-  // appropriately.
-  auto paEquivClass = pa->getOrCreateEquivalenceClass();
-  const RequirementSource *concreteSource;
-  if (auto writtenSource =
-        paEquivClass->findAnyConcreteConstraintAsWritten(pa))
-    concreteSource = writtenSource->source;
-  else
-    concreteSource = paEquivClass->concreteTypeConstraints.front().source;
-
-  // Lookup the conformance of the concrete type to this protocol.
-  auto conformance =
-      lookupConformance(pa->getDependentType({ })->getCanonicalType(),
-                        concrete,
-                        proto->getDeclaredInterfaceType()
-                          ->castTo<ProtocolType>());
-  if (!conformance) {
-    if (!concrete->hasError() && concreteSource->getLoc().isValid()) {
-      Impl->HadAnyError = true;
-
-      Diags.diagnose(concreteSource->getLoc(),
-                     diag::requires_generic_param_same_type_does_not_conform,
-                     concrete, proto->getName());
-    }
-
-    Impl->HadAnyError = true;
-    paEquivClass->invalidConcreteType = true;
-    return nullptr;
-  }
-
-  concreteSource = concreteSource->viaConcrete(*this, *conformance);
-  paEquivClass->recordConformanceConstraint(pa, proto, concreteSource);
-  addConditionalRequirements(*this, *conformance);
-  return concreteSource;
-}
-
 class GenericSignatureBuilder::ResolvedType {
   llvm::PointerUnion<PotentialArchetype *, Type> type;
   EquivalenceClass *equivClass;
@@ -2237,6 +2194,50 @@ public:
   }
 };
 
+const RequirementSource *
+GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
+                                                    ProtocolDecl *proto) {
+  auto equivClass = type.getEquivalenceClass();
+  auto concrete = equivClass->concreteType;
+  if (!concrete) return nullptr;
+
+  // Conformance to this protocol is redundant; update the requirement source
+  // appropriately.
+  const RequirementSource *concreteSource;
+  if (auto writtenSource =
+        equivClass->findAnyConcreteConstraintAsWritten(nullptr))
+    concreteSource = writtenSource->source;
+  else
+    concreteSource = equivClass->concreteTypeConstraints.front().source;
+
+  // Lookup the conformance of the concrete type to this protocol.
+  auto conformance =
+      lookupConformance(type.getDependentType()->getCanonicalType(),
+                        concrete,
+                        proto->getDeclaredInterfaceType()
+                          ->castTo<ProtocolType>());
+  if (!conformance) {
+    if (!concrete->hasError() && concreteSource->getLoc().isValid()) {
+      Impl->HadAnyError = true;
+
+      Diags.diagnose(concreteSource->getLoc(),
+                     diag::requires_generic_param_same_type_does_not_conform,
+                     concrete, proto->getName());
+    }
+
+    Impl->HadAnyError = true;
+    equivClass->invalidConcreteType = true;
+    return nullptr;
+  }
+
+  // FIXME: Shouldn't have to realize this here.
+  auto pa = type.realizePotentialArchetype(*this);
+
+  concreteSource = concreteSource->viaConcrete(*this, *conformance);
+  equivClass->recordConformanceConstraint(pa, proto, concreteSource);
+  addConditionalRequirements(*this, *conformance);
+  return concreteSource;
+}
 const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
                                                         ResolvedType type,
                                                         ProtocolDecl *proto) {
