@@ -358,13 +358,13 @@ private:
   const RequirementSource *resolveSuperConformance(ResolvedType type,
                                                    ProtocolDecl *proto);
 
-  /// \brief Add a new conformance requirement specifying that the given
-  /// potential archetype conforms to the given protocol.
-  ConstraintResult addConformanceRequirement(PotentialArchetype *T,
-                                             ProtocolDecl *Proto,
-                                             const RequirementSource *Source);
-
 public:
+  /// \brief Add a new conformance requirement specifying that the given
+  /// type conforms to the given protocol.
+  ConstraintResult addConformanceRequirement(ResolvedType type,
+                                             ProtocolDecl *proto,
+                                             FloatingRequirementSource source);
+
   /// "Expand" the conformance of the given \c pa to the protocol \c proto,
   /// adding the requirements from its requirement signature, rooted at
   /// the given requirement \c source.

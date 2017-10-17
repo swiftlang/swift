@@ -3559,14 +3559,18 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 }
 
 ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
-                               PotentialArchetype *PAT,
-                               ProtocolDecl *Proto,
-                               const RequirementSource *Source) {
+                               ResolvedType type,
+                               ProtocolDecl *proto,
+                               FloatingRequirementSource source) {
+  // FIXME: Resolve later.
+  auto pa = type.realizePotentialArchetype(*this);
+  auto resolvedSource = source.getSource(pa);
+
   // Add the requirement, if we haven't done so already.
-  if (!PAT->addConformance(Proto, Source, *this))
+  if (!pa->addConformance(proto, resolvedSource, *this))
     return ConstraintResult::Resolved;
 
-  return expandConformanceRequirement(PAT, Proto, Source,
+  return expandConformanceRequirement(pa, proto, resolvedSource,
                                       /*onlySameTypeRequirements=*/false);
 }
 
@@ -3652,6 +3656,10 @@ bool GenericSignatureBuilder::updateSuperclass(
       auto proto = conforms.first;
       if (auto superSource = resolveSuperConformance(type, proto)) {
         for (auto assocType : proto->getAssociatedTypeMembers()) {
+          // Only do this for the anchor.
+          if (assocType != assocType->getAssociatedTypeAnchor())
+            continue;
+
           // FIXME: More efficient way to extend resolved type?
           Type nestedType =
             DependentMemberType::get(type.getDependentType(), assocType);
@@ -3659,7 +3667,7 @@ bool GenericSignatureBuilder::updateSuperclass(
                 maybeResolveEquivalenceClass(
                                  nestedType,
                                  ArchetypeResolutionKind::AlreadyKnown,
-                                             /*wantExactPotentialArchetype=*/false)) {
+                                 /*wantExactPotentialArchetype=*/true)) {
             maybeAddSameTypeRequirementForNestedType(nested, superSource,
                                                      *this);
           }
@@ -3834,34 +3842,29 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     return ConstraintResult::Resolved;
   }
 
-  auto subjectPA = resolvedSubject.realizePotentialArchetype(*this);
-  assert(subjectPA && "No potential archetype?");
-
-  auto resolvedSource = source.getSource(subjectPA);
-
   // Protocol requirements.
   if (constraintType->isExistentialType()) {
     bool anyErrors = false;
     auto layout = constraintType->getExistentialLayout();
 
     if (auto layoutConstraint = layout.getLayoutConstraint()) {
-      if (isErrorResult(addLayoutRequirementDirect(subjectPA,
+      if (isErrorResult(addLayoutRequirementDirect(resolvedSubject,
                                                    layoutConstraint,
                                                    source)))
         anyErrors = true;
     }
 
     if (layout.superclass) {
-      if (isErrorResult(addSuperclassRequirementDirect(subjectPA,
+      if (isErrorResult(addSuperclassRequirementDirect(resolvedSubject,
                                                        layout.superclass,
-                                                       resolvedSource)))
+                                                       source)))
         anyErrors = true;
     }
 
     for (auto *proto : layout.getProtocols()) {
       auto *protoDecl = proto->getDecl();
-      if (isErrorResult(addConformanceRequirement(subjectPA, protoDecl,
-                                                  resolvedSource)))
+      if (isErrorResult(addConformanceRequirement(resolvedSubject, protoDecl,
+                                                  source)))
         anyErrors = true;
     }
 
@@ -3870,8 +3873,8 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   }
 
   // Superclass constraint.
-  return addSuperclassRequirementDirect(subjectPA, constraintType,
-                                        resolvedSource);
+  return addSuperclassRequirementDirect(resolvedSubject, constraintType,
+                                        source);
 }
 
 void GenericSignatureBuilder::PotentialArchetype::addSameTypeConstraint(
