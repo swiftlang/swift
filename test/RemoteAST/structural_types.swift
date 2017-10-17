@@ -13,6 +13,30 @@ typealias Fn2 = (Int, Float) -> ()
 printType(Fn2.self)
 // CHECK: found type: (Int, Float) -> ()
 
+typealias Fn3 = (inout Int, Float) -> ()
+printType(Fn3.self)
+// CHECK: found type: (inout Int, Float) -> ()
+
+typealias Fn4 = (inout Int, inout Float) -> ()
+printType(Fn4.self)
+// CHECK: found type: (inout Int, inout Float) -> ()
+
+typealias Fn5 = (Int, inout Float) -> ()
+printType(Fn5.self)
+// CHECK: found type: (Int, inout Float) -> ()
+
+typealias Fn6 = (Int, inout String, Float) -> ()
+printType(Fn6.self)
+// CHECK: found type: (Int, inout String, Float) -> ()
+
+typealias Fn7 = (inout Int, String, inout Float, Double) -> ()
+printType(Fn7.self)
+// CHECK: found type: (inout Int, String, inout Float, Double) -> ()
+
+typealias Fn8 = (String, Int, Double, Float) -> ()
+printType(Fn8.self)
+// CHECK: found type: (String, Int, Double, Float) -> ()
+
 typealias Tuple1 = (Int, Float, Int)
 printType(Tuple1.self)
 // CHECK: found type: (Int, Float, Int)

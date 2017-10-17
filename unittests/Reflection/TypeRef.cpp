@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/Remote/MetadataReader.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
@@ -26,6 +27,8 @@ static const std::string MyModule = "MyModule";
 static const std::string Shmodule = "Shmodule";
 static const std::string MyProtocol = "MyProtocol";
 static const std::string Shmrotocol = "Shmrotocol";
+
+using Param = remote::FunctionParam<const TypeRef *>;
 
 TEST(TypeRefTest, UniqueBuiltinTypeRef) {
   TypeRefBuilder Builder;
@@ -115,39 +118,74 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   std::vector<const TypeRef *> Void;
   auto VoidResult = Builder.createTupleType(Void, "", false);
-  std::vector<bool> VoidInout;
-  auto Arg1 = Builder.createNominalType(ABC, nullptr);
-  auto Arg2 = Builder.createNominalType(XYZ, nullptr);
+  Param Param1 = Builder.createNominalType(ABC, nullptr);
+  Param Param2 = Builder.createNominalType(XYZ, nullptr);
 
-  std::vector<const TypeRef *> Arguments1 { Arg1, Arg2 };
-  std::vector<bool> Inout1 { false, false };
-  auto Result = Builder.createTupleType({Arg1, Arg2}, "", false);
+  std::vector<Param> VoidParams;
+  std::vector<Param> Parameters1{Param1, Param2};
+  std::vector<Param> Parameters2{Param1, Param1};
 
-  std::vector<const TypeRef *> Arguments2 { Arg1, Arg1 };
-  std::vector<bool> Inout2 { false, false };
+  auto Result =
+      Builder.createTupleType({Param1.getType(), Param2.getType()}, "", false);
 
-  auto F1 = Builder.createFunctionType(Arguments1, Inout1, Result,
-                                       FunctionTypeFlags());
-  auto F2 = Builder.createFunctionType(Arguments1, Inout1, Result,
-                                       FunctionTypeFlags());
-  auto F3 = Builder.createFunctionType(Arguments2, Inout1, Result,
-                                       FunctionTypeFlags());
+  auto F1 =
+      Builder.createFunctionType(Parameters1, Result, FunctionTypeFlags());
+  auto F2 =
+      Builder.createFunctionType(Parameters1, Result, FunctionTypeFlags());
+  auto F3 =
+      Builder.createFunctionType(Parameters2, Result, FunctionTypeFlags());
 
   EXPECT_EQ(F1, F2);
   EXPECT_NE(F2, F3);
 
-  auto F4 = Builder.createFunctionType(Arguments1, Inout1, Result,
+  auto F4 = Builder.createFunctionType(Parameters1, Result,
                                        FunctionTypeFlags().withThrows(true));
-  auto F5 = Builder.createFunctionType(Arguments1, Inout1, Result,
+  auto F5 = Builder.createFunctionType(Parameters1, Result,
                                        FunctionTypeFlags().withThrows(true));
 
   EXPECT_EQ(F4, F5);
   EXPECT_NE(F4, F1);
 
-  auto VoidVoid1 = Builder.createFunctionType(Void, VoidInout, VoidResult,
-                                              FunctionTypeFlags());
-  auto VoidVoid2 = Builder.createFunctionType(Void, VoidInout, VoidResult,
-                                              FunctionTypeFlags());
+  // Test parameter with and without inout/shared/variadic and/or label.
+  ParameterTypeFlags paramFlags;
+  auto inoutFlags = paramFlags.withInOut(true);
+  auto variadicFlags = paramFlags.withVariadic(true);
+  auto sharedFlags = paramFlags.withShared(true);
+
+  auto F6 = Builder.createFunctionType({Param1.withFlags(inoutFlags)}, Result,
+                                       FunctionTypeFlags());
+  auto F6_1 = Builder.createFunctionType({Param1.withFlags(inoutFlags)}, Result,
+                                         FunctionTypeFlags());
+  EXPECT_EQ(F6, F6_1);
+
+  auto F7 = Builder.createFunctionType({Param1.withFlags(variadicFlags)},
+                                       Result, FunctionTypeFlags());
+  auto F7_1 = Builder.createFunctionType({Param1.withFlags(variadicFlags)},
+                                         Result, FunctionTypeFlags());
+  EXPECT_EQ(F7, F7_1);
+
+  auto F8 = Builder.createFunctionType({Param1.withFlags(sharedFlags)}, Result,
+                                       FunctionTypeFlags());
+  auto F8_1 = Builder.createFunctionType({Param1.withFlags(sharedFlags)},
+                                         Result, FunctionTypeFlags());
+  EXPECT_EQ(F8, F8_1);
+
+  auto F9 = Builder.createFunctionType({Param1}, Result, FunctionTypeFlags());
+  auto F9_1 = Builder.createFunctionType({Param1.withLabel("foo")}, Result,
+                                         FunctionTypeFlags());
+  EXPECT_NE(F9, F9_1);
+
+  EXPECT_NE(F6, F7);
+  EXPECT_NE(F6, F8);
+  EXPECT_NE(F6, F9);
+  EXPECT_NE(F7, F8);
+  EXPECT_NE(F7, F9);
+  EXPECT_NE(F8, F9);
+
+  auto VoidVoid1 =
+      Builder.createFunctionType(VoidParams, VoidResult, FunctionTypeFlags());
+  auto VoidVoid2 =
+      Builder.createFunctionType(VoidParams, VoidResult, FunctionTypeFlags());
 
   EXPECT_EQ(VoidVoid1, VoidVoid2);
   EXPECT_NE(VoidVoid1, F1);
@@ -390,8 +428,8 @@ TEST(TypeRefTest, DeriveSubstitutions) {
                                                /*parent*/ nullptr);
 
   auto Result = Builder.createTupleType({GTP00, GTP01}, "", false);
-  auto Func = Builder.createFunctionType({Nominal}, {}, Result,
-                                         FunctionTypeFlags());
+  auto Func =
+      Builder.createFunctionType({Nominal}, Result, FunctionTypeFlags());
 
   std::string SubstOneName("subst1");
   auto SubstOne = Builder.createNominalType(SubstOneName, /*parent*/ nullptr);
