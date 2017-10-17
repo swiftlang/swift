@@ -4617,23 +4617,6 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
   }
 }
 
-/// Retrieve the "local" archetype anchor for the given potential archetype,
-/// which rebuilds this potential archetype using the archetype anchors of
-/// the parent types.
-static PotentialArchetype *getLocalAnchor(PotentialArchetype *pa,
-                                          GenericSignatureBuilder &builder) {
-  auto parent = pa->getParent();
-  if (!parent) return pa;
-
-  auto parentAnchor = getLocalAnchor(parent, builder);
-  if (!parentAnchor) return pa;
-  auto localAnchor =
-    parentAnchor->getNestedArchetypeAnchor(
-                                pa->getNestedName(), builder,
-                                ArchetypeResolutionKind::CompleteWellFormed);
-  return localAnchor ? localAnchor : pa;
-}
-
 void
 GenericSignatureBuilder::finalize(SourceLoc loc,
                            ArrayRef<GenericTypeParamType *> genericParams,
@@ -4780,13 +4763,6 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   // FIXME: Expand all conformance requirements. This is expensive :(
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
     if (archetype != archetype->getRepresentative()) return;
-
-    // Make sure that we've build the archetype anchors for each potential
-    // archetype in this equivalence class. This is important to do for *all*
-    // potential archetypes because some non-archetype anchors will nonetheless
-    // be used in the canonicalized requirements.
-    for (auto pa : archetype->getEquivalenceClassMembers())
-      (void)getLocalAnchor(pa, *this);
 
     if (auto equivClass = archetype->getEquivalenceClassIfPresent())
       expandSameTypeConstraints(*this, equivClass);
