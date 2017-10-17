@@ -125,11 +125,48 @@ public:
       break;
     }
 
-    for (const auto &Param : F->getParameters())
-      printRec(Param.getType());
-    printRec(F->getResult());
+    OS << '\n';
+    Indent += 2;
+    printHeader("parameters");
 
+    auto &parameters = F->getParameters();
+    for (const auto &param : parameters) {
+      auto flags = param.getFlags();
+
+      if (!flags.isNone()) {
+        Indent += 2;
+        OS << '\n';
+      }
+
+      if (flags.isInOut())
+        printHeader("inout");
+
+      if (flags.isVariadic())
+        printHeader("variadic");
+
+      if (flags.isShared())
+        printHeader("shared");
+
+      if (flags.isEscaping())
+        printHeader("escaping");
+
+      printRec(param.getType());
+
+      if (!flags.isNone()) {
+        Indent -= 2;
+        OS << ')';
+      }
+    }
+
+    if (parameters.empty())
+      OS << ')';
+
+    OS << '\n';
+    printHeader("result");
+    printRec(F->getResult());
     OS << ')';
+
+    Indent -= 2;
   }
 
   void visitProtocolTypeRef(const ProtocolTypeRef *P) {
