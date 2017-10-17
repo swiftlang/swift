@@ -78,9 +78,11 @@ STATISTIC(NumSameTypeConstraints, "# of same-type constraints tracked");
 STATISTIC(NumConcreteTypeConstraints,
           "# of same-type-to-concrete constraints tracked");
 STATISTIC(NumSuperclassConstraints, "# of superclass constraints tracked");
+STATISTIC(NumSuperclassConstraintsExtra,
+          "# of superclass constraints that add no information");
 STATISTIC(NumLayoutConstraints, "# of layout constraints tracked");
 STATISTIC(NumLayoutConstraintsExtra,
-          "# of layout constraints considered that add no information");
+          "# of layout constraints  that add no information");
 STATISTIC(NumSelfDerived, "# of self-derived constraints removed");
 STATISTIC(NumArchetypeAnchorCacheHits,
           "# of hits in the archetype anchor cache");
@@ -2156,41 +2158,8 @@ GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
   return concreteSource;
 }
 
-const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
-                                                        PotentialArchetype *pa,
-                                                        ProtocolDecl *proto) {
-  // Get the superclass constraint.
-  auto equivClass = pa->getEquivalenceClassIfPresent();
-  Type superclass = equivClass ? equivClass->superclass : nullptr;
-  if (!superclass) return nullptr;
-
-  // Lookup the conformance of the superclass to this protocol.
-  auto conformance =
-    lookupConformance(pa->getDependentType({ })->getCanonicalType(),
-                      superclass,
-                      proto->getDeclaredInterfaceType()
-                        ->castTo<ProtocolType>());
-  if (!conformance) return nullptr;
-
-  // Conformance to this protocol is redundant; update the requirement source
-  // appropriately.
-  auto paEquivClass = pa->getOrCreateEquivalenceClass();
-  const RequirementSource *superclassSource;
-  if (auto writtenSource =
-        paEquivClass->findAnySuperclassConstraintAsWritten(pa))
-    superclassSource = writtenSource->source;
-  else
-    superclassSource = paEquivClass->superclassConstraints.front().source;
-
-  superclassSource =
-    superclassSource->viaSuperclass(*this, *conformance);
-  paEquivClass->recordConformanceConstraint(pa, proto, superclassSource);
-  addConditionalRequirements(*this, *conformance);
-  return superclassSource;
-}
-
 class GenericSignatureBuilder::ResolvedType {
-  llvm::PointerUnion<Type, PotentialArchetype *> type;
+  llvm::PointerUnion<PotentialArchetype *, Type> type;
   EquivalenceClass *equivClass;
 
   /// For a type that could not be resolved further unless the given
@@ -2258,8 +2227,49 @@ public:
     assert(!*this);
     return equivClass;
   }
+
+  /// Return an unresolved type.
+  ///
+  /// This loses equivalence-class information that could be useful, which
+  /// is unfortunate.
+  UnresolvedType getUnresolvedType() const {
+    return type;
+  }
 };
 
+const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
+                                                        ResolvedType type,
+                                                        ProtocolDecl *proto) {
+  // Get the superclass constraint.
+  auto equivClass = type.getEquivalenceClass();
+  Type superclass = equivClass->superclass;
+  if (!superclass) return nullptr;
+
+  // Lookup the conformance of the superclass to this protocol.
+  auto conformance =
+    lookupConformance(type.getDependentType()->getCanonicalType(),
+                      superclass,
+                      proto->getDeclaredInterfaceType()
+                        ->castTo<ProtocolType>());
+  if (!conformance) return nullptr;
+
+  // Conformance to this protocol is redundant; update the requirement source
+  // appropriately.
+  const RequirementSource *superclassSource;
+  if (auto writtenSource =
+        equivClass->findAnySuperclassConstraintAsWritten(nullptr))
+    superclassSource = writtenSource->source;
+  else
+    superclassSource = equivClass->superclassConstraints.front().source;
+
+  // FIXME: Shouldn't have to realize this here.
+  auto pa = type.realizePotentialArchetype(*this);
+  superclassSource =
+    superclassSource->viaSuperclass(*this, *conformance);
+  equivClass->recordConformanceConstraint(pa, proto, superclassSource);
+  addConditionalRequirements(*this, *conformance);
+  return superclassSource;
+}
 /// Realize a potential archetype for this type parameter.
 PotentialArchetype *ResolvedType::realizePotentialArchetype(
                                            GenericSignatureBuilder &builder) {
@@ -2293,13 +2303,20 @@ Type ResolvedType::getDependentType() const {
 /// If there is a same-type requirement to be added for the given nested type
 /// due to a superclass constraint on the parent type, add it now.
 static void maybeAddSameTypeRequirementForNestedType(
-              GenericSignatureBuilder::PotentialArchetype *nestedPA,
-              const RequirementSource *superSource,
-              GenericSignatureBuilder &builder) {
+                                          ResolvedType nested,
+                                          const RequirementSource *superSource,
+                                          GenericSignatureBuilder &builder) {
   // If there's no super conformance, we're done.
   if (!superSource) return;
 
-  auto assocType = nestedPA->getResolvedAssociatedType();
+  // If the nested type is already concrete, we're done.
+  if (nested.getAsConcreteType()) return;
+
+  // Dig out the associated type.
+  AssociatedTypeDecl *assocType = nullptr;
+  if (auto depMemTy = nested.getDependentType()->getAs<DependentMemberType>())
+    assocType = depMemTy->getAssocType();
+
   if (!assocType) return;
 
   // Dig out the type witness.
@@ -2315,7 +2332,8 @@ static void maybeAddSameTypeRequirementForNestedType(
   // Add the same-type constraint.
   auto nestedSource = superSource->viaParent(builder, assocType);
 
-  builder.addSameTypeRequirement(nestedPA, concreteType, nestedSource,
+  builder.addSameTypeRequirement(
+        nested.getUnresolvedType(), concreteType, nestedSource,
         GenericSignatureBuilder::UnresolvedHandlingKind::GenerateConstraints);
 }
 
@@ -3623,28 +3641,29 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
   return addLayoutRequirementDirect(resolvedSubject, layout, source);
 }
 
-void GenericSignatureBuilder::updateSuperclass(
-                                           PotentialArchetype *T,
+bool GenericSignatureBuilder::updateSuperclass(
+                                           ResolvedType type,
                                            Type superclass,
-                                           const RequirementSource *source) {
-  auto equivClass = T->getOrCreateEquivalenceClass();
+                                           FloatingRequirementSource source) {
+  auto equivClass = type.getEquivalenceClass();
 
   // Local function to handle the update of superclass conformances
   // when the superclass constraint changes.
   auto updateSuperclassConformances = [&] {
     for (const auto &conforms : equivClass->conformsTo) {
       auto proto = conforms.first;
-      if (auto superSource = resolveSuperConformance(T, proto)) {
+      if (auto superSource = resolveSuperConformance(type, proto)) {
         for (auto assocType : proto->getAssociatedTypeMembers()) {
-
-          const auto &nestedTypes = T->getNestedTypes();
-          auto nested = nestedTypes.find(assocType->getName());
-          if (nested == nestedTypes.end()) continue;
-
-          for (auto nestedPA : nested->second) {
-            if (nestedPA->getResolvedAssociatedType() == assocType)
-              maybeAddSameTypeRequirementForNestedType(nestedPA, superSource,
-                                                       *this);
+          // FIXME: More efficient way to extend resolved type?
+          Type nestedType =
+            DependentMemberType::get(type.getDependentType(), assocType);
+          if (auto nested =
+                maybeResolveEquivalenceClass(
+                                 nestedType,
+                                 ArchetypeResolutionKind::AlreadyKnown,
+                                             /*wantExactPotentialArchetype=*/false)) {
+            maybeAddSameTypeRequirementForNestedType(nested, superSource,
+                                                     *this);
           }
         }
       }
@@ -3659,15 +3678,17 @@ void GenericSignatureBuilder::updateSuperclass(
 
     // Presence of a superclass constraint implies a _Class layout
     // constraint.
-    auto layoutReqSource = source->viaDerived(*this);
-    addLayoutRequirementDirect(T,
+    // FIXME: FloatingRequirementSource should be able to handle "viaDerived".
+    auto pa = type.realizePotentialArchetype(*this);
+    auto layoutReqSource = source.getSource(pa)->viaDerived(*this);
+    addLayoutRequirementDirect(type,
                          LayoutConstraint::getLayoutConstraint(
                              superclass->getClassOrBoundGenericClass()->isObjC()
                                  ? LayoutConstraintKind::Class
                                  : LayoutConstraintKind::NativeClass,
                              getASTContext()),
                          layoutReqSource);
-    return;
+    return true;
   }
 
   // T already has a superclass; make sure it's related.
@@ -3687,25 +3708,31 @@ void GenericSignatureBuilder::updateSuperclass(
 
     // We've strengthened the bound, so update superclass conformances.
     updateSuperclassConformances();
-    return;
+    return true;
   }
 
-  return;
+  return false;
 }
 
 ConstraintResult GenericSignatureBuilder::addSuperclassRequirementDirect(
-                                            PotentialArchetype *T,
+                                            ResolvedType type,
                                             Type superclass,
-                                            const RequirementSource *source) {
+                                            FloatingRequirementSource source) {
+  // FIXME: realize much later.
+  auto T = type.realizePotentialArchetype(*this);
+  auto resolvedSource = source.getSource(T);
+
   // Record the constraint.
-  auto equivClass = T->getOrCreateEquivalenceClass();
+  auto equivClass = type.getEquivalenceClass();
   equivClass->superclassConstraints.push_back(
-                                    ConcreteConstraint{T, superclass, source});
+                          ConcreteConstraint{T, superclass, resolvedSource});
   equivClass->modified(*this);
   ++NumSuperclassConstraints;
 
   // Update the equivalence class with the constraint.
-  updateSuperclass(T, superclass, source);
+  if (!updateSuperclass(type, superclass, source))
+    ++NumSuperclassConstraintsExtra;
+
   return ConstraintResult::Resolved;
 }
 
@@ -3822,7 +3849,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     if (auto layoutConstraint = layout.getLayoutConstraint()) {
       if (isErrorResult(addLayoutRequirementDirect(subjectPA,
                                                    layoutConstraint,
-                                                   resolvedSource)))
+                                                   source)))
         anyErrors = true;
     }
 

@@ -353,11 +353,10 @@ private:
   /// Retrieve the constraint source conformance for the superclass constraint
   /// of the given potential archetype (if present) to the given protocol.
   ///
-  /// \param pa The potential archetype whose superclass constraint is being
-  /// queried.
+  /// \param type The type whose superclass constraint is being queried.
   ///
   /// \param proto The protocol to which we are establishing conformance.
-  const RequirementSource *resolveSuperConformance(PotentialArchetype *pa,
+  const RequirementSource *resolveSuperConformance(ResolvedType type,
                                                    ProtocolDecl *proto);
 
   /// \brief Add a new conformance requirement specifying that the given
@@ -413,17 +412,20 @@ public:
   /// Update the superclass for the equivalence class of \c T.
   ///
   /// This assumes that the constraint has already been recorded.
-  void updateSuperclass(PotentialArchetype *T,
+  ///
+  /// \returns true if anything in the equivalence class changed, false
+  /// otherwise.
+  bool updateSuperclass(ResolvedType type,
                         Type superclass,
-                        const RequirementSource *source);
+                        FloatingRequirementSource source);
 
 private:
   /// \brief Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
   ConstraintResult addSuperclassRequirementDirect(
-                                              PotentialArchetype *T,
-                                              Type Superclass,
-                                              const RequirementSource *Source);
+                                              ResolvedType type,
+                                              Type superclass,
+                                              FloatingRequirementSource source);
 
   /// \brief Add a new type requirement specifying that the given
   /// type conforms-to or is a superclass of the second type.
