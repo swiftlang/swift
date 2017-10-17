@@ -154,7 +154,7 @@ public:
   ///
   /// It is supposed to be used only for compiling overlays.
   /// User code should never be compiled with this flag set.
-  bool SILSerializeWitnessTables = false;
+  bool SILSerializeWitnessTables = true;
 
   /// If set, SIL vtables will be serialized.
   ///
