@@ -1753,14 +1753,18 @@ function(add_swift_library name)
         # Add Swift standard library targets as dependencies to the top-level
         # convenience target.
         if(SWIFTLIB_TARGET_LIBRARY)
+          set(FILTERED_UNITTESTS
+                swiftStdlibCollectionUnittest
+                swiftStdlibUnicodeUnittest)
+
           foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
             set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-            if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
+            if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND
+               TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
               add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
                   ${lipo_target}
                   ${lipo_target_static})
-              if((NOT "${name}" STREQUAL "swiftStdlibCollectionUnittest") AND
-                 (NOT "${name}" STREQUAL "swiftStdlibUnicodeUnittest"))
+              if(NOT "${name}" IN_LIST FILTERED_UNITTESTS)
                 add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
                     ${lipo_target}
                     ${lipo_target_static})
