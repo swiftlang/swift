@@ -2284,6 +2284,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   addConditionalRequirements(*this, *conformance);
   return superclassSource;
 }
+
 /// Realize a potential archetype for this type parameter.
 PotentialArchetype *ResolvedType::realizePotentialArchetype(
                                            GenericSignatureBuilder &builder) {
@@ -2605,27 +2606,6 @@ static void concretizeNestedTypeFromConcreteParent(
          SameTypeConflictCheckedLater());
 }
 
-PotentialArchetype *PotentialArchetype::getNestedType(
-                                           Identifier nestedName,
-                                           ArchetypeResolutionKind kind,
-                                           GenericSignatureBuilder &builder) {
-  // If we already have a nested type with this name, return it.
-  auto known = NestedTypes.find(nestedName);
-  if (known != NestedTypes.end())
-    return known->second.front();
-
-  // Retrieve the nested archetype anchor, which is the best choice (so far)
-  // for this nested type.
-  return getNestedArchetypeAnchor(nestedName, builder, kind);
-}
-
-PotentialArchetype *PotentialArchetype::getNestedType(
-                                            TypeDecl *type,
-                                            GenericSignatureBuilder &builder) {
-  return updateNestedTypeForConformance(type,
-                                        ArchetypeResolutionKind::WellFormed);
-}
-
 PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
                                            Identifier name,
                                            GenericSignatureBuilder &builder,
@@ -2650,19 +2630,6 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
   return resultPA;
 }
 
-
-PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
-                                                 Identifier name,
-                                                 ProtocolDecl *proto,
-                                                 ArchetypeResolutionKind kind) {
-  // Lookup the best type for this name.
-  auto bestType =
-    getOrCreateEquivalenceClass()->lookupNestedType(name, nullptr);
-  if (!bestType) return nullptr;
-
-  // Form the potential archetype.
-  return updateNestedTypeForConformance(bestType, kind);
-}
 
 PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
                                               TypeDecl *type,
@@ -3906,7 +3873,9 @@ void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
   if (parentPA == parentRepPA) return;
 
   PotentialArchetype *existingPA =
-    parentRepPA->getNestedType(nestedPA->getResolvedType(), *this);
+    parentRepPA->updateNestedTypeForConformance(
+                                        nestedPA->getResolvedType(),
+                                        ArchetypeResolutionKind::WellFormed);
 
   auto sameNamedSource =
     FloatingRequirementSource::forNestedTypeNameMatch(

@@ -1655,15 +1655,6 @@ public:
     return { };
   }
 
-  /// \brief Retrieve (or create) a nested type with the given name.
-  PotentialArchetype *getNestedType(Identifier Name,
-                                    ArchetypeResolutionKind kind,
-                                    GenericSignatureBuilder &builder);
-
-  /// \brief Retrieve (or create) a nested type with a known type.
-  PotentialArchetype *getNestedType(TypeDecl *type,
-                                    GenericSignatureBuilder &builder);
-
   /// \brief Retrieve (or create) a nested type that is the current best
   /// nested archetype anchor (locally) with the given name.
   ///
@@ -1682,17 +1673,6 @@ public:
   /// a potential archetype should not be created if it's missing.
   PotentialArchetype *updateNestedTypeForConformance(
                         TypeDecl *type,
-                        ArchetypeResolutionKind kind);
-
-  /// Update the named nested type when we know this type conforms to the given
-  /// protocol.
-  ///
-  /// \returns the potential archetype associated with either an associated
-  /// type or typealias of the given protocol, unless the \c kind implies that
-  /// a potential archetype should not be created if it's missing.
-  PotentialArchetype *updateNestedTypeForConformance(
-                        Identifier name,
-                        ProtocolDecl *protocol,
                         ArchetypeResolutionKind kind);
 
   /// Retrieve the dependent type that describes this potential
