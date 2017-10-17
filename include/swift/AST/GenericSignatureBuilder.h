@@ -89,7 +89,6 @@ public:
   class PotentialArchetype;
 
   using UnresolvedType = llvm::PointerUnion<PotentialArchetype *, Type>;
-  struct ResolvedType;
   class ResolveResult;
 
   using RequirementRHS =
@@ -386,7 +385,7 @@ public:
   /// previous example).
   ConstraintResult
   addSameTypeRequirementDirect(
-                         ResolvedType paOrT1, ResolvedType paOrT2,
+                         ResolveResult paOrT1, ResolveResult paOrT2,
                          FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
