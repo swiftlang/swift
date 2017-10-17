@@ -3154,18 +3154,13 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
     -> ResolveResult {
   auto pa = paOrT.dyn_cast<PotentialArchetype *>();
   if (auto type = paOrT.dyn_cast<Type>()) {
-    // Determine what kind of resolution we want.
-    ArchetypeResolutionKind resolutionKind =
-      ArchetypeResolutionKind::WellFormed;
-    if (!source.isExplicit() && source.isRecursive(type, *this))
-      resolutionKind = ArchetypeResolutionKind::AlreadyKnown;
-
     // If it's not a type parameter, it won't directly resolve to one.
     if (!type->isTypeParameter()) {
       // If there is a type parameter somewhere in this type, resolve it.
       if (type->hasTypeParameter()) {
         Type resolved =
-          resolveDependentMemberTypes(*this, type, resolutionKind);
+          resolveDependentMemberTypes(*this, type,
+                                      ArchetypeResolutionKind::WellFormed);
         if (resolved->hasError() && !type->hasError())
           return ResolveResult::forUnresolved(nullptr);
 
@@ -3174,6 +3169,12 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
 
       return ResolveResult(type, nullptr);
     }
+
+    // Determine what kind of resolution we want.
+    ArchetypeResolutionKind resolutionKind =
+      ArchetypeResolutionKind::WellFormed;
+    if (!source.isExplicit() && source.isRecursive(type, *this))
+      resolutionKind = ArchetypeResolutionKind::AlreadyKnown;
 
     return maybeResolveEquivalenceClass(type, resolutionKind,
                                         /*wantExactPotentialArchetype=*/true);
