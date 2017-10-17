@@ -101,241 +101,60 @@ extension NSImage : _ExpressibleByImageLiteral {
 
 public typealias _ImageLiteralType = NSImage
 
-// Extensions for common numeric enum operations
+// Numeric backed types
 
 @available(swift 4)
-public protocol _AppKitNumericWrapper : RawRepresentable { }
-extension _AppKitNumericWrapper where RawValue == Float {
-  public static func +(lhs: Self, rhs: Double) -> Self {
-    return Self(rawValue: lhs.rawValue + Float(rhs))!
+public protocol _AppKitKitNumericRawRepresentable : RawRepresentable, Comparable
+  where RawValue: Comparable & Numeric { }
+
+extension _AppKitKitNumericRawRepresentable {
+  public static func <(lhs: Self, rhs: Self) -> Bool {
+    return lhs.rawValue < rhs.rawValue
   }
-  public static func -(lhs: Self, rhs: Double) -> Self {
-    return Self(rawValue: lhs.rawValue - Float(rhs))!
-  }
-  public static func +(lhs: Self, rhs: Float) -> Self {
+
+  public static func +(lhs: Self, rhs: RawValue) -> Self {
     return Self(rawValue: lhs.rawValue + rhs)!
   }
-  public static func -(lhs: Self, rhs: Float) -> Self {
-    return Self(rawValue: lhs.rawValue - rhs)!
-  }
-  public static func +(lhs: Self, rhs: Int) -> Self {
-    return Self(rawValue: lhs.rawValue + Float(rhs))!
-  }
-  public static func -(lhs: Self, rhs: Int) -> Self {
-    return Self(rawValue: lhs.rawValue - Float(rhs))!
-  }
-  public static func +(lhs: Float, rhs: Self) -> Self {
+
+  public static func +(lhs: RawValue, rhs: Self) -> Self {
     return Self(rawValue: lhs + rhs.rawValue)!
   }
-  public static func +(lhs: Int, rhs: Self) -> Self {
-    return Self(rawValue: Float(lhs) + rhs.rawValue)!
-  }
-  public static func +(lhs: Double, rhs: Self) -> Self {
-    return Self(rawValue: Float(lhs) + rhs.rawValue)!
-  }
-  public static func += (lhs: inout Self, rhs: Double) {
-      lhs = Self(rawValue: lhs.rawValue + Float(rhs))!
-  }
-  public static func += (lhs: inout Self, rhs: Float) {
-      lhs = Self(rawValue: lhs.rawValue + rhs)!
-  }
-  public static func += (lhs: inout Self, rhs: Int) {
-      lhs = Self(rawValue: lhs.rawValue + Float(rhs))!
-  }
-  public static func -= (lhs: inout Self, rhs: Double) {
-      lhs = Self(rawValue: lhs.rawValue - Float(rhs))!
-  }
-  public static func -= (lhs: inout Self, rhs: Float) {
-      lhs = Self(rawValue: lhs.rawValue - rhs)!
-  }
-  public static func -= (lhs: inout Self, rhs: Int) {
-      lhs = Self(rawValue: lhs.rawValue - Float(rhs))!
-  }
-}
-extension _AppKitNumericWrapper where RawValue == CGFloat {
-  public static func +(lhs: Self, rhs: Double) -> Self {
-    return Self(rawValue: lhs.rawValue + CGFloat(rhs))!
-  }
-  public static func -(lhs: Self, rhs: Double) -> Self {
-    return Self(rawValue: lhs.rawValue - CGFloat(rhs))!
-  }
-  public static func +(lhs: Self, rhs: Float) -> Self {
-    return Self(rawValue: lhs.rawValue + CGFloat(rhs))!
-  }
-  public static func -(lhs: Self, rhs: Float) -> Self {
-    return Self(rawValue: lhs.rawValue - CGFloat(rhs))!
-  }
-  public static func +(lhs: Self, rhs: CGFloat) -> Self {
-    return Self(rawValue: lhs.rawValue + rhs)!
-  }
-  public static func -(lhs: Self, rhs: CGFloat) -> Self {
+
+  public static func -(lhs: Self, rhs: RawValue) -> Self {
     return Self(rawValue: lhs.rawValue - rhs)!
   }
-  public static func +(lhs: Self, rhs: Int) -> Self {
-    return Self(rawValue: lhs.rawValue + CGFloat(rhs))!
+
+  public static func -(lhs: Self, rhs: Self) -> RawValue {
+    return lhs.rawValue - rhs.rawValue
   }
-  public static func -(lhs: Self, rhs: Int) -> Self {
-    return Self(rawValue: lhs.rawValue - CGFloat(rhs))!
+
+  public static func +=(lhs: inout Self, rhs: RawValue) {
+    lhs = Self(rawValue: lhs.rawValue + rhs)!
   }
-  public static func +(lhs: Float, rhs: Self) -> Self {
-    return Self(rawValue: CGFloat(lhs) + rhs.rawValue)!
-  }
-  public static func +(lhs: Int, rhs: Self) -> Self {
-    return Self(rawValue: CGFloat(lhs) + rhs.rawValue)!
-  }
-  public static func +(lhs: Double, rhs: Self) -> Self {
-    return Self(rawValue: CGFloat(lhs) + rhs.rawValue)!
-  }
-  public static func += (lhs: inout Self, rhs: Double) {
-      lhs = Self(rawValue: lhs.rawValue + CGFloat(rhs))!
-  }
-  public static func += (lhs: inout Self, rhs: Float) {
-      lhs = Self(rawValue: lhs.rawValue + CGFloat(rhs))!
-  }
-  public static func += (lhs: inout Self, rhs: CGFloat) {
-      lhs = Self(rawValue: lhs.rawValue + rhs)!
-  }
-  public static func += (lhs: inout Self, rhs: Int) {
-      lhs = Self(rawValue: lhs.rawValue + CGFloat(rhs))!
-  }
-  public static func -= (lhs: inout Self, rhs: Double) {
-      lhs = Self(rawValue: lhs.rawValue - CGFloat(rhs))!
-  }
-  public static func -= (lhs: inout Self, rhs: Float) {
-      lhs = Self(rawValue: lhs.rawValue - CGFloat(rhs))!
-  }
-  public static func -= (lhs: inout Self, rhs: CGFloat) {
-      lhs = Self(rawValue: lhs.rawValue - rhs)!
-  }
-  public static func -= (lhs: inout Self, rhs: Int) {
-      lhs = Self(rawValue: lhs.rawValue - CGFloat(rhs))!
-  }
-}
-extension _AppKitNumericWrapper where RawValue == Double {
-  public static func +(lhs: Self, rhs: Double) -> Self {
-    return Self(rawValue: lhs.rawValue + rhs)!
-  }
-  public static func -(lhs: Self, rhs: Double) -> Self {
-    return Self(rawValue: lhs.rawValue - rhs)!
-  }
-  public static func +(lhs: Self, rhs: Float) -> Self {
-    return Self(rawValue: lhs.rawValue + Double(rhs))!
-  }
-  public static func -(lhs: Self, rhs: Float) -> Self {
-    return Self(rawValue: lhs.rawValue - Double(rhs))!
-  }
-  public static func +(lhs: Self, rhs: Int) -> Self {
-    return Self(rawValue: lhs.rawValue + Double(rhs))!
-  }
-  public static func -(lhs: Self, rhs: Int) -> Self {
-    return Self(rawValue: lhs.rawValue - Double(rhs))!
-  }
-  public static func +(lhs: Float, rhs: Self) -> Self {
-    return Self(rawValue: Double(lhs) + rhs.rawValue)!
-  }
-  public static func +(lhs: Int, rhs: Self) -> Self {
-    return Self(rawValue: Double(lhs) + rhs.rawValue)!
-  }
-  public static func +(lhs: Double, rhs: Self) -> Self {
-    return Self(rawValue: lhs + rhs.rawValue)!
-  }
-  public static func += (lhs: inout Self, rhs: Double) {
-      lhs = Self(rawValue: lhs.rawValue + rhs)!
-  }
-  public static func += (lhs: inout Self, rhs: Float) {
-      lhs = Self(rawValue: lhs.rawValue + Double(rhs))!
-  }
-  public static func += (lhs: inout Self, rhs: Int) {
-      lhs = Self(rawValue: lhs.rawValue + Double(rhs))!
-  }
-  public static func -= (lhs: inout Self, rhs: Double) {
-      lhs = Self(rawValue: lhs.rawValue - rhs)!
-  }
-  public static func -= (lhs: inout Self, rhs: Float) {
-      lhs = Self(rawValue: lhs.rawValue - Double(rhs))!
-  }
-  public static func -= (lhs: inout Self, rhs: Int) {
-      lhs = Self(rawValue: lhs.rawValue - Double(rhs))!
-  }
-}
-extension _AppKitNumericWrapper where RawValue == Int {
-  public static func +(lhs: Self, rhs: Int) -> Self {
-    return Self(rawValue: lhs.rawValue + rhs)!
-  }
-  public static func -(lhs: Self, rhs: Int) -> Self {
-    return Self(rawValue: lhs.rawValue - rhs)!
-  }
-  public static func +(lhs: Int, rhs: Self) -> Self {
-    return Self(rawValue: lhs + rhs.rawValue)!
-  }
-  public static func += (lhs: inout Self, rhs: Int) {
-      lhs = Self(rawValue: lhs.rawValue + rhs)!
-  }
-  public static func -= (lhs: inout Self, rhs: Int) {
-      lhs = Self(rawValue: lhs.rawValue - rhs)!
+
+  public static func -=(lhs: inout Self, rhs: RawValue) {
+    lhs = Self(rawValue: lhs.rawValue - rhs)!
   }
 }
 
 @available(swift 4)
-extension NSAppKitVersion : _AppKitNumericWrapper, Comparable {
-  public static func <(lhs: NSAppKitVersion, rhs: NSAppKitVersion) -> Bool {
-    return lhs.rawValue < rhs.rawValue
-  }
-  public static func >(lhs: NSAppKitVersion, rhs: NSAppKitVersion) -> Bool {
-    return lhs.rawValue > rhs.rawValue
-  }
-}
+extension NSAppKitVersion : _AppKitKitNumericRawRepresentable { }
+
 @available(swift 4)
-extension NSLayoutConstraint.Priority : _AppKitNumericWrapper, Comparable {
-  public static func <(lhs: NSLayoutConstraint.Priority, rhs: NSLayoutConstraint.Priority) -> Bool {
-    return lhs.rawValue < rhs.rawValue
-  }
-  public static func >(lhs: NSLayoutConstraint.Priority, rhs: NSLayoutConstraint.Priority) -> Bool {
-    return lhs.rawValue > rhs.rawValue
-  }
-}
+extension NSLayoutConstraint.Priority : _AppKitKitNumericRawRepresentable { }
+
 @available(swift 4)
-extension NSStackView.VisibilityPriority : _AppKitNumericWrapper, Comparable {
-  public static func <(lhs: NSStackView.VisibilityPriority, rhs: NSStackView.VisibilityPriority) -> Bool {
-    return lhs.rawValue < rhs.rawValue
-  }
-  public static func >(lhs: NSStackView.VisibilityPriority, rhs: NSStackView.VisibilityPriority) -> Bool {
-    return lhs.rawValue > rhs.rawValue
-  }
-}
+extension NSStackView.VisibilityPriority : _AppKitKitNumericRawRepresentable { }
+
 @available(swift 4)
-extension NSToolbarItem.VisibilityPriority : _AppKitNumericWrapper, Comparable {
-  public static func <(lhs: NSToolbarItem.VisibilityPriority, rhs: NSToolbarItem.VisibilityPriority) -> Bool {
-    return lhs.rawValue < rhs.rawValue
-  }
-  public static func >(lhs: NSToolbarItem.VisibilityPriority, rhs: NSToolbarItem.VisibilityPriority) -> Bool {
-    return lhs.rawValue > rhs.rawValue
-  }
-}
-@available(swift 4) @available(macOS 10.12.2, *)
-extension NSTouchBarItem.Priority : _AppKitNumericWrapper, Comparable {
-  public static func <(lhs: NSTouchBarItem.Priority, rhs: NSTouchBarItem.Priority) -> Bool {
-    return lhs.rawValue < rhs.rawValue
-  }
-  public static func >(lhs: NSTouchBarItem.Priority, rhs: NSTouchBarItem.Priority) -> Bool {
-    return lhs.rawValue > rhs.rawValue
-  }
-}
+extension NSToolbarItem.VisibilityPriority : _AppKitKitNumericRawRepresentable { }
+
+@available(macOS 10.12.2, *)
 @available(swift 4)
-extension NSWindow.Level : _AppKitNumericWrapper, Comparable {
-  public static func <(lhs: NSWindow.Level, rhs: NSWindow.Level) -> Bool {
-    return lhs.rawValue < rhs.rawValue
-  }
-  public static func >(lhs: NSWindow.Level, rhs: NSWindow.Level) -> Bool {
-    return lhs.rawValue > rhs.rawValue
-  }
-}
+extension NSTouchBarItem.Priority : _AppKitKitNumericRawRepresentable { }
+
 @available(swift 4)
-extension NSFont.Weight : _AppKitNumericWrapper, Comparable {
-  public static func <(lhs: NSFont.Weight, rhs: NSFont.Weight) -> Bool {
-    return lhs.rawValue < rhs.rawValue
-  }
-  public static func >(lhs: NSFont.Weight, rhs: NSFont.Weight) -> Bool {
-    return lhs.rawValue > rhs.rawValue
-  }
-}
+extension NSWindow.Level : _AppKitKitNumericRawRepresentable { }
+
+@available(swift 4)
+extension NSFont.Weight : _AppKitKitNumericRawRepresentable { }

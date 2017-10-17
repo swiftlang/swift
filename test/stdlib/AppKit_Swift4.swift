@@ -108,17 +108,14 @@ AppKitTests.test("NSColor.Literals") {
 AppKitTests.test("NSLayoutPriority") {
   let highPriority: NSLayoutConstraint.Priority = .defaultHigh
 
-  // Priority added to Int
   let adjustedPriority1 = highPriority + 1
   let adjustedPriority1RawValue: Float = NSLayoutConstraint.Priority.defaultHigh.rawValue + 1
   expectEqual(adjustedPriority1.rawValue, adjustedPriority1RawValue)
 
-  // Double subtracted from Priority
   let adjustedPriority2 = highPriority - 5.0
   let adjustedPriority2RawValue: Float = NSLayoutConstraint.Priority.defaultHigh.rawValue - 5.0
   expectEqual(adjustedPriority2.rawValue, adjustedPriority2RawValue)
 
-  // Double added to Priority
   let adjustedPriority3 = 5.0 + highPriority
   let adjustedPriority3RawValue: Float = 5.0 + NSLayoutConstraint.Priority.defaultHigh.rawValue
   expectEqual(adjustedPriority3.rawValue, adjustedPriority3RawValue)

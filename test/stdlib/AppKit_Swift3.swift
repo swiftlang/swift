@@ -20,17 +20,14 @@ AppKitTests.test("NSEventMaskFromType") {
 AppKitTests.test("NSLayoutPriority") {
 	let highPriority: NSLayoutPriority = NSLayoutPriorityDefaultHigh
 
-	// Priority added to Int
   let adjustedPriority1 = highPriority + 1
   let adjustedPriority1RawValue: Float = NSLayoutPriorityDefaultHigh + 1
   expectEqual(adjustedPriority1, adjustedPriority1RawValue)
 
-	// Double subtracted from Priority
   let adjustedPriority2 = highPriority - 5.0
   let adjustedPriority2RawValue: Float = NSLayoutPriorityDefaultHigh - 5.0
   expectEqual(adjustedPriority2, adjustedPriority2RawValue)
 
-	// Double added to Priority
   let adjustedPriority3 = 5.0 + highPriority
   let adjustedPriority3RawValue: Float = 5.0 + NSLayoutPriorityDefaultHigh
   expectEqual(adjustedPriority3, adjustedPriority3RawValue)
