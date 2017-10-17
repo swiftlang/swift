@@ -158,6 +158,10 @@ public:
     std::vector<Constraint<LayoutConstraint>> layoutConstraints;
 
     /// The members of the equivalence class.
+    ///
+    /// This list of members is slightly ordered, in that the first
+    /// element always has a depth no greater than the depth of any other
+    /// member.
     TinyPtrVector<PotentialArchetype *> members;
 
     /// Describes a component within the graph of same-type constraints within
@@ -202,6 +206,9 @@ public:
     EquivalenceClass(EquivalenceClass &&) = delete;
     EquivalenceClass &operator=(const EquivalenceClass &) = delete;
     EquivalenceClass &operator=(EquivalenceClass &&) = delete;
+
+    /// Add a new member to this equivalence class.
+    void addMember(PotentialArchetype *pa);
 
     /// Record the conformance of this equivalence class to the given
     /// protocol as found via the given requirement source.
@@ -758,13 +765,11 @@ public:
   resolvePotentialArchetype(Type type,
                             ArchetypeResolutionKind resolutionKind);
 
-private:
   /// \brief Try to resolvew the equivalence class of the given type.
   ResolveResult maybeResolveEquivalenceClass(
                                       Type type,
                                       ArchetypeResolutionKind resolutionKind);
 
-public:
   /// \brief Resolve the equivalence class for the given type parameter,
   /// which provides information about that type.
   ///

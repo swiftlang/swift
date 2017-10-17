@@ -1550,6 +1550,14 @@ unsigned GenericSignatureBuilder::PotentialArchetype::getNestingDepth() const {
   return Depth;
 }
 
+void EquivalenceClass::addMember(PotentialArchetype *pa) {
+  members.push_back(pa);
+  if (members.back()->getNestingDepth() < members.front()->getNestingDepth()) {
+    MutableArrayRef<PotentialArchetype *> mutMembers = members;
+    std::swap(mutMembers.front(), mutMembers.back());
+  }
+}
+
 bool EquivalenceClass::recordConformanceConstraint(
                                  PotentialArchetype *pa,
                                  ProtocolDecl *proto,
@@ -2759,6 +2767,8 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
             proto, getDependentType(/*genericParams=*/{}),
             ProtocolConformanceRef(proto));
           type = type.subst(subMap, SubstFlags::UseErrorType);
+          if (!type)
+            type = ErrorType::get(proto->getASTContext());
         } else {
           // Substitute in the superclass type.
           auto superclass = getEquivalenceClassIfPresent()->superclass;
@@ -3095,21 +3105,19 @@ ResolveResult GenericSignatureBuilder::maybeResolveEquivalenceClass(
       }
     }
 
-    // Retrieve the anchor of the base equivalence class, and use that to
-    // find the nested potential archetype corresponding to this dependent
-    // type.
-    auto baseAnchorPA =
-      baseEquivClass->members.front()->getArchetypeAnchor(*this);
+    // Retrieve the "smallest" type in the equivalence class, by depth, and
+    // use that to find a nested potential archetype. We used the smallest
+    // type by depth to limit expansion of the type graph.
+    auto basePA = baseEquivClass->members.front();
     auto nestedPA =
-      baseAnchorPA->updateNestedTypeForConformance(nestedTypeDecl,
-                                                   resolutionKind);
+      basePA->updateNestedTypeForConformance(nestedTypeDecl, resolutionKind);
     if (!nestedPA)
       return ResolveResult::forUnresolved(baseEquivClass);
 
     // If base resolved to the anchor, then the nested potential archetype
     // we found is the resolved potential archetype. Return it directly,
     // so it doesn't need to be resolved again.
-    if (baseAnchorPA == resolvedBase.getAsPotentialArchetype())
+    if (basePA == resolvedBase.getAsPotentialArchetype())
       return ResolveResult(nestedPA);
 
     // Compute the resolved dependent type to return.
@@ -3978,7 +3986,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   auto equivClass1Members = equivClass->members;
   auto equivClass2Members = T2->getEquivalenceClassMembers();
   for (auto equiv : equivClass2Members)
-    equivClass->members.push_back(equiv);
+    equivClass->addMember(equiv);
 
   // Grab the old equivalence class, if present. We'll deallocate it at the end.
   auto equivClass2 = T2->getEquivalenceClassIfPresent();
@@ -5656,9 +5664,10 @@ static void collapseSameTypeComponentsThroughDelayedRequirements(
   /// associated, for a type that we haven't tried to resolve yet.
   auto getUnknownTypeVirtualComponent = [&](Type type) {
     if (auto pa =
-            builder.resolvePotentialArchetype(type,
+            builder.maybeResolveEquivalenceClass(
+                                     type,
                                      ArchetypeResolutionKind::AlreadyKnown)
-              .dyn_cast<PotentialArchetype *>())
+              .getAsPotentialArchetype())
       return getPotentialArchetypeVirtualComponent(pa);
 
     return getTypeVirtualComponent(type);
@@ -6537,9 +6546,9 @@ GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
     proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
   builder.addGenericParameter(selfType);
   auto selfPA =
-    builder.resolvePotentialArchetype(selfType,
-                                      ArchetypeResolutionKind::WellFormed)
-      .get<PotentialArchetype *>();
+    builder.resolveEquivalenceClass(selfType,
+                                    ArchetypeResolutionKind::WellFormed)
+      ->members.front();
 
   // Add the conformance of 'self' to the protocol.
   auto requirement =
