@@ -115,74 +115,49 @@ FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/AlwaysSuc
 
 %  end # for in all_floating_point_types (Other)
 
-%{
+#if arch(i386) || arch(arm)
+% int_types = all_integer_types(32)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+% int_types = all_integer_types(64)
+#else
+_UnimplementedError()
+#endif
 
-float_to_int_conversion_template = gyb.parse_template("float_to_int_conversion",
-"""
-% for int_ty in all_integer_types(word_bits):
+% for int_ty in int_types:
 %  OtherInt = int_ty.stdlib_name
 %  OtherMin = int_ty.min
 %  OtherMax = int_ty.max
 %  (FloatMin, FloatMax) = getFtoIBounds(self_type.bits, int_ty.bits, int_ty.is_signed)
 
-%  for testValue in [0, FloatMin, FloatMax, FloatMin - 1, FloatMax + 1, OtherMin, OtherMax]:
+FixedPointConversionTruncations.test("${OtherInt}to${Self}")
+  .forEach(in: [
+    (0, 0, 0),
+% if int_ty.bits > self_type.significand_bits + 1:
+%   limit = ~(~0 << (self_type.significand_bits + 1))
+%   over = ~(~0 << (self_type.significand_bits + 2))
+    (${limit}, ${limit}, ${limit}),
+    (${over}, ${over + 1}, nil),
+%   if int_ty.is_signed:
+    (-${limit}, -${limit}, -${limit}),
+    (-${over}, -${over + 1}, nil),
+%   end
+% else:
+    (${OtherInt}.min, ${OtherInt}.min, ${OtherInt}.min),
+    (${OtherInt}.max, ${OtherInt}.max, ${OtherInt}.max),
+% end
+  ] as [(${OtherInt}, ${OtherInt}, ${OtherInt}?)]) { value, roundedExpectation, exactExpectation in
+  let roundedResult = ${Self}(value)
+  expectEqual(roundedResult, ${Self}(roundedExpectation))
 
-%    if testValue < OtherMin or testValue > OtherMax: 
-%          # Can't construct `other` value, do nothing and continue.
-
-%    elif testValue >= FloatMin and testValue <= FloatMax:
-
-FixedPointConversionTruncations.test("${OtherInt}to${Self}Conversion/${testValue}") {
-  expectEqual(${Self}(${testValue} as ${OtherInt}), ${testValue})
+  let exactResult = ${Self}(exactly: value)
+  if let expectation = exactExpectation {
+    expectEqual(exactResult!, ${Self}(expectation))
+  } else {
+    expectNil(exactResult)
+  }
 }
 
-FixedPointConversionFailures.test("${OtherInt}to${Self}FailableConversion/${testValue}") {
-  expectEqual(${Self}(exactly: ${testValue} as ${OtherInt}), ${testValue})
-}
-
-%    else:
-
-FixedPointConversionTruncations.test("${OtherInt}to${Self}Truncation/${testValue}") {
-  let value: ${OtherInt} = ${testValue}
-  let result = ${Self}(value)
-  expectNotEqual(${OtherInt}(result), value)
-}
-
-FixedPointConversionFailures.test("${OtherInt}to${Self}Failure/${testValue}") {
-  let value: ${OtherInt} = ${testValue}
-  let result = ${Self}(exactly: value)
-  expectEqual(result, ${OtherMin} as ${Self})
-  expectEqual(${OtherInt}(result!), value)
-}
-
-%    end
-
-%  end # testValue in testValues
-%  end # for in all_integer_types (Other)
-""")
-}%
-
-#if arch(i386) || arch(arm)
-
-  ${gyb.execute_template(
-      float_to_int_conversion_template,
-      word_bits=32,
-      **locals()
-      )}
-
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-
-  ${gyb.execute_template(
-      float_to_int_conversion_template,
-      word_bits=64,
-      **locals()
-      )}
-
-#else
-
-_UnimplementedError()
-
-#endif
+%  end # for in int_types
 
 %  if Self == 'Float80':
 #endif
