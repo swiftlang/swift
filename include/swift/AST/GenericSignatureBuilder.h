@@ -158,6 +158,10 @@ public:
     std::vector<Constraint<LayoutConstraint>> layoutConstraints;
 
     /// The members of the equivalence class.
+    ///
+    /// This list of members is slightly ordered, in that the first
+    /// element always has a depth no greater than the depth of any other
+    /// member.
     TinyPtrVector<PotentialArchetype *> members;
 
     /// Describes a component within the graph of same-type constraints within
@@ -202,6 +206,9 @@ public:
     EquivalenceClass(EquivalenceClass &&) = delete;
     EquivalenceClass &operator=(const EquivalenceClass &) = delete;
     EquivalenceClass &operator=(EquivalenceClass &&) = delete;
+
+    /// Add a new member to this equivalence class.
+    void addMember(PotentialArchetype *pa);
 
     /// Record the conformance of this equivalence class to the given
     /// protocol as found via the given requirement source.
@@ -757,6 +764,11 @@ public:
   llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
   resolvePotentialArchetype(Type type,
                             ArchetypeResolutionKind resolutionKind);
+
+  /// \brief Try to resolvew the equivalence class of the given type.
+  ResolveResult maybeResolveEquivalenceClass(
+                                      Type type,
+                                      ArchetypeResolutionKind resolutionKind);
 
   /// \brief Resolve the equivalence class for the given type parameter,
   /// which provides information about that type.
@@ -1593,41 +1605,12 @@ public:
     return identifier.assocTypeOrConcrete;
   }
 
-  /// Retrieve the set of protocols to which this potential archetype
-  /// conforms.
-  SmallVector<ProtocolDecl *, 4> getConformsTo() const {
-    SmallVector<ProtocolDecl *, 4> result;
-
-    if (auto equiv = getEquivalenceClassIfPresent()) {
-      for (const auto &entry : equiv->conformsTo)
-        result.push_back(entry.first);
-    }
-
-    return result;
-  }
-
   /// Add a conformance to this potential archetype.
   ///
   /// \returns true if the conformance was new, false if it already existed.
   bool addConformance(ProtocolDecl *proto,
                       const RequirementSource *source,
                       GenericSignatureBuilder &builder);
-
-  /// Retrieve the superclass of this archetype.
-  Type getSuperclass() const {
-    if (auto equiv = getEquivalenceClassIfPresent())
-      return equiv->superclass;
-    
-    return nullptr;
-  }
-
-  /// Retrieve the layout constraint of this archetype.
-  LayoutConstraint getLayout() const {
-    if (auto equivClass = getEquivalenceClassIfPresent())
-      return equivClass->layout;
-
-    return LayoutConstraint();
-  }
 
   /// Retrieve the set of nested types.
   const llvm::MapVector<Identifier, StoredNestedType> &getNestedTypes() const {
@@ -1741,14 +1724,6 @@ public:
     return false;
   }
   
-  /// Get the concrete type this potential archetype is constrained to.
-  Type getConcreteType() const {
-    if (auto equivClass = getEquivalenceClassIfPresent())
-      return equivClass->concreteType;
-
-    return Type();
-  }
-
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const,
       "only for use within the debugger");
