@@ -130,11 +130,6 @@ SourceFile *getSourceFile(CompilerInstance &Instance,
   // First, parse the file normally and get the regular old AST.
   Instance.performParseOnly();
 
-  if (Instance.getDiags().hadAnyError()) {
-    return nullptr;
-  }
-
-
   SourceFile *SF = nullptr;
   for (auto Unit : Instance.getMainModule()->getFiles()) {
     SF = dyn_cast<SourceFile>(Unit);
