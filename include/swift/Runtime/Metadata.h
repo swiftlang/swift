@@ -1745,9 +1745,7 @@ using EnumMetadata = TargetEnumMetadata<InProcess>;
 template <typename Runtime>
 struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
-
-  // TODO: Make this target agnostic
-  using Argument = FlaggedPointer<const TargetMetadata<Runtime> *, 0>;
+  using Argument = const TargetMetadata<Runtime> *;
 
   TargetFunctionTypeFlags<StoredSize> Flags;
 
@@ -1761,7 +1759,15 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   TargetPointer<Runtime, const Argument> getArguments() const {
     return reinterpret_cast<TargetPointer<Runtime, const Argument>>(this + 1);
   }
-  
+
+  uint32_t getParameterFlags(unsigned index) const {
+    auto numParams = getNumArguments();
+    assert(index < numParams);
+    auto *flags = reinterpret_cast<const uint32_t *>(this + 1 +
+                                                  numParams * sizeof(Argument));
+    return flags[index];
+  }
+
   StoredSize getNumArguments() const {
     return Flags.getNumArguments();
   }
@@ -2649,6 +2655,13 @@ swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
+swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
+                                        const void *arg0,
+                                        const uint32_t *paramFlags,
+                                        const Metadata *resultMetadata);
+
+SWIFT_RUNTIME_EXPORT
+const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
                                const void *arg0,
                                const void *arg1,
@@ -2656,11 +2669,28 @@ swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
-                               const void *arg0,
-                               const void *arg1,
-                               const void *arg2,
-                               const Metadata *resultMetadata);
+swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
+                                        const void *arg0,
+                                        const void *arg1,
+                                        const uint32_t *paramFlags,
+                                        const Metadata *resultMetadata);
+
+SWIFT_RUNTIME_EXPORT
+const FunctionTypeMetadata *swift_getFunctionTypeMetadata3(
+                                                FunctionTypeFlags flags,
+                                                const void *arg0,
+                                                const void *arg1,
+                                                const void *arg2,
+                                                const Metadata *resultMetadata);
+
+SWIFT_RUNTIME_EXPORT
+const FunctionTypeMetadata *swift_getFunctionTypeMetadata3WithFlags(
+                                                FunctionTypeFlags flags,
+                                                const void *arg0,
+                                                const void *arg1,
+                                                const void *arg2,
+                                                const uint32_t *paramFlags,
+                                                const Metadata *resultMetadata);
 
 /// \brief Fetch a uniqued metadata for a thin function type.
 SWIFT_RUNTIME_EXPORT
