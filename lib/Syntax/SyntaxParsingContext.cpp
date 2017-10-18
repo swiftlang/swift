@@ -41,7 +41,7 @@ struct SyntaxParsingContext::ContextInfo {
       return false;
     auto Back = PendingSyntax[PendingSyntax.size() - 1 - OffsetFromBack].
       getAs<TokenSyntax>();
-    return Back.hasValue() && (*Back).getTokenKind() == Kind);
+    return Back.hasValue() && Back->getTokenKind() == Kind;
   }
 
   void addPendingSyntax(ArrayRef<Syntax> More) {
