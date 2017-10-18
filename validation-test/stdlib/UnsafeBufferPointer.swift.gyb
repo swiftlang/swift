@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
+// rdar://35052802 unexpected assertions when test is run with optimize_size
+// XFAIL: swift_test_mode_optimize_size && optimized_stdlib
+
 import StdlibUnittest
 import StdlibCollectionUnittest
 
