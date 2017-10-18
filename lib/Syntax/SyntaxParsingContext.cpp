@@ -69,7 +69,7 @@ struct SyntaxParsingContext::ContextInfo {
     // Remove the building bricks and re-append the result.
     for (unsigned I = 0; I < N; I ++)
       PendingSyntax.pop_back();
-    addPendingSyntax({Result});
+    addPendingSyntax({ *Result });
     assert(Size - N + 1 == PendingSyntax.size());
   }
 };
