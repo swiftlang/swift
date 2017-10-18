@@ -40,17 +40,17 @@ extension Unicode {
     _ string: UnsafeBufferPointer<UInt8>
   ) -> Int {
     let collationTable = _swift_stdlib_unicode_getASCIICollationTable()
-    var hasher = _SipHash13Context(key: _Hashing.secretKey)
+    var hasher = _DefaultHasher()
     for c in string {
       _precondition(c <= 127)
       let element = collationTable[Int(c)]
       // Ignore zero valued collation elements. They don't participate in the
       // ordering relation.
       if element != 0 {
-        hasher.append(element)
+        hasher.append(Int(truncatingIfNeeded: element))
       }
     }
-    return hasher._finalizeAndReturnIntHash()
+    return hasher.finalize()
   }
 
   // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
@@ -64,7 +64,7 @@ extension Unicode {
       UInt32(string.count))
     defer { _swift_stdlib_unicodeCollationIterator_delete(collationIterator) }
 
-    var hasher = _SipHash13Context(key: _Hashing.secretKey)
+    var hasher = _DefaultHasher()
     while true {
       var hitEnd = false
       let element =
@@ -75,10 +75,10 @@ extension Unicode {
       // Ignore zero valued collation elements. They don't participate in the
       // ordering relation.
       if element != 0 {
-        hasher.append(element)
+        hasher.append(Int(truncatingIfNeeded: element))
       }
     }
-    return hasher._finalizeAndReturnIntHash()
+    return hasher.finalize()
   }
 }
 
