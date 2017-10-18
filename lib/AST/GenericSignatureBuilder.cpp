@@ -4761,12 +4761,9 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   };
 
   // FIXME: Expand all conformance requirements. This is expensive :(
-  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
-    if (archetype != archetype->getRepresentative()) return;
-
-    if (auto equivClass = archetype->getEquivalenceClassIfPresent())
-      expandSameTypeConstraints(*this, equivClass);
-  });
+  for (auto &equivClass : Impl->EquivalenceClasses) {
+      expandSameTypeConstraints(*this, &equivClass);
+  }
 
   // Check same-type constraints.
   for (const auto &equivClass : Impl->EquivalenceClasses) {
@@ -6097,42 +6094,6 @@ void GenericSignatureBuilder::checkLayoutConstraints(
     diag::previous_layout_constraint);
 }
 
-template<typename F>
-void GenericSignatureBuilder::visitPotentialArchetypes(F f) {
-  // Stack containing all of the potential archetypes to visit.
-  SmallVector<PotentialArchetype *, 4> stack;
-  llvm::SmallPtrSet<PotentialArchetype *, 4> visited;
-
-  // Add top-level potential archetypes to the stack.
-  for (const auto pa : Impl->PotentialArchetypes) {
-    if (visited.insert(pa).second)
-      stack.push_back(pa);
-  }
-
-  // Visit all of the potential archetypes.
-  while (!stack.empty()) {
-    PotentialArchetype *pa = stack.back();
-    stack.pop_back();
-    f(pa);
-
-    // Visit everything in this equivalence class.
-    for (auto equivPA : pa->getEquivalenceClassMembers()) {
-      if (visited.insert(equivPA).second) {
-        stack.push_back(equivPA);
-      }
-    }
-
-    // Visit nested potential archetypes.
-    for (const auto &nested : pa->getNestedTypes()) {
-      for (auto nestedPA : nested.second) {
-        if (visited.insert(nestedPA).second) {
-          stack.push_back(nestedPA);
-        }
-      }
-    }
-  }
-}
-
 namespace {
   /// Retrieve the best requirement source from a set of constraints.
   template<typename T>
@@ -6158,9 +6119,16 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
                            const RequirementSource *source)> f) {
   // Collect all archetypes.
   SmallVector<PotentialArchetype *, 8> archetypes;
-  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
-    archetypes.push_back(archetype);
-  });
+  for (auto &equivClass : Impl->EquivalenceClasses) {
+    if (equivClass.derivedSameTypeComponents.empty()) {
+      checkSameTypeConstraints(Impl->GenericParams,
+                               equivClass.members.front()->getRepresentative());
+    }
+
+    for (const auto &component : equivClass.derivedSameTypeComponents) {
+      archetypes.push_back(component.anchor);
+    }
+  }
 
   // Sort the archetypes in canonical order.
   llvm::array_pod_sort(archetypes.begin(), archetypes.end(),
@@ -6172,15 +6140,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
     //
     // FIXME: O(n) in the number of implied connected components within the
     // equivalence class. The equivalence class should be small, but...
-    auto rep = archetype->getRepresentative();
-    auto equivClass = rep->getOrCreateEquivalenceClass();
-
-    // If we didn't compute the derived same-type components yet, do so now.
-    if (equivClass->derivedSameTypeComponents.empty()) {
-      checkSameTypeConstraints(Impl->GenericParams, rep);
-      rep = archetype->getRepresentative();
-      equivClass = rep->getOrCreateEquivalenceClass();
-    }
+    auto equivClass = archetype->getOrCreateEquivalenceClass();
 
     assert(!equivClass->derivedSameTypeComponents.empty() &&
            "Didn't compute derived same-type components?");

@@ -488,10 +488,6 @@ private:
                                 const RequirementSource *parentSource,
                                 ModuleDecl *inferForModule);
 
-  /// Visit all of the potential archetypes.
-  template<typename F>
-  void visitPotentialArchetypes(F f);
-
 public:
   /// Construct a new generic signature builder.
   explicit GenericSignatureBuilder(ASTContext &ctx);
