@@ -166,6 +166,11 @@ extension OpaquePointer: Hashable {
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_rawValue))
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: (Int) -> Void) {
+    hasher(Int(bitPattern: self))
+  }
 }
 
 extension OpaquePointer : CustomDebugStringConvertible {

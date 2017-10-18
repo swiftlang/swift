@@ -904,8 +904,13 @@ extension ${Self}: Hashable {
   public var hashValue: Int {
     return Int(bitPattern: self)
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: (Int) -> Void) {
+    hasher(Int(bitPattern: self))
+  }
 }
-  
+
 extension ${Self}: Strideable {
   /// Returns a pointer to the next consecutive instance.
   ///
