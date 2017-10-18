@@ -2184,6 +2184,16 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
         witnessID,
         ListOfValues);
   }
+
+  for (auto conditional : wt.getConditionalConformances()) {
+    WitnessConditionalConformanceLayout::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[WitnessConditionalConformanceLayout::Code],
+        S.addTypeRef(conditional.Requirement));
+
+    S.writeConformance(conditional.Conformance, SILAbbrCodes);
+    continue;
+  }
 }
 
 void SILSerializer::
@@ -2273,6 +2283,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<WitnessBaseEntryLayout>();
   registerSILAbbr<WitnessAssocProtocolLayout>();
   registerSILAbbr<WitnessAssocEntryLayout>();
+  registerSILAbbr<WitnessConditionalConformanceLayout>();
   registerSILAbbr<DefaultWitnessTableLayout>();
   registerSILAbbr<DefaultWitnessTableEntryLayout>();
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();

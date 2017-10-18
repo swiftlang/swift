@@ -159,6 +159,7 @@ namespace sil_block {
     SIL_WITNESS_BASE_ENTRY,
     SIL_WITNESS_ASSOC_PROTOCOL,
     SIL_WITNESS_ASSOC_ENTRY,
+    SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
     SIL_DEFAULT_WITNESS_TABLE_ENTRY,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
@@ -232,6 +233,12 @@ namespace sil_block {
     SIL_WITNESS_ASSOC_ENTRY,
     DeclIDField,  // ID of AssociatedTypeDecl
     TypeIDField
+  >;
+
+  using WitnessConditionalConformanceLayout = BCRecordLayout<
+    SIL_WITNESS_CONDITIONAL_CONFORMANCE,
+    TypeIDField // ID of associated type
+    // Trailed by the conformance itself if appropriate.
   >;
 
   using DefaultWitnessTableLayout = BCRecordLayout<
