@@ -236,7 +236,6 @@ SILFunction *SILModule::getOrCreateFunction(
     CanSILFunctionType type, IsBare_t isBareSILFunction,
     IsTransparent_t isTransparent, IsSerialized_t isSerialized,
     ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope) {
-  assert(!type->isNoEscape() && "Function decls always have escaping types.");
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
     assert(fn->getLinkage() == linkage ||

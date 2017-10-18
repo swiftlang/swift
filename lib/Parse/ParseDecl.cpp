@@ -1681,14 +1681,11 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     }
 
     // @noescape is deprecated and no longer used
-    // In SIL, the polarity of @escaping is reversed.
-    // @escaping is the default and @noescape is explicit.
-    if (!isInSILMode()) {
-      diagnose(Loc, Context.isSwiftVersion3()
-               ? diag::swift3_attr_noescape_deprecated
-               : diag::attr_noescape_deprecated)
+    diagnose(Loc, Context.isSwiftVersion3()
+                      ? diag::swift3_attr_noescape_deprecated
+                      : diag::attr_noescape_deprecated)
         .fixItRemove({Attributes.AtLoc, Loc});
-    }
+
     break;
   case TAK_escaping:
     // You can't specify @noescape and @escaping together.

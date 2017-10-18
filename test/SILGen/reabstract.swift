@@ -13,16 +13,14 @@ func test0() {
 // CHECK-NEXT: reabstract.liftOptional
 // CHECK-NEXT: [[T1:%.*]] = function_ref @_T010reabstract12liftOptional{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: [[T2:%.*]] = thin_to_thick_function [[T1]]
-// CHECK-NEXT: [[CVT:%.*]] = convert_function [[T2]]
 // CHECK-NEXT: reabstraction thunk
 // CHECK-NEXT: [[T3:%.*]] = function_ref [[THUNK:@.*]] :
-// CHECK-NEXT: [[T4:%.*]] = partial_apply [[T3]]([[CVT]])
-// CHECK-NEXT: [[CVT:%.*]] = convert_function [[T4]]
-// CHECK-NEXT: apply [[T0]]<Int>([[CVT]])
+// CHECK-NEXT: [[T4:%.*]] = partial_apply [[T3]]([[T2]])
+// CHECK-NEXT: apply [[T0]]<Int>([[T4]])
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
-// CHECK:    sil shared [transparent] [serializable] [reabstraction_thunk] [[THUNK]] : $@convention(thin) (@in Int, @owned @noescape @callee_owned (Int) -> Optional<Int>) -> @out Optional<Int> {
+// CHECK:    sil shared [transparent] [serializable] [reabstraction_thunk] [[THUNK]] : $@convention(thin) (@in Int, @owned @callee_owned (Int) -> Optional<Int>) -> @out Optional<Int> {
 // CHECK:      [[T0:%.*]] = load [trivial] %1 : $*Int
 // CHECK-NEXT: [[T1:%.*]] = apply %2([[T0]])
 // CHECK-NEXT: store [[T1]] to [trivial] %0
@@ -30,8 +28,8 @@ func test0() {
 // CHECK-NEXT: return
 
 // CHECK-LABEL: sil hidden @_T010reabstract10testThrowsyypF
-// CHECK:         function_ref @_T0ytytIexir_Iex_TR
-// CHECK:         function_ref @_T0ytyts5Error_pIexirzo_sAA_pIexzo_TR
+// CHECK:         function_ref @_T0ytytIxir_Ix_TR
+// CHECK:         function_ref @_T0ytyts5Error_pIxirzo_sAA_pIxzo_TR
 func testThrows(_ x: Any) {
   _ = x as? () -> ()
   _ = x as? () throws -> ()
@@ -56,13 +54,13 @@ func testInoutOpaque(_ c: C, i: Int) {
 // CHECK-LABEL: sil hidden @_T010reabstract15testInoutOpaqueyAA1CC_Si1itF
 // CHECK:         function_ref @_T010reabstract6notFunyAA1CCz_Si1itF
 // CHECK:         thin_to_thick_function {{%[0-9]+}}
-// CHECK:         function_ref @_T010reabstract1CCSiIexly_ACSiytIexlir_TR
+// CHECK:         function_ref @_T010reabstract1CCSiIxly_ACSiytIxlir_TR
 // CHECK:         partial_apply
 // CHECK:         store
 // CHECK:         load
-// CHECK:         function_ref @_T010reabstract1CCSiytIexlir_ACSiIexly_TR
+// CHECK:         function_ref @_T010reabstract1CCSiytIxlir_ACSiIxly_TR
 // CHECK:         partial_apply
 // CHECK:         apply
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T010reabstract1CCSiIexly_ACSiytIexlir_TR : $@convention(thin) (@inout C, @in Int, @owned @callee_owned (@inout C, Int) -> ()) -> @out () {
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T010reabstract1CCSiytIexlir_ACSiIexly_TR : $@convention(thin) (@inout C, Int, @owned @callee_owned (@inout C, @in Int) -> @out ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T010reabstract1CCSiIxly_ACSiytIxlir_TR : $@convention(thin) (@inout C, @in Int, @owned @callee_owned (@inout C, Int) -> ()) -> @out () {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T010reabstract1CCSiytIxlir_ACSiIxly_TR : $@convention(thin) (@inout C, Int, @owned @callee_owned (@inout C, @in Int) -> @out ()) -> () {

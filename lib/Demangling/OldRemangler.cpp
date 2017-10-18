@@ -1164,10 +1164,6 @@ void Remangler::mangleImplResult(Node *node) {
   mangleChildNodes(node); // impl convention, type
 }
 
-void Remangler::mangleImplEscaping(Node *node) {
-  // The old mangler does not encode escaping.
-}
-
 void Remangler::mangleImplConvention(Node *node) {
   assert(node->getKind() == Node::Kind::ImplConvention);
   StringRef text = node->getText();

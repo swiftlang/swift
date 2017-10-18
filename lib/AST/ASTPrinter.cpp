@@ -3543,9 +3543,6 @@ public:
     if (info.isPseudogeneric()) {
       Printer.printSimpleAttr("@pseudogeneric") << " ";
     }
-    if (info.isNoEscape()) {
-      Printer.printSimpleAttr("@noescape") << " ";
-    }
   }
 
   void visitFunctionType(FunctionType *T) {

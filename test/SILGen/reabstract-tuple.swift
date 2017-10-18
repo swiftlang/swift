@@ -23,7 +23,7 @@ class Box<T> {
 // CHECK:   [[ELTA_1:%.*]] = tuple_extract [[BORROWA]] : $(Int, @callee_owned () -> ()), 1
 // CHECK:   [[COPYA_1:%.*]] = copy_value [[ELTA_1]] : $@callee_owned () -> () 
 // CHECK:   end_borrow [[BORROWA]] from %{{.*}} : $(Int, @callee_owned () -> ()), $(Int, @callee_owned () -> ())
-// CHECK:   [[THUNK1:%.*]] = function_ref @_T0Iex_ytytIexir_TR : $@convention(thin) (@in (), @owned @callee_owned () -> ()) -> @out ()
+// CHECK:   [[THUNK1:%.*]] = function_ref @_T0Ix_ytytIxir_TR : $@convention(thin) (@in (), @owned @callee_owned () -> ()) -> @out ()
 // CHECK:   [[PA:%.*]] = partial_apply [[THUNK1]]([[COPYA_1]]) : $@convention(thin) (@in (), @owned @callee_owned () -> ()) -> @out ()
 // CHECK:   [[TUPLEB:%.*]] = tuple ([[ELTA_0]] : $Int, [[PA]] : $@callee_owned (@in ()) -> @out ())
 // CHECK:   [[BORROWB:%.*]] = begin_borrow [[TUPLEB]] : $(Int, @callee_owned (@in ()) -> @out ())
@@ -42,7 +42,7 @@ class Box<T> {
 // CHECK:   [[TUPLEC_0:%.*]] = tuple_extract [[BORROW_TUPLEC]] : $(Int, @callee_owned (@in ()) -> @out ()), 0
 // CHECK:   [[TUPLEC_1:%.*]] = tuple_extract [[BORROW_TUPLEC]] : $(Int, @callee_owned (@in ()) -> @out ()), 1
 // CHECK:   [[COPYC_1:%.*]] = copy_value [[TUPLEC_1]] : $@callee_owned (@in ()) -> @out ()
-// CHECK:   [[THUNK2:%.*]] = function_ref @_T0ytytIexir_Iex_TR : $@convention(thin) (@owned @callee_owned (@in ()) -> @out ()) -> ()
+// CHECK:   [[THUNK2:%.*]] = function_ref @_T0ytytIxir_Ix_TR : $@convention(thin) (@owned @callee_owned (@in ()) -> @out ()) -> ()
 // CHECK:   [[PA2:%.*]] = partial_apply [[THUNK2]]([[COPYC_1]]) : $@convention(thin) (@owned @callee_owned (@in ()) -> @out ()) -> ()
 // CHECK:   end_access [[READ]] : $*(Int, @callee_owned (@in ()) -> @out ())
 // CHECK:   destroy_value [[PA2]] : $@callee_owned () -> ()    

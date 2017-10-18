@@ -42,7 +42,7 @@ struct Struct<T> {
 }
 
 // CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B13_reabstractedyAA6StructVyS2icGz_S2ictF
-// CHECK:         [[REABSTRACT:%.*]] = function_ref @_T0S2iIexyd_S2iIexir_TR
+// CHECK:         [[REABSTRACT:%.*]] = function_ref @_T0S2iIxyd_S2iIxir_TR
 // CHECK:         [[REABSTRACTED:%.*]] = partial_apply [[REABSTRACT]]
 // CHECK:         assign [[REABSTRACTED]] to {{%.*}} : $*@callee_owned (@in Int) -> @out Int
 func assign_optional_lvalue_reabstracted(_ x: inout Struct<(Int) -> Int>,

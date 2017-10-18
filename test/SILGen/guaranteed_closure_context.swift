@@ -54,8 +54,7 @@ func guaranteed_captures() {
   // CHECK: [[IMMUTABLE_RETAINABLE_COPY:%.*]] = copy_value [[IMMUTABLE_RETAINABLE]]
   // CHECK: [[IMMUTABLE_AO_BOX:%.*]] = alloc_box ${ var P }
   // CHECK: [[CLOSURE:%.*]] = partial_apply {{.*}}([[MUTABLE_TRIVIAL_BOX_COPY]], [[MUTABLE_RETAINABLE_BOX_COPY]], [[MUTABLE_ADDRESS_ONLY_BOX_COPY]], [[IMMUTABLE_TRIVIAL]], [[IMMUTABLE_RETAINABLE_COPY]], [[IMMUTABLE_AO_BOX]])
-  // CHECK: [[CONVERT:%.*]] = convert_function [[CLOSURE]]
-  // CHECK: apply {{.*}}[[CONVERT]]
+  // CHECK: apply {{.*}}[[CLOSURE]]
 
   // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX]]
   // CHECK-NOT: copy_value [[MUTABLE_RETAINABLE_BOX]]

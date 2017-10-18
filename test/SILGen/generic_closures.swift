@@ -130,7 +130,7 @@ class NestedGeneric<U> {
   }
 
   // CHECK-LABEL: sil hidden @_T016generic_closures13NestedGenericC20nested_reabstraction{{[_0-9a-zA-Z]*}}F
-  //   CHECK:       [[REABSTRACT:%.*]] = function_ref @_T0Iex_ytytIexir_TR
+  //   CHECK:       [[REABSTRACT:%.*]] = function_ref @_T0Ix_ytytIxir_TR
   //   CHECK:       partial_apply [[REABSTRACT]]
   func nested_reabstraction<T>(_ x: T) -> Optionable<() -> ()> {
     return .some({})
@@ -234,7 +234,7 @@ func outer_generic<T>(t: T, i: Int) {
   let _: () -> () = inner_generic_nocapture
   // CHECK: [[FN:%.*]] = function_ref @_T016generic_closures06outer_A0yx1t_Si1itlF06inner_A10_nocaptureL_qd__qd__1u_tr__lF : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0) -> @out τ_1_0
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[FN]]<T, ()>() : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0) -> @out τ_1_0
-  // CHECK: [[THUNK:%.*]] = function_ref @_T0ytytIexir_Iex_TR
+  // CHECK: [[THUNK:%.*]] = function_ref @_T0ytytIxir_Ix_TR
   // CHECK: [[THUNK_CLOSURE:%.*]] = partial_apply [[THUNK]]([[CLOSURE]])
   // CHECK: destroy_value [[THUNK_CLOSURE]]
 
@@ -244,7 +244,7 @@ func outer_generic<T>(t: T, i: Int) {
 
   // CHECK: [[FN:%.*]] = function_ref @_T016generic_closures06outer_A0yx1t_Si1itlF14inner_generic1L_Siqd__1u_tr__lF : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, Int) -> Int
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[FN]]<T, ()>(%1) : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, Int) -> Int
-  // CHECK: [[THUNK:%.*]] = function_ref @_T0ytSiIexid_SiIexd_TR
+  // CHECK: [[THUNK:%.*]] = function_ref @_T0ytSiIxid_SiIxd_TR
   // CHECK: [[THUNK_CLOSURE:%.*]] = partial_apply [[THUNK]]([[CLOSURE]])
   // CHECK: destroy_value [[THUNK_CLOSURE]]
   let _: () -> Int = inner_generic1
@@ -255,7 +255,7 @@ func outer_generic<T>(t: T, i: Int) {
 
   // CHECK: [[FN:%.*]] = function_ref @_T016generic_closures06outer_A0yx1t_Si1itlF14inner_generic2L_xqd__1u_tr__lF : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[FN]]<T, ()>([[ARG:%.*]]) : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
-  // CHECK: [[THUNK:%.*]] = function_ref @_T0ytxIexir_xIexr_lTR
+  // CHECK: [[THUNK:%.*]] = function_ref @_T0ytxIxir_xIxr_lTR
   // CHECK: [[THUNK_CLOSURE:%.*]] = partial_apply [[THUNK]]<T>([[CLOSURE]])
   // CHECK: destroy_value [[THUNK_CLOSURE]]
   let _: () -> T = inner_generic2
@@ -277,7 +277,7 @@ func outer_concrete(i: Int) {
 
   // CHECK: [[FN:%.*]] = function_ref @_T016generic_closures14outer_concreteySi1i_tF06inner_A10_nocaptureL_xx1u_tlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[FN]]<()>() : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
-  // CHECK: [[THUNK:%.*]] = function_ref @_T0ytytIexir_Iex_TR
+  // CHECK: [[THUNK:%.*]] = function_ref @_T0ytytIxir_Ix_TR
   // CHECK: [[THUNK_CLOSURE:%.*]] = partial_apply [[THUNK]]([[CLOSURE]])
   // CHECK: destroy_value [[THUNK_CLOSURE]]
   let _: () -> () = inner_generic_nocapture
@@ -288,7 +288,7 @@ func outer_concrete(i: Int) {
 
   // CHECK: [[FN:%.*]] = function_ref @_T016generic_closures14outer_concreteySi1i_tF06inner_A0L_Six1u_tlF : $@convention(thin) <τ_0_0> (@in τ_0_0, Int) -> Int
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[FN]]<()>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0, Int) -> Int
-  // CHECK: [[THUNK:%.*]] = function_ref @_T0ytSiIexid_SiIexd_TR
+  // CHECK: [[THUNK:%.*]] = function_ref @_T0ytSiIxid_SiIxd_TR
   // CHECK: [[THUNK_CLOSURE:%.*]] = partial_apply [[THUNK]]([[CLOSURE]])
   // CHECK: destroy_value [[THUNK_CLOSURE]]
   let _: () -> Int = inner_generic

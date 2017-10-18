@@ -26,7 +26,7 @@ protocol ReturnsFunction {
 
 struct ConformsToReturnsFunction : ReturnsFunction {
   // CHECK-LABEL: sil private [transparent] [thunk] @_T018result_abstraction25ConformsToReturnsFunctionVAA0eF0A2aDP7getFunc{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in_guaranteed ConformsToReturnsFunction) -> @owned @callee_owned (@in S) -> @out R
-  // CHECK:         function_ref @_T018result_abstraction1SVAA1RVIexyd_AcEIexir_TR : $@convention(thin) (@in S, @owned @callee_owned (S) -> R) -> @out R
+  // CHECK:         function_ref @_T018result_abstraction1SVAA1RVIxyd_AcEIxir_TR : $@convention(thin) (@in S, @owned @callee_owned (S) -> R) -> @out R
   func getFunc() -> (S) -> R {
     return {s in R()}
   }

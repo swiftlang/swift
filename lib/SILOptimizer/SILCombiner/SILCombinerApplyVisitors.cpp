@@ -14,20 +14,19 @@
 #include "SILCombiner.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Range.h"
-#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -363,40 +362,17 @@ SILInstruction *PartialApplyCombiner::combine() {
 
   // Iterate over all uses of the partial_apply
   // and look for applies that use it as a callee.
-
-  // Worklist of operands.
-  SmallVector<Operand *, 8> Uses(PAI->getUses());
-
-  // Uses may grow in this loop.
-  for (size_t UseIndex = 0; UseIndex < Uses.size(); ++UseIndex) {
-    auto *Use = Uses[UseIndex];
-    auto *User = Use->getUser();
-
-    // Recurse through conversions.
-    if (auto *CFI = dyn_cast<ConvertFunctionInst>(User)) {
-      // TODO: Handle argument conversion. All the code in this file needs to be
-      // cleaned up and generalized. The argument conversion handling in
-      // optimizeApplyOfConvertFunctionInst should apply to any combine
-      // involving an apply, not just a specific pattern.
-      //
-      // For now, just handle conversion to @noescape, which is irrelevant for
-      // direct application of the closure.
-      auto ConvertCalleeTy = CFI->getType().castTo<SILFunctionType>();
-      auto EscapingCalleeTy = Lowering::adjustFunctionType(
-          ConvertCalleeTy, ConvertCalleeTy->getExtInfo().withNoEscape(false),
-          ConvertCalleeTy->getCalleeConvention());
-      if (Use->get()->getType().castTo<SILFunctionType>() == EscapingCalleeTy)
-        Uses.append(CFI->getUses().begin(), CFI->getUses().end());
-
-      continue;
-    }
+  for (auto UI = PAI->use_begin(), UE = PAI->use_end(); UI != UE; ) {
+    auto Use = *UI;
+    ++UI;
+    auto User = Use->getUser();
     // If this use of a partial_apply is not
     // an apply which uses it as a callee, bail.
     auto AI = FullApplySite::isa(User);
     if (!AI)
       continue;
 
-    if (AI.getCallee() != Use->get())
+    if (AI.getCallee() != PAI)
       continue;
 
     // We cannot handle generic apply yet. Bail.
@@ -431,24 +407,17 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                 ConvertFunctionInst *CFI) {
   // We only handle simplification of static function references. If we don't
   // have one, bail.
-  SILValue funcOper = CFI->getOperand();
-  if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(funcOper))
-    funcOper = TTI->getOperand();
-
-  auto *FRI = dyn_cast<FunctionRefInst>(funcOper);
+  auto *FRI = dyn_cast<FunctionRefInst>(CFI->getOperand());
   if (!FRI)
     return nullptr;
 
   // Grab our relevant callee types...
   CanSILFunctionType SubstCalleeTy = AI.getSubstCalleeType();
-  auto ConvertCalleeTy = funcOper->getType().castTo<SILFunctionType>();
+  auto ConvertCalleeTy =
+      CFI->getOperand()->getType().castTo<SILFunctionType>();
 
   // ... and make sure they have no unsubstituted generics. If they do, bail.
   if (SubstCalleeTy->hasArchetype() || ConvertCalleeTy->hasArchetype())
-    return nullptr;
-
-  // Indirect results are not currently handled.
-  if (AI.hasIndirectSILResults())
     return nullptr;
 
   // Bail if the result type of the converted callee is different from the callee's
@@ -485,13 +454,12 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       assert(NewOpType.isAddress() && "Addresses should map to addresses.");
       auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(UAC);
-    } else if (SILType::canRefCast(OldOpType, NewOpType, AI.getModule())) {
+    } else if (OldOpType.isHeapObjectReferenceType()) {
+      assert(NewOpType.isHeapObjectReferenceType() &&
+             "refs should map to refs.");
       auto URC = Builder.createUncheckedRefCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
     } else {
-      assert((!OldOpType.isHeapObjectReferenceType()
-              && !NewOpType.isHeapObjectReferenceType()) &&
-             "ref argument types should map to refs.");
       Args.push_back(Op);
     }
   }

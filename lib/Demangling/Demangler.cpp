@@ -1012,9 +1012,6 @@ NodePointer Demangler::demangleImplFunctionType() {
   if (GenSig && nextIf('P'))
     GenSig = changeKind(GenSig, Node::Kind::DependentPseudogenericSignature);
 
-  if (nextIf('e'))
-    type->addChild(createNode(Node::Kind::ImplEscaping), *this);
-
   const char *CAttr = nullptr;
   switch (nextChar()) {
     case 'y': CAttr = "@callee_unowned"; break;
