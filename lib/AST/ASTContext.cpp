@@ -1684,6 +1684,11 @@ ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::getOverriddenDecls() const {
     return known->second;
   }
 
+  // While we are computing overridden declarations, pretend there are none.
+  auto mutableThis = const_cast<AssociatedTypeDecl *>(this);
+  mutableThis->AssociatedTypeDeclBits.ComputedOverridden = true;
+  mutableThis->AssociatedTypeDeclBits.HasOverridden = false;
+
   // Find associated types with the given name in all of the inherited
   // protocols.
   SmallVector<AssociatedTypeDecl *, 4> inheritedAssociatedTypes;
@@ -1718,8 +1723,8 @@ ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::getOverriddenDecls() const {
                        inheritedAssociatedTypes.end(),
                        compareSimilarAssociatedTypes);
 
-  return const_cast<AssociatedTypeDecl *>(this)
-    ->setOverriddenDecls(inheritedAssociatedTypes);
+  mutableThis->AssociatedTypeDeclBits.ComputedOverridden = false;
+  return mutableThis->setOverriddenDecls(inheritedAssociatedTypes);
 }
 
 ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::setOverriddenDecls(
