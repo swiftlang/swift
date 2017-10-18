@@ -25,6 +25,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/ExternalUnion.h"
@@ -67,7 +68,7 @@ static CanType getDynamicMethodSelfType(SILGenFunction &SGF,
                                         const ArgumentSource &proto,
                                         ValueDecl *member) {
   if (member->isInstanceMember()) {
-    return member->getASTContext().TheUnknownObjectType;
+    return SGF.getASTContext().getAnyObjectType();
   } else {
     return proto.getSILSubstType(SGF).getSwiftRValueType();
   }
@@ -250,19 +251,17 @@ public:
     /// Enum case constructor call.
     EnumElement,
 
-    VirtualMethod_First,
-      /// A method call using class method dispatch.
-      ClassMethod = VirtualMethod_First,
-      /// A method call using super method dispatch.
-      SuperMethod,
-    VirtualMethod_Last = SuperMethod,
+    /// A method call using class method dispatch.
+    ClassMethod,
 
-    GenericMethod_First,
-      /// A method call using archetype dispatch.
-      WitnessMethod = GenericMethod_First,
-      /// A method call using dynamic lookup.
-      DynamicMethod,
-    GenericMethod_Last = DynamicMethod
+    /// A method call using super method dispatch.
+    SuperMethod,
+
+    /// A method call using protocol witness table dispatch.
+    WitnessMethod,
+
+    /// A method call using dynamic lookup.
+    DynamicMethod,
   };
 
   const Kind kind;
@@ -391,14 +390,11 @@ public:
     return Callee(Kind::SuperMethod, SGF, std::move(selfValue), c,
                   ci.FormalPattern, ci.FormalType, subs, l);
   }
-  static Callee forArchetype(SILGenFunction &SGF,
-                             CanType protocolSelfType,
-                             SILDeclRef c,
-                             SubstitutionList subs,
-                             SILLocation l) {
-    auto *protocol = cast<ProtocolDecl>(c.getDecl()->getDeclContext());
-    c = c.asForeign(protocol->isObjC());
-
+  static Callee forWitnessMethod(SILGenFunction &SGF,
+                                 CanType protocolSelfType,
+                                 SILDeclRef c,
+                                 SubstitutionList subs,
+                                 SILLocation l) {
     auto &ci = SGF.getConstantInfo(c);
     return Callee(Kind::WitnessMethod, SGF, None, c, ci.FormalPattern,
                   ci.FormalType, subs, l);
@@ -559,14 +555,23 @@ public:
         return ManagedValue::forUnmanaged(ref);
       }
 
+      auto methodTy = SGF.SGM.Types.getConstantOverrideType(*constant);
+
       // Otherwise, do the dynamic dispatch inline.
       Scope S(SGF, Loc);
       ManagedValue borrowedSelf =
           SelfValue.getValue().borrow(SGF).getAsSingleValue(SGF);
-      SILValue methodVal =
-          SGF.B.createClassMethod(Loc, borrowedSelf.getValue(), *constant,
-                                  /*volatile*/
-                                  constant->isForeign);
+
+      SILValue methodVal;
+      if (!constant->isForeign) {
+        methodVal = SGF.B.createClassMethod(
+            Loc, borrowedSelf.getValue(), *constant,
+            SILType::getPrimitiveObjectType(methodTy));
+      } else {
+        methodVal = SGF.B.createObjCMethod(
+            Loc, borrowedSelf.getValue(), *constant,
+            SILType::getPrimitiveObjectType(methodTy));
+      }
       return ManagedValue::forUnmanaged(methodVal);
     }
     case Kind::SuperMethod: {
@@ -580,10 +585,14 @@ public:
       auto base = SGF.SGM.Types.getOverriddenVTableEntry(*constant);
       auto constantInfo =
           SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
-      return SGF.B.createSuperMethod(Loc, castValue, *constant,
-                                     constantInfo.getSILType(),
-                                     /*volatile*/
-                                     constant->isForeign);
+
+      if (!constant->isForeign) {
+        return SGF.B.createSuperMethod(Loc, castValue, *constant,
+                                       constantInfo.getSILType());
+      } else {
+        return SGF.B.createObjCSuperMethod(Loc, castValue, *constant,
+                                           constantInfo.getSILType());
+      }
     }
     case Kind::WitnessMethod: {
       auto constantInfo = SGF.getConstantInfo(*constant);
@@ -610,6 +619,7 @@ public:
     }
     case Kind::DynamicMethod: {
       assert(!constant->isCurried);
+      assert(constant->isForeign);
 
       // Lower the substituted type from the AST, which should have any generic
       // parameters in the original signature erased to their upper bounds.
@@ -628,10 +638,9 @@ public:
       Scope S(SGF, Loc);
       ManagedValue self =
           SelfValue.getValue().borrow(SGF).getAsSingleValue(SGF);
-      SILValue fn = SGF.B.createDynamicMethod(
+      SILValue fn = SGF.B.createObjCMethod(
           Loc, self.getValue(), *constant,
-          SILType::getPrimitiveObjectType(closureType),
-          /*volatile*/ Constant.isForeign);
+          SILType::getPrimitiveObjectType(closureType));
       return ManagedValue::forUnmanaged(fn);
     }
     }
@@ -945,11 +954,13 @@ public:
       }
     }
 
-    SILDeclRef constant = SILDeclRef(afd, kind);
+    SILDeclRef constant(afd, kind);
+    constant = constant.asForeign(afd->isObjC());
 
     // Prepare the callee.  This can modify both selfValue and subs.
-    Callee theCallee = Callee::forArchetype(SGF, selfValue.getSubstRValueType(),
-                                            constant, subs, e);
+    Callee theCallee = Callee::forWitnessMethod(
+        SGF, selfValue.getSubstRValueType(),
+        constant, subs, e);
     assumedPlusZeroSelf =
         selfValue.isRValue() &&
         selfValue.forceAndPeekRValue(SGF).peekIsPlusZeroRValueOrTrivial();
@@ -1390,47 +1401,35 @@ public:
     auto subs = ctorRef->getDeclRef().getSubstitutions();
     ArgumentSource selfArgSource(arg, RValue(SGF, expr, selfFormalType, self));
 
+    SILDeclRef constant(ctorRef->getDecl(),
+                        useAllocatingCtor
+                         ? SILDeclRef::Kind::Allocator
+                         : SILDeclRef::Kind::Initializer);
+
+    constant = constant.asForeign(requiresForeignEntryPoint(ctorRef->getDecl()));
+
     // Determine the callee. For structs and enums, this is the allocating
     // constructor (because there is no initializing constructor). For protocol
     // default implementations, we also use the allocating constructor, because
     // that's the only thing that's witnessed. For classes,
     // this is the initializing constructor, to which we will dynamically
     // dispatch.
-    if (selfArgSource.getSubstRValueType()
-            ->getRValueInstanceType()
-            ->is<ArchetypeType>() &&
-        isa<ProtocolDecl>(ctorRef->getDecl()->getDeclContext())) {
+    if (isa<ProtocolDecl>(ctorRef->getDecl()->getDeclContext())) {
       // Look up the witness for the constructor.
-      auto constant = SILDeclRef(ctorRef->getDecl(),
-                             useAllocatingCtor
-                               ? SILDeclRef::Kind::Allocator
-                               : SILDeclRef::Kind::Initializer);
-      setCallee(Callee::forArchetype(SGF,
-                                     self.getType().getSwiftRValueType(),
-                                     constant, subs, expr));
+      setCallee(Callee::forWitnessMethod(
+          SGF, self.getType().getSwiftRValueType(),
+          constant, subs, expr));
     } else if (getMethodDispatch(ctorRef->getDecl())
                  == MethodDispatch::Class) {
       // Dynamic dispatch to the initializer.
       Scope S(SGF, expr);
       setCallee(Callee::forClassMethod(
           SGF, selfArgSource.delayedBorrow(SGF),
-          SILDeclRef(ctorRef->getDecl(),
-                     useAllocatingCtor ? SILDeclRef::Kind::Allocator
-                                       : SILDeclRef::Kind::Initializer)
-              .asForeign(requiresForeignEntryPoint(ctorRef->getDecl())),
-          subs, fn));
+          constant, subs, fn));
     } else {
       // Directly call the peer constructor.
       setCallee(
-        Callee::forDirect(
-          SGF,
-          SILDeclRef(ctorRef->getDecl(),
-                     useAllocatingCtor
-                       ? SILDeclRef::Kind::Allocator
-                     : SILDeclRef::Kind::Initializer)
-            .asForeign(requiresForeignEntryPoint(ctorRef->getDecl())),
-          subs,
-          fn));
+        Callee::forDirect(SGF, constant, subs, fn));
     }
 
     setSelfParam(std::move(selfArgSource), expr);
@@ -1515,7 +1514,7 @@ public:
                                    SGF.emitRValue(dynamicMemberRef->getBase()));
 
       // Determine the type of the method we referenced, by replacing the
-      // class type of the 'Self' parameter with Builtin.UnknownObject.
+      // class type of the 'Self' parameter with AnyObject.
       auto member = SILDeclRef(fd).asForeign();
 
       auto substFormalType =
@@ -4279,20 +4278,6 @@ CallEmission::applyEnumElementConstructor(unsigned uncurryLevel, SGFContext C) {
   auto substFnType =
       SGF.getSILFunctionType(origFormalType, firstLevelResult.formalType);
 
-  // Now that we know the substFnType, check if we assumed that we were
-  // passing self at +0. If we did and self is not actually passed at +0,
-  // retain Self.
-  if (assumedPlusZeroSelf) {
-    // If the final emitted function does not have a self param or it does
-    // have a self param that is consumed, convert what we think is self
-    // to
-    // be plus zero.
-    if (!substFnType->hasSelfParam() ||
-        substFnType->getSelfParameter().isConsumed()) {
-      convertSelfToPlusOneFromPlusZero();
-    }
-  }
-
   // We have a fully-applied enum element constructor: open-code the
   // construction.
   EnumElementDecl *element = callee.getEnumElementDecl();
@@ -4381,9 +4366,13 @@ CallEmission::applyPartiallyAppliedSuperMethod(unsigned uncurryLevel,
     Scope S(SGF, loc);
     ManagedValue castValue =
         borrowedCastToOriginalSelfType(SGF, loc, upcastedSelf);
-    superMethod = SGF.B.createSuperMethod(loc, castValue, constant, functionTy,
-                                          /*volatile*/
-                                          constant.isForeign);
+    if (!constant.isForeign) {
+      superMethod = SGF.B.createSuperMethod(loc, castValue, constant,
+                                            functionTy);
+    } else {
+      superMethod = SGF.B.createObjCSuperMethod(loc, castValue, constant,
+                                                functionTy);
+    }
   }
   auto closureTy = SILGenBuilder::getPartialApplyResultType(
       constantInfo.getSILType(), 1, SGF.B.getModule(), subs,
@@ -4780,9 +4769,9 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   // Form the callee.
   Optional<Callee> callee;
   if (isa<ProtocolDecl>(ctor->getDeclContext())) {
-    callee.emplace(Callee::forArchetype(SGF,
-                                        selfMetaVal.getType().getSwiftRValueType(),
-                                        initRef, subs, loc));
+    callee.emplace(Callee::forWitnessMethod(
+        SGF, selfMetaVal.getType().getSwiftRValueType(),
+        initRef, subs, loc));
   } else {
     callee.emplace(Callee::forDirect(SGF, initRef, subs, loc));
   }
@@ -5004,9 +4993,9 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
     assert(!isDirectUse && "direct use of protocol accessor?");
     assert(!isSuper && "super call to protocol method?");
 
-    return Callee::forArchetype(SGF,
-                                selfValue.getSubstRValueType(),
-                                constant, subs, loc);
+    return Callee::forWitnessMethod(
+        SGF, selfValue.getSubstRValueType(),
+        constant, subs, loc);
   }
 
   bool isClassDispatch = false;
@@ -5261,6 +5250,10 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
 
 static bool shouldReferenceForeignAccessor(AbstractStorageDecl *storage,
                                            bool isDirectUse) {
+  // Members of Objective-C protocols should be dynamically dispatched.
+  if (auto *protoDecl = dyn_cast<ProtocolDecl>(storage->getDeclContext()))
+    return protoDecl->isObjC();
+
   // C functions imported as members should be referenced as C functions.
   if (storage->getGetter()->isImportAsMember())
     return true;

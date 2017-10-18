@@ -23,11 +23,12 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
-#include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/SILValue.h"
@@ -43,6 +44,7 @@ class DeclRefExpr;
 class FloatLiteralExpr;
 class FuncDecl;
 class IntegerLiteralExpr;
+class NonValueInstruction;
 class SILBasicBlock;
 class SILBuilder;
 class SILDebugLocation;
@@ -85,6 +87,114 @@ SILInstructionKind getSILInstructionKind(StringRef InstName);
 
 /// Map SILInstructionKind to a corresponding SILInstruction name.
 StringRef getSILInstructionName(SILInstructionKind Kind);
+
+/// A formal SIL reference to a list of values, suitable for use as the result
+/// of a SILInstruction.
+///
+/// *NOTE* Most multiple value instructions will not have many results, so if we
+/// want we can cache up to 3 bytes in the lower bits of the value.
+///
+/// *NOTE* Most of this defined out of line further down in the file to work
+/// around forward declaration issues.
+class SILInstructionResultArray {
+  const uint8_t *Pointer;
+  unsigned Size;
+
+public:
+  SILInstructionResultArray() : Pointer(nullptr), Size(0) {}
+  SILInstructionResultArray(const SingleValueInstruction *SVI);
+
+  SILInstructionResultArray(const SILInstructionResultArray &Other) = default;
+  SILInstructionResultArray &
+  operator=(const SILInstructionResultArray &Other) = default;
+  SILInstructionResultArray(SILInstructionResultArray &&Other) = default;
+  SILInstructionResultArray &
+  operator=(SILInstructionResultArray &&Other) = default;
+
+  SILValue operator[](size_t Index) const;
+
+  bool empty() const { return Size == 0; }
+
+  size_t size() const { return Size; }
+
+  class iterator;
+
+  iterator begin() const;
+  iterator end() const;
+
+  using range = llvm::iterator_range<iterator>;
+  range getValues() const;
+
+  using type_range = llvm::iterator_range<
+      llvm::mapped_iterator<iterator, std::function<SILType(SILValue)>>>;
+  type_range getTypes() const;
+
+  bool operator==(const SILInstructionResultArray &rhs);
+  bool operator!=(const SILInstructionResultArray &other) {
+    return !(*this == other);
+  }
+
+  /// Returns true if both this and \p rhs have the same result types.
+  ///
+  /// *NOTE* This does not imply that the actual return SILValues are the
+  /// same. Just that the types are the same.
+  bool hasSameTypes(const SILInstructionResultArray &rhs);
+
+private:
+  /// Return the offset 1 past the end of the array or None if we are not
+  /// actually storing anything.
+  Optional<unsigned> getStartOffset() const {
+    return empty() ? None : Optional<unsigned>(0);
+  }
+
+  /// Return the offset 1 past the end of the array or None if we are not
+  /// actually storing anything.
+  Optional<unsigned> getEndOffset() const {
+    return empty() ? None : Optional<unsigned>(size());
+  }
+};
+
+class SILInstructionResultArray::iterator
+    : public std::iterator<std::bidirectional_iterator_tag, SILValue,
+                           ptrdiff_t> {
+  /// Our "parent" array.
+  ///
+  /// This is actually a value type reference into a SILInstruction of some
+  /// sort. So we can just have our own copy. This also allows us to not worry
+  /// about our underlying array having too short of a lifetime.
+  SILInstructionResultArray Parent;
+
+  /// The index into the parent array.
+  Optional<unsigned> Index;
+
+public:
+  iterator() = default;
+  iterator(const SILInstructionResultArray &Parent,
+           Optional<unsigned> Index = 0)
+      : Parent(Parent), Index(Index) {}
+
+  SILValue operator*() const { return Parent[Index.getValue()]; }
+
+  SILValue operator->() const { return operator*(); }
+
+  iterator &operator++() {
+    ++Index.getValue();
+    return *this;
+  }
+
+  iterator operator++(int) {
+    iterator copy = *this;
+    ++Index.getValue();
+    return copy;
+  }
+
+  friend bool operator==(iterator lhs, iterator rhs) {
+    assert(lhs.Parent.Pointer == rhs.Parent.Pointer);
+    return lhs.Index == rhs.Index;
+  }
+
+  friend bool operator!=(iterator lhs, iterator rhs) { return !(lhs == rhs); }
+};
 
 /// This is the root class for all instructions that can be used as the
 /// contents of a Swift SILBasicBlock.
@@ -142,7 +252,7 @@ class SILInstruction
 
   /// An internal method which retrieves the result values of the
   /// instruction as an array of ValueBase objects.
-  ArrayRef<ValueBase> getResultsImpl() const;
+  SILInstructionResultArray getResultsImpl() const;
 
 protected:
   SILInstruction(SILInstructionKind kind, SILDebugLocation DebugLoc)
@@ -317,18 +427,13 @@ public:
     getAllOperands()[Num1].swap(getAllOperands()[Num2]);
   }
 
-  using ResultArrayRef =
-    ArrayRefView<ValueBase,SILValue,projectValueBaseAsSILValue>;
-
   /// Return the list of results produced by this instruction.
-  ResultArrayRef getResults() const { return getResultsImpl(); }
-
-  using ResultTypeArrayRef =
-    ArrayRefView<ValueBase,SILType,projectValueBaseType>;
+  SILInstructionResultArray getResults() const { return getResultsImpl(); }
+  unsigned getNumResults() const { return getResults().size(); }
 
   /// Return the types of the results produced by this instruction.
-  ResultTypeArrayRef getResultTypes() const {
-    return getResultsImpl();
+  SILInstructionResultArray::type_range getResultTypes() const {
+    return getResultsImpl().getTypes();
   }
 
   MemoryBehavior getMemoryBehavior() const;
@@ -363,9 +468,9 @@ public:
       return false;
     }
 
-    if (getResultTypes() != RHS->getResultTypes())
+    if (!getResults().hasSameTypes(RHS->getResults()))
       return false;
-    
+
     // Check operands.
     for (unsigned i = 0, e = getNumOperands(); i != e; ++i)
       if (!opEqual(getOperand(i), RHS->getOperand(i)))
@@ -503,8 +608,8 @@ class SingleValueInstruction : public SILInstruction, public ValueBase {
   }
 
   friend class SILInstruction;
-  ArrayRef<ValueBase> getResultsImpl() const {
-    return ArrayRef<ValueBase>(this, 1);
+  SILInstructionResultArray getResultsImpl() const {
+    return SILInstructionResultArray(this);
   }
 public:
   SingleValueInstruction(SILInstructionKind kind, SILDebugLocation loc,
@@ -546,9 +651,7 @@ public:
   }
 
   /// Override this to reflect the more efficient access pattern.
-  ResultArrayRef getResults() const {
-    return getResultsImpl();
-  }
+  SILInstructionResultArray getResults() const { return getResultsImpl(); }
 
   static bool classof(const SILNode *node) {
     return isSingleValueInstKind(node->getKind());
@@ -598,7 +701,14 @@ public:
 
   /// Doesn't produce any results.
   SILType getType() const = delete;
-  ResultArrayRef getResults() const = delete;
+  SILInstructionResultArray getResults() const = delete;
+
+  static bool classof(const ValueBase *value) = delete;
+  static bool classof(const SILNode *N) {
+    return N->getKind() >= SILNodeKind::First_NonValueInstruction &&
+           N->getKind() <= SILNodeKind::Last_NonValueInstruction;
+  }
+  static bool classof(const NonValueInstruction *) { return true; }
 };
 #define DEFINE_ABSTRACT_NON_VALUE_INST_BOILERPLATE(ID)          \
   static bool classof(const ValueBase *value) = delete;         \
@@ -3721,16 +3831,6 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
-/// Test that an address or reference type is not null.
-class IsNonnullInst
-    : public UnaryInstructionBase<SILInstructionKind::IsNonnullInst,
-                                  SingleValueInstruction> {
-  friend SILBuilder;
-
-  IsNonnullInst(SILDebugLocation DebugLoc, SILValue Operand, SILType BoolTy)
-      : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
-};
-  
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 class UnconditionalCheckedCastInst final
@@ -4440,14 +4540,17 @@ class SelectEnumInstBase
 protected:
   SelectEnumInstBase(SILInstructionKind kind, SILDebugLocation debugLoc,
                      SILType type, SILValue enumValue, SILValue defaultValue,
-                     ArrayRef<std::pair<EnumElementDecl *, SILValue>> cases);
-
+                     ArrayRef<std::pair<EnumElementDecl *, SILValue>> cases,
+                     Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                     ProfileCounter DefaultCount);
   template <typename SELECT_ENUM_INST>
   static SELECT_ENUM_INST *
   createSelectEnum(SILDebugLocation DebugLoc, SILValue Enum, SILType Type,
                    SILValue DefaultValue,
                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-                   SILFunction &F);
+                   SILFunction &F,
+                   Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                   ProfileCounter DefaultCount);
 
 public:
   SILValue getEnumOperand() const { return getOperand(); }
@@ -4498,14 +4601,17 @@ private:
 
   SelectEnumInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                  SILValue DefaultValue,
-                 ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues)
-      : InstructionBase(DebugLoc, Type, Operand, DefaultValue, CaseValues) {}
-
+                 ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+                 Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                 ProfileCounter DefaultCount)
+      : InstructionBase(DebugLoc, Type, Operand, DefaultValue, CaseValues,
+                        CaseCounts, DefaultCount) {}
   static SelectEnumInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-         SILFunction &F);
+         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         ProfileCounter DefaultCount);
 };
 
 /// Select one of a set of values based on the case of an enum.
@@ -4518,14 +4624,17 @@ class SelectEnumAddrInst
   SelectEnumAddrInst(
       SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
       SILValue DefaultValue,
-      ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues)
-      : InstructionBase(DebugLoc, Type, Operand, DefaultValue, CaseValues) {}
-
+      ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+      Optional<ArrayRef<ProfileCounter>> CaseCounts,
+      ProfileCounter DefaultCount)
+      : InstructionBase(DebugLoc, Type, Operand, DefaultValue, CaseValues,
+                        CaseCounts, DefaultCount) {}
   static SelectEnumAddrInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-         SILFunction &F);
+         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         ProfileCounter DefaultCount);
 };
 
 /// Select on a value of a builtin integer type.
@@ -4819,17 +4928,13 @@ public:
 /// method lookup.
 class MethodInst : public SingleValueInstruction {
   SILDeclRef Member;
-  bool Volatile;
 public:
   MethodInst(SILInstructionKind Kind, SILDebugLocation DebugLoc, SILType Ty,
-             SILDeclRef Member, bool Volatile = false)
-      : SingleValueInstruction(Kind, DebugLoc, Ty), Member(Member), Volatile(Volatile) {
+             SILDeclRef Member)
+      : SingleValueInstruction(Kind, DebugLoc, Ty), Member(Member) {
   }
 
   SILDeclRef getMember() const { return Member; }
-
-  /// True if this dynamic dispatch is semantically required.
-  bool isVolatile() const { return Volatile; }
 
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(MethodInst)
 };
@@ -4844,8 +4949,8 @@ class ClassMethodInst
   friend SILBuilder;
 
   ClassMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                  SILDeclRef Member, SILType Ty, bool Volatile = false)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member, Volatile) {}
+                  SILDeclRef Member, SILType Ty)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
 };
 
 /// SuperMethodInst - Given the address of a value of class type and a method
@@ -4857,8 +4962,44 @@ class SuperMethodInst
   friend SILBuilder;
 
   SuperMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                  SILDeclRef Member, SILType Ty, bool Volatile = false)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member, Volatile) {}      
+                  SILDeclRef Member, SILType Ty)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
+};
+
+/// ObjCMethodInst - Given the address of a value of class type and a method
+/// constant, extracts the implementation of that method for the dynamic
+/// instance type of the class.
+class ObjCMethodInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::ObjCMethodInst,
+          ObjCMethodInst,
+          MethodInst>
+{
+  friend SILBuilder;
+
+  ObjCMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
+                 ArrayRef<SILValue> TypeDependentOperands,
+                 SILDeclRef Member, SILType Ty)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                               TypeDependentOperands, Ty, Member) {}
+
+  static ObjCMethodInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand,
+         SILDeclRef Member, SILType Ty, SILFunction *F,
+         SILOpenedArchetypesState &OpenedArchetypes);
+};
+
+/// ObjCSuperMethodInst - Given the address of a value of class type and a method
+/// constant, extracts the implementation of that method for the superclass of
+/// the static type of the class.
+class ObjCSuperMethodInst
+  : public UnaryInstructionBase<SILInstructionKind::ObjCSuperMethodInst, MethodInst>
+{
+  friend SILBuilder;
+
+  ObjCSuperMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
+                      SILDeclRef Member, SILType Ty)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
 };
 
 /// WitnessMethodInst - Given a type, a protocol conformance,
@@ -4874,18 +5015,32 @@ class WitnessMethodInst final
   CanType LookupType;
   ProtocolConformanceRef Conformance;
   unsigned NumOperands;
+  bool Volatile;
 
   WitnessMethodInst(SILDebugLocation DebugLoc, CanType LookupType,
                     ProtocolConformanceRef Conformance, SILDeclRef Member,
                     SILType Ty, ArrayRef<SILValue> TypeDependentOperands,
                     bool Volatile = false)
-      : InstructionBase(DebugLoc, Ty, Member, Volatile),
+      : InstructionBase(DebugLoc, Ty, Member),
         LookupType(LookupType), Conformance(Conformance),
-        NumOperands(TypeDependentOperands.size()) {
+        NumOperands(TypeDependentOperands.size()),
+        Volatile(Volatile) {
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                            TypeDependentOperands);
   }
 
+  /// Create a witness method call of a protocol requirement, passing in a lookup
+  /// type and conformance.
+  ///
+  /// At runtime, the witness is looked up in the conformance of the lookup type
+  /// to the protocol.
+  ///
+  /// The lookup type is usually an archetype, but it will be concrete if the
+  /// witness_method instruction is inside a function body that was specialized.
+  ///
+  /// The conformance must exactly match the requirement; the caller must handle
+  /// the case where the requirement is defined in a base protocol that is
+  /// refined by the conforming protocol.
   static WitnessMethodInst *
   create(SILDebugLocation DebugLoc, CanType LookupType,
          ProtocolConformanceRef Conformance, SILDeclRef Member, SILType Ty,
@@ -4906,6 +5061,8 @@ public:
              ->getAsProtocolOrProtocolExtensionContext();
   }
 
+  bool isVolatile() const { return Volatile; }
+
   ProtocolConformanceRef getConformance() const { return Conformance; }
 
   ArrayRef<Operand> getAllOperands() const {
@@ -4923,30 +5080,6 @@ public:
   MutableArrayRef<Operand> getTypeDependentOperands() {
     return { getTrailingObjects<Operand>(), NumOperands };
   }
-};
-
-/// Given the address of a value of AnyObject protocol type and a method
-/// constant referring to some Objective-C method, performs dynamic method
-/// lookup to extract the implementation of that method. This method lookup
-/// can fail at run-time
-class DynamicMethodInst final
-  : public UnaryInstructionWithTypeDependentOperandsBase<
-                                   SILInstructionKind::DynamicMethodInst,
-                                   DynamicMethodInst,
-                                   MethodInst>
-{
-  friend SILBuilder;
-
-  DynamicMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                    ArrayRef<SILValue> TypeDependentOperands,
-                    SILDeclRef Member, SILType Ty, bool Volatile)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                               TypeDependentOperands, Ty, Member, Volatile) {}
-
-  static DynamicMethodInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand,
-         SILDeclRef Member, SILType Ty, bool Volatile, SILFunction *F,
-         SILOpenedArchetypesState &OpenedArchetypes);
 };
 
 /// Access allowed to the opened value by the open_existential_addr instruction.
@@ -5950,22 +6083,24 @@ private:
   TailAllocatedOperandList<1> Operands;
   CondBranchInst(SILDebugLocation DebugLoc, SILValue Condition,
                  SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
-                 ArrayRef<SILValue> Args, unsigned NumTrue, unsigned NumFalse);
+                 ArrayRef<SILValue> Args, unsigned NumTrue, unsigned NumFalse,
+                 ProfileCounter TrueBBCount, ProfileCounter FalseBBCount);
 
   /// Construct a CondBranchInst that will branch to TrueBB or FalseBB based on
   /// the Condition value. Both blocks must not take any arguments.
   static CondBranchInst *create(SILDebugLocation DebugLoc, SILValue Condition,
                                 SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
-                                SILFunction &F);
+                                ProfileCounter TrueBBCount,
+                                ProfileCounter FalseBBCount, SILFunction &F);
 
   /// Construct a CondBranchInst that will either branch to TrueBB and pass
   /// TrueArgs or branch to FalseBB and pass FalseArgs based on the Condition
   /// value.
-  static CondBranchInst *create(SILDebugLocation DebugLoc, SILValue Condition,
-                                SILBasicBlock *TrueBB,
-                                ArrayRef<SILValue> TrueArgs,
-                                SILBasicBlock *FalseBB,
-                                ArrayRef<SILValue> FalseArgs, SILFunction &F);
+  static CondBranchInst *
+  create(SILDebugLocation DebugLoc, SILValue Condition, SILBasicBlock *TrueBB,
+         ArrayRef<SILValue> TrueArgs, SILBasicBlock *FalseBB,
+         ArrayRef<SILValue> FalseArgs, ProfileCounter TrueBBCount,
+         ProfileCounter FalseBBCount, SILFunction &F);
 
 public:
   SILValue getCondition() const { return Operands[ConditionIdx].get(); }
@@ -5981,6 +6116,11 @@ public:
   const SILBasicBlock *getTrueBB() const { return DestBBs[0]; }
   SILBasicBlock *getFalseBB() { return DestBBs[1]; }
   const SILBasicBlock *getFalseBB() const { return DestBBs[1]; }
+
+  /// The number of times the True branch was executed.
+  ProfileCounter getTrueBBCount() const { return DestBBs[0].getCount(); }
+  /// The number of times the False branch was executed.
+  ProfileCounter getFalseBBCount() const { return DestBBs[1].getCount(); }
 
   /// Get the arguments to the true BB.
   OperandValueArrayRef getTrueArgs() const;
@@ -6143,13 +6283,15 @@ protected:
   SwitchEnumInstBase(
       SILInstructionKind Kind, SILDebugLocation DebugLoc, SILValue Operand,
       SILBasicBlock *DefaultBB,
-      ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs);
+      ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
+      Optional<ArrayRef<ProfileCounter>> Counts, ProfileCounter DefaultCount);
 
   template <typename SWITCH_ENUM_INST>
   static SWITCH_ENUM_INST *createSwitchEnum(
       SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      SILFunction &F);
+      SILFunction &F, Optional<ArrayRef<ProfileCounter>> Counts,
+      ProfileCounter DefaultCount);
 
 public:
   /// Clean up tail-allocated successor records for the switch cases.
@@ -6170,6 +6312,10 @@ public:
   getCase(unsigned i) const {
     assert(i < NumCases && "case out of bounds");
     return {getCaseBuf()[i], getSuccessorBuf()[i].getBB()};
+  }
+  ProfileCounter getCaseCount(unsigned i) const {
+    assert(i < NumCases && "case out of bounds");
+    return getSuccessorBuf()[i].getCount();
   }
 
   // Swap the cases at indices \p i and \p j.
@@ -6199,6 +6345,10 @@ public:
     assert(HasDefault && "doesn't have a default");
     return getSuccessorBuf()[NumCases];
   }
+  ProfileCounter getDefaultCount() const {
+    assert(HasDefault && "doesn't have a default");
+    return getSuccessorBuf()[NumCases].getCount();
+  }
 
   static bool classof(const SILInstruction *I) {
     return I->getKind() >= SILInstructionKind::SwitchEnumInst &&
@@ -6218,13 +6368,16 @@ private:
 
   SwitchEnumInst(
       SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
-      ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs)
-      : InstructionBase(DebugLoc, Operand, DefaultBB, CaseBBs) {}
-
+      ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
+      Optional<ArrayRef<ProfileCounter>> CaseCounts,
+      ProfileCounter DefaultCount)
+      : InstructionBase(DebugLoc, Operand, DefaultBB, CaseBBs, CaseCounts,
+                        DefaultCount) {}
   static SwitchEnumInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
          ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-         SILFunction &F);
+         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         ProfileCounter DefaultCount);
 };
 
 /// A switch on an enum's discriminator in memory.
@@ -6238,13 +6391,16 @@ private:
 
   SwitchEnumAddrInst(
       SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
-      ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs)
-      : InstructionBase(DebugLoc, Operand, DefaultBB, CaseBBs) {}
-
+      ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
+      Optional<ArrayRef<ProfileCounter>> CaseCounts,
+      ProfileCounter DefaultCount)
+      : InstructionBase(DebugLoc, Operand, DefaultBB, CaseBBs, CaseCounts,
+                        DefaultCount) {}
   static SwitchEnumAddrInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
          ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-         SILFunction &F);
+         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         ProfileCounter DefaultCount);
 };
 
 /// Branch on the existence of an Objective-C method in the dynamic type of
@@ -6311,17 +6467,20 @@ class CheckedCastBranchInst final:
   CheckedCastBranchInst(SILDebugLocation DebugLoc, bool IsExact,
                         SILValue Operand,
                         ArrayRef<SILValue> TypeDependentOperands,
-                        SILType DestTy,
-                        SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB)
+                        SILType DestTy, SILBasicBlock *SuccessBB,
+                        SILBasicBlock *FailureBB, ProfileCounter Target1Count,
+                        ProfileCounter Target2Count)
       : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                                               TypeDependentOperands),
-        DestTy(DestTy), IsExact(IsExact),
-        DestBBs{{this, SuccessBB}, {this, FailureBB}} {}
+                                                      TypeDependentOperands),
+        DestTy(DestTy),
+        IsExact(IsExact), DestBBs{{this, SuccessBB, Target1Count},
+                                  {this, FailureBB, Target2Count}} {}
 
   static CheckedCastBranchInst *
   create(SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
          SILType DestTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+         ProfileCounter Target1Count, ProfileCounter Target2Count);
 
 public:
   bool isExact() const { return IsExact; }
@@ -6348,6 +6507,11 @@ public:
   const SILBasicBlock *getSuccessBB() const { return DestBBs[0]; }
   SILBasicBlock *getFailureBB() { return DestBBs[1]; }
   const SILBasicBlock *getFailureBB() const { return DestBBs[1]; }
+
+  /// The number of times the True branch was executed
+  ProfileCounter getTrueBBCount() const { return DestBBs[0].getCount(); }
+  /// The number of times the False branch was executed
+  ProfileCounter getFalseBBCount() const { return DestBBs[1].getCount(); }
 };
 
 /// Perform a checked cast operation and branch on whether the cast succeeds.
@@ -6424,11 +6588,13 @@ class CheckedCastAddrBranchInst
   CheckedCastAddrBranchInst(SILDebugLocation DebugLoc,
                             CastConsumptionKind consumptionKind, SILValue src,
                             CanType srcType, SILValue dest, CanType targetType,
-                            SILBasicBlock *successBB, SILBasicBlock *failureBB)
-      : InstructionBase(DebugLoc),
-        ConsumptionKind(consumptionKind), Operands{this, src, dest},
-        DestBBs{{this, successBB}, {this, failureBB}}, SourceType(srcType),
-        TargetType(targetType) {}
+                            SILBasicBlock *successBB, SILBasicBlock *failureBB,
+                            ProfileCounter Target1Count,
+                            ProfileCounter Target2Count)
+      : InstructionBase(DebugLoc), ConsumptionKind(consumptionKind),
+        Operands{this, src, dest}, DestBBs{{this, successBB, Target1Count},
+                                           {this, failureBB, Target2Count}},
+        SourceType(srcType), TargetType(targetType) {}
 
 public:
   CastConsumptionKind getConsumptionKind() const { return ConsumptionKind; }
@@ -6453,6 +6619,11 @@ public:
   const SILBasicBlock *getSuccessBB() const { return DestBBs[0]; }
   SILBasicBlock *getFailureBB() { return DestBBs[1]; }
   const SILBasicBlock *getFailureBB() const { return DestBBs[1]; }
+
+  /// The number of times the True branch was executed.
+  ProfileCounter getTrueBBCount() const { return DestBBs[0].getCount(); }
+  /// The number of times the False branch was executed.
+  ProfileCounter getFalseBBCount() const { return DestBBs[1].getCount(); }
 };
 
 /// A private abstract class to store the destinations of a TryApplyInst.

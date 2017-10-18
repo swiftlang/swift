@@ -62,7 +62,7 @@ SliceTests.test("${Slice}/AssociatedTypes") {
       subSequenceType: CollectionSlice.self,
       indexType: MinimalIndex.self,
       indexDistanceType: Int.self,
-      indicesType: ${defaultIndicesForTraversal(Traversal)}<CollectionSlice>.self)
+      indicesType: Collection.Indices.self)
   }
 
   func checkStaticTypealiases1<Base : Collection>(_: Base) {

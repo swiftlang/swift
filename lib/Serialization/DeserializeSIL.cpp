@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "deserialize"
 #include "DeserializeSIL.h"
 #include "swift/Basic/Defer.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Serialization/ModuleFile.h"
 #include "SILFormat.h"
@@ -318,7 +319,7 @@ static SILFunction *createBogusSILFunction(SILModule &M,
   return M.createFunction(
       SILLinkage::Private, name, type.castTo<SILFunctionType>(), nullptr,
       RegularLocation(loc), IsNotBare, IsNotTransparent, IsNotSerialized,
-      IsNotThunk, SubclassScope::NotApplicable);
+      ProfileCounter(), IsNotThunk, SubclassScope::NotApplicable);
 }
 
 /// Helper function to find a SILFunction, given its name and type.
@@ -470,7 +471,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     fn = SILMod.createFunction(
         linkage.getValue(), name, ty.castTo<SILFunctionType>(), nullptr, loc,
         IsNotBare, IsTransparent_t(isTransparent == 1),
-        IsSerialized_t(isSerialized), IsThunk_t(isThunk),
+        IsSerialized_t(isSerialized), ProfileCounter(), IsThunk_t(isThunk),
         SubclassScope::NotApplicable, (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);
@@ -1401,7 +1402,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(DeinitExistentialValue)
   UNARY_INSTRUCTION(EndBorrowArgument)
   UNARY_INSTRUCTION(DestroyAddr)
-  UNARY_INSTRUCTION(IsNonnull)
   UNARY_INSTRUCTION(Return)
   UNARY_INSTRUCTION(Throw)
   UNARY_INSTRUCTION(FixLifetime)
@@ -1896,11 +1896,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::SuperMethodInst:
-  case SILInstructionKind::DynamicMethodInst: {
+  case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::ObjCSuperMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
-    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),
-    // and an operand.
-    unsigned NextValueIndex = 1;
+    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel), and an operand.
+    unsigned NextValueIndex = 0;
     SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, NextValueIndex);
     SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     assert(ListOfValues.size() >= NextValueIndex + 2 &&
@@ -1908,24 +1908,28 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType operandTy = getSILType(MF->getType(ListOfValues[NextValueIndex]),
                                    (SILValueCategory)ListOfValues[NextValueIndex+1]);
     NextValueIndex += 2;
-    bool IsVolatile = ListOfValues[0] > 0;
 
     switch (OpCode) {
     default: llvm_unreachable("Out of sync with parent switch");
     case SILInstructionKind::ClassMethodInst:
       ResultVal = Builder.createClassMethod(Loc,
                     getLocalValue(ListOfValues[NextValueIndex], operandTy),
-                    DRef, Ty, IsVolatile);
+                    DRef, Ty);
       break;
     case SILInstructionKind::SuperMethodInst:
       ResultVal = Builder.createSuperMethod(Loc,
                     getLocalValue(ListOfValues[NextValueIndex], operandTy),
-                    DRef, Ty, IsVolatile);
+                    DRef, Ty);
       break;
-    case SILInstructionKind::DynamicMethodInst:
-      ResultVal = Builder.createDynamicMethod(Loc,
+    case SILInstructionKind::ObjCMethodInst:
+      ResultVal = Builder.createObjCMethod(Loc,
                     getLocalValue(ListOfValues[NextValueIndex], operandTy),
-                    DRef, Ty, IsVolatile);
+                    DRef, Ty);
+      break;
+    case SILInstructionKind::ObjCSuperMethodInst:
+      ResultVal = Builder.createObjCSuperMethod(Loc,
+                    getLocalValue(ListOfValues[NextValueIndex], operandTy),
+                    DRef, Ty);
       break;
     }
     break;

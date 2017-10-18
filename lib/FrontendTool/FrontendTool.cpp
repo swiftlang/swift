@@ -135,7 +135,8 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
     out << escape(targetName) << " :";
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!
-    for (auto const &path : reversePathSortedFilenames(opts.InputFilenames))
+    for (auto const &path :
+         reversePathSortedFilenames(opts.Inputs.getInputFilenames()))
       out << ' ' << escape(path);
     // Then print dependencies we've picked up during compilation.
     for (auto const &path :
@@ -527,15 +528,16 @@ static bool performCompile(CompilerInstance &Instance,
     auto &ImporterOpts = Invocation.getClangImporterOptions();
     auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
     if (!PCHOutDir.empty()) {
-      ImporterOpts.BridgingHeader = Invocation.getInputFilenames()[0];
+      ImporterOpts.BridgingHeader =
+          Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput();
       // Create or validate a persistent PCH.
       auto SwiftPCHHash = Invocation.getPCHHash();
       auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
       return !PCH.hasValue();
     }
     return clangImporter->emitBridgingPCH(
-      Invocation.getInputFilenames()[0],
-      opts.getSingleOutputFilename());
+        Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
+        opts.getSingleOutputFilename());
   }
 
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
@@ -545,15 +547,16 @@ static bool performCompile(CompilerInstance &Instance,
     auto &LLVMContext = getGlobalLLVMContext();
 
     // Load in bitcode file.
-    assert(Invocation.getInputFilenames().size() == 1 &&
+    assert(Invocation.getFrontendOptions().Inputs.hasUniqueInputFilename() &&
            "We expect a single input for bitcode input!");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(Invocation.getInputFilenames()[0]);
+        llvm::MemoryBuffer::getFileOrSTDIN(
+            Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput());
     if (!FileBufOrErr) {
-      Instance.getASTContext().Diags.diagnose(SourceLoc(),
-                                              diag::error_open_input_file,
-                                              Invocation.getInputFilenames()[0],
-                                              FileBufOrErr.getError().message());
+      Instance.getASTContext().Diags.diagnose(
+          SourceLoc(), diag::error_open_input_file,
+          Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
+          FileBufOrErr.getError().message());
       return true;
     }
     llvm::MemoryBuffer *MainFile = FileBufOrErr.get().get();
@@ -565,10 +568,10 @@ static bool performCompile(CompilerInstance &Instance,
     if (!Module) {
       // TODO: Translate from the diagnostic info to the SourceManager location
       // if available.
-      Instance.getASTContext().Diags.diagnose(SourceLoc(),
-                                              diag::error_parse_input_file,
-                                              Invocation.getInputFilenames()[0],
-                                              Err.getMessage());
+      Instance.getASTContext().Diags.diagnose(
+          SourceLoc(), diag::error_parse_input_file,
+          Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
+          Err.getMessage());
       return true;
     }
 
@@ -770,10 +773,10 @@ static bool performCompile(CompilerInstance &Instance,
       auto SASTF = dyn_cast<SerializedASTFile>(File);
       return SASTF && SASTF->isSIB();
     };
-    if (opts.PrimaryInput.hasValue() && opts.PrimaryInput.getValue().isFilename()) {
+    if (opts.Inputs.haveAPrimaryInputFile()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
-        auto Index = opts.PrimaryInput.getValue().Index;
+        auto Index = opts.Inputs.getPrimaryInput().getValue().Index;
         PrimaryFile = Instance.getMainModule()->getFiles()[Index];
       }
       astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
@@ -851,6 +854,46 @@ static bool performCompile(CompilerInstance &Instance,
     SM->verify();
   }
 
+  // This is the action to be used to serialize SILModule.
+  // It may be invoked multiple times, but it will perform
+  // serialization only once. The serialization may either happen
+  // after high-level optimizations or after all optimizations are
+  // done, depending on the compiler setting.
+
+  auto SerializeSILModuleAction = [&]() {
+    if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
+      auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile)
+                                  : Instance.getMainModule();
+      if (!opts.ModuleOutputPath.empty()) {
+        SerializationOptions serializationOpts;
+        serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
+        serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
+        serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
+        if (opts.SerializeBridgingHeader)
+          serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
+        serializationOpts.ModuleLinkName = opts.ModuleLinkName;
+        serializationOpts.ExtraClangOptions =
+            Invocation.getClangImporterOptions().ExtraArgs;
+        serializationOpts.EnableNestedTypeLookupTable =
+            opts.EnableSerializationNestedTypeLookupTable;
+        if (!IRGenOpts.ForceLoadSymbolName.empty())
+          serializationOpts.AutolinkForceLoad = true;
+
+        // Options contain information about the developer's computer,
+        // so only serialize them if the module isn't going to be shipped to
+        // the public.
+        serializationOpts.SerializeOptionsForDebugging =
+            !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
+
+        serialize(DC, serializationOpts, SM.get());
+      }
+    }
+  };
+
+  // Set the serialization action, so that the SIL module
+  // can be serialized at any moment, e.g. during the optimization pipeline.
+  SM->setSerializeSILAction(SerializeSILModuleAction);
+
   // Perform SIL optimization passes if optimizations haven't been disabled.
   // These may change across compiler versions.
   {
@@ -918,34 +961,9 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
-    auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
-                                  Instance.getMainModule();
-    if (!opts.ModuleOutputPath.empty()) {
-      SerializationOptions serializationOpts;
-      serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
-      serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
-      serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-      serializationOpts.SerializeAllSIL =
-          Invocation.getSILOptions().SILSerializeAll;
-      if (opts.SerializeBridgingHeader)
-        serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
-      serializationOpts.ModuleLinkName = opts.ModuleLinkName;
-      serializationOpts.ExtraClangOptions =
-          Invocation.getClangImporterOptions().ExtraArgs;
-      serializationOpts.EnableNestedTypeLookupTable =
-          opts.EnableSerializationNestedTypeLookupTable;
-      if (!IRGenOpts.ForceLoadSymbolName.empty())
-        serializationOpts.AutolinkForceLoad = true;
-
-      // Options contain information about the developer's computer,
-      // so only serialize them if the module isn't going to be shipped to
-      // the public.
-      serializationOpts.SerializeOptionsForDebugging =
-          !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
-
-      serialize(DC, serializationOpts, SM.get());
-    }
-
+    // Serialize the SILModule if it was not serialized yet.
+    if (!SM.get()->isSerialized())
+      SM.get()->serialize();
     if (Action == FrontendOptions::MergeModules ||
         Action == FrontendOptions::EmitModuleOnly) {
       if (shouldIndex) {
@@ -1349,13 +1367,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     auto &FEOpts = Invocation.getFrontendOptions();
     auto &LangOpts = Invocation.getLangOptions();
     auto &SILOpts = Invocation.getSILOptions();
-    StringRef InputName;
-    std::string TargetName = FEOpts.ModuleName;
-    if (FEOpts.PrimaryInput.hasValue() &&
-        FEOpts.PrimaryInput.getValue().isFilename()) {
-      auto Index = FEOpts.PrimaryInput.getValue().Index;
-      InputName = FEOpts.InputFilenames[Index];
-    }
+    StringRef InputName = FEOpts.Inputs.primaryInputFilenameIfAny();
     StringRef OptType = silOptModeArgStr(SILOpts.Optimization);
     StringRef OutFile = FEOpts.getSingleOutputFilename();
     StringRef OutputType = llvm::sys::path::extension(OutFile);

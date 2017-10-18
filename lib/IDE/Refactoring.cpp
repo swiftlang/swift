@@ -40,22 +40,28 @@ class ContextFinder : public SourceEntityWalker {
   SourceFile &SF;
   ASTContext &Ctx;
   SourceManager &SM;
-  ASTNode Target;
+  SourceRange Target;
   llvm::function_ref<bool(ASTNode)> IsContext;
   SmallVector<ASTNode, 4> AllContexts;
   bool contains(ASTNode Enclosing) {
-    auto Result = SM.rangeContains(Enclosing.getSourceRange(),
-                                   Target.getSourceRange());
+    auto Result = SM.rangeContains(Enclosing.getSourceRange(), Target);
     if (Result && IsContext(Enclosing))
       AllContexts.push_back(Enclosing);
     return Result;
   }
 public:
-  ContextFinder(SourceFile &SF, ASTNode Target,
+  ContextFinder(SourceFile &SF, ASTNode TargetNode,
                 llvm::function_ref<bool(ASTNode)> IsContext =
-                  [](ASTNode N) { return true; }) : SF(SF),
-                  Ctx(SF.getASTContext()), SM(Ctx.SourceMgr), Target(Target),
-                  IsContext(IsContext) {}
+                  [](ASTNode N) { return true; }) :
+                  SF(SF), Ctx(SF.getASTContext()), SM(Ctx.SourceMgr),
+                  Target(TargetNode.getSourceRange()), IsContext(IsContext) {}
+  ContextFinder(SourceFile &SF, SourceLoc TargetLoc,
+                llvm::function_ref<bool(ASTNode)> IsContext =
+                  [](ASTNode N) { return true; }) :
+                  SF(SF), Ctx(SF.getASTContext()), SM(Ctx.SourceMgr),
+                  Target(TargetLoc), IsContext(IsContext) {
+                    assert(TargetLoc.isValid() && "Invalid loc to find");
+                  }
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override { return contains(D); }
   bool walkToStmtPre(Stmt *S) override { return contains(S); }
   bool walkToExprPre(Expr *E) override { return contains(E); }
@@ -998,7 +1004,8 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
 
   CompilerInvocation Invocation{};
   Invocation.addInputBuffer(InputBuffer.get());
-  Invocation.getFrontendOptions().PrimaryInput = {0, SelectedInput::InputKind::Buffer};
+  Invocation.getFrontendOptions().Inputs.setPrimaryInput(
+      {0, SelectedInput::InputKind::Buffer});
   Invocation.getFrontendOptions().ModuleName = "extract";
 
   auto Instance = llvm::make_unique<swift::CompilerInstance>();
@@ -1721,7 +1728,8 @@ public:
 
 FillProtocolStubContext FillProtocolStubContext::
 getContextFromCursorInfo(ResolvedCursorInfo CursorInfo) {
-  assert(CursorInfo.isValid());
+  if(!CursorInfo.isValid())
+    return FillProtocolStubContext();
   if (!CursorInfo.IsRef) {
     // If the type name is on the declared nominal, e.g. "class A {}"
     if (auto ND = dyn_cast<NominalTypeDecl>(CursorInfo.ValueD)) {
@@ -1800,57 +1808,25 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
   return collectAvailableRefactorings(SF, Tok, Scratch, /*Exclude rename*/false);
 }
 
-bool RefactoringActionExpandDefault::
-isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
-  auto Exit = [&](bool Applicable) {
-    if (!Applicable)
-      Diag.diagnose(SourceLoc(), diag::invalid_default_location);
-    return Applicable;
-  };
-  if (CursorInfo.Kind != CursorInfoKind::StmtStart)
-    return Exit(false);
-  if (auto *CS = dyn_cast<CaseStmt>(CursorInfo.TrailingStmt)) {
-    return Exit(CS->isDefault());
+static EnumDecl* getEnumDeclFromSwitchStmt(SwitchStmt *SwitchS) {
+  if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
+    return SubjectTy->getAnyNominal()->getAsEnumOrEnumExtensionContext();
   }
-  return Exit(false);
+  return nullptr;
 }
 
-bool RefactoringActionExpandDefault::performChange() {
-  // Try to find the switch statement enclosing the default statement.
-  auto *CS = static_cast<CaseStmt*>(CursorInfo.TrailingStmt);
-  auto IsSwitch = [](ASTNode Node) {
-    return Node.is<Stmt*>() &&
-      Node.get<Stmt*>()->getKind() == StmtKind::Switch;
-  };
-  ContextFinder Finder(*TheFile, CS, IsSwitch);
-  Finder.resolve();
-
-  // If failed to find the switch statement, issue error.
-  if (Finder.getContexts().empty()) {
-    DiagEngine.diagnose(CS->getStartLoc(), diag::no_parent_switch);
-    return true;
-  }
-  auto *SwitchS = static_cast<SwitchStmt*>(Finder.getContexts().back().
-    get<Stmt*>());
-
-  // To find the subject enum decl for this switch statement; if failing,
-  // issue errors.
-  EnumDecl *SubjectED = nullptr;
-  if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
-    SubjectED = SubjectTy->getAnyNominal()->getAsEnumOrEnumExtensionContext();
-  }
-  if (!SubjectED) {
-    DiagEngine.diagnose(CS->getStartLoc(), diag::no_subject_enum);
-    return true;
-  }
-
+static bool performCasesExpansionInSwitchStmt(SwitchStmt *SwitchS,
+                                              DiagnosticEngine &DiagEngine,
+                                              SourceLoc ExpandedStmtLoc,
+                                              EditorConsumerInsertStream &OS
+                                              ) {
   // Assume enum elements are not handled in the switch statement.
+  auto EnumDecl = getEnumDeclFromSwitchStmt(SwitchS);
+  assert(EnumDecl);
   llvm::DenseSet<EnumElementDecl*> UnhandledElements;
-  SubjectED->getAllElements(UnhandledElements);
-  bool FoundDefault = false;
+  EnumDecl->getAllElements(UnhandledElements);
   for (auto Current : SwitchS->getCases()) {
-    if (Current == CS) {
-      FoundDefault = true;
+    if (Current->isDefault()) {
       continue;
     }
     // For each handled enum element, remove it from the bucket.
@@ -1861,25 +1837,117 @@ bool RefactoringActionExpandDefault::performChange() {
     }
   }
 
-  // If we've not seen the default statement inside the switch statement, issue
-  // error.
-  if (!FoundDefault) {
-    DiagEngine.diagnose(CS->getStartLoc(), diag::no_parent_switch);
-    return true;
-  }
-
   // If all enum elements are handled in the switch statement, issue error.
   if (UnhandledElements.empty()) {
-    DiagEngine.diagnose(CS->getStartLoc(), diag::no_remaining_cases);
+    DiagEngine.diagnose(ExpandedStmtLoc, diag::no_remaining_cases);
     return true;
   }
 
-  // Good to go, change the code!
+  printEnumElementsAsCases(UnhandledElements, OS);
+  return false;
+}
+
+// Finds SwitchStmt that contains given CaseStmt.
+static SwitchStmt* findEnclosingSwitchStmt(CaseStmt *CS,
+                                           SourceFile *SF,
+                                           DiagnosticEngine &DiagEngine) {
+  auto IsSwitch = [](ASTNode Node) {
+    return Node.is<Stmt*>() &&
+    Node.get<Stmt*>()->getKind() == StmtKind::Switch;
+  };
+  ContextFinder Finder(*SF, CS, IsSwitch);
+  Finder.resolve();
+
+  // If failed to find the switch statement, issue error.
+  if (Finder.getContexts().empty()) {
+    DiagEngine.diagnose(CS->getStartLoc(), diag::no_parent_switch);
+    return nullptr;
+  }
+  auto *SwitchS = static_cast<SwitchStmt*>(Finder.getContexts().back().
+                                           get<Stmt*>());
+  // Make sure that CaseStmt is included in switch that was found.
+  auto Cases = SwitchS->getCases();
+  auto Default = std::find(Cases.begin(), Cases.end(), CS);
+  if (Default == Cases.end()) {
+    DiagEngine.diagnose(CS->getStartLoc(), diag::no_parent_switch);
+    return nullptr;
+  }
+  return SwitchS;
+}
+
+bool RefactoringActionExpandDefault::
+isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
+  auto Exit = [&](bool Applicable) {
+    if (!Applicable)
+      Diag.diagnose(SourceLoc(), diag::invalid_default_location);
+    return Applicable;
+  };
+  if (CursorInfo.Kind != CursorInfoKind::StmtStart)
+    return Exit(false);
+  if (auto *CS = dyn_cast<CaseStmt>(CursorInfo.TrailingStmt)) {
+    auto EnclosingSwitchStmt = findEnclosingSwitchStmt(CS,
+                                                       CursorInfo.SF,
+                                                       Diag);
+    if (!EnclosingSwitchStmt)
+      return false;
+    auto EnumD = getEnumDeclFromSwitchStmt(EnclosingSwitchStmt);
+    auto IsApplicable = CS->isDefault() && EnumD != nullptr;
+    return IsApplicable;
+  }
+  return Exit(false);
+}
+
+bool RefactoringActionExpandDefault::performChange() {
+  // If we've not seen the default statement inside the switch statement, issue
+  // error.
+  auto *CS = static_cast<CaseStmt*>(CursorInfo.TrailingStmt);
+  auto *SwitchS = findEnclosingSwitchStmt(CS, TheFile, DiagEngine);
+  assert(SwitchS);
   EditorConsumerInsertStream OS(EditConsumer, SM,
                                 Lexer::getCharSourceRangeFromSourceRange(SM,
                                   CS->getLabelItemsRange()));
-  printEnumElementsAsCases(UnhandledElements, OS);
+  return performCasesExpansionInSwitchStmt(SwitchS,
+                                           DiagEngine,
+                                           CS->getStartLoc(),
+                                           OS);
+}
+
+bool RefactoringActionExpandSwitchCases::
+isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &DiagEngine) {
+  if (!CursorInfo.TrailingStmt)
+    return false;
+  if (auto *Switch = dyn_cast<SwitchStmt>(CursorInfo.TrailingStmt)) {
+    return getEnumDeclFromSwitchStmt(Switch);
+  }
   return false;
+}
+
+bool RefactoringActionExpandSwitchCases::performChange() {
+  auto *SwitchS = dyn_cast<SwitchStmt>(CursorInfo.TrailingStmt);
+  assert(SwitchS);
+
+  auto InsertRange = CharSourceRange();
+  auto Cases = SwitchS->getCases();
+  auto Default = std::find_if(Cases.begin(), Cases.end(), [](CaseStmt *Stmt) {
+    return Stmt->isDefault();
+  });
+  if (Default != Cases.end()) {
+    auto DefaultRange = (*Default)->getLabelItemsRange();
+    InsertRange = Lexer::getCharSourceRangeFromSourceRange(SM, DefaultRange);
+  } else {
+    auto RBraceLoc = SwitchS->getRBraceLoc();
+    InsertRange = CharSourceRange(SM, RBraceLoc, RBraceLoc);
+  }
+  EditorConsumerInsertStream OS(EditConsumer, SM, InsertRange);
+  if (SM.getLineNumber(SwitchS->getLBraceLoc()) ==
+      SM.getLineNumber(SwitchS->getRBraceLoc())) {
+    OS << "\n";
+  }
+  auto Result = performCasesExpansionInSwitchStmt(SwitchS,
+                                           DiagEngine,
+                                           SwitchS->getStartLoc(),
+                                           OS);
+  return Result;
 }
 
 static Expr *findLocalizeTarget(ResolvedCursorInfo CursorInfo) {
@@ -1970,7 +2038,7 @@ bool RefactoringActionConvertToDoCatch::performChange() {
   // Delete ! from try! expression
   auto ExclaimLen = getKeywordLen(tok::exclaim_postfix);
   auto ExclaimRange = CharSourceRange(TryExpr->getExclaimLoc(), ExclaimLen);
-  EditConsumer.accept(SM, ExclaimRange, "");
+  EditConsumer.remove(SM, ExclaimRange);
   return false;
 }
 
@@ -2064,6 +2132,110 @@ bool RefactoringActionSimplifyNumberLiteral::performChange() {
     return false;
   }
   return true;
+}
+
+static CallExpr *findTrailingClosureTarget(SourceManager &SM,
+                                           ResolvedCursorInfo CursorInfo) {
+  if (CursorInfo.Kind == CursorInfoKind::StmtStart)
+    // StmtStart postion can't be a part of CallExpr.
+    return nullptr;
+
+  // Find inner most CallExpr
+  ContextFinder
+  Finder(*CursorInfo.SF, CursorInfo.Loc,
+         [](ASTNode N) {
+           return N.isStmt(StmtKind::Brace) || N.isExpr(ExprKind::Call);
+         });
+  Finder.resolve();
+  if (Finder.getContexts().empty()
+      || !Finder.getContexts().back().is<Expr*>())
+    return nullptr;
+  CallExpr *CE = cast<CallExpr>(Finder.getContexts().back().get<Expr*>());
+
+  // The last arugment is a closure?
+  Expr *Args = CE->getArg();
+  if (!Args)
+    return nullptr;
+  Expr *LastArg;
+  if (auto *TSE = dyn_cast<TupleShuffleExpr>(Args))
+    Args = TSE->getSubExpr();
+  if (auto *PE = dyn_cast<ParenExpr>(Args)) {
+    LastArg = PE->getSubExpr();
+  } else {
+    auto *TE = cast<TupleExpr>(Args);
+    if (TE->getNumElements() == 0)
+      return nullptr;
+    LastArg = TE->getElements().back();
+  }
+
+  if (auto *ICE = dyn_cast<ImplicitConversionExpr>(LastArg))
+    LastArg = ICE->getSyntacticSubExpr();
+
+  if (isa<ClosureExpr>(LastArg) || isa<CaptureListExpr>(LastArg))
+    return CE;
+  return nullptr;
+}
+
+bool RefactoringActionTrailingClosure::
+isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
+  SourceManager &SM = CursorInfo.SF->getASTContext().SourceMgr;
+  return findTrailingClosureTarget(SM, CursorInfo);
+}
+
+bool RefactoringActionTrailingClosure::performChange() {
+  auto *CE = findTrailingClosureTarget(SM, CursorInfo);
+  if (!CE)
+    return true;
+  Expr *Args = CE->getArg();
+  if (auto *TSE = dyn_cast<TupleShuffleExpr>(Args))
+    Args = TSE;
+
+  Expr *ClosureArg = nullptr;
+  Expr *PrevArg = nullptr;
+  SourceLoc LPLoc, RPLoc;
+
+  if (auto *PE = dyn_cast<ParenExpr>(Args)) {
+    ClosureArg = PE->getSubExpr();
+    LPLoc = PE->getLParenLoc();
+    RPLoc = PE->getRParenLoc();
+  } else {
+    auto *TE = cast<TupleExpr>(Args);
+    auto NumArgs = TE->getNumElements();
+    if (NumArgs == 0)
+      return true;
+    LPLoc = TE->getLParenLoc();
+    RPLoc = TE->getRParenLoc();
+    ClosureArg = TE->getElement(NumArgs - 1);
+    if (NumArgs > 1)
+      PrevArg = TE->getElement(NumArgs - 2);
+  }
+  if (auto *ICE = dyn_cast<ImplicitConversionExpr>(ClosureArg))
+    ClosureArg = ICE->getSyntacticSubExpr();
+
+  if (LPLoc.isInvalid() || RPLoc.isInvalid())
+    return true;
+
+  // Replace:
+  //   * Open paren with ' ' if the closure is sole argument.
+  //   * Comma with ') ' otherwise.
+  if (PrevArg) {
+    CharSourceRange PreRange(
+        SM,
+        Lexer::getLocForEndOfToken(SM, PrevArg->getEndLoc()),
+        ClosureArg->getStartLoc());
+    EditConsumer.accept(SM, PreRange, ") ");
+  } else {
+    CharSourceRange PreRange(
+        SM, LPLoc, ClosureArg->getStartLoc());
+    EditConsumer.accept(SM, PreRange, " ");
+  }
+  // Remove original closing paren.
+  CharSourceRange PostRange(
+      SM,
+      Lexer::getLocForEndOfToken(SM, ClosureArg->getEndLoc()),
+      Lexer::getLocForEndOfToken(SM, RPLoc));
+  EditConsumer.remove(SM, PostRange);
+  return false;
 }
 
 static bool rangeStartMayNeedRename(ResolvedRangeInfo Info) {

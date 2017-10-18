@@ -725,12 +725,14 @@ namespace {
       return metadata;
     }
 
-    llvm::Value *extractAndMarkInOut(CanType type) {
+    llvm::Value *extractAndMarkInOut(AnyFunctionType::CanParam param) {
       // If the type is inout, get the metadata for its inner object type
       // instead, and then set the lowest bit to help the runtime unique
       // the metadata type for this function.
-      if (auto inoutType = dyn_cast<InOutType>(type)) {
-        auto metadata = IGF.emitTypeMetadataRef(inoutType.getObjectType());
+      auto type = param.getType();
+      if (param.getParameterFlags().isInOut()) {
+        auto objectType = type->getInOutObjectType()->getCanonicalType();
+        auto metadata = IGF.emitTypeMetadataRef(objectType);
         auto metadataInt = IGF.Builder.CreatePtrToInt(metadata, IGF.IGM.SizeTy);
         auto inoutFlag = llvm::ConstantInt::get(IGF.IGM.SizeTy, 1);
         auto marked = IGF.Builder.CreateOr(metadataInt, inoutFlag);
@@ -746,13 +748,9 @@ namespace {
         return metatype;
 
       auto resultMetadata = extractAndMarkResultType(type);
-      
-      auto inputTuple = dyn_cast<TupleType>(type.getInput());
 
-      size_t numArguments = 1;
-
-      if (inputTuple && !inputTuple->isMaterializable())
-        numArguments = inputTuple->getNumElements();
+      auto params = type.getParams();
+      auto numParams = params.size();
 
       // Map the convention to a runtime metadata value.
       FunctionMetadataConvention metadataConvention;
@@ -770,31 +768,27 @@ namespace {
         metadataConvention = FunctionMetadataConvention::CFunctionPointer;
         break;
       }
-      
+
       auto flagsVal = FunctionTypeFlags()
-        .withNumArguments(numArguments)
-        .withConvention(metadataConvention)
-        .withThrows(type->throws());
-      
+                          .withNumArguments(numParams)
+                          .withConvention(metadataConvention)
+                          .withThrows(type->throws());
+
       auto flags = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                           flagsVal.getIntValue());
 
-      switch (numArguments) {
-        case 1: {
-          auto arg0 = (inputTuple && !inputTuple->isMaterializable()) ?
-            extractAndMarkInOut(inputTuple.getElementType(0))
-          : extractAndMarkInOut(type.getInput());
-
-          auto call = IGF.Builder.CreateCall(
-                                            IGF.IGM.getGetFunctionMetadata1Fn(),
-                                            {flags, arg0, resultMetadata});
-          call->setDoesNotThrow();
-          return setLocal(CanType(type), call);
+      switch (numParams) {
+      case 1: {
+        auto arg0 = extractAndMarkInOut(params[0]);
+        auto call = IGF.Builder.CreateCall(IGF.IGM.getGetFunctionMetadata1Fn(),
+                                           {flags, arg0, resultMetadata});
+        call->setDoesNotThrow();
+        return setLocal(CanType(type), call);
         }
 
         case 2: {
-          auto arg0 = extractAndMarkInOut(inputTuple.getElementType(0));
-          auto arg1 = extractAndMarkInOut(inputTuple.getElementType(1));
+          auto arg0 = extractAndMarkInOut(params[0]);
+          auto arg1 = extractAndMarkInOut(params[1]);
           auto call = IGF.Builder.CreateCall(
                                             IGF.IGM.getGetFunctionMetadata2Fn(),
                                             {flags, arg0, arg1, resultMetadata});
@@ -803,9 +797,9 @@ namespace {
         }
 
         case 3: {
-          auto arg0 = extractAndMarkInOut(inputTuple.getElementType(0));
-          auto arg1 = extractAndMarkInOut(inputTuple.getElementType(1));
-          auto arg2 = extractAndMarkInOut(inputTuple.getElementType(2));
+          auto arg0 = extractAndMarkInOut(params[0]);
+          auto arg1 = extractAndMarkInOut(params[1]);
+          auto arg2 = extractAndMarkInOut(params[2]);
           auto call = IGF.Builder.CreateCall(
                                             IGF.IGM.getGetFunctionMetadata3Fn(),
                                             {flags, arg0, arg1, arg2,
@@ -815,31 +809,27 @@ namespace {
         }
 
         default:
-          auto arguments = inputTuple.getElementTypes();
-          auto arrayTy = llvm::ArrayType::get(IGF.IGM.Int8PtrTy,
-                                              arguments.size() + 2);
+          auto arrayTy = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, numParams + 2);
           Address buffer = IGF.createAlloca(arrayTy,
                                             IGF.IGM.getPointerAlignment(),
                                             "function-arguments");
           IGF.Builder.CreateLifetimeStart(buffer,
-                                  IGF.IGM.getPointerSize() * arguments.size());
+                                          IGF.IGM.getPointerSize() * numParams);
           Address pointerToFirstArg = IGF.Builder.CreateStructGEP(buffer, 0,
                                                                    Size(0));
           Address flagsPtr = IGF.Builder.CreateBitCast(pointerToFirstArg,
                                                IGF.IGM.SizeTy->getPointerTo());
           IGF.Builder.CreateStore(flags, flagsPtr);
-          
-          for (size_t i = 0; i < arguments.size(); ++i) {
-            auto argMetadata = extractAndMarkInOut(
-                                                  inputTuple.getElementType(i));
+
+          for (auto i : indices(params)) {
+            auto argMetadata = extractAndMarkInOut(params[i]);
             Address argPtr = IGF.Builder.CreateStructGEP(buffer, i + 1,
                                                       IGF.IGM.getPointerSize());
             IGF.Builder.CreateStore(argMetadata, argPtr);
-
           }
-          Address resultPtr = IGF.Builder.CreateStructGEP(buffer,
-                                                    arguments.size() + 1,
-                                                    IGF.IGM.getPointerSize());
+
+          Address resultPtr = IGF.Builder.CreateStructGEP(
+              buffer, numParams + 1, IGF.IGM.getPointerSize());
           resultPtr = IGF.Builder.CreateBitCast(resultPtr,
                                      IGF.IGM.TypeMetadataPtrTy->getPointerTo());
           IGF.Builder.CreateStore(resultMetadata, resultPtr);
@@ -847,9 +837,9 @@ namespace {
           auto call = IGF.Builder.CreateCall(IGF.IGM.getGetFunctionMetadataFn(),
                                              pointerToFirstArg.getAddress());
           call->setDoesNotThrow();
-          
+
           IGF.Builder.CreateLifetimeEnd(buffer,
-                                   IGF.IGM.getPointerSize() * arguments.size());
+                                        IGF.IGM.getPointerSize() * numParams);
 
           return setLocal(type, call);
       }
@@ -2116,7 +2106,7 @@ namespace {
     void layout() {
       asImpl().addName();
       asImpl().addKindDependentFields();
-      asImpl().addGenericMetadataPatternAndKind();
+      asImpl().addKind();
       asImpl().addAccessFunction();
       asImpl().addGenericParams();
     }
@@ -2130,19 +2120,9 @@ namespace {
                                  /*willBeRelativelyAddressed*/ true));
     }
     
-    void addGenericMetadataPatternAndKind() {
-      NominalTypeDecl *ntd = asImpl().getTarget();
+    void addKind() {
       auto kind = asImpl().getKind();
-      if (!ntd->isGenericContext()) {
-        // There's no pattern to link.
-        B.addInt32(kind);
-        return;
-      }
-
-      B.addTaggedRelativeOffset(
-        IGM.RelativeAddressTy,
-        IGM.getAddrOfTypeMetadata(getAbstractType(), /*pattern*/ true),
-        kind);
+      B.addInt32(kind);
     }
 
     void addAccessFunction() {
@@ -3150,13 +3130,12 @@ namespace {
         B.addNullPointer(IGM.FunctionPtrTy);
       }
     }
-    
+
     void addNominalTypeDescriptor() {
-      auto descriptor =
-        ClassNominalTypeDescriptorBuilder(IGM, Target).emit();
-      B.addFarRelativeAddress(descriptor);
+      auto descriptor = ClassNominalTypeDescriptorBuilder(IGM, Target).emit();
+      B.add(descriptor);
     }
-    
+
     void addIVarDestroyer() {
       auto dtorFunc = IGM.getAddrOfIVarInitDestroy(Target,
                                                    /*isDestroyer=*/ true,
@@ -4416,9 +4395,8 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      llvm::Constant *descriptor =
-        StructNominalTypeDescriptorBuilder(IGM, Target).emit();
-      B.addFarRelativeAddress(descriptor);
+      auto *descriptor = StructNominalTypeDescriptorBuilder(IGM, Target).emit();
+      B.add(descriptor);
     }
 
     void addFieldOffset(VarDecl *var) {
@@ -4596,12 +4574,10 @@ public:
                   : MetadataKind::Enum;
     B.addInt(IGM.MetadataKindTy, unsigned(kind));
   }
-  
+
   void addNominalTypeDescriptor() {
-    auto descriptor =
-      EnumNominalTypeDescriptorBuilder(IGM, Target).emit();
-    
-    B.addFarRelativeAddress(descriptor);
+    auto descriptor = EnumNominalTypeDescriptorBuilder(IGM, Target).emit();
+    B.add(descriptor);
   }
 
   void addGenericArgument(CanType type) {

@@ -96,17 +96,31 @@ CanType SILFunctionType::getSelfInstanceType() const {
 }
 
 ProtocolDecl *
-SILFunctionType::getDefaultWitnessMethodProtocol(ModuleDecl &M) const {
+SILFunctionType::getDefaultWitnessMethodProtocol() const {
   assert(getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod);
   auto selfTy = getSelfInstanceType();
   if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
-    auto superclass = GenericSig->getSuperclassBound(paramTy, M);
+    assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
+    auto superclass = GenericSig->getSuperclassBound(paramTy);
     if (superclass)
       return nullptr;
-    assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
-    auto protos = GenericSig->getConformsTo(paramTy, M);
+    auto protos = GenericSig->getConformsTo(paramTy);
     assert(protos.size() == 1);
     return protos[0];
+  }
+
+  return nullptr;
+}
+
+ClassDecl *
+SILFunctionType::getWitnessMethodClass(ModuleDecl &M) const {
+  auto selfTy = getSelfInstanceType();
+  auto genericSig = getGenericSignature();
+  if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
+    assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
+    auto superclass = genericSig->getSuperclassBound(paramTy);
+    if (superclass)
+      return superclass->getClassOrBoundGenericClass();
   }
 
   return nullptr;
@@ -291,8 +305,8 @@ enum class ConventionsKind : uint8_t {
       // If the substituted type is returned indirectly, so must the
       // unsubstituted type.
       if ((origType.isTypeParameter()
-           && !origType.isConcreteType(*M.getSwiftModule())
-           && !origType.requiresClass(*M.getSwiftModule()))
+           && !origType.isConcreteType()
+           && !origType.requiresClass())
           || substTL.isAddressOnly()) {
         return true;
 
@@ -448,8 +462,6 @@ enum class ConventionsKind : uint8_t {
     bool isFormallyPassedIndirectly(AbstractionPattern origType,
                                     CanType substType,
                                     const TypeLowering &substTL) {
-      auto &mod = *M.getSwiftModule();
-
       // If the C type of the argument is a const pointer, but the Swift type
       // isn't, treat it as indirect.
       if (origType.isClangType()
@@ -460,8 +472,8 @@ enum class ConventionsKind : uint8_t {
 
       // If the substituted type is passed indirectly, so must the
       // unsubstituted type.
-      if ((origType.isTypeParameter() && !origType.isConcreteType(mod)
-           && !origType.requiresClass(mod))
+      if ((origType.isTypeParameter() && !origType.isConcreteType()
+           && !origType.requiresClass())
           || substTL.isAddressOnly()) {
         return true;
 
@@ -857,9 +869,6 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     // signature from the AST for that.
     auto origGenericSig
       = function->getGenericSignature();
-    auto getCanonicalType = [origGenericSig, &M](Type t) -> CanType {
-      return t->getCanonicalType(origGenericSig, *M.getSwiftModule());
-    };
 
     auto &Types = M.Types;
     auto loweredCaptures = Types.getLoweredLocalCaptures(*function);
@@ -867,10 +876,16 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     for (auto capture : loweredCaptures.getCaptures()) {
       if (capture.isDynamicSelfMetadata()) {
         ParameterConvention convention = ParameterConvention::Direct_Unowned;
+        auto dynamicSelfInterfaceType = GenericEnvironment::mapTypeOutOfContext(
+          function->getGenericEnvironment(),
+          loweredCaptures.getDynamicSelfType());
+        
         auto selfMetatype = MetatypeType::get(
-            loweredCaptures.getDynamicSelfType(),
+            dynamicSelfInterfaceType,
             MetatypeRepresentation::Thick);
-        auto canSelfMetatype = getCanonicalType(selfMetatype);
+        
+        auto canSelfMetatype =
+          selfMetatype->getCanonicalType(origGenericSig);
         SILParameterInfo param(canSelfMetatype, convention);
         inputs.push_back(param);
 
@@ -879,7 +894,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
 
       auto *VD = capture.getDecl();
       auto type = VD->getInterfaceType();
-      auto canType = getCanonicalType(type);
+      auto canType = type->getCanonicalType(origGenericSig);
 
       auto &loweredTL = Types.getTypeLowering(
                               AbstractionPattern(genericSig, canType), canType);
@@ -936,11 +951,10 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   bool pseudogeneric = (constant ? isPseudogeneric(*constant) : false);
 
   // Always strip the auto-closure and no-escape bit.
-  // TODO: The noescape bit could be of interest to SIL optimizations.
-  //   We should bring it back when we have those optimizations.
   auto silExtInfo = SILFunctionType::ExtInfo()
     .withRepresentation(extInfo.getSILRepresentation())
-    .withIsPseudogeneric(pseudogeneric);
+    .withIsPseudogeneric(pseudogeneric)
+    .withNoEscape(extInfo.isNoEscape());
   
   return SILFunctionType::get(genericSig,
                               silExtInfo, calleeConvention,

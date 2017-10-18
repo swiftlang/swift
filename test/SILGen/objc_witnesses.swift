@@ -65,7 +65,7 @@ protocol Subscriptable {
 // CHECK-LABEL: sil private [transparent] [thunk] @_T0So7NSArrayC14objc_witnesses13SubscriptableA2cDPypSicigTW : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @out Any {
 // CHECK:         function_ref @_T0So7NSArrayCypSicigTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any
 // CHECK-LABEL: sil shared [serializable] [thunk] @_T0So7NSArrayCypSicigTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any {
-// CHECK:         class_method [volatile] {{%.*}} : $NSArray, #NSArray.subscript!getter.1.foreign
+// CHECK:         objc_method {{%.*}} : $NSArray, #NSArray.subscript!getter.1.foreign
 extension NSArray: Subscriptable {}
 
 // witness is a dynamic thunk:
@@ -110,11 +110,11 @@ extension NSObject : Atom {
 }
 
 // CHECK-LABEL: sil private @_T0So8NSObjectC14objc_witnessesE7valenceSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout NSObject, @thick NSObject.Type) -> () {
-// CHECK: class_method [volatile] %4 : $NSObject, #NSObject.valence!setter.1.foreign
+// CHECK: objc_method %4 : $NSObject, #NSObject.valence!setter.1.foreign
 // CHECK: }
 
 // CHECK-LABEL: sil hidden @_T0So8NSObjectC14objc_witnessesE7valenceSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed NSObject) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: class_method [volatile] %2 : $NSObject, #NSObject.valence!getter.1.foreign
+// CHECK: objc_method %2 : $NSObject, #NSObject.valence!getter.1.foreign
 // CHECK: }
 
 protocol Atom : class {

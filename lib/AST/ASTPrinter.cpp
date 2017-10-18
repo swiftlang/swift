@@ -3543,6 +3543,9 @@ public:
     if (info.isPseudogeneric()) {
       Printer.printSimpleAttr("@pseudogeneric") << " ";
     }
+    if (info.isNoEscape()) {
+      Printer.printSimpleAttr("@noescape") << " ";
+    }
   }
 
   void visitFunctionType(FunctionType *T) {
@@ -3940,27 +3943,31 @@ void GenericSignature::dump() const {
 }
 
 void Requirement::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << '\n';
+}
+void Requirement::dump(raw_ostream &out) const {
   switch (getKind()) {
   case RequirementKind::Conformance:
-    llvm::errs() << "conforms_to: ";
+    out << "conforms_to: ";
     break;
   case RequirementKind::Layout:
-    llvm::errs() << "layout: ";
+    out << "layout: ";
     break;
   case RequirementKind::Superclass:
-    llvm::errs() << "superclass: ";
+    out << "superclass: ";
     break;
   case RequirementKind::SameType:
-    llvm::errs() << "same_type: ";
+    out << "same_type: ";
     break;
   }
 
-  if (getFirstType()) llvm::errs() << getFirstType() << " ";
+  if (getFirstType())
+    out << getFirstType() << " ";
   if (getKind() != RequirementKind::Layout && getSecondType())
-    llvm::errs() << getSecondType();
+    out << getSecondType();
   else if (getLayoutConstraint())
-    llvm::errs() << getLayoutConstraint();
-  llvm::errs() << "\n";
+    out << getLayoutConstraint();
 }
 
 void Requirement::print(raw_ostream &os, const PrintOptions &opts) const {

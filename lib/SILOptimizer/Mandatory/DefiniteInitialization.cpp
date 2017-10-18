@@ -521,6 +521,8 @@ namespace {
 
   private:
 
+    void emitSelfConsumedDiagnostic(SILInstruction *Inst);
+
     LiveOutBlockState &getBlockInfo(SILBasicBlock *BB) {
       return PerBlockInfo.insert({BB,
                      LiveOutBlockState(TheMemory.NumElements)}).first->second;
@@ -550,7 +552,6 @@ namespace {
                               bool SuperInitDone,
                               bool FailedSelfUse);
 
-    void handleSuperInitUse(const DIMemoryUse &InstInfo);
     void handleSelfInitUse(DIMemoryUse &InstInfo);
     void updateInstructionForInitState(DIMemoryUse &InstInfo);
 
@@ -690,13 +691,6 @@ bool LifetimeChecker::shouldEmitError(SILInstruction *Inst) {
 void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
   assert(TheMemory.isAnyInitSelf() && !TheMemory.isDelegatingInit() &&
          "Not a designated initializer");
-
-  // Root protocol initializers (ones that reassign to self, not delegating to
-  // self.init) have no members to initialize and self itself has already been
-  // reported to be uninit in the primary diagnostic.
-  if (TheMemory.isProtocolInitSelf())
-    return;
-
 
   // Determine which members, specifically are uninitialized.
   AvailabilitySet Liveness =
@@ -848,9 +842,6 @@ void LifetimeChecker::doIt() {
     case DIUseKind::Escape:
       handleEscapeUse(Use);
       break;
-    case DIUseKind::SuperInit:
-      handleSuperInitUse(Use);
-      break;
     case DIUseKind::SelfInit:
       handleSelfInitUse(Use);
       break;
@@ -931,18 +922,23 @@ void LifetimeChecker::handleLoadUse(unsigned UseID) {
   }
 }
 
+void LifetimeChecker::emitSelfConsumedDiagnostic(SILInstruction *Inst) {
+  if (!shouldEmitError(Inst))
+    return;
+
+  diagnose(Module, Inst->getLoc(),
+           diag::self_inside_catch_superselfinit,
+           (unsigned)TheMemory.isDelegatingInit());
+}
+
 void LifetimeChecker::handleStoreUse(unsigned UseID) {
   DIMemoryUse &InstInfo = Uses[UseID];
 
-  if (getSelfConsumedAtInst(InstInfo.Inst) != DIKind::No) {
-    // FIXME: more specific diagnostics here, handle this case gracefully below.
-    if (!shouldEmitError(InstInfo.Inst))
+  if (TheMemory.isAnyInitSelf()) {
+    if (getSelfConsumedAtInst(InstInfo.Inst) != DIKind::No) {
+      emitSelfConsumedDiagnostic(InstInfo.Inst);
       return;
-
-    diagnose(Module, InstInfo.Inst->getLoc(),
-             diag::self_inside_catch_superselfinit,
-             (unsigned)TheMemory.isDelegatingInit());
-    return;
+    }
   }
 
   // Determine the liveness state of the element that we care about.
@@ -1036,13 +1032,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
   // before the "address" is passed as an l-value.
   if (!isInitializedAtUse(Use, &IsSuperInitDone, &FailedSelfUse)) {
     if (FailedSelfUse) {
-      // FIXME: more specific diagnostics here, handle this case gracefully below.
-      if (!shouldEmitError(Use.Inst))
-        return;
-      
-      diagnose(Module, Use.Inst->getLoc(),
-               diag::self_inside_catch_superselfinit,
-               (unsigned)TheMemory.isDelegatingInit());
+      emitSelfConsumedDiagnostic(Use.Inst);
       return;
     }
 
@@ -1094,7 +1084,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
           if (auto *DSCE = dyn_cast<SelfApplyExpr>(CE->getFn()))
             // Normal method calls are curried, so they are:
             // (call_expr (dot_syntax_call_expr (decl_ref_expr METHOD)))
-            FD = dyn_cast<FuncDecl>(DSCE->getCalledValue());
+            FD = dyn_cast_or_null<FuncDecl>(DSCE->getCalledValue());
           else
             // Operators and normal function calls are just (CallExpr DRE)
             FD = dyn_cast_or_null<FuncDecl>(CE->getCalledValue());
@@ -1144,13 +1134,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
   auto Inst = Use.Inst;
 
   if (FailedSelfUse) {
-    // FIXME: more specific diagnostics here, handle this case gracefully below.
-    if (!shouldEmitError(Inst))
-      return;
-    
-    diagnose(Module, Inst->getLoc(),
-             diag::self_inside_catch_superselfinit,
-             (unsigned)TheMemory.isDelegatingInit());
+    emitSelfConsumedDiagnostic(Inst);
     return;
   }
 
@@ -1161,21 +1145,48 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 
     if (!shouldEmitError(Inst)) return;
 
-    auto diagID = diag::self_before_superselfinit;
-
     // If this is a load with a single user that is a return, then this is
     // a return before self.init.   Emit a specific diagnostic.
     if (auto *LI = dyn_cast<LoadInst>(Inst))
       if (LI->hasOneUse() &&
           isa<ReturnInst>((*LI->use_begin())->getUser())) {
-        diagID = diag::superselfinit_not_called_before_return;
+        diagnose(Module, Inst->getLoc(),
+                 diag::superselfinit_not_called_before_return,
+                 (unsigned)TheMemory.isDelegatingInit());
+        return;
       }
     if (isa<ReturnInst>(Inst)) {
-      diagID = diag::superselfinit_not_called_before_return;
+      diagnose(Module, Inst->getLoc(),
+               diag::superselfinit_not_called_before_return,
+               (unsigned)TheMemory.isDelegatingInit());
+      return;
     }
 
-    diagnose(Module, Inst->getLoc(), diagID,
-             (unsigned)TheMemory.isDelegatingInit());
+    if (!TheMemory.isClassInitSelf()) {
+      // If this is a copy_addr into the indirect result, then we're looking at
+      // the implicit "return self" in an address-only initializer.  Emit a
+      // specific diagnostic.
+      if (auto *CA = dyn_cast<CopyAddrInst>(Inst)) {
+        if (CA->isInitializationOfDest() &&
+            !CA->getFunction()->getArguments().empty() &&
+            SILValue(CA->getFunction()->getArgument(0)) == CA->getDest()) {
+          diagnose(Module, Inst->getLoc(),
+                   diag::superselfinit_not_called_before_return,
+                   (unsigned)TheMemory.isDelegatingInit());
+          return;
+        }
+      }
+    }
+
+    if (TheMemory.isDelegatingInit()) {
+      if (TheMemory.isClassInitSelf()) {
+        diagnose(Module, Inst->getLoc(), diag::self_before_selfinit);
+      } else {
+        diagnose(Module, Inst->getLoc(), diag::self_before_selfinit_value_type);
+      }
+    } else {
+      diagnose(Module, Inst->getLoc(), diag::self_before_superinit);
+    }
     return;
   }
 
@@ -1183,11 +1194,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
       !TheMemory.isClassInitSelf()) {
     if (!shouldEmitError(Inst)) return;
 
-    auto diagID = diag::use_of_self_before_fully_init;
-    if (TheMemory.isProtocolInitSelf())
-      diagID = diag::use_of_self_before_fully_init_protocol;
-
-    diagnose(Module, Inst->getLoc(), diagID);
+    diagnose(Module, Inst->getLoc(), diag::use_of_self_before_fully_init);
     noteUninitializedMembers(Use);
     return;
   }
@@ -1368,7 +1375,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // be removed.
     //
     // TODO: Implement the SILGen fixes so this can be removed.
-    ClassMethodInst *CMI = nullptr;
+    MethodInst *MI = nullptr;
     ApplyInst *AI = nullptr;
     SILInstruction *Release = nullptr;
     for (auto UI : UCI->getUses()) {
@@ -1379,9 +1386,16 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
           continue;
         }
       }
-      if (auto *TCMI = dyn_cast<ClassMethodInst>(User)) {
-        if (!CMI) {
-          CMI = TCMI;
+      if (auto *CMI = dyn_cast<ClassMethodInst>(User)) {
+        if (!MI) {
+          MI = CMI;
+          continue;
+        }
+      }
+
+      if (auto *OMI = dyn_cast<ObjCMethodInst>(User)) {
+        if (!MI) {
+          MI = OMI;
           continue;
         }
       }
@@ -1395,7 +1409,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
 
       // Not a pattern we recognize, conservatively generate a generic
       // diagnostic.
-      CMI = nullptr;
+      MI = nullptr;
       break;
     }
 
@@ -1405,11 +1419,11 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // That is the only case where we support pattern matching a release.
     if (Release && AI &&
         !AI->getSubstCalleeType()->getExtInfo().hasGuaranteedSelfParam())
-      CMI = nullptr;
+      MI = nullptr;
 
-    if (AI && CMI) {
+    if (AI && MI) {
       // TODO: Could handle many other members more specifically.
-      Method = dyn_cast<FuncDecl>(CMI->getMember().getDecl());
+      Method = dyn_cast<FuncDecl>(MI->getMember().getDecl());
     }
   }
 
@@ -1419,6 +1433,9 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // If this is a method application, produce a nice, specific, error.
     if (auto *CMI = dyn_cast<ClassMethodInst>(Inst->getOperand(0)))
       Method = dyn_cast<FuncDecl>(CMI->getMember().getDecl());
+
+    if (auto *OMI = dyn_cast<ObjCMethodInst>(Inst->getOperand(0)))
+      Method = dyn_cast<FuncDecl>(OMI->getMember().getDecl());
 
     // If this is a direct/devirt method application, check the location info.
     if (auto *Fn = cast<ApplyInst>(Inst)->getReferencedFunction()) {
@@ -1478,13 +1495,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   SILInstruction *Inst = Use.Inst;
   
   if (FailedSelfUse) {
-    // FIXME: more specific diagnostics here, handle this case gracefully below.
-    if (!shouldEmitError(Inst))
-      return;
-    
-    diagnose(Module, Inst->getLoc(),
-             diag::self_inside_catch_superselfinit,
-             (unsigned)TheMemory.isDelegatingInit());
+    emitSelfConsumedDiagnostic(Inst);
     return;
   }
   
@@ -1541,13 +1552,6 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
         }
       }
       
-      if (TheMemory.isEnumInitSelf()) {
-        if (!shouldEmitError(Inst)) return;
-        diagnose(Module, returnLoc,
-                 diag::return_from_init_without_initing_self);
-        return;
-      }
-      
       if (TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf() &&
                  !TheMemory.isDelegatingInit()) {
         if (!shouldEmitError(Inst)) return;
@@ -1567,20 +1571,6 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
     if (CA->isInitializationOfDest() &&
         !CA->getFunction()->getArguments().empty() &&
         SILValue(CA->getFunction()->getArgument(0)) == CA->getDest()) {
-      if (TheMemory.isEnumInitSelf()) {
-        if (!shouldEmitError(Inst)) return;
-        diagnose(Module, Inst->getLoc(),
-                 diag::return_from_init_without_initing_self);
-        return;
-      }
-
-      if (TheMemory.isProtocolInitSelf()) {
-        if (!shouldEmitError(Inst)) return;
-        diagnose(Module, Inst->getLoc(),
-                 diag::return_from_protocol_init_without_initing_self);
-        return;
-      }
-
       if (TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf() &&
           !TheMemory.isDelegatingInit()) {
         if (!shouldEmitError(Inst)) return;
@@ -1617,8 +1607,15 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   // generic error, depending on what kind of failure this is.
   if (!SuperInitDone) {
     if (!shouldEmitError(Inst)) return;
-    diagnose(Module, Inst->getLoc(), diag::self_before_superselfinit,
-             (unsigned)TheMemory.isDelegatingInit());
+    if (TheMemory.isDelegatingInit()) {
+      if (TheMemory.isClassInitSelf()) {
+        diagnose(Module, Inst->getLoc(), diag::self_before_selfinit);
+      } else {
+        diagnose(Module, Inst->getLoc(), diag::self_before_selfinit_value_type);
+      }
+    } else {
+      diagnose(Module, Inst->getLoc(), diag::self_before_superinit);
+    }
     return;
   }
 
@@ -1637,10 +1634,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
       TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf()) {
     if (!shouldEmitError(Inst)) return;
 
-    auto diagID = diag::use_of_self_before_fully_init;
-    if (TheMemory.isProtocolInitSelf())
-      diagID = diag::use_of_self_before_fully_init_protocol;
-    diagnose(Module, Inst->getLoc(), diagID);
+    diagnose(Module, Inst->getLoc(), diag::use_of_self_before_fully_init);
     noteUninitializedMembers(Use);
     return;
   }
@@ -1654,29 +1648,25 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
     diagnoseInitError(Use, diag::variable_used_before_initialized);
 }
 
-/// handleSuperInitUse - When processing a 'self' argument on a class, this is
-/// a call to super.init.
-void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
-  // This is an apply or try_apply.
+/// handleSelfInitUse - When processing a 'self' argument on a class, this is
+/// a call to self.init or super.init.
+void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
   auto *Inst = InstInfo.Inst;
 
+  assert(TheMemory.isAnyInitSelf());
+  assert(TheMemory.getType()->hasReferenceSemantics());
+
   if (getSelfConsumedAtInst(Inst) != DIKind::No) {
-    // FIXME: more specific diagnostics here, handle this case gracefully below.
-    if (!shouldEmitError(Inst))
-      return;
-    
-    diagnose(Module, Inst->getLoc(),
-             diag::self_inside_catch_superselfinit,
-             (unsigned)TheMemory.isDelegatingInit());
+    emitSelfConsumedDiagnostic(Inst);
     return;
   }
 
   // Determine the liveness states of the memory object, including the
-  // super.init state.
+  // self/super.init state.
   AvailabilitySet Liveness = getLivenessAtInst(Inst, 0, TheMemory.NumElements);
 
-  // super.init() calls require that super.init has not already been called. If
-  // it has, reject the program.
+  // self/super.init() calls require that self/super.init has not already
+  // been called. If it has, reject the program.
   switch (Liveness.get(TheMemory.NumElements-1)) {
   case DIKind::No:  // This is good! Keep going.
     break;
@@ -1684,64 +1674,33 @@ void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
   case DIKind::Partial:
     // This is bad, only one super.init call is allowed.
     if (shouldEmitError(Inst))
-      diagnose(Module, Inst->getLoc(), diag::selfinit_multiple_times, 0);
+      diagnose(Module, Inst->getLoc(), diag::selfinit_multiple_times,
+               TheMemory.isDelegatingInit());
     return;
   }
 
-  // super.init also requires that all ivars are initialized before the
-  // superclass initializer runs.
-  for (unsigned i = 0, e = TheMemory.NumElements-1; i != e; ++i) {
-    if (Liveness.get(i) == DIKind::Yes) continue;
+  if (TheMemory.isDelegatingInit()) {
+    assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
 
-    // If the super.init call is implicit generated, produce a specific
-    // diagnostic.
-    bool isImplicit = InstInfo.Inst->getLoc().getSourceLoc().isInvalid();
-    auto diag = isImplicit ? diag::ivar_not_initialized_at_implicit_superinit :
-                diag::ivar_not_initialized_at_superinit;
-    return diagnoseInitError(InstInfo, diag);
+    // Lower Assign instructions if needed.
+    if (isa<AssignInst>(InstInfo.Inst))
+      updateInstructionForInitState(InstInfo);
+  } else {
+    // super.init also requires that all ivars are initialized before the
+    // superclass initializer runs.
+    for (unsigned i = 0, e = TheMemory.NumElements-1; i != e; ++i) {
+      if (Liveness.get(i) == DIKind::Yes) continue;
+
+      // If the super.init call is implicit generated, produce a specific
+      // diagnostic.
+      bool isImplicit = InstInfo.Inst->getLoc().getSourceLoc().isInvalid();
+      auto diag = isImplicit ? diag::ivar_not_initialized_at_implicit_superinit :
+                  diag::ivar_not_initialized_at_superinit;
+      return diagnoseInitError(InstInfo, diag);
+    }
+
+    // Otherwise everything is good!
   }
-
-  // Otherwise everything is good!
-}
-
-/// handleSelfInitUse - When processing a 'self' argument on a class, this is
-/// a call to self.init.
-void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
-  auto *Inst = InstInfo.Inst;
-
-  assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
-  
-  if (getSelfConsumedAtInst(Inst) != DIKind::No) {
-    // FIXME: more specific diagnostics here, handle this case gracefully below.
-    if (!shouldEmitError(Inst))
-      return;
-    
-    diagnose(Module, Inst->getLoc(),
-             diag::self_inside_catch_superselfinit,
-             (unsigned)TheMemory.isDelegatingInit());
-    return;
-  }
-
-  // Determine the self.init state.  self.init() calls require that self.init
-  // has not already been called. If it has, reject the program.
-  switch (getLivenessAtInst(Inst, 0, 1).get(0)) {
-  case DIKind::No:  // This is good! Keep going.
-    break;
-  case DIKind::Yes:
-  case DIKind::Partial:
-    // This is bad, only one self.init call is allowed.
-    if (EmittedErrorLocs.empty() && shouldEmitError(Inst))
-      diagnose(Module, Inst->getLoc(), diag::selfinit_multiple_times, 1);
-    return;
-  }
-
-  // If this is a copy_addr, make sure we remember that it is an initialization.
-  if (auto *CAI = dyn_cast<CopyAddrInst>(InstInfo.Inst))
-    CAI->setIsInitializationOfDest(IsInitialization);
-
-  // Lower Assign instructions if needed.
-  if (isa<AssignInst>(InstInfo.Inst))
-    updateInstructionForInitState(InstInfo);
 }
 
 
@@ -1924,8 +1883,10 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
          isa<DestroyAddrInst>(Release));
 
   auto Availability = getLivenessAtInst(Release, 0, TheMemory.NumElements);
-  DIKind SelfConsumed =
-    getSelfConsumedAtInst(Release);
+  DIKind SelfConsumed = DIKind::No;
+
+  if (TheMemory.isAnyInitSelf())
+    SelfConsumed = getSelfConsumedAtInst(Release);
 
   if (SelfConsumed == DIKind::Yes) {
     // We're in an error path after performing a self.init or super.init
@@ -2115,7 +2076,6 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       break;
 
     case DIUseKind::SelfInit:
-    case DIUseKind::SuperInit:
     case DIUseKind::Initialization:
       // If this is an initialization of only trivial elements, then we don't
       // need to update the bitvector.
@@ -2669,12 +2629,14 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
                                          bool *FailedSelfUse) {
   if (FailedSelfUse) *FailedSelfUse = false;
   if (SuperInitDone) *SuperInitDone = true;
-  
-  // If the self.init() or super.init() call threw an error and
-  // we caught it, self is no longer available.
-  if (getSelfConsumedAtInst(Use.Inst) != DIKind::No) {
-    if (FailedSelfUse) *FailedSelfUse = true;
-    return false;
+
+  if (TheMemory.isAnyInitSelf()) {
+    // If the self.init() or super.init() call threw an error and
+    // we caught it, self is no longer available.
+    if (getSelfConsumedAtInst(Use.Inst) != DIKind::No) {
+      if (FailedSelfUse) *FailedSelfUse = true;
+      return false;
+    }
   }
 
   // Determine the liveness states of the elements that we care about.

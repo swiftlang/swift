@@ -351,7 +351,7 @@ extension ThisBase1 {
 
   func baseExtFunc0() {}
 
-  var baseExtStaticVar: Int // expected-error {{extensions may not contain stored properties}} // expected-note 2 {{did you mean 'baseExtStaticVar'?}}
+  var baseExtStaticVar: Int // expected-error {{extensions must not contain stored properties}} // expected-note 2 {{did you mean 'baseExtStaticVar'?}}
 
   var baseExtStaticProp: Int { // expected-note 2 {{did you mean 'baseExtStaticProp'?}}
     get {
@@ -383,7 +383,7 @@ extension ThisDerived1 {
 
   func derivedExtFunc0() {}
 
-  var derivedExtStaticVar: Int // expected-error {{extensions may not contain stored properties}}
+  var derivedExtStaticVar: Int // expected-error {{extensions must not contain stored properties}}
 
   var derivedExtStaticProp: Int {
     get {
@@ -565,4 +565,39 @@ enum MyGenericEnum<T> {
 func foo1() {
   _ = MyGenericEnum<Int>.One // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'One'; did you mean 'one'}}{{26-29=one}}
   _ = MyGenericEnum<Int>.OneTwo // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'OneTwo'; did you mean 'oneTwo'}}{{26-32=oneTwo}}
+}
+
+// SR-4082
+func foo2() {
+  let x = 5
+  if x < 0, let x = Optional(1) { } // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+}
+
+struct Person {
+  let name: String?
+}
+
+struct Company { // expected-note 2{{did you mean 'Company'?}}
+  let owner: Person?
+}
+
+func test1() {
+  let example: Company? = Company(owner: Person(name: "Owner"))
+  if let person = aCompany.owner, // expected-error {{use of unresolved identifier 'aCompany'}}
+     let aCompany = example {
+    _ = person
+  }
+}
+
+func test2() {
+  let example: Company? = Company(owner: Person(name: "Owner"))
+  guard let person = aCompany.owner, // expected-error {{use of unresolved identifier 'aCompany'}}
+        let aCompany = example else { return }
+}
+
+func test3() {
+  var c: String? = "c" // expected-note {{did you mean 'c'?}}
+  if let a = b = c, let b = c { // expected-error {{use of unresolved identifier 'b'}}
+    _ = b
+  }
 }

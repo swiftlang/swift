@@ -33,6 +33,7 @@
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -1680,6 +1681,10 @@ public:
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(Fix fix, ConstraintLocatorBuilder locator);
   
+  /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
+  /// constraint system, return the decl that it references.
+  ValueDecl *findResolvedMemberRef(ConstraintLocator *locator);
+
   /// \brief Try to salvage the constraint system by applying (speculative)
   /// fixes to the underlying expression.
   ///
@@ -1712,6 +1717,10 @@ public:
   /// \brief Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
                      ConstraintLocatorBuilder locator,
+                     bool isFavored = false);
+
+  /// \brief Add a requirement as a constraint to the constraint system.
+  void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
                      bool isFavored = false);
 
   /// \brief Add a key path application constraint to the constraint system.
@@ -2577,6 +2586,9 @@ private:
     /// Tracks the position of the last known supertype in the group.
     Optional<unsigned> lastSupertypeIndex;
 
+    /// A set of all constraints which contribute to pontential bindings.
+    llvm::SmallPtrSet<Constraint *, 8> Sources;
+
     PotentialBindings(TypeVariableType *typeVar) : TypeVar(typeVar) {}
 
     /// Determine whether the set of bindings is non-empty.
@@ -2600,7 +2612,29 @@ private:
     /// \c x is a better set of bindings that \c y.
     friend bool operator<(const PotentialBindings &x,
                           const PotentialBindings &y) {
-      return formBindingScore(x) < formBindingScore(y);
+      if (formBindingScore(x) < formBindingScore(y))
+        return true;
+
+      if (!x.hasNonDefaultableBindings())
+        return false;
+
+      llvm::SmallPtrSet<Constraint *, 8> intersection(x.Sources);
+      llvm::set_intersect(intersection, y.Sources);
+
+      // Some relational constraints dictate certain
+      // ordering when it comes to attempting binding
+      // of type variables, where left-hand side is
+      // always more preferrable than right-hand side.
+      for (const auto *constraint : intersection) {
+        if (constraint->getKind() != ConstraintKind::Subtype)
+          continue;
+
+        auto lhs = constraint->getFirstType();
+        if (auto *typeVar = lhs->getAs<TypeVariableType>())
+          return x.TypeVar == typeVar;
+      }
+
+      return false;
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
@@ -2641,35 +2675,32 @@ private:
       if (NumDefaultableBindings > 0)
         out << "#defaultable_bindings=" << NumDefaultableBindings << " ";
 
-      out << "bindings=";
-      if (!Bindings.empty()) {
-        interleave(Bindings,
-                   [&](const PotentialBinding &binding) {
-                     auto type = binding.BindingType;
-                     auto &ctx = type->getASTContext();
-                     llvm::SaveAndRestore<bool> debugConstraints(
-                         ctx.LangOpts.DebugConstraintSolver, true);
-                     switch (binding.Kind) {
-                     case AllowedBindingKind::Exact:
-                       break;
+      out << "bindings={";
+      interleave(Bindings,
+                 [&](const PotentialBinding &binding) {
+                   auto type = binding.BindingType;
+                   auto &ctx = type->getASTContext();
+                   llvm::SaveAndRestore<bool> debugConstraints(
+                       ctx.LangOpts.DebugConstraintSolver, true);
+                   switch (binding.Kind) {
+                   case AllowedBindingKind::Exact:
+                     break;
 
-                     case AllowedBindingKind::Subtypes:
-                       out << "(subtypes of) ";
-                       break;
+                   case AllowedBindingKind::Subtypes:
+                     out << "(subtypes of) ";
+                     break;
 
-                     case AllowedBindingKind::Supertypes:
-                       out << "(supertypes of) ";
-                       break;
-                     }
-                     if (binding.DefaultedProtocol)
-                       out << "(default from "
-                           << (*binding.DefaultedProtocol)->getName() << ") ";
-                     out << type.getString();
-                   },
-                   [&]() { out << " "; });
-      } else {
-        out << "{}";
-      }
+                   case AllowedBindingKind::Supertypes:
+                     out << "(supertypes of) ";
+                     break;
+                   }
+                   if (binding.DefaultedProtocol)
+                     out << "(default from "
+                         << (*binding.DefaultedProtocol)->getName() << ") ";
+                   out << type.getString();
+                 },
+                 [&]() { out << "; "; });
+      out << "}";
     }
 
     void dump(ConstraintSystem *cs,

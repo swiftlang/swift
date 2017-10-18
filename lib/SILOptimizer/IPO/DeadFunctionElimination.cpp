@@ -27,9 +27,22 @@
 using namespace swift;
 
 STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
-STATISTIC(NumEliminatedExternalDefs, "Number of external function definitions eliminated");
 
 namespace {
+
+/// Returns true if a function should be SIL serialized or emitted by IRGen.
+static bool shouldBeSerializedOrEmitted(SILFunction *F) {
+  // public_external functions are never SIL serialized or emitted by IRGen.
+  if (F->isAvailableExternally() && hasPublicVisibility(F->getLinkage()) &&
+      !F->isTransparent())
+    return false;
+
+  // [serialized] functions should always be SIL serialized.
+  if (F->isSerialized())
+    return true;
+
+  return false;
+}
 
 /// This is a base class for passes that are based on function liveness
 /// computations like e.g. dead function elimination.
@@ -98,7 +111,7 @@ protected:
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
 
-    // Remove internal functions that are not referenced by anything.
+    // Functions that may be used externally cannot be removed.
     if (isPossiblyUsedExternally(F->getLinkage(), Module->isWholeModule()))
       return true;
 
@@ -117,6 +130,11 @@ protected:
                          << F->getName() << '\n');
       return true;
     }
+
+    // Do not consider public_external functions that do not need to be emitted
+    // into the client as anchors.
+    if (shouldBeSerializedOrEmitted(F))
+      return true;
 
     return false;
   }
@@ -191,7 +209,7 @@ protected:
     }
 
   }
-  
+
   /// Marks the declarations referenced by a key path pattern as alive if they
   /// aren't yet.
   void ensureKeyPathComponentsAreAlive(KeyPathPattern *KP) {
@@ -223,7 +241,7 @@ protected:
         case KeyPathPatternComponent::ComputedPropertyId::Property:
           break;
         }
-        
+
         if (auto equals = component.getComputedPropertyIndexEquals())
           ensureAlive(equals);
         if (auto hash = component.getComputedPropertyIndexHash())
@@ -234,12 +252,12 @@ protected:
       case KeyPathPatternComponent::Kind::StoredProperty:
       case KeyPathPatternComponent::Kind::OptionalChain:
       case KeyPathPatternComponent::Kind::OptionalForce:
-      case KeyPathPatternComponent::Kind::OptionalWrap:            
+      case KeyPathPatternComponent::Kind::OptionalWrap:
         continue;
       }
     }
   }
-  
+
   /// Marks a function as alive if it is not alive yet.
   void ensureAlive(SILFunction *F) {
     if (!isAlive(F))
@@ -279,14 +297,14 @@ protected:
     // All implementations of derived classes may be called.
     if (isDerivedOrEqual(ImplCl, MethodCl))
       return true;
-    
+
     // Check if the method implementation is the same in a super class, i.e.
     // it is not overridden in the derived class.
     auto *Impl1 = MethodCl->findImplementingMethod(FD);
     assert(Impl1);
     auto *Impl2 = ImplCl->findImplementingMethod(FD);
     assert(Impl2);
-    
+
     return Impl1 == Impl2;
   }
 
@@ -505,7 +523,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         mi->addWitnessFunction(F, nullptr);
       }
     }
-    
+
 
   }
 
@@ -702,172 +720,6 @@ public:
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
-//                        ExternalFunctionDefinitionsElimination
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// This pass performs removal of external function definitions for a sake of
-/// reducing the amount of code to run through IRGen. It is supposed to run very
-/// late in the pipeline, after devirtualization, inlining and specialization
-/// passes.
-///
-/// NOTE:
-/// Overall, this pass does not try to remove any information which can be
-/// useful for LLVM code generation, e.g. for analysis of function's
-/// side-effects. Therefore it does not remove bodies of any external functions
-/// that are alive, because LLVM may analyze their bodies to determine their
-/// side-effects and use it to achieve a better optimization.
-///
-/// Current implementation does not consider functions which are reachable only
-/// via vtables or witness_tables as alive and removes their bodies, because
-/// even if they would be kept around, LLVM does not know how to look at
-/// function definitions through Swift's vtables and witness_tables.
-///
-/// TODO:
-/// Once there is a proper support for IPO in Swift compiler and/or there is
-/// a way to communicate function's side-effects without providing its body
-/// (e.g. by means of SILFunction flags, attributes, etc), it should be
-/// safe to remove bodies of all external definitions.
-
-class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
-
-  /// ExternalFunctionDefinitionsElimination pass does not take functions
-  /// reachable via vtables and witness_tables into account when computing
-  /// a function liveness information. The only exceptions are external
-  /// transparent functions, because bodies of external transparent functions
-  /// should never be removed.
-  void findAnchorsInTables() override {
-    // Check vtable methods.
-    for (SILVTable &vTable : Module->getVTableList()) {
-      for (auto &entry : vTable.getEntries()) {
-        SILFunction *F = entry.Implementation;
-        if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
-          ensureAlive(F);
-      }
-    }
-
-    // Check witness methods.
-    for (SILWitnessTable &WT : Module->getWitnessTableList()) {
-      isVisibleExternally(WT.getConformance()->getProtocol());
-      for (const SILWitnessTable::Entry &entry : WT.getEntries()) {
-        if (entry.getKind() != SILWitnessTable::Method)
-          continue;
-
-        auto methodWitness = entry.getMethodWitness();
-        SILFunction *F = methodWitness.Witness;
-        if (!F)
-          continue;
-        if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
-          ensureAlive(F);
-      }
-    }
-
-    // Check default witness methods.
-    for (SILDefaultWitnessTable &WT : Module->getDefaultWitnessTableList()) {
-      for (const SILDefaultWitnessTable::Entry &entry : WT.getEntries()) {
-        if (!entry.isValid())
-          continue;
-
-        SILFunction *F = entry.getWitness();
-        if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
-          ensureAlive(F);
-      }
-    }
-
-  }
-
-  bool findAliveFunctions() {
-    /// TODO: Once there is a proper support for IPO,
-    /// bodies of all external functions can be removed.
-    /// Therefore there is no need for a liveness computation.
-    /// The next line can be just replaced by:
-    /// return false;
-
-    // Keep all transparent functions alive. This is important because we have
-    // to generate code for transparent functions.
-    // Here we handle the special case if a transparent function is referenced
-    // from a non-externally-available function (i.e. a function for which we
-    // generate code). And those function is only reachable through a
-    // vtable/witness-table. In such a case we would not visit the transparent
-    // function in findAliveFunctions() because we don't consider vtables/
-    // witness-tables as anchors.
-    for (SILFunction &F : *Module) {
-      if (isAvailableExternally(F.getLinkage()))
-        continue;
-
-      for (SILBasicBlock &BB : F) {
-        for (SILInstruction &I : BB) {
-          if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
-            SILFunction *RefF = FRI->getReferencedFunction();
-            // FIXME: Bad usage of transparent
-            if (RefF->isTransparent() && RefF->isSerialized())
-              ensureAlive(RefF);
-          }
-        }
-      }
-    }
-
-    return FunctionLivenessComputation::findAliveFunctions();
-  }
-
-  /// Try to convert definition into declaration.
-  /// Returns true if function was erased from the module.
-  bool tryToConvertExternalDefinitionIntoDeclaration(SILFunction *F) {
-    // Bail if it is a declaration already
-    if (!F->isDefinition())
-      return false;
-    // Bail if there is no external implementation of this function.
-    if (!F->isAvailableExternally())
-      return false;
-    // Bail if has a shared visibility, as there are no guarantees
-    // that an implementation is available elsewhere.
-    if (hasSharedVisibility(F->getLinkage()))
-      return false;
-    // Make this definition a declaration by removing the body of a function.
-
-    DEBUG(llvm::dbgs() << "  removed external function " << F->getName()
-          << "\n");
-    F->dropAllReferences();
-    auto &Blocks = F->getBlocks();
-    Blocks.clear();
-    assert(F->isExternalDeclaration() &&
-           "Function should be an external declaration");
-    NumEliminatedExternalDefs++;
-    return true;
-  }
-
-public:
-  ExternalFunctionDefinitionsElimination(SILModule *module)
-      : FunctionLivenessComputation(module) {}
-
-  /// Eliminate bodies of external functions which are not alive.
-  ///
-  /// Bodies of alive functions should not be removed, as LLVM may
-  /// still need them for analyzing their side-effects.
-  void eliminateFunctions(SILModuleTransform *DFEPass) {
-
-    findAliveFunctions();
-    // Get rid of definitions for all global functions that are not marked as
-    // alive.
-    for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
-      SILFunction *F = &*FI;
-      ++FI;
-      // Do not remove bodies of any functions that are alive.
-      if (!isAlive(F)) {
-        if (tryToConvertExternalDefinitionIntoDeclaration(F)) {
-          DFEPass->notifyDeleteFunction(F);
-          if (F->getRefCount() == 0)
-            F->getModule().eraseFunction(F);
-        }
-      }
-    }
-  }
-};
-
-} // end anonymous namespace
-
-//===----------------------------------------------------------------------===//
 //                      Pass Definition and Entry Points
 //===----------------------------------------------------------------------===//
 
@@ -887,34 +739,12 @@ class SILDeadFuncElimination : public SILModuleTransform {
     DeadFunctionElimination deadFunctionElimination(getModule());
     deadFunctionElimination.eliminateFunctions(this);
   }
-  
-};
-
-class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
-  void run() override {
-    DEBUG(llvm::dbgs() << "Running ExternalFunctionDefinitionsElimination\n");
-
-    // The deserializer caches functions that it deserializes so that if it is
-    // asked to deserialize that function again, it does not do extra work. This
-    // causes the function's reference count to be incremented causing it to be
-    // alive unnecessarily. We invalidate the SILLoaderCaches here so that we
-    // can eliminate the definitions of such functions.
-    getModule()->invalidateSILLoaderCaches();
-
-    ExternalFunctionDefinitionsElimination EFDFE(getModule());
-    EFDFE.eliminateFunctions(this);
- }
-
 };
 
 } // end anonymous namespace
 
 SILTransform *swift::createDeadFunctionElimination() {
   return new SILDeadFuncElimination();
-}
-
-SILTransform *swift::createExternalFunctionDefinitionsElimination() {
-  return new SILExternalFuncDefinitionsElimination();
 }
 
 void swift::performSILDeadFunctionElimination(SILModule *M) {

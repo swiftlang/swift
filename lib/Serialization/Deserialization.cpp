@@ -1034,7 +1034,7 @@ ModuleFile::getGenericSignatureOrEnvironment(
 
   // Form the generic environment. Record it now so that deserialization of
   // the archetypes in the environment can refer to this environment.
-  auto genericEnv = signature->createGenericEnvironment(*getAssociatedModule());
+  auto genericEnv = signature->createGenericEnvironment();
   envOrOffset = genericEnv;
 
   return genericEnv;
@@ -2128,8 +2128,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
 
-  if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumDeclsDeserialized++;
+  if (auto s = ctx.Stats)
+    s->getFrontendCounters().NumDeclsDeserialized++;
 
   // Read the attributes (if any).
   // This isn't just using DeclAttributes because that would result in the
@@ -2502,11 +2502,13 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclContextID contextID;
     TypeID defaultDefinitionID;
     bool isImplicit;
+    ArrayRef<uint64_t> rawOverriddenIDs;
 
     decls_block::AssociatedTypeDeclLayout::readRecord(scratch, nameID,
                                                       contextID,
                                                       defaultDefinitionID,
-                                                      isImplicit);
+                                                      isImplicit,
+                                                      rawOverriddenIDs);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2533,6 +2535,17 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       assocType->setImplicit();
 
     assocType->setCheckedInheritanceClause();
+
+    // Overridden associated types.
+    SmallVector<AssociatedTypeDecl *, 2> overriddenAssocTypes;
+    for (auto overriddenID : rawOverriddenIDs) {
+      if (auto overriddenAssocType =
+              dyn_cast_or_null<AssociatedTypeDecl>(getDecl(overriddenID))) {
+        overriddenAssocTypes.push_back(overriddenAssocType);
+      }
+    }
+    (void)assocType->setOverriddenDecls(overriddenAssocTypes);
+
     break;
   }
 
@@ -3127,17 +3140,21 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     configureGenericEnvironment(proto, genericEnvID);
 
-    SmallVector<Requirement, 4> requirements;
-    readGenericRequirements(requirements, DeclTypeCursor);
-
     if (isImplicit)
       proto->setImplicit();
     proto->computeType();
 
-    proto->setRequirementSignature(requirements);
+    proto->setCircularityCheck(CircularityCheck::Checked);
+
+    // Establish the requirement signature.
+    {
+      SmallVector<Requirement, 4> requirements;
+      readGenericRequirements(requirements, DeclTypeCursor);
+      proto->setRequirementSignature(requirements);
+    }
 
     proto->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
-    proto->setCircularityCheck(CircularityCheck::Checked);
+
     break;
   }
 
@@ -3816,8 +3833,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   StringRef blobData;
   unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
 
-  if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumTypesDeserialized++;
+  if (auto s = ctx.Stats)
+    s->getFrontendCounters().NumTypesDeserialized++;
 
   switch (recordID) {
   case decls_block::NAME_ALIAS_TYPE: {
@@ -4317,6 +4334,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     uint8_t rawCalleeConvention;
     uint8_t rawRepresentation;
     bool pseudogeneric = false;
+    bool noescape;
     bool hasErrorResult;
     unsigned numParams;
     unsigned numResults;
@@ -4326,6 +4344,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                              rawCalleeConvention,
                                              rawRepresentation,
                                              pseudogeneric,
+                                             noescape,
                                              hasErrorResult,
                                              numParams,
                                              numResults,
@@ -4338,7 +4357,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       error();
       return nullptr;
     }
-    SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric);
+    SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape);
 
     // Process the callee convention.
     auto calleeConvention = getActualParameterConvention(rawCalleeConvention);
@@ -4861,8 +4880,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       syntheticSig = GenericSignature::get(genericParams, requirements);
 
       // Create the synthetic environment.
-      syntheticEnv =
-        syntheticSig->createGenericEnvironment(*getAssociatedModule());
+      syntheticEnv = syntheticSig->createGenericEnvironment();
 
       // Requirement -> synthetic substitutions.
       if (unsigned numReqSubstitutions = *rawIDIter++) {

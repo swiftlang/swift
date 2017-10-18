@@ -71,6 +71,7 @@ static void printDemangleResults(sourcekitd_variant_t Info, raw_ostream &OS);
 static void prepareMangleRequest(sourcekitd_object_t Req,
                                  const TestOptions &Opts);
 static void printMangleResults(sourcekitd_variant_t Info, raw_ostream &OS);
+static void printStatistics(sourcekitd_variant_t Info, raw_ostream &OS);
 
 static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
                                    StringRef Filename);
@@ -569,6 +570,11 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
     break;
 
+  case SourceKitRequest::Close:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorClose);
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    break;
+
   case SourceKitRequest::Edit:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestEditorReplaceText);
@@ -662,7 +668,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     break;
 
   case SourceKitRequest::SyntacticRename:
-  case SourceKitRequest::FindRenameRanges:
+  case SourceKitRequest::FindRenameRanges: {
     if (Opts.Request == SourceKitRequest::SyntacticRename) {
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSyntacticRename);
     } else {
@@ -682,6 +688,10 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       return 1;
     }
     sourcekitd_request_dictionary_set_value(Req, KeyRenameLocations, RenameSpec);
+    break;
+  }
+  case SourceKitRequest::Statistics:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestStatistics);
     break;
   }
 
@@ -803,6 +813,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       break;
 
     case SourceKitRequest::ProtocolVersion:
+    case SourceKitRequest::Close:
     case SourceKitRequest::Index:
     case SourceKitRequest::CodeComplete:
     case SourceKitRequest::CodeCompleteOpen:
@@ -945,6 +956,8 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       case SourceKitRequest::FindLocalRenameRanges:
         printRenameRanges(Info, llvm::outs());
         break;
+      case SourceKitRequest::Statistics:
+        printStatistics(Info, llvm::outs());
     }
   }
 
@@ -1634,6 +1647,18 @@ static void printMangleResults(sourcekitd_variant_t Info, raw_ostream &OS) {
     return true;
   });
   OS << "END MANGLE\n";
+}
+
+static void printStatistics(sourcekitd_variant_t Info, raw_ostream &OS) {
+  sourcekitd_variant_t results =
+    sourcekitd_variant_dictionary_get_value(Info, KeyResults);
+  sourcekitd_variant_array_apply(results, ^bool(size_t index, sourcekitd_variant_t value) {
+    auto uid = sourcekitd_variant_dictionary_get_uid(value, KeyKind);
+    auto desc = sourcekitd_variant_dictionary_get_string(value, KeyDescription);
+    auto statValue = sourcekitd_variant_dictionary_get_int64(value, KeyValue);
+    OS << statValue << "\t" << desc << "\t- " << sourcekitd_uid_get_string_ptr(uid) << "\n";
+    return true;
+  });
 }
 
 static void initializeRewriteBuffer(StringRef Input,

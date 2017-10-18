@@ -1469,6 +1469,13 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
                             const FuncDecl *Accessor)
       : TC(TC), Var(var), Accessor(Accessor) {}
 
+    /// Return true if this is an implicit reference to self.
+    static bool isImplicitSelfUse(Expr *E) {
+      auto *DRE = dyn_cast<DeclRefExpr>(E);
+      return DRE && DRE->isImplicit() && isa<VarDecl>(DRE->getDecl()) &&
+             cast<VarDecl>(DRE->getDecl())->isSelfParameter();
+    }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       Expr *subExpr;
       bool isStore = false;
@@ -1529,7 +1536,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
         // Find MemberRefExprs that have an implicit "self" base.
         if (MRE->getMember().getDecl() == Var &&
             isa<DeclRefExpr>(MRE->getBase()) &&
-            MRE->getBase()->isImplicit()) {
+            isImplicitSelfUse(MRE->getBase())) {
           
           if (MRE->getAccessSemantics() != AccessSemantics::DirectToStorage) {
             bool shouldDiagnose = false;
@@ -2093,7 +2100,13 @@ class VarDeclUsageChecker : public ASTWalker {
   /// This is a mapping from an OpaqueValue to the expression that initialized
   /// it.
   llvm::SmallDenseMap<OpaqueValueExpr*, Expr*> OpaqueValueMap;
-  
+
+  /// The getter associated with a setter function declaration.
+  const VarDecl *AssociatedGetter = nullptr;
+
+  /// The first reference to the associated getter.
+  const DeclRefExpr *AssociatedGetterDeclRef = nullptr;
+
   /// This is a mapping from VarDecls to the if/while/guard statement that they
   /// occur in, when they are in a pattern in a StmtCondition.
   llvm::SmallDenseMap<VarDecl*, LabeledConditionalStmt*> StmtConditionForVD;
@@ -2105,12 +2118,18 @@ class VarDeclUsageChecker : public ASTWalker {
 
 public:
   VarDeclUsageChecker(TypeChecker &TC, AbstractFunctionDecl *AFD) : Diags(TC.Diags) {
-    // Track the parameters of the function.
-    for (auto PL : AFD->getParameterLists())
-      for (auto param : *PL)
-        if (shouldTrackVarDecl(param))
-          VarDecls[param] = 0;
-    
+    // If this AFD is a setter, track the parameter and the getter for
+    // the containing property so if newValue isn't used but the getter is used
+    // an error can be reported.
+    if (auto FD = dyn_cast<FuncDecl>(AFD)) {
+      if (FD->getAccessorKind() == AccessorKind::IsSetter) {
+        if (auto getter = dyn_cast<VarDecl>(FD->getAccessorStorageDecl())) {
+          auto arguments = FD->getParameterLists().back();
+          VarDecls[arguments->get(0)] = 0;
+          AssociatedGetter = getter;
+        }
+      }
+    }
   }
 
   VarDeclUsageChecker(DiagnosticEngine &Diags) : Diags(Diags) {}
@@ -2119,7 +2138,7 @@ public:
     // Track a specific VarDecl
     VarDecls[VD] = 0;
   }
-    
+
   void suppressDiagnostics() {
     sawError = true; // set this flag so that no diagnostics will be emitted on delete.
   }
@@ -2257,7 +2276,6 @@ public:
       }
     }
 
-    
     // Note that we ignore the initialization behavior of PatternBindingDecls,
     // but we do want to walk into them, because we want to see any uses or
     // other things going on in the initializer expressions.
@@ -2321,12 +2339,27 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     if (var->isInOut())
       continue;    
     
-    // Consider parameters to always have been read.  It is common to name a
-    // parameter and not use it (e.g. because you are an override or want the
-    // named keyword, etc).  Warning to rewrite it to _ is more annoying than
-    // it is useful.
-    if (isa<ParamDecl>(var))
-      access |= RK_Read;
+    // If the setter parameter is not used, but the property is read, report
+    // a warning. Otherwise, parameters should not generate usage warnings. It
+    // is common to name a parameter and not use it (e.g. because you are an
+    // override or want the named keyword, etc).  Warning to rewrite it to _ is
+    // more annoying than it is useful.
+    if (auto param = dyn_cast<ParamDecl>(var)) {
+      auto FD = dyn_cast<FuncDecl>(param->getDeclContext());
+      if (FD && FD->getAccessorKind() == AccessorKind::IsSetter) {
+        auto getter = dyn_cast<VarDecl>(FD->getAccessorStorageDecl());
+        if ((access & RK_Read) == 0 && AssociatedGetter == getter) {
+          if (auto DRE = AssociatedGetterDeclRef) {
+            Diags.diagnose(DRE->getLoc(), diag::unused_setter_parameter,
+                           var->getName());
+            Diags.diagnose(DRE->getLoc(), diag::fixit_for_unused_setter_parameter,
+                           var->getName())
+              .fixItReplace(DRE->getSourceRange(), var->getName().str());
+          }
+        }
+      }
+      continue;
+    }
     
     // Diagnose variables that were never used (other than their
     // initialization).
@@ -2608,9 +2641,15 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
 
   // If this is a DeclRefExpr found in a random place, it is a load of the
   // vardecl.
-  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     addMark(DRE->getDecl(), RK_Read);
 
+    // If the Decl is a read of a getter, track the first DRE for diagnostics
+    if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+      if (AssociatedGetter == VD && AssociatedGetterDeclRef == nullptr)
+        AssociatedGetterDeclRef = DRE;
+    }
+  }
   // If this is an AssignExpr, see if we're mutating something that we know
   // about.
   if (auto *assign = dyn_cast<AssignExpr>(E)) {

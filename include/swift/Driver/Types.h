@@ -36,6 +36,8 @@ namespace types {
   StringRef getTypeTempSuffix(ID Id);
 
   /// Lookup the type to use for the file extension \p Ext.
+  /// If the extension is empty or is otherwise not recognized, return
+  /// the invalid type \c TY_INVALID.
   ID lookupTypeForExtension(StringRef Ext);
 
   /// Lookup the type to use for the name \p Name.

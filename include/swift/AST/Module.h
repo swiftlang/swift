@@ -114,13 +114,7 @@ enum class ResilienceStrategy : unsigned {
   /// Non-inlineable function bodies: resilient
   ///
   /// This is the behavior with -enable-resilience.
-  Resilient,
-
-  /// Public nominal types: fragile
-  /// Non-inlineable function bodies: fragile
-  ///
-  /// This is the behavior with -sil-serialize-all.
-  Fragile
+  Resilient
 };
 
 /// The minimum unit of compilation.

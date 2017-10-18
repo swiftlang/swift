@@ -93,6 +93,11 @@
           key.line: 8,
           key.column: 15
         }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
+        }
       ]
     },
     {

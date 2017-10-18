@@ -417,6 +417,37 @@ func testStaticKeyPathComponent() {
   _ = \X.Type.b // expected-error{{cannot refer to static member}}
 }
 
+class Bass: Hashable {
+  static func ==(_: Bass, _: Bass) -> Bool { return false }
+  var hashValue: Int { return 0 }
+}
+
+class Treble: Bass { }
+
+struct BassSubscript {
+  subscript(_: Bass) -> Int { fatalError() }
+  subscript(_: @autoclosure () -> String) -> Int { fatalError() }
+}
+
+func testImplicitConversionInSubscriptIndex() {
+  _ = \BassSubscript.[Treble()]
+  _ = \BassSubscript.["hello"] // expected-error{{must be Hashable}}
+}
+
+// SR-6106
+func sr6106() {
+  class B {}
+  class A {
+    var b: B? = nil
+  }
+  class C {
+    var a: A?
+    func myFunc() {
+      let _ = \C.a?.b
+    }
+  }
+}
+
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}
   _ = \.a ;

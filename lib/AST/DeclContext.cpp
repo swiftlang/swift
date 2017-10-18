@@ -17,6 +17,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
@@ -89,6 +90,10 @@ ClassDecl *DeclContext::getAsClassOrClassExtensionContext() const {
 
 EnumDecl *DeclContext::getAsEnumOrEnumExtensionContext() const {
   return dyn_cast_or_null<EnumDecl>(getAsTypeOrTypeExtensionContext());
+}
+
+StructDecl *DeclContext::getAsStructOrStructExtensionContext() const {
+  return dyn_cast_or_null<StructDecl>(getAsTypeOrTypeExtensionContext());
 }
 
 ProtocolDecl *DeclContext::getAsProtocolOrProtocolExtensionContext() const {
@@ -942,9 +947,9 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
   ++NumLazyIterableDeclContexts;
   ++NumUnloadedLazyIterableDeclContexts;
   // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (ctx.Stats) {
-    ++ctx.Stats->getFrontendCounters().NumLazyIterableDeclContexts;
-    ++ctx.Stats->getFrontendCounters().NumUnloadedLazyIterableDeclContexts;
+  if (auto s = ctx.Stats) {
+    ++s->getFrontendCounters().NumLazyIterableDeclContexts;
+    ++s->getFrontendCounters().NumUnloadedLazyIterableDeclContexts;
   }
 }
 
@@ -974,8 +979,8 @@ void IterableDeclContext::loadAllMembers() const {
 
   --NumUnloadedLazyIterableDeclContexts;
   // FIXME: (transitional) decrement the redundant "always-on" counter.
-  if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumUnloadedLazyIterableDeclContexts--;
+  if (auto s = ctx.Stats)
+    s->getFrontendCounters().NumUnloadedLazyIterableDeclContexts--;
 }
 
 bool IterableDeclContext::classof(const Decl *D) {

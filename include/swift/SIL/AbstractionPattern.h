@@ -705,34 +705,9 @@ public:
 
   /// Is this an interface type that is subject to a concrete
   /// same-type constraint?
-  bool isConcreteType(ModuleDecl &module) const {
-    assert(isTypeParameter());
-    return (getKind() != Kind::Opaque &&
-            GenericSig != nullptr &&
-            GenericSig->isConcreteType(getType(), module));
-  }
+  bool isConcreteType() const;
 
-  bool requiresClass(ModuleDecl &module) {
-    switch (getKind()) {
-    case Kind::Opaque:
-      return false;
-    case Kind::Type:
-    case Kind::Discard: {
-      auto type = getType();
-      if (auto archetype = dyn_cast<ArchetypeType>(type))
-        return archetype->requiresClass();
-      else if (isa<DependentMemberType>(type) ||
-               isa<GenericTypeParamType>(type)) {
-        assert(GenericSig &&
-               "Dependent type in pattern without generic signature?");
-        return GenericSig->requiresClass(type, module);
-      }
-      return false;
-    }
-    default:
-      return false;
-    }
-  }
+  bool requiresClass();
 
   /// Return the Swift type which provides structure for this
   /// abstraction pattern.

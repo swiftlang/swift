@@ -110,6 +110,20 @@ const SILNode *SILNode::getCanonicalSILNodeSlowPath() const {
               static_cast<const ValueBase &>(*this)));
 }
 
+/// Get a location for this value.
+SILLocation SILValue::getLoc() const {
+  if (auto *instr = Value->getDefiningInstruction())
+    return instr->getLoc();
+
+  if (auto *arg = dyn_cast<SILArgument>(*this)) {
+    if (arg->getDecl())
+      return RegularLocation(const_cast<ValueDecl *>(arg->getDecl()));
+  }
+  // TODO: bbargs should probably use one of their operand locations.
+  return Value->getFunction()->getLocation();
+}
+
+
 //===----------------------------------------------------------------------===//
 //                             ValueOwnershipKind
 //===----------------------------------------------------------------------===//

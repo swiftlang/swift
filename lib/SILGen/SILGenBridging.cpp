@@ -881,10 +881,14 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   // Create it in the current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);
-  auto thunkedFn = B.createPartialApply(loc, thunkValue,
-                                    SILType::getPrimitiveObjectType(substFnTy),
-                                    subs, block.forward(*this),
-                                SILType::getPrimitiveObjectType(loweredFuncTy));
+  SingleValueInstruction *thunkedFn = B.createPartialApply(
+      loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy), subs,
+      block.forward(*this), SILType::getPrimitiveObjectType(loweredFuncTy));
+  if (loweredFuncTy->isNoEscape()) {
+    auto &funcTL = getTypeLowering(loweredFuncTy);
+    thunkedFn =
+        B.createConvertFunction(loc, thunkedFn, funcTL.getLoweredType());
+  }
   return emitManagedRValueWithCleanup(thunkedFn);
 }
 
@@ -1483,12 +1487,10 @@ getThunkedForeignFunctionRef(SILGenFunction &SGF,
   // Produce a class_method when thunking imported ObjC methods.
   } else if (foreignCI.SILFnType->getRepresentation()
         == SILFunctionTypeRepresentation::ObjCMethod) {
-//    assert(subs.empty());
     SILValue thisArg = args.back().getValue();
 
-    return SGF.B.createClassMethod(loc, thisArg, foreign,
-                         SILType::getPrimitiveObjectType(foreignCI.SILFnType),
-                                   /*volatile*/ true);
+    return SGF.B.createObjCMethod(loc, thisArg, foreign,
+                         SILType::getPrimitiveObjectType(foreignCI.SILFnType));
   }
   // Otherwise, emit a function_ref.
   return SGF.emitGlobalFunctionRef(loc, foreign);

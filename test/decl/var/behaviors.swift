@@ -155,7 +155,7 @@ struct Foo2<T> {
 
 extension Foo {
   static var y: T __behavior hasStorage // expected-error{{static stored properties not supported in generic types}}
-  var y: T __behavior hasStorage // expected-error {{extensions may not contain stored properties}}
+  var y: T __behavior hasStorage // expected-error {{extensions must not contain stored properties}}
 }
 
 protocol storageWithoutInit {

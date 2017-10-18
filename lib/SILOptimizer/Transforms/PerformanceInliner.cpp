@@ -128,15 +128,24 @@ class SILPerformanceInliner {
     return SPA;
   }
 
-  bool isProfitableToInline(FullApplySite AI,
-                            Weight CallerWeight,
-                            ConstantTracker &callerTracker,
-                            int &NumCallerBlocks);
+  bool profileBasedDecision(
+      const FullApplySite &AI, int Benefit, SILFunction *Callee, int CalleeCost,
+      int &NumCallerBlocks,
+      const llvm::DenseMapIterator<
+          swift::SILBasicBlock *, uint64_t,
+          llvm::DenseMapInfo<swift::SILBasicBlock *>,
+          llvm::detail::DenseMapPair<swift::SILBasicBlock *, uint64_t>, true>
+          &bbIt);
 
-  bool decideInWarmBlock(FullApplySite AI,
-                         Weight CallerWeight,
-                         ConstantTracker &callerTracker,
-                         int &NumCallerBlocks);
+  bool isProfitableToInline(
+      FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
+      int &NumCallerBlocks,
+      const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap);
+
+  bool decideInWarmBlock(
+      FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
+      int &NumCallerBlocks,
+      const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap);
 
   bool decideInColdBlock(FullApplySite AI, SILFunction *Callee);
 
@@ -165,10 +174,63 @@ static bool canSpecializeGeneric(ApplySite AI, SILFunction *F,
   return ReabstractionInfo::canBeSpecialized(AI, F, Subs);
 }
 
-bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
-                                                 Weight CallerWeight,
-                                                 ConstantTracker &callerTracker,
-                                                 int &NumCallerBlocks) {
+bool SILPerformanceInliner::profileBasedDecision(
+    const FullApplySite &AI, int Benefit, SILFunction *Callee, int CalleeCost,
+    int &NumCallerBlocks,
+    const llvm::DenseMapIterator<
+        swift::SILBasicBlock *, uint64_t,
+        llvm::DenseMapInfo<swift::SILBasicBlock *>,
+        llvm::detail::DenseMapPair<swift::SILBasicBlock *, uint64_t>, true>
+        &bbIt) {
+  if (CalleeCost < TrivialFunctionThreshold) {
+    // We do not increase code size below this threshold
+    return true;
+  }
+  auto callerCount = bbIt->getSecond();
+  if (callerCount < 1) {
+    // Never called - do not inline
+    DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs()
+                                        << "profiled decision: NO"
+                                        << ", reason= Never Called." << '\n';);
+    return false;
+  }
+  auto calleeCount = Callee->getEntryCount();
+  if (calleeCount) {
+    // If we have Callee count - use SI heuristic:
+    auto calleCountVal = calleeCount.getValue();
+    auto percent = (long double)callerCount / (long double)calleCountVal;
+    if (percent < 0.8) {
+      DEBUG(dumpCaller(AI.getFunction());
+            llvm::dbgs() << "profiled decision: NO"
+                         << ", reason=SI " << std::to_string(percent) << "%"
+                         << '\n';);
+      return false;
+    }
+    DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs() << "profiled decision: YES"
+                                                     << ", reason=SI "
+                                                     << std::to_string(percent)
+                                                     << "%" << '\n';);
+  } else {
+    // No callee count - use a "modified" aggressive IHF for now
+    if (CalleeCost > Benefit && callerCount < 100) {
+      DEBUG(dumpCaller(AI.getFunction());
+            llvm::dbgs() << "profiled decision: NO"
+                         << ", reason=IHF " << callerCount << '\n';);
+      return false;
+    }
+    DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs() << "profiled decision: YES"
+                                                     << ", reason=IHF "
+                                                     << callerCount << '\n';);
+  }
+  // We're gonna inline!
+  NumCallerBlocks += Callee->size();
+  return true;
+}
+
+bool SILPerformanceInliner::isProfitableToInline(
+    FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
+    int &NumCallerBlocks,
+    const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
   SILFunction *Callee = AI.getReferencedFunction();
   bool IsGeneric = !AI.getSubstitutions().empty();
 
@@ -362,6 +424,14 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
                         NumCallerBlocks / BlockLimitDenominator;
   Benefit -= blockMinus;
 
+  // If we have profile info - use it for final inlining decision.
+  auto *bb = AI.getInstruction()->getParent();
+  auto bbIt = BBToWeightMap.find(bb);
+  if (bbIt != BBToWeightMap.end()) {
+    return profileBasedDecision(AI, Benefit, Callee, CalleeCost,
+                                NumCallerBlocks, bbIt);
+  }
+
   // This is the final inlining decision.
   if (CalleeCost > Benefit) {
     return false;
@@ -423,11 +493,10 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   return None;
 }
 
-bool SILPerformanceInliner::
-decideInWarmBlock(FullApplySite AI,
-                  Weight CallerWeight,
-                  ConstantTracker &callerTracker,
-                  int &NumCallerBlocks) {
+bool SILPerformanceInliner::decideInWarmBlock(
+    FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
+    int &NumCallerBlocks,
+    const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
   if (!AI.getSubstitutions().empty()) {
     // Only inline generics if definitively clear that it should be done.
     auto ShouldInlineGeneric = shouldInlineGeneric(AI);
@@ -445,7 +514,8 @@ decideInWarmBlock(FullApplySite AI,
     return true;
   }
 
-  return isProfitableToInline(AI, CallerWeight, callerTracker, NumCallerBlocks);
+  return isProfitableToInline(AI, CallerWeight, callerTracker, NumCallerBlocks,
+                              BBToWeightMap);
 }
 
 /// Return true if inlining this call site into a cold block is profitable.
@@ -505,6 +575,94 @@ static void addWeightCorrection(FullApplySite FAS,
   }
 }
 
+static bool containsWeight(TermInst *inst) {
+  for (auto &succ : inst->getSuccessors()) {
+    if (succ.getCount()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void
+addToBBCounts(llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap,
+              uint64_t numToAdd, swift::TermInst *termInst) {
+  for (auto &succ : termInst->getSuccessors()) {
+    auto *currBB = succ.getBB();
+    assert(BBToWeightMap.find(currBB) != BBToWeightMap.end() &&
+           "Expected to find block in map");
+    BBToWeightMap[currBB] += numToAdd;
+  }
+}
+
+static void
+calculateBBWeights(SILFunction *Caller, DominanceInfo *DT,
+                   llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
+  auto entryCount = Caller->getEntryCount();
+  if (!entryCount) {
+    // No profile for function - return
+    return;
+  }
+  // Add all blocks to BBToWeightMap without count 0
+  for (auto &block : Caller->getBlocks()) {
+    BBToWeightMap[&block] = 0;
+  }
+  BBToWeightMap[Caller->getEntryBlock()] = entryCount.getValue();
+  DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
+  while (SILBasicBlock *block = domOrder.getNext()) {
+    auto bbIt = BBToWeightMap.find(block);
+    assert(bbIt != BBToWeightMap.end() && "Expected to find block in map");
+    auto bbCount = bbIt->getSecond();
+    auto *termInst = block->getTerminator();
+    if (containsWeight(termInst)) {
+      // Instruction already contains accurate counters - use them as-is
+      uint64_t countSum = 0;
+      uint64_t blocksWithoutCount = 0;
+      for (auto &succ : termInst->getSuccessors()) {
+        auto *currBB = succ.getBB();
+        assert(BBToWeightMap.find(currBB) != BBToWeightMap.end() &&
+               "Expected to find block in map");
+        auto currCount = succ.getCount();
+        if (!currCount) {
+          ++blocksWithoutCount;
+          continue;
+        }
+        auto currCountVal = currCount.getValue();
+        countSum += currCountVal;
+        BBToWeightMap[currBB] += currCountVal;
+      }
+      if (countSum < bbCount) {
+        // inaccurate profile - fill in the gaps for BBs without a count:
+        if (blocksWithoutCount > 0) {
+          auto numToAdd = (bbCount - countSum) / blocksWithoutCount;
+          for (auto &succ : termInst->getSuccessors()) {
+            auto *currBB = succ.getBB();
+            auto currCount = succ.getCount();
+            if (!currCount) {
+              BBToWeightMap[currBB] += numToAdd;
+            }
+          }
+        }
+      } else {
+        auto numOfSucc = termInst->getSuccessors().size();
+        assert(numOfSucc > 0 && "Expected successors > 0");
+        auto numToAdd = (countSum - bbCount) / numOfSucc;
+        addToBBCounts(BBToWeightMap, numToAdd, termInst);
+      }
+    } else {
+      // Fill counters speculatively
+      auto numOfSucc = termInst->getSuccessors().size();
+      if (numOfSucc == 0) {
+        // No successors to fill
+        continue;
+      }
+      auto numToAdd = bbCount / numOfSucc;
+      addToBBCounts(BBToWeightMap, numToAdd, termInst);
+    }
+    domOrder.pushChildrenIf(block, [&](SILBasicBlock *child) { return true; });
+  }
+}
+
 void SILPerformanceInliner::collectAppliesToInline(
     SILFunction *Caller, SmallVectorImpl<FullApplySite> &Applies) {
   DominanceInfo *DT = DA->get(Caller);
@@ -552,6 +710,9 @@ void SILPerformanceInliner::collectAppliesToInline(
   DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
   int NumCallerBlocks = (int)Caller->size();
 
+  llvm::DenseMap<SILBasicBlock *, uint64_t> BBToWeightMap;
+  calculateBBWeights(Caller, DT, BBToWeightMap);
+
   // Go through all instructions and find candidates for inlining.
   // We do this in dominance order for the constTracker.
   SmallVector<FullApplySite, 8> InitialCandidates;
@@ -575,7 +736,8 @@ void SILPerformanceInliner::collectAppliesToInline(
         // The actual weight including a possible weight correction.
         Weight W(BlockWeight, WeightCorrections.lookup(AI));
 
-        if (decideInWarmBlock(AI, W, constTracker, NumCallerBlocks))
+        if (decideInWarmBlock(AI, W, constTracker, NumCallerBlocks,
+                              BBToWeightMap))
           InitialCandidates.push_back(AI);
       }
     }
@@ -607,8 +769,9 @@ void SILPerformanceInliner::collectAppliesToInline(
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
     const unsigned CallsToCalleeThreshold = 1024;
-    if (CalleeCount[Callee] <= CallsToCalleeThreshold)
+    if (CalleeCount[Callee] <= CallsToCalleeThreshold) {
       Applies.push_back(AI);
+    }
   }
 }
 

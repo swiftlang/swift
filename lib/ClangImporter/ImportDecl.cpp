@@ -3772,7 +3772,7 @@ namespace {
 
       // If the method has a related result type that is representable
       // in Swift as DynamicSelf, do so.
-      if (decl->hasRelatedResultType()) {
+      if (!prop && decl->hasRelatedResultType()) {
         result->setDynamicSelf(true);
         resultTy = DynamicSelfType::get(dc->getSelfInterfaceType(),
                                         Impl.SwiftContext);
@@ -6716,7 +6716,7 @@ void SwiftDeclConverter::importInheritedConstructors(
 
   auto curObjCClass = cast<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
 
-  auto inheritConstructors = [&](DeclRange members,
+  auto inheritConstructors = [&](ArrayRef<ValueDecl *> members,
                                  Optional<CtorInitializerKind> kind) {
     const auto &languageVersion =
         Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
@@ -6816,10 +6816,8 @@ void SwiftDeclConverter::importInheritedConstructors(
   // If we have a superclass, import from it.
   if (auto superclassClangDecl = superclass->getClangDecl()) {
     if (isa<clang::ObjCInterfaceDecl>(superclassClangDecl)) {
-      inheritConstructors(superclass->getMembers(), kind);
-
-      for (auto ext : superclass->getExtensions())
-        inheritConstructors(ext->getMembers(), kind);
+      inheritConstructors(superclass->lookupDirect(Impl.SwiftContext.Id_init),
+                          kind);
     }
   }
 }
@@ -7640,8 +7638,7 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 
 GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
-  GenericSignatureBuilder builder(SwiftContext,
-                           LookUpConformanceInModule(dc->getParentModule()));
+  GenericSignatureBuilder builder(SwiftContext);
   SmallVector<GenericTypeParamType *, 4> allGenericParams;
   for (auto param : *genericParams) {
     builder.addGenericParameter(param);
@@ -7654,14 +7651,13 @@ GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     (void) result;
   }
 
-  return builder.computeGenericSignature(SourceLoc());
+  return std::move(builder).computeGenericSignature(SourceLoc());
 }
 
 // Calculate the generic environment from an imported generic param list.
 GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
     GenericParamList *genericParams, DeclContext *dc) {
-  return buildGenericSignature(genericParams, dc)->createGenericEnvironment(
-                                                       *dc->getParentModule());
+  return buildGenericSignature(genericParams, dc)->createGenericEnvironment();
 }
 
 DeclContext *
@@ -7978,9 +7974,11 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
-  static RecursiveSharedTimer timer("ClangImporterLoadAllMembers");
-  auto guard = RecursiveSharedTimer::Guard(timer);
-  (void)guard;
+  RecursiveSharedTimer::Guard guard;
+  if (auto s = D->getASTContext().Stats) {
+    guard = s->getFrontendRecursiveSharedTimers()
+                .ClangImporter__Implementation__loadAllMembers.getGuard();
+  }
 
   assert(D);
 

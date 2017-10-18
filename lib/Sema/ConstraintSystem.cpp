@@ -624,6 +624,14 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
     }
 
     if (auto typeVar = type->getAs<TypeVariableType>()) {
+      bool hasRepresentative = false;
+      if (auto *repr = getRepresentative(typeVar)) {
+        if (typeVar != repr) {
+          hasRepresentative = true;
+          typeVar = repr;
+        }
+      }
+
       if (auto fixed = getFixedType(typeVar)) {
         if (wantRValue)
           fixed = fixed->getRValueType();
@@ -631,6 +639,12 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
         type = fixed;
         continue;
       }
+
+      // If type variable has a representative but
+      // no fixed type, reflect that in the type itself.
+      if (hasRepresentative)
+        type = typeVar;
+
       break;
     }
 
@@ -1030,55 +1044,33 @@ void ConstraintSystem::openGeneric(
 
   // Add the requirements as constraints.
   for (auto req : sig->getRequirements()) {
-  switch (req.getKind()) {
+    Optional<Requirement> openedReq;
+    auto openedFirst = openType(req.getFirstType(), replacements);
+
+    auto kind = req.getKind();
+    switch (kind) {
     case RequirementKind::Conformance: {
-      auto subjectTy = openType(req.getFirstType(), replacements);
       auto proto = req.getSecondType()->castTo<ProtocolType>();
       auto protoDecl = proto->getDecl();
-
       // Determine whether this is the protocol 'Self' constraint we should
       // skip.
       if (skipProtocolSelfConstraint &&
           protoDecl == outerDC &&
           protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
-        break;
-
-      addConstraint(ConstraintKind::ConformsTo, subjectTy, proto,
-                    locatorPtr);
+        continue;
+      openedReq = Requirement(kind, openedFirst, proto);
       break;
     }
-
-    case RequirementKind::Layout: {
-      auto subjectTy = openType(req.getFirstType(), replacements);
-      auto layoutConstraint = req.getLayoutConstraint();
-
-      if (layoutConstraint->isClass())
-        addConstraint(ConstraintKind::ConformsTo, subjectTy,
-                      TC.Context.getAnyObjectType(),
-                      locatorPtr);
-
-      // Nothing else can appear outside of @_specialize yet, and Sema
-      // doesn't know how to check.
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType:
+      openedReq = Requirement(kind, openedFirst,
+                              openType(req.getSecondType(), replacements));
+      break;
+    case RequirementKind::Layout:
+      openedReq = Requirement(kind, openedFirst, req.getLayoutConstraint());
       break;
     }
-
-    case RequirementKind::Superclass: {
-      auto subjectTy = openType(req.getFirstType(), replacements);
-      auto boundTy = openType(req.getSecondType(), replacements);
-      addConstraint(ConstraintKind::Subtype, subjectTy, boundTy, locatorPtr);
-      addConstraint(ConstraintKind::ConformsTo, subjectTy,
-                    TC.Context.getAnyObjectType(),
-                    locatorPtr);
-      break;
-    }
-
-    case RequirementKind::SameType: {
-      auto firstTy = openType(req.getFirstType(), replacements);
-      auto secondTy = openType(req.getSecondType(), replacements);
-      addConstraint(ConstraintKind::Bind, firstTy, secondTy, locatorPtr);
-      break;
-    }
-  }
+    addConstraint(*openedReq, locatorPtr);
   }
 }
 

@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
@@ -397,9 +398,7 @@ TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
       assert(FalseArgs.size() == Dest->getNumArguments());
     }
 
-    return Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
-                                    CBI->getTrueBB(), TrueArgs,
-                                    CBI->getFalseBB(), FalseArgs);
+    return Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(), CBI->getTrueBB(), TrueArgs, CBI->getFalseBB(), FalseArgs, CBI->getTrueBBCount(), CBI->getFalseBBCount());
   }
 
   if (auto *BI = dyn_cast<BranchInst>(Branch)) {
@@ -425,11 +424,7 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *F, SILLinkage L) {
     return SILLinkage::Private;
   }
 
-  // Treat stdlib_binary_only specially. We don't serialize the body of
-  // stdlib_binary_only functions so we can't mark them as Shared (making
-  // their visibility in the dylib hidden).
-  return F->hasSemanticsAttr("stdlib_binary_only") ? SILLinkage::Public
-                                                   : SILLinkage::Shared;
+  return SILLinkage::Shared;
 }
 
 /// Remove all instructions in the body of \p BB in safe manner by using
@@ -902,6 +897,12 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   }
 }
 
+static bool useHasTransitiveOwnership(const SILInstruction *I) {
+  // convert_function is used to add the @noescape attribute. It does not change
+  // ownership of the function value.
+  return isa<ConvertFunctionInst>(I);
+}
+
 static SILValue createLifetimeExtendedAllocStack(
     SILBuilder &Builder, SILLocation Loc, SILValue Arg,
     ArrayRef<SILBasicBlock *> ExitingBlocks, InstModCallbacks Callbacks) {
@@ -1088,9 +1089,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *Closure,
   // object is dead. This should be expanded in the future. This also ensures
   // that we are locally identified and non-escaping since we only allow for
   // specific ARC users.
-  ReleaseTracker Tracker([](const SILInstruction *I) -> bool {
-    return useDoesNotKeepClosureAlive(I);
-  });
+  ReleaseTracker Tracker(useDoesNotKeepClosureAlive, useHasTransitiveOwnership);
 
   // Find the ARC Users and the final retain, release.
   if (!getFinalReleasesForValue(SILValue(Closure), Tracker))
@@ -1105,12 +1104,14 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *Closure,
       return false;
   }
 
-  // Then delete all user instructions.
-  for (auto *User : Tracker.getTrackedUsers()) {
+  // Then delete all user instructions in reverse so that leaf uses are deleted
+  // first.
+  for (auto *User : reverse(Tracker.getTrackedUsers())) {
     assert(User->getResults().empty()
-           && "We expect only ARC operations without "
-              "results. This is true b/c of "
-              "isARCOperationRemovableIfObjectIsDead");
+           || useHasTransitiveOwnership(User)
+                  && "We expect only ARC operations without "
+                     "results. This is true b/c of "
+                     "isARCOperationRemovableIfObjectIsDead");
     Callbacks.DeleteInst(User);
   }
 
@@ -2294,8 +2295,9 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
                 Inst->getTargetType())) {
           SILBuilderWithScope B(Inst);
           auto NewI = B.createCheckedCastBranch(
-              Loc, false /*isExact*/, MI,
-              Dest->getType().getObjectType(), SuccessBB, FailureBB);
+              Loc, false /*isExact*/, MI, Dest->getType().getObjectType(),
+              SuccessBB, FailureBB, Inst->getTrueBBCount(),
+              Inst->getFalseBBCount());
           SuccessBB->createPHIArgument(Dest->getType().getObjectType(),
                                        ValueOwnershipKind::Owned);
           B.setInsertionPoint(SuccessBB->begin());
@@ -2341,10 +2343,9 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(Op)) {
     if (auto *MI = dyn_cast<MetatypeInst>(IEMI->getOperand())) {
       SILBuilderWithScope B(Inst);
-      auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
-                                LoweredTargetType,
-                                SuccessBB,
-                                FailureBB);
+      auto *NewI = B.createCheckedCastBranch(
+          Loc, /* isExact */ false, MI, LoweredTargetType, SuccessBB, FailureBB,
+          Inst->getTrueBBCount(), Inst->getFalseBBCount());
       EraseInstAction(Inst);
       return NewI;
     }
@@ -2410,10 +2411,9 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
             FoundIEI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIEI->getLoc(), SILMetaTy);
 
-        auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
-                                  LoweredTargetType,
-                                  SuccessBB,
-                                  FailureBB);
+        auto *NewI = B.createCheckedCastBranch(
+            Loc, /* isExact */ false, MI, LoweredTargetType, SuccessBB,
+            FailureBB, Inst->getTrueBBCount(), Inst->getFalseBBCount());
         EraseInstAction(Inst);
         return NewI;
       }
@@ -2470,10 +2470,9 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
             FoundIERI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
 
-        auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
-                                  LoweredTargetType,
-                                  SuccessBB,
-                                  FailureBB);
+        auto *NewI = B.createCheckedCastBranch(
+            Loc, /* isExact */ false, MI, LoweredTargetType, SuccessBB,
+            FailureBB, Inst->getTrueBBCount(), Inst->getFalseBBCount());
         EraseInstAction(Inst);
         return NewI;
       }

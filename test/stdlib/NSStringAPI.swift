@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift -swift-version 3
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -1144,9 +1144,11 @@ NSStringAPIs.test("rangeOfComposedCharacterSequences(for:)") {
       for: s.index(s.startIndex, offsetBy: 8)..<s.index(s.startIndex, offsetBy: 10))])
 }
 
-func toIntRange(
-  _ string: String, _ maybeRange: Range<String.Index>?
-) -> Range<Int>? {
+func toIntRange<
+  S : StringProtocol
+>(
+  _ string: S, _ maybeRange: Range<String.Index>?
+) -> Range<Int>? where S.Index == String.Index, S.IndexDistance == Int {
   guard let range = maybeRange else { return nil }
 
   return

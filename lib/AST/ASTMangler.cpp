@@ -533,25 +533,6 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   }
 }
 
-/// Returns true if one of the ancestor DeclContexts of \p D is either marked
-/// private or is a local context.
-static bool isInPrivateOrLocalContext(const ValueDecl *D) {
-  const DeclContext *DC = D->getDeclContext();
-  if (!DC->isTypeContext()) {
-    assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
-           "unexpected context kind");
-    return DC->isLocalContext();
-  }
-
-  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (nominal == nullptr)
-    return false;
-
-  if (nominal->getFormalAccess() <= AccessLevel::FilePrivate)
-    return true;
-  return isInPrivateOrLocalContext(nominal);
-}
-
 static bool getUnnamedParamIndex(const ParameterList *ParamList,
                                  const ParamDecl *D,
                                  unsigned &UnnamedIndex) {
@@ -593,11 +574,8 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
 }
 
 static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
-  if (!decl->hasAccess() ||
-      decl->getFormalAccess() > AccessLevel::FilePrivate ||
-      isInPrivateOrLocalContext(decl)) {
+  if (!decl->isOutermostPrivateOrFilePrivateScope())
     return StringRef();
-  }
 
   // Mangle non-local private declarations with a textual discriminator
   // based on their enclosing file.
@@ -892,8 +870,7 @@ void ASTMangler::appendType(Type type) {
 
       // Find the archetype information.
       const DeclContext *DC = DeclCtx;
-      auto GTPT = GenericEnvironment::mapTypeOutOfContext(GenericEnv, archetype)
-                      ->castTo<GenericTypeParamType>();
+      auto GTPT = archetype->getInterfaceType()->castTo<GenericTypeParamType>();
 
       // The DWARF output created by Swift is intentionally flat,
       // therefore archetypes are emitted with their DeclContext if
@@ -923,7 +900,7 @@ void ASTMangler::appendType(Type type) {
 
     case TypeKind::GenericFunction: {
       auto genFunc = cast<GenericFunctionType>(tybase);
-      appendFunctionType(genFunc, /*forceSingleParam*/ false);
+      appendFunctionType(genFunc);
       appendGenericSignature(genFunc->getGenericSignature());
       appendOperator("u");
       return;
@@ -966,7 +943,7 @@ void ASTMangler::appendType(Type type) {
     }
       
     case TypeKind::Function:
-      appendFunctionType(cast<FunctionType>(tybase), /*forceSingleParam*/ false);
+      appendFunctionType(cast<FunctionType>(tybase));
       return;
       
     case TypeKind::SILBox: {
@@ -1122,6 +1099,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 
   if (fn->isPolymorphic() && fn->isPseudogeneric())
     OpArgs.push_back('P');
+
+  if (!fn->isNoEscape())
+    OpArgs.push_back('e');
 
   // <impl-callee-convention>
   if (fn->getExtInfo().hasContext()) {
@@ -1334,7 +1314,9 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
       appendModule(ExtD->getParentModule());
       if (sig && ExtD->isConstrainedExtension()) {
         Mod = ExtD->getModuleContext();
-        appendGenericSignature(sig);
+        auto nominalSig = ExtD->getAsNominalTypeOrNominalTypeExtensionContext()
+                            ->getGenericSignatureOfContext();
+        appendGenericSignature(sig, nominalSig);
       }
       return appendOperator("E");
     }
@@ -1461,12 +1443,11 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   addSubstitution(key.getPointer());
 }
 
-void ASTMangler::appendFunctionType(AnyFunctionType *fn,
-                                    bool forceSingleParam) {
+void ASTMangler::appendFunctionType(AnyFunctionType *fn) {
   assert((DWARFMangling || fn->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
 
-  appendFunctionSignature(fn, forceSingleParam);
+  appendFunctionSignature(fn);
 
   // Note that we do not currently use thin representations in the AST
   // for the types of function decls.  This may need to change at some
@@ -1493,48 +1474,52 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn,
   }
 }
 
-void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
-                                         bool forceSingleParam) {
-  appendParams(fn->getResult(), /*forceSingleParam*/ false);
-  appendParams(fn->getInput(), forceSingleParam);
+void ASTMangler::appendFunctionSignature(AnyFunctionType *fn) {
+  appendFunctionResultType(fn->getResult());
+  appendFunctionInputType(fn->getParams());
   if (fn->throws())
     appendOperator("K");
 }
 
-void ASTMangler::appendParams(Type ParamsTy, bool forceSingleParam) {
-  if (TupleType *Tuple = ParamsTy->getAs<TupleType>()) {
-    if (Tuple->getNumElements() == 0) {
-      if (forceSingleParam) {
-        // A tuple containing a single empty tuple.
-        appendOperator("y");
-        appendOperator("t");
-        appendListSeparator();
-        appendOperator("t");
-      } else {
-        appendOperator("y");
-      }
-      return;
-    }
-    if (forceSingleParam && Tuple->getNumElements() > 1) {
-      auto flags = ParameterTypeFlags();
-      if (ParenType *Paren = dyn_cast<ParenType>(ParamsTy.getPointer())) {
-        ParamsTy = Paren->getUnderlyingType();
-        flags = Paren->getParameterFlags();
-      }
+void ASTMangler::appendFunctionInputType(
+    ArrayRef<AnyFunctionType::Param> params) {
+  switch (params.size()) {
+  case 0:
+    appendOperator("y");
+    break;
 
-      appendType(ParamsTy);
-      if (flags.isShared())
-        appendOperator("h");
-      appendListSeparator();
-      appendOperator("t");
-      return;
+  case 1: {
+    const auto &param = params.front();
+    auto type = param.getType();
+
+    // If this is just a single parenthesized type,
+    // to save space in the mangled name, let's encode
+    // it as a single type dropping sugar.
+    if (!param.hasLabel() && !param.isVariadic() &&
+        !isa<TupleType>(type.getPointer())) {
+      appendType(type);
+      break;
     }
+
+    // If this is a tuple type with a single labeled element
+    // let's handle it as a general case.
+    LLVM_FALLTHROUGH;
   }
 
-  if (ParenType *Paren = dyn_cast<ParenType>(ParamsTy.getPointer()))
-    ParamsTy = Paren->getUnderlyingType();
+  default:
+    bool isFirstParam = true;
+    for (auto &param : params) {
+      appendTypeListElement(param.getLabel(), param.getType(),
+                            param.getParameterFlags());
+      appendListSeparator(isFirstParam);
+    }
+    appendOperator("t");
+    break;
+  }
+}
 
-  appendType(ParamsTy);
+void ASTMangler::appendFunctionResultType(Type resultType) {
+  return resultType->isVoid() ? appendOperator("y") : appendType(resultType);
 }
 
 void ASTMangler::appendTypeList(Type listTy) {
@@ -1543,15 +1528,8 @@ void ASTMangler::appendTypeList(Type listTy) {
       return appendOperator("y");
     bool firstField = true;
     for (auto &field : tuple->getElements()) {
-      appendType(field.getType()->getInOutObjectType());
-      if (field.isInOut())
-        appendOperator("z");
-      if (field.getParameterFlags().isShared())
-        appendOperator("h");
-      if (field.hasName())
-        appendIdentifier(field.getName().str());
-      if (field.isVararg())
-        appendOperator("d");
+      appendTypeListElement(field.getName(), field.getType(),
+                            field.getParameterFlags());
       appendListSeparator(firstField);
     }
   } else {
@@ -1560,11 +1538,74 @@ void ASTMangler::appendTypeList(Type listTy) {
   }
 }
 
-void ASTMangler::appendGenericSignature(const GenericSignature *sig) {
+void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
+                                       ParameterTypeFlags flags) {
+  appendType(elementType->getInOutObjectType());
+  if (flags.isInOut())
+    appendOperator("z");
+  if (flags.isShared())
+    appendOperator("h");
+  if (!name.empty())
+    appendIdentifier(name.str());
+  if (flags.isVariadic())
+    appendOperator("d");
+}
+
+bool ASTMangler::appendGenericSignature(const GenericSignature *sig,
+                                        GenericSignature *contextSig) {
   auto canSig = sig->getCanonicalSignature();
   CurGenericSignature = canSig;
-  appendGenericSignatureParts(canSig->getGenericParams(), 0,
-                              canSig->getRequirements());
+
+  unsigned initialParamDepth;
+  ArrayRef<GenericTypeParamType *> genericParams;
+  ArrayRef<Requirement> requirements;
+  SmallVector<Requirement, 4> requirementsBuffer;
+  if (contextSig) {
+    // If the signature is the same as the context signature, there's nothing
+    // to do.
+    if (contextSig->getCanonicalSignature() == canSig) {
+      return false;
+    }
+
+    // The signature depth starts above the depth of the context signature.
+    if (!contextSig->getGenericParams().empty()) {
+      initialParamDepth = contextSig->getGenericParams().back()->getDepth() + 1;
+    }
+
+    // Find the parameters at this depth (or greater).
+    genericParams = canSig->getGenericParams();
+    unsigned firstParam = genericParams.size();
+    while (firstParam > 1 &&
+           genericParams[firstParam-1]->getDepth() >= initialParamDepth)
+      --firstParam;
+    genericParams = genericParams.slice(firstParam);
+
+    // Special case: if we would be mangling zero generic parameters, but
+    // the context signature is a single, unconstrained generic parameter,
+    // it's better to mangle the complete canonical signature because we
+    // have a special-case mangling for that.
+    if (genericParams.empty() &&
+        contextSig->getGenericParams().size() == 1 &&
+        contextSig->getRequirements().empty()) {
+      initialParamDepth = 0;
+      genericParams = canSig->getGenericParams();
+      requirements = canSig->getRequirements();
+    } else {
+      requirementsBuffer = canSig->requirementsNotSatisfiedBy(contextSig);
+      requirements = requirementsBuffer;
+    }
+  } else {
+    // Use the complete canonical signature.
+    initialParamDepth = 0;
+    genericParams = canSig->getGenericParams();
+    requirements = canSig->getRequirements();
+  }
+
+  if (genericParams.empty() && requirements.empty())
+    return false;
+
+  appendGenericSignatureParts(genericParams, initialParamDepth, requirements);
+  return true;
 }
 
 void ASTMangler::appendRequirement(const Requirement &reqt) {
@@ -1703,8 +1744,8 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
   // dependent type, but can't yet. Shouldn't need this side channel.
 
   appendIdentifier(assocTy->getName().str());
-  if (!OptimizeProtocolNames || !CurGenericSignature || !Mod
-      || CurGenericSignature->getConformsTo(dmt->getBase(), *Mod).size() > 1) {
+  if (!OptimizeProtocolNames || !CurGenericSignature
+      || CurGenericSignature->getConformsTo(dmt->getBase()).size() > 1) {
     appendAnyGenericType(assocTy->getProtocol());
   }
 }
@@ -1759,23 +1800,13 @@ static bool isMethodDecl(const Decl *decl) {
     && decl->getDeclContext()->isTypeContext();
 }
 
-static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
-  if (!type->hasTypeParameter())
-    return true;
-
-  return !type.findIf([methodDepth](Type t) -> bool {
-    if (auto *gp = t->getAs<GenericTypeParamType>())
-      return gp->getDepth() >= methodDepth;
-    return false;
-  });
-}
-
 CanType ASTMangler::getDeclTypeForMangling(
-    const ValueDecl *decl,
-    ArrayRef<GenericTypeParamType *> &genericParams,
-    unsigned &initialParamDepth,
-    ArrayRef<Requirement> &requirements,
-    SmallVectorImpl<Requirement> &requirementsBuf) {
+                                       const ValueDecl *decl,
+                                       GenericSignature *&genericSig,
+                                       GenericSignature *&parentGenericSig) {
+  genericSig = nullptr;
+  parentGenericSig = nullptr;
+
   auto &C = decl->getASTContext();
   if (!decl->hasInterfaceType() || decl->getInterfaceType()->is<ErrorType>()) {
     if (isa<AbstractFunctionDecl>(decl))
@@ -1784,21 +1815,14 @@ CanType ASTMangler::getDeclTypeForMangling(
     return C.TheErrorType;
   }
 
-  auto type = decl->getInterfaceType()->getCanonicalType();
 
-  initialParamDepth = 0;
-  CanGenericSignature sig;
+  CanType type = decl->getInterfaceType()->getCanonicalType();
   if (auto gft = dyn_cast<GenericFunctionType>(type)) {
-    sig = gft.getGenericSignature();
-    CurGenericSignature = sig;
-    genericParams = sig->getGenericParams();
-    requirements = sig->getRequirements();
+    genericSig = gft.getGenericSignature();
+    CurGenericSignature = gft.getGenericSignature();
 
     type = CanFunctionType::get(gft->getParams(), gft.getResult(),
                                 gft->getExtInfo());
-  } else {
-    genericParams = {};
-    requirements = {};
   }
 
   if (!type->hasError()) {
@@ -1808,89 +1832,31 @@ CanType ASTMangler::getDeclTypeForMangling(
       type = cast<AnyFunctionType>(type).getResult();
     }
 
-    if (isMethodDecl(decl) || isa<SubscriptDecl>(decl)) {
-      // Drop generic parameters and requirements from the method's context.
-      auto parentGenericSig =
-        decl->getDeclContext()->getGenericSignatureOfContext();
-      if (parentGenericSig && sig) {
-        // The method's depth starts above the depth of the context.
-        if (!parentGenericSig->getGenericParams().empty())
-          initialParamDepth =
-            parentGenericSig->getGenericParams().back()->getDepth() + 1;
-
-        while (!genericParams.empty()) {
-          if (genericParams.front()->getDepth() >= initialParamDepth)
-            break;
-          genericParams = genericParams.slice(1);
-        }
-
-        requirementsBuf.clear();
-        for (auto &reqt : sig->getRequirements()) {
-          switch (reqt.getKind()) {
-        case RequirementKind::Conformance:
-        case RequirementKind::Layout:
-        case RequirementKind::Superclass:
-          // We don't need the requirement if the constrained type is below the
-          // method depth.
-          if (genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth))
-            continue;
-          break;
-        case RequirementKind::SameType:
-          // We don't need the requirement if both types are below the method
-          // depth, or non-dependent.
-          if (genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth) &&
-              genericParamIsBelowDepth(reqt.getSecondType(), initialParamDepth))
-            continue;
-          break;
-          }
-
-          // If we fell through the switch, mangle the requirement.
-          requirementsBuf.push_back(reqt);
-        }
-        requirements = requirementsBuf;
-      }
-    }
+    if (isMethodDecl(decl) || isa<SubscriptDecl>(decl))
+      parentGenericSig = decl->getDeclContext()->getGenericSignatureOfContext();
   }
-  return type->getCanonicalType();
+
+  return type;
 }
 
 void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) {
-  ArrayRef<GenericTypeParamType *> genericParams;
-  unsigned initialParamDepth;
-  ArrayRef<Requirement> requirements;
-  SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();
-  auto type = getDeclTypeForMangling(decl,
-                                     genericParams, initialParamDepth,
-                                     requirements, requirementsBuf);
- 
+  GenericSignature *genericSig = nullptr;
+  GenericSignature *parentGenericSig = nullptr;
+  auto type = getDeclTypeForMangling(decl, genericSig, parentGenericSig);
+
   if (AnyFunctionType *FuncTy = type->getAs<AnyFunctionType>()) {
-
-    const ParameterList *Params = nullptr;
-    if (const auto *FDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
-      unsigned PListIdx = isMethodDecl(decl) ? 1 : 0;
-      if (PListIdx < FDecl->getNumParameterLists()) {
-        Params = FDecl->getParameterList(PListIdx);
-      }
-    } else if (const auto *SDecl = dyn_cast<SubscriptDecl>(decl)) {
-        Params = SDecl->getIndices();
-    }
-    bool forceSingleParam = Params && (Params->size() == 1);
-          
-
     if (isFunctionMangling) {
-      appendFunctionSignature(FuncTy, forceSingleParam);
+      appendFunctionSignature(FuncTy);
     } else {
-      appendFunctionType(FuncTy, forceSingleParam);
+      appendFunctionType(FuncTy);
     }
   } else {
     appendType(type);
   }
 
   // Mangle the generic signature, if any.
-  if (!genericParams.empty() || !requirements.empty()) {
-    appendGenericSignatureParts(genericParams, initialParamDepth,
-                                requirements);
+  if (genericSig && appendGenericSignature(genericSig, parentGenericSig)) {
     // The 'F' function mangling doesn't need a 'u' for its generic signature.
     if (!isFunctionMangling)
       appendOperator("u");
@@ -1997,6 +1963,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
 }
 
 void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance){
+  GenericSignature *contextSig = nullptr;
   Mod = conformance->getDeclContext()->getParentModule();
   if (auto behaviorStorage = conformance->getBehaviorDecl()) {
     auto topLevelContext =
@@ -2014,9 +1981,12 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
     appendType(conformingType->getCanonicalType());
     appendProtocolName(conformance->getProtocol());
     appendModule(conformance->getDeclContext()->getParentModule());
+
+    contextSig =
+      conformingType->getAnyNominal()->getGenericSignatureOfContext();
   }
   if (GenericSignature *Sig = conformance->getGenericSignature()) {
-    appendGenericSignature(Sig);
+    appendGenericSignature(Sig, contextSig);
   }
 }
 

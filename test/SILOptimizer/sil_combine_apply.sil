@@ -309,3 +309,131 @@ bb0(%0 : $*SwiftP):
   %9999 = tuple()
   return %9999 : $()
 }
+
+protocol MutatingProto {
+    mutating func mutatingMethod()
+}
+
+struct MStruct : MutatingProto { 
+
+    var somevar: Builtin.Int32
+
+    mutating func mutatingMethod()
+}
+
+// CHECK-LABEL: sil @dont_replace_copied_self_in_mutating_method_call
+sil @dont_replace_copied_self_in_mutating_method_call : $@convention(thin) (MStruct) -> (@out MutatingProto) {
+bb0(%0 : $*MutatingProto, %1 : $MStruct):
+  %2 = alloc_stack $MutatingProto
+  %4 = init_existential_addr %2 : $*MutatingProto, $MStruct
+  store %1 to %4 : $*MStruct
+  %9 = alloc_stack $MutatingProto
+  copy_addr %2 to [initialization] %9 : $*MutatingProto
+  // CHECK: [[E:%[0-9]+]] = open_existential_addr
+  %11 = open_existential_addr mutable_access %9 : $*MutatingProto to $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto
+  // CHECK: [[M:%[0-9]+]] = witness_method $MStruct,
+  %12 = witness_method $@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto, #MutatingProto.mutatingMethod!1 : <Self where Self : MutatingProto> (inout Self) -> () -> (), %11 : $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto : $@convention(witness_method) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
+  // CHECK: apply [[M]]<@opened("{{.*}}") MutatingProto>([[E]]) :
+  %13 = apply %12<@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto>(%11) : $@convention(witness_method) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
+  copy_addr [take] %9 to [initialization] %0 : $*MutatingProto
+  dealloc_stack %9 : $*MutatingProto
+  destroy_addr %2 : $*MutatingProto
+  dealloc_stack %2 : $*MutatingProto
+  %27 = tuple ()
+  return %27 : $()
+}
+
+// CHECK-LABEL: sil @dont_replace_copied_self_in_mutating_method_call2
+sil @dont_replace_copied_self_in_mutating_method_call2 : $@convention(thin) (@thick MutatingProto.Type) -> (@out MutatingProto) {
+bb0(%0 : $*MutatingProto, %1 : $@thick MutatingProto.Type):
+  %alloc1 = alloc_stack $MutatingProto, let, name "p"
+  %openType = open_existential_metatype %1 : $@thick MutatingProto.Type to $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto).Type
+  %initType =  init_existential_addr %alloc1 : $*MutatingProto, $@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto
+  %alloc2 = alloc_stack $MutatingProto
+  copy_addr %alloc1 to [initialization] %alloc2 : $*MutatingProto
+  %oeaddr = open_existential_addr mutable_access %alloc2 : $*MutatingProto to $*@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto
+  %witmethod = witness_method $@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto, #MutatingProto.mutatingMethod!1 : <Self where Self : MutatingProto> (inout Self) -> () -> (), %openType : $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto).Type : $@convention(witness_method) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
+  // CHECK: apply {{%.*}}<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto>({{%.*}}) : $@convention(witness_method) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> () // type-defs
+  %apply = apply %witmethod<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto>(%oeaddr) : $@convention(witness_method) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
+  dealloc_stack %alloc2 : $*MutatingProto
+  dealloc_stack %alloc1 : $*MutatingProto
+  %27 = tuple ()
+  return %27 : $()
+}
+
+sil @helperForOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32
+
+// Test function_ref -> thin_to_thick -> convert_function with indirect results.
+// (we currently bail on it).
+// CHECK-LABEL: sil @testOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32 {
+// CHECK: bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int8):
+// CHECK:   [[FN:%.*]] = function_ref @helperForOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32
+// CHECK:   [[TTF:%.*]] = thin_to_thick_function [[FN]] : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32 to $@callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
+// CHECK:   [[CVF:%.*]] = convert_function [[TTF]] : $@callee_owned (@in Builtin.Int8) -> @out Builtin.Int32 to $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
+// CHECK:   %{{.*}} = apply [[CVF]](%0, %1) : $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
+// CHECK:   %{{.*}} = tuple ()
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'testOptimizeApplyOfConvertFunction'
+sil @testOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int8):
+  %2 = function_ref @helperForOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32
+  %3 = thin_to_thick_function %2 : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32 to $@callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
+  %4 = convert_function %3 : $@callee_owned (@in Builtin.Int8) -> @out Builtin.Int32 to $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
+
+  strong_retain %4 : $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
+  %18 = apply %4(%0, %1) : $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
+
+  %29 = tuple ()
+  return %29 : $()
+}
+
+sil @testCombineClosureHelper : $(Builtin.Int32) -> ()
+
+// Test function_ref -> partial_apply -> convert_function -> apply.
+// Where the convert_function only affects @noescape.
+//
+// CHECK-LABEL: sil @testCombineClosureNoescape : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK: bb0(%0 : $Builtin.Int32):
+// CHECK:  [[F:%.*]] = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK:  apply [[F]](%0) : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK-LABEL: } // end sil function 'testCombineClosureNoescape'
+sil @testCombineClosureNoescape : $(Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %49 = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
+  %50 = partial_apply %49(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %51 = convert_function %50 : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+  apply %51() : $@noescape @callee_owned () -> ()
+  %empty = tuple ()
+  return %empty : $()
+}
+
+// Test function_ref -> partial_apply -> convert_function -> try_apply.
+// This is not currently combined because we don't know how to reform the
+// try_apply with a different type.
+//
+// CHECK-LABEL: sil @testCombineClosureConvert : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK: bb0(%0 : $Builtin.Int32):
+// CHECK:  [[F:%.*]] = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK:  [[PA:%.*]] = partial_apply [[F]](%0) : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK:  [[CVT1:%.*]] = convert_function [[PA]] : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+// CHECK:  [[CVT2:%.*]] = convert_function [[CVT1]] : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
+// CHECK:  try_apply [[CVT2]]() : $@noescape @callee_owned () -> @error Error, normal bb1, error bb2
+// CHECK-LABEL: } // end sil function 'testCombineClosureConvert'
+sil @testCombineClosureConvert : $(Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %49 = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
+  %50 = partial_apply %49(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %51 = convert_function %50 : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+  %52 = convert_function %51 : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
+  try_apply %52() : $@noescape @callee_owned () -> @error Error, normal bb7, error bb11
+
+bb7(%callret : $()):
+  br bb99
+
+bb11(%128 : $Error):
+  br bb99
+
+bb99:
+  %empty = tuple ()
+  return %empty : $()
+}

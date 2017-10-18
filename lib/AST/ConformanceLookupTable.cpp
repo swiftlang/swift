@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
@@ -447,14 +448,23 @@ bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
         return false;
 
       case ConformanceEntryKind::Implied:
-        // An implied conformance is better than a synthesized one.
         // Ignore implied circular protocol inheritance
-        if (kind == ConformanceEntryKind::Synthesized ||
-            existingEntry->getProtocol() == protocol)
+        if (existingEntry->getProtocol() == protocol)
           return false;
+
+        // An implied conformance is better than a synthesized one, unless
+        // the implied conformance was deserialized.
+        if (kind == ConformanceEntryKind::Synthesized &&
+            existingEntry->getDeclContext()->getParentSourceFile() == nullptr)
+          return false;
+
         break;
 
       case ConformanceEntryKind::Synthesized:
+        // An implied conformance is better unless it was deserialized.
+        if (dc->getParentSourceFile() == nullptr)
+          return false;
+
         break;
       }
     }
@@ -1131,7 +1141,7 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
 
       auto normal = conf->getRootNormalConformance();
       normal->forEachValueWitness(resolver, [&](ValueDecl *req,
-                                              ConcreteDeclRef witness) {
+                                                Witness witness) {
         if (witness.getDecl() == member)
           reqs.push_back(req);
       });

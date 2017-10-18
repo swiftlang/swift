@@ -306,8 +306,8 @@ func create<T>(_ fn: () throws -> T) throws -> T {
 func testThunk(_ fn: () throws -> Int) throws -> Int {
   return try create(fn)
 }
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Sis5Error_pIxdzo_SisAA_pIxrzo_TR : $@convention(thin) (@owned @callee_owned () -> (Int, @error Error)) -> (@out Int, @error Error)
-// CHECK: bb0(%0 : @trivial $*Int, %1 : @owned $@callee_owned () -> (Int, @error Error)):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Sis5Error_pIxdzo_SisAA_pIxrzo_TR : $@convention(thin) (@owned @noescape @callee_owned () -> (Int, @error Error)) -> (@out Int, @error Error)
+// CHECK: bb0(%0 : @trivial $*Int, %1 : @owned $@noescape @callee_owned () -> (Int, @error Error)):
 // CHECK:   try_apply %1()
 // CHECK: bb1([[T0:%.*]] : @trivial $Int):
 // CHECK:   store [[T0]] to [trivial] %0 : $*Int
@@ -321,9 +321,9 @@ func createInt(_ fn: () -> Int) throws {}
 func testForceTry(_ fn: () -> Int) {
   try! createInt(fn)
 }
-// CHECK-LABEL: sil hidden @_T06errors12testForceTryySiycF : $@convention(thin) (@owned @callee_owned () -> Int) -> ()
-// CHECK: bb0([[ARG:%.*]] : @owned $@callee_owned () -> Int):
-// CHECK: [[FUNC:%.*]] = function_ref @_T06errors9createIntySiycKF : $@convention(thin) (@owned @callee_owned () -> Int) -> @error Error
+// CHECK-LABEL: sil hidden @_T06errors12testForceTryySiycF : $@convention(thin) (@owned @noescape @callee_owned () -> Int) -> ()
+// CHECK: bb0([[ARG:%.*]] : @owned $@noescape @callee_owned () -> Int):
+// CHECK: [[FUNC:%.*]] = function_ref @_T06errors9createIntySiycKF : $@convention(thin) (@owned @noescape @callee_owned () -> Int) -> @error Error
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK: try_apply [[FUNC]]([[ARG_COPY]])
@@ -423,7 +423,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-LABEL: sil hidden @_T06errors13test_variadicyAA3CatCKF : $@convention(thin) (@owned Cat) -> @error Error {
 // CHECK:       bb0([[ARG:%.*]] : @owned $Cat):
 // CHECK:         debug_value undef : $Error, var, name "$error", argno 2
-// CHECK:         [[TAKE_FN:%.*]] = function_ref @_T06errors14take_many_catsySayAA3CatCGd_tKF : $@convention(thin) (@owned Array<Cat>) -> @error Error
+// CHECK:         [[TAKE_FN:%.*]] = function_ref @_T06errors14take_many_catsyAA3CatCd_tKF : $@convention(thin) (@owned Array<Cat>) -> @error Error
 // CHECK:         [[N:%.*]] = integer_literal $Builtin.Word, 4
 // CHECK:         [[T0:%.*]] = function_ref @_T0s27_allocateUninitializedArray{{.*}}F
 // CHECK:         [[T1:%.*]] = apply [[T0]]<Cat>([[N]])
@@ -670,7 +670,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK: } // end sil function '_T06errors16supportStructureyAA6BridgeVz_SS4nametKF'
 
 struct OwnedBridge {
-  var owner : Builtin.UnknownObject
+  var owner : AnyObject
   subscript(name: String) -> Pylon {
     addressWithOwner { return (someValidPointer(), owner) }
     mutableAddressWithOwner { return (someValidPointer(), owner) }
@@ -700,13 +700,13 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK-NEXT: try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 // CHECK:    [[BB_NORMAL]]
 // CHECK-NEXT: end_access [[WRITE]]
-// CHECK-NEXT: destroy_value [[OWNER]] : $Builtin.UnknownObject
+// CHECK-NEXT: destroy_value [[OWNER]] : $AnyObject
 // CHECK-NEXT: end_borrow [[BORROWED_ARG2]] from [[ARG2]]
 // CHECK-NEXT: destroy_value [[ARG2]] : $String
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 // CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : @owned $Error):
-// CHECK-NEXT: destroy_value [[OWNER]] : $Builtin.UnknownObject
+// CHECK-NEXT: destroy_value [[OWNER]] : $AnyObject
 // CHECK-NEXT: end_access [[WRITE]]
 // CHECK-NEXT: end_borrow [[BORROWED_ARG2]] from [[ARG2]]
 // CHECK-NEXT: destroy_value [[ARG2]] : $String

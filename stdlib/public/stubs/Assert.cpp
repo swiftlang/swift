@@ -27,7 +27,10 @@ static int swift_asprintf(char **strp, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
 #if defined(_WIN32)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
   int len = _vscprintf(fmt, args);
+#pragma GCC diagnostic pop
   if (len < 0) {
     va_end(args);
     return -1;

@@ -11,18 +11,18 @@ are available. Currently, the runtime has been tested to build against the
 Windows 10 SDK at revision 10.10.586.
 
 ```
-export WINKIT_ROOT=".../Windows Kits/10"
-export VC_ROOT=".../Microsoft Visual Studio 14.0/VC"
-export INCLUDE='${VC_ROOT}/include;${WINKIT_ROOT}/Include/10.0.10586.0/ucrt;${WINKIT_ROOT}/Include/10.0.10586.0/um;${WINKIT_ROOT}/Include/10.0.10586.0/shared'
-export LIB='${VC_ROOT}/lib;${WINKIT_ROOT}/Lib/10.0.10586.0/ucrt/x86;${WINKIT_ROOT}/Lib/10.0.10586.0/um/x86'
+# Visual Studio 2015 does not have VCToolsInstallDir, use VCINSTALLDIR's value
+export UCRTVersion=10.0.10586.0
+export UniversalCRTSdkDir=".../Windows Kits/10"
+export VCToolsInstallDir=".../Microsoft Visual Studio/2017/Community"
 ```
 
 ### 2. Setup `visualc` and `ucrt` modules
 The `visualc.modulemap` located at
 `swift/stdlib/public/Platform/visualc.modulemap` needs to be copied into
-`${VC_ROOT}/include`. The `ucrt.modulemap` located at
+`${VCToolsInstallDir}/include`. The `ucrt.modulemap` located at
 `swift/stdlib/public/Platform/ucrt.modulemap` needs to be copied into
-`${WINKIT_ROOT}/Include/10.0.10586.0/ucrt`.
+`${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt`.
 
 ### 3. Configure the runtime to be built with the just built clang
 Ensure that we use the tools from the just built LLVM and clang tools to build

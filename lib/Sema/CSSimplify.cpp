@@ -1037,20 +1037,10 @@ ConstraintSystem::matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1
   // Match up the call arguments to the parameters.
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 4> parameterBindings;
-  if (constraints::matchCallArguments(type2, type1, defaultMap,
-                                      hasTrailingClosure,
-                                      /*allowFixes=*/false,
-                                      listener,
-                                      parameterBindings)) {
-    // FIXME: Sometimes we get asked to bind type variables to parameters.
-    // We should not be asked to bind type variables to parameters.
-    if (type2.size() == 1 && type2[0].getType()->isTypeVariableOrMember()) {
-      return matchTypes(argType, type2[0].getType(),
-                        ConstraintKind::BindParam,
-                        subflags, locator);
-    }
+  if (constraints::matchCallArguments(
+          type2, type1, defaultMap, hasTrailingClosure,
+          /*allowFixes=*/false, listener, parameterBindings))
     return SolutionKind::Error;
-  }
   
   // Compare each of the bound arguments for this parameter.
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
@@ -1695,13 +1685,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
 
         // If we have a binding for the right-hand side
-        // (argument type) don't try to bind it to the left-hand
-        // side (parameter type) directly, because their
-        // relationship is contravariant and the actual
-        // binding can only come from the left-hand side.
+        // (argument type used in the body) don't try
+        // to bind it to the left-hand side (parameter type)
+        // directly, because there could be an implicit
+        // conversion between them, and actual binding
+        // can only come from the left-hand side.
         addUnsolvedConstraint(
-            Constraint::create(*this, ConstraintKind::ArgumentConversion, type2,
-                               typeVar1, getConstraintLocator(locator)));
+            Constraint::create(*this, ConstraintKind::Equal, typeVar1, type2,
+                               getConstraintLocator(locator)));
         return SolutionKind::Solved;
       }
 
@@ -2613,6 +2604,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                 ConformanceCheckFlags::InExpression)) {
       CheckedConformances.push_back({getConstraintLocator(locator),
                                      *conformance});
+
+      // This conformance may be conditional, in which case we need to consider
+      // those requirements as constraints too.
+      //
+      // FIXME: this doesn't seem to be right; the requirements are sometimes
+      // phrased in terms of the type's generic parameters, not type variables
+      // in this context.
+      for (auto req : conformance->getConditionalRequirements()) {
+        addConstraint(req, locator);
+      }
       return SolutionKind::Solved;
     }
     break;
@@ -4868,6 +4869,43 @@ ConstraintSystem::addKeyPathConstraint(Type keypath,
   }
 }
 
+void ConstraintSystem::addConstraint(Requirement req,
+                                     ConstraintLocatorBuilder locator,
+                                     bool isFavored) {
+  bool conformsToAnyObject = false;
+  Optional<ConstraintKind> kind;
+  switch (req.getKind()) {
+  case RequirementKind::Conformance:
+    kind = ConstraintKind::ConformsTo;
+    break;
+  case RequirementKind::Superclass:
+    conformsToAnyObject = true;
+    kind = ConstraintKind::Subtype;
+    break;
+  case RequirementKind::SameType:
+    kind = ConstraintKind::Equal;
+    break;
+  case RequirementKind::Layout:
+    // Only a class constraint can be modeled as a constraint, and only that can
+    // appear outside of a @_specialize at the moment anyway.
+    if (req.getLayoutConstraint()->isClass()) {
+      conformsToAnyObject = true;
+      break;
+    }
+    return;
+  }
+
+  auto firstType = req.getFirstType();
+  if (kind) {
+    addConstraint(*kind, req.getFirstType(), req.getSecondType(), locator,
+                  isFavored);
+  }
+
+  if (conformsToAnyObject) {
+    auto anyObject = getASTContext().getAnyObjectType();
+    addConstraint(ConstraintKind::ConformsTo, firstType, anyObject, locator);
+  }
+}
 
 void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                      Type second,

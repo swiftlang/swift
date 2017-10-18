@@ -342,8 +342,7 @@ Type TypeChecker::resolveTypeInContext(
       //
       // Get the superclass of the 'Self' type parameter.
       auto *sig = foundDC->getGenericSignatureOfContext();
-      auto superclassType = sig->getSuperclassBound(
-        selfType, *foundDC->getParentModule());
+      auto superclassType = sig->getSuperclassBound(selfType);
       assert(superclassType);
       selfType = superclassType;
     }
@@ -612,7 +611,7 @@ Type TypeChecker::applyUnboundGenericArguments(
                                 LookUpConformance(*this, dc),
                                 SubstFlags::UseErrorType);
 
-  if (isa<NominalTypeDecl>(decl)) {
+  if (isa<NominalTypeDecl>(decl) && resultType) {
     if (useObjectiveCBridgeableConformancesOfArgs(
           dc, resultType->castTo<BoundGenericType>(),
           unsatisfiedDependency))
@@ -638,6 +637,34 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
               unbound->getDecl()->getName());
 }
 
+// Produce a diagnostic if the type we referenced was an
+// associated type but the type itself was erroneous. We'll produce a
+// diagnostic here if the diagnostic for the bad type witness would show up in
+// a different context.
+static void maybeDiagnoseBadConformanceRef(TypeChecker &tc,
+                                           DeclContext *dc,
+                                           Type parentTy,
+                                           SourceLoc loc,
+                                           AssociatedTypeDecl *assocType) {
+  // If we weren't given a conformance, go look it up.
+  ProtocolConformance *conformance = nullptr;
+  if (auto conformanceRef =
+        tc.conformsToProtocol(
+          parentTy, assocType->getProtocol(), dc,
+          (ConformanceCheckFlags::InExpression|
+           ConformanceCheckFlags::SuppressDependencyTracking))) {
+    if (conformanceRef->isConcrete())
+      conformance = conformanceRef->getConcrete();
+  }
+
+  // If any errors have occurred, don't bother diagnosing this cross-file
+  // issue.
+  if (tc.Context.Diags.hadAnyError())
+    return;
+
+  tc.diagnose(loc, diag::broken_associated_type_witness,
+              assocType->getFullName(), parentTy);
+};
 /// \brief Returns a valid type or ErrorType in case of an error.
 static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *foundDC,
@@ -678,6 +705,12 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
       !options.contains(TR_ResolveStructure)) {
     diagnoseUnboundGenericType(TC, type, loc);
     return ErrorType::get(TC.Context);
+  }
+
+  if (type->hasError() && isa<AssociatedTypeDecl>(typeDecl)) {
+    maybeDiagnoseBadConformanceRef(TC, fromDC,
+                                   foundDC->getDeclaredInterfaceType(),
+                                   loc, cast<AssociatedTypeDecl>(typeDecl));
   }
 
   if (generic && !options.contains(TR_ResolveStructure)) {
@@ -1174,42 +1207,6 @@ static Type resolveNestedIdentTypeComponent(
               bool diagnoseErrors,
               GenericTypeResolver *resolver,
               UnsatisfiedDependency *unsatisfiedDependency) {
-  // Local function to produce a diagnostic if the type we referenced was an
-  // associated type but the type itself was erroneous. We'll produce a
-  // diagnostic here if the diagnostic for the bad type witness would show up in
-  // a different context.
-  auto maybeDiagnoseBadConformanceRef = [&](AssociatedTypeDecl *assocType) {
-    // If we aren't emitting any diagnostics, we're done.
-    if (!diagnoseErrors)
-      return;
-
-    // If we weren't given a conformance, go look it up.
-    ProtocolConformance *conformance = nullptr;
-    if (auto conformanceRef =
-        TC.conformsToProtocol(
-          parentTy, assocType->getProtocol(), DC,
-            (ConformanceCheckFlags::InExpression|
-             ConformanceCheckFlags::SuppressDependencyTracking))) {
-      if (conformanceRef->isConcrete())
-        conformance = conformanceRef->getConcrete();
-    }
-
-    // If there is a conformance and it comes from the same source file as type
-    // resolution, don't diagnose.
-    if (conformance &&
-        conformance->getDeclContext()->getParentSourceFile() ==
-          DC->getParentSourceFile())
-      return;
-
-    // If any errors have occurred, don't bother diagnosing this cross-file
-    // issue.
-    if (TC.Context.Diags.hadAnyError())
-      return;
-
-    TC.diagnose(comp->getLoc(), diag::broken_associated_type_witness,
-                assocType->getFullName(), parentTy);
-  };
-
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType) {
     // Diagnose invalid cases.
     if (TC.isUnsupportedMemberTypeAccess(parentTy, member)) {
@@ -1247,10 +1244,11 @@ static Type resolveNestedIdentTypeComponent(
       return ErrorType::get(TC.Context);
 
     // Diagnose a bad conformance reference if we need to.
-    if (isa<AssociatedTypeDecl>(member) &&
-        memberType &&
-        memberType->hasError())
-      maybeDiagnoseBadConformanceRef(cast<AssociatedTypeDecl>(member));
+    if (isa<AssociatedTypeDecl>(member) && diagnoseErrors &&
+        memberType && memberType->hasError()) {
+      maybeDiagnoseBadConformanceRef(TC, DC, parentTy, comp->getLoc(),
+                                     cast<AssociatedTypeDecl>(member));
+    }
 
     // At this point, we need to have resolved the type of the member.
     if (!memberType || memberType->hasError()) return memberType;
@@ -1747,7 +1745,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
                                     /*diagnoseErrors*/ true, Resolver,
                                     UnsatisfiedDependency);
 
-  case TypeReprKind::Function:
+  case TypeReprKind::Function: {
     if (!(options & TR_SILType)) {
       // Default non-escaping for closure parameters
       auto result =
@@ -1757,7 +1755,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
       return result;
     }
     return resolveSILFunctionType(cast<FunctionTypeRepr>(repr), options);
-
+  }
   case TypeReprKind::SILBox:
     assert((options & TR_SILType) && "SILBox repr in non-SIL type context?!");
     return resolveSILBoxType(cast<SILBoxTypeRepr>(repr), options);
@@ -1994,7 +1992,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     // Resolve the function type directly with these attributes.
-    SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric));
+    SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
+                                     attrs.has(TAK_noescape));
 
     ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
     if (!ty || ty->hasError()) return ty;

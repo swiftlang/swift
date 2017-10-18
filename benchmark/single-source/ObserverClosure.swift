@@ -10,6 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+import TestsUtils
+
+
+public let ObserverClosure = BenchmarkInfo(
+  name: "ObserverClosure",
+  runFunction: run_ObserverClosure,
+  tags: [.validation])
+
 class Observer {
   @inline(never)
   func receive(_ value: Int) {

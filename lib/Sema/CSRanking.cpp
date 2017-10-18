@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "llvm/ADT/Statistic.h"
@@ -190,39 +191,38 @@ static bool isNominallySuperclassOf(Type type1, Type type2) {
 
 /// Determine the relationship between the self types of the given declaration
 /// contexts..
-static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
-                                                        DeclContext *dc,
-                                                        DeclContext *dc1,
-                                                        DeclContext *dc2){
+static std::pair<SelfTypeRelationship, Optional<ProtocolConformanceRef>>
+computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, DeclContext *dc1,
+                            DeclContext *dc2) {
   // If at least one of the contexts is a non-type context, the two are
   // unrelated.
   if (!dc1->isTypeContext() || !dc2->isTypeContext())
-    return SelfTypeRelationship::Unrelated;
+    return {SelfTypeRelationship::Unrelated, None};
 
   Type type1 = dc1->getDeclaredInterfaceType();
   Type type2 = dc2->getDeclaredInterfaceType();
 
   // If the types are equal, the answer is simple.
   if (type1->isEqual(type2))
-    return SelfTypeRelationship::Equivalent;
+    return {SelfTypeRelationship::Equivalent, None};
 
   // If both types can have superclasses, which whether one is a superclass
   // of the other. The subclass is the common base type.
   if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass()) {
     if (isNominallySuperclassOf(type1, type2))
-      return SelfTypeRelationship::Superclass;
+      return {SelfTypeRelationship::Superclass, None};
 
     if (isNominallySuperclassOf(type2, type1))
-      return SelfTypeRelationship::Subclass;
+      return {SelfTypeRelationship::Subclass, None};
 
-    return SelfTypeRelationship::Unrelated;
+    return {SelfTypeRelationship::Unrelated, None};
   }
 
   // If neither or both are protocol types, consider the bases unrelated.
   bool isProtocol1 = isa<ProtocolDecl>(dc1);
   bool isProtocol2 = isa<ProtocolDecl>(dc2);
   if (isProtocol1 == isProtocol2)
-    return SelfTypeRelationship::Unrelated;
+    return {SelfTypeRelationship::Unrelated, None};
 
   // Just one of the two is a protocol. Check whether the other conforms to
   // that protocol.
@@ -232,12 +232,15 @@ static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
 
   // If the model type does not conform to the protocol, the bases are
   // unrelated.
-  if (!tc.conformsToProtocol(modelTy, proto, dc,
-                             ConformanceCheckFlags::InExpression))
-    return SelfTypeRelationship::Unrelated;
+  auto conformance = tc.conformsToProtocol(modelTy, proto, dc,
+                                           ConformanceCheckFlags::InExpression);
+  if (!conformance)
+    return {SelfTypeRelationship::Unrelated, None};
 
-  return isProtocol1? SelfTypeRelationship::ConformedToBy
-                    : SelfTypeRelationship::ConformsTo;
+  if (isProtocol1)
+    return {SelfTypeRelationship::ConformedToBy, conformance};
+
+  return {SelfTypeRelationship::ConformsTo, conformance};
 }
 
 // Given a type and a declaration context, return a type with a curried
@@ -524,7 +527,11 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       // Determine the relationship between the 'self' types and add the
       // appropriate constraints. The constraints themselves never fail, but
       // they help deduce type variables that were opened.
-      switch (computeSelfTypeRelationship(tc, dc, outerDC1, outerDC2)) {
+      auto selfTypeRelationship =
+          computeSelfTypeRelationship(tc, dc, outerDC1, outerDC2);
+      auto relationshipKind = selfTypeRelationship.first;
+      auto conformance = selfTypeRelationship.second;
+      switch (relationshipKind) {
       case SelfTypeRelationship::Unrelated:
         // Skip the self types parameter entirely.
         break;
@@ -542,16 +549,27 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         break;
 
       case SelfTypeRelationship::ConformsTo:
+        assert(conformance);
         cs.addConstraint(ConstraintKind::ConformsTo, selfTy1,
                          cast<ProtocolDecl>(outerDC2)->getDeclaredType(),
                          locator);
         break;
 
       case SelfTypeRelationship::ConformedToBy:
+        assert(conformance);
         cs.addConstraint(ConstraintKind::ConformsTo, selfTy2,
                          cast<ProtocolDecl>(outerDC1)->getDeclaredType(),
                          locator);
         break;
+      }
+
+      if (conformance) {
+        assert(relationshipKind == SelfTypeRelationship::ConformsTo ||
+               relationshipKind == SelfTypeRelationship::ConformedToBy);
+
+        for (auto requirement : conformance->getConditionalRequirements()) {
+          cs.addConstraint(requirement, locator);
+        }
       }
 
       bool fewerEffectiveParameters = false;

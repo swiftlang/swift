@@ -449,6 +449,17 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities04MoreA0P8addZooAtySi_Si1ySi1ztF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "addNewZooAt(_:newY:newZ:)",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1:0",
     "LeftUsr": "s:6CitiesAAC8maroochyySiSg1x_AD1ytF",

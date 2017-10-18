@@ -157,11 +157,12 @@ enum class CursorInfoKind {
 
 struct ResolvedCursorInfo {
   CursorInfoKind Kind = CursorInfoKind::Invalid;
+  SourceFile *SF;
+  SourceLoc Loc;
   ValueDecl *ValueD = nullptr;
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtTyRef = nullptr;
   ModuleEntity Mod;
-  SourceLoc Loc;
   bool IsRef = true;
   bool IsKeywordArgument = false;
   Type Ty;
@@ -171,33 +172,36 @@ struct ResolvedCursorInfo {
   Expr *TrailingExpr = nullptr;
 
   ResolvedCursorInfo() = default;
-  ResolvedCursorInfo(ValueDecl *ValueD,
-                     TypeDecl *CtorTyRef,
-                     ExtensionDecl *ExtTyRef,
-                     SourceLoc Loc,
-                     bool IsRef,
-                     Type Ty,
-                     Type ContainerType) :
-                        Kind(CursorInfoKind::ValueRef),
-                        ValueD(ValueD),
-                        CtorTyRef(CtorTyRef),
-                        ExtTyRef(ExtTyRef),
-                        Loc(Loc),
-                        IsRef(IsRef),
-                        Ty(Ty),
-                        DC(ValueD->getDeclContext()),
-                        ContainerType(ContainerType) {}
-  ResolvedCursorInfo(ModuleEntity Mod,
-                     SourceLoc Loc) :
-                        Kind(CursorInfoKind::ModuleRef),
-                        Mod(Mod),
-                        Loc(Loc) { }
-  ResolvedCursorInfo(Stmt *TrailingStmt) :
-                        Kind(CursorInfoKind::StmtStart),
-                        TrailingStmt(TrailingStmt) {}
-  ResolvedCursorInfo(Expr* TrailingExpr) :
-                        Kind(CursorInfoKind::ExprStart),
-                        TrailingExpr(TrailingExpr) {}
+  ResolvedCursorInfo(SourceFile *SF) : SF(SF) {}
+  
+  void setValueRef(ValueDecl *ValueD,
+                   TypeDecl *CtorTyRef,
+                   ExtensionDecl *ExtTyRef,
+                   bool IsRef,
+                   Type Ty,
+                   Type ContainerType) {
+    Kind = CursorInfoKind::ValueRef;
+    this->ValueD = ValueD;
+    this->CtorTyRef = CtorTyRef;
+    this->ExtTyRef = ExtTyRef;
+    this->IsRef = IsRef;
+    this->Ty = Ty;
+    this->DC = ValueD->getDeclContext();
+    this->ContainerType = ContainerType;
+  }
+  void setModuleRef(ModuleEntity Mod) {
+    Kind = CursorInfoKind::ModuleRef;
+    this->Mod = Mod;
+  }
+  void setTrailingStmt(Stmt *TrailingStmt) {
+    Kind = CursorInfoKind::StmtStart;
+    this->TrailingStmt = TrailingStmt;
+  }
+  void setTrailingExpr(Expr* TrailingExpr) {
+    Kind = CursorInfoKind::ExprStart;
+    this->TrailingExpr = TrailingExpr;
+  }
+
   bool isValid() const { return !isInvalid(); }
   bool isInvalid() const { return Kind == CursorInfoKind::Invalid; }
 };
@@ -210,7 +214,8 @@ class CursorInfoResolver : public SourceEntityWalker {
   llvm::SmallVector<Expr*, 4> TrailingExprStack;
 
 public:
-  explicit CursorInfoResolver(SourceFile &SrcFile) : SrcFile(SrcFile) { }
+  explicit CursorInfoResolver(SourceFile &SrcFile) :
+    SrcFile(SrcFile), CursorInfo(&SrcFile) {}
   ResolvedCursorInfo resolve(SourceLoc Loc);
   SourceManager &getSourceMgr() const;
 private:
@@ -527,6 +532,7 @@ public:
   void accept(SourceManager &SM, SourceLoc Loc, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
   void insertAfter(SourceManager &SM, SourceLoc Loc, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
   void accept(SourceManager &SM, Replacement Replacement) { accept(SM, RegionType::ActiveCode, {Replacement}); }
+  void remove(SourceManager &SM, CharSourceRange Range);
 };
 
 /// This helper stream inserts text into a SourceLoc by calling functions in

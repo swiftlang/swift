@@ -21,7 +21,7 @@ extension Foo {
   // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV4zangyqd__lF
   func zang<U>(_: U) { }
   // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV4zungyqd__AA8RuncibleRd__3HatQyd__Rs_lF
-  func zung<U: Runcible where U.Hat == T>(_: U) { }
+  func zung<U: Runcible>(_: U) where U.Hat == T { }
 }
 
 extension Foo where T: Runcible {
@@ -53,6 +53,17 @@ extension Runcible {
 }
 
 extension Runcible where Self.Spoon == Self.Hat {
-  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions8RunciblePA2aBRz5SpoonQz3HatRtzlE5runceyyF
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions8RunciblePAA5SpoonQz3HatRtzrlE5runceyyF
   func runce() {}
+}
+
+
+struct Bar<T: Runcible, U: Runcible> { }
+
+extension Bar {
+  // CHECK-LABEL: _T027mangling_generic_extensions3BarV4bar1yqd__AA8RuncibleRd__AaE5SpoonRpzAFQy_AGRSlF
+  func bar1<V: Runcible>(_: V) where U.Spoon: Runcible, T.Spoon == U.Spoon { }
+
+  // CHECK-LABEL: _T027mangling_generic_extensions3BarV4bar1yqd__AA8RuncibleRd__AaE5SpoonRp_lF
+  func bar1<V: Runcible>(_: V) where U.Spoon: Runcible { }
 }

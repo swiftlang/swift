@@ -421,6 +421,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindExprDictionary;
     case SyntaxStructureKind::ObjectLiteralExpression:
       return KindExprObjectLiteral;
+    case SyntaxStructureKind::TupleExpression:
+      return KindExprTuple;
     case SyntaxStructureKind::Argument:
       return KindExprArg;
   }
@@ -623,10 +625,47 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
         return Attr_Objc;
       }
     }
+    case DAK_AccessControl: {
+      static UIdent Attr_Private("source.decl.attribute.private");
+      static UIdent Attr_FilePrivate("source.decl.attribute.fileprivate");
+      static UIdent Attr_Internal("source.decl.attribute.internal");
+      static UIdent Attr_Public("source.decl.attribute.public");
+      static UIdent Attr_Open("source.decl.attribute.open");
 
-    // We handle access control explicitly.
-    case DAK_AccessControl:
-    case DAK_SetterAccess:
+      switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
+        case AccessLevel::Private:
+          return Attr_Private;
+        case AccessLevel::FilePrivate:
+          return Attr_FilePrivate;
+        case AccessLevel::Internal:
+          return Attr_Internal;
+        case AccessLevel::Public:
+          return Attr_Public;
+        case AccessLevel::Open:
+          return Attr_Open;
+      }
+    }
+    case DAK_SetterAccess: {
+      static UIdent Attr_Private("source.decl.attribute.setter_access.private");
+      static UIdent Attr_FilePrivate("source.decl.attribute.setter_access.fileprivate");
+      static UIdent Attr_Internal("source.decl.attribute.setter_access.internal");
+      static UIdent Attr_Public("source.decl.attribute.setter_access.public");
+      static UIdent Attr_Open("source.decl.attribute.setter_access.open");
+
+      switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
+        case AccessLevel::Private:
+          return Attr_Private;
+        case AccessLevel::FilePrivate:
+          return Attr_FilePrivate;
+        case AccessLevel::Internal:
+          return Attr_Internal;
+        case AccessLevel::Public:
+          return Attr_Public;
+        case AccessLevel::Open:
+          return Attr_Open;
+      }
+    }
+
     // Ignore these.
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
@@ -711,6 +750,14 @@ std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
       fileHandle, full_path, sizeof(full_path), FILE_NAME_NORMALIZED);
   return (success ? full_path : InputPath);
 #endif
+}
+
+void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {
+  std::vector<Statistic *> stats = {
+#define SWIFT_STATISTIC(VAR, UID, DESC) &Stats.VAR,
+#include "SwiftStatistics.def"
+  };
+  receiver(stats);
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

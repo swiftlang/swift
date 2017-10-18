@@ -393,7 +393,7 @@ public:
 
   /// getCanonicalType - Stronger canonicalization which folds away equivalent
   /// associated types, or type parameters that have been made concrete.
-  CanType getCanonicalType(GenericSignature *sig, ModuleDecl &mod);
+  CanType getCanonicalType(GenericSignature *sig);
 
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
@@ -1430,6 +1430,11 @@ public:
   bool isInOut() const { return value.contains(InOut); }
   bool isShared() const { return value.contains(Shared); }
 
+  ParameterTypeFlags withVariadic(bool variadic) const {
+    return ParameterTypeFlags(variadic ? value | ParameterTypeFlags::Variadic
+                                       : value - ParameterTypeFlags::Variadic);
+  }
+
   ParameterTypeFlags withEscaping(bool escaping) const {
     return ParameterTypeFlags(escaping ? value | ParameterTypeFlags::Escaping
                                        : value - ParameterTypeFlags::Escaping);
@@ -2347,7 +2352,8 @@ public:
     /// FIXME(Remove InOutType): This is mostly for copying between param
     /// types and should go away.
     Type getPlainType() const { return Ty; }
-    
+
+    bool hasLabel() const { return !Label.empty(); }
     Identifier getLabel() const { return Label; }
     
     ParameterTypeFlags getParameterFlags() const { return Flags; }
@@ -2467,22 +2473,26 @@ public:
     
     // Note that we don't have setters. That is by design, use
     // the following with methods instead of mutating these objects.
+    LLVM_NODISCARD
     ExtInfo withRepresentation(Representation Rep) const {
       return ExtInfo((Bits & ~RepresentationMask)
                      | (unsigned)Rep);
     }
+    LLVM_NODISCARD
     ExtInfo withIsAutoClosure(bool IsAutoClosure = true) const {
       if (IsAutoClosure)
         return ExtInfo(Bits | AutoClosureMask);
       else
         return ExtInfo(Bits & ~AutoClosureMask);
     }
+    LLVM_NODISCARD
     ExtInfo withNoEscape(bool NoEscape = true) const {
       if (NoEscape)
         return ExtInfo(Bits | NoEscapeMask);
       else
         return ExtInfo(Bits & ~NoEscapeMask);
     }
+    LLVM_NODISCARD
     ExtInfo withThrows(bool Throws = true) const {
       if (Throws)
         return ExtInfo(Bits | ThrowsMask);
@@ -3201,11 +3211,12 @@ public:
     // you'll need to adjust both the Bits field below and
     // TypeBase::AnyFunctionTypeBits.
 
-    //   |representation|pseudogeneric|
-    //   |    0 .. 3    |      4      |
+    //   |representation|pseudogeneric| noescape |
+    //   |    0 .. 3    |      4      |     5    |
     //
     enum : uint16_t { RepresentationMask = 0x00F };
     enum : uint16_t { PseudogenericMask  = 0x010 };
+    enum : uint16_t { NoEscapeMask       = 0x020 };
 
     uint16_t Bits;
 
@@ -3218,14 +3229,18 @@ public:
     ExtInfo() : Bits(0) { }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation rep, bool isPseudogeneric) {
+    ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape) {
       Bits = ((unsigned) rep) |
-             (isPseudogeneric ? PseudogenericMask : 0);
+             (isPseudogeneric ? PseudogenericMask : 0) |
+             (isNoEscape ? NoEscapeMask : 0);
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
     /// is not permitted to dynamically depend on its type arguments.
     bool isPseudogeneric() const { return Bits & PseudogenericMask; }
+
+    // Is this function guaranteed to be no-escape by the type system?
+    bool isNoEscape() const { return Bits & NoEscapeMask; }
 
     /// What is the abstract representation of this function value?
     Representation getRepresentation() const {
@@ -3298,6 +3313,12 @@ public:
         return ExtInfo(Bits | PseudogenericMask);
       else
         return ExtInfo(Bits & ~PseudogenericMask);
+    }
+    ExtInfo withNoEscape(bool NoEscape = true) const {
+      if (NoEscape)
+        return ExtInfo(Bits | NoEscapeMask);
+      else
+        return ExtInfo(Bits & ~NoEscapeMask);
     }
 
     uint16_t getFuncAttrKey() const {
@@ -3520,9 +3541,15 @@ public:
 
   CanType getSelfInstanceType() const;
 
-  /// If this a @convention(witness_method) function with an abstract
-  /// self parameter, return the protocol constraint for the Self type.
-  ProtocolDecl *getDefaultWitnessMethodProtocol(ModuleDecl &M) const;
+  /// If this is a @convention(witness_method) function with a protocol
+  /// constrained self parameter, return the protocol constraint for
+  /// the Self type.
+  ProtocolDecl *getDefaultWitnessMethodProtocol() const;
+
+  /// If this is a @convention(witness_method) function with a class
+  /// constrained self parameter, return the class constraint for the
+  /// Self type.
+  ClassDecl *getWitnessMethodClass(ModuleDecl &M) const;
 
   ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
 
@@ -3542,6 +3569,10 @@ public:
 
   bool isPseudogeneric() const {
     return getExtInfo().isPseudogeneric();
+  }
+
+  bool isNoEscape() const {
+    return getExtInfo().isNoEscape();
   }
 
   bool isNoReturnFunction(); // Defined in SILType.cpp
@@ -4041,7 +4072,7 @@ class ArchetypeType final : public SubstitutableType,
 
   llvm::PointerUnion3<ArchetypeType *, TypeBase *,
                       GenericEnvironment *> ParentOrOpenedOrEnvironment;
-  llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName;
+  Type InterfaceType;
   MutableArrayRef<std::pair<Identifier, Type>> NestedTypes;
 
   void populateNestedTypes() const;
@@ -4053,7 +4084,7 @@ public:
   /// The ConformsTo array will be copied into the ASTContext by this routine.
   static CanTypeWrapper<ArchetypeType>
                         getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                               AssociatedTypeDecl *AssocType,
+                               DependentMemberType *InterfaceType,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass, LayoutConstraint Layout);
 
@@ -4063,8 +4094,8 @@ public:
   /// by this routine.
   static CanTypeWrapper<ArchetypeType>
                         getNew(const ASTContext &Ctx,
-                               GenericEnvironment *genericEnvironment,
-                               Identifier Name,
+                               GenericEnvironment *GenericEnv,
+                               GenericTypeParamType *InterfaceType,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass, LayoutConstraint Layout);
 
@@ -4108,15 +4139,17 @@ public:
   /// Note: opened archetypes currently don't have generic environments.
   GenericEnvironment *getGenericEnvironment() const;
 
+  /// Retrieve the interface type of this associated type, which will either
+  /// be a GenericTypeParamType or a DependentMemberType.
+  Type getInterfaceType() const { return InterfaceType; }
+
   /// Retrieve the associated type to which this archetype (if it is a nested
   /// archetype) corresponds.
   ///
   /// This associated type will have the same name as the archetype and will
   /// be a member of one of the protocols to which the parent archetype
   /// conforms.
-  AssociatedTypeDecl *getAssocType() const {
-    return AssocTypeOrName.dyn_cast<AssociatedTypeDecl *>();
-  }
+  AssociatedTypeDecl *getAssocType() const;
 
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
@@ -4224,7 +4257,7 @@ private:
           const ASTContext &Ctx,
           llvm::PointerUnion<ArchetypeType *, GenericEnvironment *>
             ParentOrGenericEnv,
-          llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
+          Type InterfaceType,
           ArrayRef<ProtocolDecl *> ConformsTo,
           Type Superclass, LayoutConstraint Layout);
 

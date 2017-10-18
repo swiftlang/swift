@@ -80,7 +80,7 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
     return false;
 
   if (Loc == LocToResolve) {
-    CursorInfo = { D, CtorTyRef, ExtTyRef, Loc, IsRef, Ty, ContainerType };
+    CursorInfo.setValueRef(D, CtorTyRef, ExtTyRef, IsRef, Ty, ContainerType);
     return true;
   }
   return false;
@@ -88,7 +88,7 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
 
 bool CursorInfoResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
   if (Loc == LocToResolve) {
-    CursorInfo = { Mod, Loc };
+    CursorInfo.setModuleRef(Mod);
     return true;
   }
   return false;
@@ -97,13 +97,13 @@ bool CursorInfoResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
 bool CursorInfoResolver::tryResolve(Stmt *St) {
   if (auto *LST = dyn_cast<LabeledStmt>(St)) {
     if (LST->getStartLoc() == LocToResolve) {
-      CursorInfo = { St };
+      CursorInfo.setTrailingStmt(St);
       return true;
     }
   }
   if (auto *CS = dyn_cast<CaseStmt>(St)) {
     if (CS->getStartLoc() == LocToResolve) {
-      CursorInfo = { St };
+      CursorInfo.setTrailingStmt(St);
       return true;
     }
   }
@@ -120,7 +120,7 @@ bool CursorInfoResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange R
 ResolvedCursorInfo CursorInfoResolver::resolve(SourceLoc Loc) {
   assert(Loc.isValid());
   LocToResolve = Loc;
-  CursorInfo = ResolvedCursorInfo();
+  CursorInfo.Loc = Loc;
   walk(SrcFile);
   return CursorInfo;
 }
@@ -211,7 +211,7 @@ bool CursorInfoResolver::walkToExprPost(Expr *E) {
     return false;
   if (!TrailingExprStack.empty() && TrailingExprStack.back() == E) {
     // We return the outtermost expression in the token info.
-    CursorInfo = { TrailingExprStack.front() };
+    CursorInfo.setTrailingExpr(TrailingExprStack.front());
     return false;
   }
   return true;

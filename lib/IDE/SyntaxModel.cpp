@@ -507,10 +507,24 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     pushStructureNode(SN, E);
   } else if (auto *Tup = dyn_cast<TupleExpr>(E)) {
-    for (unsigned I = 0; I < Tup->getNumElements(); ++ I) {
-      SourceLoc NameLoc = Tup->getElementNameLoc(I);
-      if (NameLoc.isValid())
-        passTokenNodesUntil(NameLoc, PassNodesBehavior::ExcludeNodeAtLocation);
+    if (isCurrentCallArgExpr(Tup)) {
+      for (unsigned I = 0; I < Tup->getNumElements(); ++ I) {
+        SourceLoc NameLoc = Tup->getElementNameLoc(I);
+        if (NameLoc.isValid())
+          passTokenNodesUntil(NameLoc, PassNodesBehavior::ExcludeNodeAtLocation);
+      }
+    } else {
+      SyntaxStructureNode SN;
+      SN.Kind = SyntaxStructureKind::TupleExpression;
+      SN.Range = charSourceRangeFromSourceRange(SM, Tup->getSourceRange());
+      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
+                                                         Tup->getSourceRange());
+
+      for (auto *Elem : Tup->getElements()) {
+        addExprElem(Elem, SN);
+      }
+
+      pushStructureNode(SN, Tup);
     }
   }
 

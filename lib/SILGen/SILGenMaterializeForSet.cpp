@@ -434,8 +434,7 @@ public:
     }
 
     CanType witnessSelfType =
-      computeSelfParam(Witness).getType()->getCanonicalType(
-        GenericSig, *SGM.M.getSwiftModule());
+      computeSelfParam(Witness).getType()->getCanonicalType(GenericSig);
     witnessSelfType = getSubstWitnessInterfaceType(witnessSelfType);
 
     // Get the inout object type, but remember whether we needed to.
@@ -661,8 +660,7 @@ collectIndicesFromParameters(SILGenFunction &SGF, SILLocation loc,
   auto witnessSubscript = cast<SubscriptDecl>(WitnessStorage);
   CanType witnessIndicesType =
     witnessSubscript->getIndicesInterfaceType()
-      ->getCanonicalType(GenericSig,
-                         *SGM.M.getSwiftModule());
+      ->getCanonicalType(GenericSig);
   CanType substIndicesType =
     getSubstWitnessInterfaceType(witnessIndicesType);
 
@@ -700,10 +698,9 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
 
   auto callback = SGM.M.createFunction(
       callbackLinkage, CallbackName, callbackType, genericEnv,
-      SILLocation(Witness), IsBare, F.isTransparent(), F.isSerialized(), IsNotThunk,
-      SubclassScope::NotApplicable,
-      /*inlineStrategy=*/InlineDefault,
-      /*EK=*/EffectsKind::Unspecified,
+      SILLocation(Witness), IsBare, F.isTransparent(), F.isSerialized(),
+      F.getEntryCount(), IsNotThunk, SubclassScope::NotApplicable,
+      /*inlineStrategy=*/InlineDefault, /*EK=*/EffectsKind::Unspecified,
       /*InsertBefore=*/&F);
 
   callback->setDebugScope(new (SGM.M) SILDebugScope(Witness, callback));

@@ -220,7 +220,7 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
     reinterpret_cast<const char*>(pattern->getMetadataTemplate()) +
     pattern->AddressPoint;
   auto patternMetadata = reinterpret_cast<const ValueMetadata*>(patternBytes);
-  metadata->Description = patternMetadata->Description.get();
+  metadata->Description = patternMetadata->Description;
 
   return metadata;
 }
@@ -326,7 +326,8 @@ public:
     }
 
     const void * const *getArguments() const {
-      return &FlagsArgsAndResult[1];
+      return getFlags().getNumArguments() == 0
+              ? nullptr : &FlagsArgsAndResult[1];
     }
   };
 
@@ -1300,7 +1301,7 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
   // Copy the class's immediate methods from the nominal type descriptor
   // to the class metadata.
   {
-    auto &description = theClass->getDescription();
+    const auto *description = theClass->getDescription();
     auto &genericParams = description->GenericParams;
 
     auto *classWords = reinterpret_cast<void **>(theClass);
@@ -1325,7 +1326,7 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
   auto *classWords = reinterpret_cast<uintptr_t *>(theClass);
   auto *superWords = reinterpret_cast<const uintptr_t *>(theSuperclass);
   while (ancestor && ancestor->isTypeMetadata()) {
-    auto &description = ancestor->getDescription();
+    const auto *description = ancestor->getDescription();
     auto &genericParams = description->GenericParams;
 
     // Copy the generic requirements.
@@ -1471,11 +1472,6 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
   // even if Swift doesn't, because of SwiftObject.)
   rodata->InstanceStart = size;
 
-  auto genericPattern = self->getDescription()->getGenericMetadataPattern();
-  auto &allocator =
-    genericPattern ? unsafeGetInitializedCache(genericPattern).getAllocator()
-                   : getResilientMetadataAllocator();
-
   // Always clone the ivar descriptors.
   if (numFields) {
     const ClassIvarList *dependentIvars = rodata->IvarList;
@@ -1484,8 +1480,8 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 
     auto ivarListSize = sizeof(ClassIvarList) +
                         numFields * sizeof(ClassIvarEntry);
-    auto ivars = (ClassIvarList*) allocator.Allocate(ivarListSize,
-                                                     alignof(ClassIvarList));
+    auto ivars = (ClassIvarList*) getResilientMetadataAllocator()
+      .Allocate(ivarListSize, alignof(ClassIvarList));
     memcpy(ivars, dependentIvars, ivarListSize);
     rodata->IvarList = ivars;
 
@@ -2420,14 +2416,6 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
 /*** Other metadata routines ***********************************************/
 /***************************************************************************/
 
-template<> const GenericMetadata *
-Metadata::getGenericPattern() const {
-  auto &ntd = getNominalTypeDescriptor();
-  if (!ntd)
-    return nullptr;
-  return ntd->getGenericMetadataPattern();
-}
-
 template<> const ClassMetadata *
 Metadata::getClassObject() const {
   switch (getKind()) {
@@ -2738,7 +2726,7 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
                                               std::memory_order_relaxed)) {
       // If that succeeded, we've successfully allocated.
       __msan_allocated_memory(allocation, size);
-      __asan_poison_memory_region(allocation, size);
+      __asan_unpoison_memory_region(allocation, size);
       return allocation;
     }
 

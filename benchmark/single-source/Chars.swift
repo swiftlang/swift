@@ -13,6 +13,11 @@
 // This test tests the performance of ASCII Character comparison.
 import TestsUtils
 
+public let Chars = BenchmarkInfo(
+  name: "Chars",
+  runFunction: run_Chars,
+  tags: [.validation, .api, .String])
+
 @inline(never)
 public func run_Chars(_ N: Int) {
   // Permute some characters.

@@ -91,7 +91,7 @@ public:
   }
 
   static bool classof(const Syntax *S) {
-    return S->getKind() == SyntaxKind::Token;
+    return S->isToken();
   }
 };
 

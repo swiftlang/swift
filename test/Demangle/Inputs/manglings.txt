@@ -250,8 +250,11 @@ _T04main5innerys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nc_n --
 _T03foo6testityyyc_yyctF1a1bTf3pfpf_n ---> function signature specialization <Arg[0] = [Constant Propagated Function : a], Arg[1] = [Constant Propagated Function : b]> of foo.testit(() -> (), () -> ()) -> ()
 _SocketJoinOrLeaveMulticast ---> _SocketJoinOrLeaveMulticast
 _T0s10DictionaryV3t17E6Index2V1loiSbAEyxq__G_AGtFZ ---> static (extension in t17):Swift.Dictionary.Index2.< infix((extension in t17):[A : B].Index2, (extension in t17):[A : B].Index2) -> Swift.Bool
-_T08mangling14varargsVsArrayySaySiG3arrd_SS1ntF ---> mangling.varargsVsArray(arr: Swift.Int..., n: Swift.String) -> ()
-_T08mangling14varargsVsArrayySaySiG3arrd_tF ---> mangling.varargsVsArray(arr: Swift.Int...) -> ()
+_T08mangling14varargsVsArrayySi3arrd_SS1ntF ---> mangling.varargsVsArray(arr: Swift.Int..., n: Swift.String) -> ()
+_T08mangling14varargsVsArrayySaySiG3arr_SS1ntF ---> mangling.varargsVsArray(arr: [Swift.Int], n: Swift.String) -> ()
+_T08mangling14varargsVsArrayySaySiG3arrd_SS1ntF ---> mangling.varargsVsArray(arr: [Swift.Int]..., n: Swift.String) -> ()
+_T08mangling14varargsVsArrayySi3arrd_tF ---> mangling.varargsVsArray(arr: Swift.Int...) -> ()
+_T08mangling14varargsVsArrayySaySiG3arrd_tF ---> mangling.varargsVsArray(arr: [Swift.Int]...) -> ()
 _T0s13_UnicodeViewsVss22RandomAccessCollectionRzs0A8EncodingR_11SubSequence_5IndexQZAFRtzsAcERpzAE_AEQZAIRSs15UnsignedInteger8Iterator_7ElementRPzAE_AlMQZANRS13EncodedScalar_AlMQY_AORSr0_lE13CharacterViewVyxq__G ---> (extension in Swift):Swift._UnicodeViews<A, B><A, B where A: Swift.RandomAccessCollection, B: Swift.UnicodeEncoding, A.Index == A.SubSequence.Index, A.SubSequence: Swift.RandomAccessCollection, A.SubSequence == A.SubSequence.SubSequence, A.Iterator.Element: Swift.UnsignedInteger, A.Iterator.Element == A.SubSequence.Iterator.Element, A.SubSequence.Iterator.Element == B.EncodedScalar.Iterator.Element>.CharacterView
 _T010Foundation11MeasurementV12SimulatorKitSo9UnitAngleCRszlE11OrientationO2eeoiSbAcDEAGOyAF_G_AKtFZ ---> static (extension in SimulatorKit):Foundation.Measurement<A where A == __ObjC.UnitAngle>.Orientation.== infix((extension in SimulatorKit):Foundation.Measurement<__ObjC.UnitAngle>.Orientation, (extension in SimulatorKit):Foundation.Measurement<__ObjC.UnitAngle>.Orientation) -> Swift.Bool
 _T04main1_yyF ---> main._() -> ()
@@ -271,3 +274,4 @@ _T0So11UITextFieldC4textSSSgvgToTepb_ ---> outlined bridged method (pb) of @objc
 _T0So11UITextFieldC4textSSSgvgToTeab_ ---> outlined bridged method (ab) of @objc __ObjC.UITextField.text.getter : Swift.String?
 _T0So5GizmoC11doSomethingSQyypGSQySaySSGGFToTembnn_ ---> outlined bridged method (mbnn) of @objc __ObjC.Gizmo.doSomething([Swift.String]!) -> Any!
 _T0So5GizmoC12modifyStringSQySSGAD_Si10withNumberSQyypG0D6FoobartFToTembnnnb_ ---> outlined bridged method (mbnnnb) of @objc __ObjC.Gizmo.modifyString(Swift.String!, withNumber: Swift.Int, withFoobar: Any!) -> Swift.String!
+_T04test1SVyxGAA1RA2A1ZRzAA1Y2ZZRpzl1A_AhaGPWT ---> {C} associated type witness table accessor for A.ZZ : test.Y in <A where A: test.Z, A.ZZ: test.Y> test.S<A> : test.R in test

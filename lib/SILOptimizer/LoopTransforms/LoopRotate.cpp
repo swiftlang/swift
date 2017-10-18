@@ -61,9 +61,9 @@ canDuplicateOrMoveToPreheader(SILLoop *L, SILBasicBlock *Preheader,
   for (auto &I : *Blk) {
     auto *Inst = &I;
     if (auto *MI = dyn_cast<MethodInst>(Inst)) {
-      if (MI->getMember().isForeign && MI->isVolatile())
+      if (MI->getMember().isForeign)
         return false;
-      if (MI->isVolatile() || !hasLoopInvariantOperands(Inst, L, Invariant))
+      if (!hasLoopInvariantOperands(Inst, L, Invariant))
         continue;
       Move.push_back(Inst);
       Invariant.insert(Inst);

@@ -57,6 +57,109 @@ SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
   return make<UnknownSyntax>(Raw);
 }
 
+Optional<Syntax>
+SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
+  switch(Kind) {
+% for node in SYNTAX_NODES:
+  case SyntaxKind::${node.syntax_kind}: {
+% if node.children:
+%    child_count = len(node.children)
+    static std::pair<bool, std::function<bool(const Syntax&)>>
+      ChildrenConditions[${child_count}] = {
+%    for child in node.children:
+%       if child.is_optional:
+%         option = "true"
+%       else:
+%         option = "false"
+%       if child.token_choices:
+        {   ${option},
+            [](const Syntax &S) {
+              // check ${child.name}.
+              if (auto Tok = S.getAs<TokenSyntax>()) {
+                auto Kind = Tok->getTokenKind();
+%           tok_checks = []
+%           for choice in child.token_choices:
+%             tok_checks.append("Kind == tok::%s" % choice.kind)
+%           end
+%           all_checks = ' || '.join(tok_checks)
+                return ${all_checks};
+              }
+              return false;
+            }
+        },
+%       else:
+        {   ${option},
+            [](const Syntax &S) {
+              // check ${child.name}.
+              return S.getAs<${child.type_name}>().hasValue();
+            }
+        },
+%       end
+%    end
+    };
+    Optional<Syntax> Parameters[${child_count}];
+    unsigned CurCond = 0;
+    for (unsigned I = 0, N = Elements.size(); I < N; ) {
+      // We should use all elements.
+      if (CurCond == ${child_count}) {
+        return None;
+      }
+      if (ChildrenConditions[CurCond].second(Elements[I])) {
+        // we find a node that satisfies the condition.
+        Parameters[CurCond].emplace(Elements[I]);
+        CurCond ++;
+        I ++;
+      } else if (ChildrenConditions[CurCond].first) {
+        // If the unsatisfied condition is optional, move on to the next condition.
+        CurCond ++;
+      } else {
+        // Mandatory condition is not satisfied.
+        return None;
+      }
+    }
+    for (; CurCond < ${child_count}; CurCond ++) {
+      if (!ChildrenConditions[CurCond].first) {
+        // if the remaining condition is mandatory, we cannot create.
+        return None;
+      }
+    }
+    assert(CurCond == ${child_count});
+    return make${node.syntax_kind}(
+% params = []
+% for i, child in enumerate(node.children):
+%   child = node.children[i]
+%   if child.is_optional:
+%      params.append("/*Optional %s*/ Parameters[%s].hasValue() ?" \
+%       "(*Parameters[%s]).getAs<%s>().getValue() : (Optional<%s>) None" %
+%         (child.name, i, i, child.type_name, child.type_name))
+%   else:
+%      params.append("/*%s*/ (*Parameters[%s]).getAs<%s>().getValue()" %
+%        (child.name, i, child.type_name))
+%   end
+% end
+% child_parms = '\n, '.join(params)
+      ${child_parms}
+    );
+% elif node.is_syntax_collection():
+      std::vector<${node.collection_element_type}> Parts;
+      for (auto &E: Elements) {
+        if (auto P = E.getAs<${node.collection_element_type}>()) {
+          Parts.emplace_back(make<${node.collection_element_type}>(P->getRaw()));
+        } else {
+          return None;
+        }
+      }
+      return make${node.syntax_kind}(Parts);
+% else:
+    return None;
+% end
+   }
+% end
+  default:
+    return None;
+  }
+}
+
 % for node in SYNTAX_NODES:
 %   if node.children:
 %     child_params = []
@@ -110,7 +213,7 @@ SyntaxFactory::makeBlank${node.syntax_kind}() {
   TokenSyntax
   SyntaxFactory::make${token.name}Keyword(const Trivia &LeadingTrivia,
                                           const Trivia &TrailingTrivia) {
-    return makeToken(tok::${token.kind}, "${token.text}", 
+    return makeToken(tok::${token.kind}, "${token.text}",
                      SourcePresence::Present,
                      LeadingTrivia, TrailingTrivia);
   }
@@ -168,7 +271,7 @@ TypeIdentifierSyntax SyntaxFactory::makeAnyTypeIdentifier(
     const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
   return makeTypeIdentifier("Any", LeadingTrivia, TrailingTrivia);
 }
-  
+
 TypeIdentifierSyntax SyntaxFactory::makeSelfTypeIdentifier(
     const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
   return makeTypeIdentifier("Self", LeadingTrivia, TrailingTrivia);

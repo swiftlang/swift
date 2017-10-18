@@ -70,7 +70,7 @@ class C : P1 {
 
 //   (materializeForSet test from above)
 // CHECK-LABEL: sil private [transparent] [thunk] @_T019protocol_extensions1CCAA2P1A2aDPS2icimTW
-// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*C):
+// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*τ_0_0):
 // CHECK: function_ref @_T019protocol_extensions2P1PAAES2icig
 // CHECK: return
 
@@ -692,24 +692,71 @@ protocol InitRequirement {
 }
 
 extension InitRequirement {
-  // CHECK-LABEL: sil hidden @_T019protocol_extensions15InitRequirementPAAE{{[_0-9a-zA-Z]*}}fC : $@convention(method) <Self where Self : InitRequirement> (@owned D, @thick Self.Type) -> @out Self
+  // CHECK-LABEL: sil hidden @_T019protocol_extensions15InitRequirementPAAExAA1DC1d_tcfC : $@convention(method) <Self where Self : InitRequirement> (@owned D, @thick Self.Type) -> @out Self
   // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   init(d: D) {
-    // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@owned C, @thick τ_0_0.Type) -> @out τ_0_0
-  // CHECK:           [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:           [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-  // CHECK:           [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
-  // CHECK:           apply [[DELEGATEE]]<Self>({{%.*}}, [[ARG_COPY_CAST]], [[SELF_TYPE]])
-  // CHECK:           end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK:      [[SELF_BOX:%.*]] = alloc_box
+    // CHECK-NEXT: [[UNINIT_SELF:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
+    // CHECK-NEXT: [[SELF_BOX_ADDR:%.*]] = project_box [[UNINIT_SELF]]
+    // CHECK:      [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@owned C, @thick τ_0_0.Type) -> @out τ_0_0
+    // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $Self
+    // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+    // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+    // CHECK-NEXT: [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
+    // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY_CAST]], [[SELF_TYPE]])
+    // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
+    // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
+    // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [initialization] [[OUT]]
+    // CHECK-NEXT: destroy_value [[ARG]]
+    // CHECK-NEXT: destroy_value [[UNINIT_SELF]]
+    // CHECK:      return
     self.init(c: d)
   }
-  // CHECK: } // end sil function '_T019protocol_extensions15InitRequirementPAAE{{[_0-9a-zA-Z]*}}fC'
 
-  // CHECK-LABEL: sil hidden @_T019protocol_extensions15InitRequirementPAAE{{[_0-9a-zA-Z]*}}fC : $@convention(method)
-  // CHECK:         function_ref @_T019protocol_extensions15InitRequirementPAAE{{[_0-9a-zA-Z]*}}fC
-  // CHECK: } // end sil function '_T019protocol_extensions15InitRequirementPAAE{{[_0-9a-zA-Z]*}}fC'
+  // CHECK-LABEL: sil hidden @_T019protocol_extensions15InitRequirementPAAExAA1DC2d2_tcfC : $@convention(method)
+  // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   init(d2: D) {
+    // CHECK:      [[SELF_BOX:%.*]] = alloc_box
+    // CHECK-NEXT: [[UNINIT_SELF:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
+    // CHECK-NEXT: [[SELF_BOX_ADDR:%.*]] = project_box [[UNINIT_SELF]]
+    // CHECK:      [[DELEGATEE:%.*]] = function_ref @_T019protocol_extensions15InitRequirementPAAExAA1DC1d_tcfC
+    // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $Self
+    // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+    // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+    // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY]], [[SELF_TYPE]])
+    // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
+    // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
+    // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [initialization] [[OUT]]
+    // CHECK-NEXT: destroy_value [[ARG]]
+    // CHECK-NEXT: destroy_value [[UNINIT_SELF]]
+    // CHECK:      return
     self.init(d: d2)
+  }
+
+  // CHECK-LABEL: sil hidden @_T019protocol_extensions15InitRequirementPAAExAA1CC2c2_tcfC  : $@convention(method)
+  // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $C, [[SELF_TYPE:%.*]] : $@thick Self.Type):
+  init(c2: C) {
+    // CHECK:      [[SELF_BOX:%.*]] = alloc_box
+    // CHECK-NEXT: [[UNINIT_SELF:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
+    // CHECK-NEXT: [[SELF_BOX_ADDR:%.*]] = project_box [[UNINIT_SELF]]
+    // CHECK:      [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1
+    // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $Self
+    // CHECK-NEXT: [[SELF_TYPE:%.*]] = metatype $@thick Self.Type
+    // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+    // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+    // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY]], [[SELF_TYPE]])
+    // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF_BOX_ADDR]]
+    // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[ACCESS]]
+    // CHECK-NEXT: end_access [[ACCESS]]
+    // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
+    // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [initialization] [[OUT]]
+    // CHECK-NEXT: destroy_value [[ARG]]
+    // CHECK-NEXT: destroy_value [[UNINIT_SELF]]
+    // CHECK:      return
+    self = Self(c: c2)
   }
 }
 

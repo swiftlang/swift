@@ -363,8 +363,8 @@ func trivialRedundancy<T: P10>(_: T) where T.A == T.A { } // expected-warning{{r
 
 struct X11<T: P10> where T.A == T.B { }
 
-func intracomponentInferred<T>(_: X11<T>) // expected-note{{previous same-type constraint 'T.A' == 'T.B' inferred from type here}}
-  where T.A == T.B { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.B'}}
+func intracomponentInferred<T>(_: X11<T>)
+  where T.A == T.B { }
 
 // Suppress redundant same-type constraint warnings from result types.
 struct StructTakingP1<T: P1> { }

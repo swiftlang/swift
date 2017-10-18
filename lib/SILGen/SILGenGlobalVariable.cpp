@@ -14,6 +14,7 @@
 #include "ManagedValue.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/SIL/FormalLinkage.h"
 
 using namespace swift;
@@ -46,10 +47,7 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   SILLinkage link = getSILLinkage(getDeclLinkage(gDecl), forDef);
   SILType silTy = M.Types.getLoweredTypeOfGlobal(gDecl);
 
-  auto *silGlobal = SILGlobalVariable::create(M, link,
-                                              isMakeModuleFragile()
-                                                ? IsSerialized
-                                                : IsNotSerialized,
+  auto *silGlobal = SILGlobalVariable::create(M, link, IsNotSerialized,
                                               mangledName, silTy,
                                               None, gDecl);
   silGlobal->setDeclaration(!forDef);
@@ -223,9 +221,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   // TODO: include the module in the onceToken's name mangling.
   // Then we can make it fragile.
   auto onceToken = SILGlobalVariable::create(M, SILLinkage::Private,
-                                             isMakeModuleFragile()
-                                               ? IsSerialized
-                                               : IsNotSerialized,
+                                             IsNotSerialized,
                                              onceTokenBuffer, onceSILTy);
   onceToken->setDeclaration(false);
 

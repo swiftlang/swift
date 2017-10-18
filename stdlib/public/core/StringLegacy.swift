@@ -27,6 +27,7 @@ extension String {
   ///   - repeatedValue: The string to repeat.
   ///   - count: The number of times to repeat `repeatedValue` in the resulting
   ///     string.
+  @_inlineable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: String, count: Int) {
     if count == 0 {
       self = ""
@@ -44,12 +45,14 @@ extension String {
   }
 
   /// A Boolean value indicating whether a string has no characters.
+  @_inlineable // FIXME(sil-serialize-all)
   public var isEmpty: Bool {
     return _core.count == 0
   }
 }
 
 extension String {
+  @_inlineable // FIXME(sil-serialize-all)
   public init(_ _c: Unicode.Scalar) {
     self = String._fromWellFormedCodeUnitSequence(
       UTF32.self,
@@ -60,18 +63,30 @@ extension String {
 #if _runtime(_ObjC)
 /// Determines if `theString` starts with `prefix` comparing the strings under
 /// canonical equivalence.
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHasPrefixNFD")
-func _stdlib_NSStringHasPrefixNFD(_ theString: AnyObject, _ prefix: AnyObject) -> Bool
+internal func _stdlib_NSStringHasPrefixNFD(
+  _ theString: AnyObject, _ prefix: AnyObject) -> Bool
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHasPrefixNFDPointer")
-func _stdlib_NSStringHasPrefixNFDPointer(_ theString: OpaquePointer, _ prefix: OpaquePointer) -> Bool
+internal func _stdlib_NSStringHasPrefixNFDPointer(
+  _ theString: OpaquePointer, _ prefix: OpaquePointer) -> Bool
 
 /// Determines if `theString` ends with `suffix` comparing the strings under
 /// canonical equivalence.
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHasSuffixNFD")
-func _stdlib_NSStringHasSuffixNFD(_ theString: AnyObject, _ suffix: AnyObject) -> Bool
+internal func _stdlib_NSStringHasSuffixNFD(
+  _ theString: AnyObject, _ suffix: AnyObject) -> Bool
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHasSuffixNFDPointer")
-func _stdlib_NSStringHasSuffixNFDPointer(_ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
+internal func _stdlib_NSStringHasSuffixNFDPointer(
+  _ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
 
 extension String {
   /// Returns a Boolean value indicating whether the string begins with the
@@ -103,6 +118,7 @@ extension String {
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
   /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   public func hasPrefix(_ prefix: String) -> Bool {
     let selfCore = self._core
     let prefixCore = prefix._core
@@ -161,6 +177,7 @@ extension String {
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
   /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   public func hasSuffix(_ suffix: String) -> Bool {
     let selfCore = self._core
     let suffixCore = suffix._core
@@ -229,6 +246,7 @@ extension String {
   ///     `false`.
   // FIXME(integers): support a more general BinaryInteger protocol
   // FIXME(integers): support larger bitwidths than 64
+  @_inlineable // FIXME(sil-serialize-all)
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
@@ -267,6 +285,7 @@ extension String {
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
   // FIXME(integers): tiebreaker between T : FixedWidthInteger and other obsoleted
+  @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
@@ -306,6 +325,7 @@ extension String {
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
   // FIXME(integers): support a more general BinaryInteger protocol
+  @_inlineable // FIXME(sil-serialize-all)
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) where T : UnsignedInteger {
@@ -343,6 +363,7 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use the version for FixedWidthInteger instead.")
   public init<T : SignedInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
@@ -381,6 +402,7 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
+  @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use the version for FixedWidthInteger instead.")
   public init<T : UnsignedInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false

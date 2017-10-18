@@ -111,7 +111,6 @@ namespace {
     llvm::SmallVector<TypeVariableType *, 16> floatLiteralTyvars;
     llvm::SmallVector<TypeVariableType *, 16> stringLiteralTyvars;
 
-    llvm::SmallVector<ClosureExpr *, 4> closureExprs;
     llvm::SmallVector<BinaryExpr *, 4> binaryExprs;
 
     // TODO: manage as a set of lists, to speed up addition of binding
@@ -246,14 +245,8 @@ namespace {
       }
 
 
-      if (auto CE = dyn_cast<ClosureExpr>(expr)) {
-        if (!(LTI.closureExprs.size() || *LTI.closureExprs.end() == CE)) {
-          LTI.closureExprs.push_back(CE);
-          return { true, expr };
-        } else {
-          CS.optimizeConstraints(expr);
-          return { false, expr };
-        }
+      if (isa<ClosureExpr>(expr)) {
+        return { true, expr };
       }
 
       if (auto FVE = dyn_cast<ForceValueExpr>(expr)) {
@@ -329,17 +322,6 @@ namespace {
       }
       
       return { true, expr };
-    }
-    
-    Expr *walkToExprPost(Expr *expr) override {
-
-      if (auto CE = dyn_cast<ClosureExpr>(expr)) {
-        if (LTI.closureExprs.size() && *LTI.closureExprs.end() == CE) {
-          LTI.closureExprs.pop_back();
-        }
-      }
-
-      return expr;
     }
     
     /// \brief Ignore statements.
@@ -1944,9 +1926,13 @@ namespace {
 
     /// Give each parameter in a ClosureExpr a fresh type variable if parameter
     /// types were not specified, and return the eventual function type.
-    Type getTypeForParameterList(ParameterList *params,
-                                 ConstraintLocatorBuilder locator) {
-      for (auto param : *params) {
+    Type getTypeForParameterList(ClosureExpr *closureExpr) {
+      auto *params = closureExpr->getParameters();
+      for (auto i : indices(params->getArray())) {
+        auto *param = params->get(i);
+        auto *locator = CS.getConstraintLocator(
+            closureExpr, LocatorPathElt::getTupleElement(i));
+
         // If a type was explicitly specified, use its opened type.
         if (auto type = param->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
@@ -1958,9 +1944,8 @@ namespace {
         }
 
         // Otherwise, create a fresh type variable.
-        Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                        TVO_CanBindToInOut);
-        
+        Type ty = CS.createTypeVariable(locator, TVO_CanBindToInOut);
+
         param->setType(ty);
         param->setInterfaceType(ty);
       }
@@ -2304,12 +2289,7 @@ namespace {
 
       // Give each parameter in a ClosureExpr a fresh type variable if parameter
       // types were not specified, and return the eventual function type.
-      auto paramTy = getTypeForParameterList(
-                       expr->getParameters(),
-                       CS.getConstraintLocator(
-                         expr,
-                         LocatorPathElt::getTupleElement(0)));
-
+      auto paramTy = getTypeForParameterList(expr);
       auto extInfo = FunctionType::ExtInfo();
       
       if (closureCanThrow(expr))
@@ -3490,58 +3470,18 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
     return TC->isProtocolExtensionUsable(&DC, BaseTy, const_cast<ExtensionDecl*>(ED));
   ConstraintSystem CS(*TC, &DC, Options);
   auto Loc = CS.getConstraintLocator(nullptr);
-  std::vector<Identifier> Scratch;
   bool Failed = false;
-  SmallVector<Type, 3> TypeScratch;
 
   // Prepare type substitution map.
   SubstitutionMap Substitutions = BaseTy->getContextSubstitutionMap(
     DC.getParentModule(), ED);
-  auto resolveType = [&](Type Ty) {
-    return Ty.subst(Substitutions);
-  };
-
-  auto createMemberConstraint = [&](Requirement &Req, ConstraintKind Kind) {
-    auto First = resolveType(Req.getFirstType());
-    auto Second = resolveType(Req.getSecondType());
-    if (First.isNull() || Second.isNull()) {
-      Failed = true;
-      return;
-    }
-    // Add constraints accordingly.
-    CS.addConstraint(Kind, First, Second, Loc);
-  };
 
   // For every requirement, add a constraint.
   for (auto Req : ED->getGenericRequirements()) {
-    switch(Req.getKind()) {
-      case RequirementKind::Conformance:
-        createMemberConstraint(Req, ConstraintKind::ConformsTo);
-        break;
-      case RequirementKind::Layout:
-        if (Req.getLayoutConstraint()->isClass()) {
-          auto First = resolveType(Req.getFirstType());
-          CS.addConstraint(ConstraintKind::ConformsTo, First,
-                           CS.getASTContext().getAnyObjectType(),
-                           Loc);
-        }
-
-        // Nothing else can appear outside of @_specialize yet, and Sema
-        // doesn't know how to check.
-        break;
-      case RequirementKind::Superclass: {
-        createMemberConstraint(Req, ConstraintKind::Subtype);
-
-        auto First = resolveType(Req.getFirstType());
-        CS.addConstraint(ConstraintKind::ConformsTo, First,
-                         CS.getASTContext().getAnyObjectType(),
-                         Loc);
-
-        break;
-      }
-      case RequirementKind::SameType:
-        createMemberConstraint(Req, ConstraintKind::Equal);
-        break;
+    if (auto resolved = Req.subst(Substitutions)) {
+      CS.addConstraint(*resolved, Loc);
+    } else {
+      Failed = true;
     }
   }
   if (Failed)

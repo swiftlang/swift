@@ -159,7 +159,6 @@
                     "objc_metatype_to_object"
                     "objc_existential_metatype_to_object"
                     "word_to_bridge_object"
-                    "is_nonnull"
 
                     )
                   'words) . font-lock-keyword-face)

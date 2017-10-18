@@ -3,7 +3,7 @@
 // Tests for typealias inside protocols
 
 protocol Bad {
-  associatedtype X<T>  // expected-error {{associated types may not have a generic parameter list}}
+  associatedtype X<T>  // expected-error {{associated types must not have a generic parameter list}}
   typealias Y<T>       // expected-error {{expected '=' in type alias declaration}}
 }
 
@@ -190,6 +190,7 @@ struct T5 : P5 {
 // Unqualified lookup finds typealiases in protocol extensions
 protocol P7 {
   associatedtype A
+  typealias Z = A
 }
 
 extension P7 {
@@ -203,6 +204,7 @@ struct S7 : P7 {
 
   func inExpressionContext() {
     _ = Y.self
+    _ = Z.self
     _ = T5.T1.self
     _ = T5.T2.self
   }

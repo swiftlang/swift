@@ -16,7 +16,6 @@
 #include "swift/Basic/Mangler.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/GenericSignature.h"
 
 namespace swift {
 
@@ -187,15 +186,28 @@ protected:
 
   void appendAnyGenericType(const GenericTypeDecl *decl);
 
-  void appendFunctionType(AnyFunctionType *fn, bool forceSingleParam);
+  void appendFunctionType(AnyFunctionType *fn);
 
-  void appendFunctionSignature(AnyFunctionType *fn, bool forceSingleParam);
+  void appendFunctionSignature(AnyFunctionType *fn);
 
-  void appendParams(Type ParamsTy, bool forceSingleParam);
+  void appendFunctionInputType(ArrayRef<AnyFunctionType::Param> params);
+  void appendFunctionResultType(Type resultType);
 
   void appendTypeList(Type listTy);
+  void appendTypeListElement(Identifier name, Type elementType,
+                             ParameterTypeFlags flags);
 
-  void appendGenericSignature(const GenericSignature *sig);
+  /// Append a generic signature to the mangling.
+  ///
+  /// \param sig The generic signature.
+  ///
+  /// \param contextSig The signature of the known context. This function
+  /// will only mangle the difference between \c sig and \c contextSig.
+  ///
+  /// \returns \c true if a generic signature was appended, \c false
+  /// if it was empty.
+  bool appendGenericSignature(const GenericSignature *sig,
+                              GenericSignature *contextSig = nullptr);
 
   void appendRequirement(const Requirement &reqt);
 
@@ -218,10 +230,8 @@ protected:
   void appendInitializerEntity(const VarDecl *var);
 
   CanType getDeclTypeForMangling(const ValueDecl *decl,
-                                 ArrayRef<GenericTypeParamType *> &genericParams,
-                                 unsigned &initialParamIndex,
-                                 ArrayRef<Requirement> &requirements,
-                                 SmallVectorImpl<Requirement> &requirementsBuf);
+                                 GenericSignature *&genericSig,
+                                 GenericSignature *&parentGenericSig);
 
   void appendDeclType(const ValueDecl *decl, bool isFunctionMangling = false);
 

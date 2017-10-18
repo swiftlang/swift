@@ -35,7 +35,7 @@ var count: Int = 0
     count += 1
   }
 }
-@inline(never) func count_characters(_ s: String.CharacterView) {
+@inline(never) func count_characters(_ s: String) {
   for _ in s {
     count += 1
   }
@@ -48,7 +48,7 @@ var count: Int = 0
   }
 }
 @inline(never) func count_characters_rev(
-  _ s: ReversedCollection<String.CharacterView>
+  _ s: ReversedCollection<String>
 ) {
   for _ in s {
     count += 1
@@ -89,24 +89,58 @@ let baseMultiplier = 10_000
 let unicodeScalarsMultiplier = baseMultiplier
 let charactersMultiplier = baseMultiplier / 5
 
-% for Name in ["ascii", "utf16", "tweet", "japanese", "chinese", "korean", "russian", "punctuated", "punctuatedJapanese"]:
-%   for Kind in ["unicodeScalars", "characters"]:
+% Names = ["ascii", "utf16", "tweet", "japanese", "chinese", "korean", "russian", "punctuated", "punctuatedJapanese"]
+% Kinds = ["unicodeScalars", "characters"]
+% Directions = ["", "_Backwards"]
+
+// An extended benchmark suite exercising finer-granularity behavior of our
+// Strings.
+public var StringWalk = [
+  BenchmarkInfo(
+    name: "StringWalk",
+    runFunction: run_StringWalk,
+    tags: [.validation, .api, .String]),
+
+% for Name in Names:
+%   for Direction in Directions:
+%     for Kind in Kinds:
+
+  BenchmarkInfo(
+    name: "StringWalk_${Name}_${Kind}${Direction}",
+    runFunction: run_StringWalk_${Name}_${Kind}${Direction},
+    tags: [.api, .String, .skip]),
+
+%     end # Kinds
+
+  BenchmarkInfo(
+    name: "CharIteration_${Name}_unicodeScalars${Direction}",
+    runFunction: run_CharIteration_${Name}_unicodeScalars${Direction},
+    tags: [.validation, .api, .String]),
+
+  BenchmarkInfo(
+    name: "CharIndexing_${Name}_unicodeScalars${Direction}",
+    runFunction: run_CharIndexing_${Name}_unicodeScalars${Direction},
+    tags: [.validation, .api, .String]),
+%   end # Directions
+% end # Names
+]
+
+% for Name in Names:
+%   for (Kind, View) in zip(Kinds, [".unicodeScalars", ""]):
 
 @inline(never)
 public func run_StringWalk_${Name}_${Kind}(_ N: Int) {
   for _ in 1...${Kind}Multiplier*N {
-    count_${Kind}(${Name}.${Kind})
+    count_${Kind}(${Name}${View})
   }
 }
 
 @inline(never)
 public func run_StringWalk_${Name}_${Kind}_Backwards(_ N: Int) {
   for _ in 1...${Kind}Multiplier*N {
-    count_${Kind}_rev(${Name}.${Kind}.reversed())
+    count_${Kind}_rev(${Name}${View}.reversed())
   }
 }
-
-
 
 %   end
 

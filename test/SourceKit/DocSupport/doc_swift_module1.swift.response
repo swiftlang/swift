@@ -635,7 +635,7 @@ protocol P3 {
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "fooConstraint()",
-        key.usr: "s:5cake12P2PA2aBRzAA2P3RzlE13fooConstraintyyF",
+        key.usr: "s:5cake12P2PA2A2P3RzrlE13fooConstraintyyF",
         key.default_implementation_of: "s:5cake12P1P13fooConstraintyyF",
         key.offset: 391,
         key.length: 20,

@@ -59,7 +59,7 @@ public struct UnsafeBufferPointerIterator<Element>
 /// referenced memory and into the new collection.
 @_fixed_layout
 public struct Unsafe${Mutable}BufferPointer<Element>
-  : _${Mutable}Indexable, ${Mutable}Collection, RandomAccessCollection {
+  : ${Mutable}Collection, RandomAccessCollection {
   // FIXME: rdar://18157434 - until this is fixed, this has to be fixed layout
   // to avoid a hang in Foundation, which has the following setup:
   // struct A { struct B { let x: UnsafeMutableBufferPointer<...> } let b: B }
@@ -185,6 +185,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   ///
   /// - Returns: an iterator over any remaining elements of `self` and the
   ///   number of elements initialized.
+  @_inlineable // FIXME(sil-serialize-all)
   public func _copyContents(
     initializing destination: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
@@ -395,6 +396,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 
 extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
+  @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "Unsafe${Mutable}BufferPointer"
       + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"

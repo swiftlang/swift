@@ -850,7 +850,7 @@ struct ObservingPropertiesWithOwnershipTypesInferred {
 
 // <rdar://problem/16554876> property accessor synthesization of weak variables doesn't work
 protocol WeakPropertyProtocol {
- weak var maybePresent : Ref? { get set }
+ var maybePresent : Ref? { get set }
 }
 
 struct WeakPropertyStruct : WeakPropertyProtocol {
@@ -992,7 +992,7 @@ class ClassWithLetProperty {
   // This property is marked dynamic, so go through the getter, always.
   func ReturnDynamicConstant() -> Int { return q }
 // CHECK-LABEL: sil hidden @_T010properties20ClassWithLetPropertyC21ReturnDynamicConstant{{[_0-9a-zA-Z]*}}F
-// CHECK: class_method [volatile] %0 : $ClassWithLetProperty, #ClassWithLetProperty.q!getter.1.foreign
+// CHECK: objc_method %0 : $ClassWithLetProperty, #ClassWithLetProperty.q!getter.1.foreign
 }
 
 

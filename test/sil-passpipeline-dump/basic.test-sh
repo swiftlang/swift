@@ -8,7 +8,6 @@
 // CHECK:     ],
 // CHECK:     [
 // CHECK:         "Rest of Onone",
-// CHECK-NEXT:         ["ExternalDefsToDecls","external-defs-to-decls"],
 // CHECK-NEXT:         ["AssumeSingleThreaded","sil-assume-single-threaded"],
 // CHECK-NEXT:         ["SILDebugInfoGenerator","sil-debuginfo-gen"]
 // CHECK:     ]

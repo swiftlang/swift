@@ -463,6 +463,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   }
   SIMPLE_PRINTER(char)
   SIMPLE_PRINTER(unsigned)
+  SIMPLE_PRINTER(uint64_t)
   SIMPLE_PRINTER(StringRef)
   SIMPLE_PRINTER(Identifier)
   SIMPLE_PRINTER(ID)
@@ -659,13 +660,13 @@ public:
   /// Print out the users of the SILValue \p V. Return true if we printed out
   /// either an id or a use list. Return false otherwise.
   bool printUsersOfSILNode(const SILNode *node, bool printedSlashes) {
-    SILInstruction::ResultArrayRef values;
+    TinyPtrVector<SILValue> values;
     if (auto value = dyn_cast<ValueBase>(node)) {
       // The base pointer of the ultimate ArrayRef here is just the
       // ValueBase; we aren't forming a reference to a temporary array.
-      values = ArrayRef<ValueBase>(value, 1);
-    } else if (auto inst = dyn_cast<SILInstruction>(node)) {
-      values = inst->getResults();
+      values.push_back(value);
+    } else if (auto *inst = dyn_cast<SILInstruction>(node)) {
+      copy(inst->getResults(), std::back_inserter(values));
     }
 
     // If the set of values is empty, we need to print the ID of
@@ -907,7 +908,7 @@ public:
 #define INST(ID, PARENT) \
     case SILNodeKind::ID:
 #include "swift/SIL/SILNodes.def"
-      print(cast<SingleValueInstruction>(node));
+      print(cast<SILInstruction>(node));
       return;
 
     // TODO: MultiValueInstruction
@@ -1329,6 +1330,10 @@ public:
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getCastType()
           << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
+    if (CI->getTrueBBCount())
+      *this << " !true_count(" << CI->getTrueBBCount().getValue() << ")";
+    if (CI->getFalseBBCount())
+      *this << " !false_count(" << CI->getFalseBBCount().getValue() << ")";
   }
 
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CI) {
@@ -1355,6 +1360,10 @@ public:
           << getIDAndType(CI->getDest()) << ", "
           << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
+    if (CI->getTrueBBCount())
+      *this << " !true_count(" << CI->getTrueBBCount().getValue() << ")";
+    if (CI->getFalseBBCount())
+      *this << " !false_count(" << CI->getFalseBBCount().getValue() << ")";
   }
 
   void printUncheckedConversionInst(ConversionInst *CI, SILValue operand) {
@@ -1456,10 +1465,6 @@ public:
   }
   void visitBridgeObjectToWordInst(BridgeObjectToWordInst *I) {
     printUncheckedConversionInst(I, I->getOperand());
-  }
-
-  void visitIsNonnullInst(IsNonnullInst *I) {
-    *this << getIDAndType(I->getOperand());
   }
 
   void visitCopyValueInst(CopyValueInst *I) {
@@ -1580,9 +1585,6 @@ public:
   }
 
   void printMethodInst(MethodInst *I, SILValue Operand) {
-    if (I->isVolatile())
-      *this << "[volatile] ";
-    
     *this << getIDAndType(Operand) << ", " << I->getMember();
   }
   
@@ -1593,6 +1595,18 @@ public:
     *this << AMI->getType();
   }
   void visitSuperMethodInst(SuperMethodInst *AMI) {
+    printMethodInst(AMI, AMI->getOperand());
+    *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
+    *this << ", ";
+    *this << AMI->getType();
+  }
+  void visitObjCMethodInst(ObjCMethodInst *AMI) {
+    printMethodInst(AMI, AMI->getOperand());
+    *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
+    *this << ", ";
+    *this << AMI->getType();
+  }
+  void visitObjCSuperMethodInst(ObjCSuperMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
     *this << ", ";
@@ -1612,12 +1626,6 @@ public:
       *this << getIDAndType(WMI->getTypeDependentOperands()[0].get());
     }
     *this << " : " << WMI->getType();
-  }
-  void visitDynamicMethodInst(DynamicMethodInst *DMI) {
-    printMethodInst(DMI, DMI->getOperand());
-    *this << " : " << DMI->getMember().getDecl()->getInterfaceType();
-    *this << ", ";
-    *this << DMI->getType();
   }
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *OI) {
     if (OI->getAccessKind() == OpenedExistentialAccess::Immutable)
@@ -1820,9 +1828,16 @@ public:
       std::tie(elt, dest) = SOI->getCase(i);
       *this << ", case " << SILDeclRef(elt, SILDeclRef::Kind::EnumElement)
             << ": " << Ctx.getID(dest);
+      if (SOI->getCaseCount(i)) {
+        *this << " !case_count(" << SOI->getCaseCount(i).getValue() << ")";
+      }
     }
-    if (SOI->hasDefault())
+    if (SOI->hasDefault()) {
       *this << ", default " << Ctx.getID(SOI->getDefaultBB());
+      if (SOI->getDefaultCount()) {
+        *this << " !default_count(" << SOI->getDefaultCount().getValue() << ")";
+      }
+    }
   }
   
   void visitSwitchEnumInst(SwitchEnumInst *SOI) {
@@ -1897,6 +1912,10 @@ public:
     printBranchArgs(CBI->getTrueArgs());
     *this << ", " << Ctx.getID(CBI->getFalseBB());
     printBranchArgs(CBI->getFalseArgs());
+    if (CBI->getTrueBBCount())
+      *this << " !true_count(" << CBI->getTrueBBCount().getValue() << ")";
+    if (CBI->getFalseBBCount())
+      *this << " !false_count(" << CBI->getFalseBBCount().getValue() << ")";
   }
   
   void visitKeyPathInst(KeyPathInst *KPI) {
@@ -2235,6 +2254,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
   
   if (!isExternalDeclaration()) {
+    if (auto eCount = getEntryCount()) {
+      OS << " !function_entry_count(" << eCount.getValue() << ")";
+    }
     OS << " {\n";
 
     SILPrinter(PrintCtx, (Aliases.empty() ? nullptr : &Aliases))
@@ -2865,29 +2887,37 @@ ID SILPrintContext::getID(const SILNode *node) {
     // Lazily initialize the instruction -> ID mapping.
     if (ValueToIDMap.empty())
       F->numberValues(ValueToIDMap);
-  } else {
-    setContext(BB);
-    // Lazily initialize the instruction -> ID mapping.
-    if (ValueToIDMap.empty()) {
-      unsigned idx = 0;
-      for (auto &I : *BB) {
-        // Give the instruction itself the next ID.
-        ValueToIDMap[&I] = idx;
+    ID R = {ID::SSAValue, ValueToIDMap[node]};
+    return R;
+  }
 
-        // If there are no results, make sure we don't reuse that ID.
-        auto results = I.getResults();
-        if (results.empty()) {
-          idx++;
+  setContext(BB);
 
-        // Otherwise, assign all of the results an index.  Note that
-        // we'll assign the same ID to both the instruction and the
-        // first result.
-        } else {
-          for (auto result : results) {
-            ValueToIDMap[result] = idx++;
-          }
-        }
-      }
+  // Check if we have initialized our ValueToIDMap yet. If we have, just use
+  // that.
+  if (!ValueToIDMap.empty()) {
+    ID R = {ID::SSAValue, ValueToIDMap[node]};
+    return R;
+  }
+
+  // Otherwise, initialize the instruction -> ID mapping cache.
+  unsigned idx = 0;
+  for (auto &I : *BB) {
+    // Give the instruction itself the next ID.
+    ValueToIDMap[&I] = idx;
+
+    // If there are no results, make sure we don't reuse that ID.
+    auto results = I.getResults();
+    if (results.empty()) {
+      idx++;
+      continue;
+    }
+
+    // Otherwise, assign all of the results an index.  Note that
+    // we'll assign the same ID to both the instruction and the
+    // first result.
+    for (auto result : results) {
+      ValueToIDMap[result] = idx++;
     }
   }
 

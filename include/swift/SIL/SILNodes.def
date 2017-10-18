@@ -249,11 +249,13 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       MethodInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(SuperMethodInst, super_method,
                       MethodInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ObjCMethodInst, objc_method,
+                      MethodInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ObjCSuperMethodInst, objc_super_method,
+                      MethodInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(WitnessMethodInst, witness_method,
                       MethodInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(DynamicMethodInst, dynamic_method,
-                      MethodInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST_RANGE(MethodInst, ClassMethodInst, DynamicMethodInst)
+    SINGLE_VALUE_INST_RANGE(MethodInst, ClassMethodInst, WitnessMethodInst)
 
   // Conversions
   ABSTRACT_SINGLE_VALUE_INST(ConversionInst, SingleValueInstruction)
@@ -460,12 +462,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(KeyPathInst, keypath,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
-  SINGLE_VALUE_INST(IsNonnullInst, is_nonnull,
-                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, KeyPathInst)
 
-  SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, IsNonnullInst)
-
-NODE_RANGE(ValueBase, SILPHIArgument, IsNonnullInst)
+NODE_RANGE(ValueBase, SILPHIArgument, KeyPathInst)
 
 // Terminators
 ABSTRACT_INST(TermInst, SILInstruction)
@@ -610,6 +609,8 @@ NON_VALUE_INST(AllocGlobalInst, alloc_global,
 // FIXME: Special MemBehavior for runtime failure?
 NON_VALUE_INST(CondFailInst, cond_fail,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
+
+NODE_RANGE(NonValueInstruction, UnreachableInst, CondFailInst)
 
 NODE_RANGE(SILInstruction, AllocStackInst, CondFailInst)
 NODE_RANGE(SILNode, SILPHIArgument, CondFailInst)

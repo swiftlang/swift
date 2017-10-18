@@ -1089,6 +1089,12 @@ public:
   void emitRuntimeRegistration();
   void emitVTableStubs();
   void emitTypeVerifier();
+
+  /// Create llvm metadata which encodes the branch weights given by
+  /// \p TrueCount and \p FalseCount.
+  llvm::MDNode *createProfileWeights(uint64_t TrueCount,
+                                     uint64_t FalseCount) const;
+
 private:
   void emitGlobalDecl(Decl *D);
 };
@@ -1113,6 +1119,9 @@ public:
   IRGenModule *get() const { return IGM; }
   IRGenModule *operator->() const { return IGM; }
 };
+
+/// Workaround to disable thumb-mode until debugger support is there.
+bool shouldRemoveTargetFeature(StringRef);
 
 } // end namespace irgen
 } // end namespace swift

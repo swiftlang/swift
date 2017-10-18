@@ -69,7 +69,7 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
   if (auto *genericEnv = F->getGenericEnvironment())
-    if (genericEnv->containsPrimaryArchetype(A))
+    if (A->getGenericEnvironment() == genericEnv)
       return true;
 
   return false;
@@ -1159,11 +1159,20 @@ public:
 
     // A direct reference to a non-public or shared but not fragile function
     // from a fragile function is an error.
-    if (F.isSerialized()) {
-      require((SingleFunction && RefF->isExternalDeclaration()) ||
-              RefF->hasValidLinkageForFragileRef(),
-              "function_ref inside fragile function cannot "
-              "reference a private or hidden symbol");
+    //
+    // Exception: When compiling OnoneSupport anything can reference anything,
+    // because the bodies of functions are never SIL serialized, but
+    // specializations are exposed as public symbols in the produced object
+    // files. For the same reason, KeepAsPublic functions (i.e. specializations)
+    // can refer to anything or can be referenced from any other function.
+    if (!F.getModule().isOptimizedOnoneSupportModule() &&
+        !(F.isKeepAsPublic() || RefF->isKeepAsPublic())) {
+      if (F.isSerialized()) {
+        require((SingleFunction && RefF->isExternalDeclaration()) ||
+                    RefF->hasValidLinkageForFragileRef(),
+                "function_ref inside fragile function cannot "
+                "reference a private or hidden symbol");
+      }
     }
     verifySILFunctionType(fnType);
   }
@@ -2106,8 +2115,7 @@ public:
     require(selfRequirement &&
             selfRequirement->getKind() == RequirementKind::Conformance,
             "first non-same-typerequirement should be conformance requirement");
-    auto conformsTo = genericSig->getConformsTo(selfGenericParam,
-                                                *F.getModule().getSwiftModule());
+    auto conformsTo = genericSig->getConformsTo(selfGenericParam);
     require(conformsTo.size() == 1,
             "requirement Self parameter must conform to exactly one protocol");
     require(conformsTo[0] == protocol,
@@ -2185,28 +2193,9 @@ public:
     return SILType::getPrimitiveObjectType(fnTy);
   }
   
-  void checkDynamicMethodInst(DynamicMethodInst *EMI) {
-    requireObjectType(SILFunctionType, EMI, "result of dynamic_method");
-    SILType operandType = EMI->getOperand()->getType();
-
-    require(EMI->getMember().getDecl()->isObjC(), "method must be @objc");
-    if (!EMI->getMember().getDecl()->isInstanceMember()) {
-      require(operandType.is<MetatypeType>(),
-              "operand must have metatype type");
-      require(operandType.castTo<MetatypeType>()
-                ->getInstanceType()->mayHaveSuperclass(),
-              "operand must have metatype of class or class-bounded type");
-    }
-    
-    require(getDynamicMethodType(operandType, EMI->getMember())
-              .getSwiftRValueType()
-              ->isBindableTo(EMI->getType().getSwiftRValueType()),
-            "result must be of the method's type");
-    verifyOpenedArchetype(EMI, EMI->getType().getSwiftRValueType());
-  }
-
   void checkClassMethodInst(ClassMethodInst *CMI) {
-    auto overrideTy = TC.getConstantOverrideType(CMI->getMember());
+    auto member = CMI->getMember();
+    auto overrideTy = TC.getConstantOverrideType(member);
     if (CMI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(
           CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
@@ -2222,29 +2211,15 @@ public:
     require(getMethodSelfType(methodType).isClassOrClassMetatype(),
             "result must be a method of a class");
     
-    require(CMI->getMember().isForeign
-            || !CMI->getMember().getDecl()->hasClangNode(),
+    require(!member.isForeign,
             "foreign method cannot be dispatched natively");
-
-    require(CMI->getMember().isForeign
-            || !isa<ExtensionDecl>(CMI->getMember().getDecl()->getDeclContext()),
+    require(!isa<ExtensionDecl>(member.getDecl()->getDeclContext()),
             "extension method cannot be dispatched natively");
-    
-    // TODO: We should enforce that ObjC methods are dispatched on ObjC
-    // metatypes, but IRGen appears not to care right now.
-#if 0
-    if (auto metaTy = operandType.getAs<AnyMetatypeType>()) {
-      bool objcMetatype
-        = metaTy->getRepresentation() == MetatypeRepresentation::ObjC;
-      bool objcMethod = CMI->getMember().isForeign;
-      require(objcMetatype == objcMethod,
-              "objc class methods must be invoked on objc metatypes");
-    }
-#endif
   }
 
   void checkSuperMethodInst(SuperMethodInst *CMI) {
-    auto overrideTy = TC.getConstantOverrideType(CMI->getMember());
+    auto member = CMI->getMember();
+    auto overrideTy = TC.getConstantOverrideType(member);
     if (CMI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(
           CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
@@ -2260,18 +2235,84 @@ public:
     require(getMethodSelfType(methodType).isClassOrClassMetatype(),
             "result must be a method of a class");
 
-    Type methodClass;
+    require(!member.isForeign,
+            "foreign method cannot be dispatched natively");
+    require(!isa<ExtensionDecl>(member.getDecl()->getDeclContext()),
+            "extension method cannot be dispatched natively");
+
     auto decl = CMI->getMember().getDecl();
-    if (auto classDecl = dyn_cast<ClassDecl>(decl))
-      methodClass = classDecl->getDeclaredTypeInContext();
-    else
-      methodClass = decl->getDeclContext()->getDeclaredTypeInContext();
+    auto methodClass = decl->getDeclContext()->getDeclaredInterfaceType();
 
     require(methodClass->getClassOrBoundGenericClass(),
             "super_method must look up a class method");
-    require(!methodClass->isEqual(operandType.getSwiftRValueType()),
-            "super_method operand should be a subtype of the "
-            "lookup class type");
+  }
+
+  void checkObjCMethodInst(ObjCMethodInst *OMI) {
+    auto member = OMI->getMember();
+    require(member.isForeign,
+            "native method cannot be dispatched via objc");
+
+    auto methodType = requireObjectType(SILFunctionType, OMI,
+                                        "result of objc_method");
+    require(!methodType->getExtInfo().hasContext(),
+            "result method must be of a context-free function type");
+
+    auto methodSelfType = getMethodSelfType(methodType);
+    auto operandType = OMI->getOperand()->getType();
+
+    if (methodSelfType.isClassOrClassMetatype()) {
+      auto overrideTy = TC.getConstantOverrideType(member);
+      requireSameType(
+          OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
+          "result type of objc_method must match abstracted type of method");
+      require(operandType.isClassOrClassMetatype(),
+              "operand must be of a class type");
+    } else {
+      require(getDynamicMethodType(operandType, OMI->getMember())
+                .getSwiftRValueType()
+                ->isBindableTo(OMI->getType().getSwiftRValueType()),
+              "result must be of the method's type");
+      verifyOpenedArchetype(OMI, OMI->getType().getSwiftRValueType());
+    }
+
+    // TODO: We should enforce that ObjC methods are dispatched on ObjC
+    // metatypes, but IRGen appears not to care right now.
+#if 0
+    if (auto metaTy = operandType.getAs<AnyMetatypeType>()) {
+      bool objcMetatype
+        = metaTy->getRepresentation() == MetatypeRepresentation::ObjC;
+      require(objcMetatype,
+              "objc class methods must be invoked on objc metatypes");
+    }
+#endif
+  }
+
+  void checkObjCSuperMethodInst(ObjCSuperMethodInst *OMI) {
+    auto member = OMI->getMember();
+    auto overrideTy = TC.getConstantOverrideType(member);
+    if (OMI->getModule().getStage() != SILStage::Lowered) {
+      requireSameType(
+          OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
+          "result type of super_method must match abstracted type of method");
+    }
+    auto methodType = requireObjectType(SILFunctionType, OMI,
+                                        "result of objc_super_method");
+    require(!methodType->getExtInfo().hasContext(),
+            "result method must be of a context-free function type");
+    SILType operandType = OMI->getOperand()->getType();
+    require(operandType.isClassOrClassMetatype(),
+            "operand must be of a class type");
+    require(getMethodSelfType(methodType).isClassOrClassMetatype(),
+            "result must be a method of a class");
+
+    require(member.isForeign,
+            "native method cannot be dispatched via objc");
+
+    auto decl = member.getDecl();
+    auto methodClass = decl->getDeclContext()->getDeclaredInterfaceType();
+
+    require(methodClass->getClassOrBoundGenericClass(),
+            "objc_super_method must look up a class method");
   }
 
   void checkOpenExistentialAddrInst(OpenExistentialAddrInst *OEI) {
@@ -2354,9 +2395,40 @@ public:
             break;
         case SILInstructionKind::DestroyAddrInst:
           return true;
-        case SILInstructionKind::UncheckedAddrCastInst:
-          // Escaping use lets be conservative here.
+        case SILInstructionKind::UncheckedAddrCastInst: {
+          // Don't be too conservative here, we have a new case:
+          // sil-combine producing a new code pattern for devirtualizer
+          // open_existential_addr immutable_access -> witness_method
+          // witness_method gets transformed into unchecked_addr_cast
+          // we are "OK" If one of the new users is an non-consuming apply
+          // we are also "OK" if we have a single non-consuming user
+          auto isCastToNonConsuming = [=](UncheckedAddrCastInst *I) -> bool {
+            for (auto *use : I->getUses()) {
+              auto *inst = use->getUser();
+              switch (inst->getKind()) {
+              case SILInstructionKind::ApplyInst:
+              case SILInstructionKind::TryApplyInst:
+              case SILInstructionKind::PartialApplyInst:
+                if (!isConsumingOrMutatingApplyUse(use))
+                  return true;
+                break;
+              case SILInstructionKind::StructElementAddrInst:
+              case SILInstructionKind::LoadInst:
+              case SILInstructionKind::DebugValueAddrInst:
+                if (I->hasOneUse())
+                  return true;
+                break;
+              default:
+                break;
+              }
+            }
+            return false;
+          };
+          if (isCastToNonConsuming(dyn_cast<UncheckedAddrCastInst>(inst))) {
+            break;
+          }
           return true;
+        }
         case SILInstructionKind::CheckedCastAddrBranchInst:
           if (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind() !=
               CastConsumptionKind::CopyOnSuccess)
@@ -3036,13 +3108,6 @@ public:
       }
   }
 
-  void checkIsNonnullInst(IsNonnullInst *II) {
-    // The operand must be a function type or a class type.
-    auto OpTy = II->getOperand()->getType().getSwiftRValueType();
-    require(OpTy->mayHaveSuperclass() || OpTy->is<SILFunctionType>(),
-            "is_nonnull operand must be a class or function type");
-  }
-
   void checkAddressToPointerInst(AddressToPointerInst *AI) {
     require(AI->getOperand()->getType().isAddress(),
             "address-to-pointer operand must be an address");
@@ -3117,9 +3182,7 @@ public:
     require(AI->getType()
               .getSwiftRValueType()->isBridgeableObjectType()
             || AI->getType().getSwiftRValueType()->isEqual(
-                             AI->getType().getASTContext().TheNativeObjectType)
-            || AI->getType().getSwiftRValueType()->isEqual(
-                            AI->getType().getASTContext().TheUnknownObjectType),
+                             AI->getType().getASTContext().TheNativeObjectType),
         "raw-pointer-to-ref result must be a class reference or NativeObject");
     require(AI->getOperand()->getType().getSwiftRValueType()->isEqual(
                             AI->getType().getASTContext().TheRawPointerType),
@@ -4450,7 +4513,7 @@ void SILWitnessTable::verify(const SILModule &M) const {
                SILFunctionTypeRepresentation::WitnessMethod &&
                "Witnesses must have witness_method representation.");
         auto *witnessSelfProtocol = F->getLoweredFunctionType()
-            ->getDefaultWitnessMethodProtocol(*M.getSwiftModule());
+            ->getDefaultWitnessMethodProtocol();
         assert((witnessSelfProtocol == nullptr ||
                 witnessSelfProtocol == protocol) &&
                "Witnesses must either have a concrete Self, or an "
@@ -4478,7 +4541,7 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
            SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
     auto *witnessSelfProtocol = F->getLoweredFunctionType()
-        ->getDefaultWitnessMethodProtocol(*M.getSwiftModule());
+        ->getDefaultWitnessMethodProtocol();
     assert(witnessSelfProtocol == getProtocol() &&
            "Default witnesses must have an abstract Self parameter "
            "constrained to their protocol.");

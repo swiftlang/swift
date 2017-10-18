@@ -134,7 +134,7 @@ func genericClassNotEquatable<T>(_ gc: GenericClass<T>, x: T, y: T) {
 
 extension Array where Element == String { }
 
-extension GenericClass : P3 where T : P3 { } // expected-error{{extension of type 'GenericClass' with constraints cannot have an inheritance clause}}
+extension GenericClass : P3 where T : P3 { }
 
 extension GenericClass where Self : P3 { }
 // expected-error@-1{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'GenericClass'?}} {{30-34=GenericClass}}

@@ -330,7 +330,6 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
     
     auto linkInfo = LinkInfo::get(IGM, "swift_keyPathGenericWitnessTable",
                                   SILLinkage::PublicExternal,
-                                  /*fragile*/ false,
                                   /*sil only*/ false,
                                   NotForDefinition,
                                   /*weak imported*/ false);
@@ -643,7 +642,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   
   GenericEnvironment *genericEnv = nullptr;
   if (auto sig = pattern->getGenericSignature()) {
-    genericEnv = sig->createGenericEnvironment(*getSwiftModule());
+    genericEnv = sig->createGenericEnvironment();
     enumerateGenericSignatureRequirements(pattern->getGenericSignature(),
       [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   }

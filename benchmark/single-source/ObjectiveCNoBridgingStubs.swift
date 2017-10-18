@@ -21,6 +21,17 @@ import Foundation
 import ObjectiveCTests
 #endif
 
+public let ObjectiveCNoBridgingStubs = [
+  BenchmarkInfo(name: "ObjectiveCBridgeStubToNSStringRef", runFunction: run_ObjectiveCBridgeStubToNSStringRef, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubToNSDateRef", runFunction: run_ObjectiveCBridgeStubToNSDateRef, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubNSDateRefAccess", runFunction: run_ObjectiveCBridgeStubNSDateRefAccess, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubNSDateMutationRef", runFunction: run_ObjectiveCBridgeStubNSDateMutationRef, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubNSDataAppend", runFunction: run_ObjectiveCBridgeStubNSDataAppend, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSStringRef", runFunction: run_ObjectiveCBridgeStubFromNSStringRef, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSDateRef", runFunction: run_ObjectiveCBridgeStubFromNSDateRef, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubURLAppendPathRef", runFunction: run_ObjectiveCBridgeStubURLAppendPathRef, tags: [.validation, .bridging]),
+]
+
 #if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubFromNSStringRef() {

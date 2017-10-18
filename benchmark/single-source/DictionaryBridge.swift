@@ -16,6 +16,11 @@
 import Foundation
 import TestsUtils
 
+public let DictionaryBridge = BenchmarkInfo(
+  name: "DictionaryBridge",
+  runFunction: run_DictionaryBridge,
+  tags: [.validation, .api, .Dictionary, .bridging])
+
 #if _runtime(_ObjC)
 class Thing : NSObject {
 

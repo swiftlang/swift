@@ -140,6 +140,28 @@ bb0(%0 : $Builtin.Int64, %1 : $() -> @owned BigStruct):
   return undef : $BigStruct
 }
 
+// CHECK-LABEL: define swiftcc void @poninter_to_mod_ret(i8*, %swift.refcounted*) #0 {
+// CHECK: [[BITCAST:%.*]] = bitcast i8* %0 to { i8*, %swift.refcounted* } (%swift.refcounted*)*
+// CHECK: [[CALL:%.*]] = call swiftcc { i8*, %swift.refcounted* } [[BITCAST]](%swift.refcounted* swiftself %1)
+// CHECK: extractvalue { i8*, %swift.refcounted* } [[CALL]], 0
+// CHECK: extractvalue { i8*, %swift.refcounted* } [[CALL]], 1
+// CHECK: ret void
+sil @poninter_to_mod_ret : $@convention(thin) (@owned @callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct) -> () {
+bb0(%funcpointer : $@callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct):
+  %papply = apply %funcpointer() : $@callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: define swiftcc { i64, i64 } @ret_pointer_to_mod() #0 {
+// CHECK-NEXT: entry
+// CHECK-NEXT: ret { i64, i64 } zeroinitializer
+sil @ret_pointer_to_mod : $@convention(thin) () -> @owned Optional<@callee_owned () -> @owned Optional<BigStruct>> {
+bb0:
+  %0 = enum $Optional<@callee_owned () -> @owned Optional<BigStruct>>, #Optional.none!enumelt // user: %1
+  return %0 : $Optional<@callee_owned () -> @owned Optional<BigStruct>> // id: %1
+}
+
 //////////////////////
 // Autoclosure Test //
 //////////////////////
@@ -204,6 +226,37 @@ bb1(%17 : $()):
 
 bb2(%24 : $Error):
   unreachable
+}
+
+sil @returnBigStruct : $@convention(thin) () -> @owned BigStruct
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @closureToConvert() #0 {
+// CHECK: entry:
+// CHECK:   [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK:   call swiftcc void @returnBigStruct(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC]])
+// CHECK:   ret void
+// CHECK-LABEL: }
+sil @closureToConvert : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @returnBigStruct : $@convention(thin) () -> @owned BigStruct
+  %apply = apply %f() : $@convention(thin) () -> @owned BigStruct
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testConvertFunc() #0 {
+// CHECK: entry:
+// CHECK:   call swiftcc void bitcast (void ()* @closureToConvert to void (%swift.refcounted*)*)(%swift.refcounted* swiftself null)
+// CHECK:   ret void
+// CHECK-LABEL: }
+sil @testConvertFunc : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @closureToConvert : $@convention(thin) () -> ()
+  %cf = convert_function %f : $@convention(thin) () -> () to $@noescape @convention(thin) () -> ()
+  %thick = thin_to_thick_function %cf : $@noescape @convention(thin) () -> () to $@noescape @callee_owned () -> ()
+  %apply = apply %thick() : $@noescape @callee_owned () -> ()
+  %99 = tuple ()
+  return %99 : $()
 }
 
 sil_vtable SuperBase {

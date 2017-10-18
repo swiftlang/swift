@@ -5,6 +5,9 @@
 // General Collection behavior tests are in
 // validation-test/stdlib/UnsafeBufferPointer.swift.
 
+// rdar://35052802 unexpected assertions when test is run with optimize_size
+// XFAIL: swift_test_mode_optimize_size && optimized_stdlib
+
 import StdlibUnittest
 
 var UnsafeRawBufferPointerTestSuite = TestSuite("UnsafeRawBufferPointer")
@@ -66,7 +69,11 @@ UnsafeRawBufferPointerTestSuite.test("initFromArray") {
   array1.withUnsafeBytes { bytes1 in
     expectEqual(bytes1.count, 16)
     for (i, b) in bytes1.enumerated() {
-      if i % 4 == 0 {
+      var num = i
+#if _endian(big)
+      num = num + 1
+#endif
+      if num % 4 == 0 {
         expectEqual(Int(b), i / 4)
       }
       else {

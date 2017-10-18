@@ -79,6 +79,8 @@ static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo) {
         return getElementTypeRec(Module, FieldType, EltNo);
       EltNo -= NumFieldElements;
     }
+    // This can only happen if we look at a symbolic element number of an empty
+    // tuple.
     llvm::report_fatal_error("invalid element number");
   }
 

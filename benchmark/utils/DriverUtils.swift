@@ -26,7 +26,9 @@ struct BenchResults {
   var mean: UInt64 = 0
   var sd: UInt64 = 0
   var median: UInt64 = 0
+
   init() {}
+
   init(delim: String, sampleCount: UInt64, min: UInt64, max: UInt64, mean: UInt64, sd: UInt64, median: UInt64) {
     self.delim = delim
     self.sampleCount = sampleCount
@@ -52,25 +54,50 @@ extension BenchResults : CustomStringConvertible {
 }
 
 struct Test {
-  let name: String
+  let benchInfo: BenchmarkInfo
   let index: Int
-  let f: (Int) -> ()
-  let run: Bool
-  let tags: [BenchmarkCategories]
+
+  /// The name of the benchmark.
+  var name: String {
+    return benchInfo.name
+  }
+
+  /// The "main routine" of the benchmark.
+  var runFunction: (Int) -> () {
+    return benchInfo.runFunction
+  }
+
+  /// The benchmark categories that this test belongs to. Used for filtering.
+  var tags: [BenchmarkCategory] {
+    return benchInfo.tags
+  }
+
+  /// An optional initialization function for a benchmark that is run before
+  /// measuring begins. Intended to be used to initialize global data used in
+  /// a benchmark.
+  var setUpFunction: (() -> ())? {
+    return benchInfo.setUpFunction
+  }
+
+  /// An optional deinitialization function that if non-null is run /after/ a
+  /// measurement has been taken.
+  var tearDownFunction: (() -> ())? {
+    return benchInfo.tearDownFunction
+  }
 }
 
 // Legacy test dictionaries.
-public var precommitTests: [String : ((Int) -> (), [BenchmarkCategories])] = [:]
-public var otherTests: [String : ((Int) -> (), [BenchmarkCategories])] = [:]
-public var stringTests: [String : ((Int) -> (), [BenchmarkCategories])] = [:]
+public var precommitTests: [BenchmarkInfo] = []
+public var otherTests: [BenchmarkInfo] = []
+public var stringTests: [BenchmarkInfo] = []
 
 // We should migrate to a collection of BenchmarkInfo.
-public var registeredBenchmarks = [TestsUtils.BenchmarkInfo]()
+public var registeredBenchmarks: [BenchmarkInfo] = []
 
 enum TestAction {
-  case Run
-  case ListTests
-  case Fail(String)
+  case run
+  case listTests
+  case fail(String)
 }
 
 struct TestConfig {
@@ -80,8 +107,11 @@ struct TestConfig {
   /// The filters applied to our test names.
   var filters = [String]()
 
-  /// The tag that we want to run
-  var tags = Set<BenchmarkCategories>()
+  /// The tags that we want to run
+  var tags = Set<BenchmarkCategory>()
+
+  /// Tests tagged with any of these will not be executed
+  var skipTags: Set<BenchmarkCategory> = [.unstable, .skip]
 
   /// The scalar multiple of the amount of times a test should be run. This
   /// enables one to cause tests to run for N iterations longer than they
@@ -100,14 +130,6 @@ struct TestConfig {
   /// Is verbose output enabled?
   var verbose: Bool = false
 
-  /// Should we only run the "pre-commit" tests?
-  var onlyPrecommit: Bool = true
-
-  /// Temporary option to only run tests that have been registered with
-  /// BenchmarkInfo. This will go away as soon as the benchmarks have been
-  /// categorized.
-  var onlyRegistered: Bool = false
-
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
   var afterRunSleep: Int?
@@ -118,29 +140,29 @@ struct TestConfig {
   mutating func processArguments() -> TestAction {
     let validOptions = [
       "--iter-scale", "--num-samples", "--num-iters",
-      "--verbose", "--delim", "--run-all", "--list", "--sleep",
-      "--registered", "--tags"
+      "--verbose", "--delim", "--list", "--sleep",
+      "--tags", "--skip-tags"
     ]
     let maybeBenchArgs: Arguments? = parseArgs(validOptions)
     if maybeBenchArgs == nil {
-      return .Fail("Failed to parse arguments")
+      return .fail("Failed to parse arguments")
     }
     let benchArgs = maybeBenchArgs!
 
     filters = benchArgs.positionalArgs
 
     if let x = benchArgs.optionalArgsMap["--iter-scale"] {
-      if x.isEmpty { return .Fail("--iter-scale requires a value") }
+      if x.isEmpty { return .fail("--iter-scale requires a value") }
       iterationScale = Int(x)!
     }
 
     if let x = benchArgs.optionalArgsMap["--num-iters"] {
-      if x.isEmpty { return .Fail("--num-iters requires a value") }
+      if x.isEmpty { return .fail("--num-iters requires a value") }
       fixedNumIters = numericCast(Int(x)!)
     }
 
     if let x = benchArgs.optionalArgsMap["--num-samples"] {
-      if x.isEmpty { return .Fail("--num-samples requires a value") }
+      if x.isEmpty { return .fail("--num-samples requires a value") }
       numSamples = Int(x)!
     }
 
@@ -150,139 +172,107 @@ struct TestConfig {
     }
 
     if let x = benchArgs.optionalArgsMap["--delim"] {
-      if x.isEmpty { return .Fail("--delim requires a value") }
+      if x.isEmpty { return .fail("--delim requires a value") }
       delim = x
     }
 
     if let x = benchArgs.optionalArgsMap["--tags"] {
-      if x.isEmpty { return .Fail("--tags requires a value") }
-      if x.contains("cpubench") {
-        tags.insert(BenchmarkCategories.cpubench)
-      }
-      if x.contains("unstable") {
-        tags.insert(BenchmarkCategories.unstable)
-      }
-      if x.contains("validation") {
-        tags.insert(BenchmarkCategories.validation)
-      }
-      if x.contains("api") {
-        tags.insert(BenchmarkCategories.api)
-      }
-      if x.contains("Array") {
-        tags.insert(BenchmarkCategories.Array)
-      }
-      if x.contains("String") {
-        tags.insert(BenchmarkCategories.String)
-      }
-      if x.contains("Dictionary") {
-        tags.insert(BenchmarkCategories.Dictionary)
-      }
-      if x.contains("Codable") {
-        tags.insert(BenchmarkCategories.Codable)
-      }
-      if x.contains("Set") {
-        tags.insert(BenchmarkCategories.Set)
-      }
-      if x.contains("sdk") {
-        tags.insert(BenchmarkCategories.sdk)
-      }
-      if x.contains("runtime") {
-        tags.insert(BenchmarkCategories.runtime)
-      }
-      if x.contains("refcount") {
-        tags.insert(BenchmarkCategories.refcount)
-      }
-      if x.contains("metadata") {
-        tags.insert(BenchmarkCategories.metadata)
-      }
-      if x.contains("abstraction") {
-        tags.insert(BenchmarkCategories.abstraction)
-      }
-      if x.contains("safetychecks") {
-        tags.insert(BenchmarkCategories.safetychecks)
-      }
-      if x.contains("exceptions") {
-        tags.insert(BenchmarkCategories.exceptions)
-      }
-      if x.contains("bridging") {
-        tags.insert(BenchmarkCategories.bridging)
-      }
-      if x.contains("concurrency") {
-        tags.insert(BenchmarkCategories.concurrency)
-      }
-      if x.contains("algorithm") {
-        tags.insert(BenchmarkCategories.algorithm)
-      }
-      if x.contains("miniapplication") {
-        tags.insert(BenchmarkCategories.miniapplication)
-      }
-      if x.contains("regression") {
-        tags.insert(BenchmarkCategories.regression)
+      if x.isEmpty { return .fail("--tags requires a value") }
+
+      // We support specifying multiple tags by splitting on comma, i.e.:
+      //
+      //  --tags=array,set
+      //
+      // FIXME: If we used Error instead of .fail, then we could have a cleaner
+      // impl here using map on x and tags.formUnion.
+      for t in x.split(separator: ",") {
+        guard let cat = BenchmarkCategory(rawValue: String(t)) else {
+          return .fail("Unknown benchmark category: '\(t)'")
+        }
+        tags.insert(cat)
       }
     }
 
-    if let _ = benchArgs.optionalArgsMap["--run-all"] {
-      onlyPrecommit = false
+    if let x = benchArgs.optionalArgsMap["--skip-tags"] {
+      // if the --skip-tags parameter is specified, we need to ignore the
+      // default and start from a clean slate.
+      skipTags = []
+
+      // We support specifying multiple tags by splitting on comma, i.e.:
+      //
+      //  --skip-tags=array,set
+      //
+      // FIXME: If we used Error instead of .fail, then we could have a cleaner
+      // impl here using map on x and tags.formUnion.
+      for t in x.split(separator: ",") {
+        guard let cat = BenchmarkCategory(rawValue: String(t)) else {
+          return .fail("Unknown benchmark category: '\(t)'")
+        }
+        skipTags.insert(cat)
+      }
     }
 
     if let x = benchArgs.optionalArgsMap["--sleep"] {
       if x.isEmpty {
-        return .Fail("--sleep requires a non-empty integer value")
+        return .fail("--sleep requires a non-empty integer value")
       }
       let v: Int? = Int(x)
       if v == nil {
-        return .Fail("--sleep requires a non-empty integer value")
+        return .fail("--sleep requires a non-empty integer value")
       }
       afterRunSleep = v!
     }
 
     if let _ = benchArgs.optionalArgsMap["--list"] {
-      return .ListTests
+      return .listTests
     }
 
-    if let _ = benchArgs.optionalArgsMap["--registered"] {
-      onlyRegistered = true
-    }
-
-    return .Run
+    return .run
   }
 
   mutating func findTestsToRun() {
-    var allTests: [(key: String, value: ((Int) -> (), [BenchmarkCategories]))]
+    // Begin by creating a set of our non-legacy registeredBenchmarks
+    var allTests = Set(registeredBenchmarks)
 
-    if onlyRegistered {
-      allTests = registeredBenchmarks.map {
-        bench -> (key: String, value: ((Int) -> (), [BenchmarkCategories])) in
-        (bench.name, (bench.runFunction, bench.tags))
+    // Merge legacy benchmark info into allTests. If we already have a
+    // registered benchmark info, formUnion leaves this alone. This allows for
+    // us to perform incremental work.
+    for testList in [precommitTests, otherTests, stringTests] {
+      allTests.formUnion(testList)
+    }
+
+    let benchmarkNameFilter = Set(filters)
+
+    // t is needed so we don't capture an ivar of a mutable inout self.
+    let t = tags
+    let st = skipTags
+    let filteredTests = Array(allTests.filter { benchInfo in
+      if !t.isSubset(of: benchInfo.tags) {
+        return false
       }
-      // FIXME: for now unstable/extra benchmarks are not registered at all, but
-      // soon they will be handled with a default exclude list.
-      onlyPrecommit = false
-    }
-    else {
-      allTests = [precommitTests, otherTests, stringTests]
-        .map { dictionary -> [(key: String, value: ((Int) -> (), [BenchmarkCategories]))] in
-          Array(dictionary).sorted { $0.key < $1.key } } // by name
-        .flatMap { $0 }
-    }
 
-    let filteredTests = allTests.filter { pair in tags.isSubset(of: pair.value.1)}
+      if !st.isDisjoint(with: benchInfo.tags) {
+        return false
+      }
+
+      // If the user did not specified a benchmark name filter and our tags are
+      // a subset of the specified tags by the user, return true. We want to run
+      // this test.
+      if benchmarkNameFilter.isEmpty {
+        return true
+      }
+
+      // Otherwise, we need to check if our benchInfo's name is in the benchmark
+      // name filter list. If it isn't, then we shouldn't process it.
+      return benchmarkNameFilter.contains(benchInfo.name)
+    }).sorted()
+
     if (filteredTests.isEmpty) {
-      return;
+      return
     }
 
-    let included =
-      !filters.isEmpty ? Set(filters)
-      : onlyPrecommit ? Set(precommitTests.keys)
-      : Set(filteredTests.map { $0.key })
-
-    tests = zip(1...filteredTests.count, filteredTests).map {
-      t -> Test in
-      let (ordinal, (key: name, value: funcAndTags)) = t
-      return Test(name: name, index: ordinal, f: funcAndTags.0,
-                  run: included.contains(name)
-                    || included.contains(String(ordinal)),
-                  tags: funcAndTags.1)
+    tests = filteredTests.enumerated().map {
+      Test(benchInfo: $0.element, index: $0.offset + 1)
     }
   }
 }
@@ -388,12 +378,11 @@ class SampleRunner {
 }
 
 /// Invoke the benchmark entry point and return the run time in milliseconds.
-func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResults {
-
+func runBench(_ test: Test, _ c: TestConfig) -> BenchResults {
   var samples = [UInt64](repeating: 0, count: c.numSamples)
 
   if c.verbose {
-    print("Running \(name) for \(c.numSamples) samples.")
+    print("Running \(test.name) for \(c.numSamples) samples.")
   }
 
   let sampler = SampleRunner()
@@ -403,7 +392,10 @@ func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResu
     var scale : UInt
     var elapsed_time : UInt64 = 0
     if c.fixedNumIters == 0 {
-      elapsed_time = sampler.run(name, fn: fn, num_iters: 1)
+      test.setUpFunction?()
+      elapsed_time = sampler.run(test.name, fn: test.runFunction, num_iters: 1)
+      test.tearDownFunction?()
+
       if elapsed_time > 0 {
         scale = UInt(time_per_sample / elapsed_time)
       } else {
@@ -422,7 +414,9 @@ func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResu
       if c.verbose {
         print("    Measuring with scale \(scale).")
       }
-      elapsed_time = sampler.run(name, fn: fn, num_iters: scale)
+      test.setUpFunction?()
+      elapsed_time = sampler.run(test.name, fn: test.runFunction, num_iters: scale)
+      test.tearDownFunction?()
     } else {
       scale = 1
     }
@@ -453,9 +447,7 @@ func printRunInfo(_ c: TestConfig) {
     print("Tests Filter: \(c.filters)")
     print("Tests to run: ", terminator: "")
     for t in c.tests {
-      if t.run {
-        print("\(t.name), ", terminator: "")
-      }
+      print("\(t.name), ", terminator: "")
     }
     print("")
     print("")
@@ -466,48 +458,42 @@ func printRunInfo(_ c: TestConfig) {
 func runBenchmarks(_ c: TestConfig) {
   let units = "us"
   print("#\(c.delim)TEST\(c.delim)SAMPLES\(c.delim)MIN(\(units))\(c.delim)MAX(\(units))\(c.delim)MEAN(\(units))\(c.delim)SD(\(units))\(c.delim)MEDIAN(\(units))")
-  var SumBenchResults = BenchResults()
-  SumBenchResults.sampleCount = 0
+  var sumBenchResults = BenchResults()
+  sumBenchResults.sampleCount = 0
 
   for t in c.tests {
-    if !t.run {
-      continue
-    }
-    let BenchIndex = t.index
-    let BenchName = t.name
-    let BenchFunc = t.f
-    let results = runBench(BenchName, BenchFunc, c)
-    print("\(BenchIndex)\(c.delim)\(BenchName)\(c.delim)\(results.description)")
+    let results = runBench(t, c)
+    print("\(t.index)\(c.delim)\(t.name)\(c.delim)\(results.description)")
     fflush(stdout)
 
-    SumBenchResults.min += results.min
-    SumBenchResults.max += results.max
-    SumBenchResults.mean += results.mean
-    SumBenchResults.sampleCount += 1
+    sumBenchResults.min += results.min
+    sumBenchResults.max += results.max
+    sumBenchResults.mean += results.mean
+    sumBenchResults.sampleCount += 1
     // Don't accumulate SD and Median, as simple sum isn't valid for them.
     // TODO: Compute SD and Median for total results as well.
-    // SumBenchResults.sd += results.sd
-    // SumBenchResults.median += results.median
+    // sumBenchResults.sd += results.sd
+    // sumBenchResults.median += results.median
   }
 
   print("")
-  print("Totals\(c.delim)\(SumBenchResults.description)")
+  print("Totals\(c.delim)\(sumBenchResults.description)")
 }
 
 public func main() {
   var config = TestConfig()
 
   switch (config.processArguments()) {
-    case let .Fail(msg):
+    case let .fail(msg):
       // We do this since we need an autoclosure...
       fatalError("\(msg)")
-    case .ListTests:
+    case .listTests:
       config.findTestsToRun()
       print("Enabled Tests\(config.delim)Tags")
-      for t in config.tests where t.run == true {
+      for t in config.tests {
         print("\(t.name)\(config.delim)\(t.tags)")
       }
-    case .Run:
+    case .run:
       config.findTestsToRun()
       printRunInfo(config)
       runBenchmarks(config)

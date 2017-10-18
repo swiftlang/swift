@@ -54,11 +54,6 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   case AccessLevel::Open:
     return FormalLinkage::PublicUnique;
   case AccessLevel::Internal:
-    // If we're serializing all function bodies, type metadata for internal
-    // types needs to be public too.
-    if (D->getDeclContext()->getParentModule()->getResilienceStrategy()
-        == ResilienceStrategy::Fragile)
-      return FormalLinkage::PublicUnique;
     return FormalLinkage::HiddenUnique;
   case AccessLevel::FilePrivate:
   case AccessLevel::Private:

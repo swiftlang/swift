@@ -16,7 +16,6 @@
 
 // RUN: %target-swift-ide-test -print-module -module-to-print=Swift -source-filename %s -print-interface -skip-underscored-stdlib-protocols > %t-prot.txt
 // RUN: %FileCheck -check-prefix=CHECK-UNDERSCORED-PROT %s < %t-prot.txt
-// CHECK-UNDERSCORED-PROT: public protocol _Incrementable
 // CHECK-UNDERSCORED-PROT: public protocol _SequenceWrapper
 // CHECK-UNDERSCORED-PROT-NOT: protocol _
 

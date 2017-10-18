@@ -13,6 +13,7 @@
 #include "SILGenFunction.h"
 #include "RValue.h"
 #include "Scope.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -239,7 +240,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
                                    SILDeclRef::Kind::Deallocator)
     .asForeign();
   auto superclassDtorType = SGM.getConstantType(superclassDtor);
-  SILValue superclassDtorValue = B.createSuperMethod(
+  SILValue superclassDtorValue = B.createObjCSuperMethod(
                                    cleanupLoc, selfValue, superclassDtor,
                                    superclassDtorType);
 

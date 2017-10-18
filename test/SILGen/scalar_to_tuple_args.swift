@@ -52,7 +52,7 @@ scalarWithCallerSideDefaults(x)
 // CHECK: apply [[TUPLE_WITH_DEFAULTS]]([[X1]], [[X2]], [[DEFAULT_Y]], [[DEFAULT_Z]])
 tupleWithDefaults(x: (x,x))
 
-// CHECK: [[VARIADIC_FIRST:%.*]] = function_ref @_T020scalar_to_tuple_args13variadicFirstySaySiGd_tF
+// CHECK: [[VARIADIC_FIRST:%.*]] = function_ref @_T020scalar_to_tuple_args13variadicFirstySid_tF
 // CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [[BORROWED_ALLOC_ARRAY:%.*]] = begin_borrow [[ALLOC_ARRAY]]
 // CHECK: [[BORROWED_ARRAY:%.*]] = tuple_extract [[BORROWED_ALLOC_ARRAY]] {{.*}}, 0
@@ -67,7 +67,7 @@ tupleWithDefaults(x: (x,x))
 // CHECK: apply [[VARIADIC_FIRST]]([[ARRAY]])
 variadicFirst(x)
 
-// CHECK: [[VARIADIC_SECOND:%.*]] = function_ref @_T020scalar_to_tuple_args14variadicSecondySi_SaySiGdtF
+// CHECK: [[VARIADIC_SECOND:%.*]] = function_ref @_T020scalar_to_tuple_args14variadicSecondySi_SidtF
 // CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [[BORROWED_ALLOC_ARRAY:%.*]] = begin_borrow [[ALLOC_ARRAY]]
 // CHECK: [[BORROWED_ARRAY:%.*]] = tuple_extract [[BORROWED_ALLOC_ARRAY]] {{.*}}, 0

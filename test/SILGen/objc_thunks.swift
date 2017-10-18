@@ -314,7 +314,7 @@ class Hoozit : Gizmo {
   // CHECK: [[GIZMO:%[0-9]+]] = upcast [[SELF:%[0-9]+]] : $Hoozit to $Gizmo
   // CHECK: [[BORROWED_GIZMO:%.*]] = begin_borrow [[GIZMO]]
   // CHECK: [[CAST_BORROWED_GIZMO:%.*]] = unchecked_ref_cast [[BORROWED_GIZMO]] : $Gizmo to $Hoozit
-  // CHECK: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[CAST_BORROWED_GIZMO]] : $Hoozit, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo!, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
+  // CHECK: [[SUPERMETHOD:%[0-9]+]] = objc_super_method [[CAST_BORROWED_GIZMO]] : $Hoozit, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo!, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK-NEXT: end_borrow [[BORROWED_GIZMO]] from [[GIZMO]]
   // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK-NOT: unconditional_checked_cast downcast [[SELF_REPLACED]] : $Gizmo to $Hoozit
@@ -424,25 +424,9 @@ extension Hoozit {
     // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
     // CHECK: [[X_BOX:%[0-9]+]] = alloc_box ${ var X }
     var x = X()
-    // CHECK: [[CTOR:%[0-9]+]] = class_method [volatile] [[SELF:%[0-9]+]] : $Hoozit, #Hoozit.init!initializer.1.foreign : (Hoozit.Type) -> (Int) -> Hoozit, $@convention(objc_method) (Int, @owned Hoozit) -> @owned Hoozit
+    // CHECK: [[CTOR:%[0-9]+]] = objc_method [[SELF:%[0-9]+]] : $Hoozit, #Hoozit.init!initializer.1.foreign : (Hoozit.Type) -> (Int) -> Hoozit, $@convention(objc_method) (Int, @owned Hoozit) -> @owned Hoozit
     // CHECK: [[NEW_SELF:%[0-9]+]] = apply [[CTOR]]
     // CHECK: store [[NEW_SELF]] to [init] [[PB_BOX]] : $*Hoozit
-    // CHECK: [[RELOADED_SELF:%.*]] = load_borrow [[PB_BOX]]
-    // CHECK: [[NONNULL:%[0-9]+]] = is_nonnull [[RELOADED_SELF]] : $Hoozit
-    // CHECK: end_borrow [[RELOADED_SELF]] from [[PB_BOX]]
-    // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
-    // CHECK: [[NULL_BB]]:
-    // CHECK-NEXT: destroy_value [[X_BOX]] : ${ var X }
-    // CHECK-NEXT: br [[EPILOG_BB:bb[0-9]+]]
-
-    // CHECK: [[NONNULL_BB]]:
-    // CHECK:   [[OTHER_REF:%[0-9]+]] = function_ref @_T011objc_thunks5otheryyF : $@convention(thin) () -> ()
-    // CHECK-NEXT: apply [[OTHER_REF]]() : $@convention(thin) () -> ()
-    // CHECK-NEXT: destroy_value [[X_BOX]] : ${ var X }
-    // CHECK-NEXT: br [[EPILOG_BB]]
-    
-    // CHECK: [[EPILOG_BB]]:
-    // CHECK-NOT: super_method
     // CHECK: return
     self.init(int:Int(d))
     other()
@@ -460,11 +444,11 @@ func useHoozit(_ h: Hoozit) {
 // sil @_T011objc_thunks9useHoozityAA0D0C1h_tF
   // In the class decl, overrides importd method, 'dynamic' was inferred
   h.fork()
-  // CHECK: class_method [volatile] {{%.*}} : {{.*}}, #Hoozit.fork!1.foreign
+  // CHECK: objc_method {{%.*}} : {{.*}}, #Hoozit.fork!1.foreign
 
   // In an extension, 'dynamic' was inferred.
   h.foof()
-  // CHECK: class_method [volatile] {{%.*}} : {{.*}}, #Hoozit.foof!1.foreign
+  // CHECK: objc_method {{%.*}} : {{.*}}, #Hoozit.foof!1.foreign
 }
 
 func useWotsit(_ w: Wotsit<String>) {
@@ -476,7 +460,7 @@ func useWotsit(_ w: Wotsit<String>) {
 
   // Inherited methods only have objc entry points
   w.clone()
-  // CHECK: class_method [volatile] {{%.*}} : {{.*}}, #Gizmo.clone!1.foreign
+  // CHECK: objc_method {{%.*}} : {{.*}}, #Gizmo.clone!1.foreign
 }
 
 func other() { }
@@ -487,7 +471,7 @@ class X { }
 func property(_ g: Gizmo) -> Int {
   // CHECK: bb0([[ARG:%.*]] : @owned $Gizmo):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.count!getter.1.foreign
+  // CHECK:   objc_method [[BORROWED_ARG]] : $Gizmo, #Gizmo.count!getter.1.foreign
   return g.count
 }
 
@@ -495,10 +479,10 @@ func property(_ g: Gizmo) -> Int {
 func blockProperty(_ g: Gizmo) {
   // CHECK: bb0([[ARG:%.*]] : @owned $Gizmo):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.block!setter.1.foreign
+  // CHECK:   objc_method [[BORROWED_ARG]] : $Gizmo, #Gizmo.block!setter.1.foreign
   g.block = { }
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.block!getter.1.foreign
+  // CHECK:   objc_method [[BORROWED_ARG]] : $Gizmo, #Gizmo.block!getter.1.foreign
   g.block()
 }
 
@@ -523,12 +507,12 @@ class DesignatedOverrides : Gizmo {
   // CHECK-LABEL: sil hidden @_T011objc_thunks19DesignatedOverridesCSQyACGycfc
   // CHECK-NOT: return
   // CHECK: function_ref @_T011objc_thunks19DesignatedOverridesC1iSivpfi : $@convention(thin) () -> Int
-  // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> () -> Gizmo!, $@convention(objc_method) (@owned Gizmo) -> @owned Optional<Gizmo>
+  // CHECK: objc_super_method [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> () -> Gizmo!, $@convention(objc_method) (@owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK: return
 
   // CHECK-LABEL: sil hidden @_T011objc_thunks19DesignatedOverridesCSQyACGSi7bellsOn_tcfc
   // CHECK: function_ref @_T011objc_thunks19DesignatedOverridesC1iSivpfi : $@convention(thin) () -> Int
-  // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo!, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
+  // CHECK: objc_super_method [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo!, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK: return
 }
 

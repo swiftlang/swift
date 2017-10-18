@@ -604,6 +604,7 @@ private:
     }
 
     bool skipAvailability = false;
+    bool makeNewUnavailable = false;
     // Swift designated initializers are Objective-C designated initializers.
     if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
       if (ctor->hasStubImplementation()
@@ -612,6 +613,9 @@ private:
         // required access
         os << " SWIFT_UNAVAILABLE";
         skipAvailability = true;
+        // If -init is unavailable, then +new should be, too:
+        const bool selectorIsInit = selector.getNumArgs() == 0 && selectorPieces.front().str() == "init";
+        makeNewUnavailable = selectorIsInit;
       } else if (ctor->isDesignatedInit() &&
           !isa<ProtocolDecl>(ctor->getDeclContext())) {
         os << " OBJC_DESIGNATED_INITIALIZER";
@@ -643,6 +647,10 @@ private:
     }
 
     os << ";\n";
+
+    if (makeNewUnavailable) {
+        os << "+ (nonnull instancetype)new SWIFT_UNAVAILABLE;\n";
+    }
   }
 
   void printAbstractFunctionAsFunction(FuncDecl *FD) {
@@ -1936,13 +1944,12 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
 
   /// Returns true if \p paramTy has any constraints other than being
   /// class-bound ("conforms to" AnyObject).
-  static bool isConstrained(ModuleDecl &mod,
-                            GenericSignature *sig,
+  static bool isConstrained(GenericSignature *sig,
                             GenericTypeParamType *paramTy) {
-    if (sig->getSuperclassBound(paramTy, mod))
+    if (sig->getSuperclassBound(paramTy))
       return true;
 
-    auto conformsTo = sig->getConformsTo(paramTy, mod);
+    auto conformsTo = sig->getConformsTo(paramTy);
     return conformsTo.size() > 0;
   }
 
@@ -1959,7 +1966,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
     for_each(boundGeneric->getGenericArgs(),
              sig->getInnermostGenericParams(),
              [&](Type argTy, GenericTypeParamType *paramTy) {
-      if (isObjCGeneric && isConstrained(M, sig, paramTy))
+      if (isObjCGeneric && isConstrained(sig, paramTy))
         NeedsDefinition = true;
       visit(argTy);
       NeedsDefinition = false;
@@ -2364,21 +2371,6 @@ public:
            "# define __has_warning(x) 0\n"
            "#endif\n"
            "\n"
-           "#if __has_attribute(external_source_symbol)\n"
-           "# define SWIFT_STRINGIFY(str) #str\n"
-           "# define SWIFT_MODULE_NAMESPACE_PUSH(module_name) "
-             "_Pragma(SWIFT_STRINGIFY(clang attribute "
-             "push(__attribute__((external_source_symbol(language=\"Swift\", "
-             "defined_in=module_name, generated_declaration))), "
-             "apply_to=any(function, enum, objc_interface, objc_category, "
-             "objc_protocol))))\n"
-           "# define SWIFT_MODULE_NAMESPACE_POP "
-             "_Pragma(\"clang attribute pop\")\n"
-           "#else\n"
-           "# define SWIFT_MODULE_NAMESPACE_PUSH(module_name)\n"
-           "# define SWIFT_MODULE_NAMESPACE_POP\n"
-           "#endif\n"
-           "\n"
            "#if __has_include(<swift/objc-prologue.h>)\n"
            "# include <swift/objc-prologue.h>\n"
            "#endif\n"
@@ -2742,9 +2734,20 @@ public:
         "#pragma clang diagnostic ignored \"-Wunknown-pragmas\"\n"
         "#pragma clang diagnostic ignored \"-Wnullability\"\n"
         "\n"
-        "SWIFT_MODULE_NAMESPACE_PUSH(\"" << M.getNameStr() << "\")\n"
+        "#if __has_attribute(external_source_symbol)\n"
+        "# pragma push_macro(\"any\")\n"
+        "# undef any\n"
+        "# pragma clang attribute push("
+          "__attribute__((external_source_symbol(language=\"Swift\", "
+            "defined_in=\"" << M.getNameStr() << "\",generated_declaration))), "
+          "apply_to=any(function,enum,objc_interface,objc_category,"
+             "objc_protocol))\n"
+        "# pragma pop_macro(\"any\")\n"
+        "#endif\n\n"
       << os.str()
-      << "SWIFT_MODULE_NAMESPACE_POP\n"
+      << "#if __has_attribute(external_source_symbol)\n"
+         "# pragma clang attribute pop\n"
+         "#endif\n"
          "#pragma clang diagnostic pop\n";
     return false;
   }

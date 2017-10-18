@@ -209,19 +209,6 @@ func class_to_native_object(_ c:C) -> Builtin.NativeObject {
   return Builtin.castToNativeObject(c)
 }
 
-// CHECK-LABEL: sil hidden @_T08builtins23class_to_unknown_object{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[ARG:%.*]] : @owned $C):
-// CHECK-NEXT:   debug_value
-// CHECK-NEXT:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT:   [[COPY_BORROWED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK-NEXT:   [[OBJ:%.*]] = unchecked_ref_cast [[COPY_BORROWED_ARG:%.*]] to $Builtin.UnknownObject
-// CHECK-NEXT:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK-NEXT:   destroy_value [[ARG]]
-// CHECK-NEXT:   return [[OBJ]]
-func class_to_unknown_object(_ c:C) -> Builtin.UnknownObject {
-  return Builtin.castToUnknownObject(c)
-}
-
 // CHECK-LABEL: sil hidden @_T08builtins32class_archetype_to_native_object{{[_0-9a-zA-Z]*}}F
 func class_archetype_to_native_object<T : C>(_ t: T) -> Builtin.NativeObject {
   // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.NativeObject
@@ -229,15 +216,6 @@ func class_archetype_to_native_object<T : C>(_ t: T) -> Builtin.NativeObject {
   // CHECK-NOT: destroy_value [[OBJ]]
   // CHECK: return [[OBJ]]
   return Builtin.castToNativeObject(t)
-}
-
-// CHECK-LABEL: sil hidden @_T08builtins33class_archetype_to_unknown_object{{[_0-9a-zA-Z]*}}F
-func class_archetype_to_unknown_object<T : C>(_ t: T) -> Builtin.UnknownObject {
-  // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.UnknownObject
-  // CHECK-NOT: destroy_value [[C]]
-  // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[OBJ]]
-  return Builtin.castToUnknownObject(t)
 }
 
 // CHECK-LABEL: sil hidden @_T08builtins34class_existential_to_native_object{{[_0-9a-zA-Z]*}}F
@@ -254,13 +232,6 @@ func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject 
   return Builtin.unsafeCastToNativeObject(t)
 }
 
-// CHECK-LABEL: sil hidden @_T08builtins35class_existential_to_unknown_object{{[_0-9a-zA-Z]*}}F
-func class_existential_to_unknown_object(_ t:ClassProto) -> Builtin.UnknownObject {
-  // CHECK: [[REF:%[0-9]+]] = open_existential_ref [[T:%[0-9]+]] : $ClassProto
-  // CHECK: [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.UnknownObject
-  return Builtin.castToUnknownObject(t)
-}
-
 // CHECK-LABEL: sil hidden @_T08builtins24class_from_native_object{{[_0-9a-zA-Z]*}}F
 func class_from_native_object(_ p: Builtin.NativeObject) -> C {
   // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] to $C
@@ -268,15 +239,6 @@ func class_from_native_object(_ p: Builtin.NativeObject) -> C {
   // CHECK-NOT: destroy_value [[OBJ]]
   // CHECK: return [[C]]
   return Builtin.castFromNativeObject(p)
-}
-
-// CHECK-LABEL: sil hidden @_T08builtins25class_from_unknown_object{{[_0-9a-zA-Z]*}}F
-func class_from_unknown_object(_ p: Builtin.UnknownObject) -> C {
-  // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] to $C
-  // CHECK-NOT: destroy_value [[C]]
-  // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[C]]
-  return Builtin.castFromUnknownObject(p)
 }
 
 // CHECK-LABEL: sil hidden @_T08builtins34class_archetype_from_native_object{{[_0-9a-zA-Z]*}}F
@@ -288,15 +250,6 @@ func class_archetype_from_native_object<T : C>(_ p: Builtin.NativeObject) -> T {
   return Builtin.castFromNativeObject(p)
 }
 
-// CHECK-LABEL: sil hidden @_T08builtins35class_archetype_from_unknown_object{{[_0-9a-zA-Z]*}}F
-func class_archetype_from_unknown_object<T : C>(_ p: Builtin.UnknownObject) -> T {
-  // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.UnknownObject to $T
-  // CHECK-NOT: destroy_value [[C]]
-  // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[C]]
-  return Builtin.castFromUnknownObject(p)
-}
-
 // CHECK-LABEL: sil hidden @_T08builtins41objc_class_existential_from_native_object{{[_0-9a-zA-Z]*}}F
 func objc_class_existential_from_native_object(_ p: Builtin.NativeObject) -> AnyObject {
   // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.NativeObject to $AnyObject
@@ -304,15 +257,6 @@ func objc_class_existential_from_native_object(_ p: Builtin.NativeObject) -> Any
   // CHECK-NOT: destroy_value [[OBJ]]
   // CHECK: return [[C]]
   return Builtin.castFromNativeObject(p)
-}
-
-// CHECK-LABEL: sil hidden @_T08builtins42objc_class_existential_from_unknown_object{{[_0-9a-zA-Z]*}}F
-func objc_class_existential_from_unknown_object(_ p: Builtin.UnknownObject) -> AnyObject {
-  // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.UnknownObject to $AnyObject
-  // CHECK-NOT: destroy_value [[C]]
-  // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[C]]
-  return Builtin.castFromUnknownObject(p)
 }
 
 // CHECK-LABEL: sil hidden @_T08builtins20class_to_raw_pointer{{[_0-9a-zA-Z]*}}F
@@ -354,14 +298,6 @@ func class_archetype_from_raw_pointer<T : C>(_ p: Builtin.RawPointer) -> T {
 // CHECK-LABEL: sil hidden @_T08builtins20obj_from_raw_pointer{{[_0-9a-zA-Z]*}}F
 func obj_from_raw_pointer(_ p: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $Builtin.NativeObject
-  // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
-  // CHECK: return [[C_COPY]]
-  return Builtin.bridgeFromRawPointer(p)
-}
-
-// CHECK-LABEL: sil hidden @_T08builtins28unknown_obj_from_raw_pointer{{[_0-9a-zA-Z]*}}F
-func unknown_obj_from_raw_pointer(_ p: Builtin.RawPointer) -> Builtin.UnknownObject {
-  // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $Builtin.UnknownObject
   // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
   // CHECK: return [[C_COPY]]
   return Builtin.bridgeFromRawPointer(p)

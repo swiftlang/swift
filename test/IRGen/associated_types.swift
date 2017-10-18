@@ -66,7 +66,8 @@ protocol FastRuncible {
 // information for archetypes from all paths to that archetype, not just
 // its parent relationships.
 
-func testFastRuncible<T: Runcible, U: FastRuncible where T.RuncerType == U.RuncerType>(_ t: T, u: U) {
+func testFastRuncible<T: Runcible, U: FastRuncible>(_ t: T, u: U)
+   where T.RuncerType == U.RuncerType {
   U.RuncerType.Runcee.accelerate()
 }
 

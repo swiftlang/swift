@@ -72,16 +72,12 @@ struct U<T : Carnivora> {}
 struct V<T : Canidae> {}
 
 // CHECK-LABEL: .inferSuperclassRequirement1@
-// CHECK-NEXT: Requirements:
-// CHECK-NEXT:   τ_0_0 : Canidae
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Canidae>
 func inferSuperclassRequirement1<T : Carnivora>(
 	_ v: V<T>) {}
-// expected-warning@-2{{redundant superclass constraint 'T' : 'Carnivora'}}
-// expected-note@-2{{superclass constraint 'T' : 'Canidae' inferred from type here}}
 
 // CHECK-LABEL: .inferSuperclassRequirement2@
-// CHECK-NEXT: Requirements:
-// CHECK-NEXT:   τ_0_0 : Canidae
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Canidae>
 func inferSuperclassRequirement2<T : Canidae>(_ v: U<T>) {}
 
 // ----------------------------------------------------------------------------
@@ -110,33 +106,17 @@ protocol PAssoc {
 
 struct Model_P3_P4_Eq<T : P3, U : P4> where T.P3Assoc == U.P4Assoc {}
 
-// CHECK-LABEL: .inferSameType1@
-// CHECK-NEXT: Requirements:
-// CHECK-NEXT:   τ_0_0 : P3 [τ_0_0: Inferred @ {{.*}}:32]
-// CHECK-NEXT:   τ_0_1 : P4 [τ_0_1: Inferred @ {{.*}}:32]
-// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P1 [τ_0_1: Inferred @ {{.*}}:32 -> Protocol requirement (via Self.P4Assoc in P4)
-// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P2 [τ_0_0: Inferred @ {{.*}}:32 -> Protocol requirement (via Self.P3Assoc in P3)
-// FIXME: τ_0_0[.P3].P3Assoc == τ_0_1[.P4].P4Assoc [τ_0_0: Inferred]
-func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) { }
+func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) {
+  let u: U.P4Assoc? = nil
+  let _: T.P3Assoc? = u!
+}
 
-// CHECK-LABEL: .inferSameType2@
-// CHECK-NEXT: Requirements:
-// CHECK-NEXT:   τ_0_0 : P3 [τ_0_0: Explicit @ {{.*}}:25]
-// CHECK-NEXT:   τ_0_1 : P4 [τ_0_1: Explicit @ {{.*}}:33]
-// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P1 [τ_0_1: Explicit @ {{.*}}:33 -> Protocol requirement (via Self.P4Assoc in P4)
-// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P2 [τ_0_0: Explicit @ {{.*}}:25 -> Protocol requirement (via Self.P3Assoc in P3)
-// CHECK-NEXT:   τ_0_0[.P3].P3Assoc == τ_0_1[.P4].P4Assoc [τ_0_0[.P3].P3Assoc: Explicit]
 func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
 // expected-warning@-1{{redundant conformance constraint 'T.P3Assoc': 'P2'}}
 // expected-note@-2{{conformance constraint 'T.P3Assoc': 'P2' implied here}}
 
-// CHECK-LABEL: .inferSameType3@
-// CHECK-NEXT: Requirements:
-// CHECK-NEXT:   τ_0_0 : PCommonAssoc1 [τ_0_0: Explicit @ {{.*}}:25]
-// CHECK-NEXT:   τ_0_0 : PCommonAssoc2 [τ_0_0: Explicit @ {{.*}}:74]
-// CHECK-NEXT:   τ_0_0[.PCommonAssoc1].CommonAssoc : P1 [τ_0_0[.PCommonAssoc1].CommonAssoc: Explicit @ {{.*}}:66]
-// CHECK-NEXT: Potential archetypes
-func inferSameType3<T : PCommonAssoc1>(_: T) where T.CommonAssoc : P1, T : PCommonAssoc2 {}
+func inferSameType3<T : PCommonAssoc1>(_: T) where T.CommonAssoc : P1, T : PCommonAssoc2 {
+}
 
 protocol P5 {
   associatedtype Element
@@ -178,7 +158,8 @@ protocol P10 {
 func sameTypeConcrete1<T : P9 & P10>(_: T) where T.A == X3, T.C == T.B, T.C == Int { }
 
 // CHECK-LABEL: sameTypeConcrete2@
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.A == τ_0_0.A, τ_0_0.B == X3, τ_0_0.C == X3>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.B == X3, τ_0_0.C == X3>
+// FIXME: Should have τ_0_0.A == τ_0_0.A
 func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3 { }
 // expected-warning@-1{{redundant superclass constraint 'T.B' : 'X3'}}
 // expected-note@-2{{same-type constraint 'T.C' == 'X3' written here}}
@@ -188,7 +169,6 @@ func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3
 // CHECK-LABEL: RangeReplaceableCollection
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RangeReplaceableCollection, τ_0_0.SubSequence == MutableRangeReplaceableSlice<τ_0_0>>
 extension RangeReplaceableCollection where
-  Self: MutableCollection,
   Self.SubSequence == MutableRangeReplaceableSlice<Self>
 {
 	func f() { }
@@ -197,7 +177,7 @@ extension RangeReplaceableCollection where
 // CHECK-LABEL: X14.recursiveConcreteSameType
 // CHECK: Generic signature: <T, V where T == CountableRange<Int>>
 // CHECK-NEXT: Canonical generic signature: <τ_0_0, τ_1_0 where τ_0_0 == CountableRange<Int>>
-struct X14<T: Collection> where T.Iterator == IndexingIterator<T> {
+struct X14<T> where T.Iterator == IndexingIterator<T> {
 	func recursiveConcreteSameType<V>(_: V) where T == CountableRange<Int> { }
 }
 
@@ -307,8 +287,8 @@ struct X21<T, U> {
 }
 
 struct X22<T, U> {
-  func g<V>(_: V) where T: P20, // expected-warning{{redundant conformance constraint 'T': 'P20'}}
-                  U == X20<T> { } // expected-note{{conformance constraint 'T': 'P20' inferred from type here}}
+  func g<V>(_: V) where T: P20,
+                  U == X20<T> { }
 }
 
 // CHECK: Generic signature: <Self where Self : P22>
@@ -330,8 +310,8 @@ protocol P22 {
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.B : P20, τ_0_0.A == X20<τ_0_0.B>>
 protocol P23 {
   associatedtype A
-  associatedtype B: P20 // expected-warning{{redundant conformance constraint 'Self.B': 'P20'}}
-    where A == X20<B> // expected-note{{conformance constraint 'Self.B': 'P20' inferred from type here}}
+  associatedtype B: P20
+    where A == X20<B>
 }
 
 protocol P24 {
@@ -417,5 +397,30 @@ protocol P30 {
 protocol P31 { }
 
 // CHECK-LABEL: .sameTypeNameMatch1@
-// Generic signature: <T where T : P29, T : P30, T.X : P31, T.X == T.X>
+// CHECK: Generic signature: <T where T : P29, T : P30, T.X : P31, T.X == T.X>
 func sameTypeNameMatch1<T: P29 & P30>(_: T) where T.X: P31 { }
+
+// ----------------------------------------------------------------------------
+// Infer requirements from conditional conformances
+// ----------------------------------------------------------------------------
+
+protocol P32 {}
+protocol P33 {
+  associatedtype A: P32
+}
+protocol P34 {}
+struct Foo<T> {}
+extension Foo: P32 where T: P34 {}
+
+// Inference chain: U.A: P32 => Foo<V>: P32 => V: P34
+
+// CHECK-LABEL: conditionalConformance1@
+// CHECK: Generic signature: <U, V where U : P33, V : P34, U.A == Foo<V>>
+// CHECK: Canonical generic signature: <τ_0_0, τ_0_1 where τ_0_0 : P33, τ_0_1 : P34, τ_0_0.A == Foo<τ_0_1>>
+func conditionalConformance1<U: P33, V>(_: U) where U.A == Foo<V> {}
+
+struct Bar<U: P32> {}
+// CHECK-LABEL: conditionalConformance2@
+// CHECK: Generic signature: <V where V : P34>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P34>
+func conditionalConformance2<V>(_: Bar<Foo<V>>) {}

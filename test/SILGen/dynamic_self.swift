@@ -129,7 +129,7 @@ func testObjCInit(meta: ObjCInit.Type) {
 // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[THICK_META]] : $@thick ObjCInit.Type to $@objc_metatype ObjCInit.Type
 // CHECK:   [[OBJ:%[0-9]+]] = alloc_ref_dynamic [objc] [[OBJC_META]] : $@objc_metatype ObjCInit.Type, $ObjCInit
 // CHECK:   [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
-// CHECK:   [[INIT:%[0-9]+]] = class_method [volatile] [[BORROWED_OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : (ObjCInit.Type) -> () -> ObjCInit, $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
+// CHECK:   [[INIT:%[0-9]+]] = objc_method [[BORROWED_OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : (ObjCInit.Type) -> () -> ObjCInit, $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   [[RESULT_OBJ:%[0-9]+]] = apply [[INIT]]([[OBJ]]) : $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
@@ -352,6 +352,28 @@ class Derived : Base {
   static func superCallFromMethodReturningSelfStatic() -> Self {
     _ = super.returnsSelfStatic()
     return self.init()
+  }
+}
+
+class Generic<T> {
+  // Examples where we have to add a special argument to capture Self's metadata
+  func t1() -> Self {
+    // CHECK-LABEL: sil private @_T012dynamic_self7GenericC2t1ACyxGXDyFAEXDSgycfU_ : $@convention(thin) <T> (@owned <τ_0_0> { var @sil_weak Optional<Generic<τ_0_0>> } <T>, @thick @dynamic_self Generic<T>.Type) -> @owned Optional<Generic<T>>
+    _ = {[weak self] in self }
+    return self
+  }
+
+  func t2() -> Self {
+    // CHECK-LABEL: sil private @_T012dynamic_self7GenericC2t2ACyxGXDyFAEXD_AEXDtycfU_ : $@convention(thin) <T> (@owned (Generic<T>, Generic<T>), @thick @dynamic_self Generic<T>.Type) -> (@owned Generic<T>, @owned Generic<T>)
+    let selves = (self, self)
+    _ = { selves }
+    return self
+  }
+
+  func t3() -> Self {
+    // CHECK-LABEL: sil private @_T012dynamic_self7GenericC2t3ACyxGXDyFAEXDycfU_ : $@convention(thin) <T> (@owned @sil_unowned Generic<T>, @thick @dynamic_self Generic<T>.Type) -> @owned Generic<T> 
+    _ = {[unowned self] in self }
+    return self
   }
 }
 

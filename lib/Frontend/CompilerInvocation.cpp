@@ -27,7 +27,6 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 
 using namespace swift;
@@ -98,47 +97,6 @@ static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
 
-/// Try to read a file list file.
-///
-/// Returns false on error.
-static bool readFileList(DiagnosticEngine &diags,
-                         std::vector<std::string> &inputFiles,
-                         const llvm::opt::Arg *filelistPath,
-                         const llvm::opt::Arg *primaryFileArg = nullptr,
-                         unsigned *primaryFileIndex = nullptr) {
-  assert((primaryFileArg == nullptr) || (primaryFileIndex != nullptr) &&
-         "did not provide argument for primary file index");
-
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-      llvm::MemoryBuffer::getFile(filelistPath->getValue());
-  if (!buffer) {
-    diags.diagnose(SourceLoc(), diag::cannot_open_file,
-                   filelistPath->getValue(), buffer.getError().message());
-    return false;
-  }
-
-  bool foundPrimaryFile = false;
-  if (primaryFileIndex) *primaryFileIndex = 0;
-
-  for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
-    inputFiles.push_back(line);
-
-    if (foundPrimaryFile || primaryFileArg == nullptr)
-      continue;
-    if (line == primaryFileArg->getValue())
-      foundPrimaryFile = true;
-    else
-      ++*primaryFileIndex;
-  }
-
-  if (primaryFileArg && !foundPrimaryFile) {
-    diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
-                   primaryFileArg->getValue(), filelistPath->getValue());
-    return false;
-  }
-
-  return true;
-}
 
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                               DiagnosticEngine &Diags) {
@@ -267,27 +225,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_filelist)) {
-    const Arg *primaryFileArg = Args.getLastArg(OPT_primary_file);
-    unsigned primaryFileIndex = 0;
-    if (readFileList(Diags, Opts.InputFilenames, A,
-                     primaryFileArg, &primaryFileIndex)) {
-      if (primaryFileArg)
-        Opts.PrimaryInput = SelectedInput(primaryFileIndex);
-      assert(!Args.hasArg(OPT_INPUT) && "mixing -filelist with inputs");
-    }
-  } else {
-    for (const Arg *A : Args.filtered(OPT_INPUT, OPT_primary_file)) {
-      if (A->getOption().matches(OPT_INPUT)) {
-        Opts.InputFilenames.push_back(A->getValue());
-      } else if (A->getOption().matches(OPT_primary_file)) {
-        Opts.PrimaryInput = SelectedInput(Opts.InputFilenames.size());
-        Opts.InputFilenames.push_back(A->getValue());
-      } else {
-        llvm_unreachable("Unknown input-related argument!");
-      }
-    }
-  }
+  Opts.Inputs.setInputFilenamesAndPrimaryInput(Diags, Args);
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
@@ -382,71 +320,25 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   }
 
   if (Opts.RequestedAction == FrontendOptions::Immediate &&
-      Opts.PrimaryInput.hasValue()) {
+      Opts.Inputs.hasPrimaryInput()) {
     Diags.diagnose(SourceLoc(), diag::error_immediate_mode_primary_file);
     return true;
   }
 
-  bool TreatAsSIL = Args.hasArg(OPT_parse_sil);
-  if (!TreatAsSIL && Opts.InputFilenames.size() == 1) {
-    // If we have exactly one input filename, and its extension is "sil",
-    // treat the input as SIL.
-    StringRef Input(Opts.InputFilenames[0]);
-    TreatAsSIL = llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
-  } else if (!TreatAsSIL && Opts.PrimaryInput.hasValue() &&
-             Opts.PrimaryInput->isFilename()) {
-    // If we have a primary input and it's a filename with extension "sil",
-    // treat the input as SIL.
-    StringRef Input(Opts.InputFilenames[Opts.PrimaryInput->Index]);
-    TreatAsSIL = llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
-  }
+  bool TreatAsSIL =
+      Args.hasArg(OPT_parse_sil) || Opts.Inputs.shouldTreatAsSIL();
 
-  // If we have exactly one input filename, and its extension is "bc" or "ll",
-  // treat the input as LLVM_IR.
-  bool TreatAsLLVM = false;
-  if (Opts.InputFilenames.size() == 1) {
-    StringRef Input(Opts.InputFilenames[0]);
-    TreatAsLLVM =
-      llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
-      llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
-  }
+  bool TreatAsLLVM = Opts.Inputs.shouldTreatAsLLVM();
 
-  if (Opts.RequestedAction == FrontendOptions::REPL) {
-    if (!Opts.InputFilenames.empty()) {
-      Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
-      return true;
-    }
-  } else if (TreatAsSIL && Opts.PrimaryInput.hasValue()) {
-    // If we have the SIL as our primary input, we can waive the one file
-    // requirement as long as all the other inputs are SIBs.
-    if (Opts.PrimaryInput.hasValue()) {
-      for (unsigned i = 0, e = Opts.InputFilenames.size(); i != e; ++i) {
-        if (i == Opts.PrimaryInput->Index)
-          continue;
-
-        StringRef File(Opts.InputFilenames[i]);
-        if (!llvm::sys::path::extension(File).endswith(SIB_EXTENSION)) {
-          Diags.diagnose(SourceLoc(),
-                         diag::error_mode_requires_one_sil_multi_sib);
-          return true;
-        }
-      }
-    }
-  } else if (TreatAsSIL) {
-    if (Opts.InputFilenames.size() != 1) {
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
-      return true;
-    }
-  } else if (Opts.RequestedAction != FrontendOptions::NoneAction) {
-    if (Opts.InputFilenames.empty()) {
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
-      return true;
-    }
+  if (Opts.Inputs.verifyInputs(
+          Diags, TreatAsSIL, Opts.RequestedAction == FrontendOptions::REPL,
+          Opts.RequestedAction == FrontendOptions::NoneAction)) {
+    return true;
   }
 
   if (Opts.RequestedAction == FrontendOptions::Immediate) {
-    assert(!Opts.InputFilenames.empty());
-    Opts.ImmediateArgv.push_back(Opts.InputFilenames[0]); // argv[0]
+    Opts.ImmediateArgv.push_back(
+        Opts.Inputs.getFilenameOfFirstInput()); // argv[0]
     if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
       for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
         Opts.ImmediateArgv.push_back(A->getValue(i));
@@ -465,59 +357,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   else
     Opts.InputKind = InputFileKind::IFK_Swift;
 
-  if (const Arg *A = Args.getLastArg(OPT_output_filelist)) {
-    readFileList(Diags, Opts.OutputFilenames, A);
-    assert(!Args.hasArg(OPT_o) && "don't use -o with -output-filelist");
-  } else {
-    Opts.OutputFilenames = Args.getAllArgValues(OPT_o);
-  }
+  Opts.setOutputFileList(Diags, Args);
 
-  bool UserSpecifiedModuleName = false;
-  {
-    const Arg *A = Args.getLastArg(OPT_module_name);
-    StringRef ModuleName = Opts.ModuleName;
-    if (A) {
-      ModuleName = A->getValue();
-      UserSpecifiedModuleName = true;
-    } else if (ModuleName.empty()) {
-      // The user did not specify a module name, so determine a default fallback
-      // based on other options.
-
-      // Note: this code path will only be taken when running the frontend
-      // directly; the driver should always pass -module-name when invoking the
-      // frontend.
-      if (Opts.RequestedAction == FrontendOptions::REPL) {
-        // Default to a module named "REPL" if we're in REPL mode.
-        ModuleName = "REPL";
-      } else if (!Opts.InputFilenames.empty()) {
-        StringRef OutputFilename = Opts.getSingleOutputFilename();
-        if (OutputFilename.empty() || OutputFilename == "-" ||
-            llvm::sys::fs::is_directory(OutputFilename)) {
-          ModuleName = Opts.InputFilenames[0];
-        } else {
-          ModuleName = OutputFilename;
-        }
-
-        ModuleName = llvm::sys::path::stem(ModuleName);
-      }
-    }
-
-    if (!Lexer::isIdentifier(ModuleName) ||
-        (ModuleName == STDLIB_NAME && !Opts.ParseStdlib)) {
-      if (!Opts.actionHasOutput() ||
-          (Opts.InputKind == InputFileKind::IFK_Swift &&
-           Opts.InputFilenames.size() == 1)) {
-        ModuleName = "main";
-      } else {
-        auto DID = (ModuleName == STDLIB_NAME) ? diag::error_stdlib_module_name
-                                               : diag::error_bad_module_name;
-        Diags.diagnose(SourceLoc(), DID, ModuleName, A == nullptr);
-        ModuleName = "__bad__";
-      }
-    }
-
-    Opts.ModuleName = ModuleName;
-  }
+  Opts.setModuleName(Diags, Args);
 
   if (Opts.OutputFilenames.empty() ||
       llvm::sys::fs::is_directory(Opts.getSingleOutputFilename())) {
@@ -543,7 +385,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpScopeMaps:
     case FrontendOptions::DumpTypeRefinementContexts:
       // Textual modes.
-      Opts.setSingleOutputFilename("-");
+      Opts.setOutputFilenameToStdout();
       break;
 
     case FrontendOptions::EmitPCH:
@@ -553,7 +395,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL: {
       if (Opts.OutputFilenames.empty())
-        Opts.setSingleOutputFilename("-");
+        Opts.setOutputFilenameToStdout();
       else
         Suffix = SIL_EXTENSION;
       break;
@@ -577,7 +419,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
     case FrontendOptions::EmitAssembly: {
       if (Opts.OutputFilenames.empty())
-        Opts.setSingleOutputFilename("-");
+        Opts.setOutputFilenameToStdout();
       else
         Suffix = "s";
       break;
@@ -585,7 +427,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
     case FrontendOptions::EmitIR: {
       if (Opts.OutputFilenames.empty())
-        Opts.setSingleOutputFilename("-");
+        Opts.setOutputFilenameToStdout();
       else
         Suffix = "ll";
       break;
@@ -602,7 +444,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
     case FrontendOptions::EmitImportedModules:
       if (Opts.OutputFilenames.empty())
-        Opts.setSingleOutputFilename("-");
+        Opts.setOutputFilenameToStdout();
       else
         Suffix = "importedmodules";
       break;
@@ -613,24 +455,13 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
       // First, if we're reading from stdin and we don't have a directory,
       // output to stdout.
-      if (Opts.InputFilenames.size() == 1 && Opts.InputFilenames[0] == "-" &&
-          Opts.OutputFilenames.empty())
-        Opts.setSingleOutputFilename("-");
+      if (Opts.Inputs.isReadingFromStdin() && Opts.OutputFilenames.empty())
+        Opts.setOutputFilenameToStdout();
       else {
         // We have a suffix, so determine an appropriate name.
+        StringRef BaseName =
+            Opts.Inputs.baseNameOfOutput(Args, Opts.ModuleName);
         llvm::SmallString<128> Path(Opts.getSingleOutputFilename());
-
-        StringRef BaseName;
-        if (Opts.PrimaryInput.hasValue() && Opts.PrimaryInput->isFilename()) {
-          unsigned Index = Opts.PrimaryInput->Index;
-          BaseName = llvm::sys::path::stem(Opts.InputFilenames[Index]);
-        } else if (!UserSpecifiedModuleName &&
-                   Opts.InputFilenames.size() == 1) {
-          BaseName = llvm::sys::path::stem(Opts.InputFilenames[0]);
-        } else {
-          BaseName = Opts.ModuleName;
-        }
-
         llvm::sys::path::append(Path, BaseName);
         llvm::sys::path::replace_extension(Path, Suffix);
 
@@ -645,8 +476,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         Diags.diagnose(SourceLoc(), diag::error_no_output_filename_specified);
         return true;
       }
-    } else if (Opts.getSingleOutputFilename() != "-" &&
-        llvm::sys::fs::is_directory(Opts.getSingleOutputFilename())) {
+    } else if (Opts.isOutputFileDirectory()) {
       Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
                      Opts.getSingleOutputFilename());
       return true;
@@ -675,21 +505,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     if (!output.empty())
       return;
 
-    StringRef OriginalPath;
-    if (!Opts.OutputFilenames.empty() && Opts.getSingleOutputFilename() != "-")
-      // Put the serialized diagnostics file next to the output file.
-      OriginalPath = Opts.getSingleOutputFilename();
-    else if (Opts.PrimaryInput.hasValue() && Opts.PrimaryInput->isFilename())
-      // We have a primary input, so use that as the basis for the name of the
-      // serialized diagnostics file.
-      OriginalPath = llvm::sys::path::filename(
-        Opts.InputFilenames[Opts.PrimaryInput->Index]);
-    else
-      // We don't have any better indication of name, so fall back on the
-      // module name.
-      OriginalPath = Opts.ModuleName;
-
-    llvm::SmallString<128> Path(OriginalPath);
+    llvm::SmallString<128> Path(Opts.originalPath());
     llvm::sys::path::replace_extension(Path, extension);
     output = Path.str();
   };
@@ -891,7 +707,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
     Opts.SerializeBridgingHeader |=
-      !Opts.PrimaryInput && !Opts.ModuleOutputPath.empty();
+        !Opts.Inputs.getPrimaryInput() && !Opts.ModuleOutputPath.empty();
   }
 
   for (const Arg *A : Args.filtered(OPT_import_module)) {
@@ -1132,13 +948,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 #endif
 
-  Opts.EnableObjCInterop = Target.isOSDarwin();
-  if (auto A = Args.getLastArg(OPT_enable_objc_interop,
-                               OPT_disable_objc_interop)) {
-    Opts.EnableObjCInterop
-      = A->getOption().matches(OPT_enable_objc_interop);
-  }
-
+  Opts.EnableObjCInterop =
+      Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
+                   Target.isOSDarwin());
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
   // Must be processed after any other language options that could affect
@@ -1373,9 +1185,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 
-  Opts.SILSerializeAll |= Args.hasArg(OPT_sil_serialize_all);
   Opts.SILSerializeWitnessTables |=
     Args.hasArg(OPT_sil_serialize_witness_tables);
+  Opts.SILSerializeVTables |=
+    Args.hasArg(OPT_sil_serialize_vtables);
 
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
@@ -1458,6 +1271,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ExternalPassPipelineFilename = A->getValue();
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
+  const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);
+  Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";
+
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
   Opts.EnableGuaranteedClosureContexts |=
     Args.hasArg(OPT_enable_guaranteed_closure_contexts);
@@ -1618,11 +1434,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // in other classes.
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
     Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (FrontendOpts.PrimaryInput && FrontendOpts.PrimaryInput->isFilename()) {
-    unsigned Index = FrontendOpts.PrimaryInput->Index;
-    Opts.MainInputFilename = FrontendOpts.InputFilenames[Index];
-  } else if (FrontendOpts.InputFilenames.size() == 1) {
-    Opts.MainInputFilename = FrontendOpts.InputFilenames.front();
+  } else if (FrontendOpts.Inputs.getPrimaryInput() &&
+             FrontendOpts.Inputs.getPrimaryInput()->isFilename()) {
+    unsigned Index = FrontendOpts.Inputs.getPrimaryInput()->Index;
+    Opts.MainInputFilename = FrontendOpts.Inputs.getInputFilenames()[Index];
+  } else if (FrontendOpts.Inputs.hasUniqueInputFilename()) {
+    Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
   Opts.OutputFilenames = FrontendOpts.OutputFilenames;
   Opts.ModuleName = FrontendOpts.ModuleName;
@@ -1639,6 +1456,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
+  const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);
+  Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";
+
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
 
   Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);

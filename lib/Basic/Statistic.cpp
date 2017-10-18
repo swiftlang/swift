@@ -100,8 +100,10 @@ auxName(StringRef ModuleName,
   if (InputName.empty()) {
     InputName = "all";
   }
+  // Dispose of path prefix, which might make composite name too long.
+  InputName = path::filename(InputName);
   if (OptType.empty()) {
-    InputName = "Onone";
+    OptType = "Onone";
   }
   if (!OutputType.empty() && OutputType.front() == '.') {
     OutputType = OutputType.substr(1);
@@ -171,6 +173,14 @@ UnifiedStatsReporter::getFrontendCounters()
   if (!FrontendCounters)
     FrontendCounters = make_unique<AlwaysOnFrontendCounters>();
   return *FrontendCounters;
+}
+
+UnifiedStatsReporter::AlwaysOnFrontendRecursiveSharedTimers &
+UnifiedStatsReporter::getFrontendRecursiveSharedTimers() {
+  if (!FrontendRecursiveSharedTimers)
+    FrontendRecursiveSharedTimers =
+        make_unique<AlwaysOnFrontendRecursiveSharedTimers>();
+  return *FrontendRecursiveSharedTimers;
 }
 
 void
@@ -313,6 +323,15 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
 #undef FRONTEND_STATISTIC
 }
 
+UnifiedStatsReporter::AlwaysOnFrontendRecursiveSharedTimers::
+    AlwaysOnFrontendRecursiveSharedTimers()
+    :
+#define FRONTEND_RECURSIVE_SHARED_TIMER(ID) ID(#ID),
+#include "swift/Basic/Statistics.def"
+#undef FRONTEND_RECURSIVE_SHARED_TIMER
+      dummyInstanceVariableToGetConstructorToParse(0) {
+}
+
 UnifiedStatsReporter::~UnifiedStatsReporter()
 {
   // NB: Timer needs to be Optional<> because it needs to be destructed early;
@@ -342,8 +361,11 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 
   std::error_code EC;
   raw_fd_ostream ostream(StatsFilename, EC, fs::F_Append | fs::F_Text);
-  if (EC)
+  if (EC) {
+    llvm::errs() << "Error opening -stats-output-dir file '"
+                 << TraceFilename << "' for writing\n";
     return;
+  }
 
   // We change behavior here depending on whether -DLLVM_ENABLE_STATS and/or
   // assertions were on in this build; this is somewhat subtle, but turning on
@@ -368,8 +390,11 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   if (LastTracedFrontendCounters && SourceMgr) {
     std::error_code EC;
     raw_fd_ostream tstream(TraceFilename, EC, fs::F_Append | fs::F_Text);
-    if (EC)
+    if (EC) {
+      llvm::errs() << "Error opening -trace-stats-events file '"
+                   << TraceFilename << "' for writing\n";
       return;
+    }
     tstream << "Time,Live,IsEntry,EventName,CounterName,"
             << "CounterDelta,CounterValue,SourceRange\n";
     for (auto const &E : FrontendStatsEvents) {

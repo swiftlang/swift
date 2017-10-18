@@ -16,6 +16,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -1521,7 +1522,7 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
   case CodeCompletionLiteralKind::NilLiteral:
     return KnownProtocolKind::ExpressibleByNilLiteral;
   case CodeCompletionLiteralKind::StringLiteral:
-    return KnownProtocolKind::ExpressibleByStringLiteral;
+    return KnownProtocolKind::ExpressibleByUnicodeScalarLiteral;
   case CodeCompletionLiteralKind::Tuple:
     llvm_unreachable("no such protocol kind");
   }
@@ -1956,7 +1957,7 @@ public:
       }
 
       if (t->isTypeParameter()) {
-        auto protos = genericSig->getConformsTo(t, *M);
+        auto protos = genericSig->getConformsTo(t);
         if (!protos.empty())
           return buildProtocolComposition(protos);
       }

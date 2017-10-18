@@ -892,8 +892,9 @@ public:
 
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
+  void visitObjCMethodInst(ObjCMethodInst *i);
+  void visitObjCSuperMethodInst(ObjCSuperMethodInst *i);
   void visitWitnessMethodInst(WitnessMethodInst *i);
-  void visitDynamicMethodInst(DynamicMethodInst *i);
 
   void visitAllocValueBufferInst(AllocValueBufferInst *i);
   void visitProjectValueBufferInst(ProjectValueBufferInst *i);
@@ -1007,8 +1008,6 @@ public:
   void visitRefToBridgeObjectInst(RefToBridgeObjectInst *i);
   void visitBridgeObjectToRefInst(BridgeObjectToRefInst *i);
   void visitBridgeObjectToWordInst(BridgeObjectToWordInst *i);
-
-  void visitIsNonnullInst(IsNonnullInst *i);
 
   void visitIndexAddrInst(IndexAddrInst *i);
   void visitTailAddrInst(TailAddrInst *i);
@@ -1459,6 +1458,11 @@ static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
 /// Emit the definition for the given SIL constant.
 void IRGenModule::emitSILFunction(SILFunction *f) {
   if (f->isExternalDeclaration())
+    return;
+  // Do not emit bodies of public_external functions.
+  // The only exception is transparent functions.
+  if (hasPublicVisibility(f->getLinkage()) && f->isAvailableExternally() &&
+      !f->isTransparent())
     return;
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
@@ -1952,10 +1956,9 @@ static llvm::Value *getObjCClassForValue(IRGenFunction &IGF,
 static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
                                               CanSILFunctionType origCalleeType,
                                               SubstitutionList subs) {
-  auto &M = *IGF.getSwiftModule();
   llvm::Value *wtable;
 
-  if (auto *proto = origCalleeType->getDefaultWitnessMethodProtocol(M)) {
+  if (auto *proto = origCalleeType->getDefaultWitnessMethodProtocol()) {
     // The generic signature for a witness method with abstract Self must
     // have exactly one protocol requirement.
     //
@@ -3062,7 +3065,14 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
   addIncomingSILArgumentsToPHINodes(*this, trueBB, i->getTrueArgs());
   addIncomingSILArgumentsToPHINodes(*this, falseBB, i->getFalseArgs());
 
-  Builder.CreateCondBr(condValue, trueBB.bb, falseBB.bb);
+  llvm::MDNode *Weights = nullptr;
+  auto TrueBBCount = i->getTrueBBCount();
+  auto FalseBBCount = i->getFalseBBCount();
+  if (TrueBBCount || FalseBBCount)
+    Weights = IGM.createProfileWeights(TrueBBCount ? TrueBBCount.getValue() : 0,
+        FalseBBCount ? FalseBBCount.getValue() : 0);
+
+  Builder.CreateCondBr(condValue, trueBB.bb, falseBB.bb, Weights);
 }
 
 void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
@@ -4683,35 +4693,6 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   setLoweredExplosion(I, e);
 }
 
-void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
-  // Get the value we're testing, which may be a function, an address or an
-  // instance pointer.
-  llvm::Value *val;
-
-  SILValue operand = i->getOperand();
-  auto type = operand->getType();
-  if (type.isAddress()) {
-    val = getLoweredAddress(operand).getAddress();
-  } else if (auto fnType = type.getAs<SILFunctionType>()) {
-    Explosion values = getLoweredExplosion(operand);
-    val = values.claimNext();    // Function pointer.
-    if (fnType->getRepresentation() == SILFunctionTypeRepresentation::Thick)
-      (void) values.claimNext(); // Ignore the data pointer.
-  } else {
-    Explosion values = getLoweredExplosion(operand);
-    val = values.claimNext();
-  }
-  
-  // Check that the result isn't null.
-  auto *valTy = cast<llvm::PointerType>(val->getType());
-  llvm::Value *result = Builder.CreateICmp(llvm::CmpInst::ICMP_NE,
-                                    val, llvm::ConstantPointerNull::get(valTy));
-  
-  Explosion out;
-  out.add(result);
-  setLoweredExplosion(i, out);
-}
-
 void IRGenSILFunction::visitUpcastInst(swift::UpcastInst *i) {
   auto toTy = getTypeInfo(i->getType()).getSchema()[0].getScalarType();
 
@@ -4992,12 +4973,6 @@ IRGenSILFunction::visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i) {
   }
 }
 
-void IRGenSILFunction::visitDynamicMethodInst(DynamicMethodInst *i) {
-  assert(i->getMember().isForeign && "dynamic_method requires [objc] method");
-  setLoweredObjCMethod(i, i->getMember());
-  return;
-}
-
 void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   // For Objective-C classes we need to arrange for a msgSend
   // to happen when the method is called.
@@ -5106,12 +5081,7 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
 }
 
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
-  if (i->getMember().isForeign) {
-    setLoweredObjCMethodBounded(i, i->getMember(),
-                                i->getOperand()->getType(),
-                                /*startAtSuper=*/true);
-    return;
-  }
+  assert(!i->getMember().isForeign);
 
   auto base = getLoweredExplosion(i->getOperand());
   auto baseType = i->getOperand()->getType();
@@ -5127,20 +5097,22 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   setLoweredFunctionPointer(i, fn);
 }
 
+void IRGenSILFunction::visitObjCSuperMethodInst(swift::ObjCSuperMethodInst *i) {
+  assert(i->getMember().isForeign);
+  setLoweredObjCMethodBounded(i, i->getMember(),
+                              i->getOperand()->getType(),
+                              /*startAtSuper=*/true);
+}
+
 void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
-  // For Objective-C classes we need to arrange for a msgSend
-  // to happen when the method is called.
-  if (i->getMember().isForeign) {
-    setLoweredObjCMethod(i, i->getMember());
-    return;
-  }
-  
+  assert(!i->getMember().isForeign);
+
   Explosion base = getLoweredExplosion(i->getOperand());
   llvm::Value *baseValue = base.claimNext();
-  
+
   SILDeclRef method = i->getMember();
   auto methodType = i->getType().castTo<SILFunctionType>();
- 
+
   // For Swift classes, get the method implementation from the vtable.
   // FIXME: better explosion kind, map as static.
   FunctionPointer fn = emitVirtualMethodValue(*this, baseValue,
@@ -5149,6 +5121,13 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
                                               /*useSuperVTable*/ false);
 
   setLoweredFunctionPointer(i, fn);
+}
+
+void IRGenSILFunction::visitObjCMethodInst(swift::ObjCMethodInst *i) {
+  // For Objective-C classes we need to arrange for a msgSend
+  // to happen when the method is called.
+  assert(i->getMember().isForeign);
+  setLoweredObjCMethod(i, i->getMember());
 }
 
 void IRGenModule::emitSILStaticInitializers() {

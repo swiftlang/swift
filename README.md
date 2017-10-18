@@ -54,7 +54,7 @@ supported host development operating systems.
 
 #### macOS
 
-To build for macOS, you need [Xcode 9.0](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 9.1 beta 2](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
@@ -70,7 +70,7 @@ which can be installed via a package manager:
 
     sudo port install cmake ninja
 
-Instructions for installing CMake and Ninja directly can be found [below](#build-dependencies)
+Instructions for installing CMake and Ninja directly can be found [below](#build-dependencies).
 
 #### Linux
 
@@ -81,7 +81,7 @@ For Ubuntu, you'll need the following development dependencies:
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
 
-Build instructions for Ubuntu 14.04 LTS can be found [here](docs/Ubuntu14.md)
+Build instructions for Ubuntu 14.04 LTS can be found [here](docs/Ubuntu14.md).
 
 ### Getting Sources for Swift and Related Projects
 
@@ -181,12 +181,12 @@ To open the Swift project in Xcode, open `${SWIFT_BUILD_DIR}/Swift.xcodeproj`.
 It will auto-create a *lot* of schemes for all of the available targets. A
 common debug flow would involve:
 
- - Select the 'swift' scheme
- - Pull up the scheme editor (⌘⇧<)
- - Select the 'Arguments' tab and click the '+'
- - Add the command line options
- - Close the scheme editor
- - Build and run
+ - Select the 'swift' scheme.
+ - Pull up the scheme editor (⌘⇧<).
+ - Select the 'Arguments' tab and click the '+'.
+ - Add the command line options.
+ - Close the scheme editor.
+ - Build and run.
 
 Another option is to change the scheme to "Wait for executable to be launched",
 then run the build product in Terminal.

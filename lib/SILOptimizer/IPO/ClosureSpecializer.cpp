@@ -56,8 +56,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "closure-specialization"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
+#include "swift/Basic/Range.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -66,10 +65,12 @@
 #include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "llvm/ADT/Statistic.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
@@ -121,6 +122,9 @@ public:
         CallSiteDesc(CallSiteDesc) {}
 
   void populateCloned();
+
+  SILValue cloneCalleeConversion(SILValue calleeValue, SILValue NewClosure,
+                                 SILBuilder &Builder);
 
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
   static SILFunction *cloneFunction(const CallSiteDescriptor &CallSiteDesc,
@@ -184,6 +188,11 @@ public:
   }
 
   unsigned getClosureIndex() const { return ClosureIndex; }
+
+  // Get the closure value passed to the apply (on the caller side).
+  SILValue getClosureCallerArg() const {
+    return getApplyInst().getArgument(ClosureIndex);
+  }
 
   SILParameterInfo getClosureParameterInfo() const { return ClosureParamInfo; }
 
@@ -616,10 +625,10 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       // and not the original linkage.
       // Otherwise the new function could have an external linkage (in case the
       // original function was de-serialized) and would not be code-gen'd.
-      getSpecializedLinkage(ClosureUser, ClosureUser->getLinkage()),
-      ClonedName, ClonedTy,
-      ClosureUser->getGenericEnvironment(), ClosureUser->getLocation(),
-      IsBare, ClosureUser->isTransparent(), CallSiteDesc.isSerialized(),
+      getSpecializedLinkage(ClosureUser, ClosureUser->getLinkage()), ClonedName,
+      ClonedTy, ClosureUser->getGenericEnvironment(),
+      ClosureUser->getLocation(), IsBare, ClosureUser->isTransparent(),
+      CallSiteDesc.isSerialized(), ClosureUser->getEntryCount(),
       ClosureUser->isThunk(), ClosureUser->getClassSubclassScope(),
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
@@ -629,6 +638,21 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
   for (auto &Attr : ClosureUser->getSemanticsAttrs())
     Fn->addSemanticsAttr(Attr);
   return Fn;
+}
+
+// Clone a chain of ConvertFunctionInsts.
+SILValue ClosureSpecCloner::cloneCalleeConversion(SILValue calleeValue,
+                                                  SILValue NewClosure,
+                                                  SILBuilder &Builder) {
+  if (calleeValue == CallSiteDesc.getClosure())
+    return NewClosure;
+
+  auto *CFI = cast<ConvertFunctionInst>(calleeValue);
+
+  calleeValue = cloneCalleeConversion(CFI->getOperand(), NewClosure, Builder);
+
+  return Builder.createConvertFunction(CallSiteDesc.getLoc(), calleeValue,
+                                       CFI->getType());
 }
 
 /// \brief Populate the body of the cloned closure, modifying instructions as
@@ -682,7 +706,11 @@ void ClosureSpecCloner::populateCloned() {
   SILValue FnVal =
       Builder.createFunctionRef(CallSiteDesc.getLoc(), ClosedOverFun);
   auto *NewClosure = CallSiteDesc.createNewClosure(Builder, FnVal, NewPAIArgs);
-  ValueMap.insert(std::make_pair(ClosureArg, SILValue(NewClosure)));
+
+  // Clone a chain of ConvertFunctionInsts.
+  SILValue ConvertedCallee = cloneCalleeConversion(
+      CallSiteDesc.getClosureCallerArg(), NewClosure, Builder);
+  ValueMap.insert(std::make_pair(ClosureArg, ConvertedCallee));
 
   BBMap.insert(std::make_pair(ClosureUserEntryBB, ClonedEntryBB));
   // Recursively visit original BBs in depth-first preorder, starting with the
@@ -816,7 +844,24 @@ void SILClosureSpecializerTransform::gatherCallSites(
       ClosureInfo *CInfo = nullptr;
 
       // Go through all uses of our closure.
-      for (auto *Use : ClosureInst->getUses()) {
+
+      // Worklist of operands.
+      SmallVector<Operand *, 8> Uses(ClosureInst->getUses());
+
+      // Live range end points.
+      SmallVector<SILInstruction *, 8> UsePoints;
+
+      // Uses may grow in this loop.
+      for (size_t UseIndex = 0; UseIndex < Uses.size(); ++UseIndex) {
+        auto *Use = Uses[UseIndex];
+        UsePoints.push_back(Use->getUser());
+
+        // Recurse through conversions.
+        if (auto *CFI = dyn_cast<ConvertFunctionInst>(Use->getUser())) {
+          // Push Uses in reverse order so they are visited in forward order.
+          Uses.append(CFI->getUses().begin(), CFI->getUses().end());
+          continue;
+        }
         // If this use is not an apply inst or an apply inst with
         // substitutions, there is nothing interesting for us to do, so
         // continue...
@@ -859,7 +904,7 @@ void SILClosureSpecializerTransform::gatherCallSites(
         // corresponding to our partial apply.
         Optional<unsigned> ClosureIndex;
         for (unsigned i = 0, e = AI.getNumArguments(); i != e; ++i) {
-          if (AI.getArgument(i) != ClosureInst)
+          if (AI.getArgument(i) != Use->get())
             continue;
           ClosureIndex = i;
           DEBUG(llvm::dbgs() << "    Found callsite with closure argument at "
@@ -912,12 +957,8 @@ void SILClosureSpecializerTransform::gatherCallSites(
 
         // Compute the final release points of the closure. We will insert
         // release of the captured arguments here.
-        if (!CInfo) {
+        if (!CInfo)
           CInfo = new ClosureInfo(ClosureInst);
-          ValueLifetimeAnalysis VLA(CInfo->Closure);
-          VLA.computeFrontier(CInfo->LifetimeFrontier,
-                              ValueLifetimeAnalysis::AllowToModifyCFG);
-        }
 
         // Now we know that CSDesc is profitable to specialize. Add it to our
         // call site list.
@@ -925,8 +966,12 @@ void SILClosureSpecializerTransform::gatherCallSites(
           CallSiteDescriptor(CInfo, AI, ClosureIndex.getValue(),
                              ClosureParamInfo, std::move(NonFailureExitBBs)));
       }
-      if (CInfo)
+      if (CInfo) {
+        ValueLifetimeAnalysis VLA(CInfo->Closure, UsePoints);
+        VLA.computeFrontier(CInfo->LifetimeFrontier,
+                            ValueLifetimeAnalysis::AllowToModifyCFG);
         ClosureCandidates.push_back(CInfo);
+      }
     }
   }
 }

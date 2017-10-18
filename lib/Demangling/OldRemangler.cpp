@@ -1164,6 +1164,10 @@ void Remangler::mangleImplResult(Node *node) {
   mangleChildNodes(node); // impl convention, type
 }
 
+void Remangler::mangleImplEscaping(Node *node) {
+  // The old mangler does not encode escaping.
+}
+
 void Remangler::mangleImplConvention(Node *node) {
   assert(node->getKind() == Node::Kind::ImplConvention);
   StringRef text = node->getText();
@@ -1795,6 +1799,10 @@ void Remangler::mangleSILBoxImmutableField(Node *node) {
   assert(node->getNumChildren() == 1
          && node->getChild(0)->getKind() == Node::Kind::Type);
   mangleType(node->getChild(0));
+}
+
+void Remangler::mangleAssocTypePath(Node *node) {
+  unreachable("unsupported");
 }
 
 /// The top-level interface to the remangler.

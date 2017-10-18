@@ -201,6 +201,12 @@ public:
                               X->getOperand());
   }
 
+  hash_code visitSuperMethodInst(SuperMethodInst *X) {
+    return llvm::hash_combine(X->getKind(),
+                              X->getType(),
+                              X->getOperand());
+  }
+
   hash_code visitTupleInst(TupleInst *X) {
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(X->getKind(), X->getTupleType(),
@@ -341,10 +347,6 @@ public:
       hash = llvm::hash_combine(hash, X->getDefaultResult());
 
     return hash;
-  }
-
-  hash_code visitIsNonnullInst(IsNonnullInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
   }
 
   hash_code visitThinFunctionToPointerInst(ThinFunctionToPointerInst *X) {
@@ -862,9 +864,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
       return false;
     return !BI->mayReadOrWriteMemory();
   }
-  if (auto *CMI = dyn_cast<ClassMethodInst>(Inst)) {
-    return !CMI->isVolatile();
-  }
   if (auto *WMI = dyn_cast<WitnessMethodInst>(Inst)) {
     return !WMI->isVolatile();
   }
@@ -872,6 +871,8 @@ bool CSE::canHandle(SILInstruction *Inst) {
     return !EMI->getOperand()->getType().isAddress();
   }
   switch (Inst->getKind()) {
+  case SILInstructionKind::ClassMethodInst:
+  case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::FunctionRefInst:
   case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::IntegerLiteralInst:
@@ -896,7 +897,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::UncheckedEnumDataInst:
-  case SILInstructionKind::IsNonnullInst:
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::RefToRawPointerInst:

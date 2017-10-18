@@ -19,8 +19,12 @@
 // to allow performance optimizations of linear traversals.
 
 /// CR and LF are common special cases in grapheme breaking logic
-@_versioned internal var _CR: UInt8 { return 0x0d }
-@_versioned internal var _LF: UInt8 { return 0x0a }
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned
+internal var _CR: UInt8 { return 0x0d }
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned
+internal var _LF: UInt8 { return 0x0a }
 
 import SwiftShims
 
@@ -57,6 +61,7 @@ extension String {
   ///         print(firstName)
   ///     }
   ///     // Prints "Marie"
+  @_fixed_layout // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
   public struct CharacterView {
@@ -71,11 +76,13 @@ extension String {
     internal var _coreOffset: Int
 
     /// Creates a view of the given string.
+    @_inlineable // FIXME(sil-serialize-all)
     public init(_ text: String) {
       self._core = text._core
       self._coreOffset = 0
     }
     
+    @_inlineable // FIXME(sil-serialize-all)
     public // @testable
     init(_ _core: _StringCore, coreOffset: Int = 0) {
       self._core = _core
@@ -84,6 +91,7 @@ extension String {
   }
 
   /// A view of the string's contents as a collection of characters.
+  @_inlineable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
   public var characters: CharacterView {
@@ -126,6 +134,7 @@ extension String {
   ///   value for the `withMutableCharacters(_:)` method. The `CharacterView`
   ///   argument is valid only for the duration of the closure's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func withMutableCharacters<R>(
     _ body: (inout CharacterView) -> R
   ) -> R {
@@ -155,13 +164,16 @@ extension String {
   ///     // Prints "'Twas brillig, and the..."
   ///
   /// - Parameter characters: A character view to convert to a string.
+  @_inlineable // FIXME(sil-serialize-all)
   public init(_ characters: CharacterView) {
     self.init(characters._core)
   }
 }
 
 extension String.CharacterView : _SwiftStringView {
-  var _persistentContent : String {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _persistentContent : String {
     // FIXME: we might want to make sure our _StringCore isn't somehow a slice
     // of some larger storage before blindly wrapping/returning it as
     // persistent.  That said, if current benchmarks are measuring these cases,
@@ -177,6 +189,7 @@ extension String.CharacterView : _SwiftStringView {
 /// `String.CharacterView` is a collection of `Character`.
 extension String.CharacterView : BidirectionalCollection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core, coreOffset: _coreOffset)
@@ -188,6 +201,7 @@ extension String.CharacterView : BidirectionalCollection {
   /// The position of the first character in a nonempty character view.
   /// 
   /// In an empty character view, `startIndex` is equal to `endIndex`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var startIndex: Index {
     return unicodeScalars.startIndex
   }
@@ -196,10 +210,13 @@ extension String.CharacterView : BidirectionalCollection {
   /// greater than the last valid subscript argument.
   ///
   /// In an empty character view, `endIndex` is equal to `startIndex`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var endIndex: Index {
     return unicodeScalars.endIndex
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal func _index(atEncodedOffset n: Int) -> Index {
     let stride = _measureExtendedGraphemeClusterForward(
       from: Index(encodedOffset: n))
@@ -209,6 +226,7 @@ extension String.CharacterView : BidirectionalCollection {
   /// Returns the next consecutive position after `i`.
   ///
   /// - Precondition: The next position is valid.
+  @_inlineable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
     _precondition(
       i < unicodeScalars.endIndex,
@@ -230,6 +248,7 @@ extension String.CharacterView : BidirectionalCollection {
   /// Returns the previous consecutive position before `i`.
   ///
   /// - Precondition: The previous position is valid.
+  @_inlineable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     _precondition(i > unicodeScalars.startIndex,
       "cannot decrement before startIndex")
@@ -267,6 +286,7 @@ extension String.CharacterView : BidirectionalCollection {
   // TODO: this is actually fine to inline into non-inlinable code
   //
   @inline(never) // @inline(resilient_only)
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal static func _internalExtraCheckGraphemeBreakBetween(
     _ lhs: UInt16, _ rhs: UInt16
@@ -388,8 +408,9 @@ extension String.CharacterView : BidirectionalCollection {
   }
   
   @inline(never)
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  func _measureExtendedGraphemeClusterForwardSlow(
+  internal func _measureExtendedGraphemeClusterForwardSlow(
     startOffset: Int
   ) -> Int {
     let endOffset = unicodeScalars.endIndex.encodedOffset - _coreOffset
@@ -526,8 +547,9 @@ extension String.CharacterView : BidirectionalCollection {
   }
   
   @inline(never)
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  func _measureExtendedGraphemeClusterBackwardSlow(
+  internal func _measureExtendedGraphemeClusterBackwardSlow(
     endOffset: Int
   ) -> Int {
     let startOffset = 0
@@ -616,6 +638,7 @@ extension String.CharacterView : BidirectionalCollection {
   ///
   /// - Parameter position: A valid index of the character view. `position`
   ///   must be less than the view's end index.
+  @_inlineable // FIXME(sil-serialize-all)
   public subscript(i_: Index) -> Character {
     var i = i_
     while true {
@@ -653,6 +676,7 @@ extension String.CharacterView : BidirectionalCollection {
 
 extension String.CharacterView : RangeReplaceableCollection {
   /// Creates an empty character view.
+  @_inlineable // FIXME(sil-serialize-all)
   public init() {
     self.init("")
   }
@@ -671,6 +695,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   ///   view and `newElements`. If the call to `replaceSubrange(_:with:)`
   ///   simply removes characters at the end of the view, the complexity is
   ///   O(*n*), where *n* is equal to `bounds.count`.
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
@@ -694,6 +719,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   ///   to allocate.
   ///
   /// - Complexity: O(*n*), where *n* is the capacity being reserved.
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
     _core.reserveCapacity(n)
   }
@@ -701,6 +727,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   /// Appends the given character to the character view.
   ///
   /// - Parameter c: The character to append to the character view.
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
     if let c0 = c._smallUTF16 {
       _core.append(contentsOf: c0)
@@ -712,6 +739,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   /// Appends the characters in the given sequence to the character view.
   /// 
   /// - Parameter newElements: A sequence of characters.
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func append<S : Sequence>(contentsOf newElements: S)
   where S.Element == Character {
     if _fastPath(newElements is _SwiftStringView) {
@@ -743,6 +771,7 @@ extension String.CharacterView {
   ///
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
+  @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> String.CharacterView {
     return String.CharacterView(
       unicodeScalars[bounds]._core,

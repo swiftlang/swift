@@ -62,6 +62,13 @@ public func fooHelperExplicitFrameworkFunc1(_ a: Int32) -> Int32
     key.typename: "Int32",
     key.nameoffset: 13,
     key.namelength: 43,
+    key.attributes: [
+      {
+        key.offset: 1,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ],
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.var.parameter,

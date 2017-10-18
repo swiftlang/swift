@@ -165,13 +165,14 @@ uint32_t Global2 = 0;
 uint32_t Global3 = 0;
 
 /// The general structure of a generic metadata.
-template <typename Instance>
+template <typename Instance, unsigned NumArguments>
 struct GenericMetadataTest {
   GenericMetadata Header;
   Instance Template;
+  void *Storage[NumArguments];
 };
 
-GenericMetadataTest<StructMetadata> MetadataTest1 = {
+GenericMetadataTest<StructMetadata, 1> MetadataTest1 = {
   // Header
   {
     // allocation function
@@ -182,7 +183,7 @@ GenericMetadataTest<StructMetadata> MetadataTest1 = {
       metadataWords[2] = argsWords[0];
       return metadata;
     },
-    2 * sizeof(void*), // metadata size
+    3 * sizeof(void*), // metadata size
     1, // num arguments
     0, // address point
     {} // private data
@@ -192,7 +193,10 @@ GenericMetadataTest<StructMetadata> MetadataTest1 = {
   {
     MetadataKind::Struct,
     reinterpret_cast<const NominalTypeDescriptor*>(&Global1)
-  }
+  },
+
+  // Arguments
+  {nullptr}
 };
 
 struct TestObjContainer {
@@ -296,8 +300,8 @@ TEST(MetadataTest, getGenericMetadata) {
       auto fields = reinterpret_cast<void * const *>(inst);
 
       EXPECT_EQ(MetadataKind::Struct, inst->getKind());
-      EXPECT_EQ((const NominalTypeDescriptor*)&Global1,
-                inst->Description.get());
+      EXPECT_EQ(reinterpret_cast<const NominalTypeDescriptor *>(&Global1),
+                inst->Description);
 
       EXPECT_EQ(&Global2, fields[2]);
 
@@ -314,8 +318,8 @@ TEST(MetadataTest, getGenericMetadata) {
 
       auto fields = reinterpret_cast<void * const *>(inst);
       EXPECT_EQ(MetadataKind::Struct, inst->getKind());
-      EXPECT_EQ((const NominalTypeDescriptor*)&Global1,
-                inst->Description.get());
+      EXPECT_EQ(reinterpret_cast<const NominalTypeDescriptor *>(&Global1),
+                inst->Description);
 
       EXPECT_EQ(&Global3, fields[2]);
 

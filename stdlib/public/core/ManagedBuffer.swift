@@ -12,6 +12,8 @@
 
 import SwiftShims
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_bufferAllocate")
 internal func _swift_bufferAllocate(
   bufferType type: AnyClass,
@@ -30,11 +32,13 @@ internal func _swift_bufferAllocate(
 /// any live elements in the `deinit` of a subclass.
 /// - Note: Subclasses must not have any stored properties; any storage
 ///   needed should be included in `Header`.
+@_fixed_layout // FIXME(sil-serialize-all)
 open class ManagedBuffer<Header, Element> {
 
   /// Create a new instance of the most-derived class, calling
   /// `factory` on the partially-constructed object to generate
   /// an initial `Header`.
+  @_inlineable // FIXME(sil-serialize-all)
   public final class func create(
     minimumCapacity: Int,
     makingHeaderWith factory: (
@@ -59,6 +63,7 @@ open class ManagedBuffer<Header, Element> {
   /// This header may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "header" area when
   /// an instance is created.
+  @_inlineable // FIXME(sil-serialize-all)
   public final var capacity: Int {
     let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(self))
     let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
@@ -67,11 +72,15 @@ open class ManagedBuffer<Header, Element> {
     return realCapacity
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal final var firstElementAddress: UnsafeMutablePointer<Element> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self,
                                                          Element.self))
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal final var headerAddress: UnsafeMutablePointer<Header> {
     return UnsafeMutablePointer<Header>(Builtin.addressof(&header))
   }
@@ -81,6 +90,7 @@ open class ManagedBuffer<Header, Element> {
   ///
   /// - Note: This pointer is valid only for the duration of the
   ///   call to `body`.
+  @_inlineable // FIXME(sil-serialize-all)
   public final func withUnsafeMutablePointerToHeader<R>(
     _ body: (UnsafeMutablePointer<Header>) throws -> R
   ) rethrows -> R {
@@ -92,6 +102,7 @@ open class ManagedBuffer<Header, Element> {
   ///
   /// - Note: This pointer is valid only for the duration of the
   ///   call to `body`.
+  @_inlineable // FIXME(sil-serialize-all)
   public final func withUnsafeMutablePointerToElements<R>(
     _ body: (UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
@@ -103,6 +114,7 @@ open class ManagedBuffer<Header, Element> {
   ///
   /// - Note: These pointers are valid only for the duration of the
   ///   call to `body`.
+  @_inlineable // FIXME(sil-serialize-all)
   public final func withUnsafeMutablePointers<R>(
     _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
@@ -121,6 +133,8 @@ open class ManagedBuffer<Header, Element> {
   //===--- internal/private API -------------------------------------------===//
 
   /// Make ordinary initialization unavailable
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only initialize these by calling create")
   }
@@ -179,6 +193,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   ///   `bufferClass` is a non-`@objc` class with no declared stored
   ///   properties.  The `deinit` of `bufferClass` must destroy its
   ///   stored `Header` and any constructed `Element`s.
+  @_inlineable // FIXME(sil-serialize-all)
   public init(
     bufferClass: AnyClass,
     minimumCapacity: Int,
@@ -206,6 +221,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   ///
   /// - Precondition: `buffer` is an instance of a non-`@objc` class whose
   ///   `deinit` destroys its stored `Header` and any constructed `Element`s.
+  @_inlineable // FIXME(sil-serialize-all)
   public init(unsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._checkValidBufferClass(type(of: buffer))
 
@@ -220,6 +236,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// _debugPreconditions in _checkValidBufferClass for any array. Since we know
   /// for the _ContiguousArrayBuffer that this check must always succeed we omit
   /// it in this specialized constructor.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._sanityCheckValidBufferClass(type(of: buffer))
@@ -227,6 +244,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   }
 
   /// The stored `Header` instance.
+  @_inlineable // FIXME(sil-serialize-all)
   public var header: Header {
     addressWithNativeOwner {
       return (UnsafePointer(_headerPointer), _nativeBuffer)
@@ -237,6 +255,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   }
 
   /// Returns the object instance being used for storage.
+  @_inlineable // FIXME(sil-serialize-all)
   public var buffer: AnyObject {
     return Builtin.castFromNativeObject(_nativeBuffer)
   }
@@ -246,6 +265,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// This value may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "header" area when
   /// an instance is created.
+  @_inlineable // FIXME(sil-serialize-all)
   public var capacity: Int {
     return (_capacityInBytes &- _My._elementOffset) / MemoryLayout<Element>.stride
   }
@@ -255,6 +275,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   ///
   /// - Note: This pointer is valid only
   ///   for the duration of the call to `body`.
+  @_inlineable // FIXME(sil-serialize-all)
   public func withUnsafeMutablePointerToHeader<R>(
     _ body: (UnsafeMutablePointer<Header>) throws -> R
   ) rethrows -> R {
@@ -266,6 +287,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   ///
   /// - Note: This pointer is valid only for the duration of the
   ///   call to `body`.
+  @_inlineable // FIXME(sil-serialize-all)
   public func withUnsafeMutablePointerToElements<R>(
     _ body: (UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
@@ -277,6 +299,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   ///
   /// - Note: These pointers are valid only for the duration of the
   ///   call to `body`.
+  @_inlineable // FIXME(sil-serialize-all)
   public func withUnsafeMutablePointers<R>(
     _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
@@ -287,6 +310,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// Returns `true` iff `self` holds the only strong reference to its buffer.
   ///
   /// See `isUniquelyReferenced` for details.
+  @_inlineable // FIXME(sil-serialize-all)
   public mutating func isUniqueReference() -> Bool {
     return _isUnique(&_nativeBuffer)
   }
@@ -304,6 +328,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   ///   `bufferClass` is a non-`@objc` class with no declared stored
   ///   properties.  The `deinit` of `bufferClass` must destroy its
   ///   stored `Header` and any constructed `Element`s.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal init(
     bufferClass: AnyClass,
     minimumCapacity: Int
@@ -319,6 +345,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
 
   /// Internal version for use by _ContiguousArrayBuffer.init where we know that
   /// we have a valid buffer class and that the capacity is >= 0.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal init(
     _uncheckedBufferClass: AnyClass,
@@ -344,6 +371,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   ///
   /// - Note: It is an error to use the `header` property of the resulting
   ///   instance unless it has been initialized.
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal init(_ buffer: ManagedBuffer<Header, Element>) {
     _nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
@@ -351,6 +379,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
 
   internal typealias _My = ManagedBufferPointer
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static func _checkValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
@@ -368,6 +398,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     )
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static func _sanityCheckValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
@@ -386,6 +418,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   }
 
   /// The required alignment for allocations of this type, minus 1
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static var _alignmentMask: Int {
     return max(
       MemoryLayout<_HeapObject>.alignment,
@@ -393,16 +427,22 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   }
 
   /// The actual number of bytes allocated for this object.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal var _capacityInBytes: Int {
     return _swift_stdlib_malloc_size(_address)
   }
 
   /// The address of this instance in a convenient pointer-to-bytes form
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal var _address: UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_nativeBuffer))
   }
 
   /// Offset from the allocated storage for `self` to the stored `Header`
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static var _headerOffset: Int {
     _onFastPath()
     return _roundUp(
@@ -413,6 +453,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// An **unmanaged** pointer to the storage for the `Header`
   /// instance.  Not safe to use without _fixLifetime calls to
   /// guarantee it doesn't dangle
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal var _headerPointer: UnsafeMutablePointer<Header> {
     _onFastPath()
     return (_address + _My._headerOffset).assumingMemoryBound(
@@ -422,6 +464,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// An **unmanaged** pointer to the storage for `Element`s.  Not
   /// safe to use without _fixLifetime calls to guarantee it doesn't
   /// dangle.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal var _elementPointer: UnsafeMutablePointer<Element> {
     _onFastPath()
     return (_address + _My._elementOffset).assumingMemoryBound(
@@ -429,6 +473,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   }
 
   /// Offset from the allocated storage for `self` to the `Element` storage
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal static var _elementOffset: Int {
     _onFastPath()
     return _roundUp(
@@ -436,12 +482,14 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
       toAlignment: MemoryLayout<Element>.alignment)
   }
   
+  @_inlineable // FIXME(sil-serialize-all)
   public static func == (
     lhs: ManagedBufferPointer, rhs: ManagedBufferPointer
   ) -> Bool {
     return lhs._address == rhs._address
   }
 
+  @_versioned // FIXME(sil-serialize-all)
   internal var _nativeBuffer: Builtin.NativeObject
 }
 

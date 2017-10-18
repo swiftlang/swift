@@ -16,7 +16,6 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -25,6 +24,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ASTMangler.h"
@@ -621,6 +622,22 @@ TrailingWhereClause *TrailingWhereClause::create(
   unsigned size = totalSizeToAlloc<RequirementRepr>(requirements.size());
   void *mem = ctx.Allocate(size, alignof(TrailingWhereClause));
   return new (mem) TrailingWhereClause(whereLoc, requirements);
+}
+
+ArrayRef<GenericTypeParamType *>
+GenericContext::getInnermostGenericParamTypes() const {
+  if (auto sig = getGenericSignature())
+    return sig->getInnermostGenericParams();
+  else
+    return { };
+}
+
+/// Retrieve the generic requirements.
+ArrayRef<Requirement> GenericContext::getGenericRequirements() const {
+  if (auto sig = getGenericSignature())
+    return sig->getRequirements();
+  else
+    return { };
 }
 
 void GenericContext::setGenericParams(GenericParamList *params) {
@@ -1433,6 +1450,34 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
   llvm_unreachable("bad access semantics");
 }
 
+static bool hasPrivateOrFilePrivateFormalAccess(const ValueDecl *D) {
+  return D->hasAccess() && D->getFormalAccess() <= AccessLevel::FilePrivate;
+}
+
+/// Returns true if one of the ancestor DeclContexts of this ValueDecl is either
+/// marked private or fileprivate or is a local context.
+static bool isInPrivateOrLocalContext(const ValueDecl *D) {
+  const DeclContext *DC = D->getDeclContext();
+  if (!DC->isTypeContext()) {
+    assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
+           "unexpected context kind");
+    return DC->isLocalContext();
+  }
+
+  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (nominal == nullptr)
+    return false;
+
+  if (hasPrivateOrFilePrivateFormalAccess(nominal))
+    return true;
+  return isInPrivateOrLocalContext(nominal);
+}
+
+bool ValueDecl::isOutermostPrivateOrFilePrivateScope() const {
+  return hasPrivateOrFilePrivateFormalAccess(this) &&
+         !isInPrivateOrLocalContext(this);
+}
+
 bool AbstractStorageDecl::hasFixedLayout() const {
   // If we're in a nominal type, just query the type.
   auto *dc = getDeclContext();
@@ -1459,7 +1504,6 @@ bool AbstractStorageDecl::hasFixedLayout() const {
   switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Resilient:
     return false;
-  case ResilienceStrategy::Fragile:
   case ResilienceStrategy::Default:
     return true;
   }
@@ -1594,6 +1638,8 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
     return sdd->getOverriddenDecl();
   if (auto cd = dyn_cast<ConstructorDecl>(this))
     return cd->getOverriddenDecl();
+  if (auto at = dyn_cast<AssociatedTypeDecl>(this))
+    return at->getOverriddenDecl();
   return nullptr;
 }
 
@@ -2217,7 +2263,6 @@ bool NominalTypeDecl::hasFixedLayout() const {
   switch (getParentModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Resilient:
     return false;
-  case ResilienceStrategy::Fragile:
   case ResilienceStrategy::Default:
     return true;
   }
@@ -2234,72 +2279,6 @@ bool NominalTypeDecl::hasFixedLayout(ModuleDecl *M,
     return hasFixedLayout() || M == getModuleContext();
   }
   llvm_unreachable("bad resilience expansion");
-}
-
-
-bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
-  // Only known protocols can be derived.
-  auto knownProtocol = protocol->getKnownProtocolKind();
-  if (!knownProtocol)
-    return false;
-
-  if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
-    switch (*knownProtocol) {
-    // The presence of a raw type is an explicit declaration that
-    // the compiler should derive a RawRepresentable conformance.
-    case KnownProtocolKind::RawRepresentable:
-      return enumDecl->hasRawType();
-    
-    // Enums without associated values can implicitly derive Equatable and
-    // Hashable conformance.
-    case KnownProtocolKind::Equatable:
-    case KnownProtocolKind::Hashable:
-      return enumDecl->hasCases()
-          && enumDecl->hasOnlyCasesWithoutAssociatedValues();
-
-    // @objc enums can explicitly derive their _BridgedNSError conformance.
-    case KnownProtocolKind::BridgedNSError:
-      return isObjC() && enumDecl->hasCases()
-          && enumDecl->hasOnlyCasesWithoutAssociatedValues();
-
-    // Enums without associated values and enums with a raw type of String
-    // or Int can explicitly derive CodingKey conformance.
-    case KnownProtocolKind::CodingKey: {
-      Type rawType = enumDecl->getRawType();
-      if (rawType) {
-        auto parentDC = enumDecl->getDeclContext();
-        ASTContext &C = parentDC->getASTContext();
-
-        auto nominal = rawType->getAnyNominal();
-        return nominal == C.getStringDecl() || nominal == C.getIntDecl();
-      }
-
-      // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
-      // empty enumas are allowed to conform as well.
-      return enumDecl->hasOnlyCasesWithoutAssociatedValues();
-    }
-
-    default:
-      return false;
-    }
-  } else if (isa<StructDecl>(this) || isa<ClassDecl>(this)) {
-    // Structs and classes can explicitly derive Encodable and Decodable
-    // conformance (explicitly meaning we can synthesize an implementation if
-    // a type conforms manually).
-    if (*knownProtocol == KnownProtocolKind::Encodable ||
-        *knownProtocol == KnownProtocolKind::Decodable) {
-      // FIXME: This is not actually correct. We cannot promise to always
-      // provide a witness here for all structs and classes. Unfortunately,
-      // figuring out whether this is actually possible requires much more
-      // context -- a TypeChecker and the parent decl context at least -- and is
-      // tightly coupled to the logic within DerivedConformance.
-      // This unfortunately means that we expect a witness even if one will not
-      // be produced, which requires DerivedConformance::deriveCodable to output
-      // its own diagnostics.
-      return true;
-    }
-  }
-  return false;
 }
 
 void NominalTypeDecl::computeType() {
@@ -2582,7 +2561,11 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        TrailingWhereClause *trailingWhere)
     : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
       KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
-      TrailingWhere(trailingWhere) {}
+      TrailingWhere(trailingWhere) {
+
+  AssociatedTypeDeclBits.ComputedOverridden = false;
+  AssociatedTypeDeclBits.HasOverridden = false;
+}
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
@@ -2593,6 +2576,8 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
       KeywordLoc(keywordLoc), TrailingWhere(trailingWhere),
       Resolver(definitionResolver), ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
+  AssociatedTypeDeclBits.ComputedOverridden = false;
+  AssociatedTypeDeclBits.HasOverridden = false;
 }
 
 void AssociatedTypeDecl::computeType() {
@@ -2617,6 +2602,29 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
     endLoc = getInherited().back().getSourceRange().End;
   }
   return SourceRange(KeywordLoc, endLoc);
+}
+
+AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
+  auto overridden = getOverriddenDecls();
+
+  // If this declaration does not override any other declarations, it's
+  // the anchor.
+  if (overridden.empty()) return const_cast<AssociatedTypeDecl *>(this);
+
+  // Find the best anchor among the anchors of the overridden decls.
+  AssociatedTypeDecl *bestAnchor = nullptr;
+  for (auto assocType : overridden) {
+    auto anchor = assocType->getAssociatedTypeAnchor();
+    if (!bestAnchor || compare(anchor, bestAnchor) < 0)
+      bestAnchor = anchor;
+  }
+
+  return bestAnchor;
+}
+
+AssociatedTypeDecl *AssociatedTypeDecl::getOverriddenDecl() const {
+  auto overridden = getOverriddenDecls();
+  return overridden.empty() ? nullptr : overridden.front();
 }
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
@@ -2992,6 +3000,8 @@ ProtocolDecl::getInheritedProtocols() const {
   // We shouldn't need this, but it shows up in recursive invocations.
   if (!isRequirementSignatureComputed()) {
     SmallPtrSet<ProtocolDecl *, 4> known;
+    if (auto resolver = getASTContext().getLazyResolver())
+      resolver->resolveInheritanceClause(const_cast<ProtocolDecl *>(this));
     for (auto inherited : getInherited()) {
       if (auto type = inherited.getType()) {
         // Only protocols can appear in the inheritance clause
@@ -3016,6 +3026,19 @@ ProtocolDecl::getInheritedProtocols() const {
     if (req.getKind() == RequirementKind::Conformance &&
         req.getFirstType()->isEqual(selfType))
       result.push_back(req.getSecondType()->castTo<ProtocolType>()->getDecl());
+  }
+  return result;
+}
+
+llvm::TinyPtrVector<AssociatedTypeDecl *>
+ProtocolDecl::getAssociatedTypeMembers() const {
+  llvm::TinyPtrVector<AssociatedTypeDecl *> result;
+  if (!isObjC()) {
+    for (auto member : getMembers()) {
+      if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
+        result.push_back(ATD);
+      }
+    }
   }
   return result;
 }
@@ -3310,6 +3333,10 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
   ProtocolDeclBits.ExistentialTypeSupportedValid = true;
   ProtocolDeclBits.ExistentialTypeSupported = true;
 
+  // ObjC protocols can always be existential.
+  if (isObjC())
+    return true;
+
   // Resolve the protocol's type.
   if (resolver && !hasInterfaceType())
     resolver->resolveDeclSignature(this);
@@ -3399,27 +3426,9 @@ void ProtocolDecl::createGenericParamsIfMissing() {
 void ProtocolDecl::computeRequirementSignature() {
   assert(!RequirementSignature && "already computed requirement signature");
 
-  auto module = getParentModule();
-
-  auto selfType = getSelfInterfaceType()->castTo<GenericTypeParamType>();
-  auto requirement =
-    Requirement(RequirementKind::Conformance, selfType,
-                getDeclaredInterfaceType());
-
-  GenericSignatureBuilder builder(getASTContext(),
-                                  LookUpConformanceInModule(module));
-  builder.addGenericParameter(selfType);
-  auto selfPA =
-      builder.resolveArchetype(selfType, ArchetypeResolutionKind::WellFormed);
-
-  builder.addRequirement(
-         requirement,
-         GenericSignatureBuilder::RequirementSource
-           ::forRequirementSignature(selfPA, this),
-         nullptr);
-
   // Compute and record the signature.
-  auto requirementSig = builder.computeGenericSignature(SourceLoc());
+  auto requirementSig =
+    GenericSignatureBuilder::computeRequirementSignature(this);
   RequirementSignature = requirementSig->getRequirements().data();
   assert(RequirementSignature != nullptr);
   NumRequirementsInSignature = requirementSig->getRequirements().size();
@@ -4220,7 +4229,9 @@ ParamDecl::ParamDecl(Specifier specifier,
 ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
   : VarDecl(DeclKind::Param, /*IsStatic*/false, PD->getSpecifier(),
             /*IsCaptureList*/false, PD->getNameLoc(), PD->getName(),
-            PD->hasType() && withTypes? PD->getType() : Type(),
+            PD->hasType() && withTypes
+              ? PD->getType()->getInOutObjectType()
+              : Type(),
             PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
@@ -4233,7 +4244,7 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
     typeLoc.setType(Type());
 
   if (withTypes && PD->hasInterfaceType())
-    setInterfaceType(PD->getInterfaceType());
+    setInterfaceType(PD->getInterfaceType()->getInOutObjectType());
 }
 
 
@@ -5297,6 +5308,29 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // get the kind out of the finder.
   auto Kind = finder.Kind;
 
+  auto *NTD = getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+
+  // Protocol extension and enum initializers are always delegating.
+  if (Kind == BodyInitKind::None) {
+    if (isa<ProtocolDecl>(NTD) || isa<EnumDecl>(NTD)) {
+      Kind = BodyInitKind::Delegating;
+    }
+  }
+
+  // Struct initializers that cannot see the layout of the struct type are
+  // always delegating. This occurs if the struct type is not fixed layout,
+  // and the constructor is either inlinable or defined in another module.
+  //
+  // FIXME: Figure out the right condition to use here that does not depend
+  // on the -enable-resilience flag, and make it conditional on
+  // -swift-version 5 instead, once the "disallow memberwise cross-module
+  // initializer" proposal lands.
+  if (Kind == BodyInitKind::None) {
+    if (isa<StructDecl>(NTD) &&
+        !NTD->hasFixedLayout(getParentModule(), getResilienceExpansion())) {
+      Kind = BodyInitKind::Delegating;
+    }
+  }
 
   // If we didn't find any delegating or chained initializers, check whether
   // the initializer was explicitly marked 'convenience'.

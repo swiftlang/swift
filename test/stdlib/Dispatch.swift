@@ -115,6 +115,31 @@ DispatchAPI.test("DispatchTime comparisons") {
     }
 }
 
+DispatchAPI.test("DispatchTime.create") {
+	var info = mach_timebase_info_data_t(numer: 1, denom: 1)
+	mach_timebase_info(&info)
+	let scales = info.numer != info.denom
+
+	// Simple tests for non-overflow behavior
+	var time = DispatchTime(uptimeNanoseconds: 0)
+	expectEqual(time.uptimeNanoseconds, 0)
+
+	time = DispatchTime(uptimeNanoseconds: 15 * NSEC_PER_SEC)
+	expectEqual(time.uptimeNanoseconds, 15 * NSEC_PER_SEC)
+
+	// On platforms where the timebase scale is not 1, the next two cases
+	// overflow and become DISPATCH_TIME_FOREVER (UInt64.max) instead of trapping.
+	time = DispatchTime(uptimeNanoseconds: UInt64.max - 1)
+	expectEqual(time.uptimeNanoseconds, scales ? UInt64.max : UInt64.max - UInt64(1))
+
+	time = DispatchTime(uptimeNanoseconds: UInt64.max / 2) 
+	expectEqual(time.uptimeNanoseconds, scales ? UInt64.max : UInt64.max / 2)
+
+	// UInt64.max must always be returned as UInt64.max.
+	time = DispatchTime(uptimeNanoseconds: UInt64.max)
+	expectEqual(time.uptimeNanoseconds, UInt64.max)
+}
+
 DispatchAPI.test("DispatchTime.addSubtract") {
 	var then = DispatchTime.now() + Double.infinity
 	expectEqual(DispatchTime.distantFuture, then)

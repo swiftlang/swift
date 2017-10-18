@@ -172,19 +172,20 @@ void SILInstruction::dropAllReferences() {
   }
 }
 
-ArrayRef<ValueBase> SILInstruction::getResultsImpl() const {
+SILInstructionResultArray SILInstruction::getResultsImpl() const {
   switch (getKind()) {
 #define NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
   case SILInstructionKind::ID:
 #include "swift/SIL/SILNodes.def"
-    return {};
+    return SILInstructionResultArray();
 
 #define SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
   case SILInstructionKind::ID:
 #include "swift/SIL/SILNodes.def"
-    return static_cast<const SingleValueInstruction *>(this)->getResultsImpl();
+    return SILInstructionResultArray(
+        static_cast<const SingleValueInstruction *>(this));
 
-  // add any multi-result instructions here...
+    // add any multi-result instructions here...
   }
   llvm_unreachable("bad kind");
 }
@@ -720,10 +721,6 @@ namespace {
       return true;
     }
 
-    bool visitIsNonnullInst(IsNonnullInst *RHS) {
-      return true;
-    }
-      
     bool visitBridgeObjectToRefInst(BridgeObjectToRefInst *X) {
       return true;
     }
@@ -749,6 +746,27 @@ namespace {
 
     bool visitClassMethodInst(ClassMethodInst *RHS) {
       auto *X = cast<ClassMethodInst>(LHS);
+      return X->getMember()  == RHS->getMember() &&
+             X->getOperand() == RHS->getOperand() &&
+             X->getType()    == RHS->getType();
+    }
+
+    bool visitSuperMethodInst(SuperMethodInst *RHS) {
+      auto *X = cast<SuperMethodInst>(LHS);
+      return X->getMember()  == RHS->getMember() &&
+             X->getOperand() == RHS->getOperand() &&
+             X->getType()    == RHS->getType();
+    }
+
+    bool visitObjCMethodInst(ObjCMethodInst *RHS) {
+      auto *X = cast<ObjCMethodInst>(LHS);
+      return X->getMember()  == RHS->getMember() &&
+             X->getOperand() == RHS->getOperand() &&
+             X->getType()    == RHS->getType();
+    }
+
+    bool visitObjCSuperMethodInst(ObjCSuperMethodInst *RHS) {
+      auto *X = cast<ObjCSuperMethodInst>(LHS);
       return X->getMember()  == RHS->getMember() &&
              X->getOperand() == RHS->getOperand() &&
              X->getType()    == RHS->getType();
@@ -877,7 +895,7 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
                                 : MemoryBehavior::MayHaveSideEffects;
 
     // Handle LLVM intrinsic functions.
-    const IntrinsicInfo & IInfo = BI->getIntrinsicInfo();
+    const IntrinsicInfo &IInfo = BI->getIntrinsicInfo();
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
       // Read-only.
       if (IInfo.hasAttribute(llvm::Attribute::ReadOnly) &&
@@ -1152,4 +1170,102 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   }
 
   llvm_unreachable("Unhandled ReleasingBehavior in switch.");
+}
+
+//===----------------------------------------------------------------------===//
+//                         SILInstructionResultArray
+//===----------------------------------------------------------------------===//
+
+SILInstructionResultArray::SILInstructionResultArray(
+    const SingleValueInstruction *SVI)
+    : Pointer(), Size(1) {
+  // Make sure that even though we are munging things, we are able to get back
+  // the original value, types, and operands.
+  SILValue originalValue(SVI);
+  SILType originalType = SVI->getType();
+  (void)originalValue;
+  (void)originalType;
+
+  // *PLEASE READ BEFORE CHANGING*
+  //
+  // Since SingleValueInstruction is both a ValueBase and a SILInstruction, but
+  // SILInstruction is the first parent, we need to ensure that our ValueBase *
+  // pointer is properly offset. by first static casting to ValueBase and then
+  // going back to a uint8_t *.
+  auto *Value = static_cast<const ValueBase *>(SVI);
+  assert(uintptr_t(Value) != uintptr_t(SVI) &&
+         "Expected value to be offset from SVI since it is not the first "
+         "multi-inheritence parent");
+  Pointer = reinterpret_cast<const uint8_t *>(Value);
+
+  assert(originalValue == (*this)[0] &&
+         "Wrong value returned for single result");
+  assert(originalType == (*this)[0]->getType());
+
+  auto ValueRange = getValues();
+  (void)ValueRange;
+  assert(1 == std::distance(ValueRange.begin(), ValueRange.end()));
+  assert(originalValue == *ValueRange.begin());
+
+  auto TypedRange = getTypes();
+  (void)TypedRange;
+  assert(1 == std::distance(TypedRange.begin(), TypedRange.end()));
+  assert(originalType == *TypedRange.begin());
+
+  SILInstructionResultArray Copy = *this;
+  (void)Copy;
+  assert(Copy.hasSameTypes(*this));
+  assert(Copy == *this);
+}
+
+SILValue SILInstructionResultArray::operator[](size_t Index) const {
+  assert(Index < Size && "Index out of bounds");
+  // Today we only have single instruction results so offset will always be
+  // zero. Once we have multiple instruction results, this will be equal to
+  // sizeof(MultipleValueInstructionResult)*Index. This is safe even to do with
+  // SingleValueInstruction since index will always be zero for the offset.
+  size_t Offset = 0;
+  return SILValue(reinterpret_cast<const ValueBase *>(&Pointer[Offset]));
+}
+
+bool SILInstructionResultArray::hasSameTypes(
+    const SILInstructionResultArray &rhs) {
+  auto &lhs = *this;
+  if (lhs.size() != rhs.size())
+    return false;
+  for (unsigned i : indices(lhs)) {
+    if (lhs[i]->getType() != rhs[i]->getType())
+      return false;
+  }
+  return true;
+}
+
+bool SILInstructionResultArray::
+operator==(const SILInstructionResultArray &other) {
+  if (size() != other.size())
+    return false;
+  for (auto i : indices(*this))
+    if ((*this)[i] != other[i])
+      return false;
+  return true;
+}
+
+SILInstructionResultArray::type_range
+SILInstructionResultArray::getTypes() const {
+  std::function<SILType(SILValue)> F = [](SILValue V) -> SILType {
+    return V->getType();
+  };
+  return {llvm::map_iterator(begin(), F), llvm::map_iterator(end(), F)};
+}
+
+SILInstructionResultArray::iterator SILInstructionResultArray::begin() const {
+  return iterator(*this, getStartOffset());
+}
+
+SILInstructionResultArray::iterator SILInstructionResultArray::end() const {
+  return iterator(*this, getEndOffset());
+}
+
+SILInstructionResultArray::range SILInstructionResultArray::getValues() const {
+  return {begin(), end()};
 }

@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let PrimsSplit = BenchmarkInfo(
+  name: "PrimsSplit",
+  runFunction: run_PrimsSplit,
+  tags: [.validation, .algorithm])
+
 @inline(never)
 public func run_PrimsSplit(_ N: Int) {
   for _ in 1...5*N {

@@ -641,6 +641,10 @@ def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts">;
 
+def profile_use : CommaJoined<["-"], "profile-use=">,
+  Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<profdata>">,
+  HelpText<"Supply a profdata file to enable profile-guided optimization">;
+
 def profile_coverage_mapping : Flag<["-"], "profile-coverage-mapping">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate coverage data for use with profiled execution counts">;

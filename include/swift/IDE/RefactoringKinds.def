@@ -34,6 +34,8 @@ CURSOR_REFACTORING(FillProtocolStub, "Add Missing Protocol Requirements", fillst
 
 CURSOR_REFACTORING(ExpandDefault, "Expand Default", expand.default)
 
+CURSOR_REFACTORING(ExpandSwitchCases, "Expand Switch Cases", expand.switch.cases)
+
 CURSOR_REFACTORING(LocalizeString, "Localize String", localize.string)
 
 CURSOR_REFACTORING(SimplifyNumberLiteral, "Simplify Long Number Literal", simplify.long.number.literal)
@@ -41,6 +43,8 @@ CURSOR_REFACTORING(SimplifyNumberLiteral, "Simplify Long Number Literal", simpli
 CURSOR_REFACTORING(CollapseNestedIfExpr, "Collapse Nested If Expression", collapse.nested.if.expr)
 
 CURSOR_REFACTORING(ConvertToDoCatch, "Convert To Do/Catch", convert.do.catch)
+
+CURSOR_REFACTORING(TrailingClosure, "Convert To Trailing Closure", trailingclosure)
 
 RANGE_REFACTORING(ExtractExpr, "Extract Expression", extract.expr)
 

@@ -30,7 +30,7 @@ typealias DS<T> = MyType<String, T>
 
 typealias BadA<T : Int> = MyType<String, T>  // expected-error {{inheritance from non-protocol, non-class type 'Int'}}
 
-typealias BadB<T where T == Int> = MyType<String, T>  // expected-error {{associated types may not have a generic parameter list}}
+typealias BadB<T where T == Int> = MyType<String, T>  // expected-error {{associated types must not have a generic parameter list}}
 // expected-error@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
 
 typealias BadC<T,T> = MyType<String, T>  // expected-error {{definition conflicts with previous value}}
@@ -338,10 +338,10 @@ class AnotherGeneric<T> {}
 
 protocol P {
   associatedtype A
-  typealias G1<T> = MyType<Self, T> // expected-note {{did you mean 'G1'?}}
-  typealias G2<T> = MyType<T, A> // expected-note {{did you mean 'G2'?}}
-  typealias G3<T> = () -> () // expected-note {{did you mean 'G3'?}}
-  typealias G4<T> = (T) -> () // expected-note {{did you mean 'G4'?}}
+  typealias G1<T> = MyType<Self, T>
+  typealias G2<T> = MyType<T, A>
+  typealias G3<T> = () -> ()
+  typealias G4<T> = (T) -> ()
 
   func firstRequirement(_: G1<Int>)
   func secondRequirement(_: G2<Int>)
@@ -368,19 +368,19 @@ struct S : P {
   func fourthRequirement(_: G4<Int>) {}
 
   func firstRequirementGeneric<T>(_: G1<T>) {
-    _ = G1<T>.self // FIXME // expected-error {{use of unresolved identifier 'G1'}}
+    _ = G1<T>.self
   }
 
   func secondRequirementGeneric<T>(_: G2<T>) {
-    _ = G2<T>.self // FIXME // expected-error {{use of unresolved identifier 'G2'}}
+    _ = G2<T>.self
   }
 
   func thirdRequirementGeneric<T>(_: G3<T>, _: T) {
-    _ = G3<T>.self // FIXME // expected-error {{use of unresolved identifier 'G3'}}
+    _ = G3<T>.self
   }
 
   func fourthRequirementGeneric<T>(_: G4<T>) {
-    _ = G4<T>.self // FIXME // expected-error {{use of unresolved identifier 'G4'}}
+    _ = G4<T>.self
   }
 
   func expressionContext() {

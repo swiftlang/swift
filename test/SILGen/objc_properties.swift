@@ -15,7 +15,7 @@ class A {
 
   // Regular methods go through the @objc property accessors.
   // CHECK-LABEL: sil hidden @_T015objc_properties1AC6method{{[_0-9a-zA-Z]*}}F
-  // CHECK: class_method {{.*}} #A.prop
+  // CHECK: objc_method {{.*}} #A.prop
   func method(_ x: Int) {
     prop = x
     method(prop)
@@ -45,7 +45,7 @@ class A {
     // CHECK: end_borrow [[BORROWED_SELF]] from [[SELF]]
     prop = x
 
-    // CHECK: class_method
+    // CHECK: objc_method
     // CHECK: apply
     other.prop = x
   }
@@ -62,25 +62,25 @@ class A {
 
 // CHECK-LABEL: sil hidden @_T015objc_properties11testPropGet{{[_0-9a-zA-Z]*}}F
 func testPropGet(_ a: A) -> Int {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.prop!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
   return a.prop
 }
 
 // CHECK-LABEL: sil hidden @_T015objc_properties11testPropSet{{[_0-9a-zA-Z]*}}F
 func testPropSet(_ a: A, i: Int) {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.prop!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
   a.prop = i
 }
 
 // CHECK-LABEL: sil hidden @_T015objc_properties19testComputedPropGet{{[_0-9a-zA-Z]*}}F
 func testComputedPropGet(_ a: A) -> Int {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.computedProp!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
   return a.computedProp
 }
 
 // CHECK-LABEL: sil hidden @_T015objc_properties19testComputedPropSet{{[_0-9a-zA-Z]*}}F
 func testComputedPropSet(_ a: A, i: Int) {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.computedProp!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
   a.computedProp = i
 }
 
@@ -89,12 +89,12 @@ class B : A {
   @objc override var computedProp: Int {
     // CHECK-LABEL: sil hidden @_T015objc_properties1BC12computedPropSivg : $@convention(method) (@guaranteed B) -> Int
     get {
-      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
+      // CHECK: objc_super_method [[SELF:%[0-9]+]] : $B, #A.computedProp!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
       return super.computedProp
     }
     // CHECK-LABEL: sil hidden @_T015objc_properties1BC12computedPropSivs : $@convention(method) (Int, @guaranteed B) -> ()
     set(value) {
-      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
+      // CHECK: objc_super_method [[SELF:%[0-9]+]] : $B, #A.computedProp!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
       super.computedProp = value
     }
   }
@@ -106,7 +106,7 @@ class TestNSCopying {
   // CHECK-LABEL: sil hidden [transparent] @_T015objc_properties13TestNSCopyingC8propertySo8NSStringCvs : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
   // CHECK: bb0([[ARG0:%.*]] : $NSString, [[ARG1:%.*]] : $TestNSCopying):
   // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-  // CHECK:   class_method [volatile] [[BORROWED_ARG0]] : $NSString, #NSString.copy!1.foreign
+  // CHECK:   objc_method [[BORROWED_ARG0]] : $NSString, #NSString.copy!1.foreign
   @NSCopying var property : NSString
 
   @NSCopying var optionalProperty : NSString?

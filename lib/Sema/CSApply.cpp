@@ -20,6 +20,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -160,6 +161,8 @@ static DeclTy *findNamedWitnessImpl(
     if (!conformance)
       return nullptr;
   }
+  assert(conformance->getConditionalRequirements().empty() &&
+         "unhandled conditional conformance");
 
   // For a type with dependent conformance, just return the requirement from
   // the protocol. There are no protocol conformance tables.
@@ -471,6 +474,9 @@ namespace {
               tc.conformsToProtocol(baseTy, proto, cs.DC,
                                     (ConformanceCheckFlags::InExpression|
                                          ConformanceCheckFlags::Used));
+            assert((!conformance ||
+                    conformance->getConditionalRequirements().empty()) &&
+                   "unhandled conditional conformance");
             if (conformance && conformance->isConcrete()) {
               if (auto witness =
                         conformance->getConcrete()->getWitnessDecl(decl, &tc)) {
@@ -1593,6 +1599,9 @@ namespace {
       FuncDecl *fn = nullptr;
 
       if (bridgedToObjectiveCConformance) {
+        assert(bridgedToObjectiveCConformance->getConditionalRequirements()
+                   .empty() &&
+               "cannot conditionally conform to _BridgedToObjectiveC");
         // The conformance to _BridgedToObjectiveC is statically known.
         // Retrieve the bridging operation to be used if a static conformance
         // to _BridgedToObjectiveC can be proven.
@@ -2232,6 +2241,8 @@ namespace {
         tc.conformsToProtocol(conformingType, proto, cs.DC,
                               ConformanceCheckFlags::InExpression);
       assert(conformance && "object literal type conforms to protocol");
+      assert(conformance->getConditionalRequirements().empty() &&
+             "unhandled conditional conformance");
 
       Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
                                                 ctx);
@@ -2681,6 +2692,8 @@ namespace {
         tc.conformsToProtocol(arrayTy, arrayProto, cs.DC,
                               ConformanceCheckFlags::InExpression);
       assert(conformance && "Type does not conform to protocol?");
+      assert(conformance->getConditionalRequirements().empty() &&
+             "unhandled conditional conformance");
 
       // Call the witness that builds the array literal.
       // FIXME: callWitness() may end up re-doing some work we already did
@@ -2762,6 +2775,9 @@ namespace {
                               ConformanceCheckFlags::InExpression);
       if (!conformance)
         return nullptr;
+
+      assert(conformance->getConditionalRequirements().empty() &&
+             "unhandled conditional conformance");
 
       // Call the witness that builds the dictionary literal.
       // FIXME: callWitness() may end up re-doing some work we already did
@@ -4071,9 +4087,14 @@ namespace {
           
           auto dc = subscript->getInnermostDeclContext();
           SmallVector<Substitution, 4> subs;
+          SubstitutionMap subMap;
+          auto indexType = subscript->getIndicesInterfaceType();
+
           if (auto sig = dc->getGenericSignatureOfContext()) {
             // Compute substitutions to refer to the member.
             solution.computeSubstitutions(sig, locator, subs);
+            subMap = sig->getSubstitutionMap(subs);
+            indexType = indexType.subst(subMap);
           }
           
           auto resolvedTy = foundDecl->openedType->castTo<AnyFunctionType>()
@@ -4082,9 +4103,13 @@ namespace {
           
           auto ref = ConcreteDeclRef(cs.getASTContext(), subscript, subs);
           
+          // Coerce the indices to the type the subscript expects.
+          auto indexExpr = coerceToType(origComponent.getIndexExpr(),
+                                        indexType,
+                                        locator);
+          
           component = KeyPathExpr::Component
-            ::forSubscriptWithPrebuiltIndexExpr(ref,
-                                            origComponent.getIndexExpr(),
+            ::forSubscriptWithPrebuiltIndexExpr(ref, indexExpr,
                                             origComponent.getSubscriptLabels(),
                                             resolvedTy,
                                             origComponent.getLoc(),
@@ -4147,7 +4172,7 @@ namespace {
       if (didOptionalChain &&
           baseTy &&
           !baseTy->hasUnresolvedType() &&
-          !baseTy->isEqual(leafTy)) {
+          !baseTy->getWithoutSpecifierType()->isEqual(leafTy)) {
         assert(leafTy->getAnyOptionalObjectType()
                      ->isEqual(baseTy->getWithoutSpecifierType()));
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
@@ -5072,16 +5097,11 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 
   // Handle existential coercions that implicitly look through ImplicitlyUnwrappedOptional<T>.
   if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
-    auto unwrappedExpr
-      = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
-    
-    auto unwrappedFromType = cs.getType(unwrappedExpr);
-    assert(!unwrappedFromType->is<AnyMetatypeType>());
-
     // FIXME: Hack. We shouldn't try to coerce existential when there is no
     // existential upcast to perform.
-    if (unwrappedFromType->isEqual(toType))
-      return unwrappedExpr;
+    if (ty->isEqual(toType)) {
+      return coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
+    }
   }
 
   Type fromInstanceType = fromType;
@@ -6063,6 +6083,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                               (ConformanceCheckFlags::InExpression |
                                ConformanceCheckFlags::Used));
       assert(conformance && "must conform to Hashable");
+      assert(conformance->getConditionalRequirements().empty() &&
+             "unhandled conditional conformance");
+
       return cs.cacheType(
           new (tc.Context) AnyHashableErasureExpr(expr, toType, *conformance));
     }
@@ -6294,24 +6317,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // Coercion from one function type to another, this produces a
     // FunctionConversionExpr in its full generality.
     if (auto fromFunc = fromType->getAs<FunctionType>()) {
-      // If toType is a NoEscape or NoReturn function type and the expression is
-      // a ClosureExpr, propagate these bits onto the ClosureExpr.  Do not
-      // *remove* any bits that are already on the closure though.
-      // Note that in this case, we do not want to propagate the 'throws' bit
-      // to the closure type, as the closure has already been analyzed for
-      // throwing subexpressions. We also don't want to change the convention
-      // of the original closure.
+      // If we have a ClosureExpr, then we can safely propagate the 'no escape'
+      // bit to the closure without invalidating prior analysis.
       auto fromEI = fromFunc->getExtInfo(), toEI = toFunc->getExtInfo();
       if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
-        swift::AnyFunctionType::ExtInfo newEI(fromEI.getRepresentation(),
-                                        toEI.isAutoClosure(),
-                                        toEI.isNoEscape() | fromEI.isNoEscape(),
-                                        toEI.throws() & fromEI.throws());
-        auto newToType = FunctionType::get(fromFunc->getInput(),
-                                           fromFunc->getResult(), newEI);
-        if (applyTypeToClosureExpr(cs, expr, newToType)) {
-          fromFunc = newToType;
-          // Propagating the bits in might have satisfied the entire
+        auto newFromFunc = FunctionType::get(fromFunc->getInput(),
+                                             fromFunc->getResult(),
+                                             fromEI.withNoEscape());
+        if (applyTypeToClosureExpr(cs, expr, newFromFunc)) {
+          fromFunc = newFromFunc;
+          // Propagating the 'no escape' bit might have satisfied the entire
           // conversion.  If so, we're done, otherwise keep converting.
           if (fromFunc->isEqual(toType))
             return expr;
@@ -6500,6 +6515,9 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
       (builtinConformance =
          tc.conformsToProtocol(type, builtinProtocol, cs.DC,
                                ConformanceCheckFlags::InExpression))) {
+    assert(builtinConformance->getConditionalRequirements().empty() &&
+           "conditional conformance to builtins not handled");
+
     // Find the builtin argument type we'll use.
     Type argType;
     if (builtinLiteralType.is<Type>())
@@ -6554,6 +6572,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   auto conformance = tc.conformsToProtocol(type, protocol, cs.DC,
                                            ConformanceCheckFlags::InExpression);
   assert(conformance && "must conform to literal protocol");
+  assert(conformance->getConditionalRequirements().empty() &&
+         "unexpected conditional requirements");
 
   // Figure out the (non-builtin) argument type if there is one.
   Type argType;
@@ -6647,6 +6667,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
       (builtinConformance =
          tc.conformsToProtocol(type, builtinProtocol, cs.DC,
                                ConformanceCheckFlags::InExpression))) {
+    assert(builtinConformance->getConditionalRequirements().empty() &&
+           "conditional conformance to builtins not handled");
     // Find the witness that we'll use to initialize the type via a builtin
     // literal.
     auto witness = findNamedWitnessImpl<AbstractFunctionDecl>(
@@ -6695,6 +6717,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   auto conformance = tc.conformsToProtocol(type, protocol, cs.DC,
                                            ConformanceCheckFlags::InExpression);
   assert(conformance && "must conform to literal protocol");
+  assert(conformance->getConditionalRequirements().empty() &&
+         "unexpected conditional requirements");
 
   // Dig out the literal type and perform a builtin literal conversion to it.
   if (!literalType.empty()) {

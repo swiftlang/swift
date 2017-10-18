@@ -1086,26 +1086,32 @@ BranchInst *BranchInst::create(SILDebugLocation Loc,
 CondBranchInst::CondBranchInst(SILDebugLocation Loc, SILValue Condition,
                                SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
                                ArrayRef<SILValue> Args, unsigned NumTrue,
-                               unsigned NumFalse)
-    : InstructionBase(Loc),
-      DestBBs{{this, TrueBB}, {this, FalseBB}}, NumTrueArgs(NumTrue),
-      NumFalseArgs(NumFalse), Operands(this, Args, Condition) {
+                               unsigned NumFalse, ProfileCounter TrueBBCount,
+                               ProfileCounter FalseBBCount)
+    : InstructionBase(Loc), DestBBs{{this, TrueBB, TrueBBCount},
+                                    {this, FalseBB, FalseBBCount}},
+      NumTrueArgs(NumTrue), NumFalseArgs(NumFalse),
+      Operands(this, Args, Condition) {
   assert(Args.size() == (NumTrueArgs + NumFalseArgs) &&
          "Invalid number of args");
   assert(TrueBB != FalseBB && "Identical destinations");
 }
 
-CondBranchInst *CondBranchInst::create(SILDebugLocation Loc,
-                                       SILValue Condition,
+CondBranchInst *CondBranchInst::create(SILDebugLocation Loc, SILValue Condition,
                                        SILBasicBlock *TrueBB,
-                                       SILBasicBlock *FalseBB, SILFunction &F) {
-  return create(Loc, Condition, TrueBB, {}, FalseBB, {}, F);
+                                       SILBasicBlock *FalseBB,
+                                       ProfileCounter TrueBBCount,
+                                       ProfileCounter FalseBBCount,
+                                       SILFunction &F) {
+  return create(Loc, Condition, TrueBB, {}, FalseBB, {}, TrueBBCount,
+                FalseBBCount, F);
 }
 
 CondBranchInst *
 CondBranchInst::create(SILDebugLocation Loc, SILValue Condition,
                        SILBasicBlock *TrueBB, ArrayRef<SILValue> TrueArgs,
                        SILBasicBlock *FalseBB, ArrayRef<SILValue> FalseArgs,
+                       ProfileCounter TrueBBCount, ProfileCounter FalseBBCount,
                        SILFunction &F) {
   SmallVector<SILValue, 4> Args;
   Args.append(TrueArgs.begin(), TrueArgs.end());
@@ -1115,7 +1121,8 @@ CondBranchInst::create(SILDebugLocation Loc, SILValue Condition,
                               decltype(Operands)::getExtraSize(Args.size()),
                             alignof(CondBranchInst));
   return ::new (Buffer) CondBranchInst(Loc, Condition, TrueBB, FalseBB, Args,
-                                       TrueArgs.size(), FalseArgs.size());
+                                       TrueArgs.size(), FalseArgs.size(),
+                                       TrueBBCount, FalseBBCount);
 }
 
 OperandValueArrayRef CondBranchInst::getTrueArgs() const {
@@ -1329,9 +1336,10 @@ getCaseOperands(ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
 }
 
 SelectEnumInstBase::SelectEnumInstBase(
-    SILInstructionKind Kind, SILDebugLocation Loc,
-    SILType Ty, SILValue Operand, SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues)
+    SILInstructionKind Kind, SILDebugLocation Loc, SILType Ty, SILValue Operand,
+    SILValue DefaultValue,
+    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+    Optional<ArrayRef<ProfileCounter>> CaseCounts, ProfileCounter DefaultCount)
     : SelectInstBase(Kind, Loc, Ty, CaseValues.size(), bool(DefaultValue),
                      getCaseOperands(CaseValues, DefaultValue), Operand) {
   // Initialize the case and successor arrays.
@@ -1344,42 +1352,48 @@ SelectEnumInstBase::SelectEnumInstBase(
 template <typename SELECT_ENUM_INST>
 SELECT_ENUM_INST *SelectEnumInstBase::createSelectEnum(
     SILDebugLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-    SILFunction &F) {
+    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILFunction &F,
+    Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    ProfileCounter DefaultCount) {
   // Allocate enough room for the instruction with tail-allocated
   // EnumElementDecl and operand arrays. There are `CaseBBs.size()` decls
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` values.
   unsigned numCases = CaseValues.size();
 
   void *buf = F.getModule().allocateInst(
-    sizeof(SELECT_ENUM_INST) + sizeof(EnumElementDecl*) * numCases
-     + TailAllocatedOperandList<1>::getExtraSize(numCases + (bool)DefaultValue),
-    alignof(SELECT_ENUM_INST));
-  return ::new (buf) SELECT_ENUM_INST(Loc,Operand,Ty,DefaultValue,CaseValues);
+      sizeof(SELECT_ENUM_INST) + sizeof(EnumElementDecl *) * numCases +
+          sizeof(ProfileCounter) + TailAllocatedOperandList<1>::getExtraSize(
+                                       numCases + (bool)DefaultValue),
+      alignof(SELECT_ENUM_INST));
+  return ::new (buf) SELECT_ENUM_INST(Loc, Operand, Ty, DefaultValue,
+                                      CaseValues, CaseCounts, DefaultCount);
 }
 
 SelectEnumInst *SelectEnumInst::create(
-    SILDebugLocation Loc, SILValue Operand, SILType Type,
-    SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-    SILFunction &F) {
+    SILDebugLocation Loc, SILValue Operand, SILType Type, SILValue DefaultValue,
+    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILFunction &F,
+    Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    ProfileCounter DefaultCount) {
   return createSelectEnum<SelectEnumInst>(Loc, Operand, Type, DefaultValue,
-                                          CaseValues, F);
+                                          CaseValues, F, CaseCounts,
+                                          DefaultCount);
 }
 
 SelectEnumAddrInst *SelectEnumAddrInst::create(
-    SILDebugLocation Loc, SILValue Operand, SILType Type,
-    SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-    SILFunction &F) {
+    SILDebugLocation Loc, SILValue Operand, SILType Type, SILValue DefaultValue,
+    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILFunction &F,
+    Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    ProfileCounter DefaultCount) {
   return createSelectEnum<SelectEnumAddrInst>(Loc, Operand, Type, DefaultValue,
-                                              CaseValues, F);
+                                              CaseValues, F, CaseCounts,
+                                              DefaultCount);
 }
 
 SwitchEnumInstBase::SwitchEnumInstBase(
     SILInstructionKind Kind, SILDebugLocation Loc, SILValue Operand,
     SILBasicBlock *DefaultBB,
-    ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs)
+    ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
+    Optional<ArrayRef<ProfileCounter>> CaseCounts, ProfileCounter DefaultCount)
     : TermInst(Kind, Loc), Operands(this, Operand), NumCases(CaseBBs.size()),
       HasDefault(bool(DefaultBB)) {
   // Initialize the case and successor arrays.
@@ -1387,11 +1401,17 @@ SwitchEnumInstBase::SwitchEnumInstBase(
   auto *succs = getSuccessorBuf();
   for (unsigned i = 0, size = CaseBBs.size(); i < size; ++i) {
     cases[i] = CaseBBs[i].first;
-    ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
+    if (CaseCounts) {
+      ::new (succs + i)
+          SILSuccessor(this, CaseBBs[i].second, CaseCounts.getValue()[i]);
+    } else {
+      ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
+    }
   }
 
-  if (HasDefault)
-    ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
+  if (HasDefault) {
+    ::new (succs + NumCases) SILSuccessor(this, DefaultBB, DefaultCount);
+  }
 }
 
 void SwitchEnumInstBase::swapCase(unsigned i, unsigned j) {
@@ -1489,18 +1509,20 @@ template <typename SWITCH_ENUM_INST>
 SWITCH_ENUM_INST *SwitchEnumInstBase::createSwitchEnum(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    SILFunction &F) {
+    SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    ProfileCounter DefaultCount) {
   // Allocate enough room for the instruction with tail-allocated
   // EnumElementDecl and SILSuccessor arrays. There are `CaseBBs.size()` decls
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
   unsigned numCases = CaseBBs.size();
   unsigned numSuccessors = numCases + (DefaultBB ? 1 : 0);
 
-  void *buf = F.getModule().allocateInst(sizeof(SWITCH_ENUM_INST)
-                                       + sizeof(EnumElementDecl*) * numCases
-                                       + sizeof(SILSuccessor) * numSuccessors,
-                                     alignof(SWITCH_ENUM_INST));
-  return ::new (buf) SWITCH_ENUM_INST(Loc, Operand, DefaultBB, CaseBBs);
+  void *buf = F.getModule().allocateInst(
+      sizeof(SWITCH_ENUM_INST) + sizeof(EnumElementDecl *) * numCases +
+          sizeof(SILSuccessor) * numSuccessors,
+      alignof(SWITCH_ENUM_INST));
+  return ::new (buf) SWITCH_ENUM_INST(Loc, Operand, DefaultBB, CaseBBs,
+                                      CaseCounts, DefaultCount);
 }
 
 NullablePtr<EnumElementDecl> SwitchEnumInstBase::getUniqueCaseForDefault() {
@@ -1533,17 +1555,19 @@ SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
 SwitchEnumInst *SwitchEnumInst::create(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    SILFunction &F) {
-  return
-    createSwitchEnum<SwitchEnumInst>(Loc, Operand, DefaultBB, CaseBBs, F);
+    SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    ProfileCounter DefaultCount) {
+  return createSwitchEnum<SwitchEnumInst>(Loc, Operand, DefaultBB, CaseBBs, F,
+                                          CaseCounts, DefaultCount);
 }
 
 SwitchEnumAddrInst *SwitchEnumAddrInst::create(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    SILFunction &F) {
-  return createSwitchEnum<SwitchEnumAddrInst>
-    (Loc, Operand, DefaultBB, CaseBBs, F);
+    SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    ProfileCounter DefaultCount) {
+  return createSwitchEnum<SwitchEnumAddrInst>(Loc, Operand, DefaultBB, CaseBBs,
+                                              F, CaseCounts, DefaultCount);
 }
 
 DynamicMethodBranchInst::DynamicMethodBranchInst(SILDebugLocation Loc,
@@ -1568,18 +1592,6 @@ DynamicMethodBranchInst::create(SILDebugLocation Loc, SILValue Operand,
       DynamicMethodBranchInst(Loc, Operand, Member, HasMethodBB, NoMethodBB);
 }
 
-/// Create a witness method call of a protocol requirement, passing in a lookup
-/// type and conformance.
-///
-/// At runtime, the witness is looked up in the conformance of the lookup type
-/// to the protocol.
-///
-/// The lookup type is usually an archetype, but it will be concrete if the
-/// witness_method instruction is inside a function body that was specialized.
-///
-/// The conformance must exactly match the requirement; the caller must handle
-/// the case where the requirement is defined in a base protocol that is
-/// refined by the conforming protocol.
 WitnessMethodInst *
 WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
                           ProtocolConformanceRef Conformance, SILDeclRef Member,
@@ -1603,11 +1615,10 @@ WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
                                           Ty, TypeDependentOperands, Volatile);
 }
 
-DynamicMethodInst *
-DynamicMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
-                          SILDeclRef Member, SILType Ty, bool Volatile,
-                          SILFunction *F,
-                          SILOpenedArchetypesState &OpenedArchetypes) {
+ObjCMethodInst *
+ObjCMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                       SILDeclRef Member, SILType Ty, SILFunction *F,
+                       SILOpenedArchetypesState &OpenedArchetypes) {
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
@@ -1615,10 +1626,10 @@ DynamicMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
 
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
-  void *Buffer = Mod.allocateInst(size, alignof(DynamicMethodInst));
-  return ::new (Buffer) DynamicMethodInst(DebugLoc, Operand,
-                                          TypeDependentOperands,
-                                          Member, Ty, Volatile);
+  void *Buffer = Mod.allocateInst(size, alignof(ObjCMethodInst));
+  return ::new (Buffer) ObjCMethodInst(DebugLoc, Operand,
+                                       TypeDependentOperands,
+                                       Member, Ty);
 }
 
 InitExistentialAddrInst *InitExistentialAddrInst::create(
@@ -1904,7 +1915,8 @@ UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
 CheckedCastBranchInst *CheckedCastBranchInst::create(
     SILDebugLocation DebugLoc, bool IsExact, SILValue Operand, SILType DestTy,
     SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB, SILFunction &F,
-    SILOpenedArchetypesState &OpenedArchetypes) {
+    SILOpenedArchetypesState &OpenedArchetypes, ProfileCounter Target1Count,
+    ProfileCounter Target2Count) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -1912,9 +1924,9 @@ CheckedCastBranchInst *CheckedCastBranchInst::create(
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(CheckedCastBranchInst));
-  return ::new (Buffer) CheckedCastBranchInst(DebugLoc, IsExact, Operand,
-                                              TypeDependentOperands, DestTy,
-                                              SuccessBB, FailureBB);
+  return ::new (Buffer) CheckedCastBranchInst(
+      DebugLoc, IsExact, Operand, TypeDependentOperands, DestTy, SuccessBB,
+      FailureBB, Target1Count, Target2Count);
 }
 
 CheckedCastValueBranchInst *

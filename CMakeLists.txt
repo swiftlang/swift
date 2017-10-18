@@ -85,6 +85,13 @@ option(SWIFT_INCLUDE_DOCS
 # TODO: Please categorize these!
 #
 
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE "Debug" CACHE STRING
+      "Build type for Swift [Debug, RelWithDebInfo, Release, MinSizeRel]"
+      FORCE)
+  message(STATUS "No build type was specified, will default to ${CMAKE_BUILD_TYPE}")
+endif()
+
 set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
     "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
 set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
@@ -767,17 +774,7 @@ endif()
 # Should we cross-compile the standard library for Windows?
 is_sdk_requested(WINDOWS swift_build_windows)
 if(swift_build_windows AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-  if("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "aarch64")
-    configure_sdk_windows(WINDOWS "Windows" "msvc" aarch64)
-  elseif("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "armv7")
-    configure_sdk_windows(WINDOWS "Windows" "msvc" armv7)
-  elseif("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "i686")
-    configure_sdk_windows(WINDOWS "Windows" "msvc" i686)
-  elseif("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "x86_64")
-    configure_sdk_windows(WINDOWS "Windows" "msvc" x86_64)
-  else()
-    message(FATAL_ERROR "unable to calculate triple for Windows host on ${SWIFT_HOST_VARIANT_ARCH}")
-  endif()
+  configure_sdk_windows(WINDOWS "Windows" "msvc" "aarch64;armv7;i686;x86_64")
 endif()
 
 if("${SWIFT_SDKS}" STREQUAL "")
@@ -821,14 +818,23 @@ message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
 message(STATUS "  LTO:        ${SWIFT_TOOLS_ENABLE_LTO}")
 message(STATUS "")
 
-message(STATUS "Building Swift standard library and SDK overlays for SDKs: ${SWIFT_SDKS}")
-message(STATUS "  Build type: ${SWIFT_STDLIB_BUILD_TYPE}")
-message(STATUS "  Assertions: ${SWIFT_STDLIB_ASSERTIONS}")
-message(STATUS "")
+if (SWIFT_BULID_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
 
-message(STATUS "Building Swift runtime with:")
-message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
-message(STATUS "")
+  message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
+  message(STATUS "  Build type: ${SWIFT_STDLIB_BUILD_TYPE}")
+  message(STATUS "  Assertions: ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "")
+
+  message(STATUS "Building Swift runtime with:")
+  message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
+  message(STATUS "")
+
+else()
+
+  message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
+  message(STATUS "")
+
+endif()
 
 #
 # Find required dependencies.

@@ -16,7 +16,7 @@ import Glibc
 import Darwin
 #endif
 
-public enum BenchmarkCategories : CustomStringConvertible {
+public enum BenchmarkCategory : String {
   // Validation "micro" benchmarks test a specific operation or critical path that
   // we know is important to measure.
   case validation
@@ -66,42 +66,61 @@ public enum BenchmarkCategories : CustomStringConvertible {
   // significant optimization.
   case cpubench
 
-  public var description : String {
-    switch self {
-    case .cpubench: return "cpubench"
-    case .unstable: return "unstable"
-    case .validation: return "validation"
-    case .api: return "api"
-    case .Array: return "Array"
-    case .String: return "String"
-    case .Dictionary: return "Dictionary"
-    case .Codable: return "Codable"
-    case .Set: return "Set"
-    case .sdk: return "sdk"
-    case .runtime: return "runtime"
-    case .refcount: return "refcount"
-    case .metadata: return "metadata"
-    case .abstraction: return "abstraction"
-    case .safetychecks: return "safetychecks"
-    case .exceptions: return "exceptions"
-    case .bridging: return "bridging"
-    case .concurrency: return "concurrency"
-    case .algorithm: return "algorithm"
-    case .miniapplication: return "miniapplication"
-    case .regression: return "regression"
-    }
-  }
+  // Explicit skip marker
+  case skip
 }
 
 public struct BenchmarkInfo {
+  /// The name of the benchmark that should be displayed by the harness.
   public var name: String
-  public var runFunction: (Int) -> ()
-  public var tags: [BenchmarkCategories]
 
-  public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategories]) {
+  /// A function that invokes the specific benchmark routine.
+  public var runFunction: (Int) -> ()
+
+  /// A set of category tags that describe this benchmark. This is used by the
+  /// harness to allow for easy slicing of the set of benchmarks along tag
+  /// boundaries, e.x.: run all string benchmarks or ref count benchmarks, etc.
+  public var tags: [BenchmarkCategory]
+
+  /// An optional function that if non-null is run before benchmark samples
+  /// are timed.
+  public var setUpFunction: (() -> ())?
+
+  /// An optional function that if non-null is run immediately after a sample is
+  /// taken.
+  public var tearDownFunction: (() -> ())?
+
+  public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory]) {
     self.name = name
     self.runFunction = runFunction
     self.tags = tags
+    self.setUpFunction = nil
+    self.tearDownFunction = nil
+  }
+
+  public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory],
+              setUpFunction: (() -> ())?,
+              tearDownFunction: (() -> ())?) {
+    self.name = name
+    self.runFunction = runFunction
+    self.tags = tags
+    self.setUpFunction = setUpFunction
+    self.tearDownFunction = tearDownFunction
+  }
+}
+
+extension BenchmarkInfo : Comparable {
+  public static func < (lhs: BenchmarkInfo, rhs: BenchmarkInfo) -> Bool {
+    return lhs.name < rhs.name
+  }
+  public static func == (lhs: BenchmarkInfo, rhs: BenchmarkInfo) -> Bool {
+    return lhs.name == rhs.name
+  }
+}
+
+extension BenchmarkInfo : Hashable {
+  public var hashValue: Int {
+    return name.hashValue
   }
 }
 
@@ -147,20 +166,6 @@ public func CheckResults(
     ) {
     guard _fastPath(resultsMatch) else {
         print("Incorrect result in \(function), \(file):\(line)")
-        abort()
-    }
-}
-
-// Due to potential overhead of passing closures around on the
-// performance measurements, this version is now deprecated
-@available(*, deprecated,
-  message: "For debugging test failures only! Use the version without message.")
-public func CheckResults(
-    _ resultsMatch: Bool,
-    _ message: @autoclosure () -> String
-    ) {
-    guard resultsMatch else {
-        print(message())
         abort()
     }
 }

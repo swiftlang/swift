@@ -1186,15 +1186,6 @@ visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitIsNonnullInst(IsNonnullInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createIsNonnull(getOpLocation(Inst->getLoc()),
-                                 getOpValue(Inst->getOperand())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
                                           UnconditionalCheckedCastInst *Inst) {
   SILLocation OpLoc = getOpLocation(Inst->getLoc());
@@ -1535,8 +1526,7 @@ SILCloner<ImplClass>::visitClassMethodInst(ClassMethodInst *Inst) {
     getBuilder().createClassMethod(getOpLocation(Inst->getLoc()),
                                    getOpValue(Inst->getOperand()),
                                    Inst->getMember(),
-                                   Inst->getType(),
-                                   Inst->isVolatile()));
+                                   Inst->getType()));
 }
 
 template<typename ImplClass>
@@ -1547,8 +1537,29 @@ SILCloner<ImplClass>::visitSuperMethodInst(SuperMethodInst *Inst) {
     getBuilder().createSuperMethod(getOpLocation(Inst->getLoc()),
                                    getOpValue(Inst->getOperand()),
                                    Inst->getMember(),
-                                   Inst->getType(),
-                                   Inst->isVolatile()));
+                                   Inst->getType()));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitObjCMethodInst(ObjCMethodInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createObjCMethod(getOpLocation(Inst->getLoc()),
+                                  getOpValue(Inst->getOperand()),
+                                  Inst->getMember(),
+                                  getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitObjCSuperMethodInst(ObjCSuperMethodInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createObjCSuperMethod(getOpLocation(Inst->getLoc()),
+                                       getOpValue(Inst->getOperand()),
+                                       Inst->getMember(),
+                                       Inst->getType()));
 }
 
 template<typename ImplClass>
@@ -1579,18 +1590,6 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
               newLookupType, conformance,
               Inst->getMember(), Inst->getType(),
               Inst->isVolatile()));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitDynamicMethodInst(DynamicMethodInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createDynamicMethod(getOpLocation(Inst->getLoc()),
-                                     getOpValue(Inst->getOperand()),
-                                     Inst->getMember(),
-                                     getOpType(Inst->getType()),
-                                     Inst->isVolatile()));
 }
 
 template<typename ImplClass>
@@ -2119,7 +2118,8 @@ SILCloner<ImplClass>::visitCondBranchInst(CondBranchInst *Inst) {
                                   getOpValue(Inst->getCondition()),
                                   getOpBasicBlock(Inst->getTrueBB()), TrueArgs,
                                   getOpBasicBlock(Inst->getFalseBB()),
-                                  FalseArgs));
+                                  FalseArgs, Inst->getTrueBBCount(),
+                                  Inst->getFalseBBCount()));
 }
 
 template<typename ImplClass>
@@ -2127,13 +2127,15 @@ void
 SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
   SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
+  auto TrueCount = Inst->getTrueBBCount();
+  auto FalseCount = Inst->getFalseBBCount();
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
-       getBuilder().createCheckedCastBranch(getOpLocation(Inst->getLoc()),
-                                            Inst->isExact(),
-                                            getOpValue(Inst->getOperand()),
-                                            getOpType(Inst->getCastType()),
-                                            OpSuccBB, OpFailBB));
+                getBuilder().createCheckedCastBranch(
+                    getOpLocation(Inst->getLoc()), Inst->isExact(),
+                    getOpValue(Inst->getOperand()),
+                    getOpType(Inst->getCastType()), OpSuccBB, OpFailBB,
+                    TrueCount, FalseCount));
 }
 
 template <typename ImplClass>
@@ -2158,12 +2160,13 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
   CanType SrcType = getOpASTType(Inst->getSourceType());
   CanType TargetType = getOpASTType(Inst->getTargetType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto TrueCount = Inst->getTrueBBCount();
+  auto FalseCount = Inst->getFalseBBCount();
   doPostProcess(Inst,
-       getBuilder().createCheckedCastAddrBranch(getOpLocation(Inst->getLoc()),
-                                                Inst->getConsumptionKind(),
-                                                SrcValue, SrcType,
-                                                DestValue, TargetType,
-                                                OpSuccBB, OpFailBB));
+                getBuilder().createCheckedCastAddrBranch(
+                    getOpLocation(Inst->getLoc()), Inst->getConsumptionKind(),
+                    SrcValue, SrcType, DestValue, TargetType, OpSuccBB,
+                    OpFailBB, TrueCount, FalseCount));
 }
   
 template<typename ImplClass>

@@ -36,6 +36,8 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                       "fill-stub", "Perform fill protocol stub refactoring"),
            clEnumValN(RefactoringKind::ExpandDefault,
                       "expand-default", "Perform expand default statement refactoring"),
+           clEnumValN(RefactoringKind::ExpandSwitchCases,
+                      "expand-switch-cases", "Perform switch cases expand refactoring"),
            clEnumValN(RefactoringKind::LocalizeString,
                       "localize-string", "Perform string localization refactoring"),
            clEnumValN(RefactoringKind::CollapseNestedIfExpr,
@@ -53,7 +55,9 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::FindGlobalRenameRanges,
                       "find-rename-ranges", "Find detailed ranges for syntactic rename"),
            clEnumValN(RefactoringKind::FindLocalRenameRanges,
-                      "find-local-rename-ranges", "Find detailed ranges for local rename")));
+                      "find-local-rename-ranges", "Find detailed ranges for local rename"),
+           clEnumValN(RefactoringKind::TrailingClosure,
+                      "trailingclosure", "Perform trailing closure refactoring")));
 
 
 static llvm::cl::opt<std::string>

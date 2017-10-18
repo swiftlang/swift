@@ -18,6 +18,11 @@
 import Foundation
 import TestsUtils
 
+public let RGBHistogram = [
+  BenchmarkInfo(name: "RGBHistogram", runFunction: run_RGBHistogram, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "RGBHistogramOfObjects", runFunction: run_RGBHistogramOfObjects, tags: [.validation, .algorithm]),
+]
+
 @inline(never)
 public func run_RGBHistogram(_ N: Int) {
     var histogram = [(key: rrggbb_t, value: Int)]()
