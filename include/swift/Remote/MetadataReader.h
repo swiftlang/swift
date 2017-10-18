@@ -53,6 +53,7 @@ public:
   void setVariadic() { Flags = Flags.withVariadic(true); }
   void setShared() { Flags = Flags.withShared(true); }
   void setInOut() { Flags = Flags.withInOut(true); }
+  void setFlags(ParameterTypeFlags flags) { Flags = flags; };
 
   FunctionParam withLabel(StringRef label) const {
     return FunctionParam(label, Type, Flags);
@@ -804,22 +805,17 @@ public:
         sizeof(TargetFunctionTypeMetadata<Runtime>);
       for (StoredPointer i = 0; i < Function->getNumArguments(); ++i,
            ArgumentAddress += sizeof(StoredPointer)) {
-        StoredPointer FlaggedArgumentAddress;
+        StoredPointer ParameterAddress;
         if (!Reader->readInteger(RemoteAddress(ArgumentAddress),
-                                 &FlaggedArgumentAddress))
+                                 &ParameterAddress))
           return BuiltType();
 
         FunctionParam<BuiltType> Param;
+        if (auto ParamTypeRef = readTypeFromMetadata(ParameterAddress)) {
+          auto ParameterFlags = Function->getParameterFlags(i);
 
-        // TODO: Use target-agnostic FlaggedPointer to mask this!
-        const auto InOutMask = (StoredPointer) 1;
-        // FIXME: Add import parameter related flags from metadata
-        if ((FlaggedArgumentAddress & InOutMask) != 0)
-          Param.setInOut();
-
-        FlaggedArgumentAddress &= ~InOutMask;
-        if (auto ParamTypeRef = readTypeFromMetadata(FlaggedArgumentAddress)) {
           Param.setType(ParamTypeRef);
+          Param.setFlags(ParameterTypeFlags::fromRaw(ParameterFlags));
           Parameters.push_back(std::move(Param));
         } else {
           return BuiltType();
