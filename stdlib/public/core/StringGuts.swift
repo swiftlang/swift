@@ -31,11 +31,102 @@ struct _StringGuts {
     get { return _storage.1 }
     set { _storage.1 = newValue }
   }
+  var _objectBitPattern: UInt {
+    get { return _bitPattern(_object) }
+    set { _object = Builtin.reinterpretCast(newValue) }
+  }
 
   internal
   init(_ object: _BuiltinBridgeObject, _ otherBits: UInt) {
     self._storage.0 = object
     self._storage.1 = otherBits
+  }
+}
+
+//
+// Discriminators
+//
+
+// FIXME: Define this properly per ABI. For now, it's taking advantage of tag
+// bits being highest (and possibly lowest but shifted away). Furthermore, these
+// won't work out-of-the-box for 32bit platforms.
+
+// The bit used to discriminate value or managed.
+/*fileprivate*/ internal var _tagBit: UInt { return _objCTaggedPointerBits }
+
+// When a value, the bit that discriminates a small string from an unsafe string
+//
+// NOTE: Until we wean ourselves off of _StringCore, the only "small" strings we
+// can store are tagged NSStrings. For now, this is synonymous with a tagged
+// NSString but this will be expanded in the future to store other forms.
+//
+/*fileprivate*/ internal var _smallBit: UInt { return _tagBit >> 1 }
+
+// When managed, or an unsafe string, the bit used to discriminate two-byte or
+// one-byte code units.
+/*fileprivate*/ internal var _twoByteCodeUnitBit: UInt { return _smallBit >> 1 }
+
+// When managed, or an unsafe string, the bit used to discriminate Cocoa-buffer-
+// backed Strings.
+//
+// TODO: Remove when weaned off of _LegacyStringCore. Is should be effectively
+// redundant with BridgeObject's isObjC bit, and unsafe strings shouldn't care
+// where they came from.
+//
+/*fileprivate*/ internal var _hasCocoaBufferBit: UInt {
+  return _twoByteCodeUnitBit >> 1
+}
+
+//
+// Flags
+//
+extension _StringGuts {
+  /*private*/ internal var _flagsMask: UInt {
+    return _twoByteCodeUnitBit | _hasCocoaBufferBit
+  }
+
+  var isSingleByte: Bool {
+    return (_objectBitPattern & _twoByteCodeUnitBit) == 0
+  }
+
+  // NOTE: Currently, single byte representation is synonymous with ASCII. This
+  // may change in the future in preference of either UTF8 or Latin1.
+  var isASCII: Bool {
+    return isSingleByte
+  }
+
+  // TODO: remove
+  var hasCocoaBuffer: Bool {
+    return (_objectBitPattern & _hasCocoaBufferBit) != 0
+  }
+
+  var _unflaggedObject: _BuiltinBridgeObject {
+    _sanityCheck(!_isSmallCocoa, "TODO: drop small cocoa")
+    return Builtin.reinterpretCast(_objectBitPattern & ~_flagsMask)
+  }
+
+  var _isTagged: Bool { return _isTaggedObject(_object) }
+
+  var _untaggedUnflaggedBitPattern: UInt {
+    _sanityCheck(_isTagged)
+    return _bridgeObject(toTagPayload: _unflaggedObject)
+  }
+
+  /*private*/ internal init(
+    _unflagged object: _BuiltinBridgeObject,
+    isSingleByte: Bool,
+    hasCocoaBuffer: Bool,
+    otherBits: UInt
+  ) {
+    self.init(object, otherBits)
+    if !isSingleByte {
+      self._objectBitPattern |= _twoByteCodeUnitBit
+    }
+    if hasCocoaBuffer {
+      self._objectBitPattern |= _hasCocoaBufferBit
+    }
+
+    _sanityCheck(_bitPattern(self._unflaggedObject) == _bitPattern(object))
   }
 }
 
@@ -118,19 +209,25 @@ internal struct UnsafeString {
   //     designating UnsafeString
   //
 
-  var baseAddress: UnsafeRawPointer
-  var legacyCountAndFlags: UInt
+  var baseAddress: UnsafeRawPointer // TODO: Mutable?
+  var count: Int
 
-  var isSingleByte: Bool {
-    fatalError("unimplemented")
-  }
-  var count: Int {
-    fatalError("unimplemented")
-  }
+  var isSingleByte: Bool
 
-  init(_ baseAddress: UnsafeRawPointer, _ legacyCountAndFlags: UInt) {
+  // TODO: Is this actually important to track? Can we drop it when we're no
+  // longer using _LegacyStringCore?
+  var hasCocoaBuffer: Bool
+
+  init(
+    baseAddress: UnsafeRawPointer,
+    count: Int,
+    isSingleByte: Bool,
+    hasCocoaBuffer: Bool
+  ) {
     self.baseAddress = baseAddress
-    self.legacyCountAndFlags = legacyCountAndFlags
+    self.count = count
+    self.isSingleByte = isSingleByte
+    self.hasCocoaBuffer = hasCocoaBuffer
   }
 
   var unsafeUTF16String: UnsafeBufferPointer<UInt16>? {
@@ -206,20 +303,10 @@ internal struct UnsafeString {
 }
 
 //
-// Discriminators
-//
-
-// FIXME: Define this properly per ABI. For now, it's taking advantage of tag
-// bits being highest (and possibly lowest but shifted away)
-/*fileprivate*/ internal var _tagBig: UInt { return _objCTaggedPointerBits }
-/*fileprivate*/ internal var _smallBit: UInt { return _tagBig >> 1 }
-/*fileprivate*/ internal var _smallCocoaBit: UInt { return _smallBit >> 1 }
-
-//
 // Masks
 //
-/*fileprivate*/ internal var _smallCocoaStringMask: UInt {
-  return _tagBig | _smallBit | _smallCocoaBit
+/*fileprivate*/ internal var _smallStringMask: UInt {
+  return _tagBit | _smallBit
 }
 
 extension _StringGuts {
@@ -239,13 +326,10 @@ extension _StringGuts {
       if _isNonTaggedObjCPointer(_object) { return .nonTaggedCocoa }
 
       // Must be tagged
-      _sanityCheck(_isTaggedObject(_object))
-      if _bitPattern(_object) & _smallBit == 0 { return .unsafe }
+      _sanityCheck(_isTagged)
+      if _objectBitPattern & _smallBit == 0 { return .unsafe }
 
-      // Must be smol
-      if _bitPattern(_object) == _smallCocoaStringMask { return .smallCocoa }
-
-      return .error
+      return .smallCocoa
     }
   }
 }
@@ -291,17 +375,29 @@ extension _StringGuts {
   // Unsafe Strings
   //
   var _isUnsafe: Bool { return classification == .unsafe }
+
   var _unsafeString: UnsafeString? {
     guard _isUnsafe else { return nil }
+
+    // Unflag it, untag it, and go
+    let pointer = UnsafeRawPointer(
+      bitPattern: self._untaggedUnflaggedBitPattern
+    )._unsafelyUnwrappedUnchecked
     return UnsafeString(
-      UnsafeRawPointer(
-        bitPattern: _bridgeObject(toTagPayload: _object
-      ))._unsafelyUnwrappedUnchecked,
-      UInt(_otherBits))
+      baseAddress: pointer,
+      count: Int(self._otherBits),
+      isSingleByte: self.isSingleByte,
+      hasCocoaBuffer: self.hasCocoaBuffer)
   }
+
   init(_ s: UnsafeString) {
-    self.init(_bridgeObject(
-      taggingPayload: UInt(bitPattern: s.baseAddress)), s.legacyCountAndFlags)
+    // Tag it, flag it, and go
+    let object = _bridgeObject(taggingPayload: UInt(bitPattern: s.baseAddress))
+    self.init(
+      _unflagged: object,
+      isSingleByte: s.isSingleByte,
+      hasCocoaBuffer: s.hasCocoaBuffer,
+      otherBits: UInt(s.count))
   }
 
   //
@@ -318,7 +414,7 @@ extension _StringGuts {
 
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: SmallCocoaString) {
-    self.init(_bridgeObject(fromTagged: _smallCocoaStringMask), s.taggedPointer)
+    self.init(_bridgeObject(fromTagged: _smallStringMask), s.taggedPointer)
   }
 
   //
@@ -361,17 +457,6 @@ internal func internalDumpHex(_ x: Bool) {
 
 
 extension _StringGuts {
-  // func getUnsafeContents() -> UnsafeString {
-  //   if let unsafeString = self.unsafeString {
-  //     return unsafeString
-  //   }
-  //   if let native = self._native {
-
-  //   }
-  // }
-}
-
-extension _StringGuts {
   enum Stats {
     internal static var numNativeSelfSlice = 0
     internal static var numCocoaSelfSlice = 0
@@ -400,7 +485,9 @@ extension _StringGuts {
       return _LegacyStringCore(
         baseAddress: UnsafeMutableRawPointer(
           mutating: unsafeString.baseAddress),
-        _countAndFlags: unsafeString.legacyCountAndFlags,
+        count: unsafeString.count,
+        elementShift: unsafeString.isSingleByte ? 0 : 1,
+        hasCocoaBuffer: unsafeString.hasCocoaBuffer,
         owner: nil)
     }
     if let cocoa = self._cocoa {
@@ -454,7 +541,12 @@ extension _StringGuts {
 
     guard let owner = legacyCore._owner else {
       // Immortal String
-      let immortal = UnsafeString(baseAddress, legacyCore._countAndFlags)
+      _sanityCheck((0...2).contains(legacyCore.elementWidth))
+      let immortal = UnsafeString(
+        baseAddress: baseAddress,
+        count: legacyCore.count,
+        isSingleByte: legacyCore.elementWidth == 1,
+        hasCocoaBuffer: legacyCore.hasCocoaBuffer)
       self.init(immortal)
       return
     }
