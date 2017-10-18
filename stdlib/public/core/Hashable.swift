@@ -108,6 +108,23 @@ public protocol Hashable : Equatable {
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   var hashValue: Int { get }
+
+  func _hash(into hasher: (Int) -> Void)
+}
+
+@_versioned
+@_inlineable
+@inline(__always)
+internal func _defaultHashValue<T : Hashable>(for value: T) -> Int {
+  var hasher = _DefaultHasher(_inlineable: ())
+  value._hash(into: { hasher.append($0) })
+  return hasher._finalize_alwaysInline()
+}
+
+extension Hashable {
+  public func _hash(into hasher: (Int) -> Void) {
+    hasher(self.hashValue)
+  }
 }
 
 // Called by the SwiftValue implementation.
@@ -127,3 +144,50 @@ internal func Hashable_hashValue_indirect<T : Hashable>(
   return value.pointee.hashValue
 }
 
+// FIXME: This is purely for benchmarking; to be removed.
+@_fixed_layout
+public struct _QuickHasher {
+  @_versioned
+  internal var _hash: Int
+
+  @inline(never)
+  public init() {
+    _hash = 0
+  }
+
+  @_inlineable
+  @_versioned
+  internal init(_inlineable: Void) {
+    _hash = 0
+  }
+
+  @inline(never)
+  public mutating func append(_ value: Int) {
+    _append_alwaysInline(value)
+  }
+
+  @_inlineable
+  @_versioned
+  @inline(__always)
+  internal mutating func _append_alwaysInline(_ value: Int) {
+    if _hash == 0 {
+      _hash = value
+      return
+    }
+    _hash = _combineHashValues(_hash, value)
+  }
+
+  @inline(never)
+  public mutating func finalize() -> Int {
+    return _finalize_alwaysInline()
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  @inline(__always)
+  internal mutating func _finalize_alwaysInline() -> Int {
+    return _mixInt(_hash)
+  }
+}
+
+public typealias _DefaultHasher = _QuickHasher
