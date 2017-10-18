@@ -2473,22 +2473,26 @@ public:
     
     // Note that we don't have setters. That is by design, use
     // the following with methods instead of mutating these objects.
+    LLVM_NODISCARD
     ExtInfo withRepresentation(Representation Rep) const {
       return ExtInfo((Bits & ~RepresentationMask)
                      | (unsigned)Rep);
     }
+    LLVM_NODISCARD
     ExtInfo withIsAutoClosure(bool IsAutoClosure = true) const {
       if (IsAutoClosure)
         return ExtInfo(Bits | AutoClosureMask);
       else
         return ExtInfo(Bits & ~AutoClosureMask);
     }
+    LLVM_NODISCARD
     ExtInfo withNoEscape(bool NoEscape = true) const {
       if (NoEscape)
         return ExtInfo(Bits | NoEscapeMask);
       else
         return ExtInfo(Bits & ~NoEscapeMask);
     }
+    LLVM_NODISCARD
     ExtInfo withThrows(bool Throws = true) const {
       if (Throws)
         return ExtInfo(Bits | ThrowsMask);
