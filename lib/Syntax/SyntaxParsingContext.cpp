@@ -21,13 +21,11 @@ using namespace swift;
 using namespace swift::syntax;
 
 namespace {
-static ExprSyntax getUnknownExpr(ArrayRef<Syntax> SubExpr) {
+static Syntax makeUnknownSyntax(SyntaxKind Kind, ArrayRef<Syntax> SubExpr) {
   RawSyntax::LayoutList Layout;
   std::transform(SubExpr.begin(), SubExpr.end(), std::back_inserter(Layout),
                  [](const Syntax &S) { return S.getRaw(); });
-  return make<ExprSyntax>(RawSyntax::make(SyntaxKind::UnknownExpr,
-                                          Layout,
-                                          SourcePresence::Present));
+  return make<Syntax>(RawSyntax::make(Kind, Layout, SourcePresence::Present));
 }
 } // End of anonymous namespace
 
@@ -37,16 +35,13 @@ struct SyntaxParsingContext::ContextInfo {
 
   ContextInfo(bool Enabled): Enabled(Enabled) {}
 
-  // Pop back from PendingSyntax if the back is a token of the given Kind.
-  Optional<TokenSyntax> checkBackToken(tok Kind) {
-    if (PendingSyntax.empty())
-      return None;
-    auto Back = PendingSyntax.back().getAs<TokenSyntax>();
-    if (Back.hasValue() && (*Back).getTokenKind() == Kind) {
-      PendingSyntax.pop_back();
-      return Back;
-    }
-    return None;
+  // Check if the pending syntax is a token syntax in the given kind.
+  bool checkTokenFromBack(tok Kind, unsigned OffsetFromBack = 0) {
+    if (PendingSyntax.size() - 1 < OffsetFromBack)
+      return false;
+    auto Back = PendingSyntax[PendingSyntax.size() - 1 - OffsetFromBack].
+      getAs<TokenSyntax>();
+    return Back.hasValue() && (*Back).getTokenKind() == Kind);
   }
 
   void addPendingSyntax(ArrayRef<Syntax> More) {
@@ -54,12 +49,28 @@ struct SyntaxParsingContext::ContextInfo {
                  [](const Syntax &S) { return make<Syntax>(S.getRaw()); });
   }
 
-  // Pop back from PendingSyntax.
-  Syntax popPendingSyntax() {
-    assert(!PendingSyntax.empty());
-    auto Result = PendingSyntax.back();
-    PendingSyntax.pop_back();
-    return Result;
+  // Squash N syntax nodex from the back of the pending list into one.
+  void createFromBack(SyntaxKind Kind, unsigned N = 0) {
+    auto Size = PendingSyntax.size();
+    assert(Size >= N);
+    if (!N)
+      N = Size;
+    auto Parts = llvm::makeArrayRef(PendingSyntax).slice(Size - N);
+
+    // Try to create the node of the given syntax.
+    Optional<Syntax> Result = SyntaxFactory::createSyntax(Kind, Parts);
+    if (!Result) {
+
+      // If unable to create, we should create an unknown node.
+      Result.emplace(makeUnknownSyntax(SyntaxFactory::getUnknownKind(Kind),
+                                       Parts));
+    }
+
+    // Remove the building bricks and re-append the result.
+    for (unsigned I = 0; I < N; I ++)
+      PendingSyntax.pop_back();
+    addPendingSyntax({Result});
+    assert(Size - N + 1 == PendingSyntax.size());
   }
 };
 
@@ -129,7 +140,9 @@ SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
       // If this is a standalone token, we create an unknown expression wrapper
       // for it.
       AllStmts.push_back(SyntaxFactory::makeExpressionStmt(
-        getUnknownExpr({ *S.getAs<TokenSyntax>() }), None));
+        *makeUnknownSyntax(SyntaxKind::UnknownExpr,
+                           { *S.getAs<TokenSyntax>() }).getAs<ExprSyntax>(),
+                                                           None));
     }
     AllTopLevel.push_back(SyntaxFactory::makeTopLevelCodeDecl(
       SyntaxFactory::makeStmtList(AllStmts)));
@@ -158,30 +171,21 @@ void SyntaxParsingContextChild::addTokenSyntax(SourceLoc Loc) {
       retrieveTokenSyntax(Loc));
 }
 
-SyntaxParsingContextChild::~SyntaxParsingContextChild() {
-  // Parent should take care of the created syntax.
-  Parent->ContextData.addPendingSyntax(ContextData.PendingSyntax);
-
-  // Reset the context holder to be Parent.
-  ContextHolder = Parent;
-}
-
-void SyntaxParsingContextExpr::makeNode(SyntaxKind Kind) {
+void SyntaxParsingContextChild::makeNode(SyntaxKind Kind) {
   if (!ContextData.Enabled)
     return;
 
   // Create syntax nodes according to the given kind.
   switch (Kind) {
   case SyntaxKind::IntegerLiteralExpr: {
-    auto Digit = *ContextData.popPendingSyntax().getAs<TokenSyntax>();
-    ContextData.PendingSyntax.push_back(SyntaxFactory::makeIntegerLiteralExpr(
-      ContextData.checkBackToken(tok::oper_prefix), Digit));
+    // Integer may include the signs before the digits, so check if the sign
+    // exists and create.
+    ContextData.createFromBack(Kind, ContextData.
+      checkTokenFromBack(tok::oper_prefix, 1) ? 2 : 1);
     break;
   }
   case SyntaxKind::StringLiteralExpr: {
-    auto StringToken = *ContextData.popPendingSyntax().getAs<TokenSyntax>();
-    ContextData.PendingSyntax.push_back(SyntaxFactory::
-      makeStringLiteralExpr(StringToken));
+    ContextData.createFromBack(Kind, 1);
     break;
   }
 
@@ -190,12 +194,18 @@ void SyntaxParsingContextExpr::makeNode(SyntaxKind Kind) {
   }
 }
 
-SyntaxParsingContextExpr::~SyntaxParsingContextExpr() {
-  // If we've created more than one expression syntax, we should enclose them
-  // under a unknown expression.
+SyntaxParsingContextChild::~SyntaxParsingContextChild() {
+  SWIFT_DEFER {
+    // Parent should take care of the created syntax.
+    Parent->ContextData.addPendingSyntax(ContextData.PendingSyntax);
+
+    // Reset the context holder to be Parent.
+    ContextHolder = Parent;
+  };
+
+  // If we've created more than one syntax node, we should try building by using
+  // the final kind.
   if (ContextData.PendingSyntax.size() > 1) {
-    auto Result = getUnknownExpr(ContextData.PendingSyntax);
-    ContextData.PendingSyntax.clear();
-    ContextData.PendingSyntax.push_back(Result);
+    ContextData.createFromBack(FinalKind);
   }
 }

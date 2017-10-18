@@ -40,7 +40,7 @@ using namespace swift::syntax;
 /// \param isExprBasic Whether we're only parsing an expr-basic.
 ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
   // Start a context for creating expression syntax.
-  SyntaxParsingContextExpr ExprParsingContext(SyntaxContext);
+  SyntaxParsingContextChild ExprParsingContext(SyntaxContext, SyntaxKind::Expr);
 
   // If we are parsing a refutable pattern, check to see if this is the start
   // of a let/var/is pattern.  If so, parse it to an UnresolvedPatternExpr and
@@ -1804,7 +1804,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   // Create a syntax node for string literal.
   SyntaxContext->addTokenSyntax(Tok.getLoc());
   SyntaxContext->makeNode(SyntaxKind::StringLiteralExpr);
-  SyntaxParsingContextExpr LocalContext(SyntaxContext);
+  SyntaxParsingContextChild LocalContext(SyntaxContext, SyntaxKind::Expr);
 
   // FIXME: Avoid creating syntax nodes for string interpolation.
   LocalContext.disable();

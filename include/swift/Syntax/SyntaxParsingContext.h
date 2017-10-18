@@ -33,7 +33,7 @@ struct RawTokenInfo {
 
 enum class SyntaxParsingContextKind: uint8_t {
   Root,
-  Expr,
+  Child,
 };
 
 /// The base class of different kinds of Syntax context that Parser should use to
@@ -87,30 +87,21 @@ public:
 class SyntaxParsingContextChild: public SyntaxParsingContext {
   SyntaxParsingContext *Parent;
   SyntaxParsingContext *&ContextHolder;
-protected:
-  SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder):
+  const SyntaxKind FinalKind;
+public:
+  SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
+                            SyntaxKind FinalKind):
     SyntaxParsingContext(*ContextHolder), Parent(ContextHolder),
-    ContextHolder(ContextHolder) {
+    ContextHolder(ContextHolder), FinalKind(FinalKind) {
       ContextHolder = this;
   }
   ~SyntaxParsingContextChild();
-public:
+  void makeNode(SyntaxKind Kind) override;
   void addTokenSyntax(SourceLoc Loc) override;
   SyntaxParsingContext* getParent() { return Parent; }
   SyntaxParsingContextRoot &getRoot();
-};
-
-// The context for creating expression syntax. By the destruction
-// of this context, we should expect one expression syntax is
-// created.
-class SyntaxParsingContextExpr: public SyntaxParsingContextChild {
-public:
-  SyntaxParsingContextExpr(SyntaxParsingContext *&ContextHolder):
-    SyntaxParsingContextChild(ContextHolder) {}
-  ~SyntaxParsingContextExpr();
-  void makeNode(SyntaxKind Kind) override;
   SyntaxParsingContextKind getKind() override {
-    return SyntaxParsingContextKind::Expr;
+    return SyntaxParsingContextKind::Child;
   };
 };
 }
