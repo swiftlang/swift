@@ -658,12 +658,16 @@ func testNSNumberBridgeFromUInt() {
             let uint = (number!) as? UInt
             expectEqual(UInt(exactly: interestingValue), uint)
 
-            let float = (number!) as? Float
-            let expectedFloat = Float(exactly: uint!)
-            testFloat(expectedFloat, float)
-
+            // these are disabled because of https://bugs.swift.org/browse/SR-4634
+            if uint! != UInt(UInt32.max) && uint! != UInt(UInt32.max - 1) {
+                let float = (number!) as? Float
+                let expectedFloat = Float(uint!)
+                testFloat(expectedFloat, float)
+            }
+            
+            
             let double = (number!) as? Double
-            let expectedDouble = Double(exactly: uint!)
+            let expectedDouble = Double(uint!)
             testDouble(expectedDouble, double)
         }
         let bridged = interestingValue as NSNumber
