@@ -547,12 +547,12 @@ namespace {
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
 
-    void handleLoadUseFailure(const DIMemoryUse &InstInfo,
+    void handleLoadUseFailure(const DIMemoryUse &Use,
                               bool SuperInitDone,
                               bool FailedSelfUse);
 
-    void handleSelfInitUse(DIMemoryUse &InstInfo);
-    void updateInstructionForInitState(DIMemoryUse &InstInfo);
+    void handleSelfInitUse(DIMemoryUse &Use);
+    void updateInstructionForInitState(DIMemoryUse &Use);
 
 
     void processUninitializedRelease(SILInstruction *Release,
@@ -928,17 +928,17 @@ void LifetimeChecker::emitSelfConsumedDiagnostic(SILInstruction *Inst) {
 }
 
 void LifetimeChecker::handleStoreUse(unsigned UseID) {
-  DIMemoryUse &InstInfo = Uses[UseID];
+  DIMemoryUse &Use = Uses[UseID];
 
   // Determine the liveness state of the element that we care about.
-  auto Liveness = getLivenessAtInst(InstInfo.Inst, InstInfo.FirstElement,
-                                    InstInfo.NumElements);
+  auto Liveness = getLivenessAtInst(Use.Inst, Use.FirstElement,
+                                    Use.NumElements);
 
   // Check to see if the stored location is either fully uninitialized or fully
   // initialized.
   bool isFullyInitialized = true;
   bool isFullyUninitialized = true;
-  for (unsigned i = InstInfo.FirstElement, e = i+InstInfo.NumElements;
+  for (unsigned i = Use.FirstElement, e = i+Use.NumElements;
        i != e;++i) {
     auto DI = Liveness.get(i);
     if (DI != DIKind::Yes)
@@ -948,11 +948,11 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   }
 
   if (TheMemory.isNonRootClassSelf()) {
-    if (getSelfInitializedAtInst(InstInfo.Inst) != DIKind::Yes) {
-      auto SelfLiveness = getLivenessAtInst(InstInfo.Inst,
+    if (getSelfInitializedAtInst(Use.Inst) != DIKind::Yes) {
+      auto SelfLiveness = getLivenessAtInst(Use.Inst,
                                             0, TheMemory.NumElements);
       if (SelfLiveness.isAllYes()) {
-        emitSelfConsumedDiagnostic(InstInfo.Inst);
+        emitSelfConsumedDiagnostic(Use.Inst);
         return;
       }
     }
@@ -960,29 +960,29 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
 
   // If this is a partial store into a struct and the whole struct hasn't been
   // initialized, diagnose this as an error.
-  if (InstInfo.Kind == DIUseKind::PartialStore && !isFullyInitialized) {
-    assert(InstInfo.NumElements == 1 && "partial stores are intra-element");
-    diagnoseInitError(InstInfo, diag::struct_not_fully_initialized);
+  if (Use.Kind == DIUseKind::PartialStore && !isFullyInitialized) {
+    assert(Use.NumElements == 1 && "partial stores are intra-element");
+    diagnoseInitError(Use, diag::struct_not_fully_initialized);
     return;
   }
 
   // If this is a store to a 'let' property in an initializer, then we only
   // allow the assignment if the property was completely uninitialized.
   // Overwrites are not permitted.
-  if (InstInfo.Kind == DIUseKind::PartialStore || !isFullyUninitialized) {
-    for (unsigned i = InstInfo.FirstElement, e = i+InstInfo.NumElements;
+  if (Use.Kind == DIUseKind::PartialStore || !isFullyUninitialized) {
+    for (unsigned i = Use.FirstElement, e = i+Use.NumElements;
          i != e; ++i) {
       if (Liveness.get(i) == DIKind::No || !TheMemory.isElementLetProperty(i))
         continue;
 
       // Don't emit errors for unreachable code, or if we have already emitted
       // a diagnostic.
-      if (!shouldEmitError(InstInfo.Inst))
+      if (!shouldEmitError(Use.Inst))
         continue;
       
       std::string PropertyName;
       auto *VD = TheMemory.getPathStringToElement(i, PropertyName);
-      diagnose(Module, InstInfo.Inst->getLoc(),
+      diagnose(Module, Use.Inst->getLoc(),
                diag::immutable_property_already_initialized, PropertyName);
       
       if (auto *Var = dyn_cast<VarDecl>(VD)) {
@@ -998,9 +998,9 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   // If this is an initialization or a normal assignment, upgrade the store to
   // an initialization or assign in the uses list so that clients know about it.
   if (isFullyUninitialized) {
-    InstInfo.Kind = DIUseKind::Initialization;
+    Use.Kind = DIUseKind::Initialization;
   } else if (isFullyInitialized) {
-    InstInfo.Kind = DIUseKind::Assign;
+    Use.Kind = DIUseKind::Assign;
   } else {
     // If it is initialized on some paths, but not others, then we have an
     // inconsistent initialization, which needs dynamic control logic in the
@@ -1008,21 +1008,21 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
 
     // This is classified as InitOrAssign (not PartialStore), so there are only
     // a few instructions that could reach here.
-    assert(InstInfo.Kind == DIUseKind::InitOrAssign &&
+    assert(Use.Kind == DIUseKind::InitOrAssign &&
            "should only have inconsistent InitOrAssign's here");
 
     // If this access stores something of non-trivial type, then keep track of
     // it for later.   Once we've collected all of the conditional init/assigns,
     // we can insert a single control variable for the memory object for the
     // whole function.
-    if (!InstInfo.onlyTouchesTrivialElements(TheMemory))
+    if (!Use.onlyTouchesTrivialElements(TheMemory))
       HasConditionalInitAssign = true;
     return;
   }
   
   // Otherwise, we have a definite init or assign.  Make sure the instruction
   // itself is tagged properly.
-  updateInstructionForInitState(InstInfo);
+  updateInstructionForInitState(Use);
 }
 
 void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
@@ -1650,8 +1650,8 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
 
 /// handleSelfInitUse - When processing a 'self' argument on a class, this is
 /// a call to self.init or super.init.
-void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
-  auto *Inst = InstInfo.Inst;
+void LifetimeChecker::handleSelfInitUse(DIMemoryUse &Use) {
+  auto *Inst = Use.Inst;
 
   assert(TheMemory.isAnyInitSelf());
   assert(!TheMemory.isClassInitSelf() || TheMemory.isNonRootClassSelf());
@@ -1684,8 +1684,8 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
     assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
 
     // Lower Assign instructions if needed.
-    if (isa<AssignInst>(InstInfo.Inst))
-      updateInstructionForInitState(InstInfo);
+    if (isa<AssignInst>(Use.Inst))
+      updateInstructionForInitState(Use);
   } else {
     // super.init also requires that all ivars are initialized before the
     // superclass initializer runs.
@@ -1694,10 +1694,10 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
 
       // If the super.init call is implicit generated, produce a specific
       // diagnostic.
-      bool isImplicit = InstInfo.Inst->getLoc().getSourceLoc().isInvalid();
+      bool isImplicit = Use.Inst->getLoc().getSourceLoc().isInvalid();
       auto diag = isImplicit ? diag::ivar_not_initialized_at_implicit_superinit :
                   diag::ivar_not_initialized_at_superinit;
-      return diagnoseInitError(InstInfo, diag);
+      return diagnoseInitError(Use, diag);
     }
 
     // Otherwise everything is good!
@@ -1709,15 +1709,15 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
 /// from being InitOrAssign to some concrete state, update it for that state.
 /// This includes rewriting them from assign instructions into their composite
 /// operations.
-void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
-  SILInstruction *Inst = InstInfo.Inst;
+void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
+  SILInstruction *Inst = Use.Inst;
 
   IsInitialization_t InitKind;
-  if (InstInfo.Kind == DIUseKind::Initialization ||
-      InstInfo.Kind == DIUseKind::SelfInit)
+  if (Use.Kind == DIUseKind::Initialization ||
+      Use.Kind == DIUseKind::SelfInit)
     InitKind = IsInitialization;
   else {
-    assert(InstInfo.Kind == DIUseKind::Assign);
+    assert(Use.Kind == DIUseKind::Assign);
     InitKind = IsNotInitialization;
   }
 
@@ -1751,8 +1751,8 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
   if (auto *AI = dyn_cast<AssignInst>(Inst)) {
     // Remove this instruction from our data structures, since we will be
     // removing it.
-    auto Kind = InstInfo.Kind;
-    InstInfo.Inst = nullptr;
+    auto Kind = Use.Kind;
+    Use.Inst = nullptr;
     NonLoadUses.erase(Inst);
 
     PartialInitializationKind PartialInitKind;
@@ -1767,8 +1767,8 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
                          : PartialInitializationKind::IsNotInitialization);
     }
 
-    unsigned FirstElement = InstInfo.FirstElement;
-    unsigned NumElements = InstInfo.NumElements;
+    unsigned FirstElement = Use.FirstElement;
+    unsigned NumElements = Use.NumElements;
 
     SmallVector<SILInstruction*, 4> InsertedInsts;
     SILBuilderWithScope B(Inst, &InsertedInsts);
