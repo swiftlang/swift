@@ -61,7 +61,6 @@ namespace {
   typedef EquivalenceClass::DerivedSameTypeComponent DerivedSameTypeComponent;
   typedef GenericSignatureBuilder::DelayedRequirement DelayedRequirement;
   typedef GenericSignatureBuilder::ResolvedType ResolvedType;
-  typedef GenericSignatureBuilder::ResolveResult ResolveResult;
 } // end anonymous namespace
 
 namespace llvm {
@@ -79,7 +78,11 @@ STATISTIC(NumSameTypeConstraints, "# of same-type constraints tracked");
 STATISTIC(NumConcreteTypeConstraints,
           "# of same-type-to-concrete constraints tracked");
 STATISTIC(NumSuperclassConstraints, "# of superclass constraints tracked");
+STATISTIC(NumSuperclassConstraintsExtra,
+          "# of superclass constraints that add no information");
 STATISTIC(NumLayoutConstraints, "# of layout constraints tracked");
+STATISTIC(NumLayoutConstraintsExtra,
+          "# of layout constraints  that add no information");
 STATISTIC(NumSelfDerived, "# of self-derived constraints removed");
 STATISTIC(NumArchetypeAnchorCacheHits,
           "# of hits in the archetype anchor cache");
@@ -1558,22 +1561,119 @@ void EquivalenceClass::addMember(PotentialArchetype *pa) {
   }
 }
 
+class GenericSignatureBuilder::ResolvedType {
+  llvm::PointerUnion<PotentialArchetype *, Type> type;
+  EquivalenceClass *equivClass;
+
+  /// For a type that could not be resolved further unless the given
+  /// equivalence class changes.
+  ResolvedType(EquivalenceClass *equivClass)
+    : type(), equivClass(equivClass) { }
+
+public:
+  /// A specific resolved potential archetype.
+  ResolvedType(PotentialArchetype *pa)
+    : type(pa), equivClass(pa->getEquivalenceClassIfPresent()) { }
+
+  /// A resolved type within the given equivalence class.
+  ResolvedType(Type type, EquivalenceClass *equivClass)
+      : type(type), equivClass(equivClass) {
+    assert(type->isTypeParameter() == static_cast<bool>(equivClass) &&
+           "type parameters must have equivalence classes");
+  }
+
+  /// Return an unresolved result, which could be resolved when we
+  /// learn more information about the given equivalence class.
+  static ResolvedType forUnresolved(EquivalenceClass *equivClass) {
+    return ResolvedType(equivClass);
+  }
+
+  /// Return a result for a concrete type.
+  static ResolvedType forConcrete(Type concreteType) {
+    return ResolvedType(concreteType, nullptr);
+  }
+
+  /// Determine whether this result was resolved.
+  explicit operator bool() const { return !type.isNull(); }
+
+  /// Retrieve the dependent type.
+  Type getDependentType() const;
+
+  /// Retrieve the concrete type, or a null type if this result doesn't store
+  /// a concrete type.
+  Type getAsConcreteType() const {
+    assert(*this && "Doesn't contain any result");
+    if (equivClass) return Type();
+    return type.dyn_cast<Type>();
+  }
+
+  /// Realize a potential archetype for this type parameter.
+  PotentialArchetype *realizePotentialArchetype(
+                                            GenericSignatureBuilder &builder);
+
+  /// Retrieve the potential archetype, if already known.
+  PotentialArchetype *getPotentialArchetypeIfKnown() const {
+    return type.dyn_cast<PotentialArchetype *>();
+  }
+
+  /// Retrieve the equivalence class into which a resolved type refers.
+  EquivalenceClass *getEquivalenceClass() const {
+    assert(*this && "Only for resolved types");
+    if (equivClass) return equivClass;
+
+    // Create the equivalence class now.
+    return type.get<PotentialArchetype *>()->getOrCreateEquivalenceClass();
+  }
+
+  /// Retrieve the unresolved result.
+  EquivalenceClass *getUnresolvedEquivClass() const {
+    assert(!*this);
+    return equivClass;
+  }
+
+  /// Return an unresolved type.
+  ///
+  /// This loses equivalence-class information that could be useful, which
+  /// is unfortunate.
+  UnresolvedType getUnresolvedType() const {
+    return type;
+  }
+};
+
 bool EquivalenceClass::recordConformanceConstraint(
-                                 PotentialArchetype *pa,
+                                 ResolvedType type,
                                  ProtocolDecl *proto,
-                                 const RequirementSource *source) {
+                                 FloatingRequirementSource source) {
+  auto &builder = *members.front()->getBuilder();
+
   // If we haven't seen a conformance to this protocol yet, add it.
   bool inserted = false;
   auto known = conformsTo.find(proto);
   if (known == conformsTo.end()) {
     known = conformsTo.insert({ proto, { }}).first;
     inserted = true;
-    modified(*pa->getBuilder());
+    modified(builder);
     ++NumConformances;
+
+    // If there is a concrete type that resolves this conformance requirement,
+    // record the conformance.
+    if (!builder.resolveConcreteConformance(type, proto)) {
+      // Otherwise, determine whether there is a superclass constraint where the
+      // superclass conforms to this protocol.
+      (void)builder.resolveSuperConformance(type, proto);
+    }
+
+    // Resolve any associated type members.
+    for (auto assocType : proto->getAssociatedTypeMembers()) {
+      type.realizePotentialArchetype(builder)->updateNestedTypeForConformance(
+                                        assocType,
+                                        ArchetypeResolutionKind::AlreadyKnown);
+    }
   }
 
   // Record this conformance source.
-  known->second.push_back({pa, proto, source});
+  auto pa = type.realizePotentialArchetype(builder);
+  known->second.push_back({pa, proto, source.getSource(pa)});
   ++NumConformanceConstraints;
 
   return inserted;
@@ -2113,25 +2213,24 @@ static void addConditionalRequirements(GenericSignatureBuilder &builder,
 }
 
 const RequirementSource *
-GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
+GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
                                                     ProtocolDecl *proto) {
-  auto equivClass = pa->getEquivalenceClassIfPresent();
-  auto concrete = equivClass ? equivClass->concreteType : Type();
+  auto equivClass = type.getEquivalenceClass();
+  auto concrete = equivClass->concreteType;
   if (!concrete) return nullptr;
 
   // Conformance to this protocol is redundant; update the requirement source
   // appropriately.
-  auto paEquivClass = pa->getOrCreateEquivalenceClass();
   const RequirementSource *concreteSource;
   if (auto writtenSource =
-        paEquivClass->findAnyConcreteConstraintAsWritten(pa))
+        equivClass->findAnyConcreteConstraintAsWritten(nullptr))
     concreteSource = writtenSource->source;
   else
-    concreteSource = paEquivClass->concreteTypeConstraints.front().source;
+    concreteSource = equivClass->concreteTypeConstraints.front().source;
 
   // Lookup the conformance of the concrete type to this protocol.
   auto conformance =
-      lookupConformance(pa->getDependentType({ })->getCanonicalType(),
+      lookupConformance(type.getDependentType()->getCanonicalType(),
                         concrete,
                         proto->getDeclaredInterfaceType()
                           ->castTo<ProtocolType>());
@@ -2145,27 +2244,26 @@ GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
     }
 
     Impl->HadAnyError = true;
-    paEquivClass->invalidConcreteType = true;
+    equivClass->invalidConcreteType = true;
     return nullptr;
   }
 
   concreteSource = concreteSource->viaConcrete(*this, *conformance);
-  paEquivClass->recordConformanceConstraint(pa, proto, concreteSource);
+  equivClass->recordConformanceConstraint(type, proto, concreteSource);
   addConditionalRequirements(*this, *conformance);
   return concreteSource;
 }
-
 const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
-                                                        PotentialArchetype *pa,
+                                                        ResolvedType type,
                                                         ProtocolDecl *proto) {
   // Get the superclass constraint.
-  auto equivClass = pa->getEquivalenceClassIfPresent();
-  Type superclass = equivClass ? equivClass->superclass : nullptr;
+  auto equivClass = type.getEquivalenceClass();
+  Type superclass = equivClass->superclass;
   if (!superclass) return nullptr;
 
   // Lookup the conformance of the superclass to this protocol.
   auto conformance =
-    lookupConformance(pa->getDependentType({ })->getCanonicalType(),
+    lookupConformance(type.getDependentType()->getCanonicalType(),
                       superclass,
                       proto->getDeclaredInterfaceType()
                         ->castTo<ProtocolType>());
@@ -2173,144 +2271,67 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
 
   // Conformance to this protocol is redundant; update the requirement source
   // appropriately.
-  auto paEquivClass = pa->getOrCreateEquivalenceClass();
   const RequirementSource *superclassSource;
   if (auto writtenSource =
-        paEquivClass->findAnySuperclassConstraintAsWritten(pa))
+        equivClass->findAnySuperclassConstraintAsWritten(nullptr))
     superclassSource = writtenSource->source;
   else
-    superclassSource = paEquivClass->superclassConstraints.front().source;
+    superclassSource = equivClass->superclassConstraints.front().source;
 
   superclassSource =
     superclassSource->viaSuperclass(*this, *conformance);
-  paEquivClass->recordConformanceConstraint(pa, proto, superclassSource);
+  equivClass->recordConformanceConstraint(type, proto, superclassSource);
   addConditionalRequirements(*this, *conformance);
   return superclassSource;
 }
 
-struct GenericSignatureBuilder::ResolvedType {
-  llvm::PointerUnion<PotentialArchetype *, Type> paOrT;
-
-  explicit ResolvedType(PotentialArchetype *pa) : paOrT(pa) {}
-  explicit ResolvedType(Type ty) : paOrT(ty) {}
-
-public:
-  static ResolvedType forConcreteType(Type t) {
-    assert(!t->isTypeParameter() &&
-           "concrete type with parameter should've been resolved");
-    return ResolvedType(t);
-  }
-
-  static ResolvedType forPotentialArchetype(PotentialArchetype *pa) {
-    return ResolvedType(pa);
-  }
-
-  Type getType() const { return paOrT.dyn_cast<Type>(); }
-  PotentialArchetype *getPotentialArchetype() const {
-    return paOrT.dyn_cast<PotentialArchetype *>();
-  }
-
-  bool isType() const { return paOrT.is<Type>(); }
-};
-
-class GenericSignatureBuilder::ResolveResult {
-  llvm::PointerUnion<Type, PotentialArchetype *> type;
-  EquivalenceClass *equivClass;
-
-  /// For a type that could not be resolved further unless the given
-  /// equivalence class changes.
-  ResolveResult(EquivalenceClass *equivClass)
-    : type(), equivClass(equivClass) { }
-
-public:
-  /// A specific resolved potential archetype.
-  ResolveResult(PotentialArchetype *pa)
-    : type(pa), equivClass(pa->getEquivalenceClassIfPresent()) { }
-
-  /// A resolved type within the given equivalence class.
-  ResolveResult(Type type, EquivalenceClass *equivClass)
-      : type(type), equivClass(equivClass) {
-    assert(type->isTypeParameter() == static_cast<bool>(equivClass) &&
-           "type parameters must have equivalence classes");
-  }
-
-  /// Return an unresolved result, which could be resolved when we
-  /// learn more information about the given equivalence class.
-  static ResolveResult forUnresolved(EquivalenceClass *equivClass){
-    return ResolveResult(equivClass);
-  }
-
-  /// Determine whether this result was resolved.
-  explicit operator bool() const { return !type.isNull(); }
-
-  /// Retrieve the resolved type.
-  ResolvedType getResolvedType(GenericSignatureBuilder &builder) const;
-
-  /// Retrieve the dependent type.
-  Type getDependentType() const;
-
-  /// Retrieve the potential archetype, if already known.
-  PotentialArchetype *getAsPotentialArchetype() const {
-    return type.dyn_cast<PotentialArchetype *>();
-  }
-
-  /// Retrieve the equivalence class into which a resolved type refers.
-  EquivalenceClass *getEquivalenceClass() const {
-    assert(*this && "Only for resolved types");
-    if (equivClass) return equivClass;
-
-    // Create the equivalence class now.
-    return type.get<PotentialArchetype *>()->getOrCreateEquivalenceClass();
-  }
-
-  /// Retrieve the unresolved result.
-  EquivalenceClass *getUnresolvedEquivClass() const {
-    assert(!*this);
-    return equivClass;
-  }
-};
-
-ResolvedType ResolveResult::getResolvedType(
-                                     GenericSignatureBuilder &builder) const {
-  assert(*this && "Unresolved result");
-
-  // Already-resolved potential archetype.
-  if (auto pa = type.dyn_cast<PotentialArchetype *>())
-    return ResolvedType::forPotentialArchetype(pa);
-
-  Type type = this->type.get<Type>();
-
-  // Concrete type.
-  if (!type->isTypeParameter())
-    return ResolvedType::forConcreteType(type);
+/// Realize a potential archetype for this type parameter.
+PotentialArchetype *ResolvedType::realizePotentialArchetype(
+                                           GenericSignatureBuilder &builder) {
+  if (auto pa = getPotentialArchetypeIfKnown())
+    return pa;
 
   // Resolve the potential archetype now.
+  Type type = this->type.get<Type>();
+  assert(type->isTypeParameter());
   auto pa =
-    builder.resolvePotentialArchetype(type,
-                                      ArchetypeResolutionKind::WellFormed)
-      .get<PotentialArchetype *>();
+    builder.maybeResolveEquivalenceClass(type,
+                                         ArchetypeResolutionKind::WellFormed,
+                                         /*wantExactPotentialArchetype=*/true)
+      .getPotentialArchetypeIfKnown();
   assert(pa && "Not a resolvable type!");
-  return ResolvedType::forPotentialArchetype(pa);
+
+  // Cache the potential archetype, now that it's been realized.
+  this->type = pa;
+  return pa;
 }
 
-Type ResolveResult::getDependentType() const {
+Type ResolvedType::getDependentType() const {
   // Already-resolved potential archetype.
   if (auto pa = type.dyn_cast<PotentialArchetype *>())
     return pa->getDependentType({ });
 
-  return type.get<Type>();
+  Type result = type.get<Type>();
+  return result->isTypeParameter() ? result : Type();
 }
 
 /// If there is a same-type requirement to be added for the given nested type
 /// due to a superclass constraint on the parent type, add it now.
 static void maybeAddSameTypeRequirementForNestedType(
-              GenericSignatureBuilder::PotentialArchetype *nestedPA,
-              const RequirementSource *superSource,
-              GenericSignatureBuilder &builder) {
+                                          ResolvedType nested,
+                                          const RequirementSource *superSource,
+                                          GenericSignatureBuilder &builder) {
   // If there's no super conformance, we're done.
   if (!superSource) return;
 
-  auto assocType = nestedPA->getResolvedAssociatedType();
+  // If the nested type is already concrete, we're done.
+  if (nested.getAsConcreteType()) return;
+
+  // Dig out the associated type.
+  AssociatedTypeDecl *assocType = nullptr;
+  if (auto depMemTy = nested.getDependentType()->getAs<DependentMemberType>())
+    assocType = depMemTy->getAssocType();
+
   if (!assocType) return;
 
   // Dig out the type witness.
@@ -2326,36 +2347,13 @@ static void maybeAddSameTypeRequirementForNestedType(
   // Add the same-type constraint.
   auto nestedSource = superSource->viaParent(builder, assocType);
 
-  builder.addSameTypeRequirement(nestedPA, concreteType, nestedSource,
+  builder.addSameTypeRequirement(
+        nested.getUnresolvedType(), concreteType, nestedSource,
         GenericSignatureBuilder::UnresolvedHandlingKind::GenerateConstraints);
 }
 
-bool PotentialArchetype::addConformance(ProtocolDecl *proto,
-                                        const RequirementSource *source,
-                                        GenericSignatureBuilder &builder) {
-  // Check whether we already knew about this conformance.
-  auto equivClass = getOrCreateEquivalenceClass();
-  if (!equivClass->recordConformanceConstraint(this, proto, source))
-    return false;
-
-  // If there is a concrete type that resolves this conformance requirement,
-  // record the conformance.
-  if (!builder.resolveConcreteConformance(this, proto)) {
-    // Otherwise, determine whether there is a superclass constraint where the
-    // superclass conforms to this protocol.
-    (void)builder.resolveSuperConformance(this, proto);
-  }
-
-  // Resolve any existing nested types that need it.
-  for (auto &nested : NestedTypes) {
-    (void)updateNestedTypeForConformance(nested.first, proto,
-                                         ArchetypeResolutionKind::AlreadyKnown);
-  }
-
-  return true;
-}
-
-auto PotentialArchetype::getOrCreateEquivalenceClass() const -> EquivalenceClass * {
+auto PotentialArchetype::getOrCreateEquivalenceClass() const
+    -> EquivalenceClass * {
   // The equivalence class is stored on the representative.
   auto representative = getRepresentative();
   if (representative != this)
@@ -2572,7 +2570,7 @@ static void concretizeNestedTypeFromConcreteParent(
   // add it now; it was elided earlier.
   if (parentEquiv->conformsTo.count(proto) == 0) {
     auto source = parentEquiv->concreteTypeConstraints.front().source;
-    parent->addConformance(proto, source, builder);
+    parentEquiv->recordConformanceConstraint(parent, proto, source);
   }
 
   assert(parentEquiv->conformsTo.count(proto) > 0 &&
@@ -2608,27 +2606,6 @@ static void concretizeNestedTypeFromConcreteParent(
          SameTypeConflictCheckedLater());
 }
 
-PotentialArchetype *PotentialArchetype::getNestedType(
-                                           Identifier nestedName,
-                                           ArchetypeResolutionKind kind,
-                                           GenericSignatureBuilder &builder) {
-  // If we already have a nested type with this name, return it.
-  auto known = NestedTypes.find(nestedName);
-  if (known != NestedTypes.end())
-    return known->second.front();
-
-  // Retrieve the nested archetype anchor, which is the best choice (so far)
-  // for this nested type.
-  return getNestedArchetypeAnchor(nestedName, builder, kind);
-}
-
-PotentialArchetype *PotentialArchetype::getNestedType(
-                                            TypeDecl *type,
-                                            GenericSignatureBuilder &builder) {
-  return updateNestedTypeForConformance(type,
-                                        ArchetypeResolutionKind::WellFormed);
-}
-
 PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
                                            Identifier name,
                                            GenericSignatureBuilder &builder,
@@ -2653,19 +2630,6 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
   return resultPA;
 }
 
-
-PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
-                                                 Identifier name,
-                                                 ProtocolDecl *proto,
-                                                 ArchetypeResolutionKind kind) {
-  // Lookup the best type for this name.
-  auto bestType =
-    getOrCreateEquivalenceClass()->lookupNestedType(name, nullptr);
-  if (!bestType) return nullptr;
-
-  // Form the potential archetype.
-  return updateNestedTypeForConformance(bestType, kind);
-}
 
 PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
                                               TypeDecl *type,
@@ -2797,11 +2761,8 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 
     // We know something concrete about the parent PA, so we need to propagate
     // that information to this new archetype.
-    // FIXME: This feels like massive overkill. Why do we have to loop?
     if (isConcreteType()) {
-      for (auto equivT : getRepresentative()->getEquivalenceClassMembers()) {
-        concretizeNestedTypeFromConcreteParent(equivT, resultPA, builder);
-      }
+      concretizeNestedTypeFromConcreteParent(this, resultPA, builder);
     }
   }
 
@@ -3026,128 +2987,6 @@ LazyResolver *GenericSignatureBuilder::getLazyResolver() const {
   return Context.getLazyResolver();
 }
 
-auto GenericSignatureBuilder::resolvePotentialArchetype(
-                                     Type type,
-                                     ArchetypeResolutionKind resolutionKind)
-  -> llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
-{
-  if (auto genericParam = type->getAs<GenericTypeParamType>()) {
-    unsigned index = GenericParamKey(genericParam).findIndexIn(
-                                                           Impl->GenericParams);
-    if (index < Impl->GenericParams.size())
-      return Impl->PotentialArchetypes[index];
-
-    return (EquivalenceClass *)nullptr;
-  }
-
-  if (auto dependentMember = type->getAs<DependentMemberType>()) {
-    auto base = resolvePotentialArchetype(
-                  dependentMember->getBase(), resolutionKind);
-    auto basePA = base.dyn_cast<PotentialArchetype *>();
-    if (!basePA)
-      return base;
-
-    // If we know the associated type already, get that specific type.
-    PotentialArchetype *nestedPA;
-    if (auto assocType = dependentMember->getAssocType()) {
-      nestedPA =
-        basePA->updateNestedTypeForConformance(assocType, resolutionKind);
-    } else {
-      // Resolve based on name alone.
-      auto name = dependentMember->getName();
-      nestedPA = basePA->getNestedArchetypeAnchor(name, *this, resolutionKind);
-    }
-
-    // If we found a nested potential archetype, return it.
-    if (nestedPA)
-      return nestedPA;
-
-    // Otherwise, get/create an equivalence class for the base potential
-    // archetype.
-    return basePA->getOrCreateEquivalenceClass();
-  }
-
-  return (EquivalenceClass *)nullptr;
-}
-
-ResolveResult GenericSignatureBuilder::maybeResolveEquivalenceClass(
-                                    Type type,
-                                    ArchetypeResolutionKind resolutionKind) {
-  // The equivalence class of a generic type is known directly.
-  if (auto genericParam = type->getAs<GenericTypeParamType>()) {
-    unsigned index = GenericParamKey(genericParam).findIndexIn(
-                                                           Impl->GenericParams);
-    if (index < Impl->GenericParams.size()) {
-      auto pa = Impl->PotentialArchetypes[index];
-      return ResolveResult(type, pa->getOrCreateEquivalenceClass());
-    }
-
-    return ResolveResult::forUnresolved(nullptr);
-  }
-
-  // The equivalence class of a dependent member type is determined by its
-  // base equivalence class.
-  if (auto depMemTy = type->getAs<DependentMemberType>()) {
-    // Find the equivalence class of the base.
-    auto resolvedBase = maybeResolveEquivalenceClass(depMemTy->getBase(),
-                                                     resolutionKind);
-    if (!resolvedBase) return resolvedBase;
-
-    // Find the nested type declaration for this.
-    auto baseEquivClass = resolvedBase.getEquivalenceClass();
-    TypeDecl *nestedTypeDecl;
-    if (auto assocType = depMemTy->getAssocType()) {
-      nestedTypeDecl = assocType;
-    } else {
-      nestedTypeDecl = baseEquivClass->lookupNestedType(depMemTy->getName());
-      if (!nestedTypeDecl) {
-        return ResolveResult::forUnresolved(baseEquivClass);
-      }
-    }
-
-    // Retrieve the "smallest" type in the equivalence class, by depth, and
-    // use that to find a nested potential archetype. We used the smallest
-    // type by depth to limit expansion of the type graph.
-    auto basePA = baseEquivClass->members.front();
-    auto nestedPA =
-      basePA->updateNestedTypeForConformance(nestedTypeDecl, resolutionKind);
-    if (!nestedPA)
-      return ResolveResult::forUnresolved(baseEquivClass);
-
-    // If base resolved to the anchor, then the nested potential archetype
-    // we found is the resolved potential archetype. Return it directly,
-    // so it doesn't need to be resolved again.
-    if (basePA == resolvedBase.getAsPotentialArchetype())
-      return ResolveResult(nestedPA);
-
-    // Compute the resolved dependent type to return.
-    Type resolvedBaseType = resolvedBase.getDependentType();
-    Type resolvedMemberType;
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(nestedTypeDecl)) {
-      resolvedMemberType =
-        DependentMemberType::get(resolvedBaseType, assocType);
-    } else {
-      // Note: strange case that might not even really be dependent.
-      resolvedMemberType =
-        DependentMemberType::get(resolvedBaseType, depMemTy->getName());
-    }
-
-    return ResolveResult(resolvedMemberType,
-                         nestedPA->getOrCreateEquivalenceClass());
-  }
-
-  return ResolveResult::forUnresolved(nullptr);
-}
-
-EquivalenceClass *GenericSignatureBuilder::resolveEquivalenceClass(
-                                    Type type,
-                                    ArchetypeResolutionKind resolutionKind) {
-  if (auto resolved = maybeResolveEquivalenceClass(type, resolutionKind))
-    return resolved.getEquivalenceClass();
-
-  return nullptr;
-}
-
 /// Resolve any unresolved dependent member types using the given builder.
 static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
                                         Type type,
@@ -3181,42 +3020,124 @@ static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
     return None;
   });
 }
-auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
-                                      FloatingRequirementSource source)
-    -> ResolveResult {
-  auto pa = paOrT.dyn_cast<PotentialArchetype *>();
-  if (auto type = paOrT.dyn_cast<Type>()) {
-    // Determine what kind of resolution we want.
-    ArchetypeResolutionKind resolutionKind =
-      ArchetypeResolutionKind::WellFormed;
-    if (!source.isExplicit() && source.isRecursive(type, *this))
-      resolutionKind = ArchetypeResolutionKind::AlreadyKnown;
 
-    // If it's not a type parameter, it won't directly resolve to one.
-    if (!type->isTypeParameter()) {
-      // If there is a type parameter somewhere in this type, resolve it.
-      if (type->hasTypeParameter()) {
-        Type resolved =
-          resolveDependentMemberTypes(*this, type, resolutionKind);
-        if (resolved->hasError() && !type->hasError())
-          return ResolveResult::forUnresolved(nullptr);
-
-        type = resolved;
-      }
-
-      return ResolveResult(type, nullptr);
+ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
+                                    Type type,
+                                    ArchetypeResolutionKind resolutionKind,
+                                    bool wantExactPotentialArchetype) {
+  // The equivalence class of a generic type is known directly.
+  if (auto genericParam = type->getAs<GenericTypeParamType>()) {
+    unsigned index = GenericParamKey(genericParam).findIndexIn(
+                                                           Impl->GenericParams);
+    if (index < Impl->GenericParams.size()) {
+      return ResolvedType(Impl->PotentialArchetypes[index]);
     }
 
-    // Attempt to resolve the type parameter to a potential archetype. If this
-    // fails, it's because we weren't allowed to resolve anything now.
-    auto resolved = resolvePotentialArchetype(type, resolutionKind);
-    pa = resolved.dyn_cast<PotentialArchetype *>();
-    if (!pa) {
-      return ResolveResult::forUnresolved(resolved.get<EquivalenceClass *>());
-    }
+    return ResolvedType::forUnresolved(nullptr);
   }
 
-  return ResolveResult(pa);
+  // The equivalence class of a dependent member type is determined by its
+  // base equivalence class.
+  if (auto depMemTy = type->getAs<DependentMemberType>()) {
+    // Find the equivalence class of the base.
+    auto resolvedBase =
+      maybeResolveEquivalenceClass(depMemTy->getBase(),
+                                   resolutionKind,
+                                   wantExactPotentialArchetype);
+    if (!resolvedBase) return resolvedBase;
+
+    // Find the nested type declaration for this.
+    auto baseEquivClass = resolvedBase.getEquivalenceClass();
+    TypeDecl *nestedTypeDecl;
+    if (auto assocType = depMemTy->getAssocType()) {
+      nestedTypeDecl = assocType;
+    } else {
+      nestedTypeDecl = baseEquivClass->lookupNestedType(depMemTy->getName());
+      if (!nestedTypeDecl) {
+        return ResolvedType::forUnresolved(baseEquivClass);
+      }
+    }
+
+    // Retrieve the "smallest" type in the equivalence class, by depth, and
+    // use that to find a nested potential archetype. We used the smallest
+    // type by depth to limit expansion of the type graph.
+    PotentialArchetype *basePA;
+    if (wantExactPotentialArchetype) {
+      basePA = resolvedBase.getPotentialArchetypeIfKnown();
+      if (!basePA) return ResolvedType::forUnresolved(baseEquivClass);
+    } else {
+      basePA = baseEquivClass->members.front();
+    }
+
+    auto nestedPA =
+      basePA->updateNestedTypeForConformance(nestedTypeDecl, resolutionKind);
+    if (!nestedPA)
+      return ResolvedType::forUnresolved(baseEquivClass);
+
+    // If base resolved to the anchor, then the nested potential archetype
+    // we found is the resolved potential archetype. Return it directly,
+    // so it doesn't need to be resolved again.
+    if (basePA == resolvedBase.getPotentialArchetypeIfKnown())
+      return ResolvedType(nestedPA);
+
+    // Compute the resolved dependent type to return.
+    Type resolvedBaseType = resolvedBase.getDependentType();
+    Type resolvedMemberType;
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(nestedTypeDecl)) {
+      resolvedMemberType =
+        DependentMemberType::get(resolvedBaseType, assocType);
+    } else {
+      // Note: strange case that might not even really be dependent.
+      resolvedMemberType =
+        DependentMemberType::get(resolvedBaseType, depMemTy->getName());
+    }
+
+    return ResolvedType(resolvedMemberType,
+                         nestedPA->getOrCreateEquivalenceClass());
+  }
+
+  // If it's not a type parameter, it won't directly resolve to one.
+  // FIXME: Generic typealiases contradict the assumption above.
+  // If there is a type parameter somewhere in this type, resolve it.
+  if (type->hasTypeParameter()) {
+    Type resolved =
+    resolveDependentMemberTypes(*this, type,
+                                ArchetypeResolutionKind::WellFormed);
+    if (resolved->hasError() && !type->hasError())
+      return ResolvedType::forUnresolved(nullptr);
+
+    type = resolved;
+  }
+
+  return ResolvedType::forConcrete(type);
+}
+
+EquivalenceClass *GenericSignatureBuilder::resolveEquivalenceClass(
+                                    Type type,
+                                    ArchetypeResolutionKind resolutionKind) {
+  if (auto resolved =
+        maybeResolveEquivalenceClass(type, resolutionKind,
+                                     /*wantExactPotentialArchetype=*/false))
+    return resolved.getEquivalenceClass();
+
+  return nullptr;
+}
+
+auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
+                                      FloatingRequirementSource source)
+    -> ResolvedType {
+  if (auto pa = paOrT.dyn_cast<PotentialArchetype *>())
+    return ResolvedType(pa);
+
+  // Determine what kind of resolution we want.
+    Type type = paOrT.dyn_cast<Type>();
+  ArchetypeResolutionKind resolutionKind =
+    ArchetypeResolutionKind::WellFormed;
+  if (!source.isExplicit() && source.isRecursive(type, *this))
+    resolutionKind = ArchetypeResolutionKind::AlreadyKnown;
+
+  return maybeResolveEquivalenceClass(type, resolutionKind,
+                                      /*wantExactPotentialArchetype=*/true);
 }
 
 void GenericSignatureBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
@@ -3594,37 +3515,49 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 }
 
 ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
-                               PotentialArchetype *PAT,
-                               ProtocolDecl *Proto,
-                               const RequirementSource *Source) {
-  // Add the requirement, if we haven't done so already.
-  if (!PAT->addConformance(Proto, Source, *this))
+                               ResolvedType type,
+                               ProtocolDecl *proto,
+                               FloatingRequirementSource source) {
+  // Add the conformance requirement, bailing out earlier if we've already
+  // seen it.
+  auto equivClass = type.getEquivalenceClass();
+  if (!equivClass->recordConformanceConstraint(type, proto, source))
     return ConstraintResult::Resolved;
 
-  return expandConformanceRequirement(PAT, Proto, Source,
+  // FIXME: Resolve later.
+  auto pa = type.realizePotentialArchetype(*this);
+  return expandConformanceRequirement(pa, proto, source.getSource(pa),
                                       /*onlySameTypeRequirements=*/false);
 }
 
 ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
-                                             PotentialArchetype *PAT,
-                                             LayoutConstraint Layout,
-                                             const RequirementSource *Source) {
-  auto equivClass = PAT->getOrCreateEquivalenceClass();
-
-  // Record this layout constraint.
-  equivClass->layoutConstraints.push_back({PAT, Layout, Source});
-  equivClass->modified(*this);
-  ++NumLayoutConstraints;
+                                             ResolvedType type,
+                                             LayoutConstraint layout,
+                                             FloatingRequirementSource source) {
+  auto equivClass = type.getEquivalenceClass();
 
   // Update the layout in the equivalence class, if we didn't have one already.
-  if (!equivClass->layout)
-    equivClass->layout = Layout;
-  else {
+  bool anyChanges = false;
+  if (!equivClass->layout) {
+    equivClass->layout = layout;
+    anyChanges = true;
+  } else {
     // Try to merge layout constraints.
-    auto mergedLayout = equivClass->layout.merge(Layout);
-    if (mergedLayout->isKnownLayout() && mergedLayout != equivClass->layout)
+    auto mergedLayout = equivClass->layout.merge(layout);
+    if (mergedLayout->isKnownLayout() && mergedLayout != equivClass->layout) {
       equivClass->layout = mergedLayout;
+      anyChanges = true;
+    }
   }
+
+  // FIXME: Don't want to realize this potential archetype if we can avoid it.
+  auto pa = type.realizePotentialArchetype(*this);
+
+  // Record this layout constraint.
+  equivClass->layoutConstraints.push_back({pa, layout, source.getSource(pa)});
+  equivClass->modified(*this);
+  ++NumLayoutConstraints;
+  if (!anyChanges) ++NumLayoutConstraintsExtra;
 
   return ConstraintResult::Resolved;
 }
@@ -3635,28 +3568,25 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
                                              FloatingRequirementSource source,
                                              UnresolvedHandlingKind unresolvedHandling) {
   // Resolve the subject.
-  auto maybeResolvedSubject = resolve(subject, source);
-  if (!maybeResolvedSubject) {
+  auto resolvedSubject = resolve(subject, source);
+  if (!resolvedSubject) {
     return handleUnresolvedRequirement(
                                RequirementKind::Layout, subject,
                                layout, source,
-                               maybeResolvedSubject.getUnresolvedEquivClass(),
+                               resolvedSubject.getUnresolvedEquivClass(),
                                unresolvedHandling);
   }
 
-  /// Resolve the subject fully.
-  ResolvedType resolvedSubject = maybeResolvedSubject.getResolvedType(*this);
-
   // If this layout constraint applies to a concrete type, we can fully
   // resolve it now.
-  if (resolvedSubject.isType()) {
+  if (auto concreteType = resolvedSubject.getAsConcreteType()) {
     // If a layout requirement was explicitly written on a concrete type,
     // complain.
     if (source.isExplicit() && source.getLoc().isValid()) {
       Impl->HadAnyError = true;
 
       Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
-                     TypeLoc::withoutLoc(resolvedSubject.getType()));
+                     TypeLoc::withoutLoc(concreteType));
       return ConstraintResult::Concrete;
     }
 
@@ -3666,32 +3596,36 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
     return ConstraintResult::Resolved;
   }
 
-  auto pa = resolvedSubject.getPotentialArchetype();
-  return addLayoutRequirementDirect(pa, layout, source.getSource(pa));
+  return addLayoutRequirementDirect(resolvedSubject, layout, source);
 }
 
-void GenericSignatureBuilder::updateSuperclass(
-                                           PotentialArchetype *T,
+bool GenericSignatureBuilder::updateSuperclass(
+                                           ResolvedType type,
                                            Type superclass,
-                                           const RequirementSource *source) {
-  auto equivClass = T->getOrCreateEquivalenceClass();
+                                           FloatingRequirementSource source) {
+  auto equivClass = type.getEquivalenceClass();
 
   // Local function to handle the update of superclass conformances
   // when the superclass constraint changes.
   auto updateSuperclassConformances = [&] {
     for (const auto &conforms : equivClass->conformsTo) {
       auto proto = conforms.first;
-      if (auto superSource = resolveSuperConformance(T, proto)) {
+      if (auto superSource = resolveSuperConformance(type, proto)) {
         for (auto assocType : proto->getAssociatedTypeMembers()) {
+          // Only do this for the anchor.
+          if (assocType != assocType->getAssociatedTypeAnchor())
+            continue;
 
-          const auto &nestedTypes = T->getNestedTypes();
-          auto nested = nestedTypes.find(assocType->getName());
-          if (nested == nestedTypes.end()) continue;
-
-          for (auto nestedPA : nested->second) {
-            if (nestedPA->getResolvedAssociatedType() == assocType)
-              maybeAddSameTypeRequirementForNestedType(nestedPA, superSource,
-                                                       *this);
+          // FIXME: More efficient way to extend resolved type?
+          Type nestedType =
+            DependentMemberType::get(type.getDependentType(), assocType);
+          if (auto nested =
+                maybeResolveEquivalenceClass(
+                                 nestedType,
+                                 ArchetypeResolutionKind::AlreadyKnown,
+                                 /*wantExactPotentialArchetype=*/true)) {
+            maybeAddSameTypeRequirementForNestedType(nested, superSource,
+                                                     *this);
           }
         }
       }
@@ -3706,15 +3640,17 @@ void GenericSignatureBuilder::updateSuperclass(
 
     // Presence of a superclass constraint implies a _Class layout
     // constraint.
-    auto layoutReqSource = source->viaDerived(*this);
-    addLayoutRequirementDirect(T,
+    // FIXME: FloatingRequirementSource should be able to handle "viaDerived".
+    auto pa = type.realizePotentialArchetype(*this);
+    auto layoutReqSource = source.getSource(pa)->viaDerived(*this);
+    addLayoutRequirementDirect(type,
                          LayoutConstraint::getLayoutConstraint(
                              superclass->getClassOrBoundGenericClass()->isObjC()
                                  ? LayoutConstraintKind::Class
                                  : LayoutConstraintKind::NativeClass,
                              getASTContext()),
                          layoutReqSource);
-    return;
+    return true;
   }
 
   // T already has a superclass; make sure it's related.
@@ -3734,25 +3670,31 @@ void GenericSignatureBuilder::updateSuperclass(
 
     // We've strengthened the bound, so update superclass conformances.
     updateSuperclassConformances();
-    return;
+    return true;
   }
 
-  return;
+  return false;
 }
 
 ConstraintResult GenericSignatureBuilder::addSuperclassRequirementDirect(
-                                            PotentialArchetype *T,
+                                            ResolvedType type,
                                             Type superclass,
-                                            const RequirementSource *source) {
+                                            FloatingRequirementSource source) {
+  // FIXME: realize much later.
+  auto T = type.realizePotentialArchetype(*this);
+  auto resolvedSource = source.getSource(T);
+
   // Record the constraint.
-  auto equivClass = T->getOrCreateEquivalenceClass();
+  auto equivClass = type.getEquivalenceClass();
   equivClass->superclassConstraints.push_back(
-                                    ConcreteConstraint{T, superclass, source});
+                          ConcreteConstraint{T, superclass, resolvedSource});
   equivClass->modified(*this);
   ++NumSuperclassConstraints;
 
   // Update the equivalence class with the constraint.
-  updateSuperclass(T, superclass, source);
+  if (!updateSuperclass(type, superclass, source))
+    ++NumSuperclassConstraintsExtra;
+
   return ConstraintResult::Resolved;
 }
 
@@ -3770,23 +3712,20 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     FloatingRequirementSource source, UnresolvedHandlingKind unresolvedHandling,
     ModuleDecl *inferForModule) {
   // Resolve the constraint.
-  auto maybeResolvedConstraint = resolve(constraint, source);
-  if (!maybeResolvedConstraint) {
+  auto resolvedConstraint = resolve(constraint, source);
+  if (!resolvedConstraint) {
     return handleUnresolvedRequirement(
                              RequirementKind::Conformance, subject,
                              toRequirementRHS(constraint), source,
-                             maybeResolvedConstraint.getUnresolvedEquivClass(),
+                             resolvedConstraint.getUnresolvedEquivClass(),
                              unresolvedHandling);
   }
 
   // The right-hand side needs to be concrete.
-  ResolvedType resolvedConstraint =
-    maybeResolvedConstraint.getResolvedType(*this);
-  Type constraintType;
-  if (auto constraintPA = resolvedConstraint.getPotentialArchetype()) {
-    constraintType = constraintPA->getDependentType(Impl->GenericParams);
-  } else {
-    constraintType = resolvedConstraint.getType();
+  Type constraintType = resolvedConstraint.getAsConcreteType();
+  if (!constraintType) {
+    constraintType = resolvedConstraint.getDependentType();
+    assert(constraintType && "No type to express resolved constraint?");
   }
 
   // Check whether we have a reasonable constraint type at all.
@@ -3808,8 +3747,8 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   }
 
   // Resolve the subject. If we can't, delay the constraint.
-  auto maybeResolvedSubject = resolve(subject, source);
-  if (!maybeResolvedSubject) {
+  auto resolvedSubject = resolve(subject, source);
+  if (!resolvedSubject) {
     auto recordedKind =
       constraintType->isExistentialType()
         ? RequirementKind::Conformance
@@ -3817,17 +3756,14 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     return handleUnresolvedRequirement(
                                recordedKind, subject, constraintType,
                                source,
-                               maybeResolvedSubject.getUnresolvedEquivClass(),
+                               resolvedSubject.getUnresolvedEquivClass(),
                                unresolvedHandling);
   }
 
   // If the resolved subject is a type, there may be things we can infer (if it
   // conditionally conforms to the protocol), and we can probably perform
   // diagnostics here.
-  ResolvedType resolvedSubject = maybeResolvedSubject.getResolvedType(*this);
-  if (resolvedSubject.isType()) {
-    auto subjectType = resolvedSubject.getType();
-
+  if (auto subjectType = resolvedSubject.getAsConcreteType()) {
     if (constraintType->isExistentialType()) {
       auto layout = constraintType->getExistentialLayout();
       for (auto *proto : layout.getProtocols()) {
@@ -3862,34 +3798,29 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     return ConstraintResult::Resolved;
   }
 
-  auto subjectPA = resolvedSubject.getPotentialArchetype();
-  assert(subjectPA && "No potential archetype?");
-
-  auto resolvedSource = source.getSource(subjectPA);
-
   // Protocol requirements.
   if (constraintType->isExistentialType()) {
     bool anyErrors = false;
     auto layout = constraintType->getExistentialLayout();
 
     if (auto layoutConstraint = layout.getLayoutConstraint()) {
-      if (isErrorResult(addLayoutRequirementDirect(subjectPA,
+      if (isErrorResult(addLayoutRequirementDirect(resolvedSubject,
                                                    layoutConstraint,
-                                                   resolvedSource)))
+                                                   source)))
         anyErrors = true;
     }
 
     if (layout.superclass) {
-      if (isErrorResult(addSuperclassRequirementDirect(subjectPA,
+      if (isErrorResult(addSuperclassRequirementDirect(resolvedSubject,
                                                        layout.superclass,
-                                                       resolvedSource)))
+                                                       source)))
         anyErrors = true;
     }
 
     for (auto *proto : layout.getProtocols()) {
       auto *protoDecl = proto->getDecl();
-      if (isErrorResult(addConformanceRequirement(subjectPA, protoDecl,
-                                                  resolvedSource)))
+      if (isErrorResult(addConformanceRequirement(resolvedSubject, protoDecl,
+                                                  source)))
         anyErrors = true;
     }
 
@@ -3898,8 +3829,8 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   }
 
   // Superclass constraint.
-  return addSuperclassRequirementDirect(subjectPA, constraintType,
-                                        resolvedSource);
+  return addSuperclassRequirementDirect(resolvedSubject, constraintType,
+                                        source);
 }
 
 void GenericSignatureBuilder::PotentialArchetype::addSameTypeConstraint(
@@ -3942,7 +3873,9 @@ void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
   if (parentPA == parentRepPA) return;
 
   PotentialArchetype *existingPA =
-    parentRepPA->getNestedType(nestedPA->getResolvedType(), *this);
+    parentRepPA->updateNestedTypeForConformance(
+                                        nestedPA->getResolvedType(),
+                                        ArchetypeResolutionKind::WellFormed);
 
   auto sameNamedSource =
     FloatingRequirementSource::forNestedTypeNameMatch(
@@ -4052,7 +3985,8 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   // Add all of the protocol conformance requirements of T2 to T1.
   if (equivClass2) {
     for (const auto &entry : equivClass2->conformsTo) {
-      T1->addConformance(entry.first, entry.second.front().source, *this);
+      equivClass->recordConformanceConstraint(T1, entry.first,
+                                              entry.second.front().source);
 
       auto &constraints1 = equivClass->conformsTo[entry.first];
       // FIXME: Go through recordConformanceConstraint()?
@@ -4227,18 +4161,19 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
                                        unresolvedHandling);
   }
 
-  return addSameTypeRequirementDirect(resolved1.getResolvedType(*this),
-                                      resolved2.getResolvedType(*this),
-                                      source, diagnoseMismatch);
+  return addSameTypeRequirementDirect(resolved1, resolved2, source,
+                                      diagnoseMismatch);
 }
 
 ConstraintResult GenericSignatureBuilder::addSameTypeRequirementDirect(
-    ResolvedType paOrT1, ResolvedType paOrT2, FloatingRequirementSource source,
+    ResolvedType paOrT1, ResolvedType paOrT2,
+    FloatingRequirementSource source,
     llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
-  auto pa1 = paOrT1.getPotentialArchetype();
-  auto pa2 = paOrT2.getPotentialArchetype();
-  auto t1 = paOrT1.getType();
-  auto t2 = paOrT2.getType();
+  auto t1 = paOrT1.getAsConcreteType();
+  auto *pa1 = t1 ? nullptr : paOrT1.realizePotentialArchetype(*this);
+
+  auto t2 = paOrT2.getAsConcreteType();
+  auto *pa2 = t2 ? nullptr : paOrT2.realizePotentialArchetype(*this);
 
   // If both sides of the requirement are type parameters, equate them.
   if (pa1 && pa2) {
@@ -4682,23 +4617,6 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
   }
 }
 
-/// Retrieve the "local" archetype anchor for the given potential archetype,
-/// which rebuilds this potential archetype using the archetype anchors of
-/// the parent types.
-static PotentialArchetype *getLocalAnchor(PotentialArchetype *pa,
-                                          GenericSignatureBuilder &builder) {
-  auto parent = pa->getParent();
-  if (!parent) return pa;
-
-  auto parentAnchor = getLocalAnchor(parent, builder);
-  if (!parentAnchor) return pa;
-  auto localAnchor =
-    parentAnchor->getNestedArchetypeAnchor(
-                                pa->getNestedName(), builder,
-                                ArchetypeResolutionKind::CompleteWellFormed);
-  return localAnchor ? localAnchor : pa;
-}
-
 void
 GenericSignatureBuilder::finalize(SourceLoc loc,
                            ArrayRef<GenericTypeParamType *> genericParams,
@@ -4843,19 +4761,9 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   };
 
   // FIXME: Expand all conformance requirements. This is expensive :(
-  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
-    if (archetype != archetype->getRepresentative()) return;
-
-    // Make sure that we've build the archetype anchors for each potential
-    // archetype in this equivalence class. This is important to do for *all*
-    // potential archetypes because some non-archetype anchors will nonetheless
-    // be used in the canonicalized requirements.
-    for (auto pa : archetype->getEquivalenceClassMembers())
-      (void)getLocalAnchor(pa, *this);
-
-    if (auto equivClass = archetype->getEquivalenceClassIfPresent())
-      expandSameTypeConstraints(*this, equivClass);
-  });
+  for (auto &equivClass : Impl->EquivalenceClasses) {
+      expandSameTypeConstraints(*this, &equivClass);
+  }
 
   // Check same-type constraints.
   for (const auto &equivClass : Impl->EquivalenceClasses) {
@@ -5666,8 +5574,9 @@ static void collapseSameTypeComponentsThroughDelayedRequirements(
     if (auto pa =
             builder.maybeResolveEquivalenceClass(
                                      type,
-                                     ArchetypeResolutionKind::AlreadyKnown)
-              .getAsPotentialArchetype())
+                                     ArchetypeResolutionKind::AlreadyKnown,
+                                     /*wantExactPotentialArchetype=*/true)
+              .getPotentialArchetypeIfKnown())
       return getPotentialArchetypeVirtualComponent(pa);
 
     return getTypeVirtualComponent(type);
@@ -6185,49 +6094,6 @@ void GenericSignatureBuilder::checkLayoutConstraints(
     diag::previous_layout_constraint);
 }
 
-template<typename F>
-void GenericSignatureBuilder::visitPotentialArchetypes(F f) {
-  // Stack containing all of the potential archetypes to visit.
-  SmallVector<PotentialArchetype *, 4> stack;
-  llvm::SmallPtrSet<PotentialArchetype *, 4> visited;
-
-  // Add top-level potential archetypes to the stack.
-  for (const auto pa : Impl->PotentialArchetypes) {
-    if (visited.insert(pa).second)
-      stack.push_back(pa);
-  }
-
-  // Visit all of the potential archetypes.
-  while (!stack.empty()) {
-    PotentialArchetype *pa = stack.back();
-    stack.pop_back();
-    f(pa);
-
-    // Visit the archetype anchor.
-    if (auto anchor = pa->getArchetypeAnchor(*this)) {
-      if (visited.insert(anchor).second) {
-        stack.push_back(anchor);
-      }
-    }
-
-    // Visit everything else in this equivalence class.
-    for (auto equivPA : pa->getEquivalenceClassMembers()) {
-      if (visited.insert(equivPA).second) {
-        stack.push_back(equivPA);
-      }
-    }
-
-    // Visit nested potential archetypes.
-    for (const auto &nested : pa->getNestedTypes()) {
-      for (auto nestedPA : nested.second) {
-        if (visited.insert(nestedPA).second) {
-          stack.push_back(nestedPA);
-        }
-      }
-    }
-  }
-}
-
 namespace {
   /// Retrieve the best requirement source from a set of constraints.
   template<typename T>
@@ -6253,9 +6119,16 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
                            const RequirementSource *source)> f) {
   // Collect all archetypes.
   SmallVector<PotentialArchetype *, 8> archetypes;
-  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
-    archetypes.push_back(archetype);
-  });
+  for (auto &equivClass : Impl->EquivalenceClasses) {
+    if (equivClass.derivedSameTypeComponents.empty()) {
+      checkSameTypeConstraints(Impl->GenericParams,
+                               equivClass.members.front()->getRepresentative());
+    }
+
+    for (const auto &component : equivClass.derivedSameTypeComponents) {
+      archetypes.push_back(component.anchor);
+    }
+  }
 
   // Sort the archetypes in canonical order.
   llvm::array_pod_sort(archetypes.begin(), archetypes.end(),
@@ -6267,15 +6140,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
     //
     // FIXME: O(n) in the number of implied connected components within the
     // equivalence class. The equivalence class should be small, but...
-    auto rep = archetype->getRepresentative();
-    auto equivClass = rep->getOrCreateEquivalenceClass();
-
-    // If we didn't compute the derived same-type components yet, do so now.
-    if (equivClass->derivedSameTypeComponents.empty()) {
-      checkSameTypeConstraints(Impl->GenericParams, rep);
-      rep = archetype->getRepresentative();
-      equivClass = rep->getOrCreateEquivalenceClass();
-    }
+    auto equivClass = archetype->getOrCreateEquivalenceClass();
 
     assert(!equivClass->derivedSameTypeComponents.empty() &&
            "Didn't compute derived same-type components?");
