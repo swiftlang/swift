@@ -686,8 +686,14 @@ public struct String {
 
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
+  init(_ _guts: _StringGuts) {
+    self._guts = _guts
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public // @testable
   init(_ _core: _LegacyStringCore) {
-    self._guts = _StringGuts(_core)
+    self.init(_StringGuts(_core))
   }
 
   public var _guts: _StringGuts
