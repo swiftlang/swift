@@ -405,8 +405,8 @@ public:
   ProtocolDecl *getErrorDecl() const;
   CanType getExceptionType() const;
   
-#define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
-  /** Retrieve the declaration of Swift.NAME. */ \
+#define KNOWN_STDLIB_TYPE_DECL_WITH_NAME(NAME, IDSTR, DECL_CLASS, NUM_GENERIC_PARAMS) \
+  /** Retrieve the declaration of Swift.IDSTR. */ \
   DECL_CLASS *get##NAME##Decl() const;
 #include "swift/AST/KnownStdlibTypes.def"
 
