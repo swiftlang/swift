@@ -182,6 +182,10 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   }
 
   SILValue CalleeSource = CalleeValue;
+  // Handle partial_apply/thin_to_thick -> convert_function:
+  // tryDeleteDeadClosure must run before deleting a ConvertFunction that
+  // uses the PartialApplyInst or ThinToThickFunctionInst. tryDeleteDeadClosure
+  // will delete any uses of the closure, including this ConvertFunction.
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeValue))
     CalleeSource = CFI->getOperand();
 
@@ -190,15 +194,15 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     if (!tryDeleteDeadClosure(PAI))
       return;
     CalleeValue = Callee;
-  }
 
-  if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CalleeSource)) {
+  } else if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CalleeSource)) {
     SILValue Callee = TTTFI->getCallee();
     if (!tryDeleteDeadClosure(TTTFI))
       return;
     CalleeValue = Callee;
   }
 
+  // Handle function_ref -> convert_function -> partial_apply/thin_to_thick.
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeValue)) {
     if (isInstructionTriviallyDead(CFI)) {
       recursivelyDeleteTriviallyDeadInstructions(CFI, true);
