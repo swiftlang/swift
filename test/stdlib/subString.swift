@@ -43,7 +43,7 @@ SubstringTests.test("Equality") {
   expectNotEqual(s.dropLast(2), s.dropLast(1))
   expectEqual(s.dropFirst(1), s.dropFirst(1))
   expectTrue(s != s[...].dropFirst(1))
-  let i = emoji.index(of: "😄")!
+  let i = emoji.firstIndex(of: "😄")!
   expectEqual("😄👍🏽" as String, emoji[i...].prefix(2))
   expectTrue("😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String == emoji[i...].dropLast(2))
   expectTrue("🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String == emoji[i...].dropLast(2).dropFirst(2))
