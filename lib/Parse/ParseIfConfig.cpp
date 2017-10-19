@@ -37,6 +37,7 @@ Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
     .Case("_endian", PlatformConditionKind::Endianness)
     .Case("_runtime", PlatformConditionKind::Runtime)
     .Case("canImport", PlatformConditionKind::CanImport)
+    .Case("targetEnvironment", PlatformConditionKind::TargetEnvironment)
     .Default(None);
 }
 
@@ -325,6 +326,8 @@ public:
         DiagName = "endianness"; break;
       case PlatformConditionKind::CanImport:
         DiagName = "import conditional"; break;
+      case PlatformConditionKind::TargetEnvironment:
+        DiagName = "target environment"; break;
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }

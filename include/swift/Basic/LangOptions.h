@@ -46,6 +46,8 @@ namespace swift {
     Runtime,
     /// Conditional import of module
     CanImport,
+    /// Target Environment (currently just 'simulator' or absent)
+    TargetEnvironment,
   };
 
   /// Describes which Swift 3 Objective-C inference warnings should be
@@ -351,7 +353,7 @@ namespace swift {
     }
 
   private:
-    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 4>
+    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 5>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };
