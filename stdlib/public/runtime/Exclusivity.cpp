@@ -27,12 +27,22 @@
 // If we're using Clang, and Clang claims not to support thread_local,
 // it must be because we're on a platform that doesn't support it.
 // Use pthreads.
-#if __clang__ && !__has_feature(cxx_thread_local)
-#define SWIFT_EXCLUSIVITY_USE_THREADLOCAL 0
-#define SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC 1
+// Workaround: has_feature(cxx_thread_local) is wrong on two old Apple
+// simulators. clang thinks thread_local works there, but it doesn't.
+#if TARGET_OS_SIMULATOR && !TARGET_RT_64_BIT &&                      \
+  ((TARGET_OS_IOS && __IPHONE_OS_VERSION_MIN_REQUIRED__ < 100000) || \
+   (TARGET_OS_WATCH && __WATCHOS_OS_VERSION_MIN_REQUIRED__ < 30000))
+// 32-bit iOS 9 simulator or 32-bit watchOS 2 simulator - use pthreads
+# define SWIFT_EXCLUSIVITY_USE_THREADLOCAL 0
+# define SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC 1
+#elif __clang__ && !__has_feature(cxx_thread_local)
+// clang without thread_local support - use pthreads
+# define SWIFT_EXCLUSIVITY_USE_THREADLOCAL 0
+# define SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC 1
 #else
-#define SWIFT_EXCLUSIVITY_USE_THREADLOCAL 1
-#define SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC 0
+// Use thread_local
+# define SWIFT_EXCLUSIVITY_USE_THREADLOCAL 1
+# define SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC 0
 #endif
 
 #endif
