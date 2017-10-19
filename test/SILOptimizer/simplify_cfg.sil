@@ -562,10 +562,14 @@ bb6(%8 : $Int64):
 
 // CHECK-LABEL: @infinite_loop
 // CHECK: bb0
-// CHECK-NEXT: br bb0
+// CHECK-NEXT: br bb1
+// CHECK: bb1
+// CHECK-NEXT: br bb1
 sil @infinite_loop : $@convention(thin) () -> () {
 bb0:
-  br bb0
+  br bb1
+bb1:
+  br bb1
 }
 
 import Builtin

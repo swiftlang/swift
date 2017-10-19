@@ -4003,7 +4003,11 @@ public:
             "final component should match leaf value type of key path type");
   }
 
-  void verifyEntryPointArguments(SILBasicBlock *entry) {
+  // This verifies that the entry block of a SIL function doesn't have
+  // any predecessors and also verifies the entry point arguments.
+  void verifyEntryBlock(SILBasicBlock *entry) {
+    require(entry->pred_empty(), "entry block cannot have predecessors");
+
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
           for (auto *arg
                : make_range(entry->args_begin(), entry->args_end()))
@@ -4384,7 +4388,7 @@ public:
     }
 
     // Otherwise, verify the body of the function.
-    verifyEntryPointArguments(&*F->getBlocks().begin());
+    verifyEntryBlock(&*F->getBlocks().begin());
     verifyEpilogBlocks(F);
     verifyFlowSensitiveRules(F);
     verifyBranches(F);
