@@ -255,6 +255,11 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     return lowerBound <= element && element < upperBound ? element : nil
   }
 
+  @inlinable
+  public func _customLastIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    return _customIndexOfEquatableElement(element)
+  }
+
   /// Accesses the element at specified position.
   ///
   /// You can subscript a collection with any valid index other than the

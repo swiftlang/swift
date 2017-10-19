@@ -308,6 +308,11 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     return lowerBound <= element && element <= upperBound
               ? .inRange(element) : nil
   }
+
+  @inlinable
+  public func _customLastIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    return _customIndexOfEquatableElement(element)
+  }
 }
 
 extension Comparable {  

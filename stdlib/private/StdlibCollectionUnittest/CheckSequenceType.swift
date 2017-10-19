@@ -149,7 +149,7 @@ public struct FindTest {
 
   public init(
     expected: Int?, element: Int, sequence: [Int],
-    expectedLeftoverSequence: [Int],
+    expectedLeftoverSequence: [Int] = [],
     file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
@@ -579,6 +579,68 @@ public let findTests = [
 
   FindTest(
     expected: 1,
+    element: 2020,
+    sequence: [ 1010, 2020, 3030, 2020, 4040 ],
+    expectedLeftoverSequence: [ 3030, 2020, 4040 ]),
+]
+
+public let findLastTests = [
+  FindTest(
+    expected: nil,
+    element: 42,
+    sequence: [],
+    expectedLeftoverSequence: []),
+
+  FindTest(
+    expected: nil,
+    element: 42,
+    sequence: [ 1010 ],
+    expectedLeftoverSequence: []),
+  FindTest(
+    expected: 0,
+    element: 1010,
+    sequence: [ 1010 ],
+    expectedLeftoverSequence: []),
+
+  FindTest(
+    expected: nil,
+    element: 42,
+    sequence: [ 1010, 1010 ],
+    expectedLeftoverSequence: []),
+  FindTest(
+    expected: 1,
+    element: 1010,
+    sequence: [ 1010, 1010 ],
+    expectedLeftoverSequence: [ 1010 ]),
+
+  FindTest(
+    expected: nil,
+    element: 42,
+    sequence: [ 1010, 2020, 3030, 4040 ],
+    expectedLeftoverSequence: []),
+  FindTest(
+    expected: 0,
+    element: 1010,
+    sequence: [ 1010, 2020, 3030, 4040 ],
+    expectedLeftoverSequence: [ ]),
+  FindTest(
+    expected: 1,
+    element: 2020,
+    sequence: [ 1010, 2020, 3030, 4040 ],
+    expectedLeftoverSequence: [ 3030, 4040 ]),
+  FindTest(
+    expected: 2,
+    element: 3030,
+    sequence: [ 1010, 2020, 3030, 4040 ],
+    expectedLeftoverSequence: [ 4040 ]),
+  FindTest(
+    expected: 3,
+    element: 4040,
+    sequence: [ 1010, 2020, 3030, 4040 ],
+    expectedLeftoverSequence: []),
+
+  FindTest(
+    expected: 3,
     element: 2020,
     sequence: [ 1010, 2020, 3030, 2020, 4040 ],
     expectedLeftoverSequence: [ 3030, 2020, 4040 ]),
