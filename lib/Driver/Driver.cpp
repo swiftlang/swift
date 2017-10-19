@@ -1414,14 +1414,21 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       }
       case types::TY_SwiftModuleFile:
       case types::TY_SwiftModuleDocFile:
-        // Module inputs are okay if generating a module.
         if (OI.ShouldGenerateModule) {
+          // When generating a .swiftmodule, treat .swiftmodule files as
+          // inputs to a MergeModule action.
           AllModuleInputs.push_back(Current);
           break;
+        } else if (OI.shouldLink()) {
+          // Otherwise, if linking, pass .swiftmodule files as inputs to the
+          // linker, so that their debug info is available.
+          AllLinkerInputs.push_back(Current);
+          break;
+        } else {
+          Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
+                         InputArg->getValue());
+          continue;
         }
-        Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
-                       InputArg->getValue());
-        continue;
       case types::TY_AutolinkFile:
       case types::TY_Object:
         // Object inputs are only okay if linking.
@@ -1564,13 +1571,18 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     auto *LinkAction = C.createAction<LinkJobAction>(AllLinkerInputs,
                                                      OI.LinkAction);
 
-    if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
-        TC.getTriple().isOSCygMing()) {
-      // On ELF platforms there's no built in autolinking mechanism, so we
-      // pull the info we need from the .o files directly and pass them as an
-      // argument input file to the linker.
+    // On ELF platforms there's no built in autolinking mechanism, so we
+    // pull the info we need from the .o files directly and pass them as an
+    // argument input file to the linker.
+    SmallVector<const Action *, 2> AutolinkExtractInputs;
+    for (const Action *A : AllLinkerInputs)
+      if (A->getType() == types::TY_Object)
+        AutolinkExtractInputs.push_back(A);
+    if (!AutolinkExtractInputs.empty() &&
+        (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
+         TC.getTriple().isOSCygMing())) {
       auto *AutolinkExtractAction =
-          C.createAction<AutolinkExtractJobAction>(AllLinkerInputs);
+          C.createAction<AutolinkExtractJobAction>(AutolinkExtractInputs);
       // Takes the same inputs as the linker...
       // ...and gives its output to the linker.
       LinkAction->addInput(AutolinkExtractAction);
