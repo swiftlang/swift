@@ -163,6 +163,15 @@ public protocol Equatable {
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
   static func == (lhs: Self, rhs: Self) -> Bool
+
+  /// A Boolean value indicating whether the type contains a subset of values
+  /// which are treated as exceptional.
+  ///
+  /// A value is exceptional if it is outside the domain of meaningful
+  /// arguments for the purposes of the `Equatable` protocol. For example, the
+  /// special "not a number" value for floating-point types
+  /// (`FloatingPoint.nan`) compares not equal to itself.
+  static var _containsExceptionalValues: Bool { get }
 }
 
 extension Equatable {
@@ -181,6 +190,12 @@ extension Equatable {
   @_transparent
   public static func != (lhs: Self, rhs: Self) -> Bool {
     return !(lhs == rhs)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public static var _containsExceptionalValues: Bool {
+    return false
   }
 }
 

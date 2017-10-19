@@ -1425,6 +1425,12 @@ extension FloatingPoint {
   public static func >= (lhs: Self, rhs: Self) -> Bool {
     return rhs.isLessThanOrEqualTo(lhs)
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public static var _containsExceptionalValues: Bool {
+    return true
+  }
 }
 
 /// A radix-2 (binary) floating-point type.

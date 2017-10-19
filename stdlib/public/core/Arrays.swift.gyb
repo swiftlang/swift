@@ -2190,9 +2190,13 @@ public func == <Element : Equatable>(
   if lhsCount != rhs.count {
     return false
   }
+  if lhsCount == 0 {
+    return true
+  }
 
   // Test referential equality.
-  if lhsCount == 0 || lhs._buffer.identity == rhs._buffer.identity {
+  if lhs._buffer.identity == rhs._buffer.identity
+    && !Element._containsExceptionalValues {
     return true
   }
 
