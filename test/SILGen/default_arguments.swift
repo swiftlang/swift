@@ -214,17 +214,15 @@ class ReabstractDefaultArgument<T> {
 // CHECK: [[INITFN:%[0-9]+]] = function_ref @_T017default_arguments25ReabstractDefaultArgumentC{{[_0-9a-zA-Z]*}}fC
 // %1 = metatype $@thick ReabstractDefaultArgument<Int>.Type
 // function_ref default_arguments.ReabstractDefaultArgument.(init <A>(default_arguments.ReabstractDefaultArgument<A>.Type) -> (a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>).(default argument 0)
-// CHECK: %2 = function_ref @_T017default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @noescape @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
-// CHECK-NEXT: %3 = apply %2<Int>() : $@convention(thin) <τ_0_0> () -> @owned @noescape @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK: %2 = function_ref @_T017default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK-NEXT: %3 = apply %2<Int>() : $@convention(thin) <τ_0_0> () -> @owned @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
 // CHECK-NEXT: function_ref reabstraction thunk helper from @callee_owned (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool) to @callee_owned (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool)
-// CHECK-NEXT: %4 = function_ref @_T0S2iSbIxiid_S2iSbIxyyd_TR : $@convention(thin) (Int, Int, @owned @noescape @callee_owned (@in Int, @in Int) -> Bool) -> Bool
-// CHECK-NEXT: %5 = partial_apply %4(%3) : $@convention(thin) (Int, Int, @owned @noescape @callee_owned (@in Int, @in Int) -> Bool) -> Bool
-// CHECK-NEXT: %6 = convert_function %5
+// CHECK-NEXT: %4 = function_ref @_T0S2iSbIxiid_S2iSbIxyyd_TR : $@convention(thin) (Int, Int, @owned @callee_owned (@in Int, @in Int) -> Bool) -> Bool
+// CHECK-NEXT: %5 = partial_apply %4(%3) : $@convention(thin) (Int, Int, @owned @callee_owned (@in Int, @in Int) -> Bool) -> Bool
 // function_ref reabstraction thunk helper from @callee_owned (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool)
-// CHECK: %7 = function_ref @_T0S2iSbIxyyd_S2iSbIxiid_TR : $@convention(thin) (@in Int, @in Int, @owned @noescape @callee_owned (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: %8 = partial_apply %7(%6) : $@convention(thin) (@in Int, @in Int, @owned @noescape @callee_owned (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: %9 = convert_function %8
-// CHECK-NEXT: apply [[INITFN]]<Int>(%9, 
+// CHECK: %6 = function_ref @_T0S2iSbIxyyd_S2iSbIxiid_TR : $@convention(thin) (@in Int, @in Int, @owned @callee_owned (Int, Int) -> Bool) -> Bool
+// CHECK-NEXT: %7 = partial_apply %6(%5) : $@convention(thin) (@in Int, @in Int, @owned @callee_owned (Int, Int) -> Bool) -> Bool
+// CHECK-NEXT: apply [[INITFN]]<Int>(%7, 
 
 func testDefaultArgumentReabstraction() {
   _ = ReabstractDefaultArgument<Int>()

@@ -133,11 +133,11 @@ func call_let_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
   return x()
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}test_let_auto_closure_with_value_capture
+// CHECK: sil hidden @{{.*}}test_let_auto_closure_with_value_capture
 // CHECK: bb0(%0 : $Bool):
 // CHECK-NEXT: debug_value %0 : $Bool
 // CHECK-NEXT: return %0 : $Bool
-// CHECK-LABEL: // end sil function '{{.*}}test_let_auto_closure_with_value_capture
+
 func test_let_auto_closure_with_value_capture(_ x: Bool) -> Bool {
   return call_let_auto_closure(x)
 }

@@ -1100,9 +1100,6 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   if (fn->isPolymorphic() && fn->isPseudogeneric())
     OpArgs.push_back('P');
 
-  if (!fn->isNoEscape())
-    OpArgs.push_back('e');
-
   // <impl-callee-convention>
   if (fn->getExtInfo().hasContext()) {
     OpArgs.push_back(getParamConvention(fn->getCalleeConvention()));

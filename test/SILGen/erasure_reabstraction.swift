@@ -12,7 +12,7 @@ let x: Any = Foo.self
 // CHECK: [[CONCRETE:%.*]] = init_existential_addr [[EXISTENTIAL:%.*]] : $*Any, $() -> ()
 // CHECK: [[CLOSURE:%.*]] = function_ref
 // CHECK: [[CLOSURE_THICK:%.*]] = thin_to_thick_function [[CLOSURE]]
-// CHECK: [[REABSTRACTION_THUNK:%.*]] = function_ref @_T0Iex_ytytIexir_TR
+// CHECK: [[REABSTRACTION_THUNK:%.*]] = function_ref @_T0Ix_ytytIxir_TR
 // CHECK: [[CLOSURE_REABSTRACTED:%.*]] = partial_apply [[REABSTRACTION_THUNK]]([[CLOSURE_THICK]])
 // CHECK: store [[CLOSURE_REABSTRACTED]] to [init] [[CONCRETE]]
 let y: Any = {() -> () in ()}

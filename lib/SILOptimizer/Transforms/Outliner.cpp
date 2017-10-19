@@ -287,8 +287,7 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
   Results.push_back(SILResultInfo(Br->getArg(0)->getType().getSwiftRValueType(),
                                   ResultConvention::Owned));
   auto ExtInfo =
-      SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                               /*pseudogeneric*/ false, /*noescape*/ false);
+      SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin, false);
   auto FunctionType = SILFunctionType::get(
       nullptr, ExtInfo, ParameterConvention::Direct_Unowned, Parameters,
       Results, None, M.getASTContext());
@@ -1175,9 +1174,7 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
   }
 
   auto ExtInfo =
-      SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                               /*pseudogeneric*/ false,
-                               /*noescape*/ false);
+      SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin, false);
 
   SmallVector<SILResultInfo, 4> Results;
   // If we don't have a bridged return we changed from @autoreleased to @owned

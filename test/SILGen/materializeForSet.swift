@@ -83,7 +83,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[VALUE:%.*]] = load [take] [[RESULT_ADDR]] : $*@callee_owned () -> @out Int
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIexr_SiIexd_TR : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
+// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxr_SiIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
 // CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
 // CHECK-NEXT: [[FN:%.*]] = class_method [[SELF]] : $Base, #Base.storedFunction!setter.1 : (Base) -> (@escaping () -> Int) -> ()
 // CHECK-NEXT: apply [[FN]]([[NEWVALUE]], [[SELF]])
@@ -102,7 +102,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: store [[RESULT]] to [init] [[TEMP]]
 // CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[TEMP]]
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIexd_SiIexr_TR : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
+// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxd_SiIxr_TR : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[REABSTRACTOR]]([[RESULT]])
 // CHECK-NEXT: destroy_addr [[TEMP]]
 // CHECK-NEXT: store [[T1]] to [init] [[RESULT_ADDR]]
@@ -123,7 +123,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[VALUE:%.*]] = load [take] [[RESULT_ADDR]] : $*@callee_owned () -> @out Int
 // CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIexr_SiIexd_TR : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
+// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxr_SiIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
 // CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
 // CHECK-NEXT: [[ADDR:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.finalStoredFunction
 // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[ADDR]] : $*@callee_owned () -> Int
@@ -140,7 +140,7 @@ extension Derived : Abstractable {}
 // UNCHECKED-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_owned () -> @out Int
 // UNCHECKED-NEXT: [[VALUE:%.*]] = load [take] [[RESULT_ADDR]] : $*@callee_owned () -> @out Int
 // UNCHECKED-NEXT: // function_ref
-// UNCHECKED-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIexr_SiIexd_TR : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
+// UNCHECKED-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxr_SiIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
 // UNCHECKED-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
 // UNCHECKED-NEXT: [[ADDR:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.finalStoredFunction
 // UNCHECKED-NEXT: assign [[NEWVALUE]] to [[ADDR]]
@@ -157,7 +157,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*@callee_owned () -> Int
 // CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[READ]]
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIexd_SiIexr_TR : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
+// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxd_SiIxr_TR : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[REABSTRACTOR]]([[RESULT]])
 // CHECK-NEXT: end_access [[READ]] : $*@callee_owned () -> Int
 // CHECK-NEXT: store [[T1]] to [init] [[RESULT_ADDR]]
@@ -178,7 +178,7 @@ extension Derived : Abstractable {}
 // UNCHECKED-NEXT: [[ADDR:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.finalStoredFunction
 // UNCHECKED-NEXT: [[RESULT:%.*]] = load [copy] [[ADDR]]
 // UNCHECKED-NEXT: function_ref
-// UNCHECKED-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIexd_SiIexr_TR : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
+// UNCHECKED-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxd_SiIxr_TR : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
 // UNCHECKED-NEXT: [[T1:%.*]] = partial_apply [[REABSTRACTOR]]([[RESULT]])
 // UNCHECKED-NEXT: store [[T1]] to [init] [[RESULT_ADDR]]
 // UNCHECKED-NEXT: [[RESULT_PTR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned () -> @out Int to $Builtin.RawPointer
@@ -196,7 +196,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[BASE_SELF:%.*]] = upcast [[SELF]] : $@thick Derived.Type to $@thick Base.Type
 // CHECK-NEXT: [[BUFFER:%.*]] = pointer_to_address [[ARG1]] : $Builtin.RawPointer to [strict] $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[VALUE:%.*]] = load [take] [[BUFFER]] : $*@callee_owned () -> @out Int
-// CHECK:      [[REABSTRACTOR:%.*]] = function_ref @_T0SiIexr_SiIexd_TR : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
+// CHECK:      [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxr_SiIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
 // CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]]) : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
 // CHECK:      [[SETTER_FN:%.*]] = function_ref @_T017materializeForSet4BaseC14staticFunctionSiycvsZ : $@convention(method) (@owned @callee_owned () -> Int, @thick Base.Type) -> ()
 // CHECK-NEXT: apply [[SETTER_FN]]([[NEWVALUE]], [[BASE_SELF]]) : $@convention(method) (@owned @callee_owned () -> Int, @thick Base.Type) -> ()
@@ -212,7 +212,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[GETTER]]([[SELF]]) : $@convention(method) (@thick Base.Type) -> @owned @callee_owned () -> Int
 // CHECK-NEXT: store [[VALUE]] to [init] [[OUT]] : $*@callee_owned () -> Int
 // CHECK-NEXT: [[VALUE:%.*]] = load [copy] [[OUT]] : $*@callee_owned () -> Int
-// CHECK:      [[REABSTRACTOR:%.*]] = function_ref @_T0SiIexd_SiIexr_TR : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
+// CHECK:      [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxd_SiIxr_TR : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
 // CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
 // CHECK-NEXT: destroy_addr [[OUT]] : $*@callee_owned () -> Int
 // CHECK-NEXT: store [[NEWVALUE]] to [init] [[RESULT_ADDR]] : $*@callee_owned () -> @out Int
@@ -572,11 +572,11 @@ struct TuxedoPanda : Panda { }
 
   // FIXME: Useless re-abstractions
 
-  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIexir_A2CIexyd_TR : $@convention(thin) (TuxedoPanda, @owned @callee_owned (@in TuxedoPanda) -> @out TuxedoPanda) -> TuxedoPanda
+  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIxir_A2CIxyd_TR : $@convention(thin) (TuxedoPanda, @owned @callee_owned (@in TuxedoPanda) -> @out TuxedoPanda) -> TuxedoPanda
 
   // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xxxcvs : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@owned @callee_owned (@in τ_0_0) -> @out τ_0_0, @inout τ_0_0) -> ()
 
-  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIexyd_A2CIexir_TR : $@convention(thin) (@in TuxedoPanda, @owned @callee_owned (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
+  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIxyd_A2CIxir_TR : $@convention(thin) (@in TuxedoPanda, @owned @callee_owned (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
 
 // CHECK: }
 
@@ -589,13 +589,13 @@ struct TuxedoPanda : Panda { }
 // Result of calling the getter is re-abstracted to the maximally substituted type
 // by SILGenFunction::emitApply():
 
-  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIexir_A2CIexyd_TR : $@convention(thin) (TuxedoPanda, @owned @callee_owned (@in TuxedoPanda) -> @out TuxedoPanda) -> TuxedoPanda
+  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIxir_A2CIxyd_TR : $@convention(thin) (TuxedoPanda, @owned @callee_owned (@in TuxedoPanda) -> @out TuxedoPanda) -> TuxedoPanda
 
 // ... then we re-abstract to the requirement signature:
 // FIXME: Peephole this away with the previous one since there's actually no
 // abstraction change in this case.
 
-  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIexyd_A2CIexir_TR : $@convention(thin) (@in TuxedoPanda, @owned @callee_owned (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
+  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIxyd_A2CIxir_TR : $@convention(thin) (@in TuxedoPanda, @owned @callee_owned (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
 
 // The callback:
 

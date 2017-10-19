@@ -340,31 +340,22 @@ class ReleaseTracker {
   llvm::SmallSetVector<SILInstruction *, 4> TrackedUsers;
   llvm::SmallSetVector<SILInstruction *, 4> FinalReleases;
   std::function<bool(SILInstruction *)> AcceptableUserQuery;
-  std::function<bool(SILInstruction *)> TransitiveUserQuery;
 
 public:
-  ReleaseTracker(std::function<bool(SILInstruction *)> AcceptableUserQuery,
-                 std::function<bool(SILInstruction *)> TransitiveUserQuery)
+  ReleaseTracker(std::function<bool(SILInstruction *)> AcceptableUserQuery)
       : TrackedUsers(), FinalReleases(),
-        AcceptableUserQuery(AcceptableUserQuery),
-        TransitiveUserQuery(TransitiveUserQuery) {}
+        AcceptableUserQuery(AcceptableUserQuery) {}
 
   void trackLastRelease(SILInstruction *Inst) { FinalReleases.insert(Inst); }
 
   bool isUserAcceptable(SILInstruction *User) const {
     return AcceptableUserQuery(User);
   }
-  bool isUserTransitive(SILInstruction *User) const {
-    return TransitiveUserQuery(User);
-  }
-
-  bool isUser(SILInstruction *User) { return TrackedUsers.count(User); }
 
   void trackUser(SILInstruction *User) { TrackedUsers.insert(User); }
 
   using range = iterator_range<llvm::SmallSetVector<SILInstruction *, 4>::iterator>;
 
-  // An ordered list of users, with "casts" before their transitive uses.
   range getTrackedUsers() { return {TrackedUsers.begin(), TrackedUsers.end()}; }
 
   range getFinalReleases() {

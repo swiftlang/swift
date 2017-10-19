@@ -2740,8 +2740,6 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // on the result type.
   assert(expectedType->getExtInfo().hasContext());
 
-  // This may inherit @noescape from the expectedType. The @noescape attribute
-  // is only stripped when using this type to materialize a new decl.
   auto extInfo = expectedType->getExtInfo()
     .withRepresentation(SILFunctionType::Representation::Thin);
 
@@ -2919,15 +2917,10 @@ static ManagedValue createThunk(SILGenFunction &SGF,
 
   // Create it in our current function.
   auto thunkValue = SGF.B.createFunctionRef(loc, thunk);
-  SingleValueInstruction *thunkedFn =
-    SGF.B.createPartialApply(loc, thunkValue,
-                             SILType::getPrimitiveObjectType(substFnType),
-                             subs, fn.forward(SGF),
-                             SILType::getPrimitiveObjectType(expectedType));
-  if (expectedType->isNoEscape()) {
-    thunkedFn = SGF.B.createConvertFunction(loc, thunkedFn,
-                                            expectedTL.getLoweredType());
-  }
+  auto thunkedFn = SGF.B.createPartialApply(loc, thunkValue,
+                              SILType::getPrimitiveObjectType(substFnType),
+                                            subs, fn.forward(SGF),
+                              SILType::getPrimitiveObjectType(expectedType));
   return SGF.emitManagedRValueWithCleanup(thunkedFn, expectedTL);
 }
 

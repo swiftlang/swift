@@ -228,37 +228,6 @@ bb2(%24 : $Error):
   unreachable
 }
 
-sil @returnBigStruct : $@convention(thin) () -> @owned BigStruct
-
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @closureToConvert() #0 {
-// CHECK: entry:
-// CHECK:   [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV
-// CHECK:   call swiftcc void @returnBigStruct(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC]])
-// CHECK:   ret void
-// CHECK-LABEL: }
-sil @closureToConvert : $@convention(thin) () -> () {
-bb0:
-  %f = function_ref @returnBigStruct : $@convention(thin) () -> @owned BigStruct
-  %apply = apply %f() : $@convention(thin) () -> @owned BigStruct
-  %99 = tuple ()
-  return %99 : $()
-}
-
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @testConvertFunc() #0 {
-// CHECK: entry:
-// CHECK:   call swiftcc void bitcast (void ()* @closureToConvert to void (%swift.refcounted*)*)(%swift.refcounted* swiftself null)
-// CHECK:   ret void
-// CHECK-LABEL: }
-sil @testConvertFunc : $@convention(thin) () -> () {
-bb0:
-  %f = function_ref @closureToConvert : $@convention(thin) () -> ()
-  %cf = convert_function %f : $@convention(thin) () -> () to $@noescape @convention(thin) () -> ()
-  %thick = thin_to_thick_function %cf : $@noescape @convention(thin) () -> () to $@noescape @callee_owned () -> ()
-  %apply = apply %thick() : $@noescape @callee_owned () -> ()
-  %99 = tuple ()
-  return %99 : $()
-}
-
 sil_vtable SuperBase {
 }
 

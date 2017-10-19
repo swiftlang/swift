@@ -488,7 +488,7 @@ class Bas : NSObject {
 
 // CHECK-LABEL: sil hidden @_T013objc_bridging16applyStringBlockS3SXB_SS1xtF
 func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> String {
-  // CHECK: bb0([[BLOCK:%.*]] : @owned $@convention(block) @noescape (NSString) -> @autoreleased NSString, [[STRING:%.*]] : @owned $String):
+  // CHECK: bb0([[BLOCK:%.*]] : @owned $@convention(block) (NSString) -> @autoreleased NSString, [[STRING:%.*]] : @owned $String):
   // CHECK:   [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:   [[BORROWED_BLOCK_COPY:%.*]] = begin_borrow [[BLOCK_COPY]]
   // CHECK:   [[BLOCK_COPY_COPY:%.*]] = copy_value [[BORROWED_BLOCK_COPY]]
@@ -499,7 +499,7 @@ func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> 
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_STRING_COPY]]) : $@convention(method) (@guaranteed String)
   // CHECK:   end_borrow [[BORROWED_STRING_COPY]] from [[STRING_COPY]]
   // CHECK:   destroy_value [[STRING_COPY]]
-  // CHECK:   [[RESULT_NSSTR:%.*]] = apply [[BLOCK_COPY_COPY]]([[NSSTR]]) : $@convention(block) @noescape (NSString) -> @autoreleased NSString
+  // CHECK:   [[RESULT_NSSTR:%.*]] = apply [[BLOCK_COPY_COPY]]([[NSSTR]]) : $@convention(block) (NSString) -> @autoreleased NSString
   // CHECK:   destroy_value [[NSSTR]]
   // CHECK:   [[FINAL_BRIDGE:%.*]] = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
   // CHECK:   [[OPTIONAL_NSSTR:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[RESULT_NSSTR]]
@@ -643,12 +643,12 @@ func takeTwoAnys(_ lhs: Any, _ rhs: Any) -> Any { return lhs }
 // CHECK-LABEL: sil hidden @_T013objc_bridging22defineNonStandardBlockyyp1x_tF
 func defineNonStandardBlock(x: Any) {
   // CHECK: function_ref @_T013objc_bridging22defineNonStandardBlockyyp1x_tFypypcfU_
-  // CHECK: function_ref @_T0ypypIexir_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+  // CHECK: function_ref @_T0ypypIxir_yXlyXlIyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
 
   let fn : @convention(block) (Any) -> Any = { y in takeTwoAnys(x, y) }
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypypIexir_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypypIxir_yXlyXlIyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
 // CHECK: bb0(%0 : @trivial $*@block_storage @callee_owned (@in Any) -> @out Any, %1 : @unowned $AnyObject):
 // CHECK:   [[T0:%.*]] = copy_value %1 : $AnyObject
 // CHECK:   [[T1:%.*]] = open_existential_ref [[T0]] : $AnyObject
