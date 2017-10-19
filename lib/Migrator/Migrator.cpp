@@ -118,7 +118,7 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
     llvm::MemoryBuffer::getMemBufferCopy(InputText, getInputFilename());
 
   CompilerInvocation Invocation { StartInvocation };
-  Invocation.clearInputs();
+  Invocation.getFrontendOptions().Inputs.clearInputs();
   Invocation.getLangOptions().EffectiveLanguageVersion = SwiftLanguageVersion;
   auto &LLVMArgs = Invocation.getFrontendOptions().LLVMArgs;
   auto aarch64_use_tbi = std::find(LLVMArgs.begin(), LLVMArgs.end(),
@@ -448,7 +448,7 @@ const MigratorOptions &Migrator::getMigratorOptions() const {
 
 const StringRef Migrator::getInputFilename() const {
   auto PrimaryInput =
-      StartInvocation.getFrontendOptions().Inputs.getPrimaryInput().getValue();
+      StartInvocation.getFrontendOptions().Inputs.getOptionalPrimaryInput().getValue();
   return StartInvocation.getFrontendOptions()
       .Inputs.getInputFilenames()[PrimaryInput.Index];
 }
