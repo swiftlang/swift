@@ -119,7 +119,7 @@ private:
     assert(PrimaryInputs.size() < 2 &&
            "have not implemented >1 primary input yet");
   }
-  
+
 public:
   bool hasPrimaryInputFilenames() const {
     for (const SelectedInput &SI : getPrimaryInputs())
@@ -142,56 +142,55 @@ public:
     }
     return r;
   }
- 
-  
+
   const ArrayRef<SelectedInput> getPrimaryInputs() const {
     return PrimaryInputs;
   }
-  
+
 private:
   std::vector<SelectedInput> &getMutablePrimaryInputs() {
     mustNotBeMoreThanOnePrimaryInput();
     return PrimaryInputs;
   }
-  
+
 public:
   // TO BE DELETED
   unsigned primaryInputCount() const { return getPrimaryInputs().size(); }
-  
+
   bool hasPrimaryInput() const { return primaryInputCount() > 0; }
   bool havePrimaryInputs() const { return primaryInputCount() > 0; }
 
   bool isWholeModule() { return !hasPrimaryInput(); }
-  
+
   // TO BE DELETED
   Optional<SelectedInput> getOptionalPrimaryInput() const {
     return hasPrimaryInput() ? Optional<SelectedInput>(getPrimaryInputs()[0])
-    : Optional<SelectedInput>();
+                             : Optional<SelectedInput>();
   }
 
   bool isPrimaryInputAFileAt(unsigned i) {
     return hasPrimaryInput() && getOptionalPrimaryInput()->isFilename() &&
-    getOptionalPrimaryInput()->Index == i;
+           getOptionalPrimaryInput()->Index == i;
   }
   bool haveAPrimaryInputFile() const {
     return hasPrimaryInput() && getOptionalPrimaryInput()->isFilename();
   }
-  
+
   bool hasUniquePrimaryInputFilename() const {
     return primaryInputCount() == 1 && getPrimaryInputs()[0].isFilename();
   }
-  
+
   llvm::Optional<StringRef> uniquePrimaryInputFilename() const {
     return hasUniquePrimaryInputFilename()
-    ? llvm::Optional<StringRef>(
-                                getInputFilenames()[getPrimaryInputs()[0].Index])
-    : llvm::Optional<StringRef>();
+               ? llvm::Optional<StringRef>(
+                     getInputFilenames()[getPrimaryInputs()[0].Index])
+               : llvm::Optional<StringRef>();
   }
-  
+
   Optional<unsigned> primaryInputFileIndex() const {
     return haveAPrimaryInputFile()
-    ? Optional<unsigned>(getOptionalPrimaryInput()->Index)
-    : None;
+               ? Optional<unsigned>(getOptionalPrimaryInput()->Index)
+               : None;
   }
   // Will be supplanted by others
   StringRef primaryInputFilenameIfAny() const {
@@ -226,19 +225,19 @@ public:
   // Primary input writers
 
   void clearPrimaryInputs() { getMutablePrimaryInputs().clear(); }
-  
+
   void setPrimaryInputToFirstFile() {
     clearPrimaryInputs();
     addPrimaryInput(SelectedInput(0, SelectedInput::InputKind::Filename));
   }
-  
+
   void addPrimaryInput(SelectedInput si) { PrimaryInputs.push_back(si); }
-  
+
   void setPrimaryInput(SelectedInput si) {
     clearPrimaryInputs();
     getMutablePrimaryInputs().push_back(si);
   }
-  
+
   void addPrimaryInputFilename(const std::string &inputFilename,
                                unsigned index) {
     addPrimaryInput(SelectedInput(index, SelectedInput::InputKind::Filename));
@@ -259,7 +258,6 @@ public:
     InputBuffers.clear();
   }
 };
-
 
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {

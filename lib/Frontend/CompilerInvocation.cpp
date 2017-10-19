@@ -16,11 +16,11 @@
 # include "AppleHostVersionDetection.h"
 #endif
 
-#include "swift/Strings.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
@@ -85,148 +85,148 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
 }
 
 namespace swift {
-  
-  /// Implement argument semantics in a way that will make it easier to have
-  /// >1 primary file (or even a primary file list) in the future without
-  /// breaking anything today.
-  /// Semantics today:
-  /// If input files are on command line, primary files on command line are also
-  /// input files; they are not repeated without -primary-file. If input files are
-  /// in a file list, the primary files on the command line are repeated in the
-  /// file list. Thus, if there are any primary files, it is illegal to have both
-  /// (non-primary) input files and a file list. Finally, the order of input files
-  /// must match the order given on the command line or the file list. Side note:
-  /// since each input file will cause a lot of work for the compiler, this code
-  /// is biased towards clarity and not optimized.
-  
-  class ArgsToFrontendInputsConverter {
-    DiagnosticEngine &Diags;
-    const ArgList &Args;
-    FrontendInputs &Inputs;
-    
-    const llvm::opt::Arg *filelistPathOrNull;
-    const llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBuffer;
-    enum PrimaryOrOrdinary { Primary, Ordinary };
-    std::vector<std::pair<StringRef, PrimaryOrOrdinary>> files;
-    llvm::StringMap<unsigned> fileIndices;
-    
-  public:
-    ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
-                                  FrontendInputs &Inputs)
-    : Diags(Diags), Args(Args), Inputs(Inputs),
-    filelistPathOrNull(Args.getLastArg(options::OPT_filelist)),
-    filelistBuffer(getFilelistBuffer(Diags, filelistPathOrNull)) {}
-    
-  private:
-    static llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-    getFilelistBuffer(DiagnosticEngine &diags, const llvm::opt::Arg *pathOrNull) {
-      llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-      llvm::MemoryBuffer::getFile(pathOrNull ? pathOrNull->getValue()
-                                  : "/dev/null");
-      if (!buffer) {
-        assert(pathOrNull && "could not open /dev/null");
-        diags.diagnose(SourceLoc(), diag::cannot_open_file,
-                       pathOrNull->getValue(), buffer.getError().message());
-      }
-      return buffer;
+
+/// Implement argument semantics in a way that will make it easier to have
+/// >1 primary file (or even a primary file list) in the future without
+/// breaking anything today.
+/// Semantics today:
+/// If input files are on command line, primary files on command line are also
+/// input files; they are not repeated without -primary-file. If input files are
+/// in a file list, the primary files on the command line are repeated in the
+/// file list. Thus, if there are any primary files, it is illegal to have both
+/// (non-primary) input files and a file list. Finally, the order of input files
+/// must match the order given on the command line or the file list. Side note:
+/// since each input file will cause a lot of work for the compiler, this code
+/// is biased towards clarity and not optimized.
+
+class ArgsToFrontendInputsConverter {
+  DiagnosticEngine &Diags;
+  const ArgList &Args;
+  FrontendInputs &Inputs;
+
+  const llvm::opt::Arg *filelistPathOrNull;
+  const llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBuffer;
+  enum PrimaryOrOrdinary { Primary, Ordinary };
+  std::vector<std::pair<StringRef, PrimaryOrOrdinary>> files;
+  llvm::StringMap<unsigned> fileIndices;
+
+public:
+  ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
+                                FrontendInputs &Inputs)
+      : Diags(Diags), Args(Args), Inputs(Inputs),
+        filelistPathOrNull(Args.getLastArg(options::OPT_filelist)),
+        filelistBuffer(getFilelistBuffer(Diags, filelistPathOrNull)) {}
+
+private:
+  static llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
+  getFilelistBuffer(DiagnosticEngine &diags, const llvm::opt::Arg *pathOrNull) {
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
+        llvm::MemoryBuffer::getFile(pathOrNull ? pathOrNull->getValue()
+                                               : "/dev/null");
+    if (!buffer) {
+      assert(pathOrNull && "could not open /dev/null");
+      diags.diagnose(SourceLoc(), diag::cannot_open_file,
+                     pathOrNull->getValue(), buffer.getError().message());
     }
-    
-    static std::vector<StringRef>
-    splitIntoLines(const llvm::MemoryBuffer &buffer) {
-      std::vector<StringRef> fileNames;
-      for (StringRef line : make_range(llvm::line_iterator(buffer), {})) {
-        fileNames.push_back(line);
-      }
-      return fileNames;
+    return buffer;
+  }
+
+  static std::vector<StringRef>
+  splitIntoLines(const llvm::MemoryBuffer &buffer) {
+    std::vector<StringRef> fileNames;
+    for (StringRef line : make_range(llvm::line_iterator(buffer), {})) {
+      fileNames.push_back(line);
     }
-    
-    bool hasFilelist() const { return filelistPathOrNull != nullptr; }
-    enum Semantics {
-      PrimariesAlsoCountAsOrdinaries,
-      PrimariesAreRepeatedInOrdinaries
-    };
-    Semantics whichSemantics() {
-      return hasFilelist() ? PrimariesAreRepeatedInOrdinaries
-      : PrimariesAlsoCountAsOrdinaries;
-    }
-    
-    void getFilesFromArgs() {
-      for (const Arg *A :
-           Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
-        enum PrimaryOrOrdinary fileType;
-        if (A->getOption().matches(options::OPT_INPUT)) {
-          fileType = Ordinary;
-        } else if (A->getOption().matches(options::OPT_primary_file)) {
-          fileType = Primary;
-        } else {
-          llvm_unreachable("Unknown input-related argument!");
-        }
-        files.push_back(
-                        std::pair<StringRef, PrimaryOrOrdinary>(A->getValue(), fileType));
-      }
-    }
-    
-    void getFilesFromFilelist() {
-      std::vector<StringRef> inputFilesFromFilelist =
-      splitIntoLines(*filelistBuffer->get());
-      for (auto file : inputFilesFromFilelist) {
-        files.push_back(std::pair<StringRef, PrimaryOrOrdinary>(file, Ordinary));
-      }
-    }
-    
-    bool enforceFilelistExclusion() {
-      if (Args.hasArg(options::OPT_primary_file) &&
-          Args.hasArg(options::OPT_INPUT) && Args.hasArg(options::OPT_filelist)) {
-        Diags.diagnose(SourceLoc(),
-                       diag::error_cannot_have_input_files_with_file_list);
-        return true;
-      }
-      return false;
-    }
-    
-    void setInputFilesAndIndices() {
-      for (std::pair<StringRef, bool> p : files) {
-        if (p.second == Ordinary ||
-            whichSemantics() == PrimariesAlsoCountAsOrdinaries) {
-          unsigned index = Inputs.inputFilenameCount();
-          auto file = p.first;
-          Inputs.addInputFilename(file);
-          fileIndices.insert({file, index});
-        }
-      }
-    }
-    bool setPrimaryFiles() {
-      for (std::pair<StringRef, bool> p : files) {
-        if (p.second != Primary)
-          continue;
-        auto file = p.first;
-        const auto iterator = fileIndices.find(file);
-        if (iterator == fileIndices.end()) {
-          Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
-                         filelistPathOrNull->getValue());
-          return true;
-        }
-        Inputs.addPrimaryInputFilename(file, iterator->second);
-      }
-      return false;
-    }
-    
-  public:
-    bool convert() {
-      if (enforceFilelistExclusion())
-        return true;
-      
-      if (!filelistBuffer)
-        return true;
-      
-      getFilesFromArgs();
-      getFilesFromFilelist();
-      
-      setInputFilesAndIndices();
-      return setPrimaryFiles();
-    }
+    return fileNames;
+  }
+
+  bool hasFilelist() const { return filelistPathOrNull != nullptr; }
+  enum Semantics {
+    PrimariesAlsoCountAsOrdinaries,
+    PrimariesAreRepeatedInOrdinaries
   };
-}
+  Semantics whichSemantics() {
+    return hasFilelist() ? PrimariesAreRepeatedInOrdinaries
+                         : PrimariesAlsoCountAsOrdinaries;
+  }
+
+  void getFilesFromArgs() {
+    for (const Arg *A :
+         Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
+      enum PrimaryOrOrdinary fileType;
+      if (A->getOption().matches(options::OPT_INPUT)) {
+        fileType = Ordinary;
+      } else if (A->getOption().matches(options::OPT_primary_file)) {
+        fileType = Primary;
+      } else {
+        llvm_unreachable("Unknown input-related argument!");
+      }
+      files.push_back(
+          std::pair<StringRef, PrimaryOrOrdinary>(A->getValue(), fileType));
+    }
+  }
+
+  void getFilesFromFilelist() {
+    std::vector<StringRef> inputFilesFromFilelist =
+        splitIntoLines(*filelistBuffer->get());
+    for (auto file : inputFilesFromFilelist) {
+      files.push_back(std::pair<StringRef, PrimaryOrOrdinary>(file, Ordinary));
+    }
+  }
+
+  bool enforceFilelistExclusion() {
+    if (Args.hasArg(options::OPT_primary_file) &&
+        Args.hasArg(options::OPT_INPUT) && Args.hasArg(options::OPT_filelist)) {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_cannot_have_input_files_with_file_list);
+      return true;
+    }
+    return false;
+  }
+
+  void setInputFilesAndIndices() {
+    for (std::pair<StringRef, bool> p : files) {
+      if (p.second == Ordinary ||
+          whichSemantics() == PrimariesAlsoCountAsOrdinaries) {
+        unsigned index = Inputs.inputFilenameCount();
+        auto file = p.first;
+        Inputs.addInputFilename(file);
+        fileIndices.insert({file, index});
+      }
+    }
+  }
+  bool setPrimaryFiles() {
+    for (std::pair<StringRef, bool> p : files) {
+      if (p.second != Primary)
+        continue;
+      auto file = p.first;
+      const auto iterator = fileIndices.find(file);
+      if (iterator == fileIndices.end()) {
+        Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
+                       filelistPathOrNull->getValue());
+        return true;
+      }
+      Inputs.addPrimaryInputFilename(file, iterator->second);
+    }
+    return false;
+  }
+
+public:
+  bool convert() {
+    if (enforceFilelistExclusion())
+      return true;
+
+    if (!filelistBuffer)
+      return true;
+
+    getFilesFromArgs();
+    getFilesFromFilelist();
+
+    setInputFilesAndIndices();
+    return setPrimaryFiles();
+  }
+};
+} // namespace swift
 
 // This is a separate function so that it shows up in stack traces.
 LLVM_ATTRIBUTE_NOINLINE
@@ -371,7 +371,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   }
 
   ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert();
- 
+
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
   // Determine what the user has asked the frontend to do.
@@ -851,8 +851,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |=
-        !Opts.Inputs.getOptionalPrimaryInput() && !Opts.ModuleOutputPath.empty();
+    Opts.SerializeBridgingHeader |= !Opts.Inputs.getOptionalPrimaryInput() &&
+                                    !Opts.ModuleOutputPath.empty();
   }
 
   for (const Arg *A : Args.filtered(OPT_import_module)) {
