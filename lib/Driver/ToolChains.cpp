@@ -42,31 +42,41 @@ static const size_t TOO_MANY_FILES = 128;
 
 static void addInputsOfType(ArgStringList &Arguments,
                             ArrayRef<const Action *> Inputs,
-                            types::ID InputType) {
+                            types::ID InputType,
+                            const char *PrefixArgument = nullptr) {
   for (auto &Input : Inputs) {
     if (Input->getType() != InputType)
       continue;
+    if (PrefixArgument)
+      Arguments.push_back(PrefixArgument);
     Arguments.push_back(cast<InputAction>(Input)->getInputArg().getValue());
   }
 }
 
 static void addInputsOfType(ArgStringList &Arguments,
                             ArrayRef<const Job *> Jobs,
-                            types::ID InputType) {
+                            types::ID InputType,
+                            const char *PrefixArgument = nullptr) {
   for (const Job *Cmd : Jobs) {
     auto &output = Cmd->getOutput().getAnyOutputForType(InputType);
-    if (!output.empty())
+    if (!output.empty()) {
+      if (PrefixArgument)
+        Arguments.push_back(PrefixArgument);
       Arguments.push_back(output.c_str());
+    }
   }
 }
 
 static void addPrimaryInputsOfType(ArgStringList &Arguments,
                                    ArrayRef<const Job *> Jobs,
-                                   types::ID InputType) {
+                                   types::ID InputType,
+                                   const char *PrefixArgument = nullptr) {
   for (const Job *Cmd : Jobs) {
     auto &outputInfo = Cmd->getOutput();
     if (outputInfo.getPrimaryOutputType() == InputType) {
       for (const std::string &Output : outputInfo.getPrimaryOutputFilenames()) {
+        if (PrefixArgument)
+          Arguments.push_back(PrefixArgument);
         Arguments.push_back(Output.c_str());
       }
     }
@@ -1228,20 +1238,17 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
 
-  if (context.OI.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
-    size_t argCount = Arguments.size();
-    if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
-      addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
-    else
-      addPrimaryInputsOfType(Arguments, context.Inputs,
-                             types::TY_SwiftModuleFile);
+  if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
+    addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile,
+                    "-add_ast_path");
+  else
+    addPrimaryInputsOfType(Arguments, context.Inputs,
+                           types::TY_SwiftModuleFile, "-add_ast_path");
 
-    if (Arguments.size() > argCount) {
-      assert(argCount + 1 == Arguments.size() &&
-             "multiple swiftmodules found for -g");
-      Arguments.insert(Arguments.end() - 1, "-add_ast_path");
-    }
-  }
+  // Add all .swiftmodule file inputs as arguments, preceded by the
+  // "-add_ast_path" linker option.
+  addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile,
+                  "-add_ast_path");
 
   switch (job.getKind()) {
   case LinkKind::None:
