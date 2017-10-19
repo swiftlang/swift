@@ -987,6 +987,8 @@ private:
   bool diagnoseClosureExpr(ClosureExpr *closureExpr, Type contextualType,
                            std::function<bool(Type, Type)> resultTypeProcessor);
 
+  bool diagnoseSubscriptErrors(SubscriptExpr *SE, bool performingSet);
+
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
@@ -4478,9 +4480,7 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
   return false;
 }
 
-
-
-bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
+bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE, bool inAssignmentDestination) {
   auto baseExpr = typeCheckChildIndependently(SE->getBase());
   if (!baseExpr) return true;
   auto baseType = CS.getType(baseExpr);
@@ -4494,8 +4494,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   std::function<bool(ArrayRef<OverloadChoice>)> callback =
       [&](ArrayRef<OverloadChoice> candidates) -> bool {
     CalleeCandidateInfo calleeInfo(Type(), candidates, SE->hasTrailingClosure(),
-                                   CS,
-                                   /*selfAlreadyApplied*/ false);
+                                   CS, /*selfAlreadyApplied*/ false);
 
     // We're about to typecheck the index list, which needs to be processed with
     // self already applied.
@@ -4522,7 +4521,9 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     calleeInfo.filterList(
         [&](UncurriedCandidate cand) -> CalleeCandidateInfo::ClosenessResultTy {
           // Classify how close this match is.  Non-subscript decls don't match.
-          if (!dyn_cast_or_null<SubscriptDecl>(cand.getDecl()))
+          auto subscriptDecl = dyn_cast_or_null<SubscriptDecl>(cand.getDecl());
+          if (!subscriptDecl ||
+              (inAssignmentDestination && !subscriptDecl->isSettable()))
             return {CC_GeneralMismatch, {}};
 
           // Check whether the self type matches.
@@ -4544,8 +4545,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
         });
 
     // If the closest matches all mismatch on self, we either have something
-    // that
-    // cannot be subscripted, or an ambiguity.
+    // that cannot be subscripted, or an ambiguity.
     if (calleeInfo.closeness == CC_SelfMismatch) {
       diagnose(SE->getLoc(), diag::cannot_subscript_base, baseType)
           .highlight(SE->getBase()->getSourceRange());
@@ -4575,6 +4575,20 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
         if (CS.TC.getTypeOfExpressionWithoutApplying(expr, CS.DC, decl))
           return false;
+
+        // If we are down to a single candidate but with an unresolved
+        // index type, we can substitute in the base type to get a simpler
+        // and more concrete expected type for this subscript decl, in order
+        // to diagnose a better error.
+        if (baseType && indexType->hasUnresolvedType()) {
+          UncurriedCandidate cand = calleeInfo.candidates[0];
+          auto candType = baseType->getTypeOfMember(CS.DC->getParentModule(),
+                                                    cand.getDecl(), nullptr);
+          auto paramsType = candType->getAs<FunctionType>()->getInput();
+          if (!typeCheckChildIndependently(indexExpr, paramsType,
+                                           CTP_CallArgument, TCC_ForceRecheck))
+            return true;
+        }
       }
 
       diagnose(SE->getLoc(), message, baseType, indexType)
@@ -4599,6 +4613,12 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     if (calleeInfo.diagnoseSimpleErrors(SE))
       return true;
 
+    // If we haven't found a diagnostic yet, and we are in an assignment's
+    // destination, continue with diagnosing the assignment rather than giving
+    // a last resort diagnostic here.
+    if (inAssignmentDestination)
+      return false;
+
     diagnose(SE->getLoc(), diag::cannot_subscript_with_index, baseType,
              indexType);
 
@@ -4615,6 +4635,9 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
                                 callback);
 }
 
+bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
+  return diagnoseSubscriptErrors(SE, /* inAssignmentDestination = */ false);
+}
 
 namespace {
   /// Type checking listener for pattern binding initializers.
@@ -5833,6 +5856,14 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   // If the result type is a non-lvalue, then we are failing because it is
   // immutable and that's not a great thing to assign to.
   if (!destType->hasLValueType()) {
+    // If the destination is a subscript, the problem may actually be that we
+    // incorrectly decided on a get-only subscript overload, and we may be able
+    // to come up with a better diagnosis by looking only at subscript candidates
+    // that are set-able.
+    if (auto subscriptExpr = dyn_cast<SubscriptExpr>(destExpr)) {
+      if (diagnoseSubscriptErrors(subscriptExpr, /* inAssignmentDestination = */ true))
+        return true;
+    }
     CS.diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc());
     return true;
   }
