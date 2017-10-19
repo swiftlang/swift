@@ -2545,7 +2545,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_C_COMPILER:PATH="${LLVM_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${LLVM_BIN}/clang++"
                     -DCMAKE_SWIFT_COMPILER:PATH="${SWIFTC_BIN}"
-                    -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
+                    -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                    -DCMAKE_INSTALL_LIBDIR:PATH="lib"
 
                     -DENABLE_SWIFT=YES
                     -DSWIFT_RUNTIME_LIBDIR:PATH="${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
