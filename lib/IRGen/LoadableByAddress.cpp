@@ -2542,6 +2542,10 @@ void LoadableByAddress::run() {
           SILFunction *RefF = FRI->getReferencedFunction();
           if (modFuncs.count(RefF) != 0) {
             // Go over the uses and add them to lists to modify
+            //
+            // FIXME: Why aren't function_ref uses processed transitively?  And
+            // why is it necessary to visit uses at all if they will be visited
+            // later in this loop?
             for (auto *user : FRI->getUses()) {
               SILInstruction *currInstr = user->getUser();
               switch (currInstr->getKind()) {
@@ -2584,6 +2588,14 @@ void LoadableByAddress::run() {
           if (modifiableFunction(CanSILFunctionType(fType))) {
             conversionInstrs.insert(CFI);
           }
+        } else if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(&I)) {
+
+          CanType canType = TTI->getCallee()->getType().getSwiftRValueType();
+          auto *fType = canType->castTo<SILFunctionType>();
+
+          if (modifiableFunction(CanSILFunctionType(fType)))
+            conversionInstrs.insert(TTI);
+
         } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
           SILType currType = LI->getType();
           if (auto *fType = getInnerFunctionType(currType)) {
