@@ -940,9 +940,9 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
 
       // If the coercion type is a struct, we need to expand it.
       auto type = AI.getCoerceToType();
-      if (auto expandedType = dyn_cast<llvm::StructType>(type)) {
-        for (size_t j = 0, e = expandedType->getNumElements(); j != e; ++j)
-          ParamIRTypes.push_back(expandedType->getElementType(j));
+      if (const auto *ST = dyn_cast<llvm::StructType>(type)) {
+        for (unsigned EI : range(ST->getNumElements()))
+          ParamIRTypes.push_back(ST->getElementType(EI));
       } else {
         ParamIRTypes.push_back(type);
       }
@@ -1685,11 +1685,11 @@ static void emitCoerceAndExpand(IRGenFunction &IGF,
 }
 
 static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
-                                       llvm::Type *toTy, Explosion &in,
+                                       llvm::Type *argTy, Explosion &in,
                                        Explosion &out) {
   // If we're supposed to pass directly as a struct type, that
   // really means expanding out as multiple arguments.
-  ArrayRef<llvm::Type *> expandedTys = expandScalarOrStructTypeToArray(toTy);
+  ArrayRef<llvm::Type *> expandedTys = expandScalarOrStructTypeToArray(argTy);
 
   auto &argTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(argType));
   auto inputSchema = argTI.getSchema();
@@ -1710,7 +1710,7 @@ static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
   Address temporary;
   Size tempSize;
   std::tie(temporary, tempSize) =
-      allocateForCoercion(IGF, argTI.getStorageType(), toTy, "coerced-arg");
+      allocateForCoercion(IGF, argTI.getStorageType(), argTy, "coerced-arg");
   IGF.Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Store to a temporary.
@@ -1720,10 +1720,10 @@ static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
 
   // Bitcast the temporary to the expected type.
   Address coercedAddr =
-    IGF.Builder.CreateBitCast(temporary, toTy->getPointerTo());
+      IGF.Builder.CreateBitCast(temporary, argTy->getPointerTo());
 
   // Project out individual elements if necessary.
-  if (auto expansionTy = dyn_cast<llvm::StructType>(toTy)) {
+  if (auto expansionTy = dyn_cast<llvm::StructType>(argTy)) {
     auto layout = IGF.IGM.DataLayout.getStructLayout(expansionTy);
     for (unsigned i = 0, e = expansionTy->getNumElements(); i != e; ++i) {
       auto fieldOffset = Size(layout->getElementOffset(i));
