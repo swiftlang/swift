@@ -213,12 +213,9 @@ public:
     return getSingleOutputFilename() == "-";
   }
   bool isOutputFileDirectory() const;
-  bool isOutputFilePlainFile() const;
   bool hasNamedOutputFile() const {
     return !OutputFilenames.empty() && !isOutputFilenameStdout();
   }
-  void setOutputFileList(DiagnosticEngine &Diags,
-                         const llvm::opt::ArgList &Args);
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
@@ -474,14 +471,10 @@ public:
 
   StringRef originalPath() const;
 
-  StringRef determineFallbackModuleName() const;
-
   bool isCompilingExactlyOneSwiftFile() const {
     return InputKind == InputFileKind::IFK_Swift &&
            Inputs.hasUniqueInputFilename();
   }
-
-  void setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args);
 };
 
 }
