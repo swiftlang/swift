@@ -104,12 +104,33 @@ public:
 
   class DelayedRequirement;
 
-  /// Describes a specific constraint on a potential archetype.
+  /// Describes a specific constraint on a particular type.
   template<typename T>
   struct Constraint {
-    PotentialArchetype *archetype;
+    /// The specific subject of the constraint.
+    PotentialArchetype *subject;
+
+    /// A value used to describe the constraint.
     T value;
+
+    /// The requirement source used to derive this constraint.
     const RequirementSource *source;
+
+    /// Retrieve the dependent type describing the subject of the constraint.
+    Type getSubjectDependentType() const;
+
+    /// Realizes and retrieves the potential archetype describing the
+    /// subject of the constraint.
+    PotentialArchetype *realizeSubjectPotentialArchetype(
+                          GenericSignatureBuilder &builder) const;
+
+    /// Determine whether the subject is equivalence to the given potential
+    /// archetype.
+    bool isSubjectEqualTo(const PotentialArchetype *pa) const;
+
+    /// Determine whether this constraint has the same subject as the
+    /// given constraint.
+    bool hasSameSubjectAs(const Constraint<T> &other) const;
   };
 
   /// Describes a concrete constraint on a potential archetype where, where the
@@ -1513,9 +1534,9 @@ public:
   /// path compression on the way.
   PotentialArchetype *getRepresentative() const;
 
-private:
   /// Retrieve the generic signature builder with which this archetype is
   /// associated.
+  /// FIXME: Only EquivalenceClassVizIterator gets to use this.
   GenericSignatureBuilder *getBuilder() const {
     const PotentialArchetype *pa = this;
     while (auto parent = pa->getParent())
@@ -1523,6 +1544,7 @@ private:
     return pa->parentOrBuilder.get<GenericSignatureBuilder *>();
   }
 
+private:
   // Replace the generic signature builder.
   void replaceBuilder(GenericSignatureBuilder *builder) {
     assert(parentOrBuilder.is<GenericSignatureBuilder *>());
