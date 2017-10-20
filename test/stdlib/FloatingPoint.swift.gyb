@@ -102,7 +102,9 @@ FloatingPoint.test("Float/staticProperties") {
   // From the FloatingPoint protocol.
   expectEqual(2, Ty.radix)
   expectBitwiseEqual(bitPattern: 0x7fc0_0000, Ty.nan)
+#if !arch(i386) // i386 does not support a signaling nans.
   expectBitwiseEqual(bitPattern: 0x7fa0_0000, Ty.signalingNaN)
+#endif
   expectBitwiseEqual(bitPattern: 0x7f80_0000, Ty.infinity)
   expectBitwiseEqual(0x1.ffff_fe__p127, Ty.greatestFiniteMagnitude)
   expectBitwiseEqual(0x1.921f_b4__p1, Ty.pi)
@@ -179,7 +181,9 @@ FloatingPoint.test("Double/staticProperties") {
   // From the FloatingPoint protocol.
   expectEqual(2, Ty.radix)
   expectBitwiseEqual(bitPattern: 0x7ff8_0000_0000_0000, Ty.nan)
+#if !arch(i386) // i386 does not support a signaling nans.
   expectBitwiseEqual(bitPattern: 0x7ff4_0000_0000_0000, Ty.signalingNaN)
+#endif
   expectBitwiseEqual(bitPattern: 0x7ff0_0000_0000_0000, Ty.infinity)
   expectBitwiseEqual(0x1.ffff_ffff_ffff_f__p1023, Ty.greatestFiniteMagnitude)
   expectBitwiseEqual(0x1.921f_b544_42d1_8__p1, Ty.pi)
@@ -464,7 +468,9 @@ FloatingPoint.test("Float80/staticProperties") {
   // From the FloatingPoint protocol.
   expectEqual(2, Ty.radix)
   expectBitwiseEqual(bitPattern: 0x7ff8_0000_0000_0000, Ty.nan)
+#if !arch(i386) // i386 does not support a signaling nans.
   expectBitwiseEqual(bitPattern: 0x7ff4_0000_0000_0000, Ty.signalingNaN)
+#endif
   expectBitwiseEqual(bitPattern: 0x7ff0_0000_0000_0000, Ty.infinity)
   expectBitwiseEqual(0x1.ffff_ffff_ffff_f__p1023, Ty.greatestFiniteMagnitude)
   expectBitwiseEqual(0x1.921f_b544_42d1_8__p1, Ty.pi)
@@ -1157,7 +1163,7 @@ FloatingPoint.test("Float64/signalingNaN") {
 
 #endif
 
-#if arch(i386) || arch(x86_64)
+#if arch(x86_64)
 
 FloatingPoint.test("Float80/signalingNaN") {
   do {
