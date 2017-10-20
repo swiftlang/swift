@@ -165,6 +165,7 @@ _TtERR ---> <ERROR TYPE>
 _TtGSqGSaC5sugar7MyClass__ ---> [sugar.MyClass]?
 _TtGSaGSqC5sugar7MyClass__ ---> [sugar.MyClass?]
 _TtaC9typealias5DWARF9DIEOffset ---> typealias.DWARF.DIEOffset
+_Tta1t5Alias ---> t.Alias
 _Ttas3Int ---> Swift.Int
 _TTRXFo_dSc_dSb_XFo_iSc_iSb_ ---> reabstraction thunk helper from @callee_owned (@unowned Swift.UnicodeScalar) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.UnicodeScalar) -> (@out Swift.Bool)
 _TTRXFo_dSi_dGSqSi__XFo_iSi_iGSqSi__ ---> reabstraction thunk helper from @callee_owned (@unowned Swift.Int) -> (@unowned Swift.Int?) to @callee_owned (@in Swift.Int) -> (@out Swift.Int?)
