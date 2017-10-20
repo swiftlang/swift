@@ -42,6 +42,7 @@
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | %FileCheck -check-prefix DEBUG %s
 
+// RUN: %empty-directory(%t)
 // RUN: touch %t/a.o
 // RUN: touch %t/a.swiftmodule
 // RUN: touch %t/b.o
