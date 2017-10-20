@@ -675,7 +675,8 @@ static bool isSelfDerivedProtocolRequirementInProtocol(
   // same equivalence class as what we've proven with this requirement,
   // it's a self-derived requirement.
   return
-    source->getAffectedPotentialArchetype()->getEquivalenceClassIfPresent() ==
+    builder.resolveEquivalenceClass(source->getAffectedType(),
+                                    ArchetypeResolutionKind::WellFormed) ==
       builder.resolveEquivalenceClass(source->getStoredType(),
                                       ArchetypeResolutionKind::AlreadyKnown);
 }
@@ -688,6 +689,8 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
 
   // If it's not a derived requirement, it's not self-derived.
   if (!isDerivedRequirement()) return this;
+
+  auto &builder = *currentPA->getBuilder();
 
   /// Keep track of all of the requirements we've seen along the way. If
   /// we see the same requirement twice, we have found a shorter path.
@@ -786,7 +789,8 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
   if (redundantSubpath) {
     assert(isSelfDerived && "Not considered self-derived?");
     auto shorterSource =
-      withoutRedundantSubpath(redundantSubpath->first,
+      withoutRedundantSubpath(builder,
+                              redundantSubpath->first,
                               redundantSubpath->second);
     return shorterSource
       ->getMinimalConformanceSource(currentPA, proto, derivedViaConcrete);
@@ -967,6 +971,7 @@ const RequirementSource *RequirementSource::viaEquivalentType(
 #undef REQUIREMENT_SOURCE_FACTORY_BODY
 
 const RequirementSource *RequirementSource::withoutRedundantSubpath(
+                                        GenericSignatureBuilder &builder,
                                         const RequirementSource *start,
                                         const RequirementSource *end) const {
   // Replace the end with the start; the caller has guaranteed that they
@@ -986,7 +991,6 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
     return start;
   }
 
-  auto &builder = *getRootPotentialArchetype()->getBuilder();
   switch (kind) {
   case Explicit:
   case Inferred:
@@ -996,35 +1000,35 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
     llvm_unreachable("Subpath end doesn't occur within path");
 
   case ProtocolRequirement:
-    return parent->withoutRedundantSubpath(start, end)
+    return parent->withoutRedundantSubpath(builder, start, end)
       ->viaProtocolRequirement(builder, getStoredType(),
                                getProtocolDecl(), /*inferred=*/false,
                                getWrittenRequirementLoc());
 
   case InferredProtocolRequirement:
-    return parent->withoutRedundantSubpath(start, end)
+    return parent->withoutRedundantSubpath(builder, start, end)
       ->viaProtocolRequirement(builder, getStoredType(),
                                getProtocolDecl(), /*inferred=*/true,
                                getWrittenRequirementLoc());
 
   case Concrete:
-    return parent->withoutRedundantSubpath(start, end)
+    return parent->withoutRedundantSubpath(builder, start, end)
       ->viaParent(builder, getAssociatedType());
 
   case Derived:
-    return parent->withoutRedundantSubpath(start, end)
+    return parent->withoutRedundantSubpath(builder, start, end)
       ->viaDerived(builder);
 
   case EquivalentType:
-    return parent->withoutRedundantSubpath(start, end)
+    return parent->withoutRedundantSubpath(builder, start, end)
       ->viaEquivalentType(builder, getAffectedPotentialArchetype());
 
   case Parent:
-    return parent->withoutRedundantSubpath(start, end)
+    return parent->withoutRedundantSubpath(builder, start, end)
       ->viaParent(builder, getAssociatedType());
 
   case Superclass:
-    return parent->withoutRedundantSubpath(start, end)
+    return parent->withoutRedundantSubpath(builder, start, end)
       ->viaSuperclass(builder, getProtocolConformance());
   }
 }
@@ -1045,11 +1049,19 @@ PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
   return root->storage.rootArchetype;
 }
 
+Type RequirementSource::getRootType() const {
+  return getRootPotentialArchetype()->getDependentType({ });
+}
+
 PotentialArchetype *RequirementSource::getAffectedPotentialArchetype() const {
   return visitPotentialArchetypesAlongPath(
                          [](PotentialArchetype *, const RequirementSource *) {
                            return false;
                          });
+}
+
+Type RequirementSource::getAffectedType() const {
+  return getAffectedPotentialArchetype()->getDependentType({ });
 }
 
 PotentialArchetype *
@@ -1230,8 +1242,7 @@ void RequirementSource::print(llvm::raw_ostream &out,
     parent->print(out, srcMgr);
     out << " -> ";
   } else {
-    auto pa = getRootPotentialArchetype();
-    out << pa->getDebugName() << ": ";
+    out << getRootType().getString() << ": ";
   }
 
   switch (kind) {
@@ -1330,20 +1341,22 @@ void RequirementSource::print(llvm::raw_ostream &out,
 }
 
 /// Form the dependent type such that the given protocol's \c Self can be
-/// replaced by \c basePA to reach \c pa.
+/// replaced by \c baseType to reach \c type.
 static Type formProtocolRelativeType(ProtocolDecl *proto,
-                                     PotentialArchetype *basePA,
-                                     PotentialArchetype *pa) {
+                                     Type baseType,
+                                     Type type) {
   // Basis case: we've hit the base potential archetype.
-  if (basePA == pa)
+  if (baseType->isEqual(type))
     return proto->getSelfInterfaceType();
 
   // Recursive case: form a dependent member type.
-  auto baseType = formProtocolRelativeType(proto, basePA, pa->getParent());
-  if (auto assocType = pa->getResolvedAssociatedType())
-    return DependentMemberType::get(baseType, assocType);
+  auto depMemTy = type->castTo<DependentMemberType>();
+  Type newBaseType = formProtocolRelativeType(proto, baseType,
+                                              depMemTy->getBase());
+  if (auto assocType = depMemTy->getAssocType())
+    return DependentMemberType::get(newBaseType, assocType);
 
-  return DependentMemberType::get(baseType, pa->getNestedName());
+  return DependentMemberType::get(newBaseType, depMemTy->getName());
 }
 
 const RequirementSource *FloatingRequirementSource::getSource(
@@ -1367,11 +1380,11 @@ const RequirementSource *FloatingRequirementSource::getSource(
     // the path from the requirement source on which this requirement is based
     // to the potential archetype on which the requirement is being placed.
     auto baseSource = storage.get<const RequirementSource *>();
-    auto baseSourcePA =
-      baseSource->getAffectedPotentialArchetype();
+    auto baseSourceType = baseSource->getAffectedType();
 
     auto dependentType =
-      formProtocolRelativeType(protocolReq.protocol, baseSourcePA, pa);
+      formProtocolRelativeType(protocolReq.protocol, baseSourceType,
+                               pa->getDependentType({ }));
 
     return storage.get<const RequirementSource *>()
       ->viaProtocolRequirement(*pa->getBuilder(), dependentType,
@@ -2457,6 +2470,67 @@ static bool hasConcreteDecls(const PotentialArchetype *pa) {
   return hasConcreteDecls(parent);
 }
 
+/// Canonical ordering for dependent types.
+static int compareDependentTypes(Type type1, Type type2,
+                                 bool outermost = true) {
+  // Fast-path check for equality.
+  if (type1->isEqual(type2)) return 0;
+
+  if (outermost) {
+    // If there are any unresolved dependent member types in a type,
+    // it's an indication of a reference to a concrete, non-associated-type
+    // declaration. We prefer the type without such declarations.
+    bool hasConcreteDecls1 =
+      static_cast<bool>(type1->findUnresolvedDependentMemberType());
+    bool hasConcreteDecls2 =
+      static_cast<bool>(type2->findUnresolvedDependentMemberType());
+    if (hasConcreteDecls1 != hasConcreteDecls2)
+      return hasConcreteDecls1 ? +1 : -1;
+  }
+
+  // Ordering is as follows:
+  // - Generic params
+  auto gp1 = type1->getAs<GenericTypeParamType>();
+  auto gp2 = type2->getAs<GenericTypeParamType>();
+  if (gp1 && gp2)
+    return GenericParamKey(gp1) < GenericParamKey(gp2) ? -1 : +1;
+
+  // A generic parameter is always ordered before a nested type.
+  if (static_cast<bool>(gp1) != static_cast<bool>(gp2))
+    return gp1 ? -1 : +1;
+
+  // - Dependent members
+  auto depMemTy1 = type1->castTo<DependentMemberType>();
+  auto depMemTy2 = type2->castTo<DependentMemberType>();
+
+  // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
+  if (int compareBases =
+        compareDependentTypes(depMemTy1->getBase(), depMemTy2->getBase(),
+                              /*outermost=*/false))
+    return compareBases;
+
+  // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
+  if (int compareNames = depMemTy1->getName().str().compare(
+                                                  depMemTy2->getName().str()))
+    return compareNames;
+
+  if (auto *assocType1 = depMemTy1->getAssocType()) {
+    if (auto *assocType2 = depMemTy2->getAssocType()) {
+      if (int result = compareAssociatedTypes(assocType1, assocType2))
+        return result;
+    } else {
+      // A resolved archetype is always ordered before an unresolved one.
+      return -1;
+    }
+  } else {
+    // A resolved archetype is always ordered before an unresolved one.
+    if (depMemTy2->getAssocType())
+      return +1;
+  }
+
+  return 0;
+}
+
 /// Canonical ordering for dependent types in generic signatures.
 static int compareDependentTypes(PotentialArchetype * const* pa,
                                  PotentialArchetype * const* pb,
@@ -3190,6 +3264,12 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
 
   return maybeResolveEquivalenceClass(type, resolutionKind,
                                       /*wantExactPotentialArchetype=*/true);
+}
+
+bool GenericSignatureBuilder::areInSameEquivalenceClass(Type type1,
+                                                        Type type2) {
+  return resolveEquivalenceClass(type1, ArchetypeResolutionKind::WellFormed)
+    == resolveEquivalenceClass(type2, ArchetypeResolutionKind::WellFormed);
 }
 
 void GenericSignatureBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
@@ -4528,10 +4608,9 @@ namespace swift {
   template<typename T>
   bool operator<(const Constraint<T> &lhs, const Constraint<T> &rhs) {
     // FIXME: Awful.
-    auto &builder = *lhs.source->getRootPotentialArchetype()->getBuilder();
-    auto lhsPA = lhs.realizeSubjectPotentialArchetype(builder);
-    auto rhsPA = rhs.realizeSubjectPotentialArchetype(builder);
-    if (int result = compareDependentTypes(&lhsPA, &rhsPA))
+    auto lhsSource = lhs.getSubjectDependentType();
+    auto rhsSource = rhs.getSubjectDependentType();
+    if (int result = compareDependentTypes(lhsSource, rhsSource))
       return result < 0;
 
     if (int result = lhs.source->compare(rhs.source))
@@ -4626,7 +4705,7 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
                                       EquivalenceClass *equivClass) {
   auto existingMembers = equivClass->members;
   for (auto pa : existingMembers) {
-    // Make sure that there are only associated types the chain up to the
+    // Make sure that there are only associated types that chain up to the
     // parent.
     bool foundNonAssociatedType = false;
     for (auto currentPA = pa; auto parentPA = currentPA->getParent();
@@ -4638,6 +4717,7 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
     }
     if (foundNonAssociatedType) continue;
 
+    auto dependentType = pa->getDependentType({ });
     for (const auto &conforms : equivClass->conformsTo) {
       auto proto = conforms.first;
 
@@ -4646,7 +4726,7 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
       bool alreadyFound = false;
       const RequirementSource *conformsSource = nullptr;
       for (const auto &constraint : conforms.second) {
-        if (constraint.source->getAffectedPotentialArchetype() == pa) {
+        if (constraint.source->getAffectedType()->isEqual(dependentType)) {
           alreadyFound = true;
           break;
         }
@@ -5284,9 +5364,8 @@ void GenericSignatureBuilder::checkConformanceConstraints(
         if (rootSource->kind == RequirementSource::RequirementSignatureSelf &&
             source != rootSource &&
             proto == rootSource->getProtocolDecl() &&
-            rootSource->getRootPotentialArchetype()
-              ->isInSameEquivalenceClassAs(
-                                 source->getAffectedPotentialArchetype())) {
+            areInSameEquivalenceClass(rootSource->getRootType(),
+                                      source->getAffectedType())) {
           return ConstraintRelation::Unrelated;
         }
 
