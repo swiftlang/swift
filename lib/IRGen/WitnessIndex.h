@@ -25,15 +25,17 @@ namespace irgen {
 
 /// A class which encapsulates an index into a witness table.
 class WitnessIndex {
-  unsigned Value : 31;
+  // Negative values are indexing into the private area of a protocol witness
+  // table.
+  int Value : 31;
   unsigned IsPrefix : 1;
 public:
   WitnessIndex() = default;
-  WitnessIndex(ValueWitness index) : Value(unsigned(index)) {}
-  explicit WitnessIndex(unsigned index, bool isPrefix)
-    : Value(index), IsPrefix(isPrefix) {}
+  WitnessIndex(ValueWitness index) : Value(int(index)) {}
+  explicit WitnessIndex(int index, bool isPrefix)
+      : Value(index), IsPrefix(isPrefix) {}
 
-  unsigned getValue() const { return Value; }
+  int getValue() const { return Value; }
 
   bool isPrefix() const { return IsPrefix; }
 };

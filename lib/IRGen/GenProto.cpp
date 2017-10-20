@@ -1072,9 +1072,10 @@ class AccessorConformanceInfo : public ConformanceInfo {
   friend ProtocolInfo;
 
   const NormalProtocolConformance *Conformance;
+
 public:
   AccessorConformanceInfo(const NormalProtocolConformance *C)
-    : Conformance(C) {}
+      : Conformance(C) {}
 
   llvm::Value *getTable(IRGenFunction &IGF, CanType type,
                         llvm::Value **typeMetadataCache) const override {
@@ -2206,6 +2207,41 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     return source;
   }
 
+  case Component::Kind::ConditionalConformance: {
+    auto sourceConformance = sourceKey.Kind.getProtocolConformance();
+
+    auto reqtIndex = component.getPrimaryIndex();
+
+    ProtocolDecl *conformingProto;
+    auto found = SILWitnessTable::enumerateWitnessTableConditionalConformances(
+        sourceConformance.getConcrete(),
+        [&](unsigned index, CanType type, ProtocolDecl *proto) {
+          if (reqtIndex == index) {
+            conformingProto = proto;
+            sourceKey.Type = type;
+            // done!
+            return true;
+          }
+          return /*finished?*/ false;
+        });
+    assert(found && "too many conditional conformances");
+
+    sourceKey.Kind =
+        LocalTypeDataKind::forAbstractProtocolWitnessTable(conformingProto);
+
+    if (source) {
+      WitnessIndex index(privateIndexToTableOffset(reqtIndex),
+                         /*prefix*/ false);
+
+      source = emitInvariantLoadOfOpaqueWitness(IGF, source, index);
+      source = IGF.Builder.CreateBitCast(source, IGF.IGM.WitnessTablePtrTy);
+      setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type,
+                                  conformingProto);
+    }
+
+    return source;
+  }
+
   case Component::Kind::Impossible:
     llvm_unreachable("following an impossible path!");
 
@@ -2235,6 +2271,9 @@ void MetadataPath::print(llvm::raw_ostream &out) const {
     case Component::Kind::NominalTypeArgumentConformance:
       out << "nominal_type_argument_conformance["
           << component.getPrimaryIndex() << "]";
+      break;
+    case Component::Kind::ConditionalConformance:
+      out << "conditional_conformance[" << component.getPrimaryIndex() << "]";
       break;
     case Component::Kind::Impossible:
       out << "impossible";
