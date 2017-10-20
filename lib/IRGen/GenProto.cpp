@@ -142,9 +142,32 @@ private:
                          bool isSelfParameter);
 
   void addSelfMetadataFulfillment(CanType arg);
-  void addSelfWitnessTableFulfillment(CanType arg, ProtocolDecl *proto);
+  void addSelfWitnessTableFulfillment(CanType arg,
+                                      ProtocolConformanceRef conformance);
 
   void addPseudogenericFulfillments();
+
+  struct FulfillmentMapCallback : FulfillmentMap::InterestingKeysCallback {
+    PolymorphicConvention &Self;
+    FulfillmentMapCallback(PolymorphicConvention &self) : Self(self) {}
+
+    bool isInterestingType(CanType type) const override {
+      return type->isTypeParameter();
+    }
+    bool hasInterestingType(CanType type) const override {
+      return type->hasTypeParameter();
+    }
+    bool hasLimitedInterestingConformances(CanType type) const override {
+      return true;
+    }
+    GenericSignature::ConformsToArray
+    getInterestingConformances(CanType type) const override {
+      return Self.getConformsTo(type);
+    }
+    CanType getSuperclassBound(CanType type) const override {
+      return Self.getSuperclassBound(type);
+    }
+  };
 };
 
 } // end anonymous namespace
@@ -167,9 +190,9 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
   }
 
   if (rep == SILFunctionTypeRepresentation::WitnessMethod) {
-    // Protocol witnesses always derive all polymorphic parameter
-    // information from the Self argument. We also *cannot* consider other
-    // arguments; doing so would potentially make the signature
+    // Protocol witnesses always derive all polymorphic parameter information
+    // from the Self and Self witness table arguments. We also *cannot* consider
+    // other arguments; doing so would potentially make the signature
     // incompatible with other witnesses for the same method.
     considerWitnessSelf(fnType);
   } else if (rep == SILFunctionTypeRepresentation::ObjCMethod) {
@@ -284,27 +307,7 @@ void PolymorphicConvention::considerNewTypeSource(MetadataSource::Kind kind,
 bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact,
                                          unsigned sourceIndex,
                                          MetadataPath &&path) {
-  struct Callback : FulfillmentMap::InterestingKeysCallback {
-    PolymorphicConvention &Self;
-    Callback(PolymorphicConvention &self) : Self(self) {}
-
-    bool isInterestingType(CanType type) const override {
-      return type->isTypeParameter();
-    }
-    bool hasInterestingType(CanType type) const override {
-      return type->hasTypeParameter();
-    }
-    bool hasLimitedInterestingConformances(CanType type) const override {
-      return true;
-    }
-    GenericSignature::ConformsToArray
-    getInterestingConformances(CanType type) const override {
-      return Self.getConformsTo(type);
-    }
-    CanType getSuperclassBound(CanType type) const override {
-      return Self.getSuperclassBound(type);
-    }
-  } callbacks(*this);
+  FulfillmentMapCallback callbacks(*this);
   return Fulfillments.searchTypeMetadata(IGM, type, isExact, sourceIndex,
                                          std::move(path), callbacks);
 }
@@ -312,29 +315,17 @@ bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact,
 void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
   CanType selfTy = fnType->getSelfInstanceType();
   auto conformance = fnType->getWitnessMethodConformance();
-  auto protocol = conformance.getRequirement();
 
   // First, bind type metadata for Self.
   Sources.emplace_back(MetadataSource::Kind::SelfMetadata,
                        MetadataSource::InvalidSourceIndex,
                        selfTy);
 
-  if (auto *proto = fnType->getDefaultWitnessMethodProtocol()) {
+  if (fnType->getDefaultWitnessMethodProtocol() ||
+      fnType->getWitnessMethodClass(M)) {
     // The Self type is abstract, so we can fulfill its metadata from
     // the Self metadata parameter.
     addSelfMetadataFulfillment(selfTy);
-
-    // The witness table for the Self : P conformance can be
-    // fulfilled from the Self witness table parameter.
-    Sources.emplace_back(MetadataSource::Kind::SelfWitnessTable,
-                         MetadataSource::InvalidSourceIndex,
-                         selfTy);
-    addSelfWitnessTableFulfillment(selfTy, proto);
-  } else if (auto *classDecl = fnType->getWitnessMethodClass(M)) {
-    // The Self type is abstract, so we can fulfill its metadata from
-    // the Self metadata parameter.
-    addSelfMetadataFulfillment(selfTy);
-    addSelfWitnessTableFulfillment(selfTy, protocol);
   } else {
     // If the Self type is concrete, we have a witness thunk with a
     // fully substituted Self type. The witness table parameter is not
@@ -346,9 +337,13 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
     //
     // For now, just fulfill the generic arguments of 'Self'.
     considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
-
-    addSelfWitnessTableFulfillment(selfTy, protocol);
   }
+
+  // The witness table for the Self : P conformance can be
+  // fulfilled from the Self witness table parameter.
+  Sources.emplace_back(MetadataSource::Kind::SelfWitnessTable,
+                       MetadataSource::InvalidSourceIndex, selfTy);
+  addSelfWitnessTableFulfillment(selfTy, conformance);
 }
 
 void PolymorphicConvention::considerObjCGenericSelf(CanSILFunctionType fnType) {
@@ -433,9 +428,17 @@ void PolymorphicConvention::addSelfMetadataFulfillment(CanType arg) {
   Fulfillments.addFulfillment({arg, nullptr}, source, MetadataPath());
 }
 
-void PolymorphicConvention::addSelfWitnessTableFulfillment(CanType arg, ProtocolDecl *proto) {
+void PolymorphicConvention::addSelfWitnessTableFulfillment(
+    CanType arg, ProtocolConformanceRef conformance) {
+  auto proto = conformance.getRequirement();
   unsigned source = Sources.size() - 1;
   Fulfillments.addFulfillment({arg, proto}, source, MetadataPath());
+
+  if (conformance.isConcrete()) {
+    FulfillmentMapCallback callbacks(*this);
+    Fulfillments.searchConformance(IGM, conformance.getConcrete(), source,
+                                   MetadataPath(), callbacks);
+  }
 }
 
 const Fulfillment *
