@@ -1466,13 +1466,30 @@ public protocol BinaryInteger :
   /// - Parameter source: An integer to convert to this type.
   init<T : BinaryInteger>(clamping source: T)
 
+  // FIXME: should be removed. It's here to avoid regressing compiler
+  // performance when using a constraint on Words associated type.
+  /// Returns the n-th word, counting from the least significant to most
+  /// significant, of this value's binary representation.
+  ///
+  /// The `_word(at:)` method returns negative values in two's complement
+  /// representation, regardless of a type's underlying implementation. If `n`
+  /// is greater than the number of words in this value's current
+  /// representation, the result is `0` for positive numbers and `~0` for
+  /// negative numbers.
+  ///
+  /// - Parameter n: The word to return, counting from the least significant to
+  ///   most significant. `n` must be greater than or equal to zero.
+  /// - Returns: An word-sized, unsigned integer with the bit pattern of the
+  ///   n-th word of this value.
+  func _word(at: Int) -> UInt
+
   // FIXME: Should be `Words : Collection where Words.Element == UInt`
   // See <rdar://problem/31798916> for why it isn't.
   /// A type that represents the words of a binary integer.
   ///
   /// The `Words` type must conform to the `Collection` protocol with an
   /// `Element` type of `UInt`.
-  associatedtype Words : Sequence where Words.Element == UInt
+  associatedtype Words
 
   /// A collection containing the words of this value's binary
   /// representation, in order from the least significant to most significant.
@@ -1480,9 +1497,6 @@ public protocol BinaryInteger :
   /// Negative values are returned in two's complement representation,
   /// regardless of the type's underlying implementation.
   var words: Words { get }
-
-  /// The least significant word in this value's binary representation.
-  var _lowWord: UInt { get }
 
   /// The number of bits in the current binary representation of this value.
   ///
@@ -1602,12 +1616,6 @@ extension BinaryInteger {
   @_transparent
   public func signum() -> Self {
     return (self > (0 as Self) ? 1 : 0) - (self < (0 as Self) ? 1 : 0)
-  }
-
-  @_transparent
-  public var _lowWord: UInt {
-    var it = words.makeIterator()
-    return it.next() ?? 0
   }
 
   public func quotientAndRemainder(dividingBy rhs: Self)
@@ -1896,6 +1904,31 @@ extension BinaryInteger {
     return rhs < lhs
   }
 }
+
+//===----------------------------------------------------------------------===//
+// FIXME(integers): remove these extensions once constrained Words is fast
+// enough
+extension BinaryInteger {
+  @_transparent
+  public var _countRepresentedWords: Int {
+    return (self.bitWidth + ${word_bits} - 1) / ${word_bits}
+  }
+}
+
+extension BinaryInteger where
+  Words : Collection,
+  Words.Index : BinaryInteger,
+  Words.Element == UInt {
+
+  @_transparent
+  public func _word(at n: Int) -> UInt {
+    _precondition(
+      words.startIndex..<words.endIndex ~= numericCast(n),
+      "Index out of range")
+    return words[numericCast(n)]
+  }
+}
+//===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 //===--- FixedWidthInteger ------------------------------------------------===//
@@ -2389,20 +2422,19 @@ ${unsafeOperationComment(x.operator)}
   @inline(__always)
   public init<T : BinaryInteger>(truncatingIfNeeded source: T) {
     if Self.bitWidth <= ${word_bits} {
-      self = Self.init(_truncatingBits: source._lowWord)
+      self = Self.init(_truncatingBits: source._word(at: 0))
     }
     else {
-      let neg = source < (0 as T)
-      var result: Self = neg ? ~0 : 0
-      var shift: Self = 0
-      let width = Self(_truncatingBits: Self.bitWidth._lowWord)
-      for word in source.words {
-        guard shift < width else { break }
-        // masking shift is OK here because we have already ensured
-        // that shift < Self.bitWidth. Not masking results in
+      var result: Self = source < (0 as T) ? ~0 : 0
+      // start with the most significant word
+      var n = source._countRepresentedWords
+      while n >= 0 {
+        // masking is OK here because this we have already ensured
+        // that Self.bitWidth > ${word_bits}.  Not masking results in
         // infinite recursion.
-        result ^= Self(_truncatingBits: neg ? ~word : word) &<< shift
-        shift += ${word_bits}
+        result &<<= (${word_bits} as Self)
+        result |= Self(_truncatingBits: source._word(at: n))
+        n -= 1
       }
       self = result
     }
@@ -2964,6 +2996,22 @@ ${assignmentOperatorComment(x.operator, True)}
       ${Self}(
         Builtin.int_ctpop_Int${bits}(self._value)
       )._lowWord._value)
+  }
+
+  @inline(__always)
+  public func _word(at n: Int) -> UInt {
+    _precondition(n >= 0, "Negative word index")
+    if _fastPath(n < _countRepresentedWords) {
+      let shift = UInt(n._value) &* ${word_bits}
+      let bitWidth = UInt(self.bitWidth._value)
+      _sanityCheck(shift < bitWidth)
+      return (self &>> ${Self}(_truncatingBits: shift))._lowWord
+    }
+% if signed:
+    return self < (0 as ${Self}) ? ~0 : 0
+% else:
+    return 0
+% end
   }
 
   // FIXME should be RandomAccessCollection

@@ -121,7 +121,8 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // FIXME: This is broken on 32-bit arch w/ Word = UInt64
     let wordRatio = UInt.bitWidth / Word.bitWidth
     _sanityCheck(wordRatio != 0)
-    for var sourceWord in source.words {
+    for i in 0..<source._countRepresentedWords {
+      var sourceWord = source._word(at: i)
       for _ in 0..<wordRatio {
         _data.append(Word(truncatingIfNeeded: sourceWord))
         sourceWord >>= Word.bitWidth
@@ -656,6 +657,38 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
       // The highest bit is set to 0, which moves to 1 after negation.
       return x._data.map(~)
     }
+  }
+
+  public func _word(at n: Int) -> UInt {
+    let ratio = UInt.bitWidth / Word.bitWidth
+    _sanityCheck(ratio != 0)
+
+    var twosComplementData = _dataAsTwosComplement()
+
+    // Find beginning of range. If we're beyond the value, return 1s or 0s.
+    let start = n * ratio
+    if start >= twosComplementData.count {
+      return isNegative ? UInt.max : 0
+    }
+
+    // Find end of range. If the range extends beyond the representation,
+    // add bits to the end.
+    let end = (n + 1) * ratio
+    if end > twosComplementData.count {
+      twosComplementData.append(contentsOf:
+        repeatElement(isNegative ? Word.max : 0,
+          count: end - twosComplementData.count))
+    }
+
+    // Build the correct word from the range determined above.
+    let wordSlice = twosComplementData[start..<end]
+    var result: UInt = 0
+    for v in wordSlice.reversed() {
+      result <<= Word.bitWidth
+      result |= UInt(truncatingIfNeeded: v)
+    }
+
+    return result
   }
 
   public var words: [UInt] {
@@ -1274,6 +1307,10 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
 
   var byteSwapped: Bit {
     return self
+  }
+
+  func _word(at n: Int) -> UInt {
+    return UInt(value)
   }
 
   var words: UInt.Words {
