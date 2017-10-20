@@ -1486,7 +1486,7 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
 
     // For class initializers, the assign into the self box may be
     // captured as SelfInit or SuperInit elsewhere.
-    if (TheMemory.isClassInitSelf() && isa<AssignInst>(User) &&
+    if (isa<AssignInst>(User) &&
         Op->getOperandNumber() == 1) {
       // If the source of the assignment is an application of a C
       // function, there is no metatype argument, so treat the
@@ -1541,13 +1541,8 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
     UseInfo.trackUse(DIMemoryUse(User, DIUseKind::Escape, 0, 1));
   }
 
-  if (TheMemory.isClassInitSelf()) {
-    assert(StoresOfArgumentToSelf == 1 &&
-           "The 'self' argument should have been stored into the box exactly once");
-  } else {
-    assert(StoresOfArgumentToSelf == 0 &&
-           "Initializing constructor for class-constrained protocol extension?");
-  }
+  assert(StoresOfArgumentToSelf == 1 &&
+         "The 'self' argument should have been stored into the box exactly once");
 
   // The MUI must be used on an alloc_box or alloc_stack instruction. If we have
   // an alloc_stack, there is nothing further to do.
@@ -1719,7 +1714,7 @@ void swift::ownership::collectDIElementUsesFrom(
   // collector.
   if (MemoryInfo.isDelegatingInit()) {
     DelegatingInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
-    if (MemoryInfo.getType()->hasReferenceSemantics()) {
+    if (MemoryInfo.isClassInitSelf()) {
       UseCollector.collectClassInitSelfUses();
     } else {
       UseCollector.collectValueTypeInitSelfUses();
