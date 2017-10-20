@@ -963,8 +963,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       // Compute the root type, canonicalizing it w.r.t. the protocol context.
       auto conformsSource = getBestRequirementSource(conforms->second);
       assert(conformsSource != source || !requirementSignatureProto);
-      Type localRootType = conformsSource->getRootPotentialArchetype()
-                             ->getDependentType(inProtoSig->getGenericParams());
+      Type localRootType = conformsSource->getRootType();
       localRootType = inProtoSig->getCanonicalTypeInContext(localRootType);
 
       // Build the path according to the requirement signature.
@@ -1001,9 +1000,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
   // Canonicalize the root type.
   auto source = getBestRequirementSource(conforms->second);
-  auto subjectPA = source->getRootPotentialArchetype();
-  Type rootType =
-    subjectPA->getOrCreateEquivalenceClass()->getAnchor(getGenericParams());
+  Type rootType = source->getRootType()->getCanonicalType(this);
 
   // Build the path.
   buildPath(getRequirements(), source, protocol, rootType, nullptr);

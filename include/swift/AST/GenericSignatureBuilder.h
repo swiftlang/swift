@@ -778,6 +778,9 @@ public:
   /// class that would need to change to resolve this type.
   ResolvedType resolve(UnresolvedType type, FloatingRequirementSource source);
 
+  /// Determine whether the two given types are in the same equivalence class.
+  bool areInSameEquivalenceClass(Type type1, Type type2);
+
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(),
@@ -1158,17 +1161,26 @@ public:
   /// It is the caller's responsibility to ensure that the path up to \c start
   /// and the path through \c start to \c end produce the same thing.
   const RequirementSource *withoutRedundantSubpath(
+                                          GenericSignatureBuilder &builder,
                                           const RequirementSource *start,
                                           const RequirementSource *end) const;
 
   /// Retrieve the root requirement source.
   const RequirementSource *getRoot() const;
 
+private:
   /// Retrieve the potential archetype at the root.
   PotentialArchetype *getRootPotentialArchetype() const;
 
+public:
+  /// Retrieve the type at the root.
+  Type getRootType() const;
+
   /// Retrieve the potential archetype to which this source refers.
   PotentialArchetype *getAffectedPotentialArchetype() const;
+
+  /// Retrieve the type to which this source refers.
+  Type getAffectedType() const;
 
   /// Visit each of the potential archetypes along the path, from the root
   /// potential archetype to each potential archetype named via (e.g.) a
