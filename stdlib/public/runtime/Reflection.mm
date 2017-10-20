@@ -19,7 +19,6 @@
 #include "swift/Runtime/Unreachable.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Debug.h"
-#include "swift/Runtime/Portability.h"
 #include "Private.h"
 #include "WeakReference.h"
 #include "llvm/Support/Compiler.h"
@@ -1079,65 +1078,4 @@ MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   if (!take)
     T->vw_destroy(value);
   return MirrorReturn(result);
-}
-
-// NB: This function is not used directly in the Swift codebase, but is
-// exported for Xcode support and is used by the sanitizers. Please coordinate
-// before changing.
-//
-/// Demangles a Swift symbol name.
-///
-/// \param mangledName is the symbol name that needs to be demangled.
-/// \param mangledNameLength is the length of the string that should be
-/// demangled.
-/// \param outputBuffer is the user provided buffer where the demangled name
-/// will be placed. If nullptr, a new buffer will be malloced. In that case,
-/// the user of this API is responsible for freeing the returned buffer.
-/// \param outputBufferSize is the size of the output buffer. If the demangled
-/// name does not fit into the outputBuffer, the output will be truncated and
-/// the size will be updated, indicating how large the buffer should be.
-/// \param flags can be used to select the demangling style. TODO: We should
-//// define what these will be.
-/// \returns the demangled name. Returns nullptr if the input String is not a
-/// Swift mangled name.
-SWIFT_RUNTIME_EXPORT
-char *swift_demangle(const char *mangledName,
-                     size_t mangledNameLength,
-                     char *outputBuffer,
-                     size_t *outputBufferSize,
-                     uint32_t flags) {
-  if (flags != 0) {
-    swift::fatalError(0, "Only 'flags' value of '0' is currently supported.");
-  }
-  if (outputBuffer != nullptr && outputBufferSize == nullptr) {
-    swift::fatalError(0, "'outputBuffer' is passed but the size is 'nullptr'.");
-  }
-
-  // Check if we are dealing with Swift mangled name, otherwise, don't try
-  // to demangle and send indication to the user.
-  if (!Demangle::isSwiftSymbol(mangledName))
-    return nullptr; // Not a mangled name
-
-  // Demangle the name.
-  auto options = Demangle::DemangleOptions();
-  options.DisplayDebuggerGeneratedModule = false;
-  auto result =
-      Demangle::demangleSymbolAsString(mangledName,
-                                       mangledNameLength,
-                                       options);
-
-  // If the output buffer is not provided, malloc memory ourselves.
-  if (outputBuffer == nullptr || *outputBufferSize == 0) {
-    return strdup(result.c_str());
-  }
-
-  // Indicate a failure if the result does not fit and will be truncated
-  // and set the required outputBufferSize.
-  if (*outputBufferSize < result.length() + 1) {
-    *outputBufferSize = result.length() + 1;
-  }
-
-  // Copy into the provided buffer.
-  _swift_strlcpy(outputBuffer, result.c_str(), *outputBufferSize);
-  return outputBuffer;
 }
