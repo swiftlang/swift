@@ -1812,3 +1812,40 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
                         extendedInfo.getExtraClangImporterOptions().end());
   return info.status;
 }
+
+llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
+CompilerInvocation::setupForToolInputFile(
+                                          const std::string &InputFilename, const std::string &ModuleNameArg,
+                                          bool alwaysSetModuleToMain,
+                                          serialization::ExtendedValidationInfo &extendedInfo) {
+  // Load the input file.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+  llvm::MemoryBuffer::getFileOrSTDIN(InputFilename);
+  if (!FileBufOrErr) {
+    fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
+    return FileBufOrErr;
+  }
+  
+  // If it looks like we have an AST, set the source file kind to SIL and the
+  // name of the module to the file's name.
+  addInputBuffer(FileBufOrErr.get().get());
+  
+  auto result = serialization::validateSerializedAST(
+                                                     FileBufOrErr.get()->getBuffer(), &extendedInfo);
+  bool HasSerializedAST = result.status == serialization::Status::Valid;
+  
+  if (HasSerializedAST) {
+    const StringRef Stem = ModuleNameArg.size()
+    ? StringRef(ModuleNameArg)
+    : llvm::sys::path::stem(InputFilename);
+    setModuleName(Stem);
+    setInputKind(InputFileKind::IFK_Swift_Library);
+  } else {
+    const StringRef Name = !alwaysSetModuleToMain && ModuleNameArg.size()
+    ? StringRef(ModuleNameArg)
+    : "main";
+    setModuleName(Name);
+    setInputKind(InputFileKind::IFK_SIL);
+  }
+  return FileBufOrErr;
+}
