@@ -193,16 +193,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   bool visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (TAD->getGenericParams() &&
         Walker.shouldWalkIntoGenericParams()) {
-      // Visit generic params
-      for (auto GP : TAD->getGenericParams()->getParams()) {
-        if (doIt(GP))
-          return true;
-      }
-      // Visit param conformance
-      for (auto &Req : TAD->getGenericParams()->getRequirements()) {
-        if (doIt(Req))
-          return true;
-      }
+
+      if (visitGenericParamList(TAD->getGenericParams()))
+        return true;
     }
 
     return doIt(TAD->getUnderlyingTypeLoc());
@@ -228,16 +221,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
     if (NTD->getGenericParams() &&
         Walker.shouldWalkIntoGenericParams()) {
-      // Visit generic params
-      for (auto GP : NTD->getGenericParams()->getParams()) {
-        if (doIt(GP))
-          return true;
-      }
-      // Visit param conformance
-      for (auto &Req : NTD->getGenericParams()->getRequirements()) {
-        if (doIt(Req))
-          return true;
-      }
+      if (visitGenericParamList(NTD->getGenericParams()))
+        return true;
     }
 
     for (auto &Inherit : NTD->getInherited()) {
@@ -285,17 +270,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (AFD->getGenericParams() &&
         Walker.shouldWalkIntoGenericParams()) {
 
-      // Visit generic params
-      for (auto &P : AFD->getGenericParams()->getParams()) {
-        if (doIt(P))
-          return true;
-      }
-
-      // Visit param conformance
-      for (auto &Req : AFD->getGenericParams()->getRequirements()) {
-        if (doIt(Req))
-          return true;
-      }
+      if (visitGenericParamList(AFD->getGenericParams()))
+        return true;
     }
 
     for (auto PL : AFD->getParameterLists()) {
@@ -349,6 +325,21 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return true;
     }
+    return false;
+  }
+
+  bool visitGenericParamList(GenericParamList *GPL) {
+    // Visit generic params
+    for (auto GP : GPL->getParams()) {
+      if (doIt(GP))
+        return true;
+    }
+    // Visit param conformance
+    for (auto &Req : GPL->getRequirements()) {
+      if (doIt(Req))
+        return true;
+    }
+
     return false;
   }
 
