@@ -104,37 +104,7 @@ public:
 
   class DelayedRequirement;
 
-  /// Describes a specific constraint on a particular type.
-  template<typename T>
-  struct Constraint {
-    /// The specific subject of the constraint.
-    ///
-    /// This may either be a (resolved) dependent type or the potential
-    /// archetype that it resolves to.
-    mutable UnresolvedType subject;
-
-    /// A value used to describe the constraint.
-    T value;
-
-    /// The requirement source used to derive this constraint.
-    const RequirementSource *source;
-
-    /// Retrieve the dependent type describing the subject of the constraint.
-    Type getSubjectDependentType() const;
-
-    /// Realizes and retrieves the potential archetype describing the
-    /// subject of the constraint.
-    PotentialArchetype *realizeSubjectPotentialArchetype(
-                          GenericSignatureBuilder &builder) const;
-
-    /// Determine whether the subject is equivalence to the given potential
-    /// archetype.
-    bool isSubjectEqualTo(const PotentialArchetype *pa) const;
-
-    /// Determine whether this constraint has the same subject as the
-    /// given constraint.
-    bool hasSameSubjectAs(const Constraint<T> &other) const;
-  };
+  template<typename T> struct Constraint;
 
   /// Describes a concrete constraint on a potential archetype where, where the
   /// other parameter is a concrete type.
@@ -1447,6 +1417,38 @@ public:
   /// Whether this requirement source is recursive when composed with
   /// the given type.
   bool isRecursive(Type rootType, GenericSignatureBuilder &builder) const;
+};
+
+/// Describes a specific constraint on a particular type.
+template<typename T>
+struct GenericSignatureBuilder::Constraint {
+  /// The specific subject of the constraint.
+  ///
+  /// This may either be a (resolved) dependent type or the potential
+  /// archetype that it resolves to.
+  mutable UnresolvedType subject;
+
+  /// A value used to describe the constraint.
+  T value;
+
+  /// The requirement source used to derive this constraint.
+  const RequirementSource *source;
+
+  /// Retrieve the dependent type describing the subject of the constraint.
+  Type getSubjectDependentType() const;
+
+  /// Realizes and retrieves the potential archetype describing the
+  /// subject of the constraint.
+  PotentialArchetype *realizeSubjectPotentialArchetype(
+                        GenericSignatureBuilder &builder) const;
+
+  /// Determine whether the subject is equivalence to the given potential
+  /// archetype.
+  bool isSubjectEqualTo(const PotentialArchetype *pa) const;
+
+  /// Determine whether this constraint has the same subject as the
+  /// given constraint.
+  bool hasSameSubjectAs(const Constraint<T> &other) const;
 };
 
 class GenericSignatureBuilder::PotentialArchetype {
