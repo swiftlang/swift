@@ -25,8 +25,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Syntax/RawTokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
@@ -326,9 +324,6 @@ public:
   ///
   /// This vector is managed by \c StructureMarkerRAII objects.
   llvm::SmallVector<StructureMarker, 16> StructureMarkers;
-
-  /// Current syntax parsing context where call backs should be directed to.
-  syntax::SyntaxParsingContext *SyntaxContext;
 
 public:
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
@@ -1422,11 +1417,6 @@ tokenizeWithTrivia(const LangOptions &LangOpts,
                    unsigned Offset = 0,
                    unsigned EndOffset = 0);
 
-
-void populateTokenSyntaxMap(const LangOptions &LangOpts,
-                            const SourceManager &SM,
-                            unsigned BufferID,
-                            std::vector<syntax::RawTokenInfo> &Result);
 } // end namespace swift
 
 #endif

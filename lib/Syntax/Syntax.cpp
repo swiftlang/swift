@@ -52,10 +52,6 @@ bool Syntax::isExpr() const {
   return Data->isExpr();
 }
 
-bool Syntax::isToken() const {
-  return getRaw()->isToken();
-}
-
 bool Syntax::isPattern() const {
   return Data->isPattern();
 }
@@ -71,6 +67,11 @@ bool Syntax::isPresent() const {
 bool Syntax::isMissing() const {
   return getRaw()->isMissing();
 }
+
+bool Syntax::isToken() const {
+  return getRaw()->isToken();
+}
+
 
 llvm::Optional<Syntax> Syntax::getParent() const {
   auto ParentData = getData().Parent;

@@ -23,7 +23,6 @@
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Trivia.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -246,7 +245,7 @@ public:
   }
 
   /// Lex a full token including leading and trailing trivia.
-  syntax::RawTokenInfo fullLex();
+  RC<syntax::RawTokenSyntax> fullLex();
 
   bool isKeepingComments() const {
     return RetainComments == CommentRetentionMode::ReturnAsTokens;
