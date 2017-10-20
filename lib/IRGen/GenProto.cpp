@@ -556,20 +556,48 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
 
     case MetadataSource::Kind::SelfWitnessTable: {
       assert(witnessMetadata && "no metadata for witness method");
-      llvm::Value *wtable = witnessMetadata->SelfWitnessTable;
-      assert(wtable && "no Self witness table for witness method");
+      llvm::Value *selfTable = witnessMetadata->SelfWitnessTable;
+      assert(selfTable && "no Self witness table for witness method");
 
       // Mark this as the cached witness table for Self.
+      auto conformance = FnType->getWitnessMethodConformance();
+      auto selfProto = conformance.getRequirement();
 
-      if (auto *proto = FnType->getDefaultWitnessMethodProtocol()) {
-        auto selfTy = FnType->getSelfInstanceType();
-        CanType argTy = getTypeInContext(selfTy);
-        auto archetype = cast<ArchetypeType>(argTy);
+      auto selfTy = FnType->getSelfInstanceType();
+      CanType argTy = getTypeInContext(selfTy);
+      if (auto archetype = dyn_cast<ArchetypeType>(argTy)) {
+        setProtocolWitnessTableName(IGF.IGM, selfTable, argTy, selfProto);
+        IGF.setUnscopedLocalTypeData(
+            archetype,
+            LocalTypeDataKind::forAbstractProtocolWitnessTable(selfProto),
+            selfTable);
+      }
 
-        setProtocolWitnessTableName(IGF.IGM, wtable, argTy, proto);
-        IGF.setUnscopedLocalTypeData(archetype,
-                                     LocalTypeDataKind::forAbstractProtocolWitnessTable(proto),
-                                     wtable);
+      if (conformance.isConcrete()) {
+        // Now bind all the conditional witness tables that can be pulled out of
+        // the self witness table.
+        SILWitnessTable::enumerateWitnessTableConditionalConformances(
+            conformance.getConcrete(),
+            [&](unsigned index, CanType type, ProtocolDecl *proto) {
+              auto archetype = getTypeInContext(type);
+              if (isa<ArchetypeType>(archetype)) {
+                WitnessIndex wIndex(privateIndexToTableOffset(index),
+                                    /*prefix*/ false);
+
+                auto table =
+                    emitInvariantLoadOfOpaqueWitness(IGF, selfTable, wIndex);
+                table =
+                    IGF.Builder.CreateBitCast(table, IGF.IGM.WitnessTablePtrTy);
+                setProtocolWitnessTableName(IGF.IGM, table, archetype, proto);
+
+                IGF.setUnscopedLocalTypeData(
+                    archetype,
+                    LocalTypeDataKind::forAbstractProtocolWitnessTable(proto),
+                    table);
+              }
+
+              return /*finished?*/ false;
+            });
       }
       return;
     }
