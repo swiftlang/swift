@@ -41,6 +41,11 @@ CMakeCache.txt
 CMakeFiles
 .atom-build.json
 
+xcuserdata
+*.xccheckout
+
+swift-nightly-install
+*.tar.gz
 #==============================================================================#
 # Ignore compile database
 #==============================================================================#

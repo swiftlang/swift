@@ -1,0 +1,108 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXFileReference section */
+		0C3E871A1D4C11FF00A1C97F /* apinotes */ = {isa = PBXFileReference; lastKnownFileType = folder; path = apinotes; sourceTree = "<group>"; };
+		0C3E871B1D4C11FF00A1C97F /* benchmark */ = {isa = PBXFileReference; lastKnownFileType = folder; path = benchmark; sourceTree = "<group>"; };
+		0C3E871C1D4C11FF00A1C97F /* bindings */ = {isa = PBXFileReference; lastKnownFileType = folder; path = bindings; sourceTree = "<group>"; };
+		0C3E871D1D4C11FF00A1C97F /* CHANGELOG.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.md; sourceTree = "<group>"; };
+		0C3E871E1D4C11FF00A1C97F /* cmake */ = {isa = PBXFileReference; lastKnownFileType = folder; path = cmake; sourceTree = "<group>"; };
+		0C3E871F1D4C11FF00A1C97F /* CMakeLists.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		0C3E87201D4C11FF00A1C97F /* CODE_OWNERS.TXT */ = {isa = PBXFileReference; lastKnownFileType = text; path = CODE_OWNERS.TXT; sourceTree = "<group>"; };
+		0C3E87211D4C11FF00A1C97F /* CONTRIBUTING.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CONTRIBUTING.md; sourceTree = "<group>"; };
+		0C3E87221D4C11FF00A1C97F /* docs */ = {isa = PBXFileReference; lastKnownFileType = folder; path = docs; sourceTree = "<group>"; };
+		0C3E87231D4C11FF00A1C97F /* include */ = {isa = PBXFileReference; lastKnownFileType = folder; path = include; sourceTree = "<group>"; };
+		0C3E87241D4C11FF00A1C97F /* lib */ = {isa = PBXFileReference; lastKnownFileType = folder; path = lib; sourceTree = "<group>"; };
+		0C3E87251D4C11FF00A1C97F /* LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE.txt; sourceTree = "<group>"; };
+		0C3E87261D4C11FF00A1C97F /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		0C3E87271D4C11FF00A1C97F /* stdlib */ = {isa = PBXFileReference; lastKnownFileType = folder; path = stdlib; sourceTree = "<group>"; };
+		0C3E87281D4C11FF00A1C97F /* test */ = {isa = PBXFileReference; lastKnownFileType = folder; path = test; sourceTree = "<group>"; };
+		0C3E87291D4C11FF00A1C97F /* tools */ = {isa = PBXFileReference; lastKnownFileType = folder; path = tools; sourceTree = "<group>"; };
+		0C3E872A1D4C11FF00A1C97F /* unittests */ = {isa = PBXFileReference; lastKnownFileType = folder; path = unittests; sourceTree = "<group>"; };
+		0C3E872B1D4C11FF00A1C97F /* utils */ = {isa = PBXFileReference; lastKnownFileType = folder; path = utils; sourceTree = "<group>"; };
+		0C3E872C1D4C11FF00A1C97F /* validation-test */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "validation-test"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0C3E87131D4C11D100A1C97F = {
+			isa = PBXGroup;
+			children = (
+				0C3E871A1D4C11FF00A1C97F /* apinotes */,
+				0C3E871B1D4C11FF00A1C97F /* benchmark */,
+				0C3E871C1D4C11FF00A1C97F /* bindings */,
+				0C3E871D1D4C11FF00A1C97F /* CHANGELOG.md */,
+				0C3E871E1D4C11FF00A1C97F /* cmake */,
+				0C3E871F1D4C11FF00A1C97F /* CMakeLists.txt */,
+				0C3E87201D4C11FF00A1C97F /* CODE_OWNERS.TXT */,
+				0C3E87211D4C11FF00A1C97F /* CONTRIBUTING.md */,
+				0C3E87221D4C11FF00A1C97F /* docs */,
+				0C3E87231D4C11FF00A1C97F /* include */,
+				0C3E87241D4C11FF00A1C97F /* lib */,
+				0C3E87251D4C11FF00A1C97F /* LICENSE.txt */,
+				0C3E87261D4C11FF00A1C97F /* README.md */,
+				0C3E87271D4C11FF00A1C97F /* stdlib */,
+				0C3E87281D4C11FF00A1C97F /* test */,
+				0C3E87291D4C11FF00A1C97F /* tools */,
+				0C3E872A1D4C11FF00A1C97F /* unittests */,
+				0C3E872B1D4C11FF00A1C97F /* utils */,
+				0C3E872C1D4C11FF00A1C97F /* validation-test */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXProject section */
+		0C3E87141D4C11D100A1C97F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0730;
+			};
+			buildConfigurationList = 0C3E87171D4C11D100A1C97F /* Build configuration list for PBXProject "swift" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = 0C3E87131D4C11D100A1C97F;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+			);
+		};
+/* End PBXProject section */
+
+/* Begin XCBuildConfiguration section */
+		0C3E87181D4C11D100A1C97F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		0C3E87191D4C11D100A1C97F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0C3E87171D4C11D100A1C97F /* Build configuration list for PBXProject "swift" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0C3E87181D4C11D100A1C97F /* Debug */,
+				0C3E87191D4C11D100A1C97F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 0C3E87141D4C11D100A1C97F /* Project object */;
+}
