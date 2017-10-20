@@ -3663,6 +3663,20 @@ class TestData : TestDataSuper {
         expectEqual(Data(bytes: [0, 1, 2, 3, 4]), regionData[1]) //passes
         expectEqual(Data(bytes: [0]), regionData[2]) //fails
     }
+
+    func test_hashEmptyData() {
+        let d1 = Data()
+        let h1 = d1.hashValue
+
+        let d2 = NSData() as Data
+        let h2 = d2.hashValue
+        expectEqual(h1, h2)
+
+        let data = Data(bytes: [0, 1, 2, 3, 4, 5, 6])
+        let d3 = data[4..<4]
+        let h3 = d3.hashValue
+        expectEqual(h1, h3)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -3973,6 +3987,7 @@ DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubr
 DataTests.test("test_sliceHash") { TestData().test_sliceHash() }
 DataTests.test("test_slice_resize_growth") { TestData().test_slice_resize_growth() }
 DataTests.test("test_sliceEnumeration") { TestData().test_sliceEnumeration() }
+DataTests.test("test_hashEmptyData") { TestData().test_hashEmptyData() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

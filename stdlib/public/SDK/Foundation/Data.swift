@@ -1626,9 +1626,11 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public var hashValue: Int {
         var hashValue = 0
         let hashRange: Range<Int> = _sliceRange.lowerBound..<Swift.min(_sliceRange.lowerBound + 80, _sliceRange.upperBound)
-        _withStackOrHeapBuffer(hashRange.count) { buffer in
-            _backing.withUnsafeBytes(in: hashRange) {
-                memcpy(buffer.pointee.memory, $0.baseAddress!, hashRange.count)
+        _withStackOrHeapBuffer(hashRange.count + 1) { buffer in
+            if hashRange.count > 0 {
+                _backing.withUnsafeBytes(in: hashRange) {
+                    memcpy(buffer.pointee.memory, $0.baseAddress!, hashRange.count)
+                }
             }
             hashValue = Int(bitPattern: CFHashBytes(buffer.pointee.memory.assumingMemoryBound(to: UInt8.self), hashRange.count))
         }

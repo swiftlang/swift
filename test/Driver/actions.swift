@@ -118,6 +118,16 @@
 // DEBUG-LINK-ONLY: 5: link, {0, 1, 4}, image
 // DEBUG-LINK-ONLY: 6: generate-dSYM, {5}, dSYM
 
+// RUN: touch %t/c.swift
+// RUN: %swiftc_driver -driver-print-actions %t/c.swift %t/a.o %t/b.o %t/a.swiftmodule %t/b.swiftmodule -o main 2>&1 | %FileCheck %s -check-prefix=LINK-SWIFTMODULES
+// LINK-SWIFTMODULES: 0: input, "{{.*}}/c.swift", swift
+// LINK-SWIFTMODULES: 1: compile, {0}, object
+// LINK-SWIFTMODULES: 2: input, "{{.*}}/a.o", object
+// LINK-SWIFTMODULES: 3: input, "{{.*}}/b.o", object
+// LINK-SWIFTMODULES: 4: input, "{{.*}}/a.swiftmodule", swiftmodule
+// LINK-SWIFTMODULES: 5: input, "{{.*}}/b.swiftmodule", swiftmodule
+// LINK-SWIFTMODULES: 6: link, {1, 2, 3, 4, 5}, image
+
 // RUN: touch %t/a.o %t/b.o
 // RUN: %swiftc_driver -driver-print-actions %t/a.o %s -o main 2>&1 | %FileCheck %s -check-prefix=COMPILE-PLUS-OBJECT
 // COMPILE-PLUS-OBJECT: 0: input, "{{.*}}/a.o", object
