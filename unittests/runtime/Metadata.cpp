@@ -938,17 +938,27 @@ static void initializeRelativePointer(int32_t *ptr, T value) {
 // Tests for resilient witness table instantiation, with runtime-provided
 // default requirements
 
+struct WitnessTableSlice {
+  WitnessTable **tables;
+  size_t count;
+};
+
 static void witnessTableInstantiator(WitnessTable *instantiatedTable,
                                      const Metadata *type,
                                      void * const *instantiationArgs) {
   EXPECT_EQ(type, nullptr);
-  EXPECT_EQ(instantiationArgs, nullptr);
 
   EXPECT_EQ(((void **) instantiatedTable)[0], (void*) 123);
   EXPECT_EQ(((void **) instantiatedTable)[1], (void*) 234);
 
   // The last witness is computed dynamically at instantiation time.
   ((void **) instantiatedTable)[2] = (void *) 345;
+
+  auto conditionalTables = (WitnessTableSlice *)instantiationArgs;
+
+  EXPECT_EQ(conditionalTables->count, 1UL);
+  EXPECT_EQ(conditionalTables->tables[0], (void *)678);
+  ((void **)instantiatedTable)[-1] = conditionalTables->tables[0];
 }
 
 static void fakeDefaultWitness1() {}
@@ -1013,6 +1023,9 @@ const void *witnesses[] = {
   (void *) 567
 };
 
+WitnessTable *conditionalTablesBuffer[] = {(WitnessTable *)678};
+WitnessTableSlice conditionalTablesSlice = {conditionalTablesBuffer, 1};
+
 TEST(WitnessTableTest, getGenericWitnessTable) {
   EXPECT_EQ(sizeof(GenericWitnessTableStorage), sizeof(GenericWitnessTable));
 
@@ -1048,7 +1061,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
   // and an initializer, so we must instantiate.
   {
     tableStorage2.WitnessTableSizeInWords = 5;
-    tableStorage2.WitnessTablePrivateSizeInWords = 1;
+    tableStorage2.WitnessTablePrivateSizeInWords = 1 + 1;
     initializeRelativePointer(&tableStorage2.Protocol, &testProtocol.descriptor);
     initializeRelativePointer(&tableStorage2.Pattern, witnesses);
     initializeRelativePointer(&tableStorage2.Instantiator,
@@ -1060,12 +1073,13 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
 
     RaceTest_ExpectEqual<const WitnessTable *>(
       [&]() -> const WitnessTable * {
-        const WitnessTable *instantiatedTable =
-            swift_getGenericWitnessTable(table, nullptr, nullptr);
+        const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
+            table, nullptr, (void**)&conditionalTablesSlice);
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
-        EXPECT_EQ(((void **) instantiatedTable)[-1], (void *) 0);
+        EXPECT_EQ(((void **) instantiatedTable)[-2], (void *) 0);
+        EXPECT_EQ(((void **) instantiatedTable)[-1], (void *) 678);
 
         EXPECT_EQ(((void **) instantiatedTable)[0], (void *) 123);
         EXPECT_EQ(((void **) instantiatedTable)[1], (void *) 234);
@@ -1080,7 +1094,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
   // Conformance needs one default requirement to be filled in
   {
     tableStorage3.WitnessTableSizeInWords = 4;
-    tableStorage3.WitnessTablePrivateSizeInWords = 1;
+    tableStorage3.WitnessTablePrivateSizeInWords = 1 + 1;
     initializeRelativePointer(&tableStorage3.Protocol, &testProtocol.descriptor);
     initializeRelativePointer(&tableStorage3.Pattern, witnesses);
     initializeRelativePointer(&tableStorage3.Instantiator, witnessTableInstantiator);
@@ -1091,12 +1105,13 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
 
     RaceTest_ExpectEqual<const WitnessTable *>(
       [&]() -> const WitnessTable * {
-        const WitnessTable *instantiatedTable =
-            swift_getGenericWitnessTable(table, nullptr, nullptr);
+        const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
+            table, nullptr, (void**)&conditionalTablesSlice);
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
-        EXPECT_EQ(((void **) instantiatedTable)[-1], (void *) 0);
+        EXPECT_EQ(((void **) instantiatedTable)[-2], (void *) 0);
+        EXPECT_EQ(((void **) instantiatedTable)[-1], (void *) 678);
 
         EXPECT_EQ(((void **) instantiatedTable)[0], (void *) 123);
         EXPECT_EQ(((void **) instantiatedTable)[1], (void *) 234);
@@ -1112,7 +1127,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
   // to be filled in
   {
     tableStorage4.WitnessTableSizeInWords = 3;
-    tableStorage4.WitnessTablePrivateSizeInWords = 1;
+    tableStorage4.WitnessTablePrivateSizeInWords = 1 + 1;
     initializeRelativePointer(&tableStorage4.Protocol, &testProtocol.descriptor);
     initializeRelativePointer(&tableStorage4.Pattern, witnesses);
     initializeRelativePointer(&tableStorage4.Instantiator, witnessTableInstantiator);
@@ -1123,12 +1138,13 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
 
     RaceTest_ExpectEqual<const WitnessTable *>(
       [&]() -> const WitnessTable * {
-        const WitnessTable *instantiatedTable =
-            swift_getGenericWitnessTable(table, nullptr, nullptr);
+        const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
+            table, nullptr, (void**)&conditionalTablesSlice);
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
-        EXPECT_EQ(((void **) instantiatedTable)[-1], (void *) 0);
+        EXPECT_EQ(((void **) instantiatedTable)[-2], (void *) 0);
+        EXPECT_EQ(((void **) instantiatedTable)[-1], (void *) 678);
 
         EXPECT_EQ(((void **) instantiatedTable)[0], (void *) 123);
         EXPECT_EQ(((void **) instantiatedTable)[1], (void *) 234);
