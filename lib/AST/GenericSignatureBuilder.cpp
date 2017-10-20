@@ -1686,23 +1686,49 @@ bool EquivalenceClass::recordConformanceConstraint(
 
 template<typename T>
 Type Constraint<T>::getSubjectDependentType() const {
-  return subject->getDependentType({ });
+  if (auto type = subject.dyn_cast<Type>())
+    return type;
+
+  return subject.get<PotentialArchetype *>()->getDependentType({ });
 }
 
 template<typename T>
 PotentialArchetype *Constraint<T>::realizeSubjectPotentialArchetype(
                       GenericSignatureBuilder &builder) const {
-  return subject;
+  if (auto pa = subject.dyn_cast<PotentialArchetype *>())
+    return pa;
+
+  auto type = subject.get<Type>();
+  auto pa =
+    builder.maybeResolveEquivalenceClass(type,
+                                         ArchetypeResolutionKind::WellFormed,
+                                         /*wantExactPotentialArchetype=*/true)
+      .realizePotentialArchetype(builder);
+  assert(pa && "Invalid dependent type");
+
+  // Cache the result, so we don't need to realize the potential archetype
+  // again.
+  subject = pa;
+  return pa;
 }
 
 template<typename T>
 bool Constraint<T>::isSubjectEqualTo(const PotentialArchetype *pa) const {
-  return subject == pa;
+  if (auto subjectPA = subject.dyn_cast<PotentialArchetype *>())
+    return subjectPA == pa;
+
+  return getSubjectDependentType()->isEqual(pa->getDependentType({ }));
 }
 
 template<typename T>
 bool Constraint<T>::hasSameSubjectAs(const Constraint<T> &other) const {
-  return subject == other.subject;
+  if (auto subjectPA = subject.dyn_cast<PotentialArchetype *>()) {
+    if (auto otherSubjectPA =
+          other.subject.template dyn_cast<PotentialArchetype *>())
+      return subjectPA == otherSubjectPA;
+  }
+
+  return getSubjectDependentType()->isEqual(other.getSubjectDependentType());
 }
 
 Optional<ConcreteConstraint>
@@ -2815,7 +2841,7 @@ void ArchetypeType::resolveNestedType(
 }
 
 Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
-                                ArrayRef<GenericTypeParamType *> genericParams){
+                        ArrayRef<GenericTypeParamType *> genericParams) const {
   if (auto parent = getParent()) {
     Type parentType = parent->getDependentType(genericParams);
     if (parentType->hasError())
@@ -4501,8 +4527,10 @@ void GenericSignatureBuilder::inferRequirements(
 namespace swift {
   template<typename T>
   bool operator<(const Constraint<T> &lhs, const Constraint<T> &rhs) {
-    auto lhsPA = lhs.subject;
-    auto rhsPA = rhs.subject;
+    // FIXME: Awful.
+    auto &builder = *lhs.source->getRootPotentialArchetype()->getBuilder();
+    auto lhsPA = lhs.realizeSubjectPotentialArchetype(builder);
+    auto rhsPA = rhs.realizeSubjectPotentialArchetype(builder);
     if (int result = compareDependentTypes(&lhsPA, &rhsPA))
       return result < 0;
 
@@ -4984,7 +5012,8 @@ namespace {
   ///
   /// \returns true if any derived-via-concrete constraints were found.
   template<typename T>
-  bool removeSelfDerived(std::vector<Constraint<T>> &constraints,
+  bool removeSelfDerived(GenericSignatureBuilder &builder,
+                         std::vector<Constraint<T>> &constraints,
                          ProtocolDecl *proto,
                          bool dropDerivedViaConcrete = true,
                          bool allCanBeSelfDerived = false) {
@@ -4996,9 +5025,9 @@ namespace {
         [&](const Constraint<T> &constraint) {
           bool derivedViaConcrete;
           auto minimalSource =
-            constraint.source->getMinimalConformanceSource(constraint.subject,
-                                                           proto,
-                                                           derivedViaConcrete);
+            constraint.source->getMinimalConformanceSource(
+                         constraint.realizeSubjectPotentialArchetype(builder),
+                         proto, derivedViaConcrete);
           if (minimalSource != constraint.source) {
             // The minimal source is smaller than the original source, so the
             // original source is self-derived.
@@ -5078,7 +5107,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            bool removeSelfDerived) {
   assert(!constraints.empty() && "No constraints?");
   if (removeSelfDerived) {
-    ::removeSelfDerived(constraints, /*proto=*/nullptr);
+    ::removeSelfDerived(*this, constraints, /*proto=*/nullptr);
   }
 
   // Sort the constraints, so we get a deterministic ordering of diagnostics.
@@ -5095,8 +5124,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
     Diags.diagnose(representativeConstraint->source->getLoc(),
                    otherNoteDiag,
                    representativeConstraint->source->classifyDiagKind(),
-                   representativeConstraint->subject->
-                     getDependentType(genericParams),
+                   representativeConstraint->getSubjectDependentType(),
                    diagValue(representativeConstraint->value));
   };
 
@@ -5115,8 +5143,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       // Figure out what kind of subject we have; it will affect the
       // diagnostic.
       auto getSubjectType =
-        [&](PotentialArchetype *pa) -> std::pair<unsigned, Type> {
-          auto subjectType = pa->getDependentType(genericParams);
+        [&](Type subjectType) -> std::pair<unsigned, Type> {
           unsigned kind;
           if (auto gp = subjectType->getAs<GenericTypeParamType>()) {
             if (gp->getDecl() &&
@@ -5140,7 +5167,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       if (constraint.source->getLoc().isValid()) {
         Impl->HadAnyError = true;
 
-        auto subject = getSubjectType(constraint.subject);
+        auto subject = getSubjectType(constraint.getSubjectDependentType());
         Diags.diagnose(constraint.source->getLoc(), *conflictingDiag,
                        subject.first, subject.second,
                        diagValue(constraint.value),
@@ -5156,7 +5183,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
           representativeConstraint->source->getLoc().isValid()) {
         Impl->HadAnyError = true;
 
-        auto subject = getSubjectType(representativeConstraint->subject);
+        auto subject =
+          getSubjectType(representativeConstraint->getSubjectDependentType());
         Diags.diagnose(representativeConstraint->source->getLoc(),
                        *conflictingDiag,
                        subject.first, subject.second,
@@ -5178,7 +5206,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
           representativeConstraint->source->shouldDiagnoseRedundancy(false)) {
         Diags.diagnose(constraint.source->getLoc(),
                        redundancyDiag,
-                       constraint.subject->getDependentType(genericParams),
+                       constraint.getSubjectDependentType(),
                        diagValue(constraint.value));
 
         noteRepresentativeConstraint();
@@ -5238,7 +5266,7 @@ void GenericSignatureBuilder::checkConformanceConstraints(
     assert(!entry.second.empty() && "No constraints to work with?");
 
     // Remove any self-derived constraints.
-    removeSelfDerived(entry.second, entry.first);
+    removeSelfDerived(*this, entry.second, entry.first);
 
     checkConstraintList<ProtocolDecl *, ProtocolDecl *>(
       genericParams, entry.second,
@@ -5765,7 +5793,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
     auto &constraints = entry.second;
 
     // Remove self-derived constraints.
-    if (removeSelfDerived(constraints, /*proto=*/nullptr,
+    if (removeSelfDerived(*this, constraints, /*proto=*/nullptr,
                           /*dropDerivedViaConcrete=*/false,
                           /*allCanBeSelfDerived=*/true))
       anyDerivedViaConcrete = true;
@@ -5862,7 +5890,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       auto &constraints = entry.second;
 
       // Remove derived-via-concrete constraints.
-      (void)removeSelfDerived(constraints, /*proto=*/nullptr,
+      (void)removeSelfDerived(*this, constraints, /*proto=*/nullptr,
                               /*dropDerivedViaConcrete=*/true,
                               /*allCanBeSelfDerived=*/true);
     }
