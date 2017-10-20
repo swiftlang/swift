@@ -336,6 +336,21 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
   public var isEmpty: Bool {
     return false
   }
+
+  /// Returns a Boolean value indicating whether the given element is contained
+  /// within the range.
+  ///
+  /// A `CountableClosedRange` instance contains both its lower and upper bound.
+  /// `element` is contained in the range if it is between the two bounds or
+  /// equal to either bound.
+  ///
+  /// - Parameter element: The element to check for containment.
+  /// - Returns: `true` if `element` is contained in the range; otherwise,
+  ///   `false`.
+  @_inlineable
+  public func contains(_ element: Bound) -> Bool {
+    return element >= self.lowerBound && element <= self.upperBound
+  }
 }
 
 /// An interval over a comparable type, from a lower bound up to, and

@@ -270,6 +270,22 @@ public struct CountableRange<Bound> : RandomAccessCollection
   public var isEmpty: Bool {
     return lowerBound == upperBound
   }
+
+  /// Returns a Boolean value indicating whether the given element is contained
+  /// within the range.
+  ///
+  /// Because `CountableRange` represents a half-open range, a `CountableRange`
+  /// instance does not contain its upper bound. `element` is contained in the
+  /// range if it is greater than or equal to the lower bound and less than
+  /// the upper bound.
+  ///
+  /// - Parameter element: The element to check for containment.
+  /// - Returns: `true` if `element` is contained in the range; otherwise,
+  ///   `false`.
+  @_inlineable
+  public func contains(_ element: Bound) -> Bool {
+    return lowerBound <= element && element < upperBound
+  }
 }
 
 //===--- Protection against 0-based indexing assumption -------------------===//
