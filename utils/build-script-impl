@@ -3448,8 +3448,8 @@ function build_and_test_installable_package() {
           with_pushd "${host_install_destdir}" \
               call tar -c -z -f "${package_for_host}" "${TOOLCHAIN_PREFIX/#\/}"
         else
-            # tar on OS X doesn't support --owner/--group.
-            if [[ "$(uname -s)" == "Darwin" ]] ; then
+            # BSD tar doesn't support --owner/--group.
+            if [[ "$(uname -s)" == "Darwin" || "$(uname -s)" == "FreeBSD" ]] ; then
                 with_pushd "${host_install_destdir}" \
                     tar -c -z -f "${package_for_host}" "${host_install_prefix/#\/}"
             else
