@@ -1059,6 +1059,10 @@ void ElementUseCollector::collectClassSelfUses() {
     return;
   }
 
+  // The number of stores of the initial 'self' argument into the self box
+  // that we saw.
+  unsigned StoresOfArgumentToSelf = 0;
+
   // Okay, given that we have a proper setup, we walk the use chains of the self
   // box to find any accesses to it. The possible uses are one of:
   //
@@ -1076,9 +1080,12 @@ void ElementUseCollector::collectClassSelfUses() {
       if (Op->getOperandNumber() == 1) {
         // The initial store of 'self' into the box at the start of the
         // function. Ignore it.
-        if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc()))
-          if (Arg->getParent() == MUI->getParent())
+        if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
+          if (Arg->getParent() == MUI->getParent()) {
+            StoresOfArgumentToSelf++;
             continue;
+          }
+        }
 
         // A store of a load from the box is ignored.
         // FIXME: SILGen should not emit these.
@@ -1121,6 +1128,9 @@ void ElementUseCollector::collectClassSelfUses() {
     // and super.init must be called.
     trackUse(DIMemoryUse(User, DIUseKind::Load, 0, TheMemory.NumElements));
   }
+
+  assert(StoresOfArgumentToSelf == 1 &&
+         "The 'self' argument should have been stored into the box exactly once");
 }
 
 static bool isSuperInitUse(SILInstruction *User) {
@@ -1430,6 +1440,10 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
   assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
   auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
 
+  // The number of stores of the initial 'self' argument into the self box
+  // that we saw.
+  unsigned StoresOfArgumentToSelf = 0;
+
   // We walk the use chains of the self MUI to find any accesses to it.  The
   // possible uses are:
   //   1) The initialization store.
@@ -1451,9 +1465,12 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
       if (Op->getOperandNumber() == 1) {
         // The initial store of 'self' into the box at the start of the
         // function. Ignore it.
-        if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc()))
-          if (Arg->getParent() == MUI->getParent())
+        if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
+          if (Arg->getParent() == MUI->getParent()) {
+            StoresOfArgumentToSelf++;
             continue;
+          }
+        }
 
         // A store of a load from the box is ignored.
         // FIXME: SILGen should not emit these.
@@ -1522,6 +1539,14 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
     // We can safely handle anything else as an escape.  They should all happen
     // after self.init is invoked.
     UseInfo.trackUse(DIMemoryUse(User, DIUseKind::Escape, 0, 1));
+  }
+
+  if (TheMemory.isClassInitSelf()) {
+    assert(StoresOfArgumentToSelf == 1 &&
+           "The 'self' argument should have been stored into the box exactly once");
+  } else {
+    assert(StoresOfArgumentToSelf == 0 &&
+           "Initializing constructor for class-constrained protocol extension?");
   }
 
   // The MUI must be used on an alloc_box or alloc_stack instruction. If we have

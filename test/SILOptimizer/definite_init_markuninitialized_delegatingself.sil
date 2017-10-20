@@ -203,13 +203,14 @@ class MyClass3 {
 sil @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
 
 // CHECK-LABEL: sil hidden @test_conditional_destroy_class_delegating_init
-sil hidden @test_conditional_destroy_class_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : @trivial $Builtin.Int1):
+sil hidden @test_conditional_destroy_class_delegating_init : $@convention(thin) (Builtin.Int1, @owned MyClass3) -> () {
+bb0(%0 : @trivial $Builtin.Int1, %1 : @owned $MyClass3):
 // CHECK:  [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int2
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack $MyClass3
 
   %2 = alloc_stack $MyClass3
   %3 = mark_uninitialized [delegatingself] %2 : $*MyClass3
+  store %1 to [init] %3 : $*MyClass3
 
 // CHECK:  cond_br %0, [[SUCCESS:bb[0-9]+]], [[EXIT:bb[0-9]+]]
   cond_br %0, bb1, bb2
