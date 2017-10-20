@@ -60,5 +60,5 @@ where Self : CodingType,
   print(Self.ValueType.self)
 }
 
-// OSIZE: define internal i8** @_T021same_type_constraints12GenericKlazzCyxq_GAA1EAA4DataAA0F4TypePWT(%swift.type* %"GenericKlazz<T, R>.Data", %swift.type* nocapture readonly %"GenericKlazz<T, R>", i8** nocapture readnone %"GenericKlazz<T, R>.E") [[ATTRS:#[0-9]+]] {
+// OSIZE: define internal i8** @_T021same_type_constraints12GenericKlazzCyxq_GAA1EAA4Data_AA0F4TypePWT(%swift.type* %"GenericKlazz<T, R>.Data", %swift.type* nocapture readonly %"GenericKlazz<T, R>", i8** nocapture readnone %"GenericKlazz<T, R>.E") [[ATTRS:#[0-9]+]] {
 // OSIZE: [[ATTRS]] = {{{.*}}noinline

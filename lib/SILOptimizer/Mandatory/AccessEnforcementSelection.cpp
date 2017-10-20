@@ -442,30 +442,41 @@ void SelectEnforcement::updateAccess(BeginAccessInst *access) {
 }
 
 void SelectEnforcement::updateCapture(AddressCapture capture) {
-  llvm::SmallSetVector<PartialApplyInst *, 8> worklist;
+  llvm::SmallSetVector<SingleValueInstruction *, 8> worklist;
   auto visitUse = [&](Operand *oper) {
-    if (FullApplySite::isa(oper->getUser())) {
+    auto *user = oper->getUser();
+    if (FullApplySite::isa(user)) {
       // A call is considered a closure access regardless of whether it calls
       // the closure or accepts the closure as an argument.
-      if (hasPotentiallyEscapedAt(oper->getUser())) {
+      if (hasPotentiallyEscapedAt(user)) {
         dynamicCaptures.recordCapture(capture);
-        return;
       }
+      return;
     }
-    if (auto *PAI = dyn_cast<PartialApplyInst>(oper->getUser())) {
+    if (auto *CFI = dyn_cast<ConvertFunctionInst>(user)) {
+      worklist.insert(CFI);
+      return;
+    }
+    if (auto *PAI = dyn_cast<PartialApplyInst>(user)) {
       assert(oper->get() != PAI->getCallee() && "cannot re-partially apply");
       // The closure is capture by another closure. Transitively consider any
       // calls to the parent closure as an access.
       worklist.insert(PAI);
+      return;
     }
+    DEBUG(llvm::dbgs() << "    Unrecognized partial_apply user: " << *user);
+    // If this user has no results, then we can safely assume it doesn't pass
+    // the closure to a call site. If it has results, then it might propagate
+    // the closure, in which case it needs to be handled above.
+    assert(user->getResults().empty());
   };
-  auto *PAI = dyn_cast<PartialApplyInst>(capture.site);
+  SingleValueInstruction *PAIUser = dyn_cast<PartialApplyInst>(capture.site);
   while (true) {
-    for (auto *oper : PAI->getUses())
+    for (auto *oper : PAIUser->getUses())
       visitUse(oper);
     if (worklist.empty())
       break;
-    PAI = worklist.pop_back_val();
+    PAIUser = worklist.pop_back_val();
   }
 }
 

@@ -37,8 +37,8 @@ function(swift_windows_include_for_arch arch var)
   set(paths
         "$ENV{VCToolsInstallDir}/include"
         "$ENV{UniversalCRTSdkDir}/Include/$ENV{UCRTVersion}/ucrt"
-        "$ENV{UniversalCRTSdkDir}/Include/$ENV{UCRTVersion}/um"
-        "$ENV{UniversalCRTSdkDir}/Include/$ENV{UCRTVersion}/shared")
+        "$ENV{UniversalCRTSdkDir}/Include/$ENV{UCRTVersion}/shared"
+        "$ENV{UniversalCRTSdkDir}/Include/$ENV{UCRTVersion}/um")
   set(${var} ${paths} PARENT_SCOPE)
 endfunction()
 

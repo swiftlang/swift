@@ -5,6 +5,9 @@
 // General Collection behavior tests are in
 // validation-test/stdlib/UnsafeBufferPointer.swift.
 
+// rdar://35052802 unexpected assertions when test is run with optimize_size
+// XFAIL: swift_test_mode_optimize_size && optimized_stdlib
+
 import StdlibUnittest
 
 var UnsafeRawBufferPointerTestSuite = TestSuite("UnsafeRawBufferPointer")

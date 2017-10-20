@@ -77,7 +77,7 @@ def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
                           echo=True, allow_non_zero_exit=True)
             shell.run(["git", "fetch", "origin",
                        "pull/{0}/merge:{1}"
-                       .format(pr_id, repo_branch)], echo=True)
+                       .format(pr_id, repo_branch), "--tags"], echo=True)
     return repo_branch, cross_repo
 
 
@@ -128,7 +128,8 @@ def update_single_repository(args):
             # It's important that we checkout, fetch, and rebase, in order.
             # .git/FETCH_HEAD updates the not-for-merge attributes based on
             # which branch was checked out during the fetch.
-            shell.run(["git", "fetch", "--recurse-submodules=yes"], echo=True)
+            shell.run(["git", "fetch", "--recurse-submodules=yes", "--tags"],
+                      echo=True)
 
             # If we were asked to reset to the specified branch, do the hard
             # reset and return.

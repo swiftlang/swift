@@ -617,12 +617,14 @@ class SuperSub : SuperBase {
   func f() {
     // CHECK: sil private @[[INNER_FUNC_1]] : $@convention(thin) (@owned SuperSub) -> () {
     // CHECK: bb0([[ARG:%.*]] : $SuperSub):
-    // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @_T0s2qqoixxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+    // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @_T0s2qqoixxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:_T08closures8SuperSubC1fyyFyycfU_yyKXKfu_]] : $@convention(thin) (@owned SuperSub) -> @error Error
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [[INNER]]([[ARG_COPY]])
-    // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply {{.*}}([[PA]])
-    // CHECK:   try_apply [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[REABSTRACT_PA]]) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
+    // CHECK:   [[CVT:%.*]] = convert_function [[PA]]
+    // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply {{.*}}([[CVT]])
+    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_function [[REABSTRACT_PA]]    
+    // CHECK:   try_apply [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
     // CHECK:   destroy_value [[ARG]]
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
@@ -651,12 +653,14 @@ class SuperSub : SuperBase {
   func g() {
     // CHECK: sil private @[[INNER_FUNC_1]] : $@convention(thin) (@owned SuperSub) -> ()
     // CHECK: bb0([[ARG:%.*]] : $SuperSub):
-    // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @_T0s2qqoixxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+    // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @_T0s2qqoixxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:_T08closures8SuperSubC1g.*]] : $@convention(thin) (@owned SuperSub) -> @error Error
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [[INNER]]([[ARG_COPY]])
-    // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply {{%.*}}([[PA]]) : $@convention(thin) (@owned @callee_owned () -> @error Error) -> (@out (), @error Error)
-    // CHECK:   try_apply [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[REABSTRACT_PA]]) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
+    // CHECK:   [[CVT:%.*]] = convert_function [[PA]] : $@callee_owned () -> @error Error to $@noescape @callee_owned () -> @error Error
+    // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply {{%.*}}([[CVT]]) : $@convention(thin) (@owned @noescape @callee_owned () -> @error Error) -> (@out (), @error Error)
+    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_function [[REABSTRACT_PA]]
+    // CHECK:   try_apply [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
     // CHECK:   destroy_value [[ARG]]
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
@@ -703,9 +707,10 @@ class SuperSub : SuperBase {
 // CHECK:         destroy_value [[SELF]]
 // -- closure takes unowned ownership
 // CHECK:         [[OUTER_CLOSURE:%.*]] = partial_apply {{%.*}}([[UNOWNED_SELF2_COPY]])
+// CHECK:         [[OUTER_CONVERT:%.*]] = convert_function [[OUTER_CLOSURE]]
 // -- call consumes closure
 // -- strong +1, unowned +1
-// CHECK:         [[INNER_CLOSURE:%.*]] = apply [[OUTER_CLOSURE]]
+// CHECK:         [[INNER_CLOSURE:%.*]] = apply [[OUTER_CONVERT]]
 // CHECK:         [[CONSUMED_RESULT:%.*]] = apply [[INNER_CLOSURE]]()
 // CHECK:         destroy_value [[CONSUMED_RESULT]]
 // -- destroy_values unowned self in box
@@ -799,4 +804,4 @@ struct r29810997 {
 }
 
 //   DI will turn this into a direct capture of the specific stored property.
-// CHECK-LABEL: sil hidden @_T08closures16r29810997_helperS3icF : $@convention(thin) (@owned @callee_owned (Int) -> Int) -> Int
+// CHECK-LABEL: sil hidden @_T08closures16r29810997_helperS3icF : $@convention(thin) (@owned @noescape @callee_owned (Int) -> Int) -> Int

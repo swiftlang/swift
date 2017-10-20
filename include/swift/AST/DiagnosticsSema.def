@@ -1885,6 +1885,9 @@ ERROR(override_ownership_mismatch,none,
       "cannot override %select{strong|weak|unowned|unowned(unsafe)}0 property "
       "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
       (/*Ownership*/unsigned, /*Ownership*/unsigned))
+ERROR(override_dynamic_self_mismatch,none,
+      "cannot override a Self return type with a non-Self return type",
+      ())
 ERROR(override_class_declaration_in_extension,none,
       "cannot override a non-dynamic class declaration from an extension",
       ())

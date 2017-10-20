@@ -6086,6 +6086,19 @@ public:
       }
     }
 
+    // If a super method returns Self, and the subclass overrides it to
+    // instead return the subclass type, complain.
+    // This case gets this far because the type matching above specifically
+    // strips out dynamic self via replaceCovariantResultType(), and that
+    // is helpful in several cases - just not this one.
+    if (decl->getASTContext().isSwiftVersionAtLeast(5) &&
+        matchDecl->getInterfaceType()->hasDynamicSelfType() &&
+        !decl->getInterfaceType()->hasDynamicSelfType() &&
+        !classDecl->isFinal()) {
+      TC.diagnose(decl, diag::override_dynamic_self_mismatch);
+      TC.diagnose(matchDecl, diag::overridden_here);
+    }
+
     // Check that the override has the required access level.
     // Overrides have to be at least as accessible as what they
     // override, except:

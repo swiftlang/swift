@@ -23,8 +23,9 @@ public func getAnswer() -> Int32 {
   // CHECK-SINGLE-FILE: %0 = function_ref @_T04main7computes5Int32VADycF
   // CHECK-SINGLE-FILE: %1 = function_ref @_T04main9privateFn33_4704C82F83811927370AA02DFDC75B5ALLs5Int32VyF
   // CHECK-SINGLE-FILE: %2 = thin_to_thick_function %1
-  // CHECK-SINGLE-FILE: %3 = apply %0(%2)
-  // CHECK-SINGLE-FILE: return %3 : $Int
+  // CHECK-SINGLE-FILE: %3 = convert_function %2
+  // CHECK-SINGLE-FILE: %4 = apply %0(%3)
+  // CHECK-SINGLE-FILE: return %4 : $Int
 
   return compute(privateFn)
 }

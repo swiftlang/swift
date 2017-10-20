@@ -101,12 +101,16 @@ bb0:
 // CHECK:      - Capture types:
 // CHECK-NEXT: (bound_generic_enum Swift.Optional
 // CHECK-NEXT:   (function
-// CHECK-NEXT:     (tuple)))
+// CHECK-NEXT:     (parameters)
+// CHECK-NEXT:     (result
+// CHECK-NEXT:       (tuple)))
 // CHECK-NEXT: - Metadata sources:
 // CHECK-NEXT: (bound_generic_enum Swift.Optional
 // CHECK-NEXT:   (function
-// CHECK-NEXT:     (generic_type_parameter depth=0 index=0)
-// CHECK-NEXT:     (generic_type_parameter depth=0 index=1)))
+// CHECK-NEXT:     (parameters
+// CHECK-NEXT:       (generic_type_parameter depth=0 index=0)
+// CHECK-NEXT:     (result
+// CHECK-NEXT:       (generic_type_parameter depth=0 index=1)))
 // CHECK-NEXT: (closure_binding index=0)
 // CHECK-NEXT: (generic_type_parameter depth=0 index=1)
 // CHECK-NEXT: (closure_binding index=1)
@@ -135,12 +139,16 @@ bb0:
 // CHECK-NEXT: (metatype was_abstract
 // CHECK-NEXT:  (bound_generic_enum Swift.Optional
 // CHECK-NEXT:    (function
-// CHECK-NEXT:      (generic_type_parameter depth=0 index=1)
-// CHECK-NEXT:      (generic_type_parameter depth=0 index=2))))
+// CHECK-NEXT:      (parameters
+// CHECK-NEXT:        (generic_type_parameter depth=0 index=1)
+// CHECK-NEXT:      (result
+// CHECK-NEXT:        (generic_type_parameter depth=0 index=2))))
 // CHECK-NEXT: - Metadata sources:
 // CHECK-NEXT: (function
-// CHECK-NEXT:   (generic_type_parameter depth=0 index=1)
-// CHECK-NEXT:   (generic_type_parameter depth=0 index=2))
+// CHECK-NEXT:   (parameters
+// CHECK-NEXT:     (generic_type_parameter depth=0 index=1)
+// CHECK-NEXT:   (result
+// CHECK-NEXT:     (generic_type_parameter depth=0 index=2))
 // CHECK-NEXT: (generic_argument index=0
 // CHECK-NEXT:   (metadata_capture index=0))
 
@@ -229,17 +237,29 @@ bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (function convention=thin
-// CHECK-NEXT:   (tuple))
+// CHECK-NEXT:   (parameters)
+// CHECK-NEXT:   (result
+// CHECK-NEXT:     (tuple))
 // CHECK-NEXT: (function convention=c
-// CHECK-NEXT:   (tuple))
+// CHECK-NEXT:   (parameters)
+// CHECK-NEXT:   (result
+// CHECK-NEXT:     (tuple))
 // CHECK-NEXT: (function convention=block
-// CHECK-NEXT:   (tuple))
+// CHECK-NEXT:   (parameters)
+// CHECK-NEXT:   (result
+// CHECK-NEXT:     (tuple))
 // CHECK-NEXT: (function
-// CHECK-NEXT:   (tuple))
+// CHECK-NEXT:   (parameters)
+// CHECK-NEXT:   (result
+// CHECK-NEXT:     (tuple))
 // CHECK-NEXT: (function convention=thin
-// CHECK-NEXT:   (tuple))
+// CHECK-NEXT:   (parameters)
+// CHECK-NEXT:   (result
+// CHECK-NEXT:     (tuple))
 // CHECK-NEXT: (function convention=thin
-// CHECK-NEXT:   (tuple))
+// CHECK-NEXT:   (parameters)
+// CHECK-NEXT:   (result
+// CHECK-NEXT:     (tuple))
 // CHECK-NEXT: - Metadata sources:
 
 // Capturing opened existentials

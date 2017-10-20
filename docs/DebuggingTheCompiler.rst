@@ -145,7 +145,28 @@ using regular expressions (i.e. ignoring language semantics), ViewCFG can:
 The script assumes that the relevant text is passed in via stdin and uses open
 to display the .dot file.
 
-**NOTE** Since we use open, .dot files should be associated with the Graphviz app for this to work.
+Additional, both emacs and vim integration is provided. For vim integration add
+the following commands to your .vimrc::
+
+  com! -nargs=? Funccfg silent ?{$?,/^}/w !viewcfg <args>
+  com! -range -nargs=? Viewcfg silent <line1>,<line2>w !viewcfg <args>
+
+This will add::
+
+   :Funccfg        displays the CFG of the current SIL/LLVM function.
+   :<range>Viewcfg displays the sub-CFG of the selected range.
+
+For emacs users, we provide in sil-mode (``./utils/sil-mode.el``) the function::
+
+    sil-mode-display-function-cfg
+
+To use this feature, placed the point in the sil function that you want viewcfg
+to graph and then run ``sil-mode-display-function-cfg``. This will cause viewcfg
+to be invoked with the sil function body. Note,
+``sil-mode-display-function-cfg`` does not take any arguments.
+
+**NOTE** viewcfg must be in the $PATH for viewcfg to work.
+**NOTE** Since we use open, .dot files should be associated with the Graphviz app for viewcfg to work.
 
 Using Breakpoints
 `````````````````

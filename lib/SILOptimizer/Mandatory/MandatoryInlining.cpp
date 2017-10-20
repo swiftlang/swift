@@ -181,18 +181,33 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     }
   }
 
-  if (auto *PAI = dyn_cast<PartialApplyInst>(CalleeValue)) {
+  SILValue CalleeSource = CalleeValue;
+  // Handle partial_apply/thin_to_thick -> convert_function:
+  // tryDeleteDeadClosure must run before deleting a ConvertFunction that
+  // uses the PartialApplyInst or ThinToThickFunctionInst. tryDeleteDeadClosure
+  // will delete any uses of the closure, including this ConvertFunction.
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeValue))
+    CalleeSource = CFI->getOperand();
+
+  if (auto *PAI = dyn_cast<PartialApplyInst>(CalleeSource)) {
     SILValue Callee = PAI->getCallee();
     if (!tryDeleteDeadClosure(PAI))
       return;
     CalleeValue = Callee;
-  }
 
-  if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
+  } else if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CalleeSource)) {
     SILValue Callee = TTTFI->getCallee();
     if (!tryDeleteDeadClosure(TTTFI))
       return;
     CalleeValue = Callee;
+  }
+
+  // Handle function_ref -> convert_function -> partial_apply/thin_to_thick.
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeValue)) {
+    if (isInstructionTriviallyDead(CFI)) {
+      recursivelyDeleteTriviallyDeadInstructions(CFI, true);
+      return;
+    }
   }
 
   if (auto *FRI = dyn_cast<FunctionRefInst>(CalleeValue)) {
@@ -267,6 +282,39 @@ static SILFunction *getCalleeFunction(SILFunction *F, FullApplySite AI,
     CalleeValue = SI->getSrc();
   }
 
+  // PartialApply/ThinToThick -> ConvertFunction patterns are generated
+  // by @noescape closures.
+  //
+  // FIXME: We don't currently handle mismatched return types, however, this
+  // would be a good optimization to handle and would be as simple as inserting
+  // a cast.
+  auto skipFuncConvert = [](SILValue CalleeValue) {
+    auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeValue);
+    if (!CFI)
+      return CalleeValue;
+
+    // TODO: Handle argument conversion. All the code in this file needs to be
+    // cleaned up and generalized. The argument conversion handling in
+    // optimizeApplyOfConvertFunctionInst should apply to any combine
+    // involving an apply, not just a specific pattern.
+    //
+    // For now, just handle conversion that doesn't affect argument types,
+    // return types, or throws. We could trivially handle any other
+    // representation change, but the only one that doesn't affect the ABI and
+    // matters here is @noescape, so just check for that.
+    auto FromCalleeTy = CFI->getOperand()->getType().castTo<SILFunctionType>();
+    auto ToCalleeTy = CFI->getType().castTo<SILFunctionType>();
+    auto EscapingCalleeTy = Lowering::adjustFunctionType(
+        ToCalleeTy, ToCalleeTy->getExtInfo().withNoEscape(false),
+        ToCalleeTy->getCalleeConvention());
+    if (FromCalleeTy != EscapingCalleeTy)
+      return CalleeValue;
+
+    return CFI->getOperand();
+  };
+
+  CalleeValue = skipFuncConvert(CalleeValue);
+
   // We are allowed to see through exactly one "partial apply" instruction or
   // one "thin to thick function" instructions, since those are the patterns
   // generated when using auto closures.
@@ -283,6 +331,8 @@ static SILFunction *getCalleeFunction(SILFunction *F, FullApplySite AI,
     CalleeValue = TTTFI->getOperand();
     IsThick = true;
   }
+
+  CalleeValue = skipFuncConvert(CalleeValue);
 
   auto *FRI = dyn_cast<FunctionRefInst>(CalleeValue);
   if (!FRI)

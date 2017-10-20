@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Casting.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/Remote/MetadataReader.h"
 #include "swift/Runtime/Unreachable.h"
 
 #include <iostream>
@@ -331,16 +332,19 @@ public:
 };
 
 class FunctionTypeRef final : public TypeRef {
-  std::vector<const TypeRef *> Arguments;
+  using Param = remote::FunctionParam<const TypeRef *>;
+
+  std::vector<Param> Parameters;
   const TypeRef *Result;
   FunctionTypeFlags Flags;
 
-  static TypeRefID Profile(const std::vector<const TypeRef *> &Arguments,
-                           const TypeRef *Result,
-                           FunctionTypeFlags Flags) {
+  static TypeRefID Profile(const std::vector<Param> &Parameters,
+                           const TypeRef *Result, FunctionTypeFlags Flags) {
     TypeRefID ID;
-    for (auto Argument : Arguments) {
-      ID.addPointer(Argument);
+    for (const auto &Param : Parameters) {
+      ID.addString(Param.getLabel().str());
+      ID.addPointer(Param.getType());
+      ID.addInteger(static_cast<uint32_t>(Param.getFlags().toRaw()));
     }
     ID.addPointer(Result);
     ID.addInteger(static_cast<uint64_t>(Flags.getIntValue()));
@@ -348,22 +352,19 @@ class FunctionTypeRef final : public TypeRef {
   }
 
 public:
-  FunctionTypeRef(std::vector<const TypeRef *> Arguments, const TypeRef *Result,
+  FunctionTypeRef(std::vector<Param> Params, const TypeRef *Result,
                   FunctionTypeFlags Flags)
-    : TypeRef(TypeRefKind::Function), Arguments(Arguments), Result(Result),
-      Flags(Flags) {}
+      : TypeRef(TypeRefKind::Function), Parameters(Params), Result(Result),
+        Flags(Flags) {}
 
   template <typename Allocator>
-  static const FunctionTypeRef *create(Allocator &A,
-                                       std::vector<const TypeRef *> Arguments,
+  static const FunctionTypeRef *create(Allocator &A, std::vector<Param> Params,
                                        const TypeRef *Result,
                                        FunctionTypeFlags Flags) {
-    FIND_OR_CREATE_TYPEREF(A, FunctionTypeRef, Arguments, Result, Flags);
+    FIND_OR_CREATE_TYPEREF(A, FunctionTypeRef, Params, Result, Flags);
   }
 
-  const std::vector<const TypeRef *> &getArguments() const {
-    return Arguments;
-  };
+  const std::vector<Param> &getParameters() const { return Parameters; };
 
   const TypeRef *getResult() const {
     return Result;

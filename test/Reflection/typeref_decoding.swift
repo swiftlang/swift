@@ -40,18 +40,49 @@
 
 // CHECK: aFunction: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> Swift.Int
 // CHECK: (function
-// CHECK:   (class TypesToReflect.C)
-// CHECK:   (struct TypesToReflect.S)
-// CHECK:   (enum TypesToReflect.E)
-// CHECK:   (struct Swift.Int)
-// CHECK:   (struct Swift.Int))
+// CHECK:   (parameters
+// CHECK:     (class TypesToReflect.C)
+// CHECK:     (struct TypesToReflect.S)
+// CHECK:     (enum TypesToReflect.E)
+// CHECK:     (struct Swift.Int)
+// CHECK:   (result
+// CHECK:     (struct Swift.Int))
 
 // CHECK: aFunctionWithVarArgs: (TypesToReflect.C, TypesToReflect.S...) -> ()
 // CHECK: (function
-// CHECK:   (class TypesToReflect.C)
-// CHECK:   (bound_generic_struct Swift.Array
-// CHECK:     (struct TypesToReflect.S))
-// CHECK:   (tuple))
+// CHECK:   (parameters
+// CHECK:     (class TypesToReflect.C)
+// CHECK:     (variadic
+// CHECK:       (struct TypesToReflect.S))
+// CHECK:   (result
+// CHECK:     (tuple))
+
+// CHECK: aFunctionWithInout1: (inout TypesToReflect.C) -> ()
+// CHECK: (function
+// CHECK:  (parameters
+// CHECK:    (inout
+// CHECK:      (class TypesToReflect.C))
+// CHECK:  (result
+// CHECK:    (tuple))
+
+// CHECK: aFunctionWithInout2: (TypesToReflect.C, inout Swift.Int) -> ()
+// CHECK: (function
+// CHECK:  (parameters
+// CHECK:    (class TypesToReflect.C)
+// CHECK:    (inout
+// CHECK:      (struct Swift.Int))
+// CHECK:  (result
+// CHECK:    (tuple))
+
+// CHECK: aFunctionWithInout3: (inout TypesToReflect.C, inout Swift.Int) -> ()
+// CHECK: (function
+// CHECK:  (parameters
+// CHECK:    (inout
+// CHECK:      (class TypesToReflect.C))
+// CHECK:    (inout
+// CHECK:      (struct Swift.Int))
+// CHECK:  (result
+// CHECK:    (tuple))
 
 // CHECK: TypesToReflect.S.NestedS
 // CHECK: ------------------------
@@ -86,11 +117,13 @@
 
 // CHECK: aFunction: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> Swift.Int
 // CHECK: (function
-// CHECK:   (class TypesToReflect.C)
-// CHECK:   (struct TypesToReflect.S)
-// CHECK:   (enum TypesToReflect.E)
-// CHECK:   (struct Swift.Int)
-// CHECK:   (struct Swift.Int))
+// CHECK:   (parameters
+// CHECK:     (class TypesToReflect.C)
+// CHECK:     (struct TypesToReflect.S)
+// CHECK:     (enum TypesToReflect.E)
+// CHECK:     (struct Swift.Int)
+// CHECK:   (result
+// CHECK:     (struct Swift.Int))
 
 // CHECK: aFunctionWithThinRepresentation: @convention(thin) () -> ()
 // CHECK: (function convention=thin
@@ -113,11 +146,13 @@
 
 // CHECK: Function: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> ()
 // CHECK: (function
-// CHECK:   (class TypesToReflect.C)
-// CHECK:   (struct TypesToReflect.S)
-// CHECK:   (enum TypesToReflect.E)
-// CHECK:   (struct Swift.Int)
-// CHECK:   (tuple))
+// CHECK:   (parameters
+// CHECK:     (class TypesToReflect.C)
+// CHECK:     (struct TypesToReflect.S)
+// CHECK:     (enum TypesToReflect.E)
+// CHECK:     (struct Swift.Int)
+// CHECK:   (result
+// CHECK:     (tuple))
 
 // CHECK: Tuple: (TypesToReflect.C, TypesToReflect.S, Swift.Int)
 // CHECK: (tuple
@@ -174,15 +209,21 @@
 
 // CHECK: function: (TypesToReflect.C1<A>) -> (TypesToReflect.S1<A>) -> (TypesToReflect.E1<A>) -> Swift.Int
 // CHECK: (function
-// CHECK:   (bound_generic_class TypesToReflect.C1
-// CHECK:     (generic_type_parameter depth=0 index=0))
-// CHECK:   (function
-// CHECK:     (bound_generic_struct TypesToReflect.S1
+// CHECK:   (parameters
+// CHECK:     (bound_generic_class TypesToReflect.C1
 // CHECK:       (generic_type_parameter depth=0 index=0))
+// CHECK:   (result
 // CHECK:     (function
-// CHECK:       (bound_generic_enum TypesToReflect.E1
-// CHECK:         (generic_type_parameter depth=0 index=0))
-// CHECK:       (struct Swift.Int))))
+// CHECK:       (parameters
+// CHECK:         (bound_generic_struct TypesToReflect.S1
+// CHECK:           (generic_type_parameter depth=0 index=0))
+// CHECK:       (result
+// CHECK:         (function
+// CHECK:           (parameters
+// CHECK:             (bound_generic_enum TypesToReflect.E1
+// CHECK:               (generic_type_parameter depth=0 index=0))
+// CHECK:           (result
+// CHECK:             (struct Swift.Int))))
 
 // CHECK: tuple: (TypesToReflect.C1<A>, TypesToReflect.S1<A>, TypesToReflect.E1<A>, Swift.Int)
 // CHECK: (tuple
@@ -213,15 +254,21 @@
 
 // CHECK: function: (TypesToReflect.C1<A>) -> (TypesToReflect.S1<A>) -> (TypesToReflect.E1<A>) -> Swift.Int
 // CHECK: (function
-// CHECK:   (bound_generic_class TypesToReflect.C1
-// CHECK:     (generic_type_parameter depth=0 index=0))
-// CHECK:   (function
-// CHECK:     (bound_generic_struct TypesToReflect.S1
+// CHECK:   (parameters
+// CHECK:     (bound_generic_class TypesToReflect.C1
 // CHECK:       (generic_type_parameter depth=0 index=0))
+// CHECK:   (result
 // CHECK:     (function
-// CHECK:       (bound_generic_enum TypesToReflect.E1
-// CHECK:         (generic_type_parameter depth=0 index=0))
-// CHECK:       (struct Swift.Int))))
+// CHECK:       (parameters
+// CHECK:         (bound_generic_struct TypesToReflect.S1
+// CHECK:           (generic_type_parameter depth=0 index=0))
+// CHECK:       (result
+// CHECK:         (function
+// CHECK:           (parameters
+// CHECK:             (bound_generic_enum TypesToReflect.E1
+// CHECK:               (generic_type_parameter depth=0 index=0))
+// CHECK:           (result
+// CHECK:             (struct Swift.Int))))
 
 // CHECK: tuple: (TypesToReflect.C2<A>, TypesToReflect.S2<A>, TypesToReflect.E2<A>, Swift.Int)
 // CHECK: (tuple
@@ -257,15 +304,21 @@
 
 // CHECK: function: (TypesToReflect.C3<A>) -> (TypesToReflect.S3<A>) -> (TypesToReflect.E3<A>) -> Swift.Int
 // CHECK: (function
-// CHECK:   (bound_generic_class TypesToReflect.C3
-// CHECK:     (generic_type_parameter depth=0 index=0))
-// CHECK:   (function
-// CHECK:     (bound_generic_struct TypesToReflect.S3
+// CHECK:   (parameters
+// CHECK:     (bound_generic_class TypesToReflect.C3
 // CHECK:       (generic_type_parameter depth=0 index=0))
+// CHECK:   (result
 // CHECK:     (function
-// CHECK:       (bound_generic_enum TypesToReflect.E3
-// CHECK:         (generic_type_parameter depth=0 index=0))
-// CHECK:       (struct Swift.Int))))
+// CHECK:       (parameters
+// CHECK:         (bound_generic_struct TypesToReflect.S3
+// CHECK:           (generic_type_parameter depth=0 index=0))
+// CHECK:       (result
+// CHECK:         (function
+// CHECK:           (parameters
+// CHECK:             (bound_generic_enum TypesToReflect.E3
+// CHECK:               (generic_type_parameter depth=0 index=0))
+// CHECK:           (result
+// CHECK:             (struct Swift.Int))))
 
 // CHECK: tuple: (TypesToReflect.C3<A>, TypesToReflect.S3<A>, TypesToReflect.E3<A>, Swift.Int)
 // CHECK: (tuple
@@ -312,15 +365,21 @@
 
 // CHECK: function: (TypesToReflect.C1<A>) -> (TypesToReflect.S1<A>) -> (TypesToReflect.E1<A>) -> Swift.Int
 // CHECK: (function
-// CHECK:   (bound_generic_class TypesToReflect.C1
-// CHECK:     (generic_type_parameter depth=0 index=0))
-// CHECK:   (function
-// CHECK:     (bound_generic_struct TypesToReflect.S1
+// CHECK:   (parameters
+// CHECK:     (bound_generic_class TypesToReflect.C1
 // CHECK:       (generic_type_parameter depth=0 index=0))
+// CHECK:   (result
 // CHECK:     (function
-// CHECK:       (bound_generic_enum TypesToReflect.E1
-// CHECK:         (generic_type_parameter depth=0 index=0))
-// CHECK:       (struct Swift.Int))))
+// CHECK:       (parameters
+// CHECK:         (bound_generic_struct TypesToReflect.S1
+// CHECK:           (generic_type_parameter depth=0 index=0))
+// CHECK:     (result
+// CHECK:       (function
+// CHECK:         (parameters
+// CHECK:           (bound_generic_enum TypesToReflect.E1
+// CHECK:             (generic_type_parameter depth=0 index=0))
+// CHECK:         (result
+// CHECK:           (struct Swift.Int))))
 
 // CHECK: tuple: (TypesToReflect.C1<A>, TypesToReflect.Box<TypesToReflect.S1<A>>, TypesToReflect.Box<TypesToReflect.E1<A>>, Swift.Int)
 // CHECK: (tuple
@@ -355,15 +414,21 @@
 
 // CHECK: function: (TypesToReflect.C2<A>) -> (TypesToReflect.S2<A>) -> (TypesToReflect.E2<A>) -> Swift.Int
 // CHECK: (function
-// CHECK:   (bound_generic_class TypesToReflect.C2
-// CHECK:     (generic_type_parameter depth=0 index=0))
-// CHECK:   (function
-// CHECK:     (bound_generic_struct TypesToReflect.S2
+// CHECK:   (parameters
+// CHECK:     (bound_generic_class TypesToReflect.C2
 // CHECK:       (generic_type_parameter depth=0 index=0))
+// CHECK:   (result
 // CHECK:     (function
-// CHECK:       (bound_generic_enum TypesToReflect.E2
-// CHECK:         (generic_type_parameter depth=0 index=0))
-// CHECK:       (struct Swift.Int))))
+// CHECK:       (parameters
+// CHECK:         (bound_generic_struct TypesToReflect.S2
+// CHECK:           (generic_type_parameter depth=0 index=0))
+// CHECK:       (result
+// CHECK:         (function
+// CHECK:           (parameters
+// CHECK:             (bound_generic_enum TypesToReflect.E2
+// CHECK:               (generic_type_parameter depth=0 index=0))
+// CHECK:           (result
+// CHECK:             (struct Swift.Int))))
 
 // CHECK: tuple: (TypesToReflect.C2<A>, TypesToReflect.Box<TypesToReflect.S2<A>>, TypesToReflect.Box<TypesToReflect.E2<A>>, Swift.Int)
 // CHECK: (tuple
@@ -403,15 +468,21 @@
 
 // CHECK: function: (TypesToReflect.C3<A>) -> (TypesToReflect.S3<A>) -> (TypesToReflect.E3<A>) -> Swift.Int
 // CHECK: (function
-// CHECK:   (bound_generic_class TypesToReflect.C3
-// CHECK:     (generic_type_parameter depth=0 index=0))
-// CHECK:   (function
-// CHECK:     (bound_generic_struct TypesToReflect.S3
+// CHECK:   (parameters
+// CHECK:     (bound_generic_class TypesToReflect.C3
 // CHECK:       (generic_type_parameter depth=0 index=0))
+// CHECK:   (result
 // CHECK:     (function
-// CHECK:       (bound_generic_enum TypesToReflect.E3
-// CHECK:         (generic_type_parameter depth=0 index=0))
-// CHECK:       (struct Swift.Int))))
+// CHECK:       (parameters
+// CHECK:         (bound_generic_struct TypesToReflect.S3
+// CHECK:           (generic_type_parameter depth=0 index=0))
+// CHECK:       (result
+// CHECK:         (function
+// CHECK:           (parameters
+// CHECK:             (bound_generic_enum TypesToReflect.E3
+// CHECK:               (generic_type_parameter depth=0 index=0))
+// CHECK:           (result
+// CHECK:             (struct Swift.Int))))
 
 // CHECK: tuple: (TypesToReflect.C3<A>, TypesToReflect.Box<TypesToReflect.S3<A>>, TypesToReflect.Box<TypesToReflect.E3<A>>, Swift.Int)
 // CHECK: (tuple
@@ -461,9 +532,11 @@
 
 // CHECK: Function: (A) -> TypesToReflect.E1<A>
 // CHECK: (function
-// CHECK:   (generic_type_parameter depth=0 index=0)
-// CHECK:   (bound_generic_enum TypesToReflect.E1
-// CHECK:     (generic_type_parameter depth=0 index=0)))
+// CHECK:   (parameters
+// CHECK:     (generic_type_parameter depth=0 index=0)
+// CHECK:   (result
+// CHECK:     (bound_generic_enum TypesToReflect.E1
+// CHECK:       (generic_type_parameter depth=0 index=0)))
 
 // CHECK: Tuple: (TypesToReflect.C1<A>, TypesToReflect.S1<A>, Swift.Int)
 // CHECK: (tuple
@@ -496,10 +569,12 @@
 
 // CHECK: Function: (A.Type) -> TypesToReflect.E1<A>
 // CHECK: (function
-// CHECK:   (metatype
-// CHECK:     (generic_type_parameter depth=0 index=0))
-// CHECK:   (bound_generic_enum TypesToReflect.E1
-// CHECK:     (generic_type_parameter depth=0 index=0)))
+// CHECK:   (parameters
+// CHECK:     (metatype
+// CHECK:       (generic_type_parameter depth=0 index=0))
+// CHECK:   (result
+// CHECK:     (bound_generic_enum TypesToReflect.E1
+// CHECK:       (generic_type_parameter depth=0 index=0)))
 
 // CHECK: Tuple: (TypesToReflect.C2<A>, TypesToReflect.S2<A>, Swift.Int)
 // CHECK: (tuple
@@ -537,11 +612,13 @@
 
 // CHECK: Function: (A.Type.Type) -> TypesToReflect.E1<A>
 // CHECK: (function
-// CHECK:   (metatype
+// CHECK:   (parameters
 // CHECK:     (metatype
+// CHECK:       (metatype
+// CHECK:         (generic_type_parameter depth=0 index=0)))
+// CHECK:   (result
+// CHECK:     (bound_generic_enum TypesToReflect.E1
 // CHECK:       (generic_type_parameter depth=0 index=0)))
-// CHECK:   (bound_generic_enum TypesToReflect.E1
-// CHECK:     (generic_type_parameter depth=0 index=0)))
 
 // CHECK: Tuple: (TypesToReflect.C3<A>, TypesToReflect.S3<A>, Swift.Int)
 // CHECK: (tuple

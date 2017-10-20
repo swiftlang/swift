@@ -239,6 +239,10 @@ void Mangler::appendIdentifier(StringRef ident) {
   recordOpStat("<identifier>", OldPos);
 }
 
+void Mangler::dump() {
+  llvm::errs() << Buffer.str() << '\n';
+}
+
 bool Mangler::tryMangleSubstitution(const void *ptr) {
   auto ir = Substitutions.find(ptr);
   if (ir == Substitutions.end())

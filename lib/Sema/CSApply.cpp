@@ -6317,24 +6317,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // Coercion from one function type to another, this produces a
     // FunctionConversionExpr in its full generality.
     if (auto fromFunc = fromType->getAs<FunctionType>()) {
-      // If toType is a NoEscape or NoReturn function type and the expression is
-      // a ClosureExpr, propagate these bits onto the ClosureExpr.  Do not
-      // *remove* any bits that are already on the closure though.
-      // Note that in this case, we do not want to propagate the 'throws' bit
-      // to the closure type, as the closure has already been analyzed for
-      // throwing subexpressions. We also don't want to change the convention
-      // of the original closure.
+      // If we have a ClosureExpr, then we can safely propagate the 'no escape'
+      // bit to the closure without invalidating prior analysis.
       auto fromEI = fromFunc->getExtInfo(), toEI = toFunc->getExtInfo();
       if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
-        swift::AnyFunctionType::ExtInfo newEI(fromEI.getRepresentation(),
-                                        toEI.isAutoClosure(),
-                                        toEI.isNoEscape() | fromEI.isNoEscape(),
-                                        toEI.throws() & fromEI.throws());
-        auto newToType = FunctionType::get(fromFunc->getInput(),
-                                           fromFunc->getResult(), newEI);
-        if (applyTypeToClosureExpr(cs, expr, newToType)) {
-          fromFunc = newToType;
-          // Propagating the bits in might have satisfied the entire
+        auto newFromFunc = FunctionType::get(fromFunc->getInput(),
+                                             fromFunc->getResult(),
+                                             fromEI.withNoEscape());
+        if (applyTypeToClosureExpr(cs, expr, newFromFunc)) {
+          fromFunc = newFromFunc;
+          // Propagating the 'no escape' bit might have satisfied the entire
           // conversion.  If so, we're done, otherwise keep converting.
           if (fromFunc->isEqual(toType))
             return expr;

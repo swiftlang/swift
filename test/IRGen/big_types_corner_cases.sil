@@ -228,6 +228,57 @@ bb2(%24 : $Error):
   unreachable
 }
 
+sil @returnBigStruct : $@convention(thin) () -> @owned BigStruct
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @closureToConvert() #0 {
+// CHECK: entry:
+// CHECK:   [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK:   call swiftcc void @returnBigStruct(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC]])
+// CHECK:   ret void
+// CHECK-LABEL: }
+sil @closureToConvert : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @returnBigStruct : $@convention(thin) () -> @owned BigStruct
+  %apply = apply %f() : $@convention(thin) () -> @owned BigStruct
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testConvertFunc() #0 {
+// CHECK: entry:
+// CHECK:   call swiftcc void bitcast (void ()* @closureToConvert to void (%swift.refcounted*)*)(%swift.refcounted* swiftself null)
+// CHECK:   ret void
+// CHECK-LABEL: }
+sil @testConvertFunc : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @closureToConvert : $@convention(thin) () -> ()
+  %cf = convert_function %f : $@convention(thin) () -> () to $@noescape @convention(thin) () -> ()
+  %thick = thin_to_thick_function %cf : $@noescape @convention(thin) () -> () to $@noescape @callee_owned () -> ()
+  %apply = apply %thick() : $@noescape @callee_owned () -> ()
+  %99 = tuple ()
+  return %99 : $()
+}
+
+sil @convertToThickHelper : $@convention(thin) (@owned BigStruct) -> ()
+
+// CHECK-LABAL: define {{.*}} swiftcc void @convertToThick(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}})) #0 {
+// CHECK: entry:
+// CHECK:   [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV, align 4
+// CHECK:   call void @llvm.memcpy.p0i8.p0i8.i64
+// CHECK:   call swiftcc void bitcast (void (%T22big_types_corner_cases9BigStructV*)* @convertToThickHelper to void (%T22big_types_corner_cases9BigStructV*, %swift.refcounted*)*)(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) [[ALLOC]], %swift.refcounted* swiftself null)
+// CHECK:   ret void
+// CHECK-LABEL: }
+sil @convertToThick : $@convention(thin) (@in BigStruct) -> () {
+bb0(%0 : $*BigStruct):
+  %3 = function_ref @convertToThickHelper : $@convention(thin) (@owned BigStruct) -> ()
+  %4 = convert_function %3 : $@convention(thin) (@owned BigStruct) -> () to $@convention(thin) @noescape (@owned BigStruct) -> ()
+  %5 = thin_to_thick_function %4 : $@convention(thin) @noescape (@owned BigStruct) -> () to $@noescape @callee_owned (@owned BigStruct) -> ()
+  %8 = load %0 : $*BigStruct
+  %10 = apply %5(%8) : $@noescape @callee_owned (@owned BigStruct) -> ()
+  %12 = tuple ()
+  return %12 : $()
+}
+
 sil_vtable SuperBase {
 }
 

@@ -897,6 +897,12 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   }
 }
 
+static bool useHasTransitiveOwnership(const SILInstruction *I) {
+  // convert_function is used to add the @noescape attribute. It does not change
+  // ownership of the function value.
+  return isa<ConvertFunctionInst>(I);
+}
+
 static SILValue createLifetimeExtendedAllocStack(
     SILBuilder &Builder, SILLocation Loc, SILValue Arg,
     ArrayRef<SILBasicBlock *> ExitingBlocks, InstModCallbacks Callbacks) {
@@ -1083,9 +1089,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *Closure,
   // object is dead. This should be expanded in the future. This also ensures
   // that we are locally identified and non-escaping since we only allow for
   // specific ARC users.
-  ReleaseTracker Tracker([](const SILInstruction *I) -> bool {
-    return useDoesNotKeepClosureAlive(I);
-  });
+  ReleaseTracker Tracker(useDoesNotKeepClosureAlive, useHasTransitiveOwnership);
 
   // Find the ARC Users and the final retain, release.
   if (!getFinalReleasesForValue(SILValue(Closure), Tracker))
@@ -1100,12 +1104,14 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *Closure,
       return false;
   }
 
-  // Then delete all user instructions.
-  for (auto *User : Tracker.getTrackedUsers()) {
+  // Then delete all user instructions in reverse so that leaf uses are deleted
+  // first.
+  for (auto *User : reverse(Tracker.getTrackedUsers())) {
     assert(User->getResults().empty()
-           && "We expect only ARC operations without "
-              "results. This is true b/c of "
-              "isARCOperationRemovableIfObjectIsDead");
+           || useHasTransitiveOwnership(User)
+                  && "We expect only ARC operations without "
+                     "results. This is true b/c of "
+                     "isARCOperationRemovableIfObjectIsDead");
     Callbacks.DeleteInst(User);
   }
 

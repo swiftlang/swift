@@ -1255,6 +1255,7 @@ static void VisitNodeFunction(
 static void CreateFunctionType(ASTContext *ast,
                                const VisitNodeResult &arg_type_result,
                                const VisitNodeResult &return_type_result,
+                               bool escaping,
                                bool throws,
                                VisitNodeResult &result) {
   Type arg_clang_type;
@@ -1287,7 +1288,8 @@ static void CreateFunctionType(ASTContext *ast,
   if (arg_clang_type && return_clang_type) {
     result._types.push_back(
         FunctionType::get(arg_clang_type, return_clang_type,
-                          FunctionType::ExtInfo().withThrows(throws)));
+                          FunctionType::ExtInfo().withNoEscape(!escaping)
+                          .withThrows(throws)));
   }
 }
 
@@ -1314,7 +1316,8 @@ static void VisitNodeFunctionType(
       break;
     }
   }
-  CreateFunctionType(ast, arg_type_result, return_type_result, throws, result);
+  CreateFunctionType(ast, arg_type_result, return_type_result,
+                     /*escaping=*/true, throws, result);
 }
 
 static void VisitNodeImplFunctionType(
@@ -1323,10 +1326,14 @@ static void VisitNodeImplFunctionType(
   VisitNodeResult arg_type_result;
   VisitNodeResult return_type_result;
   Demangle::Node::iterator end = cur_node->end();
+  bool escaping = false;
   bool throws = false;
   for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
     const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind) {
+    case Demangle::Node::Kind::ImplEscaping:
+      escaping = true;
+      break;
     case Demangle::Node::Kind::ImplConvention:
       // Ignore the ImplConvention it is only a hint for the SIL ARC optimizer.
       break;
@@ -1343,7 +1350,8 @@ static void VisitNodeImplFunctionType(
       break;
     }
   }
-  CreateFunctionType(ast, arg_type_result, return_type_result, throws, result);
+  CreateFunctionType(ast, arg_type_result, return_type_result, escaping, throws,
+                     result);
 }
 
 

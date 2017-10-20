@@ -35,7 +35,7 @@ func generic_get_func<T>(_ t1: T, _ b: Bool) -> (T) -> T {
 // CHECK-LABEL: sil hidden [noinline] @_T04test7testit1S2icSbF : $@convention(thin) (Bool) -> @owned @callee_owned (Int) -> Int {
 // CHECK: [[F:%[0-9]+]] = function_ref @_T04test16generic_get_funcxxcx_SbtlFSi_Tg5 : $@convention(thin) (Int, Bool) -> @owned @callee_owned (@in Int) -> @out Int
 // CHECK: [[CL:%[0-9]+]] = apply [[F]](%{{[0-9]+}}, %0) : $@convention(thin) (Int, Bool) -> @owned @callee_owned (@in Int) -> @out Int
-// CHECK: [[TH:%[0-9]+]] = function_ref @_T0S2iIxir_S2iIxyd_TR : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Int) -> Int
+// CHECK: [[TH:%[0-9]+]] = function_ref @_T0S2iIexir_S2iIexyd_TR : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Int) -> Int
 // CHECK: [[RET:%[0-9]+]] = partial_apply [[TH]]([[CL]]) : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Int) -> Int
 // CHECK: return [[RET]] : $@callee_owned (Int) -> Int
 @inline(never)
@@ -109,7 +109,7 @@ func generic_get_func_throwing<T>(_ b: Bool) -> (T) throws -> T {
 // CHECK-LABEL: sil hidden [noinline] @_T04test16testit1_throwingS2iKcSbF : $@convention(thin) (Bool) -> @owned @callee_owned (Int) -> (Int, @error Error) {
 // CHECK: [[F:%[0-9]+]] = function_ref @_T04test25generic_get_func_throwingxxKcSblFSi_Tg5 : $@convention(thin) (Bool) -> @owned @callee_owned (@in Int) -> (@out Int, @error Error)
 // CHECK: [[CL:%[0-9]+]] = apply [[F]](%0) : $@convention(thin) (Bool) -> @owned @callee_owned (@in Int) -> (@out Int, @error Error)
-// CHECK: [[TH:%[0-9]+]] = function_ref @_T0S2is5Error_pIxirzo_S2isAA_pIxydzo_TR : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> (@out Int, @error Error)) -> (Int, @error Error)
+// CHECK: [[TH:%[0-9]+]] = function_ref @_T0S2is5Error_pIexirzo_S2isAA_pIexydzo_TR : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> (@out Int, @error Error)) -> (Int, @error Error)
 // CHECK: [[RET:%[0-9]+]] = partial_apply [[TH]]([[CL]]) : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> (@out Int, @error Error)) -> (Int, @error Error)
 // CHECK: return [[RET]] : $@callee_owned (Int) -> (Int, @error Error)
 @inline(never)

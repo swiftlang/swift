@@ -330,6 +330,7 @@ private:
     case Node::Kind::Index:
     case Node::Kind::IVarInitializer:
     case Node::Kind::IVarDestroyer:
+    case Node::Kind::ImplEscaping:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplFunctionAttribute:
     case Node::Kind::ImplFunctionType:
@@ -416,6 +417,7 @@ private:
     case Node::Kind::OutlinedRetain:
     case Node::Kind::OutlinedRelease:
     case Node::Kind::OutlinedVariable:
+    case Node::Kind::AssocTypePath:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -969,9 +971,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       print(id);
     }
     if (isVariadic) {
-      SugarType Sugar = findSugar(type);
-      if (Sugar == SugarType::Array)
-        type = type->getFirstChild()->getChild(1)->getFirstChild();
       print(type);
       Printer << "...";
     } else {
@@ -1565,6 +1564,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::TypeList:
     printChildren(Node);
     return nullptr;
+  case Node::Kind::ImplEscaping:
+    Printer << "@escaping";
+    return nullptr;
   case Node::Kind::ImplConvention:
     Printer << Node->getText();
     return nullptr;
@@ -1779,6 +1781,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
            && Node->getChild(0)->getKind() == Node::Kind::Type);
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::AssocTypePath:
+    printChildren(Node->begin(), Node->end(), ".");
+      return nullptr;
   }
   printer_unreachable("bad node kind!");
 }

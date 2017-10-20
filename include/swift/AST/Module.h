@@ -28,6 +28,8 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Parse/Token.h"
+#include "swift/Syntax/SyntaxNodes.h"
+#include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
@@ -1082,9 +1084,23 @@ public:
     return (bool)AllCorrectedTokens;
   }
 
+  syntax::SourceFileSyntax getSyntaxRoot() const {
+    assert(SyntaxRoot && "no syntax root is set.");
+    return *SyntaxRoot;
+  }
+
 private:
+  friend class syntax::SyntaxParsingContext;
+  friend class syntax::SyntaxParsingContextRoot;
+
   /// If not None, the underlying vector should contain tokens of this source file.
   Optional<std::vector<Token>> AllCorrectedTokens;
+
+  /// All of the raw token syntax nodes in the underlying source.
+  std::vector<syntax::RawTokenInfo> AllRawTokenSyntax;
+
+  /// The root of the syntax tree representing the source file.
+  Optional<syntax::SourceFileSyntax> SyntaxRoot;
 };
 
 

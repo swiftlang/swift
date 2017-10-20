@@ -7,4 +7,7 @@
 
 // REQUIRES: asserts
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-protocol A:RangeReplaceableCollection&a:class a:A
+class a
+class a<a{{}class a<a{var f=a
+& ManagedBuffer
+protocol a

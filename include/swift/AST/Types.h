@@ -1430,6 +1430,11 @@ public:
   bool isInOut() const { return value.contains(InOut); }
   bool isShared() const { return value.contains(Shared); }
 
+  ParameterTypeFlags withVariadic(bool variadic) const {
+    return ParameterTypeFlags(variadic ? value | ParameterTypeFlags::Variadic
+                                       : value - ParameterTypeFlags::Variadic);
+  }
+
   ParameterTypeFlags withEscaping(bool escaping) const {
     return ParameterTypeFlags(escaping ? value | ParameterTypeFlags::Escaping
                                        : value - ParameterTypeFlags::Escaping);
@@ -2468,22 +2473,26 @@ public:
     
     // Note that we don't have setters. That is by design, use
     // the following with methods instead of mutating these objects.
+    LLVM_NODISCARD
     ExtInfo withRepresentation(Representation Rep) const {
       return ExtInfo((Bits & ~RepresentationMask)
                      | (unsigned)Rep);
     }
+    LLVM_NODISCARD
     ExtInfo withIsAutoClosure(bool IsAutoClosure = true) const {
       if (IsAutoClosure)
         return ExtInfo(Bits | AutoClosureMask);
       else
         return ExtInfo(Bits & ~AutoClosureMask);
     }
+    LLVM_NODISCARD
     ExtInfo withNoEscape(bool NoEscape = true) const {
       if (NoEscape)
         return ExtInfo(Bits | NoEscapeMask);
       else
         return ExtInfo(Bits & ~NoEscapeMask);
     }
+    LLVM_NODISCARD
     ExtInfo withThrows(bool Throws = true) const {
       if (Throws)
         return ExtInfo(Bits | ThrowsMask);
@@ -3202,11 +3211,12 @@ public:
     // you'll need to adjust both the Bits field below and
     // TypeBase::AnyFunctionTypeBits.
 
-    //   |representation|pseudogeneric|
-    //   |    0 .. 3    |      4      |
+    //   |representation|pseudogeneric| noescape |
+    //   |    0 .. 3    |      4      |     5    |
     //
     enum : uint16_t { RepresentationMask = 0x00F };
     enum : uint16_t { PseudogenericMask  = 0x010 };
+    enum : uint16_t { NoEscapeMask       = 0x020 };
 
     uint16_t Bits;
 
@@ -3219,14 +3229,18 @@ public:
     ExtInfo() : Bits(0) { }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation rep, bool isPseudogeneric) {
+    ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape) {
       Bits = ((unsigned) rep) |
-             (isPseudogeneric ? PseudogenericMask : 0);
+             (isPseudogeneric ? PseudogenericMask : 0) |
+             (isNoEscape ? NoEscapeMask : 0);
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
     /// is not permitted to dynamically depend on its type arguments.
     bool isPseudogeneric() const { return Bits & PseudogenericMask; }
+
+    // Is this function guaranteed to be no-escape by the type system?
+    bool isNoEscape() const { return Bits & NoEscapeMask; }
 
     /// What is the abstract representation of this function value?
     Representation getRepresentation() const {
@@ -3299,6 +3313,12 @@ public:
         return ExtInfo(Bits | PseudogenericMask);
       else
         return ExtInfo(Bits & ~PseudogenericMask);
+    }
+    ExtInfo withNoEscape(bool NoEscape = true) const {
+      if (NoEscape)
+        return ExtInfo(Bits | NoEscapeMask);
+      else
+        return ExtInfo(Bits & ~NoEscapeMask);
     }
 
     uint16_t getFuncAttrKey() const {
@@ -3549,6 +3569,10 @@ public:
 
   bool isPseudogeneric() const {
     return getExtInfo().isPseudogeneric();
+  }
+
+  bool isNoEscape() const {
+    return getExtInfo().isNoEscape();
   }
 
   bool isNoReturnFunction(); // Defined in SILType.cpp

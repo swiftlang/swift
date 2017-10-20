@@ -50,7 +50,7 @@ bool swift::parseASTSection(SerializedModuleLoader *SML, StringRef buf,
     } else {
       llvm::dbgs() << "Unable to load module";
       if (!info.name.empty())
-        llvm::dbgs() << '\'' << info.name << '\'';
+        llvm::dbgs() << " '" << info.name << '\'';
       llvm::dbgs() << ".\n";
     }
 

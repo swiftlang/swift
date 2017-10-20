@@ -89,9 +89,9 @@ public func genericBlockBridging<T: Ansible>(x: GenericClass<T>) {
 }
 
 // CHECK-LABEL: sil @_T021objc_imported_generic0C13BlockBridging{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[BLOCK_TO_FUNC:%.*]] = function_ref @_T0xxIyBya_xxIxxo_21objc_imported_generic7AnsibleRzlTR
+// CHECK:         [[BLOCK_TO_FUNC:%.*]] = function_ref @_T0xxIeyBya_xxIexxo_21objc_imported_generic7AnsibleRzlTR
 // CHECK:         partial_apply [[BLOCK_TO_FUNC]]<T>
-// CHECK:         [[FUNC_TO_BLOCK:%.*]] = function_ref @_T0xxIxxo_xxIyBya_21objc_imported_generic7AnsibleRzlTR
+// CHECK:         [[FUNC_TO_BLOCK:%.*]] = function_ref @_T0xxIexxo_xxIeyBya_21objc_imported_generic7AnsibleRzlTR
 // CHECK:         init_block_storage_header {{.*}} invoke [[FUNC_TO_BLOCK]]<T>
 
 // CHECK-LABEL: sil @_T021objc_imported_generic20arraysOfGenericParam{{[_0-9a-zA-Z]*}}F

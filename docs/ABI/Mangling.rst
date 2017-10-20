@@ -74,7 +74,7 @@ Globals
   global ::= protocol-conformance 'WP'   // protocol witness table
 
   global ::= protocol-conformance identifier 'Wt' // associated type metadata accessor
-  global ::= protocol-conformance identifier nominal-type 'WT' // associated type witness table accessor
+  global ::= protocol-conformance assoc_type_path nominal-type 'WT' // associated type witness table accessor
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
   global ::= type 'WV'                   // value witness table
   global ::= entity 'Wv' DIRECTNESS      // field offset
@@ -83,6 +83,8 @@ Globals
   global ::= type 'We' // Outlined Consume Function Type
   global ::= type 'Wr' // Outlined Retain Function Type
   global ::= type 'Ws' // Outlined Release Function Type
+
+  assoc_type_path ::= identifier '_' identifier*
 
   DIRECTNESS ::= 'd'                         // direct
   DIRECTNESS ::= 'i'                         // indirect
@@ -402,9 +404,11 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' PSEUDO-GENERIC? FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= CALLEE-CONVENTION? FUNC-REPRESENTATION PARAM-CONVENTION* RESULT-CONVENTION* ('z' RESULT-CONVENTION)
+  FUNC-ATTRIBUTES ::= CALLEE-ESCAPE? CALLEE-CONVENTION FUNC-REPRESENTATION? PARAM-CONVENTION* RESULT-CONVENTION* ('z' RESULT-CONVENTION)
 
   PSEUDO-GENERIC ::= 'P'
+
+  CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
 
   CALLEE-CONVENTION ::= 'y'                  // @callee_unowned
   CALLEE-CONVENTION ::= 'g'                  // @callee_guaranteed

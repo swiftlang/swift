@@ -7,8 +7,8 @@ The list is sorted by surname and formatted to allow easy grepping and
 beautification by scripts.  The fields are: name (N), email (E), web-address
 (W), description (D).
 
-N: David Abrahams
-E: dabrahams@apple.com
+N: Ben Cohen
+E: ben_cohen@apple.com
 D: Swift standard library
 
 N: Erik Eckstein
