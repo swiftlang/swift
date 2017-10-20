@@ -108,7 +108,10 @@ public:
   template<typename T>
   struct Constraint {
     /// The specific subject of the constraint.
-    PotentialArchetype *subject;
+    ///
+    /// This may either be a (resolved) dependent type or the potential
+    /// archetype that it resolves to.
+    mutable UnresolvedType subject;
 
     /// A value used to describe the constraint.
     T value;
@@ -1698,7 +1701,7 @@ public:
   ///
   /// \param genericParams The set of generic parameters to use in the resulting
   /// dependent type.
-  Type getDependentType(ArrayRef<GenericTypeParamType *> genericParams);
+  Type getDependentType(ArrayRef<GenericTypeParamType *> genericParams) const;
 
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.
