@@ -201,7 +201,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   ///
 %if Mutable:
   /// The following example uses the buffer pointer's subscript to access and
-  /// modifying the elements of a mutable buffer pointing to the contiguous
+  /// modify the elements of a mutable buffer pointing to the contiguous
   /// contents of an array:
   ///
   ///     var numbers = [1, 2, 3, 4, 5]
