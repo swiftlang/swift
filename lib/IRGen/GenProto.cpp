@@ -74,6 +74,10 @@
 using namespace swift;
 using namespace irgen;
 
+// Return the offset one should do on a witness table pointer to retrieve the
+// `index`th piece of private data.
+static int privateIndexToTableOffset(unsigned index) { return -1 - (int)index; }
+
 namespace {
 
 /// A class for computing how to pass arguments to a polymorphic
@@ -960,7 +964,10 @@ static bool isDependentConformance(IRGenModule &IGM,
     return true;
   }
 
-  return false;
+  // Check if there are any conditional conformances. Other forms of conditional
+  // requirements don't exist in the witness table.
+  return SILWitnessTable::enumerateWitnessTableConditionalConformances(
+      conformance, [](unsigned, CanType, ProtocolDecl *) { return true; });
 }
 
 /// Detail about how an object conforms to a protocol.
@@ -1102,27 +1109,29 @@ public:
     CanType ConcreteType;
     const NormalProtocolConformance &Conformance;
     ArrayRef<SILWitnessTable::Entry> SILEntries;
+    ArrayRef<SILWitnessTable::ConditionalConformance>
+        SILConditionalConformances;
     const ProtocolInfo &PI;
     Optional<FulfillmentMap> Fulfillments;
     SmallVector<std::pair<size_t, const ConformanceInfo *>, 4>
       SpecializedBaseConformances;
-    // Metadata caches are stored at negative offsets.
-    unsigned NextCacheIndex = 0;
+
+    SmallVector<size_t, 4> ConditionalRequirementPrivateDataIndices;
+
+    // Conditional conformances and metadata caches are stored at negative
+    // offsets, with conditional conformances closest to 0.
+    unsigned NextPrivateDataIndex = 0;
     bool RequiresSpecialization = false;
 
   public:
-    WitnessTableBuilder(IRGenModule &IGM,
-                        ConstantArrayBuilder &table,
+    WitnessTableBuilder(IRGenModule &IGM, ConstantArrayBuilder &table,
                         SILWitnessTable *SILWT)
-      : IGM(IGM), Table(table),
-        ConcreteType(SILWT->getConformance()->getType()->getCanonicalType()),
-        Conformance(*SILWT->getConformance()),
-        SILEntries(SILWT->getEntries()),
-        PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol()))
-    {
-      // TODO: in conditional conformances, allocate space for the assumed
-      // conformances here.
-
+        : IGM(IGM), Table(table),
+          ConcreteType(SILWT->getConformance()->getType()->getCanonicalType()),
+          Conformance(*SILWT->getConformance()),
+          SILEntries(SILWT->getEntries()),
+          SILConditionalConformances(SILWT->getConditionalConformances()),
+          PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol())) {
       // If the conformance is resilient, we require runtime instantiation.
       if (isResilientConformance(&Conformance))
         RequiresSpecialization = true;
@@ -1144,8 +1153,8 @@ public:
       assert(entry.getBaseProtocolWitness().Requirement == baseProto
              && "sil witness table does not match protocol");
       auto piIndex = PI.getBaseIndex(baseProto);
-      assert(piIndex.getValue() == Table.size()
-             && "offset doesn't match ProtocolInfo layout");
+      assert((size_t)piIndex.getValue() == Table.size() &&
+             "offset doesn't match ProtocolInfo layout");
 #endif
       
       SILEntries = SILEntries.slice(1);
@@ -1189,8 +1198,8 @@ public:
              && "sil witness table does not match protocol");
       auto piIndex =
         PI.getFunctionIndex(cast<AbstractFunctionDecl>(requirement.getDecl()));
-      assert(piIndex.getValue() == Table.size()
-             && "offset doesn't match ProtocolInfo layout");
+      assert((size_t)piIndex.getValue() == Table.size() &&
+             "offset doesn't match ProtocolInfo layout");
 #endif
 
       SILFunction *Func = entry.getMethodWitness().Witness;
@@ -1220,8 +1229,8 @@ public:
                == requirement.getAssociation()
              && "sil witness table does not match protocol");
       auto piIndex = PI.getAssociatedTypeIndex(requirement);
-      assert(piIndex.getValue() == Table.size()
-             && "offset doesn't match ProtocolInfo layout");
+      assert((size_t)piIndex.getValue() == Table.size() &&
+             "offset doesn't match ProtocolInfo layout");
 #endif
 
       SILEntries = SILEntries.slice(1);
@@ -1263,13 +1272,13 @@ public:
                requirement.getAssociatedRequirement()
              && "sil witness table does not match protocol");
       auto piIndex = PI.getAssociatedConformanceIndex(requirement);
-      assert(piIndex.getValue() == Table.size()
-             && "offset doesn't match ProtocolInfo layout");
+      assert((size_t)piIndex.getValue() == Table.size() &&
+             "offset doesn't match ProtocolInfo layout");
 #endif
 
       SILEntries = SILEntries.slice(1);
 
-      llvm::Constant *wtableAccessFunction = 
+      llvm::Constant *wtableAccessFunction =
         getAssociatedTypeWitnessTableAccessFunction(requirement,
                                                     associate,
                                                     associatedConformance);
@@ -1277,6 +1286,17 @@ public:
     }
 
   private:
+    void addConditionalConformances() {
+      for (auto conditional : SILConditionalConformances) {
+        // We don't actually need to know anything about the specific
+        // conformances here, just make sure we get right private data slots.
+        (void)conditional;
+
+        auto reqtIndex = getNextPrivateDataIndex();
+        ConditionalRequirementPrivateDataIndices.push_back(reqtIndex);
+      }
+    }
+
     llvm::Constant *buildInstantiationFunction();
 
     llvm::Constant *
@@ -1295,9 +1315,16 @@ public:
                                     llvm::function_ref<llvm::Value*()> body);
 
     /// Allocate another word of private data storage in the conformance table.
-    unsigned getNextCacheIndex() {
+    unsigned getNextPrivateDataIndex() {
       RequiresSpecialization = true;
-      return NextCacheIndex++;
+      return NextPrivateDataIndex++;
+    }
+
+    Address getAddressOfPrivateDataSlot(IRGenFunction &IGF, Address table,
+                                        unsigned index) {
+      assert(index < NextPrivateDataIndex);
+      return IGF.Builder.CreateConstArrayGEP(
+          table, privateIndexToTableOffset(index), IGF.IGM.getPointerSize());
     }
 
     const FulfillmentMap &getFulfillmentMap() {
@@ -1336,6 +1363,7 @@ public:
 
 /// Build the witness table.
 void WitnessTableBuilder::build() {
+  addConditionalConformances();
   visitProtocolDecl(Conformance.getProtocol());
   TableSize = Table.size();
 }
@@ -1554,9 +1582,8 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
                                  llvm::Value *selfMetadata,
                                  llvm::function_ref<llvm::Value*()> body) {
   // Allocate a new cache slot and drill down to it.
-  int cacheIndex = -1 - getNextCacheIndex();
-  Address cache = IGF.Builder.CreateConstArrayGEP(destTable, cacheIndex,
-                                                  IGM.getPointerSize());
+  auto cache =
+      getAddressOfPrivateDataSlot(IGF, destTable, getNextPrivateDataIndex());
 
   llvm::Type *expectedTy = IGF.CurFn->getReturnType();
   cache = IGF.Builder.CreateBitCast(cache, expectedTy->getPointerTo());
@@ -1641,7 +1668,8 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   //    RelativeDirectPointer<WitnessTable> WitnessTable;
   //
   //    /// The instantiation function, which is called after the template is copied.
-  //    RelativeDirectPointer<void(WitnessTable *, const Metadata *)> Instantiator;
+  //    RelativeDirectPointer<void(WitnessTable *, const Metadata *, void * const *)>
+  //                               Instantiator;
   //
   //    void *PrivateData[swift::NumGenericMetadataPrivateDataWords];
   //  };
@@ -1655,7 +1683,8 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   // is non-dependent.
   // TODO: the conformance might be conditional.
   llvm::Constant *instantiationFn;
-  if (SpecializedBaseConformances.empty()) {
+  if (SpecializedBaseConformances.empty() &&
+      ConditionalRequirementPrivateDataIndices.empty()) {
     instantiationFn = nullptr;
   } else {
     instantiationFn = buildInstantiationFunction();
@@ -1672,7 +1701,7 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   // WitnessTableSizeInWords
   cacheData.addInt(IGM.Int16Ty, TableSize);
   // WitnessTablePrivateSizeInWords
-  cacheData.addInt(IGM.Int16Ty, NextCacheIndex);
+  cacheData.addInt(IGM.Int16Ty, NextPrivateDataIndex);
   // RelativeIndirectablePointer<ProtocolDescriptor>
   cacheData.addRelativeAddress(descriptorRef);
   // RelativePointer<WitnessTable>
