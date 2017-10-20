@@ -1176,24 +1176,20 @@ public:
   /// Retrieve the type at the root.
   Type getRootType() const;
 
-  /// Retrieve the potential archetype to which this source refers.
-  PotentialArchetype *getAffectedPotentialArchetype() const;
-
   /// Retrieve the type to which this source refers.
   Type getAffectedType() const;
 
-  /// Visit each of the potential archetypes along the path, from the root
-  /// potential archetype to each potential archetype named via (e.g.) a
-  /// protocol requirement or parent source.
+  /// Visit each of the types along the path, from the root type
+  /// each type named via (e.g.) a protocol requirement or parent source.
   ///
-  /// \param visitor Called with each potential archetype along the path along
+  /// \param visitor Called with each type along the path along
   /// with the requirement source that is being applied on top of that
-  /// potential archetype. Can return \c true to halt the search.
+  /// type. Can return \c true to halt the search.
   ///
-  /// \returns nullptr if any call to \c visitor returned true. Otherwise,
-  /// returns the potential archetype to which the entire source refers.
-  PotentialArchetype *visitPotentialArchetypesAlongPath(
-           llvm::function_ref<bool(PotentialArchetype *,
+  /// \returns a null type if any call to \c visitor returned true. Otherwise,
+  /// returns the type to which the entire source refers.
+  Type visitPotentialArchetypesAlongPath(
+           llvm::function_ref<bool(Type,
                                    const RequirementSource *)> visitor) const;
 
   /// Whether this source is a requirement in a protocol.
@@ -1228,10 +1224,11 @@ public:
   /// requirement. Such "self-derived" requirements do not make the original
   /// requirement redundant, because without said original requirement, the
   /// derived requirement ceases to hold.
-  bool isSelfDerivedSource(PotentialArchetype *pa,
+  bool isSelfDerivedSource(GenericSignatureBuilder &builder,
+                           Type type,
                            bool &derivedViaConcrete) const;
 
-  /// For a requirement source that describes the requirement \c pa:proto,
+  /// For a requirement source that describes the requirement \c type:proto,
   /// retrieve the minimal subpath of this requirement source that will
   /// compute that requirement.
   ///
@@ -1239,7 +1236,8 @@ public:
   /// nullptr (indicating an embedded, distinct self-derived subpath), the
   /// conformance requirement is considered to be "self-derived".
   const RequirementSource *getMinimalConformanceSource(
-                                            PotentialArchetype *pa,
+                                            GenericSignatureBuilder &builder,
+                                            Type type,
                                             ProtocolDecl *proto,
                                             bool &derivedViaConcrete) const;
 

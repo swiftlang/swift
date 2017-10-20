@@ -587,9 +587,11 @@ bool RequirementSource::shouldDiagnoseRedundancy(bool primary) const {
          (!primary || !isDerivedRequirement());
 }
 
-bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa,
+bool RequirementSource::isSelfDerivedSource(GenericSignatureBuilder &builder,
+                                            Type type,
                                             bool &derivedViaConcrete) const {
-  return getMinimalConformanceSource(pa, /*proto=*/nullptr, derivedViaConcrete)
+  return getMinimalConformanceSource(builder, type, /*proto=*/nullptr,
+                                     derivedViaConcrete)
     != this;
 }
 
@@ -598,60 +600,18 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa,
 /// the nested type. This limited operation makes sure that it does not
 /// create any new potential archetypes along the way, so it should only be
 /// used in cases where we're reconstructing something that we know exists.
-static PotentialArchetype *replaceSelfWithPotentialArchetype(
-                             PotentialArchetype *selfPA, Type depTy) {
+static Type replaceSelfWithType(Type selfType, Type depTy) {
   if (auto depMemTy = depTy->getAs<DependentMemberType>()) {
-    // Recurse to produce the potential archetype for the base.
-    auto basePA = replaceSelfWithPotentialArchetype(selfPA,
-                                                    depMemTy->getBase());
+    Type baseType = replaceSelfWithType(selfType, depMemTy->getBase());
 
-    PotentialArchetype *nestedPAByName = nullptr;
+    if (auto assocType = depMemTy->getAssocType())
+      return DependentMemberType::get(baseType, assocType);
 
-    auto assocType = depMemTy->getAssocType();
-    auto name = depMemTy->getName();
-    auto findNested = [&](PotentialArchetype *pa) -> PotentialArchetype * {
-      const auto &nested = pa->getNestedTypes();
-      auto found = nested.find(name);
-
-      if (found == nested.end()) return nullptr;
-      if (found->second.empty()) return nullptr;
-
-      // Note that we've found a nested PA by name.
-      if (!nestedPAByName) {
-        nestedPAByName = found->second.front();
-      }
-
-      // If we don't have an associated type to look for, we're done.
-      if (!assocType) return nestedPAByName;
-
-      // Look for a nested PA matching the associated type.
-      for (auto nestedPA : found->second) {
-        if (nestedPA->getResolvedAssociatedType() == assocType)
-          return nestedPA;
-      }
-
-      return nullptr;
-    };
-
-    // First, look in the base potential archetype for the member we want.
-    if (auto result = findNested(basePA))
-      return result;
-
-    // Otherwise, look elsewhere in the equivalence class of the base potential
-    // archetype.
-    for (auto otherBasePA : basePA->getEquivalenceClassMembers()) {
-      if (otherBasePA == basePA) continue;
-
-      if (auto result = findNested(otherBasePA))
-        return result;
-    }
-
-    assert(nestedPAByName && "Didn't find the associated type we wanted");
-    return nestedPAByName;
+    return DependentMemberType::get(baseType, depMemTy->getName());
   }
 
   assert(depTy->is<GenericTypeParamType>() && "missing Self?");
-  return selfPA;
+  return selfType;
 }
 
 /// Determine whether the given protocol requirement is self-derived when it
@@ -682,7 +642,8 @@ static bool isSelfDerivedProtocolRequirementInProtocol(
 }
 
 const RequirementSource *RequirementSource::getMinimalConformanceSource(
-                                             PotentialArchetype *currentPA,
+                                             GenericSignatureBuilder &builder,
+                                             Type currentType,
                                              ProtocolDecl *proto,
                                              bool &derivedViaConcrete) const {
   derivedViaConcrete = false;
@@ -690,34 +651,44 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
   // If it's not a derived requirement, it's not self-derived.
   if (!isDerivedRequirement()) return this;
 
-  auto &builder = *currentPA->getBuilder();
-
   /// Keep track of all of the requirements we've seen along the way. If
   /// we see the same requirement twice, we have found a shorter path.
-  llvm::DenseMap<std::pair<PotentialArchetype *, ProtocolDecl *>,
+  llvm::DenseMap<std::pair<EquivalenceClass *, ProtocolDecl *>,
                  const RequirementSource *>
     constraintsSeen;
 
-  // Note that we've now seen a new constraint, returning true if we've seen
-  // it before.
-  auto addConstraint = [&](PotentialArchetype *pa, ProtocolDecl *proto,
+  /// Note that we've now seen a new constraint (described on an equivalence
+  /// class).
+  auto addConstraint = [&](EquivalenceClass *equivClass, ProtocolDecl *proto,
                            const RequirementSource *source)
       -> const RequirementSource * {
-    auto &storedSource = constraintsSeen[{pa->getRepresentative(), proto}];
+    auto &storedSource = constraintsSeen[{equivClass, proto}];
     if (storedSource) return storedSource;
 
     storedSource = source;
     return nullptr;
   };
 
+  // Note that we've now seen a new constraint, returning true if we've seen
+  // it before.
+  auto addTypeConstraint = [&](Type type, ProtocolDecl *proto,
+                           const RequirementSource *source)
+      -> const RequirementSource * {
+    auto equivClass =
+        builder.resolveEquivalenceClass(type,
+                                        ArchetypeResolutionKind::WellFormed);
+    assert(equivClass && "Not a well-formed type?");
+    return addConstraint(equivClass, proto, source);
+  };
+
   bool sawProtocolRequirement = false;
   ProtocolDecl *requirementSignatureSelfProto = nullptr;
 
-  PotentialArchetype *rootPA = nullptr;
+  Type rootType = nullptr;
   Optional<std::pair<const RequirementSource *, const RequirementSource *>>
     redundantSubpath;
   bool isSelfDerived = visitPotentialArchetypesAlongPath(
-          [&](PotentialArchetype *parentPA, const RequirementSource *source) {
+          [&](Type parentType, const RequirementSource *source) {
     switch (source->kind) {
     case ProtocolRequirement:
     case InferredProtocolRequirement: {
@@ -725,13 +696,18 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
       sawProtocolRequirement = true;
 
       // If the base has been made concrete, note it.
-      if (parentPA->isConcreteType())
+      auto parentEquivClass =
+          builder.resolveEquivalenceClass(parentType,
+                                          ArchetypeResolutionKind::WellFormed);
+      assert(parentEquivClass && "Not a well-formed type?");
+
+      if (parentEquivClass->concreteType)
         derivedViaConcrete = true;
 
       // The parent potential archetype must conform to the protocol in which
       // this requirement resides. Add this constraint.
       if (auto startOfPath =
-              addConstraint(parentPA, source->getProtocolDecl(),
+              addConstraint(parentEquivClass, source->getProtocolDecl(),
                             source->parent)) {
         // We found a redundant subpath; record it and stop the algorithm.
         assert(startOfPath != source->parent);
@@ -744,7 +720,7 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
           isSelfDerivedProtocolRequirementInProtocol(
                                                source,
                                                requirementSignatureSelfProto,
-                                               *currentPA->getBuilder()))
+                                               builder))
         return true;
 
       // No redundancy thus far.
@@ -753,7 +729,8 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
 
     case Parent:
       // FIXME: Ad hoc detection of recursive same-type constraints.
-      return !proto && parentPA->isInSameEquivalenceClassAs(currentPA);
+      return !proto &&
+        builder.areInSameEquivalenceClass(parentType, currentType);
 
     case Concrete:
     case Superclass:
@@ -771,14 +748,14 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
     case Inferred:
     case NestedTypeNameMatch:
     case ConcreteTypeBinding:
-      rootPA = parentPA;
+      rootType = parentType;
       return false;
     }
-  }) == nullptr;
+  }).isNull();
 
   // If we didn't already find a redundancy, check our end state.
   if (!redundantSubpath && proto) {
-    if (auto startOfPath = addConstraint(currentPA, proto, this)) {
+    if (auto startOfPath = addTypeConstraint(currentType, proto, this)) {
       redundantSubpath = { startOfPath, this };
       assert(startOfPath != this);
       isSelfDerived = true;
@@ -793,7 +770,7 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
                               redundantSubpath->first,
                               redundantSubpath->second);
     return shorterSource
-      ->getMinimalConformanceSource(currentPA, proto, derivedViaConcrete);
+      ->getMinimalConformanceSource(builder, currentType, proto, derivedViaConcrete);
   }
 
   // It's self-derived but we don't have a redundant subpath to eliminate.
@@ -805,9 +782,10 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
 
   // The root archetype might be a nested type, which implies constraints
   // for each of the protocols of the associated types referenced (if any).
-  for (auto pa = rootPA; pa->getParent(); pa = pa->getParent()) {
-    if (auto assocType = pa->getResolvedAssociatedType()) {
-      if (addConstraint(pa->getParent(), assocType->getProtocol(), nullptr))
+  for (auto depMemTy = rootType->getAs<DependentMemberType>(); depMemTy;
+       depMemTy = depMemTy->getBase()->getAs<DependentMemberType>()) {
+    if (auto assocType = depMemTy->getAssocType()) {
+      if (addTypeConstraint(depMemTy->getBase(), assocType->getProtocol(), nullptr))
         return nullptr;
     }
   }
@@ -1021,7 +999,7 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
 
   case EquivalentType:
     return parent->withoutRedundantSubpath(builder, start, end)
-      ->viaEquivalentType(builder, getAffectedPotentialArchetype());
+      ->viaEquivalentType(builder, storage.rootArchetype);
 
   case Parent:
     return parent->withoutRedundantSubpath(builder, start, end)
@@ -1053,31 +1031,25 @@ Type RequirementSource::getRootType() const {
   return getRootPotentialArchetype()->getDependentType({ });
 }
 
-PotentialArchetype *RequirementSource::getAffectedPotentialArchetype() const {
+Type RequirementSource::getAffectedType() const {
   return visitPotentialArchetypesAlongPath(
-                         [](PotentialArchetype *, const RequirementSource *) {
+                         [](Type, const RequirementSource *) {
                            return false;
                          });
 }
 
-Type RequirementSource::getAffectedType() const {
-  return getAffectedPotentialArchetype()->getDependentType({ });
-}
-
-PotentialArchetype *
+Type
 RequirementSource::visitPotentialArchetypesAlongPath(
-         llvm::function_ref<bool(PotentialArchetype *,
-                                 const RequirementSource *)> visitor) const {
+     llvm::function_ref<bool(Type, const RequirementSource *)> visitor) const {
   switch (kind) {
   case RequirementSource::Parent: {
-    auto parentPA = parent->visitPotentialArchetypesAlongPath(visitor);
-    if (!parentPA) return nullptr;
+    Type parentType = parent->visitPotentialArchetypesAlongPath(visitor);
+    if (!parentType) return nullptr;
 
-    if (visitor(parentPA, this)) return nullptr;
+    if (visitor(parentType, this)) return nullptr;
 
-    return replaceSelfWithPotentialArchetype(
-                             parentPA,
-                             getAssociatedType()->getDeclaredInterfaceType());
+    return replaceSelfWithType(parentType,
+                               getAssociatedType()->getDeclaredInterfaceType());
   }
 
   case RequirementSource::NestedTypeNameMatch:
@@ -1085,10 +1057,10 @@ RequirementSource::visitPotentialArchetypesAlongPath(
   case RequirementSource::Explicit:
   case RequirementSource::Inferred:
   case RequirementSource::RequirementSignatureSelf: {
-    auto rootPA = getRootPotentialArchetype();
-    if (visitor(rootPA, this)) return nullptr;
+    Type rootType = getRootType();
+    if (visitor(rootType, this)) return nullptr;
 
-    return rootPA;
+    return rootType;
   }
 
   case RequirementSource::Concrete:
@@ -1097,22 +1069,22 @@ RequirementSource::visitPotentialArchetypesAlongPath(
     return parent->visitPotentialArchetypesAlongPath(visitor);
 
   case RequirementSource::EquivalentType: {
-    auto parentPA = parent->visitPotentialArchetypesAlongPath(visitor);
-    if (!parentPA) return nullptr;
+    auto parentType = parent->visitPotentialArchetypesAlongPath(visitor);
+    if (!parentType) return nullptr;
 
-    if (visitor(parentPA, this)) return nullptr;
+    if (visitor(parentType, this)) return nullptr;
 
-    return storage.rootArchetype;
+    return storage.rootArchetype->getDependentType({ });
   }
 
   case RequirementSource::ProtocolRequirement:
   case RequirementSource::InferredProtocolRequirement: {
-    auto parentPA = parent->visitPotentialArchetypesAlongPath(visitor);
-    if (!parentPA) return nullptr;
+    Type parentType = parent->visitPotentialArchetypesAlongPath(visitor);
+    if (!parentType) return nullptr;
 
-    if (visitor(parentPA, this)) return nullptr;
+    if (visitor(parentType, this)) return nullptr;
 
-    return replaceSelfWithPotentialArchetype(parentPA, getStoredType());
+    return replaceSelfWithType(parentType, getStoredType());
   }
   }
 }
@@ -5106,7 +5078,8 @@ namespace {
           bool derivedViaConcrete;
           auto minimalSource =
             constraint.source->getMinimalConformanceSource(
-                         constraint.realizeSubjectPotentialArchetype(builder),
+                         builder,
+                         constraint.getSubjectDependentType(),
                          proto, derivedViaConcrete);
           if (minimalSource != constraint.source) {
             // The minimal source is smaller than the original source, so the
@@ -5489,6 +5462,7 @@ static void computeDerivedSameTypeComponents(
   // per component.
   for (const auto &concrete : equivClass->concreteTypeConstraints) {
     // Dig out the component associated with constraint.
+    Type subjectType = concrete.getSubjectDependentType();
     auto subjectPA = concrete.realizeSubjectPotentialArchetype(builder);
     assert(componentOf.count(subjectPA) > 0);
     auto &component = components[componentOf[subjectPA]];
@@ -5498,7 +5472,7 @@ static void computeDerivedSameTypeComponents(
     // discover more information later, so we need a more on-line or
     // iterative approach.
     bool derivedViaConcrete;
-    if (concrete.source->isSelfDerivedSource(subjectPA,
+    if (concrete.source->isSelfDerivedSource(builder, subjectType,
                                              derivedViaConcrete))
       continue;
 
