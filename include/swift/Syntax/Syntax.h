@@ -127,9 +127,6 @@ public:
   /// if it has one, otherwise 0.
   CursorIndex getIndexInParent() const;
 
-  /// Returns true if this syntax node represents a token.
-  bool isToken() const;
-
   /// Returns true if this syntax node represents a statement.
   bool isStmt() const;
 
@@ -154,6 +151,9 @@ public:
 
   /// Returns true if the node is "present" in the source.
   bool isPresent() const;
+
+
+  bool isToken() const;
 
   /// Print the syntax node with full fidelity to the given output stream.
   void print(llvm::raw_ostream &OS) const;

@@ -12,6 +12,5 @@ add_swift_library(swiftSyntax STATIC
   Syntax.cpp
   SyntaxData.cpp
   UnknownSyntax.cpp
-  SyntaxParsingContext.cpp
   DEPENDS
     swift-syntax-generated-headers)

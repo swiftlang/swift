@@ -18,9 +18,6 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/TokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -30,7 +27,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
-using namespace swift::syntax;
 
 /// parseExpr
 ///
@@ -39,9 +35,6 @@ using namespace swift::syntax;
 ///
 /// \param isExprBasic Whether we're only parsing an expr-basic.
 ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
-  // Start a context for creating expression syntax.
-  SyntaxParsingContextChild ExprParsingContext(SyntaxContext, SyntaxKind::Expr);
-
   // If we are parsing a refutable pattern, check to see if this is the start
   // of a let/var/is pattern.  If so, parse it to an UnresolvedPatternExpr and
   // name binding will perform final validation.
@@ -472,7 +465,6 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     Tok.setKind(tok::oper_prefix);
     LLVM_FALLTHROUGH;
   case tok::oper_prefix:
-    SyntaxContext->addTokenSyntax(Tok.getLoc());
     Operator = parseExprOperator();
     break;
   case tok::oper_binary_spaced:
@@ -765,6 +757,7 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
   SourceLoc loc = Tok.getLoc();
   Identifier name = Context.getIdentifier(Tok.getText());
   consumeToken();
+
   // Bypass local lookup.
   return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
 }
@@ -1388,8 +1381,6 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
-    SyntaxContext->addTokenSyntax(Loc);
-    SyntaxContext->makeNode(SyntaxKind::IntegerLiteralExpr);
     Result = makeParserResult(new (Context) IntegerLiteralExpr(Text, Loc,
                                                            /*Implicit=*/false));
     break;
@@ -1795,19 +1786,10 @@ createStringLiteralExprFromSegment(ASTContext &Ctx,
 ///   expr-literal:
 ///     string_literal
 ParserResult<Expr> Parser::parseExprStringLiteral() {
-
   SmallVector<Lexer::StringSegment, 1> Segments;
   L->getStringLiteralSegments(Tok, Segments);
 
   Token EntireTok = Tok;
-
-  // Create a syntax node for string literal.
-  SyntaxContext->addTokenSyntax(Tok.getLoc());
-  SyntaxContext->makeNode(SyntaxKind::StringLiteralExpr);
-  SyntaxParsingContextChild LocalContext(SyntaxContext, SyntaxKind::Expr);
-
-  // FIXME: Avoid creating syntax nodes for string interpolation.
-  LocalContext.disable();
 
   // The start location of the entire string literal.
   SourceLoc Loc = Tok.getLoc();
