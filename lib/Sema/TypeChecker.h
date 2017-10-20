@@ -2364,6 +2364,12 @@ public:
   bool isInsideUnavailableDeclaration(SourceRange ReferenceRange,
                                       const DeclContext *DC);
 
+  /// Returns true if the reference or any of its parents is an
+  /// unconditional unavailable declaration for the same platform.
+  bool isInsideCompatibleUnavailableDeclaration(SourceRange ReferenceRange,
+                                                const DeclContext *DC,
+                                                const AvailableAttr *attr);
+
   /// Returns true if the reference is lexically contained in a declaration
   /// that is deprecated on all deployment targets.
   bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
