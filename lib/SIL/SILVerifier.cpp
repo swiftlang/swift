@@ -2405,6 +2405,7 @@ public:
                 if (!isConsumingOrMutatingApplyUse(use))
                   return true;
                 break;
+              case ValueKind::StructElementAddrInst:
               case ValueKind::LoadInst:
               case ValueKind::DebugValueAddrInst:
                 if (I->hasOneUse())
