@@ -1531,6 +1531,11 @@ function(add_swift_library name)
             if("${sdk}" STREQUAL "ANDROID")
               list(APPEND swiftlib_private_link_libraries_targets
                    "-latomic")
+            # the same issue on FreeBSD, missing symbols:
+            # __atomic_store, __atomic_compare_exchange, __atomic_load
+            elseif("${sdk}" STREQUAL "FREEBSD")
+              list(APPEND swiftlib_private_link_libraries_targets
+                   "${SWIFTLIB_DIR}/clang/lib/freebsd/libclang_rt.builtins-${arch}.a")
             endif()
           elseif("${lib}" STREQUAL "ICU_I18N")
             list(APPEND swiftlib_private_link_libraries_targets
