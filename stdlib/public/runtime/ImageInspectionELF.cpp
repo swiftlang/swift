@@ -27,7 +27,7 @@
 #include <link.h>
 #include <string.h>
 
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || defined(__FreeBSD__)
 #include "llvm/ADT/StringRef.h"
 #endif
 
@@ -72,9 +72,14 @@ static SectionInfo getSectionInfo(const char *imageName,
   SectionInfo sectionInfo = { 0, nullptr };
   void *handle = dlopen(imageName, RTLD_LAZY | RTLD_NOLOAD);
   if (!handle) {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(__FreeBSD__)
+#if defined(__ANDROID__)
+    const char *systemPath = "/system/lib";
+#elif defined(__FreeBSD__)
+    const char *systemPath = "/libexec";
+#endif
     llvm::StringRef imagePath = llvm::StringRef(imageName);
-    if (imagePath.startswith("/system/lib") ||
+    if (imagePath.startswith(systemPath) ||
         (imageName && !imagePath.endswith(".so"))) {
       return sectionInfo;
     }
