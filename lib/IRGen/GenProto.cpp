@@ -1015,16 +1015,59 @@ public:
                                               CanType conformingType) const = 0;
 };
 
-static llvm::Value *
-emitWitnessTableAccessorCall(IRGenFunction &IGF,
-                             const NormalProtocolConformance *conformance,
-                             CanType conformingType,
-                             llvm::Value **srcMetadataCache) {
-  auto accessor =
-    IGF.IGM.getAddrOfWitnessTableAccessFunction(conformance, NotForDefinition);
+static std::pair<llvm::Value *, llvm::Value *>
+emitConditionalConformancesBuffer(IRGenFunction &IGF,
+                                  const ProtocolConformance *conformance) {
+  // Pointers to the witness tables, in the right order, which will be included
+  // in the buffer that gets passed to the witness table accessor.
+  llvm::SmallVector<llvm::Value *, 4> tables;
 
-  // If the conformance is generic, the accessor takes the metatype
-  // as an argument.
+  auto subMap = conformance->getSubstitutions(IGF.IGM.getSwiftModule());
+  auto rootConformance = conformance->getRootNormalConformance();
+
+  SILWitnessTable::enumerateWitnessTableConditionalConformances(
+      rootConformance, [&](unsigned, CanType type, ProtocolDecl *proto) {
+        auto substType = type.subst(subMap)->getCanonicalType();
+        auto reqConformance = subMap.lookupConformance(type, proto);
+        assert(reqConformance && "conditional conformance must exist");
+
+        tables.push_back(emitWitnessTableRef(IGF, substType, *reqConformance));
+        return /*finished?*/ false;
+      });
+
+  // No conditional requirements means no need for a buffer, and size == 0 means
+  // no reading of the pointer.
+  // FIXME(cond. conf. assert): once the dynamic assertion is removed from the
+  // instantiation function, we can have size as undef too.
+  if (tables.empty()) {
+    return {llvm::UndefValue::get(IGF.IGM.WitnessTablePtrPtrTy),
+            llvm::ConstantInt::get(IGF.IGM.SizeTy, 0)};
+  }
+
+  auto buffer = IGF.createAlloca(
+      llvm::ArrayType::get(IGF.IGM.WitnessTablePtrTy, tables.size()),
+      IGF.IGM.getPointerAlignment(), "conditional.requirement.buffer");
+  buffer = IGF.Builder.CreateStructGEP(buffer, 0, Size(0));
+
+  // Write each of the conditional witness tables into the buffer.
+  for (auto idx : indices(tables)) {
+    auto slot =
+        IGF.Builder.CreateConstArrayGEP(buffer, idx, IGF.IGM.getPointerSize());
+    IGF.Builder.CreateStore(tables[idx], slot);
+  }
+
+  auto count = llvm::ConstantInt::get(IGF.IGM.SizeTy, tables.size());
+  return {buffer.getAddress(), count};
+}
+
+static llvm::Value *emitWitnessTableAccessorCall(
+    IRGenFunction &IGF, const ProtocolConformance *conformance,
+    CanType conformingType, llvm::Value **srcMetadataCache) {
+  auto accessor = IGF.IGM.getAddrOfWitnessTableAccessFunction(
+      conformance->getRootNormalConformance(), NotForDefinition);
+
+  // If the conformance is generic, the accessor takes the metatype plus
+  // possible conditional conformances arguments.
   llvm::CallInst *call;
   if (conformance->getDeclContext()->isGenericContext()) {
     // Emit the source metadata if we haven't yet.
@@ -1032,8 +1075,9 @@ emitWitnessTableAccessorCall(IRGenFunction &IGF,
       *srcMetadataCache = IGF.emitTypeMetadataRef(conformingType);
     }
 
-    auto conditionalTables = llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrPtrTy);
-    auto numConditionalTables = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+    llvm::Value *conditionalTables, *numConditionalTables;
+    std::tie(conditionalTables, numConditionalTables) =
+        emitConditionalConformancesBuffer(IGF, conformance);
 
     call = IGF.Builder.CreateCall(
         accessor, {*srcMetadataCache, conditionalTables, numConditionalTables});
@@ -1053,12 +1097,12 @@ emitWitnessTableAccessorCall(IRGenFunction &IGF,
 /// given type.
 static llvm::Function *
 getWitnessTableLazyAccessFunction(IRGenModule &IGM,
-                                  const NormalProtocolConformance *conformance,
+                                  const ProtocolConformance *conformance,
                                   CanType conformingType) {
   assert(!conformingType->hasArchetype());
-  llvm::Function *accessor =
-    IGM.getAddrOfWitnessTableLazyAccessFunction(conformance, conformingType,
-                                                ForDefinition);
+  auto rootConformance = conformance->getRootNormalConformance();
+  llvm::Function *accessor = IGM.getAddrOfWitnessTableLazyAccessFunction(
+      rootConformance, conformingType, ForDefinition);
 
   // If we're not supposed to define the accessor, or if we already
   // have defined it, just return the pointer.
@@ -1069,9 +1113,9 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
     accessor->addFnAttr(llvm::Attribute::NoInline);
 
   // Okay, define the accessor.
-  auto cacheVariable = cast<llvm::GlobalVariable>(
-    IGM.getAddrOfWitnessTableLazyCacheVariable(conformance, conformingType,
-                                               ForDefinition));
+  auto cacheVariable =
+      cast<llvm::GlobalVariable>(IGM.getAddrOfWitnessTableLazyCacheVariable(
+          rootConformance, conformingType, ForDefinition));
   emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
                               [&](IRGenFunction &IGF) -> llvm::Value* {
     llvm::Value *conformingMetadataCache = nullptr;
@@ -1090,8 +1134,8 @@ class DirectConformanceInfo : public ConformanceInfo {
 
   const NormalProtocolConformance *RootConformance;
 public:
-  DirectConformanceInfo(const NormalProtocolConformance *C)
-    : RootConformance(C) {}
+  DirectConformanceInfo(const ProtocolConformance *C)
+      : RootConformance(C->getRootNormalConformance()) {}
 
   llvm::Value *getTable(IRGenFunction &IGF, CanType conformingType,
                         llvm::Value **conformingMetadataCache) const override {
@@ -1108,11 +1152,10 @@ public:
 class AccessorConformanceInfo : public ConformanceInfo {
   friend ProtocolInfo;
 
-  const NormalProtocolConformance *Conformance;
+  const ProtocolConformance *Conformance;
 
 public:
-  AccessorConformanceInfo(const NormalProtocolConformance *C)
-      : Conformance(C) {}
+  AccessorConformanceInfo(const ProtocolConformance *C) : Conformance(C) {}
 
   llvm::Value *getTable(IRGenFunction &IGF, CanType type,
                         llvm::Value **typeMetadataCache) const override {
@@ -1932,28 +1975,40 @@ ProtocolInfo::getConformance(IRGenModule &IGM, ProtocolDecl *protocol,
   assert(conformance->getProtocol() == protocol &&
          "conformance is for wrong protocol");
 
-  // Drill down to the root normal conformance.
+  auto checkCache =
+      [&](const ProtocolConformance *conf) -> Optional<ConformanceInfo *> {
+    // Check whether we've already cached this.
+    auto it = Conformances.find(conformance);
+    if (it != Conformances.end())
+      return it->second;
+
+    return None;
+  };
+
+  if (auto found = checkCache(conformance))
+    return **found;
+
+  //  Drill down to the root normal
   auto normalConformance = conformance->getRootNormalConformance();
 
-  // Check whether we've already cached this.
-  auto it = Conformances.find(normalConformance);
-  if (it != Conformances.end()) return *it->second;
-
   ConformanceInfo *info;
-
   // If the conformance is dependent in any way, we need to unique it.
   // TODO: maybe this should apply whenever it's out of the module?
   // TODO: actually enable this
   if (isDependentConformance(IGM, normalConformance,
                              ResilienceExpansion::Maximal)) {
-    info = new AccessorConformanceInfo(normalConformance);
-
-  // Otherwise, we can use a direct-referencing conformance.
+    info = new AccessorConformanceInfo(conformance);
+    Conformances.insert({conformance, info});
   } else {
+    // Otherwise, we can use a direct-referencing conformance, which can get
+    // away with the non-specialized conformance.
+    if (auto found = checkCache(normalConformance))
+      return **found;
+
     info = new DirectConformanceInfo(normalConformance);
+    Conformances.insert({normalConformance, info});
   }
 
-  Conformances.insert({normalConformance, info});
   return *info;
 }
 

@@ -172,7 +172,7 @@ struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
 // CHECK-NEXT:    [[COUNT:%.*]] = getelementptr inbounds %swift.witness_table_slice, %swift.witness_table_slice* %conditional.tables, i32 0, i32 1
 // CHECK-NEXT:    store i64 %2, i64* [[COUNT]], align 8
 // CHECK-NEXT:    [[INSTANTIATION_ARGS:%.*]] = bitcast %swift.witness_table_slice* %conditional.tables to i8**
-// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_T023associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWG, %swift.type* %0, [[INSTANTIATION_ARGS]])
+// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_T023associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWG, %swift.type* %0, i8** [[INSTANTIATION_ARGS]])
 // CHECK-NEXT:    ret i8** [[WTABLE]]
 
 
