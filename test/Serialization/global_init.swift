@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-witness-tables -o %t %s
+// RUN: %target-swift-frontend -emit-module -parse-as-library -o %t %s
 // RUN: llvm-bcanalyzer %t/global_init.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-sil-opt -enable-sil-verify-all -disable-sil-linking %t/global_init.swiftmodule | %FileCheck %s
 

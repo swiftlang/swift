@@ -72,6 +72,6 @@ public class CircleManager : ShapeManager {
 
 // NEGATIVE-NOT: sil {{.*}}internalFunction
 
-// NEGATIVE-NOT: sil_witness_table {{.*}}Circle: Shape
+// NEGATIVE: sil_witness_table {{.*}}Circle: Shape
 
 // NEGATIVE-NOT: sil_vtable

@@ -39,4 +39,4 @@ public struct S : R {}
 // the use of the 'public' keyword inside an extension of 'R'
 // should generate a warning, since it has no effect.
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T021witness_accessibility1SVAA1PA2aDP17publicRequirementyyFTW
+// CHECK-LABEL: sil [transparent] [thunk] @_T021witness_accessibility1SVAA1PA2aDP17publicRequirementyyFTW
