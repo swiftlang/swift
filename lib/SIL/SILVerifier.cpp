@@ -50,6 +50,12 @@ static llvm::cl::opt<bool> SkipUnreachableMustBeLastErrors(
                               "verify-skip-unreachable-must-be-last",
                               llvm::cl::init(false));
 
+// This flag controls the default behaviour when hitting a verification
+// failure (abort/exit).
+static llvm::cl::opt<bool> AbortOnFailure(
+                              "verify-abort-on-failure",
+                              llvm::cl::init(true));
+
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
 
@@ -139,7 +145,12 @@ public:
       F.print(llvm::dbgs());
     }
 
-    abort();
+    // We abort by default because we want to always crash in
+    // the debugger.
+    if (AbortOnFailure)
+      abort();
+    else
+      exit(1);
   }
 #define require(condition, complaint) \
   _require(bool(condition), complaint ": " #condition)
