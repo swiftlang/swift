@@ -21,10 +21,6 @@
 
 namespace llvm {
   class MemoryBuffer;
-  namespace opt {
-  class ArgList;
-  class Arg;
-  } // namespace opt
 }
 
 // Force change for PR for linux test
@@ -121,7 +117,7 @@ private:
   }
 
 public:
-  bool hasPrimaryInputFilenames() const {
+  bool havePrimaryInputsFilenames() const {
     for (const SelectedInput &SI : getPrimaryInputs())
       if (SI.isFilename())
         return true;
@@ -154,26 +150,23 @@ private:
   }
 
 public:
-  // TO BE DELETED
   unsigned primaryInputCount() const { return getPrimaryInputs().size(); }
 
-  bool hasPrimaryInput() const { return primaryInputCount() > 0; }
   bool havePrimaryInputs() const { return primaryInputCount() > 0; }
+ 
+  bool isWholeModule() { return !havePrimaryInputs(); }
 
-  bool isWholeModule() { return !hasPrimaryInput(); }
-
-  // TO BE DELETED
   Optional<SelectedInput> getOptionalPrimaryInput() const {
-    return hasPrimaryInput() ? Optional<SelectedInput>(getPrimaryInputs()[0])
+    return havePrimaryInputs() ? Optional<SelectedInput>(getPrimaryInputs()[0])
                              : Optional<SelectedInput>();
   }
 
   bool isPrimaryInputAFileAt(unsigned i) {
-    return hasPrimaryInput() && getOptionalPrimaryInput()->isFilename() &&
+    return havePrimaryInputs() && getOptionalPrimaryInput()->isFilename() &&
            getOptionalPrimaryInput()->Index == i;
   }
   bool haveAPrimaryInputFile() const {
-    return hasPrimaryInput() && getOptionalPrimaryInput()->isFilename();
+    return havePrimaryInputs() && getOptionalPrimaryInput()->isFilename();
   }
 
   bool hasUniquePrimaryInputFilename() const {
@@ -192,7 +185,7 @@ public:
                ? Optional<unsigned>(getOptionalPrimaryInput()->Index)
                : None;
   }
-  // Will be supplanted by others
+ 
   StringRef primaryInputFilenameIfAny() const {
     if (auto Index = primaryInputFileIndex()) {
       return getInputFilenames()[*Index];
@@ -202,8 +195,6 @@ public:
 
 public:
   // Multi-facet readers
-  StringRef baseNameOfOutput(const llvm::opt::ArgList &Args,
-                             StringRef ModuleName) const;
   bool shouldTreatAsSIL() const;
 
   /// Return true for error
@@ -261,6 +252,7 @@ public:
 
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
+  friend class FrontendArgsToOptionsConverter;
 public:
   FrontendInputs Inputs;
 
@@ -549,8 +541,18 @@ public:
     return InputKind == InputFileKind::IFK_Swift &&
            Inputs.hasUniqueInputFilename();
   }
+private:
+  const char *computeSuffix();
+  
+  bool canEmitDependencies() const;
+  bool canEmitHeader() const;
+  bool canEmitLoadedModuleTrace() const;
+  bool canEmitModule() const;
+  
+  /// Return true if changed output filename.
+  bool actionProducesOutputFromFrontend() const;
+  bool actionOutputsToStdout() const;
 };
-
 }
 
 #endif

@@ -82,7 +82,7 @@ struct InvocationOptions {
     // Assert invocation with a primary file. We want to avoid full typechecking
     // for all files.
     assert(!this->PrimaryFile.empty());
-    assert(this->Invok.getFrontendOptions().Inputs.hasPrimaryInput());
+    assert(this->Invok.getFrontendOptions().Inputs.havePrimaryInputs());
   }
 
   void applyTo(CompilerInvocation &CompInvok) const;
