@@ -425,7 +425,11 @@ def evaluate(args):
                 print("%s => %s" % (i, v))
             env[i] = v
     try:
-        return 0 if eval(args.evaluate, env) else 1
+        if eval(args.evaluate, env):
+            return 0
+        else:
+            print("evaluate condition failed: '%s'" % args.evaluate)
+            return 1
     except Exception as e:
         print(e)
         return 1
