@@ -256,8 +256,7 @@ function(_compile_swift_files
                             "-Xfrontend" "${GROUP_INFO_JSON_FILE}")
     if (NOT SWIFT_STDLIB_ENABLE_RESILIENCE)
       if (SWIFT_STDLIB_SIL_SERIALIZE_ALL)
-        list(APPEND swift_flags "-Xfrontend" "-sil-serialize-witness-tables"
-                                "-Xfrontend" "-sil-serialize-vtables")
+        list(APPEND swift_flags "-Xfrontend" "-sil-serialize-vtables")
       endif()
     endif()
   endif()

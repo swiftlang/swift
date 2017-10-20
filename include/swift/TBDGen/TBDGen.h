@@ -24,14 +24,12 @@ class FileUnit;
 class ModuleDecl;
 
 void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
-                            bool hasMultipleIRGenThreads,
-                            bool silSerializeWitnessTables);
+                            bool hasMultipleIRGenThreads);
 void enumeratePublicSymbols(ModuleDecl *module, llvm::StringSet<> &symbols,
-                            bool hasMultipleIRGenThreads,
-                            bool silSerializeWitnessTables);
+                            bool hasMultipleIRGenThreads);
 
 void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                  bool hasMultipleIRGenThreads, bool silSerializeWitnessTables,
+                  bool hasMultipleIRGenThreads,
                   llvm::StringRef installName);
 
 } // end namespace swift
