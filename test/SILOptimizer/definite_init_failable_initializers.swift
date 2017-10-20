@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership %s | %FileCheck %s
 
 // High-level tests that DI handles early returns from failable and throwing
 // initializers properly. The main complication is conditional release of self
@@ -1530,20 +1530,6 @@ extension P2 {
 
   init(p2b: Int64) {
     self.init(p2: p2b)! // necessary '!'
-  }
-}
-
-@objc protocol P3 {
-  init?(p3: Int64)
-}
-
-extension P3 {
-  init!(p3a: Int64) {
-    self.init(p3: p3a)! // unnecessary-but-correct '!'
-  }
-
-  init(p3b: Int64) {
-    self.init(p3: p3b)! // necessary '!'
   }
 }
 
