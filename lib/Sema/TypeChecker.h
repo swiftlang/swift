@@ -1068,6 +1068,15 @@ public:
   /// properly extends the nominal type it names.
   void validateExtension(ExtensionDecl *ext);
 
+  /// Request that the given class needs to have all members validated
+  /// after everything in the translation unit has been processed.
+  void requestClassLayout(ClassDecl *classDecl);
+
+  /// Request that the superclass of the given class, if any, needs to have
+  /// all members validated after everything in the translation unit has
+  /// been processed.
+  void requestSuperclassLayout(ClassDecl *classDecl);
+
   /// Perform final validation of a declaration after everything in the
   /// translation unit has been processed.
   void finalizeDecl(ValueDecl *D);
