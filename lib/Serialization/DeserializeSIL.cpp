@@ -2486,7 +2486,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   (void)kind;
 
   DeclID ClassID;
-  VTableLayout::readRecord(scratch, ClassID);
+  unsigned Serialized;
+  VTableLayout::readRecord(scratch, ClassID, Serialized);
   if (ClassID == 0) {
     DEBUG(llvm::dbgs() << "VTable classID is 0.\n");
     return nullptr;
@@ -2539,7 +2540,10 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
       break;
     kind = SILCursor.readRecord(entry.ID, scratch);
   }
-  SILVTable *vT = SILVTable::create(SILMod, theClass, vtableEntries);
+  SILVTable *vT = SILVTable::create(
+      SILMod, theClass,
+      (Serialized) ? IsSerialized : IsNotSerialized,
+      vtableEntries);
   vTableOrOffset = vT;
 
   if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), vT);

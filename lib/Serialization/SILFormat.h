@@ -186,7 +186,8 @@ namespace sil_block {
 
   using VTableLayout = BCRecordLayout<
     SIL_VTABLE,
-    DeclIDField   // Class Decl
+    DeclIDField,   // Class Decl
+    BCFixed<1>     // IsSerialized.
   >;
 
   using VTableEntryLayout = BCRecordLayout<

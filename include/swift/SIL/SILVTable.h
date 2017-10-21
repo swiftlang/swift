@@ -32,6 +32,7 @@
 namespace swift {
 
 class ClassDecl;
+enum IsSerialized_t : unsigned char;
 class SILFunction;
 class SILModule;
 
@@ -93,14 +94,18 @@ private:
   /// The ClassDecl mapped to this VTable.
   ClassDecl *Class;
 
+  /// Whether or not this vtable is serialized, which allows
+  /// devirtualization from another module.
+  bool Serialized : 1;
+
   /// The number of SILVTables entries.
-  unsigned NumEntries;
+  unsigned NumEntries : 31;
 
   /// Tail-allocated SILVTable entries.
   Entry Entries[1];
 
   /// Private constructor. Create SILVTables by calling SILVTable::create.
-  SILVTable(ClassDecl *c, ArrayRef<Entry> entries);
+  SILVTable(ClassDecl *c, IsSerialized_t serialized, ArrayRef<Entry> entries);
 
 public:
   ~SILVTable();
@@ -109,10 +114,14 @@ public:
   /// The SILDeclRef keys should reference the most-overridden members available
   /// through the class.
   static SILVTable *create(SILModule &M, ClassDecl *Class,
+                           IsSerialized_t Serialized,
                            ArrayRef<Entry> Entries);
 
   /// Return the class that the vtable represents.
   ClassDecl *getClass() const { return Class; }
+
+  /// Returns true if this vtable is going to be (or was) serialized.
+  IsSerialized_t isSerialized() const;
 
   /// Return all of the method entries.
   ArrayRef<Entry> getEntries() const { return {Entries, NumEntries}; }
