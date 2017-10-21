@@ -667,8 +667,8 @@ private:
 
   /// Callee analysis, used for determining the callees at call sites.
   BasicCalleeAnalysis *BCA;
-  
-  /// Returns true if \p V is a "pointer" value.
+
+  /// Returns true if \p V may encapsulate a "pointer" value.
   /// See EscapeAnalysis::NodeType::Value.
   bool isPointer(ValueBase *V);
 
