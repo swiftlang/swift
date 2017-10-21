@@ -28,8 +28,6 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Parse/Token.h"
-#include "swift/Syntax/SyntaxNodes.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
@@ -81,6 +79,13 @@ namespace swift {
   class VarDecl;
   class VisibleDeclConsumer;
   
+namespace syntax {
+  class SourceFileSyntax;
+  class SyntaxParsingContext;
+  class SyntaxParsingContextRoot;
+  struct RawTokenInfo;
+}
+
 /// Discriminator for file-units.
 enum class FileUnitKind {
   /// For a .swift source file.
@@ -767,6 +772,7 @@ class SourceFile final : public FileUnit {
 public:
   class LookupCache;
   class Impl;
+  struct SourceFileSyntaxInfo;
 
   /// The implicit module import that the SourceFile should get.
   enum class ImplicitModuleImportKind {
@@ -1084,10 +1090,7 @@ public:
     return (bool)AllCorrectedTokens;
   }
 
-  syntax::SourceFileSyntax getSyntaxRoot() const {
-    assert(SyntaxRoot && "no syntax root is set.");
-    return *SyntaxRoot;
-  }
+  syntax::SourceFileSyntax getSyntaxRoot() const;
 
 private:
   friend class syntax::SyntaxParsingContext;
@@ -1099,8 +1102,7 @@ private:
   /// All of the raw token syntax nodes in the underlying source.
   std::vector<syntax::RawTokenInfo> AllRawTokenSyntax;
 
-  /// The root of the syntax tree representing the source file.
-  Optional<syntax::SourceFileSyntax> SyntaxRoot;
+  SourceFileSyntaxInfo &SyntaxInfo;
 };
 
 

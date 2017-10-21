@@ -34,6 +34,8 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Syntax/SyntaxNodes.h"
+#include "swift/Syntax/SyntaxParsingContext.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -761,6 +763,15 @@ public:
   }
 };
 
+struct SourceFile::SourceFileSyntaxInfo {
+  /// The root of the syntax tree representing the source file.
+  Optional<syntax::SourceFileSyntax> SyntaxRoot;
+};
+
+syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
+  assert(SyntaxInfo.SyntaxRoot && "no syntax root is set.");
+  return *SyntaxInfo.SyntaxRoot;
+}
 
 template<typename OP_DECL>
 static Optional<OP_DECL *>
@@ -1325,7 +1336,7 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        bool KeepTokens)
   : FileUnit(FileUnitKind::Source, M),
     BufferID(bufferID ? *bufferID : -1),
-    Kind(K) {
+    Kind(K), SyntaxInfo(*new SourceFileSyntaxInfo()) {
   M.getASTContext().addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
 
@@ -1339,7 +1350,7 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
   }
 }
 
-SourceFile::~SourceFile() {}
+SourceFile::~SourceFile() { delete &SyntaxInfo; }
 
 bool FileUnit::walk(ASTWalker &walker) {
   SmallVector<Decl *, 64> Decls;
