@@ -959,6 +959,10 @@ private:
   /// the types on the expression nodes.
   llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
 
+  /// Maps closure parameters to type variables.
+  llvm::DenseMap<const ParamDecl *, TypeVariableType *>
+    OpenedParameterTypes;
+
   /// There can only be a single contextual type on the root of the expression
   /// being checked.  If specified, this holds its type along with the base
   /// expression, and the purpose of it.

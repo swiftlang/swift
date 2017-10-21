@@ -922,12 +922,17 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // constraint.
   if (auto *param = dyn_cast<ParamDecl>(varDecl)) {
     if (param->isLet() && valueType->is<TypeVariableType>()) {
-      Type paramType = valueType;
-      valueType = createTypeVariable(getConstraintLocator(locator),
+      auto found = OpenedParameterTypes.find(param);
+      if (found != OpenedParameterTypes.end())
+        return { found->second, found->second };
+
+      auto typeVar = createTypeVariable(getConstraintLocator(locator),
                                      TVO_CanBindToLValue |
                                      TVO_CanBindToInOut);
-      addConstraint(ConstraintKind::BindParam, paramType, valueType,
+      addConstraint(ConstraintKind::BindParam, valueType, typeVar,
                     getConstraintLocator(locator));
+      OpenedParameterTypes.insert(std::make_pair(param, typeVar));
+      return { typeVar, typeVar };
     }
   }
 
