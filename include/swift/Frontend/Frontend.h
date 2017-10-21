@@ -251,12 +251,6 @@ public:
     FrontendOpts.Inputs.addInputBuffer(Buf);
   }
 
-  void setPrimaryInput(SelectedInput pi) {
-    FrontendOpts.Inputs.setPrimaryInput(pi);
-  }
-
-  void clearInputs() { FrontendOpts.Inputs.clearInputs(); }
-
   StringRef getOutputFilename() const {
     return FrontendOpts.getSingleOutputFilename();
   }
