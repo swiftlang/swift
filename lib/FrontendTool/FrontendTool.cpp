@@ -756,7 +756,7 @@ static bool performCompile(CompilerInstance &Instance,
                            : opts.TBDInstallName;
 
     if (writeTBD(Instance.getMainModule(), hasMultipleIRGenThreads,
-                 silOpts.SILSerializeWitnessTables, opts.TBDPath, installName))
+                 opts.TBDPath, installName))
       return true;
   }
 
@@ -1064,11 +1064,11 @@ static bool performCompile(CompilerInstance &Instance,
     bool error;
     if (PrimarySourceFile)
       error = validateTBD(PrimarySourceFile, *IRModule, hasMultipleIRGenThreads,
-                          silOpts.SILSerializeWitnessTables, allSymbols);
+                          allSymbols);
     else
       error = validateTBD(Instance.getMainModule(), *IRModule,
                           hasMultipleIRGenThreads,
-                          silOpts.SILSerializeWitnessTables, allSymbols);
+                          allSymbols);
     if (error)
       return true;
 

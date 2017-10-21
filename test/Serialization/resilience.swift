@@ -11,7 +11,7 @@
 // RUN: llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience2.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=RESILIENCE %s < %t/resilience2.dump.txt
 
-// RUN: %target-swift-frontend -emit-module -o %t -sil-serialize-witness-tables -sil-serialize-vtables %s
+// RUN: %target-swift-frontend -emit-module -o %t -sil-serialize-vtables %s
 // RUN: llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience3.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=FRAGILE %s < %t/resilience3.dump.txt
 
