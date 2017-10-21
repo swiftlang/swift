@@ -54,6 +54,8 @@ struct SyntaxFactory {
   static Optional<Syntax>
   createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements);
 
+  static SyntaxKind getUnknownKind(SyntaxKind Kind);
+
 % for node in SYNTAX_NODES:
 %   if node.children:
 %     child_params = []
@@ -105,7 +107,7 @@ struct SyntaxFactory {
     llvm::Optional<TokenSyntax> TrailingComma = llvm::None);
 
   /// Creates a TypeIdentifierSyntax with the provided name and leading/trailing
-  /// trivia. 
+  /// trivia.
   static TypeIdentifierSyntax makeTypeIdentifier(OwnedString TypeName,
     const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
 
@@ -117,7 +119,7 @@ struct SyntaxFactory {
   /// Creates a TypeIdentifierSyntax for the `Any` type.
   static TypeIdentifierSyntax makeAnyTypeIdentifier(
     const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
-  
+
   /// Creates a TypeIdentifierSyntax for the `Self` type.
   static TypeIdentifierSyntax makeSelfTypeIdentifier(
     const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});

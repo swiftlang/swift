@@ -49,10 +49,6 @@ class OwnedString {
     assert(Length >= 0 && "expected length to be non-negative");
 
     if (Ownership == StringOwnership::Copied && Data) {
-      assert(
-        Length <= strlen(Data) &&
-        "expected length to be a valid index, within the length of the string");
-
       char *substring = static_cast<char *>(malloc(Length + 1));
       assert(substring && "expected successful malloc of copy");
 
