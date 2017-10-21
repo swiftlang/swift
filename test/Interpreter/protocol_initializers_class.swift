@@ -7,7 +7,7 @@
 
 import StdlibUnittest
 
-var ProtocolInitTestSuite = TestSuite("ProtocolInit")
+var ProtocolInitTestSuite = TestSuite("ProtocolInitClass")
 
 func mustThrow<T>(_ f: () throws -> T) {
   do {
@@ -24,7 +24,9 @@ func mustFail<T>(f: () -> T?) {
 
 enum E : Error { case X }
 
-protocol TriviallyConstructible {
+// This is the same as the protocol_initializers.swift test,
+// but class-bound
+protocol TriviallyConstructible : class {
   init(x: LifetimeTracked)
   init(x: LifetimeTracked, throwsDuring: Bool) throws
   init?(x: LifetimeTracked, failsDuring: Bool)
@@ -330,110 +332,6 @@ ProtocolInitTestSuite.test("ClassInit_Failure") {
   mustFail { TrivialClass(failsBefore: true, failsDuring: false, failsAfter: false) }
   mustFail { TrivialClass(failsBefore: false, failsDuring: true, failsAfter: false) }
   mustFail { TrivialClass(failsBefore: false, failsDuring: false, failsAfter: true) }
-}
-
-struct TrivialStruct : TriviallyConstructible {
-  let x: LifetimeTracked
-
-  init(x: LifetimeTracked) {
-    self.x = x
-  }
-
-  init(x: LifetimeTracked, throwsDuring: Bool) throws {
-    self.init(x: x)
-    if throwsDuring {
-      throw E.X
-    }
-  }
-
-  init?(x: LifetimeTracked, failsDuring: Bool) {
-    self.init(x: x)
-    if failsDuring {
-      return nil
-    }
-  }
-}
-
-struct AddrOnlyStruct : TriviallyConstructible {
-  let x: LifetimeTracked
-  let y: Any
-
-  init(x: LifetimeTracked) {
-    self.x = x
-    self.y = "Hello world"
-  }
-
-  init(x: LifetimeTracked, throwsDuring: Bool) throws {
-    self.init(x: x)
-    if throwsDuring {
-      throw E.X
-    }
-  }
-
-  init?(x: LifetimeTracked, failsDuring: Bool) {
-    self.init(x: x)
-    if failsDuring {
-      return nil
-    }
-  }
-}
-
-extension TriviallyConstructible {
-  init(throwsFirst: Bool, throwsSecond: Bool, initThenInit: ()) throws {
-    try self.init(x: LifetimeTracked(0), throwsDuring: throwsFirst)
-    try self.init(x: LifetimeTracked(0), throwsDuring: throwsSecond)
-  }
-
-  init(throwsFirst: Bool, throwsSecond: Bool, initThenAssign: ()) throws {
-    try self.init(x: LifetimeTracked(0), throwsDuring: throwsFirst)
-    self = try Self(x: LifetimeTracked(0), throwsDuring: throwsSecond)
-  }
-
-  init(throwsFirst: Bool, throwsSecond: Bool, assignThenInit: ()) throws {
-    self = try Self(x: LifetimeTracked(0), throwsDuring: throwsFirst)
-    try self.init(x: LifetimeTracked(0), throwsDuring: throwsSecond)
-  }
-
-  init(throwsFirst: Bool, throwsSecond: Bool, assignThenAssign: ()) throws {
-    self = try Self(x: LifetimeTracked(0), throwsDuring: throwsFirst)
-    try self.init(x: LifetimeTracked(0), throwsDuring: throwsSecond)
-  }
-}
-
-ProtocolInitTestSuite.test("Struct_Success") {
-  _ = try! TrivialStruct(throwsFirst: false, throwsSecond: false, initThenInit: ())
-  _ = try! TrivialStruct(throwsFirst: false, throwsSecond: false, initThenAssign: ())
-  _ = try! TrivialStruct(throwsFirst: false, throwsSecond: false, assignThenInit: ())
-  _ = try! TrivialStruct(throwsFirst: false, throwsSecond: false, assignThenAssign: ())
-}
-
-ProtocolInitTestSuite.test("Struct_Failure") {
-  mustThrow { try TrivialStruct(throwsFirst: true, throwsSecond: false, initThenInit: ()) }
-  mustThrow { try TrivialStruct(throwsFirst: false, throwsSecond: true, initThenInit: ()) }
-  mustThrow { try TrivialStruct(throwsFirst: true, throwsSecond: false, initThenAssign: ()) }
-  mustThrow { try TrivialStruct(throwsFirst: false, throwsSecond: true, initThenAssign: ()) }
-  mustThrow { try TrivialStruct(throwsFirst: true, throwsSecond: false, assignThenInit: ()) }
-  mustThrow { try TrivialStruct(throwsFirst: false, throwsSecond: true, assignThenInit: ()) }
-  mustThrow { try TrivialStruct(throwsFirst: true, throwsSecond: false, assignThenAssign: ()) }
-  mustThrow { try TrivialStruct(throwsFirst: false, throwsSecond: true, assignThenAssign: ()) }
-}
-
-ProtocolInitTestSuite.test("AddrOnlyStruct_Success") {
-  _ = try! AddrOnlyStruct(throwsFirst: false, throwsSecond: false, initThenInit: ())
-  _ = try! AddrOnlyStruct(throwsFirst: false, throwsSecond: false, initThenAssign: ())
-  _ = try! AddrOnlyStruct(throwsFirst: false, throwsSecond: false, assignThenInit: ())
-  _ = try! AddrOnlyStruct(throwsFirst: false, throwsSecond: false, assignThenAssign: ())
-}
-
-ProtocolInitTestSuite.test("AddrOnlyStruct_Failure") {
-  mustThrow { try AddrOnlyStruct(throwsFirst: true, throwsSecond: false, initThenInit: ()) }
-  mustThrow { try AddrOnlyStruct(throwsFirst: false, throwsSecond: true, initThenInit: ()) }
-  mustThrow { try AddrOnlyStruct(throwsFirst: true, throwsSecond: false, initThenAssign: ()) }
-  mustThrow { try AddrOnlyStruct(throwsFirst: false, throwsSecond: true, initThenAssign: ()) }
-  mustThrow { try AddrOnlyStruct(throwsFirst: true, throwsSecond: false, assignThenInit: ()) }
-  mustThrow { try AddrOnlyStruct(throwsFirst: false, throwsSecond: true, assignThenInit: ()) }
-  mustThrow { try AddrOnlyStruct(throwsFirst: true, throwsSecond: false, assignThenAssign: ()) }
-  mustThrow { try AddrOnlyStruct(throwsFirst: false, throwsSecond: true, assignThenAssign: ()) }
 }
 
 runAllTests()
