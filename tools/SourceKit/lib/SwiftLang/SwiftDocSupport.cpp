@@ -769,7 +769,7 @@ private:
 
 static bool makeParserAST(CompilerInstance &CI, StringRef Text,
                           CompilerInvocation Invocation) {
-  Invocation.clearInputs();
+  Invocation.getFrontendOptions().Inputs.clearInputs();
   Invocation.setModuleName("main");
   Invocation.setInputKind(InputFileKind::IFK_Swift);
 
@@ -1436,7 +1436,7 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
                                     StringRef Error)> Receiver) {
   CompilerInvocation Invocation;
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
-  Invocation.clearInputs();
+  Invocation.getFrontendOptions().Inputs.clearInputs();
 
   CompilerInstance CI;
   // Display diagnostics to stderr.

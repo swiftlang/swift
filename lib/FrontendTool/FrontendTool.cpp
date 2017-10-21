@@ -776,7 +776,7 @@ static bool performCompile(CompilerInstance &Instance,
     if (opts.Inputs.haveAPrimaryInputFile()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
-        auto Index = opts.Inputs.getPrimaryInput().getValue().Index;
+        auto Index = opts.Inputs.getOptionalPrimaryInput()->Index;
         PrimaryFile = Instance.getMainModule()->getFiles()[Index];
       }
       astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
