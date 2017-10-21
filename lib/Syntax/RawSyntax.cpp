@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/ColorUtils.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "llvm/Support/Casting.h"
@@ -33,14 +34,26 @@ static bool isTrivialSyntaxKind(SyntaxKind Kind) {
     return false;
   }
 }
+
+static void printSyntaxKind(SyntaxKind Kind, llvm::raw_ostream &OS,
+                            SyntaxPrintOptions Opts, bool Open) {
+  std::unique_ptr<swift::OSColor> Color;
+  if (Opts.Visual) {
+    Color.reset(new swift::OSColor(OS, llvm::raw_ostream::GREEN));
+  }
+  OS << "<";
+  if (!Open)
+    OS << "/";
+  dumpSyntaxKind(OS, Kind);
+  OS << ">";
+}
+
 } // end of anonymous namespace
 void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
   const bool PrintKind = Opts.PrintSyntaxKind && !isToken() &&
     !isTrivialSyntaxKind(Kind);
   if (PrintKind) {
-    OS << "<";
-    dumpSyntaxKind(OS, Kind);
-    OS << ">";
+    printSyntaxKind(Kind, OS, Opts, true);
   }
 
   if (const auto Tok = dyn_cast<RawTokenSyntax>(this)) {
@@ -51,9 +64,7 @@ void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
     LE->print(OS, Opts);
   }
   if (PrintKind) {
-    OS << "</";
-    dumpSyntaxKind(OS, Kind);
-    OS << ">";
+    printSyntaxKind(Kind, OS, Opts, false);
   }
 }
 
