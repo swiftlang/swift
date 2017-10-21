@@ -55,6 +55,9 @@ if #available(OSX 10.51, iOS 8.0) { }  // expected-error {{must handle potential
 if #available(iOS 8.0, *) {
 }
 
+if #available(iOSApplicationExtension, unavailable) { // expected-error 2{{expected version number}}
+}
+	
 // Want to make sure we can parse this. Perhaps we should not let this validate, though.
 if #available(*) {
 }
