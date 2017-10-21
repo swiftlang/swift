@@ -1230,3 +1230,20 @@ class SuperConvenienceSub : SuperConvenienceBase {
     self.init(i1, i1)
   }
 }
+
+// While testing some changes I found this regression that wasn't
+// covered by any existing tests
+class Base {}
+
+func makeAnAny() -> Any { return 3 }
+
+class Derived : Base {
+  var x: Int?
+  var y: Int?
+
+  override init() {
+    x = makeAnAny() as? Int
+    y = makeAnAny() as? Int
+    super.init()
+  }
+}

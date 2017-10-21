@@ -196,11 +196,30 @@ func mustThrow<T>(_ f: () throws -> T) {
   } catch {}
 }
 
+ThrowingInitTestSuite.test("DesignatedInitSuccess_Root") {
+  _ = try! Bear(n: 0, before: false)
+  _ = try! Bear(n: 0, after: false)
+  _ = try! Bear(n: 0, before: false, after: false)
+  _ = try! Bear(n: 0, before: false, after: false)
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
 ThrowingInitTestSuite.test("DesignatedInitFailure_Root") {
   mustThrow { try Bear(n: 0, before: true) }
   mustThrow { try Bear(n: 0, after: true) }
   mustThrow { try Bear(n: 0, before: true, after: false) }
   mustThrow { try Bear(n: 0, before: false, after: true) }
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
+ThrowingInitTestSuite.test("DesignatedInitSuccess_Derived") {
+  _ = try! PolarBear(n: 0, before: false)
+  _ = try! PolarBear(n: 0, during: false)
+  _ = try! PolarBear(n: 0, before: false, during: false)
+  _ = try! PolarBear(n: 0, after: false)
+  _ = try! PolarBear(n: 0, during: false, after: false)
+  _ = try! PolarBear(n: 0, before: false, after: false)
+  _ = try! PolarBear(n: 0, before: false, during: false, after: false)
   expectEqual(NSLifetimeTracked.count(), 0)
 }
 
@@ -220,8 +239,27 @@ ThrowingInitTestSuite.test("DesignatedInitFailure_Derived") {
   expectEqual(NSLifetimeTracked.count(), 0)
 }
 
+ThrowingInitTestSuite.test("DesignatedInitSuccess_DerivedGeneric") {
+  _ = try! GuineaPig(t: LifetimeTracked(0), during: false)
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
 ThrowingInitTestSuite.test("DesignatedInitFailure_DerivedGeneric") {
   mustThrow { try GuineaPig(t: LifetimeTracked(0), during: true) }
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
+ThrowingInitTestSuite.test("ConvenienceInitSuccess_Root") {
+  _ = try! Bear(before: false)
+  _ = try! Bear(before2: false)
+  _ = try! Bear(before: false, before2: false)
+  _ = try! Bear(during: false)
+  _ = try! Bear(before: false, during: false)
+  _ = try! Bear(after: false)
+  _ = try! Bear(before: false, after: false)
+  _ = try! Bear(during: false, after: false)
+  _ = try! Bear(before: false, during: false, after: false)
+  _ = try! Bear(before: false, before2: false, during: false, after: false)
   expectEqual(NSLifetimeTracked.count(), 0)
 }
 
@@ -248,6 +286,20 @@ ThrowingInitTestSuite.test("ConvenienceInitFailure_Root") {
   expectEqual(NSLifetimeTracked.count(), 0)
 }
 
+ThrowingInitTestSuite.test("ConvenienceInitSuccess_Derived") {
+  _ = try! PolarBear(before: false)
+  _ = try! PolarBear(before2: false)
+  _ = try! PolarBear(before: false, before2: false)
+  _ = try! PolarBear(during: false)
+  _ = try! PolarBear(before: false, during: false)
+  _ = try! PolarBear(after: false)
+  _ = try! PolarBear(before: false, after: false)
+  _ = try! PolarBear(during: false, after: false)
+  _ = try! PolarBear(before: false, during: false, after: false)
+  _ = try! PolarBear(before: false, before2: false, during: false, after: false)
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
 ThrowingInitTestSuite.test("ConvenienceInitFailure_Derived") {
   mustThrow { try PolarBear(before: true) }
   mustThrow { try PolarBear(before2: true) }
@@ -269,6 +321,19 @@ ThrowingInitTestSuite.test("ConvenienceInitFailure_Derived") {
   mustThrow { try PolarBear(before: false, before2: false, during: true, after: false) }
   mustThrow { try PolarBear(before: false, before2: false, during: false, after: true) }
   expectEqual(NSLifetimeTracked.count(), 0)
+}
+
+// Specific regression tests:
+
+// <rdar://problem/28687665> - "overreleased while already deallocating", for "throws" convenience init in extension
+extension NSRegularExpression {
+  convenience init(foo: String, options: NSRegularExpression.Options) throws {
+    try self.init(pattern: foo, options: options)
+  }
+}
+
+ThrowingInitTestSuite.test("ConvenienceInitFailure_Dynamic") {
+  mustThrow { try NSRegularExpression(foo: "(", options: []) }
 }
 
 runAllTests()

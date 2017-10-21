@@ -150,6 +150,15 @@ public:
     return false;
   }
 
+  /// True if this memory object is the 'self' of a non-root class init method.
+  bool isNonRootClassSelf() const {
+    if (isClassInitSelf())
+      if (auto MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
+        return !MUI->isRootSelf();
+
+    return false;
+  }
+
   /// isDelegatingInit - True if this is a delegating initializer, one that
   /// calls 'self.init'.
   bool isDelegatingInit() const {
@@ -269,18 +278,13 @@ struct DIMemoryUse {
 struct DIElementUseInfo {
   SmallVector<DIMemoryUse, 16> Uses;
   SmallVector<SILInstruction *, 4> Releases;
-  TinyPtrVector<TermInst *> FailableInits;
+  TinyPtrVector<SILInstruction *> StoresToSelf;
 
   void trackUse(DIMemoryUse Use) { Uses.push_back(Use); }
 
   void trackDestroy(SILInstruction *Destroy) { Releases.push_back(Destroy); }
 
-  void trackFailableInitCall(const DIMemoryObjectInfo &TheMemory,
-                             SILInstruction *I);
-
-private:
-  void trackFailureBlock(const DIMemoryObjectInfo &TheMemory, TermInst *TI,
-                         SILBasicBlock *BB);
+  void trackStoreToSelf(SILInstruction *I);
 };
 
 /// collectDIElementUsesFrom - Analyze all uses of the specified allocation

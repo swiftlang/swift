@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership %s | %FileCheck %s
 
 // High-level tests that DI handles early returns from failable and throwing
 // initializers properly. The main complication is conditional release of self
@@ -466,10 +466,8 @@ struct ThrowStruct {
 // CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
-// CHECK-NEXT:    br bb8
+// CHECK-NEXT:    br bb7
 // CHECK:       bb7:
-// CHECK-NEXT:    br bb8
-// CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
@@ -507,10 +505,8 @@ struct ThrowStruct {
 // CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
-// CHECK-NEXT:    br bb8
+// CHECK-NEXT:    br bb7
 // CHECK:       bb7:
-// CHECK-NEXT:    br bb8
-// CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
@@ -995,9 +991,9 @@ class ThrowDerivedClass : ThrowBaseClass {
 
 // CHECK-LABEL: sil hidden @_T035definite_init_failable_initializers17ThrowDerivedClassCACSi28failBeforeFullInitialization_Si0h6DuringjK0tKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $ThrowDerivedClass):
-// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
+// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
-// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
+// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         store %2 to [[SELF_BOX]] : $*ThrowDerivedClass
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
@@ -1005,6 +1001,8 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb1([[RESULT:%.*]] : $Int)
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast %2
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers14ThrowBaseClassCACyKcfc
+// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK:         try_apply [[INIT_FN]]([[BASE_SELF]])
 // CHECK:       bb2([[NEW_SELF:%.*]] : $ThrowBaseClass):
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]]
@@ -1015,14 +1013,9 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb3([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
 // CHECK:       bb4([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
 // CHECK:       bb5([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
-// CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2)
-// CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP_MSB]] : $Builtin.Int2)
+// CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
 // CHECK-NEXT:    br bb8
@@ -1073,6 +1066,8 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers14ThrowBaseClassCACyKcfc
 // CHECK:    try_apply [[INIT_FN]]([[DERIVED_SELF]])
 // CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowBaseClass):
+// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
+// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]]
 // CHECK-NEXT:    store [[DERIVED_SELF]] to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
@@ -1082,8 +1077,6 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
 // CHECK:       bb3([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
 // CHECK:       bb4([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
@@ -1094,9 +1087,9 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP_MSB]] : $Builtin.Int2)
 // CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
+// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb7:
-// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
@@ -1109,17 +1102,21 @@ class ThrowDerivedClass : ThrowBaseClass {
 
 // CHECK-LABEL: sil hidden @_T035definite_init_failable_initializers17ThrowDerivedClassCACSi28failBeforeFullInitialization_Si0h5AfterjK0tKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $ThrowDerivedClass):
-// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
+// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
-// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         store %2 to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
+// CHECK-NEXT:    [[TWO:%.*]] = integer_literal $Builtin.Int2, -2
+// CHECK-NEXT:    store [[TWO]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast %2
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers14ThrowBaseClassCACyt6noFail_tcfc
-// CHECK:    [[NEW_SELF:%.*]] = apply [[INIT_FN]]([[BASE_SELF]])
+// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, -1
+// CHECK-NEXT:    store [[ONE]] to [[BITMAP_BOX]]
+// CHECK:         [[NEW_SELF:%.*]] = apply [[INIT_FN]]([[BASE_SELF]])
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]]
 // CHECK-NEXT:    store [[DERIVED_SELF]] to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
@@ -1133,17 +1130,28 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb4([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
 // CHECK:       bb5([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    cond_br [[COND:%.*]], bb6, bb7
+// CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
+// CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP]] : $Builtin.Int2) : $Builtin.Int1
+// CHECK-NEXT:    cond_br [[COND]], bb6, bb10
 // CHECK:       bb6:
-// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
-// CHECK-NEXT:    br bb8
+// CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
+// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
+// CHECK-NEXT:    [[SHIFTED:%.*]] = builtin "lshr_Int2"([[BITMAP]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2) : $Builtin.Int2
+// CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[SHIFTED]] : $Builtin.Int2) : $Builtin.Int1
+// CHECK-NEXT:    cond_br [[COND]], bb7, bb8
 // CHECK:       bb7:
+// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
+// CHECK-NEXT:    br bb9
+// CHECK:       bb8:
+// CHECK-NEXT:    br bb9
+// CHECK:       bb9:
+// CHECK-NEXT:    br bb11
+// CHECK:       bb10:
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[SELF_BOX]]
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thick ThrowDerivedClass.Type
 // CHECK-NEXT:    dealloc_partial_ref [[BITMAP]] : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
-// CHECK-NEXT:    br bb8
-// CHECK:       bb8:
+// CHECK-NEXT:    br bb11
+// CHECK:       bb11:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    throw [[ERROR]] : $Error
@@ -1165,8 +1173,12 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast %3
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers14ThrowBaseClassCACyKcfc
-// CHECK:    try_apply [[INIT_FN]]([[BASE_SELF]])
+// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
+// CHECK-NEXT:    store [[ONE]] to [[BITMAP_BOX]]
+// CHECK:         try_apply [[INIT_FN]]([[BASE_SELF]])
 // CHECK:       bb2([[NEW_SELF:%.*]] : $ThrowBaseClass):
+// CHECK-NEXT:    [[NEG_ONE:%.*]] = integer_literal $Builtin.Int2, -1
+// CHECK-NEXT:    store [[NEG_ONE]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]]
 // CHECK-NEXT:    store [[DERIVED_SELF]] to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
@@ -1178,31 +1190,30 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb4([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    br bb7([[ERROR]] : $Error)
 // CHECK:       bb5([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    br bb7([[ERROR]] : $Error)
 // CHECK:       bb6([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    br bb7([[ERROR]] : $Error)
 // CHECK:       bb7([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
+// CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP]] : $Builtin.Int2)
+// CHECK-NEXT:    cond_br [[COND]], bb8, bb12
+// CHECK:       bb8:
+// CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
 // CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2)
 // CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP_MSB]] : $Builtin.Int2)
-// CHECK-NEXT:    cond_br [[COND]], bb8, bb9
-// CHECK:       bb8:
-// CHECK-NEXT:    br bb13
+// CHECK-NEXT:    cond_br [[COND]], bb9, bb10
 // CHECK:       bb9:
-// CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP]] : $Builtin.Int2)
-// CHECK-NEXT:    cond_br [[COND]], bb10, bb11
-// CHECK:       bb10:
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
-// CHECK-NEXT:    br bb12
+// CHECK-NEXT:    br bb11
+// CHECK:       bb10:
+// CHECK-NEXT:    br bb11
 // CHECK:       bb11:
+// CHECK-NEXT:    br bb13
+// CHECK:       bb12:
 // CHECK-NEXT:    [[SELF:%.*]] = load [[SELF_BOX]]
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thick ThrowDerivedClass.Type
 // CHECK-NEXT:    dealloc_partial_ref [[SELF]] : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
-// CHECK-NEXT:    br bb12
-// CHECK:       bb12:
 // CHECK-NEXT:    br bb13
 // CHECK:       bb13:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
@@ -1259,15 +1270,15 @@ class ThrowDerivedClass : ThrowBaseClass {
 
 // CHECK-LABEL: sil hidden @_T035definite_init_failable_initializers17ThrowDerivedClassCACSi28failBeforeOrDuringDelegation_tKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $ThrowDerivedClass):
-// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
+// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
-// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
-// CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]] : $*Builtin.Int2
+// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]] : $*Builtin.Int1
 // CHECK:         store %1 to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[ARG:%.*]] : $Int):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, 1
+// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers17ThrowDerivedClassCACyKcfc
 // CHECK-NEXT:    try_apply [[INIT_FN]](%1)
@@ -1279,15 +1290,10 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb3([[ERROR1:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR1]] : $Error)
 // CHECK:       bb4([[ERROR2:%.*]] : $Error):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    br bb5([[ERROR2]] : $Error)
 // CHECK:       bb5([[ERROR3:%.*]] : $Error):
-// CHECK-NEXT:    [[BITMAP_VALUE:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    [[BIT_NUM:%.*]] = integer_literal $Builtin.Int2, 1
-// CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP_VALUE]] : $Builtin.Int2, [[BIT_NUM]] : $Builtin.Int2)
-// CHECK-NEXT:    [[CONDITION:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP_MSB]] : $Builtin.Int2)
-// CHECK-NEXT:    cond_br [[CONDITION]], bb6, bb7
+// CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
+// CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
 // CHECK-NEXT:    br bb8
 // CHECK:       bb7:
@@ -1305,15 +1311,15 @@ class ThrowDerivedClass : ThrowBaseClass {
 
 // CHECK-LABEL: sil hidden @_T035definite_init_failable_initializers17ThrowDerivedClassCACSi29failBeforeOrDuringDelegation2_tKcfc
 // CHECK:         bb0(%0 : $Int, %1 : $ThrowDerivedClass):
-// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
+// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
-// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
-// CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]] : $*Builtin.Int2
+// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]] : $*Builtin.Int1
 // CHECK:         store %1 to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[ARG:%.*]] : $Int):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, 1
+// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers17ThrowDerivedClassCACSi20failBeforeDelegation_tKcfc
 // CHECK-NEXT:    try_apply [[INIT_FN]]([[ARG]], %1)
@@ -1326,15 +1332,10 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    store %1 to [[SELF_BOX]]
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
 // CHECK:       bb4([[ERROR1:%.*]] : $Error):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    br bb5([[ERROR1]] : $Error)
 // CHECK:       bb5([[ERROR2:%.*]] : $Error):
-// CHECK-NEXT:    [[BITMAP_VALUE:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    [[BIT_NUM:%.*]] = integer_literal $Builtin.Int2, 1
-// CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP_VALUE]] : $Builtin.Int2, [[BIT_NUM]] : $Builtin.Int2)
-// CHECK-NEXT:    [[CONDITION:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP_MSB]] : $Builtin.Int2)
-// CHECK-NEXT:    cond_br [[CONDITION]], bb6, bb7
+// CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
+// CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
 // CHECK-NEXT:    br bb8
 // CHECK:       bb7:
@@ -1383,6 +1384,8 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers17ThrowDerivedClassCACyKcfc
 // CHECK-NEXT:    try_apply [[INIT_FN]](%1)
 // CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowDerivedClass):
+// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
+// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
@@ -1391,8 +1394,6 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
 // CHECK:       bb3([[ERROR1:%.*]] : $Error):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    br bb5([[ERROR1]] : $Error)
 // CHECK:       bb4([[ERROR2:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR2]] : $Error)
@@ -1403,9 +1404,9 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP_MSB]] : $Builtin.Int2)
 // CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
+// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb7:
-// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
@@ -1418,15 +1419,17 @@ class ThrowDerivedClass : ThrowBaseClass {
 
 // CHECK-LABEL: sil hidden @_T035definite_init_failable_initializers17ThrowDerivedClassCACSi27failBeforeOrAfterDelegation_tKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $ThrowDerivedClass):
-// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
+// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
-// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         store %1 to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -2
+// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
+// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers17ThrowDerivedClassCACyt6noFail_tcfc
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%1)
@@ -1442,17 +1445,28 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb4([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
 // CHECK:       bb5([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    cond_br [[COND]], bb6, bb7
+// CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
+// CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP]] : $Builtin.Int2) : $Builtin.Int1
+// CHECK-NEXT:    cond_br [[COND]], bb6, bb10
 // CHECK:       bb6:
-// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
-// CHECK-NEXT:    br bb8
+// CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
+// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
+// CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2)
+// CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP_MSB]] : $Builtin.Int2)
+// CHECK-NEXT:    cond_br [[COND]], bb7, bb8
 // CHECK:       bb7:
+// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
+// CHECK-NEXT:    br bb9
+// CHECK:       bb8:
+// CHECK-NEXT:    br bb9
+// CHECK:       bb9:
+// CHECK-NEXT:    br bb11
+// CHECK:       bb10:
 // CHECK-NEXT:    [[OLD_SELF:%.*]] = load [[SELF_BOX]]
 // CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick ThrowDerivedClass.Type, [[OLD_SELF]] : $ThrowDerivedClass
 // CHECK-NEXT:    dealloc_partial_ref [[OLD_SELF]] : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
-// CHECK-NEXT:    br bb8
-// CHECK:       bb8:
+// CHECK-NEXT:    br bb11
+// CHECK:       bb11:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
@@ -1516,20 +1530,6 @@ extension P2 {
 
   init(p2b: Int64) {
     self.init(p2: p2b)! // necessary '!'
-  }
-}
-
-@objc protocol P3 {
-  init?(p3: Int64)
-}
-
-extension P3 {
-  init!(p3a: Int64) {
-    self.init(p3: p3a)! // unnecessary-but-correct '!'
-  }
-
-  init(p3b: Int64) {
-    self.init(p3: p3b)! // necessary '!'
   }
 }
 
