@@ -79,6 +79,13 @@ namespace swift {
   class VarDecl;
   class VisibleDeclConsumer;
   
+namespace syntax {
+  class SourceFileSyntax;
+  class SyntaxParsingContext;
+  class SyntaxParsingContextRoot;
+  struct RawTokenInfo;
+}
+
 /// Discriminator for file-units.
 enum class FileUnitKind {
   /// For a .swift source file.
@@ -765,6 +772,7 @@ class SourceFile final : public FileUnit {
 public:
   class LookupCache;
   class Impl;
+  struct SourceFileSyntaxInfo;
 
   /// The implicit module import that the SourceFile should get.
   enum class ImplicitModuleImportKind {
@@ -1082,9 +1090,22 @@ public:
     return (bool)AllCorrectedTokens;
   }
 
+  syntax::SourceFileSyntax getSyntaxRoot() const;
+
 private:
+  friend class syntax::SyntaxParsingContext;
+  friend class syntax::SyntaxParsingContextRoot;
+
   /// If not None, the underlying vector should contain tokens of this source file.
   Optional<std::vector<Token>> AllCorrectedTokens;
+
+  /// All of the raw token syntax nodes in the underlying source.
+  std::vector<syntax::RawTokenInfo> AllRawTokenSyntax;
+
+  SourceFileSyntaxInfo &SyntaxInfo;
+
+  void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
+  bool hasSyntaxRoot() const;
 };
 
 
