@@ -401,6 +401,40 @@ def compare_stats_dirs(args):
     return write_comparison(args, old_stats.stats, new_stats.stats)
 
 
+# Evaluate a boolean expression in terms of the provided stats-dir; all stats
+# are projected into python dicts (thus variables in the eval expr) named by
+# the last identifier in the stat definition. This means you can evaluate
+# things like 'NumIRInsts < 1000' or
+# 'NumTypesValidated == NumTypesDeserialized'
+def evaluate(args):
+    if len(args.remainder) != 1:
+        raise ValueError("Expected exactly 1 stats-dir to evaluate against")
+
+    d = args.remainder[0]
+    vargs = vars_of_args(args)
+    merged = merge_all_jobstats(load_stats_dir(d, **vargs), **vargs)
+    env = {}
+    ident = re.compile('(\w+)$')
+    for (k, v) in merged.stats.items():
+        if k.startswith("time.") or '.time.' in k:
+            continue
+        m = re.search(ident, k)
+        if m:
+            i = m.groups()[0]
+            if args.verbose:
+                print("%s => %s" % (i, v))
+            env[i] = v
+    try:
+        if eval(args.evaluate, env):
+            return 0
+        else:
+            print("evaluate condition failed: '%s'" % args.evaluate)
+            return 1
+    except Exception as e:
+        print(e)
+        return 1
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", action="store_true",
@@ -492,6 +526,8 @@ def main():
                        help="Compare two stats dirs directly")
     modes.add_argument("--lnt", action="store_true",
                        help="Emit an LNT-compatible test summary")
+    modes.add_argument("--evaluate", type=str, default=None,
+                       help="evaluate an expression of stat-names")
     parser.add_argument('remainder', nargs=argparse.REMAINDER,
                         help="stats-dirs to process")
 
@@ -514,6 +550,8 @@ def main():
             show_incrementality(args)
     elif args.lnt:
         write_lnt_values(args)
+    elif args.evaluate:
+        return evaluate(args)
     return None
 
 
