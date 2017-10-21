@@ -200,6 +200,9 @@ static int compareDependentTypes(PotentialArchetype * const* pa,
   return compareDependentTypes(pa, pb, /*outermost=*/true);
 }
 
+static int compareDependentTypes(Type type1, Type type2,
+                                 bool outermost = true);
+
 namespace {
   /// A node in the equivalence class, used for visualization.
   struct EquivalenceClassVizNode {
@@ -220,10 +223,8 @@ namespace {
 
     void advance() {
       while (base != baseEnd) {
-        // FIXME: Only legitimate current use of getBuilder().
-        auto subjectPA =
-          base->realizeSubjectPotentialArchetype(*base->value->getBuilder());
-       if (compareDependentTypes(&subjectPA, &base->value) <= 0)
+       if (compareDependentTypes(base->getSubjectDependentType(),
+                                 base->value->getDependentType({ })) <= 0)
          break;
 
         ++base;
@@ -2428,7 +2429,7 @@ static bool hasConcreteDecls(const PotentialArchetype *pa) {
 
 /// Canonical ordering for dependent types.
 static int compareDependentTypes(Type type1, Type type2,
-                                 bool outermost = true) {
+                                 bool outermost) {
   // Fast-path check for equality.
   if (type1->isEqual(type2)) return 0;
 
