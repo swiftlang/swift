@@ -6,6 +6,6 @@ add_swift_library(swiftSwiftPrivate ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLI
   PRNG.swift
   ShardedAtomicCounter.swift
 
-  SWIFT_COMPILE_FLAGS ${STDLIB_SIL_SERIALIZE_ALL}
+  SWIFT_COMPILE_FLAGS
   INSTALL_IN_COMPONENT stdlib-experimental)
 

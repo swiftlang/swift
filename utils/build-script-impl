@@ -72,7 +72,6 @@ KNOWN_SETTINGS=(
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
     swift-stdlib-use-nonatomic-rc "0"            "build the Swift stdlib and overlays with nonatomic reference count operations enabled"
-    swift-stdlib-sil-serialize-all "1"           "build the Swift stdlib and overlays with all method bodies serialized"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
@@ -172,7 +171,6 @@ KNOWN_SETTINGS=(
     build-swift-static-sdk-overlay    ""         "set to 1 to build static variants of the Swift SDK overlay"
     build-swift-examples        "1"              "set to 1 to build examples"
     build-swift-remote-mirror   "1"              "set to 1 to build the Swift Remote Mirror library"
-    build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
     build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
     check-incremental-compilation "0"            "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
     report-statistics           "0"              "set to 1 to generate compilation statistics files for swift libraries"
@@ -2167,13 +2165,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
                     -DSWIFT_STDLIB_ENABLE_RESILIENCE:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_RESILIENCE}")
                     -DSWIFT_STDLIB_USE_NONATOMIC_RC:BOOL=$(true_false "${SWIFT_STDLIB_USE_NONATOMIC_RC}")
-                    -DSWIFT_STDLIB_SIL_SERIALIZE_ALL:BOOL=$(true_false "${SWIFT_STDLIB_SIL_SERIALIZE_ALL}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
                     -DSWIFT_INCLUDE_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
                     -DSWIFT_BUILD_REMOTE_MIRROR:BOOL=$(true_false "${BUILD_SWIFT_REMOTE_MIRROR}")
-                    -DSWIFT_SERIALIZE_STDLIB_UNITTEST:BOOL=$(true_false "${BUILD_SERIALIZED_STDLIB_UNITTEST}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_CHECK_INCREMENTAL_COMPILATION:BOOL=$(true_false "${CHECK_INCREMENTAL_COMPILATION}")
                     -DSWIFT_REPORT_STATISTICS:BOOL=$(true_false "${REPORT_STATISTICS}")
