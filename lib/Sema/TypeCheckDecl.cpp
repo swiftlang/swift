@@ -1,5 +1,3 @@
-// A similar struct with Codable properties adopting Codable should get a
-// synthesized init(from:), along with the memberwise initializer.
 //===--- TypeCheckDecl.cpp - Type Checking for Declarations ---------------===//
 //
 // This source file is part of the Swift.org open source project
