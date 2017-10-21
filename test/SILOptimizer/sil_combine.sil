@@ -3392,3 +3392,40 @@ bb3(%16 : $Int32):                                  // Preds: bb1 bb2
   return %16 : $Int32                               // id: %17
 }
 
+protocol Prot0 : class {
+  static func newWithConfig() throws -> Builtin.Int32
+}
+
+
+protocol Prot1 : Prot0 {
+  static func newWithConfig() throws -> Builtin.Int32
+}
+
+protocol Prot2 : Prot1 {
+  static func newWithConfig() throws -> Builtin.Int32
+}
+
+sil @getMetaType : $@convention(thin) () -> @thick Prot2.Type
+
+// CHECK-LABEL: meta_existential
+// CHECK:bb0:
+// CHECK:  [[APPLY:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @thick Prot2.Type
+// CHECK:  [[OE:%.*]] = open_existential_metatype [[APPLY]] : $@thick Prot2.Type to $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type
+// CHECK:  [[WM:%.*]] = witness_method $@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1, #Prot1.newWithConfig!1 : <Self where Self : Prot1> (Self.Type) -> () throws -> Builtin.Int32, [[OE]] : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type : $@convention(witness_method) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+// CHECK:  try_apply [[WM]]<@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1>([[OE]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+sil @meta_existential : $@convention(thin) () -> (Builtin.Int32, @error MyErrorType) {
+bb0:
+  %fref = function_ref @getMetaType : $@convention(thin) () -> @thick Prot2.Type
+  %apply = apply %fref() : $@convention(thin) () -> @thick Prot2.Type
+  %open = open_existential_metatype %apply : $@thick Prot2.Type to $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type
+  %1 = init_existential_metatype %open : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type, $@thick Prot1.Type
+  %2 = open_existential_metatype %1 : $@thick Prot1.Type to $@thick (@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1).Type
+  %3 = witness_method $@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1, #Prot1.newWithConfig!1, %2 : $@thick (@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1).Type : $@convention(witness_method) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+  try_apply %3<@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType), normal bb1, error bb2
+
+bb1(%4 : $Builtin.Int32):
+  return %4 : $Builtin.Int32
+
+bb2(%5 : $MyErrorType):
+  throw %5 : $MyErrorType
+}

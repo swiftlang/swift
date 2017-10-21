@@ -867,10 +867,15 @@ getConformanceAndConcreteType(ASTContext &Ctx,
   // opened existential type, so we must keep track of the original
   // defining instruction.
   if (ConcreteType->isOpenedExistential()) {
-    assert(!InitExistential->getTypeDependentOperands().empty() &&
-           "init_existential is supposed to have a typedef operand");
-    ConcreteTypeDef = cast<SingleValueInstruction>(
-      InitExistential->getTypeDependentOperands()[0].get());
+    if (InitExistential->getTypeDependentOperands().empty()) {
+      auto op = InitExistential->getOperand(0);
+      assert(op->getType().hasOpenedExistential() &&
+             "init_existential is supposed to have a typedef operand");
+      ConcreteTypeDef = cast<SingleValueInstruction>(op);
+    } else {
+      ConcreteTypeDef = cast<SingleValueInstruction>(
+          InitExistential->getTypeDependentOperands()[0].get());
+    }
   }
 
   return std::make_tuple(*ExactConformance, ConcreteType,
