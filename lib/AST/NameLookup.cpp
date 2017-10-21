@@ -1366,7 +1366,10 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
   // access; it is not set.
   if (hasStorage() && !isSettable(nullptr))
     return true;
-  
+
+  if (isa<ParamDecl>(this))
+    return true;
+
   return checkAccess(DC, getDeclContext(), getSetterFormalAccess());
 }
 
