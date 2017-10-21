@@ -697,12 +697,12 @@ public:
     }
 
     // Allocate the object.
-    return ManagedValue(SGF.B.createAllocRefDynamic(
+    return SGF.emitManagedRValueWithCleanup(
+        SGF.B.createAllocRefDynamic(
                           loc,
                           selfMetaObjC.getValue(),
                           SGF.SGM.getLoweredType(type),
-                          /*objc=*/true, {}, {}),
-                          selfMetaObjC.getCleanup());
+                          /*objc=*/true, {}, {}));
   }
 
   //
