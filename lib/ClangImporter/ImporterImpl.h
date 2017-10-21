@@ -1122,9 +1122,8 @@ public:
   virtual void
   loadAllMembers(Decl *D, uint64_t unused) override;
 
-  virtual bool
-  loadNamedMembers(const Decl *D, DeclName N, uint64_t contextData,
-                   TinyPtrVector<ValueDecl *> &Members) override;
+  virtual Optional<TinyPtrVector<ValueDecl *>>
+  loadNamedMembers(const Decl *D, DeclName N, uint64_t contextData) override;
 
 private:
   void

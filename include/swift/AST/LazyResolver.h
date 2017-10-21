@@ -227,13 +227,10 @@ public:
   /// Populates a vector with all members of \p D that have DeclName
   /// matching \p N.
   ///
-  /// Returns true if an error occurred \em or the set of returned
-  /// \p Members is otherwise incomplete, due to implementation limitations
-  /// (eg. the implementation is unable to do named lookup at all, or within
-  /// the particular type of Decl that \p D is).
-  virtual bool
-  loadNamedMembers(const Decl *D, DeclName N, uint64_t contextData,
-                   TinyPtrVector<ValueDecl *> &Members) = 0;
+  /// Returns None if an error occurred \em or named member-lookup
+  /// was otherwise unsupported in this implementation or Decl.
+  virtual Optional<TinyPtrVector<ValueDecl *>>
+  loadNamedMembers(const Decl *D, DeclName N, uint64_t contextData) = 0;
 
   /// Populates the given vector with all conformances for \p D.
   ///
