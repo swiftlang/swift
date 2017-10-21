@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend %clang-importer-sdk -I %S/../Inputs/clang-importer-sdk/swift-modules -emit-module -Xfrontend -disable-diagnostic-passes -Xfrontend -sil-serialize-vtables -force-single-frontend-invocation -o %t/def_basic_objc.swiftmodule %S/Inputs/def_basic_objc.sil
+// RUN: %target-build-swift -Xfrontend %clang-importer-sdk -I %S/../Inputs/clang-importer-sdk/swift-modules -emit-module -Xfrontend -disable-diagnostic-passes -force-single-frontend-invocation -o %t/def_basic_objc.swiftmodule %S/Inputs/def_basic_objc.sil
 // RUN: llvm-bcanalyzer %t/def_basic_objc.swiftmodule | %FileCheck %s
 // RUN: %target-build-swift -Xfrontend %clang-importer-sdk -emit-silgen -Xfrontend -sil-link-all -I %t %s | %FileCheck %S/Inputs/def_basic_objc.sil
 

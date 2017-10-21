@@ -54,7 +54,7 @@ public func testBase(b: Base) -> Int32 {
 
 // Check that vtables and witness tables contain SILDeclRefs with signatures.
 
-// CHECK: sil_vtable Base {
+// CHECK: sil_vtable [serialized] Base {
 // CHECK-NEXT:  #Base.foo!1: (Base) -> () -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VyF	// Base.foo()
 // CHECK-NEXT:  #Base.foo!1: (Base) -> (Int32) -> () : _T010SILDeclRef4BaseC3fooys5Int32V1n_tF	// Base.foo(n:)
 // CHECK-NEXT:  #Base.foo!1: (Base) -> (Float) -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VSf1f_tF	// Base.foo(f:)

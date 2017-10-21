@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -O -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib -emit-module -sil-serialize-vtables %s -o %t/Swift.swiftmodule
+// RUN: %target-swift-frontend -emit-module -O -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib -emit-module %s -o %t/Swift.swiftmodule
 // RUN: %target-sil-opt -enable-sil-verify-all %t/Swift.swiftmodule -o - | %FileCheck %s
 
 // Test that early serialization works as expected:
