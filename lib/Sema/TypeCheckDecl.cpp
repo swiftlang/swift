@@ -8009,6 +8009,8 @@ static void visitOuterToInner(
 static std::pair<GenericEnvironment *, Type>
 checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                             GenericParamList *genericParams) {
+  assert(!ext->getGenericEnvironment());
+
   // Form the interface type of the extension.
   Type extInterfaceType = formExtensionInterfaceType(type, genericParams);
 
