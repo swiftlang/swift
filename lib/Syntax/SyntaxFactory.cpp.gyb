@@ -160,6 +160,28 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
   }
 }
 
+SyntaxKind
+SyntaxFactory::getUnknownKind(SyntaxKind Kind) {
+  switch(Kind) {
+% for node in SYNTAX_NODES:
+%   if node.syntax_kind.endswith('Expr'):
+%     Result = 'SyntaxKind::UnknownExpr'
+%   elif node.syntax_kind.endswith('Stmt'):
+%     Result = 'SyntaxKind::UnknownStmt'
+%   elif node.syntax_kind.endswith('Decl'):
+%     Result = 'SyntaxKind::UnknownDecl'
+%   elif node.syntax_kind.endswith('Token'):
+%     Result = 'SyntaxKind::UnknownToken'
+%   else:
+%     Result = 'SyntaxKind::Unknown'
+%   end
+  case SyntaxKind::${node.syntax_kind}: return ${Result};
+% end
+  default:
+    return SyntaxKind::Unknown;
+  }
+}
+
 % for node in SYNTAX_NODES:
 %   if node.children:
 %     child_params = []
