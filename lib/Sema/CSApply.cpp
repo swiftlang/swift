@@ -1316,9 +1316,16 @@ namespace {
       if (choice.getKind() == OverloadChoiceKind::KeyPathApplication) {
         index = cs.coerceToRValue(index);
         // The index argument should be (keyPath: KeyPath<Root, Value>).
-        auto keyPathTTy = cs.getType(index)->castTo<TupleType>()
-          ->getElementType(0);
-        
+        // Dig the key path expression out of the argument tuple.
+        auto indexKP = cast<TupleExpr>(index)->getElement(0);
+        auto keyPathTTy = cs.getType(indexKP);
+
+        // Check for the KeyPath being an IUO
+        if (auto pathTy = cs.lookThroughImplicitlyUnwrappedOptionalType(keyPathTTy)) {
+          keyPathTTy = pathTy;
+          indexKP = coerceImplicitlyUnwrappedOptionalToValue(indexKP, keyPathTTy, locator);
+        }
+
         Type valueTy;
         Type baseTy;
         bool resultIsLValue;
@@ -1375,9 +1382,6 @@ namespace {
         }
         if (resultIsLValue)
           valueTy = LValueType::get(valueTy);
-        
-        // Dig the key path expression out of the argument tuple.
-        auto indexKP = cast<TupleExpr>(index)->getElement(0);
         
         auto keyPathAp = new (cs.getASTContext())
            KeyPathApplicationExpr(base, index->getStartLoc(), indexKP,

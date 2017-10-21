@@ -376,6 +376,11 @@ class CC {
 func testKeyPathOptional() {
   _ = \AA.c?.i
   _ = \AA.c!.i
+
+  // SR-6198
+  let path: KeyPath<CC,Int>! = \CC.i
+  let cc = CC()
+  _ = cc[keyPath: path]
 }
 
 func testLiteralInAnyContext() {
