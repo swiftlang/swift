@@ -7781,7 +7781,7 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
       isa<EnumElementDecl>(VD))
     return true;
 
-  // For structs, we only need to validate stored properties to
+  // For structs, we only need to validate stored instance properties to
   // know the layout.
   if (isa<StructDecl>(nominal) &&
       (isa<VarDecl>(VD) &&
@@ -7790,11 +7790,32 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
         VD->getAttrs().hasAttribute<LazyAttr>())))
     return true;
 
-  // For classes, we need to validate properties and functions,
-  // but skipping nested types is OK.
+  // For classes, we need to validate non-final, non-type members, as well
+  // as final stored instance properties.
   if (isa<ClassDecl>(nominal) &&
-      !isa<TypeDecl>(VD))
+      !isa<TypeDecl>(VD)) {
+    // 'static' implies 'final' for properties and methods, so we can
+    // skip those.
+    if (isa<VarDecl>(VD) &&
+        cast<VarDecl>(VD)->getParentPatternBinding()->getStaticSpelling()
+          == StaticSpellingKind::KeywordStatic)
+      return false;
+    if (isa<FuncDecl>(VD) &&
+        cast<FuncDecl>(VD)->getStaticSpelling()
+          == StaticSpellingKind::KeywordStatic)
+      return false;
+
+    // Stored instance properties must be validated, even 'final' ones.
+    if (isa<VarDecl>(VD) && cast<VarDecl>(VD)->hasStorage())
+      return true;
+
+    // Anything else that's 'final' can be skipped.
+    if (VD->isFinal())
+      return false;
+
+    // Everything else appears in the vtable.
     return true;
+  }
 
   // For protocols, skip nested typealiases and nominal types.
   if (isa<ProtocolDecl>(nominal) &&
