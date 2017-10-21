@@ -1209,9 +1209,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 
-  Opts.SILSerializeVTables |=
-    Args.hasArg(OPT_sil_serialize_vtables);
-
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
   IRGenOpts.Optimize = false;

@@ -375,9 +375,6 @@ def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
 def sil_link_all : Flag<["-"], "sil-link-all">,
   HelpText<"Link all SIL functions">;
 
-def sil_serialize_vtables : Flag<["-"], "sil-serialize-vtables">,
-  HelpText<"Serialize eligible SIL vtables">;
-
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
 
