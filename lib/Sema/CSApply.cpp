@@ -846,6 +846,12 @@ namespace {
           memberLocator, substitutions);
       auto memberRef = ConcreteDeclRef(context, member, substitutions);
 
+      // If the member is not final, it might be virtually dispatched,
+      // so we need to know the full layout of the class.
+      if (!member->isFinal())
+        if (auto *classDecl = dyn_cast<ClassDecl>(member->getDeclContext()))
+          tc.requestClassLayout(classDecl);
+
       auto refTy = solution.simplifyType(openedFullType);
 
       // If we're referring to the member of a module, it's just a simple
