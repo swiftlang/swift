@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %target-build-swift -emit-module -Xfrontend -disable-diagnostic-passes -Xfrontend -sil-serialize-witness-tables -Xfrontend -sil-serialize-vtables -force-single-frontend-invocation -o %t/sil_box_types.swiftmodule %s
+// RUN: %target-build-swift -emit-module -Xfrontend -disable-diagnostic-passes -Xfrontend -sil-serialize-vtables -force-single-frontend-invocation -o %t/sil_box_types.swiftmodule %s
 // RUN: %target-build-swift -emit-sil -Xfrontend -sil-link-all -I %t %s | %FileCheck %s
 
 import Builtin

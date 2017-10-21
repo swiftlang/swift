@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module %s -module-name Swift -sil-serialize-witness-tables -sil-serialize-vtables -module-link-name swiftCore -parse-as-library -parse-sil -parse-stdlib -o - | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name=Swift
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module %s -module-name Swift -sil-serialize-vtables -module-link-name swiftCore -parse-as-library -parse-sil -parse-stdlib -o - | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name=Swift
 
 struct A {
   var f : () -> ()

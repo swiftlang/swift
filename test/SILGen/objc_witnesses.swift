@@ -94,7 +94,7 @@ public class Positron : Lepton {
   public dynamic var spin: Float = 0.5
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T014objc_witnesses8PositronCAA6LeptonA2aDP4spinSfvgTW
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T014objc_witnesses8PositronCAA6LeptonA2aDP4spinSfvgTW
 // CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T014objc_witnesses8PositronC4spinSfvgTD
 
 // Override of property defined in @objc extension

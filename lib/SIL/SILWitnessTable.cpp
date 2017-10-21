@@ -159,8 +159,7 @@ Identifier SILWitnessTable::getIdentifier() const {
 }
 
 bool SILWitnessTable::conformanceIsSerialized(ProtocolConformance *conformance,
-                                              ResilienceStrategy strategy,
-                                              bool silSerializeWitnessTables) {
+                                              ResilienceStrategy strategy) {
   // Serialize witness tables for conformances synthesized by
   // the ClangImporter.
   if (isa<ClangModuleUnit>(conformance->getDeclContext()->getModuleScopeContext()))
@@ -174,6 +173,5 @@ bool SILWitnessTable::conformanceIsSerialized(ProtocolConformance *conformance,
   auto protocolIsPublic =
       conformance->getProtocol()->getEffectiveAccess() >= AccessLevel::Public;
   auto typeIsPublic = nominal->getEffectiveAccess() >= AccessLevel::Public;
-  return (moduleIsResilient || silSerializeWitnessTables) &&
-         nominal->hasFixedLayout() && protocolIsPublic && typeIsPublic;
+  return nominal->hasFixedLayout() && protocolIsPublic && typeIsPublic;
 }

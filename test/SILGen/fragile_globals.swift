@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-witness-tables -o %t %S/Inputs/ModuleA.swift
-// RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-witness-tables -o %t %S/Inputs/ModuleB.swift
+// RUN: %target-swift-frontend -emit-module -parse-as-library -o %t %S/Inputs/ModuleA.swift
+// RUN: %target-swift-frontend -emit-module -parse-as-library -o %t %S/Inputs/ModuleB.swift
 // RUN: %target-swift-frontend -parse-as-library -I%t %s -Xllvm -sil-disable-pass="SIL Global Optimization" -O -emit-sil | %FileCheck %s
 
 import ModuleA
