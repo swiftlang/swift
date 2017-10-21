@@ -121,7 +121,7 @@ SyntaxParsingContextRoot(SourceFile &File, unsigned BufferID):
 
 SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
   std::vector<DeclSyntax> AllTopLevel;
-  if (GlobalData.File.SyntaxRoot.hasValue()) {
+  if (GlobalData.File.hasSyntaxRoot()) {
     for (auto It: GlobalData.File.getSyntaxRoot().getTopLevelDecls()) {
       AllTopLevel.push_back(It);
     }
@@ -149,7 +149,7 @@ SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
   }
 
   Trivia Leading = Trivia::newlines(1), Trailing;
-  GlobalData.File.SyntaxRoot.emplace(
+  GlobalData.File.setSyntaxRoot(
     SyntaxFactory::makeSourceFile(SyntaxFactory::makeDeclList(AllTopLevel),
       SyntaxFactory::makeToken(tok::eof, "", SourcePresence::Present,
                                Leading, Trailing)));

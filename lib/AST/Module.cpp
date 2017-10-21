@@ -768,9 +768,17 @@ struct SourceFile::SourceFileSyntaxInfo {
   Optional<syntax::SourceFileSyntax> SyntaxRoot;
 };
 
+bool SourceFile::hasSyntaxRoot() const {
+  return SyntaxInfo.SyntaxRoot.hasValue();
+}
+
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
-  assert(SyntaxInfo.SyntaxRoot && "no syntax root is set.");
+  assert(hasSyntaxRoot() && "no syntax root is set.");
   return *SyntaxInfo.SyntaxRoot;
+}
+
+void SourceFile::setSyntaxRoot(syntax::SourceFileSyntax &&Root) {
+  SyntaxInfo.SyntaxRoot.emplace(Root);
 }
 
 template<typename OP_DECL>

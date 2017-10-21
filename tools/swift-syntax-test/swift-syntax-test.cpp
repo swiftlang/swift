@@ -30,6 +30,7 @@
 #include "swift/AST/LegacyASTTransformer.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxData.h"
+#include "swift/Syntax/SyntaxNodes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"

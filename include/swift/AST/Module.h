@@ -1103,6 +1103,9 @@ private:
   std::vector<syntax::RawTokenInfo> AllRawTokenSyntax;
 
   SourceFileSyntaxInfo &SyntaxInfo;
+
+  void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
+  bool hasSyntaxRoot() const;
 };
 
 
