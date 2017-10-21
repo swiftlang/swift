@@ -3301,13 +3301,12 @@ static ConstraintResult visitInherited(
 }
 
 ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
-                                            PotentialArchetype *pa,
+                                            ResolvedType selfType,
                                             ProtocolDecl *proto,
                                             const RequirementSource *source,
                                             bool onlySameTypeConstraints) {
-  auto concreteSelf = pa->getDependentType({});
   auto protocolSubMap = SubstitutionMap::getProtocolSubstitutions(
-      proto, concreteSelf, ProtocolConformanceRef(proto));
+      proto, selfType.getDependentType(), ProtocolConformanceRef(proto));
 
   // Use the requirement signature to avoid rewalking the entire protocol.  This
   // cannot compute the requirement signature directly, because that may be
@@ -3339,7 +3338,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       resolver->resolveInheritedProtocols(proto);
 
     auto inheritedReqResult =
-      addInheritedRequirements(proto, pa, source, protoModule);
+      addInheritedRequirements(proto, selfType.getUnresolvedType(), source,
+                               protoModule);
     if (isErrorResult(inheritedReqResult))
       return inheritedReqResult;
   }
@@ -3467,7 +3467,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   for (auto Member : proto->getMembers()) {
     if (auto assocTypeDecl = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
-      Type assocType = DependentMemberType::get(concreteSelf, assocTypeDecl);
+      Type assocType =
+        DependentMemberType::get(selfType.getDependentType(), assocTypeDecl);
       if (!onlySameTypeConstraints) {
         auto assocResult =
           addInheritedRequirements(assocTypeDecl, assocType, source,
@@ -3614,10 +3615,8 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   if (!equivClass->recordConformanceConstraint(type, proto, source))
     return ConstraintResult::Resolved;
 
-  // FIXME: Resolve later.
-  auto pa = type.realizePotentialArchetype(*this);
   auto resolvedSource = source.getSource(*this, type.getDependentType());
-  return expandConformanceRequirement(pa, proto, resolvedSource,
+  return expandConformanceRequirement(type, proto, resolvedSource,
                                       /*onlySameTypeRequirements=*/false);
 }
 

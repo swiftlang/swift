@@ -363,7 +363,7 @@ public:
   /// adding the requirements from its requirement signature, rooted at
   /// the given requirement \c source.
   ConstraintResult expandConformanceRequirement(
-                                      PotentialArchetype *pa,
+                                      ResolvedType selfType,
                                       ProtocolDecl *proto,
                                       const RequirementSource *source,
                                       bool onlySameTypeConstraints);
