@@ -1546,9 +1546,9 @@ public:
   /// path compression on the way.
   PotentialArchetype *getRepresentative() const;
 
+private:
   /// Retrieve the generic signature builder with which this archetype is
   /// associated.
-  /// FIXME: Only EquivalenceClassVizIterator gets to use this.
   GenericSignatureBuilder *getBuilder() const {
     const PotentialArchetype *pa = this;
     while (auto parent = pa->getParent())
@@ -1556,7 +1556,6 @@ public:
     return pa->parentOrBuilder.get<GenericSignatureBuilder *>();
   }
 
-private:
   // Replace the generic signature builder.
   void replaceBuilder(GenericSignatureBuilder *builder) {
     assert(parentOrBuilder.is<GenericSignatureBuilder *>());
