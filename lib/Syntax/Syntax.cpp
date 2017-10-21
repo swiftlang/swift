@@ -24,8 +24,8 @@ SyntaxKind Syntax::getKind() const {
   return getRaw()->Kind;
 }
 
-void Syntax::print(llvm::raw_ostream &OS) const {
-  getRaw()->print(OS);
+void Syntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
+  getRaw()->print(OS, Opts);
 }
 
 void Syntax::dump() const {
