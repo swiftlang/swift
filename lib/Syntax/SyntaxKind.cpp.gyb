@@ -38,5 +38,18 @@ void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind) {
   }
 }
 
+bool isCollectionKind(SyntaxKind Kind) {
+  switch(Kind) {
+%   for node in SYNTAX_NODES:
+%     if node.is_syntax_collection():
+  case SyntaxKind::${node.syntax_kind}:
+%     end
+%   end
+    return true;
+  default:
+    return false;
+  }
+}
+
 } // end namespace syntax
 } // end namespace swift

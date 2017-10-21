@@ -20,13 +20,40 @@
 using llvm::dyn_cast;
 using namespace swift::syntax;
 
-void RawSyntax::print(llvm::raw_ostream &OS) const {
+namespace {
+static bool isTrivialSyntaxKind(SyntaxKind Kind) {
+  if (isCollectionKind(Kind))
+    return true;
+  switch(Kind) {
+  case SyntaxKind::SourceFile:
+  case SyntaxKind::TopLevelCodeDecl:
+  case SyntaxKind::ExpressionStmt:
+    return true;
+  default:
+    return false;
+  }
+}
+} // end of anonymous namespace
+void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
+  const bool PrintKind = Opts.PrintSyntaxKind && !isToken() &&
+    !isTrivialSyntaxKind(Kind);
+  if (PrintKind) {
+    OS << "<";
+    dumpSyntaxKind(OS, Kind);
+    OS << ">";
+  }
+
   if (const auto Tok = dyn_cast<RawTokenSyntax>(this)) {
     Tok->print(OS);
   }
 
   for (const auto &LE : Layout) {
-    LE->print(OS);
+    LE->print(OS, Opts);
+  }
+  if (PrintKind) {
+    OS << "</";
+    dumpSyntaxKind(OS, Kind);
+    OS << ">";
   }
 }
 
