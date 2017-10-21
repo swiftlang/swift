@@ -3262,9 +3262,9 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
   }
 }
 
-bool ClangImporter::Implementation::loadNamedMembers(
-    const Decl *D, DeclName N, uint64_t contextData,
-    TinyPtrVector<ValueDecl *> &Members) {
+Optional<TinyPtrVector<ValueDecl *>>
+ClangImporter::Implementation::loadNamedMembers(
+    const Decl *D, DeclName N, uint64_t contextData) {
 
   auto *DC = cast<DeclContext>(D);
 
@@ -3294,6 +3294,7 @@ bool ClangImporter::Implementation::loadNamedMembers(
 
   clang::ASTContext &clangCtx = getClangASTContext();
 
+  TinyPtrVector<ValueDecl *> Members;
   if (auto *CPD = dyn_cast<clang::ObjCProtocolDecl>(CD)) {
     for (auto entry : table->lookup(SerializedSwiftName(N.getBaseName()), CPD)) {
       if (!entry.is<clang::NamedDecl *>()) continue;
@@ -3312,10 +3313,10 @@ bool ClangImporter::Implementation::loadNamedMembers(
         }
       }
     }
-    return false;
+    return Members;
   }
 
-  return true;
+  return None;
 }
 
 

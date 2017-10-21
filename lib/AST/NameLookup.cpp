@@ -1211,7 +1211,14 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
         << ", hasLazyMembers()=" << hasLazyMembers()
         << "\n");
 
-  if (ctx.LangOpts.NamedLazyMemberLoading &&
+  bool hasExtensionsToConsider = false;
+  if (!ignoreNewExtensions) {
+    auto E = getExtensions();
+    hasExtensionsToConsider = E.begin() != E.end();
+  }
+
+  if (!hasExtensionsToConsider &&
+      ctx.LangOpts.NamedLazyMemberLoading &&
       !LookupTable.getInt() &&
       hasLazyMembers()) {
     // The lookup table (containing all loaded members) has not yet been built;
@@ -1221,17 +1228,17 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     auto contextInfo =
         ctx.getOrCreateLazyIterableContextData(this,
                                                /*lazyLoader=*/nullptr);
-    if (contextInfo->loader->loadNamedMembers(this, name,
-                                              contextInfo->memberData,
-                                              results)) {
-      if (auto s = ctx.Stats) {
-        ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
-      }
-    } else {
+    if (auto results =
+        contextInfo->loader->loadNamedMembers(this, name,
+                                              contextInfo->memberData)) {
       if (auto s = ctx.Stats) {
         ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
       }
-      return results;
+      return *results;
+    } else {
+      if (auto s = ctx.Stats) {
+        ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
+      }
     }
   }
 

@@ -4678,11 +4678,11 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   }
 }
 
-bool ModuleFile::loadNamedMembers(const Decl *D, DeclName N,
-                                  uint64_t contextData,
-                                  TinyPtrVector<ValueDecl *> &Members) {
+Optional<TinyPtrVector<ValueDecl *>>
+ModuleFile::loadNamedMembers(const Decl *D, DeclName N,
+                             uint64_t contextData) {
   // Not presently supported.
-  return true;
+  return None;
 }
 
 void
