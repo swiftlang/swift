@@ -83,6 +83,10 @@ out with ``lit.py -h``. We document some of the more useful ones below:
 
 * ``-s`` reduces the amount of output that lit shows.
 * ``-v`` causes a test's commandline and output to be printed if the test fails.
+* ``-vv`` causes a test's commandline and output to be printed if the test fails,
+         showing the exact command in the test execution script where progress
+         stopped; this can be useful for finding a single silently-failing RUN
+         line, amid a sequence.
 * ``-a`` causes a test's commandline and output to always be printed.
 * ``--filter=<pattern>`` causes only tests with paths matching the given regular
   expression to be run.
