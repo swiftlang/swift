@@ -84,6 +84,11 @@ PrintNodeKind("print-node-kind",
               llvm::cl::desc("To print syntax node kind"),
               llvm::cl::cat(Category),
               llvm::cl::init(false));
+static llvm::cl::opt<bool>
+Visual("v",
+       llvm::cl::desc("Print visually"),
+       llvm::cl::cat(Category),
+       llvm::cl::init(false));
 } // end namespace options
 
 namespace {
@@ -283,6 +288,7 @@ int dumpParserGen(const char *MainExecutablePath,
   SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
   SyntaxPrintOptions Opts;
   Opts.PrintSyntaxKind = options::PrintNodeKind;
+  Opts.Visual = options::Visual;
   SF->getSyntaxRoot().print(llvm::outs(), Opts);
   return 0;
 }
