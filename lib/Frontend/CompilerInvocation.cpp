@@ -741,6 +741,22 @@ static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
   }
 }
 
+/// \brief Create a new Regex instance out of the string value in \p RpassArg.
+/// It returns a pointer to the newly generated Regex instance.
+static std::shared_ptr<llvm::Regex>
+generateOptimizationRemarkRegex(DiagnosticEngine &Diags, ArgList &Args,
+                                Arg *RpassArg) {
+  StringRef Val = RpassArg->getValue();
+  std::string RegexError;
+  std::shared_ptr<llvm::Regex> Pattern = std::make_shared<llvm::Regex>(Val);
+  if (!Pattern->isValid(RegexError)) {
+    Diags.diagnose(SourceLoc(), diag::error_optimization_remark_pattern,
+                   RegexError, RpassArg->getAsString(Args));
+    Pattern.reset();
+  }
+  return Pattern;
+}
+
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
                           const FrontendOptions &FrontendOpts) {
@@ -925,6 +941,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
                    OPT_disable_nskeyedarchiver_diagnostics,
                    Opts.EnableNSKeyedArchiverDiagnostics);
+
+  if (Arg *A = Args.getLastArg(OPT_Rpass_EQ))
+    Opts.OptimizationRemarkPassedPattern =
+        generateOptimizationRemarkRegex(Diags, Args, A);
+  if (Arg *A = Args.getLastArg(OPT_Rpass_missed_EQ))
+    Opts.OptimizationRemarkMissedPattern =
+        generateOptimizationRemarkRegex(Diags, Args, A);
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;

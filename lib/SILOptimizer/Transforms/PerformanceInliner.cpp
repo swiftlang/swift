@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-inliner"
+#include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -19,8 +20,8 @@
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -56,6 +57,8 @@ class SILPerformanceInliner {
   llvm::SpecificBumpPtrAllocator<ShortestPathAnalysis> SPAAllocator;
 
   ColdBlockInfo CBI;
+
+  OptRemark::Emitter &ORE;
 
   /// The following constants define the cost model for inlining. Some constants
   /// are also defined in ShortestPathAnalysis.
@@ -158,8 +161,8 @@ class SILPerformanceInliner {
 public:
   SILPerformanceInliner(InlineSelection WhatToInline, DominanceAnalysis *DA,
                         SILLoopAnalysis *LA, SideEffectAnalysis *SEA,
-                        SILOptions::SILOptMode OptMode)
-      : WhatToInline(WhatToInline), DA(DA), LA(LA), SEA(SEA), CBI(DA),
+                        SILOptions::SILOptMode OptMode, OptRemark::Emitter &ORE)
+      : WhatToInline(WhatToInline), DA(DA), LA(LA), SEA(SEA), CBI(DA), ORE(ORE),
         OptMode(OptMode) {}
 
   bool inlineCallsIntoFunction(SILFunction *F);
@@ -294,6 +297,7 @@ bool SILPerformanceInliner::isProfitableToInline(
     BaseBenefit *= 2;
 
   CallerWeight.updateBenefit(Benefit, BaseBenefit);
+  //  Benefit = 1;
 
   // Go through all blocks of the function, accumulate the cost and find
   // benefits.
@@ -434,6 +438,12 @@ bool SILPerformanceInliner::isProfitableToInline(
 
   // This is the final inlining decision.
   if (CalleeCost > Benefit) {
+    ORE.emit([&]() {
+      using namespace OptRemark;
+      return RemarkMissed("NoInlinedCost", *AI.getInstruction())
+             << "Not profitable to inline (cost = " << NV("Cost", CalleeCost)
+             << ", benefit = " << NV("Benefit", Benefit) << ")";
+    });
     return false;
   }
 
@@ -446,6 +456,15 @@ bool SILPerformanceInliner::isProfitableToInline(
         ", c-w=" << CallerWeight << ", bb=" << Callee->size() <<
         ", c-bb=" << NumCallerBlocks << "} " << Callee->getName() << '\n';
   );
+  ORE.emit([&]() {
+    using namespace OptRemark;
+    return RemarkPassed("Inlined", *AI.getInstruction())
+           << NV("Callee", Callee) << " inlined into "
+           << NV("Caller", AI.getFunction())
+           << " (cost = " << NV("Cost", CalleeCost)
+           << ", benefit = " << NV("Benefit", Benefit) << ")";
+  });
+
   return true;
 }
 
@@ -878,6 +897,8 @@ public:
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
+    OptRemark::Emitter ORE(DEBUG_TYPE,
+                           getFunction()->getModule().getASTContext());
 
     if (getOptions().InlineThreshold == 0) {
       return;
@@ -885,7 +906,7 @@ public:
 
     auto OptMode = getFunction()->getModule().getOptions().Optimization;
 
-    SILPerformanceInliner Inliner(WhatToInline, DA, LA, SEA, OptMode);
+    SILPerformanceInliner Inliner(WhatToInline, DA, LA, SEA, OptMode, ORE);
 
     assert(getFunction()->isDefinition() &&
            "Expected only functions with bodies!");

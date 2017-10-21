@@ -295,6 +295,8 @@ static clang::serialized_diags::Level getDiagnosticLevel(DiagnosticKind Kind) {
     return clang::serialized_diags::Note;
   case DiagnosticKind::Warning:
     return clang::serialized_diags::Warning;
+  case DiagnosticKind::Remark:
+    return clang::serialized_diags::Remark;
   }
 
   llvm_unreachable("Unhandled DiagnosticKind in switch.");
