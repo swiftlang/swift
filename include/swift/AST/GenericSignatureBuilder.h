@@ -839,7 +839,7 @@ public:
     /// This is a root requirement source.
     NestedTypeNameMatch,
 
-    /// The requirement is the implicit binding of a potential archetype to
+    /// The requirement is the implicit binding of a type to
     /// the interface type of the concrete type declaration it represents.
     ///
     /// This is a root requirement source.
@@ -881,9 +881,9 @@ public:
     /// another requirement.
     Derived,
 
-    /// A requirement that was provided for another potential archetype in the
+    /// A requirement that was provided for another type in the
     /// same equivalence class, but which we want to "re-root" on a new
-    /// potential archetype.
+    /// type.
     EquivalentType,
   };
 
@@ -894,7 +894,6 @@ private:
   /// The kind of storage we have.
   enum class StorageKind : uint8_t {
     None,
-    RootArchetype,
     StoredType,
     ProtocolConformance,
     AssociatedTypeDecl,
@@ -911,9 +910,6 @@ private:
 
   /// The actual storage, described by \c storageKind.
   union {
-    /// The root archetype.
-    PotentialArchetype *rootArchetype;
-
     /// The type to which a requirement applies.
     TypeBase *type;
 
@@ -1001,16 +997,16 @@ public:
   /// requirement source with one of the "root" kinds.
   const RequirementSource * const parent;
 
-  RequirementSource(Kind kind, PotentialArchetype *rootArchetype,
+  RequirementSource(Kind kind, Type rootType,
                     ProtocolDecl *protocol,
                     WrittenRequirementLoc writtenReqLoc)
-    : kind(kind), storageKind(StorageKind::RootArchetype),
+    : kind(kind), storageKind(StorageKind::StoredType),
       hasTrailingWrittenRequirementLoc(!writtenReqLoc.isNull()),
       usesRequirementSignature(false), parent(nullptr) {
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
 
-    storage.rootArchetype = rootArchetype;
+    storage.type = rootType.getPointer();
     if (kind == RequirementSignatureSelf)
       getTrailingObjects<ProtocolDecl *>()[0] = protocol;
     if (hasTrailingWrittenRequirementLoc)
@@ -1073,46 +1069,52 @@ public:
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
-                    PotentialArchetype *newPA)
-    : kind(kind), storageKind(StorageKind::RootArchetype),
+                    Type newType)
+    : kind(kind), storageKind(StorageKind::StoredType),
       hasTrailingWrittenRequirementLoc(false),
       usesRequirementSignature(false), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
-    storage.rootArchetype = newPA;
+    storage.type = newType.getPointer();
   }
 
 public:
   /// Retrieve an abstract requirement source.
-  static const RequirementSource *forAbstract(PotentialArchetype *root);
+  static const RequirementSource *forAbstract(GenericSignatureBuilder &builder,
+                                              Type rootType);
 
   /// Retrieve a requirement source representing an explicit requirement
   /// stated in an 'inheritance' or 'where' clause.
-  static const RequirementSource *forExplicit(PotentialArchetype *root,
+  static const RequirementSource *forExplicit(GenericSignatureBuilder &builder,
+                                              Type rootType,
                                               WrittenRequirementLoc writtenLoc);
 
   /// Retrieve a requirement source representing a requirement that is
   /// inferred from some part of a generic declaration's signature, e.g., the
   /// parameter or result type of a generic function.
-  static const RequirementSource *forInferred(PotentialArchetype *root,
+  static const RequirementSource *forInferred(GenericSignatureBuilder &builder,
+                                              Type rootType,
                                               const TypeRepr *typeRepr);
 
   /// Retrieve a requirement source representing the requirement signature
   /// computation for a protocol.
   static const RequirementSource *forRequirementSignature(
-                                                      PotentialArchetype *root,
-                                                      ProtocolDecl *protocol);
+                                              GenericSignatureBuilder &builder,
+                                              Type rootType,
+                                              ProtocolDecl *protocol);
 
   /// Retrieve a requirement source for nested type name matches.
   static const RequirementSource *forNestedTypeNameMatch(
-                                     PotentialArchetype *root);
+                                      GenericSignatureBuilder &builder,
+                                      Type rootType);
 
   /// Retrieve a requirement source describing when a concrete type
   /// declaration is used to define a potential archetype.
   static const RequirementSource *forConcreteTypeBinding(
-                                     PotentialArchetype *root);
+                                     GenericSignatureBuilder &builder,
+                                     Type rootType);
 
 private:
   /// A requirement source that describes that a requirement comes from a
@@ -1151,7 +1153,7 @@ public:
   /// A constraint source that describes a constraint that is structurally
   /// derived from another constraint but does not require further information.
   const RequirementSource *viaEquivalentType(GenericSignatureBuilder &builder,
-                                             PotentialArchetype *newPA) const;
+                                             Type newType) const;
 
   /// Form a new requirement source without the subpath [start, end).
   ///
@@ -1168,11 +1170,6 @@ public:
   /// Retrieve the root requirement source.
   const RequirementSource *getRoot() const;
 
-private:
-  /// Retrieve the potential archetype at the root.
-  PotentialArchetype *getRootPotentialArchetype() const;
-
-public:
   /// Retrieve the type at the root.
   Type getRootType() const;
 
@@ -1410,9 +1407,9 @@ public:
     return result;
   };
 
-  /// Retrieve the complete requirement source rooted at the given potential
-  /// archetype.
-  const RequirementSource *getSource(PotentialArchetype *pa) const;
+  /// Retrieve the complete requirement source rooted at the given type.
+  const RequirementSource *getSource(GenericSignatureBuilder &builder,
+                                     Type type) const;
 
   /// Retrieve the source location for this requirement.
   SourceLoc getLoc() const;
