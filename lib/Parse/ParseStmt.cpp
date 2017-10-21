@@ -1123,7 +1123,8 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
       // also in the shorthand syntax and provide a more specific diagnostic if
       // that's not the case.
       if (Tok.isIdentifierOrUnderscore() &&
-          !peekToken().isAny(tok::integer_literal, tok::floating_literal)) {
+          !peekToken().isAny(tok::integer_literal, tok::floating_literal) &&
+          !Specs.empty()) {
         auto Text = Tok.getText();
         if (Text == "deprecated" || Text == "renamed" || Text == "introduced" ||
             Text == "message" || Text == "obsoleted" || Text == "unavailable") {
