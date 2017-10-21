@@ -4580,6 +4580,7 @@ public:
       if (!CD->hasValidSignature())
         return;
 
+      TC.requestSuperclassLayout(CD);
       TC.DeclsToFinalize.remove(CD);
 
       {
@@ -7461,7 +7462,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         checkEnumRawValues(*this, ED);
     }
 
-    DeclsToFinalize.insert(nominal);
+    if (!isa<ClassDecl>(nominal))
+      DeclsToFinalize.insert(nominal);
+
     break;
   }
 
@@ -7807,8 +7810,29 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
   return false;
 }
 
+void TypeChecker::requestClassLayout(ClassDecl *classDecl) {
+  // FIXME: Check a flag in the class...
+  if (isa<SourceFile>(classDecl->getModuleScopeContext()))
+    DeclsToFinalize.insert(classDecl);
+}
+
+void TypeChecker::requestSuperclassLayout(ClassDecl *classDecl) {
+  auto superclassTy = classDecl->getSuperclass();
+  if (superclassTy) {
+    auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
+    if (superclassDecl)
+      requestClassLayout(superclassDecl);
+  }
+}
+
 static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
+  assert(!nominal->hasClangNode());
+  assert(isa<SourceFile>(nominal->getModuleScopeContext()));
+
   Optional<bool> lazyVarsAlreadyHaveImplementation;
+
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+    TC.requestSuperclassLayout(classDecl);
 
   for (auto *D : nominal->getMembers()) {
     auto VD = dyn_cast<ValueDecl>(D);
@@ -8086,11 +8110,13 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (extendedType.isNull() || extendedType->hasError())
     return;
 
-  if (extendedType->hasUnboundGenericType()) {
-    // Validate the nominal type declaration being extended.
-    auto nominal = extendedType->getAnyNominal();
-    validateDecl(nominal);
+  // Validate the nominal type declaration being extended.
+  auto nominal = extendedType->getAnyNominal();
+  validateDecl(nominal);
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+    requestClassLayout(classDecl);
 
+  if (extendedType->hasUnboundGenericType()) {
     auto genericParams = ext->getGenericParams();
 
     // The debugger synthesizes typealiases of unbound generic types
