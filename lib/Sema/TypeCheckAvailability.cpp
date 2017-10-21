@@ -1500,24 +1500,24 @@ bool TypeChecker::isInsideUnavailableDeclaration(
 }
 
 bool TypeChecker::isInsideCompatibleUnavailableDeclaration(
-	SourceRange ReferenceRange, const DeclContext *ReferenceDC,
-	const AvailableAttr *attr)
-{
-	if (!attr->isUnconditionallyUnavailable()) {
-		return false;
-	}
-	PlatformKind platform = attr->Platform;
-	if (platform == PlatformKind::none) {
-		return false;
-	}
+    SourceRange ReferenceRange, const DeclContext *ReferenceDC,
+    const AvailableAttr *attr) {
+  if (!attr->isUnconditionallyUnavailable()) {
+    return false;
+  }
+  PlatformKind platform = attr->Platform;
+  if (platform == PlatformKind::none) {
+    return false;
+  }
 
-    auto IsUnavailable = [platform](const Decl *D) {
-      auto EnclosingUnavailable = D->getAttrs().getUnavailable(D->getASTContext());
-	  return EnclosingUnavailable && EnclosingUnavailable->Platform == platform;
-    };
+  auto IsUnavailable = [platform](const Decl *D) {
+    auto EnclosingUnavailable =
+        D->getAttrs().getUnavailable(D->getASTContext());
+    return EnclosingUnavailable && EnclosingUnavailable->Platform == platform;
+  };
 
-    return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, *this,
-                                    IsUnavailable);
+  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, *this,
+                                  IsUnavailable);
 }
 
 bool TypeChecker::isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
