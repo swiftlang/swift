@@ -2282,6 +2282,8 @@ bool NominalTypeDecl::hasFixedLayout(ModuleDecl *M,
 }
 
 void NominalTypeDecl::computeType() {
+  assert(!hasInterfaceType());
+
   ASTContext &ctx = getASTContext();
 
   // A protocol has an implicit generic parameter list consisting of a single
@@ -2581,6 +2583,8 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
 }
 
 void AssociatedTypeDecl::computeType() {
+  assert(!hasInterfaceType());
+
   auto &ctx = getASTContext();
   auto interfaceTy = getDeclaredInterfaceType();
   setInterfaceType(MetatypeType::get(interfaceTy, ctx));
@@ -5101,6 +5105,8 @@ SourceRange EnumElementDecl::getSourceRange() const {
 }
 
 bool EnumElementDecl::computeType() {
+  assert(!hasInterfaceType());
+
   EnumDecl *ED = getParentEnum();
   Type resultTy = ED->getDeclaredInterfaceType();
 
