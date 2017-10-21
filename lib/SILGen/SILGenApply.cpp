@@ -917,10 +917,9 @@ public:
     std::tie(selfMetaObjC, instanceType) = convertToObjCMetatype(selfMeta, loc);
 
     // Allocate the object.
-    return ManagedValue(
+    return SGF.emitManagedRValueWithCleanup(
         SGF.B.createAllocRefDynamic(loc, selfMetaObjC.getValue(), instanceType,
-                                    /*objc=*/true, {}, {}),
-        selfMetaObjC.getCleanup());
+                                    /*objc=*/true, {}, {}));
   }
 
   void processProtocolDecl(DeclRefExpr *e, AbstractFunctionDecl *afd,
