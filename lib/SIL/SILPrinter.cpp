@@ -2536,7 +2536,11 @@ void SILInstruction::printInContext(llvm::raw_ostream &OS) const {
 }
 
 void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
-  OS << "sil_vtable " << getClass()->getName() << " {\n";
+  OS << "sil_vtable ";
+  if (isSerialized())
+    OS << "[serialized] ";
+  OS << getClass()->getName() << " {\n";
+
   PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   for (auto &entry : getEntries()) {
     OS << "  ";

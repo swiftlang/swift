@@ -4449,7 +4449,7 @@ void SILVTable::verify(const SILModule &M) const {
     assert(entry.Method.hasDecl() && "vtable entry is not a decl");
     auto baseInfo = M.Types.getConstantInfo(entry.Method);
     ValueDecl *decl = entry.Method.getDecl();
-    
+
     assert((!isa<FuncDecl>(decl)
             || !cast<FuncDecl>(decl)->isObservingAccessor())
            && "observing accessors shouldn't have vtable entries");
