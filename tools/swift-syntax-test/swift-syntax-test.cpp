@@ -36,6 +36,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
+using namespace swift::syntax;
 using llvm::StringRef;
 
 enum class ActionType {
@@ -48,6 +49,7 @@ enum class ActionType {
 };
 
 namespace options {
+static llvm::cl::OptionCategory Category("swift-syntax-test Options");
 static llvm::cl::opt<ActionType>
 Action(llvm::cl::desc("Action (required):"),
        llvm::cl::init(ActionType::None),
@@ -76,6 +78,12 @@ Action(llvm::cl::desc("Action (required):"),
 static llvm::cl::opt<std::string>
 InputSourceFilename("input-source-filename",
                     llvm::cl::desc("Path to the input .swift file"));
+
+static llvm::cl::opt<bool>
+PrintNodeKind("print-node-kind",
+              llvm::cl::desc("To print syntax node kind"),
+              llvm::cl::cat(Category),
+              llvm::cl::init(false));
 } // end namespace options
 
 namespace {
@@ -273,7 +281,9 @@ int dumpParserGen(const char *MainExecutablePath,
                   const StringRef InputFileName) {
   CompilerInstance Instance;
   SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
-  SF->getSyntaxRoot().print(llvm::outs());
+  SyntaxPrintOptions Opts;
+  Opts.PrintSyntaxKind = options::PrintNodeKind;
+  SF->getSyntaxRoot().print(llvm::outs(), Opts);
   return 0;
 }
 

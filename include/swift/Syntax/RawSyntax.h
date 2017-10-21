@@ -184,6 +184,11 @@ enum class SourcePresence {
   Missing,
 };
 
+/// The print option to specify when printing a raw syntax node.
+struct SyntaxPrintOptions {
+  bool PrintSyntaxKind = false;
+};
+
 /// RawSyntax - the strictly immutable, shared backing nodes for all syntax.
 ///
 /// This is implementation detail - do not expose it in public API.
@@ -298,7 +303,7 @@ struct RawSyntax : public llvm::ThreadSafeRefCountedBase<RawSyntax> {
   }
 
   /// Print this piece of syntax recursively.
-  void print(llvm::raw_ostream &OS) const;
+  void print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const;
 
   /// Dump this piece of syntax recursively for debugging or testing.
   void dump() const;
