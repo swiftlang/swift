@@ -202,6 +202,34 @@ AssumeUnqualifiedOwnershipWhenParsing(
     "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden, llvm::cl::init(false),
     llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
 
+/// Regular expression corresponding to the value given in one of the
+/// -pass-remarks* command line flags. Passes whose name matches this regexp
+/// will emit a diagnostic.
+static std::shared_ptr<llvm::Regex> createOptRemarkRegex(StringRef Val) {
+  std::shared_ptr<llvm::Regex> Pattern = std::make_shared<llvm::Regex>(Val);
+  if (!Val.empty()) {
+    std::string RegexError;
+    if (!Pattern->isValid(RegexError))
+      llvm::report_fatal_error("Invalid regular expression '" + Val +
+                                   "' in -sil-remarks: " + RegexError,
+                               false);
+  }
+  return Pattern;
+}
+
+static cl::opt<std::string> PassRemarksPassed(
+    "sil-remarks", cl::value_desc("pattern"),
+    cl::desc(
+        "Enable performed optimization remarks from passes whose name match "
+        "the given regular expression"),
+    cl::Hidden);
+
+static cl::opt<std::string> PassRemarksMissed(
+    "sil-remarks-missed", cl::value_desc("pattern"),
+    cl::desc("Enable missed optimization remarks from passes whose name match "
+             "the given regular expression"),
+    cl::Hidden);
+
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
   SILPassManager PM(Module, IRGenMod);
@@ -276,6 +304,11 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().ASTVerifierProcessId =
       ASTVerifierProcessId;
   Invocation.getLangOptions().EnableSILOpaqueValues = EnableSILOpaqueValues;
+
+  Invocation.getLangOptions().OptimizationRemarkPassedPattern =
+      createOptRemarkRegex(PassRemarksPassed);
+  Invocation.getLangOptions().OptimizationRemarkMissedPattern =
+      createOptRemarkRegex(PassRemarksMissed);
 
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();

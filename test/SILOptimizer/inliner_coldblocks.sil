@@ -1,5 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-remarks=sil-inliner -o %t.sil 2>&1 | %FileCheck -check-prefix=REMARKS_PASSED %s
+// RUN: %FileCheck %s < %t.sil
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-remarks-missed=sil-inliner -o /dev/null 2>&1 | %FileCheck -check-prefix=REMARKS_MISSED %s
+
+// REMARKS_PASSED-NOT: remark:
+// REMARKS_MISSED-NOT: remark:
 
 sil_stage canonical
 
@@ -185,6 +190,7 @@ bb0:
   %c30 = builtin "assert_configuration"() : $Builtin.Int32
 
   %f = function_ref @update_global: $@convention(thin) () -> ()
+  // REMARKS_PASSED: inliner_coldblocks.sil:194:3: remark: update_global inlined into regular_large_callee (cost = {{.*}}, benefit = {{.*}})
   apply %f() : $@convention(thin) () -> ()
 
   %r = tuple ()
@@ -198,6 +204,7 @@ bb0:
 sil @dont_inline_regular_large_callee : $@convention(thin) () -> () {
 bb0:
   %f = function_ref @regular_large_callee : $@convention(thin) () -> ()
+  // REMARKS_MISSED: inliner_coldblocks.sil:208:8: remark: Not profitable to inline (cost = {{.*}}, benefit = {{.*}})
   %a = apply %f() : $@convention(thin) () -> ()
   %r = tuple ()
   return %r : $()
@@ -252,3 +259,5 @@ bb0:
   return %r : $()
 }
 
+// REMARKS_PASSED-NOT: remark:
+// REMARKS_MISSED-NOT: remark:

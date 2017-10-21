@@ -17,8 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE) && defined(REMARK)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE,REMARK}
 #endif
 
 #ifndef ERROR
@@ -34,6 +34,11 @@
 #ifndef NOTE
 #  define NOTE(ID,Options,Text,Signature) \
   DIAG(NOTE,ID,Options,Text,Signature)
+#endif
+
+#ifndef REMARK
+#  define REMARK(ID,Options,Text,Signature) \
+  DIAG(REMARK,ID,Options,Text,Signature)
 #endif
 
 
@@ -290,11 +295,14 @@ ERROR(shifting_all_significant_bits,none,
 ERROR(static_report_error, none,
       "static report error", ())
 
+REMARK(opt_remark_passed, none, "%0", (StringRef))
+REMARK(opt_remark_missed, none, "%0", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
 # endif
+# undef REMARK
 # undef NOTE
 # undef WARNING
 # undef ERROR

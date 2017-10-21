@@ -69,6 +69,12 @@ void EditorDiagConsumer::handleDiagnostic(
     // Is this possible?
     return;
 
+  if (Kind == DiagnosticKind::Remark) {
+    // FIXME: we may want to handle optimization remarks in sourcekitd.
+    LOG_WARN_FUNC("unhandled optimization remark");
+    return;
+  }
+
   DiagnosticEntryInfo SKInfo;
 
   // Actually substitute the diagnostic arguments into the diagnostic text.
@@ -150,6 +156,7 @@ void EditorDiagConsumer::handleDiagnostic(
       SKInfo.Severity = DiagnosticSeverityKind::Warning;
       break;
     case DiagnosticKind::Note:
+    case DiagnosticKind::Remark:
       llvm_unreachable("already covered");
   }
 
