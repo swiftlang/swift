@@ -186,6 +186,7 @@ enum class SourcePresence {
 
 /// The print option to specify when printing a raw syntax node.
 struct SyntaxPrintOptions {
+  bool Visual = false;
   bool PrintSyntaxKind = false;
 };
 
