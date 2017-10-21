@@ -7369,8 +7369,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     assocType->setIsBeingValidated();
     SWIFT_DEFER { assocType->setIsBeingValidated(false); };
 
-    validateAccessControl(assocType);
-
     checkDeclAttributesEarly(assocType);
     checkInheritanceClause(assocType);
 
