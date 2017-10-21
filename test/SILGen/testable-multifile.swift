@@ -50,7 +50,7 @@ public class PublicSub: Base {
 // CHECK-NEXT:   #Sub.deinit!deallocator: _T04main3SubCfD
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil_vtable PublicSub {
+// CHECK-LABEL: sil_vtable [serialized] PublicSub {
 // CHECK-NEXT:   #Base.foo!1: {{.*}} : _T04main9PublicSubC3fooyyF
 // CHECK-NEXT:   #Base.init!initializer.1: {{.*}} : _T04main9PublicSubCACycfc
 // CHECK-NEXT:   #PublicSub.deinit!deallocator: _T04main9PublicSubCfD

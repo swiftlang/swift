@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-sil -emit-sib -parse-as-library -sil-serialize-vtables -parse-stdlib -module-name vtable -o %t/vtable.sib %s
+// RUN: %target-swift-frontend -parse-sil -emit-sib -parse-as-library -parse-stdlib -module-name vtable -o %t/vtable.sib %s
 // RUN: %target-sil-opt %t/vtable.sib -o - -emit-sorted-sil | %FileCheck %s
 
 sil_stage canonical

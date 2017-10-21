@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %target-build-swift -Xfrontend -assume-parsing-unqualified-ownership-sil -emit-module -Xfrontend -disable-diagnostic-passes -Xfrontend -sil-serialize-vtables -force-single-frontend-invocation -o %t/sil_partial_apply_ownership.swiftmodule %s
+// RUN: %target-build-swift -Xfrontend -assume-parsing-unqualified-ownership-sil -emit-module -Xfrontend -disable-diagnostic-passes -force-single-frontend-invocation -o %t/sil_partial_apply_ownership.swiftmodule %s
 // RUN: %target-build-swift -Xfrontend -assume-parsing-unqualified-ownership-sil -emit-sil -Xfrontend -sil-link-all -I %t %s | %FileCheck %s
 
 import Builtin

@@ -548,13 +548,13 @@ public class ConcreteDerived : GenericBase<Int> {
 // CHECK: }
 
 // No vtable entry for override of @objc extension property
-// CHECK-LABEL: sil_vtable SubExt {
+// CHECK-LABEL: sil_vtable [serialized] SubExt {
 // CHECK-NEXT: #BaseExt.init!initializer.1: (BaseExt.Type) -> () -> BaseExt : _T07dynamic6SubExtCACycfc [override] // dynamic.SubExt.init() -> dynamic.SubExt
 // CHECK-NEXT: #SubExt.deinit!deallocator: _T07dynamic6SubExtCfD // dynamic.SubExt.__deallocating_deinit
 // CHECK-NEXT: }
 
 // Dynamic thunk + vtable re-abstraction
-// CHECK-LABEL: sil_vtable ConcreteDerived {
+// CHECK-LABEL: sil_vtable [serialized] ConcreteDerived {
 // CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public _T07dynamic15ConcreteDerivedC6methodySiFAA11GenericBaseCADyxFTV [override]     // vtable thunk for dynamic.GenericBase.method(A) -> () dispatching to dynamic.ConcreteDerived.method(Swift.Int) -> ()
 // CHECK-NEXT: #GenericBase.init!initializer.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : _T07dynamic15ConcreteDerivedCACycfc [override]      // dynamic.ConcreteDerived.init() -> dynamic.ConcreteDerived
 // CHECK-NEXT: #ConcreteDerived.deinit!deallocator: _T07dynamic15ConcreteDerivedCfD  // dynamic.ConcreteDerived.__deallocating_deinit
