@@ -134,6 +134,7 @@ createVarWithPattern(ASTContext &ctx, DeclContext *dc, Identifier name, Type ty,
   if (isImplicit)
     var->setImplicit();
   var->setInterfaceType(ty);
+  var->setValidationStarted();
   var->setAccess(access);
   var->setSetterAccess(setterAccess);
 
@@ -400,6 +401,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
                                  enumDecl->getRawType(),
                                  enumDecl);
   param->setInterfaceType(enumDecl->getRawType());
+  param->setValidationStarted();
 
   auto paramPL = ParameterList::createWithoutLoc(param);
   
@@ -420,6 +422,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto initFnTy = FunctionType::get(enumTy, fnTy);
   ctorDecl->setInterfaceType(allocFnTy);
   ctorDecl->setInitializerInterfaceType(initFnTy);
+  ctorDecl->setValidationStarted();
 
   // Don't bother synthesizing the body if we've already finished type-checking.
   if (Impl.hasFinishedTypeChecking())
@@ -479,6 +482,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                                                   params, C);
 
   getterDecl->setInterfaceType(type);
+  getterDecl->setValidationStarted();
 
   getterDecl->setAccess(AccessLevel::Public);
 
@@ -541,6 +545,7 @@ static FuncDecl *makeNewtypeBridgedRawValueGetter(
   auto type = ParameterList::getFullInterfaceType(computedType, params, C);
 
   getterDecl->setInterfaceType(type);
+  getterDecl->setValidationStarted();
 
   getterDecl->setAccess(AccessLevel::Public);
 
@@ -589,7 +594,7 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
 
   auto type = ParameterList::getFullInterfaceType(getterType, params, C);
   getterDecl->setInterfaceType(type);
-
+  getterDecl->setValidationStarted();
 
   return getterDecl;
 }
@@ -625,6 +630,7 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
 
   auto type = ParameterList::getFullInterfaceType(voidTy, params, C);
   setterDecl->setInterfaceType(type);
+  setterDecl->setValidationStarted();
 
   setterDecl->setAccess(AccessLevel::Public);
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -1069,6 +1075,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   auto initFnTy = FunctionType::get(selfType, fnTy);
   constructor->setInterfaceType(allocFnTy);
   constructor->setInitializerInterfaceType(initFnTy);
+  constructor->setValidationStarted();
 
   constructor->setAccess(AccessLevel::Public);
 
@@ -1139,6 +1146,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
         ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), var->getType(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
+    param->setValidationStarted();
     valueParameters.push_back(param);
   }
 
@@ -1163,6 +1171,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   auto initFnTy = FunctionType::get(selfType, fnTy);
   constructor->setInterfaceType(allocFnTy);
   constructor->setInitializerInterfaceType(initFnTy);
+  constructor->setValidationStarted();
 
   constructor->setAccess(AccessLevel::Public);
 
@@ -1377,6 +1386,7 @@ static void makeStructRawValuedWithBridge(
   computedVar->setImplicit();
   computedVar->setAccess(AccessLevel::Public);
   computedVar->setSetterAccess(AccessLevel::Private);
+  computedVar->setValidationStarted();
 
   // Create the getter for the computed value variable.
   auto computedVarGetter = makeNewtypeBridgedRawValueGetter(
@@ -1456,6 +1466,7 @@ static FuncDecl *buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
       /*GenericParams=*/nullptr, getterArgs,
       TypeLoc::withoutLoc(elementTy), dc, getter->getClangNode());
   thunk->setInterfaceType(interfaceType);
+  thunk->setValidationStarted();
   thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
   thunk->setAccess(getOverridableAccessLevel(dc));
@@ -1494,6 +1505,7 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                         Identifier(), loc, valueIndex->get(0)->getName(),
                         elementTy, dc);
   paramVarDecl->setInterfaceType(elementInterfaceTy);
+  paramVarDecl->setValidationStarted();
 
   auto valueIndicesPL = ParameterList::create(C, {paramVarDecl, index});
 
@@ -1518,6 +1530,7 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
       /*GenericParams=*/nullptr, setterArgs,
       TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc, setter->getClangNode());
   thunk->setInterfaceType(interfaceType);
+  thunk->setValidationStarted();
   thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
   thunk->setAccess(getOverridableAccessLevel(dc));
@@ -1677,12 +1690,14 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(stringTy), swiftDecl);
   getterDecl->setInterfaceType(toStringTy);
+  getterDecl->setValidationStarted();
 
   // Make the property decl
   auto errorDomainPropertyDecl = new (C) VarDecl(
       /*IsStatic*/isStatic, VarDecl::Specifier::Var, /*IsCaptureList*/false,
       SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
+  errorDomainPropertyDecl->setValidationStarted();
   errorDomainPropertyDecl->setAccess(AccessLevel::Public);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
@@ -2425,6 +2440,7 @@ namespace {
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
           AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
         structDecl->computeType();
+        structDecl->setValidationStarted();
         structDecl->setCheckedInheritanceClause();
 
         auto options = getDefaultMakeStructRawValuedOptions();
@@ -2474,6 +2490,7 @@ namespace {
           // Create the wrapper struct.
           errorWrapper = new (C) StructDecl(loc, name, loc, None, nullptr, dc);
           errorWrapper->computeType();
+          errorWrapper->setValidationStarted();
           errorWrapper->setAccess(AccessLevel::Public);
 
           // Add inheritance clause.
@@ -2491,6 +2508,7 @@ namespace {
           nsErrorProp->setImplicit();
           nsErrorProp->setAccess(AccessLevel::Public);
           nsErrorProp->setInterfaceType(nsErrorType);
+          nsErrorProp->setValidationStarted();
 
           // Create a pattern binding to describe the variable.
           Pattern *nsErrorPattern = createTypedNamedPattern(nsErrorProp);
@@ -2526,6 +2544,7 @@ namespace {
             decl, AccessLevel::Public, loc, enumName,
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->computeType();
+        enumDecl->setValidationStarted();
 
         // Set up the C underlying type as its Swift raw type.
         enumDecl->setRawType(underlyingType);
@@ -2565,6 +2584,7 @@ namespace {
         rawValue->setAccess(AccessLevel::Public);
         rawValue->setSetterAccess(AccessLevel::Private);
         rawValue->setInterfaceType(underlyingType);
+        rawValue->setValidationStarted();
 
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(rawValue);
@@ -2863,6 +2883,7 @@ namespace {
                                  Impl.importSourceLoc(decl->getLocation()),
                                  None, nullptr, dc);
       result->computeType();
+      result->setValidationStarted();
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
@@ -3182,6 +3203,7 @@ namespace {
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
+      result->setValidationStarted();
 
       // If this is a compatibility stub, mark is as such.
       if (correctSwiftName)
@@ -3315,6 +3337,7 @@ namespace {
           TypeLoc::withoutLoc(resultTy), dc, decl);
 
       result->setInterfaceType(type);
+      result->setValidationStarted();
 
       // Someday, maybe this will need to be 'open' for C++ virtual methods.
       result->setAccess(AccessLevel::Public);
@@ -3404,6 +3427,7 @@ namespace {
                               Impl.importSourceLoc(decl->getLocation()),
                               name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
+      result->setValidationStarted();
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
@@ -3483,6 +3507,7 @@ namespace {
                        Impl.importSourceLoc(decl->getLocation()),
                        name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
+      result->setValidationStarted();
 
       // If imported as member, the member should be final.
       if (dc->getAsClassOrClassExtensionContext())
@@ -3802,6 +3827,7 @@ namespace {
       auto interfaceType = getGenericMethodType(dc, type->castTo<AnyFunctionType>());
       result->setInterfaceType(interfaceType);
       result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+      result->setValidationStarted();
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -4164,6 +4190,7 @@ namespace {
           Impl.importSourceLoc(decl->getLocation()), name, None,
           /*TrailingWhere=*/nullptr);
       result->computeType();
+      result->setValidationStarted();
 
       // FIXME: Kind of awkward that we have to do this here
       result->getGenericParams()->getParams()[0]->setDepth(0);
@@ -4226,6 +4253,7 @@ namespace {
                                                         SourceLoc(), None,
                                                         nullptr, dc);
         result->computeType();
+        result->setValidationStarted();
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
         result->setCircularityCheck(CircularityCheck::Checked);
         result->setSuperclass(Type());
@@ -4326,6 +4354,7 @@ namespace {
       }
 
       result->computeType();
+      result->setValidationStarted();
 
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
       result->setCircularityCheck(CircularityCheck::Checked);
@@ -4566,6 +4595,7 @@ namespace {
           /*IsCaptureList*/false, Impl.importSourceLoc(decl->getLocation()),
           name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
+      result->setValidationStarted();
 
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
@@ -4782,6 +4812,7 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
       decl, AccessLevel::Public, SourceLoc(), className, SourceLoc(), None,
       nullptr, dc);
   theClass->computeType();
+  theClass->setValidationStarted();
   theClass->setCircularityCheck(CircularityCheck::Checked);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
@@ -4957,6 +4988,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
   structDecl->computeType();
+  structDecl->setValidationStarted();
   structDecl->setCheckedInheritanceClause();
 
   // Import the type of the underlying storage
@@ -5114,6 +5146,7 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
 
   // Give the enum element the appropriate type.
   element->computeType();
+  element->setValidationStarted();
 
   Impl.importAttributes(decl, element);
 
@@ -5205,6 +5238,7 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
   structDecl->computeType();
+  structDecl->setValidationStarted();
   structDecl->setCheckedInheritanceClause();
 
   makeStructRawValued(Impl, structDecl, underlyingType,
@@ -5249,6 +5283,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
             SourceLoc(), argNames.front(), Impl.SwiftContext.TheEmptyTupleType,
             dc);
     paramDecl->setInterfaceType(Impl.SwiftContext.TheEmptyTupleType);
+    paramDecl->setValidationStarted();
 
     parameterList = ParameterList::createWithoutLoc(paramDecl);
   } else {
@@ -5285,6 +5320,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
   Type allocType = FunctionType::get(selfMetaType, fnType);
   result->setInterfaceType(allocType);
+  result->setValidationStarted();
 
   finishFuncDecl(decl, result);
   if (correctSwiftName)
@@ -5370,6 +5406,7 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
   auto interfaceType = getGenericMethodType(dc, fnType->castTo<AnyFunctionType>());
   result->setInterfaceType(interfaceType);
   result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+  result->setValidationStarted();
 
   result->setAccess(AccessLevel::Public);
   if (selfIsInOut)
@@ -5524,6 +5561,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       VarDecl::Specifier::Var, /*IsCaptureList*/false, SourceLoc(),
       propertyName, dc->mapTypeIntoContext(swiftPropertyType), dc);
   property->setInterfaceType(swiftPropertyType);
+  property->setValidationStarted();
 
   // Note that we've formed this property.
   Impl.FunctionsAsProperties[getter] = property;
@@ -5899,6 +5937,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   result->setInitializerInterfaceType(interfaceInitType);
   result->setInterfaceType(interfaceAllocType);
   result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+  result->setValidationStarted();
 
   if (implicit)
     result->setImplicit();
@@ -6296,6 +6335,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   else
     fnType = FunctionType::get(indicesType, elementTy);
   subscript->setInterfaceType(fnType);
+  subscript->setValidationStarted();
 
   addObjCAttribute(subscript, None);
 
@@ -7860,6 +7900,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   }
 
   var->setInterfaceType(type);
+  var->setValidationStarted();
 
   // Form the argument patterns.
   SmallVector<ParameterList*, 3> getterArgs;
@@ -7888,6 +7929,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->setStatic(isStatic);
   func->setInterfaceType(getterType);
   func->setAccess(getOverridableAccessLevel(dc));
+  func->setValidationStarted();
   func->setImplicit();
 
   // If we're not done type checking, build the getter body.
@@ -7966,6 +8008,7 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
                                               /*IsCaptureList*/false,
                                               SourceLoc(), name, type, dc);
   var->setInterfaceType(type);
+  var->setValidationStarted();
   markUnavailable(var, UnavailableMessage);
 
   return var;
