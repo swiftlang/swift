@@ -2179,6 +2179,28 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   auto resultTy = typeCheckExpression(initializer, DC, contextualType,
                                       contextualPurpose, flags, &listener);
+
+  // If we detected that the initializer would have a non-materializable type,
+  // complain.
+  if (resultTy && listener.isInOut()) {
+    diagnose(pattern->getStartLoc(), diag::var_type_not_materializable,
+             resultTy);
+
+    pattern->setType(ErrorType::get(Context));
+    pattern->forEachVariable([&](VarDecl *var) {
+      // Don't change the type of a variable that we've been able to
+      // compute a type for.
+      if (var->hasType() &&
+          !var->getType()->hasUnboundGenericType() &&
+          !var->getType()->hasError())
+        return;
+
+      var->markInvalid();
+    });
+
+    return true;
+  }
+
   if (resultTy) {
     TypeResolutionOptions options;
     options |= TR_OverrideType;
@@ -2196,7 +2218,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     // Apply the solution to the pattern as well.
     if (coercePatternToType(pattern, DC, initTy, options,
-                            nullptr, TypeLoc(), listener.isInOut())) {
+                            nullptr, TypeLoc())) {
       return true;
     }
   }

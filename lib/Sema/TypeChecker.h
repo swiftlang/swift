@@ -1799,8 +1799,7 @@ public:
   bool coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                            TypeResolutionOptions options,
                            GenericTypeResolver *resolver = nullptr,
-                           TypeLoc tyLoc = TypeLoc(),
-                           bool forceInOut = false);
+                           TypeLoc tyLoc = TypeLoc());
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);
 

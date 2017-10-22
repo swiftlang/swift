@@ -433,18 +433,14 @@ public:
       return LValue::forValue(self, SubstSelfType);
     }
 
+    auto selfParam = computeSelfParam(Witness);
     CanType witnessSelfType =
-      computeSelfParam(Witness).getType()->getCanonicalType(GenericSig);
+      selfParam.getPlainType()->getCanonicalType(GenericSig);
     witnessSelfType = getSubstWitnessInterfaceType(witnessSelfType);
-
-    // Get the inout object type, but remember whether we needed to.
-    auto witnessSelfInOutType = dyn_cast<InOutType>(witnessSelfType);
-    if (witnessSelfInOutType)
-      witnessSelfType = witnessSelfInOutType.getObjectType();
 
     // If the witness wants an inout and the types match, just use
     // this value.
-    if (witnessSelfInOutType && witnessSelfType == SubstSelfType) {
+    if (selfParam.isInOut() && witnessSelfType == SubstSelfType) {
       return LValue::forValue(self, witnessSelfType);
     }
 
@@ -462,7 +458,7 @@ public:
     }
 
     // Put the object back in memory if necessary.
-    if (witnessSelfInOutType) {
+    if (selfParam.isInOut()) {
       self = self.materialize(SGF, loc);
     }
 

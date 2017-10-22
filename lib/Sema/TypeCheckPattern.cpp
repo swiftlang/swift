@@ -914,8 +914,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
 bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                                       TypeResolutionOptions options,
                                       GenericTypeResolver *resolver,
-                                      TypeLoc tyLoc,
-                                      bool forceInOut) {
+                                      TypeLoc tyLoc) {
 recur:
   if (tyLoc.isNull()) {
     tyLoc = TypeLoc::withoutLoc(type);
@@ -1001,9 +1000,6 @@ recur:
     VarDecl *var = NP->getDecl();
     if (var->isInvalid())
       type = ErrorType::get(Context);
-    if (forceInOut) {
-      var->setSpecifier(VarDecl::Specifier::InOut);
-    }
     var->setType(type->getInOutObjectType());
     // FIXME: wtf
     if (type->hasTypeParameter())

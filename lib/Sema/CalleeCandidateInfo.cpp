@@ -370,7 +370,8 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     // Bindings specify the arguments that source the parameter.  The only case
     // this returns a non-singular value is when there are varargs in play.
     auto &bindings = paramBindings[i];
-    auto paramType = getParamResultType(candArgs[i]);
+    auto param = candArgs[i];
+    auto paramType = getParamResultType(param);
     
     for (auto argNo : bindings) {
       auto argType = getParamResultType(actualArgs[argNo]);
@@ -392,7 +393,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
         auto matchType = paramType;
         // If the parameter is an inout type, and we have a proper lvalue, match
         // against the type contained therein.
-        if (paramType->is<InOutType>() && argType->is<LValueType>())
+        if (param.isInOut() && argType->is<LValueType>())
           matchType = matchType->getInOutObjectType();
         
         if (candidate.substituted) {

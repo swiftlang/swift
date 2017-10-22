@@ -3984,12 +3984,6 @@ public:
 
   void visitBoundVariable(VarDecl *VD) {
     TC.validateDecl(VD);
-    
-    if (!VD->getType()->isMaterializable()) {
-      TC.diagnose(VD->getStartLoc(), diag::var_type_not_materializable,
-                  VD->getType());
-      VD->markInvalid();
-    }
 
     // Check the behavior.
     checkVarBehavior(VD, TC);
