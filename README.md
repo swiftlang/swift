@@ -114,7 +114,7 @@ options such as building a Swift-compatible LLDB, building the Swift Package
 Manager, building for various platforms, running tests after builds, and more.
 
 There are two primary build systems to use: Xcode and Ninja. The Xcode build
-system allows you to work in Xcode.app, but Ninja is a bit faster and supports
+system allows you to work in Xcode, but Ninja is a bit faster and supports
 more environments.
 
 To build using Ninja, run:
@@ -143,7 +143,7 @@ information, see the inline help:
 #### Xcode
 
 To build using Xcode, specify the `--xcode` argument on any of the above commands.
-Xcode.app can be used to edit the Swift source code, but it is not currently
+Xcode can be used to edit the Swift source code, but it is not currently
 fully supported as a build environment for SDKs other than macOS. The generated
 Xcode project does not integrate with the test runner, but the tests can be run
 with the 'check-swift' target.
@@ -159,7 +159,7 @@ helps to save this directory as an environment variable for future use.
 
 #### Ninja
 
-Once the first build has completed, ninja can perform fast incremental builds of
+Once the first build has completed, Ninja can perform fast incremental builds of
 various products. These incremental builds are a big timesaver when developing
 and debugging.
 
