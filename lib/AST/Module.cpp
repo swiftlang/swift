@@ -352,6 +352,10 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
+
+  // validateDecl() should return immediately given a ModuleDecl.
+  setValidationStarted();
+
   setAccess(AccessLevel::Public);
 }
 
