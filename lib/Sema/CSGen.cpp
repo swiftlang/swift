@@ -1293,8 +1293,7 @@ namespace {
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.
       auto tv = CS.createTypeVariable(locator,
-                                      TVO_CanBindToLValue |
-                                      TVO_CanBindToInOut);
+                                      TVO_CanBindToLValue);
       CS.resolveOverload(locator, tv,
                          OverloadChoice(Type(), E->getDecl(),
                                         E->getFunctionRefKind()),
@@ -1635,8 +1634,9 @@ namespace {
       SmallVector<TupleTypeElt, 4> elements;
       elements.reserve(expr->getNumElements());
       for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
-        auto ty = CS.getType(expr->getElement(i));
-        auto flags = ParameterTypeFlags().withInOut(ty->is<InOutType>());
+        auto *elt = expr->getElement(i);
+        auto ty = CS.getType(elt);
+        auto flags = ParameterTypeFlags().withInOut(elt->isSemanticallyInOutExpr());
         elements.push_back(TupleTypeElt(ty->getInOutObjectType(),
                                         expr->getElementName(i), flags));
       }
