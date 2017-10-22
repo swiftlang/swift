@@ -4444,11 +4444,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   // T <p U ===> T[] <a UnsafeMutablePointer<U>
   case ConversionRestrictionKind::ArrayToPointer: {
     addContextualScore();
-    auto obj1 = type1;
     // Unwrap an inout type.
-    if (auto inout1 = obj1->getAs<InOutType>()) {
-      obj1 = inout1->getObjectType();
-    }
+    auto obj1 = type1->getInOutObjectType();
     
     obj1 = getFixedTypeRecursive(obj1, false, false);
     
