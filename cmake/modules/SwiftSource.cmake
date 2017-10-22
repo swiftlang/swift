@@ -254,11 +254,6 @@ function(_compile_swift_files
         "-nostdimport" "-parse-stdlib" "-module-name" "Swift")
     list(APPEND swift_flags "-Xfrontend" "-group-info-path"
                             "-Xfrontend" "${GROUP_INFO_JSON_FILE}")
-    if (NOT SWIFT_STDLIB_ENABLE_RESILIENCE)
-      if (SWIFT_STDLIB_SIL_SERIALIZE_ALL)
-        list(APPEND swift_flags "-Xfrontend" "-sil-serialize-vtables")
-      endif()
-    endif()
   endif()
 
   # Force swift 3 compatibility mode for Standard Library and overlay.

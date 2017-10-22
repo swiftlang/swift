@@ -4,9 +4,6 @@ set(swift_stdlib_unittest_compile_flags
 if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER")
 endif()
-if(SWIFT_SERIALIZE_STDLIB_UNITTEST)
-  list(APPEND swift_stdlib_unittest_compile_flags "-Xfrontend" "-sil-serialize-vtables")
-endif()
 
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" IS_BUILD_TYPE_OPTIMIZED)
 if (NOT IS_BUILD_TYPE_OPTIMIZED)

@@ -1282,15 +1282,15 @@ bb0(%0 : $Int32, %1 : $Int, %2 : $Int, %3 : $Foo):
 }
 
 
-// CHECK-LABEL: sil_vtable Foo {
+// CHECK-LABEL: sil_vtable [serialized] Foo {
 // CHECK: #Foo.subscript!getter.1: {{.*}} : _T03tmp3FooC9subscriptSiSi1x_Si1ytcfg
 // CHECK: #Foo.subscript!setter.1: {{.*}} : _T03tmp3FooC9subscriptSiSi1x_Si1ytcfs
 // CHECK: }
-// CHECK_DECL-LABEL: sil_vtable Foo {
+// CHECK_DECL-LABEL: sil_vtable [serialized] Foo {
 // CHECK_DECL: #Foo.subscript!getter.1: {{.*}} : _T03tmp3FooC9subscriptSiSi1x_Si1ytcfg
 // CHECK_DECL: #Foo.subscript!setter.1: {{.*}} : _T03tmp3FooC9subscriptSiSi1x_Si1ytcfs
 // CHECK_DECL: }
-sil_vtable Foo {
+sil_vtable [serialized] Foo {
   #Foo.subscript!getter.1: _T03tmp3FooC9subscriptSiSi1x_Si1ytcfg
   #Foo.subscript!setter.1: _T03tmp3FooC9subscriptSiSi1x_Si1ytcfs
 }
