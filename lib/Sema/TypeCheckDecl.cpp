@@ -4580,6 +4580,7 @@ public:
       if (!CD->hasValidSignature())
         return;
 
+      TC.requestSuperclassLayout(CD);
       TC.DeclsToFinalize.remove(CD);
 
       {
@@ -7313,6 +7314,17 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     return;
   }
 
+  // FIXME: It would be nicer if Sema would always synthesize fully-typechecked
+  // declarations, but for now, you can make an imported type conform to a
+  // protocol with property requirements, which requires synthesizing getters
+  // and setters, etc.
+  if (!isa<VarDecl>(D) &&
+      (!isa<FuncDecl>(D) ||
+       cast<FuncDecl>(D)->getAccessorKind() == AccessorKind::NotAccessor)) {
+    assert(isa<SourceFile>(D->getDeclContext()->getModuleScopeContext()) &&
+           "Should not validate imported or deserialized declarations");
+  }
+
   PrettyStackTraceDecl StackTrace("validating", D);
 
   if (hasEnabledForbiddenTypecheckPrefix())
@@ -7450,7 +7462,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         checkEnumRawValues(*this, ED);
     }
 
-    DeclsToFinalize.insert(nominal);
+    if (!isa<ClassDecl>(nominal))
+      DeclsToFinalize.insert(nominal);
+
     break;
   }
 
@@ -7773,7 +7787,7 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
       isa<EnumElementDecl>(VD))
     return true;
 
-  // For structs, we only need to validate stored properties to
+  // For structs, we only need to validate stored instance properties to
   // know the layout.
   if (isa<StructDecl>(nominal) &&
       (isa<VarDecl>(VD) &&
@@ -7782,11 +7796,32 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
         VD->getAttrs().hasAttribute<LazyAttr>())))
     return true;
 
-  // For classes, we need to validate properties and functions,
-  // but skipping nested types is OK.
+  // For classes, we need to validate non-final, non-type members, as well
+  // as final stored instance properties.
   if (isa<ClassDecl>(nominal) &&
-      !isa<TypeDecl>(VD))
+      !isa<TypeDecl>(VD)) {
+    // 'static' implies 'final' for properties and methods, so we can
+    // skip those.
+    if (isa<VarDecl>(VD) &&
+        cast<VarDecl>(VD)->getParentPatternBinding()->getStaticSpelling()
+          == StaticSpellingKind::KeywordStatic)
+      return false;
+    if (isa<FuncDecl>(VD) &&
+        cast<FuncDecl>(VD)->getStaticSpelling()
+          == StaticSpellingKind::KeywordStatic)
+      return false;
+
+    // Stored instance properties must be validated, even 'final' ones.
+    if (isa<VarDecl>(VD) && cast<VarDecl>(VD)->hasStorage())
+      return true;
+
+    // Anything else that's 'final' can be skipped.
+    if (VD->isFinal())
+      return false;
+
+    // Everything else appears in the vtable.
     return true;
+  }
 
   // For protocols, skip nested typealiases and nominal types.
   if (isa<ProtocolDecl>(nominal) &&
@@ -7796,8 +7831,29 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
   return false;
 }
 
+void TypeChecker::requestClassLayout(ClassDecl *classDecl) {
+  // FIXME: Check a flag in the class...
+  if (isa<SourceFile>(classDecl->getModuleScopeContext()))
+    DeclsToFinalize.insert(classDecl);
+}
+
+void TypeChecker::requestSuperclassLayout(ClassDecl *classDecl) {
+  auto superclassTy = classDecl->getSuperclass();
+  if (superclassTy) {
+    auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
+    if (superclassDecl)
+      requestClassLayout(superclassDecl);
+  }
+}
+
 static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
+  assert(!nominal->hasClangNode());
+  assert(isa<SourceFile>(nominal->getModuleScopeContext()));
+
   Optional<bool> lazyVarsAlreadyHaveImplementation;
+
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+    TC.requestSuperclassLayout(classDecl);
 
   for (auto *D : nominal->getMembers()) {
     auto VD = dyn_cast<ValueDecl>(D);
@@ -8003,6 +8059,8 @@ static void visitOuterToInner(
 static std::pair<GenericEnvironment *, Type>
 checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                             GenericParamList *genericParams) {
+  assert(!ext->getGenericEnvironment());
+
   // Form the interface type of the extension.
   Type extInterfaceType = formExtensionInterfaceType(type, genericParams);
 
@@ -8073,11 +8131,13 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (extendedType.isNull() || extendedType->hasError())
     return;
 
-  if (extendedType->hasUnboundGenericType()) {
-    // Validate the nominal type declaration being extended.
-    auto nominal = extendedType->getAnyNominal();
-    validateDecl(nominal);
+  // Validate the nominal type declaration being extended.
+  auto nominal = extendedType->getAnyNominal();
+  validateDecl(nominal);
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+    requestClassLayout(classDecl);
 
+  if (extendedType->hasUnboundGenericType()) {
     auto genericParams = ext->getGenericParams();
 
     // The debugger synthesizes typealiases of unbound generic types
