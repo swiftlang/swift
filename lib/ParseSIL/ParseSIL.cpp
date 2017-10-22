@@ -3422,7 +3422,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     bool OnStack = false;
     SmallVector<SILType, 2> ElementTypes;
     SmallVector<SILValue, 2> ElementCounts;
-    StringRef Optional;
     while (P.consumeIf(tok::l_square)) {
       Identifier Id;
       parseSILIdentifier(Id, diag::expected_in_attribute_list);
