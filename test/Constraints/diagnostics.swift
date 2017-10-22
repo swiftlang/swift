@@ -139,7 +139,7 @@ func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 @available(*, unavailable, message: "call the 'map()' method on the sequence")
-public func myMap<C : Collection, T>(
+public func myMap<C : Collection, T>( // expected-note {{'myMap' has been explicitly marked unavailable here}}
   _ source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
@@ -151,10 +151,8 @@ public func myMap<T, U>(_ x: T?, _ f: (T) -> U) -> U? {
 }
 
 // <rdar://problem/20142523>
-// FIXME: poor diagnostic, to be fixed in 20142462. For now, we just want to
-// make sure that it doesn't crash.
 func rdar20142523() {
-  myMap(0..<10, { x in // expected-error{{ambiguous reference to member '..<'}}
+  myMap(0..<10, { x in // expected-error{{'myMap' is unavailable: call the 'map()' method on the sequence}}
     ()
     return x
   })
