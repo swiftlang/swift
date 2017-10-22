@@ -7313,6 +7313,17 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     return;
   }
 
+  // FIXME: It would be nicer if Sema would always synthesize fully-typechecked
+  // declarations, but for now, you can make an imported type conform to a
+  // protocol with property requirements, which requires synthesizing getters
+  // and setters, etc.
+  if (!isa<VarDecl>(D) &&
+      (!isa<FuncDecl>(D) ||
+       cast<FuncDecl>(D)->getAccessorKind() == AccessorKind::NotAccessor)) {
+    assert(isa<SourceFile>(D->getDeclContext()->getModuleScopeContext()) &&
+           "Should not validate imported or deserialized declarations");
+  }
+
   PrettyStackTraceDecl StackTrace("validating", D);
 
   if (hasEnabledForbiddenTypecheckPrefix())
@@ -8003,6 +8014,8 @@ static void visitOuterToInner(
 static std::pair<GenericEnvironment *, Type>
 checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                             GenericParamList *genericParams) {
+  assert(!ext->getGenericEnvironment());
+
   // Form the interface type of the extension.
   Type extInterfaceType = formExtensionInterfaceType(type, genericParams);
 

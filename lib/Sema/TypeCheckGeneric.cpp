@@ -1180,6 +1180,8 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 }
 
 void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
+  assert(!typeDecl->getGenericEnvironment());
+
   auto *gp = typeDecl->getGenericParams();
   auto *dc = typeDecl->getDeclContext();
 
