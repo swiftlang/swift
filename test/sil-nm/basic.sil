@@ -59,9 +59,8 @@ sil_witness_table [serialized] <T> ConformingGenericStruct<T> : ResilientProtoco
 }
 
 // vtables cannot be serialized from SIL.
-// Only the frontend has the -Xfrontend -sil-serialize-vtables option. 
 // SIL-NM: V C
-sil_vtable C {
+sil_vtable [serialized] C {
   #C.deinit!deallocator: c_deinit
 }
 

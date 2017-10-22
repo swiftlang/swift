@@ -150,12 +150,6 @@ public:
   /// \brief Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
 
-  /// If set, SIL vtables will be serialized.
-  ///
-  /// It is supposed to be used only for compiling overlays.
-  /// User code should never be compiled with this flag set.
-  bool SILSerializeVTables = false;
-
   SILOptions() {}
 
   /// Return a hash code of any components from these options that should
