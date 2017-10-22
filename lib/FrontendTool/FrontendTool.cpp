@@ -1316,6 +1316,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1);
   }
 
+  /* SR-5860: TODO: remove this;
+   verifies contents of Invocation's ImmediateExecutionBuffer
+   StringRef text = Invocation.getImmediateExecutionBuffer()->getBuffer();
+   */
+  
   // Setting DWARF Version depend on platform
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
   IRGenOpts.DWARFVersion = swift::DWARFVersion;

@@ -330,18 +330,22 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   bool TreatAsLLVM = Opts.Inputs.shouldTreatAsLLVM();
 
-  if (Opts.Inputs.verifyInputs(
+  if (Args.hasArg(OPT_e)) {
+    Opts.ImmediateExecutionMode = true;
+  } else {
+    if (Opts.Inputs.verifyInputs(
           Diags, TreatAsSIL, Opts.RequestedAction == FrontendOptions::REPL,
           Opts.RequestedAction == FrontendOptions::NoneAction)) {
     return true;
   }
 
-  if (Opts.RequestedAction == FrontendOptions::Immediate) {
-    Opts.ImmediateArgv.push_back(
-        Opts.Inputs.getFilenameOfFirstInput()); // argv[0]
-    if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
-      for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
-        Opts.ImmediateArgv.push_back(A->getValue(i));
+    if (Opts.RequestedAction == FrontendOptions::Immediate) {
+      Opts.ImmediateArgv.push_back(
+          Opts.Inputs.getFilenameOfFirstInput()); // argv[0]
+      if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
+        for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
+          Opts.ImmediateArgv.push_back(A->getValue(i));
+        }
       }
     }
   }
@@ -1613,6 +1617,19 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
   return false;
 }
 
+void CompilerInvocation::ParseImmediateExecutionArgs(ArgList &Args) {
+  using namespace options;
+  
+  if (Args.hasArg(OPT_e)) {
+    llvm::SmallString<64> CodeBuffer;
+    for (const Arg *A : Args.filtered(OPT_e)) {
+      CodeBuffer.append(A->getValue());
+      CodeBuffer.append("\n");
+    }
+    setImmediateExecutionBuffer(CodeBuffer.str());
+  }
+}
+
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags,
                                    StringRef workingDirectory) {
@@ -1645,6 +1662,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
+  ParseImmediateExecutionArgs(ParsedArgs);
+  
   if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
   }

@@ -1057,7 +1057,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   if (driverKind == DriverKind::Interactive) {
     OI.CompilerMode = OutputInfo::Mode::Immediate;
-    if (Inputs.empty())
+    if (Inputs.empty() && !Args.hasArg(options::OPT_e))
       OI.CompilerMode = OutputInfo::Mode::REPL;
     OI.CompilerOutputType = types::TY_Nothing;
 
@@ -1524,7 +1524,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     break;
   }
   case OutputInfo::Mode::Immediate: {
-    if (Inputs.empty())
+    if (Inputs.empty() && !Args.hasArg(options::OPT_e))
       return;
 
     assert(OI.CompilerOutputType == types::TY_Nothing);
@@ -1648,6 +1648,12 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     SuppressNoInputFilesError = true;
   }
 
+  // SR-5860: TODO: change this to emit a diagnostic here: -e can't have
+  // input files (diagnostics are defined in DiagnosticsDriver.def).
+  if (Args.hasArg(options::OPT_e)) {
+    SuppressNoInputFilesError = true;
+  }
+  
   if (const Arg *A = Args.getLastArg(options::OPT_driver_use_frontend_path))
     DriverExecutable = A->getValue();
 

@@ -531,6 +531,8 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
 
   context.Args.AddAllArgs(Arguments, options::OPT_l, options::OPT_framework);
 
+  context.Args.AddAllArgs(Arguments, options::OPT_e);
+  
   // The immediate arguments must be last.
   context.Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
 

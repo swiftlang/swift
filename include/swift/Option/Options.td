@@ -289,6 +289,10 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
+def e : Separate<["-"], "e">,
+  Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Evaluate one line of Swift code. Multiple -e's allowed.">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,

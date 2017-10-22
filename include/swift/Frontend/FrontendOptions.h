@@ -463,6 +463,10 @@ public:
   /// Indicates whether the RequestedAction will immediately run code.
   bool actionIsImmediate() const;
 
+  /// Indicates whether or not we are compiling code passed from the command
+  /// line.
+  bool ImmediateExecutionMode = false;
+  
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {

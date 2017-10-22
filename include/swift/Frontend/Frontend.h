@@ -76,6 +76,10 @@ class CompilerInvocation {
 
   CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
 
+  /// \brief Used for holding the Swift code passed into the command line via
+  /// the "-e" flag.
+  std::shared_ptr<llvm::MemoryBuffer> ImmediateExecutionBuffer;
+  
 public:
   CompilerInvocation();
 
@@ -308,6 +312,17 @@ public:
       return SourceFile::ImplicitModuleImportKind::Builtin;
     }
     return SourceFile::ImplicitModuleImportKind::Stdlib;
+  }
+
+  std::shared_ptr<llvm::MemoryBuffer> getImmediateExecutionBuffer() {
+    return ImmediateExecutionBuffer;
+  }
+  
+  private:
+  void ParseImmediateExecutionArgs(llvm::opt::ArgList &Args);
+  
+  void setImmediateExecutionBuffer(StringRef buffer) {
+    ImmediateExecutionBuffer = llvm::MemoryBuffer::getMemBufferCopy(buffer);
   }
 };
 
