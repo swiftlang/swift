@@ -376,11 +376,6 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
       auto argType = getParamResultType(actualArgs[argNo]);
       auto rArgType = argType->getRValueType();
       
-      // If the argument has an unresolved type, then we're not actually
-      // matching against it.
-      if (rArgType->is<UnresolvedType>())
-        continue;
-      
       // FIXME: Right now, a "matching" overload is one with a parameter whose
       // type is identical to the argument type, or substitutable via handling
       // of functions with primary archetypes in one or more parameters.
@@ -391,7 +386,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
       bool matched;
       if (paramType->hasUnresolvedType())
         matched = true;
-      else if (rArgType->hasTypeVariable())
+      else if (rArgType->hasTypeVariable() || rArgType->hasUnresolvedType())
         matched = false;
       else {
         auto matchType = paramType;
@@ -476,10 +471,14 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
       if (matched)
         continue;
       
-      if (archetypesMap.empty())
-        mismatchesAreNearMisses &= argumentMismatchIsNearMiss(argType, paramType);
-      
-      ++mismatchingArgs;
+      // If the real argument is unresolved, the candidate isn't a mismatch because
+      // the type could be anything, but it's still useful to save the argument as
+      // failureInfo.
+      if (!rArgType->hasUnresolvedType()) {
+        if (archetypesMap.empty())
+          mismatchesAreNearMisses &= argumentMismatchIsNearMiss(argType, paramType);
+        ++mismatchingArgs;
+      }
       
       failureInfo.argumentNumber = argNo;
       failureInfo.parameterType = paramType;
@@ -489,7 +488,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   }
   
   if (mismatchingArgs == 0)
-    return { CC_ExactMatch, {}};
+    return { CC_ExactMatch, failureInfo};
   
   // Check to see if the first argument expects an inout argument, but is not
   // an lvalue.
