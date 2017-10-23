@@ -209,7 +209,7 @@ internal struct UnsafeString {
   //     designating UnsafeString
   //
 
-  var baseAddress: UnsafeRawPointer // TODO: Mutable?
+  var baseAddress: UnsafeMutableRawPointer
   var count: Int
 
   var isSingleByte: Bool
@@ -219,7 +219,7 @@ internal struct UnsafeString {
   var hasCocoaBuffer: Bool
 
   init(
-    baseAddress: UnsafeRawPointer,
+    baseAddress: UnsafeMutableRawPointer,
     count: Int,
     isSingleByte: Bool,
     hasCocoaBuffer: Bool
@@ -258,12 +258,29 @@ internal struct UnsafeString {
   var owner: _BuiltinNativeObject
 
   var stringBuffer: _StringBuffer {
+    // TODO: Does this in practice incur overhead? Should we cast it?
     return _StringBuffer(_StringBuffer._Storage(_nativeObject: owner))
   }
 
   var unsafe: UnsafeString {
-    // return UnsafeString(stringBuffer._elementPointer)
-    fatalError("unimplemented")
+    return UnsafeString(
+      baseAddress: self.baseAddress,
+      count: self.count,
+      isSingleByte: self.isSingleByte,
+      hasCocoaBuffer: false)
+  }
+
+  var baseAddress: UnsafeMutableRawPointer {
+    return stringBuffer.start
+  }
+
+  var count: Int {
+    return stringBuffer.usedCount
+  }
+
+  var isSingleByte: Bool {
+    _sanityCheck((0...1).contains(stringBuffer.elementShift))
+    return stringBuffer.elementShift == 0
   }
 
   init(_ native: _BuiltinNativeObject) {
@@ -380,7 +397,7 @@ extension _StringGuts {
     guard _isUnsafe else { return nil }
 
     // Unflag it, untag it, and go
-    let pointer = UnsafeRawPointer(
+    let pointer = UnsafeMutableRawPointer(
       bitPattern: self._untaggedUnflaggedBitPattern
     )._unsafelyUnwrappedUnchecked
     return UnsafeString(
