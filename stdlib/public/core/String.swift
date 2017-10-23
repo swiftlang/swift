@@ -1138,7 +1138,7 @@ extension String {
   ///
   /// Here's an example of transforming a string to all lowercase letters.
   ///
-  ///     let cafe = "Café 🍵"
+  ///     let cafe = "CAfé 🍵"
   ///     print(cafe.lowercased())
   ///     // Prints "café 🍵"
   ///
