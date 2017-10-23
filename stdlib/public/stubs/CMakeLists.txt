@@ -33,6 +33,7 @@ set(ICU_UC_LIBRARY "")
 
 set(swift_stubs_c_compile_flags ${SWIFT_RUNTIME_CORE_CXX_FLAGS})
 list(APPEND swift_stubs_c_compile_flags -DswiftCore_EXPORTS)
+list(APPEND swift_stubs_c_compile_flags -I${SWIFT_SOURCE_DIR}/include)
 
 add_swift_library(swiftStdlibStubs OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_stubs_sources}
