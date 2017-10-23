@@ -2385,7 +2385,7 @@ public:
            "# define SWIFT_TYPEDEFS 1\n"
            "# if __has_include(<uchar.h>)\n"
            "#  include <uchar.h>\n"
-           "# elif !defined(__cplusplus) || __cplusplus < 201103L\n"
+           "# elif !defined(__cplusplus)\n"
            "typedef uint_least16_t char16_t;\n"
            "typedef uint_least32_t char32_t;\n"
            "# endif\n"
