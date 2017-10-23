@@ -401,6 +401,11 @@ public:
   /// with the parwise-corresponding results of the given instruction.
   void replaceAllUsesPairwiseWith(SILInstruction *other);
 
+  /// \brief Replace all uses of all results of this instruction with the
+  /// parwise-corresponding results of the passed in array.
+  void
+  replaceAllUsesPairwiseWith(const llvm::SmallVectorImpl<SILValue> &NewValues);
+
   /// \brief Are there uses of any of the results of this instruction?
   bool hasUsesOfAnyResult() const {
     for (auto result : getResults()) {
