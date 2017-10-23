@@ -32,13 +32,39 @@
 using namespace swift;
 using namespace DerivedConformance;
 
+/// Returns true if we can synthesize the protocol's requirements for the given
+/// type. This is trivially true if the type directly conforms to the protocol,
+/// but we also support tuples where all elements conform to the protocol. We do
+/// not attempt to do so recursively (for example, tuples of tuples), due to the
+/// complexity involved in synthesizing such requirements.
+static bool typeCanSynthesizeProtocol(TypeChecker &tc, Type type,
+                                      ProtocolDecl *protocol,
+                                      DeclContext *declContext) {
+  // If the type is a tuple, then we can synthesize P if all of its elements
+  // conform to P.
+  if (auto tupleType = type->getAs<TupleType>()) {
+    for (auto tupleElementType : tupleType->getElementTypes()) {
+      if (!tc.conformsToProtocol(tupleElementType, protocol, declContext,
+                                 ConformanceCheckFlags::Used)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Otherwise, return whether or not the type conforms to the protocol.
+  return (bool) tc.conformsToProtocol(type, protocol, declContext,
+                                      ConformanceCheckFlags::Used);
+}
+
 /// Returns true if, for every element of the given enum, it either has no
 /// associated values or all of them conform to a protocol.
 /// \p theEnum The enum whose elements and associated values should be checked.
 /// \p protocol The protocol being requested.
 /// \return True if all associated values of all elements of the enum conform.
-bool allAssociatedValuesConformToProtocol(TypeChecker &tc, EnumDecl *theEnum,
-                                          ProtocolDecl *protocol) {
+static bool allAssociatedValuesConformToProtocol(TypeChecker &tc,
+                                                 EnumDecl *theEnum,
+                                                 ProtocolDecl *protocol) {
   auto declContext = theEnum->getDeclContext();
 
   for (auto elt : theEnum->getAllElements()) {
@@ -53,16 +79,15 @@ bool allAssociatedValuesConformToProtocol(TypeChecker &tc, EnumDecl *theEnum,
       // One associated value with a label or multiple associated values
       // (labeled or unlabeled) are tuple types.
       for (auto tupleElementType : tupleType->getElementTypes()) {
-        if (!tc.conformsToProtocol(tupleElementType, protocol, declContext,
-                                   ConformanceCheckFlags::Used)) {
+        if (!typeCanSynthesizeProtocol(tc, tupleElementType, protocol,
+                                       declContext)) {
           return false;
         }
       }
     } else {
       // One associated value with no label is represented as a paren type.
       auto actualType = argumentType->getWithoutParens();
-      if (!tc.conformsToProtocol(actualType, protocol, declContext,
-                                 ConformanceCheckFlags::Used)) {
+      if (!typeCanSynthesizeProtocol(tc, actualType, protocol, declContext)) {
         return false;
       }
     }
@@ -75,9 +100,9 @@ bool allAssociatedValuesConformToProtocol(TypeChecker &tc, EnumDecl *theEnum,
 /// \p theStruct The struct whose stored properties should be checked.
 /// \p protocol The protocol being requested.
 /// \return True if all stored properties of the struct conform.
-bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
-                                          StructDecl *theStruct,
-                                          ProtocolDecl *protocol) {
+static bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
+                                                 StructDecl *theStruct,
+                                                 ProtocolDecl *protocol) {
   auto declContext = theStruct->getDeclContext();
 
   auto storedProperties =
@@ -87,8 +112,8 @@ bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
       tc.validateDecl(propertyDecl);
 
     if (!propertyDecl->hasType() ||
-        !tc.conformsToProtocol(propertyDecl->getType(), protocol, declContext,
-                               ConformanceCheckFlags::Used)) {
+        !typeCanSynthesizeProtocol(tc, propertyDecl->getType(), protocol,
+                                   declContext)) {
       return false;
     }
   }
@@ -283,24 +308,44 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
 }
 
 /// Generates a guard statement that checks whether the given lhs and rhs
-/// variables are equal; if they are not, then the isEqual variable is set to
-/// false and a break statement is executed.
+/// variables are equal; if they are not, then the body of the guard returns
+/// false.
 /// \p C The AST context.
 /// \p lhsVar The first variable to test for equality.
 /// \p rhsVar The second variable to test for equality.
-/// \p isEqualVar The variable to set to false if the guard condition fails.
-static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
-                                        Expr *lhsExpr,
-                                        Expr *rhsExpr) {
+static void appendReturnIfNotEqualGuard(
+    ASTContext &C, Expr *lhsExpr, Expr *rhsExpr, Type type,
+    SmallVectorImpl<ASTNode> &statements) {
+  // We can generate a single equality testing statement for types conforming to
+  // Equatable and for tuples of arity <= 6 where all elements conform to
+  // Equatable (because the standard library provides hand-coded == impls for
+  // these). For larger tuples, we must manually generate tests for each
+  // element.
+  if (auto tupleType = type->getAs<TupleType>()) {
+    if (tupleType->getNumElements() > 6) {
+      for (unsigned i = 0; i < tupleType->getNumElements(); ++i) {
+        auto tupleElt = tupleType->getElement(i);
+        auto tupleEltType = tupleElt.getType();
+        auto lhsEltExpr = new (C) TupleElementExpr(lhsExpr, SourceLoc(), i,
+                                                   SourceLoc(), tupleEltType);
+        lhsEltExpr->setImplicit(true);
+        auto rhsEltExpr = new (C) TupleElementExpr(rhsExpr, SourceLoc(), i,
+                                                   SourceLoc(), tupleEltType);
+        rhsEltExpr->setImplicit(true);
+        appendReturnIfNotEqualGuard(C, lhsEltExpr, rhsEltExpr, tupleEltType,
+                                    statements);
+      }
+      return;
+    }
+  }
+
   SmallVector<StmtConditionElement, 1> conditions;
-  SmallVector<ASTNode, 2> statements;
 
   // First, generate the statements for the body of the guard.
   // return false
   auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                               /*Implicit*/true);
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
-  statements.emplace_back(ASTNode(returnStmt));
 
   // Next, generate the condition being checked.
   // lhs == rhs
@@ -316,10 +361,12 @@ static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
                                     /*Implicit*/true);
   conditions.emplace_back(cmpExpr);
 
-  // Build and return the complete guard statement.
+  // Build and append the complete guard statement.
   // guard lhs == rhs else { return false }
-  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
+  auto body = BraceStmt::create(C, SourceLoc(), { returnStmt }, SourceLoc());
+  auto guardStmt =
+      new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
+  statements.emplace_back(guardStmt);
 }
 
 /// Derive the body for an '==' operator for an enum that has no associated
@@ -445,8 +492,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
       auto rhsVar = rhsPayloadVars[varIdx];
       auto rhsExpr = new (C) DeclRefExpr(rhsVar, DeclNameLoc(),
                                          /*Implicit*/true);
-      auto guardStmt = returnIfNotEqualGuard(C, lhsExpr, rhsExpr);
-      statementsInCase.emplace_back(guardStmt);
+      appendReturnIfNotEqualGuard(
+          C, lhsExpr, rhsExpr, lhsVar->getType(), statementsInCase);
     }
 
     // If none of the guard statements caused an early exit, then all the pairs
@@ -529,8 +576,8 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl) {
     auto bPropertyExpr = new (C) DotSyntaxCallExpr(bPropertyRef, SourceLoc(),
                                                    bParamRef);
 
-    auto guardStmt = returnIfNotEqualGuard(C, aPropertyExpr, bPropertyExpr);
-    statements.emplace_back(guardStmt);
+    appendReturnIfNotEqualGuard(C, aPropertyExpr, bPropertyExpr,
+        propertyDecl->getType(), statements);
   }
 
   // If none of the guard statements caused an early exit, then all the pairs
@@ -750,10 +797,28 @@ static Expr* integerLiteralExpr(ASTContext &C, int64_t value) {
 /// \p C The AST context.
 /// \p resultVar The variable into which the hash value will be mixed.
 /// \p exprToHash The expression whose hash value should be mixed in.
-/// \return The expression that mixes the hash value into the result variable.
-static Expr* mixInHashExpr_hashValue(ASTContext &C,
-                                     VarDecl* resultVar,
-                                     Expr *exprToHash) {
+/// \p type The type of the expression.
+/// \p expressions A vector to which the function will append the expression
+/// that mixes the hash value into the result variable.
+static void appendMixInHashExpr_hashValue(
+    ASTContext &C, VarDecl *resultVar, Expr *exprToHash, Type type,
+    SmallVectorImpl<ASTNode> &expressions) {
+  // We can generate a single hashValue expression for anything that directly
+  // conforms to Hashable. For tuples, we have to loop over the elements and mix
+  // in their hash values.
+  if (auto tupleType = type->getAs<TupleType>()) {
+    for (unsigned i = 0; i < tupleType->getNumElements(); ++i) {
+      auto tupleElt = tupleType->getElement(i);
+      auto tupleEltType = tupleElt.getType();
+      auto tupleEltExpr = new (C) TupleElementExpr(exprToHash, SourceLoc(), i,
+                                                 SourceLoc(), tupleEltType);
+      tupleEltExpr->setImplicit(true);
+      appendMixInHashExpr_hashValue(C, resultVar, tupleEltExpr, tupleEltType,
+                                    expressions);
+    }
+    return;
+  }
+
   // <exprToHash>.hashValue
   auto hashValueExpr = new (C) UnresolvedDotExpr(exprToHash, SourceLoc(),
                                                  C.Id_hashValue, DeclNameLoc(),
@@ -773,7 +838,7 @@ static Expr* mixInHashExpr_hashValue(ASTContext &C,
                                            /*implicit*/ true);
   auto assignExpr = new (C) AssignExpr(lhsResultExpr, SourceLoc(),
                                        mixinResultExpr, /*implicit*/ true);
-  return assignExpr;
+  expressions.emplace_back(assignExpr);
 }
 
 /// Returns a new assignment expression that invokes _mixInt on a variable and
@@ -874,8 +939,8 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
         auto payloadVarRef = new (C) DeclRefExpr(payloadVar, DeclNameLoc(),
                                                  /*implicit*/ true);
         // result = _mixForSynthesizedHashValue(result, <payloadVar>.hashValue)
-        auto mixExpr = mixInHashExpr_hashValue(C, resultVar, payloadVarRef);
-        mixExpressions.emplace_back(ASTNode(mixExpr));
+        appendMixInHashExpr_hashValue(C, resultVar, payloadVarRef,
+                                      payloadVar->getType(), mixExpressions);
       }
 
       // result = _mixInt(result)
@@ -963,8 +1028,8 @@ deriveBodyHashable_struct_hashValue(AbstractFunctionDecl *hashValueDecl) {
     auto selfPropertyExpr = new (C) DotSyntaxCallExpr(propertyRef, SourceLoc(),
                                                       selfRef);
     // result = _mixForSynthesizedHashValue(result, <property>.hashValue)
-    auto mixExpr = mixInHashExpr_hashValue(C, resultVar, selfPropertyExpr);
-    statements.emplace_back(ASTNode(mixExpr));
+    appendMixInHashExpr_hashValue(C, resultVar, selfPropertyExpr,
+                                  propertyDecl->getType(), statements);
   }
 
   {
