@@ -310,9 +310,6 @@ extension String {
       set { self._guts = _StringGuts(newValue) }
     }
 
-    // TODO(StringGuts): I believe _coreOffset below (also present in
-    // CharacterView) is vestigial and should be removed.
-    //
     /// The offset of this view's `_core` from an original core. This works
     /// around the fact that `_LegacyStringCore` is always zero-indexed.
     /// `_coreOffset` should be subtracted from `UnicodeScalarIndex.encodedOffset`
