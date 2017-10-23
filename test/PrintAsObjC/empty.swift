@@ -1,7 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -emit-objc-header-path %t/empty.h
 // RUN: %FileCheck %s < %t/empty.h
+
 // RUN: %check-in-clang -std=c99 %t/empty.h
+// RUN: %check-in-clang -std=c11 %t/empty.h
+// RUN: %check-in-clang++ -std=c++98 %t/empty.h
+// RUN: %check-in-clang++ -std=c++14 %t/empty.h
+
 // RUN: %check-in-clang -std=c99 -fno-modules -Qunused-arguments %t/empty.h
 // RUN: not %check-in-clang -I %S/Inputs/clang-headers %t/empty.h 2>&1 | %FileCheck %s --check-prefix=CUSTOM-OBJC-PROLOGUE
 
