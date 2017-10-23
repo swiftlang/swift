@@ -1478,8 +1478,8 @@ struct GenericSignatureBuilder::Constraint {
 
 class GenericSignatureBuilder::PotentialArchetype {
   /// The parent of this potential archetype (for a nested type) or the
-  /// generic signature builder in which this root resides.
-  llvm::PointerUnion<PotentialArchetype*, GenericSignatureBuilder*> parentOrBuilder;
+  /// ASTContext in which the potential archetype resides.
+  llvm::PointerUnion<PotentialArchetype*, ASTContext*> parentOrContext;
 
   /// The identifier describing this particular archetype.
   ///
@@ -1545,7 +1545,7 @@ class GenericSignatureBuilder::PotentialArchetype {
 
   /// \brief Construct a new potential archetype for a concrete declaration.
   PotentialArchetype(PotentialArchetype *parent, TypeDecl *concreteDecl)
-    : parentOrBuilder(parent), identifier(concreteDecl)
+    : parentOrContext(parent), identifier(concreteDecl)
   {
     assert(parent != nullptr && "Not a nested type?");
     assert(!isa<AssociatedTypeDecl>(concreteDecl) ||
@@ -1553,9 +1553,8 @@ class GenericSignatureBuilder::PotentialArchetype {
   }
 
   /// \brief Construct a new potential archetype for a generic parameter.
-  PotentialArchetype(GenericSignatureBuilder *builder,
-                     GenericParamKey genericParam)
-    : parentOrBuilder(builder), identifier(genericParam)
+  PotentialArchetype(ASTContext &ctx, GenericParamKey genericParam)
+    : parentOrContext(&ctx), identifier(genericParam)
   {
   }
 
@@ -1563,13 +1562,6 @@ public:
   /// \brief Retrieve the representative for this archetype, performing
   /// path compression on the way.
   PotentialArchetype *getRepresentative() const;
-
-private:
-  // Replace the generic signature builder.
-  void replaceBuilder(GenericSignatureBuilder *builder) {
-    assert(parentOrBuilder.is<GenericSignatureBuilder *>());
-    parentOrBuilder = builder;
-  }
 
   friend class GenericSignatureBuilder;
   friend class GenericSignature;
@@ -1583,7 +1575,7 @@ public:
   /// Retrieve the parent of this potential archetype, which will be non-null
   /// when this potential archetype is an associated type.
   PotentialArchetype *getParent() const { 
-    return parentOrBuilder.dyn_cast<PotentialArchetype *>();
+    return parentOrContext.dyn_cast<PotentialArchetype *>();
   }
 
   /// Retrieve the type declaration to which this nested type was resolved.
@@ -1601,7 +1593,7 @@ public:
 
   /// Determine whether this is a generic parameter.
   bool isGenericParam() const {
-    return parentOrBuilder.is<GenericSignatureBuilder *>();
+    return parentOrContext.is<ASTContext *>();
   }
 
   /// Retrieve the generic parameter key for a potential archetype that
