@@ -412,6 +412,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
 IRGenModule::~IRGenModule() {
   destroyClangTypeConverter();
+  destroyMetadataLayoutMap();
   delete &Types;
   delete DebugInfo;
 }
