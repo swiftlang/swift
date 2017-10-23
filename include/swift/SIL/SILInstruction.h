@@ -5567,6 +5567,13 @@ public:
   SILValue getValue() const { return Operands[Value].get(); }
   SILValue getBase() const { return Operands[Base].get(); }
 
+  void setValue(SILValue newVal) {
+    Operands[Value].set(newVal);
+  }
+  void setBase(SILValue newVal) {
+    Operands[Base].set(newVal);
+  }
+  
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
