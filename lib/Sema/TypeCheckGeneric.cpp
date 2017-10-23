@@ -142,7 +142,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 
   // Look for a nested type with the given name.
   if (auto nestedType =
-          baseEquivClass->lookupNestedType(ref->getIdentifier())) {
+          baseEquivClass->lookupNestedType(builder, ref->getIdentifier())) {
     // Record the type we found.
     ref->setValue(nestedType, nullptr);
   } else {

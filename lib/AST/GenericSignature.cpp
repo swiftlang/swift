@@ -754,7 +754,8 @@ bool GenericSignature::isCanonicalTypeInContext(Type type,
     if (!equivClass) return false;
 
     return (equivClass->concreteType ||
-            !component->isEqual(equivClass->getAnchor(getGenericParams())));
+            !component->isEqual(equivClass->getAnchor(builder,
+                                                      getGenericParams())));
   });
 }
 
@@ -784,7 +785,7 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type,
       return getCanonicalTypeInContext(equivClass->concreteType, builder);
     }
 
-    return equivClass->getAnchor(getGenericParams());
+    return equivClass->getAnchor(builder, getGenericParams());
   });
   
   auto result = type->getCanonicalType();
