@@ -1489,10 +1489,12 @@ std::string GenericSignatureBuilder::PotentialArchetype::getDebugName() const {
 
   auto parent = getParent();
   if (!parent) {
-    return GenericTypeParamType::get(getGenericParamKey().Depth,
-                                     getGenericParamKey().Index,
-                                     getBuilder()->getASTContext())->getName()
-             .str();
+    static const char *tau = u8"\u03C4_";
+
+    llvm::raw_svector_ostream os(result);
+    os << tau << getGenericParamKey().Depth << '_'
+       << getGenericParamKey().Index;
+    return os.str().str();
   }
 
   // Nested types.
@@ -1616,11 +1618,10 @@ public:
 };
 
 bool EquivalenceClass::recordConformanceConstraint(
+                                 GenericSignatureBuilder &builder,
                                  ResolvedType type,
                                  ProtocolDecl *proto,
                                  FloatingRequirementSource source) {
-  auto &builder = *members.front()->getBuilder();
-
   // If we haven't seen a conformance to this protocol yet, add it.
   bool inserted = false;
   auto known = conformsTo.find(proto);
@@ -1641,7 +1642,7 @@ bool EquivalenceClass::recordConformanceConstraint(
     // Resolve any associated type members.
     for (auto assocType : proto->getAssociatedTypeMembers()) {
       type.realizePotentialArchetype(builder)->updateNestedTypeForConformance(
-                                        assocType,
+                                        builder, assocType,
                                         ArchetypeResolutionKind::AlreadyKnown);
     }
   }
@@ -1783,6 +1784,7 @@ static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
 }
 
 TypeDecl *EquivalenceClass::lookupNestedType(
+                             GenericSignatureBuilder &builder,
                              Identifier name,
                              SmallVectorImpl<TypeDecl *> *otherConcreteTypes) {
   // Populates the result structures from the given cache entry.
@@ -1892,8 +1894,7 @@ TypeDecl *EquivalenceClass::lookupNestedType(
 
   // Infer same-type constraints among same-named associated type anchors.
   if (assocTypeAnchors.size() > 1) {
-    auto &builder = *members.front()->getBuilder();
-    auto anchorType = getAnchor({ });
+    auto anchorType = getAnchor(builder, { });
     auto inferredSource = FloatingRequirementSource::forInferred(nullptr);
     for (auto assocType : assocTypeAnchors) {
       if (assocType == bestAssocType) continue;
@@ -1937,9 +1938,9 @@ TypeDecl *EquivalenceClass::lookupNestedType(
 }
 
 Type EquivalenceClass::getAnchor(
+                            GenericSignatureBuilder &builder,
                             ArrayRef<GenericTypeParamType *> genericParams) {
-  auto anchorPA =
-    members.front()->getArchetypeAnchor(*members.front()->getBuilder());
+  auto anchorPA = members.front()->getArchetypeAnchor(builder);
   return anchorPA->getDependentType(genericParams);
 }
 
@@ -1949,7 +1950,7 @@ Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
     genericEnv->getGenericParams();
 
   // The anchor descr
-  Type anchor = getAnchor(genericParams);
+  Type anchor = getAnchor(builder, genericParams);
 
   // If this equivalence class is mapped to a concrete type, produce that
   // type.
@@ -2271,7 +2272,7 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
   }
 
   concreteSource = concreteSource->viaConcrete(*this, *conformance);
-  equivClass->recordConformanceConstraint(type, proto, concreteSource);
+  equivClass->recordConformanceConstraint(*this, type, proto, concreteSource);
   addConditionalRequirements(*this, *conformance);
   return concreteSource;
 }
@@ -2302,7 +2303,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
 
   superclassSource =
     superclassSource->viaSuperclass(*this, *conformance);
-  equivClass->recordConformanceConstraint(type, proto, superclassSource);
+  equivClass->recordConformanceConstraint(*this, type, proto, superclassSource);
   addConditionalRequirements(*this, *conformance);
   return superclassSource;
 }
@@ -2653,7 +2654,7 @@ static void concretizeNestedTypeFromConcreteParent(
   // add it now; it was elided earlier.
   if (parentEquiv->conformsTo.count(proto) == 0) {
     auto source = parentEquiv->concreteTypeConstraints.front().source;
-    parentEquiv->recordConformanceConstraint(parent, proto, source);
+    parentEquiv->recordConformanceConstraint(builder, parent, proto, source);
   }
 
   assert(parentEquiv->conformsTo.count(proto) > 0 &&
@@ -2695,18 +2696,19 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
                                            ArchetypeResolutionKind kind) {
   SmallVector<TypeDecl *, 4> concreteDecls;
   auto bestType =
-    getOrCreateEquivalenceClass()->lookupNestedType(name, &concreteDecls);
+    getOrCreateEquivalenceClass()->lookupNestedType(builder, name,
+                                                    &concreteDecls);
 
   // We didn't find any type with this name.
   if (!bestType) return nullptr;
 
   // Resolve the nested type.
-  auto resultPA = updateNestedTypeForConformance(bestType, kind);
+  auto resultPA = updateNestedTypeForConformance(builder, bestType, kind);
 
   // Update for all of the concrete decls with this name, which will introduce
   // various same-type constraints.
   for (auto concreteDecl : concreteDecls) {
-    (void)updateNestedTypeForConformance(concreteDecl,
+    (void)updateNestedTypeForConformance(builder, concreteDecl,
                                          ArchetypeResolutionKind::WellFormed);
   }
 
@@ -2715,6 +2717,7 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
 
 
 PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
+                                              GenericSignatureBuilder &builder,
                                               TypeDecl *type,
                                               ArchetypeResolutionKind kind) {
   if (!type) return nullptr;
@@ -2731,7 +2734,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   // process delayed requirements if anything changed.
   SWIFT_DEFER {
     if (kind == ArchetypeResolutionKind::CompleteWellFormed)
-      getBuilder()->processDelayedRequirements();
+      builder.processDelayedRequirements();
   };
 
   Identifier name = assocType ? assocType->getName() : concreteDecl->getName();
@@ -2746,7 +2749,6 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   PotentialArchetype *resultPA = nullptr;
   auto knownNestedTypes = NestedTypes.find(name);
   bool shouldUpdatePA = false;
-  auto &builder = *getBuilder();
   if (knownNestedTypes != NestedTypes.end()) {
     for (auto existingPA : knownNestedTypes->second) {
       // Do we have an associated-type match?
@@ -3091,7 +3093,8 @@ static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
       if (!parentEquivClass)
         return ErrorType::get(depTy);
 
-      auto memberType = parentEquivClass->lookupNestedType(depTy->getName());
+      auto memberType =
+        parentEquivClass->lookupNestedType(builder, depTy->getName());
       if (!memberType)
         return ErrorType::get(depTy);
 
@@ -3137,7 +3140,8 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
     if (auto assocType = depMemTy->getAssocType()) {
       nestedTypeDecl = assocType;
     } else {
-      nestedTypeDecl = baseEquivClass->lookupNestedType(depMemTy->getName());
+      nestedTypeDecl =
+        baseEquivClass->lookupNestedType(*this, depMemTy->getName());
       if (!nestedTypeDecl) {
         return ResolvedType::forUnresolved(baseEquivClass);
       }
@@ -3155,7 +3159,8 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
     }
 
     auto nestedPA =
-      basePA->updateNestedTypeForConformance(nestedTypeDecl, resolutionKind);
+      basePA->updateNestedTypeForConformance(*this, nestedTypeDecl,
+                                             resolutionKind);
     if (!nestedPA)
       return ResolvedType::forUnresolved(baseEquivClass);
 
@@ -3617,7 +3622,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   // Add the conformance requirement, bailing out earlier if we've already
   // seen it.
   auto equivClass = type.getEquivalenceClass();
-  if (!equivClass->recordConformanceConstraint(type, proto, source))
+  if (!equivClass->recordConformanceConstraint(*this, type, proto, source))
     return ConstraintResult::Resolved;
 
   auto resolvedSource = source.getSource(*this, type.getDependentType());
@@ -3964,6 +3969,7 @@ void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
 
   PotentialArchetype *existingPA =
     parentRepPA->updateNestedTypeForConformance(
+                                        *this,
                                         nestedPA->getResolvedType(),
                                         ArchetypeResolutionKind::WellFormed);
 
@@ -4075,7 +4081,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   // Add all of the protocol conformance requirements of T2 to T1.
   if (equivClass2) {
     for (const auto &entry : equivClass2->conformsTo) {
-      equivClass->recordConformanceConstraint(T1, entry.first,
+      equivClass->recordConformanceConstraint(*this, T1, entry.first,
                                               entry.second.front().source);
 
       auto &constraints1 = equivClass->conformsTo[entry.first];

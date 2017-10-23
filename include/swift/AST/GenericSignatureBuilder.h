@@ -208,7 +208,8 @@ public:
     ///
     /// \returns true if this conformance is new to the equivalence class,
     /// and false otherwise.
-    bool recordConformanceConstraint(ResolvedType type,
+    bool recordConformanceConstraint(GenericSignatureBuilder &builder,
+                                     ResolvedType type,
                                      ProtocolDecl *proto,
                                      FloatingRequirementSource source);
 
@@ -236,12 +237,14 @@ public:
     /// \param otherConcreteTypes If non-null, will be filled in the all of the
     /// concrete types we found (other than the result) with the same name.
     TypeDecl *lookupNestedType(
+                   GenericSignatureBuilder &builder,
                    Identifier name,
                    SmallVectorImpl<TypeDecl *> *otherConcreteTypes = nullptr);
 
     /// Retrieve the "anchor" type that canonically describes this equivalence
     /// class, for use in the canonical type.
-    Type getAnchor(ArrayRef<GenericTypeParamType *> genericParams);
+    Type getAnchor(GenericSignatureBuilder &builder,
+                   ArrayRef<GenericTypeParamType *> genericParams);
 
     /// \brief Retrieve (or build) the contextual type corresponding to
     /// this equivalence class within the given generic environment.
@@ -1701,6 +1704,7 @@ public:
   /// type or typealias of the given protocol, unless the \c kind implies that
   /// a potential archetype should not be created if it's missing.
   PotentialArchetype *updateNestedTypeForConformance(
+                        GenericSignatureBuilder &builder,
                         TypeDecl *type,
                         ArchetypeResolutionKind kind);
 
