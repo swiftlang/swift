@@ -362,11 +362,6 @@ public protocol RangeReplaceableCollection : Collection
 //===----------------------------------------------------------------------===//
 
 extension RangeReplaceableCollection {
-  @_inlineable
-  public subscript(bounds: Range<Index>) -> RangeReplaceableSlice<Self> {
-    return RangeReplaceableSlice(base: self, bounds: bounds)
-  }
-
   /// Creates a new collection containing the specified number of a single,
   /// repeated value.
   ///
@@ -657,7 +652,6 @@ extension RangeReplaceableCollection {
 // collections.
 
 % for capability in ['', 'Bidirectional', 'RandomAccess']:
-%   if capability:
 extension RangeReplaceableCollection where
     Self.SubSequence == RangeReplaceable${capability}Slice<Self> {
   @_inlineable // FIXME(sil-serialize-all)
@@ -666,7 +660,6 @@ extension RangeReplaceableCollection where
     return RangeReplaceable${capability}Slice(base: self, bounds: bounds)
   }
 }
-%   end
 
 extension RangeReplaceableCollection where
   Self.SubSequence == MutableRangeReplaceable${capability}Slice<Self>
