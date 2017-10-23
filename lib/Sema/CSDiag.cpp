@@ -4387,6 +4387,21 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
   return false;
 }
 
+// Extract expression for failed argument number
+static Expr *getFailedArgumentExpr(CalleeCandidateInfo CCI, Expr *argExpr) {
+  if (auto *TE = dyn_cast<TupleExpr>(argExpr))
+    return TE->getElement(CCI.failedArgument.argumentNumber);
+  else if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+    assert(CCI.failedArgument.argumentNumber == 0 &&
+           "Unexpected argument #");
+    return PE->getSubExpr();
+  } else {
+    assert(CCI.failedArgument.argumentNumber == 0 &&
+           "Unexpected argument #");
+    return argExpr;
+  }
+}
+
 /// If the candidate set has been narrowed down to a specific structural
 /// problem, e.g. that there are too few parameters specified or that argument
 /// labels don't match up, diagnose that error and return true.
@@ -4451,20 +4466,8 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
     if (CCI.failedArgument.parameterType->is<InOutType>())
       options |= TCC_AllowLValue;
 
-    Expr *badArgExpr;
-    if (auto *TE = dyn_cast<TupleExpr>(argExpr))
-      badArgExpr = TE->getElement(CCI.failedArgument.argumentNumber);
-    else if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
-      assert(CCI.failedArgument.argumentNumber == 0 &&
-             "Unexpected argument #");
-      badArgExpr = PE->getSubExpr();
-    } else {
-      assert(CCI.failedArgument.argumentNumber == 0 &&
-             "Unexpected argument #");
-      badArgExpr = argExpr;
-    }
-
     // It could be that the argument doesn't conform to an archetype.
+    Expr *badArgExpr = getFailedArgumentExpr(CCI, argExpr);
     if (CCI.diagnoseGenericParameterErrors(badArgExpr))
       return true;
 
@@ -5735,9 +5738,17 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                                           calleeInfo, argLabels))
     return true;
 
+  // If we have a failure where closeness is an exact match, but there is
+  // still a failed argument, it is because one (or more) of the arguments
+  // types are unresolved.
+  if (calleeInfo.closeness == CC_ExactMatch && calleeInfo.failedArgument.isValid()) {
+    diagnoseAmbiguity(getFailedArgumentExpr(calleeInfo, argExpr));
+    return true;
+  }
+
   if (isContextualConversionFailure(argExpr))
     return false;
-  
+
   // Generate specific error messages for unary operators.
   if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
     assert(!overloadName.empty());

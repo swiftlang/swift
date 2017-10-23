@@ -118,8 +118,8 @@ func rdar32431165_1(_: Int, _: E_32431165) {}
 rdar32431165_1(E_32431165.baz)
 // expected-error@-1 {{type 'E_32431165' has no member 'baz'}}
 
-rdar32431165_1(.baz) // FIXME: the error should be {{reference to member 'baz' cannot be resolved without a contextual type}}
-// expected-error@-1 {{expression type '()' is ambiguous without more context}}
+rdar32431165_1(.baz)
+// expected-error@-1 {{reference to member 'baz' cannot be resolved without a contextual type}}
 
 rdar32431165_1("")
 // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{15-15=E_32431165(rawValue: }} {{19-19=)}}
