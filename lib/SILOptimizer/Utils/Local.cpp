@@ -2887,7 +2887,9 @@ swift::analyzeStaticInitializer(SILValue V,
         return false;
     }
     return true;
-  } else if (auto *TI = dyn_cast<TupleInst>(V)) {
+  }
+
+  if (auto *TI = dyn_cast<TupleInst>(V)) {
     // If it is not a tuple which is a simple type, bail.
     if (!isSimpleType(TI->getType(), TI->getModule()))
       return false;
@@ -2898,7 +2900,9 @@ swift::analyzeStaticInitializer(SILValue V,
         return false;
     }
     return true;
-  } else if (auto *bi = dyn_cast<BuiltinInst>(V)) {
+  }
+
+  if (auto *bi = dyn_cast<BuiltinInst>(V)) {
     switch (bi->getBuiltinInfo().ID) {
     case BuiltinValueKind::FPTrunc:
       if (auto *LI = dyn_cast<LiteralInst>(bi->getArguments()[0])) {
@@ -2908,13 +2912,15 @@ swift::analyzeStaticInitializer(SILValue V,
     default:
       return false;
     }
-  } else if (isa<IntegerLiteralInst>(V)
-             || isa<FloatLiteralInst>(V)
-             || isa<StringLiteralInst>(V)) {
-    return true;
-  } else {
-    return false;
   }
+
+  if (isa<IntegerLiteralInst>(V)
+      || isa<FloatLiteralInst>(V)
+      || isa<StringLiteralInst>(V)) {
+    return true;
+  }
+
+  return false;
 }
 
 /// Replace load sequence which may contain
