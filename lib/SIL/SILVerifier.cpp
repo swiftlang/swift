@@ -4031,8 +4031,6 @@ public:
       auto mappedTy = F.mapTypeIntoContext(ty);
       SILArgument *bbarg = *argI;
       ++argI;
-      auto ownershipkind = ValueOwnershipKind(
-          M, mappedTy, fnConv.getSILArgumentConvention(bbarg->getIndex()));
       if (bbarg->getType() != mappedTy) {
         llvm::errs() << what << " type mismatch!\n";
         llvm::errs() << "  argument: "; bbarg->dump();
@@ -4044,6 +4042,9 @@ public:
       if (!F.hasQualifiedOwnership()) {
         return;
       }
+
+      auto ownershipkind = ValueOwnershipKind(
+          M, mappedTy, fnConv.getSILArgumentConvention(bbarg->getIndex()));
 
       if (bbarg->getOwnershipKind() != ownershipkind) {
         llvm::errs() << what << " ownership kind mismatch!\n";
