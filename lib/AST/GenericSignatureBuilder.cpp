@@ -1594,12 +1594,14 @@ public:
   }
 
   /// Retrieve the equivalence class into which a resolved type refers.
-  EquivalenceClass *getEquivalenceClass() const {
+  EquivalenceClass *getEquivalenceClass(
+                     GenericSignatureBuilder &builder) const {
     assert(*this && "Only for resolved types");
     if (equivClass) return equivClass;
 
     // Create the equivalence class now.
-    return type.get<PotentialArchetype *>()->getOrCreateEquivalenceClass();
+    return type.get<PotentialArchetype *>()
+             ->getOrCreateEquivalenceClass(builder);
   }
 
   /// Retrieve the unresolved result.
@@ -1653,6 +1655,23 @@ bool EquivalenceClass::recordConformanceConstraint(
   ++NumConformanceConstraints;
 
   return inserted;
+}
+
+bool EquivalenceClass::recordSameTypeConstraint(
+                              GenericSignatureBuilder &builder,
+                              PotentialArchetype *type1,
+                              PotentialArchetype *type2,
+                              const RequirementSource *source) {
+  sameTypeConstraints[type1].push_back({type1, type2, source});
+  ++NumSameTypeConstraints;
+
+  if (type1 != type2) {
+    type2->getOrCreateEquivalenceClass(builder)
+      ->sameTypeConstraints[type2].push_back({type2, type1, source});
+    ++NumSameTypeConstraints;
+  }
+
+  return true;
 }
 
 template<typename T>
@@ -2238,7 +2257,7 @@ static void addConditionalRequirements(GenericSignatureBuilder &builder,
 const RequirementSource *
 GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
                                                     ProtocolDecl *proto) {
-  auto equivClass = type.getEquivalenceClass();
+  auto equivClass = type.getEquivalenceClass(*this);
   auto concrete = equivClass->concreteType;
   if (!concrete) return nullptr;
 
@@ -2280,7 +2299,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
                                                         ResolvedType type,
                                                         ProtocolDecl *proto) {
   // Get the superclass constraint.
-  auto equivClass = type.getEquivalenceClass();
+  auto equivClass = type.getEquivalenceClass(*this);
   Type superclass = equivClass->superclass;
   if (!superclass) return nullptr;
 
@@ -2375,12 +2394,13 @@ static void maybeAddSameTypeRequirementForNestedType(
         GenericSignatureBuilder::UnresolvedHandlingKind::GenerateConstraints);
 }
 
-auto PotentialArchetype::getOrCreateEquivalenceClass() const
+auto PotentialArchetype::getOrCreateEquivalenceClass(
+                                       GenericSignatureBuilder &builder) const
     -> EquivalenceClass * {
   // The equivalence class is stored on the representative.
   auto representative = getRepresentative();
   if (representative != this)
-    return representative->getOrCreateEquivalenceClass();
+    return representative->getOrCreateEquivalenceClass(builder);
 
   // If we already have an equivalence class, return it.
   if (auto equivClass = getEquivalenceClassIfPresent())
@@ -2388,7 +2408,7 @@ auto PotentialArchetype::getOrCreateEquivalenceClass() const
 
   // Create a new equivalence class.
   auto equivClass =
-    getBuilder()->Impl->allocateEquivalenceClass(
+    builder.Impl->allocateEquivalenceClass(
       const_cast<PotentialArchetype *>(this));
   representativeOrEquivClass = equivClass;
   return equivClass;
@@ -2696,8 +2716,8 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
                                            ArchetypeResolutionKind kind) {
   SmallVector<TypeDecl *, 4> concreteDecls;
   auto bestType =
-    getOrCreateEquivalenceClass()->lookupNestedType(builder, name,
-                                                    &concreteDecls);
+    getOrCreateEquivalenceClass(builder)->lookupNestedType(builder, name,
+                                                           &concreteDecls);
 
   // We didn't find any type with this name.
   if (!bestType) return nullptr;
@@ -2772,7 +2792,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
     case ArchetypeResolutionKind::WellFormed: {
       // Creating a new potential archetype in an equivalence class is a
       // modification.
-      getOrCreateEquivalenceClass()->modified(builder);
+      getOrCreateEquivalenceClass(builder)->modified(builder);
 
       void *mem = builder.Impl->Allocator.Allocate<PotentialArchetype>();
       if (assocType)
@@ -3135,7 +3155,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
     if (!resolvedBase) return resolvedBase;
 
     // Find the nested type declaration for this.
-    auto baseEquivClass = resolvedBase.getEquivalenceClass();
+    auto baseEquivClass = resolvedBase.getEquivalenceClass(*this);
     TypeDecl *nestedTypeDecl;
     if (auto assocType = depMemTy->getAssocType()) {
       nestedTypeDecl = assocType;
@@ -3183,7 +3203,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
     }
 
     return ResolvedType(resolvedMemberType,
-                         nestedPA->getOrCreateEquivalenceClass());
+                         nestedPA->getOrCreateEquivalenceClass(*this));
   }
 
   // If it's not a type parameter, it won't directly resolve to one.
@@ -3208,7 +3228,7 @@ EquivalenceClass *GenericSignatureBuilder::resolveEquivalenceClass(
   if (auto resolved =
         maybeResolveEquivalenceClass(type, resolutionKind,
                                      /*wantExactPotentialArchetype=*/false))
-    return resolved.getEquivalenceClass();
+    return resolved.getEquivalenceClass(*this);
 
   return nullptr;
 }
@@ -3617,7 +3637,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
                                FloatingRequirementSource source) {
   // Add the conformance requirement, bailing out earlier if we've already
   // seen it.
-  auto equivClass = type.getEquivalenceClass();
+  auto equivClass = type.getEquivalenceClass(*this);
   if (!equivClass->recordConformanceConstraint(*this, type, proto, source))
     return ConstraintResult::Resolved;
 
@@ -3630,7 +3650,7 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
                                              ResolvedType type,
                                              LayoutConstraint layout,
                                              FloatingRequirementSource source) {
-  auto equivClass = type.getEquivalenceClass();
+  auto equivClass = type.getEquivalenceClass(*this);
 
   // Update the layout in the equivalence class, if we didn't have one already.
   bool anyChanges = false;
@@ -3697,7 +3717,7 @@ bool GenericSignatureBuilder::updateSuperclass(
                                            ResolvedType type,
                                            Type superclass,
                                            FloatingRequirementSource source) {
-  auto equivClass = type.getEquivalenceClass();
+  auto equivClass = type.getEquivalenceClass(*this);
 
   // Local function to handle the update of superclass conformances
   // when the superclass constraint changes.
@@ -3776,7 +3796,7 @@ ConstraintResult GenericSignatureBuilder::addSuperclassRequirementDirect(
   auto resolvedSource = source.getSource(*this, type.getDependentType());
 
   // Record the constraint.
-  auto equivClass = type.getEquivalenceClass();
+  auto equivClass = type.getEquivalenceClass(*this);
   equivClass->superclassConstraints.push_back(
     ConcreteConstraint{type.getUnresolvedType(), superclass, resolvedSource});
   equivClass->modified(*this);
@@ -3924,22 +3944,6 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                                         source);
 }
 
-void GenericSignatureBuilder::PotentialArchetype::addSameTypeConstraint(
-                                             PotentialArchetype *otherPA,
-                                             const RequirementSource *source) {
-  // Update the same-type constraints of this PA to reference the other PA.
-  getOrCreateEquivalenceClass()->sameTypeConstraints[this]
-    .push_back({this, otherPA, source});
-  ++NumSameTypeConstraints;
-
-  if (this != otherPA) {
-    // Update the same-type constraints of the other PA to reference this PA.
-    otherPA->getOrCreateEquivalenceClass()->sameTypeConstraints[otherPA]
-      .push_back({otherPA, this, source});
-    ++NumSameTypeConstraints;
-  }
-}
-
 void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
   // If there was already another type with this name within the parent
   // potential archetype, equate this type with that one.
@@ -3982,16 +3986,16 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
        PotentialArchetype *OrigT2,
        const RequirementSource *Source) 
 {
-  // Record the same-type constraint.
-  OrigT1->addSameTypeConstraint(OrigT2, Source);
-
   // Operate on the representatives
   auto T1 = OrigT1->getRepresentative();
   auto T2 = OrigT2->getRepresentative();
 
   // If the representatives are already the same, we're done.
-  if (T1 == T2)
+  if (T1 == T2) {
+    T1->getOrCreateEquivalenceClass(*this)
+      ->recordSameTypeConstraint(*this, OrigT1, OrigT2, Source);
     return ConstraintResult::Resolved;
+  }
 
   unsigned nestingDepth1 = T1->getNestingDepth();
   unsigned nestingDepth2 = T2->getNestingDepth();
@@ -4005,8 +4009,11 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   }
 
   // Merge the equivalence classes.
-  auto equivClass = T1->getOrCreateEquivalenceClass();
+  auto equivClass = T1->getOrCreateEquivalenceClass(*this);
   equivClass->modified(*this);
+
+  // Record the same-type constraint.
+  equivClass->recordSameTypeConstraint(*this, OrigT1, OrigT2, Source);
 
   auto equivClass1Members = equivClass->members;
   auto equivClass2Members = T2->getEquivalenceClassMembers();
@@ -4137,7 +4144,7 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
        Type Concrete,
        const RequirementSource *Source) {
   auto rep = T->getRepresentative();
-  auto equivClass = rep->getOrCreateEquivalenceClass();
+  auto equivClass = rep->getOrCreateEquivalenceClass(*this);
 
   // Record the concrete type and its source.
   equivClass->concreteTypeConstraints.push_back(
@@ -4889,7 +4896,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
       // Don't allow a generic parameter to be equivalent to a concrete type,
       // because then we don't actually have a parameter.
-      auto equivClass = rep->getOrCreateEquivalenceClass();
+      auto equivClass = rep->getOrCreateEquivalenceClass(*this);
       if (equivClass->concreteType) {
         if (auto constraint = equivClass->findAnyConcreteConstraintAsWritten()){
           Impl->HadAnyError = true;
@@ -5436,7 +5443,7 @@ static void computeDerivedSameTypeComponents(
               PotentialArchetype *rep,
               llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf){
   // Perform a depth-first search to identify the components.
-  auto equivClass = rep->getOrCreateEquivalenceClass();
+  auto equivClass = rep->getOrCreateEquivalenceClass(builder);
   auto &components = equivClass->derivedSameTypeComponents;
   for (auto pa : rep->getEquivalenceClassMembers()) {
     // If we've already seen this potential archetype, there's nothing else to
@@ -6044,7 +6051,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 void GenericSignatureBuilder::checkConcreteTypeConstraints(
                                  ArrayRef<GenericTypeParamType *> genericParams,
                                  PotentialArchetype *representative) {
-  auto equivClass = representative->getOrCreateEquivalenceClass();
+  auto equivClass = representative->getOrCreateEquivalenceClass(*this);
   assert(equivClass->concreteType && "No concrete type to check");
 
   checkConstraintList<Type>(
@@ -6081,7 +6088,7 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
 void GenericSignatureBuilder::checkSuperclassConstraints(
                                  ArrayRef<GenericTypeParamType *> genericParams,
                                  PotentialArchetype *representative) {
-  auto equivClass = representative->getOrCreateEquivalenceClass();
+  auto equivClass = representative->getOrCreateEquivalenceClass(*this);
   assert(equivClass->superclass && "No superclass constraint?");
 
   // FIXME: We should be substituting in the canonical type in context so
@@ -6236,7 +6243,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
     //
     // FIXME: O(n) in the number of implied connected components within the
     // equivalence class. The equivalence class should be small, but...
-    auto equivClass = archetype->getOrCreateEquivalenceClass();
+    auto equivClass = archetype->getOrCreateEquivalenceClass(*this);
 
     assert(!equivClass->derivedSameTypeComponents.empty() &&
            "Didn't compute derived same-type components?");

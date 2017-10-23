@@ -213,6 +213,16 @@ public:
                                      ProtocolDecl *proto,
                                      FloatingRequirementSource source);
 
+    /// Record a same-type constraint between \c type1 and \c type2 determined
+    /// via the given source.
+    ///
+    /// \returns true if this same-type constraint merges two equivalence
+    /// classes, and false otherwise.
+    bool recordSameTypeConstraint(GenericSignatureBuilder &builder,
+                                  PotentialArchetype *type1,
+                                  PotentialArchetype *type2,
+                                  const RequirementSource *source);
+
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
     /// that concrete type as written.
@@ -1655,7 +1665,8 @@ public:
   }
 
   /// Retrieve or create the equivalence class.
-  EquivalenceClass *getOrCreateEquivalenceClass() const;
+  EquivalenceClass *getOrCreateEquivalenceClass(
+                                    GenericSignatureBuilder &builder) const;
 
   /// Retrieve the equivalence class containing this potential archetype.
   TinyPtrVector<PotentialArchetype *> getEquivalenceClassMembers() const {
@@ -1669,11 +1680,6 @@ public:
   /// \brief Retrieve the potential archetype to be used as the anchor for
   /// potential archetype computations.
   PotentialArchetype *getArchetypeAnchor(GenericSignatureBuilder &builder);
-
-  /// Add a same-type constraint between this archetype and the given
-  /// other archetype.
-  void addSameTypeConstraint(PotentialArchetype *otherPA,
-                             const RequirementSource *source);
 
   /// Retrieve the same-type constraints.
   ArrayRef<Constraint<PotentialArchetype *>> getSameTypeConstraints() const {
