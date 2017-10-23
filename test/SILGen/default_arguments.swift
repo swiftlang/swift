@@ -116,7 +116,7 @@ class Foo {
 
   // CHECK-LABEL: sil hidden @_T017default_arguments3FooCACSi3int_SS6stringtcfc : $@convention(method) (Int, @owned String, @owned Foo) -> @owned Foo
   // CHECK:         string_literal utf16 "init(int:string:)"
-  init(int: Int, string: String) {
+  init(int: Int, string: String = #function) {
     testMagicLiterals()
     closure { testMagicLiterals() }
     autoclosure(testMagicLiterals())
@@ -138,6 +138,9 @@ class Foo {
     autoclosure(testMagicLiterals())
     return x
   }
+ 
+  static let x = Foo(int:0)
+
 }
 
 // Test at top level.
