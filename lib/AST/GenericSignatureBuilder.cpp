@@ -2925,8 +2925,8 @@ Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
 }
 
 ASTContext &PotentialArchetype::getASTContext() const {
-  if (auto builder = parentOrBuilder.dyn_cast<GenericSignatureBuilder *>())
-    return builder->getASTContext();
+  if (auto context = parentOrContext.dyn_cast<ASTContext *>())
+    return *context;
 
   return getResolvedType()->getASTContext();
 }
@@ -3068,10 +3068,6 @@ GenericSignatureBuilder::GenericSignatureBuilder(
     for (auto &gp : Impl->GenericParams) {
       gp = gp->getCanonicalType()->castTo<GenericTypeParamType>();
     }
-
-    // Point each root potential archetype at this generic signature builder.
-    for (auto pa : Impl->PotentialArchetypes)
-      pa->replaceBuilder(this);
   }
 }
 
@@ -3299,7 +3295,7 @@ void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericP
 
   // Create a potential archetype for this type parameter.
   void *mem = Impl->Allocator.Allocate<PotentialArchetype>();
-  auto PA = new (mem) PotentialArchetype(this, GenericParam);
+  auto PA = new (mem) PotentialArchetype(getASTContext(), GenericParam);
   Impl->GenericParams.push_back(GenericParam);
   Impl->PotentialArchetypes.push_back(PA);
 }
