@@ -223,9 +223,9 @@ namespace {
 
     void advance() {
       while (base != baseEnd) {
-       if (compareDependentTypes(base->getSubjectDependentType(),
-                                 base->value->getDependentType({ })) <= 0)
-         break;
+        if (compareDependentTypes(base->getSubjectDependentType({ }),
+                                  base->value->getDependentType({ })) <= 0)
+          break;
 
         ++base;
       }
@@ -1574,7 +1574,7 @@ public:
   explicit operator bool() const { return !type.isNull(); }
 
   /// Retrieve the dependent type.
-  Type getDependentType() const;
+  Type getDependentType(GenericSignatureBuilder &builder) const;
 
   /// Retrieve the concrete type, or a null type if this result doesn't store
   /// a concrete type.
@@ -1651,7 +1651,8 @@ bool EquivalenceClass::recordConformanceConstraint(
 
   // Record this conformance source.
   known->second.push_back({type.getUnresolvedType(), proto,
-                           source.getSource(builder, type.getDependentType())});
+                           source.getSource(builder,
+                                            type.getDependentType(builder))});
   ++NumConformanceConstraints;
 
   return inserted;
@@ -1675,11 +1676,12 @@ bool EquivalenceClass::recordSameTypeConstraint(
 }
 
 template<typename T>
-Type Constraint<T>::getSubjectDependentType() const {
+Type Constraint<T>::getSubjectDependentType(
+                        ArrayRef<GenericTypeParamType *> genericParams) const {
   if (auto type = subject.dyn_cast<Type>())
     return type;
 
-  return subject.get<PotentialArchetype *>()->getDependentType({ });
+  return subject.get<PotentialArchetype *>()->getDependentType(genericParams);
 }
 
 template<typename T>
@@ -1707,7 +1709,7 @@ bool Constraint<T>::isSubjectEqualTo(const PotentialArchetype *pa) const {
   if (auto subjectPA = subject.dyn_cast<PotentialArchetype *>())
     return subjectPA == pa;
 
-  return getSubjectDependentType()->isEqual(pa->getDependentType({ }));
+  return getSubjectDependentType({ })->isEqual(pa->getDependentType({ }));
 }
 
 template<typename T>
@@ -1718,7 +1720,8 @@ bool Constraint<T>::hasSameSubjectAs(const Constraint<T> &other) const {
       return subjectPA == otherSubjectPA;
   }
 
-  return getSubjectDependentType()->isEqual(other.getSubjectDependentType());
+  return getSubjectDependentType({ })
+    ->isEqual(other.getSubjectDependentType({ }));
 }
 
 Optional<ConcreteConstraint>
@@ -1913,7 +1916,7 @@ TypeDecl *EquivalenceClass::lookupNestedType(
 
   // Infer same-type constraints among same-named associated type anchors.
   if (assocTypeAnchors.size() > 1) {
-    auto anchorType = getAnchor(builder, { });
+    auto anchorType = getAnchor(builder, builder.getGenericParams());
     auto inferredSource = FloatingRequirementSource::forInferred(nullptr);
     for (auto assocType : assocTypeAnchors) {
       if (assocType == bestAssocType) continue;
@@ -2272,7 +2275,7 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
 
   // Lookup the conformance of the concrete type to this protocol.
   auto conformance =
-      lookupConformance(type.getDependentType()->getCanonicalType(),
+      lookupConformance(type.getDependentType(*this)->getCanonicalType(),
                         concrete,
                         proto->getDeclaredInterfaceType()
                           ->castTo<ProtocolType>());
@@ -2305,7 +2308,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
 
   // Lookup the conformance of the superclass to this protocol.
   auto conformance =
-    lookupConformance(type.getDependentType()->getCanonicalType(),
+    lookupConformance(type.getDependentType(*this)->getCanonicalType(),
                       superclass,
                       proto->getDeclaredInterfaceType()
                         ->castTo<ProtocolType>());
@@ -2348,10 +2351,10 @@ PotentialArchetype *ResolvedType::realizePotentialArchetype(
   return pa;
 }
 
-Type ResolvedType::getDependentType() const {
+Type ResolvedType::getDependentType(GenericSignatureBuilder &builder) const {
   // Already-resolved potential archetype.
   if (auto pa = type.dyn_cast<PotentialArchetype *>())
-    return pa->getDependentType({ });
+    return pa->getDependentType(builder.getGenericParams());
 
   Type result = type.get<Type>();
   return result->isTypeParameter() ? result : Type();
@@ -2371,7 +2374,7 @@ static void maybeAddSameTypeRequirementForNestedType(
 
   // Dig out the associated type.
   AssociatedTypeDecl *assocType = nullptr;
-  if (auto depMemTy = nested.getDependentType()->getAs<DependentMemberType>())
+  if (auto depMemTy = nested.getDependentType(builder)->getAs<DependentMemberType>())
     assocType = depMemTy->getAssocType();
 
   if (!assocType) return;
@@ -2833,7 +2836,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
           // Substitute in the type of the current PotentialArchetype in
           // place of 'Self' here.
           auto subMap = SubstitutionMap::getProtocolSubstitutions(
-            proto, getDependentType(/*genericParams=*/{}),
+            proto, getDependentType(builder.getGenericParams()),
             ProtocolConformanceRef(proto));
           type = type.subst(subMap, SubstFlags::UseErrorType);
           if (!type)
@@ -2851,8 +2854,8 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
                          UnresolvedType(resultPA),
                          UnresolvedType(type),
                          RequirementSource::forConcreteTypeBinding(
-                                             builder,
-                                             resultPA->getDependentType({ })),
+                           builder,
+                           resultPA->getDependentType(builder.getGenericParams())),
                          UnresolvedHandlingKind::GenerateConstraints);
       }
     }
@@ -2911,12 +2914,21 @@ Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
   
   assert(isGenericParam() && "Not a generic parameter?");
 
-  // FIXME: This is a temporary workaround.
-  if (genericParams.empty())
-    genericParams = getBuilder()->Impl->GenericParams;
+  if (genericParams.empty()) {
+    return GenericTypeParamType::get(getGenericParamKey().Depth,
+                                     getGenericParamKey().Index,
+                                     getASTContext());
+  }
 
   unsigned index = getGenericParamKey().findIndexIn(genericParams);
   return genericParams[index];
+}
+
+ASTContext &PotentialArchetype::getASTContext() const {
+  if (auto builder = parentOrBuilder.dyn_cast<GenericSignatureBuilder *>())
+    return builder->getASTContext();
+
+  return getResolvedType()->getASTContext();
 }
 
 void GenericSignatureBuilder::PotentialArchetype::dump() const {
@@ -3191,7 +3203,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
       return ResolvedType(nestedPA);
 
     // Compute the resolved dependent type to return.
-    Type resolvedBaseType = resolvedBase.getDependentType();
+    Type resolvedBaseType = resolvedBase.getDependentType(*this);
     Type resolvedMemberType;
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(nestedTypeDecl)) {
       resolvedMemberType =
@@ -3254,6 +3266,11 @@ bool GenericSignatureBuilder::areInSameEquivalenceClass(Type type1,
                                                         Type type2) {
   return resolveEquivalenceClass(type1, ArchetypeResolutionKind::WellFormed)
     == resolveEquivalenceClass(type2, ArchetypeResolutionKind::WellFormed);
+}
+
+ArrayRef<GenericTypeParamType *>
+GenericSignatureBuilder::getGenericParams() const {
+  return Impl->GenericParams;
 }
 
 void GenericSignatureBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
@@ -3332,7 +3349,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
                                             const RequirementSource *source,
                                             bool onlySameTypeConstraints) {
   auto protocolSubMap = SubstitutionMap::getProtocolSubstitutions(
-      proto, selfType.getDependentType(), ProtocolConformanceRef(proto));
+      proto, selfType.getDependentType(*this), ProtocolConformanceRef(proto));
 
   // Use the requirement signature to avoid rewalking the entire protocol.  This
   // cannot compute the requirement signature directly, because that may be
@@ -3498,7 +3515,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     if (auto assocTypeDecl = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
       Type assocType =
-        DependentMemberType::get(selfType.getDependentType(), assocTypeDecl);
+        DependentMemberType::get(selfType.getDependentType(*this), assocTypeDecl);
       if (!onlySameTypeConstraints) {
         auto assocResult =
           addInheritedRequirements(assocTypeDecl, assocType, source,
@@ -3645,7 +3662,8 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   if (!equivClass->recordConformanceConstraint(*this, type, proto, source))
     return ConstraintResult::Resolved;
 
-  auto resolvedSource = source.getSource(*this, type.getDependentType());
+  auto resolvedSource = source.getSource(*this,
+                                         type.getDependentType(*this));
   return expandConformanceRequirement(type, proto, resolvedSource,
                                       /*onlySameTypeRequirements=*/false);
 }
@@ -3672,7 +3690,7 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
 
   // Record this layout constraint.
   equivClass->layoutConstraints.push_back({type.getUnresolvedType(),
-    layout, source.getSource(*this, type.getDependentType())});
+    layout, source.getSource(*this, type.getDependentType(*this))});
   equivClass->modified(*this);
   ++NumLayoutConstraints;
   if (!anyChanges) ++NumLayoutConstraintsExtra;
@@ -3736,7 +3754,7 @@ bool GenericSignatureBuilder::updateSuperclass(
 
           // FIXME: More efficient way to extend resolved type?
           Type nestedType =
-            DependentMemberType::get(type.getDependentType(), assocType);
+            DependentMemberType::get(type.getDependentType(*this), assocType);
           if (auto nested =
                 maybeResolveEquivalenceClass(
                                  nestedType,
@@ -3759,7 +3777,8 @@ bool GenericSignatureBuilder::updateSuperclass(
     // Presence of a superclass constraint implies a _Class layout
     // constraint.
     auto layoutReqSource =
-      source.getSource(*this, type.getDependentType())->viaDerived(*this);
+      source.getSource(*this,
+                       type.getDependentType(*this))->viaDerived(*this);
     addLayoutRequirementDirect(type,
                          LayoutConstraint::getLayoutConstraint(
                              superclass->getClassOrBoundGenericClass()->isObjC()
@@ -3797,7 +3816,8 @@ ConstraintResult GenericSignatureBuilder::addSuperclassRequirementDirect(
                                             ResolvedType type,
                                             Type superclass,
                                             FloatingRequirementSource source) {
-  auto resolvedSource = source.getSource(*this, type.getDependentType());
+  auto resolvedSource =
+    source.getSource(*this, type.getDependentType(*this));
 
   // Record the constraint.
   auto equivClass = type.getEquivalenceClass(*this);
@@ -3839,7 +3859,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   // The right-hand side needs to be concrete.
   Type constraintType = resolvedConstraint.getAsConcreteType();
   if (!constraintType) {
-    constraintType = resolvedConstraint.getDependentType();
+    constraintType = resolvedConstraint.getDependentType(*this);
     assert(constraintType && "No type to express resolved constraint?");
   }
 
@@ -3850,7 +3870,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       auto subjectType = subject.dyn_cast<Type>();
       if (!subjectType)
         subjectType = subject.get<PotentialArchetype *>()
-                        ->getDependentType(Impl->GenericParams);
+                        ->getDependentType(getGenericParams());
 
       Impl->HadAnyError = true;
       Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
@@ -4100,7 +4120,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   }
 
   // Recursively merge the associated types of T2 into T1.
-  auto dependentT1 = T1->getDependentType({ });
+  auto dependentT1 = T1->getDependentType(getGenericParams());
   for (auto equivT2 : equivClass2Members) {
     for (auto T2Nested : equivT2->NestedTypes) {
       // If T1 is concrete but T2 is not, concretize the nested types of T2.
@@ -4283,14 +4303,17 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementDirect(
   if (pa1 && pa2) {
     return addSameTypeRequirementBetweenArchetypes(
                        pa1, pa2,
-                       source.getSource(*this, paOrT2.getDependentType()));
+                       source.getSource(*this,
+                                        paOrT2.getDependentType(*this)));
     // If just one side is a type parameter, map it to a concrete type.
   } else if (pa1) {
     return addSameTypeRequirementToConcrete(
-                  pa1, t2, source.getSource(*this, paOrT1.getDependentType()));
+                  pa1, t2,
+                  source.getSource(*this, paOrT1.getDependentType(*this)));
   } else if (pa2) {
     return addSameTypeRequirementToConcrete(
-                pa2, t1, source.getSource(*this, paOrT2.getDependentType()));
+                pa2, t1,
+                source.getSource(*this, paOrT2.getDependentType(*this)));
   } else {
     return addSameTypeRequirementBetweenConcrete(t1, t2, source,
                                                  diagnoseMismatch);
@@ -4583,8 +4606,8 @@ namespace swift {
   template<typename T>
   bool operator<(const Constraint<T> &lhs, const Constraint<T> &rhs) {
     // FIXME: Awful.
-    auto lhsSource = lhs.getSubjectDependentType();
-    auto rhsSource = rhs.getSubjectDependentType();
+    auto lhsSource = lhs.getSubjectDependentType({ });
+    auto rhsSource = rhs.getSubjectDependentType({ });
     if (int result = compareDependentTypes(lhsSource, rhsSource))
       return result < 0;
 
@@ -4678,6 +4701,7 @@ namespace {
 /// protocol.
 static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
                                       EquivalenceClass *equivClass) {
+  auto genericParams = builder.getGenericParams();
   auto existingMembers = equivClass->members;
   for (auto pa : existingMembers) {
     // Make sure that there are only associated types that chain up to the
@@ -4692,7 +4716,7 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
     }
     if (foundNonAssociatedType) continue;
 
-    auto dependentType = pa->getDependentType({ });
+    auto dependentType = pa->getDependentType(genericParams);
     for (const auto &conforms : equivClass->conformsTo) {
       auto proto = conforms.first;
 
@@ -4855,7 +4879,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
           Diags.diagnose(source->source->getLoc(),
                          diag::recursive_superclass_constraint,
-                         source->getSubjectDependentType(),
+                         source->getSubjectDependentType(genericParams),
                          equivClass.superclass);
         }
 
@@ -5072,6 +5096,7 @@ namespace {
                          ProtocolDecl *proto,
                          bool dropDerivedViaConcrete = true,
                          bool allCanBeSelfDerived = false) {
+    auto genericParams = builder.getGenericParams();
     bool anyDerivedViaConcrete = false;
     Optional<Constraint<T>> remainingConcrete;
     SmallVector<Constraint<T>, 4> minimalSources;
@@ -5082,7 +5107,7 @@ namespace {
           auto minimalSource =
             constraint.source->getMinimalConformanceSource(
                          builder,
-                         constraint.getSubjectDependentType(),
+                         constraint.getSubjectDependentType(genericParams),
                          proto, derivedViaConcrete);
           if (minimalSource != constraint.source) {
             // The minimal source is smaller than the original source, so the
@@ -5180,7 +5205,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
     Diags.diagnose(representativeConstraint->source->getLoc(),
                    otherNoteDiag,
                    representativeConstraint->source->classifyDiagKind(),
-                   representativeConstraint->getSubjectDependentType(),
+                   representativeConstraint->getSubjectDependentType(
+                                                               genericParams),
                    diagValue(representativeConstraint->value));
   };
 
@@ -5223,7 +5249,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       if (constraint.source->getLoc().isValid()) {
         Impl->HadAnyError = true;
 
-        auto subject = getSubjectType(constraint.getSubjectDependentType());
+        auto subject =
+          getSubjectType(constraint.getSubjectDependentType(genericParams));
         Diags.diagnose(constraint.source->getLoc(), *conflictingDiag,
                        subject.first, subject.second,
                        diagValue(constraint.value),
@@ -5240,7 +5267,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
         Impl->HadAnyError = true;
 
         auto subject =
-          getSubjectType(representativeConstraint->getSubjectDependentType());
+          getSubjectType(
+            representativeConstraint->getSubjectDependentType(genericParams));
         Diags.diagnose(representativeConstraint->source->getLoc(),
                        *conflictingDiag,
                        subject.first, subject.second,
@@ -5262,7 +5290,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
           representativeConstraint->source->shouldDiagnoseRedundancy(false)) {
         Diags.diagnose(constraint.source->getLoc(),
                        redundancyDiag,
-                       constraint.getSubjectDependentType(),
+                       constraint.getSubjectDependentType(genericParams),
                        diagValue(constraint.value));
 
         noteRepresentativeConstraint();
@@ -5465,7 +5493,8 @@ static void computeDerivedSameTypeComponents(
   // per component.
   for (const auto &concrete : equivClass->concreteTypeConstraints) {
     // Dig out the component associated with constraint.
-    Type subjectType = concrete.getSubjectDependentType();
+    Type subjectType =
+      concrete.getSubjectDependentType(builder.getGenericParams());
     auto subjectPA = concrete.realizeSubjectPotentialArchetype(builder);
     assert(componentOf.count(subjectPA) > 0);
     auto &component = components[componentOf[subjectPA]];
@@ -5527,7 +5556,7 @@ namespace {
 }
 
 void IntercomponentEdge::dump() const {
-  llvm::errs() << constraint.getSubjectDependentType().getString() << " -- "
+  llvm::errs() << constraint.getSubjectDependentType({ }).getString() << " -- "
     << constraint.value->getDebugName() << ": ";
   constraint.source->print(llvm::errs(), nullptr);
   llvm::errs() << "\n";
@@ -5678,8 +5707,9 @@ static void collapseSameTypeComponentsThroughDelayedRequirements(
     // We found a potential archetype in another equivalence class. Treat it
     // as a "virtual" component representing that potential archetype's
     // equivalence class.
+    auto genericParams = builder.getGenericParams();
     return getTypeVirtualComponent(
-                             pa->getRepresentative()->getDependentType({ }));
+             pa->getRepresentative()->getDependentType(genericParams));
   };
 
   /// Local function to retrieve the component with which the given type is
@@ -5886,7 +5916,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
         if (constraint.source->shouldDiagnoseRedundancy(true)) {
           Diags.diagnose(constraint.source->getLoc(),
                          diag::redundant_same_type_constraint,
-                         constraint.getSubjectDependentType(),
+                         constraint.getSubjectDependentType(genericParams),
                          constraint.value->getDependentType(genericParams));
         }
 
@@ -6001,12 +6031,12 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 
         Diags.diagnose(lhs.constraint.source->getLoc(),
                        diag::redundant_same_type_constraint,
-                       lhs.constraint.getSubjectDependentType(),
+                       lhs.constraint.getSubjectDependentType(genericParams),
                        lhs.constraint.value->getDependentType(genericParams));
         Diags.diagnose(rhs.constraint.source->getLoc(),
                        diag::previous_same_type_constraint,
                        rhs.constraint.source->classifyDiagKind(),
-                       rhs.constraint.getSubjectDependentType(),
+                       rhs.constraint.getSubjectDependentType(genericParams),
                        rhs.constraint.value->getDependentType(genericParams));
         return true;
       }),
@@ -6027,14 +6057,16 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
             firstEdge.constraint.source->shouldDiagnoseRedundancy(false)) {
           Diags.diagnose(edge.constraint.source->getLoc(),
                          diag::redundant_same_type_constraint,
-                         edge.constraint.getSubjectDependentType(),
+                         edge.constraint.getSubjectDependentType(
+                                                          genericParams),
                          edge.constraint.value->getDependentType(
                                                           genericParams));
 
           Diags.diagnose(firstEdge.constraint.source->getLoc(),
                          diag::previous_same_type_constraint,
                          firstEdge.constraint.source->classifyDiagKind(),
-                         firstEdge.constraint.getSubjectDependentType(),
+                         firstEdge.constraint.getSubjectDependentType(
+                                                          genericParams),
                          firstEdge.constraint.value->getDependentType(
                                                           genericParams));
         }
@@ -6141,20 +6173,22 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
       Impl->HadAnyError = true;
       if (existing) {
         Diags.diagnose(existing->source->getLoc(), diag::type_does_not_inherit,
-                       existing->getSubjectDependentType(),
+                       existing->getSubjectDependentType(getGenericParams()),
                        existing->value, equivClass->superclass);
 
         if (representativeConstraint.source->getLoc().isValid()) {
           Diags.diagnose(representativeConstraint.source->getLoc(),
                          diag::superclass_redundancy_here,
                          representativeConstraint.source->classifyDiagKind(),
-                         representativeConstraint.getSubjectDependentType(),
+                         representativeConstraint.getSubjectDependentType(
+                                                              genericParams),
                          equivClass->superclass);
         }
       } else if (representativeConstraint.source->getLoc().isValid()) {
         Diags.diagnose(representativeConstraint.source->getLoc(),
                        diag::type_does_not_inherit,
-                       representativeConstraint.getSubjectDependentType(),
+                       representativeConstraint.getSubjectDependentType(
+                                                              genericParams),
                        equivClass->concreteType, equivClass->superclass);
       }
     } else if (representativeConstraint.source->shouldDiagnoseRedundancy(true)
@@ -6163,13 +6197,14 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
       // It does fulfill the requirement; diagnose the redundancy.
       Diags.diagnose(representativeConstraint.source->getLoc(),
                      diag::redundant_superclass_constraint,
-                     representativeConstraint.getSubjectDependentType(),
+                     representativeConstraint.getSubjectDependentType(
+                                                              genericParams),
                      representativeConstraint.value);
 
       Diags.diagnose(existing->source->getLoc(),
                      diag::same_type_redundancy_here,
                      existing->source->classifyDiagKind(),
-                     existing->getSubjectDependentType(),
+                     existing->getSubjectDependentType(genericParams),
                      existing->value);
     }
   }
@@ -6228,7 +6263,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
   SmallVector<PotentialArchetype *, 8> archetypes;
   for (auto &equivClass : Impl->EquivalenceClasses) {
     if (equivClass.derivedSameTypeComponents.empty()) {
-      checkSameTypeConstraints(Impl->GenericParams,
+      checkSameTypeConstraints(getGenericParams(),
                                equivClass.members.front()->getRepresentative());
     }
 
@@ -6241,6 +6276,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
   llvm::array_pod_sort(archetypes.begin(), archetypes.end(),
                        compareDependentTypes);
 
+  auto genericParams = getGenericParams();
   for (auto *archetype : archetypes) {
     // Check whether this archetype is one of the anchors within its
     // connected component. If so, we may need to emit a same-type constraint.
@@ -6273,7 +6309,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
           knownAnchor->concreteTypeSource
             ? knownAnchor->concreteTypeSource
             : RequirementSource::forAbstract(*this,
-                                             archetype->getDependentType({ }));
+                             archetype->getDependentType(getGenericParams()));
 
         // Drop recursive and invalid concrete-type constraints.
         if (equivClass->recursiveConcreteType ||
@@ -6293,11 +6329,13 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
         // to the next.
         // FIXME: Distinguish between explicit and inferred here?
         auto otherPA = nextAnchor->anchor;
-        deferredSameTypeRequirement = [&f, archetype, otherPA, this] {
-          f(RequirementKind::SameType, archetype, otherPA,
-            RequirementSource::forAbstract(*this,
-                                           archetype->getDependentType({ })));
-        };
+        deferredSameTypeRequirement =
+          [&f, archetype, otherPA, this, genericParams] {
+            f(RequirementKind::SameType, archetype, otherPA,
+              RequirementSource::forAbstract(
+                                     *this,
+                                     archetype->getDependentType(genericParams)));
+          };
       }
     }
     SWIFT_DEFER {
@@ -6318,8 +6356,9 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
 
       if (!bestSource)
         bestSource =
-          RequirementSource::forAbstract(*this,
-                                         archetype->getDependentType({ }));
+          RequirementSource::forAbstract(
+                                 *this,
+                                 archetype->getDependentType(genericParams));
 
       f(RequirementKind::Superclass, archetype, equivClass->superclass,
         *bestSource);
@@ -6334,8 +6373,9 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
                           });
       if (!bestSource)
         bestSource =
-          RequirementSource::forAbstract(*this,
-                                         archetype->getDependentType({ }));
+          RequirementSource::forAbstract(
+                                   *this,
+                                   archetype->getDependentType(genericParams));
 
       f(RequirementKind::Layout, archetype, equivClass->layout, *bestSource);
     }

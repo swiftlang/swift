@@ -547,6 +547,10 @@ public:
                             const RequirementSource *source)> f);
 
 public:
+  /// Retrieve the generic parameters used to describe the generic
+  /// signature being built.
+  ArrayRef<GenericTypeParamType *> getGenericParams() const;
+
   /// \brief Add a new generic parameter for which there may be requirements.
   void addGenericParameter(GenericTypeParamDecl *GenericParam);
 
@@ -1455,7 +1459,8 @@ struct GenericSignatureBuilder::Constraint {
   const RequirementSource *source;
 
   /// Retrieve the dependent type describing the subject of the constraint.
-  Type getSubjectDependentType() const;
+  Type getSubjectDependentType(
+                       ArrayRef<GenericTypeParamType *> genericParams) const;
 
   /// Realizes and retrieves the potential archetype describing the
   /// subject of the constraint.
@@ -1560,15 +1565,6 @@ public:
   PotentialArchetype *getRepresentative() const;
 
 private:
-  /// Retrieve the generic signature builder with which this archetype is
-  /// associated.
-  GenericSignatureBuilder *getBuilder() const {
-    const PotentialArchetype *pa = this;
-    while (auto parent = pa->getParent())
-      pa = parent;
-    return pa->parentOrBuilder.get<GenericSignatureBuilder *>();
-  }
-
   // Replace the generic signature builder.
   void replaceBuilder(GenericSignatureBuilder *builder) {
     assert(parentOrBuilder.is<GenericSignatureBuilder *>());
@@ -1729,7 +1725,10 @@ public:
 
     return false;
   }
-  
+
+  /// Retrieve the AST context in which this potential archetype resides.
+  ASTContext &getASTContext() const;
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const,
       "only for use within the debugger");
