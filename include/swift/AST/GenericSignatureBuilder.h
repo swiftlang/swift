@@ -120,11 +120,8 @@ public:
     llvm::MapVector<ProtocolDecl *, std::vector<Constraint<ProtocolDecl *>>>
       conformsTo;
 
-    /// Same-type constraints between each potential archetype and any other
-    /// archetype in its equivalence class.
-    llvm::MapVector<PotentialArchetype *,
-                    std::vector<Constraint<PotentialArchetype *>>>
-      sameTypeConstraints;
+    /// Same-type constraints within this equivalence class.
+    std::vector<Constraint<PotentialArchetype *>> sameTypeConstraints;
 
     /// Concrete type to which this equivalence class is equal.
     ///
@@ -1668,18 +1665,6 @@ public:
   /// \brief Retrieve the potential archetype to be used as the anchor for
   /// potential archetype computations.
   PotentialArchetype *getArchetypeAnchor(GenericSignatureBuilder &builder);
-
-  /// Retrieve the same-type constraints.
-  ArrayRef<Constraint<PotentialArchetype *>> getSameTypeConstraints() const {
-    if (auto equivClass = getEquivalenceClassIfPresent()) {
-      auto known = equivClass->sameTypeConstraints.find(
-                                       const_cast<PotentialArchetype *>(this));
-      if (known == equivClass->sameTypeConstraints.end()) return { };
-      return known->second;
-    }
-
-    return { };
-  }
 
   /// \brief Retrieve (or create) a nested type that is the current best
   /// nested archetype anchor (locally) with the given name.
