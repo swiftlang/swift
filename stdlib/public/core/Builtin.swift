@@ -144,8 +144,13 @@ internal func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
 }
 
-/// Returns `true` iff `t0` is identical to `t1`; i.e. if they are both
-/// `nil` or they both represent the same type.
+/// Returns a Boolean value indicating whether two types are identical.
+///
+/// - Parameters:
+///   - t0: A type to compare.
+///   - t1: Another type to compare.
+/// - Returns: `true` if both `t0` and `t1` are `nil` or if they represent the
+///   same type; otherwise, `false`.
 @_inlineable
 public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
   switch (t0, t1) {
@@ -156,8 +161,13 @@ public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
   }
 }
 
-/// Returns `false` iff `t0` is identical to `t1`; i.e. if they are both
-/// `nil` or they both represent the same type.
+/// Returns a Boolean value indicating whether two types are not identical.
+///
+/// - Parameters:
+///   - t0: A type to compare.
+///   - t1: Another type to compare.
+/// - Returns: `true` if one, but not both, of `t0` and `t1` are `nil`, or if
+///   they represent different types; otherwise, `false`.
 @_inlineable
 public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return !(t0 == t1)

@@ -15,8 +15,8 @@
 //===----------------------------------------------------------------------===//
 // Standardized uninhabited type
 //===----------------------------------------------------------------------===//
-/// The return type of functions that do not return normally; a type with no
-/// values.
+/// The return type of functions that do not return normally, that is, a type
+/// with no values.
 ///
 /// Use `Never` as the return type when declaring a closure, function, or
 /// method that unconditionally throws an error, traps, or otherwise does
@@ -31,16 +31,16 @@ public enum Never {}
 //===----------------------------------------------------------------------===//
 // Standardized aliases
 //===----------------------------------------------------------------------===//
-/// The return type of functions that don't explicitly specify a return type;
-/// an empty tuple (i.e., `()`).
+/// The return type of functions that don't explicitly specify a return type,
+/// that is, an empty tuple `()`.
 ///
 /// When declaring a function or method, you don't need to specify a return
 /// type if no value will be returned. However, the type of a function,
 /// method, or closure always includes a return type, which is `Void` if
 /// otherwise unspecified.
 ///
-/// Use `Void` or an empty tuple as the return type when declaring a
-/// closure, function, or method that doesn't return a value.
+/// Use `Void` or an empty tuple as the return type when declaring a closure,
+/// function, or method that doesn't return a value.
 ///
 ///     // No return type declared:
 ///     func logMessage(_ s: String) {

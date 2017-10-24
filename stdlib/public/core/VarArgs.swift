@@ -10,28 +10,30 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Instances of conforming types can be encoded, and appropriately
-/// passed, as elements of a C `va_list`.
+/// A type whose instances can be encoded, and appropriately passed, as
+/// elements of a C `va_list`.
 ///
-/// This protocol is useful in presenting C "varargs" APIs natively in
-/// Swift.  It only works for APIs that have a `va_list` variant, so
-/// for example, it isn't much use if all you have is:
+/// You use this protocol to present a native Swift interface to a C "varargs"
+/// API. For example, a program can import a C API like the one defined here:
 ///
-/// ~~~ c
-/// int c_api(int n, ...)
-/// ~~~
-///
-/// Given a version like this, though,
-///
-/// ~~~ c
+/// ~~~c
 /// int c_api(int, va_list arguments)
 /// ~~~
 ///
-/// you can write:
+/// To create a wrapper for the `c_api` function, write a function that takes
+/// `CVarArg` arguments, and then call the imported C function using the
+/// `withVaList(_:_:)` function:
 ///
 ///     func swiftAPI(_ x: Int, arguments: CVarArg...) -> Int {
-///       return withVaList(arguments) { c_api(x, $0) }
+///         return withVaList(arguments) { c_api(x, $0) }
 ///     }
+///
+/// Swift only imports C variadic functions that use a `va_list` for their
+/// arguments. C functions that use the `...` syntax for variadic arguments
+/// are not imported, and therefore can't be called using `CVarArg` arguments.
+///
+/// - Note: Declaring conformance to the `CVarArg` protocol for types defined
+///   outside the standard library is not supported.
 public protocol CVarArg {
   // Note: the protocol is public, but its requirement is stdlib-private.
   // That's because there are APIs operating on CVarArg instances, but

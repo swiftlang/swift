@@ -29,6 +29,11 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///     let zeroes = String(repeating: "0" as Character, count: 10)
   ///     print(zeroes)
   ///     // Prints "0000000000"
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The character to repeat.
+  ///   - count: The number of times to repeat `repeatedValue` in the 
+  ///     resulting string.
   @_inlineable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: Character, count: Int) {
     self.init(repeating: String(repeatedValue), count: count)
@@ -38,6 +43,22 @@ extension String : StringProtocol, RangeReplaceableCollection {
   // that String conforms to Collection:
   // - init<T>(_ value: T) where T : LosslessStringConvertible
   // - init<S>(_ characters: S) where S : Sequence, S.Element == Character
+  
+  /// Creates a new string containing the characters in the given sequence.
+  ///
+  /// You can use this initializer to create a new string from the result of
+  /// one or more collection operations on a string's characters. For example:
+  ///
+  ///     let str = "The rain in Spain stays mainly in the plain."
+  ///
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     let disemvoweled = String(str.lazy.filter { !vowels.contains($0) })
+  ///
+  ///     print(disemvoweled)
+  ///     // Prints "Th rn n Spn stys mnly n th pln."
+  ///
+  /// - Parameter other: A string instance or another sequence of 
+  ///   characters.
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence & LosslessStringConvertible>(_ other: S)
   where S.Element == Character {
@@ -171,14 +192,16 @@ extension String : StringProtocol, RangeReplaceableCollection {
 
   /// Accesses the character at the given position.
   ///
-  /// Indices for a subscripting a string are shared with the string's
-  /// `characters` view. For example:
+  /// You can use the same indices for subscripting a string and its substring.
+  /// For example, this code finds the first letter after the first space:
   ///
-  ///     let greeting = "Hello, friend!"
-  ///     if let i = greeting.characters.index(where: { $0 >= "A" && $0 <= "Z" }) {
-  ///         print("First capital letter: \(greeting[i])")
+  ///     let str = "Greetings, friend! How are you?"
+  ///     let firstSpace = str.index(of: " ") ?? str.endIndex
+  ///     let substr = str[firstSpace...]
+  ///     if let nextCapital = substr.index(where: { $0 >= "A" && $0 <= "Z" }) {
+  ///         print("Capital after a space: \(str[nextCapital])")
   ///     }
-  ///     // Prints "First capital letter: H"
+  ///     // Prints "Capital after a space: H"
   ///
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
@@ -190,17 +213,18 @@ extension String {
   /// Creates a new string containing the characters in the given sequence.
   ///
   /// You can use this initializer to create a new string from the result of
-  /// one or more operations on a string's `characters` view. For example:
+  /// one or more collection operations on a string's characters. For example:
   ///
   ///     let str = "The rain in Spain stays mainly in the plain."
   ///
   ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-  ///     let disemvoweled = String(str.characters.lazy.filter { !vowels.contains($0) })
+  ///     let disemvoweled = String(str.lazy.filter { !vowels.contains($0) })
   ///
   ///     print(disemvoweled)
   ///     // Prints "Th rn n Spn stys mnly n th pln."
   ///
-  /// - Parameter characters: A sequence of characters.
+  /// - Parameter characters: A string instance or another sequence of 
+  ///   characters.
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence>(_ characters: S)
     where S.Iterator.Element == Character {
@@ -326,7 +350,7 @@ extension String {
   /// removes the hyphen from the middle of a string.
   ///
   ///     var nonempty = "non-empty"
-  ///     if let i = nonempty.characters.index(of: "-") {
+  ///     if let i = nonempty.index(of: "-") {
   ///         nonempty.remove(at: i)
   ///     }
   ///     print(nonempty)
