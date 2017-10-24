@@ -5385,44 +5385,6 @@ void GenericSignatureBuilder::checkConformanceConstraints(
   }
 }
 
-/// Perform a depth-first search from the given potential archetype through
-/// the *implicit* same-type constraints.
-///
-/// \param pa The potential archetype to visit.
-/// \param paToComponent A mapping from each potential archetype to its
-/// component number.
-/// \param component The component number we're currently visiting.
-///
-/// \returns the best archetype anchor seen so far.
-static PotentialArchetype *sameTypeDFS(PotentialArchetype *pa,
-          unsigned component,
-          llvm::SmallDenseMap<PotentialArchetype *, unsigned> &paToComponent) {
-  PotentialArchetype *anchor = pa;
-
-  // If we've already visited this potential archetype, we're done.
-  if (!paToComponent.insert({pa, component}).second) return anchor;
-
-  // Visit its adjacent potential archetypes.
-  for (const auto &constraint : pa->getSameTypeConstraints()) {
-    // Treat nested-type-name-match constraints specially.
-    if (constraint.source->getRoot()->kind ==
-          RequirementSource::NestedTypeNameMatch)
-      continue;
-
-    // Skip non-derived constraints.
-    if (!constraint.source->isDerivedRequirement()) continue;
-
-    auto newAnchor =
-      sameTypeDFS(constraint.value, component, paToComponent);
-
-    // If this type is better than the anchor, use it for the anchor.
-    if (compareDependentTypes(&newAnchor, &anchor) < 0)
-      anchor = newAnchor;
-  }
-
-  return anchor;
-}
-
 namespace swift {
   bool operator<(const DerivedSameTypeComponent &lhs,
                  const DerivedSameTypeComponent &rhs) {
@@ -5430,16 +5392,50 @@ namespace swift {
   }
 } // namespace swift
 
+/// Find the representative in a simple union-find data structure of
+/// integral values.
+static unsigned findRepresentative(SmallVectorImpl<unsigned> &parents,
+                                   unsigned index) {
+  if (parents[index] == index) return index;
+
+  return parents[index] = findRepresentative(parents, parents[index]);
+}
+
+/// Union the same-type components denoted by \c index1 and \c index2.
+///
+/// \param successThreshold Returns true when two sets have been joined
+/// and both representatives are below the threshold. The default of 0
+/// is equivalent to \c successThreshold == parents.size().
+///
+/// \returns \c true if the two components were separate and have now
+/// been joined; \c false if they were already in the same set.
+static bool unionSets(SmallVectorImpl<unsigned> &parents,
+                      unsigned index1, unsigned index2,
+                      unsigned successThreshold = 0) {
+  // Find the representatives of each component class.
+  unsigned rep1 = findRepresentative(parents, index1);
+  unsigned rep2 = findRepresentative(parents, index2);
+  if (rep1 == rep2) return false;
+
+  // Point at the lowest-numbered representative.
+  if (rep1 < rep2)
+    parents[rep2] = rep1;
+  else
+    parents[rep1] = rep2;
+
+  return (successThreshold == 0) ||
+    (rep1 < successThreshold && rep2 < successThreshold);
+}
+
 /// Computes the ordered set of archetype anchors required to form a minimum
 /// spanning tree among the connected components formed by only the derived
-/// same-type requirements within the equivalence class of \c rep.
+/// same-type requirements within the equivalence class \c equivClass.
 ///
-/// The equivalence class of the given representative potential archetype
-/// (\c rep) contains all potential archetypes that are made equivalent by
-/// the known set of same-type constraints, which includes both directly-
-/// stated same-type constraints (e.g., \c T.A == T.B) as well as same-type
-/// constraints that are implied either because the names coincide (e.g.,
-/// \c T[.P1].A == T[.P2].A) or due to a requirement in a protocol.
+/// The equivalence class contains all potential archetypes that are made
+/// equivalent by the known set of same-type constraints, which includes both
+/// directly-stated same-type constraints (e.g., \c T.A == T.B) as well as
+/// same-type constraints that are implied either because the names coincide
+/// (e.g., \c T[.P1].A == T[.P2].A) or due to a requirement in a protocol.
 ///
 /// The equivalence class of the given representative potential archetype
 /// (\c rep) is formed from a graph whose vertices are the potential archetypes
@@ -5468,21 +5464,68 @@ namespace swift {
 /// canonical edges connects vertex i to vertex i+1 for i in 0..<size-1.
 static void computeDerivedSameTypeComponents(
               GenericSignatureBuilder &builder,
-              PotentialArchetype *rep,
+              EquivalenceClass *equivClass,
               llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf){
-  // Perform a depth-first search to identify the components.
-  auto equivClass = rep->getOrCreateEquivalenceClass(builder);
+  // Set up the array of "parents" in the union-find data structure.
+  llvm::SmallDenseMap<CanType, unsigned> parentIndices;
+  SmallVector<unsigned, 4> parents;
+  for (unsigned i : indices(equivClass->members)) {
+    Type depType = equivClass->members[i]->getDependentType({ });
+    parentIndices[depType->getCanonicalType()] = parents.size();
+    parents.push_back(i);
+  }
+
+  // Walk all of the same-type constraints, performing a union-find operation.
+  for (const auto &entry : equivClass->sameTypeConstraints) {
+    for (const auto &constraint : entry.second) {
+      // Treat nested-type-name-match constraints specially.
+      if (constraint.source->getRoot()->kind ==
+            RequirementSource::NestedTypeNameMatch)
+        continue;
+
+      // Skip non-derived constraints.
+      if (!constraint.source->isDerivedRequirement()) continue;
+
+      CanType source =
+        constraint.getSubjectDependentType({ })->getCanonicalType();
+      CanType target =
+        constraint.value->getDependentType({ })->getCanonicalType();
+
+      assert(parentIndices.count(source) == 1 && "Missing source");
+      assert(parentIndices.count(target) == 1 && "Missing target");
+      unionSets(parents, parentIndices[source], parentIndices[target]);
+    }
+  }
+
+  // Compute and record the components.
   auto &components = equivClass->derivedSameTypeComponents;
-  for (auto pa : rep->getEquivalenceClassMembers()) {
-    // If we've already seen this potential archetype, there's nothing else to
-    // do.
-    if (componentOf.count(pa) != 0) continue;
+  for (unsigned i : indices(equivClass->members)) {
+    auto pa = equivClass->members[i];
+    CanType depType = pa->getDependentType({ })->getCanonicalType();
 
-    // Find all of the potential archetypes within this connected component.
-    auto anchor = sameTypeDFS(pa, components.size(), componentOf);
+    // Find the representative of this set.
+    assert(parentIndices.count(depType) == 1 && "Unknown member?");
+    unsigned index = parentIndices[depType];
+    unsigned representative = findRepresentative(parents, index);
 
-    // Record the anchor.
-    components.push_back({anchor, nullptr});
+    // If this is the representative, add a component for it.
+    if (representative == index) {
+      componentOf[pa] = components.size();
+      components.push_back(DerivedSameTypeComponent{pa, nullptr});
+      continue;
+    }
+
+    // This is not the representative; point at the component of the
+    // representative.
+    auto representativePA = equivClass->members[representative];
+    assert(componentOf.count(representativePA) == 1 &&
+           "Missing representative component?");
+    unsigned componentIndex = componentOf[representativePA];
+    componentOf[pa] = componentIndex;
+
+    // If this is a better anchor, record it.
+    if (compareDependentTypes(&pa, &components[componentIndex].anchor) < 0)
+      components[componentIndex].anchor = pa;
   }
 
   // If there is a concrete type, figure out the best concrete type anchor
@@ -5556,42 +5599,6 @@ void IntercomponentEdge::dump() const {
     << constraint.value->getDebugName() << ": ";
   constraint.source->print(llvm::errs(), nullptr);
   llvm::errs() << "\n";
-}
-
-/// Find the representative in a simple union-find data structure of
-/// integral values.
-static unsigned findRepresentative(SmallVectorImpl<unsigned> &parents,
-                                   unsigned index) {
-  if (parents[index] == index) return index;
-
-  return parents[index] = findRepresentative(parents, parents[index]);
-}
-
-
-/// Union the same-type components denoted by \c index1 and \c index2.
-///
-/// \param successThreshold Returns true when two sets have been joined
-/// and both representatives are below the threshold. The default of 0
-/// is equivalent to \c successThreshold == parents.size().
-///
-/// \returns \c true if the two components were separate and have now
-/// been joined; \c false if they were already in the same set.
-static bool unionSets(SmallVectorImpl<unsigned> &parents,
-                      unsigned index1, unsigned index2,
-                      unsigned successThreshold = 0) {
-  // Find the representatives of each component class.
-  unsigned rep1 = findRepresentative(parents, index1);
-  unsigned rep2 = findRepresentative(parents, index2);
-  if (rep1 == rep2) return false;
-
-  // Point at the lowest-numbered representative.
-  if (rep1 < rep2)
-    parents[rep2] = rep1;
-  else
-    parents[rep1] = rep2;
-
-  return (successThreshold == 0) ||
-    (rep1 < successThreshold && rep2 < successThreshold);
 }
 
 /// Determine whether the removal of the given edge will disconnect the
@@ -5887,7 +5894,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   // Compute the components in the subgraph of the same-type constraint graph
   // that includes only derived constraints.
   llvm::SmallDenseMap<PotentialArchetype *, unsigned> componentOf;
-  computeDerivedSameTypeComponents(*this, pa, componentOf);
+  computeDerivedSameTypeComponents(*this, equivClass, componentOf);
 
   // Go through all of the same-type constraints, collecting all of the
   // non-derived constraints to put them into bins: intra-component and
