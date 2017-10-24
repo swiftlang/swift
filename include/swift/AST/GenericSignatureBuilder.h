@@ -104,13 +104,7 @@ public:
 
   class DelayedRequirement;
 
-  /// Describes a specific constraint on a potential archetype.
-  template<typename T>
-  struct Constraint {
-    PotentialArchetype *archetype;
-    T value;
-    const RequirementSource *source;
-  };
+  template<typename T> struct Constraint;
 
   /// Describes a concrete constraint on a potential archetype where, where the
   /// other parameter is a concrete type.
@@ -214,9 +208,20 @@ public:
     ///
     /// \returns true if this conformance is new to the equivalence class,
     /// and false otherwise.
-    bool recordConformanceConstraint(ResolvedType type,
+    bool recordConformanceConstraint(GenericSignatureBuilder &builder,
+                                     ResolvedType type,
                                      ProtocolDecl *proto,
                                      FloatingRequirementSource source);
+
+    /// Record a same-type constraint between \c type1 and \c type2 determined
+    /// via the given source.
+    ///
+    /// \returns true if this same-type constraint merges two equivalence
+    /// classes, and false otherwise.
+    bool recordSameTypeConstraint(GenericSignatureBuilder &builder,
+                                  PotentialArchetype *type1,
+                                  PotentialArchetype *type2,
+                                  const RequirementSource *source);
 
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
@@ -242,12 +247,14 @@ public:
     /// \param otherConcreteTypes If non-null, will be filled in the all of the
     /// concrete types we found (other than the result) with the same name.
     TypeDecl *lookupNestedType(
+                   GenericSignatureBuilder &builder,
                    Identifier name,
                    SmallVectorImpl<TypeDecl *> *otherConcreteTypes = nullptr);
 
     /// Retrieve the "anchor" type that canonically describes this equivalence
     /// class, for use in the canonical type.
-    Type getAnchor(ArrayRef<GenericTypeParamType *> genericParams);
+    Type getAnchor(GenericSignatureBuilder &builder,
+                   ArrayRef<GenericTypeParamType *> genericParams);
 
     /// \brief Retrieve (or build) the contextual type corresponding to
     /// this equivalence class within the given generic environment.
@@ -369,7 +376,7 @@ public:
   /// adding the requirements from its requirement signature, rooted at
   /// the given requirement \c source.
   ConstraintResult expandConformanceRequirement(
-                                      PotentialArchetype *pa,
+                                      ResolvedType selfType,
                                       ProtocolDecl *proto,
                                       const RequirementSource *source,
                                       bool onlySameTypeConstraints);
@@ -540,6 +547,10 @@ public:
                             const RequirementSource *source)> f);
 
 public:
+  /// Retrieve the generic parameters used to describe the generic
+  /// signature being built.
+  ArrayRef<GenericTypeParamType *> getGenericParams() const;
+
   /// \brief Add a new generic parameter for which there may be requirements.
   void addGenericParameter(GenericTypeParamDecl *GenericParam);
 
@@ -784,6 +795,9 @@ public:
   /// class that would need to change to resolve this type.
   ResolvedType resolve(UnresolvedType type, FloatingRequirementSource source);
 
+  /// Determine whether the two given types are in the same equivalence class.
+  bool areInSameEquivalenceClass(Type type1, Type type2);
+
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(),
@@ -842,7 +856,7 @@ public:
     /// This is a root requirement source.
     NestedTypeNameMatch,
 
-    /// The requirement is the implicit binding of a potential archetype to
+    /// The requirement is the implicit binding of a type to
     /// the interface type of the concrete type declaration it represents.
     ///
     /// This is a root requirement source.
@@ -884,9 +898,9 @@ public:
     /// another requirement.
     Derived,
 
-    /// A requirement that was provided for another potential archetype in the
+    /// A requirement that was provided for another type in the
     /// same equivalence class, but which we want to "re-root" on a new
-    /// potential archetype.
+    /// type.
     EquivalentType,
   };
 
@@ -897,7 +911,6 @@ private:
   /// The kind of storage we have.
   enum class StorageKind : uint8_t {
     None,
-    RootArchetype,
     StoredType,
     ProtocolConformance,
     AssociatedTypeDecl,
@@ -914,9 +927,6 @@ private:
 
   /// The actual storage, described by \c storageKind.
   union {
-    /// The root archetype.
-    PotentialArchetype *rootArchetype;
-
     /// The type to which a requirement applies.
     TypeBase *type;
 
@@ -1004,16 +1014,16 @@ public:
   /// requirement source with one of the "root" kinds.
   const RequirementSource * const parent;
 
-  RequirementSource(Kind kind, PotentialArchetype *rootArchetype,
+  RequirementSource(Kind kind, Type rootType,
                     ProtocolDecl *protocol,
                     WrittenRequirementLoc writtenReqLoc)
-    : kind(kind), storageKind(StorageKind::RootArchetype),
+    : kind(kind), storageKind(StorageKind::StoredType),
       hasTrailingWrittenRequirementLoc(!writtenReqLoc.isNull()),
       usesRequirementSignature(false), parent(nullptr) {
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
 
-    storage.rootArchetype = rootArchetype;
+    storage.type = rootType.getPointer();
     if (kind == RequirementSignatureSelf)
       getTrailingObjects<ProtocolDecl *>()[0] = protocol;
     if (hasTrailingWrittenRequirementLoc)
@@ -1076,46 +1086,52 @@ public:
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
-                    PotentialArchetype *newPA)
-    : kind(kind), storageKind(StorageKind::RootArchetype),
+                    Type newType)
+    : kind(kind), storageKind(StorageKind::StoredType),
       hasTrailingWrittenRequirementLoc(false),
       usesRequirementSignature(false), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
-    storage.rootArchetype = newPA;
+    storage.type = newType.getPointer();
   }
 
 public:
   /// Retrieve an abstract requirement source.
-  static const RequirementSource *forAbstract(PotentialArchetype *root);
+  static const RequirementSource *forAbstract(GenericSignatureBuilder &builder,
+                                              Type rootType);
 
   /// Retrieve a requirement source representing an explicit requirement
   /// stated in an 'inheritance' or 'where' clause.
-  static const RequirementSource *forExplicit(PotentialArchetype *root,
+  static const RequirementSource *forExplicit(GenericSignatureBuilder &builder,
+                                              Type rootType,
                                               WrittenRequirementLoc writtenLoc);
 
   /// Retrieve a requirement source representing a requirement that is
   /// inferred from some part of a generic declaration's signature, e.g., the
   /// parameter or result type of a generic function.
-  static const RequirementSource *forInferred(PotentialArchetype *root,
+  static const RequirementSource *forInferred(GenericSignatureBuilder &builder,
+                                              Type rootType,
                                               const TypeRepr *typeRepr);
 
   /// Retrieve a requirement source representing the requirement signature
   /// computation for a protocol.
   static const RequirementSource *forRequirementSignature(
-                                                      PotentialArchetype *root,
-                                                      ProtocolDecl *protocol);
+                                              GenericSignatureBuilder &builder,
+                                              Type rootType,
+                                              ProtocolDecl *protocol);
 
   /// Retrieve a requirement source for nested type name matches.
   static const RequirementSource *forNestedTypeNameMatch(
-                                     PotentialArchetype *root);
+                                      GenericSignatureBuilder &builder,
+                                      Type rootType);
 
   /// Retrieve a requirement source describing when a concrete type
   /// declaration is used to define a potential archetype.
   static const RequirementSource *forConcreteTypeBinding(
-                                     PotentialArchetype *root);
+                                     GenericSignatureBuilder &builder,
+                                     Type rootType);
 
 private:
   /// A requirement source that describes that a requirement comes from a
@@ -1154,7 +1170,7 @@ public:
   /// A constraint source that describes a constraint that is structurally
   /// derived from another constraint but does not require further information.
   const RequirementSource *viaEquivalentType(GenericSignatureBuilder &builder,
-                                             PotentialArchetype *newPA) const;
+                                             Type newType) const;
 
   /// Form a new requirement source without the subpath [start, end).
   ///
@@ -1164,30 +1180,30 @@ public:
   /// It is the caller's responsibility to ensure that the path up to \c start
   /// and the path through \c start to \c end produce the same thing.
   const RequirementSource *withoutRedundantSubpath(
+                                          GenericSignatureBuilder &builder,
                                           const RequirementSource *start,
                                           const RequirementSource *end) const;
 
   /// Retrieve the root requirement source.
   const RequirementSource *getRoot() const;
 
-  /// Retrieve the potential archetype at the root.
-  PotentialArchetype *getRootPotentialArchetype() const;
+  /// Retrieve the type at the root.
+  Type getRootType() const;
 
-  /// Retrieve the potential archetype to which this source refers.
-  PotentialArchetype *getAffectedPotentialArchetype() const;
+  /// Retrieve the type to which this source refers.
+  Type getAffectedType() const;
 
-  /// Visit each of the potential archetypes along the path, from the root
-  /// potential archetype to each potential archetype named via (e.g.) a
-  /// protocol requirement or parent source.
+  /// Visit each of the types along the path, from the root type
+  /// each type named via (e.g.) a protocol requirement or parent source.
   ///
-  /// \param visitor Called with each potential archetype along the path along
+  /// \param visitor Called with each type along the path along
   /// with the requirement source that is being applied on top of that
-  /// potential archetype. Can return \c true to halt the search.
+  /// type. Can return \c true to halt the search.
   ///
-  /// \returns nullptr if any call to \c visitor returned true. Otherwise,
-  /// returns the potential archetype to which the entire source refers.
-  PotentialArchetype *visitPotentialArchetypesAlongPath(
-           llvm::function_ref<bool(PotentialArchetype *,
+  /// \returns a null type if any call to \c visitor returned true. Otherwise,
+  /// returns the type to which the entire source refers.
+  Type visitPotentialArchetypesAlongPath(
+           llvm::function_ref<bool(Type,
                                    const RequirementSource *)> visitor) const;
 
   /// Whether this source is a requirement in a protocol.
@@ -1222,10 +1238,11 @@ public:
   /// requirement. Such "self-derived" requirements do not make the original
   /// requirement redundant, because without said original requirement, the
   /// derived requirement ceases to hold.
-  bool isSelfDerivedSource(PotentialArchetype *pa,
+  bool isSelfDerivedSource(GenericSignatureBuilder &builder,
+                           Type type,
                            bool &derivedViaConcrete) const;
 
-  /// For a requirement source that describes the requirement \c pa:proto,
+  /// For a requirement source that describes the requirement \c type:proto,
   /// retrieve the minimal subpath of this requirement source that will
   /// compute that requirement.
   ///
@@ -1233,7 +1250,8 @@ public:
   /// nullptr (indicating an embedded, distinct self-derived subpath), the
   /// conformance requirement is considered to be "self-derived".
   const RequirementSource *getMinimalConformanceSource(
-                                            PotentialArchetype *pa,
+                                            GenericSignatureBuilder &builder,
+                                            Type type,
                                             ProtocolDecl *proto,
                                             bool &derivedViaConcrete) const;
 
@@ -1406,9 +1424,9 @@ public:
     return result;
   };
 
-  /// Retrieve the complete requirement source rooted at the given potential
-  /// archetype.
-  const RequirementSource *getSource(PotentialArchetype *pa) const;
+  /// Retrieve the complete requirement source rooted at the given type.
+  const RequirementSource *getSource(GenericSignatureBuilder &builder,
+                                     Type type) const;
 
   /// Retrieve the source location for this requirement.
   SourceLoc getLoc() const;
@@ -1425,10 +1443,43 @@ public:
   bool isRecursive(Type rootType, GenericSignatureBuilder &builder) const;
 };
 
+/// Describes a specific constraint on a particular type.
+template<typename T>
+struct GenericSignatureBuilder::Constraint {
+  /// The specific subject of the constraint.
+  ///
+  /// This may either be a (resolved) dependent type or the potential
+  /// archetype that it resolves to.
+  mutable UnresolvedType subject;
+
+  /// A value used to describe the constraint.
+  T value;
+
+  /// The requirement source used to derive this constraint.
+  const RequirementSource *source;
+
+  /// Retrieve the dependent type describing the subject of the constraint.
+  Type getSubjectDependentType(
+                       ArrayRef<GenericTypeParamType *> genericParams) const;
+
+  /// Realizes and retrieves the potential archetype describing the
+  /// subject of the constraint.
+  PotentialArchetype *realizeSubjectPotentialArchetype(
+                        GenericSignatureBuilder &builder) const;
+
+  /// Determine whether the subject is equivalence to the given potential
+  /// archetype.
+  bool isSubjectEqualTo(const PotentialArchetype *pa) const;
+
+  /// Determine whether this constraint has the same subject as the
+  /// given constraint.
+  bool hasSameSubjectAs(const Constraint<T> &other) const;
+};
+
 class GenericSignatureBuilder::PotentialArchetype {
   /// The parent of this potential archetype (for a nested type) or the
-  /// generic signature builder in which this root resides.
-  llvm::PointerUnion<PotentialArchetype*, GenericSignatureBuilder*> parentOrBuilder;
+  /// ASTContext in which the potential archetype resides.
+  llvm::PointerUnion<PotentialArchetype*, ASTContext*> parentOrContext;
 
   /// The identifier describing this particular archetype.
   ///
@@ -1494,7 +1545,7 @@ class GenericSignatureBuilder::PotentialArchetype {
 
   /// \brief Construct a new potential archetype for a concrete declaration.
   PotentialArchetype(PotentialArchetype *parent, TypeDecl *concreteDecl)
-    : parentOrBuilder(parent), identifier(concreteDecl)
+    : parentOrContext(parent), identifier(concreteDecl)
   {
     assert(parent != nullptr && "Not a nested type?");
     assert(!isa<AssociatedTypeDecl>(concreteDecl) ||
@@ -1502,9 +1553,8 @@ class GenericSignatureBuilder::PotentialArchetype {
   }
 
   /// \brief Construct a new potential archetype for a generic parameter.
-  PotentialArchetype(GenericSignatureBuilder *builder,
-                     GenericParamKey genericParam)
-    : parentOrBuilder(builder), identifier(genericParam)
+  PotentialArchetype(ASTContext &ctx, GenericParamKey genericParam)
+    : parentOrContext(&ctx), identifier(genericParam)
   {
   }
 
@@ -1512,22 +1562,6 @@ public:
   /// \brief Retrieve the representative for this archetype, performing
   /// path compression on the way.
   PotentialArchetype *getRepresentative() const;
-
-private:
-  /// Retrieve the generic signature builder with which this archetype is
-  /// associated.
-  GenericSignatureBuilder *getBuilder() const {
-    const PotentialArchetype *pa = this;
-    while (auto parent = pa->getParent())
-      pa = parent;
-    return pa->parentOrBuilder.get<GenericSignatureBuilder *>();
-  }
-
-  // Replace the generic signature builder.
-  void replaceBuilder(GenericSignatureBuilder *builder) {
-    assert(parentOrBuilder.is<GenericSignatureBuilder *>());
-    parentOrBuilder = builder;
-  }
 
   friend class GenericSignatureBuilder;
   friend class GenericSignature;
@@ -1541,7 +1575,7 @@ public:
   /// Retrieve the parent of this potential archetype, which will be non-null
   /// when this potential archetype is an associated type.
   PotentialArchetype *getParent() const { 
-    return parentOrBuilder.dyn_cast<PotentialArchetype *>();
+    return parentOrContext.dyn_cast<PotentialArchetype *>();
   }
 
   /// Retrieve the type declaration to which this nested type was resolved.
@@ -1559,7 +1593,7 @@ public:
 
   /// Determine whether this is a generic parameter.
   bool isGenericParam() const {
-    return parentOrBuilder.is<GenericSignatureBuilder *>();
+    return parentOrContext.is<ASTContext *>();
   }
 
   /// Retrieve the generic parameter key for a potential archetype that
@@ -1619,7 +1653,8 @@ public:
   }
 
   /// Retrieve or create the equivalence class.
-  EquivalenceClass *getOrCreateEquivalenceClass() const;
+  EquivalenceClass *getOrCreateEquivalenceClass(
+                                    GenericSignatureBuilder &builder) const;
 
   /// Retrieve the equivalence class containing this potential archetype.
   TinyPtrVector<PotentialArchetype *> getEquivalenceClassMembers() const {
@@ -1633,11 +1668,6 @@ public:
   /// \brief Retrieve the potential archetype to be used as the anchor for
   /// potential archetype computations.
   PotentialArchetype *getArchetypeAnchor(GenericSignatureBuilder &builder);
-
-  /// Add a same-type constraint between this archetype and the given
-  /// other archetype.
-  void addSameTypeConstraint(PotentialArchetype *otherPA,
-                             const RequirementSource *source);
 
   /// Retrieve the same-type constraints.
   ArrayRef<Constraint<PotentialArchetype *>> getSameTypeConstraints() const {
@@ -1668,6 +1698,7 @@ public:
   /// type or typealias of the given protocol, unless the \c kind implies that
   /// a potential archetype should not be created if it's missing.
   PotentialArchetype *updateNestedTypeForConformance(
+                        GenericSignatureBuilder &builder,
                         TypeDecl *type,
                         ArchetypeResolutionKind kind);
 
@@ -1676,7 +1707,7 @@ public:
   ///
   /// \param genericParams The set of generic parameters to use in the resulting
   /// dependent type.
-  Type getDependentType(ArrayRef<GenericTypeParamType *> genericParams);
+  Type getDependentType(ArrayRef<GenericTypeParamType *> genericParams) const;
 
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.
@@ -1686,7 +1717,10 @@ public:
 
     return false;
   }
-  
+
+  /// Retrieve the AST context in which this potential archetype resides.
+  ASTContext &getASTContext() const;
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const,
       "only for use within the debugger");
