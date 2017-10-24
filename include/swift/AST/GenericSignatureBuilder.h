@@ -1229,15 +1229,6 @@ public:
   /// source that would be used for the accompanying note.
   bool shouldDiagnoseRedundancy(bool primary) const;
 
-  /// Determine whether the given derived requirement \c source, when rooted at
-  /// the potential archetype \c pa, is actually derived from the same
-  /// requirement. Such "self-derived" requirements do not make the original
-  /// requirement redundant, because without said original requirement, the
-  /// derived requirement ceases to hold.
-  bool isSelfDerivedSource(GenericSignatureBuilder &builder,
-                           Type type,
-                           bool &derivedViaConcrete) const;
-
   /// For a requirement source that describes the requirement \c type:proto,
   /// retrieve the minimal subpath of this requirement source that will
   /// compute that requirement.
