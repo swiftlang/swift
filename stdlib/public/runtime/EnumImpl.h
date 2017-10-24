@@ -110,14 +110,16 @@ inline int getEnumTagSinglePayloadImpl(
       // In practice we should need no more than four bytes from the payload
       // area.
       unsigned caseIndexFromValue = 0;
-#if defined(__BIG_ENDIAN__)
       unsigned numPayloadTagBytes = std::min(size_t(4), payloadSize);
-      small_memcpy(reinterpret_cast<uint8_t *>(&caseIndexFromValue) + 4 -
-                 numPayloadTagBytes,
-             valueAddr, numPayloadTagBytes);
+#if defined(__BIG_ENDIAN__)
+      if (numPayloadTagBytes)
+        small_memcpy(reinterpret_cast<uint8_t *>(&caseIndexFromValue) + 4 -
+                         numPayloadTagBytes,
+                     valueAddr, numPayloadTagBytes);
 #else
-      small_memcpy(&caseIndexFromValue, valueAddr,
-                   std::min(size_t(4), payloadSize));
+      if (numPayloadTagBytes)
+        small_memcpy(&caseIndexFromValue, valueAddr,
+                     numPayloadTagBytes);
 #endif
       return (caseIndexFromExtraTagBits | caseIndexFromValue) +
              payloadNumExtraInhabitants;
@@ -187,15 +189,22 @@ inline void storeEnumTagSinglePayloadImpl(
     // Store into the value.
 #if defined(__BIG_ENDIAN__)
   unsigned numPayloadTagBytes = std::min(size_t(4), payloadSize);
-  small_memcpy(valueAddr,
-         reinterpret_cast<uint8_t *>(&payloadIndex) + 4 - numPayloadTagBytes,
-         numPayloadTagBytes);
-  small_memcpy(extraTagBitAddr,
-         reinterpret_cast<uint8_t *>(&extraTagIndex) + 4 - numExtraTagBytes,
-         numExtraTagBytes);
+  if (numPayloadTagBytes)
+    small_memcpy(valueAddr,
+                 reinterpret_cast<uint8_t *>(&payloadIndex) + 4 -
+                     numPayloadTagBytes,
+                 numPayloadTagBytes);
+  if (numExtraTagBytes)
+    small_memcpy(extraTagBitAddr,
+                 reinterpret_cast<uint8_t *>(&extraTagIndex) + 4 -
+                     numExtraTagBytes,
+                 numExtraTagBytes);
 #else
-  small_memcpy(valueAddr, &payloadIndex, std::min(size_t(4), payloadSize));
-  small_memcpy(extraTagBitAddr, &extraTagIndex, numExtraTagBytes);
+  unsigned numPayloadTagBytes = std::min(size_t(4), payloadSize);
+  if (numPayloadTagBytes)
+    small_memcpy(valueAddr, &payloadIndex, numPayloadTagBytes);
+  if (numExtraTagBytes)
+    small_memcpy(extraTagBitAddr, &extraTagIndex, numExtraTagBytes);
 #endif
 }
 
