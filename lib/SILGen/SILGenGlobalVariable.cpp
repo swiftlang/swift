@@ -242,6 +242,8 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
 
 void SILGenFunction::emitLazyGlobalInitializer(PatternBindingDecl *binding,
                                                unsigned pbdEntry) {
+  MagicFunctionName = SILGenModule::getMagicFunctionName(binding->getDeclContext());
+
   {
     Scope scope(Cleanups, binding);
 
