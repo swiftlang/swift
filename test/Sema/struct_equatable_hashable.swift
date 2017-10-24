@@ -38,7 +38,7 @@ struct CustomHashable: Hashable {
 
   var hashValue: Int { return 0 }
 
-  static func ==(x: CustomHashable, y: CustomHashable) -> Bool { return true } // expected-note 2 {{non-matching type}}
+  static func ==(x: CustomHashable, y: CustomHashable) -> Bool { return true } // expected-note 3 {{non-matching type}}
 }
 
 if CustomHashable(x: 1, y: 2) == CustomHashable(x: 2, y: 3) { }
@@ -121,7 +121,7 @@ public struct StructConformsAndImplementsInExtension {
   let v: Int
 }
 extension StructConformsAndImplementsInExtension : Equatable {
-  public static func ==(lhs: StructConformsAndImplementsInExtension, rhs: StructConformsAndImplementsInExtension) -> Bool {  // expected-note {{non-matching type}}
+  public static func ==(lhs: StructConformsAndImplementsInExtension, rhs: StructConformsAndImplementsInExtension) -> Bool {  // expected-note 2 {{non-matching type}}
     return true
   }  
 }
@@ -138,13 +138,29 @@ struct NoStoredProperties: Hashable {}
 // Verify that conformance (albeit manually implemented) can still be added to
 // a type in a different file.
 extension OtherFileNonconforming: Hashable {
-  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note {{non-matching type}}
+  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 2 {{non-matching type}}
     return true
   }
   var hashValue: Int { return 0 }
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
 extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
+
+// Verify the expected results for a few tuple cases. The arity-7 case is
+// important because the stdlib's built-in == operators end at 6 and we want to
+// make sure we can handle higher ones.
+struct SatisfyingTuple0: Hashable {
+  let value: ()
+}
+struct SatisfyingTuple6: Hashable {
+  let value: (Int, Int, Int, Int, Int, Int)
+}
+struct SatisfyingTuple7: Hashable {
+  let value: (Int, Int, Int, Int, Int, Int, Int)
+}
+struct NotSatisfyingTuple: Hashable {  // expected-error 2 {{does not conform}}
+  let value: (Int, Int, NotHashable, Int, Int, Int)
+}
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'

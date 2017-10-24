@@ -35,7 +35,7 @@ enum CustomHashable {
 
   var hashValue: Int { return 0 }
 }
-func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note 3 {{non-matching type}}
+func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note 4 {{non-matching type}}
   return true
 }
 
@@ -50,7 +50,7 @@ enum InvalidCustomHashable {
 
   var hashValue: String { return "" } // expected-note{{previously declared here}}
 }
-func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note 3 {{non-matching type}}
+func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note 4 {{non-matching type}}
   return ""
 }
 if InvalidCustomHashable.A == .B { }
@@ -172,7 +172,7 @@ public enum Medicine {
 
 extension Medicine : Equatable {}
 
-public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 2 {{non-matching type}}
+public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 3 {{non-matching type}}
   return true
 }
 
@@ -189,7 +189,7 @@ extension NotExplicitlyHashableAndCannotDerive : Hashable {} // expected-error 2
 // Verify that conformance (albeit manually implemented) can still be added to
 // a type in a different file.
 extension OtherFileNonconforming: Hashable {
-  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 2 {{non-matching type}}
+  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 3 {{non-matching type}}
     return true
   }
   var hashValue: Int { return 0 }
@@ -224,6 +224,22 @@ enum MutuallyIndirectB: Hashable {
 indirect enum TotallyIndirect: Hashable {
   case another(TotallyIndirect)
   case end(Int)
+}
+
+// Verify the expected results for a few tuple cases. The arity-7 case is
+// important because the stdlib's built-in == operators end at 6 and we want to
+// make sure we can handle higher ones.
+enum SatisfyingTuple0: Hashable {
+  case value(payload: ())
+}
+enum SatisfyingTuple6: Hashable {
+  case value(payload: (Int, Int, Int, Int, Int, Int))
+}
+enum SatisfyingTuple7: Hashable {
+  case value(payload: (Int, Int, Int, Int, Int, Int, Int))
+}
+enum NotSatisfyingTuple: Hashable {  // expected-error 2 {{does not conform}}
+  case value(payload: (Int, Int, NotHashable, Int, Int, Int))
 }
 
 // FIXME: Remove -verify-ignore-unknown.

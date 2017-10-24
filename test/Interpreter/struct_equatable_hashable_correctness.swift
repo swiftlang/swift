@@ -67,4 +67,37 @@ StructSynthesisTests.test("ExplicitOverridesSynthesizedInExtension") {
   expectEqual(OverridesInExtension(a: 4).hashValue, 2)
 }
 
+// Test the synthesized members when the struct contains tuples of various
+// arities.
+struct HasTuple6: Hashable {
+  let v: (Int, Int, Int, Int, Int, Int)
+}
+struct HasTuple7: Hashable {
+  let v: (a: Int, b: Int, c: Int, d: Int, e: Int, f: Int, g: Int)
+}
+
+StructSynthesisTests.test("TupleEquatability/Hashability") {
+  checkHashable([
+    HasTuple6(v: (1, 2, 3, 4, 5, 6)),
+    HasTuple6(v: (1, 2, 3, 4, 5, 7)),
+  ], equalityOracle: { $0 == $1 })
+
+  checkHashable([
+    HasTuple7(v: (a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7)),
+    HasTuple7(v: (a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 8)),
+  ], equalityOracle: { $0 == $1 })
+}
+
+StructSynthesisTests.test("CloseTupleValuesDoNotCollide") {
+  expectNotEqual(
+    HasTuple6(v: (1, 2, 3, 4, 5, 6)).hashValue,
+    HasTuple6(v: (1, 2, 3, 4, 5, 7)).hashValue
+  )
+
+  expectNotEqual(
+    HasTuple7(v: (a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7)).hashValue,
+    HasTuple7(v: (a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 8)).hashValue
+  )
+}
+
 runAllTests()

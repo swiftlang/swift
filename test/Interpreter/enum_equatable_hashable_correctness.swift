@@ -93,4 +93,36 @@ EnumSynthesisTests.test("IndirectEquatability/Hashability") {
   checkHashable([one, two, three, four], equalityOracle: { $0 == $1 })
 }
 
+// Test the synthesized members when the enum contains tuples of various
+// arities.
+enum HasTuple6: Hashable {
+  case v((Int, Int, Int, Int, Int, Int))
+}
+enum HasTuple7: Hashable {
+  case v((a: Int, b: Int, c: Int, d: Int, e: Int, f: Int, g: Int))
+}
+
+EnumSynthesisTests.test("TupleEquatability/Hashability") {
+  checkHashable([
+    HasTuple6.v((1, 2, 3, 4, 5, 6)), .v((1, 2, 3, 4, 5, 7)),
+  ], equalityOracle: { $0 == $1 })
+
+  checkHashable([
+    HasTuple7.v((a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7)),
+    .v((a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 8)),
+  ], equalityOracle: { $0 == $1 })
+}
+
+EnumSynthesisTests.test("CloseTupleValuesDoNotCollide") {
+  expectNotEqual(
+    HasTuple6.v((1, 2, 3, 4, 5, 6)).hashValue,
+    HasTuple6.v((1, 2, 3, 4, 5, 7)).hashValue
+  )
+
+  expectNotEqual(
+    HasTuple7.v((a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7)).hashValue,
+    HasTuple7.v((a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 8)).hashValue
+  )
+}
+
 runAllTests()
