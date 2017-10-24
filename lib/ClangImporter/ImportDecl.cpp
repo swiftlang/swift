@@ -2440,7 +2440,6 @@ namespace {
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
           AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
         structDecl->computeType();
-        structDecl->setValidationStarted();
         structDecl->setCheckedInheritanceClause();
 
         auto options = getDefaultMakeStructRawValuedOptions();
@@ -2544,7 +2543,6 @@ namespace {
             decl, AccessLevel::Public, loc, enumName,
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->computeType();
-        enumDecl->setValidationStarted();
 
         // Set up the C underlying type as its Swift raw type.
         enumDecl->setRawType(underlyingType);
@@ -2883,7 +2881,6 @@ namespace {
                                  Impl.importSourceLoc(decl->getLocation()),
                                  None, nullptr, dc);
       result->computeType();
-      result->setValidationStarted();
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
@@ -3203,7 +3200,6 @@ namespace {
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
-      result->setValidationStarted();
 
       // If this is a compatibility stub, mark is as such.
       if (correctSwiftName)
@@ -3427,7 +3423,6 @@ namespace {
                               Impl.importSourceLoc(decl->getLocation()),
                               name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
-      result->setValidationStarted();
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
@@ -3507,7 +3502,6 @@ namespace {
                        Impl.importSourceLoc(decl->getLocation()),
                        name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
-      result->setValidationStarted();
 
       // If imported as member, the member should be final.
       if (dc->getAsClassOrClassExtensionContext())
@@ -4190,7 +4184,6 @@ namespace {
           Impl.importSourceLoc(decl->getLocation()), name, None,
           /*TrailingWhere=*/nullptr);
       result->computeType();
-      result->setValidationStarted();
 
       // FIXME: Kind of awkward that we have to do this here
       result->getGenericParams()->getParams()[0]->setDepth(0);
@@ -4253,7 +4246,6 @@ namespace {
                                                         SourceLoc(), None,
                                                         nullptr, dc);
         result->computeType();
-        result->setValidationStarted();
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
         result->setCircularityCheck(CircularityCheck::Checked);
         result->setSuperclass(Type());
@@ -4354,7 +4346,6 @@ namespace {
       }
 
       result->computeType();
-      result->setValidationStarted();
 
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
       result->setCircularityCheck(CircularityCheck::Checked);
@@ -4595,7 +4586,6 @@ namespace {
           /*IsCaptureList*/false, Impl.importSourceLoc(decl->getLocation()),
           name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
-      result->setValidationStarted();
 
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
@@ -4812,7 +4802,6 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
       decl, AccessLevel::Public, SourceLoc(), className, SourceLoc(), None,
       nullptr, dc);
   theClass->computeType();
-  theClass->setValidationStarted();
   theClass->setCircularityCheck(CircularityCheck::Checked);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
@@ -4988,7 +4977,6 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
   structDecl->computeType();
-  structDecl->setValidationStarted();
   structDecl->setCheckedInheritanceClause();
 
   // Import the type of the underlying storage
@@ -5146,7 +5134,6 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
 
   // Give the enum element the appropriate type.
   element->computeType();
-  element->setValidationStarted();
 
   Impl.importAttributes(decl, element);
 
@@ -5238,7 +5225,6 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
   structDecl->computeType();
-  structDecl->setValidationStarted();
   structDecl->setCheckedInheritanceClause();
 
   makeStructRawValued(Impl, structDecl, underlyingType,
@@ -5320,7 +5306,6 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
   Type allocType = FunctionType::get(selfMetaType, fnType);
   result->setInterfaceType(allocType);
-  result->setValidationStarted();
 
   finishFuncDecl(decl, result);
   if (correctSwiftName)
@@ -5561,7 +5546,6 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       VarDecl::Specifier::Var, /*IsCaptureList*/false, SourceLoc(),
       propertyName, dc->mapTypeIntoContext(swiftPropertyType), dc);
   property->setInterfaceType(swiftPropertyType);
-  property->setValidationStarted();
 
   // Note that we've formed this property.
   Impl.FunctionsAsProperties[getter] = property;
@@ -5937,7 +5921,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   result->setInitializerInterfaceType(interfaceInitType);
   result->setInterfaceType(interfaceAllocType);
   result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
-  result->setValidationStarted();
 
   if (implicit)
     result->setImplicit();
@@ -6335,7 +6318,6 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   else
     fnType = FunctionType::get(indicesType, elementTy);
   subscript->setInterfaceType(fnType);
-  subscript->setValidationStarted();
 
   addObjCAttribute(subscript, None);
 
@@ -7897,10 +7879,10 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     var = new (SwiftContext)
         VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var, /*IsCaptureList*/false,
                 SourceLoc(), name, dc->mapTypeIntoContext(type), dc);
+    var->setValidationStarted();
   }
 
   var->setInterfaceType(type);
-  var->setValidationStarted();
 
   // Form the argument patterns.
   SmallVector<ParameterList*, 3> getterArgs;
@@ -8008,7 +7990,6 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
                                               /*IsCaptureList*/false,
                                               SourceLoc(), name, type, dc);
   var->setInterfaceType(type);
-  var->setValidationStarted();
   markUnavailable(var, UnavailableMessage);
 
   return var;
