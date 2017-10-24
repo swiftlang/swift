@@ -161,11 +161,11 @@ static Class getSwiftNativeNSErrorClass() {
 }
 
 /// Allocate a catchable error object.
-static BoxPair::Return
-_swift_allocError_(const Metadata *type,
-                   const WitnessTable *errorConformance,
-                   OpaqueValue *initialValue,
-                   bool isTake) {
+BoxPair::Return
+swift::swift_allocError(const Metadata *type,
+                        const WitnessTable *errorConformance,
+                        OpaqueValue *initialValue,
+                        bool isTake) {
   auto TheSwiftNativeNSError = getSwiftNativeNSErrorClass();
   assert(class_getInstanceSize(TheSwiftNativeNSError) == sizeof(SwiftErrorHeader)
          && "NSError layout changed!");
@@ -213,30 +213,11 @@ _swift_allocError_(const Metadata *type,
   return BoxPair{reinterpret_cast<HeapObject*>(instance), valuePtr};
 }
 
-SWIFT_RUNTIME_EXPORT
-auto *_swift_allocError = _swift_allocError_;
-
-BoxPair::Return
-swift::swift_allocError(const Metadata *type,
-                        const WitnessTable *errorConformance,
-                        OpaqueValue *value, bool isTake) {
-  return _swift_allocError(type, errorConformance, value, isTake);
-}
-
 /// Deallocate an error object whose contained object has already been
 /// destroyed.
-static void
-_swift_deallocError_(SwiftError *error,
-                     const Metadata *type) {
-  object_dispose((id)error);
-}
-
-SWIFT_RUNTIME_EXPORT
-auto *_swift_deallocError = _swift_deallocError_;
-
 void
 swift::swift_deallocError(SwiftError *error, const Metadata *type) {
-  return _swift_deallocError(error, type);
+  object_dispose((id)error);
 }
 
 static const WitnessTable *getNSErrorConformanceToError() {
@@ -335,10 +316,10 @@ const HashableWitnessTable *SwiftError::getHashableConformance() const {
 /// temporary buffer. The implementation may write a reference to itself to
 /// that buffer if the error object is a toll-free-bridged NSError instead of
 /// a native Swift error, in which case the object itself is the "boxed" value.
-static void
-_swift_getErrorValue_(const SwiftError *errorObject,
-                      void **scratch,
-                      ErrorValueResult *out) {
+void
+swift::swift_getErrorValue(const SwiftError *errorObject,
+                           void **scratch,
+                           ErrorValueResult *out) {
   // TODO: Would be great if Clang had a return-three convention so we didn't
   // need the out parameter here.
 
@@ -354,16 +335,6 @@ _swift_getErrorValue_(const SwiftError *errorObject,
     out->value = errorObject->getValue();
     out->errorConformance = errorObject->errorConformance;
   }
-}
-
-SWIFT_RUNTIME_EXPORT
-auto *_swift_getErrorValue = _swift_getErrorValue_;
-
-void
-swift::swift_getErrorValue(const SwiftError *errorObject,
-                           void **scratch,
-                           ErrorValueResult *out) {
-  return _swift_getErrorValue(errorObject, scratch, out);
 }
 
 // @_silgen_name("swift_stdlib_getErrorDomainNSString")
@@ -414,7 +385,8 @@ NSDictionary *swift_stdlib_getErrorDefaultUserInfo(
 
 /// Take an Error box and turn it into a valid NSError instance.
 SWIFT_CC(swift)
-static id _swift_bridgeErrorToNSError_(SwiftError *errorObject) {
+id
+swift::swift_bridgeErrorToNSError(SwiftError *errorObject) {
   auto ns = reinterpret_cast<NSError *>(errorObject);
 
   // If we already have a domain set, then we've already initialized.
@@ -473,16 +445,6 @@ static id _swift_bridgeErrorToNSError_(SwiftError *errorObject) {
     objc_release(domain);
 
   return ns;
-}
-
-SWIFT_CC(swift)
-SWIFT_RUNTIME_EXPORT
-id (*_swift_bridgeErrorToNSError)(SwiftError*) = _swift_bridgeErrorToNSError_;
-
-SWIFT_CC(swift)
-id
-swift::swift_bridgeErrorToNSError(SwiftError *errorObject) {
-  return _swift_bridgeErrorToNSError(errorObject);
 }
 
 bool
@@ -562,37 +524,23 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   return false;
 }
 
-static SwiftError *_swift_errorRetain_(SwiftError *error) {
+SwiftError *
+swift::swift_errorRetain(SwiftError *error) {
   // For now, SwiftError is always objc-refcounted.
   return (SwiftError*)objc_retain((id)error);
 }
 
-SWIFT_RUNTIME_EXPORT
-auto *_swift_errorRetain = _swift_errorRetain_;
-
-SwiftError *swift::swift_errorRetain(SwiftError *error) {
-  return _swift_errorRetain(error);
-}
-
-static void _swift_errorRelease_(SwiftError *error) {
+void
+swift::swift_errorRelease(SwiftError *error) {
   // For now, SwiftError is always objc-refcounted.
   return objc_release((id)error);
 }
 
-SWIFT_RUNTIME_EXPORT
-auto *_swift_errorRelease = _swift_errorRelease_;
-
-void swift::swift_errorRelease(SwiftError *error) {
-  return _swift_errorRelease(error);
+/// Breakpoint hook for debuggers.
+void
+swift::swift_willThrow(SwiftError *error) {
+  // empty
 }
 
-static void _swift_willThrow_(SwiftError *error) { }
-
-SWIFT_RUNTIME_EXPORT
-auto *_swift_willThrow = _swift_willThrow_;
-
-void swift::swift_willThrow(SwiftError *error) {
-  return _swift_willThrow(error);
-}
 #endif
 
