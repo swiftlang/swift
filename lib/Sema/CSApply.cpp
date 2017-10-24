@@ -2555,13 +2555,14 @@ namespace {
       auto selected = *selectedElt;
       switch (selected.choice.getKind()) {
       case OverloadChoiceKind::DeclViaBridge: {
+        base = cs.coerceToRValue(base);
+
         // Look through an implicitly unwrapped optional.
-        auto baseTy = cs.getType(base)->getRValueType();
+        auto baseTy = cs.getType(base);
         if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)){
           base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
                                          cs.getConstraintLocator(base));
-
-          baseTy = cs.getType(base)->getRValueType();
+          baseTy = objTy;
         }
 
         auto &tc = cs.getTypeChecker();
