@@ -452,8 +452,8 @@ private:
   
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype is bound to a concrete type.
-  ConstraintResult addSameTypeRequirementToConcrete(PotentialArchetype *T,
-                                        Type Concrete,
+  ConstraintResult addSameTypeRequirementToConcrete(ResolvedType type,
+                                        Type concrete,
                                         const RequirementSource *Source);
 
   /// \brief Add a new same-type requirement specifying that the given two
