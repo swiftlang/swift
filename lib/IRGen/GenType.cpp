@@ -527,7 +527,7 @@ static void emitSpecializedMemOperation(
   auto *twoBB = llvm::BasicBlock::Create(Ctx);
   auto *fourBB = llvm::BasicBlock::Create(Ctx);
   auto *int32Ty = IGM.Int32Ty;
-  auto *zero = llvm::ConstantInt::get(int32Ty, 1U);
+  auto *zero = llvm::ConstantInt::get(int32Ty, 0U);
   auto *one = llvm::ConstantInt::get(int32Ty, 1U);
   auto *two = llvm::ConstantInt::get(int32Ty, 2U);
 
