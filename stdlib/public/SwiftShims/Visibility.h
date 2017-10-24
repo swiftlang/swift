@@ -91,9 +91,9 @@
 # define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("default")))
 #endif
 
-#else
+#else  // FIXME: this #else should be some sort of #elif Windows
 # if defined(__CYGWIN__)
-#  define SWIFT_RUNTIME_EXPORT
+#  define SWIFT_EXPORT_ATTRIBUTE
 # else
 #  if defined(swiftCore_EXPORTS)
 #   define SWIFT_EXPORT_ATTRIBUTE __declspec(dllexport)
@@ -116,4 +116,5 @@
 /// resilience we may be able to make this hidden.
 #define SWIFT_RUNTIME_STDLIB_INTERFACE SWIFT_RUNTIME_EXPORT
 
+// SWIFT_STDLIB_SHIMS_VISIBILITY_H
 #endif
