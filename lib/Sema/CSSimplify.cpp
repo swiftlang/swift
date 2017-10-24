@@ -1150,8 +1150,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
-  increaseScore(ScoreKind::SK_FunctionConversion);
-
   // Add a very narrow exception to SE-0110 by allowing functions that
   // take multiple arguments to be passed as an argument in places
   // that expect a function that takes a single tuple (of the same

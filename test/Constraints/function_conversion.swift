@@ -36,3 +36,9 @@ a(c.d)
 func b<T>(_: (T) -> () -> ()) {}
 
 b(c.e)
+
+func bar(_: () -> ()) {}
+func bar(_: () throws -> ()) {}
+func bar_empty() {}
+
+bar(bar_empty)
