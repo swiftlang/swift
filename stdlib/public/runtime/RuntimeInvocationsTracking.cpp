@@ -17,7 +17,9 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "RuntimeInvocationsTracking.h"
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Mutex.h"
 
 // This file is compiled always, even if assertions are disabled and no runtime
 // functions are being tracked. This is done to avoid recompiling Swift clients
@@ -48,12 +50,19 @@ static bool UpdateGlobalRuntimeFunctionCounters = false;
 /// TODO: Add support for enabling/disabling counters on a per object basis?
 
 /// Global set of counters tracking the total number of runtime invocations.
-static RuntimeFunctionCountersState RuntimeGlobalFunctionCountersState;
+struct RuntimeFunctionCountersStateSentinel {
+  RuntimeFunctionCountersState State;
+  StaticReadWriteLock Lock;
+};
+static RuntimeFunctionCountersStateSentinel RuntimeGlobalFunctionCountersState;
 
 /// The object state cache mapping objects to the collected state associated with
 /// them.
-/// TODO: Do we need to make it thread-safe?
-static llvm::DenseMap<HeapObject *, RuntimeFunctionCountersState> RuntimeObjectStateCache;
+struct RuntimeObjectCacheSentinel {
+  llvm::DenseMap<HeapObject *, RuntimeFunctionCountersState> Cache;
+  StaticReadWriteLock Lock;
+};
+static Lazy<RuntimeObjectCacheSentinel> RuntimeObjectStateCache;
 
 static const char *RuntimeFunctionNames[] {
 /// Define names of runtime functions.
@@ -95,22 +104,26 @@ static uint16_t RuntimeFunctionCountersOffsets[] = {
   void SWIFT_RT_TRACK_INVOCATION_NAME(RT_FUNCTION)(HeapObject * object) {      \
     /* Update global counters. */                                              \
     if (UpdateGlobalRuntimeFunctionCounters) {                                 \
-      RuntimeGlobalFunctionCountersState                                       \
+      StaticScopedWriteLock lock(RuntimeGlobalFunctionCountersState.Lock);     \
+      RuntimeGlobalFunctionCountersState.State                                 \
           .SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION)++;           \
       if (GlobalRuntimeFunctionCountersUpdateHandler) {                        \
-        auto oldGlobalMode = setGlobalRuntimeFunctionCountersMode(0);          \
-        auto oldPerObjectMode = setPerObjectRuntimeFunctionCountersMode(0);    \
+        auto oldGlobalMode = _swift_setGlobalRuntimeFunctionCountersMode(0);   \
+        auto oldPerObjectMode =                                                \
+            _swift_setPerObjectRuntimeFunctionCountersMode(0);                 \
         GlobalRuntimeFunctionCountersUpdateHandler(                            \
             object, RT_FUNCTION_ID(RT_FUNCTION));                              \
-        setGlobalRuntimeFunctionCountersMode(oldGlobalMode);                   \
-        setPerObjectRuntimeFunctionCountersMode(oldPerObjectMode);             \
+        _swift_setGlobalRuntimeFunctionCountersMode(oldGlobalMode);            \
+        _swift_setPerObjectRuntimeFunctionCountersMode(oldPerObjectMode);      \
       }                                                                        \
     }                                                                          \
     /* Update per object counters. */                                          \
     if (UpdatePerObjectRuntimeFunctionCounters && object) {                    \
-      RuntimeObjectStateCache[object]                                          \
-          .SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION)++;           \
-      /* TODO: Remember the order/history of operations? */                    \
+      auto &theSentinel = RuntimeObjectStateCache.get();                       \
+      StaticScopedWriteLock lock(theSentinel.Lock);                            \
+      theSentinel.Cache[object].SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(     \
+          RT_FUNCTION)++;                                                      \
+      /* TODO: Remember the order/history of  operations? */                   \
     }                                                                          \
   }
 #include "RuntimeInvocationsTracking.def"
@@ -118,56 +131,57 @@ static uint16_t RuntimeFunctionCountersOffsets[] = {
 /// Public APIs
 
 /// Get the runtime object state associated with an object.
-SWIFT_RT_ENTRY_VISIBILITY
-void getObjectRuntimeFunctionCounters(HeapObject *object,
-                                      RuntimeFunctionCountersState *result) {
-  *result = RuntimeObjectStateCache[object];
+void _swift_getObjectRuntimeFunctionCounters(
+    HeapObject *object, RuntimeFunctionCountersState *result) {
+  auto &theSentinel = RuntimeObjectStateCache.get();
+  StaticScopedReadLock lock(theSentinel.Lock);
+  *result = theSentinel.Cache[object];
 }
 
 /// Set the runtime object state associated with an object from a provided
 /// state.
-SWIFT_RT_ENTRY_VISIBILITY
-void setObjectRuntimeFunctionCounters(HeapObject *object,
-                                      RuntimeFunctionCountersState *state) {
-  RuntimeObjectStateCache[object] = *state;
+void _swift_setObjectRuntimeFunctionCounters(
+    HeapObject *object, RuntimeFunctionCountersState *state) {
+  auto &theSentinel = RuntimeObjectStateCache.get();
+  StaticScopedWriteLock lock(theSentinel.Lock);
+  theSentinel.Cache[object] = *state;
 }
 
 /// Get the global runtime state containing the total numbers of invocations for
 /// each runtime function of interest.
-SWIFT_RT_ENTRY_VISIBILITY
-void getGlobalRuntimeFunctionCounters(RuntimeFunctionCountersState *result) {
-  *result = RuntimeGlobalFunctionCountersState;
+void _swift_getGlobalRuntimeFunctionCounters(
+    RuntimeFunctionCountersState *result) {
+  StaticScopedReadLock lock(RuntimeGlobalFunctionCountersState.Lock);
+  *result = RuntimeGlobalFunctionCountersState.State;
 }
 
 /// Set the global runtime state of function pointers from a provided state.
-SWIFT_RT_ENTRY_VISIBILITY
-void setGlobalRuntimeFunctionCounters(RuntimeFunctionCountersState *state) {
-  RuntimeGlobalFunctionCountersState = *state;
+void _swift_setGlobalRuntimeFunctionCounters(
+    RuntimeFunctionCountersState *state) {
+  StaticScopedWriteLock lock(RuntimeGlobalFunctionCountersState.Lock);
+  RuntimeGlobalFunctionCountersState.State = *state;
 }
 
 /// Return the names of the runtime functions being tracked.
 /// Their order is the same as the order of the counters in the
 /// RuntimeObjectState structure. All these strings are null terminated.
-SWIFT_RT_ENTRY_VISIBILITY
-const char **getRuntimeFunctionNames() {
+const char **_swift_getRuntimeFunctionNames() {
   return RuntimeFunctionNames;
 }
 
 /// Return the offsets of the runtime function counters being tracked.
 /// Their order is the same as the order of the counters in the
 /// RuntimeObjectState structure.
-SWIFT_RT_ENTRY_VISIBILITY
-const uint16_t *getRuntimeFunctionCountersOffsets() {
+const uint16_t *_swift_getRuntimeFunctionCountersOffsets() {
   return RuntimeFunctionCountersOffsets;
 }
 
 /// Return the number of runtime functions being tracked.
-SWIFT_RT_ENTRY_VISIBILITY
-uint64_t getNumRuntimeFunctionCounters() {
+uint64_t _swift_getNumRuntimeFunctionCounters() {
   return ID_LastRuntimeFunctionName;
 }
 
-static void dumpRuntimeCounters(RuntimeFunctionCountersState *State) {
+static void _swift_dumpRuntimeCounters(RuntimeFunctionCountersState *State) {
   uint32_t tmp;
 /// Define how to dump the counter for a given runtime function.
 #define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
@@ -179,19 +193,19 @@ static void dumpRuntimeCounters(RuntimeFunctionCountersState *State) {
 }
 
 /// Dump all per-object runtime function pointers.
-SWIFT_RT_ENTRY_VISIBILITY
-void dumpObjectsRuntimeFunctionPointers() {
-  for (auto &Pair : RuntimeObjectStateCache) {
+void _swift_dumpObjectsRuntimeFunctionPointers() {
+  auto &theSentinel = RuntimeObjectStateCache.get();
+  StaticScopedReadLock lock(theSentinel.Lock);
+  for (auto &Pair : theSentinel.Cache) {
     printf("\n\nRuntime counters for object at address %p:\n", Pair.getFirst());
-    dumpRuntimeCounters(&Pair.getSecond());
+    _swift_dumpRuntimeCounters(&Pair.getSecond());
     printf("\n");
   }
 }
 
 /// Set mode for global runtime function counters.
 /// Return the old value of this flag.
-SWIFT_RT_ENTRY_VISIBILITY
-int setGlobalRuntimeFunctionCountersMode(int mode) {
+int _swift_setGlobalRuntimeFunctionCountersMode(int mode) {
   int oldMode = UpdateGlobalRuntimeFunctionCounters;
   UpdateGlobalRuntimeFunctionCounters = mode ? 1 : 0;
   return oldMode;
@@ -199,8 +213,7 @@ int setGlobalRuntimeFunctionCountersMode(int mode) {
 
 /// Set mode for per object runtime function counters.
 /// Return the old value of this flag.
-SWIFT_RT_ENTRY_VISIBILITY
-int setPerObjectRuntimeFunctionCountersMode(int mode) {
+int _swift_setPerObjectRuntimeFunctionCountersMode(int mode) {
   int oldMode = UpdatePerObjectRuntimeFunctionCounters;
   UpdatePerObjectRuntimeFunctionCounters = mode ? 1 : 0;
   return oldMode;
@@ -210,13 +223,12 @@ int setPerObjectRuntimeFunctionCountersMode(int mode) {
 /// is being updated. The handler should take the object and may be
 /// the name of the runtime function as parameters. And this handler
 /// could e.g. check some conditions and stop the program under
-/// a debuggger if a certain condition is met, like a refcount has
+/// a debugger if a certain condition is met, like a refcount has
 /// reached a certain value.
 /// We could allow for setting global handlers or even per-object
 /// handlers.
-SWIFT_RT_ENTRY_VISIBILITY
 RuntimeFunctionCountersUpdateHandler
-setGlobalRuntimeFunctionCountersUpdateHandler(
+_swift_setGlobalRuntimeFunctionCountersUpdateHandler(
     RuntimeFunctionCountersUpdateHandler handler) {
   auto oldHandler = GlobalRuntimeFunctionCountersUpdateHandler;
   GlobalRuntimeFunctionCountersUpdateHandler = handler;
