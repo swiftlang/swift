@@ -1661,26 +1661,6 @@ Type Constraint<T>::getSubjectDependentType(
 }
 
 template<typename T>
-PotentialArchetype *Constraint<T>::realizeSubjectPotentialArchetype(
-                      GenericSignatureBuilder &builder) const {
-  if (auto pa = subject.dyn_cast<PotentialArchetype *>())
-    return pa;
-
-  auto type = subject.get<Type>();
-  auto pa =
-    builder.maybeResolveEquivalenceClass(type,
-                                         ArchetypeResolutionKind::WellFormed,
-                                         /*wantExactPotentialArchetype=*/true)
-      .realizePotentialArchetype(builder);
-  assert(pa && "Invalid dependent type");
-
-  // Cache the result, so we don't need to realize the potential archetype
-  // again.
-  subject = pa;
-  return pa;
-}
-
-template<typename T>
 bool Constraint<T>::isSubjectEqualTo(const PotentialArchetype *pa) const {
   if (auto subjectPA = subject.dyn_cast<PotentialArchetype *>())
     return subjectPA == pa;

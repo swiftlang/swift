@@ -1458,11 +1458,6 @@ struct GenericSignatureBuilder::Constraint {
   Type getSubjectDependentType(
                        ArrayRef<GenericTypeParamType *> genericParams) const;
 
-  /// Realizes and retrieves the potential archetype describing the
-  /// subject of the constraint.
-  PotentialArchetype *realizeSubjectPotentialArchetype(
-                        GenericSignatureBuilder &builder) const;
-
   /// Determine whether the subject is equivalence to the given potential
   /// archetype.
   bool isSubjectEqualTo(const PotentialArchetype *pa) const;
