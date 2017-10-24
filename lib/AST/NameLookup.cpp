@@ -29,6 +29,10 @@
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
+
+#define DEBUG_TYPE "namelookup"
 
 using namespace swift;
 
@@ -1195,10 +1199,47 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
   RecursiveSharedTimer::Guard guard;
-  if (auto s = getASTContext().Stats) {
+  ASTContext &ctx = getASTContext();
+  if (auto s = ctx.Stats) {
     ++s->getFrontendCounters().NominalTypeLookupDirectCount;
     guard = s->getFrontendRecursiveSharedTimers()
                 .NominalTypeDecl__lookupDirect.getGuard();
+  }
+
+  DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
+        << ", lookupTable.getInt()=" << LookupTable.getInt()
+        << ", hasLazyMembers()=" << hasLazyMembers()
+        << "\n");
+
+  bool hasExtensionsToConsider = false;
+  if (!ignoreNewExtensions) {
+    auto E = getExtensions();
+    hasExtensionsToConsider = E.begin() != E.end();
+  }
+
+  if (!hasExtensionsToConsider &&
+      ctx.LangOpts.NamedLazyMemberLoading &&
+      !LookupTable.getInt() &&
+      hasLazyMembers()) {
+    // The lookup table (containing all loaded members) has not yet been built;
+    // we *might* be able to avoid loading all members, just focus on the ones
+    // matching the name we were asked for.
+    TinyPtrVector<ValueDecl *> results;
+    auto contextInfo =
+        ctx.getOrCreateLazyIterableContextData(this,
+                                               /*lazyLoader=*/nullptr);
+    if (auto results =
+        contextInfo->loader->loadNamedMembers(this, name,
+                                              contextInfo->memberData)) {
+      if (auto s = ctx.Stats) {
+        ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
+      }
+      return *results;
+    } else {
+      if (auto s = ctx.Stats) {
+        ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
+      }
+    }
   }
 
   (void)getMembers();
