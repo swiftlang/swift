@@ -522,33 +522,41 @@ static void emitSpecializedMemOperation(
   auto &IGM = IGF.IGM;
   auto &Ctx = IGF.IGM.getLLVMContext();
   auto &Builder = IGF.Builder;
-  auto *continueBB = llvm::BasicBlock::Create(Ctx);
+  auto *returnBB = llvm::BasicBlock::Create(Ctx);
   auto *oneBB = llvm::BasicBlock::Create(Ctx);
   auto *twoBB = llvm::BasicBlock::Create(Ctx);
   auto *fourBB = llvm::BasicBlock::Create(Ctx);
   auto *int32Ty = IGM.Int32Ty;
+  auto *zero = llvm::ConstantInt::get(int32Ty, 1U);
   auto *one = llvm::ConstantInt::get(int32Ty, 1U);
   auto *two = llvm::ConstantInt::get(int32Ty, 2U);
-  auto *four = llvm::ConstantInt::get(int32Ty, 4U);
 
-  auto *theSwitch = Builder.CreateSwitch(size, continueBB, 3);
-  theSwitch->addCase(one, oneBB);
-  theSwitch->addCase(two, twoBB);
-  theSwitch->addCase(four, fourBB);
+  auto *continueBB = llvm::BasicBlock::Create(Ctx);
+  auto *isZero = Builder.CreateICmpEQ(size, zero);
+  Builder.CreateCondBr(isZero, returnBB, continueBB);
+
+  Builder.emitBlock(continueBB);
+  continueBB = llvm::BasicBlock::Create(Ctx);
+  auto *isOne = Builder.CreateICmpEQ(size, one);
+  Builder.CreateCondBr(isOne, oneBB, continueBB);
+
+  Builder.emitBlock(continueBB);
+  auto *isTwo = Builder.CreateICmpEQ(size, two);
+  Builder.CreateCondBr(isTwo, twoBB, fourBB);
 
   Builder.emitBlock(oneBB);
   emitMemOpFn(Builder, 1);
-  Builder.CreateBr(continueBB);
+  Builder.CreateBr(returnBB);
 
   Builder.emitBlock(twoBB);
   emitMemOpFn(Builder, 2);
-  Builder.CreateBr(continueBB);
+  Builder.CreateBr(returnBB);
 
   Builder.emitBlock(fourBB);
   emitMemOpFn(Builder, 4);
-  Builder.CreateBr(continueBB);
+  Builder.CreateBr(returnBB);
 
-  Builder.emitBlock(continueBB);
+  Builder.emitBlock(returnBB);
 }
 
 /// Emit a memset of zero operation for a \p size of 0 to 4 bytes.
@@ -682,8 +690,6 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
       valueAddr,
       Builder.CreateBitOrPointerCast(payloadIndexAddr, IGM.Int8PtrTy),
       std::min(Size(4U).getValue(), fixedSize), 1);
-  auto *extraZeroAddr =
-      Builder.CreateConstInBoundsGEP1_32(IGM.Int8Ty, valueAddr, 4);
   emitMemCpy(IGF, extraTagBitsAddr, extraTagIndexAddr, numExtraTagBytes);
   Builder.CreateBr(returnBB);
 
