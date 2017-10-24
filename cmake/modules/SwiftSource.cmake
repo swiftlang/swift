@@ -256,7 +256,7 @@ function(_compile_swift_files
                             "-Xfrontend" "${GROUP_INFO_JSON_FILE}")
   endif()
 
-  # Force swift 3 compatibility mode for Standard Library and overlay.
+  # Force swift 3 compatibility mode for Standard Library.
   if (SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-swift-version" "3")
   endif()
