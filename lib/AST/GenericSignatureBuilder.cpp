@@ -1642,14 +1642,13 @@ bool EquivalenceClass::recordConformanceConstraint(
 }
 
 bool EquivalenceClass::recordSameTypeConstraint(
-                              GenericSignatureBuilder &builder,
                               PotentialArchetype *type1,
                               PotentialArchetype *type2,
                               const RequirementSource *source) {
-  // FIXME: Drop builder?
   sameTypeConstraints.push_back({type1, type2, source});
   ++NumSameTypeConstraints;
-  return true;
+  return type1->getEquivalenceClassIfPresent() !=
+    type2->getEquivalenceClassIfPresent();
 }
 
 template<typename T>
@@ -3981,23 +3980,20 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
        PotentialArchetype *OrigT2,
        const RequirementSource *Source) 
 {
+  // Record the same-type constraint, and bail out if it was already known.
+  if (!OrigT1->getOrCreateEquivalenceClass(*this)
+        ->recordSameTypeConstraint(OrigT1, OrigT2, Source))
+    return ConstraintResult::Resolved;
+
   // Operate on the representatives
   auto T1 = OrigT1->getRepresentative();
   auto T2 = OrigT2->getRepresentative();
 
-  // If the representatives are already the same, we're done.
-  if (T1 == T2) {
-    T1->getOrCreateEquivalenceClass(*this)
-      ->recordSameTypeConstraint(*this, OrigT1, OrigT2, Source);
-    return ConstraintResult::Resolved;
-  }
-
-  unsigned nestingDepth1 = T1->getNestingDepth();
-  unsigned nestingDepth2 = T2->getNestingDepth();
-
   // Decide which potential archetype is to be considered the representative.
   // We prefer potential archetypes with lower nesting depths, because it
   // prevents us from unnecessarily building deeply nested potential archetypes.
+  unsigned nestingDepth1 = T1->getNestingDepth();
+  unsigned nestingDepth2 = T2->getNestingDepth();
   if (nestingDepth2 < nestingDepth1) {
     std::swap(T1, T2);
     std::swap(OrigT1, OrigT2);
@@ -4006,9 +4002,6 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   // Merge the equivalence classes.
   auto equivClass = T1->getOrCreateEquivalenceClass(*this);
   equivClass->modified(*this);
-
-  // Record the same-type constraint.
-  equivClass->recordSameTypeConstraint(*this, OrigT1, OrigT2, Source);
 
   auto equivClass1Members = equivClass->members;
   auto equivClass2Members = T2->getEquivalenceClassMembers();
