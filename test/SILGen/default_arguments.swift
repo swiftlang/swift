@@ -139,6 +139,8 @@ class Foo {
     return x
   }
  
+  // CHECK-LABEL: sil private @globalinit_33_E52D764B1F2009F2390B2B8DF62DAEB8_func0
+  // CHECK:         string_literal utf16 "Foo" 
   static let x = Foo(int:0)
 
 }
@@ -147,6 +149,9 @@ class Foo {
 testMagicLiterals()
 closure { testMagicLiterals() }
 autoclosure(testMagicLiterals())
+
+// CHECK: string_literal utf16 "default_arguments"
+let y : String = #function 
 
 // CHECK-LABEL: sil hidden @_T017default_arguments16testSelectorCallySi_Si17withMagicLiteralstF
 // CHECK:         string_literal utf16 "testSelectorCall(_:withMagicLiterals:)"
