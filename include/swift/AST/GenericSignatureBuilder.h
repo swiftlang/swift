@@ -215,8 +215,7 @@ public:
     ///
     /// \returns true if this same-type constraint merges two equivalence
     /// classes, and false otherwise.
-    bool recordSameTypeConstraint(GenericSignatureBuilder &builder,
-                                  PotentialArchetype *type1,
+    bool recordSameTypeConstraint(PotentialArchetype *type1,
                                   PotentialArchetype *type2,
                                   const RequirementSource *source);
 
