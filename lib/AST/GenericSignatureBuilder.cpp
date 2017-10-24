@@ -217,18 +217,13 @@ namespace {
   class EquivalenceClassVizIterator {
     using BaseIterator = const Constraint<PotentialArchetype *> *;
 
-    const EquivalenceClass *equivClass;
+    EquivalenceClassVizNode node;
     BaseIterator base;
     BaseIterator baseEnd;
 
     void advance() {
-      while (base != baseEnd) {
-        if (compareDependentTypes(base->getSubjectDependentType({ }),
-                                  base->value->getDependentType({ })) <= 0)
-          break;
-
+      while (base != baseEnd && base->value != node.second)
         ++base;
-      }
     }
 
   public:
@@ -238,10 +233,9 @@ namespace {
     using pointer = value_type*;
     using iterator_category = std::forward_iterator_tag;
 
-    EquivalenceClassVizIterator(const EquivalenceClass *equivClass,
-                                BaseIterator base,
-                                BaseIterator baseEnd)
-        : equivClass(equivClass), base(base), baseEnd(baseEnd) {
+    EquivalenceClassVizIterator(EquivalenceClassVizNode node,
+                                BaseIterator base, BaseIterator baseEnd)
+        : node(node), base(base), baseEnd(baseEnd) {
       advance();
     }
 
@@ -249,7 +243,7 @@ namespace {
     const BaseIterator &getBase() const { return base; }
 
     reference operator*() const {
-      return { equivClass, getBase()->value };
+      return { node.first, getBase()->value };
     }
 
     EquivalenceClassVizIterator& operator++() {
@@ -354,26 +348,15 @@ namespace llvm {
     using ChildIteratorType = EquivalenceClassVizIterator;
 
     static ChildIteratorType child_begin(NodeRef node) {
-      const Constraint<PotentialArchetype *> *base = nullptr,
-        *baseEnd = nullptr;
-      auto known = node.first->sameTypeConstraints.find(node.second);
-      if (known != node.first->sameTypeConstraints.end() &&
-          !known->second.empty()) {
-        base = &known->second.front();
-        baseEnd = &known->second.front() + known->second.size();
-      }
-
-      return ChildIteratorType(node.first, base, baseEnd);
+      auto base = node.first->sameTypeConstraints.data();
+      auto baseEnd = base + node.first->sameTypeConstraints.size();
+      return ChildIteratorType(node, base, baseEnd);
     }
 
     static ChildIteratorType child_end(NodeRef node) {
-      const Constraint<PotentialArchetype *> *base = nullptr;
-      auto known = node.first->sameTypeConstraints.find(node.second);
-      if (known != node.first->sameTypeConstraints.end() &&
-          !known->second.empty())
-        base = &known->second.front() + known->second.size();
-
-      return ChildIteratorType(node.first, base, base);
+      auto base = node.first->sameTypeConstraints.data();
+      auto baseEnd = base + node.first->sameTypeConstraints.size();
+      return ChildIteratorType(node, baseEnd, baseEnd);
     }
   };
 
@@ -1663,15 +1646,9 @@ bool EquivalenceClass::recordSameTypeConstraint(
                               PotentialArchetype *type1,
                               PotentialArchetype *type2,
                               const RequirementSource *source) {
-  sameTypeConstraints[type1].push_back({type1, type2, source});
+  // FIXME: Drop builder?
+  sameTypeConstraints.push_back({type1, type2, source});
   ++NumSameTypeConstraints;
-
-  if (type1 != type2) {
-    type2->getOrCreateEquivalenceClass(builder)
-      ->sameTypeConstraints[type2].push_back({type2, type1, source});
-    ++NumSameTypeConstraints;
-  }
-
   return true;
 }
 
@@ -2103,18 +2080,16 @@ void EquivalenceClass::dump(llvm::raw_ostream &out) const {
              },
              [&] { out << ", "; });
   out << "\nSame-type constraints:";
-  for (const auto &entry : sameTypeConstraints) {
-    out << "\n  " << entry.first->getDebugName() << " == ";
-    interleave(entry.second,
-               [&](const Constraint<PotentialArchetype *> &constraint) {
-                 out << constraint.value->getDebugName();
+  interleave(sameTypeConstraints,
+             [&](const Constraint<PotentialArchetype *> &constraint) {
+               out << "\n  " << constraint.getSubjectDependentType({ })
+                   << " == " << constraint.value->getDebugName();
 
-                 if (constraint.source->isDerivedRequirement())
-                   out << " [derived]";
-               }, [&] {
-                 out << ", ";
-               });
-  }
+               if (constraint.source->isDerivedRequirement())
+                 out << " [derived]";
+             }, [&] {
+               out << ", ";
+             });
   if (concreteType)
     out << "\nConcrete type: " << concreteType.getString();
   if (superclass)
@@ -4039,7 +4014,8 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   // Grab the old equivalence class, if present. We'll deallocate it at the end.
   auto equivClass2 = T2->getEquivalenceClassIfPresent();
   SWIFT_DEFER {
-    Impl->deallocateEquivalenceClass(equivClass2);
+    if (equivClass2)
+      Impl->deallocateEquivalenceClass(equivClass2);
   };
 
   // Consider the second equivalence class to be modified.
@@ -4048,12 +4024,10 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Same-type requirements.
   if (equivClass2) {
-    for (auto &paSameTypes : equivClass2->sameTypeConstraints) {
-      auto inserted =
-        equivClass->sameTypeConstraints.insert(std::move(paSameTypes));
-      (void)inserted;
-      assert(inserted.second && "equivalence class already has entry for PA?");
-    }
+    equivClass->sameTypeConstraints.insert(
+                                   equivClass->sameTypeConstraints.end(),
+                                   equivClass2->sameTypeConstraints.begin(),
+                                   equivClass2->sameTypeConstraints.end());
   }
 
   // Same-type-to-concrete requirements.
@@ -4937,9 +4911,12 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         // Try to find an exact constraint that matches 'other'.
         auto repConstraint =
           findRepresentativeConstraint<PotentialArchetype *>(
-            pa->getSameTypeConstraints(),
-            [other](const Constraint<PotentialArchetype *> &constraint) {
-              return constraint.value == other;
+            equivClass->sameTypeConstraints,
+            [pa, other](const Constraint<PotentialArchetype *> &constraint) {
+              return (constraint.isSubjectEqualTo(pa) &&
+                      constraint.value == other) ||
+                (constraint.isSubjectEqualTo(other) &&
+                 constraint.value == pa);
             });
 
 
@@ -4947,7 +4924,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         if (!repConstraint) {
           repConstraint =
             findRepresentativeConstraint<PotentialArchetype *>(
-              pa->getSameTypeConstraints(),
+              equivClass->sameTypeConstraints,
               [](const Constraint<PotentialArchetype *> &constraint) {
                 return true;
               });
@@ -5472,25 +5449,23 @@ static void computeDerivedSameTypeComponents(
   }
 
   // Walk all of the same-type constraints, performing a union-find operation.
-  for (const auto &entry : equivClass->sameTypeConstraints) {
-    for (const auto &constraint : entry.second) {
-      // Treat nested-type-name-match constraints specially.
-      if (constraint.source->getRoot()->kind ==
-            RequirementSource::NestedTypeNameMatch)
-        continue;
+  for (const auto &constraint : equivClass->sameTypeConstraints) {
+    // Treat nested-type-name-match constraints specially.
+    if (constraint.source->getRoot()->kind ==
+          RequirementSource::NestedTypeNameMatch)
+      continue;
 
-      // Skip non-derived constraints.
-      if (!constraint.source->isDerivedRequirement()) continue;
+    // Skip non-derived constraints.
+    if (!constraint.source->isDerivedRequirement()) continue;
 
-      CanType source =
-        constraint.getSubjectDependentType({ })->getCanonicalType();
-      CanType target =
-        constraint.value->getDependentType({ })->getCanonicalType();
+    CanType source =
+      constraint.getSubjectDependentType({ })->getCanonicalType();
+    CanType target =
+      constraint.value->getDependentType({ })->getCanonicalType();
 
-      assert(parentIndices.count(source) == 1 && "Missing source");
-      assert(parentIndices.count(target) == 1 && "Missing target");
-      unionSets(parents, parentIndices[source], parentIndices[target]);
-    }
+    assert(parentIndices.count(source) == 1 && "Missing source");
+    assert(parentIndices.count(target) == 1 && "Missing target");
+    unionSets(parents, parentIndices[source], parentIndices[target]);
   }
 
   // Compute and record the components.
@@ -5773,33 +5748,25 @@ static void collapseSameTypeComponents(
     // If this edge is self-derived, remove it.
     if (isSelfDerivedNestedTypeNameMatchEdge(builder, equivClass, componentOf,
                                              sameTypeEdges, edgeIndex)) {
-      auto eraseConstraint = [&](PotentialArchetype *archetype) {
-        auto &constraints = equivClass->sameTypeConstraints[archetype];
-        auto known =
-          std::find_if(constraints.begin(), constraints.end(),
-                       [&](const Constraint<PotentialArchetype *> &existing) {
-                         // Check the requirement source, first.
-                         if (existing.source != edge.constraint.source)
-                           return false;
-
-                         return
-                           (existing.hasSameSubjectAs(edge.constraint) &&
-                            existing.value == edge.constraint.value) ||
-                           (existing.isSubjectEqualTo(edge.constraint.value) &&
-                            edge.constraint.isSubjectEqualTo(existing.value));
-                       });
-        assert(known != constraints.end());
-        constraints.erase(known);
-      };
-
       // Note that this edge is self-derived, so we don't consider it again.
       edge.isSelfDerived = true;
 
-      // Erase the constraint in both directions.
-      eraseConstraint(
-                    edge.constraint.realizeSubjectPotentialArchetype(builder));
-      eraseConstraint(edge.constraint.value);
+      auto &constraints = equivClass->sameTypeConstraints;
+      auto known =
+        std::find_if(constraints.begin(), constraints.end(),
+                     [&](const Constraint<PotentialArchetype *> &existing) {
+                       // Check the requirement source, first.
+                       if (existing.source != edge.constraint.source)
+                         return false;
 
+                       return
+                         (existing.hasSameSubjectAs(edge.constraint) &&
+                          existing.value == edge.constraint.value) ||
+                         (existing.isSubjectEqualTo(edge.constraint.value) &&
+                          edge.constraint.isSubjectEqualTo(existing.value));
+                     });
+      assert(known != constraints.end());
+      constraints.erase(known);
       continue;
     }
 
@@ -5874,18 +5841,16 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
     return;
 
   bool anyDerivedViaConcrete = false;
-  for (auto &entry : equivClass->sameTypeConstraints) {
-    auto &constraints = entry.second;
+  // Remove self-derived constraints.
+  if (removeSelfDerived(*this, equivClass->sameTypeConstraints,
+                        /*proto=*/nullptr,
+                        /*dropDerivedViaConcrete=*/false,
+                        /*allCanBeSelfDerived=*/true))
+    anyDerivedViaConcrete = true;
 
-    // Remove self-derived constraints.
-    if (removeSelfDerived(*this, constraints, /*proto=*/nullptr,
-                          /*dropDerivedViaConcrete=*/false,
-                          /*allCanBeSelfDerived=*/true))
-      anyDerivedViaConcrete = true;
-
-    // Sort the constraints, so we get a deterministic ordering of diagnostics.
-    llvm::array_pod_sort(constraints.begin(), constraints.end());
-  }
+  // Sort the constraints, so we get a deterministic ordering of diagnostics.
+  llvm::array_pod_sort(equivClass->sameTypeConstraints.begin(),
+                       equivClass->sameTypeConstraints.end());
 
   // Compute the components in the subgraph of the same-type constraint graph
   // that includes only derived constraints.
@@ -5907,78 +5872,64 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   // source/target components.
   std::vector<IntercomponentEdge> intercomponentEdges;
   std::vector<IntercomponentEdge> nestedTypeNameMatchEdges;
-  for (auto &entry : equivClass->sameTypeConstraints) {
-    auto &constraints = entry.second;
-    for (const auto &constraint : constraints) {
-      // If the source/destination are identical, complain.
-      if (constraint.isSubjectEqualTo(constraint.value)) {
-        if (constraint.source->shouldDiagnoseRedundancy(true)) {
-          Diags.diagnose(constraint.source->getLoc(),
-                         diag::redundant_same_type_constraint,
-                         constraint.getSubjectDependentType(genericParams),
-                         constraint.value->getDependentType(genericParams));
-        }
-
-        continue;
+  for (const auto &constraint : equivClass->sameTypeConstraints) {
+    // If the source/destination are identical, complain.
+    if (constraint.isSubjectEqualTo(constraint.value)) {
+      if (constraint.source->shouldDiagnoseRedundancy(true)) {
+        Diags.diagnose(constraint.source->getLoc(),
+                       diag::redundant_same_type_constraint,
+                       constraint.getSubjectDependentType(genericParams),
+                       constraint.value->getDependentType(genericParams));
       }
 
-      // Only keep constraints where the source is "first" in the ordering;
-      // this lets us eliminate the duplication coming from us adding back
-      // edges.
-      // FIXME: Alternatively, we could track back edges differently in the
-      // constraint.
-      auto subjectPA = constraint.realizeSubjectPotentialArchetype(*this);
-      if (compareDependentTypes(&subjectPA, &constraint.value) > 0)
-        continue;
-
-      // Determine which component each of the source/destination fall into.
-      assert(componentOf.count(subjectPA) > 0 &&
-             "unknown potential archetype?");
-      unsigned firstComponentIdx = componentOf[subjectPA];
-      assert(componentOf.count(constraint.value) > 0 &&
-             "unknown potential archetype?");
-      unsigned secondComponentIdx = componentOf[constraint.value];
-
-      // Separately track nested-type-name-match constraints.
-      if (constraint.source->getRoot()->kind ==
-            RequirementSource::NestedTypeNameMatch) {
-        // If this is an intercomponent edge, record it separately.
-        if (firstComponentIdx != secondComponentIdx) {
-          nestedTypeNameMatchEdges.push_back(
-            IntercomponentEdge(firstComponentIdx, secondComponentIdx, constraint));
-        }
-
-        continue;
-      }
-
-      // If both vertices are within the same component, this is an
-      // intra-component edge. Record it as such.
-      if (firstComponentIdx == secondComponentIdx) {
-        intracomponentEdges[firstComponentIdx].push_back(constraint);
-        continue;
-      }
-
-      // Otherwise, it's an intercomponent edge, which is never derived.
-      assert(!constraint.source->isDerivedRequirement() &&
-             "Must not be derived");
-
-      // Ignore inferred requirements; we don't want to diagnose them.
-      intercomponentEdges.push_back(
-        IntercomponentEdge(firstComponentIdx, secondComponentIdx, constraint));
+      continue;
     }
+
+    // Determine which component each of the source/destination fall into.
+    auto subjectPA = constraint.realizeSubjectPotentialArchetype(*this);
+    assert(componentOf.count(subjectPA) > 0 &&
+           "unknown potential archetype?");
+    unsigned firstComponentIdx = componentOf[subjectPA];
+    assert(componentOf.count(constraint.value) > 0 &&
+           "unknown potential archetype?");
+    unsigned secondComponentIdx = componentOf[constraint.value];
+
+    // Separately track nested-type-name-match constraints.
+    if (constraint.source->getRoot()->kind ==
+          RequirementSource::NestedTypeNameMatch) {
+      // If this is an intercomponent edge, record it separately.
+      if (firstComponentIdx != secondComponentIdx) {
+        nestedTypeNameMatchEdges.push_back(
+          IntercomponentEdge(firstComponentIdx, secondComponentIdx, constraint));
+      }
+
+      continue;
+    }
+
+    // If both vertices are within the same component, this is an
+    // intra-component edge. Record it as such.
+    if (firstComponentIdx == secondComponentIdx) {
+      intracomponentEdges[firstComponentIdx].push_back(constraint);
+      continue;
+    }
+
+    // Otherwise, it's an intercomponent edge, which is never derived.
+    assert(!constraint.source->isDerivedRequirement() &&
+           "Must not be derived");
+
+    // Ignore inferred requirements; we don't want to diagnose them.
+    intercomponentEdges.push_back(
+      IntercomponentEdge(firstComponentIdx, secondComponentIdx, constraint));
   }
 
   // If there were any derived-via-concrete constraints, drop them now before
   // we emit other diagnostics.
   if (anyDerivedViaConcrete) {
-    for (auto &entry : equivClass->sameTypeConstraints) {
-      auto &constraints = entry.second;
-
-      // Remove derived-via-concrete constraints.
-      (void)removeSelfDerived(*this, constraints, /*proto=*/nullptr,
-                              /*dropDerivedViaConcrete=*/true,
-                              /*allCanBeSelfDerived=*/true);
-    }
+    // Remove derived-via-concrete constraints.
+    (void)removeSelfDerived(*this, equivClass->sameTypeConstraints,
+                            /*proto=*/nullptr,
+                            /*dropDerivedViaConcrete=*/true,
+                            /*allCanBeSelfDerived=*/true);
   }
 
   // Walk through each of the components, checking the intracomponent edges.
