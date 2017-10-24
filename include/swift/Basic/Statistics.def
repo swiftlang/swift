@@ -161,6 +161,12 @@ FRONTEND_STATISTIC(Sema, NumLazyIterableDeclContexts)
 /// Number of direct member-name lookups performed on nominal types.
 FRONTEND_STATISTIC(Sema, NominalTypeLookupDirectCount)
 
+/// Number of member-name lookups that avoided loading all members.
+FRONTEND_STATISTIC(Sema, NamedLazyMemberLoadSuccessCount)
+
+/// Number of member-name lookups that wound up loading all members.
+FRONTEND_STATISTIC(Sema, NamedLazyMemberLoadFailureCount)
+
 /// Number of types deserialized.
 FRONTEND_STATISTIC(Sema, NumTypesDeserialized)
 

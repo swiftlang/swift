@@ -145,8 +145,14 @@ namespace {
       // pull out the superclass instead, and use that below.
       if (foundInType->isExistentialType()) {
         auto layout = foundInType->getExistentialLayout();
-        if (layout.superclass)
+        if (layout.superclass) {
           conformingType = layout.superclass;
+        } else {
+          // Non-subclass existential: don't need to look for further
+          // conformance or witness.
+          addResult(found);
+          return;
+        }
       }
 
       // Dig out the protocol conformance.

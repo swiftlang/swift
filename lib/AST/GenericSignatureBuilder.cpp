@@ -3371,6 +3371,10 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     }
   }
 
+  // Remaining logic is not relevant in ObjC protocol cases.
+  if (proto->isObjC())
+    return ConstraintResult::Resolved;
+
   // Collect all of the inherited associated types and typealiases in the
   // inherited protocols (recursively).
   llvm::MapVector<DeclName, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;

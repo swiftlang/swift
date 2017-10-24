@@ -218,11 +218,19 @@ class alignas(void*) LazyMemberLoader {
 public:
   virtual ~LazyMemberLoader() = default;
 
-  /// Populates the given vector with all member decls for \p D.
+  /// Populates a given decl \p D with all of its members.
   ///
   /// The implementation should add the members to D.
   virtual void
   loadAllMembers(Decl *D, uint64_t contextData) = 0;
+
+  /// Populates a vector with all members of \p D that have DeclName
+  /// matching \p N.
+  ///
+  /// Returns None if an error occurred \em or named member-lookup
+  /// was otherwise unsupported in this implementation or Decl.
+  virtual Optional<TinyPtrVector<ValueDecl *>>
+  loadNamedMembers(const Decl *D, DeclName N, uint64_t contextData) = 0;
 
   /// Populates the given vector with all conformances for \p D.
   ///
