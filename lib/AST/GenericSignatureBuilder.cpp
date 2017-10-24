@@ -563,14 +563,6 @@ bool RequirementSource::shouldDiagnoseRedundancy(bool primary) const {
          (!primary || !isDerivedRequirement());
 }
 
-bool RequirementSource::isSelfDerivedSource(GenericSignatureBuilder &builder,
-                                            Type type,
-                                            bool &derivedViaConcrete) const {
-  return getMinimalConformanceSource(builder, type, /*proto=*/nullptr,
-                                     derivedViaConcrete)
-    != this;
-}
-
 /// Replace 'Self' in the given dependent type (\c depTy) with the given
 /// potential archetype, producing a new potential archetype that refers to
 /// the nested type. This limited operation makes sure that it does not
@@ -5496,20 +5488,9 @@ static void computeDerivedSameTypeComponents(
   // per component.
   for (const auto &concrete : equivClass->concreteTypeConstraints) {
     // Dig out the component associated with constraint.
-    Type subjectType =
-      concrete.getSubjectDependentType(builder.getGenericParams());
     auto subjectPA = concrete.realizeSubjectPotentialArchetype(builder);
     assert(componentOf.count(subjectPA) > 0);
     auto &component = components[componentOf[subjectPA]];
-
-    // FIXME: Skip self-derived sources. This means our attempts to "stage"
-    // construction of self-derived sources really don't work, because we
-    // discover more information later, so we need a more on-line or
-    // iterative approach.
-    bool derivedViaConcrete;
-    if (concrete.source->isSelfDerivedSource(builder, subjectType,
-                                             derivedViaConcrete))
-      continue;
 
     // If it has a better source than we'd seen before for this component,
     // keep it.
