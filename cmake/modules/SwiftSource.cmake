@@ -257,7 +257,7 @@ function(_compile_swift_files
   endif()
 
   # Force swift 3 compatibility mode for Standard Library and overlay.
-  if (SWIFTFILE_IS_STDLIB OR SWIFTFILE_IS_SDK_OVERLAY)
+  if (SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-swift-version" "3")
   endif()
 
