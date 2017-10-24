@@ -29,7 +29,8 @@ template <unsigned count> static void small_memcpy(void *dest, const void *src) 
   }
 }
 
-static inline void small_memcpy(void *dest, const void *src, unsigned count) {
+static inline void small_memcpy(void *dest, const void *src, unsigned count,
+                                bool countMaybeThree = false) {
   // This is specialization of the memcpy line below with
   // specialization for values of 1, 2 and 4.
   // memcpy(dst, src, count)
@@ -37,6 +38,8 @@ static inline void small_memcpy(void *dest, const void *src, unsigned count) {
     small_memcpy<1>(dest, src);
   } else if (count == 2) {
     small_memcpy<2>(dest, src);
+  } else if (countMaybeThree && count == 3) {
+    small_memcpy<3>(dest, src);
   } else if (count == 4) {
     small_memcpy<4>(dest, src);
   } else {
@@ -115,11 +118,11 @@ inline int getEnumTagSinglePayloadImpl(
       if (numPayloadTagBytes)
         small_memcpy(reinterpret_cast<uint8_t *>(&caseIndexFromValue) + 4 -
                          numPayloadTagBytes,
-                     valueAddr, numPayloadTagBytes);
+                     valueAddr, numPayloadTagBytes, true);
 #else
       if (numPayloadTagBytes)
         small_memcpy(&caseIndexFromValue, valueAddr,
-                     numPayloadTagBytes);
+                     numPayloadTagBytes, true);
 #endif
       return (caseIndexFromExtraTagBits | caseIndexFromValue) +
              payloadNumExtraInhabitants;
@@ -153,17 +156,8 @@ inline void storeEnumTagSinglePayloadImpl(
   // For payload or extra inhabitant cases, zero-initialize the extra tag bits,
   // if any.
   if (whichCase < (int)payloadNumExtraInhabitants) {
-    // The two most common values for numExtraTagBytes are zero and one.
-    // Try to avoid calling bzero by specializing for these values.
-    if (numExtraTagBytes != 0) {
-      if (numExtraTagBytes == 1) {
-        // Zero a single byte.
-        *((char *)(extraTagBitAddr)) = 0;
-      } else {
-        // Zero the buffer.
-        small_memset(extraTagBitAddr, 0, numExtraTagBytes);
-      }
-    }
+    if (numExtraTagBytes != 0)
+      small_memset(extraTagBitAddr, 0, numExtraTagBytes);
 
     // If this is the payload case, we're done.
     if (whichCase == -1)
@@ -193,7 +187,7 @@ inline void storeEnumTagSinglePayloadImpl(
     small_memcpy(valueAddr,
                  reinterpret_cast<uint8_t *>(&payloadIndex) + 4 -
                      numPayloadTagBytes,
-                 numPayloadTagBytes);
+                 numPayloadTagBytes, true);
   if (numExtraTagBytes)
     small_memcpy(extraTagBitAddr,
                  reinterpret_cast<uint8_t *>(&extraTagIndex) + 4 -
@@ -202,7 +196,7 @@ inline void storeEnumTagSinglePayloadImpl(
 #else
   unsigned numPayloadTagBytes = std::min(size_t(4), payloadSize);
   if (numPayloadTagBytes)
-    small_memcpy(valueAddr, &payloadIndex, numPayloadTagBytes);
+    small_memcpy(valueAddr, &payloadIndex, numPayloadTagBytes, true);
   if (numExtraTagBytes)
     small_memcpy(extraTagBitAddr, &extraTagIndex, numExtraTagBytes);
 #endif
