@@ -4123,39 +4123,38 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
 }
 
 ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
-       PotentialArchetype *T,
-       Type Concrete,
-       const RequirementSource *Source) {
-  auto rep = T->getRepresentative();
-  auto equivClass = rep->getOrCreateEquivalenceClass(*this);
+                                           ResolvedType type,
+                                           Type concrete,
+                                           const RequirementSource *source) {
+auto equivClass = type.getEquivalenceClass(*this);
 
   // Record the concrete type and its source.
   equivClass->concreteTypeConstraints.push_back(
-                                      ConcreteConstraint{T, Concrete, Source});
+    ConcreteConstraint{type.getUnresolvedType(), concrete, source});
   equivClass->modified(*this);
   ++NumConcreteTypeConstraints;
 
   // If we've already been bound to a type, match that type.
   if (equivClass->concreteType) {
-    return addSameTypeRequirement(equivClass->concreteType, Concrete, Source,
+    return addSameTypeRequirement(equivClass->concreteType, concrete, source,
                                   UnresolvedHandlingKind::GenerateConstraints,
                                   SameTypeConflictCheckedLater());
 
   }
 
   // Record the requirement.
-  equivClass->concreteType = Concrete;
+  equivClass->concreteType = concrete;
 
   // Make sure the concrete type fulfills the conformance requirements of
   // this equivalence class.
   for (const auto &conforms : equivClass->conformsTo) {
-    if (!resolveConcreteConformance(rep, conforms.first))
+    if (!resolveConcreteConformance(type, conforms.first))
       return ConstraintResult::Conflicting;
   }
 
   // Eagerly resolve any existing nested types to their concrete forms (others
   // will be "concretized" as they are constructed, in getNestedType).
-  for (auto equivT : rep->getEquivalenceClassMembers()) {
+  for (auto equivT : equivClass->members) {
     for (auto nested : equivT->getNestedTypes()) {
       concretizeNestedTypeFromConcreteParent(equivT, nested.second.front(),
                                              *this);
@@ -4248,35 +4247,39 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
 }
 
 ConstraintResult GenericSignatureBuilder::addSameTypeRequirementDirect(
-    ResolvedType paOrT1, ResolvedType paOrT2,
+    ResolvedType type1, ResolvedType type2,
     FloatingRequirementSource source,
     llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
-  // FIXME: Realizes potential archetypes far too early.
-  auto t1 = paOrT1.getAsConcreteType();
-  auto *pa1 = t1 ? nullptr : paOrT1.realizePotentialArchetype(*this);
+  auto concreteType1 = type1.getAsConcreteType();
+  auto concreteType2 = type2.getAsConcreteType();
 
-  auto t2 = paOrT2.getAsConcreteType();
-  auto *pa2 = t2 ? nullptr : paOrT2.realizePotentialArchetype(*this);
-
-  // If both sides of the requirement are type parameters, equate them.
-  if (pa1 && pa2) {
-    return addSameTypeRequirementBetweenArchetypes(
-                       pa1, pa2,
-                       source.getSource(*this,
-                                        paOrT2.getDependentType(*this)));
-    // If just one side is a type parameter, map it to a concrete type.
-  } else if (pa1) {
-    return addSameTypeRequirementToConcrete(
-                  pa1, t2,
-                  source.getSource(*this, paOrT1.getDependentType(*this)));
-  } else if (pa2) {
-    return addSameTypeRequirementToConcrete(
-                pa2, t1,
-                source.getSource(*this, paOrT2.getDependentType(*this)));
-  } else {
-    return addSameTypeRequirementBetweenConcrete(t1, t2, source,
+  // If both sides of the requirement are concrete, equate them.
+  if (concreteType1 && concreteType2) {
+    return addSameTypeRequirementBetweenConcrete(concreteType1,
+                                                 concreteType2, source,
                                                  diagnoseMismatch);
   }
+
+  // If one side is concrete, map the other side to that concrete type.
+  if (concreteType1) {
+    return addSameTypeRequirementToConcrete(type2, concreteType1,
+                       source.getSource(*this, type2.getDependentType(*this)));
+  }
+
+  if (concreteType2) {
+    return addSameTypeRequirementToConcrete(type1, concreteType2,
+                        source.getSource(*this, type1.getDependentType(*this)));
+  }
+
+  // Both sides are type parameters; equate them.
+  // FIXME: Realizes potential archetypes far too early.
+  auto pa1 = type1.realizePotentialArchetype(*this);
+  auto pa2 = type2.realizePotentialArchetype(*this);
+
+  return addSameTypeRequirementBetweenArchetypes(
+                     pa1, pa2,
+                     source.getSource(*this,
+                                      type2.getDependentType(*this)));
 }
 
 ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
