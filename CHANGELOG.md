@@ -24,7 +24,7 @@ Swift 4.1
 
 * [SE-0185][]
 
-  Structs and enums that declare a conformance to `Equatable`/`Hashable` now get an automatically synthesized implementation of `==`/`hashValue`. For structs, all stored properties must be `Equatable`/`Hashable`. For enums, all enum cases with associated values must be `Equatable`/`Hashable`.
+  Structs and enums that declare a conformance to `Equatable`/`Hashable` now get an automatically synthesized implementation of `==`/`hashValue`. For structs, all stored properties must either be `Equatable`/`Hashable` or tuples where all elements are `Equatable`/`Hashable`. For enums, all enum cases with associated values must be `Equatable`/`Hashable` or tuples where all elements are `Equatable`/`Hashable`.
 
   ```swift
   public struct Point: Hashable {
