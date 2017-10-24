@@ -950,7 +950,8 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
 
   bool pseudogeneric = (constant ? isPseudogeneric(*constant) : false);
 
-  // Always strip the auto-closure and no-escape bit.
+  // NOTE: SILFunctionType::ExtInfo doesn't track everything that
+  // AnyFunctionType::ExtInfo tracks. For example: 'throws' or 'auto-closure'
   auto silExtInfo = SILFunctionType::ExtInfo()
     .withRepresentation(extInfo.getSILRepresentation())
     .withIsPseudogeneric(pseudogeneric)
