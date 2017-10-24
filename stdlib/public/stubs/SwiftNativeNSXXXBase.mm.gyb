@@ -53,6 +53,7 @@ using namespace swift;
 SWIFT_RUNTIME_STDLIB_INTERFACE
 @interface _SwiftNativeNS${Class}Base : NS${Class}
 {
+ @private
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
 }
 @end
