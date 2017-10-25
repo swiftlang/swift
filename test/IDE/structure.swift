@@ -217,10 +217,19 @@ class ReturnType {
   // CHECK: }</ifunc>
   
   func foo2<T>() -> T {}
-  // CHECK:  <ifunc>func <name>foo2<T>()</name> -> <type>T</type> {}</ifunc>
+  // CHECK:  <ifunc>func <name>foo2<<generic-param><name>T</name></generic-param>>()</name> -> <type>T</type> {}</ifunc>
   
   func foo3() -> () -> Int {}
   // CHECK:  <ifunc>func <name>foo3()</name> -> <type>() -> Int</type> {}</ifunc>
+}
+
+// CHECK: <struct>struct <name>Generic</name><<generic-param><name>T</name>: <inherited><elem-typeref>Comparable</elem-typeref></inherited></generic-param>, <generic-param><name>X</name></generic-param>> {
+// CHECK:   <subscript><name>subscript<<generic-param><name>U</name></generic-param>>(<param>generic: <type>U</type></param>)</name> -> <type>Int</type> { return 0 }</subscript>
+// CHECK:   <typealias>typealias <name>Foo</name><<generic-param><name>Y</name></generic-param>> = Bar<Y></typealias>
+// CHECK: }</struct>
+struct Generic<T: Comparable, X> {
+  subscript<U>(generic: U) -> Int { return 0 }
+  typealias Foo<Y> = Bar<Y>
 }
 
 protocol FooProtocol {

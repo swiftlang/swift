@@ -253,7 +253,25 @@
       key.nameoffset: 430,
       key.namelength: 6,
       key.bodyoffset: 446,
-      key.bodylength: 0
+      key.bodylength: 0,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.generic_type_param,
+          key.name: "T1",
+          key.offset: 437,
+          key.length: 2,
+          key.nameoffset: 437,
+          key.namelength: 2
+        },
+        {
+          key.kind: source.lang.swift.decl.generic_type_param,
+          key.name: "T2",
+          key.offset: 441,
+          key.length: 2,
+          key.nameoffset: 441,
+          key.namelength: 2
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.class,
