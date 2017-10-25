@@ -260,6 +260,11 @@ function(_compile_swift_files
   if (SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-swift-version" "3")
   endif()
+  
+  # Force swift 4 compatibility mode for overlays.
+  if (SWIFTFILE_IS_SDK_OVERLAY)
+    list(APPEND swift_flags "-swift-version" "4")
+  endif()
 
   if(SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-autolink-force-load")
