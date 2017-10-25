@@ -736,7 +736,7 @@ class RefCounts {
 #if __POINTER_WIDTH__ == 32
   // FIXME: hack - something somewhere is assuming a 3-word header on 32-bit
   // See also other fixmes marked "small header for 32-bit"
-  uintptr_t unused SWIFT_ATTRIBUTE_UNAVAILABLE;
+  uintptr_t : 32;
 #endif
 
   // Out-of-line slow paths.
@@ -772,11 +772,7 @@ class RefCounts {
   
   // Refcount of a new object is 1.
   constexpr RefCounts(Initialized_t)
-    : refCounts(RefCountBits(0, 1))
-#if __POINTER_WIDTH__ == 32 && !__has_attribute(unavailable)
-      , unused(0)
-#endif
-  { }
+    : refCounts(RefCountBits(0, 1)) {}
 
   void init() {
     refCounts.store(RefCountBits(0, 1), std::memory_order_relaxed);
