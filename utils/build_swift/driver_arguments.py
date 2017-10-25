@@ -13,12 +13,12 @@ import android.adb.commands
 
 # TODO: Replace with implementation in build_swift package
 from swift_build_support.swift_build_support import host
+from swift_build_support.swift_build_support import arguments
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
 
 from . import defaults
 from .argparse_builder import ArgumentParserBuilder
-from .argument_types import ClangVersionType, SwiftVersionType
 
 
 __all__ = [
@@ -129,24 +129,24 @@ def create_argument_parser():
            help='compiler vendor name')
 
     option('--clang-compiler-version', set_,
-           type=ClangVersionType(),
+           type=arguments.type.clang_compiler_version,
            metavar='VERSION',
            help='Clang compiler version')
 
     option('--clang-user-visible-version', set_,
-           type=ClangVersionType(),
+           type=arguments.type.clang_compiler_version,
            default=defaults.CLANG_USER_VISIBLE_VERSION,
            metavar='VERSION',
            help='user-visible version of the embedded Clang and LLVM '
                 'compilers')
 
     option('--swift-compiler-version', set_,
-           type=SwiftVersionType(),
+           type=arguments.type.swift_compiler_version,
            metavar='VERSION',
            help='Swift compiler version')
 
     option('--swift-user-visible-version', set_,
-           type=SwiftVersionType(),
+           type=arguments.type.swift_compiler_version,
            default=defaults.SWIFT_USER_VISIBLE_VERSION,
            metavar='VERSION',
            help='user-visible version of the embedded Swift compiler')
