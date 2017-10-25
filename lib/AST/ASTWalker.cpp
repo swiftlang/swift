@@ -212,16 +212,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
-    if (NTD->getGenericParams() &&
-        Walker.shouldWalkIntoGenericParams()) {
+    bool WalkGenerics = NTD->getGenericParams() &&
+        Walker.shouldWalkIntoGenericParams();
+
+    if (WalkGenerics) {
       // Visit generic params
       for (auto GP : NTD->getGenericParams()->getParams()) {
         if (doIt(GP))
-          return true;
-      }
-      // Visit param conformance
-      for (auto &Req : NTD->getGenericParams()->getRequirements()) {
-        if (doIt(Req))
           return true;
       }
     }
@@ -230,13 +227,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (doIt(Inherit))
         return true;
     }
-    
+
+    // Visit requirements
     if (auto *Protocol = dyn_cast<ProtocolDecl>(NTD)) {
       if (auto *WhereClause = Protocol->getTrailingWhereClause()) {
         for (auto &Req: WhereClause->getRequirements()) {
           if (doIt(Req))
             return true;
         }
+      }
+    }
+    if (WalkGenerics) {
+      for (auto &Req: NTD->getGenericParams()->getRequirements()) {
+        if (doIt(Req))
+          return true;
       }
     }
     
