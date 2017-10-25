@@ -355,17 +355,6 @@ public:
     return SILInstructionKind(SILNode::getKind());
   }
 
-  SILNode *getCanonicalSILNodeInObject() {
-    assert(isRepresentativeSILNodeInObject() &&
-           "the SILInstruction subobject is always canonical");
-    return this;
-  }
-  const SILNode *getCanonicalSILNodeInObject() const {
-    assert(isRepresentativeSILNodeInObject() &&
-           "the SILInstruction subobject is always canonical");
-    return this;
-  }
-
   const SILBasicBlock *getParent() const { return ParentBB; }
   SILBasicBlock *getParent() { return ParentBB; }
 
@@ -687,17 +676,6 @@ public:
     return ValueBase::getKind();
   }
 
-  SILNode *getCanonicalSILNodeInObject() {
-    assert(SILInstruction::isRepresentativeSILNodeInObject() &&
-           "the SILInstruction subobject is always canonical");
-    return static_cast<SILInstruction*>(this);
-  }
-  const SILNode *getCanonicalSILNodeInObject() const {
-    assert(SILInstruction::isRepresentativeSILNodeInObject() &&
-           "the SILInstruction subobject is always canonical");
-    return static_cast<const SILInstruction*>(this);
-  }
-
   SingleValueInstruction *clone(SILInstruction *insertPt = nullptr) {
     return cast<SingleValueInstruction>(SILInstruction::clone(insertPt));
   }
@@ -771,15 +749,14 @@ public:
     return const_cast<MultipleValueInstructionResult *>(this)->getParent();
   }
 
-  unsigned getIndex() const;
+  unsigned getIndex() const {
+    return unsigned((getSubclassData() >> IndexBitOffset) & IndexMask);
+  }
 
   /// Get the ownership kind assigned to this result by its parent.
   ///
   /// This is stored in the bottom 3 bits of ValueBase's subclass data.
   ValueOwnershipKind getOwnershipKind() const;
-
-  SILNode *getCanonicalSILNodeInObject();
-  const SILNode *getCanonicalSILNodeInObject() const;
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
@@ -906,6 +883,13 @@ protected:
     if (!NumResults)
       return;
     auto *DataPtr = this->template getTrailingObjects<DerivedResult>();
+    // We call the DerivedResult destructors to ensure that:
+    //
+    // 1. If our derived results have any stored data that need to be cleaned
+    // up, we clean them up. *NOTE* Today, no results have this property.
+    // 2. In ~ValueBase, we validate via an assert that a ValueBase no longer
+    // has any uses when it is being destroyed. Rather than re-implement that in
+    // result, we get that for free.
     for (unsigned i : range(NumResults))
       DataPtr[i].~DerivedResult();
   }
