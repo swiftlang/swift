@@ -49,10 +49,11 @@ class OwnedString {
       free(const_cast<char *>(Data));
   }
 
-  OwnedString(const char* Data, size_t Length, StringOwnership Ownership)
-      : Length(Length), Ownership(Ownership) {
-    assert(Length >= 0 && "expected length to be non-negative");
+  OwnedString(const char* Data, size_t Length, StringOwnership Ownership) {
     release();
+    this->Length = Length;
+    this->Ownership = Ownership;
+    assert(Length >= 0 && "expected length to be non-negative");
     if (Ownership == StringOwnership::Copied && Data) {
       char *substring = static_cast<char *>(malloc(Length + 1));
       assert(substring && "expected successful malloc of copy");
