@@ -27,7 +27,6 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/Parse/Token.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
@@ -72,6 +71,7 @@ namespace swift {
   class ProtocolDecl;
   struct PrintOptions;
   class ReferencedNameTracker;
+  class Token;
   class TupleType;
   class Type;
   class TypeRefinementContext;
@@ -1076,19 +1076,11 @@ public:
     out << str << '\n';
   }
 
-  std::vector<Token> &getTokenVector() {
-    assert(shouldKeepTokens() && "Disabled");
-    return *AllCorrectedTokens;
-  }
+  std::vector<Token> &getTokenVector();
 
-  ArrayRef<Token> getAllTokens() const {
-    assert(shouldKeepTokens() && "Disabled");
-    return *AllCorrectedTokens;
-  }
+  ArrayRef<Token> getAllTokens() const;
 
-  bool shouldKeepTokens() const {
-    return (bool)AllCorrectedTokens;
-  }
+  bool shouldKeepTokens() const;
 
   syntax::SourceFileSyntax getSyntaxRoot() const;
 
