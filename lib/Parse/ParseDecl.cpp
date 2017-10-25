@@ -1820,19 +1820,22 @@ bool Parser::parseTypeAttributeListPresent(VarDecl::Specifier &Specifier,
                                            SourceLoc &SpecifierLoc,
                                            TypeAttributes &Attributes) {
   Specifier = VarDecl::Specifier::Owned;
-  while (Tok.isAny(tok::kw_inout, tok::kw___shared, tok::kw___owned)) {
+  while (Tok.is(tok::kw_inout) ||
+         (Tok.is(tok::identifier) &&
+          (Tok.getRawText().equals("__shared") ||
+           Tok.getRawText().equals("__owned")))) {
     if (SpecifierLoc.isValid()) {
       diagnose(Tok, diag::parameter_specifier_repeated)
         .fixItRemove(SpecifierLoc);
     } else {
-      if (Tok.is(tok::kw___owned)) {
-        Specifier = VarDecl::Specifier::Owned;
-      } else if (Tok.is(tok::kw_inout)) {
+      if (Tok.is(tok::kw_inout)) {
         Specifier = VarDecl::Specifier::InOut;
-      } else if (Tok.is(tok::kw___shared)) {
-        Specifier = VarDecl::Specifier::Shared;
-      } else {
-        llvm_unreachable("unhandled specifier kind?");
+      } else if (Tok.is(tok::identifier)) {
+        if (Tok.getRawText().equals("__shared")) {
+          Specifier = VarDecl::Specifier::Shared;
+        } else if (Tok.getRawText().equals("__owned")) {
+          Specifier = VarDecl::Specifier::Owned;
+        }
       }
     }
     SpecifierLoc = consumeToken();

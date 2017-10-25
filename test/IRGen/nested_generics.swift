@@ -79,3 +79,16 @@ public class OuterGenericClass<T> {
     }
   }
 }
+
+// This used to crash while emitting value witnesses.
+
+public struct Fish<Water> {}
+
+public protocol Wet {}
+
+extension Fish where Water : Wet {
+  public enum Fillet {
+    case grilled
+    case fried
+  }
+}
