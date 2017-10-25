@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path=%t/weak_other.swiftmodule -module-name=weak_other %S/Inputs/weak_other.swift
-// RUN: %target-swift-frontend -I %t -emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -I %t -emit-silgen -enable-sil-ownership %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 import weak_other
 
