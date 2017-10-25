@@ -78,10 +78,33 @@ public:
 
   OwnedString(const char *Data) : OwnedString(StringRef(Data)) {}
 
-  OwnedString(const OwnedString &Other) {
-    // Release previously allocated data.
-    release();
-    initialize(Other.Data, Other.Length, Other.Ownership);
+  OwnedString(const OwnedString &Other):
+    OwnedString(Other.Data, Other.Length, Other.Ownership) {}
+
+  OwnedString(OwnedString &&Other): Data(Other.Data), Length(Other.Length),
+      Ownership(Other.Ownership) {
+    Other.Data = nullptr;
+    Other.Ownership = StringOwnership::Unowned;
+  }
+
+  OwnedString& operator=(const OwnedString &Other) {
+    if (&Other != this) {
+      release();
+      initialize(Other.Data, Other.Length, Other.Ownership);
+    }
+    return *this;
+  }
+
+  OwnedString& operator=(OwnedString &&Other) {
+    if (&Other != this) {
+      release();
+      this->Data = Other.Data;
+      this->Length = Other.Length;
+      this->Ownership = Other.Ownership;
+      Other.Ownership = StringOwnership::Unowned;
+      Other.Data = nullptr;
+    }
+    return *this;
   }
 
   OwnedString copy() {
