@@ -111,7 +111,8 @@
                   'words) . font-lock-keyword-face)
    ;; Metatypes
    `(,(regexp-opt '("metatype" "value_metatype"
-                    "existential_metatype" "init_existential_metatype")
+                    "existential_metatype" "init_existential_metatype"
+                    "objc_protocol")
                   'words) . font-lock-keyword-face)
    ;; Aggregate Types
    `(,(regexp-opt '("retain_value" "release_value_addr" "release_value"
