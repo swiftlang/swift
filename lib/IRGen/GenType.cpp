@@ -360,7 +360,7 @@ static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
   //   numTags += ((emptyCases + (casesPerTagBitValue - 1U)) >> bits);
   // }
   // return (numTags < 256 ? 1 :
-	// 				 numTags < 65536 ? 2 : 4);
+  // 				 numTags < 65536 ? 2 : 4);
 
   auto &IGM = IGF.IGM;
   auto &Ctx = Builder.getContext();
@@ -402,7 +402,7 @@ static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
   auto *phi = Builder.CreatePHI(int32Ty, 3);
   phi->addIncoming(one, entryBB);
   phi->addIncoming(numTags, notLT256BB);
-	return phi;
+  return phi;
 }
 
 llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
