@@ -705,7 +705,8 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
     if (auto clangDecl = decl->getClangDecl()) {
       if (auto clangTypeDecl = dyn_cast<clang::TypeDecl>(clangDecl)) {
         auto &ctx = IGM.getClangASTContext();
-        return ctx.getCanonicalType(ctx.getTypeDeclType(clangTypeDecl));
+        return ctx.getCanonicalType(ctx.getTypeDeclType(clangTypeDecl))
+            .getUnqualifiedType();
       } else if (auto ifaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
         auto &ctx = IGM.getClangASTContext();
         auto clangType  = ctx.getObjCInterfaceType(ifaceDecl);

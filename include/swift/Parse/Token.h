@@ -179,13 +179,17 @@ public:
   /// used
   bool canBeArgumentLabel() const {
     // Identifiers, escaped identifiers, and '_' can be argument labels.
-    if (is(tok::identifier) || isEscapedIdentifier() || is(tok::kw__))
-      return true;
+    if (is(tok::identifier) || isEscapedIdentifier() || is(tok::kw__)) {
+      // ... except for '__shared' and '__owned'.
+      if (getRawText().equals("__shared") ||
+          getRawText().equals("__owned"))
+        return false;
 
-    // 'let', 'var', 'inout', '__shared', and '__owned'
-    // cannot be argument labels.
-    if (isAny(tok::kw_let, tok::kw_var, tok::kw_inout,
-              tok::kw___owned, tok::kw___shared))
+      return true;
+    }
+
+    // 'let', 'var', and 'inout' cannot be argument labels.
+    if (isAny(tok::kw_let, tok::kw_var, tok::kw_inout))
       return false;
 
     // All other keywords can be argument labels.

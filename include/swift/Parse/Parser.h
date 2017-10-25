@@ -787,7 +787,10 @@ public:
   bool parseTypeAttributeList(VarDecl::Specifier &Specifier,
                               SourceLoc &SpecifierLoc,
                               TypeAttributes &Attributes) {
-    if (Tok.isAny(tok::at_sign, tok::kw_inout, tok::kw___shared, tok::kw___owned))
+    if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
+        (Tok.is(tok::identifier) &&
+         (Tok.getRawText().equals("__shared") ||
+          Tok.getRawText().equals("__owned"))))
       return parseTypeAttributeListPresent(Specifier, SpecifierLoc, Attributes);
     return false;
   }
