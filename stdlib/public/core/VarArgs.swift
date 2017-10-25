@@ -350,7 +350,40 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
   }
 }
 
-#if arch(x86_64)
+#if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+
+@_fixed_layout // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+final internal class _VaListBuilder {
+  @_versioned // FIXME(sil-serialize-all)
+  internal var __stack: ContiguousArray<Int>
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init() {
+    __stack = ContiguousArray(repeating: 0, count: 0)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func append(_ arg: CVarArg) {
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func va_list() -> CVaListPointer {
+    let __gr_top = UnsafeMutablePointer<Int>(bitPattern: 0)
+    let __vr_top = UnsafeMutablePointer<Int>(bitPattern: 0)
+    return CVaListPointer(__stack: __stack._baseAddress, __gr_top: __gr_top,
+                          __vr_top: __vr_top, __gr_off: 0, __vr_off: 0)
+  }
+}
+
+#elseif arch(x86_64)
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.

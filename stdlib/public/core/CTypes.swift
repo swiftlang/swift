@@ -201,6 +201,30 @@ extension OpaquePointer : Equatable {
 }
 
 /// The corresponding Swift type to `va_list` in imported C APIs.
+#if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+
+// non-Darwin AAPCS64 ABI
+@_fixed_layout
+public struct CVaListPointer {
+  @_versioned // FIXME(sil-serialize-all)
+  internal var value: (__stack: UnsafeMutablePointer<Int>?,
+                       __gr_top: UnsafeMutablePointer<Int>?,
+                       __vr_top: UnsafeMutablePointer<Int>?,
+                       __gr_off: Int32,
+                       __vr_off: Int32)
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public // @testable
+  init(__stack: UnsafeMutablePointer<Int>?,
+       __gr_top: UnsafeMutablePointer<Int>?,
+       __vr_top: UnsafeMutablePointer<Int>?,
+       __gr_off: Int32,
+       __vr_off: Int32) {
+    value = (__stack, __gr_top, __vr_top, __gr_off, __vr_off)
+  }
+}
+
+#else
 @_fixed_layout
 public struct CVaListPointer {
   @_versioned // FIXME(sil-serialize-all)
@@ -220,6 +244,7 @@ extension CVaListPointer : CustomDebugStringConvertible {
     return value.debugDescription
   }
 }
+#endif
 
 @_versioned
 @_inlineable

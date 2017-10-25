@@ -215,7 +215,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     return std::make_pair(Type(), "");
 
   // Check other expected properties of the C type.
-  switch(CTypeKind) {
+  switch (CTypeKind) {
   case MappedCTypeKind::UnsignedInt:
     if (!ClangType->isUnsignedIntegerType())
       return std::make_pair(Type(), "");
@@ -273,8 +273,6 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     break;
 
   case MappedCTypeKind::VaList:
-    if (ClangTypeSize != ClangCtx.getTypeSize(ClangCtx.VoidPtrTy))
-      return std::make_pair(Type(), "");
     break;
 
   case MappedCTypeKind::ObjCBool:
@@ -334,6 +332,20 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     *IsError = true;
     return std::make_pair(Type(), "");
   }
+
+  if (CTypeKind == MappedCTypeKind::VaList) {
+    const llvm::Triple &T = ClangCtx.getTargetInfo().getTriple();
+    // Darwin AArch64 uses void * for the va_list type, while AAPCS64 uses a
+    // custom type.  Once the TODO below is addressed, this check should not be
+    // needed.
+    bool IsAAPCS64 = T.getArch() == llvm::Triple::AArch64 && !T.isOSDarwin();
+    // TODO compare this against the size of the SwiftType rather than the
+    // void * type.
+    if (!IsAAPCS64 &&
+        (ClangTypeSize != ClangCtx.getTypeSize(ClangCtx.VoidPtrTy)))
+      return std::make_pair(Type(), "");
+  }
+
   return std::make_pair(SwiftType, SwiftTypeName);
 }
 
