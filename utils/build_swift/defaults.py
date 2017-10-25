@@ -22,6 +22,8 @@ __all__ = [
     'DARWIN_DEPLOYMENT_VERSION_WATCHOS',
     'UNIX_INSTALL_PREFIX',
     'DARWIN_INSTALL_PREFIX',
+    'ANDROID_API_LEVEL',
+    'ANDROID_NDK_GCC_VERSION',
 
     # Constants
 ]
@@ -45,6 +47,9 @@ DARWIN_DEPLOYMENT_VERSION_WATCHOS = '2.0'
 UNIX_INSTALL_PREFIX = '/usr'
 DARWIN_INSTALL_PREFIX = ('/Applications/Xcode.app/Contents/Developer/'
                          'Toolchains/XcodeDefault.xctoolchain/usr')
+
+ANDROID_API_LEVEL = '21'
+ANDROID_NDK_GCC_VERSION = '4.9'
 
 # Options that can only be "configured" by editing this file.
 #
