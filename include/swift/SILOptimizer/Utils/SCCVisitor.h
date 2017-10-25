@@ -161,7 +161,7 @@ private:
   }
 
   void maybeDFS(SILInstruction *inst) {
-    (void) maybeDFSCanonicalNode(inst->getCanonicalSILNodeInObject());
+    (void) maybeDFSCanonicalNode(inst->getRepresentativeSILNodeInObject());
   }
 
   /// Continue a DFS from the given node, finding the strongly
