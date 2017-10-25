@@ -172,22 +172,34 @@ void SILInstruction::dropAllReferences() {
   }
 }
 
-SILInstructionResultArray SILInstruction::getResultsImpl() const {
-  switch (getKind()) {
-#define NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
-  case SILInstructionKind::ID:
-#include "swift/SIL/SILNodes.def"
-    return SILInstructionResultArray();
+namespace {
 
-#define SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
-  case SILInstructionKind::ID:
-#include "swift/SIL/SILNodes.def"
-    return SILInstructionResultArray(
-        static_cast<const SingleValueInstruction *>(this));
-
-    // add any multi-result instructions here...
+class AllResultsAccessor
+    : public SILInstructionVisitor<AllResultsAccessor,
+                                   SILInstructionResultArray> {
+public:
+// Make sure we hit a linker error if we ever miss an instruction.
+#define INST(ID, NAME) SILInstructionResultArray visit##ID(ID *I);
+#define NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)              \
+  SILInstructionResultArray visit##ID(ID *I) {                                 \
+    return SILInstructionResultArray();                                        \
   }
-  llvm_unreachable("bad kind");
+#define SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE)    \
+  SILInstructionResultArray visit##ID(ID *I) {                                 \
+    return SILInstructionResultArray(                                          \
+        static_cast<SingleValueInstruction *>(I));                             \
+  }
+#define MULTIPLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE)  \
+  SILInstructionResultArray visit##ID(ID *I) {                                 \
+    return SILInstructionResultArray(I->getAllResults());                      \
+  }
+#include "swift/SIL/SILNodes.def"
+};
+
+} // end anonymous namespace
+
+SILInstructionResultArray SILInstruction::getResultsImpl() const {
+  return AllResultsAccessor().visit(const_cast<SILInstruction *>(this));
 }
 
 // Initialize the static members of SILInstruction.
@@ -1198,33 +1210,69 @@ SILInstructionResultArray::SILInstructionResultArray(
          "multi-inheritence parent");
   Pointer = reinterpret_cast<const uint8_t *>(Value);
 
+#ifndef NDEBUG
   assert(originalValue == (*this)[0] &&
          "Wrong value returned for single result");
   assert(originalType == (*this)[0]->getType());
 
   auto ValueRange = getValues();
-  (void)ValueRange;
   assert(1 == std::distance(ValueRange.begin(), ValueRange.end()));
   assert(originalValue == *ValueRange.begin());
 
   auto TypedRange = getTypes();
-  (void)TypedRange;
   assert(1 == std::distance(TypedRange.begin(), TypedRange.end()));
   assert(originalType == *TypedRange.begin());
 
   SILInstructionResultArray Copy = *this;
-  (void)Copy;
   assert(Copy.hasSameTypes(*this));
   assert(Copy == *this);
+#endif
+}
+
+SILInstructionResultArray::SILInstructionResultArray(
+    ArrayRef<MultipleValueInstructionResult> MVResults)
+    : Pointer(nullptr), Size(MVResults.size()) {
+  // We are assuming here that MultipleValueInstructionResult when static_cast
+  // is not offset.
+  if (Size)
+    Pointer = reinterpret_cast<const uint8_t *>(&MVResults[0]);
+
+#ifndef NDEBUG
+  // Verify our invariants.
+  assert(size() == MVResults.size());
+  auto ValueRange = getValues();
+  auto VRangeBegin = ValueRange.begin();
+  auto VRangeIter = VRangeBegin;
+  auto VRangeEnd = ValueRange.end();
+  assert(MVResults.size() == unsigned(std::distance(VRangeBegin, VRangeEnd)));
+
+  auto TypedRange = getTypes();
+  auto TRangeBegin = TypedRange.begin();
+  auto TRangeIter = TRangeBegin;
+  auto TRangeEnd = TypedRange.end();
+  assert(MVResults.size() == unsigned(std::distance(VRangeBegin, VRangeEnd)));
+  for (unsigned i : indices(MVResults)) {
+    assert(SILValue(&MVResults[i]) == (*this)[i]);
+    assert(SILValue(&MVResults[i])->getType() == (*this)[i]->getType());
+    assert(SILValue(&MVResults[i]) == (*VRangeIter));
+    assert(SILValue(&MVResults[i])->getType() == (*VRangeIter)->getType());
+    assert(SILValue(&MVResults[i])->getType() == *TRangeIter);
+    ++VRangeIter;
+    ++TRangeIter;
+  }
+
+  SILInstructionResultArray Copy = *this;
+  assert(Copy.hasSameTypes(*this));
+  assert(Copy == *this);
+#endif
 }
 
 SILValue SILInstructionResultArray::operator[](size_t Index) const {
   assert(Index < Size && "Index out of bounds");
-  // Today we only have single instruction results so offset will always be
-  // zero. Once we have multiple instruction results, this will be equal to
-  // sizeof(MultipleValueInstructionResult)*Index. This is safe even to do with
-  // SingleValueInstruction since index will always be zero for the offset.
-  size_t Offset = 0;
+  // *NOTE* In the case where we have a single instruction, Index will always
+  // necessarily be 0 implying that it is safe for us to just multiple Index by
+  // sizeof(MultipleValueInstructionResult).
+  size_t Offset = sizeof(MultipleValueInstructionResult) * Index;
   return SILValue(reinterpret_cast<const ValueBase *>(&Pointer[Offset]));
 }
 
@@ -1269,3 +1317,126 @@ SILInstructionResultArray::iterator SILInstructionResultArray::end() const {
 SILInstructionResultArray::range SILInstructionResultArray::getValues() const {
   return {begin(), end()};
 }
+
+const ValueBase *SILInstructionResultArray::front() const {
+  assert(size() && "Can not access front of an empty result array");
+  return *begin();
+}
+
+const ValueBase *SILInstructionResultArray::back() const {
+  assert(size() && "Can not access back of an empty result array");
+  if (std::next(begin()) == end()) {
+    return *begin();
+  }
+  return *std::prev(end());
+}
+
+//===----------------------------------------------------------------------===//
+//                         Multiple Value Instruction
+//===----------------------------------------------------------------------===//
+
+Optional<unsigned>
+MultipleValueInstruction::getIndexOfResult(SILValue Target) const {
+  // First make sure we actually have one of our instruction results.
+  auto *MVIR = dyn_cast<MultipleValueInstructionResult>(Target);
+  if (!MVIR || MVIR->getParent() != this)
+    return None;
+  return MVIR->getIndex();
+}
+
+MultipleValueInstructionResult::MultipleValueInstructionResult(
+    ValueKind valueKind, unsigned index, SILType type,
+    ValueOwnershipKind ownershipKind)
+    : ValueBase(valueKind, type, IsRepresentative::No) {
+  setOwnershipKind(ownershipKind);
+  setIndex(index);
+}
+
+void MultipleValueInstructionResult::setOwnershipKind(
+    ValueOwnershipKind NewKind) {
+  // Get the original data, merge in our new lower values and then reset the
+  // value in our data.
+  //
+  // *NOTE* This is a two phase set so if this code ever needs to be used in a
+  // concurrent context, a this will need to be updated.
+  uint64_t OriginalData = getSubclassData();
+  uint64_t NewData =
+      (OriginalData & ~ValueOwnershipKind::Mask) | uint64_t(NewKind);
+  setSubclassData(NewData);
+}
+
+unsigned MultipleValueInstructionResult::getIndex() const {
+  return unsigned((getSubclassData() >> IndexBitOffset) & IndexMask);
+}
+
+void MultipleValueInstructionResult::setIndex(unsigned NewIndex) {
+  // We only take the last 3 bytes for simplicity. If more bits are needed at
+  // some point, we can take 5 bits we are burning here and combine them with
+  // 6 bits from SILType, Operand to get more storage. But to do so now would
+  // be premature optimization since we could potentially use those bits for
+  // flags. 500k fields is probably enough.
+  assert(NewIndex < (1 << NumIndexBits) && "Unrepresentable index");
+  uint64_t OriginalData = getSubclassData();
+  uint64_t NewData = (OriginalData & ~(IndexMask << IndexBitOffset)) |
+                     (NewIndex << IndexBitOffset);
+  setSubclassData(NewData);
+}
+
+ValueOwnershipKind MultipleValueInstructionResult::getOwnershipKind() const {
+  uint64_t Data = getSubclassData() & ValueOwnershipKind::Mask;
+  return ValueOwnershipKind(Data);
+}
+
+MultipleValueInstruction *MultipleValueInstructionResult::getParent() {
+  char *Ptr = reinterpret_cast<char *>(
+      const_cast<MultipleValueInstructionResult *>(this));
+
+  // We know that we are in a trailing objects array with an extra prefix
+  // element that contains the pointer to our parent SILNode. So grab the
+  // address of the beginning of the array.
+  Ptr -= getIndex() * sizeof(MultipleValueInstructionResult);
+
+  // We may have some bytes of padding depending on our platform. Move past
+  // those bytes if we need to.
+  static_assert(alignof(MultipleValueInstructionResult) >=
+                    alignof(MultipleValueInstruction *),
+                "We assume this relationship in between the alignments");
+  Ptr -= alignof(MultipleValueInstructionResult) -
+         alignof(MultipleValueInstruction *);
+
+  // Then subtract the size of MultipleValueInstruction.
+  Ptr -= sizeof(MultipleValueInstruction *);
+
+  // Now that we have the correct address of our parent instruction, grab it and
+  // return it avoiding type punning.
+  uintptr_t value;
+  memcpy(&value, Ptr, sizeof(value));
+  return reinterpret_cast<MultipleValueInstruction *>(value);
+}
+
+#ifndef NDEBUG
+
+//---
+// Static verification of multiple value properties.
+//
+
+// Make sure that all subclasses of MultipleValueInstruction implement
+// getAllResults()
+#define MULTIPLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE)  \
+  static_assert(IMPLEMENTS_METHOD(ID, PARENT, getAllResults,                   \
+                                  SILInstructionResultArray() const),          \
+                #ID " does not implement SILInstructionResultArray "           \
+                    "getAllResults() const?!");
+
+// Check that all subclasses of MultipleValueInstructionResult are the same size
+// as MultipleValueInstructionResult.
+//
+// If this changes, we just need to expand the size fo SILInstructionResultArray
+// to contain a stride. But we assume this now so we should enforce it.
+#define MULTIPLE_VALUE_INST_RESULT(ID, PARENT)                                 \
+  static_assert(                                                               \
+      sizeof(ID) == sizeof(PARENT) && alignof(ID) == alignof(PARENT),          \
+      "Expected all multiple value inst result to be the same size?!");
+#include "swift/SIL/SILNodes.def"
+
+#endif

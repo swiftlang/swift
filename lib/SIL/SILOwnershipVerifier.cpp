@@ -208,6 +208,8 @@ static bool isOwnershipForwardingValueKind(SILNodeKind K) {
   case SILNodeKind::SelectEnumInst:
   case SILNodeKind::SwitchEnumInst:
   case SILNodeKind::CheckedCastBranchInst:
+  case SILNodeKind::DestructureStructInst:
+  case SILNodeKind::DestructureTupleInst:
     return true;
   default:
     return false;
@@ -229,7 +231,8 @@ static bool isGuaranteedForwardingValueKind(SILNodeKind K) {
 }
 
 static bool isGuaranteedForwardingValue(SILValue V) {
-  return isGuaranteedForwardingValueKind(SILNodeKind(V->getKind()));
+  return isGuaranteedForwardingValueKind(
+      V->getKindOfRepresentativeSILNodeInObject());
 }
 
 static bool isGuaranteedForwardingInst(SILInstruction *I) {
@@ -685,6 +688,8 @@ FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
+FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
+FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
@@ -1648,7 +1653,7 @@ void SILValueOwnershipChecker::gatherUsers(
 
   while (!Users.empty()) {
     Operand *Op = Users.pop_back_val();
-    auto *User = Op->getUser();
+    SILInstruction *User = Op->getUser();
 
     // If this op is a type dependent operand, skip it. It is not interesting
     // from an ownership perspective.
@@ -1683,26 +1688,26 @@ void SILValueOwnershipChecker::gatherUsers(
     // At this point, we know that we must have a forwarded subobject. Since the
     // base type is guaranteed, we know that the subobject is either guaranteed
     // or trivial. We now split into two cases, if the user is a terminator or
-    // not. If we do not have a terminator, then just add User->getUses() to the
-    // worklist.
-    if (auto *value = dyn_cast<SingleValueInstruction>(User)) {
-      if (SILValue(value).getOwnershipKind() == ValueOwnershipKind::Trivial) {
-        continue;
+    // not. If we do not have a terminator, then just add the uses of all of
+    // User's results to the worklist.
+    if (User->getResults().size()) {
+      for (SILValue result : User->getResults()) {
+        if (result.getOwnershipKind() == ValueOwnershipKind::Trivial) {
+          continue;
+        }
+
+        // Now, we /must/ have a guaranteed subobject, so let's assert that the
+        // user is actually guaranteed and add the subobject's users to our
+        // worklist.
+        assert(result.getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
+               "Our value is guaranteed and this is a forwarding instruction. "
+               "Should have guaranteed ownership as well.");
+        copy(result->getUses(), std::back_inserter(Users));
       }
 
-      // Now, we /must/ have a guaranteed subobject, so lets assert that the
-      // user
-      // is actually guaranteed and add the subobject's users to our worklist.
-      assert(SILValue(value).getOwnershipKind() ==
-                 ValueOwnershipKind::Guaranteed &&
-             "Our value is guaranteed and this is a forwarding instruction. "
-             "Should have guaranteed ownership as well.");
-      std::copy(value->use_begin(), value->use_end(),
-                std::back_inserter(Users));
       continue;
     }
 
-    // TODO: MultiValueInstruction
     assert(User->getResults().empty());
 
     auto *TI = dyn_cast<TermInst>(User);
