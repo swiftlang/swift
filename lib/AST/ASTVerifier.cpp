@@ -2038,10 +2038,17 @@ public:
                  "Storage overrides but setter does not");
         if (ASD->getMaterializeForSetFunc() &&
             baseASD->getMaterializeForSetFunc() &&
-            baseASD->isSetterAccessibleFrom(ASD->getDeclContext()))
-          assert(ASD->getMaterializeForSetFunc()->getOverriddenDecl() ==
-                 baseASD->getMaterializeForSetFunc() &&
-                 "Storage override but materializeForSet does not");
+            baseASD->isSetterAccessibleFrom(ASD->getDeclContext())) {
+          if (baseASD->getMaterializeForSetFunc()->hasForcedStaticDispatch()) {
+            assert(ASD->getMaterializeForSetFunc()->getOverriddenDecl() == nullptr
+                   && "Forced static dispatch materializeForSet should not be "
+                   "overridden");
+          } else {
+            assert(ASD->getMaterializeForSetFunc()->getOverriddenDecl() ==
+                   baseASD->getMaterializeForSetFunc() &&
+                   "Storage override but materializeForSet does not");
+          }
+        }
       } else {
         if (ASD->getGetter())
           assert(!ASD->getGetter()->getOverriddenDecl() &&
