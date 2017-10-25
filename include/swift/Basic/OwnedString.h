@@ -44,10 +44,15 @@ class OwnedString {
   size_t Length;
   StringOwnership Ownership;
 
+  void release() {
+    if (Ownership == StringOwnership::Copied)
+      free(const_cast<char *>(Data));
+  }
+
   OwnedString(const char* Data, size_t Length, StringOwnership Ownership)
       : Length(Length), Ownership(Ownership) {
     assert(Length >= 0 && "expected length to be non-negative");
-
+    release();
     if (Ownership == StringOwnership::Copied && Data) {
       char *substring = static_cast<char *>(malloc(Length + 1));
       assert(substring && "expected successful malloc of copy");
@@ -73,7 +78,7 @@ public:
 
   OwnedString(const OwnedString &Other)
       : OwnedString(Other.Data, Other.Length, Other.Ownership) {}
-  
+
   OwnedString copy() {
     return OwnedString(Data, Length, StringOwnership::Copied);
   }
@@ -99,8 +104,7 @@ public:
   }
 
   ~OwnedString() {
-    if (Ownership == StringOwnership::Copied)
-      free(const_cast<char *>(Data));
+    release();
   }
 };
 
