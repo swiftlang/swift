@@ -357,7 +357,7 @@ MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILInstruction *V1,
                                                     SILValue V2,
                                                     RetainObserveKind M) {
   size_t idx1 =
-    MemoryBehaviorNodeToIndex.getIndex(V1->getCanonicalSILNodeInObject());
+    MemoryBehaviorNodeToIndex.getIndex(V1->getRepresentativeSILNodeInObject());
   assert(idx1 != std::numeric_limits<size_t>::max() &&
          "~0 index reserved for empty/tombstone keys");
   size_t idx2 = MemoryBehaviorNodeToIndex.getIndex(

@@ -1365,10 +1365,6 @@ void MultipleValueInstructionResult::setOwnershipKind(
   setSubclassData(NewData);
 }
 
-unsigned MultipleValueInstructionResult::getIndex() const {
-  return unsigned((getSubclassData() >> IndexBitOffset) & IndexMask);
-}
-
 void MultipleValueInstructionResult::setIndex(unsigned NewIndex) {
   // We only take the last 3 bytes for simplicity. If more bits are needed at
   // some point, we can take 5 bits we are burning here and combine them with

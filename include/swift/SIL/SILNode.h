@@ -81,9 +81,9 @@ static_assert(unsigned(SILNodeKind::Last_SILNode) < (1 << NumSILNodeKindBits),
 /// These precautions only apply to SILNode* and not its subclasses.
 ///
 /// - There may have multiple SILNode* values that refer to the same
-///   instruction.  Data structures and algorithms that rely on
-///   uniqueness of a SILNode* should generally make sure that they're
-///   working with the canonical SILNode*; see getCanonicalSILNodeInObject().
+///   instruction.  Data structures and algorithms that rely on uniqueness of a
+///   SILNode* should generally make sure that they're working with the
+///   representative SILNode*; see getRepresentativeSILNodeInObject().
 ///
 /// - Do not use builtin C++ casts to downcast a SILNode*.  A static_cast
 ///   from SILNode* to SILInstruction* only works if the referenced
@@ -97,10 +97,12 @@ public:
   /// static assertion purposes.
   static constexpr unsigned NumTotalSILNodeBits = 64;
 
-protected:
+private:
   static constexpr unsigned NumKindBits = NumSILNodeKindBits;
   static constexpr unsigned NumStorageLocBits = 1;
   static constexpr unsigned NumIsRepresentativeBits = 1;
+
+protected:
   static constexpr unsigned NumSubclassDataBits =
       NumTotalSILNodeBits - NumKindBits - NumStorageLocBits -
       NumIsRepresentativeBits;
@@ -113,9 +115,9 @@ protected:
   };
 
 private:
-  const unsigned Kind : NumKindBits;
-  const unsigned StorageLoc : NumStorageLocBits;
-  const unsigned IsRepresentativeNode : NumIsRepresentativeBits;
+  const uint64_t Kind : NumKindBits;
+  const uint64_t StorageLoc : NumStorageLocBits;
+  const uint64_t IsRepresentativeNode : NumIsRepresentativeBits;
   uint64_t SubclassData : NumSubclassDataBits;
 
   SILNodeStorageLocation getStorageLoc() const {
@@ -140,7 +142,7 @@ protected:
 
 public:
   /// Does the given kind of node inherit from multiple multiple SILNode base
-  /// classes.
+  /// classes?
   ///
   /// This enables one to know if their is a diamond in the inheritence
   /// hierarchy for this SILNode.
@@ -151,10 +153,10 @@ public:
            kind <= SILNodeKind::Last_SingleValueInstruction;
   }
 
-  /// Is this SILNode the canonical SILNode subobject in this object?
+  /// Is this SILNode the representative SILNode subobject in this object?
   bool isRepresentativeSILNodeInObject() const { return IsRepresentativeNode; }
 
-  /// Return a pointer to the canonical SILNode subobject in this object.
+  /// Return a pointer to the representative SILNode subobject in this object.
   SILNode *getRepresentativeSILNodeInObject() {
     if (isRepresentativeSILNodeInObject())
       return this;
@@ -172,9 +174,7 @@ public:
     return SILNodeKind(Kind);
   }
 
-  /// Return the SILNodeKind of this node's canonical SILNode.
-  ///
-  /// TODO: Find a better name for this.
+  /// Return the SILNodeKind of this node's representative SILNode.
   SILNodeKind getKindOfRepresentativeSILNodeInObject() const {
     return getRepresentativeSILNodeInObject()->getKind();
   }
