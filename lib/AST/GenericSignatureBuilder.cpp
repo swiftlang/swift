@@ -1661,26 +1661,6 @@ Type Constraint<T>::getSubjectDependentType(
 }
 
 template<typename T>
-PotentialArchetype *Constraint<T>::realizeSubjectPotentialArchetype(
-                      GenericSignatureBuilder &builder) const {
-  if (auto pa = subject.dyn_cast<PotentialArchetype *>())
-    return pa;
-
-  auto type = subject.get<Type>();
-  auto pa =
-    builder.maybeResolveEquivalenceClass(type,
-                                         ArchetypeResolutionKind::WellFormed,
-                                         /*wantExactPotentialArchetype=*/true)
-      .realizePotentialArchetype(builder);
-  assert(pa && "Invalid dependent type");
-
-  // Cache the result, so we don't need to realize the potential archetype
-  // again.
-  subject = pa;
-  return pa;
-}
-
-template<typename T>
 bool Constraint<T>::isSubjectEqualTo(const PotentialArchetype *pa) const {
   if (auto subjectPA = subject.dyn_cast<PotentialArchetype *>())
     return subjectPA == pa;
@@ -4127,39 +4107,38 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
 }
 
 ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
-       PotentialArchetype *T,
-       Type Concrete,
-       const RequirementSource *Source) {
-  auto rep = T->getRepresentative();
-  auto equivClass = rep->getOrCreateEquivalenceClass(*this);
+                                           ResolvedType type,
+                                           Type concrete,
+                                           const RequirementSource *source) {
+auto equivClass = type.getEquivalenceClass(*this);
 
   // Record the concrete type and its source.
   equivClass->concreteTypeConstraints.push_back(
-                                      ConcreteConstraint{T, Concrete, Source});
+    ConcreteConstraint{type.getUnresolvedType(), concrete, source});
   equivClass->modified(*this);
   ++NumConcreteTypeConstraints;
 
   // If we've already been bound to a type, match that type.
   if (equivClass->concreteType) {
-    return addSameTypeRequirement(equivClass->concreteType, Concrete, Source,
+    return addSameTypeRequirement(equivClass->concreteType, concrete, source,
                                   UnresolvedHandlingKind::GenerateConstraints,
                                   SameTypeConflictCheckedLater());
 
   }
 
   // Record the requirement.
-  equivClass->concreteType = Concrete;
+  equivClass->concreteType = concrete;
 
   // Make sure the concrete type fulfills the conformance requirements of
   // this equivalence class.
   for (const auto &conforms : equivClass->conformsTo) {
-    if (!resolveConcreteConformance(rep, conforms.first))
+    if (!resolveConcreteConformance(type, conforms.first))
       return ConstraintResult::Conflicting;
   }
 
   // Eagerly resolve any existing nested types to their concrete forms (others
   // will be "concretized" as they are constructed, in getNestedType).
-  for (auto equivT : rep->getEquivalenceClassMembers()) {
+  for (auto equivT : equivClass->members) {
     for (auto nested : equivT->getNestedTypes()) {
       concretizeNestedTypeFromConcreteParent(equivT, nested.second.front(),
                                              *this);
@@ -4252,35 +4231,39 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
 }
 
 ConstraintResult GenericSignatureBuilder::addSameTypeRequirementDirect(
-    ResolvedType paOrT1, ResolvedType paOrT2,
+    ResolvedType type1, ResolvedType type2,
     FloatingRequirementSource source,
     llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
-  // FIXME: Realizes potential archetypes far too early.
-  auto t1 = paOrT1.getAsConcreteType();
-  auto *pa1 = t1 ? nullptr : paOrT1.realizePotentialArchetype(*this);
+  auto concreteType1 = type1.getAsConcreteType();
+  auto concreteType2 = type2.getAsConcreteType();
 
-  auto t2 = paOrT2.getAsConcreteType();
-  auto *pa2 = t2 ? nullptr : paOrT2.realizePotentialArchetype(*this);
-
-  // If both sides of the requirement are type parameters, equate them.
-  if (pa1 && pa2) {
-    return addSameTypeRequirementBetweenArchetypes(
-                       pa1, pa2,
-                       source.getSource(*this,
-                                        paOrT2.getDependentType(*this)));
-    // If just one side is a type parameter, map it to a concrete type.
-  } else if (pa1) {
-    return addSameTypeRequirementToConcrete(
-                  pa1, t2,
-                  source.getSource(*this, paOrT1.getDependentType(*this)));
-  } else if (pa2) {
-    return addSameTypeRequirementToConcrete(
-                pa2, t1,
-                source.getSource(*this, paOrT2.getDependentType(*this)));
-  } else {
-    return addSameTypeRequirementBetweenConcrete(t1, t2, source,
+  // If both sides of the requirement are concrete, equate them.
+  if (concreteType1 && concreteType2) {
+    return addSameTypeRequirementBetweenConcrete(concreteType1,
+                                                 concreteType2, source,
                                                  diagnoseMismatch);
   }
+
+  // If one side is concrete, map the other side to that concrete type.
+  if (concreteType1) {
+    return addSameTypeRequirementToConcrete(type2, concreteType1,
+                       source.getSource(*this, type2.getDependentType(*this)));
+  }
+
+  if (concreteType2) {
+    return addSameTypeRequirementToConcrete(type1, concreteType2,
+                        source.getSource(*this, type1.getDependentType(*this)));
+  }
+
+  // Both sides are type parameters; equate them.
+  // FIXME: Realizes potential archetypes far too early.
+  auto pa1 = type1.realizePotentialArchetype(*this);
+  auto pa2 = type2.realizePotentialArchetype(*this);
+
+  return addSameTypeRequirementBetweenArchetypes(
+                     pa1, pa2,
+                     source.getSource(*this,
+                                      type2.getDependentType(*this)));
 }
 
 ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
@@ -5435,7 +5418,7 @@ static bool unionSets(SmallVectorImpl<unsigned> &parents,
 static void computeDerivedSameTypeComponents(
               GenericSignatureBuilder &builder,
               EquivalenceClass *equivClass,
-              llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf){
+              llvm::SmallDenseMap<CanType, unsigned> &componentOf){
   // Set up the array of "parents" in the union-find data structure.
   llvm::SmallDenseMap<CanType, unsigned> parentIndices;
   SmallVector<unsigned, 4> parents;
@@ -5478,18 +5461,20 @@ static void computeDerivedSameTypeComponents(
 
     // If this is the representative, add a component for it.
     if (representative == index) {
-      componentOf[pa] = components.size();
+      componentOf[depType] = components.size();
       components.push_back(DerivedSameTypeComponent{pa, nullptr});
       continue;
     }
 
     // This is not the representative; point at the component of the
     // representative.
-    auto representativePA = equivClass->members[representative];
-    assert(componentOf.count(representativePA) == 1 &&
+    CanType representativeDepTy =
+      equivClass->members[representative]->getDependentType({ })
+        ->getCanonicalType();
+    assert(componentOf.count(representativeDepTy) == 1 &&
            "Missing representative component?");
-    unsigned componentIndex = componentOf[representativePA];
-    componentOf[pa] = componentIndex;
+    unsigned componentIndex = componentOf[representativeDepTy];
+    componentOf[depType] = componentIndex;
 
     // If this is a better anchor, record it.
     if (compareDependentTypes(&pa, &components[componentIndex].anchor) < 0)
@@ -5498,13 +5483,12 @@ static void computeDerivedSameTypeComponents(
 
   // If there is a concrete type, figure out the best concrete type anchor
   // per component.
+auto genericParams = builder.getGenericParams();
   for (const auto &concrete : equivClass->concreteTypeConstraints) {
     // Dig out the component associated with constraint.
-    Type subjectType =
-      concrete.getSubjectDependentType(builder.getGenericParams());
-    auto subjectPA = concrete.realizeSubjectPotentialArchetype(builder);
-    assert(componentOf.count(subjectPA) > 0);
-    auto &component = components[componentOf[subjectPA]];
+    Type subjectType = concrete.getSubjectDependentType(genericParams);
+    assert(componentOf.count(subjectType->getCanonicalType()) > 0);
+    auto &component = components[componentOf[subjectType->getCanonicalType()]];
 
     // FIXME: Skip self-derived sources. This means our attempts to "stage"
     // construction of self-derived sources really don't work, because we
@@ -5573,16 +5557,17 @@ void IntercomponentEdge::dump() const {
 /// nodes \c from and \c to within the given equivalence class.
 static bool removalDisconnectsEquivalenceClass(
                EquivalenceClass *equivClass,
-               llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
+               llvm::SmallDenseMap<CanType, unsigned> &componentOf,
                std::vector<IntercomponentEdge> &sameTypeEdges,
                unsigned edgeIndex,
-               PotentialArchetype *from,
-               PotentialArchetype *to) {
+               CanType fromDepType,
+               CanType toDepType) {
   // Which component are "from" and "to" in within the intercomponent edges?
-  assert(componentOf.count(from) > 0);
-  auto fromComponentIndex = componentOf[from];
-  assert(componentOf.count(to) > 0);
-  auto toComponentIndex = componentOf[to];
+  assert(componentOf.count(fromDepType) > 0);
+  auto fromComponentIndex = componentOf[fromDepType];
+
+  assert(componentOf.count(toDepType) > 0);
+  auto toComponentIndex = componentOf[toDepType];
 
   // If they're in the same component, they're always connected (due to
   // derived edges).
@@ -5616,24 +5601,33 @@ static bool removalDisconnectsEquivalenceClass(
 static bool isSelfDerivedNestedTypeNameMatchEdge(
               GenericSignatureBuilder &builder,
               EquivalenceClass *equivClass,
-              llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
+              llvm::SmallDenseMap<CanType, unsigned> &componentOf,
               std::vector<IntercomponentEdge> &sameTypeEdges,
               unsigned edgeIndex) {
   const auto &edge = sameTypeEdges[edgeIndex];
-  PotentialArchetype *source =
-    edge.constraint.realizeSubjectPotentialArchetype(builder);
+  auto genericParams = builder.getGenericParams();
+  Type sourceType = edge.constraint.getSubjectDependentType(genericParams);
   PotentialArchetype *target = edge.constraint.value;
-  while (source->getParent() && target->getParent() &&
-         source->getResolvedAssociatedType() ==
-           target->getResolvedAssociatedType()) {
-    source = source->getParent();
+
+  DependentMemberType *sourceDepMemTy;
+  while ((sourceDepMemTy = sourceType->getAs<DependentMemberType>()) &&
+         target->getParent() &&
+         sourceDepMemTy->getAssocType() &&
+         sourceDepMemTy->getAssocType() == target->getResolvedAssociatedType()){
+    sourceType = sourceDepMemTy->getBase();
     target = target->getParent();
 
-    if (source->isInSameEquivalenceClassAs(target) &&
-        source->getEquivalenceClassIfPresent() == equivClass &&
+    if (target->getEquivalenceClassIfPresent() == equivClass &&
+        builder.maybeResolveEquivalenceClass(
+                                     sourceType,
+                                     ArchetypeResolutionKind::WellFormed,
+                                     /*wantExactPotentialArchetype=*/false)
+          .getEquivalenceClass(builder) == equivClass &&
         !removalDisconnectsEquivalenceClass(equivClass, componentOf,
                                             sameTypeEdges, edgeIndex,
-                                            source, target))
+                                            sourceType->getCanonicalType(),
+                                            target->getDependentType({ })
+                                              ->getCanonicalType()))
       return true;
   }
 
@@ -5648,7 +5642,7 @@ static bool isSelfDerivedNestedTypeNameMatchEdge(
 static void collapseSameTypeComponentsThroughDelayedRequirements(
               GenericSignatureBuilder &builder,
               EquivalenceClass *equivClass,
-              llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
+              llvm::SmallDenseMap<CanType, unsigned> &componentOf,
               SmallVectorImpl<unsigned> &collapsedParents,
               unsigned &remainingComponents) {
   unsigned numCollapsedParents = collapsedParents.size();
@@ -5660,6 +5654,10 @@ static void collapseSameTypeComponentsThroughDelayedRequirements(
   /// Retrieve the component for a type representing a virtual component
   auto getTypeVirtualComponent = [&](Type type) {
     CanType canType = type->getCanonicalType();
+    auto knownActual = componentOf.find(canType);
+    if (knownActual != componentOf.end())
+      return knownActual->second;
+
     auto knownVirtual = virtualComponents.find(canType);
     if (knownVirtual != virtualComponents.end())
       return knownVirtual->second;
@@ -5671,30 +5669,16 @@ static void collapseSameTypeComponentsThroughDelayedRequirements(
   };
 
   /// Retrieve the component for the given potential archetype.
+  auto genericParams = builder.getGenericParams();
   auto getPotentialArchetypeVirtualComponent = [&](PotentialArchetype *pa) {
     if (pa->getEquivalenceClassIfPresent() == equivClass)
-      return componentOf[pa];
+      return getTypeVirtualComponent(pa->getDependentType(genericParams));
 
     // We found a potential archetype in another equivalence class. Treat it
     // as a "virtual" component representing that potential archetype's
     // equivalence class.
-    auto genericParams = builder.getGenericParams();
     return getTypeVirtualComponent(
              pa->getRepresentative()->getDependentType(genericParams));
-  };
-
-  /// Local function to retrieve the component with which the given type is
-  /// associated, for a type that we haven't tried to resolve yet.
-  auto getUnknownTypeVirtualComponent = [&](Type type) {
-    if (auto pa =
-            builder.maybeResolveEquivalenceClass(
-                                     type,
-                                     ArchetypeResolutionKind::AlreadyKnown,
-                                     /*wantExactPotentialArchetype=*/true)
-              .getPotentialArchetypeIfKnown())
-      return getPotentialArchetypeVirtualComponent(pa);
-
-    return getTypeVirtualComponent(type);
   };
 
   for (const auto &delayedReq : equivClass->delayedRequirements) {
@@ -5705,13 +5689,13 @@ static void collapseSameTypeComponentsThroughDelayedRequirements(
     if (auto lhsPA = delayedReq.lhs.dyn_cast<PotentialArchetype *>())
       lhsComponent = getPotentialArchetypeVirtualComponent(lhsPA);
     else
-      lhsComponent = getUnknownTypeVirtualComponent(delayedReq.lhs.get<Type>());
+      lhsComponent = getTypeVirtualComponent(delayedReq.lhs.get<Type>());
 
     unsigned rhsComponent;
     if (auto rhsPA = delayedReq.rhs.dyn_cast<PotentialArchetype *>())
       rhsComponent = getPotentialArchetypeVirtualComponent(rhsPA);
     else
-      rhsComponent = getUnknownTypeVirtualComponent(delayedReq.rhs.get<Type>());
+      rhsComponent = getTypeVirtualComponent(delayedReq.rhs.get<Type>());
 
     // Collapse the sets
     if (unionSets(collapsedParents, lhsComponent, rhsComponent,
@@ -5731,7 +5715,7 @@ static void collapseSameTypeComponentsThroughDelayedRequirements(
 static void collapseSameTypeComponents(
               GenericSignatureBuilder &builder,
               EquivalenceClass *equivClass,
-              llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
+              llvm::SmallDenseMap<CanType, unsigned> &componentOf,
               std::vector<IntercomponentEdge> &sameTypeEdges) {
   SmallVector<unsigned, 4> collapsedParents;
   for (unsigned i : indices(equivClass->derivedSameTypeComponents)) {
@@ -5851,7 +5835,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 
   // Compute the components in the subgraph of the same-type constraint graph
   // that includes only derived constraints.
-  llvm::SmallDenseMap<PotentialArchetype *, unsigned> componentOf;
+  llvm::SmallDenseMap<CanType, unsigned> componentOf;
   computeDerivedSameTypeComponents(*this, equivClass, componentOf);
 
   // Go through all of the same-type constraints, collecting all of the
@@ -5883,13 +5867,16 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
     }
 
     // Determine which component each of the source/destination fall into.
-    auto subjectPA = constraint.realizeSubjectPotentialArchetype(*this);
-    assert(componentOf.count(subjectPA) > 0 &&
+    CanType subjectType =
+      constraint.getSubjectDependentType({ })->getCanonicalType();
+    assert(componentOf.count(subjectType) > 0 &&
            "unknown potential archetype?");
-    unsigned firstComponentIdx = componentOf[subjectPA];
-    assert(componentOf.count(constraint.value) > 0 &&
+    unsigned firstComponentIdx = componentOf[subjectType];
+    assert(componentOf.count(
+             constraint.value->getDependentType({ })->getCanonicalType()) > 0 &&
            "unknown potential archetype?");
-    unsigned secondComponentIdx = componentOf[constraint.value];
+    unsigned secondComponentIdx =
+      componentOf[constraint.value->getDependentType({ })->getCanonicalType()];
 
     // Separately track nested-type-name-match constraints.
     if (constraint.source->getRoot()->kind ==

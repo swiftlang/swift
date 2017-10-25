@@ -452,8 +452,8 @@ private:
   
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype is bound to a concrete type.
-  ConstraintResult addSameTypeRequirementToConcrete(PotentialArchetype *T,
-                                        Type Concrete,
+  ConstraintResult addSameTypeRequirementToConcrete(ResolvedType type,
+                                        Type concrete,
                                         const RequirementSource *Source);
 
   /// \brief Add a new same-type requirement specifying that the given two
@@ -1457,11 +1457,6 @@ struct GenericSignatureBuilder::Constraint {
   /// Retrieve the dependent type describing the subject of the constraint.
   Type getSubjectDependentType(
                        ArrayRef<GenericTypeParamType *> genericParams) const;
-
-  /// Realizes and retrieves the potential archetype describing the
-  /// subject of the constraint.
-  PotentialArchetype *realizeSubjectPotentialArchetype(
-                        GenericSignatureBuilder &builder) const;
 
   /// Determine whether the subject is equivalence to the given potential
   /// archetype.
