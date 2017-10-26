@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen  -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -parse-as-library %s > /dev/null
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -O -parse-as-library %s > /dev/null
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-ir -parse-as-library %s > /dev/null
+// RUN: %target-swift-frontend -enable-sil-ownership -Xllvm -sil-full-demangle -emit-silgen  -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -Xllvm -sil-full-demangle -emit-sil -parse-as-library %s > /dev/null
+// RUN: %target-swift-frontend -enable-sil-ownership -Xllvm -sil-full-demangle -emit-sil -O -parse-as-library %s > /dev/null
+// RUN: %target-swift-frontend -enable-sil-ownership -Xllvm -sil-full-demangle -emit-ir -parse-as-library %s > /dev/null
 
 // TODO:
 // - test generated SIL -- mostly we're just testing mangling here
@@ -226,7 +226,7 @@ class SubclassOfInner<T, U> : OuterRing<T>.InnerRing<U> {
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T015nested_generics6PizzasV7NewYorkCyAA6PepperV_GAA7HotDogsC8AmericanVIexxd_AhLIexxr_TR : $@convention(thin) (@owned Pizzas<Pepper>.NewYork, @owned @callee_owned (@owned Pizzas<Pepper>.NewYork) -> HotDogs.American) -> @out HotDogs.American
 
 // CHECK-LABEL: sil private [transparent] [thunk] @_T015nested_generics9OuterRingC05InnerD0Cyx_qd__GAA30ProtocolWithGenericRequirementA2aGP6method1TQz_1UQzqd__tAK1t_AM1uqd__1vtlFTW : $@convention(witness_method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @in_guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0) {
-// CHECK: bb0([[T:%[0-9]+]] : $*τ_0_0, [[U:%[0-9]+]] : $*τ_1_0, [[V:%[0-9]+]] : $*τ_2_0, [[TOut:%[0-9]+]] : $*τ_0_0, [[UOut:%[0-9]+]] : $*τ_1_0, [[VOut:%[0-9]+]] : $*τ_2_0, [[SELF:%[0-9]+]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>):
+// CHECK: bb0([[T:%[0-9]+]] : @trivial $*τ_0_0, [[U:%[0-9]+]] : @trivial $*τ_1_0, [[V:%[0-9]+]] : @trivial $*τ_2_0, [[TOut:%[0-9]+]] : @trivial $*τ_0_0, [[UOut:%[0-9]+]] : @trivial $*τ_1_0, [[VOut:%[0-9]+]] : @trivial $*τ_2_0, [[SELF:%[0-9]+]] : @trivial $*OuterRing<τ_0_0>.InnerRing<τ_1_0>):
 // CHECK:   [[SELF_COPY:%[0-9]+]] = alloc_stack $OuterRing<τ_0_0>.InnerRing<τ_1_0>
 // CHECK:   copy_addr [[SELF]] to [initialization] [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
 // CHECK:   [[SELF_COPY_VAL:%[0-9]+]] = load [take] [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
