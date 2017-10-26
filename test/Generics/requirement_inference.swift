@@ -139,13 +139,13 @@ extension P7 where AssocP6.Element : P6, // expected-note{{conformance constrain
 }
 
 protocol P8 {
-  associatedtype A // expected-note{{'A' declared here}}
-  associatedtype B // expected-note{{'B' declared here}}
+  associatedtype A
+  associatedtype B
 }
 
 protocol P9 : P8 {
-  associatedtype A // expected-warning{{redeclaration of associated type 'A' from protocol 'P8' is better expressed as a 'where' clause on the protocol}}
-  associatedtype B // expected-warning{{redeclaration of associated type 'B' from protocol 'P8' is better expressed as a 'where' clause on the protocol}}
+  associatedtype A
+  associatedtype B
 }
 
 protocol P10 {
