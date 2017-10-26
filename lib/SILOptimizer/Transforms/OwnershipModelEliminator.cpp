@@ -23,10 +23,11 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-ownership-model-eliminator"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 
 using namespace swift;
 
@@ -83,6 +84,8 @@ struct OwnershipModelEliminatorVisitor
   bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *UAVI);
   bool visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
   bool visitSwitchEnumInst(SwitchEnumInst *SWI);
+  bool visitDestructureStructInst(DestructureStructInst *DSI);
+  bool visitDestructureTupleInst(DestructureTupleInst *DTI);
 };
 
 } // end anonymous namespace
@@ -246,6 +249,42 @@ bool OwnershipModelEliminatorVisitor::visitSwitchEnumInst(
     return false;
   DefaultBlock->getArgument(0)->replaceAllUsesWith(SWEI->getOperand());
   DefaultBlock->eraseArgument(0);
+  return true;
+}
+
+static void splitDestructure(SILBuilder &B, SILInstruction *I, SILValue Op) {
+  assert((isa<DestructureStructInst>(I) || isa<DestructureTupleInst>(I)) &&
+         "Only destructure operations can be passed to splitDestructure");
+
+  SILModule &M = I->getModule();
+  SILLocation Loc = I->getLoc();
+  SILType OpType = Op->getType();
+
+  llvm::SmallVector<Projection, 8> Projections;
+  Projection::getFirstLevelProjections(OpType, M, Projections);
+  assert(Projections.size() == I->getNumResults());
+
+  llvm::SmallVector<SILValue, 8> NewValues;
+  for (unsigned i : indices(Projections)) {
+    const auto &Proj = Projections[i];
+    NewValues.push_back(Proj.createObjectProjection(B, Loc, Op).get());
+    assert(NewValues.back()->getType() == I->getResults()[i]->getType() &&
+           "Expected created projections and results to be the same types");
+  }
+
+  I->replaceAllUsesPairwiseWith(NewValues);
+  I->eraseFromParent();
+}
+
+bool OwnershipModelEliminatorVisitor::visitDestructureStructInst(
+    DestructureStructInst *DSI) {
+  splitDestructure(B, DSI, DSI->getOperand());
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitDestructureTupleInst(
+    DestructureTupleInst *DTI) {
+  splitDestructure(B, DTI, DTI->getOperand());
   return true;
 }
 
