@@ -394,14 +394,14 @@ static SimpleGlobalCache<FunctionCacheEntry> FunctionTypes;
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
-                                      const void *arg0,
+                                      const Metadata *arg0,
                                       const Metadata *result) {
   return swift_getFunctionTypeMetadata1WithFlags(flags, arg0, nullptr, result);
 }
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
-                                               const void *arg0,
+                                               const Metadata *arg0,
                                                const uint32_t *paramFlags,
                                                const Metadata *result) {
   assert(flags.getNumArguments() == 1
@@ -414,8 +414,8 @@ swift::swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
-                                      const void *arg0,
-                                      const void *arg1,
+                                      const Metadata *arg0,
+                                      const Metadata *arg1,
                                       const Metadata *result) {
   return swift_getFunctionTypeMetadata2WithFlags(
                                             flags, arg0, arg1, nullptr, result);
@@ -423,8 +423,8 @@ swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
-                                               const void *arg0,
-                                               const void *arg1,
+                                               const Metadata *arg0,
+                                               const Metadata *arg1,
                                                const uint32_t *paramFlags,
                                                const Metadata *result) {
   assert(flags.getNumArguments() == 2
@@ -437,9 +437,9 @@ swift::swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
-                                      const void *arg0,
-                                      const void *arg1,
-                                      const void *arg2,
+                                      const Metadata *arg0,
+                                      const Metadata *arg1,
+                                      const Metadata *arg2,
                                       const Metadata *result) {
   return swift_getFunctionTypeMetadata3WithFlags(flags, arg0, arg1, arg2,
                                                  nullptr, result);
@@ -447,9 +447,9 @@ swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata3WithFlags(FunctionTypeFlags flags,
-                                               const void *arg0,
-                                               const void *arg1,
-                                               const void *arg2,
+                                               const Metadata *arg0,
+                                               const Metadata *arg1,
+                                               const Metadata *arg2,
                                                const uint32_t *paramFlags,
                                                const Metadata *result) {
   assert(flags.getNumArguments() == 3

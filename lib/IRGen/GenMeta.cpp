@@ -710,9 +710,7 @@ namespace {
       auto type = param.getType();
       if (param.getParameterFlags().isInOut())
         type = type->getInOutObjectType()->getCanonicalType();
-
-      auto metadata = IGF.emitTypeMetadataRef(type);
-      return IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy);
+      return IGF.emitTypeMetadataRef(type);
     }
 
     llvm::Value *visitFunctionType(CanFunctionType type) {
@@ -822,6 +820,7 @@ namespace {
       }
 
       default:
+        auto *const metadataPtrTy = IGF.IGM.TypeMetadataPtrTy->getPointerTo();
         auto arrayTy = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, numParams + 3);
         Address buffer = IGF.createAlloca(
             arrayTy, IGF.IGM.getPointerAlignment(), "function-arguments");
@@ -840,6 +839,7 @@ namespace {
         collectParameters([&](unsigned i, llvm::Value *typeRef, uint8_t flags) {
           auto argPtr = IGF.Builder.CreateStructGEP(buffer, i + 1,
                                                     IGF.IGM.getPointerSize());
+          argPtr = IGF.Builder.CreateBitCast(argPtr, metadataPtrTy);
           hasFlags |= flags;
           flagsArr.addInt32(flags);
           IGF.Builder.CreateStore(typeRef, argPtr);
@@ -860,8 +860,7 @@ namespace {
 
         Address resultPtr = IGF.Builder.CreateStructGEP(
             buffer, numParams + 2, IGF.IGM.getPointerSize());
-        resultPtr = IGF.Builder.CreateBitCast(
-            resultPtr, IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+        resultPtr = IGF.Builder.CreateBitCast(resultPtr, metadataPtrTy);
         IGF.Builder.CreateStore(resultMetadata, resultPtr);
 
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetFunctionMetadataFn(),
