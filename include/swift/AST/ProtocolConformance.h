@@ -251,6 +251,9 @@ public:
   /// interface type.
   GenericSignature *getGenericSignature() const;
 
+  /// Get the substitutions associated with this conformance.
+  SubstitutionMap getSubstitutions(ModuleDecl *M) const;
+
   /// Get the underlying normal conformance.
   const NormalProtocolConformance *getRootNormalConformance() const;
 
