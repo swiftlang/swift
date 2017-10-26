@@ -90,7 +90,6 @@ extension String {
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct Substring : StringProtocol {
   public typealias Index = String.Index
-  public typealias IndexDistance = String.IndexDistance
   public typealias SubSequence = Substring
 
   @_versioned // FIXME(sil-serialize-all)
@@ -149,7 +148,7 @@ public struct Substring : StringProtocol {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     let result = _slice.index(i, offsetBy: n)
     // FIXME(strings): slice types currently lack necessary bound checks
     _precondition(
@@ -160,7 +159,7 @@ public struct Substring : StringProtocol {
 
   @_inlineable // FIXME(sil-serialize-all)
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     let result = _slice.index(i, offsetBy: n, limitedBy: limit)
     // FIXME(strings): slice types currently lack necessary bound checks
@@ -172,7 +171,7 @@ public struct Substring : StringProtocol {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     return _slice.distance(from: start, to: end)
   }
 

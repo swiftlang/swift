@@ -66,7 +66,6 @@ StringTests.test("AssociatedTypes-UTF8View") {
     iteratorType: View.Iterator.self,
     subSequenceType: Substring.UTF8View.self,
     indexType: View.Index.self,
-    indexDistanceType: Int.self,
     indicesType: DefaultBidirectionalIndices<View>.self)
 }
 
@@ -77,7 +76,6 @@ StringTests.test("AssociatedTypes-UTF16View") {
     iteratorType: IndexingIterator<View>.self,
     subSequenceType: Substring.UTF16View.self,
     indexType: View.Index.self,
-    indexDistanceType: Int.self,
     indicesType: View.Indices.self)
 }
 
@@ -88,7 +86,6 @@ StringTests.test("AssociatedTypes-UnicodeScalarView") {
     iteratorType: View.Iterator.self,
     subSequenceType: Substring.UnicodeScalarView.self,
     indexType: View.Index.self,
-    indexDistanceType: Int.self,
     indicesType: DefaultBidirectionalIndices<View>.self)
 }
 
@@ -99,7 +96,6 @@ StringTests.test("AssociatedTypes-CharacterView") {
     iteratorType: IndexingIterator<View>.self,
     subSequenceType: View.self,
     indexType: View.Index.self,
-    indexDistanceType: Int.self,
     indicesType: DefaultBidirectionalIndices<View>.self)
 }
 

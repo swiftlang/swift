@@ -17,7 +17,6 @@ struct MyString {
 extension MyString : BidirectionalCollection {
   typealias Iterator = String.Iterator
   typealias Index = String.Index
-  typealias IndexDistance = String.IndexDistance
   typealias SubSequence = MyString
   func makeIterator() -> Iterator { return base.makeIterator() }
   var startIndex: String.Index { return base.startIndex }
@@ -28,10 +27,10 @@ extension MyString : BidirectionalCollection {
   }
   func index(after i: Index) -> Index { return base.index(after: i) }
   func index(before i: Index) -> Index { return base.index(before: i) }
-  func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  func index(_ i: Index, offsetBy n: Int) -> Index {
     return base.index(i, offsetBy: n)
   }
-  func distance(from i: Index, to j: Index) -> IndexDistance {
+  func distance(from i: Index, to j: Index) -> Int {
     return base.distance(from: i, to: j)
   }
 }

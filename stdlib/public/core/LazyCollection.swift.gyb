@@ -182,7 +182,7 @@ extension ${Self} : ${TraversalCollection} {
   /// - Complexity: O(1) if `Self` conforms to `RandomAccessCollection`;
   ///   O(*n*) otherwise.
   @_inlineable
-  public var count: Base.IndexDistance {
+  public var count: Int {
     return _base.count
   }
 
@@ -208,21 +208,21 @@ extension ${Self} : ${TraversalCollection} {
 
   // TODO: swift-3-indexing-model - add docs
   @_inlineable
-  public func index(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     return _base.index(i, offsetBy: n)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @_inlineable
   public func index(
-    _ i: Index, offsetBy n: Base.IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     return _base.index(i, offsetBy: n, limitedBy: limit)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @_inlineable
-  public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     return _base.distance(from:start, to: end)
   }
 

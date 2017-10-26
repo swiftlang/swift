@@ -64,8 +64,6 @@ where IsSentinel.Input == Base.Iterator.Element {
   @_versioned // FIXME(sil-serialize-all)
   internal var _base : Base
   
-  internal typealias IndexDistance = Base.IndexDistance
-
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal func makeIterator() -> _SentinelIterator<Base.Iterator, IsSentinel> {

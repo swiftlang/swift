@@ -155,8 +155,6 @@ public struct ${Self}<
     return SubSequence(_base: _base[bounds], transform: _transform)
   }
 
-  public typealias IndexDistance = Base.IndexDistance
-
   public typealias Indices = Base.Indices
 
   @_inlineable
@@ -178,7 +176,7 @@ public struct ${Self}<
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`; O(*n*)
   ///   otherwise.
   @_inlineable
-  public var count: Base.IndexDistance {
+  public var count: Int {
     return _base.count
   }
 
@@ -191,19 +189,19 @@ public struct ${Self}<
 %   end
 
   @_inlineable
-  public func index(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     return _base.index(i, offsetBy: n)
   }
 
   @_inlineable
   public func index(
-    _ i: Index, offsetBy n: Base.IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     return _base.index(i, offsetBy: n, limitedBy: limit)
   }
 
   @_inlineable
-  public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     return _base.distance(from: start, to: end)
   }
 
@@ -282,7 +280,7 @@ extension LazyMapCollection {
   public static func + <
     Other : LazyCollectionProtocol
   >(lhs: LazyMapCollection, rhs: Other) -> [Element]
-  where Other.Element == Element, Other.IndexDistance == IndexDistance {
+  where Other.Element == Element {
     var result: [Element] = []
     result.reserveCapacity(numericCast(lhs.count + rhs.count))
     result.append(contentsOf: lhs)

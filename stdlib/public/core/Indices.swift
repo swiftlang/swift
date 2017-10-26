@@ -39,7 +39,6 @@ extension DefaultIndices: Collection {
   public typealias Element = Elements.Index
   public typealias Indices = DefaultIndices<Elements>
   public typealias SubSequence = DefaultIndices<Elements>
-	public typealias IndexDistance = Elements.IndexDistance
 	public typealias Iterator = IndexingIterator<DefaultIndices<Elements>>
 
   @_inlineable

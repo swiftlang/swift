@@ -1045,7 +1045,6 @@ extension ${Self}: ${SelfProtocol} {
 
   public typealias Iterator = AnyIterator<Element>
   public typealias Index = AnyIndex
-  public typealias IndexDistance = Int64
   public typealias SubSequence = ${Self}<Element> 
 
 %   for SubTraversal in TRAVERSALS[ti:]:
@@ -1158,14 +1157,14 @@ extension ${Self}: ${SelfProtocol} {
 
   @_inlineable
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     return _box._index(i._box, offsetBy: n, limitedBy: limit._box)
       .map { AnyIndex(_box:$0) }
   }
 
   @_inlineable
-  public func formIndex(_ i: inout Index, offsetBy n: IndexDistance) {
+  public func formIndex(_ i: inout Index, offsetBy n: Int) {
     if _isUnique(&i._box) {
       return _box._formIndex(&i._box, offsetBy: n)
     } else {
@@ -1176,7 +1175,7 @@ extension ${Self}: ${SelfProtocol} {
   @_inlineable
   public func formIndex(
     _ i: inout Index,
-    offsetBy n: IndexDistance,
+    offsetBy n: Int,
     limitedBy limit: Index
   ) -> Bool {
     if _isUnique(&i._box) {
@@ -1191,7 +1190,7 @@ extension ${Self}: ${SelfProtocol} {
   }
 
   @_inlineable
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     return _box._distance(from: start._box, to: end._box)
   }
 
@@ -1205,7 +1204,7 @@ extension ${Self}: ${SelfProtocol} {
 % end
   /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(*n*)'}
   @_inlineable
-  public var count: IndexDistance {
+  public var count: Int {
     return _box._count
   }
 
