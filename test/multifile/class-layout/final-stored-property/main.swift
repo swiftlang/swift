@@ -1,7 +1,5 @@
-// RUN: %target-build-swift %S/library.swift %S/main.swift
-// RUN: %target-build-swift -whole-module-optimization %S/library.swift %S/main.swift
-
-// REQUIRES: executable_test
+// RUN: %target-build-swift %S/Inputs/library.swift %S/main.swift
+// RUN: %target-build-swift -whole-module-optimization %S/Inputs/library.swift %S/main.swift
 
 func meltCheese(_ burger: Burger) -> Int {
   return burger.cheeseSlices

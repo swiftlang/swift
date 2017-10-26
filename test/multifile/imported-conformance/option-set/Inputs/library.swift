@@ -1,5 +1,3 @@
-// RUN: true
-
 import Foundation
 
 @inline(__always)
