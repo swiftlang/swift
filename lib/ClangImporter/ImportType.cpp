@@ -1313,7 +1313,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
       }
     }
 
-    if (bridging == Bridgeability::Full) {
+    if (canBridgeTypes(importKind) || importKind == ImportTypeKind::Typedef) {
       auto fTy = importedType->castTo<FunctionType>();
       FunctionType::ExtInfo einfo = fTy->getExtInfo();
       if (einfo.getRepresentation() != FunctionTypeRepresentation::Swift) {
@@ -1356,7 +1356,6 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // If we have a bridged Objective-C type and we are allowed to
   // bridge, do so.
   if (hint == ImportHint::ObjCBridged &&
-      bridging == Bridgeability::Full &&
       canBridgeTypes(importKind) &&
       importKind != ImportTypeKind::PropertyWithReferenceSemantics) {
     // id and Any can be bridged without Foundation. There would be
