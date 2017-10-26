@@ -147,7 +147,7 @@ static unsigned computeSubelement(SILValue Pointer,
 
 /// Given an aggregate value and an access path, extract the value indicated by
 /// the path.
-static SILValue ExtractSubElement(SILValue Val, unsigned SubElementNumber,
+static SILValue extractSubElement(SILValue Val, unsigned SubElementNumber,
                                   SILBuilder &B, SILLocation Loc) {
   SILType ValTy = Val->getType();
   
@@ -159,7 +159,7 @@ static SILValue ExtractSubElement(SILValue Val, unsigned SubElementNumber,
       unsigned NumSubElt = getNumSubElements(EltTy, B.getModule());
       if (SubElementNumber < NumSubElt) {
         Val = B.emitTupleExtract(Loc, Val, EltNo, EltTy);
-        return ExtractSubElement(Val, SubElementNumber, B, Loc);
+        return extractSubElement(Val, SubElementNumber, B, Loc);
       }
       
       SubElementNumber -= NumSubElt;
@@ -176,7 +176,7 @@ static SILValue ExtractSubElement(SILValue Val, unsigned SubElementNumber,
       
       if (SubElementNumber < NumSubElt) {
         Val = B.emitStructExtract(Loc, Val, D);
-        return ExtractSubElement(Val, SubElementNumber, B, Loc);
+        return extractSubElement(Val, SubElementNumber, B, Loc);
       }
       
       SubElementNumber -= NumSubElt;
@@ -513,11 +513,10 @@ static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
 /// AggregateAvailableValues - Given a bunch of primitive subelement values,
 /// build out the right aggregate type (LoadTy) by emitting tuple and struct
 /// instructions as necessary.
-static SILValue
-AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
-                         SILValue Address,
-                         ArrayRef<std::pair<SILValue, unsigned>> AvailableValues,
-                         unsigned FirstElt) {
+static SILValue aggregateAvailableValues(
+    SILInstruction *Inst, SILType LoadTy, SILValue Address,
+    ArrayRef<std::pair<SILValue, unsigned>> AvailableValues,
+    unsigned FirstElt) {
   assert(LoadTy.isObject());
   SILModule &M = Inst->getModule();
   
@@ -559,8 +558,8 @@ AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
       if (anyMissing(FirstElt, NumSubElt, AvailableValues))
         EltAddr = B.createTupleElementAddr(Inst->getLoc(), Address, EltNo,
                                            EltTy.getAddressType());
-      
-      ResultElts.push_back(AggregateAvailableValues(Inst, EltTy, EltAddr,
+
+      ResultElts.push_back(aggregateAvailableValues(Inst, EltTy, EltAddr,
                                                     AvailableValues, FirstElt));
       FirstElt += NumSubElt;
     }
@@ -582,8 +581,8 @@ AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
       if (anyMissing(FirstElt, NumSubElt, AvailableValues))
         EltAddr = B.createStructElementAddr(Inst->getLoc(), Address, FD,
                                             EltTy.getAddressType());
-      
-      ResultElts.push_back(AggregateAvailableValues(Inst, EltTy, EltAddr,
+
+      ResultElts.push_back(aggregateAvailableValues(Inst, EltTy, EltAddr,
                                                     AvailableValues, FirstElt));
       FirstElt += NumSubElt;
     }
@@ -597,7 +596,7 @@ AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
     return B.createLoad(Inst->getLoc(), Address,
                         LoadOwnershipQualifier::Unqualified);
 
-  SILValue EltVal = ExtractSubElement(Val.first, Val.second, B, Inst->getLoc());
+  SILValue EltVal = extractSubElement(Val.first, Val.second, B, Inst->getLoc());
   // It must be the same type as LoadTy if available.
   assert(EltVal->getType() == LoadTy &&
          "Subelement types mismatch");
@@ -692,9 +691,9 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   // type as the load did, and emit smaller) loads for any subelements that were
   // not available.
   auto Load = cast<LoadInst>(Inst);
-  auto NewVal = AggregateAvailableValues(Load, LoadTy, Load->getOperand(),
+  auto NewVal = aggregateAvailableValues(Load, LoadTy, Load->getOperand(),
                                          AvailableValues, FirstElt);
-  
+
   ++NumLoadPromoted;
   
   // Simply replace the load.
@@ -757,8 +756,8 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
   // type as the load did, and emit smaller) loads for any subelements that were
   // not available.
   auto NewVal =
-  AggregateAvailableValues(DAI, LoadTy, Address, AvailableValues, FirstElt);
-  
+      aggregateAvailableValues(DAI, LoadTy, Address, AvailableValues, FirstElt);
+
   ++NumDestroyAddrPromoted;
   
   DEBUG(llvm::dbgs() << "  *** Promoting destroy_addr: " << *DAI << "\n");
