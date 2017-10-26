@@ -6439,7 +6439,8 @@ static bool hasGenericAncestry(ClassDecl *classDecl) {
 
 /// Infer the attribute tostatic-initialize the Objective-C metadata for the
 /// given class, if needed.
-static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
+static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
+                                              ClassDecl *classDecl) {
   // If we already have the attribute, there's nothing to do.
   if (classDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
     return;
@@ -6449,6 +6450,22 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   if (!hasGenericAncestry(classDecl) &&
       classDecl->getDeclContext()->isModuleScopeContext()) {
     return;
+  }
+
+  // If this class isn't always available on the deployment target, don't
+  // mark it as statically initialized.
+  // FIXME: This is a workaround. The proper solution is for IRGen to
+  // only statically initializae the Objective-C metadata when running on
+  // a new-enough OS.
+  if (auto sourceFile = classDecl->getParentSourceFile()) {
+    AvailabilityContext availableInfo = AvailabilityContext::alwaysAvailable();
+    for (Decl *enclosingDecl = classDecl; enclosingDecl;
+         enclosingDecl = enclosingDecl->getDeclContext()
+                           ->getInnermostDeclarationDeclContext()) {
+      if (!tc.isDeclAvailable(enclosingDecl, SourceLoc(), sourceFile,
+                              availableInfo))
+        return;
+    }
   }
 
   // Infer @_staticInitializeObjCMetadata.
@@ -6568,7 +6585,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         }
 
         // Infer @_staticInitializeObjCMetadata if needed.
-        inferStaticInitializeObjCMetadata(classDecl);
+        inferStaticInitializeObjCMetadata(*this, classDecl);
       }
     }
 
