@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen -emit-verbose-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership %s -emit-silgen -emit-verbose-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -34,8 +34,8 @@ class A {
   // rdar://15858869 - However, direct access only applies to (implicit or
   // explicit) 'self' ivar references, not ALL ivar refs.
   // CHECK-LABEL: sil hidden @_T015objc_properties1AC{{[_0-9a-zA-Z]*}}fc
-  // CHECK: bb0(%0 : $A, %1 : $Int, %2 : $A):
-  // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized [rootself] %2 : $A
+  // CHECK: bb0(%0 : @owned $A, %1 : @trivial $Int, [[OLD_SELF:%.*]] : @owned $A):
+  // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized [rootself] [[OLD_SELF]] : $A
   init(other : A, x : Int) {
     // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
     // CHECK: [[SELF_A:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $A, #A.prop
@@ -104,7 +104,7 @@ class B : A {
 // Test the @NSCopying attribute.
 class TestNSCopying {
   // CHECK-LABEL: sil hidden [transparent] @_T015objc_properties13TestNSCopyingC8propertySo8NSStringCvs : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
-  // CHECK: bb0([[ARG0:%.*]] : $NSString, [[ARG1:%.*]] : $TestNSCopying):
+  // CHECK: bb0([[ARG0:%.*]] : @owned $NSString, [[ARG1:%.*]] : @guaranteed $TestNSCopying):
   // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
   // CHECK:   objc_method [[BORROWED_ARG0]] : $NSString, #NSString.copy!1.foreign
   @NSCopying var property : NSString
@@ -158,7 +158,7 @@ class Singleton : NSObject {
 
 class HasUnmanaged : NSObject {
   // CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvgTo
-  // CHECK: bb0([[CLS:%.*]] : $HasUnmanaged):
+  // CHECK: bb0([[CLS:%.*]] : @unowned $HasUnmanaged):
   // CHECK:     [[CLS_COPY:%.*]] = copy_value [[CLS]]
   // CHECK:     [[BORROWED_CLS_COPY:%.*]] = begin_borrow [[CLS_COPY]]
   // CHECK:     [[NATIVE:%.+]] = function_ref @_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvg
@@ -171,7 +171,7 @@ class HasUnmanaged : NSObject {
   // CHECK: } // end sil function '_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvgTo'
 
   // CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvsTo
-  // CHECK: bb0([[NEW_VALUE:%.*]] : $Optional<Unmanaged<AnyObject>>, [[SELF:%.*]] : $HasUnmanaged):
+  // CHECK: bb0([[NEW_VALUE:%.*]] : @trivial $Optional<Unmanaged<AnyObject>>, [[SELF:%.*]] : @unowned $HasUnmanaged):
   // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $HasUnmanaged
   // CHECK-NEXT: [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT: // function_ref
@@ -195,7 +195,7 @@ class NonObjCClassWithObjCProperty {
   }
 
   // CHECK-LABEL: sil hidden @_T015objc_properties016NonObjCClassWithD9CPropertyC11usePropertyyyF : $@convention(method) (@guaranteed NonObjCClassWithObjCProperty) -> () {
-  // CHECK: bb0([[ARG:%.*]] : $NonObjCClassWithObjCProperty):
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $NonObjCClassWithObjCProperty):
   // CHECK: [[MATERIALIZE_FOR_SET:%.*]] = class_method [[ARG]] : $NonObjCClassWithObjCProperty, #NonObjCClassWithObjCProperty.property!materializeForSet.1
   // CHECK: [[TUPLE:%.*]] = apply [[MATERIALIZE_FOR_SET]]({{.*}}, {{.*}}, [[ARG]])
   // CHECK: [[RAW_POINTER:%.*]] = tuple_extract [[TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
