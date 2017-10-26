@@ -22,7 +22,7 @@ protocol P3 {}
 // CHECK-NEXT: Requirement signature: <Self where Self.X : P1>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.X : P1>
 protocol Q1 {
-    associatedtype X: P1 // expected-note 2{{declared here}}
+    associatedtype X: P1 // expected-note {{declared here}}
 }
 
 // inheritance
@@ -36,7 +36,7 @@ protocol Q2: Q1 {}
 // CHECK-NEXT: Requirement signature: <Self where Self : Q1>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0 : Q1>
 protocol Q3: Q1 {
-    associatedtype X // expected-warning{{redeclaration of associated type 'X'}}
+    associatedtype X
 }
 
 // inheritance adding a new conformance
