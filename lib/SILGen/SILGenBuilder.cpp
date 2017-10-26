@@ -714,6 +714,23 @@ createValueMetatype(SILLocation loc, SILType metatype,
   return ManagedValue::forUnmanaged(v);
 }
 
+void SILGenBuilder::createStoreBorrow(SILLocation loc, ManagedValue value,
+                                      SILValue address) {
+  assert(value.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
+  createStoreBorrow(loc, value.getValue(), address);
+}
+
+void SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,
+                                               ManagedValue value,
+                                               SILValue address) {
+  if (value.getOwnershipKind() == ValueOwnershipKind::Trivial) {
+    createStore(loc, value, address, StoreOwnershipQualifier::Trivial);
+    return;
+  }
+
+  createStoreBorrow(loc, value, address);
+}
+
 //===----------------------------------------------------------------------===//
 //                            Switch Enum Builder
 //===----------------------------------------------------------------------===//
