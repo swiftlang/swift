@@ -7543,6 +7543,16 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
                                                         DC);
     if (!useAs && !useAsBang)
       return false;
+    
+    // If we're performing pattern matching, "as" means something completely different...
+    if (auto binOpExpr = dyn_cast<BinaryExpr>(expr)) {
+      auto overloadedFn = dyn_cast<OverloadedDeclRefExpr>(binOpExpr->getFn());
+      if (overloadedFn && overloadedFn->getDecls().size() > 0) {
+        ValueDecl *decl0 = overloadedFn->getDecls()[0];
+        if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator)
+          return false;
+      }
+    }
 
     bool needsParensInside = exprNeedsParensBeforeAddingAs(TC, DC, affected);
     bool needsParensOutside = exprNeedsParensAfterAddingAs(TC, DC, affected,
