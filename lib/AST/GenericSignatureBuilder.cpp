@@ -3497,7 +3497,9 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
       bool shouldWarnAboutRedeclaration =
         source->kind == RequirementSource::RequirementSignatureSelf &&
-        assocTypeDecl->getDefaultDefinitionLoc().isNull();
+        assocTypeDecl->getDefaultDefinitionLoc().isNull() &&
+        (!assocTypeDecl->getInherited().empty() ||
+         assocTypeDecl->getTrailingWhereClause());
       for (auto inheritedType : knownInherited->second) {
         // If we have inherited associated type...
         if (auto inheritedAssocTypeDecl =
