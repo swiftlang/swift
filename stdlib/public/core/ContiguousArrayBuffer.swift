@@ -328,7 +328,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   @_inlineable
   @_versioned
   internal mutating func requestUniqueMutableBackingBuffer(
-    minimumCapacity: Int
+    minimumCapacity: Int, arrayCount: Int
   ) -> _ContiguousArrayBuffer<Element>? {
     if _fastPath(isUniquelyReferenced() && capacity >= minimumCapacity) {
       return self
@@ -384,24 +384,6 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
       let tmp = nv
       nv = firstElementAddress[i]
       firstElementAddress[i] = tmp
-    }
-  }
-
-  /// The number of elements the buffer stores.
-  @_inlineable
-  @_versioned
-  internal var count: Int {
-    get {
-      return _storage.countAndCapacity.count
-    }
-    nonmutating set {
-      _sanityCheck(newValue >= 0)
-
-      _sanityCheck(
-        newValue <= capacity,
-        "Can't grow an array buffer past its capacity")
-
-      _storage.countAndCapacity.count = newValue
     }
   }
 
@@ -563,40 +545,40 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   internal var _storage: _ContiguousArrayStorageBase
 }
 
-/// Append the elements of `rhs` to `lhs`.
-@_inlineable
-@_versioned
-internal func += <Element, C : Collection>(
-  lhs: inout _ContiguousArrayBuffer<Element>, rhs: C
-) where C.Element == Element {
-
-  let oldCount = lhs.count
-  let newCount = oldCount + numericCast(rhs.count)
-
-  let buf: UnsafeMutableBufferPointer<Element>
-  
-  if _fastPath(newCount <= lhs.capacity) {
-    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
-    lhs.count = newCount
-  }
-  else {
-    var newLHS = _ContiguousArrayBuffer<Element>(
-      _uninitializedCount: newCount,
-      minimumCapacity: _growArrayCapacity(lhs.capacity))
-
-    newLHS.firstElementAddress.moveInitialize(
-      from: lhs.firstElementAddress, count: oldCount)
-    lhs.count = 0
-    (lhs, newLHS) = (newLHS, lhs)
-    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
-  }
-
-  var (remainders,writtenUpTo) = buf.initialize(from: rhs)
-
-  // ensure that exactly rhs.count elements were written
-  _precondition(remainders.next() == nil, "rhs underreported its count")
-  _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")    
-}
+// /// Append the elements of `rhs` to `lhs`.
+// @_inlineable
+// @_versioned
+// internal func += <Element, C : Collection>(
+//   lhs: inout _ContiguousArrayBuffer<Element>, rhs: C
+// ) where C.Element == Element {
+//
+//   let oldCount = lhs.count
+//   let newCount = oldCount + numericCast(rhs.count)
+//
+//   let buf: UnsafeMutableBufferPointer<Element>
+//
+//   if _fastPath(newCount <= lhs.capacity) {
+//     buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
+//     lhs.count = newCount
+//   }
+//   else {
+//     var newLHS = _ContiguousArrayBuffer<Element>(
+//       _uninitializedCount: newCount,
+//       minimumCapacity: _growArrayCapacity(lhs.capacity))
+//
+//     newLHS.firstElementAddress.moveInitialize(
+//       from: lhs.firstElementAddress, count: oldCount)
+//     lhs.count = 0
+//     (lhs, newLHS) = (newLHS, lhs)
+//     buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
+//   }
+//
+//   var (remainders,writtenUpTo) = buf.initialize(from: rhs)
+//
+//   // ensure that exactly rhs.count elements were written
+//   _precondition(remainders.next() == nil, "rhs underreported its count")
+//   _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
+// }
 
 extension _ContiguousArrayBuffer : RandomAccessCollection {
   /// The position of the first element in a non-empty collection.
@@ -648,11 +630,13 @@ internal func _copySequenceToContiguousArray<
   }
 
   // Add remaining elements, if any.
+  var count = 0
   while let element = iterator.next() {
     builder.add(element)
+    count += 1
   }
 
-  return builder.finish()
+  return builder.finish(count: count)
 }
 
 extension Collection {
@@ -665,8 +649,8 @@ extension Collection {
 extension _ContiguousArrayBuffer {
   @_inlineable
   @_versioned
-  internal func _copyToContiguousArray() -> ContiguousArray<Element> {
-    return ContiguousArray(_buffer: self)
+  internal func _copyToContiguousArray(count: Int) -> ContiguousArray<Element> {
+    return ContiguousArray(_buffer: self, count: count)
   }
 }
 
@@ -702,7 +686,7 @@ internal func _copyCollectionToContiguousArray<
     p += 1
   }
   _expectEnd(of: source, is: i)
-  return ContiguousArray(_buffer: result)
+  return ContiguousArray(_buffer: result, count: count)
 }
 
 /// A "builder" interface for initializing array buffers.
@@ -717,6 +701,8 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   internal var result: _ContiguousArrayBuffer<Element>
   @_versioned
   internal var p: UnsafeMutablePointer<Element>
+  @_versioned
+  internal var count: Int
   @_versioned
   internal var remainingCapacity: Int
 
@@ -736,6 +722,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
 
     p = result.firstElementAddress
     remainingCapacity = result.capacity
+    count = 0
   }
 
   /// Add an element to the buffer, reallocating if necessary.
@@ -752,7 +739,6 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       remainingCapacity = newResult.capacity - result.capacity
       newResult.firstElementAddress.moveInitialize(
         from: result.firstElementAddress, count: result.capacity)
-      result.count = 0
       (result, newResult) = (newResult, result)
     }
     addWithExistingCapacity(element)
@@ -779,9 +765,9 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always) // For performance reasons.
-  internal mutating func finish() -> ContiguousArray<Element> {
+  internal mutating func finish(count: Int) -> ContiguousArray<Element> {
     // Adjust the initialized count of the buffer.
-    result.count = result.capacity - remainingCapacity
+    self.count = result.capacity - remainingCapacity
 
     return finishWithOriginalCount()
   }
@@ -796,11 +782,11 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   @_versioned
   @inline(__always) // For performance reasons.
   internal mutating func finishWithOriginalCount() -> ContiguousArray<Element> {
-    _sanityCheck(remainingCapacity == result.capacity - result.count,
+    _sanityCheck(remainingCapacity == result.capacity - self.count,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has incorrect count")
     var finalResult = _ContiguousArrayBuffer<Element>()
     (finalResult, result) = (result, finalResult)
     remainingCapacity = 0
-    return ContiguousArray(_buffer: finalResult)
+    return ContiguousArray(_buffer: finalResult, count: self.count)
   }
 }

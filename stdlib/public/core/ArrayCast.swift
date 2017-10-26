@@ -40,11 +40,13 @@ public func _arrayForceCast<SourceElement, TargetElement>(
       if native.storesOnlyElementsOfType(TargetElement.self) {
         // A native buffer that is known to store only elements of the
         // TargetElement can be used directly
-        return Array(_buffer: src.cast(toBufferOf: TargetElement.self))
+        return Array(_buffer: src.cast(toBufferOf: TargetElement.self),
+          count: src.count)
       }
       // Other native buffers must use deferred element type checking
       return Array(_buffer:
-        src.downcast(toBufferWithDeferredTypeCheckOf: TargetElement.self))
+        src.downcast(toBufferWithDeferredTypeCheckOf: TargetElement.self),
+        count: src.count)
     }
     return Array(_immutableCocoaArray: source._buffer._asCocoaArray())
   }

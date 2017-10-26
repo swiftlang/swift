@@ -99,6 +99,7 @@ internal struct _SliceBuffer<Element>
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with insertCount: Int,
+    arrayCount: Int,
     elementsOf newValues: C
   ) where C : Collection, C.Element == Element {
 
@@ -121,6 +122,7 @@ internal struct _SliceBuffer<Element>
     native.replaceSubrange(
       start..<end,
       with: insertCount,
+      arrayCount: arrayCount,
       elementsOf: newValues)
 
     self.endIndex = self.startIndex + oldCount + growth
@@ -164,7 +166,8 @@ internal struct _SliceBuffer<Element>
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal mutating func requestUniqueMutableBackingBuffer(
-    minimumCapacity: Int
+    minimumCapacity: Int,
+    arrayCount: Int
   ) -> NativeBuffer? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer && isUniquelyReferenced()) {
@@ -183,6 +186,7 @@ internal struct _SliceBuffer<Element>
           native.replaceSubrange(
             (myCount+offset)..<backingCount,
             with: 0,
+            arrayCount: arrayCount,
             elementsOf: EmptyCollection())
         }
         _invariantCheck()
@@ -238,22 +242,6 @@ internal struct _SliceBuffer<Element>
   @_versioned
   internal var arrayPropertyIsNativeTypeChecked: Bool {
     return _hasNativeBuffer
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
-  internal var count: Int {
-    get {
-      return endIndex - startIndex
-    }
-    set {
-      let growth = newValue - count
-      if growth != 0 {
-        nativeBuffer.count += growth
-        self.endIndex += growth
-      }
-      _invariantCheck()
-    }
   }
 
   /// Traps unless the given `index` is valid for subscripting, i.e.
@@ -393,7 +381,7 @@ extension _SliceBuffer {
     if _hasNativeBuffer {
       let n = nativeBuffer
       if count == n.count {
-        return ContiguousArray(_buffer: n)
+        return ContiguousArray(_buffer: n, count: count)
       }
     }
 
@@ -402,6 +390,6 @@ extension _SliceBuffer {
       minimumCapacity: 0)
     result.firstElementAddress.initialize(
       from: firstElementAddress, count: count)
-    return ContiguousArray(_buffer: result)
+    return ContiguousArray(_buffer: result, count: count)
   }
 }

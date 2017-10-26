@@ -48,7 +48,7 @@ internal protocol _ArrayBufferProtocol
   ///   may acquire spurious extra references, which will cause
   ///   unnecessary reallocation.
   mutating func requestUniqueMutableBackingBuffer(
-    minimumCapacity: Int
+    minimumCapacity: Int, arrayCount: Int
   ) -> _ContiguousArrayBuffer<Element>?
 
   /// Returns `true` iff this buffer is backed by a uniquely-referenced mutable
@@ -72,6 +72,7 @@ internal protocol _ArrayBufferProtocol
   mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,
+    arrayCount: Int,
     elementsOf newValues: C
   ) where C : Collection, C.Element == Element
 
@@ -92,9 +93,6 @@ internal protocol _ArrayBufferProtocol
   mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R
-
-  /// The number of elements the buffer stores.
-  var count: Int { get set }
 
   /// The number of elements the buffer can store without reallocation.
   var capacity: Int { get }
@@ -137,14 +135,14 @@ extension _ArrayBufferProtocol {
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,
+    arrayCount: Int,
     elementsOf newValues: C
   ) where C : Collection, C.Element == Element {
     _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
-    let oldCount = self.count
+    let oldCount = arrayCount
     let eraseCount = subrange.count
 
     let growth = newCount - eraseCount
-    self.count = oldCount + growth
 
     let elements = self.subscriptBaseAddress
     let oldTailIndex = subrange.upperBound

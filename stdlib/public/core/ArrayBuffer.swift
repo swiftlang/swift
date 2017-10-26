@@ -149,7 +149,8 @@ extension _ArrayBuffer {
   /// Otherwise, returns `nil`.
   @_inlineable
   @_versioned
-  internal mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
+  internal mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int, 
+    arrayCount: Int)
   -> NativeBuffer? {
     if _fastPath(isUniquelyReferenced()) {
       let b = _native
@@ -327,20 +328,6 @@ extension _ArrayBuffer {
   internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
     return _fastPath(_isNative) ? firstElementAddress : nil
   }
-
-  /// The number of elements the buffer stores.
-  @_inlineable
-  @_versioned
-  internal var count: Int {
-    @inline(__always)
-    get {
-      return _fastPath(_isNative) ? _native.count : _nonNative.count
-    }
-    set {
-      _sanityCheck(_isNative, "attempting to update count of Cocoa array")
-      _native.count = newValue
-    }
-  }
   
   /// Traps if an inout violation is detected or if the buffer is
   /// native and the subscript is out of range.
@@ -444,6 +431,7 @@ extension _ArrayBuffer {
         refCopy.replaceSubrange(
           i..<(i + 1),
           with: 1,
+          arrayCount: arrayCount,
           elementsOf: CollectionOfOne(newValue))
       }
     }
