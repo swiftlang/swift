@@ -1243,12 +1243,16 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
     return;
   }
 
-  if (isa<EnumElementDecl>(member))
+  if (isa<EnumElementDecl>(member)) {
     Diag.emplace(diagnose(loc, diag::could_not_use_enum_element_on_instance,
                           memberName));
-  else
+  } else if (isa<DeclRefExpr>(member)) {
+    Diag.emplace(diagnose(loc, diag::could_not_use_type_member_on_instance_without_name,
+                          memberName));
+  } else {
     Diag.emplace(diagnose(loc, diag::could_not_use_type_member_on_instance,
                           baseObjTy, memberName));
+  }
 
   Diag->highlight(nameLoc.getSourceRange());
 
