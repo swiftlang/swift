@@ -1924,10 +1924,6 @@ NOTE(override_unnecessary_IUO_use_strict,none,
 NOTE(override_unnecessary_IUO_silence,none,
      "add parentheses to silence this warning", ())
 
-ERROR(iuo_in_illegal_position,none,
-      "implicitly unwrapped optionals are only allowed at top level and as "
-      "function results", ())
-
 ERROR(override_mutable_covariant_property,none,
       "cannot override mutable property %0 of type %1 with covariant type %2",
       (Identifier, Type, Type))
@@ -3110,6 +3106,16 @@ ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
 ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
+
+WARNING(implicitly_unwrapped_optional_spelling_deprecated,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated", ())
+
+WARNING(implicitly_unwrapped_optional_spelling_deprecated_with_fixit,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name", ())
+
+ERROR(iuo_in_illegal_position,none,
+      "implicitly unwrapped optionals are only allowed at top level and as "
+      "function results", ())
 
 // Ownership
 ERROR(invalid_ownership_type,none,

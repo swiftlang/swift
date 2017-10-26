@@ -457,7 +457,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   // Check the parameter patterns.
   for (auto params : func->getParameterLists()) {
     // Check the pattern.
-    if (tc.typeCheckParameterList(params, func, TypeResolutionOptions(),
+    if (tc.typeCheckParameterList(params, func, TR_AllowIUO,
                                   resolver))
       badType = true;
 
@@ -472,7 +472,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     if (!fn->getBodyResultTypeLoc().isNull()) {
       // Check the result type of the function.
-      TypeResolutionOptions options;
+      TypeResolutionOptions options = TR_AllowIUO;
       if (fn->hasDynamicSelf())
         options |= TR_DynamicSelfResult;
 
@@ -949,8 +949,12 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
   // Check the indices.
   auto params = subscript->getIndices();
 
+  TypeResolutionOptions options;
+  options |= TR_SubscriptParameters;
+  options |= TR_AllowIUO;
+
   badType |= tc.typeCheckParameterList(params, subscript,
-                                       TR_SubscriptParameters,
+                                       options,
                                        resolver);
 
   // Infer requirements from the pattern.
