@@ -108,7 +108,9 @@ protected:
   bool handleTailAddr(int TailIdx, SILInstruction *I,
                       llvm::SmallVectorImpl<StoreInst *> &TailStores);
 
-  void optimizeObjectAllocation(AllocRefInst *ARI);
+  void
+  optimizeObjectAllocation(AllocRefInst *ARI,
+                           llvm::SmallVector<SILInstruction *, 4> &toRemove);
   void replaceFindStringCall(ApplyInst *FindStringCall);
 
   SILGlobalVariable *getVariableOfGlobalInit(SILFunction *AddrF);
@@ -1218,7 +1220,8 @@ public:
 ///     func getarray() -> [Int] {
 ///       return [1, 2, 3]
 ///     }
-void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
+void SILGlobalOpt::optimizeObjectAllocation(
+    AllocRefInst *ARI, llvm::SmallVector<SILInstruction *, 4> &toRemove) {
 
   if (ARI->isObjC())
     return;
@@ -1296,14 +1299,14 @@ void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
     assert(MemberStore);
     ObjectArgs.push_back(Cloner.clone(
                            cast<SingleValueInstruction>(MemberStore->getSrc())));
-    MemberStore->eraseFromParent();
+    toRemove.push_back(MemberStore);
   }
   // Create the initializers for the tail elements.
   unsigned NumBaseElements = ObjectArgs.size();
   for (StoreInst *TailStore : TailStores) {
     ObjectArgs.push_back(Cloner.clone(
                            cast<SingleValueInstruction>(TailStore->getSrc())));
-    TailStore->eraseFromParent();
+    toRemove.push_back(TailStore);
   }
   // Create the initializer for the object itself.
   SILBuilder StaticInitBuilder(Glob);
@@ -1314,12 +1317,13 @@ void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
   SILBuilder B(ARI);
   GlobalValueInst *GVI = B.createGlobalValue(ARI->getLoc(), Glob);
   B.createStrongRetain(ARI->getLoc(), GVI, B.getDefaultAtomicity());
-  while (!ARI->use_empty()) {
-    Operand *Use = *ARI->use_begin();
+  llvm::SmallVector<Operand *, 8> Worklist(ARI->use_begin(), ARI->use_end());
+  while (!Worklist.empty()) {
+    auto *Use = Worklist.pop_back_val();
     SILInstruction *User = Use->getUser();
     switch (User->getKind()) {
       case SILInstructionKind::DeallocRefInst:
-        User->eraseFromParent();
+        toRemove.push_back(User);
         break;
       default:
         Use->set(GVI);
@@ -1332,8 +1336,7 @@ void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
     replaceFindStringCall(FindStringCall);
   }
 
-  ARI->eraseFromParent();
-
+  toRemove.push_back(ARI);
   HasChanged = true;
 }
 
@@ -1456,6 +1459,7 @@ bool SILGlobalOpt::run() {
     for (auto &BB : F) {
       bool IsCold = ColdBlocks.isCold(&BB);
       auto Iter = BB.begin();
+      llvm::SmallVector<SILInstruction *, 4> toRemove;
       while (Iter != BB.end()) {
         SILInstruction *I = &*Iter;
         Iter++;
@@ -1473,10 +1477,12 @@ bool SILGlobalOpt::run() {
             // for serializable functions.
             // TODO: We may do the optimization _after_ serialization in the
             // pass pipeline.
-            optimizeObjectAllocation(ARI);
+            optimizeObjectAllocation(ARI, toRemove);
           }
         }
       }
+      for (auto *I : toRemove)
+        I->eraseFromParent();
     }
   }
 
