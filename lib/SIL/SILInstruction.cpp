@@ -255,6 +255,27 @@ void SILInstruction::replaceAllUsesPairwiseWith(SILInstruction *other) {
   }
 }
 
+void SILInstruction::replaceAllUsesPairwiseWith(
+    const llvm::SmallVectorImpl<SILValue> &NewValues) {
+  auto Results = getResults();
+
+  // If we don't have any results, fast-path out without asking the other
+  // instruction for its results.
+  if (Results.empty()) {
+    assert(NewValues.empty());
+    return;
+  }
+
+  // Replace values with the corresponding values of the list. Make sure they
+  // are all the same type.
+  assert(Results.size() == NewValues.size());
+  for (unsigned i : indices(Results)) {
+    assert(Results[i]->getType() == NewValues[i]->getType() &&
+           "Can only replace results with new values of the same type");
+    Results[i]->replaceAllUsesWith(NewValues[i]);
+  }
+}
+
 namespace {
 class InstructionDestroyer
     : public SILInstructionVisitor<InstructionDestroyer> {
