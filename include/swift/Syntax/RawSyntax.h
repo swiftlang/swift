@@ -240,42 +240,24 @@ struct RawSyntax : public llvm::ThreadSafeRefCountedBase<RawSyntax> {
   }
 
   /// Returns true if this raw syntax node is some kind of declaration.
-  bool isDecl() const {
-    return Kind >= SyntaxKind::First_Decl && Kind <= SyntaxKind::Last_Decl;
-  }
+  bool isDecl() const { return isDeclKind(Kind); }
 
   /// Returns true if this raw syntax node is some kind of type syntax.
-  bool isType() const {
-    return Kind >= SyntaxKind::First_Type && Kind <= SyntaxKind::Last_Type;
-  }
+  bool isType() const { return isTypeKind(Kind); }
 
   /// Returns true if this raw syntax node is some kind of statement.
-  bool isStmt() const {
-    return Kind >= SyntaxKind::First_Stmt && Kind <= SyntaxKind::Last_Stmt;
-  }
+  bool isStmt() const { return isStmtKind(Kind); }
 
   /// Returns true if this raw syntax node is some kind of expression.
-  bool isExpr() const {
-    return Kind >= SyntaxKind::First_Expr && Kind <= SyntaxKind::Last_Expr;
-  }
+  bool isExpr() const { return isExprKind(Kind); }
 
   /// Returns true if this raw syntax node is some kind of pattern.
-  bool isPattern() const {
-    return Kind >= SyntaxKind::First_Pattern &&
-           Kind <= SyntaxKind::Last_Pattern;
-  }
+  bool isPattern() const { return isPatternKind(Kind); }
 
   /// Return true if this raw syntax node is a token.
-  bool isToken() const {
-    return Kind == SyntaxKind::Token;
-  }
+  bool isToken() const { return isTokenKind(Kind); }
 
-  bool isUnknown() const {
-    return Kind == SyntaxKind::Unknown ||
-           Kind == SyntaxKind::UnknownDecl ||
-           Kind == SyntaxKind::UnknownExpr ||
-           Kind == SyntaxKind::UnknownStmt;
-  }
+  bool isUnknown() const { return isUnknownKind(Kind); }
 
   /// Get the absolute position of this raw syntax: its offset, line,
   /// and column.
