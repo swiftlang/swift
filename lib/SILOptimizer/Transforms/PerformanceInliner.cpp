@@ -256,7 +256,8 @@ bool SILPerformanceInliner::isProfitableToInline(
         return false;
     }
 
-    BaseBenefit = BaseBenefit / 2;
+    const uint64_t CallerBaseBenefitReductionFactor = AI.getFunction()->getModule().getOptions().CallerBaseBenefitReductionFactor;
+    BaseBenefit = BaseBenefit / CallerBaseBenefitReductionFactor;
   }
 
   // It is always OK to inline a simple call.

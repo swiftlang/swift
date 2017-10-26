@@ -1139,11 +1139,6 @@ public:
   void run() override {
     auto *F = getFunction();
 
-    // Don't run function signature optimizations at -Os.
-    if (F->getModule().getOptions().Optimization ==
-        SILOptions::SILOptMode::OptimizeForSize)
-      return;
-
     // Don't optimize callees that should not be optimized.
     if (!F->shouldOptimize())
       return;

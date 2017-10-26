@@ -160,7 +160,7 @@ void addSimplifyCFGSILCombinePasses(SILPassPipelinePlan &P) {
 }
 
 /// Perform semantic annotation/loop base optimizations.
-void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
+void addHighLevelLoopOptPasses(SILPassPipelinePlan &P, const SILOptions &Options) {
   // Perform classic SSA optimizations for cleanup.
   P.addLowerAggregateInstrs();
   P.addSILCombine();
@@ -184,7 +184,9 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addArrayCountPropagation();
   // To simplify induction variable.
   P.addSILCombine();
-  P.addLoopUnroll();
+  if (Options.Optimization != SILOptions::SILOptMode::OptimizeForSize) {
+    P.addLoopUnroll();
+  }
   P.addSimplifyCFG();
   P.addPerformanceConstantPropagation();
   P.addSimplifyCFG();
@@ -197,7 +199,9 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addCOWArrayOpts();
   // Cleanup.
   P.addDCE();
-  P.addSwiftArrayOpts();
+  if (Options.Optimization != SILOptions::SILOptMode::OptimizeForSize){
+    P.addSwiftArrayOpts();
+  }
 }
 
 // Perform classic SSA optimizations.
@@ -312,7 +316,7 @@ static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
   P.addSILLinker();
 }
 
-static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
+static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P, const SILOptions &Options) {
   P.startPipeline("EarlyModulePasses");
 
   // Get rid of apparently dead functions as soon as possible so that
@@ -325,15 +329,17 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addTempRValueOpt();
 
   // Add the outliner pass (Osize).
-  P.addOutliner();
+  if (Options.Optimization == SILOptions::SILOptMode::OptimizeForSize) {
+    P.addOutliner();
+  }
 }
 
-static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
+static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P, const SILOptions &Options) {
   P.startPipeline("HighLevel+EarlyLoopOpt");
   // FIXME: update this to be a function pass.
   P.addEagerSpecializer();
   addSSAPasses(P, OptimizationLevelKind::HighLevel);
-  addHighLevelLoopOptPasses(P);
+  addHighLevelLoopOptPasses(P, Options);
 }
 
 static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
@@ -347,7 +353,7 @@ static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
   P.addStackPromotion();
 }
 
-static void addMidLevelPassPipeline(SILPassPipelinePlan &P) {
+static void addMidLevelPassPipeline(SILPassPipelinePlan &P, const SILOptions &Options) {
   P.startPipeline("MidLevel");
   addSSAPasses(P, OptimizationLevelKind::MidLevel);
 
@@ -357,10 +363,12 @@ static void addMidLevelPassPipeline(SILPassPipelinePlan &P) {
 
   // Run loop unrolling after inlining and constant propagation, because loop
   // trip counts may have became constant.
-  P.addLoopUnroll();
+  if (Options.Optimization != SILOptions::SILOptMode::OptimizeForSize) {
+    P.addLoopUnroll();
+  }
 }
 
-static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
+static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P, const SILOptions &Options) {
   P.startPipeline("ClosureSpecialize");
   P.addDeadFunctionElimination();
   P.addDeadObjectElimination();
@@ -385,7 +393,9 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.addStackPromotion();
 
   // Speculate virtual call targets.
-  P.addSpeculativeDevirtualization();
+  if (Options.Optimization != SILOptions::SILOptMode::OptimizeForSize) {
+    P.addSpeculativeDevirtualization();
+  }
 
   // There should be at least one SILCombine+SimplifyCFG between the
   // ClosureSpecializer, etc. and the last inliner. Cleaning up after these
@@ -397,7 +407,7 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // optimizer after this.
 }
 
-static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
+static void addLowLevelPassPipeline(SILPassPipelinePlan &P, const SILOptions &Options) {
   P.startPipeline("LowLevel");
 
   // Should be after FunctionSignatureOpts and before the last inliner.
@@ -407,7 +417,9 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.addDeadStoreElimination();
 
   // We've done a lot of optimizations on this function, attempt to FSO.
-  P.addFunctionSignatureOpts();
+  if (Options.Optimization != SILOptions::SILOptMode::OptimizeForSize) {
+    P.addFunctionSignatureOpts();
+  }
 }
 
 static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
@@ -494,22 +506,22 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
 
   // Eliminate immediately dead functions and then clone functions from the
   // stdlib.
-  addPerfEarlyModulePassPipeline(P);
+  addPerfEarlyModulePassPipeline(P, Options);
 
   // Then run an iteration of the high-level SSA passes.
-  addHighLevelEarlyLoopOptPipeline(P);
+  addHighLevelEarlyLoopOptPipeline(P, Options);
   addMidModulePassesStackPromotePassPipeline(P);
 
   // Run an iteration of the mid-level SSA passes.
-  addMidLevelPassPipeline(P);
+  addMidLevelPassPipeline(P, Options);
 
   // Perform optimizations that specialize.
-  addClosureSpecializePassPipeline(P);
+  addClosureSpecializePassPipeline(P, Options);
 
   // Run another iteration of the SSA optimizations to optimize the
   // devirtualized inline caches and constants propagated into closures
   // (CapturePropagation).
-  addLowLevelPassPipeline(P);
+  addLowLevelPassPipeline(P, Options);
 
   addLateLoopOptPassPipeline(P);
 

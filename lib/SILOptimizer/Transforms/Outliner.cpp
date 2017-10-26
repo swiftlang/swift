@@ -1279,11 +1279,6 @@ public:
   void run() override {
     auto *Fun = getFunction();
 
-    // Only outline if we optimize for size.
-    if (Fun->getModule().getOptions().Optimization !=
-        SILOptions::SILOptMode::OptimizeForSize)
-      return;
-
     // Dump function if requested.
     if (DumpFuncsBeforeOutliner.size() &&
         Fun->getName().find(DumpFuncsBeforeOutliner, 0) != StringRef::npos) {

@@ -845,7 +845,7 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs) {
     Attrs.addAttribute("target-features", allFeatures);
   }
   if (IRGen.Opts.OptimizeForSize)
-    Attrs.addAttribute(llvm::Attribute::OptimizeForSize);
+    Attrs.addAttribute(llvm::Attribute::MinSize);
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {

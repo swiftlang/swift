@@ -32,6 +32,12 @@ public:
   /// Controls the aggressiveness of the performance inliner.
   int InlineThreshold = -1;
 
+  /// Controls the aggressiveness of the performance inliner for Osize
+  int CallerBaseBenefitReductionFactor = 2;
+
+  /// Controls the aggressiveness of the loop unroller 
+  int UnrollThreshold = 250;
+
   /// The number of threads for multi-threaded code generation.
   int NumThreads = 0;
   
