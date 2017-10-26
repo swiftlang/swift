@@ -22,6 +22,9 @@ CHANGELOG
 Swift 4.1
 ---------
 
+* [SE-0161][] is fully implemented. KeyPaths now support subscript, optional
+  chaining, and optional force-unwrapping components.
+
 * [SE-0186][]
 
   It is no longer valid to use the ownership keywords `weak` and `unowned` for property declarations in protocols. These keywords are meaningless and misleading when used in a protocol as they don't have any effect.
