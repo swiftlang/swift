@@ -941,13 +941,16 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
         break;
       }
 
-      // If the coercion type is a struct, we need to expand it.
-      auto type = AI.getCoerceToType();
-      if (auto expandedType = dyn_cast<llvm::StructType>(type)) {
-        for (size_t j = 0, e = expandedType->getNumElements(); j != e; ++j)
-          ParamIRTypes.push_back(expandedType->getElementType(j));
+      // If the coercion type is a struct which can be flattened, we need to
+      // expand it.
+      auto *coercedTy = AI.getCoerceToType();
+      if (AI.isDirect() && AI.getCanBeFlattened() &&
+          isa<llvm::StructType>(coercedTy)) {
+        const auto *ST = cast<llvm::StructType>(coercedTy);
+        for (unsigned EI : range(ST->getNumElements()))
+          ParamIRTypes.push_back(ST->getElementType(EI));
       } else {
-        ParamIRTypes.push_back(type);
+        ParamIRTypes.push_back(coercedTy);
       }
       break;
     }
@@ -1688,18 +1691,24 @@ static void emitCoerceAndExpand(IRGenFunction &IGF,
 }
 
 static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
-                                       llvm::Type *toTy, Explosion &in,
-                                       Explosion &out) {
+                                       const clang::CodeGen::ABIArgInfo &AI,
+                                       Explosion &in, Explosion &out) {
+  bool IsDirectFlattened = AI.isDirect() && AI.getCanBeFlattened();
+  bool IsIndirect = !AI.isDirect();
+
   // If we're supposed to pass directly as a struct type, that
   // really means expanding out as multiple arguments.
-  ArrayRef<llvm::Type *> expandedTys = expandScalarOrStructTypeToArray(toTy);
+  llvm::Type *coercedTy = AI.getCoerceToType();
+  ArrayRef<llvm::Type *> expandedTys =
+      expandScalarOrStructTypeToArray(coercedTy);
 
   auto &argTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(argType));
   auto inputSchema = argTI.getSchema();
 
   // Check to see if we can pairwise coerce Swift's exploded scalars
   // to Clang's expanded elements.
-  if (canCoerceToSchema(IGF.IGM, expandedTys, inputSchema)) {
+  if ((IsDirectFlattened || IsIndirect) &&
+      canCoerceToSchema(IGF.IGM, expandedTys, inputSchema)) {
     for (auto outputTy : expandedTys) {
       llvm::Value *arg = in.claimNext();
       if (arg->getType() != outputTy)
@@ -1713,7 +1722,7 @@ static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
   Address temporary;
   Size tempSize;
   std::tie(temporary, tempSize) =
-      allocateForCoercion(IGF, argTI.getStorageType(), toTy, "coerced-arg");
+      allocateForCoercion(IGF, argTI.getStorageType(), coercedTy, "coerced-arg");
   IGF.Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Store to a temporary.
@@ -1723,19 +1732,19 @@ static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
 
   // Bitcast the temporary to the expected type.
   Address coercedAddr =
-    IGF.Builder.CreateBitCast(temporary, toTy->getPointerTo());
+      IGF.Builder.CreateBitCast(temporary, coercedTy->getPointerTo());
 
-  // Project out individual elements if necessary.
-  if (auto expansionTy = dyn_cast<llvm::StructType>(toTy)) {
-    auto layout = IGF.IGM.DataLayout.getStructLayout(expansionTy);
-    for (unsigned i = 0, e = expansionTy->getNumElements(); i != e; ++i) {
-      auto fieldOffset = Size(layout->getElementOffset(i));
-      auto fieldAddr = IGF.Builder.CreateStructGEP(coercedAddr, i, fieldOffset);
-      out.add(IGF.Builder.CreateLoad(fieldAddr));
+  if (IsDirectFlattened && isa<llvm::StructType>(coercedTy)) {
+    // Project out individual elements if necessary.
+    auto *ST = cast<llvm::StructType>(coercedTy);
+    const auto *layout = IGF.IGM.DataLayout.getStructLayout(ST);
+    for (unsigned EI : range(ST->getNumElements())) {
+      auto offset = Size(layout->getElementOffset(EI));
+      auto address = IGF.Builder.CreateStructGEP(coercedAddr, EI, offset);
+      out.add(IGF.Builder.CreateLoad(address));
     }
-
-  // Otherwise, collect the single scalar.
   } else {
+    // Otherwise, collect the single scalar.
     out.add(IGF.Builder.CreateLoad(coercedAddr));
   }
 
@@ -1883,7 +1892,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
         break;
       }
 
-      emitDirectExternalArgument(IGF, paramType, toTy, in, out);
+      emitDirectExternalArgument(IGF, paramType, AI, in, out);
       break;
     }
     case clang::CodeGen::ABIArgInfo::Indirect: {
@@ -1963,24 +1972,24 @@ bool irgen::addNativeArgument(IRGenFunction &IGF, Explosion &in,
 }
 
 /// Emit a direct parameter that was passed under a C-based CC.
-static void emitDirectForeignParameter(IRGenFunction &IGF,
-                                       Explosion &in,
-                                       llvm::Type *coercionTy,
-                                       Explosion &out,
-                                       SILType paramType,
+static void emitDirectForeignParameter(IRGenFunction &IGF, Explosion &in,
+                                       const clang::CodeGen::ABIArgInfo &AI,
+                                       Explosion &out, SILType paramType,
                                        const LoadableTypeInfo &paramTI) {
   // The ABI IR types for the entrypoint might differ from the
   // Swift IR types for the body of the function.
 
-  ArrayRef<llvm::Type*> expandedTys;
-  if (auto expansionTy = dyn_cast<llvm::StructType>(coercionTy)) {
-    expandedTys = makeArrayRef(expansionTy->element_begin(),
-                               expansionTy->getNumElements());
+  llvm::Type *coercionTy = AI.getCoerceToType();
 
-  // Fast-path a really common case.  This check assumes that either
-  // the storage type of a type is an llvm::StructType or it has a
-  // single-element explosion.
+  ArrayRef<llvm::Type*> expandedTys;
+  if (AI.isDirect() && AI.getCanBeFlattened() &&
+      isa<llvm::StructType>(coercionTy)) {
+    const auto *ST = cast<llvm::StructType>(coercionTy);
+    expandedTys = makeArrayRef(ST->element_begin(), ST->getNumElements());
   } else if (coercionTy == paramTI.getStorageType()) {
+    // Fast-path a really common case.  This check assumes that either
+    // the storage type of a type is an llvm::StructType or it has a
+    // single-element explosion.
     out.add(in.claimNext());
     return;
   } else {
@@ -2063,11 +2072,10 @@ void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,
 
   switch (AI.getKind()) {
   case clang::CodeGen::ABIArgInfo::Extend:
-  case clang::CodeGen::ABIArgInfo::Direct: {
-    emitDirectForeignParameter(IGF, params, AI.getCoerceToType(),
-                               paramExplosion, paramTy, paramTI);
+  case clang::CodeGen::ABIArgInfo::Direct:
+    emitDirectForeignParameter(IGF, params, AI, paramExplosion, paramTy,
+                               paramTI);
     return;
-  }
   case clang::CodeGen::ABIArgInfo::Indirect: {
     Address address = paramTI.getAddressForPointer(params.claimNext());
     paramTI.loadAsTake(IGF, address, paramExplosion);
