@@ -3307,8 +3307,8 @@ ClangImporter::Implementation::loadNamedMembers(
   clang::ASTContext &clangCtx = getClangASTContext();
 
   TinyPtrVector<ValueDecl *> Members;
-  if (auto *CPD = dyn_cast<clang::ObjCProtocolDecl>(CD)) {
-    for (auto entry : table->lookup(SerializedSwiftName(N.getBaseName()), CPD)) {
+  if (auto *CCD = dyn_cast<clang::ObjCContainerDecl>(CD)) {
+    for (auto entry : table->lookup(SerializedSwiftName(N.getBaseName()), CCD)) {
       if (!entry.is<clang::NamedDecl *>()) continue;
       auto member = entry.get<clang::NamedDecl *>();
       if (!isVisibleClangEntry(clangCtx, member)) continue;
