@@ -3113,6 +3113,12 @@ WARNING(implicitly_unwrapped_optional_spelling_deprecated,none,
 WARNING(implicitly_unwrapped_optional_spelling_deprecated_with_fixit,none,
         "the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name", ())
 
+ERROR(implicitly_unwrapped_optional_spelling_error,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' in unsupported; use an explicit type followed by '!'", ())
+
+ERROR(implicitly_unwrapped_optional_spelling_error_with_fixit,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use '!' after the type name", ())
+
 ERROR(iuo_in_illegal_position,none,
       "implicitly unwrapped optionals are only allowed at top level and as "
       "function results", ())
