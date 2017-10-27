@@ -729,30 +729,30 @@ private:
   /// class of the given potential archetype.
   void checkConcreteTypeConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
-                            PotentialArchetype *pa);
+                            EquivalenceClass *equivClass);
 
   /// Check the superclass constraints within the equivalence
   /// class of the given potential archetype.
   void checkSuperclassConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
-                            PotentialArchetype *pa);
+                            EquivalenceClass *equivClass);
 
   /// Check conformance constraints within the equivalence class of the
   /// given potential archetype.
   void checkConformanceConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
-                            PotentialArchetype *pa);
+                            EquivalenceClass *equivClass);
 
   /// Check layout constraints within the equivalence class of the given
   /// potential archetype.
   void checkLayoutConstraints(ArrayRef<GenericTypeParamType *> genericParams,
-                              PotentialArchetype *pa);
+                              EquivalenceClass *equivClass);
 
   /// Check same-type constraints within the equivalence class of the
   /// given potential archetype.
   void checkSameTypeConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
-                            PotentialArchetype *pa);
+                            EquivalenceClass *equivClass);
 
   /// Realize a potential archetype for the given type.
   ///

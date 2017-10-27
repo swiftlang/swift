@@ -4830,8 +4830,6 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   // Check for recursive or conflicting same-type bindings and superclass
   // constraints.
   for (auto &equivClass : Impl->EquivalenceClasses) {
-    auto archetype = equivClass.members.front()->getRepresentative();
-
     if (equivClass.concreteType) {
       // Check for recursive same-type bindings.
       if (isRecursiveConcreteType(&equivClass, /*isSuperclass=*/false)) {
@@ -4841,13 +4839,13 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
           Diags.diagnose(constraint->source->getLoc(),
                          diag::recursive_same_type_constraint,
-                         archetype->getDependentType(genericParams),
+                         constraint->getSubjectDependentType(genericParams),
                          constraint->value);
         }
 
         equivClass.recursiveConcreteType = true;
       } else {
-        checkConcreteTypeConstraints(genericParams, archetype);
+        checkConcreteTypeConstraints(genericParams, &equivClass);
       }
     }
 
@@ -4865,12 +4863,12 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
         equivClass.recursiveSuperclassType = true;
       } else {
-        checkSuperclassConstraints(genericParams, archetype);
+        checkSuperclassConstraints(genericParams, &equivClass);
       }
     }
 
-    checkConformanceConstraints(genericParams, archetype);
-    checkLayoutConstraints(genericParams, archetype);
+    checkConformanceConstraints(genericParams, &equivClass);
+    checkLayoutConstraints(genericParams, &equivClass);
   };
 
   // FIXME: Expand all conformance requirements. This is expensive :(
@@ -4879,10 +4877,9 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   }
 
   // Check same-type constraints.
-  for (const auto &equivClass : Impl->EquivalenceClasses) {
-    checkSameTypeConstraints(genericParams,
-                             equivClass.members[0]->getRepresentative());
-  };
+  for (auto &equivClass : Impl->EquivalenceClasses) {
+    checkSameTypeConstraints(genericParams, &equivClass);
+  }
 
   // Check for generic parameters which have been made concrete or equated
   // with each other.
@@ -5323,11 +5320,7 @@ static bool isRedundantlyInheritableObjCProtocol(
 
 void GenericSignatureBuilder::checkConformanceConstraints(
                           ArrayRef<GenericTypeParamType *> genericParams,
-                          PotentialArchetype *pa) {
-  auto equivClass = pa->getEquivalenceClassIfPresent();
-  if (!equivClass || equivClass->conformsTo.empty())
-    return;
-
+                          EquivalenceClass *equivClass) {
   for (auto &entry : equivClass->conformsTo) {
     // Remove self-derived constraints.
     assert(!entry.second.empty() && "No constraints to work with?");
@@ -5855,9 +5848,8 @@ static void collapseSameTypeComponents(
 
 void GenericSignatureBuilder::checkSameTypeConstraints(
                           ArrayRef<GenericTypeParamType *> genericParams,
-                          PotentialArchetype *pa) {
-  auto equivClass = pa->getEquivalenceClassIfPresent();
-  if (!equivClass || !equivClass->derivedSameTypeComponents.empty())
+                          EquivalenceClass *equivClass) {
+  if (!equivClass->derivedSameTypeComponents.empty())
     return;
 
   bool anyDerivedViaConcrete = false;
@@ -6059,10 +6051,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 
 void GenericSignatureBuilder::checkConcreteTypeConstraints(
                                  ArrayRef<GenericTypeParamType *> genericParams,
-                                 PotentialArchetype *representative) {
-  auto equivClass = representative->getOrCreateEquivalenceClass(*this);
-  assert(equivClass->concreteType && "No concrete type to check");
-
+                                 EquivalenceClass *equivClass) {
   checkConstraintList<Type>(
     genericParams, equivClass->concreteTypeConstraints,
     [&](const ConcreteConstraint &constraint) {
@@ -6096,8 +6085,7 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
 
 void GenericSignatureBuilder::checkSuperclassConstraints(
                                  ArrayRef<GenericTypeParamType *> genericParams,
-                                 PotentialArchetype *representative) {
-  auto equivClass = representative->getOrCreateEquivalenceClass(*this);
+                                 EquivalenceClass *equivClass) {
   assert(equivClass->superclass && "No superclass constraint?");
 
   // FIXME: We should be substituting in the canonical type in context so
@@ -6185,9 +6173,8 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
 
 void GenericSignatureBuilder::checkLayoutConstraints(
                                 ArrayRef<GenericTypeParamType *> genericParams,
-                                PotentialArchetype *pa) {
-  auto equivClass = pa->getEquivalenceClassIfPresent();
-  if (!equivClass || !equivClass->layout) return;
+                                EquivalenceClass *equivClass) {
+  if (!equivClass->layout) return;
 
   checkConstraintList<LayoutConstraint>(
     genericParams, equivClass->layoutConstraints,
@@ -6238,8 +6225,7 @@ void GenericSignatureBuilder::enumerateRequirements(
   SmallVector<PotentialArchetype *, 8> archetypes;
   for (auto &equivClass : Impl->EquivalenceClasses) {
     if (equivClass.derivedSameTypeComponents.empty()) {
-      checkSameTypeConstraints(getGenericParams(),
-                               equivClass.members.front()->getRepresentative());
+      checkSameTypeConstraints(getGenericParams(), &equivClass);
     }
 
     for (auto &component : equivClass.derivedSameTypeComponents) {
