@@ -435,37 +435,33 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   auto languageVersion = ctx.LangOpts.EffectiveLanguageVersion;
 
-  if (llvm::sys::path::extension(importerOpts.BridgingHeader).endswith(
-        PCH_EXTENSION)) {
-    invocationArgStrs.insert(
-      invocationArgStrs.end(),
-        { "-include-pch", importerOpts.BridgingHeader }
-    );
+  if (llvm::sys::path::extension(importerOpts.BridgingHeader)
+          .endswith(PCH_EXTENSION)) {
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+        "-include-pch", importerOpts.BridgingHeader
+    });
   }
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
-  invocationArgStrs.insert(
-      invocationArgStrs.end(),
-      {
+  invocationArgStrs.insert(invocationArgStrs.end(), {
+      // Enable modules
+      "-fmodules",
+      "-Werror=non-modular-include-in-framework-module",
+      "-Xclang", "-fmodule-feature", "-Xclang", "swift",
 
-          // Enable modules
-          "-fmodules",
-          "-Werror=non-modular-include-in-framework-module",
-          "-Xclang", "-fmodule-feature", "-Xclang", "swift",
+      // Don't emit LLVM IR.
+      "-fsyntax-only",
 
-          // Don't emit LLVM IR.
-          "-fsyntax-only",
+      // Enable block support.
+      "-fblocks",
 
-          // Enable block support.
-          "-fblocks",
+      languageVersion.preprocessorDefinition("__swift__", {10000, 100, 1}),
 
-          languageVersion.preprocessorDefinition("__swift__", {10000, 100, 1}),
+      "-fretain-comments-from-system-headers",
 
-          "-fretain-comments-from-system-headers",
-
-          SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
-      });
+      SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
+  });
 
   // Set C language options.
   if (triple.isOSDarwin()) {
