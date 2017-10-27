@@ -99,7 +99,7 @@ ERROR(could_not_use_type_member_on_instance,none,
       "static member %1 cannot be used on instance of type %0",
       (Type, DeclName))
 ERROR(could_not_use_type_member_on_instance_without_name,none,
-      "static element %0 cannot be referenced as an instance member",
+      "static member %0 cannot be referenced as an instance member",
       (DeclName))
 ERROR(could_not_use_enum_element_on_instance,none,
       "enum element %0 cannot be referenced as an instance member",
