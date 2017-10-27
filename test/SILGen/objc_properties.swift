@@ -248,3 +248,11 @@ class HasLazyProperty : NSObject, HasProperty {
 // CHECK-LABEL: sil hidden @_T015objc_properties15HasLazyPropertyC6windowSo8NSObjectCSgvg : $@convention(method) (@guaranteed HasLazyProperty) -> @owned Optional<NSObject> {
 // CHECK: class_method %0 : $HasLazyProperty, #HasLazyProperty.instanceMethod!1 : (HasLazyProperty) -> () -> NSObject?
 // CHECK: return
+
+//   The way we import this setter splits the name into the parameter list,
+//   which can cause fits for SILGenApply the way it's currently implemented.
+// CHECK-LABEL: sil hidden @_T015objc_properties26testPropSetWithPreposition
+func testPropSetWithPreposition(object: ObjectWithSplitProperty?) {
+  // CHECK: #ObjectWithSplitProperty.flagForSomething!setter.1.foreign : (ObjectWithSplitProperty) -> (Bool) -> (), $@convention(objc_method) (ObjCBool, ObjectWithSplitProperty) -> ()
+  object?.flagForSomething = false
+}
