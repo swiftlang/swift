@@ -1,5 +1,3 @@
-// RUN: true
-
 import CoreGraphics
 
 // Case 1 - witness is imported accessor

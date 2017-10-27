@@ -6711,6 +6711,13 @@ public:
             !baseASD->isSetterAccessibleFrom(overridingASD->getDeclContext()))
           return;
 
+        // A materializeForSet for an override of storage with a
+        // forced static dispatch materializeForSet is not itself an
+        // override.
+        if (kind == AccessorKind::IsMaterializeForSet &&
+            baseAccessor->hasForcedStaticDispatch())
+          return;
+
         // FIXME: Egregious hack to set an 'override' attribute.
         if (!overridingAccessor->getAttrs().hasAttribute<OverrideAttr>()) {
           auto loc = overridingASD->getOverrideLoc();

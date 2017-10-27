@@ -1,5 +1,3 @@
-// RUN: true
-
 #if _runtime(_ObjC)
 import Foundation
 #endif

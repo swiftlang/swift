@@ -1,5 +1,3 @@
-// RUN: true
-
 import CoreGraphics
 
 public protocol OtherPoint {
