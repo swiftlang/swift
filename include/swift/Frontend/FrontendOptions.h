@@ -438,7 +438,7 @@ public:
   };
 
   /// Compare the symbols in the IR against the TBD file we would generate.
-  TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::None;
+  TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::MissingFromTBD;
 
   /// The install_name to use in the TBD file.
   std::string TBDInstallName;

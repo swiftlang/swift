@@ -194,6 +194,11 @@ ERROR(symbol_in_ir_not_in_tbd,none,
       "symbol '%0' (%1) is in generated IR file, but not in TBD file",
       (StringRef, StringRef))
 
+NOTE(pass_validate_tbd_against_ir_none,none,
+     "please file a bug including this code as a test case, and consider adding "
+     "'-Xfrontend -validate-tbd-against-ir=none' to the Swift compiler options to "
+     "silence this error", ())
+
 ERROR(invalid_conditional_compilation_flag,none,
       "conditional compilation flags must be valid Swift identifiers (rather than '%0')",
       (StringRef))
