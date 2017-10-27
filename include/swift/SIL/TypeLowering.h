@@ -531,9 +531,9 @@ class TypeConverter {
 
   llvm::SmallVector<DependentTypeState, 1> DependentTypes;
 
-  llvm::DenseMap<SILDeclRef, SILConstantInfo> ConstantTypes;
+  llvm::DenseMap<SILDeclRef, SILConstantInfo *> ConstantTypes;
   
-  llvm::DenseMap<OverrideKey, SILConstantInfo> ConstantOverrideTypes;
+  llvm::DenseMap<OverrideKey, SILConstantInfo *> ConstantOverrideTypes;
 
   llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
 
