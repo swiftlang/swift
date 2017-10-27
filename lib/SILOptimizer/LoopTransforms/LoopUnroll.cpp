@@ -29,7 +29,6 @@ using namespace swift::PatternMatch;
 using llvm::DenseMap;
 using llvm::MapVector;
 
-static const uint64_t SILLoopUnrollThreshold = 250;
 
 namespace {
 
@@ -187,6 +186,9 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
   // It is used to estimate the cost of the callee
   // inside a loop.
   const uint64_t InsnsPerBB = 4;
+  // Use command-line threshold for unrolling.
+  const uint64_t SILLoopUnrollThreshold = Loop->getBlocks().empty() ? 0 : 
+    (Loop->getBlocks())[0]->getParent()->getModule().getOptions().UnrollThreshold;
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
       if (!Loop->canDuplicate(&Inst))
