@@ -623,7 +623,14 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   // FIXME: If we reach this point, the program we're being handed is likely
   // very broken, but it's still conceivable that this may happen due to
   // invalid shadowed declarations.
-  // llvm_unreachable("Can't represent lookup result");
+  //
+  // Make sure we emit a diagnostic, since returning an ErrorExpr without
+  // producing one will break things downstream.
+  diagnose(Loc, diag::ambiguous_decl_ref, Name);
+  for (auto Result : Lookup) {
+    auto *Decl = Result.Decl;
+    diagnose(Decl, diag::decl_declared_here, Decl->getFullName());
+  }
   return new (Context) ErrorExpr(UDRE->getSourceRange());
 }
 

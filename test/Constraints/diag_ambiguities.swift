@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 func f0(_ i: Int, _ d: Double) {} // expected-note{{found this candidate}}
 func f0(_ d: Double, _ i: Int) {} // expected-note{{found this candidate}}
@@ -50,5 +50,23 @@ struct SR3715 {
 
   func test() {
     take([overloaded]) // no error
+  }
+}
+
+// rdar://35116378 - Here the ambiguity is in the pre-check pass; make sure
+// we emit a diagnostic instead of crashing.
+struct Movie {}
+
+protocol P {
+  associatedtype itemType
+  var items: [itemType] { get set }
+}
+
+class MoviesViewController : P {
+  let itemType = [Movie].self // expected-note {{'itemType' declared here}}
+  var items: [Movie] = [Movie]()
+
+  func loadData() {
+    _ = itemType // expected-error {{ambiguous use of 'itemType'}}
   }
 }
