@@ -405,17 +405,6 @@ namespace {
 
     return Type();
   }
-
-  bool sameUnresolvedType(GSBUnresolvedType type1, GSBUnresolvedType type2) {
-    auto pa1 = type1.dyn_cast<PotentialArchetype *>();
-    auto pa2 = type2.dyn_cast<PotentialArchetype *>();
-    if (pa1 && pa2)
-      return pa1 == pa2;
-
-    Type concrete1 = pa1 ? pa1->getDependentType({ }) : type1.get<Type>();
-    Type concrete2 = pa2 ? pa2->getDependentType({ }) : type2.get<Type>();
-    return concrete1->isEqual(concrete2);
-  }
 }
 
 #pragma mark Requirement sources
@@ -6212,7 +6201,22 @@ namespace {
 
     return bestSource;
   }
+
+  using SameTypeComponentRef = std::pair<EquivalenceClass *, unsigned>;
+
 } // end anonymous namespace
+
+static int compareSameTypeComponents(const SameTypeComponentRef *lhsPtr,
+                                     const SameTypeComponentRef *rhsPtr){
+  Type lhsType = getUnresolvedType(
+      lhsPtr->first->derivedSameTypeComponents[lhsPtr->second].anchor,
+      { });
+  Type rhsType = getUnresolvedType(
+      rhsPtr->first->derivedSameTypeComponents[rhsPtr->second].anchor,
+      { });
+
+  return compareDependentTypes(lhsType, rhsType);
+}
 
 void GenericSignatureBuilder::enumerateRequirements(
                    ArrayRef<GenericTypeParamType *> genericParams,
@@ -6221,86 +6225,79 @@ void GenericSignatureBuilder::enumerateRequirements(
                            Type type,
                            RequirementRHS constraint,
                            const RequirementSource *source)> f) {
-  // Collect all archetypes.
-  SmallVector<PotentialArchetype *, 8> archetypes;
+  // Collect all of the subject types that will be involved in constraints.
+  SmallVector<SameTypeComponentRef, 8> subjects;
   for (auto &equivClass : Impl->EquivalenceClasses) {
     if (equivClass.derivedSameTypeComponents.empty()) {
       checkSameTypeConstraints(getGenericParams(), &equivClass);
     }
 
-    for (auto &component : equivClass.derivedSameTypeComponents) {
-      archetypes.push_back(realizePotentialArchetype(component.anchor));
-    }
+    for (unsigned i : indices(equivClass.derivedSameTypeComponents))
+      subjects.push_back({&equivClass, i});
   }
 
-  // Sort the archetypes in canonical order.
-  llvm::array_pod_sort(archetypes.begin(), archetypes.end(),
-                       compareDependentTypes);
+  // Sort the subject types in canonical order.
+  llvm::array_pod_sort(subjects.begin(), subjects.end(),
+                       compareSameTypeComponents);
 
-  for (auto *archetype : archetypes) {
-    // Check whether this archetype is one of the anchors within its
-    // connected component. If so, we may need to emit a same-type constraint.
-    //
-    // FIXME: O(n) in the number of implied connected components within the
-    // equivalence class. The equivalence class should be small, but...
-    auto equivClass = archetype->getOrCreateEquivalenceClass(*this);
-    Type depTy = archetype->getDependentType(genericParams);
+  for (const auto &subject : subjects) {
+    // Dig out the subject type and its corresponding component.
+    auto equivClass = subject.first;
+    auto &component = equivClass->derivedSameTypeComponents[subject.second];
+    Type subjectType = getUnresolvedType(component.anchor, genericParams);
 
-    assert(!equivClass->derivedSameTypeComponents.empty() &&
-           "Didn't compute derived same-type components?");
-    auto knownAnchor =
-      std::find_if(equivClass->derivedSameTypeComponents.begin(),
-                   equivClass->derivedSameTypeComponents.end(),
-                   [&](const DerivedSameTypeComponent &component) {
-                     return sameUnresolvedType(component.anchor, archetype);
-                   });
+    // If this equivalence class is bound to a concrete type, equate the
+    // anchor with a concrete type.
+    if (Type concreteType = equivClass->concreteType) {
+      // If the parent of this anchor is also a concrete type, don't
+      // create a requirement.
+      if (!subjectType->is<GenericTypeParamType>() &&
+          maybeResolveEquivalenceClass(
+            subjectType->castTo<DependentMemberType>()->getBase(),
+            ArchetypeResolutionKind::WellFormed,
+            /*wantExactPotentialArchetype=*/false)
+            .getEquivalenceClass(*this)->concreteType)
+        continue;
+
+      auto source =
+        component.concreteTypeSource
+          ? component.concreteTypeSource
+          : RequirementSource::forAbstract(*this, subjectType);
+
+      // Drop recursive and invalid concrete-type constraints.
+      if (equivClass->recursiveConcreteType ||
+          equivClass->invalidConcreteType)
+        continue;
+
+      f(RequirementKind::SameType, subjectType, concreteType, source);
+      continue;
+    }
+
     std::function<void()> deferredSameTypeRequirement;
 
-    if (knownAnchor != equivClass->derivedSameTypeComponents.end()) {
-      // If this equivalence class is bound to a concrete type, equate the
-      // anchor with a concrete type.
-      if (Type concreteType = equivClass->concreteType) {
-        // If the parent of this anchor is also a concrete type, don't
-        // create a requirement.
-        if (!archetype->isGenericParam() &&
-            archetype->getParent()->isConcreteType())
-          continue;
-
-        auto source =
-          knownAnchor->concreteTypeSource
-            ? knownAnchor->concreteTypeSource
-            : RequirementSource::forAbstract(*this, depTy);
-
-        // Drop recursive and invalid concrete-type constraints.
-        if (equivClass->recursiveConcreteType ||
-            equivClass->invalidConcreteType)
-          continue;
-
-        f(RequirementKind::SameType, depTy, concreteType, source);
-        continue;
-      }
-
-      // If we're at the last anchor in the component, do nothing;
-      auto nextAnchor = knownAnchor;
-      ++nextAnchor;
-      if (nextAnchor != equivClass->derivedSameTypeComponents.end()) {
-        // Form a same-type constraint from this anchor within the component
-        // to the next.
-        // FIXME: Distinguish between explicit and inferred here?
-        auto otherTy = getUnresolvedType(nextAnchor->anchor, genericParams);
-        deferredSameTypeRequirement =
-          [&f, depTy, otherTy, this, genericParams] {
-            f(RequirementKind::SameType, depTy, otherTy,
-              RequirementSource::forAbstract(*this, otherTy));
-          };
-      }
+    // If we're at the last anchor in the component, do nothing;
+    if (subject.second + 1 != equivClass->derivedSameTypeComponents.size()) {
+      // Form a same-type constraint from this anchor within the component
+      // to the next.
+      // FIXME: Distinguish between explicit and inferred here?
+      auto &nextComponent =
+        equivClass->derivedSameTypeComponents[subject.second + 1];
+      Type otherSubjectType =
+        getUnresolvedType(nextComponent.anchor, genericParams);
+      deferredSameTypeRequirement =
+        [&f, subjectType, otherSubjectType, this, genericParams] {
+          f(RequirementKind::SameType, subjectType, otherSubjectType,
+            RequirementSource::forAbstract(*this, otherSubjectType));
+        };
     }
+
     SWIFT_DEFER {
       if (deferredSameTypeRequirement) deferredSameTypeRequirement();
     };
 
-    // If this is not the archetype anchor, we're done.
-    if (archetype != archetype->getArchetypeAnchor(*this))
+    // If this is not the first component anchor in its equivalence class,
+    // we're done.
+    if (subject.second > 0)
       continue;
 
     // If we have a superclass, produce a superclass requirement
@@ -6312,9 +6309,9 @@ void GenericSignatureBuilder::enumerateRequirements(
           });
 
       if (!bestSource)
-        bestSource = RequirementSource::forAbstract(*this, depTy);
+        bestSource = RequirementSource::forAbstract(*this, subjectType);
 
-      f(RequirementKind::Superclass, depTy, equivClass->superclass,
+      f(RequirementKind::Superclass, subjectType, equivClass->superclass,
         *bestSource);
     }
 
@@ -6326,9 +6323,9 @@ void GenericSignatureBuilder::enumerateRequirements(
                             return layout == equivClass->layout;
                           });
       if (!bestSource)
-        bestSource = RequirementSource::forAbstract(*this, depTy);
+        bestSource = RequirementSource::forAbstract(*this, subjectType);
 
-      f(RequirementKind::Layout, depTy, equivClass->layout, *bestSource);
+      f(RequirementKind::Layout, subjectType, equivClass->layout, *bestSource);
     }
 
     // Enumerate conformance requirements.
@@ -6356,7 +6353,7 @@ void GenericSignatureBuilder::enumerateRequirements(
     // Enumerate the conformance requirements.
     for (auto proto : protocols) {
       assert(protocolSources.count(proto) == 1 && "Missing conformance?");
-      f(RequirementKind::Conformance, depTy,
+      f(RequirementKind::Conformance, subjectType,
         proto->getDeclaredInterfaceType(),
         protocolSources.find(proto)->second);
     }
