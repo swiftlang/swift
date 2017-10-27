@@ -1012,6 +1012,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   options |= TR_AllowUnspecifiedTypes;
   options |= TR_AllowUnboundGenerics;
   options |= TR_InExpression;
+  options |= TR_AllowIUO;
   bool hadParameterError = false;
 
   GenericTypeToArchetypeResolver resolver(closure);

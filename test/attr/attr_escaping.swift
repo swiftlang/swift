@@ -121,7 +121,7 @@ func testModuloOptionalness() {
   func setIUOClosure(_ fn: () -> Void) { // expected-note {{parameter 'fn' is implicitly non-escaping}} {{28-28=@escaping }}
     iuoClosure = fn // expected-error{{assigning non-escaping parameter 'fn' to an @escaping closure}}
   }
-  var iuoClosureExplicit: ImplicitlyUnwrappedOptional<() -> Void>
+  var iuoClosureExplicit: ImplicitlyUnwrappedOptional<() -> Void> // expected-warning {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}
   func setExplicitIUOClosure(_ fn: () -> Void) { // expected-note {{parameter 'fn' is implicitly non-escaping}} {{36-36=@escaping }}
     iuoClosureExplicit = fn // expected-error{{assigning non-escaping parameter 'fn' to an @escaping closure}}
   }

@@ -1180,6 +1180,31 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     return ErrorType::get(TC.Context);
   }
 
+  // Emit a warning about directly spelling
+  // ImplicitlyUnwrappedOptional rather than using a trailing '!'.
+  auto *IUODecl = TC.Context.getImplicitlyUnwrappedOptionalDecl();
+  if (currentDecl == IUODecl) {
+    if (isa<GenericIdentTypeRepr>(comp) && options.contains(TR_AllowIUO)) {
+      auto *genericTyR = cast<GenericIdentTypeRepr>(comp);
+      assert(genericTyR->getGenericArgs().size() == 1);
+      auto *genericArgTyR = genericTyR->getGenericArgs()[0];
+
+      TC.diagnose(
+            comp->getStartLoc(),
+            diag::implicitly_unwrapped_optional_spelling_deprecated_with_fixit)
+          .fixItRemoveChars(
+              genericTyR->getStartLoc(),
+              genericTyR->getAngleBrackets().Start.getAdvancedLoc(1))
+          .fixItInsertAfter(genericArgTyR->getEndLoc(), "!")
+          .fixItRemoveChars(
+              genericTyR->getAngleBrackets().End,
+              genericTyR->getAngleBrackets().End.getAdvancedLoc(1));
+    } else {
+      TC.diagnose(comp->getStartLoc(),
+                  diag::implicitly_unwrapped_optional_spelling_deprecated);
+    }
+  }
+
   // If we found nothing, complain and give ourselves a chance to recover.
   if (current.isNull()) {
     // If we're not allowed to complain or we couldn't fix the
