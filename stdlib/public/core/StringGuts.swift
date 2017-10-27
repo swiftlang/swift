@@ -80,6 +80,9 @@ struct _StringGuts {
 //
 // Flags
 //
+// TODO: It would be more clear to wrap up BridgeObject in a
+// "StringObject"-like struct, and provide this funcitonality on that.
+//
 extension _StringGuts {
   /*private*/ internal var _flagsMask: UInt {
     return _twoByteCodeUnitBit | _hasCocoaBufferBit
@@ -87,6 +90,9 @@ extension _StringGuts {
 
   var isSingleByte: Bool {
     return (_objectBitPattern & _twoByteCodeUnitBit) == 0
+  }
+  var byteWidth: Int {
+    return isSingleByte ? 1 : 2
   }
 
   // NOTE: Currently, single byte representation is synonymous with ASCII. This
@@ -218,6 +224,14 @@ internal struct UnsafeString {
   // longer using _LegacyStringCore?
   var hasCocoaBuffer: Bool
 
+  var sizeInBytes: Int {
+    return count * byteWidth
+  }
+
+  var byteWidth: Int {
+    return isSingleByte ? 1 : 2
+  }
+
   init(
     baseAddress: UnsafeMutableRawPointer,
     count: Int,
@@ -242,6 +256,24 @@ internal struct UnsafeString {
       start: baseAddress.assumingMemoryBound(to: UInt8.self),
       count: count)
   }
+
+  @_versioned
+  internal
+  func _copy(
+    into dest: UnsafeMutableRawPointer,
+    capacityEnd: UnsafeMutableRawPointer,
+    accomodatingElementWidth width: Int
+  ) {
+    _sanityCheck(capacityEnd > dest + self.count)
+    if _fastPath(self.byteWidth == width) {
+      _memcpy(
+        dest: dest,
+        src: self.baseAddress,
+        size: UInt(self.sizeInBytes))
+    } else {
+      fatalError("TODO: zext loop")
+    }
+  }
 }
 
 /*fileprivate*/ internal struct NativeString {
@@ -258,8 +290,8 @@ internal struct UnsafeString {
   var owner: _BuiltinNativeObject
 
   var stringBuffer: _StringBuffer {
-    // TODO: Does this in practice incur overhead? Should we cast it?
-    return _StringBuffer(_StringBuffer._Storage(_nativeObject: owner))
+      // TODO: Does this in practice incur overhead? Should we cast it?
+      return _StringBuffer(_StringBuffer._Storage(_nativeObject: owner))
   }
 
   var unsafe: UnsafeString {
@@ -278,9 +310,17 @@ internal struct UnsafeString {
     return stringBuffer.usedCount
   }
 
+  var capacity: Int {
+    return stringBuffer.capacity
+  }
+
   var isSingleByte: Bool {
     _sanityCheck((0...1).contains(stringBuffer.elementShift))
     return stringBuffer.elementShift == 0
+  }
+
+  var byteWidth: Int {
+    return isSingleByte ? 1 : 2
   }
 
   init(_ native: _BuiltinNativeObject) {
@@ -296,6 +336,39 @@ internal struct UnsafeString {
       _StringBuffer(_StringBuffer._Storage(
         _uncheckedUnsafeBufferObject: object
       ))._nativeObject)
+  }
+
+  // Copy in `other` code units direclty.
+  @_versioned
+  internal
+  // FIXME: mutating
+  func _appendInPlace(_ other: _StringGuts) {
+    let otherCount = other.count
+    _sanityCheck(self.capacity > self.count + otherCount)
+
+    // TODO: Does this incur ref counting?
+    var buffer = self.stringBuffer
+
+    // TODO: Eventual small form check on other. We could even do this now for
+    // the tagged cocoa strings.
+
+    // Rare
+    if _slowPath(other._isOpaque) {
+      fatalError("TODO: copy opaque")
+      return
+    }
+
+    let unmangedOther = other._unmangedContiguous._unsafelyUnwrappedUnchecked
+
+    // TODO: _copy accomodating a width here is not necessary, because we form
+    // with the right width in `formNative`.
+    unmangedOther._copy(
+      into: buffer.usedEnd,
+      capacityEnd: buffer.capacityEnd,
+      accomodatingElementWidth: self.byteWidth)
+ 
+    buffer.usedEnd += otherCount
+    _fixLifetime(other)
   }
 }
 
@@ -318,6 +391,17 @@ internal struct UnsafeString {
     self.owner = owner
   }
 }
+
+internal struct OpaqueCocoaString {
+  let object: AnyObject
+  let count: Int
+
+  init(_ object: AnyObject) {
+    self.object = object
+    self.count = _stdlib_binary_CFStringGetLength(object)
+  }
+}
+
 
 //
 // Masks
@@ -591,3 +675,168 @@ extension _StringGuts {
     self.init(nativeString)
   }
 }
+
+// TODO: We probably want to overhaul string storage, ala the "string-recore"
+// branch. In addition to efficiency, such an overhaul can also guarantee nul-
+// termination for all native strings. For now, this lets us bootstrap
+// quicker.
+
+//
+// String API helpers
+//
+extension _StringGuts {
+  // Convert ourselves (if needed) to a NativeString for appending purposes.
+  // After this call, self is ready to be memcpy-ed into. Returns the pointer to
+  // begin writing to. Adjusts the referenced StringBuffer usedCount.
+  @_versioned
+  internal
+  mutating func _formNative(
+    forAppending other: _StringGuts
+  ) -> (
+    extraCapacityBegin: UnsafeMutableRawPointer, 
+    capacityEnd: UnsafeMutableRawPointer
+  ) {
+
+    let extra = other.count
+    let oldCapacity: Int
+    let oldCount: Int
+    if _fastPath(_isNative) {
+      var nativeBuffer = self._native._unsafelyUnwrappedUnchecked.stringBuffer
+      oldCapacity = nativeBuffer.capacity
+      oldCount = nativeBuffer.usedCount
+      if _fastPath(
+        oldCapacity >= oldCount + extra 
+        && true // FIXME: Do uniqueness checking
+      ) {
+        return (nativeBuffer.usedEnd, nativeBuffer.capacityEnd)
+      }
+    } else {
+      oldCapacity = 0
+      oldCount = self.count
+    }
+
+    let newWidth = Swift.max(self.byteWidth, other.byteWidth)
+    let newCapacity = Swift.max(
+      _growArrayCapacity(oldCapacity), oldCount + extra)
+    let newBuffer = _StringBuffer(
+      capacity: newCapacity,
+      initialSize: oldCount,
+      elementWidth: newWidth)
+
+    // Copy outselves in
+    self._copy(
+      into: newBuffer.start,
+      capacityEnd: newBuffer.capacityEnd,
+      accomodatingElementWidth: self.byteWidth)
+
+    let (usedEnd, capEnd) = (newBuffer.usedEnd, newBuffer.capacityEnd)
+    self = _StringGuts(NativeString(newBuffer))
+    return (usedEnd, capEnd)
+  }
+
+  // Copy in our elements to the new storage
+  //
+  @_versioned
+  internal
+  func _copy(
+    into dest: UnsafeMutableRawPointer,
+    capacityEnd: UnsafeMutableRawPointer,
+    accomodatingElementWidth width: Int
+  ) {
+    _sanityCheck(capacityEnd > dest + self.count)
+    let unmangedSelfOpt = self._unmangedContiguous
+    if _fastPath(unmangedSelfOpt != nil) {
+      unmangedSelfOpt._unsafelyUnwrappedUnchecked._copy(
+        into: dest, capacityEnd: capacityEnd, accomodatingElementWidth: width)
+      _fixLifetime(self)
+      return
+    }
+
+    fatalError("TODO: non-contig loop, use `_cocoaStringReadAll`")
+    return
+  }
+
+  // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
+  // the return value.
+  @_versioned
+  internal
+  var _unmangedContiguous: UnsafeString? {
+    if let unsafe = self._unsafeString {
+      return unsafe
+    }
+    if let native = self._native {
+      return native.unsafe
+    }
+    if let cocoa = self._cocoa {
+      // FIXME: Most of these are contiguous!
+      return nil
+    }
+    return nil
+  }
+
+  @_versioned
+
+  // TODO(perf): guarantee this is a simple bitmask operation, and probably
+  // make inlineable or inline allways
+  internal
+  var _isOpaque: Bool {
+      @inline(never) // TODO(perf): to inspect code quality
+      get { return _unmangedContiguous == nil }
+  }
+
+  @_versioned
+  internal
+  func getOpaque() -> OpaqueCocoaString {
+    _sanityCheck(_isOpaque)
+    return OpaqueCocoaString(Builtin.reinterpretCast(self._objectBitPattern))
+  }
+}
+
+//
+// String API
+//
+// TODO: Probably better to host top level API directly on the String type itself
+extension _StringGuts {
+  @_versioned
+  internal
+  var count: Int {
+    let contigOpt = self._unmangedContiguous
+    if _fastPath(contigOpt != nil) {
+      return contigOpt._unsafelyUnwrappedUnchecked.count
+    }
+    return self.getOpaque().count
+  }
+
+  @_versioned
+  internal
+  var capacity: Int {
+    if _fastPath(_isNative) {
+      return self._native._unsafelyUnwrappedUnchecked.capacity
+    }
+    return 0
+  }
+
+  @_versioned
+  internal
+  var _isEmpty: Bool {
+    // TODO: Could just have an empty bit pattern
+    return count == 0
+  }
+
+
+  // @_inlineable // TODO: internal-inlineable, if that's possible
+  // TODO: @_versioned
+  // TODO: internal
+  public // TODO(StringGuts): for testing only
+  mutating func append(_ other: _StringGuts) {
+    guard !other._isEmpty else { return }
+
+    // TODO: Eventual small form check on self and other. We could even do this
+    // now for the tagged cocoa strings.
+
+    _ = _formNative(forAppending: other)
+    self._native._unsafelyUnwrappedUnchecked._appendInPlace(other)
+  }
+}
+
+
