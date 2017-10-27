@@ -664,9 +664,6 @@ public:
       : SILInstruction(kind, loc),
         ValueBase(ValueKind(kind), type, IsRepresentative::No) {}
 
-  using SILInstruction::getFunction;
-  using SILInstruction::getModule;
-  using SILInstruction::getKind;
   using SILInstruction::operator new;
   using SILInstruction::dumpInContext;
   using SILInstruction::print;
@@ -674,6 +671,12 @@ public:
 
   // Redeclare because lldb currently doesn't know about using-declarations
   void dump() const;
+  SILFunction *getFunction() { return SILInstruction::getFunction(); }
+  const SILFunction *getFunction() const {
+    return SILInstruction::getFunction();
+  }
+  SILModule &getModule() const { return SILInstruction::getModule(); }
+  SILInstructionKind getKind() const { return SILInstruction::getKind(); }
 
   void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
 
