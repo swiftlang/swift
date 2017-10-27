@@ -253,6 +253,6 @@ class HasLazyProperty : NSObject, HasProperty {
 //   which can cause fits for SILGenApply the way it's currently implemented.
 // CHECK-LABEL: sil hidden @_T015objc_properties26testPropSetWithPreposition
 func testPropSetWithPreposition(object: ObjectWithSplitProperty?) {
-  // CHECK: #ObjectWithSplitProperty.flagForSomething!setter.1.foreign : (ObjectWithSplitProperty) -> (Bool) -> (), $@convention(objc_method) (ObjCBool, ObjectWithSplitProperty) -> ()
+  // CHECK: #ObjectWithSplitProperty.flagForSomething!setter.1.foreign : (ObjectWithSplitProperty) -> (Bool) -> (), $@convention(objc_method) ({{Bool|ObjCBool}}, ObjectWithSplitProperty) -> ()
   object?.flagForSomething = false
 }
