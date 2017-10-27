@@ -1187,6 +1187,65 @@ void ExtensionDecl::addedMember(Decl *member) {
   }
 }
 
+// For lack of anywhere more sensible to put it, here's a diagram of the pieces
+// involved in finding members and extensions of a NominalTypeDecl.
+//
+// ┌────────────────────────────┬─┐
+// │IterableDeclContext         │ │     ┌─────────────────────────────┐
+// │-------------------         │ │     │┌───────────────┬┐           ▼
+// │Decl *LastDecl   ───────────┼─┼─────┘│Decl           ││  ┌───────────────┬┐
+// │Decl *FirstDecl  ───────────┼─┼─────▶│----           ││  │Decl           ││
+// │                            │ │      │Decl  *NextDecl├┼─▶│----           ││
+// │bool HasLazyMembers         │ │      ├───────────────┘│  │Decl *NextDecl ││
+// │IterableDeclContextKind Kind│ │      │                │  ├───────────────┘│
+// │                            │ │      │ValueDecl       │  │                │
+// ├────────────────────────────┘ │      │---------       │  │ValueDecl       │
+// │                              │      │DeclName Name   │  │---------       │
+// │NominalTypeDecl               │      └────────────────┘  │DeclName Name   │
+// │---------------               │               ▲          └────────────────┘
+// │ExtensionDecl *FirstExtension─┼────────┐      │                   ▲
+// │ExtensionDecl *LastExtension ─┼───────┐│      │                   └───┐
+// │                              │       ││      └──────────────────────┐│
+// │MemberLookupTable *LookupTable├─┐     ││                             ││
+// │bool LookupTableComplete      │ │     ││     ┌─────────────────┐     ││
+// └──────────────────────────────┘ │     ││     │ExtensionDecl    │     ││
+//                                  │     ││     │-------------    │     ││
+//                    ┌─────────────┘     │└────▶│ExtensionDecl    │     ││
+//                    │                   │      │  *NextExtension ├──┐  ││
+//                    ▼                   │      └─────────────────┘  │  ││
+// ┌─────────────────────────────────────┐│      ┌─────────────────┐  │  ││
+// │MemberLookupTable                    ││      │ExtensionDecl    │  │  ││
+// │-----------------                    ││      │-------------    │  │  ││
+// │ExtensionDecl *LastExtensionIncluded ├┴─────▶│ExtensionDecl    │◀─┘  ││
+// │                                     │       │  *NextExtension │     ││
+// │┌───────────────────────────────────┐│       └─────────────────┘     ││
+// ││DenseMap<Declname, ...> LookupTable││                               ││
+// ││-----------------------------------││  ┌──────────────────────────┐ ││
+// ││[NameA] TinyPtrVector<ValueDecl *> ││  │TinyPtrVector<ValueDecl *>│ ││
+// ││[NameB] TinyPtrVector<ValueDecl *> ││  │--------------------------│ ││
+// ││[NameC] TinyPtrVector<ValueDecl *>─┼┼─▶│[0] ValueDecl *      ─────┼─┘│
+// │└───────────────────────────────────┘│  │[1] ValueDecl *      ─────┼──┘
+// └─────────────────────────────────────┘  └──────────────────────────┘
+//
+// The HasLazyMembers, Kind, and LookupTableComplete fields are packed into
+// PointerIntPairs so don't go grepping for them; but for purposes of
+// illustration they are effectively their own fields.
+//
+// MemberLookupTable is populated en-masse when the IterableDeclContext's
+// (IDC's) list of Decls is populated. But MemberLookupTable can also be
+// populated incrementally by one-name-at-a-time lookups by lookupDirect, in
+// which case those Decls are _not_ added to the IDC's list. They are cached in
+// the loader they come from, lifecycle-wise, and are added to the the
+// MemberLookupTable to accelerate subsequent retrieval, but the IDC is not
+// considered populated until someone calls getMembers().
+//
+// If the IDC list is later populated and/or an extension is added _after_
+// MemberLookupTable is constructed (and possibly has entries in it),
+// MemberLookupTable is purged and reconstructed from IDC's list.
+//
+// In all lookup routines, the 'ignoreNewExtensions' flag means that
+// lookup should only use the set of extensions already observed.
+
 void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
   // If we haven't allocated the lookup table yet, do so now.
   if (!LookupTable.getPointer()) {
