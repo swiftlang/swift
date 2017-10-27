@@ -1024,6 +1024,30 @@ public:
     return Lookup.find(name);
   }
 
+  /// \brief Add an empty entry to the lookup map for a given name if it does
+  /// not yet have one.
+  void addEmptyEntry(DeclName name) {
+    (void)Lookup[name];
+    if (!name.isSimpleName()) {
+      (void)Lookup[name.getBaseName()];
+    }
+  }
+
+  // \brief Mark all Decls in this table as not-resident in a table, drop
+  // references to them. Should only be called when this was not fully-populated
+  // from an IterableDeclContext.
+  void clear() {
+    // LastExtensionIncluded would only be non-null if this was populated from
+    // an IterableDeclContext (though it might still be null in that case).
+    assert(LastExtensionIncluded == nullptr);
+    for (auto i : Lookup) {
+      for (auto d : i.getSecond()) {
+        d->ValueDeclBits.AlreadyInLookupTable = false;
+      }
+    }
+    Lookup.clear();
+  }
+
   // Only allow allocation of member lookup tables using the allocator in
   // ASTContext or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
@@ -1170,6 +1194,11 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
     LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
   }
 
+  // If we're an IDC that has not yet loaded its full member set, we're doing
+  // NamedLazyMemberLoading, and we should not force getMembers().
+  if (hasLazyMembers())
+    return;
+
   // If we haven't walked the member list yet to update the lookup
   // table, do so now.
   if (!LookupTable.getInt()) {
@@ -1211,55 +1240,85 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
         << ", hasLazyMembers()=" << hasLazyMembers()
         << "\n");
 
-  bool hasExtensionsToConsider = false;
+  // We only use NamedLazyMemberLoading when a user opts-in and we have
+  // not yet loaded all the members into the IDC list in the first place.
+  bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
+                                    hasLazyMembers());
+
+  // At present, we cannot use NamedLazyMemberLoading on nominals that have
+  // extensions, unless we're being explicitly told to ignore extensions.
   if (!ignoreNewExtensions) {
     auto E = getExtensions();
-    hasExtensionsToConsider = E.begin() != E.end();
+    if (E.begin() != E.end())
+      useNamedLazyMemberLoading = false;
   }
 
-  if (!hasExtensionsToConsider &&
-      ctx.LangOpts.NamedLazyMemberLoading &&
-      !LookupTable.getInt() &&
-      hasLazyMembers()) {
-    // The lookup table (containing all loaded members) has not yet been built;
-    // we *might* be able to avoid loading all members, just focus on the ones
-    // matching the name we were asked for.
-    TinyPtrVector<ValueDecl *> results;
-    auto contextInfo =
-        ctx.getOrCreateLazyIterableContextData(this,
-                                               /*lazyLoader=*/nullptr);
-    if (auto results =
-        contextInfo->loader->loadNamedMembers(this, name,
-                                              contextInfo->memberData)) {
-      if (auto s = ctx.Stats) {
-        ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
-      }
-      return *results;
-    } else {
-      if (auto s = ctx.Stats) {
-        ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
-      }
+  // First, if we're _not_ doing NamedLazyMemberLoading, we make sure we've
+  // populated the IDC and brought it up to date with any extensions. This
+  // will flip the hasLazyMembers() flag to false as well.
+  if (!useNamedLazyMemberLoading) {
+
+    // If we're about to load members here, purge the MemberLookupTable;
+    // it will be rebuilt in prepareLookup, below.
+    if (hasLazyMembers() && LookupTable.getPointer()) {
+      // We should not have scanned the IDC list yet. Double check.
+      assert(!LookupTable.getInt());
+      LookupTable.getPointer()->clear();
+    }
+
+    (void)getMembers();
+
+    // Make sure we have the complete list of members (in this nominal and in all
+    // extensions).
+    if (!ignoreNewExtensions) {
+      for (auto E : getExtensions())
+        (void)E->getMembers();
     }
   }
 
-  (void)getMembers();
-
-  // Make sure we have the complete list of members (in this nominal and in all
-  // extensions).
-  if (!ignoreNewExtensions) {
-    for (auto E : getExtensions())
-      (void)E->getMembers();
-  }
-
+  // Next, in all cases, prepare the lookup table for use, possibly repopulating
+  // it from the IDC if just did our initial IDC population above.
   prepareLookupTable(ignoreNewExtensions);
 
-  // Look for the declarations with this name.
+  // Look for a declaration with this name.
   auto known = LookupTable.getPointer()->find(name);
-  if (known == LookupTable.getPointer()->end())
-    return { };
 
   // We found something; return it.
-  return known->second;
+  if (known != LookupTable.getPointer()->end())
+    return known->second;
+
+  // If we have no second chances, stop now.
+  if (!useNamedLazyMemberLoading)
+    return { };
+
+  // If we get here, we had a cache-miss and _are_ using NamedLazyMemberLoading.
+  // Populate a _single_ entry in the MemberLookupTable and try again.
+  auto ci = ctx.getOrCreateLazyIterableContextData(this,
+                                                   /*lazyLoader=*/nullptr);
+  // Populate LookupTable with an empty vector before we call into our loader,
+  // so that any reentry of this routine will find the set-so-far, and not
+  // fall into infinite recursion.
+  LookupTable.getPointer()->addEmptyEntry(name);
+  if (auto res = ci->loader->loadNamedMembers(this, name, ci->memberData)) {
+    if (auto s = ctx.Stats) {
+      ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
+    }
+    for (auto d : *res) {
+      LookupTable.getPointer()->addMember(d);
+    }
+    // Retry lookup in refeshed table. Note: don't try refactoring this to merge
+    // with the iterator compare-and-return above. There's epoch-based
+    // invalidation tracking on DenseMap iterators in assert builds that require
+    // us to treat iterators from each probe separately.
+    known = LookupTable.getPointer()->find(name);
+    if (known != LookupTable.getPointer()->end())
+      return known->second;
+  } else {
+    if (auto s = ctx.Stats) {
+      ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
+    }
+  }
+  return { };
 }
 
 void ClassDecl::createObjCMethodLookup() {
