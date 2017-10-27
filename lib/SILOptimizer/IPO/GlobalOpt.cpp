@@ -110,7 +110,7 @@ protected:
 
   void
   optimizeObjectAllocation(AllocRefInst *ARI,
-                           llvm::SmallVector<SILInstruction *, 4> &toRemove);
+                           llvm::SmallVector<SILInstruction *, 4> &ToRemove);
   void replaceFindStringCall(ApplyInst *FindStringCall);
 
   SILGlobalVariable *getVariableOfGlobalInit(SILFunction *AddrF);
@@ -1221,7 +1221,7 @@ public:
 ///       return [1, 2, 3]
 ///     }
 void SILGlobalOpt::optimizeObjectAllocation(
-    AllocRefInst *ARI, llvm::SmallVector<SILInstruction *, 4> &toRemove) {
+    AllocRefInst *ARI, llvm::SmallVector<SILInstruction *, 4> &ToRemove) {
 
   if (ARI->isObjC())
     return;
@@ -1299,14 +1299,14 @@ void SILGlobalOpt::optimizeObjectAllocation(
     assert(MemberStore);
     ObjectArgs.push_back(Cloner.clone(
                            cast<SingleValueInstruction>(MemberStore->getSrc())));
-    toRemove.push_back(MemberStore);
+    ToRemove.push_back(MemberStore);
   }
   // Create the initializers for the tail elements.
   unsigned NumBaseElements = ObjectArgs.size();
   for (StoreInst *TailStore : TailStores) {
     ObjectArgs.push_back(Cloner.clone(
                            cast<SingleValueInstruction>(TailStore->getSrc())));
-    toRemove.push_back(TailStore);
+    ToRemove.push_back(TailStore);
   }
   // Create the initializer for the object itself.
   SILBuilder StaticInitBuilder(Glob);
@@ -1323,7 +1323,7 @@ void SILGlobalOpt::optimizeObjectAllocation(
     SILInstruction *User = Use->getUser();
     switch (User->getKind()) {
       case SILInstructionKind::DeallocRefInst:
-        toRemove.push_back(User);
+        ToRemove.push_back(User);
         break;
       default:
         Use->set(GVI);
@@ -1336,7 +1336,7 @@ void SILGlobalOpt::optimizeObjectAllocation(
     replaceFindStringCall(FindStringCall);
   }
 
-  toRemove.push_back(ARI);
+  ToRemove.push_back(ARI);
   HasChanged = true;
 }
 
@@ -1459,7 +1459,15 @@ bool SILGlobalOpt::run() {
     for (auto &BB : F) {
       bool IsCold = ColdBlocks.isCold(&BB);
       auto Iter = BB.begin();
-      llvm::SmallVector<SILInstruction *, 4> toRemove;
+
+      // We can't remove instructions willy-nilly as we iterate because
+      // that might cause a pointer to the next instruction to become
+      // garbage, causing iterator invalidations (and crashes).
+      // Instead, we collect in a list the instructions we want to remove
+      // and erase the BB they belong to at the end of the loop, once we're
+      // sure it's safe to do so.
+      llvm::SmallVector<SILInstruction *, 4> ToRemove;
+
       while (Iter != BB.end()) {
         SILInstruction *I = &*Iter;
         Iter++;
@@ -1477,11 +1485,11 @@ bool SILGlobalOpt::run() {
             // for serializable functions.
             // TODO: We may do the optimization _after_ serialization in the
             // pass pipeline.
-            optimizeObjectAllocation(ARI, toRemove);
+            optimizeObjectAllocation(ARI, ToRemove);
           }
         }
       }
-      for (auto *I : toRemove)
+      for (auto *I : ToRemove)
         I->eraseFromParent();
     }
   }
