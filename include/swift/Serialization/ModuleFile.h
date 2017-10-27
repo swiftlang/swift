@@ -477,6 +477,11 @@ private:
   std::unique_ptr<SerializedNestedTypeDeclsTable>
   readNestedTypeDeclsTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
+  /// Main logic of getDeclChecked.
+  llvm::Expected<Decl *>
+  getDeclCheckedImpl(serialization::DeclID DID,
+                     Optional<DeclContext *> ForcedContext = None);
+
   /// Reads the index block, which contains global tables.
   ///
   /// Returns false if there was an error.

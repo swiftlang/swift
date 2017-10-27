@@ -31,6 +31,7 @@
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "Serialization"
@@ -2108,6 +2109,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
 Expected<Decl *>
 ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
+  // Tag every deserialized ValueDecl coming out of getDeclChecked with its ID.
+  Expected<Decl *> deserialized = getDeclCheckedImpl(DID, ForcedContext);
+  if (deserialized && deserialized.get()) {
+    if (auto *VD = dyn_cast<ValueDecl>(deserialized.get())) {
+      if (VD->wasDeserialized()) {
+        VD->setDeclID(DID);
+      }
+    }
+  }
+  return deserialized;
+}
+
+Expected<Decl *>
+ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DID == 0)
     return nullptr;
 
