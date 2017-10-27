@@ -67,7 +67,7 @@ syn match swiftImplicitVarName /\$\<[A-Za-z_0-9]\+\>/
 hi def link swiftImport Include
 hi def link swiftImportModule Title
 hi def link swiftImportComponent Identifier
-hi def link swiftApplyKeyword ModeMsg
+hi def link swiftApplyKeyword Statement
 hi def link swiftKeyword Statement
 hi def link swiftTypeDefinition Define
 hi def link swiftTypeName Type
