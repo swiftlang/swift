@@ -1690,6 +1690,9 @@ static void emitCoerceAndExpand(IRGenFunction &IGF,
 static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
                                        const clang::CodeGen::ABIArgInfo &AI,
                                        Explosion &in, Explosion &out) {
+  bool IsDirectFlattened = AI.isDirect() && AI.getCanBeFlattened();
+  bool IsIndirect = !AI.isDirect();
+
   // If we're supposed to pass directly as a struct type, that
   // really means expanding out as multiple arguments.
   llvm::Type *coercedTy = AI.getCoerceToType();
@@ -1701,7 +1704,7 @@ static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
 
   // Check to see if we can pairwise coerce Swift's exploded scalars
   // to Clang's expanded elements.
-  if (AI.isDirect() && AI.getCanBeFlattened() &&
+  if ((IsDirectFlattened || IsIndirect) &&
       canCoerceToSchema(IGF.IGM, expandedTys, inputSchema)) {
     for (auto outputTy : expandedTys) {
       llvm::Value *arg = in.claimNext();
@@ -1728,8 +1731,7 @@ static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
   Address coercedAddr =
       IGF.Builder.CreateBitCast(temporary, coercedTy->getPointerTo());
 
-  if (AI.isDirect() && AI.getCanBeFlattened() &&
-      isa<llvm::StructType>(coercedTy)) {
+  if (IsDirectFlattened && isa<llvm::StructType>(coercedTy)) {
     // Project out individual elements if necessary.
     auto *ST = cast<llvm::StructType>(coercedTy);
     const auto *layout = IGF.IGM.DataLayout.getStructLayout(ST);
