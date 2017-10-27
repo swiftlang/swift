@@ -1681,8 +1681,7 @@ bool Constraint<T>::hasSameSubjectAs(const Constraint<T> &other) const {
 }
 
 Optional<ConcreteConstraint>
-EquivalenceClass::findAnyConcreteConstraintAsWritten(
-                                      PotentialArchetype *preferredPA) const {
+EquivalenceClass::findAnyConcreteConstraintAsWritten(Type preferredType) const {
   // If we don't have a concrete type, there's no source.
   if (!concreteType) return None;
 
@@ -1691,7 +1690,8 @@ EquivalenceClass::findAnyConcreteConstraintAsWritten(
   for (const auto &constraint : concreteTypeConstraints) {
     if (constraint.source->getLoc().isValid()) {
       result = constraint;
-      if (!preferredPA || constraint.isSubjectEqualTo(preferredPA))
+      if (!preferredType ||
+          constraint.getSubjectDependentType({ })->isEqual(preferredType))
         return result;
     }
   }
@@ -1701,7 +1701,7 @@ EquivalenceClass::findAnyConcreteConstraintAsWritten(
 
 Optional<ConcreteConstraint>
 EquivalenceClass::findAnySuperclassConstraintAsWritten(
-                                      PotentialArchetype *preferredPA) const {
+                                                   Type preferredType) const {
   // If we don't have a superclass, there's no source.
   if (!superclass) return None;
 
@@ -1712,7 +1712,8 @@ EquivalenceClass::findAnySuperclassConstraintAsWritten(
         constraint.value->isEqual(superclass)) {
       result = constraint;
 
-      if (!preferredPA || constraint.isSubjectEqualTo(preferredPA))
+      if (!preferredType ||
+          constraint.getSubjectDependentType({ })->isEqual(preferredType))
         return result;
     }
   }
@@ -2272,7 +2273,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   // appropriately.
   const RequirementSource *superclassSource;
   if (auto writtenSource =
-        equivClass->findAnySuperclassConstraintAsWritten(nullptr))
+        equivClass->findAnySuperclassConstraintAsWritten())
     superclassSource = writtenSource->source;
   else
     superclassSource = equivClass->superclassConstraints.front().source;
@@ -2328,7 +2329,8 @@ static void maybeAddSameTypeRequirementForNestedType(
 
   // Dig out the associated type.
   AssociatedTypeDecl *assocType = nullptr;
-  if (auto depMemTy = nested.getDependentType(builder)->getAs<DependentMemberType>())
+  if (auto depMemTy =
+        nested.getDependentType(builder)->getAs<DependentMemberType>())
     assocType = depMemTy->getAssocType();
 
   if (!assocType) return;
@@ -4036,7 +4038,8 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   if (equivClass2 && equivClass2->superclass) {
     const RequirementSource *source2;
     if (auto existingSource2 =
-          equivClass2->findAnySuperclassConstraintAsWritten(OrigT2))
+          equivClass2->findAnySuperclassConstraintAsWritten(
+            OrigT2->getDependentType(getGenericParams())))
       source2 = existingSource2->source;
     else
       source2 = equivClass2->superclassConstraints.front().source;

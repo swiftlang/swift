@@ -223,15 +223,13 @@ public:
     /// archetype in this equivalence class to a concrete type along with
     /// that concrete type as written.
     Optional<ConcreteConstraint>
-    findAnyConcreteConstraintAsWritten(
-                              PotentialArchetype *preferredPA = nullptr) const;
+    findAnyConcreteConstraintAsWritten(Type preferredType = Type()) const;
 
     /// Find a source of the superclass constraint in this equivalence class
     /// that has a type equivalence to \c superclass, along with that
     /// superclass type as written.
     Optional<ConcreteConstraint>
-    findAnySuperclassConstraintAsWritten(
-                              PotentialArchetype *preferredPA = nullptr) const;
+    findAnySuperclassConstraintAsWritten(Type preferredType = Type()) const;
 
     /// Determine whether conformance to the given protocol is satisfied by
     /// a superclass requirement.
