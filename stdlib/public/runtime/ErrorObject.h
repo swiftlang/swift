@@ -208,6 +208,8 @@ SWIFT_RUNTIME_EXPORT
 void swift_errorInMain(SwiftError *object);
 SWIFT_RUNTIME_EXPORT
 void swift_willThrow(SwiftError *object);
+
+SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT LLVM_ATTRIBUTE_NORETURN
 void swift_unexpectedError(SwiftError *object);
 

@@ -11,6 +11,8 @@ import Swift
 typealias Int = Builtin.Int32
 typealias Bool = Builtin.Int1
 
+// CHECK: call swiftcc void @swift_errorInMain(
+
 infix operator * {
   associativity left
   precedence 200
@@ -837,6 +839,23 @@ func atomicload(_ p: Builtin.RawPointer) {
   // CHECK: store atomic volatile i32 [[D1]], i32* {{.*}} seq_cst, align 4
   Builtin.atomicstore_seqcst_volatile_FPIEEE32(p, d)
 }
+
+func createInt(_ fn: () -> ()) throws {}
+// CHECK-LABEL: define {{.*}}testForceTry
+// CHECK: call swiftcc void @swift_unexpectedError(%swift.error*
+func testForceTry(_ fn: () -> ()) {
+  try! createInt(fn)
+}
+
+// CHECK-LABEL: declare swiftcc void @swift_unexpectedError(%swift.error*
+
+enum MyError : Error {
+  case A, B
+}
+
+throw MyError.A
+
+
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}
 
