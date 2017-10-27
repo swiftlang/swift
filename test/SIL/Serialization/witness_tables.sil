@@ -73,14 +73,6 @@ sil_witness_table shared [serialized] InheritedConformance: AnyProtocol module w
   associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 }
 
-// CHECK-LABEL: sil_witness_table InheritedConformance2: InheritedProtocol1 module witness_tables
-// CHECK-NOT: }
-sil_witness_table InheritedConformance2: InheritedProtocol1 module witness_tables
-// CHECK-LABEL: sil_witness_table InheritedConformance2: AnyProtocol module witness_tables
-// CHECK-NOT: }
-sil_witness_table InheritedConformance2: AnyProtocol module witness_tables
-
-
 protocol Proto {
 	func abc()
 }
