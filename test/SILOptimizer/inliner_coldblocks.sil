@@ -2,9 +2,12 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-remarks=sil-inliner -o %t.sil 2>&1 | %FileCheck -check-prefix=REMARKS_PASSED %s
 // RUN: %FileCheck %s < %t.sil
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-remarks-missed=sil-inliner -o /dev/null 2>&1 | %FileCheck -check-prefix=REMARKS_MISSED %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -save-optimization-record-path %t.yaml -o /dev/null 2>&1 | %FileCheck -allow-empty -check-prefix=NO_REMARKS %s
+// RUN: %FileCheck -check-prefix=YAML %s < %t.yaml
 
 // REMARKS_PASSED-NOT: remark:
 // REMARKS_MISSED-NOT: remark:
+// NO_REMARKS-NOT: remark:
 
 sil_stage canonical
 
@@ -190,7 +193,33 @@ bb0:
   %c30 = builtin "assert_configuration"() : $Builtin.Int32
 
   %f = function_ref @update_global: $@convention(thin) () -> ()
-  // REMARKS_PASSED: inliner_coldblocks.sil:194:3: remark: update_global inlined into regular_large_callee (cost = {{.*}}, benefit = {{.*}})
+  // REMARKS_PASSED: inliner_coldblocks.sil:223:3: remark: update_global inlined into regular_large_callee (cost = {{.*}}, benefit = {{.*}})
+  // YAML:      --- !Passed
+  // YAML-NEXT: Pass:            sil-inliner
+  // YAML-NEXT: Name:            Inlined
+  // YAML-NEXT: DebugLoc:
+  // YAML-NEXT:   File:            {{.*}}inliner_coldblocks.sil
+  // YAML-NEXT:   Line:            223
+  // YAML-NEXT:   Column:          3
+  // YAML-NEXT: Function:        regular_large_callee
+  // YAML-NEXT: Args:
+  // YAML-NEXT:   - Callee:          update_global
+  // YAML-NEXT:     DebugLoc:
+  // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
+  // YAML-NEXT:       Line:            20
+  // YAML-NEXT:       Column:          6
+  // YAML-NEXT:   - String:          ' inlined into '
+  // YAML-NEXT:   - Caller:          regular_large_callee
+  // YAML-NEXT:     DebugLoc:
+  // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
+  // YAML-NEXT:       Line:            162
+  // YAML-NEXT:       Column:          6
+  // YAML-NEXT:   - String:          ' (cost = '
+  // YAML-NEXT:   - Cost:            '{{.*}}'
+  // YAML-NEXT:   - String:          ', benefit = '
+  // YAML-NEXT:   - Benefit:         '{{.*}}'
+  // YAML-NEXT:   - String:          ')'
+  // YAML-NEXT: ...
   apply %f() : $@convention(thin) () -> ()
 
   %r = tuple ()
@@ -204,7 +233,22 @@ bb0:
 sil @dont_inline_regular_large_callee : $@convention(thin) () -> () {
 bb0:
   %f = function_ref @regular_large_callee : $@convention(thin) () -> ()
-  // REMARKS_MISSED: inliner_coldblocks.sil:208:8: remark: Not profitable to inline (cost = {{.*}}, benefit = {{.*}})
+  // REMARKS_MISSED: inliner_coldblocks.sil:252:8: remark: Not profitable to inline (cost = {{.*}}, benefit = {{.*}})
+  // YAML:      --- !Missed
+  // YAML-NEXT: Pass:            sil-inliner
+  // YAML-NEXT: Name:            NoInlinedCost
+  // YAML-NEXT: DebugLoc:
+  // YAML-NEXT:   File:            {{.*}}inliner_coldblocks.sil
+  // YAML-NEXT:   Line:            252
+  // YAML-NEXT:   Column:          8
+  // YAML-NEXT: Function:        dont_inline_regular_large_callee
+  // YAML-NEXT: Args:
+  // YAML-NEXT:   - String:          'Not profitable to inline (cost = '
+  // YAML-NEXT:   - Cost:            '{{.*}}'
+  // YAML-NEXT:   - String:          ', benefit = '
+  // YAML-NEXT:   - Benefit:         '{{.*}}'
+  // YAML-NEXT:   - String:          ')'
+  // YAML-NEXT: ...
   %a = apply %f() : $@convention(thin) () -> ()
   %r = tuple ()
   return %r : $()

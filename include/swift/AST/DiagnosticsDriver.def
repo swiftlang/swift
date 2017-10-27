@@ -136,6 +136,11 @@ WARNING(verify_debug_info_requires_debug_option,none,
 ERROR(error_profile_missing,none,
       "no profdata file exists at '%0'", (StringRef))
 
+WARNING(warn_opt_remark_disabled, none,
+        "Emission of optimization records has been disabled, because it "
+        "requires a single compiler invocation: consider enabling the "
+        "-whole-module-optimization flag", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

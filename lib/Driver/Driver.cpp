@@ -1453,6 +1453,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case types::TY_ImportedModules:
       case types::TY_TBD:
       case types::TY_ModuleTrace:
+      case types::TY_OptRecord:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2234,6 +2235,19 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
         Output->setAdditionalOutputForType(types::TY_TBD, filename);
       }
     }
+  }
+
+  if (C.getArgs().hasArg(options::OPT_save_optimization_record,
+                         options::OPT_save_optimization_record_path)) {
+    if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+      auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
+          OI, C.getArgs(), options::OPT_save_optimization_record_path,
+          types::TY_OptRecord, /*TreatAsTopLevelOutput=*/true, "opt.yaml", Buf);
+
+      Output->setAdditionalOutputForType(types::TY_OptRecord, filename);
+    } else
+      // FIXME: We should use the OutputMap in this case.
+      Diags.diagnose({}, diag::warn_opt_remark_disabled);
   }
 
   // Choose the Objective-C header output path.

@@ -77,6 +77,7 @@ bool types::isTextual(ID Id) {
   case types::TY_ImportedModules:
   case types::TY_TBD:
   case types::TY_ModuleTrace:
+  case types::TY_OptRecord:
     return true;
   case types::TY_Image:
   case types::TY_Object:
@@ -131,6 +132,7 @@ bool types::isAfterLLVM(ID Id) {
   case types::TY_Remapping:
   case types::TY_IndexData:
   case types::TY_ModuleTrace:
+  case types::TY_OptRecord:
     return false;
   case types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -169,6 +171,7 @@ bool types::isPartOfSwiftCompilation(ID Id) {
   case types::TY_Remapping:
   case types::TY_IndexData:
   case types::TY_ModuleTrace:
+  case types::TY_OptRecord:
     return false;
   case types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
