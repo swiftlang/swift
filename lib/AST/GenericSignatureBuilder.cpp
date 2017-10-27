@@ -61,6 +61,7 @@ namespace {
   typedef EquivalenceClass::DerivedSameTypeComponent DerivedSameTypeComponent;
   typedef GenericSignatureBuilder::DelayedRequirement DelayedRequirement;
   typedef GenericSignatureBuilder::ResolvedType ResolvedType;
+  typedef GenericSignatureBuilder::UnresolvedType GSBUnresolvedType;
 } // end anonymous namespace
 
 namespace llvm {
@@ -390,6 +391,31 @@ namespace llvm {
     }
   };
 } // end namespace llvm
+
+namespace {
+  /// Retrieve the type described by the given unresolved tyoe.
+  Type getUnresolvedType(GSBUnresolvedType type,
+                         ArrayRef<GenericTypeParamType *> genericParams) {
+    if (auto concrete = type.dyn_cast<Type>())
+      return concrete;
+
+    if (auto pa = type.dyn_cast<PotentialArchetype *>())
+      return pa->getDependentType(genericParams);
+
+    return Type();
+  }
+
+  bool sameUnresolvedType(GSBUnresolvedType type1, GSBUnresolvedType type2) {
+    auto pa1 = type1.dyn_cast<PotentialArchetype *>();
+    auto pa2 = type2.dyn_cast<PotentialArchetype *>();
+    if (pa1 && pa2)
+      return pa1 == pa2;
+
+    Type concrete1 = pa1 ? pa1->getDependentType({ }) : type1.get<Type>();
+    Type concrete2 = pa2 ? pa2->getDependentType({ }) : type2.get<Type>();
+    return concrete1->isEqual(concrete2);
+  }
+}
 
 #pragma mark Requirement sources
 
@@ -2288,22 +2314,8 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
 /// Realize a potential archetype for this type parameter.
 PotentialArchetype *ResolvedType::realizePotentialArchetype(
                                            GenericSignatureBuilder &builder) {
-  if (auto pa = getPotentialArchetypeIfKnown())
-    return pa;
-
-  // Resolve the potential archetype now.
-  Type type = this->type.get<Type>();
-  assert(type->isTypeParameter());
-  auto pa =
-    builder.maybeResolveEquivalenceClass(type,
-                                         ArchetypeResolutionKind::WellFormed,
-                                         /*wantExactPotentialArchetype=*/true)
-      .getPotentialArchetypeIfKnown();
-  assert(pa && "Not a resolvable type!");
-
-  // Cache the potential archetype, now that it's been realized.
-  this->type = pa;
-  return pa;
+  // Realize and cache the potential archetype.
+  return builder.realizePotentialArchetype(type);
 }
 
 Type ResolvedType::getDependentType(GenericSignatureBuilder &builder) const {
@@ -3091,6 +3103,20 @@ static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
 
     return None;
   });
+}
+
+PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
+                                                     UnresolvedType &type) {
+  if (auto pa = type.dyn_cast<PotentialArchetype *>())
+    return pa;
+
+  auto pa = maybeResolveEquivalenceClass(type.get<Type>(),
+                                         ArchetypeResolutionKind::WellFormed,
+                                         /*wantExactPotentialArchetype=*/true)
+    .getPotentialArchetypeIfKnown();
+  if (pa) type = pa;
+
+  return pa;
 }
 
 ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
@@ -5346,7 +5372,8 @@ void GenericSignatureBuilder::checkConformanceConstraints(
 namespace swift {
   bool operator<(const DerivedSameTypeComponent &lhs,
                  const DerivedSameTypeComponent &rhs) {
-    return compareDependentTypes(&lhs.anchor, &rhs.anchor) < 0;
+    return compareDependentTypes(getUnresolvedType(lhs.anchor, { }),
+                                 getUnresolvedType(rhs.anchor, { })) < 0;
   }
 } // namespace swift
 
@@ -5482,7 +5509,9 @@ static void computeDerivedSameTypeComponents(
     componentOf[depType] = componentIndex;
 
     // If this is a better anchor, record it.
-    if (compareDependentTypes(&pa, &components[componentIndex].anchor) < 0)
+    if (compareDependentTypes(
+                depType,
+                getUnresolvedType(components[componentIndex].anchor, { })) < 0)
       components[componentIndex].anchor = pa;
   }
 
@@ -5799,7 +5828,9 @@ static void collapseSameTypeComponents(
       auto &newComponent = newComponents[newRepresentativeIndex];
 
       // If the old component has a better anchor, keep it.
-      if (compareDependentTypes(&oldComponent.anchor, &newComponent.anchor) < 0)
+      if (compareDependentTypes(
+                            getUnresolvedType(oldComponent.anchor, { }),
+                            getUnresolvedType(newComponent.anchor, { })) < 0)
         newComponent.anchor = oldComponent.anchor;
 
       // If the old component has a better concrete type source, keep it.
@@ -6206,8 +6237,8 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
                                equivClass.members.front()->getRepresentative());
     }
 
-    for (const auto &component : equivClass.derivedSameTypeComponents) {
-      archetypes.push_back(component.anchor);
+    for (auto &component : equivClass.derivedSameTypeComponents) {
+      archetypes.push_back(realizePotentialArchetype(component.anchor));
     }
   }
 
@@ -6230,7 +6261,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
       std::find_if(equivClass->derivedSameTypeComponents.begin(),
                    equivClass->derivedSameTypeComponents.end(),
                    [&](const DerivedSameTypeComponent &component) {
-                     return component.anchor == archetype;
+                     return sameUnresolvedType(component.anchor, archetype);
                    });
     std::function<void()> deferredSameTypeRequirement;
 
@@ -6267,7 +6298,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
         // Form a same-type constraint from this anchor within the component
         // to the next.
         // FIXME: Distinguish between explicit and inferred here?
-        auto otherPA = nextAnchor->anchor;
+        auto otherPA = realizePotentialArchetype(nextAnchor->anchor);
         deferredSameTypeRequirement =
           [&f, archetype, otherPA, this, genericParams] {
             f(RequirementKind::SameType, archetype, otherPA,

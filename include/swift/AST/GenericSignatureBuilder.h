@@ -158,7 +158,7 @@ public:
     /// the equivalence class that is held together by derived constraints.
     struct DerivedSameTypeComponent {
       /// The potential archetype that acts as the anchor for this component.
-      PotentialArchetype *anchor;
+      UnresolvedType anchor;
 
       /// The (best) requirement source within the component that makes the
       /// potential archetypes in this component equivalent to the concrete
@@ -749,6 +749,12 @@ private:
   void checkSameTypeConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
+
+  /// Realize a potential archetype for the given type.
+  ///
+  /// The resolved archetype will be written back into the unresolved type,
+  /// to make the next resolution more efficient.
+  PotentialArchetype *realizePotentialArchetype(UnresolvedType &type);
 
 public:
   /// \brief Try to resolve the equivalence class of the given type.
