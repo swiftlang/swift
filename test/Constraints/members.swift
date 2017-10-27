@@ -1,3 +1,4 @@
+
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
 ////
@@ -463,4 +464,12 @@ struct Outer {
       // expected-error@-1 {{instance member 'outer' of type 'Outer' cannot be used on instance of nested type 'Outer.Inner'}}
     }
   }
+}
+
+struct HasStaticSR6207 {
+  func foo() {
+    print(cvar) // expected-error {{static element cvar cannot be referenced as an instance member}}
+  }
+
+  static let cvar = 123
 }
