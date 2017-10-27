@@ -2874,7 +2874,7 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
     if (auto objcAttr = conflicts[0]->getAttrs().getAttribute<ObjCAttr>())
       hasExplicitObjCAttribute = !objcAttr->isImplicit();
     if (!hasExplicitObjCAttribute)
-      Diags.diagnose(conflicts[0], diag::optional_req_near_match_nonobjc, true)
+      Diags.diagnose(conflicts[0], diag::req_near_match_nonobjc, true)
         .fixItInsert(
           conflicts[0]->getAttributeInsertionLoc(/*forModifier=*/false),
           "@nonobjc ");

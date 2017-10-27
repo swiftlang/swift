@@ -4,8 +4,8 @@ enum MSV : Error {
   case Foo, Bar, Baz
   case CarriesInt(Int)
 
-  var domain: String { return "" }
-  var code: Int { return 0 }
+  var _domain: String { return "" }
+  var _code: Int { return 0 }
 }
 
 func opaque_error() -> Error { return MSV.Foo }

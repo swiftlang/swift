@@ -1635,17 +1635,18 @@ NOTE(redundant_conformance_witness_ignored,none,
      (DescriptiveDeclKind, DeclName, DeclName))
 
 // "Near matches"
-WARNING(optional_req_near_match,none,
-        "%0 %1 nearly matches optional requirement %2 of protocol %3",
-        (DescriptiveDeclKind, DeclName, DeclName, DeclName))
+WARNING(req_near_match,none,
+        "%0 %1 nearly matches %select{defaulted|optional}2 requirement %3 "
+        "of protocol %4",
+        (DescriptiveDeclKind, DeclName, bool, DeclName, DeclName))
 NOTE(optional_req_nonobjc_near_match_add_objc,none,
      "add '@objc' to provide an Objective-C entrypoint", ())
-NOTE(optional_req_near_match_move,none,
+NOTE(req_near_match_move,none,
      "move %0 to %select{an|another}1 extension to silence this warning",
      (DeclName, unsigned))
-NOTE(optional_req_near_match_nonobjc,none,
+NOTE(req_near_match_nonobjc,none,
      "add '@nonobjc' to silence this %select{warning|error}0", (bool))
-NOTE(optional_req_near_match_access,none,
+NOTE(req_near_match_access,none,
      "make %0 %select{ERROR|private|private|non-public|non-public}1 to silence this "
      "warning", (DeclName, AccessLevel))
 

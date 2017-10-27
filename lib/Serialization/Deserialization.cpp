@@ -760,6 +760,10 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
       break;
   }
 
+  // Don't create empty generic parameter lists.
+  if (params.empty())
+    return nullptr;
+
   auto paramList = GenericParamList::create(getContext(), SourceLoc(),
                                             params, SourceLoc(), { },
                                             SourceLoc());
