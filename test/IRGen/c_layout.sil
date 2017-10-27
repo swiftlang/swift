@@ -126,11 +126,11 @@ bb0:
 }
 
 // CHECK-x86_64-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
-// CHECK-x86_64:         call signext i8 @chareth(i8 signext %0)
-// CHECK-x86_64:         call signext i8 @signedChareth(i8 signext %1)
-// CHECK-x86_64:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
-// CHECK-x86_64:         call signext i16 @eatMyShorts(i16 signext %3)
-// CHECK-x86_64:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-x86_64:         call signext i8 @chareth(i8 signext
+// CHECK-x86_64:         call signext i8 @signedChareth(i8 signext
+// CHECK-x86_64:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-x86_64:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-x86_64:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
 // CHECK-x86_64:         call i32 @ints(i32 %5)
 // CHECK-x86_64:         call i32 @unsigneds(i32 %6)
 // CHECK-x86_64-LABEL: declare signext i8 @chareth(i8 signext)
@@ -142,11 +142,11 @@ bb0:
 // CHECK-x86_64-LABEL: declare i32 @unsigneds(i32)
 
 // CHECK-i386-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
-// CHECK-i386:         call signext i8 @chareth(i8 signext %0)
-// CHECK-i386:         call signext i8 @signedChareth(i8 signext %1)
-// CHECK-i386:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
-// CHECK-i386:         call signext i16 @eatMyShorts(i16 signext %3)
-// CHECK-i386:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-i386:         call signext i8 @chareth(i8 signext
+// CHECK-i386:         call signext i8 @signedChareth(i8 signext
+// CHECK-i386:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-i386:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-i386:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
 // CHECK-i386:         call i32 @ints(i32 %5)
 // CHECK-i386:         call i32 @unsigneds(i32 %6)
 // CHECK-i386-LABEL: declare signext i8 @chareth(i8 signext)
@@ -158,11 +158,11 @@ bb0:
 // CHECK-i386-LABEL: declare i32 @unsigneds(i32)
 
 // CHECK-armv7-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
-// CHECK-armv7:         call signext i8 @chareth(i8 signext %0)
-// CHECK-armv7:         call signext i8 @signedChareth(i8 signext %1)
-// CHECK-armv7:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
-// CHECK-armv7:         call signext i16 @eatMyShorts(i16 signext %3)
-// CHECK-armv7:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-armv7:         call signext i8 @chareth(i8 signext
+// CHECK-armv7:         call signext i8 @signedChareth(i8 signext
+// CHECK-armv7:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-armv7:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-armv7:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
 // CHECK-armv7:         call i32 @ints(i32 %5)
 // CHECK-armv7:         call i32 @unsigneds(i32 %6)
 // CHECK-armv7-LABEL: declare signext i8 @chareth(i8 signext)
@@ -174,11 +174,11 @@ bb0:
 // CHECK-armv7-LABEL: declare i32 @unsigneds(i32)
 
 // CHECK-armv7s-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
-// CHECK-armv7s:         call signext i8 @chareth(i8 signext %0)
-// CHECK-armv7s:         call signext i8 @signedChareth(i8 signext %1)
-// CHECK-armv7s:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
-// CHECK-armv7s:         call signext i16 @eatMyShorts(i16 signext %3)
-// CHECK-armv7s:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-armv7s:         call signext i8 @chareth(i8 signext
+// CHECK-armv7s:         call signext i8 @signedChareth(i8 signext
+// CHECK-armv7s:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-armv7s:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-armv7s:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
 // CHECK-armv7s:         call i32 @ints(i32 %5)
 // CHECK-armv7s:         call i32 @unsigneds(i32 %6)
 // CHECK-armv7s-LABEL: declare signext i8 @chareth(i8 signext)
@@ -190,11 +190,11 @@ bb0:
 // CHECK-armv7s-LABEL: declare i32 @unsigneds(i32)
 
 // CHECK-armv7k-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
-// CHECK-armv7k:         call signext i8 @chareth(i8 signext %0)
-// CHECK-armv7k:         call signext i8 @signedChareth(i8 signext %1)
-// CHECK-armv7k:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
-// CHECK-armv7k:         call signext i16 @eatMyShorts(i16 signext %3)
-// CHECK-armv7k:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-armv7k:         call signext i8 @chareth(i8 signext
+// CHECK-armv7k:         call signext i8 @signedChareth(i8 signext
+// CHECK-armv7k:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-armv7k:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-armv7k:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
 // CHECK-armv7k:         call i32 @ints(i32 %5)
 // CHECK-armv7k:         call i32 @unsigneds(i32 %6)
 // CHECK-armv7k-LABEL: declare signext i8 @chareth(i8 signext)
@@ -206,11 +206,11 @@ bb0:
 // CHECK-armv7k-LABEL: declare i32 @unsigneds(i32)
 
 // CHECK-arm64-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
-// CHECK-arm64:         call signext i8 @chareth(i8 signext %0)
-// CHECK-arm64:         call signext i8 @signedChareth(i8 signext %1)
-// CHECK-arm64:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
-// CHECK-arm64:         call signext i16 @eatMyShorts(i16 signext %3)
-// CHECK-arm64:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-arm64:         call signext i8 @chareth(i8 signext
+// CHECK-arm64:         call signext i8 @signedChareth(i8 signext
+// CHECK-arm64:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-arm64:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-arm64:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
 // CHECK-arm64:         call i32 @ints(i32 %5)
 // CHECK-arm64:         call i32 @unsigneds(i32 %6)
 // CHECK-arm64-LABEL: declare signext i8 @chareth(i8 signext)
@@ -238,11 +238,11 @@ bb0:
 // CHECK-aarch64-LABEL: declare i32 @unsigneds(i32)
 
 // CHECK-powerpc64-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
-// CHECK-powerpc64:         call zeroext i8 @chareth(i8 zeroext %0)
-// CHECK-powerpc64:         call zeroext i8 @signedChareth(i8 zeroext %1)
-// CHECK-powerpc64:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
-// CHECK-powerpc64:         call signext i16 @eatMyShorts(i16 signext %3)
-// CHECK-powerpc64:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-powerpc64:         call zeroext i8 @chareth(i8 zeroext
+// CHECK-powerpc64:         call zeroext i8 @signedChareth(i8 zeroext
+// CHECK-powerpc64:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-powerpc64:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-powerpc64:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
 // CHECK-powerpc64:         call signext i32 @ints(i32 signext %5)
 // CHECK-powerpc64:         call zeroext i32 @unsigneds(i32 zeroext %6)
 // CHECK-powerpc64-LABEL: declare zeroext i8 @chareth(i8 zeroext)
@@ -254,11 +254,11 @@ bb0:
 // CHECK-powerpc64-LABEL: declare zeroext i32 @unsigneds(i32 zeroext)
 
 // CHECK-powerpc64le-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
-// CHECK-powerpc64le:         call zeroext i8 @chareth(i8 zeroext %0)
-// CHECK-powerpc64le:         call zeroext i8 @signedChareth(i8 zeroext %1)
-// CHECK-powerpc64le:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
-// CHECK-powerpc64le:         call signext i16 @eatMyShorts(i16 signext %3)
-// CHECK-powerpc64le:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-powerpc64le:         call zeroext i8 @chareth(i8 zeroext
+// CHECK-powerpc64le:         call zeroext i8 @signedChareth(i8 zeroext
+// CHECK-powerpc64le:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-powerpc64le:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-powerpc64le:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
 // CHECK-powerpc64le:         call signext i32 @ints(i32 signext %5)
 // CHECK-powerpc64le:         call zeroext i32 @unsigneds(i32 zeroext %6)
 // CHECK-powerpc64le-LABEL: declare zeroext i8 @chareth(i8 zeroext)
@@ -270,11 +270,11 @@ bb0:
 // CHECK-powerpc64le-LABEL: declare zeroext i32 @unsigneds(i32 zeroext)
 
 // CHECK-s390x-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
-// CHECK-s390x:         call zeroext i8 @chareth(i8 zeroext %0)
-// CHECK-s390x:         call zeroext i8 @signedChareth(i8 zeroext %1)
-// CHECK-s390x:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
-// CHECK-s390x:         call signext i16 @eatMyShorts(i16 signext %3)
-// CHECK-s390x:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-s390x:         call zeroext i8 @chareth(i8 zeroext
+// CHECK-s390x:         call zeroext i8 @signedChareth(i8 zeroext
+// CHECK-s390x:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-s390x:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-s390x:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
 // CHECK-s390x:         call signext i32 @ints(i32 signext %5)
 // CHECK-s390x:         call zeroext i32 @unsigneds(i32 zeroext %6)
 // CHECK-s390x-LABEL: declare zeroext i8 @chareth(i8 zeroext)

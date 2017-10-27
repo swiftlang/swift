@@ -1,4 +1,11 @@
-module gizmo { header "Gizmo.h" }
+
+module gizmo {
+  header "Gizmo.h"
+}
+
+module SRoA {
+  header "SRoA.h"
+}
 
 module ObjectiveC {
   header "BridgeTestObjectiveC.h"
