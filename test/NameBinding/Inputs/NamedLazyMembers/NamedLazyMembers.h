@@ -30,5 +30,23 @@
 + (SimpleDoer*)Doer;
 + (SimpleDoer*)DoerOfNoWork;
 
+- (void)simplyDoSomeWork;
+- (void)simplyDoSomeWorkWithSpeed:(int)s;
+- (void)simplyDoSomeWorkWithSpeed:(int)s thoroughness:(int)t
+  NS_SWIFT_NAME(simplyDoVeryImportantWork(speed:thoroughness:));
+- (void)simplyDoSomeWorkWithSpeed:(int)s alacrity:(int)a
+  NS_SWIFT_NAME(simplyDoSomeWorkWithSpeed(speed:levelOfAlacrity:));
+
+// These we are generally trying to not-import, via laziness.
+- (void)simplyGoForWalk;
+- (void)simplyTakeNap;
+- (void)simplyEatMeal;
+- (void)simplyTidyHome;
+- (void)simplyCallFamily;
+- (void)simplySingSong;
+- (void)simplyReadBook;
+- (void)simplyAttendLecture;
+- (void)simplyWriteLetter;
+
 @end
 
