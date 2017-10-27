@@ -271,14 +271,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     return out.add(v); \
   }
 
-#define BUILTIN_RUNTIME_CALL(id, name, attrs) \
-  if (Builtin.ID == BuiltinValueKind::id) { \
-    llvm::CallInst *call = IGF.Builder.CreateCall(IGF.IGM.get##id##Fn(),  \
-                           args.claimNext()); \
-    call->setCallingConv(IGF.IGM.DefaultCC); \
-    call->setDoesNotThrow(); \
-    return out.add(call); \
- }
+#define BUILTIN_RUNTIME_CALL(id, name, attrs)                                  \
+  if (Builtin.ID == BuiltinValueKind::id) {                                    \
+    auto *fn = cast<llvm::Function>(IGF.IGM.get##id##Fn());                    \
+    llvm::CallInst *call = IGF.Builder.CreateCall(fn, args.claimNext());       \
+    call->setCallingConv(fn->getCallingConv());                                \
+    call->setAttributes(fn->getAttributes());                                  \
+    return out.add(call);                                                      \
+  }
 
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, uncheckedID, attrs, overload) \
 if (Builtin.ID == BuiltinValueKind::id) { \
