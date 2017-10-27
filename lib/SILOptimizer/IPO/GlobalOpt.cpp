@@ -1369,6 +1369,9 @@ void SILGlobalOpt::replaceFindStringCall(ApplyInst *FindStringCall) {
   if (!cacheDecl)
     return;
 
+  assert(cacheDecl->hasFixedLayout(Module->getSwiftModule(),
+                                   ResilienceExpansion::Minimal));
+
   SILType wordTy = cacheType.getFieldType(
                             cacheDecl->getStoredProperties().front(), *Module);
 

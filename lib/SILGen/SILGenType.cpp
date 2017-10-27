@@ -381,8 +381,7 @@ public:
     Serialized = IsNotSerialized;
 
     // ... or if the conformance itself thinks it should be.
-    if (SILWitnessTable::conformanceIsSerialized(
-            Conformance, SGM.M.getSwiftModule()->getResilienceStrategy()))
+    if (SILWitnessTable::conformanceIsSerialized(Conformance))
       Serialized = IsSerialized;
 
     // Not all protocols use witness tables; in this case we just skip

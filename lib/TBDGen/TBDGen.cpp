@@ -109,7 +109,7 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     // sometimes witness thunks need to be manually made public.
 
     auto conformanceIsFixed = SILWitnessTable::conformanceIsSerialized(
-        normalConformance, SwiftModule->getResilienceStrategy());
+        normalConformance);
     auto addSymbolIfNecessary = [&](ValueDecl *valueReq,
                                     SILLinkage witnessLinkage) {
       if (conformanceIsFixed &&
