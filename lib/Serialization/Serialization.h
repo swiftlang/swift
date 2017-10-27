@@ -137,7 +137,7 @@ private:
   /// A map from identifiers to methods and properties with the given name.
   ///
   /// This is used for id-style lookup.
-  DeclTable ClassMembersByName;
+  DeclTable ClassMembersForDynamicLookup;
 
   /// The queue of types and decls that need to be serialized.
   ///

@@ -1499,7 +1499,7 @@ namespace index_block {
     TOP_LEVEL_DECLS,
     OPERATORS,
     EXTENSIONS,
-    CLASS_MEMBERS,
+    CLASS_MEMBERS_FOR_DYNAMIC_LOOKUP,
     OPERATOR_METHODS,
 
     /// The Objective-C method index, which contains a mapping from

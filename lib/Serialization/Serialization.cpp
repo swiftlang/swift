@@ -638,7 +638,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, TOP_LEVEL_DECLS);
   BLOCK_RECORD(index_block, OPERATORS);
   BLOCK_RECORD(index_block, EXTENSIONS);
-  BLOCK_RECORD(index_block, CLASS_MEMBERS);
+  BLOCK_RECORD(index_block, CLASS_MEMBERS_FOR_DYNAMIC_LOOKUP);
   BLOCK_RECORD(index_block, OPERATOR_METHODS);
   BLOCK_RECORD(index_block, OBJC_METHODS);
   BLOCK_RECORD(index_block, ENTRY_POINT);
@@ -1624,7 +1624,7 @@ void Serializer::writeMembers(DeclRange members, bool isClass) {
     if (isClass) {
       if (auto VD = dyn_cast<ValueDecl>(member)) {
         if (VD->canBeAccessedByDynamicLookup()) {
-          auto &list = ClassMembersByName[VD->getBaseName()];
+          auto &list = ClassMembersForDynamicLookup[VD->getBaseName()];
           list.push_back({getKindForTable(VD), memberID});
         }
       }
@@ -4596,7 +4596,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     writeDeclTable(DeclList, index_block::TOP_LEVEL_DECLS, topLevelDecls);
     writeDeclTable(DeclList, index_block::OPERATORS, operatorDecls);
     writeDeclTable(DeclList, index_block::PRECEDENCE_GROUPS, precedenceGroupDecls);
-    writeDeclTable(DeclList, index_block::CLASS_MEMBERS, ClassMembersByName);
+    writeDeclTable(DeclList, index_block::CLASS_MEMBERS_FOR_DYNAMIC_LOOKUP,
+                   ClassMembersForDynamicLookup);
     writeDeclTable(DeclList, index_block::OPERATOR_METHODS, operatorMethodDecls);
     if (hasLocalTypes)
       writeLocalDeclTable(DeclList, index_block::LOCAL_TYPE_DECLS,

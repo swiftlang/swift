@@ -667,8 +667,8 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::EXTENSIONS:
         ExtensionDecls = readExtensionTable(scratch, blobData);
         break;
-      case index_block::CLASS_MEMBERS:
-        ClassMembersByName = readDeclTable(scratch, blobData);
+      case index_block::CLASS_MEMBERS_FOR_DYNAMIC_LOOKUP:
+        ClassMembersForDynamicLookup = readDeclTable(scratch, blobData);
         break;
       case index_block::OPERATOR_METHODS:
         OperatorMethodDecls = readDeclTable(scratch, blobData);
@@ -1640,11 +1640,11 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
   PrettyStackTraceModuleFile stackEntry(*this);
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
-  if (!ClassMembersByName)
+  if (!ClassMembersForDynamicLookup)
     return;
 
-  auto iter = ClassMembersByName->find(name.getBaseName());
-  if (iter == ClassMembersByName->end())
+  auto iter = ClassMembersForDynamicLookup->find(name.getBaseName());
+  if (iter == ClassMembersForDynamicLookup->end())
     return;
 
   if (!accessPath.empty()) {
@@ -1689,11 +1689,11 @@ void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
   PrettyStackTraceModuleFile stackEntry(*this);
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
-  if (!ClassMembersByName)
+  if (!ClassMembersForDynamicLookup)
     return;
 
   if (!accessPath.empty()) {
-    for (const auto &list : ClassMembersByName->data()) {
+    for (const auto &list : ClassMembersForDynamicLookup->data()) {
       for (auto item : list) {
         auto vd = cast<ValueDecl>(getDecl(item.second));
         auto dc = vd->getDeclContext();
@@ -1707,7 +1707,7 @@ void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
     return;
   }
 
-  for (const auto &list : ClassMembersByName->data()) {
+  for (const auto &list : ClassMembersForDynamicLookup->data()) {
     for (auto item : list)
       consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
                          DeclVisibilityKind::DynamicLookup);

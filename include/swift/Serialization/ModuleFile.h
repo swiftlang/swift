@@ -338,7 +338,7 @@ private:
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
   std::unique_ptr<SerializedDeclTable> PrecedenceGroupDecls;
-  std::unique_ptr<SerializedDeclTable> ClassMembersByName;
+  std::unique_ptr<SerializedDeclTable> ClassMembersForDynamicLookup;
   std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
   std::unique_ptr<SerializedExtensionTable> ExtensionDecls;
   std::unique_ptr<SerializedLocalDeclTable> LocalTypeDecls;
