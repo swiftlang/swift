@@ -897,8 +897,7 @@ public:
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
-    OptRemark::Emitter ORE(DEBUG_TYPE,
-                           getFunction()->getModule().getASTContext());
+    OptRemark::Emitter ORE(DEBUG_TYPE, getFunction()->getModule());
 
     if (getOptions().InlineThreshold == 0) {
       return;

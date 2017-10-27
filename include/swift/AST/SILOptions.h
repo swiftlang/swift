@@ -150,6 +150,10 @@ public:
   /// \brief Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
 
+  /// The name of the file to which the backend should save YAML optimization
+  /// records.
+  std::string OptRecordFile;
+
   SILOptions() {}
 
   /// Return a hash code of any components from these options that should

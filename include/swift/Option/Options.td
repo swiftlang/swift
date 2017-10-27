@@ -331,6 +331,13 @@ def Rpass_missed_EQ : Joined<["-"], "Rpass-missed=">,
   HelpText<"Report missed transformations by optimization passes whose "
            "name matches the given POSIX regular expression">;
 
+def save_optimization_record : Flag<["-"], "save-optimization-record">,
+  Flags<[FrontendOption]>, HelpText<"Generate a YAML optimization record file">;
+def save_optimization_record_path :
+  Separate<["-"], "save-optimization-record-path">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specify the file name of any generated YAML optimization record">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,
