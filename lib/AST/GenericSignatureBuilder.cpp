@@ -62,6 +62,7 @@ namespace {
   typedef GenericSignatureBuilder::DelayedRequirement DelayedRequirement;
   typedef GenericSignatureBuilder::ResolvedType ResolvedType;
   typedef GenericSignatureBuilder::UnresolvedType GSBUnresolvedType;
+  typedef GenericSignatureBuilder::RequirementRHS RequirementRHS;
 } // end anonymous namespace
 
 namespace llvm {
@@ -2184,7 +2185,7 @@ void DelayedRequirement::dump() const {
 ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
                                    RequirementKind kind,
                                    UnresolvedType lhs,
-                                   RequirementRHS rhs,
+                                   UnresolvedRequirementRHS rhs,
                                    FloatingRequirementSource source,
                                    EquivalenceClass *unresolvedEquivClass,
                                    UnresolvedHandlingKind unresolvedHandling) {
@@ -3814,8 +3815,8 @@ ConstraintResult GenericSignatureBuilder::addSuperclassRequirementDirect(
 }
 
 /// Map an unresolved type to a requirement right-hand-side.
-static GenericSignatureBuilder::RequirementRHS
-toRequirementRHS(GenericSignatureBuilder::UnresolvedType unresolved) {
+static GenericSignatureBuilder::UnresolvedRequirementRHS
+toUnresolvedRequirementRHS(GenericSignatureBuilder::UnresolvedType unresolved) {
   if (auto pa = unresolved.dyn_cast<PotentialArchetype *>())
     return pa;
 
@@ -3831,7 +3832,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   if (!resolvedConstraint) {
     return handleUnresolvedRequirement(
                              RequirementKind::Conformance, subject,
-                             toRequirementRHS(constraint), source,
+                             toUnresolvedRequirementRHS(constraint), source,
                              resolvedConstraint.getUnresolvedEquivClass(),
                              unresolvedHandling);
   }
@@ -4244,7 +4245,8 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
   auto resolved1 = resolve(paOrT1, source);
   if (!resolved1) {
     return handleUnresolvedRequirement(RequirementKind::SameType, paOrT1,
-                                       toRequirementRHS(paOrT2), source,
+                                       toUnresolvedRequirementRHS(paOrT2),
+                                       source,
                                        resolved1.getUnresolvedEquivClass(),
                                        unresolvedHandling);
   }
@@ -4252,7 +4254,8 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
   auto resolved2 = resolve(paOrT2, source);
   if (!resolved2) {
     return handleUnresolvedRequirement(RequirementKind::SameType, paOrT1,
-                                       toRequirementRHS(paOrT2), source,
+                                       toUnresolvedRequirementRHS(paOrT2),
+                                       source,
                                        resolved2.getUnresolvedEquivClass(),
                                        unresolvedHandling);
   }
@@ -4957,7 +4960,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
 /// Turn a requirement right-hand side into an unresolved type.
 static GenericSignatureBuilder::UnresolvedType asUnresolvedType(
-                                GenericSignatureBuilder::RequirementRHS rhs) {
+                        GenericSignatureBuilder::UnresolvedRequirementRHS rhs) {
   if (auto pa = rhs.dyn_cast<PotentialArchetype *>())
     return GenericSignatureBuilder::UnresolvedType(pa);
 
@@ -6224,10 +6227,12 @@ namespace {
   }
 } // end anonymous namespace
 
-void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
+void GenericSignatureBuilder::enumerateRequirements(
+                   ArrayRef<GenericTypeParamType *> genericParams,
+                   llvm::function_ref<
                      void (RequirementKind kind,
-                           PotentialArchetype *archetype,
-                           GenericSignatureBuilder::RequirementRHS constraint,
+                           Type type,
+                           RequirementRHS constraint,
                            const RequirementSource *source)> f) {
   // Collect all archetypes.
   SmallVector<PotentialArchetype *, 8> archetypes;
@@ -6246,7 +6251,6 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
   llvm::array_pod_sort(archetypes.begin(), archetypes.end(),
                        compareDependentTypes);
 
-  auto genericParams = getGenericParams();
   for (auto *archetype : archetypes) {
     // Check whether this archetype is one of the anchors within its
     // connected component. If so, we may need to emit a same-type constraint.
@@ -6254,6 +6258,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
     // FIXME: O(n) in the number of implied connected components within the
     // equivalence class. The equivalence class should be small, but...
     auto equivClass = archetype->getOrCreateEquivalenceClass(*this);
+    Type depTy = archetype->getDependentType(genericParams);
 
     assert(!equivClass->derivedSameTypeComponents.empty() &&
            "Didn't compute derived same-type components?");
@@ -6278,33 +6283,29 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
         auto source =
           knownAnchor->concreteTypeSource
             ? knownAnchor->concreteTypeSource
-            : RequirementSource::forAbstract(*this,
-                             archetype->getDependentType(getGenericParams()));
+            : RequirementSource::forAbstract(*this, depTy);
 
         // Drop recursive and invalid concrete-type constraints.
         if (equivClass->recursiveConcreteType ||
             equivClass->invalidConcreteType)
           continue;
 
-        f(RequirementKind::SameType, archetype, concreteType, source);
+        f(RequirementKind::SameType, depTy, concreteType, source);
         continue;
       }
 
       // If we're at the last anchor in the component, do nothing;
       auto nextAnchor = knownAnchor;
       ++nextAnchor;
-      if (nextAnchor != equivClass->derivedSameTypeComponents.end() /* &&
-          !equivClass->areAllRequirementsDerived()*/) {
+      if (nextAnchor != equivClass->derivedSameTypeComponents.end()) {
         // Form a same-type constraint from this anchor within the component
         // to the next.
         // FIXME: Distinguish between explicit and inferred here?
-        auto otherPA = realizePotentialArchetype(nextAnchor->anchor);
+        auto otherTy = getUnresolvedType(nextAnchor->anchor, genericParams);
         deferredSameTypeRequirement =
-          [&f, archetype, otherPA, this, genericParams] {
-            f(RequirementKind::SameType, archetype, otherPA,
-              RequirementSource::forAbstract(
-                                     *this,
-                                     archetype->getDependentType(genericParams)));
+          [&f, depTy, otherTy, this, genericParams] {
+            f(RequirementKind::SameType, depTy, otherTy,
+              RequirementSource::forAbstract(*this, otherTy));
           };
       }
     }
@@ -6325,12 +6326,9 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
           });
 
       if (!bestSource)
-        bestSource =
-          RequirementSource::forAbstract(
-                                 *this,
-                                 archetype->getDependentType(genericParams));
+        bestSource = RequirementSource::forAbstract(*this, depTy);
 
-      f(RequirementKind::Superclass, archetype, equivClass->superclass,
+      f(RequirementKind::Superclass, depTy, equivClass->superclass,
         *bestSource);
     }
 
@@ -6342,12 +6340,9 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
                             return layout == equivClass->layout;
                           });
       if (!bestSource)
-        bestSource =
-          RequirementSource::forAbstract(
-                                   *this,
-                                   archetype->getDependentType(genericParams));
+        bestSource = RequirementSource::forAbstract(*this, depTy);
 
-      f(RequirementKind::Layout, archetype, equivClass->layout, *bestSource);
+      f(RequirementKind::Layout, depTy, equivClass->layout, *bestSource);
     }
 
     // Enumerate conformance requirements.
@@ -6375,7 +6370,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
     // Enumerate the conformance requirements.
     for (auto proto : protocols) {
       assert(protocolSources.count(proto) == 1 && "Missing conformance?");
-      f(RequirementKind::Conformance, archetype, 
+      f(RequirementKind::Conformance, depTy,
         proto->getDeclaredInterfaceType(),
         protocolSources.find(proto)->second);
     }
@@ -6388,29 +6383,30 @@ void GenericSignatureBuilder::dump() {
 
 void GenericSignatureBuilder::dump(llvm::raw_ostream &out) {
   out << "Requirements:";
-  enumerateRequirements([&](RequirementKind kind,
-                            PotentialArchetype *archetype,
-                            GenericSignatureBuilder::RequirementRHS constraint,
+  enumerateRequirements(getGenericParams(),
+                        [&](RequirementKind kind,
+                            Type type,
+                            RequirementRHS constraint,
                             const RequirementSource *source) {
     switch (kind) {
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
       out << "\n  ";
-      out << archetype->getDebugName() << " : " 
+      out << type.getString() << " : "
           << constraint.get<Type>().getString() << " [";
       source->print(out, &Context.SourceMgr);
       out << "]";
       break;
     case RequirementKind::Layout:
       out << "\n  ";
-      out << archetype->getDebugName() << " : "
+      out << type.getString() << " : "
           << constraint.get<LayoutConstraint>().getString() << " [";
       source->print(out, &Context.SourceMgr);
       out << "]";
       break;
     case RequirementKind::SameType:
       out << "\n  ";
-      out << archetype->getDebugName() << " == " ;
+      out << type.getString() << " == " ;
       if (auto secondType = constraint.dyn_cast<Type>()) {
         out << secondType.getString();
       } else {
@@ -6446,9 +6442,11 @@ void GenericSignatureBuilder::addGenericSignature(GenericSignature *sig) {
 static void collectRequirements(GenericSignatureBuilder &builder,
                                 ArrayRef<GenericTypeParamType *> params,
                                 SmallVectorImpl<Requirement> &requirements) {
-  builder.enumerateRequirements([&](RequirementKind kind,
-          GenericSignatureBuilder::PotentialArchetype *archetype,
-          GenericSignatureBuilder::RequirementRHS type,
+  builder.enumerateRequirements(
+      params,
+      [&](RequirementKind kind,
+          Type depTy,
+          RequirementRHS type,
           const RequirementSource *source) {
     // Filter out derived requirements... except for concrete-type requirements
     // on generic parameters. The exception is due to the canonicalization of
@@ -6456,31 +6454,26 @@ static void collectRequirements(GenericSignatureBuilder &builder,
     // they have been mapped to a concrete type.
     if (source->isDerivedRequirement() &&
         !(kind == RequirementKind::SameType &&
-          archetype->isGenericParam() &&
+          depTy->is<GenericTypeParamType>() &&
           type.is<Type>()))
       return;
-
-    auto depTy = archetype->getDependentType(params);
 
     if (depTy->hasError())
       return;
 
     Type repTy;
     if (auto concreteTy = type.dyn_cast<Type>()) {
-      // Maybe we were equated to a concrete type...
+      // Maybe we were equated to a concrete or dependent type...
       repTy = concreteTy;
 
       // Drop requirements involving concrete types containing
       // unresolved associated types.
       if (repTy->findUnresolvedDependentMemberType())
         return;
-    } else if (auto layoutConstraint = type.dyn_cast<LayoutConstraint>()) {
+    } else {
+      auto layoutConstraint = type.get<LayoutConstraint>();
       requirements.push_back(Requirement(kind, depTy, layoutConstraint));
       return;
-    } else {
-      // ...or to a dependent type.
-      repTy = type.get<GenericSignatureBuilder::PotentialArchetype *>()
-          ->getDependentType(params);
     }
 
     if (repTy->hasError())

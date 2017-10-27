@@ -91,8 +91,11 @@ public:
   using UnresolvedType = llvm::PointerUnion<PotentialArchetype *, Type>;
   class ResolvedType;
 
-  using RequirementRHS =
+  using UnresolvedRequirementRHS =
       llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+
+  using RequirementRHS =
+    llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
 
   /// The location of a requirement as written somewhere in the source.
   typedef llvm::PointerUnion<const TypeRepr *, const RequirementRepr *>
@@ -337,7 +340,7 @@ private:
   /// as appropriate based on \c unresolvedHandling.
   ConstraintResult handleUnresolvedRequirement(RequirementKind kind,
                                    UnresolvedType lhs,
-                                   RequirementRHS rhs,
+                                   UnresolvedRequirementRHS rhs,
                                    FloatingRequirementSource source,
                                    EquivalenceClass *unresolvedEquivClass,
                                    UnresolvedHandlingKind unresolvedHandling);
@@ -534,13 +537,14 @@ public:
   ///
   /// \param f A function object that will be passed each requirement
   /// and requirement source.
-  void enumerateRequirements(llvm::function_ref<
+  void enumerateRequirements(
+                    ArrayRef<GenericTypeParamType *> genericParams,
+                    llvm::function_ref<
                       void (RequirementKind kind,
-                            PotentialArchetype *archetype,
+                            Type type,
                             RequirementRHS constraint,
                             const RequirementSource *source)> f);
 
-public:
   /// Retrieve the generic parameters used to describe the generic
   /// signature being built.
   ArrayRef<GenericTypeParamType *> getGenericParams() const;
@@ -1731,7 +1735,7 @@ public:
 
   Kind kind;
   UnresolvedType lhs;
-  RequirementRHS rhs;
+  UnresolvedRequirementRHS rhs;
   FloatingRequirementSource source;
 
   /// Dump a debugging representation of this delayed requirement class.
