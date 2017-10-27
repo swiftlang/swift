@@ -536,6 +536,9 @@ enum TypeResolutionFlags : unsigned {
 
   /// Whether we are checking the parameter list of a subscript.
   TR_SubscriptParameters = 0x2000000,
+
+  /// Is it okay to resolve an IUO sigil ("!") here?
+  TR_AllowIUO = 0x4000000,
 };
 
 /// Option set describing how type resolution should work.

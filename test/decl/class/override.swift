@@ -221,8 +221,10 @@ class IUOTestSubclass2 : IUOTestBaseClass {
   // expected-note@-1 {{remove '!' to make the parameter required}} {{36-37=}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{27-27=(}} {{37-37=)}}
 
-  override func oneB(x: ImplicitlyUnwrappedOptional<AnyObject>) {}  // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'ImplicitlyUnwrappedOptional<AnyObject>'}}
-  // expected-note@-1 {{add parentheses to silence this warning}} {{25-25=(}} {{63-63=)}}
+  override func oneB(x: ImplicitlyUnwrappedOptional<AnyObject>) {}
+  // expected-warning@-1 {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}{{25-53=}}{{62-62=!}}{{62-63=}}
+  // expected-warning@-2 {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'ImplicitlyUnwrappedOptional<AnyObject>'}}
+  // expected-note@-3 {{add parentheses to silence this warning}} {{25-25=(}} {{63-63=)}}
 
   override func oneC(_: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
   // expected-note@-1 {{remove '!' to make the parameter required}} {{34-35=}}
