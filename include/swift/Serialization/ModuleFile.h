@@ -335,6 +335,14 @@ private:
   using SerializedNestedTypeDeclsTable =
       llvm::OnDiskIterableChainedHashTable<NestedTypeDeclsTableInfo>;
 
+  class DeclMemberNamesTableInfo;
+  using SerializedDeclMemberNamesTable =
+      llvm::OnDiskIterableChainedHashTable<DeclMemberNamesTableInfo>;
+
+  class DeclMembersTableInfo;
+  using SerializedDeclMembersTable =
+      llvm::OnDiskIterableChainedHashTable<DeclMembersTableInfo>;
+
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
   std::unique_ptr<SerializedDeclTable> PrecedenceGroupDecls;
@@ -343,6 +351,10 @@ private:
   std::unique_ptr<SerializedExtensionTable> ExtensionDecls;
   std::unique_ptr<SerializedLocalDeclTable> LocalTypeDecls;
   std::unique_ptr<SerializedNestedTypeDeclsTable> NestedTypeDecls;
+  std::unique_ptr<SerializedDeclMemberNamesTable> DeclMemberNames;
+
+  llvm::DenseMap<serialization::BitOffset,
+           std::unique_ptr<SerializedDeclMembersTable>> DeclMembersTables;
 
   class ObjCMethodTableInfo;
   using SerializedObjCMethodTable =
@@ -476,6 +488,16 @@ private:
   /// index_block::NestedTypeDeclsLayout format.
   std::unique_ptr<SerializedNestedTypeDeclsTable>
   readNestedTypeDeclsTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Read an on-disk local decl-name hash table stored in
+  /// index_block::DeclMemberNamesLayout format.
+  std::unique_ptr<SerializedDeclMemberNamesTable>
+  readDeclMemberNamesTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Read an on-disk local decl-members hash table stored in
+  /// index_block::DeclMembersLayout format.
+  std::unique_ptr<SerializedDeclMembersTable>
+  readDeclMembersTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
   /// Main logic of getDeclChecked.
   llvm::Expected<Decl *>

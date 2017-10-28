@@ -504,6 +504,118 @@ public:
   }
 };
 
+// Indexing the members of all Decls (well, NominalTypeDecls anyway) is
+// accomplished by a 2-level hashtable scheme. The outer table here maps from
+// DeclBaseNames to serialization::BitOffsets of sub-tables. The sub-tables --
+// SerializedDeclMembersTables, one table per name -- map from the enclosing
+// (NominalTypeDecl) DeclID to a vector of DeclIDs of members of the nominal
+// with the name. See DeclMembersTableInfo below.
+class ModuleFile::DeclMemberNamesTableInfo {
+public:
+  using internal_key_type = std::pair<DeclBaseName::Kind, StringRef>;
+  using external_key_type = DeclBaseName;
+  using data_type = serialization::BitOffset;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type ID) {
+    if (ID.getKind() == DeclBaseName::Kind::Normal) {
+      return {DeclBaseName::Kind::Normal, ID.getIdentifier().str()};
+    } else {
+      return {ID.getKind(), StringRef()};
+    }
+  }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    if (key.first == DeclBaseName::Kind::Normal) {
+      return llvm::HashString(key.second);
+    } else {
+      return (hash_value_type)key.first;
+    }
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+    return { keyLength, sizeof(serialization::BitOffset) };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    uint8_t kind = endian::readNext<uint8_t, little, unaligned>(data);
+    switch (kind) {
+    case static_cast<uint8_t>(DeclNameKind::Normal): {
+      StringRef str(reinterpret_cast<const char *>(data),
+                    length - sizeof(uint8_t));
+      return {DeclBaseName::Kind::Normal, str};
+    }
+    case static_cast<uint8_t>(DeclNameKind::Subscript):
+      return {DeclBaseName::Kind::Subscript, StringRef()};
+    case static_cast<uint8_t>(DeclNameKind::Destructor):
+      return {DeclBaseName::Kind::Destructor, StringRef()};
+    default:
+      llvm_unreachable("Unknown DeclNameKind");
+    }
+  }
+
+  static data_type ReadData(internal_key_type key, const uint8_t *data,
+                            unsigned length) {
+    assert(length == sizeof(serialization::BitOffset));
+    return endian::readNext<serialization::BitOffset, little, unaligned>(data);
+  }
+};
+
+// Second half of the 2-level member name lookup scheme, see
+// DeclMemberNamesTableInfo above. There is one of these tables for each member
+// DeclBaseName N in the module, and it maps from enclosing DeclIDs (say: each
+// NominalTypeDecl T that has members named N) to the set of N-named members of
+// T. In other words, there are no names in this table: the names are one level
+// up, this table just maps { Owner-DeclID => [Member-DeclID, ...] }.
+class ModuleFile::DeclMembersTableInfo {
+public:
+  using internal_key_type = uint32_t;
+  using external_key_type = DeclID;
+  using data_type = SmallVector<DeclID, 2>;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type ID) {
+    return ID;
+  }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    return llvm::hash_value(key);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+    return { keyLength, dataLength };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    return endian::readNext<uint32_t, little, unaligned>(data);
+  }
+
+  static data_type ReadData(internal_key_type key, const uint8_t *data,
+                            unsigned length) {
+    data_type result;
+    while (length > 0) {
+      DeclID declID = endian::readNext<uint32_t, little, unaligned>(data);
+      result.push_back(declID);
+      length -= sizeof(uint32_t);
+    }
+    return result;
+  }
+};
+
+
 std::unique_ptr<ModuleFile::SerializedDeclTable>
 ModuleFile::readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   uint32_t tableOffset;
@@ -546,6 +658,31 @@ ModuleFile::readNestedTypeDeclsTable(ArrayRef<uint64_t> fields,
 
   using OwnedTable = std::unique_ptr<SerializedNestedTypeDeclsTable>;
   return OwnedTable(SerializedNestedTypeDeclsTable::Create(base + tableOffset,
+      base + sizeof(uint32_t), base));
+}
+
+std::unique_ptr<ModuleFile::SerializedDeclMemberNamesTable>
+ModuleFile::readDeclMemberNamesTable(ArrayRef<uint64_t> fields,
+                                     StringRef blobData) {
+  uint32_t tableOffset;
+  index_block::DeclMemberNamesLayout::readRecord(fields, tableOffset);
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+  using OwnedTable = std::unique_ptr<SerializedDeclMemberNamesTable>;
+  return OwnedTable(SerializedDeclMemberNamesTable::Create(base + tableOffset,
+      base + sizeof(uint32_t), base));
+}
+
+std::unique_ptr<ModuleFile::SerializedDeclMembersTable>
+ModuleFile::readDeclMembersTable(ArrayRef<uint64_t> fields,
+                                     StringRef blobData) {
+  uint32_t tableOffset;
+  decl_member_tables_block::DeclMembersLayout::readRecord(fields,
+                                                          tableOffset);
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+  using OwnedTable = std::unique_ptr<SerializedDeclMembersTable>;
+  return OwnedTable(SerializedDeclMembersTable::Create(base + tableOffset,
       base + sizeof(uint32_t), base));
 }
 
@@ -685,6 +822,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::NESTED_TYPE_DECLS:
         NestedTypeDecls = readNestedTypeDeclsTable(scratch, blobData);
+        break;
+      case index_block::DECL_MEMBER_NAMES:
+        DeclMemberNames = readDeclMemberNamesTable(scratch, blobData);
         break;
       case index_block::LOCAL_DECL_CONTEXT_OFFSETS:
         assert(blobData.empty());

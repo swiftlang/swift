@@ -651,6 +651,10 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
   BLOCK_RECORD(index_block, NESTED_TYPE_DECLS);
+  BLOCK_RECORD(index_block, DECL_MEMBER_NAMES);
+
+  BLOCK(DECL_MEMBER_TABLES_BLOCK);
+  BLOCK_RECORD(decl_member_tables_block, DECL_MEMBERS);
 
   BLOCK(SIL_BLOCK);
   BLOCK_RECORD(sil_block, SIL_FUNCTION);
