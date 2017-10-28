@@ -56,7 +56,6 @@ const uint16_t VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 const uint16_t VERSION_MINOR = 377; // Last change: SILFunctionType witness_method conformances
 
-using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
 
 // TypeID must be the same as DeclID because it is stored in the same way.
