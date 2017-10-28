@@ -60,3 +60,21 @@ extension Everything: P1 where G: P2, H == Int, I == J, K == [L] {
   func generic<T: P3>(_: T) {}
 }
 */
+
+struct IsP2: P2 {}
+struct IsNotP2 {}
+
+class Base<A> {}
+extension Base: P1 where A: P2 {
+  func normal() {}
+  func generic<T: P3>(_: T) {}
+}
+// CHECK-LABEL: sil_witness_table hidden <A where A : P2> Base<A>: P1 module conditional_conformance {
+// CHECK-NEXT:  method #P1.normal!1: <Self where Self : P1> (Self) -> () -> () : @_T023conditional_conformance4BaseCyxGAA2P1A2A2P2RzlAaEP6normalyyFTW	// protocol witness for P1.normal() in conformance <A> Base<A>
+// CHECK-NEXT:    method #P1.generic!1: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @_T023conditional_conformance4BaseCyxGAA2P1A2A2P2RzlAaEP7genericyqd__AA2P3Rd__lFTW	// protocol witness for P1.generic<A>(_:) in conformance <A> Base<A>
+// CHECK-NEXT:    conditional_conformance (τ_0_0: P2): dependent
+// CHECK-NEXT:  }
+
+// These don't get separate witness tables, but shouldn't crash anything.
+class SubclassGood: Base<IsP2> {}
+class SubclassBad: Base<IsNotP2> {}

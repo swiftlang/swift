@@ -21,6 +21,8 @@ func takes_P2<X: P2>(_: X) {}
 // expected-note@-9{{requirement from conditional conformance of 'ClassFree<U>' to 'P2'}}
 // expected-note@-10{{candidate requires that 'C3' inherit from 'U' (requirement specified as 'U' : 'C3')}}
 // expected-note@-11{{requirement from conditional conformance of 'ClassMoreSpecific<U>' to 'P2'}}
+// expected-note@-12{{candidate requires that 'C1' inherit from 'Int' (requirement specified as 'Int' : 'C1')}}
+// expected-note@-13{{requirement from conditional conformance of 'SubclassBad' to 'P2'}}
 
 struct Free<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Free<T>
@@ -189,6 +191,20 @@ struct ClassLessSpecific<T: C3> {}
 // CHECK-NEXT: (normal_conformance type=ClassLessSpecific<T> protocol=P2)
 extension ClassLessSpecific: P2 where T: C1 {}
 
+
+// Inherited conformances:
+class Base<T> {}
+extension Base: P2 where T: C1 {}
+
+class SubclassGood: Base<C1> {}
+func subclass_good() {
+  takes_P2(SubclassGood())
+}
+class SubclassBad: Base<Int> {}
+func subclass_bad() {
+  takes_P2(SubclassBad())
+  // expected-error@-1{{cannot invoke 'takes_P2(_:)' with an argument list of type '(SubclassBad)'}}
+}
 
 // FIXME: these cases should be equivalent (and both with the same output as the
 // first), but the second one choses T as the representative of the
