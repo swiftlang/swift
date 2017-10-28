@@ -2719,7 +2719,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
 
       // Suggest '@nonobjc' to suppress this error, and not try to
       // infer @objc for anything.
-      tc.diagnose(decl, diag::optional_req_near_match_nonobjc, true)
+      tc.diagnose(decl, diag::req_near_match_nonobjc, true)
         .fixItInsert(decl->getAttributeInsertionLoc(false), "@nonobjc ");
       break;
     }
