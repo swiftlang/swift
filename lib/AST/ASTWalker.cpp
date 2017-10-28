@@ -137,6 +137,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (doIt(Inherit))
         return true;
     }
+    if (auto *Where = ED->getTrailingWhereClause()) {
+      for(auto &Req: Where->getRequirements()) {
+        if (doIt(Req))
+          return true;
+      }
+    }
     for (Decl *M : ED->getMembers()) {
       if (doIt(M))
         return true;
