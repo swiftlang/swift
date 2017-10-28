@@ -320,33 +320,45 @@ public:
   void initializeWithCopy(IRGenFunction &IGF,
                           Address dest, Address src,
                           SILType T) const override {
-    llvm::Value *metadata = copyType(IGF, dest, src);
+    if (IGF.isInOutlinedFunction()) {
+      llvm::Value *metadata = copyType(IGF, dest, src);
 
-    auto layout = getLayout();
+      auto layout = getLayout();
 
-    // Project down to the buffers and ask the witnesses to do a
-    // copy-initialize.
-    Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
-    Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
-    emitInitializeBufferWithCopyOfBufferCall(IGF, metadata,
-                                             destBuffer,
-                                             srcBuffer);
+      // Project down to the buffers and ask the witnesses to do a
+      // copy-initialize.
+      Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
+      Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
+      emitInitializeBufferWithCopyOfBufferCall(IGF, metadata, destBuffer,
+                                               srcBuffer);
+    } else {
+      // Create an outlined function to avoid explosion
+      IGF.IGM.generateCallToOutlinedCopyAddr(
+          IGF, *this, dest, src, T,
+          &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction);
+    }
   }
 
   void initializeWithTake(IRGenFunction &IGF,
                           Address dest, Address src,
                           SILType T) const override {
-    llvm::Value *metadata = copyType(IGF, dest, src);
+    if (IGF.isInOutlinedFunction()) {
+      llvm::Value *metadata = copyType(IGF, dest, src);
 
-    auto layout = getLayout();
+      auto layout = getLayout();
 
-    // Project down to the buffers and ask the witnesses to do a
-    // take-initialize.
-    Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
-    Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
-    emitInitializeBufferWithTakeOfBufferCall(IGF, metadata,
-                                             destBuffer,
-                                             srcBuffer);
+      // Project down to the buffers and ask the witnesses to do a
+      // take-initialize.
+      Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
+      Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
+      emitInitializeBufferWithTakeOfBufferCall(IGF, metadata, destBuffer,
+                                               srcBuffer);
+    } else {
+      // Create an outlined function to avoid explosion
+      IGF.IGM.generateCallToOutlinedCopyAddr(
+          IGF, *this, dest, src, T,
+          &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction);
+    }
   }
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
@@ -398,37 +410,61 @@ public:
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                       SILType T) const override {
-    Address destValue = projectValue(IGF, dest);
-    Address srcValue = projectValue(IGF, src);
-    asDerived().emitValueAssignWithCopy(IGF, destValue, srcValue);
-    emitCopyOfTables(IGF, dest, src);
+    if (IGF.isInOutlinedFunction()) {
+      Address destValue = projectValue(IGF, dest);
+      Address srcValue = projectValue(IGF, src);
+      asDerived().emitValueAssignWithCopy(IGF, destValue, srcValue);
+      emitCopyOfTables(IGF, dest, src);
+    } else {
+      IGF.IGM.generateCallToOutlinedCopyAddr(
+          IGF, *this, dest, src, T,
+          &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction);
+    }
   }
 
   void initializeWithCopy(IRGenFunction &IGF,
                           Address dest, Address src,
                           SILType T) const override {
-    Address destValue = projectValue(IGF, dest);
-    Address srcValue = projectValue(IGF, src);
-    asDerived().emitValueInitializeWithCopy(IGF, destValue, srcValue);
-    emitCopyOfTables(IGF, dest, src);
+    if (IGF.isInOutlinedFunction()) {
+      Address destValue = projectValue(IGF, dest);
+      Address srcValue = projectValue(IGF, src);
+      asDerived().emitValueInitializeWithCopy(IGF, destValue, srcValue);
+      emitCopyOfTables(IGF, dest, src);
+    } else {
+      IGF.IGM.generateCallToOutlinedCopyAddr(
+          IGF, *this, dest, src, T,
+          &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction);
+    }
   }
 
   void assignWithTake(IRGenFunction &IGF,
                       Address dest, Address src,
                       SILType T) const override {
-    Address destValue = projectValue(IGF, dest);
-    Address srcValue = projectValue(IGF, src);
-    asDerived().emitValueAssignWithTake(IGF, destValue, srcValue);
-    emitCopyOfTables(IGF, dest, src);
+    if (IGF.isInOutlinedFunction()) {
+      Address destValue = projectValue(IGF, dest);
+      Address srcValue = projectValue(IGF, src);
+      asDerived().emitValueAssignWithTake(IGF, destValue, srcValue);
+      emitCopyOfTables(IGF, dest, src);
+    } else {
+      IGF.IGM.generateCallToOutlinedCopyAddr(
+          IGF, *this, dest, src, T,
+          &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction);
+    }
   }
 
   void initializeWithTake(IRGenFunction &IGF,
                           Address dest, Address src,
                           SILType T) const override {
-    Address destValue = projectValue(IGF, dest);
-    Address srcValue = projectValue(IGF, src);
-    asDerived().emitValueInitializeWithTake(IGF, destValue, srcValue);
-    emitCopyOfTables(IGF, dest, src);
+    if (IGF.isInOutlinedFunction()) {
+      Address destValue = projectValue(IGF, dest);
+      Address srcValue = projectValue(IGF, src);
+      asDerived().emitValueInitializeWithTake(IGF, destValue, srcValue);
+      emitCopyOfTables(IGF, dest, src);
+    } else {
+      IGF.IGM.generateCallToOutlinedCopyAddr(
+          IGF, *this, dest, src, T,
+          &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction);
+    }
   }
 
   void destroy(IRGenFunction &IGF, Address existential,

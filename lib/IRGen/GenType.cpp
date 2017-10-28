@@ -158,9 +158,15 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF,
   }
 
   // Otherwise explode and re-implode.
-  Explosion copy;
-  loadAsCopy(IGF, srcAddr, copy);
-  initialize(IGF, copy, destAddr);
+  if (IGF.isInOutlinedFunction()) {
+    Explosion copy;
+    loadAsCopy(IGF, srcAddr, copy);
+    initialize(IGF, copy, destAddr);
+  } else {
+    IGF.IGM.generateCallToOutlinedCopyAddr(
+        IGF, *this, destAddr, srcAddr, T,
+        &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction);
+  }
 }
 
 LoadedRef LoadableTypeInfo::loadRefcountedPtr(IRGenFunction &IGF,

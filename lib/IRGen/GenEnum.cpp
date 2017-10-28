@@ -2598,25 +2598,57 @@ namespace {
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
-      emitIndirectAssign(IGF, dest, src, T, IsNotTake);
+      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
+          (T.hasArchetype())) {
+        emitIndirectAssign(IGF, dest, src, T, IsNotTake);
+      } else {
+        // Create an outlined function to avoid explosion
+        IGF.IGM.generateCallToOutlinedCopyAddr(
+            IGF, *TI, dest, src, T,
+            &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction);
+      }
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
-      emitIndirectAssign(IGF, dest, src, T, IsTake);
+      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
+          (T.hasArchetype())) {
+        emitIndirectAssign(IGF, dest, src, T, IsTake);
+      } else {
+        // Create an outlined function to avoid explosion
+        IGF.IGM.generateCallToOutlinedCopyAddr(
+            IGF, *TI, dest, src, T,
+            &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction);
+      }
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
-      emitIndirectInitialize(IGF, dest, src, T, IsNotTake);
+      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
+          (T.hasArchetype())) {
+        emitIndirectInitialize(IGF, dest, src, T, IsNotTake);
+      } else {
+        // Create an outlined function to avoid explosion
+        IGF.IGM.generateCallToOutlinedCopyAddr(
+            IGF, *TI, dest, src, T,
+            &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction);
+      }
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
-      emitIndirectInitialize(IGF, dest, src, T, IsTake);
+      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
+          (T.hasArchetype())) {
+        emitIndirectInitialize(IGF, dest, src, T, IsTake);
+      } else {
+        // Create an outlined function to avoid explosion
+        IGF.IGM.generateCallToOutlinedCopyAddr(
+            IGF, *TI, dest, src, T,
+            &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction);
+      }
     }
 
     void storeTag(IRGenFunction &IGF,
@@ -4211,25 +4243,57 @@ namespace {
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
-      emitIndirectAssign(IGF, dest, src, T, IsNotTake);
+      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
+          (T.hasArchetype())) {
+        emitIndirectAssign(IGF, dest, src, T, IsNotTake);
+      } else {
+        // Create an outlined function to avoid explosion
+        IGF.IGM.generateCallToOutlinedCopyAddr(
+            IGF, *TI, dest, src, T,
+            &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction);
+      }
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
-      emitIndirectAssign(IGF, dest, src, T, IsTake);
+      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
+          (T.hasArchetype())) {
+        emitIndirectAssign(IGF, dest, src, T, IsTake);
+      } else {
+        // Create an outlined function to avoid explosion
+        IGF.IGM.generateCallToOutlinedCopyAddr(
+            IGF, *TI, dest, src, T,
+            &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction);
+      }
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
-      emitIndirectInitialize(IGF, dest, src, T, IsNotTake);
+      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
+          (T.hasArchetype())) {
+        emitIndirectInitialize(IGF, dest, src, T, IsNotTake);
+      } else {
+        // Create an outlined function to avoid explosion
+        IGF.IGM.generateCallToOutlinedCopyAddr(
+            IGF, *TI, dest, src, T,
+            &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction);
+      }
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
-      emitIndirectInitialize(IGF, dest, src, T, IsTake);
+      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
+          (T.hasArchetype())) {
+        emitIndirectInitialize(IGF, dest, src, T, IsTake);
+      } else {
+        // Create an outlined function to avoid explosion
+        IGF.IGM.generateCallToOutlinedCopyAddr(
+            IGF, *TI, dest, src, T,
+            &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction);
+      }
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {

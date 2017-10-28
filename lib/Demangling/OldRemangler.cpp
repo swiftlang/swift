@@ -1700,6 +1700,26 @@ void Remangler::mangleOutlinedRelease(Node *node) {
   mangleSingleChildNode(node);
 }
 
+void Remangler::mangleOutlinedInitializeWithTake(Node *node) {
+  Out << "Wb";
+  mangleSingleChildNode(node);
+}
+
+void Remangler::mangleOutlinedInitializeWithCopy(Node *node) {
+  Out << "Wc";
+  mangleSingleChildNode(node);
+}
+
+void Remangler::mangleOutlinedAssignWithTake(Node *node) {
+  Out << "Wd";
+  mangleSingleChildNode(node);
+}
+
+void Remangler::mangleOutlinedAssignWithCopy(Node *node) {
+  Out << "Wf";
+  mangleSingleChildNode(node);
+}
+
 void Remangler::mangleOutlinedVariable(Node *node) {
   Out << "Tv" << node->getIndex();
   mangleSingleChildNode(node);

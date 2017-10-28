@@ -1687,6 +1687,23 @@ NodePointer Demangler::demangleWitness() {
       return createWithChild(Node::Kind::OutlinedRelease,
                              popNode(Node::Kind::Type));
     }
+    case 'b': {
+      return createWithChild(Node::Kind::OutlinedInitializeWithTake,
+                             popNode(Node::Kind::Type));
+    }
+    case 'c': {
+      return createWithChild(Node::Kind::OutlinedInitializeWithCopy,
+                             popNode(Node::Kind::Type));
+    }
+    case 'd': {
+      return createWithChild(Node::Kind::OutlinedAssignWithTake,
+                             popNode(Node::Kind::Type));
+    }
+    case 'f': {
+      return createWithChild(Node::Kind::OutlinedAssignWithCopy,
+                             popNode(Node::Kind::Type));
+    }
+
     default:
       return nullptr;
   }

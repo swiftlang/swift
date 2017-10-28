@@ -173,6 +173,31 @@ public:
     return finalize();
   }
 
+  std::string mangleOutlinedInitializeWithTakeFunction(const Type t) {
+    beginMangling();
+    appendType(t);
+    appendOperator("Wb");
+    return finalize();
+  }
+  std::string mangleOutlinedInitializeWithCopyFunction(const Type t) {
+    beginMangling();
+    appendType(t);
+    appendOperator("Wc");
+    return finalize();
+  }
+  std::string mangleOutlinedAssignWithTakeFunction(const Type t) {
+    beginMangling();
+    appendType(t);
+    appendOperator("Wd");
+    return finalize();
+  }
+  std::string mangleOutlinedAssignWithCopyFunction(const Type t) {
+    beginMangling();
+    appendType(t);
+    appendOperator("Wf");
+    return finalize();
+  }
+
   std::string manglePartialApplyForwarder(StringRef FuncName);
 
   std::string mangleTypeForMetadata(Type type) {

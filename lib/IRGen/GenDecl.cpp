@@ -19,6 +19,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsIRGen.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
@@ -39,10 +40,10 @@
 #include "clang/AST/GlobalDecl.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/GlobalAlias.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/TypeBuilder.h"
 #include "llvm/IR/Value.h"
-#include "llvm/IR/InlineAsm.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Path.h"
@@ -3517,6 +3518,7 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &objectTI,
   return getOrCreateHelperFunction(
       funcName, llvmType, argTys,
       [&](IRGenFunction &IGF) {
+        IGF.setInOutlinedFunction();
         auto it = IGF.CurFn->arg_begin();
         Address addr(&*it++, loadableTI->getFixedAlignment());
         Explosion loaded;
@@ -3540,6 +3542,7 @@ IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
   return getOrCreateHelperFunction(
       funcName, llvmType, argTys,
       [&](IRGenFunction &IGF) {
+        IGF.setInOutlinedFunction();
         auto it = IGF.CurFn->arg_begin();
         Address addr(&*it++, loadableTI->getFixedAlignment());
         Explosion loaded;
@@ -3548,4 +3551,88 @@ IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
         IGF.Builder.CreateRet(addr.getAddress());
       },
       true /*setIsNoInline*/);
+}
+
+void IRGenModule::generateCallToOutlinedCopyAddr(
+    IRGenFunction &IGF, const TypeInfo &objectTI, Address dest, Address src,
+    SILType T, const OutlinedCopyAddrFunction MethodToCall) {
+  llvm::Type *llvmType = dest->getType();
+  auto *outlinedF = (this->*MethodToCall)(objectTI, llvmType, T);
+  llvm::Value *args[] = {src.getAddress(), dest.getAddress()};
+  llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, args);
+  call->setCallingConv(DefaultCC);
+}
+
+llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+    std::string funcName,
+    llvm::function_ref<void(const TypeInfo &objectTI, IRGenFunction &IGF,
+                            Address dest, Address src, SILType T)>
+        Generate) {
+  llvm::Type *argTys[] = {llvmType, llvmType};
+  return getOrCreateHelperFunction(
+      funcName, llvmType, argTys,
+      [&](IRGenFunction &IGF) {
+        IGF.setInOutlinedFunction();
+        auto it = IGF.CurFn->arg_begin();
+        Address src(&*it++, objectTI.getBestKnownAlignment());
+        Address dest(&*it++, objectTI.getBestKnownAlignment());
+        Generate(objectTI, IGF, dest, src, addrTy);
+        IGF.Builder.CreateRet(dest.getAddress());
+      },
+      true /*setIsNoInline*/);
+}
+
+llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy) {
+  IRGenMangler mangler;
+  CanType canType = addrTy.getObjectType().getSwiftRValueType();
+  std::string funcName =
+      mangler.mangleOutlinedInitializeWithTakeFunction(canType);
+  auto GenFunc = [this](const TypeInfo &objectTI, IRGenFunction &IGF,
+                        Address dest, Address src, SILType T) {
+    objectTI.initializeWithTake(IGF, dest, src, T);
+  };
+  return getOrCreateOutlinedCopyAddrHelperFunction(objectTI, llvmType, addrTy,
+                                                   funcName, GenFunc);
+}
+
+llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy) {
+  IRGenMangler mangler;
+  CanType canType = addrTy.getObjectType().getSwiftRValueType();
+  std::string funcName =
+      mangler.mangleOutlinedInitializeWithCopyFunction(canType);
+  auto GenFunc = [this](const TypeInfo &objectTI, IRGenFunction &IGF,
+                        Address dest, Address src, SILType T) {
+    objectTI.initializeWithCopy(IGF, dest, src, T);
+  };
+  return getOrCreateOutlinedCopyAddrHelperFunction(objectTI, llvmType, addrTy,
+                                                   funcName, GenFunc);
+}
+
+llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy) {
+  IRGenMangler mangler;
+  CanType canType = addrTy.getObjectType().getSwiftRValueType();
+  std::string funcName = mangler.mangleOutlinedAssignWithTakeFunction(canType);
+  auto GenFunc = [this](const TypeInfo &objectTI, IRGenFunction &IGF,
+                        Address dest, Address src, SILType T) {
+    objectTI.assignWithTake(IGF, dest, src, T);
+  };
+  return getOrCreateOutlinedCopyAddrHelperFunction(objectTI, llvmType, addrTy,
+                                                   funcName, GenFunc);
+}
+
+llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy) {
+  IRGenMangler mangler;
+  CanType canType = addrTy.getObjectType().getSwiftRValueType();
+  std::string funcName = mangler.mangleOutlinedAssignWithCopyFunction(canType);
+  auto GenFunc = [this](const TypeInfo &objectTI, IRGenFunction &IGF,
+                        Address dest, Address src, SILType T) {
+    objectTI.assignWithCopy(IGF, dest, src, T);
+  };
+  return getOrCreateOutlinedCopyAddrHelperFunction(objectTI, llvmType, addrTy,
+                                                   funcName, GenFunc);
 }

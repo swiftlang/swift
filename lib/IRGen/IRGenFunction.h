@@ -554,7 +554,13 @@ public:
 
   llvm::Value *getLocalSelfMetadata();
   void setLocalSelfMetadata(llvm::Value *value, LocalSelfKind kind);
-  
+
+public:
+  //--- Outlined Function Support -------------------------------------------
+public:
+  bool isInOutlinedFunction();
+  void setInOutlinedFunction();
+
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
   void destroyLocalTypeData();
@@ -571,6 +577,10 @@ private:
   llvm::Value *LocalSelf = nullptr;
   
   LocalSelfKind SelfKind;
+
+  /// Flag indiacting wherever we are in the middle of creating
+  /// an outlined address type function
+  bool inOutlinedFunction;
 };
 
 using ConditionalDominanceScope = IRGenFunction::ConditionalDominanceScope;
