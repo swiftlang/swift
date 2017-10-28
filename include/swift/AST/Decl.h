@@ -2178,7 +2178,7 @@ public:
   bool wasDeserialized() const;
 
   /// Get the DeclID this Decl was deserialized from.
-  serialization::DeclID getDeclID() {
+  serialization::DeclID getDeclID() const {
     assert(wasDeserialized());
     return SerialID;
   }
