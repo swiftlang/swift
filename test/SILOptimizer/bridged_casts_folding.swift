@@ -2,9 +2,6 @@
 
 // REQUIRES: objc_interop
 
-// FIXME: https://bugs.swift.org/browse/SR-2808
-// XFAIL: resilient_stdlib
-
 // Check that casts between bridged types are replaced by more 
 // efficient code sequences.
 // 
