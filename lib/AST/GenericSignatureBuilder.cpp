@@ -1932,11 +1932,108 @@ TypeDecl *EquivalenceClass::lookupNestedType(
   return populateResult((nestedTypeNameCache[name] = std::move(entry)));
 }
 
+/// Determine whether any part of this potential archetype's path to the
+/// root contains the given equivalence class.
+static bool pathContainsEquivalenceClass(GenericSignatureBuilder &builder,
+                                         PotentialArchetype *pa,
+                                         EquivalenceClass *equivClass) {
+  // Chase the potential archetype up to the root.
+  for (; pa; pa = pa->getParent()) {
+    // Check whether this potential archetype is in the given equivalence
+    // class.
+    if (pa->getOrCreateEquivalenceClass(builder) == equivClass)
+      return true;
+  }
+
+  return false;
+}
+
 Type EquivalenceClass::getAnchor(
                             GenericSignatureBuilder &builder,
                             ArrayRef<GenericTypeParamType *> genericParams) {
-  auto anchorPA = members.front()->getArchetypeAnchor(builder);
-  return anchorPA->getDependentType(genericParams);
+  // Check whether the cache is valid.
+  if (archetypeAnchorCache.anchor &&
+      archetypeAnchorCache.numMembers == members.size()) {
+    ++NumArchetypeAnchorCacheHits;
+
+    // Reparent the anchor using genericParams.
+    return archetypeAnchorCache.anchor.subst(
+             [&](SubstitutableType *dependentType) {
+               if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
+                 unsigned index =
+                   GenericParamKey(gp).findIndexIn(genericParams);
+                 return Type(genericParams[index]);
+               }
+
+               return Type(dependentType);
+             },
+             MakeAbstractConformanceForGenericType());
+  }
+
+  // Map the members of this equivalence class to the best associated type
+  // within that equivalence class.
+  llvm::SmallDenseMap<EquivalenceClass *, AssociatedTypeDecl *> nestedTypes;
+
+  PotentialArchetype *bestGenericParam = nullptr;
+  for (auto member : members) {
+    // If the member is a generic parameter, keep the best generic parameter.
+    if (member->isGenericParam()) {
+      if (!bestGenericParam ||
+          compareDependentTypes(&member, &bestGenericParam) < 0)
+        bestGenericParam = member;
+      continue;
+    }
+
+    // If we saw a generic parameter, ignore any nested types.
+    if (bestGenericParam) continue;
+
+    // If the nested type doesn't have an associated type, skip it.
+    auto assocType = member->getResolvedAssociatedType();
+    if (!assocType) continue;
+
+    // Dig out the equivalence class of the parent.
+    auto parentEquivClass =
+      member->getParent()->getOrCreateEquivalenceClass(builder);
+
+    // If the path from this member to the root contains this equivalence
+    // class, it cannot be part of the anchor.
+    if (pathContainsEquivalenceClass(builder, member->getParent(), this))
+      continue;
+
+    // Take the best associated type for this equivalence class.
+    assocType = assocType->getAssociatedTypeAnchor();
+    auto &bestAssocType = nestedTypes[parentEquivClass];
+    if (!bestAssocType ||
+        compareAssociatedTypes(assocType, bestAssocType) < 0)
+      bestAssocType = assocType;
+  }
+
+  // If we found a generic parameter, return that.
+  if (bestGenericParam)
+    return bestGenericParam->getDependentType(genericParams);
+
+  // Determine the best anchor among the parent equivalence classes.
+  Type bestParentAnchor;
+  AssociatedTypeDecl *bestAssocType = nullptr;
+  std::pair<EquivalenceClass *, Identifier> bestNestedType;
+  for (const auto &nestedType : nestedTypes) {
+    auto parentAnchor = nestedType.first->getAnchor(builder, genericParams);
+    if (!bestParentAnchor ||
+        compareDependentTypes(parentAnchor, bestParentAnchor) < 0) {
+      bestParentAnchor = parentAnchor;
+      bestAssocType = nestedType.second;
+    }
+  }
+
+  // Form the anchor type.
+  Type anchorType = DependentMemberType::get(bestParentAnchor, bestAssocType);
+
+  // Record the cache miss and update the cache.
+  ++NumArchetypeAnchorCacheMisses;
+  archetypeAnchorCache.anchor = anchorType;
+  archetypeAnchorCache.numMembers = members.size();
+
+  return anchorType;
 }
 
 Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
@@ -2550,60 +2647,6 @@ static int compareDependentTypes(PotentialArchetype * const* pa,
   llvm_unreachable("potential archetype total order failure");
 }
 
-PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
-                                           GenericSignatureBuilder &builder) {
-  // Find the best archetype within this equivalence class.
-  PotentialArchetype *rep = getRepresentative();
-  PotentialArchetype *anchor;
-  if (auto parent = getParent()) {
-    // For a nested type, retrieve the parent archetype anchor first.
-    auto parentAnchor = parent->getArchetypeAnchor(builder);
-    assert(parentAnchor->getNestingDepth() <= parent->getNestingDepth());
-    anchor = parentAnchor->getNestedArchetypeAnchor(
-                                  getNestedName(), builder,
-                                  ArchetypeResolutionKind::CompleteWellFormed);
-
-    // FIXME: Hack for cases where we couldn't resolve the nested type.
-    if (!anchor)
-      anchor = rep;
-  } else {
-    anchor = rep;
-  }
-
-  auto equivClass = rep->getEquivalenceClassIfPresent();
-  if (!equivClass) return anchor;
-
-  // Check whether
-  if (equivClass->archetypeAnchorCache.anchor &&
-      equivClass->archetypeAnchorCache.numMembers
-        == equivClass->members.size()) {
-    ++NumArchetypeAnchorCacheHits;
-    return equivClass->archetypeAnchorCache.anchor;
-  }
-
-  // Find the best type within this equivalence class.
-  for (auto pa : equivClass->members) {
-    if (compareDependentTypes(&pa, &anchor) < 0)
-      anchor = pa;
-  }
-
-#if SWIFT_GSB_EXPENSIVE_ASSERTIONS
-  // Make sure that we did, in fact, get one that is better than all others.
-  for (auto pa : equivClass->members) {
-    assert((pa == anchor || compareDependentTypes(&anchor, &pa) < 0) &&
-           compareDependentTypes(&pa, &anchor) >= 0 &&
-           "archetype anchor isn't a total order");
-  }
-#endif
-
-  // Record the cache miss and update the cache.
-  ++NumArchetypeAnchorCacheMisses;
-  equivClass->archetypeAnchorCache.anchor = anchor;
-  equivClass->archetypeAnchorCache.numMembers = equivClass->members.size();
-
-  return anchor;
-}
-
 namespace {
   /// Function object used to suppress conflict diagnoses when we know we'll
   /// see them again later.
@@ -2670,32 +2713,6 @@ static void concretizeNestedTypeFromConcreteParent(
          GenericSignatureBuilder::UnresolvedHandlingKind::GenerateConstraints,
          SameTypeConflictCheckedLater());
 }
-
-PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
-                                           Identifier name,
-                                           GenericSignatureBuilder &builder,
-                                           ArchetypeResolutionKind kind) {
-  SmallVector<TypeDecl *, 4> concreteDecls;
-  auto bestType =
-    getOrCreateEquivalenceClass(builder)->lookupNestedType(builder, name,
-                                                           &concreteDecls);
-
-  // We didn't find any type with this name.
-  if (!bestType) return nullptr;
-
-  // Resolve the nested type.
-  auto resultPA = updateNestedTypeForConformance(builder, bestType, kind);
-
-  // Update for all of the concrete decls with this name, which will introduce
-  // various same-type constraints.
-  for (auto concreteDecl : concreteDecls) {
-    (void)updateNestedTypeForConformance(builder, concreteDecl,
-                                         ArchetypeResolutionKind::WellFormed);
-  }
-
-  return resultPA;
-}
-
 
 PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
                                               GenericSignatureBuilder &builder,

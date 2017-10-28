@@ -268,8 +268,8 @@ public:
 
     /// The cached archetype anchor.
     struct {
-      /// The cached archetype anchor itself.
-      PotentialArchetype *anchor = nullptr;
+      /// The cached anchor itself.
+      Type anchor;
 
       /// The number of members of the equivalence class when the archetype
       /// anchor was cached.
@@ -1663,20 +1663,6 @@ public:
     return TinyPtrVector<PotentialArchetype *>(
                                        const_cast<PotentialArchetype *>(this));
   }
-
-  /// \brief Retrieve the potential archetype to be used as the anchor for
-  /// potential archetype computations.
-  PotentialArchetype *getArchetypeAnchor(GenericSignatureBuilder &builder);
-
-  /// \brief Retrieve (or create) a nested type that is the current best
-  /// nested archetype anchor (locally) with the given name.
-  ///
-  /// When called on the archetype anchor, this will produce the named
-  /// archetype anchor.
-  PotentialArchetype *getNestedArchetypeAnchor(
-                       Identifier name,
-                       GenericSignatureBuilder &builder,
-                       ArchetypeResolutionKind kind);
 
   /// Update the named nested type when we know this type conforms to the given
   /// protocol.
