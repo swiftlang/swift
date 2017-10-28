@@ -54,6 +54,15 @@ struct Subscripts {
       global = value
     }
   }
+  
+  subscript(nonescapingIndexWithAddressor fn: () -> Void) -> Int {
+    get {
+      return 0
+    }
+    mutableAddressWithNativeOwner {
+      fatalError()
+    }
+  }
 
   // expected-note@+1 2 {{implicitly non-escaping}}
   subscript(nonescapingIndex fn: () -> ()) -> Int {
@@ -95,14 +104,12 @@ func testSubscripts_value2(nonescaping: () -> (),
   s[value2: 0] = nonescaping // expected-error {{assigning non-escaping parameter}}
 }
 
-// FIXME: Allow these uses in subscript expressions!
-// expected-note@+1 2 {{implicitly non-escaping}}
 func testSubscripts_nonescapingIndex(nonescaping: () -> (),
                                      escaping: @escaping () -> ()) {
   var s = Subscripts()
-  _ = s[nonescapingIndex: nonescaping] // expected-error{{may only be called}}
+  _ = s[nonescapingIndex: nonescaping]
   _ = s[nonescapingIndex: escaping]
-  s[nonescapingIndex: nonescaping] = 0 // expected-error{{may only be called}}
+  s[nonescapingIndex: nonescaping] = 0
   s[nonescapingIndex: escaping] = 0
 }
 
