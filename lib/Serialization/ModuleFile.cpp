@@ -540,7 +540,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, sizeof(serialization::BitOffset) };
+    return { keyLength, sizeof(uint32_t) };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -562,8 +562,8 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    assert(length == sizeof(serialization::BitOffset));
-    return endian::readNext<serialization::BitOffset, little, unaligned>(data);
+    assert(length == sizeof(uint32_t));
+    return endian::readNext<uint32_t, little, unaligned>(data);
   }
 };
 

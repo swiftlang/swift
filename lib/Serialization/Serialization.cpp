@@ -72,6 +72,19 @@ static constexpr bool declIDFitsIn32Bits() {
   return PtrIntInfo::digits - DeclIDTraits::NumLowBitsAvailable <= Int32Info::digits;
 }
 
+/// Used for static_assert.
+static constexpr bool bitOffsetFitsIn32Bits() {
+  // FIXME: Considering BitOffset is a _bit_ offset, and we're storing it in 31
+  // bits of a PointerEmbeddedInt, the maximum offset inside a modulefile we can
+  // handle happens at 2**28 _bytes_, which is only 268MB. Considering
+  // Swift.swiftmodule is itself 25MB, it seems entirely possible users will
+  // exceed this limit.
+  using Int32Info = std::numeric_limits<uint32_t>;
+  using PtrIntInfo = std::numeric_limits<uintptr_t>;
+  using BitOffsetTraits = llvm::PointerLikeTypeTraits<BitOffset>;
+  return PtrIntInfo::digits - BitOffsetTraits::NumLowBitsAvailable <= Int32Info::digits;
+}
+
 namespace {
   /// Used to serialize the on-disk decl hash table.
   class DeclTableInfo {
@@ -282,6 +295,109 @@ namespace {
       for (auto entry : data) {
         writer.write<uint32_t>(entry.first);
         writer.write<uint32_t>(entry.second);
+      }
+    }
+  };
+
+  class DeclMemberNamesTableInfo {
+  public:
+    using key_type = DeclBaseName;
+    using key_type_ref = const key_type &;
+    using data_type = BitOffset; // Offsets to sub-tables
+    using data_type_ref = const data_type &;
+    using hash_value_type = uint32_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      switch (key.getKind()) {
+      case DeclBaseName::Kind::Normal:
+        assert(!key.empty());
+        return llvm::HashString(key.getIdentifier().str());
+      case DeclBaseName::Kind::Subscript:
+        return static_cast<uint8_t>(DeclNameKind::Subscript);
+      case DeclBaseName::Kind::Destructor:
+        return static_cast<uint8_t>(DeclNameKind::Destructor);
+      }
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      uint32_t keyLength = sizeof(uint8_t); // For the flag of the name's kind
+      if (key.getKind() == DeclBaseName::Kind::Normal) {
+        keyLength += key.getIdentifier().str().size(); // The name's length
+      }
+      uint32_t dataLength = sizeof(data_type);
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      endian::Writer<little> writer(out);
+      switch (key.getKind()) {
+      case DeclBaseName::Kind::Normal:
+        writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Normal));
+        writer.OS << key.getIdentifier().str();
+        break;
+      case DeclBaseName::Kind::Subscript:
+        writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Subscript));
+        break;
+      case DeclBaseName::Kind::Destructor:
+        writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Destructor));
+        break;
+      }
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(bitOffsetFitsIn32Bits(), "BitOffset too large");
+      endian::Writer<little> writer(out);
+      writer.write<data_type>(static_cast<uint32_t>(data));
+    }
+  };
+
+  class DeclMembersTableInfo {
+  public:
+    using key_type = DeclID;
+    using key_type_ref = const key_type &;
+    using data_type = Serializer::DeclMembersData; // Vector of DeclIDs
+    using data_type_ref = const data_type &;
+    using hash_value_type = uint32_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      return llvm::hash_value(static_cast<uint32_t>(key));
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      // This will trap if a single ValueDecl has more than 16383 members
+      // with the same DeclBaseName. Seems highly unlikely.
+      assert((data.size() < (1 << 14)) && "Too many members");
+      uint32_t keyLength = sizeof(uint32_t); // key DeclID
+      uint32_t dataLength = sizeof(uint32_t) * data.size(); // value DeclIDs
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
+      assert(len == sizeof(uint32_t));
+      endian::Writer<little> writer(out);
+      writer.write<uint32_t>(key);
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
+      endian::Writer<little> writer(out);
+      for (auto entry : data) {
+        writer.write<uint32_t>(entry);
       }
     }
   };
@@ -1613,7 +1729,8 @@ static bool shouldSerializeMember(Decl *D) {
   llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
-void Serializer::writeMembers(DeclRange members, bool isClass) {
+void Serializer::writeMembers(DeclID parentID,
+                              DeclRange members, bool isClass) {
   using namespace decls_block;
 
   unsigned abbrCode = DeclTypeAbbrCodes[MembersLayout::Code];
@@ -1625,8 +1742,18 @@ void Serializer::writeMembers(DeclRange members, bool isClass) {
     DeclID memberID = addDeclRef(member);
     memberIDs.push_back(memberID);
 
-    if (isClass) {
-      if (auto VD = dyn_cast<ValueDecl>(member)) {
+    if (auto VD = dyn_cast<ValueDecl>(member)) {
+
+      // Record parent->members in subtable of DeclMemberNames.
+      std::unique_ptr<DeclMembersTable> &memberTable =
+        DeclMemberNames[VD->getBaseName()].second;
+      if (!memberTable) {
+        memberTable = llvm::make_unique<DeclMembersTable>();
+      }
+      (*memberTable)[parentID].push_back(memberID);
+
+      // Possibly add a record to ClassMembersForDynamicLookup too.
+      if (isClass) {
         if (VD->canBeAccessedByDynamicLookup()) {
           auto &list = ClassMembersForDynamicLookup[VD->getBaseName()];
           list.push_back({getKindForTable(VD), memberID});
@@ -2562,7 +2689,7 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto *genericParams : allGenericParams)
       writeGenericParams(genericParams);
 
-    writeMembers(extension->getMembers(), isClassExtension);
+    writeMembers(id, extension->getMembers(), isClassExtension);
     writeConformances(conformances, DeclTypeAbbrCodes);
     break;
   }
@@ -2770,7 +2897,7 @@ void Serializer::writeDecl(const Decl *D) {
 
 
     writeGenericParams(theStruct->getGenericParams());
-    writeMembers(theStruct->getMembers(), false);
+    writeMembers(id, theStruct->getMembers(), false);
     writeConformances(conformances, DeclTypeAbbrCodes);
     break;
   }
@@ -2817,7 +2944,7 @@ void Serializer::writeDecl(const Decl *D) {
                             inheritedAndDependencyTypes);
 
     writeGenericParams(theEnum->getGenericParams());
-    writeMembers(theEnum->getMembers(), false);
+    writeMembers(id, theEnum->getMembers(), false);
     writeConformances(conformances, DeclTypeAbbrCodes);
     break;
   }
@@ -2855,7 +2982,7 @@ void Serializer::writeDecl(const Decl *D) {
                             inheritedTypes);
 
     writeGenericParams(theClass->getGenericParams());
-    writeMembers(theClass->getMembers(), true);
+    writeMembers(id, theClass->getMembers(), true);
     writeConformances(conformances, DeclTypeAbbrCodes);
     break;
   }
@@ -2889,7 +3016,7 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(proto->getGenericParams());
     writeGenericRequirements(
       proto->getRequirementSignature(), DeclTypeAbbrCodes);
-    writeMembers(proto->getMembers(), true);
+    writeMembers(id, proto->getMembers(), true);
     writeDefaultWitnessTable(proto, DeclTypeAbbrCodes);
     break;
   }
@@ -3954,6 +4081,51 @@ writeNestedTypeDeclsTable(const index_block::NestedTypeDeclsLayout &declList,
   declList.emit(scratch, tableOffset, hashTableBlob);
 }
 
+static void
+writeDeclMemberNamesTable(const index_block::DeclMemberNamesLayout &declNames,
+                          const Serializer::DeclMemberNamesTable &table) {
+  SmallVector<uint64_t, 8> scratch;
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<DeclMemberNamesTableInfo> generator;
+    // Emit the offsets of the sub-tables; the tables themselves have been
+    // separately emitted into DECL_MEMBER_TABLES_BLOCK by now.
+    for (auto &entry : table) {
+      // Or they _should_ have been; check for nonzero offsets.
+      assert(static_cast<unsigned>(entry.second.first) != 0);
+      generator.insert(entry.first, entry.second.first);
+    }
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  declNames.emit(scratch, tableOffset, hashTableBlob);
+}
+
+static void
+writeDeclMembersTable(const decl_member_tables_block::DeclMembersLayout &mems,
+                      const Serializer::DeclMembersTable &table) {
+  SmallVector<uint64_t, 8> scratch;
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<DeclMembersTableInfo> generator;
+    for (auto &entry : table)
+      generator.insert(entry.first, entry.second);
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  mems.emit(scratch, tableOffset, hashTableBlob);
+}
+
 namespace {
 
 struct DeclCommentTableData {
@@ -4491,7 +4663,8 @@ static void collectInterestingNestedDeclarations(
 }
 
 void Serializer::writeAST(ModuleOrSourceFile DC,
-                          bool enableNestedTypeLookupTable) {
+                          bool enableNestedTypeLookupTable,
+                          bool enableDeclMemberNamesTable) {
   DeclTable topLevelDecls, operatorDecls, operatorMethodDecls;
   DeclTable precedenceGroupDecls;
   ObjCMethodTable objcMethods;
@@ -4625,6 +4798,25 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
       index_block::EntryPointLayout EntryPoint(Out);
       EntryPoint.emit(ScratchRecord, entryPointClassID.getValue());
     }
+
+    if (enableDeclMemberNamesTable) {
+      {
+        // Write sub-tables to a skippable sub-block.
+        BCBlockRAII restoreBlock(Out, DECL_MEMBER_TABLES_BLOCK_ID, 4);
+        decl_member_tables_block::DeclMembersLayout DeclMembersTable(Out);
+        for (auto &entry : DeclMemberNames) {
+          // Save BitOffset we're writing sub-table to.
+          static_assert(bitOffsetFitsIn32Bits(), "BitOffset too large");
+          assert(Out.GetCurrentBitNo() < (1ull << 32));
+          entry.second.first = Out.GetCurrentBitNo();
+          // Write sub-table.
+          writeDeclMembersTable(DeclMembersTable, *entry.second.second);
+        }
+      }
+      // Write top-level table mapping names to sub-tables.
+      index_block::DeclMemberNamesLayout DeclMemberNamesTable(Out);
+      writeDeclMemberNamesTable(DeclMemberNamesTable, DeclMemberNames);
+    }
   }
 }
 
@@ -4657,7 +4849,8 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     S.writeHeader(options);
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
-    S.writeAST(DC, options.EnableNestedTypeLookupTable);
+    S.writeAST(DC, options.EnableNestedTypeLookupTable,
+               options.EnableDeclMemberNamesTable);
   }
 
   S.writeToStream(os);
