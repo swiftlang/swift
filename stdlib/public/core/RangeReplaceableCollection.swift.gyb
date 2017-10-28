@@ -354,6 +354,9 @@ public protocol RangeReplaceableCollection : Collection
   mutating func removeAll(keepingCapacity keepCapacity: Bool /*= false*/)
 
   // FIXME(ABI): Associated type inference requires this.
+  subscript(bounds: Index) -> Element { get }
+
+  // FIXME(ABI): Associated type inference requires this.
   subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 

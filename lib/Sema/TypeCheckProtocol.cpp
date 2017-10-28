@@ -2063,6 +2063,7 @@ namespace {
     llvm::SmallVector<ConformanceChecker, 4> AllUsedCheckers;
     llvm::SmallVector<NormalProtocolConformance*, 4> AllConformances;
     llvm::SetVector<ValueDecl*> MissingWitnesses;
+    llvm::SmallPtrSet<ValueDecl *, 8> CoveredMembers;
 
     /// Check one conformance.
     ProtocolConformance * checkIndividualConformance(
@@ -2083,6 +2084,11 @@ namespace {
       return llvm::makeArrayRef(UnsatisfiedReqs);
     }
 
+    /// Whether this member is "covered" by one of the conformances.
+    bool isCoveredMember(ValueDecl *member) const {
+      return CoveredMembers.count(member) > 0;
+    }
+
     /// Check all conformances and emit diagnosis globally.
     void checkAllConformances();
   };
@@ -2092,10 +2098,23 @@ namespace {
     if (conformance->isInvalid()) return false;
     if (isa<TypeDecl>(req)) return false;
 
+    auto witness = conformance->hasWitness(req)
+      ? conformance->getWitness(req, nullptr).getDecl()
+      : nullptr;
+
     // An optional requirement might not have a witness...
-    if (!conformance->hasWitness(req) ||
-        !conformance->getWitness(req, nullptr).getDecl())
+    if (!witness)
       return req->getAttrs().hasAttribute<OptionalAttr>();
+
+    // If the witness lands within the declaration context of the conformance,
+    // record it as a "covered" member.
+    if (witness->getDeclContext() == conformance->getDeclContext())
+      CoveredMembers.insert(witness);
+
+    // The witness might come from a protocol or protocol extension.
+    if (witness->getDeclContext()
+          ->getAsProtocolOrProtocolExtensionContext())
+      return true;
 
     return false;
   }
@@ -5535,7 +5554,7 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
           // If the requirement is optional, @nonobjc suppresses the
           // diagnostic.
           if (isOptional) {
-            TC.diagnose(witness, diag::optional_req_near_match_nonobjc, false)
+            TC.diagnose(witness, diag::req_near_match_nonobjc, false)
               .fixItInsert(witness->getAttributeInsertionLoc(false),
                            "@nonobjc ");
           }
@@ -6213,11 +6232,14 @@ static Optional<unsigned> scorePotentiallyMatching(TypeChecker &tc,
   DeclName reqName = req->getFullName();
   DeclName witnessName = witness->getFullName();
 
-  // Apply the omit-needless-words heuristics to both names.
-  if (auto adjustedReqName = ::omitNeedlessWords(tc, req))
-    reqName = *adjustedReqName;
-  if (auto adjustedWitnessName = ::omitNeedlessWords(tc, witness))
-    witnessName = *adjustedWitnessName;
+  // For @objc protocols, apply the omit-needless-words heuristics to
+  // both names.
+  if (cast<ProtocolDecl>(req->getDeclContext())->isObjC()) {
+    if (auto adjustedReqName = ::omitNeedlessWords(tc, req))
+      reqName = *adjustedReqName;
+    if (auto adjustedWitnessName = ::omitNeedlessWords(tc, witness))
+      witnessName = *adjustedWitnessName;
+  }
 
   return scorePotentiallyMatchingNames(reqName, witnessName, isa<FuncDecl>(req),
                                        limit);
@@ -6317,19 +6339,40 @@ static unsigned getNameLength(DeclName name) {
   return length;
 }
 
+/// Determine whether a particular declaration is generic.
+static bool isGeneric(ValueDecl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+    return func->isGeneric();
+  if (auto subscript = dyn_cast<SubscriptDecl>(decl))
+    return subscript->isGeneric();
+  return false;
+}
+
 /// Determine whether we should warn about the given witness being a close
 /// match for the given optional requirement.
-static bool shouldWarnAboutPotentialWitness(ValueDecl *req,
-                                            ValueDecl *witness,
-                                            AccessLevel access,
-                                            unsigned score) {
+static bool shouldWarnAboutPotentialWitness(
+                                      MultiConformanceChecker &groupChecker,
+                                      ValueDecl *req,
+                                      ValueDecl *witness,
+                                      AccessLevel access,
+                                      unsigned score) {
+  // If the witness is covered, don't warn about it.
+  if (groupChecker.isCoveredMember(witness))
+    return false;
+
   // If the warning couldn't be suppressed, don't warn.
   if (!canSuppressPotentialWitnessWarningWithMovement(req, witness) &&
       !canSuppressPotentialWitnessWarningWithNonObjC(req, witness))
     return false;
 
-  // If the potential witness is already marked @nonobjc, don't warn.
-  if (witness->getAttrs().hasAttribute<NonObjCAttr>())
+  // If the potential witness for an @objc requirement is already
+  // marked @nonobjc, don't warn.
+  if (req->isObjC() && witness->getAttrs().hasAttribute<NonObjCAttr>())
+    return false;
+
+  // If the witness is generic and requirement is not, or vice-versa,
+  // don't warn.
+  if (isGeneric(req) != isGeneric(witness))
     return false;
 
   // Don't warn if the potential witness has been explicitly given less
@@ -6360,9 +6403,10 @@ static void diagnosePotentialWitness(TypeChecker &tc,
   auto proto = cast<ProtocolDecl>(req->getDeclContext());
 
   // Primary warning.
-  tc.diagnose(witness, diag::optional_req_near_match,
+  tc.diagnose(witness, diag::req_near_match,
               witness->getDescriptiveKind(),
               witness->getFullName(),
+              req->getAttrs().hasAttribute<OptionalAttr>(),
               req->getFullName(),
               proto->getFullName());
 
@@ -6385,21 +6429,21 @@ static void diagnosePotentialWitness(TypeChecker &tc,
   // If moving the declaration can help, suggest that.
   if (auto move
         = canSuppressPotentialWitnessWarningWithMovement(req, witness)) {
-    tc.diagnose(witness, diag::optional_req_near_match_move,
+    tc.diagnose(witness, diag::req_near_match_move,
                 witness->getFullName(), static_cast<unsigned>(*move));
   }
 
   // If adding 'private', 'fileprivate', or 'internal' can help, suggest that.
   if (access > AccessLevel::FilePrivate &&
       !witness->getAttrs().hasAttribute<AccessControlAttr>()) {
-    tc.diagnose(witness, diag::optional_req_near_match_access,
+    tc.diagnose(witness, diag::req_near_match_access,
                 witness->getFullName(), access)
       .fixItInsert(witness->getAttributeInsertionLoc(true), "private ");
   }
 
   // If adding @nonobjc can help, suggest that.
   if (canSuppressPotentialWitnessWarningWithNonObjC(req, witness)) {
-    tc.diagnose(witness, diag::optional_req_near_match_nonobjc, false)
+    tc.diagnose(witness, diag::req_near_match_nonobjc, false)
       .fixItInsert(witness->getAttributeInsertionLoc(false), "@nonobjc ");
   }
 
@@ -6647,8 +6691,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
         bool valueIsType = isa<TypeDecl>(value);
         for (auto requirement
-              : diag.Protocol->lookupDirect(value->getFullName(),
-                                            /*ignoreNewExtensions=*/true)) {
+                : diag.Protocol->lookupDirect(value->getFullName(),
+                                              /*ignoreNewExtensions=*/true)) {
           auto requirementIsType = isa<TypeDecl>(requirement);
           if (valueIsType != requirementIsType)
             continue;
@@ -6742,8 +6786,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
             bestOptionalReqs.begin(),
             bestOptionalReqs.end(),
             [&](ValueDecl *req) {
-              return !shouldWarnAboutPotentialWitness(req, value, defaultAccess,
-                                                      bestScore);
+              return !shouldWarnAboutPotentialWitness(groupChecker, req, value,
+                                                      defaultAccess, bestScore);
             }),
           bestOptionalReqs.end());
       }
@@ -6764,7 +6808,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         assert(diagnosed && "Failed to find conformance to diagnose?");
         (void)diagnosed;
 
-        // Remove this optional requirement from the list. We don't want to
+        // Remove this requirement from the list. We don't want to
         // complain about it twice.
         unsatisfiedReqs.erase(std::find(unsatisfiedReqs.begin(),
                                         unsatisfiedReqs.end(),
