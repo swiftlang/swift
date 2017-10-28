@@ -3154,11 +3154,14 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
     // Find the nested type declaration for this.
     auto baseEquivClass = resolvedBase.getEquivalenceClass(*this);
     TypeDecl *nestedTypeDecl;
+    SmallVector<TypeDecl *, 4> concreteDecls;
     if (auto assocType = depMemTy->getAssocType()) {
       nestedTypeDecl = assocType;
     } else {
       nestedTypeDecl =
-        baseEquivClass->lookupNestedType(*this, depMemTy->getName());
+        baseEquivClass->lookupNestedType(*this, depMemTy->getName(),
+                                         &concreteDecls);
+
       if (!nestedTypeDecl) {
         return ResolvedType::forUnresolved(baseEquivClass);
       }
@@ -3180,6 +3183,15 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                              resolutionKind);
     if (!nestedPA)
       return ResolvedType::forUnresolved(baseEquivClass);
+
+    if (resolutionKind != ArchetypeResolutionKind::AlreadyKnown) {
+      // Update for all of the concrete decls with this name, which will
+      // introduce various same-type constraints.
+      for (auto concreteDecl : concreteDecls) {
+        (void)basePA->updateNestedTypeForConformance(*this, concreteDecl,
+                                                     resolutionKind);
+      }
+    }
 
     // If base resolved to the anchor, then the nested potential archetype
     // we found is the resolved potential archetype. Return it directly,
