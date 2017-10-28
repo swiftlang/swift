@@ -975,6 +975,16 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       return;
     }
 
+    // If we have a superclass or concrete requirement, the conformance
+    // we need is stored in it.
+    if (source->kind == RequirementSource::Superclass ||
+        source->kind == RequirementSource::Concrete) {
+      auto conformance = source->getProtocolConformance();
+      assert(conformance.getRequirement() == conformingProto);
+      path.path.push_back({source->getAffectedType(), conformingProto});
+      return;
+    }
+
     // If we still have a parent, keep going.
     if (source->parent) {
       buildPath(reqs, source->parent, conformingProto, rootType,

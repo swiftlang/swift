@@ -8170,6 +8170,14 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     return;
   }
 
+  // If the nominal type has a generic signature that we didn't otherwise
+  // handle yet, use it directly.
+  if (auto genericSig = nominal->getGenericSignature()) {
+    auto genericEnv = genericSig->createGenericEnvironment();
+    ext->setGenericEnvironment(genericEnv);
+    return;
+  }
+
   assert(extendedType->is<NominalType>());
 }
 
