@@ -91,8 +91,11 @@ public:
   using UnresolvedType = llvm::PointerUnion<PotentialArchetype *, Type>;
   class ResolvedType;
 
-  using RequirementRHS =
+  using UnresolvedRequirementRHS =
       llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+
+  using RequirementRHS =
+    llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
 
   /// The location of a requirement as written somewhere in the source.
   typedef llvm::PointerUnion<const TypeRepr *, const RequirementRepr *>
@@ -158,7 +161,7 @@ public:
     /// the equivalence class that is held together by derived constraints.
     struct DerivedSameTypeComponent {
       /// The potential archetype that acts as the anchor for this component.
-      PotentialArchetype *anchor;
+      UnresolvedType anchor;
 
       /// The (best) requirement source within the component that makes the
       /// potential archetypes in this component equivalent to the concrete
@@ -223,15 +226,13 @@ public:
     /// archetype in this equivalence class to a concrete type along with
     /// that concrete type as written.
     Optional<ConcreteConstraint>
-    findAnyConcreteConstraintAsWritten(
-                              PotentialArchetype *preferredPA = nullptr) const;
+    findAnyConcreteConstraintAsWritten(Type preferredType = Type()) const;
 
     /// Find a source of the superclass constraint in this equivalence class
     /// that has a type equivalence to \c superclass, along with that
     /// superclass type as written.
     Optional<ConcreteConstraint>
-    findAnySuperclassConstraintAsWritten(
-                              PotentialArchetype *preferredPA = nullptr) const;
+    findAnySuperclassConstraintAsWritten(Type preferredType = Type()) const;
 
     /// Determine whether conformance to the given protocol is satisfied by
     /// a superclass requirement.
@@ -267,8 +268,8 @@ public:
 
     /// The cached archetype anchor.
     struct {
-      /// The cached archetype anchor itself.
-      PotentialArchetype *anchor = nullptr;
+      /// The cached anchor itself.
+      Type anchor;
 
       /// The number of members of the equivalence class when the archetype
       /// anchor was cached.
@@ -339,7 +340,7 @@ private:
   /// as appropriate based on \c unresolvedHandling.
   ConstraintResult handleUnresolvedRequirement(RequirementKind kind,
                                    UnresolvedType lhs,
-                                   RequirementRHS rhs,
+                                   UnresolvedRequirementRHS rhs,
                                    FloatingRequirementSource source,
                                    EquivalenceClass *unresolvedEquivClass,
                                    UnresolvedHandlingKind unresolvedHandling);
@@ -536,13 +537,14 @@ public:
   ///
   /// \param f A function object that will be passed each requirement
   /// and requirement source.
-  void enumerateRequirements(llvm::function_ref<
+  void enumerateRequirements(
+                    ArrayRef<GenericTypeParamType *> genericParams,
+                    llvm::function_ref<
                       void (RequirementKind kind,
-                            PotentialArchetype *archetype,
+                            Type type,
                             RequirementRHS constraint,
                             const RequirementSource *source)> f);
 
-public:
   /// Retrieve the generic parameters used to describe the generic
   /// signature being built.
   ArrayRef<GenericTypeParamType *> getGenericParams() const;
@@ -727,30 +729,36 @@ private:
   /// class of the given potential archetype.
   void checkConcreteTypeConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
-                            PotentialArchetype *pa);
+                            EquivalenceClass *equivClass);
 
   /// Check the superclass constraints within the equivalence
   /// class of the given potential archetype.
   void checkSuperclassConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
-                            PotentialArchetype *pa);
+                            EquivalenceClass *equivClass);
 
   /// Check conformance constraints within the equivalence class of the
   /// given potential archetype.
   void checkConformanceConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
-                            PotentialArchetype *pa);
+                            EquivalenceClass *equivClass);
 
   /// Check layout constraints within the equivalence class of the given
   /// potential archetype.
   void checkLayoutConstraints(ArrayRef<GenericTypeParamType *> genericParams,
-                              PotentialArchetype *pa);
+                              EquivalenceClass *equivClass);
 
   /// Check same-type constraints within the equivalence class of the
   /// given potential archetype.
   void checkSameTypeConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
-                            PotentialArchetype *pa);
+                            EquivalenceClass *equivClass);
+
+  /// Realize a potential archetype for the given type.
+  ///
+  /// The resolved archetype will be written back into the unresolved type,
+  /// to make the next resolution more efficient.
+  PotentialArchetype *realizePotentialArchetype(UnresolvedType &type);
 
 public:
   /// \brief Try to resolve the equivalence class of the given type.
@@ -1656,20 +1664,6 @@ public:
                                        const_cast<PotentialArchetype *>(this));
   }
 
-  /// \brief Retrieve the potential archetype to be used as the anchor for
-  /// potential archetype computations.
-  PotentialArchetype *getArchetypeAnchor(GenericSignatureBuilder &builder);
-
-  /// \brief Retrieve (or create) a nested type that is the current best
-  /// nested archetype anchor (locally) with the given name.
-  ///
-  /// When called on the archetype anchor, this will produce the named
-  /// archetype anchor.
-  PotentialArchetype *getNestedArchetypeAnchor(
-                       Identifier name,
-                       GenericSignatureBuilder &builder,
-                       ArchetypeResolutionKind kind);
-
   /// Update the named nested type when we know this type conforms to the given
   /// protocol.
   ///
@@ -1727,7 +1721,7 @@ public:
 
   Kind kind;
   UnresolvedType lhs;
-  RequirementRHS rhs;
+  UnresolvedRequirementRHS rhs;
   FloatingRequirementSource source;
 
   /// Dump a debugging representation of this delayed requirement class.
