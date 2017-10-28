@@ -765,7 +765,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       return false;
 
     case llvm::BitstreamEntry::SubBlock:
-      // Unknown sub-block, which this version of the compiler won't use.
+      if (entry.ID == DECL_MEMBER_TABLES_BLOCK_ID) {
+        DeclMemberTablesCursor = cursor;
+        DeclMemberTablesCursor.EnterSubBlock(DECL_MEMBER_TABLES_BLOCK_ID);
+      }
       if (cursor.SkipBlock())
         return false;
       break;
@@ -1772,6 +1775,66 @@ void ModuleFile::loadObjCMethods(
       methods.push_back(func);
     }
   }
+}
+
+Optional<TinyPtrVector<ValueDecl *>>
+ModuleFile::loadNamedMembers(const Decl *D, DeclName N,
+                             uint64_t contextData) {
+
+  auto VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return None;
+  assert(VD->wasDeserialized());
+
+  if (!DeclMemberNames)
+    return None;
+
+  auto i = DeclMemberNames->find(N.getBaseName());
+  if (i == DeclMemberNames->end())
+    return None;
+
+  BitOffset subTableOffset = *i;
+  std::unique_ptr<SerializedDeclMembersTable> &subTable =
+    DeclMembersTables[subTableOffset];
+  if (!subTable) {
+    BCOffsetRAII restoreOffset(DeclMemberTablesCursor);
+    DeclMemberTablesCursor.JumpToBit(subTableOffset);
+    auto entry = DeclMemberTablesCursor.advance();
+    if (entry.Kind != llvm::BitstreamEntry::Record) {
+      error();
+      return None;
+    }
+    SmallVector<uint64_t, 64> scratch;
+    StringRef blobData;
+    unsigned kind = DeclMemberTablesCursor.readRecord(entry.ID, scratch,
+                                                      &blobData);
+    assert(kind == decl_member_tables_block::DECL_MEMBERS);
+    (void)kind;
+    subTable = readDeclMembersTable(scratch, blobData);
+  }
+
+  assert(subTable);
+  auto j = subTable->find(VD->getDeclID());
+  if (j != subTable->end()) {
+    TinyPtrVector<ValueDecl *> results;
+    for (DeclID d : *j) {
+      Expected<Decl *> mem = getDeclChecked(d);
+      if (mem) {
+        assert(mem.get() && "unchecked error deserializing named member");
+        if (auto MVD = dyn_cast<ValueDecl>(mem.get())) {
+          results.push_back(MVD);
+        }
+      } else {
+        if (!getContext().LangOpts.EnableDeserializationRecovery)
+          fatal(mem.takeError());
+        // Treat this as a cache-miss to the caller and let them attempt
+        // to refill through the normal loadAllMembers() path.
+        return None;
+      }
+    }
+    return results;
+  }
+  return None;
 }
 
 void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,

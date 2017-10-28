@@ -66,6 +66,7 @@ class ModuleFile
 
   llvm::BitstreamCursor SILCursor;
   llvm::BitstreamCursor SILIndexCursor;
+  llvm::BitstreamCursor DeclMemberTablesCursor;
 
   /// The name of the module.
   StringRef Name;
