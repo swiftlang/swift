@@ -551,9 +551,10 @@ template <typename int_type>
 class TargetFunctionTypeFlags {
   enum : int_type {
     NumArgumentsMask = 0x00FFFFFFU,
-    ConventionMask   = 0x0F000000U,
-    ConventionShift  = 24U,
-    ThrowsMask       = 0x10000000U,
+    ConventionMask = 0x0F000000U,
+    ConventionShift = 24U,
+    ThrowsMask = 0x10000000U,
+    ParamFlagsMask = 0x01000000U,
   };
   int_type Data;
   
@@ -576,7 +577,13 @@ public:
     return TargetFunctionTypeFlags<int_type>((Data & ~ThrowsMask) |
                                              (throws ? ThrowsMask : 0));
   }
-  
+
+  constexpr TargetFunctionTypeFlags<int_type>
+  withParameterFlags(bool hasFlags) const {
+    return TargetFunctionTypeFlags<int_type>((Data & ~ParamFlagsMask) |
+                                             (hasFlags ? ParamFlagsMask : 0));
+  }
+
   unsigned getNumArguments() const {
     return Data & NumArgumentsMask;
   }
@@ -588,7 +595,9 @@ public:
   bool throws() const {
     return bool(Data & ThrowsMask);
   }
-  
+
+  bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }
+
   int_type getIntValue() const {
     return Data;
   }

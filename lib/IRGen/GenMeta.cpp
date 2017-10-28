@@ -717,11 +717,19 @@ namespace {
       if (auto metatype = tryGetLocal(type))
         return metatype;
 
-      auto resultMetadata =
+      auto result =
           IGF.emitTypeMetadataRef(type->getResult()->getCanonicalType());
 
       auto params = type.getParams();
       auto numParams = params.size();
+
+      bool hasFlags = false;
+      for (auto param : params) {
+        if (!param.getParameterFlags().isNone()) {
+          hasFlags = true;
+          break;
+        }
+      }
 
       // Map the convention to a runtime metadata value.
       FunctionMetadataConvention metadataConvention;
@@ -743,7 +751,8 @@ namespace {
       auto flagsVal = FunctionTypeFlags()
                           .withNumArguments(numParams)
                           .withConvention(metadataConvention)
-                          .withThrows(type->throws());
+                          .withThrows(type->throws())
+                          .withParameterFlags(hasFlags);
 
       auto flags = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                           flagsVal.getIntValue());
@@ -758,37 +767,18 @@ namespace {
             }
           };
 
-      auto processParameterFlags =
-          [&](ConstantArrayBuilder &flags,
-              llvm::PointerType *castTo) -> llvm::Value * {
-        auto *flagsVar = flags.finishAndCreateGlobal(
-            "parameter-flags", IGF.IGM.getPointerAlignment(),
-            /*constant*/ true);
-        return IGF.Builder.CreateBitCast(flagsVar, castTo);
-      };
-
       auto constructSimpleCall =
           [&](llvm::SmallVectorImpl<llvm::Value *> &arguments)
           -> llvm::Constant * {
         arguments.push_back(flags);
 
-        ConstantInitBuilder paramFlags(IGF.IGM);
-        auto flagsArr = paramFlags.beginArray();
-
-        bool hasFlags = false;
         collectParameters([&](unsigned i, llvm::Value *typeRef, uint8_t flags) {
-          hasFlags |= flags;
-          flagsArr.addInt32(flags);
           arguments.push_back(typeRef);
+          if (hasFlags)
+            arguments.push_back(llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags));
         });
 
-        if (hasFlags)
-          arguments.push_back(
-              processParameterFlags(flagsArr, IGF.IGM.Int32Ty->getPointerTo()));
-        else
-          flagsArr.abandon();
-
-        arguments.push_back(resultMetadata);
+        arguments.push_back(result);
 
         switch (params.size()) {
         case 1:
@@ -808,6 +798,12 @@ namespace {
         }
       };
 
+      auto getArrayFor = [&](llvm::Type *elementType, unsigned size,
+                             const llvm::Twine &name) -> Address {
+        auto arrayTy = llvm::ArrayType::get(elementType, size);
+        return IGF.createAlloca(arrayTy, IGF.IGM.getPointerAlignment(), name);
+      };
+
       switch (numParams) {
       case 1:
       case 2:
@@ -820,55 +816,59 @@ namespace {
       }
 
       default:
-        auto *const metadataPtrTy = IGF.IGM.TypeMetadataPtrTy->getPointerTo();
-        auto arrayTy = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, numParams + 3);
-        Address buffer = IGF.createAlloca(
-            arrayTy, IGF.IGM.getPointerAlignment(), "function-arguments");
-        IGF.Builder.CreateLifetimeStart(buffer,
-                                        IGF.IGM.getPointerSize() * numParams);
-        Address pointerToFirstArg =
-            IGF.Builder.CreateStructGEP(buffer, 0, Size(0));
-        Address flagsPtr = IGF.Builder.CreateBitCast(
-            pointerToFirstArg, IGF.IGM.SizeTy->getPointerTo());
-        IGF.Builder.CreateStore(flags, flagsPtr);
+        auto *const Int32Ptr = IGF.IGM.Int32Ty->getPointerTo();
 
-        ConstantInitBuilder paramFlags(IGF.IGM);
-        auto flagsArr = paramFlags.beginArray();
-        bool hasFlags = false;
+        llvm::SmallVector<llvm::Value *, 8> arguments;
+        arguments.push_back(flags);
 
-        collectParameters([&](unsigned i, llvm::Value *typeRef, uint8_t flags) {
-          auto argPtr = IGF.Builder.CreateStructGEP(buffer, i + 1,
-                                                    IGF.IGM.getPointerSize());
-          argPtr = IGF.Builder.CreateBitCast(argPtr, metadataPtrTy);
-          hasFlags |= flags;
-          flagsArr.addInt32(flags);
-          IGF.Builder.CreateStore(typeRef, argPtr);
-        });
+        Address parameters;
+        if (!params.empty()) {
+          parameters = getArrayFor(IGF.IGM.TypeMetadataPtrTy, numParams,
+                                   "function-parameters");
 
-        auto paramFlagsLoc = IGF.Builder.CreateStructGEP(
-            buffer, numParams + 1, IGF.IGM.getPointerSize());
+          IGF.Builder.CreateLifetimeStart(parameters,
+                                          IGF.IGM.getPointerSize() * numParams);
 
-        llvm::Value *flagsArrPtr =
-            llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
-        if (hasFlags) {
-          flagsArrPtr = processParameterFlags(flagsArr, IGF.IGM.Int8PtrTy);
+          ConstantInitBuilder paramFlags(IGF.IGM);
+          auto flagsArr = paramFlags.beginArray();
+          collectParameters([&](unsigned i, llvm::Value *typeRef,
+                                uint8_t flags) {
+            auto argPtr = IGF.Builder.CreateStructGEP(parameters, i,
+                                                      IGF.IGM.getPointerSize());
+            IGF.Builder.CreateStore(typeRef, argPtr);
+            if (hasFlags)
+              flagsArr.addInt32(flags);
+          });
+
+          auto parametersPtr =
+              IGF.Builder.CreateStructGEP(parameters, 0, Size(0));
+          arguments.push_back(parametersPtr.getAddress());
+
+          if (hasFlags) {
+            auto *flagsVar = flagsArr.finishAndCreateGlobal(
+                "parameter-flags", IGF.IGM.getPointerAlignment(),
+                /* constant */ true);
+            arguments.push_back(IGF.Builder.CreateBitCast(flagsVar, Int32Ptr));
+          } else {
+            flagsArr.abandon();
+            arguments.push_back(llvm::ConstantPointerNull::get(Int32Ptr));
+          }
         } else {
-          flagsArr.abandon();
+          arguments.push_back(llvm::ConstantPointerNull::get(
+              IGF.IGM.TypeMetadataPtrTy->getPointerTo()));
+          arguments.push_back(llvm::ConstantPointerNull::get(Int32Ptr));
         }
 
-        IGF.Builder.CreateStore(flagsArrPtr, paramFlagsLoc);
-
-        Address resultPtr = IGF.Builder.CreateStructGEP(
-            buffer, numParams + 2, IGF.IGM.getPointerSize());
-        resultPtr = IGF.Builder.CreateBitCast(resultPtr, metadataPtrTy);
-        IGF.Builder.CreateStore(resultMetadata, resultPtr);
+        arguments.push_back(result);
 
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetFunctionMetadataFn(),
-                                           pointerToFirstArg.getAddress());
+                                           arguments);
         call->setDoesNotThrow();
 
-        IGF.Builder.CreateLifetimeEnd(buffer,
-                                      IGF.IGM.getPointerSize() * numParams);
+        if (parameters.isValid())
+          IGF.Builder.CreateLifetimeEnd(parameters,
+                                        IGF.IGM.getPointerSize() * numParams);
+
         return setLocal(type, call);
       }
     }
