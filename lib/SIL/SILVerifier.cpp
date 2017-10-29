@@ -4302,6 +4302,32 @@ public:
     }
   }
 
+  void verifyLoadInitialization(SILFunction *F) {
+    llvm::SmallSet<SILValue, 4> AllocInstSet;
+    for (auto &BB : *F) {
+      AllocInstSet.clear();
+      for (auto &I : BB) {
+        if (auto *SI = dyn_cast<StoreInst>(&I)) {
+          if (AllocInstSet.count(SI->getOperand(1)))
+            AllocInstSet.erase(SI->getOperand(1));
+        }
+        else if (auto *LI = dyn_cast<LoadInst>(&I)) {
+          require(!AllocInstSet.count(LI->getOperand()),
+                  "possibly uninitialized load");
+        }
+        else if (auto *ASI = dyn_cast<AllocStackInst>(&I)) {
+          AllocInstSet.insert(ASI);
+        }
+        else {
+          for (auto &Op : I.getAllOperands()) {
+            if (AllocInstSet.count(Op.get()))
+              AllocInstSet.erase(Op.get());
+          }
+        }
+      }
+    }
+  }
+
   void verifyOpenedArchetypes(SILFunction *F) {
     require(OpenedArchetypes.getFunction() == F,
            "Wrong SILFunction provided to verifyOpenedArchetypes");
@@ -4404,6 +4430,7 @@ public:
     verifyEpilogBlocks(F);
     verifyFlowSensitiveRules(F);
     verifyBranches(F);
+    verifyLoadInitialization(F);
 
     visitSILBasicBlocks(F);
 
