@@ -327,7 +327,7 @@ bb0:
   %9 = apply %f() : $@convention(thin) () -> @owned SomeClass
   // CHECK: [[CVAL:%[0-9]+]] = apply
 
-  assign %9 to %3 : $*SomeClass
+  store %9 to %3 : $*SomeClass
   destroy_addr %3 : $*SomeClass
   dealloc_stack %3 : $*SomeClass
   %15 = tuple ()

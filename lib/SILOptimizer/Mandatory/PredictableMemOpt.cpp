@@ -324,7 +324,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
                       SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
                       llvm::SmallBitVector &ConflictingValues) {
   // Handle store and assign.
-  if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
+  if (isa<StoreInst>(Inst)) {
     unsigned StartSubElt = computeSubelement(Inst->getOperand(1), TheMemory);
     assert(StartSubElt != ~0U && "Store within enum projection not handled");
     SILType ValTy = Inst->getOperand(0)->getType();

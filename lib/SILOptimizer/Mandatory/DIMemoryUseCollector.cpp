@@ -419,8 +419,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     }
 
     // Stores *to* the allocation are writes.
-    if ((isa<StoreInst>(User) || isa<AssignInst>(User)) &&
-        UI->getOperandNumber() == 1) {
+    if (isa<StoreInst>(User) && UI->getOperandNumber() == 1) {
       if (PointeeType.is<TupleType>()) {
         UsesToScalarize.push_back(User);
         continue;
@@ -431,8 +430,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       DIUseKind Kind;
       if (InStructSubElement)
         Kind = DIUseKind::PartialStore;
-      else if (isa<AssignInst>(User))
-        Kind = DIUseKind::InitOrAssign;
       else if (PointeeType.isTrivial(User->getModule()))
         Kind = DIUseKind::InitOrAssign;
       else
@@ -632,17 +629,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         continue;
       }
 
-      // Scalarize AssignInst
-      if (auto *AI = dyn_cast<AssignInst>(User)) {
-        SILBuilderWithScope B(User, AI);
-        getScalarizedElements(AI->getOperand(0), ElementTmps, AI->getLoc(), B);
-
-        for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createAssign(AI->getLoc(), ElementTmps[i], ElementAddrs[i]);
-        AI->eraseFromParent();
-        continue;
-      }
-      
       // Scalarize StoreInst
       if (auto *SI = dyn_cast<StoreInst>(User)) {
         SILBuilderWithScope B(User, SI);
