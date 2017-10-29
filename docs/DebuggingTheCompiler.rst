@@ -13,6 +13,15 @@ Abstract
 This document contains some useful information for debugging the
 Swift compiler and Swift compiler output.
 
+Basic Utilities
+---------------
+
+Often, the first step to debug a compiler problem is to re-run the compiler
+with a command line, which comes from a crash trace or a build log.
+
+The script ``split-cmdline`` in ``utils/dev-scripts`` splits a command line
+into multiple lines. This is helpful to understand and edit long command lines.
+
 Printing the Intermediate Representations
 -----------------------------------------
 
