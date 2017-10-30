@@ -195,65 +195,68 @@ static SILValue extractSubElement(SILValue Val, unsigned SubElementNumber,
 //===----------------------------------------------------------------------===//
 
 namespace {
-  /// AllocOptimize - This performs load promotion and deletes synthesized
-  /// allocations if all loads can be removed.
-  class AllocOptimize {
-    SILModule &Module;
-    
-    /// TheMemory - This is either an alloc_box or alloc_stack instruction.
-    AllocationInst *TheMemory;
-    
-    /// This is the SILType of the memory object.
-    SILType MemoryType;
-    
-    /// The number of primitive subelements across all elements of this memory
-    /// value.
-    unsigned NumMemorySubElements;
-    
-    SmallVectorImpl<DIMemoryUse> &Uses;
-    SmallVectorImpl<SILInstruction*> &Releases;
-    
-    llvm::SmallPtrSet<SILBasicBlock*, 32> HasLocalDefinition;
-    
-    /// This is a map of uses that are not loads (i.e., they are Stores,
-    /// InOutUses, and Escapes), to their entry in Uses.
-    llvm::SmallDenseMap<SILInstruction*, unsigned, 16> NonLoadUses;
-    
-    /// Does this value escape anywhere in the function.
-    bool HasAnyEscape = false;
-    
-  public:
-    AllocOptimize(AllocationInst *TheMemory,
-                  SmallVectorImpl<DIMemoryUse> &Uses,
-                  SmallVectorImpl<SILInstruction*> &Releases);
-    
-    bool doIt();
-    
-  private:
-    
-    bool promoteLoad(SILInstruction *Inst);
-    bool promoteDestroyAddr(DestroyAddrInst *DAI);
-    
-    // Load promotion.
-    bool hasEscapedAt(SILInstruction *I);
-    void updateAvailableValues(SILInstruction *Inst,
-                               llvm::SmallBitVector &RequiredElts,
-                         SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
-                               llvm::SmallBitVector &ConflictingValues);
-    void computeAvailableValues(SILInstruction *StartingFrom,
-                                llvm::SmallBitVector &RequiredElts,
-                        SmallVectorImpl<std::pair<SILValue, unsigned>> &Result);
-    void computeAvailableValuesFrom(SILBasicBlock::iterator StartingFrom,
-                                    SILBasicBlock *BB,
-                                    llvm::SmallBitVector &RequiredElts,
+
+/// This performs load promotion and deletes synthesized allocations if all
+/// loads can be removed.
+class AllocOptimize {
+
+  SILModule &Module;
+
+  /// This is either an alloc_box or alloc_stack instruction.
+  AllocationInst *TheMemory;
+
+  /// This is the SILType of the memory object.
+  SILType MemoryType;
+
+  /// The number of primitive subelements across all elements of this memory
+  /// value.
+  unsigned NumMemorySubElements;
+
+  SmallVectorImpl<DIMemoryUse> &Uses;
+  SmallVectorImpl<SILInstruction *> &Releases;
+
+  llvm::SmallPtrSet<SILBasicBlock *, 32> HasLocalDefinition;
+
+  /// This is a map of uses that are not loads (i.e., they are Stores,
+  /// InOutUses, and Escapes), to their entry in Uses.
+  llvm::SmallDenseMap<SILInstruction *, unsigned, 16> NonLoadUses;
+
+  /// Does this value escape anywhere in the function.
+  bool HasAnyEscape = false;
+
+public:
+  AllocOptimize(AllocationInst *TheMemory, SmallVectorImpl<DIMemoryUse> &Uses,
+                SmallVectorImpl<SILInstruction *> &Releases);
+
+  bool doIt();
+
+private:
+  bool promoteLoad(SILInstruction *Inst);
+  bool promoteDestroyAddr(DestroyAddrInst *DAI);
+
+  // Load promotion.
+  bool hasEscapedAt(SILInstruction *I);
+  void
+  updateAvailableValues(SILInstruction *Inst,
+                        llvm::SmallBitVector &RequiredElts,
                         SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
-  llvm::SmallDenseMap<SILBasicBlock*, llvm::SmallBitVector, 32> &VisitedBlocks,
-                                    llvm::SmallBitVector &ConflictingValues);
-    
-    void explodeCopyAddr(CopyAddrInst *CAI);
-    
-    bool tryToRemoveDeadAllocation();
-  };
+                        llvm::SmallBitVector &ConflictingValues);
+  void computeAvailableValues(
+      SILInstruction *StartingFrom, llvm::SmallBitVector &RequiredElts,
+      SmallVectorImpl<std::pair<SILValue, unsigned>> &Result);
+  void computeAvailableValuesFrom(
+      SILBasicBlock::iterator StartingFrom, SILBasicBlock *BB,
+      llvm::SmallBitVector &RequiredElts,
+      SmallVectorImpl<std::pair<SILValue, unsigned>> &Result,
+      llvm::SmallDenseMap<SILBasicBlock *, llvm::SmallBitVector, 32>
+          &VisitedBlocks,
+      llvm::SmallBitVector &ConflictingValues);
+
+  void explodeCopyAddr(CopyAddrInst *CAI);
+
+  bool tryToRemoveDeadAllocation();
+};
+
 } // end anonymous namespace
 
 
