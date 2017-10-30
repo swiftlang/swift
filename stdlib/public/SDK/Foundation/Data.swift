@@ -38,6 +38,22 @@ internal func __NSDataIsCompact(_ data: NSData) -> Bool {
 import _SwiftFoundationOverlayShims
 import _SwiftCoreFoundationOverlayShims
     
+internal func __NSDataIsCompact(_ data: NSData) -> Bool {
+    if #available(OSX 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *) {
+        return data._isCompact()
+    } else {
+        var compact = true
+        let len = data.length
+        data.enumerateBytes { (_, byteRange, stop) in
+            if byteRange.length != len {
+                compact = false
+            }
+            stop.pointee = true
+        }
+        return compact
+    }
+}
+
 @_silgen_name("__NSDataWriteToURL")
 internal func __NSDataWriteToURL(_ data: NSData, _ url: NSURL, _ options: UInt, _ error: NSErrorPointer) -> Bool
     
@@ -130,7 +146,7 @@ public final class _DataStorage {
         case .mutable:
             return try apply(UnsafeRawBufferPointer(start: _bytes?.advanced(by: range.lowerBound - _offset), count: Swift.min(range.count, _length)))
         case .customReference(let d):
-            if d._isCompact() {
+            if __NSDataIsCompact(d) {
                 let len = d.length
                 guard len > 0 else {
                     return try apply(UnsafeRawBufferPointer(start: nil, count: 0))
@@ -161,7 +177,7 @@ public final class _DataStorage {
                 return try apply(UnsafeRawBufferPointer(buffer))
             }
         case .customMutableReference(let d):
-            if d._isCompact() {
+            if __NSDataIsCompact(d) {
                 let len = d.length
                 guard len > 0 else {
                     return try apply(UnsafeRawBufferPointer(start: nil, count: 0))
@@ -505,7 +521,7 @@ public final class _DataStorage {
         case .mutable:
             return _bytes!.advanced(by: index - _offset).assumingMemoryBound(to: UInt8.self).pointee
         case .customReference(let d):
-            if d._isCompact() {
+            if __NSDataIsCompact(d) {
                 return d.bytes.advanced(by: index - _offset).assumingMemoryBound(to: UInt8.self).pointee
             } else {
                 var byte: UInt8 = 0
@@ -519,7 +535,7 @@ public final class _DataStorage {
                 return byte
             }
         case .customMutableReference(let d):
-            if d._isCompact() {
+            if __NSDataIsCompact(d) {
                 return d.bytes.advanced(by: index - _offset).assumingMemoryBound(to: UInt8.self).pointee
             } else {
                 var byte: UInt8 = 0
