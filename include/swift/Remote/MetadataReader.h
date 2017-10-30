@@ -17,7 +17,6 @@
 #ifndef SWIFT_REMOTE_METADATAREADER_H
 #define SWIFT_REMOTE_METADATAREADER_H
 
-#include "swift/AST/Types.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Demangling/Demangler.h"
@@ -33,9 +32,9 @@ namespace remote {
 template <typename BuiltType> class FunctionParam {
   StringRef Label;
   BuiltType Type;
-  ParameterTypeFlags Flags;
+  ParameterFlags Flags;
 
-  FunctionParam(StringRef label, BuiltType type, ParameterTypeFlags flags)
+  FunctionParam(StringRef label, BuiltType type, ParameterFlags flags)
       : Label(label), Type(type), Flags(flags) {}
 
 public:
@@ -45,7 +44,7 @@ public:
 
   StringRef getLabel() const { return Label; }
   BuiltType getType() const { return Type; }
-  ParameterTypeFlags getFlags() const { return Flags; }
+  ParameterFlags getFlags() const { return Flags; }
 
   void setLabel(StringRef label) { Label = label; }
   void setType(BuiltType type) { Type = type; }
@@ -53,7 +52,7 @@ public:
   void setVariadic() { Flags = Flags.withVariadic(true); }
   void setShared() { Flags = Flags.withShared(true); }
   void setInOut() { Flags = Flags.withInOut(true); }
-  void setFlags(ParameterTypeFlags flags) { Flags = flags; };
+  void setFlags(ParameterFlags flags) { Flags = flags; };
 
   FunctionParam withLabel(StringRef label) const {
     return FunctionParam(label, Type, Flags);
@@ -63,7 +62,7 @@ public:
     return FunctionParam(Label, type, Flags);
   }
 
-  FunctionParam withFlags(ParameterTypeFlags flags) const {
+  FunctionParam withFlags(ParameterFlags flags) const {
     return FunctionParam(Label, Type, flags);
   }
 };
@@ -805,17 +804,17 @@ public:
       StoredPointer ArgumentAddress = MetadataAddress +
         sizeof(TargetFunctionTypeMetadata<Runtime>);
       StoredPointer ParameterFlagsAddress =
-          ArgumentAddress + (numParameters * sizeof(StoredPointer));
+                    ArgumentAddress + (numParameters * sizeof(StoredPointer));
 
-      for (StoredPointer i = 0; i < numParameters; ++i,
-                         ArgumentAddress += sizeof(StoredPointer),
-                         ParameterFlagsAddress += sizeof(StoredPointer)) {
-        StoredPointer ParameterAddress;
+      for (unsigned i = 0; i < numParameters; ++i,
+           ArgumentAddress += sizeof(StoredPointer),
+           ParameterFlagsAddress += sizeof(uint32_t)) {
+        StoredPointer ParamMetadata;
         if (!Reader->readInteger(RemoteAddress(ArgumentAddress),
-                                 &ParameterAddress))
+                                 &ParamMetadata))
           return BuiltType();
 
-        if (auto ParamTypeRef = readTypeFromMetadata(ParameterAddress)) {
+        if (auto ParamTypeRef = readTypeFromMetadata(ParamMetadata)) {
           FunctionParam<BuiltType> Param;
           Param.setType(ParamTypeRef);
 
@@ -824,8 +823,7 @@ public:
             if (!Reader->readInteger(RemoteAddress(ParameterFlagsAddress),
                                      &ParameterFlags))
               return BuiltType();
-
-            Param.setFlags(ParameterTypeFlags::fromRaw(ParameterFlags));
+              Param.setFlags(ParameterFlags::fromIntValue(ParameterFlags));
           }
 
           Parameters.push_back(std::move(Param));

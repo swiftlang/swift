@@ -757,12 +757,19 @@ namespace {
                                           flagsVal.getIntValue());
 
       auto collectParameters =
-          [&](llvm::function_ref<void(unsigned, llvm::Value *, uint8_t)>
+          [&](llvm::function_ref<void(unsigned, llvm::Value *,
+                                      ParameterFlags flags)>
                   processor) {
             for (auto index : indices(params)) {
               auto param = params[index];
               auto flags = param.getParameterFlags();
-              processor(index, getFunctionParameterRef(param), flags.toRaw());
+
+              auto parameterFlags = ParameterFlags()
+                                        .withInOut(flags.isInOut())
+                                        .withShared(flags.isShared())
+                                        .withVariadic(flags.isVariadic());
+
+              processor(index, getFunctionParameterRef(param), parameterFlags);
             }
           };
 
@@ -771,10 +778,12 @@ namespace {
           -> llvm::Constant * {
         arguments.push_back(flags);
 
-        collectParameters([&](unsigned i, llvm::Value *typeRef, uint8_t flags) {
+        collectParameters([&](unsigned i, llvm::Value *typeRef,
+                              ParameterFlags flags) {
           arguments.push_back(typeRef);
           if (hasFlags)
-            arguments.push_back(llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags));
+            arguments.push_back(
+                llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags.getIntValue()));
         });
 
         arguments.push_back(result);
@@ -831,12 +840,12 @@ namespace {
           ConstantInitBuilder paramFlags(IGF.IGM);
           auto flagsArr = paramFlags.beginArray();
           collectParameters([&](unsigned i, llvm::Value *typeRef,
-                                uint8_t flags) {
+                                ParameterFlags flags) {
             auto argPtr = IGF.Builder.CreateStructGEP(parameters, i,
                                                       IGF.IGM.getPointerSize());
             IGF.Builder.CreateStore(typeRef, argPtr);
             if (hasFlags)
-              flagsArr.addInt32(flags);
+              flagsArr.addInt32(flags.getIntValue());
           });
 
           auto parametersPtr =
