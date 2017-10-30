@@ -1492,7 +1492,6 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
          "no debug info should be generated");
   StringRef SourceFileName =
       SF ? SF->getFilename() : StringRef(Opts.MainInputFilename);
-  StringRef Dir;
   llvm::SmallString<256> AbsMainFile;
   if (SourceFileName.empty())
     AbsMainFile = "<unknown>";
