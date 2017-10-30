@@ -78,16 +78,29 @@ SILValue SILSSAUpdater::GetValueAtEndOfBlock(SILBasicBlock *BB) {
 
 /// Are all available values identicalTo each other.
 bool areIdentical(AvailableValsTy &Avails) {
-  // TODO: MultiValueInstruction
-  auto *First = dyn_cast<SingleValueInstruction>(Avails.begin()->second);
-  if (!First)
+  if (auto *First = dyn_cast<SingleValueInstruction>(Avails.begin()->second)) {
+    for (auto Avail : Avails) {
+      auto *Inst = dyn_cast<SingleValueInstruction>(Avail.second);
+      if (!Inst)
+        return false;
+      if (!Inst->isIdenticalTo(First))
+        return false;
+    }
+    return true;
+  }
+
+  auto *MVIR = dyn_cast<MultipleValueInstructionResult>(Avails.begin()->second);
+  if (!MVIR)
     return false;
+
   for (auto Avail : Avails) {
-    auto *Inst = dyn_cast<SingleValueInstruction>(Avail.second);
-    if (!Inst)
+    auto *Result = dyn_cast<MultipleValueInstructionResult>(Avail.second);
+    if (!Result)
       return false;
-    if (!Inst->isIdenticalTo(First))
+    if (!Result->getParent()->isIdenticalTo(MVIR->getParent()) ||
+        Result->getIndex() != MVIR->getIndex()) {
       return false;
+    }
   }
   return true;
 }
@@ -153,6 +166,7 @@ isEquivalentPHI(SILPHIArgument *PHI,
                 llvm::SmallDenseMap<SILBasicBlock *, SILValue, 8> &ValueMap) {
   SILBasicBlock *PhiBB = PHI->getParent();
   size_t Idx = PHI->getIndex();
+  // TODO: Should we check ownership here?
   for (auto *PredBB : PhiBB->getPredecessorBlocks()) {
     auto DesiredVal = ValueMap[PredBB];
     OperandValueArrayRef EdgeValues =

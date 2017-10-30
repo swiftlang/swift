@@ -456,29 +456,39 @@ struct ThrowStruct {
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers11ThrowStructVACyt4fail_tKcfC
 // CHECK-NEXT:    try_apply [[INIT_FN]](%1)
+//
 // CHECK:       bb1([[NEW_SELF:.*]] : $ThrowStruct):
 // CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
+//
 // CHECK:       bb2([[RESULT:%.*]] : $Int):
 // CHECK-NEXT:    retain_value [[NEW_SELF]]
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
+//
 // CHECK:       bb3([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+//
 // CHECK:       bb4([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+//
 // CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    cond_br [[COND]], bb6, bb7
+// CHECK-NEXT:    cond_br [[COND]], bb7, bb6
+//
 // CHECK:       bb6:
-// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
-// CHECK-NEXT:    br bb7
+// CHECK:         br bb8
+//
 // CHECK:       bb7:
+// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
+// CHECK-NEXT:    br bb8
+//
+// CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
@@ -495,6 +505,7 @@ struct ThrowStruct {
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
+//
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers11ThrowStructVACyt6noFail_tcfC
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%1)
@@ -503,23 +514,32 @@ struct ThrowStruct {
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
+//
 // CHECK:       bb2([[RESULT:%.*]] : $Int):
 // CHECK-NEXT:    retain_value [[NEW_SELF]]
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
+//
 // CHECK:       bb3([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+//
 // CHECK:       bb4([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+//
 // CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    cond_br [[COND]], bb6, bb7
+// CHECK-NEXT:    cond_br [[COND]], bb7, bb6
+//
 // CHECK:       bb6:
-// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
-// CHECK-NEXT:    br bb7
+// CHECK-NEXT:    br bb8
+//
 // CHECK:       bb7:
+// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
+// CHECK-NEXT:    br bb8
+//
+// CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]

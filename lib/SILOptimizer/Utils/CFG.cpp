@@ -508,6 +508,27 @@ bool swift::isCriticalEdge(TermInst *T, unsigned EdgeIdx) {
   return true;
 }
 
+bool swift::gatherAllCriticalEdges(
+    TermInst *TI, llvm::SmallVectorImpl<unsigned> &EdgeIndices) {
+  if (TI->getNumSuccessors() <= 1)
+    return false;
+
+  bool FoundEdge = false;
+  unsigned Index = 0;
+  for (auto *DestBB : TI->getSuccessorBlocks()) {
+    assert(!DestBB->pred_empty() && "There should be a predecessor");
+    if (DestBB->getSinglePredecessorBlock()) {
+      ++Index;
+      continue;
+    }
+    EdgeIndices.emplace_back(Index);
+    FoundEdge = true;
+    ++Index;
+  }
+
+  return FoundEdge;
+}
+
 template<class SwitchInstTy>
 SILBasicBlock *getNthEdgeBlock(SwitchInstTy *S, unsigned EdgeIdx) {
   if (S->getNumCases() == EdgeIdx)

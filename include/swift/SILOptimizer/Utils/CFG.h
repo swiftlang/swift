@@ -66,6 +66,10 @@ void replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest, SILBasicBlock *New
 /// \brief Check if the edge from the terminator is critical.
 bool isCriticalEdge(TermInst *T, unsigned EdgeIdx);
 
+/// \brief Get all critical edges from the terminator.
+bool gatherAllCriticalEdges(TermInst *T,
+                            llvm::SmallVectorImpl<unsigned> &EdgeIndices);
+
 /// \brief Splits the edge from terminator if it is critical.
 ///
 /// Updates dominance information and loop information if not null.

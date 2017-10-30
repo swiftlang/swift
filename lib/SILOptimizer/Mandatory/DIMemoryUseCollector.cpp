@@ -193,26 +193,32 @@ static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
 static void getScalarizedElements(SILValue V,
                                   SmallVectorImpl<SILValue> &ElementVals,
                                   SILLocation Loc, SILBuilder &B) {
+  if (B.getFunction().hasQualifiedOwnership()) {
+    auto *Dest = B.createDestructureTuple(Loc, V);
+    copy(Dest->getResults(), std::back_inserter(ElementVals));
+    return;
+  }
+
   TupleType *TT = V->getType().castTo<TupleType>();
   for (auto Index : indices(TT->getElements())) {
     ElementVals.push_back(B.emitTupleExtract(Loc, V, Index));
   }
 }
 
-
 /// Scalarize a load down to its subelements.  If NewLoads is specified, this
 /// can return the newly generated sub-element loads.
 static SILValue scalarizeLoad(LoadInst *LI,
                               SmallVectorImpl<SILValue> &ElementAddrs) {
   SILBuilderWithScope B(LI);
-  SmallVector<SILValue, 4> ElementTmps;
-  
-  for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
-    auto *SubLI = B.createLoad(LI->getLoc(), ElementAddrs[i],
-                               LoadOwnershipQualifier::Unqualified);
-    ElementTmps.push_back(SubLI);
-  }
-  
+  SmallVector<SILValue, 8> ElementTmps;
+
+  transform(indices(ElementAddrs), std::back_inserter(ElementTmps),
+            [&](unsigned i) -> SILValue {
+              return B.createTrivialLoadOr(LI->getLoc(), ElementAddrs[i],
+                                           LI->getOwnershipQualifier(),
+                                           true /*SupportUnqualifiedSIL*/);
+            });
+
   if (LI->getType().is<TupleType>())
     return B.createTuple(LI->getLoc(), LI->getType(), ElementTmps);
   return B.createStruct(LI->getLoc(), LI->getType(), ElementTmps);
@@ -259,7 +265,7 @@ namespace {
 
         // If this is a release or dealloc_stack, then remember it as such.
         if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
-            isa<DeallocBoxInst>(User)) {
+            isa<DeallocBoxInst>(User) || isa<DestroyValueInst>(User)) {
           Releases.push_back(User);
         }
       }
@@ -267,7 +273,10 @@ namespace {
 
   private:
     void collectUses(SILValue Pointer, unsigned BaseEltNo);
-    void collectContainerUses(AllocBoxInst *ABI);
+
+    /// Container is assumed to be an alloc_box or a copy_value from an
+    /// alloc_box.
+    void collectContainerUses(SingleValueInstruction *Box);
     void addElementUses(unsigned BaseEltNo, SILType UseTy,
                         SILInstruction *User, DIUseKind Kind);
     void collectTupleElementUses(TupleElementAddrInst *TEAI,
@@ -327,8 +336,32 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
   collectUses(SEAI, BaseEltNo);
 }
 
-void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
-  for (Operand *UI : ABI->getUses()) {
+static bool isCopyOfBox(SingleValueInstruction *I) {
+  while (auto *CVI = dyn_cast<CopyValueInst>(I)) {
+    if (isa<AllocBoxInst>(CVI->getOperand()))
+      return true;
+
+    if (auto *NewI = dyn_cast<SingleValueInstruction>(CVI->getOperand())) {
+      I = NewI;
+      continue;
+    }
+    break;
+  }
+  return false;
+}
+
+static CanSILBoxType getBoxTypeForContainer(SingleValueInstruction *Box) {
+  if (auto *ABI = dyn_cast<AllocBoxInst>(Box))
+    return ABI->getBoxType();
+  auto *CVI = cast<CopyValueInst>(Box);
+  return CVI->getOperand()->getType().castTo<SILBoxType>();
+}
+
+void ElementUseCollector::collectContainerUses(SingleValueInstruction *Box) {
+  assert((isa<AllocBoxInst>(Box) || isCopyOfBox(Box)) &&
+         "Must be a box or a composed n-copy of a box?!");
+
+  for (Operand *UI : Box->getUses()) {
     auto *User = UI->getUser();
 
     // Deallocations and retain/release don't affect the value directly.
@@ -338,17 +371,25 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
       continue;
     if (isa<StrongReleaseInst>(User))
       continue;
+    if (isa<DestroyValueInst>(User))
+      continue;
 
-    if (auto project = dyn_cast<ProjectBoxInst>(User)) {
-      collectUses(project, project->getFieldIndex());
+    if (auto *PBI = dyn_cast<ProjectBoxInst>(User)) {
+      collectUses(PBI, PBI->getFieldIndex());
+      continue;
+    }
+
+    // Look through copy_value.
+    if (auto *CVI = dyn_cast<CopyValueInst>(User)) {
+      collectContainerUses(CVI);
       continue;
     }
 
     // Other uses of the container are considered escapes of the values.
-    for (unsigned field : indices(ABI->getBoxType()->getLayout()->getFields()))
-      addElementUses(field,
-                     ABI->getBoxType()->getFieldType(ABI->getModule(), field),
-                     User, DIUseKind::Escape);
+    CanSILBoxType BoxTy = getBoxTypeForContainer(Box);
+    for (unsigned field : indices(BoxTy->getLayout()->getFields()))
+      addElementUses(field, BoxTy->getFieldType(Box->getModule(), field), User,
+                     DIUseKind::Escape);
   }
 }
 
@@ -635,8 +676,9 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
         
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
-                        StoreOwnershipQualifier::Unqualified);
+          B.createTrivialStoreOr(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
+                                 StoreOwnershipQualifier::Init,
+                                 true /*SupportUnqualifiedSIL*/);
         SI->eraseFromParent();
         continue;
       }

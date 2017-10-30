@@ -13,11 +13,14 @@
 #define DEBUG_TYPE "predictable-memopt"
 
 #include "DIMemoryUseCollector.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -224,18 +227,16 @@ public:
 
   void addInsertionPoint(SILInstruction *I) & { InsertionPoints.insert(I); }
 
-  /// TODO: This needs a better name.
-  AvailableValue emitStructExtract(SILBuilder &B, SILLocation Loc, VarDecl *D,
-                                   unsigned SubElementNumber) const {
-    SILValue NewValue = B.emitStructExtract(Loc, Value, D);
-    return {NewValue, SubElementNumber, InsertionPoints};
+  /// Return a new Available Value, for a projection. We still have the same
+  /// insertion points thought.
+  AvailableValue withProjection(SILValue NewValue,
+                                unsigned NewSubEltNumber) const {
+    return {NewValue, NewSubEltNumber, InsertionPoints};
   }
 
-  /// TODO: This needs a better name.
-  AvailableValue emitTupleExtract(SILBuilder &B, SILLocation Loc,
-                                  unsigned EltNo,
-                                  unsigned SubElementNumber) const {
-    SILValue NewValue = B.emitTupleExtract(Loc, Value, EltNo);
+  /// Return a new available value with the same sub element number/insertion
+  /// points, but with a new value.
+  AvailableValue withReplacement(SILValue NewValue) const {
     return {NewValue, SubElementNumber, InsertionPoints};
   }
 
@@ -278,6 +279,72 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const AvailableValue &V) {
 } // end llvm namespace
 
 //===----------------------------------------------------------------------===//
+//                      Compensation Block Finding Code
+//===----------------------------------------------------------------------===//
+
+static void
+findCompensationBlocks(SILInstruction *Load,
+                       ArrayRef<SILInstruction *> InsertPts,
+                       llvm::SmallVectorImpl<SILBasicBlock *> &Result) {
+  // If we have one insert pt and that one insert pt and the load are in the
+  // same block, we do not need to insert any compensation code. Just return.
+  if (InsertPts.size() == 1 && Load->getParent() == InsertPts[0]->getParent())
+    return;
+
+  llvm::SmallPtrSet<SILBasicBlock *, 8> InsertPtBlocks;
+  for (auto *I : InsertPts) {
+    InsertPtBlocks.insert(I->getParent());
+  }
+
+  llvm::SmallVector<SILBasicBlock *, 32> Worklist;
+  llvm::SmallPtrSet<SILBasicBlock *, 32> VisitedBlocks;
+  llvm::SmallSetVector<SILBasicBlock *, 8> MustVisitBlocks;
+
+  VisitedBlocks.insert(Load->getParent());
+  for (auto *PredBB : Load->getParent()->getPredecessorBlocks()) {
+    Worklist.push_back(PredBB);
+    VisitedBlocks.insert(PredBB);
+  }
+
+  while (!Worklist.empty()) {
+    auto *Block = Worklist.pop_back_val();
+
+    // Otherwise, remove the block from MustVisitBlocks if it is in there.
+    MustVisitBlocks.remove(Block);
+
+    // Then add each successor block of Block that has not been visited yet to
+    // the MustVisitBlocks set.
+    for (auto *SuccBB : Block->getSuccessorBlocks()) {
+      if (!VisitedBlocks.count(SuccBB)) {
+        MustVisitBlocks.insert(SuccBB);
+      }
+    }
+
+    // Then if this is one of our insertion blocks, continue so we do not keep
+    // visiting predecessors.
+    if (InsertPtBlocks.count(Block)) {
+// In debug builds, remove block so we can verify that we found all of our
+// insert pts.
+#ifndef NDEBUG
+      InsertPtBlocks.erase(Block);
+#endif
+      continue;
+    }
+
+    // And then add all unvisited predecessors to the worklist.
+    copy_if(Block->getPredecessorBlocks(), std::back_inserter(Worklist),
+            [&](SILBasicBlock *Block) -> bool {
+              return VisitedBlocks.insert(Block).second;
+            });
+  }
+
+  assert(InsertPtBlocks.empty() && "Failed to find all insert pt blocks?!");
+  // Now that we are done, add all remaining must visit blocks to our result
+  // list. These are the places where we must insert compensating code.
+  copy(MustVisitBlocks, std::back_inserter(Result));
+}
+
+//===----------------------------------------------------------------------===//
 //                           Subelement Extraction
 //===----------------------------------------------------------------------===//
 
@@ -287,7 +354,7 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
                                                   SILBuilder &B,
                                                   SILLocation Loc) {
   SILType ValTy = Val.getType();
-  unsigned SubElementNumber = Val.SubElementNumber;
+  unsigned SubElementNumber = Val.getSubElementNumber();
 
   // Extract tuple elements.
   if (auto TT = ValTy.getAs<TupleType>()) {
@@ -296,7 +363,8 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
       SILType EltTy = ValTy.getTupleElementType(EltNo);
       unsigned NumSubElt = getNumSubElements(EltTy, B.getModule());
       if (SubElementNumber < NumSubElt) {
-        auto NewVal = Val.emitTupleExtract(B, Loc, EltNo, SubElementNumber);
+        SILValue Ext = B.emitTupleExtract(Loc, Val.getValue(), EltNo);
+        auto NewVal = Val.withProjection(Ext, SubElementNumber);
         return nonDestructivelyExtractSubElement(NewVal, B, Loc);
       }
       
@@ -313,7 +381,8 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
       unsigned NumSubElt = getNumSubElements(fieldType, B.getModule());
       
       if (SubElementNumber < NumSubElt) {
-        auto NewVal = Val.emitStructExtract(B, Loc, D, SubElementNumber);
+        SILValue Ext = B.emitStructExtract(Loc, Val.getValue(), D);
+        auto NewVal = Val.withProjection(Ext, SubElementNumber);
         return nonDestructivelyExtractSubElement(NewVal, B, Loc);
       }
       
@@ -326,6 +395,182 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
   // Otherwise, we're down to a scalar.
   assert(SubElementNumber == 0 && "Miscalculation indexing subelements");
   return Val.getValue();
+}
+
+namespace {
+
+/// Given an aggregate value and an access path, extract the value indicated by
+/// the path updating AvailableValues as we go. This ensures that the remaining
+/// values that we produce from the destructure are available if we are looping
+/// around gathering available values for an aggregate.
+class DestructiveSubElementExtractor {
+  AllocationInst *TheMemory;
+  SILBuilder &B;
+  SILLocation Loc;
+
+  MutableArrayRef<AvailableValue> AvailableValueList;
+
+public:
+  DestructiveSubElementExtractor(
+      AllocationInst *TheMemory, SILBuilder &B, SILLocation Loc,
+      MutableArrayRef<AvailableValue> AvailableValueList)
+      : TheMemory(TheMemory), B(B), Loc(Loc),
+        AvailableValueList(AvailableValueList) {}
+
+  SILValue extract(const AvailableValue &Val);
+
+private:
+  AvailableValue extractStructSubElement(const AvailableValue &Val,
+                                         StructDecl *SD);
+  AvailableValue extractTupleSubElement(const AvailableValue &Val,
+                                        TupleType *TT);
+
+  /// Given new destructure operations, update AvailableValues so that any items
+  /// pointing at subtypes of the aggregate now point at the destructured
+  /// results instead.
+  void updateAvailableValues(const AvailableValue &Val,
+                             ArrayRef<SILValue> DestructuredAggregate,
+                             unsigned EltIndex);
+
+  /// Has ownership been stripped out of the current function.
+  bool isOwnershipEnabled() const {
+    return TheMemory->getFunction()->hasQualifiedOwnership();
+  }
+
+  /// Given a tuple or a struct aggregate, destructure the value into its
+  /// constituant parts.
+  void destructureAggregate(SILValue Aggregate, SILLocation Loc,
+                            llvm::SmallVectorImpl<SILValue> &Results);
+};
+
+} // end anonymous namespace
+
+void DestructiveSubElementExtractor::destructureAggregate(
+    SILValue Aggregate, SILLocation Loc,
+    llvm::SmallVectorImpl<SILValue> &Results) {
+  // If ownership is not enabled, we use individual extracts. Otherwise, we use
+  // /real/ destructure operations.
+  if (!isOwnershipEnabled()) {
+    llvm::SmallVector<Projection, 8> Projections;
+    Projection::getFirstLevelProjections(Aggregate->getType(),
+                                         TheMemory->getModule(), Projections);
+    transform(Projections, std::back_inserter(Results),
+              [this, &Loc, &Aggregate](Projection &P) -> SILValue {
+                return P.createObjectProjection(B, Loc, Aggregate).get();
+              });
+    return;
+  }
+
+  MultipleValueInstruction *MVI = nullptr;
+  if (Aggregate->getType().is<TupleType>()) {
+    MVI = B.createDestructureTuple(Loc, Aggregate);
+  } else {
+    assert(Aggregate->getType().getStructOrBoundGenericStruct() &&
+           "Should have either a struct or a tuple here.");
+    MVI = B.createDestructureStruct(Loc, Aggregate);
+  }
+  copy(MVI->getResults(), std::back_inserter(Results));
+}
+
+AvailableValue DestructiveSubElementExtractor::extractTupleSubElement(
+    const AvailableValue &Agg, TupleType *TT) {
+  llvm::SmallVector<SILValue, 8> DestructuredValues;
+  unsigned SubElementNumber = Agg.getSubElementNumber();
+
+  for (unsigned EltNo : indices(TT->getElementTypes())) {
+    DestructuredValues.clear();
+
+    // Keep track of what subelement is being referenced.
+    SILType EltTy = Agg.getType().getTupleElementType(EltNo);
+    unsigned NumSubElt = getNumSubElements(EltTy, B.getModule());
+    if (SubElementNumber >= NumSubElt) {
+      SubElementNumber -= NumSubElt;
+      continue;
+    }
+
+    destructureAggregate(Agg.getValue(), Loc, DestructuredValues);
+    updateAvailableValues(Agg, DestructuredValues, EltNo);
+    return Agg.withProjection(DestructuredValues[EltNo], SubElementNumber);
+  }
+
+  llvm_unreachable("Didn't find field");
+}
+
+AvailableValue DestructiveSubElementExtractor::extractStructSubElement(
+    const AvailableValue &Agg, StructDecl *SD) {
+  llvm::SmallVector<SILValue, 8> DestructuredValues;
+  unsigned SubElementNumber = Agg.getSubElementNumber();
+  ;
+  unsigned EltNo = 0;
+  for (VarDecl *D : SD->getStoredProperties()) {
+    DestructuredValues.clear();
+
+    auto fieldType = Agg.getType().getFieldType(D, B.getModule());
+    unsigned NumSubElt = getNumSubElements(fieldType, B.getModule());
+    if (SubElementNumber >= NumSubElt) {
+      SubElementNumber -= NumSubElt;
+      ++EltNo;
+      continue;
+    }
+
+    destructureAggregate(Agg.getValue(), Loc, DestructuredValues);
+    updateAvailableValues(Agg, DestructuredValues, EltNo);
+    return Agg.withProjection(DestructuredValues[EltNo], SubElementNumber);
+  }
+  llvm_unreachable("Didn't find field");
+}
+
+SILValue
+DestructiveSubElementExtractor::extract(const AvailableValue &InputVal) {
+  // We know that all uses of InputVal will use this value non-destructively
+  // beyond our re-assignment of the loop induction variable. So this is safe to
+  // do.
+  AvailableValue *Val = const_cast<AvailableValue *>(&InputVal);
+  Optional<AvailableValue> NewVal;
+
+  while (true) {
+    if (NewVal) {
+      Val = &NewVal.getValue();
+    }
+
+    // This dynamically skips the first ieration.
+    SILType AggTy = Val->getType();
+    // Extract tuple elements.
+    if (auto TT = AggTy.getAs<TupleType>()) {
+      NewVal = extractTupleSubElement(*Val, TT);
+      continue;
+    }
+
+    // Extract struct elements.
+    if (auto *SD = getFullyReferenceableStruct(AggTy)) {
+      NewVal = extractStructSubElement(*Val, SD);
+      continue;
+    }
+
+    // Otherwise, we're down to a scalar.
+    assert(Val->getSubElementNumber() == 0 &&
+           "Miscalculation indexing subelements");
+    return Val->getValue();
+  }
+
+  llvm_unreachable("Should never hit this");
+}
+
+void DestructiveSubElementExtractor::updateAvailableValues(
+    const AvailableValue &Val, ArrayRef<SILValue> DestructuredAggregate,
+    unsigned EltNo) {
+  // Then for each leaf child element of the struct, add the new value.
+  unsigned NumSubElts =
+      getNumSubElements(Val.getType(), TheMemory->getModule());
+  for (unsigned i : range(NumSubElts)) {
+    auto &SubVal = AvailableValueList[Val.getSubElementNumber() + i];
+    assert(SubVal.getValue() != nullptr &&
+           "Since we are destructuring an already "
+           "loaded value, so we should have /some/ "
+           "value here");
+    SubVal.getValue()->replaceAllUsesWith(DestructuredAggregate[i]);
+    SubVal = Val.withProjection(DestructuredAggregate[i], i);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -351,14 +596,19 @@ class AvailableValueAggregator {
   SILModule &M;
   SILBuilderWithScope B;
   SILLocation Loc;
+  SILInstruction *Inst;
+  AllocationInst *TheMemory;
+  LoadOwnershipQualifier Qual;
   MutableArrayRef<AvailableValue> AvailableValueList;
   SmallVectorImpl<DIMemoryUse> &Uses;
 
 public:
-  AvailableValueAggregator(SILInstruction *Inst,
+  AvailableValueAggregator(AllocationInst *TheMemory, SILInstruction *Inst,
+                           LoadOwnershipQualifier Qual,
                            MutableArrayRef<AvailableValue> AvailableValueList,
                            SmallVectorImpl<DIMemoryUse> &Uses)
-      : M(Inst->getModule()), B(Inst), Loc(Inst->getLoc()),
+      : M(Inst->getModule()), B(Inst), Loc(Inst->getLoc()), Inst(Inst),
+        TheMemory(TheMemory), Qual(Qual),
         AvailableValueList(AvailableValueList), Uses(Uses) {}
 
   // This is intended to be passed by reference only once constructed.
@@ -374,6 +624,19 @@ public:
   void dump() const __attribute__((used));
 
 private:
+  bool hasOwnership() const { return B.getFunction().hasQualifiedOwnership(); }
+
+  bool isAggregatingForTake() const {
+    switch (Qual) {
+    case LoadOwnershipQualifier::Take:
+      return true;
+    case LoadOwnershipQualifier::Copy:
+    case LoadOwnershipQualifier::Trivial:
+    case LoadOwnershipQualifier::Unqualified:
+      return false;
+    }
+  }
+
   SILValue aggregateFullyAvailableValue(SILType LoadTy, unsigned FirstElt);
   SILValue aggregateTupleSubElts(TupleType *TT, SILType LoadTy,
                                  SILValue Address, unsigned FirstElt);
@@ -381,6 +644,10 @@ private:
                                   SILValue Address, unsigned FirstElt);
   SILValue handlePrimitiveValue(SILType LoadTy, SILValue Address,
                                 unsigned FirstElt);
+  SILValue handlePrimitiveValueNonDestructively(const AvailableValue &Val,
+                                                SILType LoadTy);
+  SILValue handlePrimitiveValueDestructively(const AvailableValue &Val,
+                                             SILType LoadTy);
 };
 
 } // end anonymous namespace
@@ -433,7 +700,8 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType LoadTy,
   auto &FirstVal = AvailableValueList[FirstElt];
 
   // Make sure that the first element is available and is the correct type.
-  if (!FirstVal || FirstVal.getType() != LoadTy)
+  if (!FirstVal || FirstVal.getSubElementNumber() != 0 ||
+      FirstVal.getType() != LoadTy)
     return SILValue();
 
   // If the first element of this value is available, check that any extra
@@ -446,7 +714,51 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType LoadTy,
                    }))
     return SILValue();
 
-  return FirstVal.getValue();
+  // Ok, we have a fully available value! If we do not have ownership or we are
+  // propagating a take, then just return the value.
+  if (!hasOwnership() || isAggregatingForTake())
+    return FirstVal.getValue();
+
+  // On the other hand, if we have ownership, then we need to emit copies before
+  // each insertion point and insert compensating destroys where we do not have
+  // a load.
+  ArrayRef<SILInstruction *> InsertPts = FirstVal.getInsertionPoints();
+
+  llvm::SmallVector<SILBasicBlock *, 8> CompensatingBlocks;
+  findCompensationBlocks(Inst, InsertPts, CompensatingBlocks);
+
+  assert(!InsertPts.empty());
+  if (InsertPts.size() == 1) {
+    SILValue CopiedVal;
+    {
+      SavedInsertionPointRAII SavedInsertPt(B, InsertPts[0]);
+      CopiedVal = B.emitCopyValueOperation(Loc, FirstVal.getValue());
+    }
+
+    for (auto *Block : CompensatingBlocks) {
+      SavedInsertionPointRAII SavedInsertPt(B, &*Block->begin());
+      B.emitDestroyValueOperation(Loc, CopiedVal);
+    }
+
+    return CopiedVal;
+  }
+
+  SILSSAUpdater Updater;
+  Updater.Initialize(LoadTy);
+  for (auto *I : InsertPts) {
+    SavedInsertionPointRAII SavedInsertPt(B, I);
+    SILValue Value = B.emitCopyValueOperation(Loc, FirstVal.getValue());
+    Updater.AddAvailableValue(I->getParent(), Value);
+  }
+
+  // Now add compensating destroys.
+  for (auto *Block : CompensatingBlocks) {
+    SILValue V = Updater.GetValueInMiddleOfBlock(Block);
+    SavedInsertionPointRAII SavedInsertPt(B, &*Block->begin());
+    B.emitDestroyValueOperation(Loc, V);
+  }
+
+  return Updater.GetValueInMiddleOfBlock(B.getInsertionBB());
 }
 
 SILValue AvailableValueAggregator::aggregateTupleSubElts(TupleType *TT,
@@ -496,23 +808,90 @@ SILValue AvailableValueAggregator::aggregateStructSubElts(StructDecl *SD,
   return B.createStruct(Loc, LoadTy, ResultElts);
 }
 
-// We have looked through all of the aggregate values and finally found a
-// "primitive value". If the value is available, use it (extracting if we need
-// to), otherwise emit a load of the value with the appropriate qualifier.
-SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
-                                                        SILValue Address,
-                                                        unsigned FirstElt) {
-  auto &Val = AvailableValueList[FirstElt];
+SILValue AvailableValueAggregator::handlePrimitiveValueNonDestructively(
+    const AvailableValue &Val, SILType LoadTy) {
+  // If we have 1 insertion point, just extract the value and return.
+  //
+  // This saves us from having to spend compile time in the SSA updater in this
+  // case.
+  ArrayRef<SILInstruction *> InsertPts = Val.getInsertionPoints();
+  llvm::SmallVector<SILBasicBlock *, 8> CompensatingBlocks;
+  findCompensationBlocks(Inst, InsertPts, CompensatingBlocks);
 
-  // If the value is not available, load the value and update our use list.
-  if (!Val) {
-    auto *Load =
-        B.createLoad(Loc, Address, LoadOwnershipQualifier::Unqualified);
-    Uses.push_back(DIMemoryUse(Load, DIUseKind::Load, FirstElt,
-                               getNumSubElements(Load->getType(), M)));
-    return Load;
+  if (InsertPts.size() == 1) {
+    SavedInsertionPointRAII SavedInsertPt(B, InsertPts[0]);
+
+    SILValue Value = Val.getValue();
+    if (B.getFunction().hasQualifiedOwnership() &&
+        !Value->getType().isTrivial(M)) {
+      Value = B.createBeginBorrow(Loc, Value);
+    }
+
+    SILValue EltVal =
+        nonDestructivelyExtractSubElement(Val.withReplacement(Value), B, Loc);
+    assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
+
+    if (B.getFunction().hasQualifiedOwnership() &&
+        !Value->getType().isTrivial(M)) {
+      if (Qual == LoadOwnershipQualifier::Copy) {
+        EltVal = B.emitCopyValueOperation(Loc, EltVal);
+
+        for (auto *Block : CompensatingBlocks) {
+          SavedInsertionPointRAII SavedInsertPt(B, &*Block->begin());
+          B.emitDestroyValueOperation(Loc, EltVal);
+        }
+      }
+
+      // And insert the end_borrow.
+      B.emitEndBorrowOperation(Loc, Value, Val.getValue());
+    }
+
+    return EltVal;
   }
 
+  // If we have an available value, then we want to extract the subelement from
+  // the borrowed aggregate before each insertion point.
+  SILSSAUpdater Updater;
+  Updater.Initialize(LoadTy);
+  for (auto *I : Val.getInsertionPoints()) {
+    SavedInsertionPointRAII SavedInsertPt(B, I);
+
+    SILValue Value = Val.getValue();
+    if (B.getFunction().hasQualifiedOwnership() &&
+        !Value->getType().isTrivial(M)) {
+      Value = B.createBeginBorrow(Loc, Value);
+    }
+
+    SILValue EltVal =
+        nonDestructivelyExtractSubElement(Val.withReplacement(Value), B, Loc);
+    assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
+
+    if (B.getFunction().hasQualifiedOwnership() &&
+        !Value->getType().isTrivial(M)) {
+      if (Qual == LoadOwnershipQualifier::Copy) {
+        EltVal = B.emitCopyValueOperation(Loc, EltVal);
+      }
+      // And insert the end_borrow.
+      B.emitEndBorrowOperation(Loc, Value, Val.getValue());
+    }
+    Updater.AddAvailableValue(I->getParent(), EltVal);
+  }
+
+  // Now add compensating destroys.
+  for (auto *Block : CompensatingBlocks) {
+    SILValue V = Updater.GetValueInMiddleOfBlock(Block);
+    SavedInsertionPointRAII SavedInsertPt(B, &*Block->begin());
+    B.emitDestroyValueOperation(Loc, V);
+  }
+
+  // Finally, grab the value from the SSA updater.
+  SILValue EltVal = Updater.GetValueInMiddleOfBlock(B.getInsertionBB());
+  assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
+  return EltVal;
+}
+
+SILValue AvailableValueAggregator::handlePrimitiveValueDestructively(
+    const AvailableValue &Val, SILType LoadTy) {
   // If we have 1 insertion point, just extract the value and return.
   //
   // This saves us from having to spend compile time in the SSA updater in this
@@ -520,7 +899,9 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   ArrayRef<SILInstruction *> InsertPts = Val.getInsertionPoints();
   if (InsertPts.size() == 1) {
     SavedInsertionPointRAII SavedInsertPt(B, InsertPts[0]);
-    SILValue EltVal = nonDestructivelyExtractSubElement(Val, B, Loc);
+    DestructiveSubElementExtractor Extractor(TheMemory, B, Loc,
+                                             AvailableValueList);
+    SILValue EltVal = Extractor.extract(Val);
     assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
     return EltVal;
   }
@@ -531,12 +912,53 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   Updater.Initialize(LoadTy);
   for (auto *I : Val.getInsertionPoints()) {
     SavedInsertionPointRAII SavedInsertPt(B, I);
-    SILValue EltVal = nonDestructivelyExtractSubElement(Val, B, Loc);
+    DestructiveSubElementExtractor Extractor(TheMemory, B, Loc,
+                                             AvailableValueList);
+    SILValue EltVal = Extractor.extract(Val);
     Updater.AddAvailableValue(I->getParent(), EltVal);
   }
 
   // Finally, grab the value from the SSA updater.
   SILValue EltVal = Updater.GetValueInMiddleOfBlock(B.getInsertionBB());
+  assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
+  return EltVal;
+}
+
+// We have looked through all of the aggregate values and finally found a
+// "primitive value". If the value is available, use it (extracting if we need
+// to), otherwise emit a load of the value with the appropriate qualifier.
+SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
+                                                        SILValue Address,
+                                                        unsigned FirstElt) {
+  auto &Val = AvailableValueList[FirstElt];
+
+  // If the value is not available, load the value and update our use list.
+  if (!Val) {
+    LoadInst *LI = nullptr;
+    if (B.getFunction().hasUnqualifiedOwnership()) {
+      LI = B.createLoad(Loc, Address, LoadOwnershipQualifier::Unqualified);
+    } else {
+      LI = B.createTrivialLoadOr(Loc, Address, Qual);
+    }
+    assert(LI);
+
+    Uses.push_back(DIMemoryUse(LI, DIUseKind::Load, FirstElt,
+                               getNumSubElements(LI->getType(), M)));
+    return LI;
+  }
+
+  if (!hasOwnership() || !isAggregatingForTake()) {
+    SILValue EltVal = handlePrimitiveValueNonDestructively(Val, LoadTy);
+    assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
+    return EltVal;
+  }
+
+  // If we are supposed to be performing a take, destructure the value. We
+  // update the available values of the rest of the destructured elements, so
+  // this destructuring will only occur once. The 2nd time around, we will just
+  // use the newly available destructured values.
+  assert(Qual == LoadOwnershipQualifier::Take);
+  SILValue EltVal = handlePrimitiveValueDestructively(Val, LoadTy);
   assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
   return EltVal;
 }
@@ -672,7 +1094,6 @@ bool AllocOptimize::hasEscapedAt(SILInstruction *I) {
   return HasAnyEscape;
 }
 
-
 /// The specified instruction is a non-load access of the element being
 /// promoted.  See if it provides a value or refines the demanded element mask
 /// used for load promotion.
@@ -748,9 +1169,7 @@ void AllocOptimize::updateAvailableValues(
       return;
     }
   }
-  
-  
-  
+
   // TODO: inout apply's should only clobber pieces passed in.
   
   // Otherwise, this is some unknown instruction, conservatively assume that all
@@ -955,21 +1374,23 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   // Aggregate together all of the subelements into something that has the same
   // type as the load did, and emit smaller) loads for any subelements that were
   // not available.
-  auto *Load = cast<LoadInst>(Inst);
-  AvailableValueAggregator Agg(Load, AvailableValues, Uses);
-  SILValue NewVal = Agg.aggregateValues(LoadTy, Load->getOperand(), FirstElt);
+  auto *LI = cast<LoadInst>(Inst);
+  AvailableValueAggregator Agg(TheMemory, LI, LI->getOwnershipQualifier(),
+                               AvailableValues, Uses);
+  SILValue NewVal = Agg.aggregateValues(LoadTy, LI->getOperand(), FirstElt);
 
   ++NumLoadPromoted;
   
   // Simply replace the load.
-  DEBUG(llvm::dbgs() << "  *** Promoting load: " << *Load << "\n");
+  DEBUG(llvm::dbgs() << "  *** Promoting load: " << *LI << "\n");
   DEBUG(llvm::dbgs() << "      To value: " << *NewVal << "\n");
-  
-  Load->replaceAllUsesWith(NewVal);
-  SILValue Addr = Load->getOperand();
-  Load->eraseFromParent();
+
+  LI->replaceAllUsesWith(NewVal);
+  SILValue Addr = LI->getOperand();
+  LI->eraseFromParent();
   if (auto *AddrI = Addr->getDefiningInstruction())
     recursivelyDeleteTriviallyDeadInstructions(AddrI);
+
   return true;
 }
 
@@ -1039,7 +1460,8 @@ void AllocOptimize::promoteDestroyAddr(
   // Aggregate together all of the subelements into something that has the same
   // type as the load did, and emit smaller) loads for any subelements that were
   // not available.
-  AvailableValueAggregator Agg(DAI, AvailableValues, Uses);
+  AvailableValueAggregator Agg(TheMemory, DAI, LoadOwnershipQualifier::Take,
+                               AvailableValues, Uses);
   SILValue NewVal = Agg.aggregateValues(LoadTy, Address, FirstElt);
 
   ++NumDestroyAddrPromoted;
@@ -1134,12 +1556,17 @@ void AllocOptimize::explodeCopyAddr(CopyAddrInst *CAI) {
         Uses.push_back(LoadUse);
       }
       continue;
-      
+
+    case SILInstructionKind::CopyValueInst:
+      llvm_unreachable("Should never see a copy_value here. We use load "
+                       "[copy]");
+
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::StrongRetainInst:
     case SILInstructionKind::StrongReleaseInst:
     case SILInstructionKind::UnownedRetainInst:
     case SILInstructionKind::UnownedReleaseInst:
+    case SILInstructionKind::DestroyValueInst:
     case SILInstructionKind::ReleaseValueInst:   // Destroy overwritten value
       // These are ignored.
       continue;
@@ -1283,7 +1710,7 @@ bool AllocOptimize::doIt() {
       }
     }
   }
-  
+
   // If this is an allocation, try to remove it completely.
   Changed |= tryToRemoveDeadAllocation();
 
@@ -1326,13 +1753,48 @@ static bool optimizeMemoryAllocations(SILFunction &Fn) {
   return Changed;
 }
 
+static void breakCriticalEdgesWithNonTrivialArgs(SILFunction &Fn) {
+  // Find our targets.
+  llvm::SmallVector<std::pair<SILBasicBlock *, unsigned>, 8> Targets;
+  for (auto &Block : Fn) {
+    auto *CBI = dyn_cast<CondBranchInst>(Block.getTerminator());
+    if (!CBI)
+      continue;
+
+    // See if our true index is a critical edge. If so, add block to the list
+    // and continue. If the false edge is also critical, we will handle it at
+    // the same time.
+    if (isCriticalEdge(CBI, CondBranchInst::TrueIdx)) {
+      Targets.emplace_back(&Block, CondBranchInst::TrueIdx);
+    }
+
+    if (!isCriticalEdge(CBI, CondBranchInst::FalseIdx)) {
+      continue;
+    }
+
+    Targets.emplace_back(&Block, CondBranchInst::FalseIdx);
+  }
+
+  for (auto P : Targets) {
+    SILBasicBlock *Block = P.first;
+    unsigned Index = P.second;
+    auto *Result = splitCriticalEdge(Block->getTerminator(), Index);
+    (void)Result;
+    assert(Result);
+  }
+}
+
 namespace {
 
 class PredictableMemoryOptimizations : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
-    if (optimizeMemoryAllocations(*getFunction()))
+    if (optimizeMemoryAllocations(*getFunction())) {
+      // See if we need to break any critical edges with non-trivial
+      // arguments. This is an invariant of the ownership verifier.
+      breakCriticalEdgesWithNonTrivialArgs(*getFunction());
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+    }
   }
 };
 

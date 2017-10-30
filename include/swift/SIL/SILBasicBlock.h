@@ -296,25 +296,17 @@ public:
     });
   }
 
-  using SuccessorBlockListTy =
-    TransformRange<SuccessorListTy,
-                   std::function<SILBasicBlock *(const SILSuccessor &)>>;
-  using ConstSuccessorBlockListTy =
-    TransformRange<ConstSuccessorListTy,
-                   std::function<const SILBasicBlock *(const SILSuccessor &)>>;
+  using SuccessorBlockListTy = TermInst::SuccessorBlockListTy;
+  using ConstSuccessorBlockListTy = TermInst::ConstSuccessorBlockListTy;
 
   /// Return the range of SILBasicBlocks that are successors of this block.
   SuccessorBlockListTy getSuccessorBlocks() {
-    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformRange(getSuccessors(), F);
+    return getTerminator()->getSuccessorBlocks();
   }
 
   /// Return the range of SILBasicBlocks that are successors of this block.
   ConstSuccessorBlockListTy getSuccessorBlocks() const {
-    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformRange(getSuccessors(), F);
+    return getTerminator()->getSuccessorBlocks();
   }
 
   using pred_iterator = SILSuccessor::pred_iterator;

@@ -6161,10 +6161,35 @@ public:
   using ConstSuccessorListTy = ArrayRef<SILSuccessor>;
   using SuccessorListTy = MutableArrayRef<SILSuccessor>;
 
+  bool succ_empty() const { return getSuccessors().empty(); }
+
+  unsigned getNumSuccessors() const { return getSuccessors().size(); }
+
   /// The successor basic blocks of this terminator.
   SuccessorListTy getSuccessors();
   ConstSuccessorListTy getSuccessors() const {
     return const_cast<TermInst*>(this)->getSuccessors();
+  }
+
+  using SuccessorBlockListTy =
+      TransformRange<SuccessorListTy,
+                     std::function<SILBasicBlock *(const SILSuccessor &)>>;
+  using ConstSuccessorBlockListTy =
+      TransformRange<ConstSuccessorListTy, std::function<const SILBasicBlock *(
+                                               const SILSuccessor &)>>;
+
+  /// Return the range of SILBasicBlocks that are successors of this block.
+  SuccessorBlockListTy getSuccessorBlocks() {
+    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformRange(getSuccessors(), F);
+  }
+
+  /// Return the range of SILBasicBlocks that are successors of this block.
+  ConstSuccessorBlockListTy getSuccessorBlocks() const {
+    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformRange(getSuccessors(), F);
   }
 
   DEFINE_ABSTRACT_NON_VALUE_INST_BOILERPLATE(TermInst)
