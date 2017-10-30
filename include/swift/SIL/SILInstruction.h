@@ -47,6 +47,8 @@ class IntegerLiteralExpr;
 class SingleValueInstruction;
 class MultipleValueInstruction;
 class MultipleValueInstructionResult;
+class DestructureTupleInst;
+class DestructureStructInst;
 class NonValueInstruction;
 class SILBasicBlock;
 class SILBuilder;
@@ -7274,6 +7276,11 @@ public:
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::DestructureStructResult;
   }
+
+  DestructureStructInst *getParent();
+  const DestructureStructInst *getParent() const {
+    return const_cast<DestructureStructResult *>(this)->getParent();
+  }
 };
 
 /// Instruction that takes in a struct value and splits the struct into the
@@ -7300,6 +7307,12 @@ public:
   }
 };
 
+// Out of line to work around forward declaration issues.
+inline DestructureStructInst *DestructureStructResult::getParent() {
+  auto *Parent = MultipleValueInstructionResult::getParent();
+  return cast<DestructureStructInst>(Parent);
+}
+
 /// A result for the destructure_tuple instruction. See documentation for
 /// destructure_tuple for more information.
 class DestructureTupleResult final : public MultipleValueInstructionResult {
@@ -7311,6 +7324,11 @@ public:
 
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::DestructureTupleResult;
+  }
+
+  DestructureTupleInst *getParent();
+  const DestructureTupleInst *getParent() const {
+    return const_cast<DestructureTupleResult *>(this)->getParent();
   }
 };
 
@@ -7337,6 +7355,12 @@ public:
     return N->getKind() == SILNodeKind::DestructureTupleInst;
   }
 };
+
+// Out of line to work around forward declaration issues.
+inline DestructureTupleInst *DestructureTupleResult::getParent() {
+  auto *Parent = MultipleValueInstructionResult::getParent();
+  return cast<DestructureTupleInst>(Parent);
+}
 
 } // end swift namespace
 
