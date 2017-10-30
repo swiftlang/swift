@@ -361,7 +361,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     StringRef osName;
     unsigned major, minor, micro;
     if (moduleTarget.isMacOSX()) {
-      osName = swift::prettyPlatformString(PlatformKind::OSX);
+      osName = swift::prettyPlatformString(PlatformKind::macOS);
       moduleTarget.getMacOSXVersion(major, minor, micro);
     } else {
       osName = moduleTarget.getOSName();

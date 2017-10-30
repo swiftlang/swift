@@ -919,10 +919,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       // For each platform version spec in the spec list, create an
       // implicit AvailableAttr for the platform with the introduced
       // version from the spec. For example, if we have
-      //   @available(iOS 8.0, OSX 10.10, *):
+      //   @available(iOS 8.0, macOS 10.10, *):
       // we will synthesize:
       //  @available(iOS, introduced: 8.0)
-      //  @available(OSX, introduced: 10.10)
+      //  @available(macOS, introduced: 10.10)
       //
       // Similarly if we have a language version spec in the spec
       // list, create an implicit AvailableAttr with the specified

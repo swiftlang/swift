@@ -97,7 +97,7 @@ void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
     }
   }
 
-  // Hardcode a particular annoying case in the OS X headers.
+  // Hardcode a particular annoying case in the macOS headers.
   if (decl->getName() == "DYLD_BOOL") {
     kind = EnumKind::Enum;
     return;

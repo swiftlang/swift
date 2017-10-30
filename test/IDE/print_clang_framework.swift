@@ -32,10 +32,10 @@
 // RUN: %FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
 
 // This test is in general platform-independent, but it happens to check
-// printing of @available attributes for OS X, and those are not printed on
+// printing of @available attributes for macOS, and those are not printed on
 // iOS.
 //
-// FIXME: split OS X parts into a separate test.
+// FIXME: split macOS parts into a separate test.
 //
 // REQUIRES: OS=macosx
 

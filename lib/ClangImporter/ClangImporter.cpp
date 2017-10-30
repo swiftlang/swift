@@ -483,7 +483,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-DSWIFT_ENUM_EXTRA=__attribute__((annotate(\""
         SWIFT_NATIVE_ANNOTATION_STRING "\")))",
 
-      // Avoid including the iso646.h header because some headers from OS X
+      // Avoid including the iso646.h header because some headers from macOS
       // frameworks are broken by it.
       "-D_ISO646_H_", "-D__ISO646_H",
 
@@ -1649,7 +1649,7 @@ PlatformAvailability::PlatformAvailability(LangOptions &langOpts) {
              (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
     };
     deprecatedAsUnavailableMessage =
-        "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
+        "APIs deprecated as of macOS 10.9 and earlier are unavailable in Swift";
   }
 }
 

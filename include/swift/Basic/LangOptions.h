@@ -36,7 +36,7 @@ namespace swift {
 
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
-    /// The active os target (OSX, iOS, Linux, etc.)
+    /// The active os target (macOS, iOS, Linux, etc.)
     OS,
     /// The active arch target (x86_64, i386, arm, arm64, etc.)
     Arch,

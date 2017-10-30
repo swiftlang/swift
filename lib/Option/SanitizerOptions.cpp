@@ -159,7 +159,7 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
             + toStringRef(SanitizerKind::Thread)).toStringRef(b2));
   }
 
-  // Thread Sanitizer only works on OS X and the simulators. It's only supported
+  // Thread Sanitizer only works on macOS and the simulators. It's only supported
   // on 64 bit architectures.
   if ((sanitizerSet & SanitizerKind::Thread) &&
       !isTSanSupported(Triple, sanitizerRuntimeLibExists)) {

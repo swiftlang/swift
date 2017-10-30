@@ -24,7 +24,7 @@ namespace swift {
 
 #ifdef __APPLE__
 
-// On OS X and iOS, swift_once_t matches dispatch_once_t.
+// On macOS and iOS, swift_once_t matches dispatch_once_t.
 typedef long swift_once_t;
 
 #elif defined(__CYGWIN__)

@@ -130,7 +130,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
     if (triple.isMacOSX()) {
       if (triple.isMacOSXVersionLT(10, 9))
         diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                       "OS X 10.9");
+                       "macOS 10.9");
     } else if (triple.isiOS()) {
       if (triple.isTvOS()) {
         if (triple.isOSVersionLT(9, 0)) {

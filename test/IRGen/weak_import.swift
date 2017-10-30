@@ -2,7 +2,7 @@
 // RUN: %build-irgen-test-overlays
 //
 // Specify explicit target triples for the deployment target to test weak
-// linking for a symbol introduced in OS X 10.51.
+// linking for a symbol introduced in macOS 10.51.
 //
 // RUN: %target-swift-frontend(mock-sdk: -target x86_64-apple-macosx10.50 -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck -check-prefix=CHECK-10_50 %s
 // RUN: %target-swift-frontend(mock-sdk: -target x86_64-apple-macosx10.51 -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck -check-prefix=CHECK-10_51 %s

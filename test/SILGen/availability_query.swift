@@ -15,7 +15,7 @@ if #available(OSX 10.53.8, iOS 7.1, *) {
 
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK: cond_br [[TRUE]]
-// Since we are compiling for an unmentioned platform (OS X), we check against the minimum
+// Since we are compiling for an unmentioned platform (macOS), we check against the minimum
 // deployment target, which is 10.50
 if #available(iOS 7.1, *) {
 }

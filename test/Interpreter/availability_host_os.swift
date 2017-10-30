@@ -12,9 +12,9 @@
 
 print(mavericks()) // CHECK: {{^9$}}
 print(yosemite()) // CHECK-NEXT: {{^10$}}
-// CHECK-NOT-INFERRED: 'yosemite()' is only available on OS X 10.10 or newer
+// CHECK-NOT-INFERRED: 'yosemite()' is only available on macOS 10.10 or newer
 
 #if FAIL
-print(todosSantos()) // expected-error {{'todosSantos()' is only available on OS X 10.99 or newer}}
+print(todosSantos()) // expected-error {{'todosSantos()' is only available on macOS 10.99 or newer}}
 // expected-note@-1 {{add 'if #available' version check}}
 #endif

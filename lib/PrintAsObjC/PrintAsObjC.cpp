@@ -776,7 +776,7 @@ private:
 
       const char *plat;
       switch (AvAttr->Platform) {
-      case PlatformKind::OSX:
+      case PlatformKind::macOS:
         plat = "macos";
         break;
       case PlatformKind::iOS:
@@ -788,7 +788,7 @@ private:
       case PlatformKind::watchOS:
         plat = "watchos";
         break;
-      case PlatformKind::OSXApplicationExtension:
+      case PlatformKind::macOSApplicationExtension:
         plat = "macos_app_extension";
         break;
       case PlatformKind::iOSApplicationExtension:

@@ -7220,7 +7220,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.attribute.availability,
             key.platform: source.availability.platform.osx,
             key.is_unavailable: 1,
-            key.message: "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift",
+            key.message: "APIs deprecated as of macOS 10.9 and earlier are unavailable in Swift",
             key.deprecated: "10.1"
           }
         ],

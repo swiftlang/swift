@@ -13,7 +13,7 @@
 // RUN: %swiftc_driver -target arm64-apple-ios11.0 %s -### >/dev/null
 
 
-// CHECK-OSX: Swift requires a minimum deployment target of OS X 10.9
+// CHECK-OSX: Swift requires a minimum deployment target of macOS 10.9
 // CHECK-IOS: Swift requires a minimum deployment target of iOS 7
 // CHECK-tvOS: Swift requires a minimum deployment target of tvOS 9.0
 // CHECK-watchOS: Swift requires a minimum deployment target of watchOS 2.0

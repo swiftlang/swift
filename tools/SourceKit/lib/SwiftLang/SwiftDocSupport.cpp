@@ -598,7 +598,7 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = UIdent(); break;
       case PlatformKind::iOS:
         PlatformUID = PlatformIOS; break;
-      case PlatformKind::OSX:
+      case PlatformKind::macOS:
         PlatformUID = PlatformOSX; break;
       case PlatformKind::tvOS:
         PlatformUID = PlatformtvOS; break;
@@ -606,7 +606,7 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = PlatformWatchOS; break;
       case PlatformKind::iOSApplicationExtension:
         PlatformUID = PlatformIOSAppExt; break;
-      case PlatformKind::OSXApplicationExtension:
+      case PlatformKind::macOSApplicationExtension:
         PlatformUID = PlatformOSXAppExt; break;
       case PlatformKind::tvOSApplicationExtension:
         PlatformUID = PlatformtvOSAppExt; break;

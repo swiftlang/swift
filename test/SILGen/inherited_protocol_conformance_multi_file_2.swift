@@ -14,7 +14,7 @@
 // baC
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %S/Inputs/inherited_protocol_conformance_other_file_2_b.swift %s -primary-file %S/Inputs/inherited_protocol_conformance_other_file_2_c.swift -module-name main | %FileCheck %s --check-prefix=FILE_C
 
-// OS X 10.9
+// macOS 10.9
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -primary-file %S/Inputs/inherited_protocol_conformance_other_file_2_c.swift %s %S/Inputs/inherited_protocol_conformance_other_file_2_b.swift -module-name main | %FileCheck %s --check-prefix=FILE_C
 // cAb
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %S/Inputs/inherited_protocol_conformance_other_file_2_c.swift -primary-file %s %S/Inputs/inherited_protocol_conformance_other_file_2_b.swift -module-name main | %FileCheck %s --check-prefix=FILE_A

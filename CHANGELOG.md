@@ -1477,14 +1477,14 @@ Swift 2.0
   For example:
 
   ```swift
-  @available(iOS 8.0, OSX 10.10, *)
+  @available(iOS 8.0, macOS 10.10, *)
   func startUserActivity() -> NSUserActivity {
     ...
   }
   ```
 
   This code fragment indicates that the `startUserActivity()` method is
-  available on iOS 8.0+, on OS X v10.10+, and on all versions of any other
+  available on iOS 8.0+, on macOS v10.10+, and on all versions of any other
   platform. **(20938565)**
 
 * A new `@nonobjc` attribute is introduced to selectively suppress ObjC export
@@ -1529,7 +1529,7 @@ Swift 2.0
   the new `#available()` condition in an if or guard statement. For example:
 
   ```swift
-  if #available(iOS 8.0, OSX 10.10, *) {
+  if #available(iOS 8.0, macOS 10.10, *) {
     // Use Handoff APIs when available.
     let activity =
       NSUserActivity(activityType:"com.example.ShoppingList.view")
@@ -2962,7 +2962,7 @@ Swift 1.1
   unintentionally allowed in previous versions, now cause a
   compilation error.
 
-* OS X apps can now apply the `@NSApplicationMain` attribute to their app delegate
+* macOS apps can now apply the `@NSApplicationMain` attribute to their app delegate
   class in order to generate an implicit `main` for the app. This works like
   the `@UIApplicationMain` attribute for iOS apps.
 
@@ -3801,7 +3801,7 @@ Swift 1.0
 * Swift now supports a `#elseif` form for build configurations, e.g.:
 
     ```swift
-    #if os(OSX)
+    #if os(macOS)
       typealias SKColor = NSColor
     #elseif os(iOS)
       typealias SKColor = UIColor
@@ -4683,7 +4683,7 @@ Swift 1.0
   The argument represents certain static build-time information.
 
   There are currently two supported target configurations:
-    `os`, which can have the values `OSX` or `iOS`
+    `os`, which can have the values `macOS` or `iOS`
     `arch`, which can have the values `i386`, `x86_64`, `arm` and `arm64`
 
   Within the context of an `#if` block's conditional expression, a target
@@ -4699,13 +4699,13 @@ Swift 1.0
     #endif
 
     class C {
-    #if os(OSX)
+    #if os(macOS)
       func foo() {
-        // OSX stuff goes here
+        // macOS stuff goes here
       }
     #else
       func foo() {
-        // non-OSX stuff goes here
+        // non-macOS stuff goes here
       }
     #endif
     }

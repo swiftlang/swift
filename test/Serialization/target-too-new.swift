@@ -7,5 +7,5 @@
 
 // REQUIRES: OS=macosx
 
-// CHECK: :[[@LINE+1]]:8: error: module file's minimum deployment target is OS X v10.50: {{.*}}empty.swiftmodule{{$}}
+// CHECK: :[[@LINE+1]]:8: error: module file's minimum deployment target is macOS v10.50: {{.*}}empty.swiftmodule{{$}}
 import empty

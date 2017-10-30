@@ -545,9 +545,9 @@ private:
         continue;
 
       // FIXME: This is not quite right: we want to handle AppExtensions
-      // properly. For example, on the OSXApplicationExtension platform
-      // we want to chose the OS X spec unless there is an explicit
-      // OSXApplicationExtension spec.
+      // properly. For example, on the macOSApplicationExtension platform
+      // we want to chose the macOS spec unless there is an explicit
+      // macOSApplicationExtension spec.
       if (isPlatformActive(VersionSpec->getPlatform(), TC.getLangOpts())) {
         return VersionSpec;
       }
@@ -1220,8 +1220,8 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     auto Platform = targetPlatform(TC.Context.LangOpts);
     if (RunningVers.getMajor() != RequiredVers.getMajor())
       return false;
-    if ((Platform == PlatformKind::OSX ||
-         Platform == PlatformKind::OSXApplicationExtension) &&
+    if ((Platform == PlatformKind::macOS ||
+         Platform == PlatformKind::macOSApplicationExtension) &&
         !(RunningVers.getMinor().hasValue() &&
           RequiredVers.getMinor().hasValue() &&
           RunningVers.getMinor().getValue() ==

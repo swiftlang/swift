@@ -7018,12 +7018,12 @@ void ClangImporter::Implementation::importAttributes(
       auto platformK =
         llvm::StringSwitch<Optional<PlatformKind>>(Platform)
           .Case("ios", PlatformKind::iOS)
-          .Case("macos", PlatformKind::OSX)
+          .Case("macos", PlatformKind::macOS)
           .Case("tvos", PlatformKind::tvOS)
           .Case("watchos", PlatformKind::watchOS)
           .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
           .Case("macos_app_extension",
-                PlatformKind::OSXApplicationExtension)
+                PlatformKind::macOSApplicationExtension)
           .Case("tvos_app_extension",
                 PlatformKind::tvOSApplicationExtension)
           .Case("watchos_app_extension",
@@ -7079,8 +7079,8 @@ void ClangImporter::Implementation::importAttributes(
       if (C.LangOpts.isSwiftVersion3() && isa<EnumElementDecl>(MappedDecl)) {
         bool downgradeExhaustivity = false;
         switch (*platformK) {
-        case PlatformKind::OSX:
-        case PlatformKind::OSXApplicationExtension:
+        case PlatformKind::macOS:
+        case PlatformKind::macOSApplicationExtension:
           downgradeExhaustivity = (introduced.getMajor() == 10 &&
                                    introduced.getMinor() &&
                                    *introduced.getMinor() == 13);

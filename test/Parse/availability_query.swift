@@ -45,7 +45,7 @@ if #available(iDishwasherOS 10.51) { // expected-error {{unrecognized platform n
 if #available(iDishwasherOS 10.51, *) { // expected-error {{unrecognized platform name 'iDishwasherOS'}}
 }
 
-if #available(OSX 10.51, OSX 10.52, *) {  // expected-error {{version for 'OSX' already specified}}
+if #available(macOS 10.51, macOS 10.52, *) {  // expected-error {{version for 'macOS' already specified}}
 }
 
 if #available(OSX 10.52) { }  // expected-error {{must handle potential future platforms with '*'}} {{24-24=, *}}

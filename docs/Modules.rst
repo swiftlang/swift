@@ -115,7 +115,7 @@ to the declarations in the re-exported modules. ::
 
   @exported import AmericanCheckers
 
-As an example, the "Cocoa" `framework` on OS X exists only to re-export three
+As an example, the "Cocoa" `framework` on macOS exists only to re-export three
 other frameworks: AppKit, Foundation, and CoreData.
 
 Just as certain declarations can be selectively imported from a module, so too
@@ -418,7 +418,7 @@ Glossary
     __ http://clang.llvm.org/docs/Modules.html
 
   framework
-    A mechanism for library distribution on OS X. Traditionally contains header
+    A mechanism for library distribution on macOS. Traditionally contains header
     files describing the library's API, a binary file containing the
     implementation, and a directory containing any resources the library may
     need.

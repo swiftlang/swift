@@ -119,9 +119,9 @@ LangOptions::getPlatformConditionValue(PlatformConditionKind Kind) const {
 
 bool LangOptions::
 checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
-  // Check a special case that "macOS" is an alias of "OSX".
-  if (Kind == PlatformConditionKind::OS && Value == "macOS")
-    return checkPlatformCondition(Kind, "OSX");
+  // Check a special case that "OSX" is an alias of "macOS".
+  if (Kind == PlatformConditionKind::OS && Value == "OSX")
+    return checkPlatformCondition(Kind, "macOS");
 
   for (auto &Opt : reversed(PlatformConditionValues)) {
     if (Opt.first == Kind)
@@ -163,7 +163,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
 
   // Set the "os" platform condition.
   if (Target.isMacOSX())
-    addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
+    addPlatformConditionValue(PlatformConditionKind::OS, "macOS");
   else if (triple.isTvOS())
     addPlatformConditionValue(PlatformConditionKind::OS, "tvOS");
   else if (triple.isWatchOS())
