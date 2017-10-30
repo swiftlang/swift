@@ -23,6 +23,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/IRGen/ValueWitness.h"
 
 #include "Callee.h"
@@ -141,6 +142,30 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(voidTy, args, /*isVarArg*/ false);
   }
 
+  /// int (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases,
+  ///                                M *self)
+  case ValueWitness::GetEnumTagSinglePayload: {
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *indexTy = IGM.Int32Ty;
+    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
+
+    llvm::Type *args[] = { ptrTy, indexTy, metaTy };
+    return llvm::FunctionType::get(indexTy, args, false);
+  }
+
+  /// void (*storeEnumTagSinglePayload)(T* enum, INT_TYPE whichCase,
+  ///                                   UINT_TYPE emptyCases,
+  ///                                   M *self)
+  case ValueWitness::StoreEnumTagSinglePayload: {
+    llvm::Type *voidTy = IGM.VoidTy;
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *indexTy = IGM.Int32Ty;
+    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
+
+    llvm::Type *args[] = { ptrTy, indexTy, indexTy, metaTy };
+    return llvm::FunctionType::get(voidTy, args, false);
+  }
+
   case ValueWitness::Size:
   case ValueWitness::Flags:
   case ValueWitness::Stride:
@@ -148,6 +173,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     // Non-function witnesses all have type size_t.
     return IGM.SizeTy;
   }
+
   llvm_unreachable("bad value witness!");
 }
 
@@ -173,7 +199,14 @@ static llvm::AttributeList getValueWitnessAttrs(IRGenModule &IGM,
   case ValueWitness::GetEnumTag:
   case ValueWitness::GetExtraInhabitantIndex:
   case ValueWitness::StoreExtraInhabitant:
+  case ValueWitness::StoreEnumTagSinglePayload:
     return attrs.addAttribute(ctx, 1, llvm::Attribute::NoAlias);
+
+  case ValueWitness::GetEnumTagSinglePayload:
+    return attrs
+        .addAttribute(ctx, llvm::AttributeList::FunctionIndex,
+                      llvm::Attribute::ReadOnly)
+        .addAttribute(ctx, 1, llvm::Attribute::NoAlias);
 
   // These have two arguments and they don't alias each other.
   case ValueWitness::AssignWithTake:
@@ -245,6 +278,10 @@ static StringRef getValueWitnessLabel(ValueWitness index) {
     return "destructiveProjectEnumData";
   case ValueWitness::DestructiveInjectEnumTag:
     return "destructiveInjectEnumTag";
+  case ValueWitness::GetEnumTagSinglePayload:
+    return "getEnumTagSinglePayload";
+  case ValueWitness::StoreEnumTagSinglePayload:
+    return "storeEnumTagSinglePayload";
   }
   llvm_unreachable("bad value witness index");
 }
@@ -633,6 +670,107 @@ llvm::Value *irgen::emitStoreExtraInhabitantCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {destObject.getAddress(), index, metadata});
   return call;
+}
+
+/// Emit a trampoline to call the getEnumTagSinglePayload witness. API:
+/// INT_TYPE (const T* enum, UINT_TYPE emptyCases, M *self)
+static llvm::Constant *
+getGetEnumTagSinglePayloadTrampolineFn(IRGenModule &IGM) {
+
+  llvm::Type *argTys[] = {IGM.OpaquePtrTy, IGM.Int32Ty, IGM.TypeMetadataPtrTy};
+
+  llvm::SmallString<40> fnName("__swift_getEnumTagSinglePayload");
+
+  auto func = IGM.getOrCreateHelperFunction(
+      fnName, IGM.Int32Ty, argTys,
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        auto *enumAddr = &*(it++);
+        auto *numEmptyCases = &*(it++);
+        auto *metadata = &*(it++);
+        auto &Builder = IGF.Builder;
+        auto witnessFunc = emitLoadOfValueWitnessFunctionFromMetadata(
+            IGF, metadata, ValueWitness::GetEnumTagSinglePayload);
+        auto *result = Builder.CreateCall(witnessFunc,
+                                          {enumAddr, numEmptyCases, metadata});
+        Builder.CreateRet(result);
+      },
+      true /*noinline*/);
+
+  // This function is readonly.
+  cast<llvm::Function>(func)->addFnAttr(llvm::Attribute::ReadOnly);
+  return func;
+}
+
+/// Emit a trampoline to call the storeEnumTagSinglePayload witness. API:
+/// VOID_TYPE (const T* enum, INT_TYPE whichCase, UINT_TYPE emptyCases,
+///            M *self)
+static llvm::Constant *
+getStoreEnumTagSinglePayloadTrampolineFn(IRGenModule &IGM) {
+
+  llvm::Type *argTys[] = {IGM.OpaquePtrTy, IGM.Int32Ty, IGM.Int32Ty,
+                          IGM.TypeMetadataPtrTy};
+
+  llvm::SmallString<40> fnName("__swift_storeEnumTagSinglePayload");
+
+  return IGM.getOrCreateHelperFunction(
+      fnName, IGM.VoidTy, argTys,
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        auto *enumAddr = &*(it++);
+        auto *whichCase = &*(it++);
+        auto *numEmptyCases = &*(it++);
+        auto *metadata = &*(it++);
+        auto &Builder = IGF.Builder;
+        auto witnessFunc = emitLoadOfValueWitnessFunctionFromMetadata(
+            IGF, metadata, ValueWitness::StoreEnumTagSinglePayload);
+        Builder.CreateCall(witnessFunc,
+                           {enumAddr, whichCase, numEmptyCases, metadata});
+        Builder.CreateRetVoid();
+      },
+      true /*noinline*/);
+}
+
+llvm::Value *irgen::emitGetEnumTagSinglePayloadCall(IRGenFunction &IGF,
+                                                    SILType T,
+                                                    llvm::Value *numEmptyCases,
+                                                    Address destObject) {
+  if (!IGF.IGM.getOptions().OptimizeForSize) {
+    llvm::Value *metadata;
+    auto fn = IGF.emitValueWitnessFunctionRef(
+        T, metadata, ValueWitness::GetEnumTagSinglePayload);
+    llvm::CallInst *call = IGF.Builder.CreateCall(
+        fn, {destObject.getAddress(), numEmptyCases, metadata});
+    return call;
+  }
+  auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
+  auto *func = getGetEnumTagSinglePayloadTrampolineFn(IGF.IGM);
+  auto *result = IGF.Builder.CreateCall(
+      func,
+      {IGF.Builder.CreateBitCast(destObject.getAddress(), IGF.IGM.OpaquePtrTy),
+       numEmptyCases, metadata});
+  return result;
+}
+
+llvm::Value *irgen::emitStoreEnumTagSinglePayloadCall(
+    IRGenFunction &IGF, SILType T, llvm::Value *whichCase,
+    llvm::Value *numEmptyCases, Address destObject) {
+  if (!IGF.IGM.getOptions().OptimizeForSize) {
+    llvm::Value *metadata;
+    auto fn = IGF.emitValueWitnessFunctionRef(
+        T, metadata, ValueWitness::StoreEnumTagSinglePayload);
+    llvm::CallInst *call = IGF.Builder.CreateCall(
+        fn, {destObject.getAddress(), whichCase, numEmptyCases, metadata});
+    return call;
+  }
+
+  auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
+  auto *func = getStoreEnumTagSinglePayloadTrampolineFn(IGF.IGM);
+  auto *result = IGF.Builder.CreateCall(
+      func,
+      {IGF.Builder.CreateBitCast(destObject.getAddress(), IGF.IGM.OpaquePtrTy),
+       whichCase, numEmptyCases, metadata});
+  return result;
 }
 
 /// Emit a call to the 'getEnumTag' operation.

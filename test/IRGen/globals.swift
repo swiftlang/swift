@@ -38,7 +38,6 @@ extension A {
 // CHECK: [[FLOAT:%.*]] = type <{ float }>
 
 // CHECK-NOT: TY8
-// CHECK-NOT: TY9
 
 // CHECK: @_T07globals2g0Sivp = hidden global [[INT]] zeroinitializer, align 8
 // CHECK: @_T07globals2g1yt_Siyttvp = hidden global <{ [[INT]] }> zeroinitializer, align 8
