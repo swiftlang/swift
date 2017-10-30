@@ -765,7 +765,9 @@ FUNCTION(ArrayDestroy, swift_arrayDestroy, DefaultCC,
 //                                         const Metadata *result);
 FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, DefaultCC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(), Int32Ty->getPointerTo(),
+         ARGS(SizeTy,
+              TypeMetadataPtrTy->getPointerTo(0),
+              Int32Ty->getPointerTo(0),
               TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 

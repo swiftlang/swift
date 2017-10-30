@@ -147,9 +147,6 @@ public:
       if (flags.isShared())
         printHeader("shared");
 
-      if (flags.isEscaping())
-        printHeader("escaping");
-
       printRec(param.getType());
 
       if (!flags.isNone()) {
