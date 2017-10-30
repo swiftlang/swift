@@ -7084,7 +7084,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       CEA = TSE->getSubExpr();
     // The argument is either a ParenExpr or TupleExpr.
     ArrayRef<Expr *> arguments;
-    ArrayRef<TypeBase *> types;
 
     SmallVector<Expr *, 1> Scratch;
     if (auto *TE = dyn_cast<TupleExpr>(CEA))
