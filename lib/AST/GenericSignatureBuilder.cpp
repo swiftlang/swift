@@ -2315,11 +2315,9 @@ static void addConditionalRequirements(GenericSignatureBuilder &builder,
   // Abstract conformances don't have associated decl-contexts/modules, but also
   // don't have conditional requirements.
   if (conformance.isConcrete()) {
-    auto mod = conformance.getConcrete()->getDeclContext()->getParentModule();
     auto source = FloatingRequirementSource::forInferred(nullptr);
     for (auto requirement : conformance.getConditionalRequirements()) {
-      builder.addRequirement(requirement, source,
-                             /*inferForModule=*/mod);
+      builder.addRequirement(requirement, source, /*inferForModule=*/nullptr);
       ++NumConditionalRequirementsAdded;
     }
   }
@@ -3370,8 +3368,6 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     return ConstraintResult::Resolved;
   }
 
-  auto protoModule = proto->getParentModule();
-
   if (!onlySameTypeConstraints) {
     // Add all of the inherited protocol requirements, recursively.
     if (auto resolver = getLazyResolver())
@@ -3379,7 +3375,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
     auto inheritedReqResult =
       addInheritedRequirements(proto, selfType.getUnresolvedType(), source,
-                               protoModule);
+                               /*inferForModule=*/nullptr);
     if (isErrorResult(inheritedReqResult))
       return inheritedReqResult;
   }
@@ -3394,7 +3390,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
       auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
           source, proto, &req, /*inferred=*/false);
-      addRequirement(&req, innerSource, &protocolSubMap, protoModule);
+      addRequirement(&req, innerSource, &protocolSubMap,
+                     /*inferForModule=*/nullptr);
     }
   }
 
@@ -3516,7 +3513,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       if (!onlySameTypeConstraints) {
         auto assocResult =
           addInheritedRequirements(assocTypeDecl, assocType, source,
-                                   protoModule);
+                                   /*inferForModule=*/nullptr);
         if (isErrorResult(assocResult))
           return assocResult;
       }
@@ -3533,7 +3530,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
           auto innerSource =
             FloatingRequirementSource::viaProtocolRequirement(
                                       source, proto, &req, /*inferred=*/false);
-          addRequirement(&req, innerSource, &protocolSubMap, protoModule);
+          addRequirement(&req, innerSource, &protocolSubMap,
+                         /*inferForModule=*/nullptr);
         }
       }
 
