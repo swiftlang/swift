@@ -166,7 +166,7 @@ LazyTestSuite.test("CollectionOfOne/${name}/Trap")
   ] as [Range<Int>]) {
   r in
   var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
-  let slice = r.count == 0 ? c[0..<0] : c[0..<1]
+  var slice = r.count == 0 ? c[0..<0] : c[0..<1]
   expectCrashLater()
   ${operation}
 }
@@ -597,7 +597,7 @@ extension ReversedCollection where Base : TestProtocol1 {
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Base'.
-extension ReversedIndex where Base : TestProtocol1 {
+extension ReversedCollection.Index where Base : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -619,7 +619,7 @@ extension ReversedRandomAccessCollection where Base : TestProtocol1 {
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Base'.
-extension ReversedRandomAccessIndex where Base : TestProtocol1 {
+extension ReversedRandomAccessCollection.Index where Base : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -964,14 +964,14 @@ tests.test("ReversedCollection") {
   }
 
   checkBidirectionalCollection(
-    "raboof".characters,
-    "foobar".characters.reversed())
+    "raboof",
+    "foobar".reversed())
 
   // Check that the reverse collection is still eager
   do {
     var calls = 0
-    _ = "foobar".characters.reversed().map { _ in calls += 1 }
-    expectEqual("foobar".characters.count, calls)
+    _ = "foobar".reversed().map { _ in calls += 1 }
+    expectEqual("foobar".count, calls)
   }
 }
 
@@ -1007,12 +1007,12 @@ tests.test("ReversedCollection/Lazy") {
 
   do {
     typealias Expected = LazyBidirectionalCollection<
-      ReversedCollection<String.CharacterView>
+      ReversedCollection<String>
     >
 
-    let base = "foobar".characters.lazy.map { $0 }
+    let base = "foobar".lazy.map { $0 }
     typealias Base = LazyMapBidirectionalCollection<
-      String.CharacterView, Character>
+      String, Character>
     ExpectType<Base>.test(base)
 
     typealias LazyReversedBase = LazyBidirectionalCollection<
@@ -1024,7 +1024,7 @@ tests.test("ReversedCollection/Lazy") {
     var calls = 0
     let reversedAndMapped = reversed.map { (x) -> Character in calls += 1; return x }
     expectEqual(0, calls)
-    checkBidirectionalCollection("raboof".characters, reversedAndMapped)
+    checkBidirectionalCollection("raboof", reversedAndMapped)
     expectNotEqual(0, calls)
   }
 }
@@ -1165,7 +1165,7 @@ tests.test("LazyFilterCollection/AssociatedTypes") {
     collectionType: Subject.self,
     iteratorType: LazyFilterIterator<Base.Iterator>.self,
     subSequenceType: LazyFilterCollection<Base.SubSequence>.self,
-    indexType: LazyFilterIndex<Base>.self,
+    indexType: Base.Index.self,
     indexDistanceType: Base.IndexDistance.self,
     indicesType: DefaultIndices<Subject>.self)
 }
@@ -1177,7 +1177,7 @@ tests.test("LazyFilterBidirectionalCollection/AssociatedTypes") {
     collectionType: Subject.self,
     iteratorType: LazyFilterIterator<Base.Iterator>.self,
     subSequenceType: LazyFilterBidirectionalCollection<Base.SubSequence>.self,
-    indexType: LazyFilterIndex<Base>.self,
+    indexType: Base.Index.self,
     indexDistanceType: Base.IndexDistance.self,
     indicesType: DefaultBidirectionalIndices<Subject>.self)
 }

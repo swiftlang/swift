@@ -153,8 +153,7 @@ extension Unicode.DefaultScalarView : BidirectionalCollection {
   public func index(before i: Index) -> Index {
     var parser = Encoding.ReverseParser()
     
-    var more = _ReverseIndexingIterator(
-      _elements: codeUnits, _position: i.codeUnitIndex)
+    var more = codeUnits[..<i.codeUnitIndex].reversed().makeIterator()
     
     switch parser.parseScalar(from: &more) {
     case .valid(let scalarContent):

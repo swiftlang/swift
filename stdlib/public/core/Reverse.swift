@@ -35,119 +35,14 @@ extension MutableCollection where Self : BidirectionalCollection {
   }
 }
 
-/// An iterator that can be much faster than the iterator of a reversed slice.
-// TODO: See about using this in more places
-@_fixed_layout
-public struct _ReverseIndexingIterator<
-  Elements : BidirectionalCollection
-> : IteratorProtocol, Sequence {
-
-  @_inlineable
-  @inline(__always)
-  /// Creates an iterator over the given collection.
-  public /// @testable
-  init(_elements: Elements, _position: Elements.Index) {
-    self._elements = _elements
-    self._position = _position
-  }
-  
-  @_inlineable
-  @inline(__always)
-  public mutating func next() -> Elements.Element? {
-    guard _fastPath(_position != _elements.startIndex) else { return nil }
-    _position = _elements.index(before: _position)
-    return _elements[_position]
-  }
-  
-  @_versioned
-  internal let _elements: Elements
-  @_versioned
-  internal var _position: Elements.Index
-}
+@available(*, deprecated, renamed: "ReversedCollection.Index")
+public typealias ReversedIndex<T: BidirectionalCollection> = ReversedCollection<T>.Index
 
 // FIXME(ABI)#59 (Conditional Conformance): we should have just one type,
 // `ReversedCollection`, that has conditional conformances to
 // `RandomAccessCollection`, and possibly `MutableCollection` and
 // `RangeReplaceableCollection`.
 // rdar://problem/17144340
-
-// FIXME: swift-3-indexing-model - should gyb ReversedXxx & ReversedRandomAccessXxx
-
-/// An index that traverses the same positions as an underlying index,
-/// with inverted traversal direction.
-@_fixed_layout
-public struct ReversedIndex<Base : Collection> : Comparable {
-  /// Creates a new index into a reversed collection for the position before
-  /// the specified index.
-  ///
-  /// When you create an index into a reversed collection using `base`, an
-  /// index from the underlying collection, the resulting index is the
-  /// position of the element *before* the element referenced by `base`. The
-  /// following example creates a new `ReversedIndex` from the index of the
-  /// `"a"` character in a string's character view.
-  ///
-  ///     let name = "Horatio"
-  ///     let aIndex = name.index(of: "a")!
-  ///     // name[aIndex] == "a"
-  ///
-  ///     let reversedName = name.reversed()
-  ///     let i = ReversedIndex<String>(aIndex)
-  ///     // reversedName[i] == "r"
-  ///
-  /// The element at the position created using `ReversedIndex<...>(aIndex)` is
-  /// `"r"`, the character before `"a"` in the `name` string.
-  ///
-  /// - Parameter base: The position after the element to create an index for.
-  @_inlineable
-  public init(_ base: Base.Index) {
-    self.base = base
-  }
-
-  /// The position after this position in the underlying collection.
-  ///
-  /// To find the position that corresponds with this index in the original,
-  /// underlying collection, use that collection's `index(before:)` method
-  /// with the `base` property.
-  ///
-  /// The following example declares a function that returns the index of the
-  /// last even number in the passed array, if one is found. First, the
-  /// function finds the position of the last even number as a `ReversedIndex`
-  /// in a reversed view of the array of numbers. Next, the function calls the
-  /// array's `index(before:)` method to return the correct position in the
-  /// passed array.
-  ///
-  ///     func indexOfLastEven(_ numbers: [Int]) -> Int? {
-  ///         let reversedNumbers = numbers.reversed()
-  ///         guard let i = reversedNumbers.index(where: { $0 % 2 == 0 })
-  ///             else { return nil }
-  ///
-  ///         return numbers.index(before: i.base)
-  ///     }
-  ///
-  ///     let numbers = [10, 20, 13, 19, 30, 52, 17, 40, 51]
-  ///     if let lastEven = indexOfLastEven(numbers) {
-  ///         print("Last even number: \(numbers[lastEven])")
-  ///     }
-  ///     // Prints "Last even number: 40"
-  public let base: Base.Index
-
-  @_inlineable
-  public static func == (
-    lhs: ReversedIndex<Base>,
-    rhs: ReversedIndex<Base>
-  ) -> Bool {
-    return lhs.base == rhs.base
-  }
-
-  @_inlineable
-  public static func < (
-    lhs: ReversedIndex<Base>,
-    rhs: ReversedIndex<Base>
-  ) -> Bool {
-    // Note ReversedIndex has inverted logic compared to base Base.Index
-    return lhs.base > rhs.base
-  }
-}
 
 /// A collection that presents the elements of its base collection
 /// in reverse order.
@@ -169,183 +64,121 @@ public struct ReversedIndex<Base : Collection> : Comparable {
 public struct ReversedCollection<
   Base : BidirectionalCollection
 > : BidirectionalCollection {
+  public let base: Base
+
+  /// A type that represents a valid position in the collection.
+  ///
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
+  public enum Index: Comparable {
+      case position(Base.Index)
+      case end
+
+      public static func < (lhs: Index, rhs: Index) -> Bool {
+          switch (lhs,rhs) {
+          case let (.position(i),.position(j)):
+              return j < i
+          case (.position,.end):
+              return true
+          case (.end, _):
+              return false
+          }
+      }
+
+      public var base: Base.Index {
+          guard case let .position(i) = self
+          else { fatalError("Can't get equivalent of a reversed endIndex") }
+          return i
+      }
+  }
+
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
   /// - Complexity: O(1)
   @_versioned
   @_inlineable
-  internal init(_base: Base) {
-    self._base = _base
+  internal init(base: Base) {
+    self.base = base
   }
-
-  /// A type that represents a valid position in the collection.
-  ///
-  /// Valid indices consist of the position of every element and a
-  /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = ReversedIndex<Base>
 
   public typealias IndexDistance = Base.IndexDistance
-
-  @_fixed_layout
-  public struct Iterator : IteratorProtocol, Sequence {
-    @_inlineable
-    @inline(__always)
-    public /// @testable
-    init(elements: Base, endPosition: Base.Index) {
-      self._elements = elements
-      self._position = endPosition
-    }
-    
-    @_inlineable
-    @inline(__always)
-    public mutating func next() -> Base.Iterator.Element? {
-      guard _fastPath(_position != _elements.startIndex) else { return nil }
-      _position = _elements.index(before: _position)
-      return _elements[_position]
-    }
-    
-    @_versioned
-    internal let _elements: Base
-    @_versioned
-    internal var _position: Base.Index
-  }
-
+  
   @_inlineable
-  @inline(__always)
-  public func makeIterator() -> Iterator {
-    return Iterator(elements: _base, endPosition: _base.endIndex)
-  }
+  public var startIndex: Index { 
+    if base.startIndex == base.endIndex {
+      return .end
+    }
+    else {
+      return .position(base.index(before: base.endIndex)) 
+    }
+  }  
 
-  @_inlineable
-  public var startIndex: Index {
-    return ReversedIndex(_base.endIndex)
-  }
 
   @_inlineable
   public var endIndex: Index {
-    return ReversedIndex(_base.startIndex)
+    return .end
   }
 
-  @_inlineable
-  public func index(after i: Index) -> Index {
-    return ReversedIndex(_base.index(before: i.base))
+  public func index(after: Index) -> Index {
+      switch after {
+      case .end:
+          fatalError("Can't advance beyond endIndex")
+      case let .position(i) where i == base.startIndex:
+          return .end
+      case let .position(i):
+          return .position(base.index(before: i))
+      }
   }
 
-  @_inlineable
-  public func index(before i: Index) -> Index {
-    return ReversedIndex(_base.index(after: i.base))
+  public func index(before: Index) -> Index {
+      switch before {
+      case .end:
+        return .position(base.startIndex)
+      case let .position(i):
+          return .position(base.index(after: i))
+      }
   }
 
   @_inlineable
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    return ReversedIndex(_base.index(i.base, offsetBy: -n))
-  }
-
-  @_inlineable
-  public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
-  ) -> Index? {
-    // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    return _base.index(i.base, offsetBy: -n, limitedBy: limit.base).map { ReversedIndex($0) }
+    switch i {
+    case let .position(j) where n > 0:
+      // go one less, to account for not going one past the base's start
+      let k = base.index(j, offsetBy: -(n-1))
+      // then go one more
+      return k == base.startIndex ? .end : .position(base.index(before: k))
+    case let .position(j):
+      // backwards is easier... it's just forwards. base handles out-of-bounds.
+      return .position(base.index(j, offsetBy: -n))
+    case .end where n == 0:
+      // end offset by nothing is still end
+      return .end
+    case .end where n < 0:
+      // backwards from end by n is base.start offset by one less
+      return .position(base.index(base.startIndex, offsetBy: -(n+1)))
+    case .end:
+      fatalError("Cannot advance beyond endIndex")
+    }
   }
 
   @_inlineable
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    return _base.distance(from: end.base, to: start.base)
+    switch (start,end) {
+    case let (.position(i),.position(j)):
+      return base.distance(from: j, to: i)
+    case (.end,.end):
+      return 0
+    case let (.position(i),.end):
+      return base.distance(from: base.startIndex, to: i) + 1
+    case let (.end,.position(i)):
+      return base.distance(from: i, to: base.endIndex) - 1
+    }
   }
 
   @_inlineable
-  public subscript(position: Index) -> Base.Element {
-    return _base[_base.index(before: position.base)]
-  }
-
-  @_inlineable
-  public subscript(bounds: Range<Index>) -> BidirectionalSlice<ReversedCollection> {
-    return BidirectionalSlice(base: self, bounds: bounds)
-  }
-
-  public let _base: Base
-}
-
-/// An index that traverses the same positions as an underlying index,
-/// with inverted traversal direction.
-@_fixed_layout
-public struct ReversedRandomAccessIndex<
-  Base : RandomAccessCollection
-> : Comparable {
-  /// Creates a new index into a reversed collection for the position before
-  /// the specified index.
-  ///
-  /// When you create an index into a reversed collection using the index
-  /// passed as `base`, an index from the underlying collection, the resulting
-  /// index is the position of the element *before* the element referenced by
-  /// `base`. The following example creates a new `ReversedIndex` from the
-  /// index of the `"a"` character in a string's character view.
-  ///
-  ///     let name = "Horatio"
-  ///     let aIndex = name.index(of: "a")!
-  ///     // name[aIndex] == "a"
-  ///
-  ///     let reversedName = name.reversed()
-  ///     let i = ReversedIndex<String>(aIndex)
-  ///     // reversedName[i] == "r"
-  ///
-  /// The element at the position created using `ReversedIndex<...>(aIndex)` is
-  /// `"r"`, the character before `"a"` in the `name` string. Viewed from the
-  /// perspective of the `reversedCharacters` collection, of course, `"r"` is
-  /// the element *after* `"a"`.
-  ///
-  /// - Parameter base: The position after the element to create an index for.
-  @_inlineable
-  public init(_ base: Base.Index) {
-    self.base = base
-  }
-
-  /// The position after this position in the underlying collection.
-  ///
-  /// To find the position that corresponds with this index in the original,
-  /// underlying collection, use that collection's `index(before:)` method
-  /// with this index's `base` property.
-  ///
-  /// The following example declares a function that returns the index of the
-  /// last even number in the passed array, if one is found. First, the
-  /// function finds the position of the last even number as a `ReversedIndex`
-  /// in a reversed view of the array of numbers. Next, the function calls the
-  /// array's `index(before:)` method to return the correct position in the
-  /// passed array.
-  ///
-  ///     func indexOfLastEven(_ numbers: [Int]) -> Int? {
-  ///         let reversedNumbers = numbers.reversed()
-  ///         guard let i = reversedNumbers.index(where: { $0 % 2 == 0 })
-  ///             else { return nil }
-  ///
-  ///         return numbers.index(before: i.base)
-  ///     }
-  ///
-  ///     let numbers = [10, 20, 13, 19, 30, 52, 17, 40, 51]
-  ///     if let lastEven = indexOfLastEven(numbers) {
-  ///         print("Last even number: \(numbers[lastEven])")
-  ///     }
-  ///     // Prints "Last even number: 40"
-  public let base: Base.Index
-
-  @_inlineable
-  public static func == (
-    lhs: ReversedRandomAccessIndex<Base>,
-    rhs: ReversedRandomAccessIndex<Base>
-  ) -> Bool {
-    return lhs.base == rhs.base
-  }
-
-  @_inlineable
-  public static func < (
-    lhs: ReversedRandomAccessIndex<Base>,
-    rhs: ReversedRandomAccessIndex<Base>
-  ) -> Bool {
-    // Note ReversedRandomAccessIndex has inverted logic compared to base Base.Index
-    return lhs.base > rhs.base
+  public subscript(i: Index) -> Base.Element {
+    return base[i.base]
   }
 }
 
@@ -359,8 +192,33 @@ public struct ReversedRandomAccessIndex<
 public struct ReversedRandomAccessCollection<
   Base : RandomAccessCollection
 > : RandomAccessCollection {
-  // FIXME: swift-3-indexing-model: tests for ReversedRandomAccessIndex and
-  // ReversedRandomAccessCollection.
+  public let base: Base
+
+  /// A type that represents a valid position in the collection.
+  ///
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
+  public enum Index: Comparable {
+      case position(Base.Index)
+      case end
+
+      public static func < (lhs: Index, rhs: Index) -> Bool {
+          switch (lhs,rhs) {
+          case let (.position(i),.position(j)):
+              return j < i
+          case (.position,.end):
+              return true
+          case (.end, _):
+              return false
+          }
+      }
+
+      public var base: Base.Index {
+          guard case let .position(i) = self
+          else { fatalError("Can't get equivalent of a reversed endIndex") }
+          return i
+      }
+  }
 
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
@@ -368,77 +226,85 @@ public struct ReversedRandomAccessCollection<
   /// - Complexity: O(1)
   @_versioned
   @_inlineable
-  internal init(_base: Base) {
-    self._base = _base
+  internal init(base: Base) {
+    self.base = base
   }
-
-  /// A type that represents a valid position in the collection.
-  ///
-  /// Valid indices consist of the position of every element and a
-  /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = ReversedRandomAccessIndex<Base>
 
   public typealias IndexDistance = Base.IndexDistance
-
-  public typealias Indices =
-    DefaultRandomAccessIndices<ReversedRandomAccessCollection<Base>>
-
-  /// A type that provides the sequence's iteration interface and
-  /// encapsulates its iteration state.
-  public typealias Iterator = IndexingIterator<
-    ReversedRandomAccessCollection
-  >
-
+  
   @_inlineable
-  public var startIndex: Index {
-    return ReversedRandomAccessIndex(_base.endIndex)
-  }
+  public var startIndex: Index { 
+    if base.startIndex == base.endIndex {
+      return .end
+    }
+    else {
+      return .position(base.index(before: base.endIndex)) 
+    }
+  }  
 
   @_inlineable
   public var endIndex: Index {
-    return ReversedRandomAccessIndex(_base.startIndex)
+    return .end
   }
 
-  @_inlineable
-  public func index(after i: Index) -> Index {
-    return ReversedRandomAccessIndex(_base.index(before: i.base))
+  public func index(after: Index) -> Index {
+      switch after {
+      case .end:
+          fatalError("Can't advance beyond endIndex")
+      case let .position(i) where i == base.startIndex:
+          return .end
+      case let .position(i):
+          return .position(base.index(before: i))
+      }
   }
 
-  @_inlineable
-  public func index(before i: Index) -> Index {
-    return ReversedRandomAccessIndex(_base.index(after: i.base))
+  public func index(before: Index) -> Index {
+      switch before {
+      case .end:
+        return .position(base.startIndex)
+      case let .position(i):
+          return .position(base.index(after: i))
+      }
   }
 
-  @_inlineable
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    // FIXME: swift-3-indexing-model: tests.
-    return ReversedRandomAccessIndex(_base.index(i.base, offsetBy: -n))
+    switch i {
+    case let .position(j) where n > 0:
+      // go one less, to account for not going one past the base's start
+      let k = base.index(j, offsetBy: -(n-1))
+      // then go one more
+      return k == base.startIndex ? .end : .position(base.index(before: k))
+    case let .position(j):
+      // backwards is easier... it's just forwards. base handles out-of-bounds.
+      return .position(base.index(j, offsetBy: -n))
+    case .end where n == 0:
+      // end offset by nothing is still end
+      return .end
+    case .end where n < 0:
+      // backwards from end by n is base.start offset by one less
+      return .position(base.index(base.startIndex, offsetBy: -(n+1)))
+    case .end:
+      fatalError("Cannot advance beyond endIndex")
+    }
   }
-
-  @_inlineable
-  public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
-  ) -> Index? {
-    // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    // FIXME: swift-3-indexing-model: tests.
-    return _base.index(i.base, offsetBy: -n, limitedBy: limit.base).map { Index($0) }
-  }
-
-  @_inlineable
+  
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    // FIXME: swift-3-indexing-model: tests.
-    return _base.distance(from: end.base, to: start.base)
+    switch (start,end) {
+    case let (.position(i),.position(j)):
+      return base.distance(from: j, to: i)
+    case (.end,.end):
+      return 0
+    case let (.position(i),.end):
+      return base.distance(from: base.startIndex, to: i) + 1
+    case let (.end,.position(i)):
+      return base.distance(from: i, to: base.endIndex) - 1
+    }
   }
 
   @_inlineable
-  public subscript(position: Index) -> Base.Element {
-    return _base[_base.index(before: position.base)]
+  public subscript(i: Index) -> Base.Element {
+    return base[i.base]
   }
-
-  // FIXME: swift-3-indexing-model: the rest of methods.
-
-  public let _base: Base
 }
 
 extension BidirectionalCollection {
@@ -469,7 +335,7 @@ extension BidirectionalCollection {
   /// - Complexity: O(1)
   @_inlineable
   public func reversed() -> ReversedCollection<Self> {
-    return ReversedCollection(_base: self)
+    return ReversedCollection(base: self)
   }
 }
 
@@ -503,7 +369,7 @@ extension RandomAccessCollection {
   /// - Complexity: O(1)
   @_inlineable
   public func reversed() -> ReversedRandomAccessCollection<Self> {
-    return ReversedRandomAccessCollection(_base: self)
+    return ReversedRandomAccessCollection(base: self)
   }
 }
 
@@ -519,7 +385,7 @@ extension LazyCollectionProtocol
   public func reversed() -> LazyBidirectionalCollection<
     ReversedCollection<Elements>
   > {
-    return ReversedCollection(_base: elements).lazy
+    return ReversedCollection(base: elements).lazy
   }
 }
 
@@ -535,7 +401,7 @@ extension LazyCollectionProtocol
   public func reversed() -> LazyRandomAccessCollection<
     ReversedRandomAccessCollection<Elements>
   > {
-    return ReversedRandomAccessCollection(_base: elements).lazy
+    return ReversedRandomAccessCollection(base: elements).lazy
   }
 }
 
