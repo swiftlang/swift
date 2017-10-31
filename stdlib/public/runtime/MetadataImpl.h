@@ -49,7 +49,6 @@
 #endif
 
 #include "WeakReference.h"
-#include "EnumImpl.h"
 
 #include <cstring>
 #include <type_traits>
@@ -612,8 +611,7 @@ struct SwiftAllocator {
 
 /// A CRTP class which provides basic implementations for a number of
 /// value witnesses relating to buffers.
-template <class Impl>
-struct BufferValueWitnessesBase {};
+template <class Impl> struct BufferValueWitnessesBase {};
 
 /// How should a type be packed into a fixed-size buffer?
 enum class FixedPacking {
@@ -739,72 +737,17 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
   }
 };
 
-/// Provides implementations for
-/// getEnumTagSinglePayload/storeEnumTagSinglePayload.
-template<class Impl, size_t Size, size_t Alignment, bool hasExtraInhabitants>
-struct FixedSizeBufferValueWitnesses;
-
-/// A fixed size buffer value witness that can rely on the presents of the extra
-/// inhabitant functions.
-template <class Impl, size_t Size, size_t Alignment>
-struct FixedSizeBufferValueWitnesses<Impl, Size, Alignment,
-                                     true /*hasExtraInhabitants*/>
-    : BufferValueWitnesses<Impl, Size, Alignment> {
-
-  static int getEnumTagSinglePayload(const OpaqueValue *enumAddr,
-                                     unsigned numEmptyCases,
-                                     const Metadata *self) {
-    return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, Size,
-                                       Impl::numExtraInhabitants,
-                                       Impl::getExtraInhabitantIndex);
-  }
-
-  static void storeEnumTagSinglePayload(OpaqueValue *enumAddr, int whichCase,
-                                        unsigned numEmptyCases,
-                                        const Metadata *self) {
-    return storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases,
-                                         self, Size, Impl::numExtraInhabitants,
-                                         Impl::storeExtraInhabitant);
-  }
-};
-
-/// A fixed size buffer value witness that cannot rely on the presents of the
-/// extra inhabitant functions.
-template <class Impl, size_t Size, size_t Alignment>
-struct FixedSizeBufferValueWitnesses<Impl, Size, Alignment,
-                                     false /*hasExtraInhabitants*/>
-    : BufferValueWitnesses<Impl, Size, Alignment> {
-
-  static int getEnumTagSinglePayload(const OpaqueValue *enumAddr,
-                                     unsigned numEmptyCases,
-                                     const Metadata *self) {
-    return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, Size, 0,
-                                       nullptr);
-  }
-
-  static void storeEnumTagSinglePayload(OpaqueValue *enumAddr, int whichCase,
-                                        unsigned numEmptyCases,
-                                        const Metadata *self) {
-    return storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases,
-                                         self, Size, 0, nullptr);
-  }
-};
-
-static constexpr bool hasExtraInhabitants(unsigned numExtraInhabitants) {
-  return numExtraInhabitants != 0;
-}
 /// A class which provides default implementations of various value
 /// witnesses based on a box's value operations.
 ///
 /// The box type has to provide a numExtraInhabitants member, but as
 /// long as it's zero, the rest is fine.
 template <class Box>
-struct ValueWitnesses : FixedSizeBufferValueWitnesses<
-                            ValueWitnesses<Box>, Box::size, Box::alignment,
-                            hasExtraInhabitants(Box::numExtraInhabitants)> {
-  using Base = FixedSizeBufferValueWitnesses<
-      ValueWitnesses<Box>, Box::size, Box::alignment,
-      hasExtraInhabitants(Box::numExtraInhabitants)>;
+struct ValueWitnesses : BufferValueWitnesses<ValueWitnesses<Box>,
+                                             Box::size, Box::alignment>
+{
+  using Base = BufferValueWitnesses<ValueWitnesses<Box>,
+                                    Box::size, Box::alignment>;
 
   static constexpr size_t size = Box::size;
   static constexpr size_t stride = Box::stride;
@@ -915,37 +858,6 @@ struct NonFixedValueWitnesses :
     return (OpaqueValue*) Box::assignWithTake((typename Box::type*) dest,
                                               (typename Box::type*) src,
                                               self);
-  }
-
-  static int getEnumTagSinglePayload(const OpaqueValue *enumAddr,
-                                     unsigned numEmptyCases,
-                                     const Metadata *self) {
-    auto *payloadWitnesses = self->getValueWitnesses();
-    auto size = payloadWitnesses->getSize();
-    auto getExtraInhabitantIndex =
-        (static_cast<const ExtraInhabitantsValueWitnessTable *>(
-             payloadWitnesses)
-             ->getExtraInhabitantIndex);
-
-    return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
-                                       numExtraInhabitants,
-                                       getExtraInhabitantIndex);
-  }
-
-  static void storeEnumTagSinglePayload(OpaqueValue *enumAddr, int whichCase,
-                                        unsigned numEmptyCases,
-                                        const Metadata *self) {
-    auto *payloadWitnesses = self->getValueWitnesses();
-    auto size = payloadWitnesses->getSize();
-    auto numExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
-    auto storeExtraInhabitant =
-        (static_cast<const ExtraInhabitantsValueWitnessTable *>(
-             payloadWitnesses)
-             ->storeExtraInhabitant);
-
-    storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self,
-                                  size, numExtraInhabitants,
-                                  storeExtraInhabitant);
   }
 
   // These should not get instantiated if the type doesn't have extra
