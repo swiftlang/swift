@@ -1744,13 +1744,16 @@ void Serializer::writeMembers(DeclID parentID,
 
     if (auto VD = dyn_cast<ValueDecl>(member)) {
 
-      // Record parent->members in subtable of DeclMemberNames.
-      std::unique_ptr<DeclMembersTable> &memberTable =
-        DeclMemberNames[VD->getBaseName()].second;
-      if (!memberTable) {
-        memberTable = llvm::make_unique<DeclMembersTable>();
+      // Record parent->members in subtable of DeclMemberNames
+      if (VD->hasName() &&
+          !VD->getBaseName().empty()) {
+        std::unique_ptr<DeclMembersTable> &memberTable =
+          DeclMemberNames[VD->getBaseName()].second;
+        if (!memberTable) {
+          memberTable = llvm::make_unique<DeclMembersTable>();
+        }
+        (*memberTable)[parentID].push_back(memberID);
       }
-      (*memberTable)[parentID].push_back(memberID);
 
       // Possibly add a record to ClassMembersForDynamicLookup too.
       if (isClass) {
