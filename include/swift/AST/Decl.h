@@ -2169,9 +2169,14 @@ public:
   /// Objective-C name, if used to satisfy the given requirement.
   bool canInferObjCFromRequirement(ValueDecl *requirement);
 
-  /// Get NameLoc, only valid if !isDeserialized()
-  SourceLoc getNameLoc() const { assert(!wasDeserialized()); return NameLoc; }
-  SourceLoc getLoc() const { assert(!wasDeserialized()); return NameLoc; }
+  /// Get either NameLoc or an empty SourceLog if wasDeserialized()
+  SourceLoc getNameLoc() const {
+    if (wasDeserialized())
+      return SourceLoc();
+    else
+      return NameLoc;
+  }
+  SourceLoc getLoc() const { return getNameLoc(); }
 
   /// Determine whether this Decl was deserialized (and thus DeserializedID is
   /// valid). If not, NameLoc is valid.
