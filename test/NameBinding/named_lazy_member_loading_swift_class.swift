@@ -3,13 +3,10 @@
 // Compile swiftmodule with decl member name tables
 // RUN: %target-swift-frontend -emit-module -o %t/NamedLazyMembers.swiftmodule -enable-named-lazy-member-loading %S/Inputs/NamedLazyMembers/NamedLazyMembers.swift
 //
-// Check that without lazy named member loading, we're importing too much.
+// Check that named-lazy-member-loading reduces the number of Decls deserialized
 // RUN: %target-swift-frontend -typecheck -I %t -typecheck -stats-output-dir %t/stats-pre %s
-// RUN: %utils/process-stats-dir.py --evaluate 'NumDeclsDeserialized > 140' %t/stats-pre
-//
-// Check that with lazy named member loading, we're importing less.
 // RUN: %target-swift-frontend -typecheck -I %t -enable-named-lazy-member-loading -stats-output-dir %t/stats-post %s
-// RUN: %utils/process-stats-dir.py --evaluate 'NumDeclsDeserialized < 125' %t/stats-post
+// RUN: %utils/process-stats-dir.py --evaluate-delta 'NumDeclsDeserialized < -10' %t/stats-pre %t/stats-post
 
 import NamedLazyMembers
 

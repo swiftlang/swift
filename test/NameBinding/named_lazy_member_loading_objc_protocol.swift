@@ -5,13 +5,10 @@
 // Prime module cache
 // RUN: %target-swift-frontend -typecheck -I %S/Inputs/NamedLazyMembers -typecheck %s
 //
-// Check that without lazy named member loading, we're importing too much.
-// RUN: %target-swift-frontend -typecheck -I %S/Inputs/NamedLazyMembers -typecheck -stats-output-dir %t/stats-pre %s
-// RUN: %utils/process-stats-dir.py --evaluate 'NumTotalClangImportedEntities > 35' %t/stats-pre
-//
-// Check that with lazy named member loading, we're importing less.
+// Check that named-lazy-member-loading reduces the number of Decls deserialized
+// RUN: %target-swift-frontend -typecheck -I %S/Inputs/NamedLazyMembers -stats-output-dir %t/stats-pre %s
 // RUN: %target-swift-frontend -typecheck -I %S/Inputs/NamedLazyMembers -enable-named-lazy-member-loading -stats-output-dir %t/stats-post %s
-// RUN: %utils/process-stats-dir.py --evaluate 'NumTotalClangImportedEntities < 20' %t/stats-post
+// RUN: %utils/process-stats-dir.py --evaluate-delta 'NumTotalClangImportedEntities < -10' %t/stats-pre %t/stats-post
 
 import NamedLazyMembers
 
