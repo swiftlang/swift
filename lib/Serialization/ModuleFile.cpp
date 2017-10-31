@@ -768,6 +768,14 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       if (entry.ID == DECL_MEMBER_TABLES_BLOCK_ID) {
         DeclMemberTablesCursor = cursor;
         DeclMemberTablesCursor.EnterSubBlock(DECL_MEMBER_TABLES_BLOCK_ID);
+        llvm::BitstreamEntry subentry;
+        do {
+          // Scan forward, to load the cursor with any abbrevs we'll need while
+          // seeking inside this block later.
+          subentry = DeclMemberTablesCursor.advance(
+            llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
+        } while (!DeclMemberTablesCursor.AtEndOfStream() &&
+                 subentry.Kind != llvm::BitstreamEntry::EndBlock);
       }
       if (cursor.SkipBlock())
         return false;
