@@ -1250,3 +1250,20 @@ bb3:
   return %20 : $()
 }
 
+// Check that we don't CSE open_existential_ref if they are not compeltely equal.
+// CHECK-LABEL: sil @dont_cse_open_existential_ref
+// CHECK: open_existential_ref
+// CHECK: open_existential_ref
+// CHECK: return
+sil @dont_cse_open_existential_ref : $@convention(thin) (@guaranteed Proto & Ping) -> @owned Ping {
+bb0(%0 : $Proto & Ping):
+  %4 = open_existential_ref %0 : $Proto & Ping to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto
+  %5 = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis!1, %4 : $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %6 = apply %5<@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto>(%4) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %9 = open_existential_ref %0 : $Proto & Ping to $@opened("3C038746-BE69-11E7-A5C1-685B35C48C83") Proto & Ping
+  %10 = upcast %9 : $@opened("3C038746-BE69-11E7-A5C1-685B35C48C83") Proto & Ping to $Ping
+  %11 = class_method %10 : $Ping, #Ping.ping!1 : (Ping) -> () -> Ping, $@convention(method) (@guaranteed Ping) -> @owned Ping
+  %12 = apply %11(%10) : $@convention(method) (@guaranteed Ping) -> @owned Ping
+  return %12 : $Ping
+}
+
