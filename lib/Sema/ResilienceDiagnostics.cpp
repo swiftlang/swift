@@ -98,11 +98,16 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
   // Enum cases are handled as part of their containing enum.
   if (isa<EnumElementDecl>(D))
     return false;
-    
+
   // Protocol requirements are not versioned because there's no
   // global entry point.
   if (isa<ProtocolDecl>(D->getDeclContext()) &&
       D->isProtocolRequirement())
+    return false;
+
+  // Dynamic declarations are not versioned because there's no
+  // global entry point.
+  if (D->isDynamic())
     return false;
 
   // FIXME: Figure out what to do with typealiases
