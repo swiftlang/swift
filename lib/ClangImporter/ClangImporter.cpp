@@ -464,11 +464,15 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
   });
 
-  if (LangOpts.EnableObjCInterop)
+  if (LangOpts.EnableObjCInterop) {
     invocationArgStrs.insert(invocationArgStrs.end(),
                              {"-x", "objective-c", "-std=gnu11", "-fobjc-arc"});
-  else
+    if (!triple.isOSDarwin())
+      invocationArgStrs.insert(invocationArgStrs.end(),
+                               {"-fobjc-runtime=ios-6.0"});
+  } else {
     invocationArgStrs.insert(invocationArgStrs.end(), {"-x", "c", "-std=gnu11"});
+  }
 
   // Set C language options.
   if (triple.isOSDarwin()) {
