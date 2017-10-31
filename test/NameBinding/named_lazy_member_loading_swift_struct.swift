@@ -10,6 +10,6 @@
 
 import NamedLazyMembers
 
-public func test(b: BaseClass) {
+public func test(b: BaseStruct) {
   let _ = b.memberFunc1()
 }
