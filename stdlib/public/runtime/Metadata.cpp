@@ -337,7 +337,7 @@ public:
     }
 
     ::ParameterFlags getParameterFlags(unsigned index) const {
-      assert(index < Flags.getNumArguments());
+      assert(index < Flags.getNumParameters());
       auto flags = Flags.hasParameterFlags() ? ParameterFlags[index] : 0;
       return ParameterFlags::fromIntValue(flags);
     }
@@ -358,9 +358,9 @@ public:
     if (auto result = comparePointers(key.getResult(), Data.ResultType))
       return result;
 
-    for (unsigned i = 0, e = keyFlags.getNumArguments(); i != e; ++i) {
+    for (unsigned i = 0, e = keyFlags.getNumParameters(); i != e; ++i) {
       if (auto result = comparePointers(key.getParameters()[i],
-                                        Data.getArguments()[i]))
+                                        Data.getParameters()[i]))
         return result;
 
       if (auto result =
@@ -380,8 +380,8 @@ public:
   }
 
   static size_t getExtraAllocationSize(const FunctionTypeFlags flags) {
-    const auto numParams = flags.getNumArguments();
-    auto size = numParams * sizeof(FunctionTypeMetadata::Argument);
+    const auto numParams = flags.getNumParameters();
+    auto size = numParams * sizeof(FunctionTypeMetadata::Parameter);
     if (flags.hasParameterFlags())
       size += numParams * sizeof(uint32_t);
 
@@ -399,7 +399,7 @@ const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
                                       const Metadata *arg0,
                                       const Metadata *result) {
-  assert(flags.getNumArguments() == 1
+  assert(flags.getNumParameters() == 1
          && "wrong number of arguments in function metadata flags?!");
   const Metadata *parameters[] = { arg0 };
   return swift_getFunctionTypeMetadata(flags, parameters, nullptr, result);
@@ -410,7 +410,7 @@ swift::swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
                                                const Metadata *arg0,
                                                ParameterFlags flags0,
                                                const Metadata *result) {
-  assert(flags.getNumArguments() == 1
+  assert(flags.getNumParameters() == 1
          && "wrong number of arguments in function metadata flags?!");
   const Metadata *parameters[] = { arg0 };
   const uint32_t parameterFlags[] = { flags0.getIntValue() };
@@ -425,7 +425,7 @@ swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
                                       const Metadata *arg0,
                                       const Metadata *arg1,
                                       const Metadata *result) {
-  assert(flags.getNumArguments() == 2
+  assert(flags.getNumParameters() == 2
          && "wrong number of arguments in function metadata flags?!");
   const Metadata *parameters[] = { arg0, arg1 };
   return swift_getFunctionTypeMetadata(flags, parameters, nullptr, result);
@@ -438,7 +438,7 @@ swift::swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
                                                const Metadata *arg1,
                                                ParameterFlags flags1,
                                                const Metadata *result) {
-  assert(flags.getNumArguments() == 2
+  assert(flags.getNumParameters() == 2
          && "wrong number of arguments in function metadata flags?!");
   const Metadata *parameters[] = { arg0, arg1 };
   const uint32_t parameterFlags[] = {
@@ -457,7 +457,7 @@ swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
                                       const Metadata *arg1,
                                       const Metadata *arg2,
                                       const Metadata *result) {
-  assert(flags.getNumArguments() == 3
+  assert(flags.getNumParameters() == 3
          && "wrong number of arguments in function metadata flags?!");
   const Metadata *parameters[] = { arg0, arg1, arg2 };
   return swift_getFunctionTypeMetadata(flags, parameters, nullptr, result);
@@ -472,7 +472,7 @@ swift::swift_getFunctionTypeMetadata3WithFlags(FunctionTypeFlags flags,
                                                const Metadata *arg2,
                                                ParameterFlags flags2,
                                                const Metadata *result) {
-  assert(flags.getNumArguments() == 3
+  assert(flags.getNumParameters() == 3
          && "wrong number of arguments in function metadata flags?!");
   const Metadata *parameters[] = { arg0, arg1, arg2 };
   const uint32_t parameterFlags[] = {
@@ -522,14 +522,14 @@ FunctionCacheEntry::FunctionCacheEntry(Key key) {
     break;
   }
 
-  unsigned numArguments = flags.getNumArguments();
+  unsigned numParameters = flags.getNumParameters();
 
   Data.setKind(MetadataKind::Function);
   Data.Flags = flags;
   Data.ResultType = key.getResult();
 
-  for (unsigned i = 0; i < numArguments; ++i) {
-    Data.getArguments()[i] = key.getParameters()[i];
+  for (unsigned i = 0; i < numParameters; ++i) {
+    Data.getParameters()[i] = key.getParameters()[i];
     if (flags.hasParameterFlags())
       Data.getParameterFlags()[i] = key.getParameterFlags(i).getIntValue();
   }

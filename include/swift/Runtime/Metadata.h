@@ -1745,39 +1745,39 @@ using EnumMetadata = TargetEnumMetadata<InProcess>;
 template <typename Runtime>
 struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
-  using Argument = const TargetMetadata<Runtime> *;
+  using Parameter = const TargetMetadata<Runtime> *;
 
   TargetFunctionTypeFlags<StoredSize> Flags;
 
   /// The type metadata for the result type.
   ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> ResultType;
 
-  TargetPointer<Runtime, Argument> getArguments() {
-    return reinterpret_cast<TargetPointer<Runtime, Argument>>(this + 1);
+  TargetPointer<Runtime, Parameter> getParameters() {
+    return reinterpret_cast<TargetPointer<Runtime, Parameter>>(this + 1);
   }
 
-  TargetPointer<Runtime, const Argument> getArguments() const {
-    return reinterpret_cast<TargetPointer<Runtime, const Argument>>(this + 1);
+  TargetPointer<Runtime, const Parameter> getParameters() const {
+    return reinterpret_cast<TargetPointer<Runtime, const Parameter>>(this + 1);
   }
 
   TargetPointer<Runtime, uint32_t> getParameterFlags() {
     return reinterpret_cast<TargetPointer<Runtime, uint32_t>>(
-                    reinterpret_cast<Argument *>(this + 1) + getNumArguments());
+                  reinterpret_cast<Parameter *>(this + 1) + getNumParameters());
   }
 
   TargetPointer<Runtime, const uint32_t> getParameterFlags() const {
     return reinterpret_cast<TargetPointer<Runtime, const uint32_t>>(
-              reinterpret_cast<const Argument *>(this + 1) + getNumArguments());
+            reinterpret_cast<const Parameter *>(this + 1) + getNumParameters());
   }
 
   ParameterFlags getParameterFlags(unsigned index) const {
-    assert(index < getNumArguments());
+    assert(index < getNumParameters());
     auto flags = hasParameterFlags() ? getParameterFlags()[index] : 0;
     return ParameterFlags::fromIntValue(flags);
   }
 
-  StoredSize getNumArguments() const {
-    return Flags.getNumArguments();
+  StoredSize getNumParameters() const {
+    return Flags.getNumParameters();
   }
   FunctionMetadataConvention getConvention() const {
     return Flags.getConvention();
