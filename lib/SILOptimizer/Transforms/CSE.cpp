@@ -405,12 +405,28 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
       return false;
 
     // Consider the types of two open_existential_ref instructions to be equal,
-    // if the sets of protocols they conform to are equal.
+    // if the sets of protocols they conform to are equal ...
     auto LHSArchetypeTy = LOpen->getType().castTo<ArchetypeType>();
-    auto LHSConformsTo = LHSArchetypeTy->getConformsTo();
     auto RHSArchetypeTy = ROpen->getType().castTo<ArchetypeType>();
+
+    auto LHSConformsTo = LHSArchetypeTy->getConformsTo();
     auto RHSConformsTo = RHSArchetypeTy->getConformsTo();
-    return LHSConformsTo == RHSConformsTo;
+    if (LHSConformsTo != RHSConformsTo)
+      return false;
+
+    // ... and other constraints are equal.
+    if (LHSArchetypeTy->requiresClass() != RHSArchetypeTy->requiresClass())
+      return false;
+
+    if (LHSArchetypeTy->getSuperclass().getPointer() !=
+        RHSArchetypeTy->getSuperclass().getPointer())
+      return false;
+
+    if (LHSArchetypeTy->getLayoutConstraint() !=
+        RHSArchetypeTy->getLayoutConstraint())
+      return false;
+
+    return true;
   }
   return LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI);
 }
