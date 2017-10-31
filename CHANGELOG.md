@@ -22,6 +22,36 @@ CHANGELOG
 Swift 4.1
 ---------
 
+* [SE-0157][] is implemented. Associated types can now declare "recursive"
+	constraints, which require that the associated type conform to the enclosing
+	protocol. The standard library protocols have been updated to make use of
+	recursive constraints. For example, the `SubSequence` associated type of
+	follows the enclosing protocol:
+
+        protocol Sequence {
+          associatedtype Element
+          associatedtype SubSequence: Sequence
+            where SubSequence.Element == Element,
+                  SubSequence.SubSequence == SubSequence
+          // ...
+        }
+
+        protocol Collection: Sequence where Self.SubSequence: Collection {
+          // ...
+        }
+
+  As a result, a number of new constraints have been introduced into the
+	standard library protocols:
+
+	* Make the `Indices` associated type have the same traversal requirements as
+	its enclosing protocol, e.g., `Collection.Indices` conforms to
+	`Collection`, `BidirectionalCollection.Indices` conforms to
+	`BidirectionalCollection`, and so on
+	* Make `Numeric.Magnitude` conform to `Numeric`
+	* Use more efficient `SubSequence` types for lazy filter and map
+	* Eliminate the `*Indexable` protocols
+
+
 * [SE-0161][] is fully implemented. KeyPaths now support subscript, optional
   chaining, and optional force-unwrapping components.
 
