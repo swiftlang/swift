@@ -357,7 +357,6 @@ namespace value_witness_types {
 #define TYPE_TYPE const Metadata *
 #define SIZE_TYPE size_t
 #define INT_TYPE int
-#define UINT_TYPE unsigned
 #define VOID_TYPE void
 #include "swift/ABI/ValueWitness.def"
 

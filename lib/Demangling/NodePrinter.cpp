@@ -149,10 +149,6 @@ static StringRef toString(ValueWitnessKind k) {
     return "destructiveProjectEnumData";
   case ValueWitnessKind::DestructiveInjectEnumTag:
     return "destructiveInjectEnumTag";
-  case ValueWitnessKind::GetEnumTagSinglePayload:
-    return "getEnumTagSinglePayload";
-  case ValueWitnessKind::StoreEnumTagSinglePayload:
-    return "storeEnumTagSinglePayload";
   }
   printer_unreachable("bad value witness kind");
 }
