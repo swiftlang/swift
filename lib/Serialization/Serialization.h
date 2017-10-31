@@ -132,7 +132,7 @@ public:
   using DeclMembersData = SmallVector<DeclID, 2>;
   // In-memory representation of what will eventually be an on-disk
   // hash table of all ValueDecl-members of a paticular DeclBaseName.
-  using DeclMembersTable = llvm::MapVector<DeclID, DeclMembersData>;
+  using DeclMembersTable = llvm::MapVector<uint32_t, DeclMembersData>;
 
   using DeclMemberNamesData = std::pair<serialization::BitOffset,
                                         std::unique_ptr<DeclMembersTable>>;
