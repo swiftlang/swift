@@ -330,7 +330,7 @@ namespace {
       uint32_t dataLength = sizeof(data_type);
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      // No need to write dataLength, it's constant.
       return { keyLength, dataLength };
     }
 
