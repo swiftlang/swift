@@ -354,7 +354,7 @@ private:
   std::unique_ptr<SerializedNestedTypeDeclsTable> NestedTypeDecls;
   std::unique_ptr<SerializedDeclMemberNamesTable> DeclMemberNames;
 
-  llvm::DenseMap<serialization::BitOffset,
+  llvm::DenseMap<uint32_t,
            std::unique_ptr<SerializedDeclMembersTable>> DeclMembersTables;
 
   class ObjCMethodTableInfo;
