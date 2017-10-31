@@ -109,7 +109,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
 
   swift_install_in_component(stdlib
     TARGETS swiftImageInspectionStatic swiftImageInspectionShared
-    DESTINATION "lib/swift_static/${lowercase_sdk}")
+    DESTINATION "lib${SWIFT_LIBDIR_SUFFIX}/swift_static/${lowercase_sdk}")
 
   # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
   set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
@@ -126,7 +126,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
   swift_install_in_component(stdlib
     FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
-    DESTINATION "lib/swift_static/${lowercase_sdk}")
+    DESTINATION "lib${SWIFT_LIBDIR_SUFFIX}/swift_static/${lowercase_sdk}")
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
 
   add_swift_library(swiftImageInspectionShared OBJECT_LIBRARY TARGET_LIBRARY
@@ -215,7 +215,7 @@ foreach(sdk ${ELFISH_SDKS})
             "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
             "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
         DESTINATION
-            "lib/swift/${arch_subdir}")
+            "lib${SWIFT_LIBDIR_SUFFIX}/swift/${arch_subdir}")
 
     if(SWIFT_BUILD_STATIC_STDLIB)
       # Static lib versions of swift_begin.o and swift_end.o
@@ -248,7 +248,7 @@ foreach(sdk ${ELFISH_SDKS})
               "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_begin.o"
               "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_end.o"
           DESTINATION
-              "lib/swift_static/${arch_subdir}")
+              "lib${SWIFT_LIBDIR_SUFFIX}/swift_static/${arch_subdir}")
     endif()
 
   endforeach()

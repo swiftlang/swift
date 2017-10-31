@@ -1979,6 +1979,17 @@ for host in "${ALL_HOSTS[@]}"; do
         product_cmake_options_name=$(to_varname "${product}")_CMAKE_OPTIONS
         product_cmake_options=(${!product_cmake_options_name}) # convert to array
         cmake_options+=("${product_cmake_options[@]}")
+        
+        LIBDIR_SUFFIX=""
+        
+        if [ "${host}" == "linux-x86_64" ] ; then
+            LIBDIR_SUFFIX="64"
+            cmake_options+=(
+            -DLLVM_LIBDIR_SUFFIX="64"
+            -DCLANG_LIBDIR_SUFFIX="64"
+            -DSWIFT_LIBDIR_SUFFIX="64"
+            )
+        fi
 
         case ${product} in
             cmark)
@@ -2557,7 +2568,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 SWIFT_BUILD_PATH=$(build_directory ${host} swift)
                 LIBICU_BUILD_DIR=$(build_directory ${host} ${product})
                 ICU_TMPINSTALL=$LIBICU_BUILD_DIR/tmp_install
-                ICU_TMPLIBDIR="${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                ICU_TMPLIBDIR="${SWIFT_BUILD_PATH}/lib${LIBDIR_SUFFIX}/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                 if [[ "${RECONFIGURE}" || ! -f "${LIBICU_BUILD_DIR}"/config.status ]]; then
                     echo "Reconfiguring libicu"
                     if [[ "$LIBICU_BUILD_TYPE" == "Release" ]] ; then
@@ -2581,9 +2592,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 with_pushd "${LIBICU_BUILD_DIR}" \
                     call make install
-                ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
-                ICU_LIBDIR_STATIC="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}"
-                ICU_LIBDIR_STATIC_ARCH="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                ICU_LIBDIR="$(build_directory ${host} swift)/lib${LIBDIR_SUFFIX}/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                ICU_LIBDIR_STATIC="$(build_directory ${host} swift)/lib${LIBDIR_SUFFIX}/swift_static/${SWIFT_HOST_VARIANT}"
+                ICU_LIBDIR_STATIC_ARCH="$(build_directory ${host} swift)/lib${LIBDIR_SUFFIX}/swift_static/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                 mkdir -p "${ICU_LIBDIR_STATIC_ARCH}"
                 # Copy the static libs into the swift_static directory
                 for l in uc i18n data
@@ -2838,7 +2849,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
                            call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
-                           SWIFTLIBS="${swift_build_dir}/lib/swift" \
+                           SWIFTLIBS="${swift_build_dir}/lib${LIBDIR_SUFFIX}/swift" \
                            "${LLDB_SOURCE_DIR}"/test/dotest.py \
                            --executable "${lldb_executable}" \
                            --rerun-all-issues \
@@ -2913,7 +2924,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
                 with_pushd "${FOUNDATION_SOURCE_DIR}" \
                     call ${NINJA_BIN} TestFoundation
-                call env LD_LIBRARY_PATH="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"/lib/swift/:"${build_dir}/Foundation":"${XCTEST_BUILD_DIR}""${LIBDISPATCH_LIB_DIR}":${LD_LIBRARY_PATH} "${build_dir}"/TestFoundation/TestFoundation
+                call env LD_LIBRARY_PATH="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"/lib${LIBDIR_SUFFIX}/swift/:"${build_dir}/Foundation":"${XCTEST_BUILD_DIR}""${LIBDISPATCH_LIB_DIR}":${LD_LIBRARY_PATH} "${build_dir}"/TestFoundation/TestFoundation
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
@@ -2949,7 +2960,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 continue
                 ;;
            playgroundlogger)
-               SWIFT_DYLIB_PATH=$(build_directory ${host} swift)/lib/swift/macosx/
+               SWIFT_DYLIB_PATH=$(build_directory ${host} swift)/lib${LIBDIR_SUFFIX}/swift/macosx/
                PLAYGROUNDLOGGER_FRAMEWORK_PATH=$(build_directory ${host} ${product})
                set -x
                pushd "${PLAYGROUNDLOGGER_FRAMEWORK_PATH}"
@@ -3164,9 +3175,9 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 echo "--- Installing ${product} ---"
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
-                XCTEST_INSTALL_PREFIX="${host_install_destdir}${host_install_prefix}/lib/swift/${LIB_TARGET}"
+                XCTEST_INSTALL_PREFIX="${host_install_destdir}${host_install_prefix}/lib${LIBDIR_SUFFIX}/swift/${LIB_TARGET}"
                 if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
-                    XCTEST_STATIC_INSTALL_PREFIX="${host_install_destdir}${host_install_prefix}/lib/swift_static/${LIB_TARGET}"
+                    XCTEST_STATIC_INSTALL_PREFIX="${host_install_destdir}${host_install_prefix}/lib${LIBDIR_SUFFIX}/swift_static/${LIB_TARGET}"
                     xctest_static_install="--static-library-install-path=${XCTEST_STATIC_INSTALL_PREFIX}"
                 else
                     xctest_static_install=""
@@ -3240,9 +3251,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 echo "--- Installing ${product} ---"
                 LIBICU_BUILD_DIR=$(build_directory ${host} ${product})
-                ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
-                LIBICU_DEST_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib/swift/${SWIFT_HOST_VARIANT}"
-                LIBICU_DEST_DIR_STATIC="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib/swift_static/${SWIFT_HOST_VARIANT}"
+                ICU_LIBDIR="$(build_directory ${host} swift)/lib${LIBDIR_SUFFIX}/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                LIBICU_DEST_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib${LIBDIR_SUFFIX}/swift/${SWIFT_HOST_VARIANT}"
+                LIBICU_DEST_DIR_STATIC="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib${LIBDIR_SUFFIX}/swift_static/${SWIFT_HOST_VARIANT}"
                 mkdir -p ${LIBICU_DEST_DIR}
                 mkdir -p ${LIBICU_DEST_DIR_STATIC}
                 for l in uc i18n data
@@ -3273,7 +3284,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 set -x
                 case "$(uname -s)" in
                     Linux)
-                        PLAYGROUNDLOGGER_INSTALL_DIR="$(get_host_install_destdir ${host})/$(get_host_install_prefix ${host})/lib/swift/linux"
+                        PLAYGROUNDLOGGER_INSTALL_DIR="$(get_host_install_destdir ${host})/$(get_host_install_prefix ${host})/lib${LIBDIR_SUFFIX}/swift/linux"
                         mkdir -p "${PLAYGROUNDLOGGER_INSTALL_DIR}"
                         cp -R "${PLAYGROUNDLOGGER_BUILD_DIR}"/libPlaygroundLogger.so "${PLAYGROUNDLOGGER_INSTALL_DIR}"
                         ;;

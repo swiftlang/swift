@@ -453,7 +453,7 @@ function (swift_benchmark_compile_archopts)
         "-lobjc"
         "-L${SWIFT_LIBRARY_PATH}/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
         "-Xlinker" "-rpath"
-        "-Xlinker" "@executable_path/../lib/swift/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
+        "-Xlinker" "@executable_path/../lib${SWIFT_LIBDIR_SUFFIX}/swift/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
         ${bench_library_objects}
         ${bench_driver_objects}
         ${SWIFT_BENCH_OBJFILES}
