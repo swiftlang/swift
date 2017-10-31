@@ -197,6 +197,8 @@ inline void storeEnumTagSinglePayloadImpl(
   unsigned numPayloadTagBytes = std::min(size_t(4), payloadSize);
   if (numPayloadTagBytes)
     small_memcpy(valueAddr, &payloadIndex, numPayloadTagBytes, true);
+  if (payloadSize > 4)
+    memset(valueAddr + 4, 0, payloadSize - 4);
   if (numExtraTagBytes)
     small_memcpy(extraTagBitAddr, &extraTagIndex, numExtraTagBytes);
 #endif

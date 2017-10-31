@@ -690,6 +690,12 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
       valueAddr,
       Builder.CreateBitOrPointerCast(payloadIndexAddr, IGM.Int8PtrTy),
       std::min(Size(4U).getValue(), fixedSize), 1);
+  auto *extraZeroAddr =
+      Builder.CreateConstInBoundsGEP1_32(IGM.Int8Ty, valueAddr, 4);
+  if (fixedSize > 4)
+    Builder.CreateMemSet(
+        extraZeroAddr, llvm::ConstantInt::get(IGM.Int8Ty, 0),
+        Builder.CreateSub(size, llvm::ConstantInt::get(size->getType(), 4)), 1);
   emitMemCpy(IGF, extraTagBitsAddr, extraTagIndexAddr, numExtraTagBytes);
   Builder.CreateBr(returnBB);
 
