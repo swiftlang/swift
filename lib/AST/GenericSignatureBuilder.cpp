@@ -6314,7 +6314,7 @@ void GenericSignatureBuilder::enumerateRequirements(
       Type otherSubjectType =
         getUnresolvedType(nextComponent.anchor, genericParams);
       deferredSameTypeRequirement =
-        [&f, subjectType, otherSubjectType, this, genericParams] {
+        [&f, subjectType, otherSubjectType, this] {
           f(RequirementKind::SameType, subjectType, otherSubjectType,
             RequirementSource::forAbstract(*this, otherSubjectType));
         };
