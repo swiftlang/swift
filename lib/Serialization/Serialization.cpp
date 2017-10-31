@@ -327,7 +327,7 @@ namespace {
       if (key.getKind() == DeclBaseName::Kind::Normal) {
         keyLength += key.getIdentifier().str().size(); // The name's length
       }
-      uint32_t dataLength = sizeof(data_type);
+      uint32_t dataLength = sizeof(uint32_t);
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       // No need to write dataLength, it's constant.
@@ -354,7 +354,7 @@ namespace {
                   unsigned len) {
       static_assert(bitOffsetFitsIn32Bits(), "BitOffset too large");
       endian::Writer<little> writer(out);
-      writer.write<data_type>(static_cast<uint32_t>(data));
+      writer.write<uint32_t>(static_cast<uint32_t>(data));
     }
   };
 
