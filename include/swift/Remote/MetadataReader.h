@@ -798,7 +798,7 @@ public:
     }
     case MetadataKind::Function: {
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta);
-      auto numParameters = Function->getNumArguments();
+      auto numParameters = Function->getNumParameters();
 
       std::vector<FunctionParam<BuiltType>> Parameters;
       StoredPointer ArgumentAddress = MetadataAddress +
@@ -836,8 +836,10 @@ public:
       if (!Result)
         return BuiltType();
 
-      auto flags = FunctionTypeFlags().withConvention(Function->getConvention())
-                                      .withThrows(Function->throws());
+      auto flags = FunctionTypeFlags()
+                       .withConvention(Function->getConvention())
+                       .withThrows(Function->throws())
+                       .withParameterFlags(Function->hasParameterFlags());
       auto BuiltFunction =
           Builder.createFunctionType(Parameters, Result, flags);
       TypeCache[MetadataAddress] = BuiltFunction;

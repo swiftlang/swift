@@ -749,7 +749,7 @@ namespace {
       }
 
       auto flagsVal = FunctionTypeFlags()
-                          .withNumArguments(numParams)
+                          .withNumParameters(numParams)
                           .withConvention(metadataConvention)
                           .withThrows(type->throws())
                           .withParameterFlags(hasFlags);
