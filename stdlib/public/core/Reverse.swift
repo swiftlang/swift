@@ -66,6 +66,37 @@ public struct ReversedCollection<
 > : BidirectionalCollection {
   public let base: Base
 
+  @_fixed_layout
+  public struct Iterator: IteratorProtocol, Sequence {
+    @_inlineable
+    @inline(__always)
+    /// Creates an iterator over the given collection.
+    public /// @testable
+    init(elements: Base, position: Base.Index) {
+      self._elements = elements
+      self._position = position
+    }
+
+    @_inlineable
+    @inline(__always)
+    public mutating func next() -> Base.Element? {
+      guard _fastPath(_position != _elements.startIndex) else { return nil }
+      _position = _elements.index(before: _position)
+      return _elements[_position]
+    }
+  
+    @_versioned
+    internal let _elements: Base
+    @_versioned
+    internal var _position: Base.Index
+  }
+  
+  @_inlineable
+  @inline(__always)
+  public func makeIterator() -> Iterator {
+    return Iterator(elements: base, position: base.endIndex)
+  }
+
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -193,6 +224,37 @@ public struct ReversedRandomAccessCollection<
   Base : RandomAccessCollection
 > : RandomAccessCollection {
   public let base: Base
+
+  @_fixed_layout
+  public struct Iterator: IteratorProtocol, Sequence {
+    @_inlineable
+    @inline(__always)
+    /// Creates an iterator over the given collection.
+    public /// @testable
+    init(elements: Base, position: Base.Index) {
+      self._elements = elements
+      self._position = position
+    }
+  
+    @_inlineable
+    @inline(__always)
+    public mutating func next() -> Base.Element? {
+      guard _fastPath(_position != _elements.startIndex) else { return nil }
+      _position = _elements.index(before: _position)
+      return _elements[_position]
+    }
+  
+    @_versioned
+    internal let _elements: Base
+    @_versioned
+    internal var _position: Base.Index
+  }
+  
+  @_inlineable
+  @inline(__always)
+  public func makeIterator() -> Iterator {
+    return Iterator(elements: base, position: base.endIndex)
+  }
 
   /// A type that represents a valid position in the collection.
   ///
