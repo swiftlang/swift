@@ -112,7 +112,7 @@ protected:
   bool isAnchorFunction(SILFunction *F) {
 
     // Functions that may be used externally cannot be removed.
-    if (isPossiblyUsedExternally(F->getLinkage(), Module->isWholeModule()))
+    if (F->isPossiblyUsedExternally())
       return true;
 
     // ObjC functions are called through the runtime and are therefore alive

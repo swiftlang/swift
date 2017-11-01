@@ -96,7 +96,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       Serialized(isSerialized), Thunk(isThunk),
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
-      KeepAsPublic(false), EffectsKindAttr(E), EntryCount(entryCount) {
+      HasCReferences(false), KeepAsPublic(false), EffectsKindAttr(E),
+      EntryCount(entryCount) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -445,18 +446,25 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
   return hasPublicVisibility(getLinkage());
 }
 
-/// Helper method which returns true if the linkage of the SILFunction
-/// indicates that the objects definition might be required outside the
-/// current SILModule.
 bool
 SILFunction::isPossiblyUsedExternally() const {
-  return swift::isPossiblyUsedExternally(getLinkage(),
-                                         getModule().isWholeModule());
+  auto linkage = getLinkage();
+
+  // Hidden functions may be referenced by other C code in the linkage unit.
+  if (linkage == SILLinkage::Hidden && hasCReferences())
+    return true;
+
+  if (getModule().isWholeModule())
+    return linkage <= SILLinkage::Public;
+  else
+    return linkage <= SILLinkage::Hidden;
 }
 
 bool SILFunction::isExternallyUsedSymbol() const {
-  return swift::isPossiblyUsedExternally(getEffectiveSymbolLinkage(),
-                                         getModule().isWholeModule());
+  if (getModule().isWholeModule())
+    return getEffectiveSymbolLinkage() <= SILLinkage::Public;
+  else
+    return getEffectiveSymbolLinkage() <= SILLinkage::Hidden;
 }
 
 void SILFunction::convertToDeclaration() {
