@@ -360,8 +360,6 @@ internal struct UnsafeString {
 
     let unmangedOther = other._unmangedContiguous._unsafelyUnwrappedUnchecked
 
-    // TODO: _copy accomodating a width here is not necessary, because we form
-    // with the right width in `formNative`.
     unmangedOther._copy(
       into: buffer.usedEnd,
       capacityEnd: buffer.capacityEnd,
@@ -685,37 +683,35 @@ extension _StringGuts {
 // String API helpers
 //
 extension _StringGuts {
-  // Convert ourselves (if needed) to a NativeString for appending purposes.
-  // After this call, self is ready to be memcpy-ed into. Returns the pointer to
-  // begin writing to. Adjusts the referenced StringBuffer usedCount.
   @_versioned
   internal
-  mutating func _formNative(
-    forAppending other: _StringGuts
-  ) -> (
-    extraCapacityBegin: UnsafeMutableRawPointer, 
-    capacityEnd: UnsafeMutableRawPointer
-  ) {
-
+  mutating func isUniqueNative() -> Bool {
+    return _isNative && _isUnique(&_object)
+  }
+  
+  // Convert ourselves (if needed) to a NativeString for appending purposes.
+  // After this call, self is ready to be memcpy-ed into. Adjusts the
+  // referenced StringBuffer usedCount.
+  @_versioned
+  internal
+  mutating func _formNative(forAppending other: _StringGuts) {
     let extra = other.count
     let oldCapacity: Int
     let oldCount: Int
-    if _fastPath(_isNative) {
+    let newWidth = Swift.max(self.byteWidth, other.byteWidth)
+    if _fastPath(self.byteWidth == newWidth && isUniqueNative()) {
+      // TODO: width extension can be done in place if there's capacity
       var nativeBuffer = self._native._unsafelyUnwrappedUnchecked.stringBuffer
       oldCapacity = nativeBuffer.capacity
       oldCount = nativeBuffer.usedCount
-      if _fastPath(
-        oldCapacity >= oldCount + extra 
-        && true // FIXME: Do uniqueness checking
-      ) {
-        return (nativeBuffer.usedEnd, nativeBuffer.capacityEnd)
+      if _fastPath(oldCapacity >= oldCount + extra) {
+        return
       }
     } else {
       oldCapacity = 0
       oldCount = self.count
     }
 
-    let newWidth = Swift.max(self.byteWidth, other.byteWidth)
     let newCapacity = Swift.max(
       _growArrayCapacity(oldCapacity), oldCount + extra)
     let newBuffer = _StringBuffer(
@@ -723,15 +719,13 @@ extension _StringGuts {
       initialSize: oldCount,
       elementWidth: newWidth)
 
-    // Copy outselves in
+    // Copy ourselves in
     self._copy(
       into: newBuffer.start,
       capacityEnd: newBuffer.capacityEnd,
       accomodatingElementWidth: self.byteWidth)
 
-    let (usedEnd, capEnd) = (newBuffer.usedEnd, newBuffer.capacityEnd)
     self = _StringGuts(NativeString(newBuffer))
-    return (usedEnd, capEnd)
   }
 
   // Copy in our elements to the new storage
@@ -834,7 +828,7 @@ extension _StringGuts {
     // TODO: Eventual small form check on self and other. We could even do this
     // now for the tagged cocoa strings.
 
-    _ = _formNative(forAppending: other)
+    self._formNative(forAppending: other)
     self._native._unsafelyUnwrappedUnchecked._appendInPlace(other)
   }
 }
