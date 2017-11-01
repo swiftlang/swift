@@ -378,9 +378,9 @@ internal struct UnsafeString {
     unmangedOther._copy(
       into: buffer.usedEnd,
       capacityEnd: buffer.capacityEnd,
-      accomodatingElementWidth: self.byteWidth)
+      accomodatingElementWidth: buffer.elementWidth)
  
-    buffer.usedEnd += otherCount
+    buffer.usedEnd += otherCount &<< buffer.elementShift
     _fixLifetime(other)
   }
 }
@@ -464,7 +464,11 @@ extension _StringGuts {
 
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: NativeString) {
-    self.init(_bridgeObject(fromNativeObject: s.owner), 0)
+    self.init(
+      _unflagged: _bridgeObject(fromNativeObject: s.owner),
+      isSingleByte: s.isSingleByte,
+      hasCocoaBuffer: false,
+      otherBits: 0)
   }
 
   //
@@ -482,7 +486,11 @@ extension _StringGuts {
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: NonTaggedCocoaString) {
     _sanityCheck(!_isObjCTaggedPointer(s.owner))
-    self.init(_bridgeObject(fromNonTaggedObjC: s.owner), 0)
+    self.init(
+      _unflagged: _bridgeObject(fromNonTaggedObjC: s.owner),
+      isSingleByte: false,
+      hasCocoaBuffer: true,
+      otherBits: 0)
   }
 
   //
@@ -719,7 +727,7 @@ extension _StringGuts {
       var nativeBuffer = self._native._unsafelyUnwrappedUnchecked.stringBuffer
       oldCapacity = nativeBuffer.capacity
       oldCount = nativeBuffer.usedCount
-      if _fastPath(oldCapacity >= oldCount + extra) {
+      if _fastPath(oldCapacity > oldCount + extra) {
         return
       }
     } else {
@@ -728,17 +736,20 @@ extension _StringGuts {
     }
 
     let newCapacity = Swift.max(
-      _growArrayCapacity(oldCapacity), oldCount + extra)
+      _growArrayCapacity(oldCapacity),
+      oldCount + extra + 1 // reserve space for nul terminator (TODO)
+    ) 
     let newBuffer = _StringBuffer(
       capacity: newCapacity,
       initialSize: oldCount,
       elementWidth: newWidth)
+    _sanityCheck(newBuffer.capacity >= newCapacity)
 
     // Copy ourselves in
     self._copy(
       into: newBuffer.start,
       capacityEnd: newBuffer.capacityEnd,
-      accomodatingElementWidth: self.byteWidth)
+      accomodatingElementWidth: newWidth)
 
     self = _StringGuts(NativeString(newBuffer))
   }
