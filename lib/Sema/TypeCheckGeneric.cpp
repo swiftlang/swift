@@ -457,7 +457,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   // Check the parameter patterns.
   for (auto params : func->getParameterLists()) {
     // Check the pattern.
-    if (tc.typeCheckParameterList(params, func, TR_AllowIUO,
+    if (tc.typeCheckParameterList(params, func, TypeResolutionOptions(),
                                   resolver))
       badType = true;
 
@@ -932,8 +932,7 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
 
   // Check the element type.
   badType |= tc.validateType(subscript->getElementTypeLoc(), subscript,
-                             TypeResolutionOptions(),
-                             &resolver);
+                             TR_AllowIUO, &resolver);
 
   // Infer requirements from it.
   if (genericParams && builder) {
@@ -951,7 +950,6 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
 
   TypeResolutionOptions options;
   options |= TR_SubscriptParameters;
-  options |= TR_AllowIUO;
 
   badType |= tc.typeCheckParameterList(params, subscript,
                                        options,
