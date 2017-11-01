@@ -7,21 +7,21 @@
 - (nullable id)failAndReturnError:(NSError **)error;
 @end
 
-static id __nullable testSucceed(id <ErrorTest> __nonnull testObj) {
+static id _Nullable testSucceed(id<ErrorTest> _Nonnull testObj) {
   NSError *error = nil;
   return [testObj succeedAndReturnError:&error];
 }
 
-static id __nullable testSucceedIgnoringError(id <ErrorTest> __nonnull testObj) {
+static id _Nullable testSucceedIgnoringError(id<ErrorTest> _Nonnull testObj) {
   return [testObj succeedAndReturnError:NULL];
 }
 
-static id __nullable testFail(id <ErrorTest> __nonnull testObj) {
+static id _Nullable testFail(id<ErrorTest> _Nonnull testObj) {
   NSError *error = nil;
   return [testObj failAndReturnError:&error];
 }
 
-static id __nullable testFailIgnoringError(id <ErrorTest> __nonnull testObj) {
+static id _Nullable testFailIgnoringError(id<ErrorTest> _Nonnull testObj) {
   return [testObj failAndReturnError:NULL];
 }
 
