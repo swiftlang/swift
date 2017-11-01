@@ -1136,7 +1136,6 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
       ReceiverTy = MetaT->getInstanceType();
 
     if (auto TyD = ReceiverTy->getAnyNominal()) {
-      StringRef unused;
       if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationReceivedBy, TyD))
         return true;
       if (isDynamicCall(BaseE, D))
