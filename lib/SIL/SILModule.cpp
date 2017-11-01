@@ -334,10 +334,12 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
+    // Propagate @_semantics.
     auto Attrs = decl->getAttrs();
     for (auto *A : Attrs.getAttributes<SemanticsAttr>())
       F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
 
+    // Propagate @_specialize.
     for (auto *A : Attrs.getAttributes<SpecializeAttr>()) {
       auto *SA = cast<SpecializeAttr>(A);
       auto kind = SA->getSpecializationKind() ==
@@ -347,6 +349,11 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
       F->addSpecializeAttr(SILSpecializeAttr::create(
           *this, SA->getRequirements(), SA->isExported(), kind));
     }
+
+    // @_silgen_name and @_cdecl functions may be called from C code somewhere.
+    if (Attrs.hasAttribute<SILGenNameAttr>() ||
+        Attrs.hasAttribute<CDeclAttr>())
+      F->setHasCReferences(true);
   }
 
   // If this function has a self parameter, make sure that it has a +0 calling
