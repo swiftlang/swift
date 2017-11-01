@@ -271,7 +271,13 @@ internal struct UnsafeString {
         src: self.baseAddress,
         size: UInt(self.sizeInBytes))
     } else {
-      fatalError("TODO: zext loop")
+      _sanityCheck(self.byteWidth == 1 && width == 2)
+      // TODO: performance
+      var dest = dest.assumingMemoryBound(to: UInt16.self)
+      for byte in self.unsafeOneByteString! {
+        dest.pointee = UInt16(truncatingIfNeeded: byte)
+        dest += 1
+      }
     }
   }
 }
