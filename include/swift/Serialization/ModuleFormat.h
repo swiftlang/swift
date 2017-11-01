@@ -440,11 +440,6 @@ enum BlockID {
   /// \sa index_block
   INDEX_BLOCK_ID,
 
-  /// The declaration member-tables index block, a sub-blocb of the index block.
-  ///
-  /// \sa decl_member_tables_block
-  DECL_MEMBER_TABLES_BLOCK_ID,
-
   /// The block for SIL functions.
   ///
   /// \sa sil_block
@@ -468,7 +463,12 @@ enum BlockID {
   /// The comment block, which contains documentation comments.
   ///
   /// \sa comment_block
-  COMMENT_BLOCK_ID
+  COMMENT_BLOCK_ID,
+
+  /// The declaration member-tables index block, a sub-blocb of the index block.
+  ///
+  /// \sa decl_member_tables_block
+  DECL_MEMBER_TABLES_BLOCK_ID
 };
 
 /// The record types within the control block.
@@ -1523,7 +1523,7 @@ namespace index_block {
     NESTED_TYPE_DECLS,
     DECL_MEMBER_NAMES,
 
-    LastRecordKind = PRECEDENCE_GROUPS,
+    LastRecordKind = DECL_MEMBER_NAMES,
   };
   
   constexpr const unsigned RecordIDFieldWidth = 5;
