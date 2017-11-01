@@ -901,6 +901,18 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   Witnesses.flags = layout.flags;
   Witnesses.stride = layout.stride;
 
+  // We have extra inhabitants if the first element does.
+  // FIXME: generalize this.
+  bool hasExtraInhabitants = false;
+  if (auto firstEltEIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
+                             key.Elements[0]->getValueWitnesses())) {
+    hasExtraInhabitants = true;
+    Witnesses.flags = Witnesses.flags.withExtraInhabitants(true);
+    Witnesses.extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
+    Witnesses.storeExtraInhabitant = tuple_storeExtraInhabitant;
+    Witnesses.getExtraInhabitantIndex = tuple_getExtraInhabitantIndex;
+  }
+
   // Copy the function witnesses in, either from the proposed
   // witnesses or from the standard table.
   if (!proposedWitnesses) {
@@ -913,13 +925,13 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
       // into something better).
     } else if (layout.flags.isInlineStorage()
                && layout.flags.isPOD()) {
-      if (layout.size == 8 && layout.flags.getAlignmentMask() == 7)
+      if (!hasExtraInhabitants && layout.size == 8 && layout.flags.getAlignmentMask() == 7)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi64_);
-      else if (layout.size == 4 && layout.flags.getAlignmentMask() == 3)
+      else if (!hasExtraInhabitants && layout.size == 4 && layout.flags.getAlignmentMask() == 3)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi32_);
-      else if (layout.size == 2 && layout.flags.getAlignmentMask() == 1)
+      else if (!hasExtraInhabitants && layout.size == 2 && layout.flags.getAlignmentMask() == 1)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi16_);
-      else if (layout.size == 1)
+      else if (!hasExtraInhabitants && layout.size == 1)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi8_);
       else
         proposedWitnesses = &tuple_witnesses_pod_inline;
@@ -940,16 +952,6 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   Witnesses.LOWER_ID = proposedWitnesses->LOWER_ID;
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
 #include "swift/ABI/ValueWitness.def"
-
-  // We have extra inhabitants if the first element does.
-  // FIXME: generalize this.
-  if (auto firstEltEIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
-                             key.Elements[0]->getValueWitnesses())) {
-    Witnesses.flags = Witnesses.flags.withExtraInhabitants(true);
-    Witnesses.extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
-    Witnesses.storeExtraInhabitant = tuple_storeExtraInhabitant;
-    Witnesses.getExtraInhabitantIndex = tuple_getExtraInhabitantIndex;
-  }
 }
 
 const TupleTypeMetadata *
