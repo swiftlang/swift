@@ -187,14 +187,6 @@ DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
                llvm::cl::init(false),
                llvm::cl::desc("Do not dump AST."));
 
-static llvm::cl::opt<unsigned>
-ASTVerifierProcessCount("ast-verifier-process-count", llvm::cl::Hidden,
-                        llvm::cl::init(1));
-
-static llvm::cl::opt<unsigned>
-ASTVerifierProcessId("ast-verifier-process-id", llvm::cl::Hidden,
-                     llvm::cl::init(1));
-
 static llvm::cl::opt<bool>
 PerformWMO("wmo", llvm::cl::desc("Enable whole-module optimizations"));
 
@@ -305,10 +297,6 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().EnableObjCInterop =
     llvm::Triple(Target).isOSDarwin();
 
-  Invocation.getLangOptions().ASTVerifierProcessCount =
-      ASTVerifierProcessCount;
-  Invocation.getLangOptions().ASTVerifierProcessId =
-      ASTVerifierProcessId;
   Invocation.getLangOptions().EnableSILOpaqueValues = EnableSILOpaqueValues;
 
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
