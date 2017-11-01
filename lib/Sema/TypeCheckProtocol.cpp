@@ -1766,19 +1766,18 @@ namespace {
   ///
   /// This class evaluates true if an error occurred.
   class CheckTypeWitnessResult {
-    NominalTypeDecl *Nominal = nullptr;
+    Type Requirement;
 
   public:
     CheckTypeWitnessResult() { }
+    CheckTypeWitnessResult(Type reqt) : Requirement(reqt) {}
 
-    CheckTypeWitnessResult(NominalTypeDecl *nominal) : Nominal(nominal) {
-      assert(isa<ProtocolDecl>(nominal) || isa<ClassDecl>(nominal));
+    Type getRequirement() const { return Requirement; }
+    bool isConformanceRequirement() const {
+      return Requirement->isExistentialType();
     }
 
-    NominalTypeDecl *getProtocolOrClass() const { return Nominal; }
-    bool isProtocol() const { return isa<ProtocolDecl>(Nominal); }
-
-    explicit operator bool() const { return Nominal != nullptr; }
+    explicit operator bool() const { return !Requirement.isNull(); }
   };
 
   /// The set of associated types that have been inferred by matching
@@ -1814,8 +1813,8 @@ namespace {
         out.indent(indent + 2);
         out << std::get<0>(inferred)->getName() << " := "
             << std::get<1>(inferred).getString();
-        if (auto nominal = std::get<2>(inferred).getProtocolOrClass())
-          out << " [failed constraint " << nominal->getName() << "]";
+        auto type = std::get<2>(inferred).getRequirement();
+        out << " [failed constraint " << type.getString() << "]";
       }
 
       out << ")";
@@ -3558,13 +3557,13 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 
   if (auto superclass = genericSig->getSuperclassBound(depTy)) {
     if (!superclass->isExactSuperclassOf(type))
-      return superclass->getAnyNominal();
+      return superclass;
   }
 
   // Check protocol conformances.
   for (auto reqProto : genericSig->getConformsTo(depTy)) {
     if (!tc.conformsToProtocol(type, reqProto, dc, None))
-      return reqProto;
+      return CheckTypeWitnessResult(reqProto->getDeclaredType());
 
     // FIXME: Why is conformsToProtocol() not enough? The stdlib doesn't
     // build unless we fail here while inferring an associated type
@@ -3580,7 +3579,7 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
           return t.subst(subMap, SubstFlags::UseErrorType)->hasError();
         });
       if (result)
-        return reqProto;
+        return CheckTypeWitnessResult(reqProto->getDeclaredType());
     }
   }
 
@@ -3616,7 +3615,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // Determine which of the candidates is viable.
   SmallVector<std::pair<TypeDecl *, Type>, 2> viable;
-  SmallVector<std::pair<TypeDecl *, NominalTypeDecl *>, 2> nonViable;
+  SmallVector<std::pair<TypeDecl *, CheckTypeWitnessResult>, 2> nonViable;
   for (auto candidate : candidates) {
     // Skip nested generic types.
     if (auto *genericDecl = dyn_cast<GenericTypeDecl>(candidate.first))
@@ -3626,8 +3625,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     // Check this type against the protocol requirements.
     if (auto checkResult = checkTypeWitness(TC, DC, Proto, assocType,
                                             candidate.second)) {
-      auto reqProto = checkResult.getProtocolOrClass();
-      nonViable.push_back({candidate.first, reqProto});
+      nonViable.push_back({candidate.first, checkResult});
     } else {
       viable.push_back(candidate);
     }
@@ -3671,8 +3669,8 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
            candidate.first,
            diag::protocol_witness_nonconform_type,
            candidate.first->getDeclaredInterfaceType(),
-           candidate.second->getDeclaredInterfaceType(),
-           candidate.second->getDeclaredInterfaceType()->is<ProtocolType>());
+           candidate.second.getRequirement(),
+           candidate.second.isConformanceRequirement());
       }
     });
 
@@ -5077,9 +5075,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
                          failedDefaultedWitness,
                          failedDefaultedAssocType->getFullName(),
                          proto->getDeclaredType(),
-                         failedDefaultedResult.getProtocolOrClass()
-                           ->getDeclaredType(),
-                         failedDefaultedResult.isProtocol());
+                         failedDefaultedResult.getRequirement(),
+                         failedDefaultedResult.isConformanceRequirement());
         });
       return;
     }
@@ -5117,8 +5114,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
                            diag::associated_type_deduction_witness_failed,
                            failed.Requirement->getFullName(),
                            failed.TypeWitness,
-                           failed.Result.getProtocolOrClass()->getFullName(),
-                           failed.Result.isProtocol());
+                           failed.Result.getRequirement(),
+                           failed.Result.isConformanceRequirement());
           }
         });
 
