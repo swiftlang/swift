@@ -454,17 +454,12 @@ SILFunction::isPossiblyUsedExternally() const {
   if (linkage == SILLinkage::Hidden && hasCReferences())
     return true;
 
-  if (getModule().isWholeModule())
-    return linkage <= SILLinkage::Public;
-  else
-    return linkage <= SILLinkage::Hidden;
+  return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
 
 bool SILFunction::isExternallyUsedSymbol() const {
-  if (getModule().isWholeModule())
-    return getEffectiveSymbolLinkage() <= SILLinkage::Public;
-  else
-    return getEffectiveSymbolLinkage() <= SILLinkage::Hidden;
+  return swift::isPossiblyUsedExternally(getEffectiveSymbolLinkage(),
+                                         getModule().isWholeModule());
 }
 
 void SILFunction::convertToDeclaration() {
