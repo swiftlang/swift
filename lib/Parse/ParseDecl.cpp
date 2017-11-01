@@ -1663,7 +1663,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
             .fixItReplace(autoclosureEscapingParenRange, " @escaping ");
       }
       Attributes.setAttr(TAK_escaping, Loc);
-    } else if (Attributes.has(TAK_noescape) && !isInSILMode()) {
+    } else if (Attributes.has(TAK_noescape)) {
       diagnose(Loc, diag::attr_noescape_implied_by_autoclosure);
     }
     break;
@@ -1676,7 +1676,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     }
 
     // @noescape after @autoclosure is redundant.
-    if (Attributes.has(TAK_autoclosure) && !isInSILMode()) {
+    if (Attributes.has(TAK_autoclosure)) {
       diagnose(Loc, diag::attr_noescape_implied_by_autoclosure);
     }
 
