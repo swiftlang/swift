@@ -259,6 +259,12 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
+    internal init(_ _guts: _StringGuts) {
+      self.init(_guts, offset: 0, length: _guts.count)
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
     internal init(_ _core: _LegacyStringCore) {
       self.init(_core, offset: 0, length: _core.count)
     }
@@ -308,7 +314,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public var utf16: UTF16View {
     get {
-      return UTF16View(_core)
+      return UTF16View(_guts)
     }
     set {
       self = String(describing: newValue)
