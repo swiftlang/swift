@@ -398,15 +398,15 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   // access if it contains a resilient type.
   if (isa<StructType>(type) || isa<EnumType>(type)) {
     auto nominalType = cast<NominalType>(type);
+    auto *nominalDecl = nominalType->getDecl();
 
     // Imported type metadata always requires an accessor.
-    if (isa<ClangModuleUnit>(nominalType->getDecl()->getModuleScopeContext()))
+    if (isa<ClangModuleUnit>(nominalDecl->getModuleScopeContext()))
       return false;
 
-    // Metadata with a non-trivial parent node always requires an accessor.
-    if (auto parent = nominalType.getParent())
-      if (!isTypeMetadataAccessTrivial(IGM, parent))
-        return false;
+    // Generic type metadata always requires an accessor.
+    if (nominalDecl->isGenericContext())
+      return false;
 
     // Resiliently-sized metadata access always requires an accessor.
     return (IGM.getTypeInfoForUnlowered(type).isFixedSize());
