@@ -1040,7 +1040,7 @@ public:
     // LastExtensionIncluded would only be non-null if this was populated from
     // an IterableDeclContext (though it might still be null in that case).
     assert(LastExtensionIncluded == nullptr);
-    for (auto i : Lookup) {
+    for (auto const &i : Lookup) {
       for (auto d : i.getSecond()) {
         d->ValueDeclBits.AlreadyInLookupTable = false;
       }
@@ -1235,7 +1235,7 @@ void ExtensionDecl::addedMember(Decl *member) {
 // (IDC's) list of Decls is populated. But MemberLookupTable can also be
 // populated incrementally by one-name-at-a-time lookups by lookupDirect, in
 // which case those Decls are _not_ added to the IDC's list. They are cached in
-// the loader they come from, lifecycle-wise, and are added to the the
+// the loader they come from, lifecycle-wise, and are added to the
 // MemberLookupTable to accelerate subsequent retrieval, but the IDC is not
 // considered populated until someone calls getMembers().
 //
@@ -1365,7 +1365,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     for (auto d : *res) {
       LookupTable.getPointer()->addMember(d);
     }
-    // Retry lookup in refeshed table. Note: don't try refactoring this to merge
+    // Retry lookup in refreshed table. Note: don't try refactoring this to merge
     // with the iterator compare-and-return above. There's epoch-based
     // invalidation tracking on DenseMap iterators in assert builds that require
     // us to treat iterators from each probe separately.

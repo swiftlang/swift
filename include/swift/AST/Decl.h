@@ -2169,7 +2169,7 @@ public:
   /// Objective-C name, if used to satisfy the given requirement.
   bool canInferObjCFromRequirement(ValueDecl *requirement);
 
-  /// Get either NameLoc or an empty SourceLog if wasDeserialized()
+  /// Get either NameLoc or an empty SourceLoc if wasDeserialized()
   SourceLoc getNameLoc() const {
     if (wasDeserialized())
       return SourceLoc();
