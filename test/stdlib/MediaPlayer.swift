@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: OS=ios
+// REQUIRES: rdar34462543
 
 import MediaPlayer
 import StdlibUnittest
