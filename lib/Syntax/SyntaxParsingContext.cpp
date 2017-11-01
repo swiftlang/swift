@@ -299,5 +299,9 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
       Parent->ContextData.addPendingSyntax({Start, TokCount,
         makeUnknownSyntax(SyntaxKind::UnknownExpr, SyntaxNodes).getRaw()});
       return;
+    case SyntaxContextKind::Decl:
+      Parent->ContextData.addPendingSyntax({Start, TokCount,
+        makeUnknownSyntax(SyntaxKind::UnknownDecl, SyntaxNodes).getRaw()});
+      return;
   }
 }

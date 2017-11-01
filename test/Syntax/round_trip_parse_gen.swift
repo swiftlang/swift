@@ -1,10 +1,15 @@
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen > %t
-// RUN: diff %t %s
+// RUN: diff -u %t %s
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
-// RUN: diff %t.withkinds %S/Outputs/round_trip_parse_gen.swift.withkinds
+// RUN: diff -u %t.withkinds %S/Outputs/round_trip_parse_gen.swift.withkinds
 
-"String Literal"
-
-""
-
-/*comments*/+3 // comments
+class C {
+  func bar(_ a: Int) {}
+  func foo() {
+    var a = /*comment*/"abc"/*comment*/
+    var b = /*comment*/+2/*comment*/
+    bar(1)
+    bar(+10)
+    bar(-10)
+  }
+}

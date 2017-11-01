@@ -92,6 +92,7 @@ public:
 
 enum class SyntaxContextKind: uint8_t{
   Expr,
+  Decl,
 };
 
 // The base class for contexts that are created from a parent context.
