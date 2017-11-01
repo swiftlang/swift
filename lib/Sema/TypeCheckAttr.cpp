@@ -1892,6 +1892,15 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
     attr->setInvalid();
     return;
   }
+
+  // Symbols of dynamically-dispatched declarations are never referenced
+  // directly, so marking them as @_versioned does not make sense.
+  if (VD->isDynamic()) {
+    TC.diagnose(attr->getLocation(),
+                diag::versioned_dynamic_not_supported);
+    attr->setInvalid();
+    return;
+  }
 }
 
 void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
@@ -1906,10 +1915,20 @@ void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
                   diag::inlineable_stored_property)
         .fixItRemove(attr->getRangeWithAt());
       attr->setInvalid();
+      return;
     }
   }
 
   auto *VD = cast<ValueDecl>(D);
+
+  // Calls to dynamically-dispatched declarations are never devirtualized,
+  // so marking them as @_inlinable does not make sense.
+  if (VD->isDynamic()) {
+    TC.diagnose(attr->getLocation(),
+                diag::inlineable_dynamic_not_supported);
+    attr->setInvalid();
+    return;
+  }
 
   // @_inlineable can only be applied to public or @_versioned
   // declarations.

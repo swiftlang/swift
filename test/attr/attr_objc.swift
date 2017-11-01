@@ -2282,3 +2282,12 @@ class User: NSObject {
     }
   }
 }
+
+// 'dynamic' methods cannot be @_inlineable or @_versioned
+class BadClass {
+  @_inlineable @objc dynamic func badMethod1() {}
+  // expected-error@-1 {{'@_inlineable' attribute cannot be applied to 'dynamic' declarations}}
+
+  @_versioned @objc dynamic func badMethod2() {}
+  // expected-error@-1 {{'@_versioned' attribute cannot be applied to 'dynamic' declarations}}
+}
